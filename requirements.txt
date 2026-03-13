@@ -1,0 +1,11 @@
+torch>=2.0.0
+transformers>=4.40.0
+accelerate>=1.0.0
+roboflow
+opencv-python-headless
+Pillow
+matplotlib
+numpy
+requests
+qwen-vl-utils
+ultralytics
