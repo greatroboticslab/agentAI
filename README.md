@@ -1,126 +1,172 @@
 # Weed Detection LLM Benchmark
 
-Use open-source vision LLMs to detect weeds in agricultural images, compare models, and complement YOLO11n.
+A benchmark framework for evaluating open-source vision LLMs on agricultural weed detection. Uses large vision models as a "second opinion" to correct and supplement YOLO11n detections.
 
-## Project Goal
-
-Use large vision models to **correct and supplement** YOLO11n weed detection:
-- YOLO is fast but may miss weeds or misclassify
-- LLMs provide a "second opinion" with species identification
-- Fusion logic merges both results via IoU matching
-
-## Location
+## Overview
 
 ```
-/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/
+                    +-----------------+
+                    | Roboflow Dataset|
+                    +--------+--------+
+                             |
+                         Download
+                             |
+                    +--------v--------+
+                    | Weed Images     |
+                    +--------+--------+
+                             |
+               +-------------+-------------+
+               |                           |
+      +--------v--------+        +--------v--------+
+      | YOLO11n         |        | Vision LLM      |
+      | (fast, precise) |        | (thorough,       |
+      |                 |        |  species ID)     |
+      +--------+--------+        +--------+--------+
+               |                           |
+               +-------------+-------------+
+                             |
+                    +--------v--------+
+                    | IoU Fusion      |
+                    | - Keep all YOLO |
+                    | - Add LLM-only  |
+                    | - Flag disagree |
+                    +--------+--------+
+                             |
+                    +--------v--------+
+                    | Merged Results  |
+                    | + Upload back   |
+                    +--------+--------+
 ```
+
+**Why both?** YOLO is fast but may miss weeds or misclassify. LLMs provide species-level identification and catch what YOLO misses. The fusion pipeline merges both via IoU matching.
 
 ## Supported Models
 
-| Key | Model | Size | Grounding? | Status |
-|-----|-------|------|-----------|--------|
-| `qwen7b` | Qwen2.5-VL-7B-Instruct | ~14GB | Native bbox | Downloaded |
-| `qwen3b` | Qwen2.5-VL-3B-Instruct | ~6GB | Native bbox | Downloaded |
-| `minicpm` | MiniCPM-V-2.6 | ~16GB | No | Need download |
-| `internvl2` | InternVL2-8B | ~16GB | Partial | Need download |
+| Key | Model | Size | Bounding Box Support |
+|-----|-------|------|---------------------|
+| `qwen7b` | Qwen2.5-VL-7B-Instruct | ~14GB | Native bbox output |
+| `qwen3b` | Qwen2.5-VL-3B-Instruct | ~6GB | Native bbox output |
+| `minicpm` | MiniCPM-V-2.6 | ~16GB | Text-based |
+| `internvl2` | InternVL2-8B | ~16GB | Partial |
+| `florence2` | Florence-2-large | ~1.5GB | Native grounding |
 
-## Files
+## Project Structure
 
-| File | Purpose |
-|------|---------|
-| `roboflow_bridge.py` | **Main tool** - Download from Roboflow, run LLM detection, upload results back |
-| `run_roboflow_bridge.sh` | SLURM batch script for `roboflow_bridge.py` |
-| `config.py` | Model definitions, prompts, paths |
-| `test_hf_models.py` | Benchmark multiple HuggingFace models |
-| `test_ollama.py` | Benchmark models via Ollama |
-| `quick_test.py` | Quick single-image test with Qwen |
-| `visualize_results.py` | Draw bboxes on images, comparison charts |
-| `yolo_llm_fusion.py` | Merge YOLO + LLM detections via IoU |
-| `weed_lable_update_download.py` | YOLO auto-labeling + Roboflow upload tool |
+```
+weed_llm_benchmark/
+  roboflow_bridge.py           # Main pipeline: Roboflow download -> LLM detect -> upload
+  weed_lable_update_download.py # YOLO auto-labeling + Roboflow upload
+  yolo_llm_fusion.py           # Merge YOLO + LLM detections via IoU
+  test_hf_models.py            # Benchmark HuggingFace vision models
+  test_ollama.py               # Benchmark Ollama-served models
+  quick_test.py                # Quick single-image test
+  visualize_results.py         # Draw bboxes on images, comparison charts
+  config.py                    # Model definitions, prompts, shared settings
+  run_roboflow_bridge.sh       # SLURM script: full pipeline
+  run_hf_benchmark.sh          # SLURM script: HF model benchmark
+  run_ollama_benchmark.sh      # SLURM script: Ollama benchmark
+  requirements.txt             # Python dependencies
+```
+
+## Installation
+
+```bash
+git clone https://github.com/YOUR_USERNAME/weed-llm-benchmark.git
+cd weed-llm-benchmark
+pip install -r requirements.txt
+```
 
 ## Quick Start
 
-### Interactive mode (need GPU node)
+### 1. Full Pipeline (download -> detect -> upload)
+
+**Interactive mode** (on a GPU node):
 ```bash
-salloc --partition=GPU-shared --gpus=v100-32:1 --cpus-per-task=5 --mem=40G --time=02:00:00
-conda activate qwen
-cd /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark
 python roboflow_bridge.py
 ```
-Menu lets you: pick Roboflow project, choose model, auto-upload results.
+The menu lets you: pick a Roboflow project, choose a model, run detection, and auto-upload results.
 
-### SLURM batch mode
+**Command line**:
 ```bash
-cd /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark
-
-# Test with different models (submit multiple in parallel)
-sbatch run_roboflow_bridge.sh weed2okok 1 qwen7b
-sbatch run_roboflow_bridge.sh weed2okok 1 qwen3b
-sbatch run_roboflow_bridge.sh weed2okok 1 minicpm
-
-# Monitor
-squeue -u byler
-tail -30 slurm_roboflow_JOBID.out
+python roboflow_bridge.py --all --project weed2okok --version 1 --model-key qwen7b
 ```
 
-Upload project auto-named with model: e.g. `weed2okok-qwen25-vl-7b`
+### 2. YOLO Auto-Labeling
 
-### Quick single-image test
+Use a trained YOLO model to auto-label images and upload to Roboflow:
 ```bash
-# On GPU node
-conda activate qwen
-python quick_test.py --image images/your_photo.jpg --model qwen7b
+python weed_lable_update_download.py
 ```
 
-## Roboflow Setup
+### 3. Benchmark Models
 
-- Workspace: `mtsu-2h73y`
-- API key stored in: `.roboflow_key` (auto-prompted on first run)
-- Get new key at: https://app.roboflow.com/settings/api
+Compare multiple vision LLMs on the same dataset:
+```bash
+# HuggingFace models
+python test_hf_models.py --image images/weed1.jpg --model qwen7b
+python test_hf_models.py --image-dir images/ --model all
 
-## Conda Environment
-
-Primary env: `qwen` (Python 3.10)
-- transformers 5.0.0.dev0
-- torch 2.5.1 + CUDA
-- accelerate 1.13.0
-- roboflow, opencv-python-headless
-
-Fix broken pip: `python -m pip install --force-reinstall pip`
-
-## SLURM Settings (Bridges-2)
-
-```
---partition=GPU-shared
---gpus=v100-32:1
---cpus-per-task=5      # max 5 per GPU on Bridges-2
---mem=40G
---time=04:00:00
+# Ollama models
+python test_ollama.py --image images/weed1.jpg --model all
 ```
 
-## Output Structure
+### 4. YOLO + LLM Fusion
 
-```
-llm_labeled/
-  qwen25-vl-7b/           # per-model output
-    detected/
-      images/              # images with detections
-      labels/              # YOLO format .txt labels
-    no_detection/
-      images/
-    visualized/            # images with drawn bboxes
-    detection_results.json # full results with raw LLM responses
-```
-
-## YOLO + LLM Fusion
-
+Merge YOLO detections with LLM detections:
 ```bash
 python yolo_llm_fusion.py --image photo.jpg --yolo-results yolo_output.json --model qwen7b
 ```
 
 Fusion strategy:
-1. Keep all YOLO detections (precise bboxes)
-2. LLM reviews same image, finds additional weeds
+1. Keep all YOLO detections (precise bboxes from trained model)
+2. LLM reviews same image independently
 3. IoU matching merges overlapping detections
 4. LLM-only detections flagged as "YOLO missed"
-5. Disagreements flagged for review
+5. Disagreements flagged for human review
+
+### 5. Visualize Results
+
+```bash
+python visualize_results.py --results results/hf_benchmark_*.json
+```
+
+## SLURM (Bridges-2 HPC)
+
+Submit batch jobs on PSC Bridges-2:
+
+```bash
+# Full pipeline with different models
+sbatch run_roboflow_bridge.sh weed2okok 1 qwen7b
+sbatch run_roboflow_bridge.sh weed2okok 1 qwen3b
+
+# Benchmark only
+sbatch run_hf_benchmark.sh qwen7b
+sbatch run_ollama_benchmark.sh all
+
+# Monitor
+squeue -u $USER
+tail -30 slurm_roboflow_JOBID.out
+```
+
+Resource settings: `GPU-shared`, 1x V100-32GB, 5 CPUs, 40GB RAM, 4hr limit.
+
+## Roboflow Integration
+
+- Workspace: `mtsu-2h73y`
+- API key is auto-prompted on first run and saved locally in `.roboflow_key`
+- Get a key at: https://app.roboflow.com/settings/api
+- Upload project is auto-named with model info (e.g., `weed2okok-qwen25-vl-7b`)
+
+## Output Structure
+
+```
+llm_labeled/
+  qwen25-vl-7b/                  # per-model output
+    detected/
+      images/                    # images with detections
+      labels/                    # YOLO-format .txt labels
+    no_detection/
+      images/                    # images with no plants found
+    visualized/                  # images with drawn bboxes
+    detection_results.json       # full results with raw LLM responses
+```
