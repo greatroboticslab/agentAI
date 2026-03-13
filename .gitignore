@@ -1,0 +1,22 @@
+# API keys
+.roboflow_key
+
+# Data & outputs (downloadable/regenerable)
+downloads/
+llm_labeled/
+images/
+results/
+
+# SLURM logs
+slurm_*.out
+slurm_*.err
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
