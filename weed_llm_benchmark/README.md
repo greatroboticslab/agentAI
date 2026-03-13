@@ -96,7 +96,7 @@ MODEL_SHORTCUTS["your_model"] = {
 weed_llm_benchmark/
   roboflow_bridge.py           # Main pipeline: Roboflow download -> LLM detect -> upload
   weed_lable_update_download.py # YOLO auto-labeling + Roboflow upload
-  yolo_llm_fusion.py           # Merge YOLO + LLM detections via IoU
+  yolo_llm_fusion.py           # YOLO + LLM fusion module (standalone, future integration)
   test_hf_models.py            # Benchmark HuggingFace vision models
   test_ollama.py               # Benchmark Ollama-served models
   quick_test.py                # Quick single-image test
@@ -106,6 +106,7 @@ weed_llm_benchmark/
   run_hf_benchmark.sh          # SLURM script: HF model benchmark
   run_ollama_benchmark.sh      # SLURM script: Ollama benchmark
   requirements.txt             # Python dependencies
+  CHANGELOG.md                 # Development history
 ```
 
 ## Installation

@@ -38,9 +38,8 @@
 - Each model's output saved in separate directory under `llm_labeled/`
 
 ## TODO
+- [ ] Add quantitative evaluation against ground truth (precision, recall, mAP)
 - [ ] Test qwen3b, minicpm, internvl2 on same dataset and compare
-- [ ] Add Florence-2 support (best for pure detection/grounding)
-- [ ] Add Grounding DINO as non-LLM detector option
+- [ ] Integrate YOLO + LLM fusion into main pipeline
+- [ ] Add Grounding DINO as non-LLM baseline detector
 - [ ] Fine-tune best model on labeled weed data
-- [ ] Implement full YOLO + LLM fusion pipeline with real YOLO results
-- [ ] Add Ollama-based models (qwen2.5vl via ollama, moondream)
