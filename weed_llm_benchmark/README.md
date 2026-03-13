@@ -40,15 +40,55 @@ A benchmark framework for evaluating open-source vision LLMs on agricultural wee
 
 **Why both?** YOLO is fast but may miss weeds or misclassify. LLMs provide species-level identification and catch what YOLO misses. The fusion pipeline merges both via IoU matching.
 
-## Supported Models
+## Model Support
 
-| Key | Model | Size | Bounding Box Support |
-|-----|-------|------|---------------------|
-| `qwen7b` | Qwen2.5-VL-7B-Instruct | ~14GB | Native bbox output |
-| `qwen3b` | Qwen2.5-VL-3B-Instruct | ~6GB | Native bbox output |
-| `minicpm` | MiniCPM-V-2.6 | ~16GB | Text-based |
-| `internvl2` | InternVL2-8B | ~16GB | Partial |
-| `florence2` | Florence-2-large | ~1.5GB | Native grounding |
+The framework is **model-agnostic** — the core pipeline (prompt -> JSON response -> extract bboxes -> YOLO format -> upload) works with any vision LLM. Two integration paths are provided:
+
+- **Ollama**: Plug-and-play. Any vision model served by Ollama works out of the box — just specify the model name (e.g., `--model llava-next:13b`). No code changes needed.
+- **HuggingFace Transformers**: Requires a lightweight adapter (~20-30 lines) per model family for loading and inference. The rest of the pipeline is shared.
+
+### Pre-configured Models
+
+| Key | Model | Size | Bounding Box Support | Backend |
+|-----|-------|------|---------------------|---------|
+| `qwen7b` | Qwen2.5-VL-7B-Instruct | ~14GB | Native bbox output | HuggingFace |
+| `qwen3b` | Qwen2.5-VL-3B-Instruct | ~6GB | Native bbox output | HuggingFace |
+| `minicpm` | MiniCPM-V-2.6 | ~16GB | Text-based | HuggingFace |
+| `internvl2` | InternVL2-8B | ~16GB | Partial | HuggingFace |
+| `florence2` | Florence-2-large | ~1.5GB | Native grounding | HuggingFace |
+| `qwen2.5vl:7b` | Qwen2.5-VL-7B | ~6GB | Native bbox | Ollama |
+| `qwen2.5vl:3b` | Qwen2.5-VL-3B | ~3.2GB | Native bbox | Ollama |
+| `moondream` | Moondream2 1.8B | ~1.7GB | detect() API | Ollama |
+| `llama3.2-vision:11b` | Llama 3.2 Vision 11B | ~7GB | Text-based | Ollama |
+| `minicpm-v` | MiniCPM-V | ~5GB | Text-based | Ollama |
+| `llava:13b` | LLaVA 1.5 13B | ~8GB | Text-based | Ollama |
+| `llava:34b` | LLaVA 1.6 34B | ~20GB | Text-based | Ollama |
+
+### Adding a New Model
+
+**Ollama** — no code changes, just run:
+```bash
+python test_ollama.py --image images/weed1.jpg --model <any-ollama-vision-model>
+```
+
+**HuggingFace** — add a loader and inferencer in `test_hf_models.py`:
+```python
+# 1. Write a load/infer function pair
+def load_your_model(model_name):
+    ...
+    return model, processor
+
+def infer_your_model(model, processor, image_path, prompt):
+    ...
+    return response_text
+
+# 2. Register it
+MODEL_SHORTCUTS["your_model"] = {
+    "full_name": "org/YourModel",
+    "loader": load_your_model,
+    "inferencer": infer_your_model,
+}
+```
 
 ## Project Structure
 
@@ -71,8 +111,8 @@ weed_llm_benchmark/
 ## Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/weed-llm-benchmark.git
-cd weed-llm-benchmark
+git clone https://github.com/greatroboticslab/agentAI.git
+cd agentAI/weed_llm_benchmark
 pip install -r requirements.txt
 ```
 
