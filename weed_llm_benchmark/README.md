@@ -1,44 +1,44 @@
 # Weed Detection LLM Benchmark
 
-A benchmark framework for evaluating open-source vision LLMs on agricultural weed detection. Uses large vision models as a "second opinion" to correct and supplement YOLO11n detections.
+A benchmark framework for evaluating how well open-source vision LLMs can detect and identify weeds in agricultural images. Tests multiple models on the same dataset and compares their detection capabilities.
 
 ## Overview
 
 ```
-                    +-----------------+
-                    | Roboflow Dataset|
-                    +--------+--------+
-                             |
-                         Download
-                             |
-                    +--------v--------+
-                    | Weed Images     |
-                    +--------+--------+
-                             |
-               +-------------+-------------+
-               |                           |
-      +--------v--------+        +--------v--------+
-      | YOLO11n         |        | Vision LLM      |
-      | (fast, precise) |        | (thorough,       |
-      |                 |        |  species ID)     |
-      +--------+--------+        +--------+--------+
-               |                           |
-               +-------------+-------------+
-                             |
-                    +--------v--------+
-                    | IoU Fusion      |
-                    | - Keep all YOLO |
-                    | - Add LLM-only  |
-                    | - Flag disagree |
-                    +--------+--------+
-                             |
-                    +--------v--------+
-                    | Merged Results  |
-                    | + Upload back   |
-                    +--------+--------+
+  +------------------+
+  | Roboflow Dataset |    Labeled weed images (ground truth)
+  +--------+---------+
+           |
+       Download
+           |
+  +--------v---------+
+  | Weed Images      |
+  +--------+---------+
+           |
+           |   Run each model on the same images
+           |
+     +-----+-----+-----+-----+-----+---- ...
+     |           |           |           |
+  +--v---+  +---v--+  +---v---+  +--v-------+
+  |Qwen  |  |Qwen  |  |MiniCPM|  | Any new  |
+  |VL-7B |  |VL-3B |  |  -V   |  | model... |
+  +--+---+  +---+--+  +---+---+  +--+-------+
+     |           |           |           |
+     +-----+-----+-----+-----+-----+----+
+           |
+  +--------v---------+
+  | Compare Results   |    JSON valid? BBox? Weed count?
+  | per Model         |    Inference time? Species ID?
+  +--------+---------+
+           |
+  +--------v---------+
+  | Visualize +       |    Side-by-side charts, bbox overlays
+  | Upload to         |    Results back to Roboflow
+  | Roboflow          |
+  +-------------------+
 ```
 
-**Why both?** YOLO is fast but may miss weeds or misclassify. LLMs provide species-level identification and catch what YOLO misses. The fusion pipeline merges both via IoU matching.
+**Goal**: Determine which vision LLMs are most effective at weed detection before deploying them in a real agricultural pipeline. The framework tests each model's ability to return valid bounding boxes, identify weed species, and produce reliable JSON output.
 
 ## Model Support
 
@@ -150,21 +150,7 @@ python test_hf_models.py --image-dir images/ --model all
 python test_ollama.py --image images/weed1.jpg --model all
 ```
 
-### 4. YOLO + LLM Fusion
-
-Merge YOLO detections with LLM detections:
-```bash
-python yolo_llm_fusion.py --image photo.jpg --yolo-results yolo_output.json --model qwen7b
-```
-
-Fusion strategy:
-1. Keep all YOLO detections (precise bboxes from trained model)
-2. LLM reviews same image independently
-3. IoU matching merges overlapping detections
-4. LLM-only detections flagged as "YOLO missed"
-5. Disagreements flagged for human review
-
-### 5. Visualize Results
+### 4. Visualize Results
 
 ```bash
 python visualize_results.py --results results/hf_benchmark_*.json
@@ -210,3 +196,10 @@ llm_labeled/
     visualized/                  # images with drawn bboxes
     detection_results.json       # full results with raw LLM responses
 ```
+
+## Roadmap
+
+- [ ] Add quantitative evaluation: compare LLM detections against ground truth labels (precision, recall, mAP)
+- [ ] YOLO + LLM fusion pipeline: use LLM as a second opinion to supplement YOLO detections (`yolo_llm_fusion.py` — module ready, not yet integrated into main pipeline)
+- [ ] Fine-tune best-performing model on labeled weed data
+- [ ] Add Grounding DINO as a non-LLM baseline detector
