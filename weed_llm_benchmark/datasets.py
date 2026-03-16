@@ -24,7 +24,10 @@ from pathlib import Path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)  # parent of weed_llm_benchmark/
-DOWNLOAD_DIR = os.path.join(PROJECT_ROOT, "downloads")
+# Check both possible download locations (local vs cluster layout)
+_dl_project = os.path.join(PROJECT_ROOT, "downloads")
+_dl_base = os.path.join(BASE_DIR, "downloads")
+DOWNLOAD_DIR = _dl_base if os.path.isdir(_dl_base) else _dl_project
 
 # ============================================================
 # Dataset Registry

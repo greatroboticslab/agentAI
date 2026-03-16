@@ -1,0 +1,36 @@
+# Agent Parameter Configuration
+
+perception:
+  yolo_model: "yolo11nweed.pt"
+  confidence_threshold: 0.5
+  detection_interval_ms: 100
+  noise_filter:
+    min_area: 100
+    max_area: 50000
+    min_aspect_ratio: 0.2
+    max_aspect_ratio: 5.0
+  tracker:
+    max_disappeared: 30
+    max_distance: 80
+
+targeting:
+  coordinate_transform:
+    camera_resolution: [640, 480]
+    laser_range: [4095, 4095]
+  firing:
+    default_power: 0.8
+    dwell_time_ms: 50
+    cooldown_ms: 100
+  patterns:
+    default: "circle"
+    radius: 30
+
+navigation:
+  default_speed: 0.5
+  patrol_pattern: "sweep_a"
+  turn_speed: 0.3
+
+brain:
+  think_interval_ms: 2000
+  event_batch_size: 50
+  optimization_interval_ms: 30000

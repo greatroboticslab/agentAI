@@ -227,6 +227,63 @@ MODEL_REGISTRY = {
         "size": "~16GB",
         "description": "Strong grounding, good plant recognition",
     },
+    "florence2": {
+        "name": "Florence-2-large",
+        "model_id": "microsoft/Florence-2-large",
+        "type": "florence",
+        "size": "~1.5GB",
+        "description": "Microsoft's lightweight vision model with native object detection",
+    },
+    # ---- New models added 2026-03-16 (Phase 2 expansion) ----
+    "qwen3_8b": {
+        "name": "Qwen3-VL-8B",
+        "model_id": "Qwen/Qwen3-VL-8B-Instruct",
+        "type": "qwen3",
+        "size": "~16GB",
+        "description": "Latest Qwen VL with enhanced grounding (Jan 2026)",
+    },
+    "grounding_dino": {
+        "name": "Grounding-DINO-base",
+        "model_id": "IDEA-Research/grounding-dino-base",
+        "type": "grounding_dino",
+        "size": "~1GB",
+        "description": "Open-set object detector with text prompts (ECCV 2024)",
+    },
+    "paligemma2": {
+        "name": "PaliGemma2-3B-mix",
+        "model_id": "google/paligemma2-3b-mix-448",
+        "type": "paligemma",
+        "size": "~6GB",
+        "description": "Google detection model with native <loc> coordinate tokens",
+    },
+    "yolo_world": {
+        "name": "YOLO-World-v2-L",
+        "model_id": "yolov8l-worldv2",
+        "type": "yolo_world",
+        "size": "~200MB",
+        "description": "Open-vocabulary YOLO with text-prompted detection",
+    },
+    "minicpm_v45": {
+        "name": "MiniCPM-V-4.5",
+        "model_id": "openbmb/MiniCPM-V-4_5",
+        "type": "minicpm_v45",
+        "size": "~16GB",
+        "description": "Strong 8B VLM with native detect mode (Feb 2026)",
+    },
+    "molmo2": {
+        "name": "Molmo-7B-D",
+        "model_id": "allenai/Molmo-7B-D-0924",
+        "type": "molmo",
+        "size": "~14GB",
+        "description": "Allen AI model with precise pixel coordinate output",
+    },
+    "deepseek_vl2": {
+        "name": "DeepSeek-VL2-Small",
+        "model_id": "deepseek-ai/deepseek-vl2-small",
+        "type": "deepseek_vl",
+        "size": "~8GB",
+        "description": "MoE VLM with grounding tokens (Dec 2024)",
+    },
 }
 
 
@@ -262,12 +319,20 @@ def load_model(model_key="qwen7b"):
     if model_type == "qwen":
         from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
         print(f"[*] Loading {model_id}...")
+        # Avoid device_map entirely — in transformers 5.0, ANY device_map value
+        # (including {"": 0}) triggers accelerate's weight materialization which
+        # is pathologically slow (~48s/weight x 729 = 10+ hours).
+        # Instead: load to CPU then .cuda()
         model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            model_id, torch_dtype=torch.bfloat16, device_map="auto",
+            model_id, torch_dtype=torch.bfloat16,
             cache_dir=os.path.join(HF_CACHE, "hub"),
-        )
+        ).cuda()
+        # Limit pixels to prevent OOM on V100-32GB with high-res images
+        min_pixels = 256 * 28 * 28
+        max_pixels = 1280 * 28 * 28
         processor = AutoProcessor.from_pretrained(
             model_id, cache_dir=os.path.join(HF_CACHE, "hub"),
+            min_pixels=min_pixels, max_pixels=max_pixels,
         )
         print(f"[+] {info['name']} loaded.")
         return model, processor, model_type
@@ -289,13 +354,140 @@ def load_model(model_key="qwen7b"):
         return model, tokenizer, model_type
 
     elif model_type == "internvl":
+        from transformers import AutoModel, AutoTokenizer, PreTrainedModel
+        # Monkey-patch for transformers 5.0: InternVL2's custom code references
+        # all_tied_weights_keys which was removed in transformers 5.0.
+        # Must be dict (not set) because callers do .keys() on it.
+        if not hasattr(PreTrainedModel, 'all_tied_weights_keys'):
+            PreTrainedModel.all_tied_weights_keys = {}
+            print("[*] Patched all_tied_weights_keys for transformers 5.0 compat")
+        print(f"[*] Loading {model_id}...")
+        model = AutoModel.from_pretrained(
+            model_id, trust_remote_code=True,
+            torch_dtype=torch.bfloat16,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_id, trust_remote_code=True,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        )
+        model.eval()
+        print(f"[+] {info['name']} loaded.")
+        return model, tokenizer, model_type
+
+    elif model_type == "florence":
+        from transformers import AutoModelForCausalLM, AutoProcessor
+        from transformers import PretrainedConfig
+        print(f"[*] Loading {model_id}...")
+        # Florence-2's config code does self.forced_bos_token_id which was removed
+        # in transformers 5.0. The error happens INSIDE AutoConfig.from_pretrained,
+        # so we must patch the base class BEFORE loading config.
+        if not hasattr(PretrainedConfig, 'forced_bos_token_id'):
+            PretrainedConfig.forced_bos_token_id = None
+            print("[*] Patched forced_bos_token_id for transformers 5.0 compat")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id, trust_remote_code=True,
+            torch_dtype=torch.float16, device_map={"": 0},
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        )
+        processor = AutoProcessor.from_pretrained(
+            model_id, trust_remote_code=True,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        )
+        model.eval()
+        print(f"[+] {info['name']} loaded.")
+        return model, processor, model_type
+
+    elif model_type == "qwen3":
+        from transformers import AutoModelForCausalLM, AutoProcessor
+        print(f"[*] Loading {model_id}...")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id, trust_remote_code=True,
+            torch_dtype=torch.bfloat16,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
+        min_pixels = 256 * 28 * 28
+        max_pixels = 1280 * 28 * 28
+        processor = AutoProcessor.from_pretrained(
+            model_id, trust_remote_code=True,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+            min_pixels=min_pixels, max_pixels=max_pixels,
+        )
+        print(f"[+] {info['name']} loaded.")
+        return model, processor, model_type
+
+    elif model_type == "grounding_dino":
+        from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+        print(f"[*] Loading {model_id}...")
+        model = AutoModelForZeroShotObjectDetection.from_pretrained(
+            model_id, cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
+        processor = AutoProcessor.from_pretrained(
+            model_id, cache_dir=os.path.join(HF_CACHE, "hub"),
+        )
+        print(f"[+] {info['name']} loaded.")
+        return model, processor, model_type
+
+    elif model_type == "paligemma":
+        from transformers import PaliGemmaForConditionalGeneration, AutoProcessor
+        print(f"[*] Loading {model_id}...")
+        model = PaliGemmaForConditionalGeneration.from_pretrained(
+            model_id, torch_dtype=torch.bfloat16,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
+        processor = AutoProcessor.from_pretrained(
+            model_id, cache_dir=os.path.join(HF_CACHE, "hub"),
+        )
+        print(f"[+] {info['name']} loaded.")
+        return model, processor, model_type
+
+    elif model_type == "yolo_world":
+        from ultralytics import YOLOWorld
+        print(f"[*] Loading {model_id}...")
+        model = YOLOWorld(model_id)
+        model.set_classes(["weed", "plant", "grass"])
+        print(f"[+] {info['name']} loaded.")
+        return model, None, model_type
+
+    elif model_type == "minicpm_v45":
         from transformers import AutoModel, AutoTokenizer
         print(f"[*] Loading {model_id}...")
         model = AutoModel.from_pretrained(
             model_id, trust_remote_code=True,
-            torch_dtype=torch.bfloat16, device_map="auto",
+            torch_dtype=torch.bfloat16,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_id, trust_remote_code=True,
             cache_dir=os.path.join(HF_CACHE, "hub"),
         )
+        model.eval()
+        print(f"[+] {info['name']} loaded.")
+        return model, tokenizer, model_type
+
+    elif model_type == "molmo":
+        from transformers import AutoModelForCausalLM, AutoProcessor
+        print(f"[*] Loading {model_id}...")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id, trust_remote_code=True,
+            torch_dtype=torch.bfloat16,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
+        processor = AutoProcessor.from_pretrained(
+            model_id, trust_remote_code=True,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        )
+        print(f"[+] {info['name']} loaded.")
+        return model, processor, model_type
+
+    elif model_type == "deepseek_vl":
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        print(f"[*] Loading {model_id}...")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id, trust_remote_code=True,
+            torch_dtype=torch.bfloat16,
+            cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
         tokenizer = AutoTokenizer.from_pretrained(
             model_id, trust_remote_code=True,
             cache_dir=os.path.join(HF_CACHE, "hub"),
@@ -327,14 +519,22 @@ The bbox should be in pixel coordinates of the original image."""
 
 def run_inference(model, processor, image_path, model_type="qwen"):
     """Run inference with any supported model type."""
-    if model_type == "qwen":
-        return _infer_qwen(model, processor, image_path)
-    elif model_type == "minicpm":
-        return _infer_minicpm(model, processor, image_path)
-    elif model_type == "internvl":
-        return _infer_internvl(model, processor, image_path)
-    else:
+    dispatch = {
+        "qwen": _infer_qwen,
+        "qwen3": _infer_qwen,  # same chat interface as qwen2.5
+        "minicpm": _infer_minicpm,
+        "minicpm_v45": _infer_minicpm,  # same .chat() API
+        "internvl": _infer_internvl,
+        "florence": _infer_florence,
+        "grounding_dino": _infer_grounding_dino,
+        "paligemma": _infer_paligemma,
+        "yolo_world": _infer_yolo_world,
+        "molmo": _infer_molmo,
+        "deepseek_vl": _infer_deepseek_vl,
+    }
+    if model_type not in dispatch:
         raise ValueError(f"Unknown model type: {model_type}")
+    return dispatch[model_type](model, processor, image_path)
 
 
 def _infer_qwen(model, processor, image_path):
@@ -395,6 +595,174 @@ def _infer_internvl(model, tokenizer, image_path):
     gen_config = {"max_new_tokens": 2048, "temperature": 0.1, "do_sample": True}
     with torch.no_grad():
         response = model.chat(tokenizer, pixel_values, WEED_PROMPT, gen_config)
+    return response
+
+
+def _infer_florence(model, processor, image_path):
+    """Florence-2 inference using native object detection task."""
+    import torch
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    task = "<OD>"
+    inputs = processor(text=task, images=image, return_tensors="pt").to(model.device, torch.float16)
+
+    with torch.no_grad():
+        generated_ids = model.generate(
+            input_ids=inputs["input_ids"],
+            pixel_values=inputs["pixel_values"],
+            max_new_tokens=1024,
+            num_beams=3,
+        )
+
+    result = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+    parsed = processor.post_process_generation(result, task=task,
+                                                image_size=(image.width, image.height))
+
+    # Convert Florence-2 OD output to our standard JSON format
+    od_result = parsed.get("<OD>", {})
+    bboxes = od_result.get("bboxes", [])
+    labels = od_result.get("labels", [])
+
+    detections = []
+    for bbox, label in zip(bboxes, labels):
+        detections.append({
+            "label": label.lower() if label else "object",
+            "bbox": [round(b, 1) for b in bbox],
+            "confidence": "medium",
+        })
+
+    response = json.dumps({"detections": detections})
+    return response
+
+
+def _infer_grounding_dino(model, processor, image_path):
+    """Grounding DINO: text-prompted open-set object detection."""
+    import torch
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    text = "weed . plant ."  # period-separated classes for GDINO
+
+    inputs = processor(images=image, text=text, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    results = processor.post_process_grounded_object_detection(
+        outputs, inputs.input_ids,
+        box_threshold=0.25, text_threshold=0.25,
+        target_sizes=[(image.height, image.width)]
+    )[0]
+
+    detections = []
+    for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+        x1, y1, x2, y2 = box.tolist()
+        detections.append({
+            "label": label if isinstance(label, str) else "weed",
+            "bbox": [round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1)],
+            "confidence": round(score.item(), 3),
+        })
+    return json.dumps({"detections": detections})
+
+
+def _infer_paligemma(model, processor, image_path):
+    """PaliGemma 2: detection via <loc> coordinate tokens."""
+    import torch
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    prompt = "detect weed"
+
+    inputs = processor(text=prompt, images=image, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        output = model.generate(**inputs, max_new_tokens=512)
+
+    decoded = processor.decode(output[0], skip_special_tokens=False)
+    # PaliGemma outputs: <loc{Y1}><loc{X1}><loc{Y2}><loc{X2}> label
+    loc_pattern = r'<loc(\d{4})><loc(\d{4})><loc(\d{4})><loc(\d{4})>\s*(\w+)'
+    matches = re.findall(loc_pattern, decoded)
+
+    detections = []
+    for y1, x1, y2, x2, label in matches:
+        detections.append({
+            "label": label.lower(),
+            "bbox": [
+                round(int(x1) / 1024 * image.width, 1),
+                round(int(y1) / 1024 * image.height, 1),
+                round(int(x2) / 1024 * image.width, 1),
+                round(int(y2) / 1024 * image.height, 1),
+            ],
+            "confidence": "medium",
+        })
+    return json.dumps({"detections": detections})
+
+
+def _infer_yolo_world(model, _processor, image_path):
+    """YOLO-World: open-vocabulary YOLO detection."""
+    results = model.predict(image_path, conf=0.25, verbose=False)
+    detections = []
+    for r in results:
+        for box in r.boxes:
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            cls = int(box.cls[0])
+            conf = float(box.conf[0])
+            detections.append({
+                "label": model.names.get(cls, "object"),
+                "bbox": [round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1)],
+                "confidence": round(conf, 3),
+            })
+    return json.dumps({"detections": detections})
+
+
+def _infer_molmo(model, processor, image_path):
+    """Molmo: Allen AI model with pixel coordinate output."""
+    import torch
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    inputs = processor.process(images=[image], text=WEED_PROMPT)
+    inputs = {k: v.to(model.device).unsqueeze(0) for k, v in inputs.items()
+              if isinstance(v, torch.Tensor)}
+
+    with torch.no_grad():
+        output = model.generate_from_batch(inputs, max_new_tokens=2048,
+                                           tokenizer=processor.tokenizer)
+    response = processor.tokenizer.decode(output[0], skip_special_tokens=True)
+    return response
+
+
+def _infer_deepseek_vl(model, tokenizer, image_path):
+    """DeepSeek-VL2: MoE VLM with <ref>/<det> grounding tokens."""
+    import torch
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    prompt = (
+        "Detect all weeds in this image. For each detection, output bounding box "
+        "coordinates as JSON: {\"detections\": [{\"label\": \"weed\", "
+        "\"bbox\": [x_min, y_min, x_max, y_max]}]}"
+    )
+
+    messages = [{"role": "user", "content": [
+        {"type": "image", "image": image},
+        {"type": "text", "text": prompt},
+    ]}]
+
+    # DeepSeek-VL2 uses a chat interface similar to other VLMs
+    inputs = tokenizer.apply_chat_template(messages, return_tensors="pt",
+                                           add_generation_prompt=True)
+    if isinstance(inputs, dict):
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    else:
+        inputs = inputs.to(model.device)
+
+    with torch.no_grad():
+        if isinstance(inputs, dict):
+            out = model.generate(**inputs, max_new_tokens=2048)
+        else:
+            out = model.generate(inputs, max_new_tokens=2048)
+
+    response = tokenizer.decode(out[0], skip_special_tokens=True)
     return response
 
 

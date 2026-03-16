@@ -1,0 +1,28 @@
+# Hardware Configuration (used by EdgeClient)
+
+camera:
+  device_id: 0
+  resolution: [640, 480]
+  fps: 30
+  jpeg_quality: 80
+
+helios_dac:
+  num_motors: 2
+  points_per_frame: 1000
+  frame_rate: 30000
+  max_power: 1.0
+
+esp32:
+  serial_port: "/dev/ttyUSB0"
+  baud_rate: 115200
+  timeout: 1.0
+
+flysky:
+  serial_port: "/dev/ttyUSB1"
+  baud_rate: 115200
+  channels: 10
+
+safety:
+  heartbeat_timeout_ms: 500
+  max_temperature_c: 60
+  emergency_stop_on_disconnect: true

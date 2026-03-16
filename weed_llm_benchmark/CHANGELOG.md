@@ -63,10 +63,43 @@
   - supplement (add LLM-only detections), filter (confirm YOLO with LLM), weighted (combine confidence)
 - `README.md` — updated with evaluation, datasets, paper, and new file listing
 
+## 2026-03-16 - Phase 1 Complete, Phase 2 In Progress
+
+### Phase 1 Complete
+- YOLO11n fine-tuned on CottonWeedDet12 (100 epochs, V100-32GB, batch=60)
+- Test results: mAP@0.5=0.929, mAP@0.5:0.95=0.865, P=0.930, R=0.850
+- Model saved: `models/yolo11n_cottonweeddet12_best.pt` (5.5MB)
+
+### Phase 2: LLM Benchmark Expanded (19 models)
+- **Completed**: moondream(mAP=0.0), llava:7b/13b/bakllava (0 bounding boxes)
+- **Running on cluster**: qwen7b, qwen3b, llama3.2-vision:11b, internvl2, florence2
+- **7 new models added to benchmark** (coverage audit found gaps):
+  - Qwen3-VL-8B — latest Qwen VL (Jan 2026), native grounding
+  - Grounding DINO — #1 open-set detection model, essential baseline
+  - PaliGemma2-3B — Google, native `<loc>` detection tokens
+  - YOLO-World v2 — open-vocabulary YOLO, bridges YOLO and VLM
+  - MiniCPM-V 4.5 — Feb 2026, replaces gated v2.6
+  - Molmo-7B-D — Allen AI, precise pixel coordinate output
+  - DeepSeek-VL2-Small — MoE with grounding tokens
+
+### Bug Fixes
+- Fixed `evaluate.py` mAP bug (was using Precision as mAP)
+- Fixed DOWNLOAD_DIR path for cluster flat structure
+- Fixed `query_ollama` return type (dict not tuple)
+- Fixed Qwen OOM with pixel limits (min=256*28*28, max=1280*28*28)
+- Fixed transformers 5.0 compat (3 rounds):
+  - Qwen: removed `device_map`, use `.cuda()` (avoids 10hr weight materialization)
+  - InternVL2: `all_tied_weights_keys = {}` (dict not set, callers use .keys())
+  - Florence-2: `PretrainedConfig.forced_bos_token_id = None` (patch before config load)
+
+### Modified
+- `roboflow_bridge.py` — MODEL_REGISTRY expanded (5→12 models), 7 new inference functions
+- `run_full_benchmark.py` — HF_MODELS expanded with 7 new entries
+- `setup_and_train.sh` — batch=-1 (auto), workers=5
+
 ## TODO
-- [ ] Download CottonWeedDet12 and DeepWeeds datasets
-- [ ] Run YOLO11n zero-shot baseline on all 3 datasets
-- [ ] Run all LLM models on all datasets
+- [ ] Finish running all 12 HF models + 6 Ollama models on CottonWeedDet12
+- [ ] Download new model weights to cluster (qwen3_8b, grounding_dino, paligemma2, etc.)
 - [ ] Test YOLO+LLM fusion strategies
 - [ ] Run ablation studies
 - [ ] Generate paper figures and tables

@@ -148,7 +148,7 @@ results = model.train(
     data='$DATA_DIR/data.yaml',
     epochs=100,
     imgsz=640,
-    batch=16,
+    batch=-1,
     patience=20,
     project='runs',
     name='yolo11n_cottonweeddet12',
@@ -158,7 +158,7 @@ results = model.train(
     lr0=0.001,
     lrf=0.01,
     warmup_epochs=5,
-    workers=4,
+    workers=5,
 )
 
 print()

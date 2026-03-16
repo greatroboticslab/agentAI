@@ -30,7 +30,9 @@ from pathlib import Path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)  # parent of weed_llm_benchmark/
 RESULT_DIR = os.path.join(BASE_DIR, "results")
-DOWNLOAD_DIR = os.path.join(PROJECT_ROOT, "downloads")
+_dl_project = os.path.join(PROJECT_ROOT, "downloads")
+_dl_base = os.path.join(BASE_DIR, "downloads")
+DOWNLOAD_DIR = _dl_base if os.path.isdir(_dl_base) else _dl_project
 CHECKPOINT_FILE = os.path.join(RESULT_DIR, "benchmark_checkpoint.json")
 
 # ============================================================
@@ -39,7 +41,18 @@ CHECKPOINT_FILE = os.path.join(RESULT_DIR, "benchmark_checkpoint.json")
 DATASETS = ["cottonweeddet12", "deepweeds", "weed2okok"]
 
 # Models to run on cluster (HuggingFace)
-HF_MODELS = ["qwen7b", "qwen3b", "minicpm", "internvl2", "florence2"]
+HF_MODELS = [
+    # Original models
+    "qwen7b", "qwen3b", "minicpm", "internvl2", "florence2",
+    # New models (Phase 2 expansion, 2026-03-16)
+    "qwen3_8b",         # Qwen3-VL-8B (Jan 2026)
+    "grounding_dino",   # Grounding DINO (ECCV 2024) — open-set detector baseline
+    "paligemma2",       # PaliGemma2-3B (Google) — native <loc> detection
+    "yolo_world",       # YOLO-World v2 — open-vocabulary YOLO
+    "minicpm_v45",      # MiniCPM-V 4.5 (Feb 2026) — replaces gated v2.6
+    "molmo2",           # Molmo-7B-D (Allen AI) — pixel coordinate grounding
+    "deepseek_vl2",     # DeepSeek-VL2-Small — MoE with grounding tokens
+]
 
 # Models to run via Ollama (local or cluster)
 OLLAMA_MODELS = ["moondream", "llava:13b", "llama3.2-vision:11b"]
@@ -163,13 +176,19 @@ def run_ollama_experiment(dataset_key, model_name):
 
     for i, img_path in enumerate(image_files):
         img_name = os.path.basename(img_path)
-        success, response, duration, eval_count = query_ollama(model_name, img_path, prompt)
+        result = query_ollama(model_name, img_path, prompt)
+        success = result.get("success", False)
+        response = result.get("response", "")
+        duration = result.get("total_duration_s", 0)
 
         detections = []
         if success:
             parsed = extract_json(response)
-            if parsed and "detections" in parsed:
-                detections = parsed["detections"]
+            if parsed:
+                if isinstance(parsed, list):
+                    detections = parsed
+                elif "detections" in parsed:
+                    detections = parsed["detections"]
 
         all_results.append({
             "image": img_name,

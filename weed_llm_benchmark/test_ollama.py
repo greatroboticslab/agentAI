@@ -218,8 +218,11 @@ def test_single_image(model_name, image_path, use_simple_prompt=False):
         result["parsed_json"] = parsed
         result["json_valid"] = True
 
-        # Count detections
-        detections = parsed.get("detections", [])
+        # Count detections - handle both list and dict formats
+        if isinstance(parsed, list):
+            detections = parsed
+        else:
+            detections = parsed.get("detections", [])
         weeds = [d for d in detections if "weed" in d.get("label", "").lower()]
         crops = [d for d in detections if "crop" in d.get("label", "").lower()]
         print(f"\nDetections: {len(detections)} total, {len(weeds)} weeds, {len(crops)} crops")

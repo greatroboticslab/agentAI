@@ -33,3 +33,15 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# multagent - exclude generated/vendored/large files
+multagent/metagpt/
+multagent/logs/
+multagent/workspace/
+multagent/.pytest_cache/
+multagent/dashboard/frontend/node_modules/
+multagent/dashboard/frontend/dist/
+
+# IDE
+.idea/
+*.iml

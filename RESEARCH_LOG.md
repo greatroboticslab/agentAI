@@ -119,11 +119,88 @@ Per-class validation results:
 
 ---
 
-## Phase 2: Full LLM Benchmark (Planned)
+## Phase 2: Full LLM Benchmark (In Progress)
 
-**Decision**: Paper focuses on CottonWeedDet12 only
-**Models**: qwen7b, qwen3b, minicpm, internvl2, florence2 (HF) + moondream, llava:13b, llama3.2-vision:11b (Ollama)
-**Small models test locally**, large models on cluster
+**Decision**: Paper focuses on CottonWeedDet12 only. All models run on cluster.
+
+### 2026-03-16 (Session 4)
+**Goal**: Run 10+ vision LLMs on CottonWeedDet12 test set (848 images)
+
+**Done**:
+- Fixed `run_full_benchmark.py` bugs: query_ollama returns dict not tuple, JSON parse handles list format
+- Fixed `test_ollama.py`: handle list-format JSON responses
+- Ran moondream locally (848 images, 1173s = 20min)
+- Submitted 5 HF model jobs to Bridges-2 — all failed due to DOWNLOAD_DIR path bug
+
+### 2026-03-16 (Session 5)
+**Goal**: Fix cluster bugs, run all 11 models on CottonWeedDet12
+
+**Bugs Fixed**:
+1. **DOWNLOAD_DIR path**: cluster has flat dir structure, `datasets.py` and `run_full_benchmark.py` pointed to wrong downloads path. Fixed with dual-check: `_dl_base if os.path.isdir(_dl_base) else _dl_project`
+2. **query_ollama return type**: `run_full_benchmark.py` tried tuple unpacking but function returns dict. Fixed.
+3. **JSON list format**: models return `[{...}]` instead of `{"detections": [...]}`. Fixed both files.
+4. **Qwen OOM**: CottonWeedDet12 images are high-res, caused 230GB attention allocation on V100-32GB. Fixed by limiting `min_pixels=256*28*28, max_pixels=1280*28*28` in processor.
+5. **InternVL2 transformers 5.0 compat**: `all_tied_weights_keys` attribute missing. Fixed with monkey-patch: `caching_allocator_warmup = lambda: None`
+6. **Florence-2 transformers 5.0 compat**: `forced_bos_token_id` config error. Fixed with `revision="refs/pr/6"` + monkey-patch.
+7. **MiniCPM gated repo**: `openbmb/MiniCPM-V-2_6` requires HF authentication. Skipped for now.
+8. **minicpm-v Ollama**: consistently returns HTTP 500. Skipped.
+9. **Added Florence-2**: new model type in `roboflow_bridge.py` MODEL_REGISTRY with `_infer_florence()` using `<OD>` task for native object detection.
+
+**Completed Ollama Results (848 images each)**:
+| Model | Size | Pred Boxes | GT Boxes | Notes |
+|-------|------|-----------|----------|-------|
+| moondream | 1.8B | 527 | 1464 | Has predictions but very imprecise |
+| llava:7b | 7B | 0 | 1464 | Cannot produce bounding boxes |
+| llava:13b | 13B | 0 | 1464 | Cannot produce bounding boxes |
+| bakllava | 7B | 0 | 1464 | Cannot produce bounding boxes |
+
+**Still Running on Cluster**:
+- qwen7b (Qwen2.5-VL-7B) — resubmitted with pixel limits, Job 38016297
+- qwen3b (Qwen2.5-VL-3B) — resubmitted with pixel limits, Job 38016298
+- llama3.2-vision:11b — Ollama, Job 38014616 (~45min, processing ~7s/image)
+- internvl2 (InternVL2-8B) — resubmitted with monkey-patch, Job 38016326
+- florence2 (Florence-2-large) — resubmitted with revision fix, Job 38016327
+
+**Cluster Environment**: transformers==5.0.0.dev0 (bleeding edge, caused many compat issues)
+
+**Key Insight**: Ollama models without native grounding (LLaVA, BakLLaVA) produce 0 bounding boxes. Only models with native bbox output (Qwen2.5-VL, Florence-2, moondream) can generate coordinates. This is a key finding for the paper.
+
+**Next**:
+- Wait for qwen7b, qwen3b, llama3.2-vision, internvl2, florence2 to complete
+- Run evaluation on all completed results
+- If Qwen models succeed, we have 8-10 models for comparison
+- Begin Phase 3 (YOLO+LLM Fusion) and Phase 5 (figures/tables)
+
+### 2026-03-16 (Session 6)
+**Goal**: Fix cluster bugs (round 3), expand model coverage for paper
+
+**Bugs Fixed (Round 3)**:
+1. **Qwen loading speed**: `device_map="auto"` AND `device_map={"": 0}` both trigger transformers 5.0's accelerate weight materialization (~48s/weight x 729 = 10+ hours). Fix: remove device_map entirely, use `.cuda()` instead.
+2. **InternVL2 `all_tied_weights_keys`**: Previous patch used `set()` but callers do `.keys()` on it. Fix: use `{}` (dict) not `set()`.
+3. **Florence-2 `forced_bos_token_id`**: Error happens INSIDE `AutoConfig.from_pretrained` during Florence2LanguageConfig construction, so patching config after load is too late. Fix: patch `PretrainedConfig.forced_bos_token_id = None` class attribute BEFORE loading.
+
+**Git Email Fix**: Rewrote all commit history to change placeholder `your.email@university.edu` → `harry567566@gmail.com`. Force pushed to remove "claude Claude" from GitHub contributors.
+
+**Model Coverage Expansion**: Research found 7 important missing models. Added to benchmark:
+
+| Model | Type | Size | Why Add |
+|-------|------|------|---------|
+| Qwen3-VL-8B | VLM+grounding | 8B | Direct successor to Qwen2.5-VL, Jan 2026, best VLM grounding |
+| Grounding DINO | Open-set detector | 172M | #1 zero-shot detection model on HuggingFace, essential baseline |
+| PaliGemma2-3B | Detection VLM | 3B | Google, native `<loc>` tokens for detection, MIT license |
+| YOLO-World v2 | Open-vocab YOLO | ~100M | Bridges YOLO baseline and language-driven detection |
+| MiniCPM-V 4.5 | VLM+detect | 8B | Feb 2026, replaces gated v2.6, surpasses GPT-4o on benchmarks |
+| Molmo-7B-D | VLM+pointing | 7B | Allen AI, precise pixel coordinates, fully open |
+| DeepSeek-VL2 | MoE VLM | 4.5B active | Grounding tokens, efficient MoE architecture |
+
+**Reference**: AgroBench (ICCV 2025) found most open-source VLMs perform near-random on weed identification → validates our paper's importance.
+
+**Cluster Jobs Submitted**: qwen7b, qwen3b, internvl2, florence2 (resubmitted with fixes). llama3.2-vision still running.
+
+**Full Model List (19 models total)**:
+- **YOLO baseline**: YOLO11n fine-tuned (mAP@0.5=0.929)
+- **HF models (12)**: qwen7b, qwen3b, qwen3_8b, internvl2, florence2, grounding_dino, paligemma2, yolo_world, minicpm_v45, molmo2, deepseek_vl2, minicpm (skipped/gated)
+- **Ollama models (6)**: moondream, llava:7b, llava:13b, bakllava, llama3.2-vision:11b, minicpm-v (HTTP 500)
 
 ---
 
