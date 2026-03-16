@@ -5,14 +5,21 @@
 downloads/
 llm_labeled/
 images/
-results/
 
 # SLURM logs
 slurm_*.out
 slurm_*.err
 
-# Model weights
+# Model weights (large files)
 *.pt
+
+# Allow fine-tuned models we want to track
+!weed_llm_benchmark/models/*.pt
+
+# Results - ignore raw detection JSONs but keep evaluation results
+weed_llm_benchmark/results/yolo_*.json
+weed_llm_benchmark/results/eval_*.json
+!weed_llm_benchmark/results/yolo_finetuned_*.json
 
 # Training runs
 runs/

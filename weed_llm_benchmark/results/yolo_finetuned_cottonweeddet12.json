@@ -1,0 +1,48 @@
+{
+  "model": "YOLO11n",
+  "dataset": "CottonWeedDet12",
+  "training": {
+    "epochs": 100,
+    "batch_size": 60,
+    "optimizer": "AdamW",
+    "lr0": 0.001,
+    "lrf": 0.01,
+    "cos_lr": true,
+    "warmup_epochs": 5,
+    "patience": 20,
+    "imgsz": 640,
+    "gpu": "Tesla V100-SXM2-32GB",
+    "training_time_hours": 2.75,
+    "split": {"train": 3671, "valid": 1129, "test": 848},
+    "split_seed": 42,
+    "split_ratio": "65/20/15"
+  },
+  "validation_results": {
+    "mAP50": 0.943,
+    "mAP50_95": 0.898,
+    "precision": 0.944,
+    "recall": 0.884
+  },
+  "test_results": {
+    "mAP50": 0.9287,
+    "mAP50_95": 0.8645,
+    "precision": 0.9303,
+    "recall": 0.8499
+  },
+  "per_class_validation": {
+    "Carpetweeds": {"mAP50": 0.976, "mAP50_95": 0.936, "precision": 0.929, "recall": 0.949},
+    "Crabgrass": {"mAP50": 0.979, "mAP50_95": 0.935, "precision": 0.988, "recall": 0.953},
+    "Eclipta": {"mAP50": 0.920, "mAP50_95": 0.878, "precision": 0.878, "recall": 0.892},
+    "Goosegrass": {"mAP50": 0.903, "mAP50_95": 0.830, "precision": 0.908, "recall": 0.805},
+    "Morningglory": {"mAP50": 0.853, "mAP50_95": 0.769, "precision": 0.878, "recall": 0.697},
+    "Nutsedge": {"mAP50": 0.939, "mAP50_95": 0.878, "precision": 0.954, "recall": 0.850},
+    "PalmerAmaranth": {"mAP50": 0.955, "mAP50_95": 0.917, "precision": 0.958, "recall": 0.906},
+    "PricklySida": {"mAP50": 0.970, "mAP50_95": 0.947, "precision": 0.960, "recall": 0.928},
+    "Purslane": {"mAP50": 0.941, "mAP50_95": 0.930, "precision": 0.965, "recall": 0.936},
+    "Ragweed": {"mAP50": 0.993, "mAP50_95": 0.983, "precision": 0.999, "recall": 0.980},
+    "Sicklepod": {"mAP50": 0.945, "mAP50_95": 0.858, "precision": 0.965, "recall": 0.884},
+    "SpottedSpurge": {"mAP50": 0.950, "mAP50_95": 0.919, "precision": 0.948, "recall": 0.833}
+  },
+  "weights_file": "models/yolo11n_cottonweeddet12_best.pt",
+  "date": "2026-03-16"
+}
