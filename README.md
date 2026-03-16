@@ -17,7 +17,7 @@ A collection of AI agent projects for agricultural research at MTSU Great Roboti
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 0: Evaluation Module | Done | `evaluate.py` (mAP, precision, recall), `datasets.py`, format converters |
-| Phase 1: YOLO Baseline | In Progress | Fine-tuning YOLO11n on CottonWeedDet12 (Bridges-2 V100 cluster) |
+| Phase 1: YOLO Baseline | **Done** | YOLO11n fine-tuned on CottonWeedDet12 — Test: mAP@0.5=0.929, P=0.930, R=0.850 |
 | Phase 2: Full LLM Benchmark | Planned | Run 8 vision LLMs on CottonWeedDet12 test set |
 | Phase 3: YOLO+LLM Fusion | Planned | 3 fusion strategies: supplement, filter, weighted |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |

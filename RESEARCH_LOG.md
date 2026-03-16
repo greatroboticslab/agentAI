@@ -55,7 +55,7 @@
 | Method | mAP@0.5 | mAP@0.25 | Precision | Recall |
 |--------|---------|----------|-----------|--------|
 | yolo11nweed.pt (cross-dataset) | 0.316 | 0.374 | 0.473 | 0.404 |
-| YOLO11n fine-tuned (cluster, pending) | — | — | — | — |
+| YOLO11n fine-tuned 100ep | **0.929** | — | **0.930** | **0.850** |
 
 **Issues**:
 - Cluster curl doesn't support `--progress-bar` → switched to wget
@@ -70,11 +70,52 @@
 
 ---
 
-## Phase 1: YOLO Baseline (In Progress)
+## Phase 1: YOLO Baseline (Complete)
 
-**Status**: Fine-tuning YOLO11n on CottonWeedDet12 on Bridges-2 V100 (Job 38007424)
-- 100 epochs, batch=16, imgsz=640, patience=20
-- Early local results (5 epochs on MPS): mAP@0.5=0.695, trending up
+### 2026-03-16 (Session 3)
+**Goal**: Optimize YOLO fine-tuning on cluster for better GPU utilization
+
+**Done**:
+- Cancelled Job 38007424 (batch=16, only using 2.34G/32G = 7% GPU)
+- Updated `setup_and_train.sh`: batch=-1 (auto), workers=5
+- AutoBatch selected **batch=60** using 19G/32G (60% of V100)
+- Resubmitted as Job 38007481 on V100 (v017)
+- Committed and pushed root README.md update (commit 87fc225)
+
+**Training Complete (Job 38007481, 100 epochs, 2.75 hours)**:
+
+| Metric | Validation (best) | **Test (848 images)** |
+|--------|-------------------|----------------------|
+| mAP@0.5 | 0.943 | **0.929** |
+| mAP@0.5:0.95 | 0.898 | **0.865** |
+| Precision | 0.944 | **0.930** |
+| Recall | 0.884 | **0.850** |
+
+Per-class validation results:
+| Class | mAP@0.5 | mAP@0.5:0.95 |
+|-------|---------|-------------|
+| Carpetweeds | 0.976 | 0.936 |
+| Crabgrass | 0.979 | 0.935 |
+| Eclipta | 0.920 | 0.878 |
+| Goosegrass | 0.903 | 0.830 |
+| Morningglory | 0.853 | 0.769 |
+| Nutsedge | 0.939 | 0.878 |
+| PalmerAmaranth | 0.955 | 0.917 |
+| PricklySida | 0.970 | 0.947 |
+| Purslane | 0.941 | 0.930 |
+| Ragweed | 0.993 | 0.983 |
+| Sicklepod | 0.945 | 0.858 |
+| SpottedSpurge | 0.950 | 0.919 |
+
+- Training config: batch=60 (auto), AdamW lr=0.000625, cos_lr, warmup=5ep, patience=20
+- Training speed: ~1.8 min/epoch on V100-32GB
+- Model: runs/detect/runs/yolo11n_cottonweeddet12/weights/best.pt (5.5MB)
+- **Bug found**: setup_and_train.sh test eval used wrong path (`runs/yolo11n_cottonweeddet12/` vs actual `runs/detect/runs/yolo11n_cottonweeddet12/`). Fixed by running test eval manually.
+
+**Next**:
+- Download best.pt from cluster to local
+- Run LLM models on CottonWeedDet12 test set (848 images)
+- Small models (moondream, Qwen-3B) locally on Mac
 
 ---
 
