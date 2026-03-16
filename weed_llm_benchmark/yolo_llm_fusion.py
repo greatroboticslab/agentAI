@@ -190,14 +190,158 @@ def fuse_detections(yolo_dets, llm_dets, iou_threshold=0.3):
     return fused
 
 
+def fuse_dataset(yolo_dir, llm_dir, output_dir, iou_threshold=0.3, strategy="supplement"):
+    """Batch fusion: fuse YOLO and LLM detections for an entire dataset.
+
+    Args:
+        yolo_dir: Directory with YOLO detection JSONs or single JSON file.
+        llm_dir: Directory with LLM detection JSONs or single JSON file.
+        output_dir: Output directory for fused results.
+        iou_threshold: IoU threshold for matching.
+        strategy: Fusion strategy - "supplement", "filter", or "weighted".
+
+    Strategies:
+        supplement: Add LLM-only detections to YOLO (improves recall)
+        filter: Only keep YOLO detections confirmed by LLM (improves precision)
+        weighted: Combine YOLO confidence + LLM confidence
+    """
+    import glob as glob_mod
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Load results
+    def load_results(path):
+        if os.path.isfile(path):
+            with open(path) as f:
+                return json.load(f)
+        results = []
+        for jf in sorted(glob_mod.glob(os.path.join(path, "*.json"))):
+            with open(jf) as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    results.extend(data)
+                else:
+                    results.append(data)
+        return results
+
+    yolo_results = load_results(yolo_dir)
+    llm_results = load_results(llm_dir)
+
+    # Build per-image lookup
+    yolo_by_image = {}
+    for r in yolo_results:
+        stem = Path(r.get("image", "")).stem
+        yolo_by_image[stem] = r.get("detections", [])
+
+    llm_by_image = {}
+    for r in llm_results:
+        stem = Path(r.get("image", "")).stem
+        llm_by_image[stem] = r.get("detections", [])
+
+    all_images = sorted(set(yolo_by_image.keys()) | set(llm_by_image.keys()))
+    fused_results = []
+    stats = {"total": 0, "yolo_only": 0, "llm_only": 0, "both": 0, "filtered": 0}
+
+    for img_stem in all_images:
+        yolo_dets = yolo_by_image.get(img_stem, [])
+        llm_dets = llm_by_image.get(img_stem, [])
+
+        if strategy == "supplement":
+            fused = fuse_detections(yolo_dets, llm_dets, iou_threshold)
+        elif strategy == "filter":
+            # Only keep YOLO detections that LLM also confirms
+            fused = []
+            for yd in yolo_dets:
+                y_bbox = yd.get("bbox", [0, 0, 0, 0])
+                confirmed = False
+                for ld in llm_dets:
+                    l_bbox = ld.get("bbox", [0, 0, 0, 0])
+                    iou = compute_iou(y_bbox, l_bbox)
+                    if iou > iou_threshold:
+                        confirmed = True
+                        break
+                if confirmed:
+                    fused.append(yd)
+                else:
+                    stats["filtered"] += 1
+        elif strategy == "weighted":
+            # Combine confidence scores
+            fused = fuse_detections(yolo_dets, llm_dets, iou_threshold)
+            for det in fused:
+                yolo_conf = det.get("confidence", 0.5)
+                if isinstance(yolo_conf, str):
+                    yolo_conf = {"high": 0.9, "medium": 0.6, "low": 0.3}.get(yolo_conf, 0.5)
+                llm_conf = det.get("iou_with_llm", 0)
+                # Weighted average: 70% YOLO, 30% LLM overlap
+                det["confidence_fused"] = round(0.7 * float(yolo_conf) + 0.3 * float(llm_conf), 3)
+        else:
+            fused = fuse_detections(yolo_dets, llm_dets, iou_threshold)
+
+        # Count stats
+        for d in fused:
+            stats["total"] += 1
+            src = d.get("source", "")
+            if src == "yolo":
+                stats["yolo_only"] += 1
+            elif src == "llm_only":
+                stats["llm_only"] += 1
+            elif src == "yolo+llm":
+                stats["both"] += 1
+
+        fused_results.append({
+            "image": f"{img_stem}.jpg",
+            "num_detections": len(fused),
+            "detections": fused,
+        })
+
+    # Save fused results
+    output_path = os.path.join(output_dir, "fused_results.json")
+    with open(output_path, "w") as f:
+        json.dump(fused_results, f, indent=2)
+
+    print(f"\n{'='*50}")
+    print(f"BATCH FUSION COMPLETE (strategy: {strategy})")
+    print(f"{'='*50}")
+    print(f"  Images processed:  {len(all_images)}")
+    print(f"  Total detections:  {stats['total']}")
+    print(f"  YOLO only:         {stats['yolo_only']}")
+    print(f"  LLM only:          {stats['llm_only']}")
+    print(f"  Both agree:        {stats['both']}")
+    if strategy == "filter":
+        print(f"  Filtered out:      {stats['filtered']}")
+    print(f"  Output:            {output_path}")
+
+    return output_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="YOLO + LLM fusion for weed detection")
-    parser.add_argument("--image", type=str, required=True, help="Image path")
+    parser.add_argument("--image", type=str, help="Image path (single image mode)")
     parser.add_argument("--yolo-results", type=str, default=None, help="YOLO results JSON file")
     parser.add_argument("--model", type=str, default="qwen7b", help="LLM model to use")
     parser.add_argument("--iou-threshold", type=float, default=0.3, help="IoU threshold for matching")
     parser.add_argument("--output", type=str, default=None, help="Output JSON path")
+    # Batch mode arguments
+    parser.add_argument("--batch", action="store_true", help="Batch mode: fuse entire dataset")
+    parser.add_argument("--yolo-dir", type=str, help="YOLO results directory/file (batch mode)")
+    parser.add_argument("--llm-dir", type=str, help="LLM results directory/file (batch mode)")
+    parser.add_argument("--output-dir", type=str, help="Output directory (batch mode)")
+    parser.add_argument("--strategy", type=str, default="supplement",
+                        choices=["supplement", "filter", "weighted"],
+                        help="Fusion strategy (batch mode)")
     args = parser.parse_args()
+
+    # Batch mode
+    if args.batch:
+        if not args.yolo_dir or not args.llm_dir:
+            parser.error("Batch mode requires --yolo-dir and --llm-dir")
+        output_dir = args.output_dir or os.path.join(RESULT_DIR, "fusion_batch")
+        fuse_dataset(args.yolo_dir, args.llm_dir, output_dir,
+                     args.iou_threshold, args.strategy)
+        return
+
+    if not args.image:
+        parser.error("Single image mode requires --image")
 
     image_path = args.image
     img = Image.open(image_path)

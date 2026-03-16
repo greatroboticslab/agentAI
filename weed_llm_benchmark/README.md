@@ -95,16 +95,24 @@ MODEL_SHORTCUTS["your_model"] = {
 ```
 weed_llm_benchmark/
   roboflow_bridge.py           # Main pipeline: Roboflow download -> LLM detect -> upload
-  weed_lable_update_download.py # YOLO auto-labeling + Roboflow upload
-  yolo_llm_fusion.py           # YOLO + LLM fusion module (standalone, future integration)
+  evaluate.py                  # Evaluation: mAP, precision, recall, F1 vs ground truth
+  datasets.py                  # Dataset registry, download helpers, metadata
+  run_yolo_baseline.py         # YOLO11n baseline (zero-shot + fine-tuned)
+  run_full_benchmark.py        # Orchestrator: all models x all datasets
+  run_ablations.py             # Ablation studies (prompt, size, grounding, fusion IoU)
+  yolo_llm_fusion.py           # YOLO + LLM fusion (single image + batch mode)
   test_hf_models.py            # Benchmark HuggingFace vision models
   test_ollama.py               # Benchmark Ollama-served models
-  quick_test.py                # Quick single-image test
+  generate_paper_figures.py    # Publication-quality figures (matplotlib)
+  generate_tables.py           # LaTeX table generation
   visualize_results.py         # Draw bboxes on images, comparison charts
   config.py                    # Model definitions, prompts, shared settings
+  quick_test.py                # Quick single-image test
+  weed_lable_update_download.py # YOLO auto-labeling + Roboflow upload
   run_roboflow_bridge.sh       # SLURM script: full pipeline
   run_hf_benchmark.sh          # SLURM script: HF model benchmark
   run_ollama_benchmark.sh      # SLURM script: Ollama benchmark
+  run_yolo_baseline.sh         # SLURM script: YOLO baseline
   requirements.txt             # Python dependencies
   CHANGELOG.md                 # Development history
 ```
@@ -151,7 +159,69 @@ python test_hf_models.py --image-dir images/ --model all
 python test_ollama.py --image images/weed1.jpg --model all
 ```
 
-### 4. Visualize Results
+### 4. Evaluate Detections Against Ground Truth
+
+```bash
+# Evaluate LLM predictions against ground truth
+python evaluate.py --pred-dir llm_labeled/qwen25-vl-7b/detected/labels \
+                   --gt-dir downloads/weed2okok/test/labels
+
+# Evaluate from benchmark JSON
+python evaluate.py --pred-json results/hf_benchmark_*.json \
+                   --gt-dir downloads/weed2okok/test/labels
+
+# Or use --evaluate flag in the pipeline
+python roboflow_bridge.py --all --project weed2okok --version 1 --model-key qwen7b --evaluate
+```
+
+### 5. Run YOLO Baseline
+
+```bash
+# Zero-shot (pretrained, no weed training)
+python run_yolo_baseline.py --dataset weed2okok --mode zero-shot --evaluate
+
+# Fine-tuned on dataset
+python run_yolo_baseline.py --dataset cottonweeddet12 --mode fine-tune --epochs 50 --evaluate
+```
+
+### 6. Full Benchmark (all models x all datasets)
+
+```bash
+# Run everything
+python run_full_benchmark.py --all
+
+# Resume if interrupted
+python run_full_benchmark.py --all --resume
+
+# Just aggregate existing results
+python run_full_benchmark.py --aggregate
+```
+
+### 7. YOLO+LLM Fusion (batch mode)
+
+```bash
+python yolo_llm_fusion.py --batch \
+    --yolo-dir results/yolo_zero_shot_weed2okok.json \
+    --llm-dir llm_labeled/qwen7b_weed2okok/detection_results.json \
+    --output-dir results/fusion_weed2okok \
+    --strategy supplement
+```
+
+### 8. Ablation Studies
+
+```bash
+python run_ablations.py --all --dataset weed2okok
+python run_ablations.py --experiment prompt --dataset weed2okok
+```
+
+### 9. Generate Paper Figures and Tables
+
+```bash
+python generate_paper_figures.py --all
+python generate_tables.py --all
+```
+
+### 10. Visualize Results
 
 ```bash
 python visualize_results.py --results results/hf_benchmark_*.json
@@ -198,9 +268,40 @@ llm_labeled/
     detection_results.json       # full results with raw LLM responses
 ```
 
+## Datasets
+
+| Dataset | Images | Classes | Source |
+|---------|--------|---------|--------|
+| CottonWeedDet12 | ~5,648 | 12 weed species | Roboflow |
+| DeepWeeds | ~17,509 | 8 species + negative | Roboflow |
+| weed2okok | 106 | 1 (weed) | Lab data |
+
+```bash
+python datasets.py --list          # Show all datasets
+python datasets.py --download all  # Download all
+python datasets.py --info weed2okok
+```
+
+## Research Paper
+
+**Title**: "Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Models for Agricultural Object Detection"
+
+**Research Questions**:
+- RQ1: How do open-source vision LLMs compare to YOLO11n in weed detection (mAP@0.5:0.95)?
+- RQ2: Can YOLO+LLM fusion improve detection beyond either method alone?
+- RQ3: How do model size, prompt design, and native grounding capability affect detection quality?
+
+See `RESEARCH_LOG.md` in project root for daily progress.
+
 ## Roadmap
 
-- [ ] Add quantitative evaluation: compare LLM detections against ground truth labels (precision, recall, mAP)
-- [ ] YOLO + LLM fusion pipeline: use LLM as a second opinion to supplement YOLO detections (`yolo_llm_fusion.py` — module ready, not yet integrated into main pipeline)
+- [x] Quantitative evaluation: mAP, precision, recall, F1 vs ground truth (`evaluate.py`)
+- [x] Dataset registry and download management (`datasets.py`)
+- [x] YOLO baseline: zero-shot and fine-tuned (`run_yolo_baseline.py`)
+- [x] Full benchmark orchestrator (`run_full_benchmark.py`)
+- [x] YOLO+LLM fusion with batch mode and 3 strategies (`yolo_llm_fusion.py`)
+- [x] Ablation studies: prompt, size, grounding, fusion IoU (`run_ablations.py`)
+- [x] Paper figure and table generation (`generate_paper_figures.py`, `generate_tables.py`)
+- [ ] Run full benchmark on all 3 datasets
 - [ ] Fine-tune best-performing model on labeled weed data
-- [ ] Add Grounding DINO as a non-LLM baseline detector
+- [ ] Write paper

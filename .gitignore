@@ -11,6 +11,12 @@ results/
 slurm_*.out
 slurm_*.err
 
+# Model weights
+*.pt
+
+# Training runs
+runs/
+
 # Python
 __pycache__/
 *.pyc

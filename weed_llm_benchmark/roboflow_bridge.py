@@ -858,6 +858,45 @@ def run_interactive():
             break
 
 
+def _run_evaluation(dataset_dir, output_dir, model_key):
+    """Run evaluation comparing detections against ground truth."""
+    try:
+        from evaluate import evaluate_dataset, load_predictions_from_json, load_yolo_labels, print_evaluation
+
+        # Find ground truth labels
+        gt_dir = None
+        for split in ["test", "valid"]:
+            candidate = os.path.join(dataset_dir, split, "labels")
+            if os.path.isdir(candidate):
+                gt_dir = candidate
+                break
+
+        if not gt_dir:
+            print("[!] No ground truth labels found for evaluation")
+            return
+
+        result_json = os.path.join(output_dir, "detection_results.json")
+        if not os.path.exists(result_json):
+            print("[!] No detection results JSON found for evaluation")
+            return
+
+        gt = load_yolo_labels(gt_dir)
+        predictions = load_predictions_from_json(result_json)
+        summary = evaluate_dataset(gt, predictions, iou_thresholds=[0.25, 0.5, 0.75])
+        print_evaluation(summary, model_name=MODEL_REGISTRY.get(model_key, {}).get("name", model_key))
+
+        # Save evaluation results
+        eval_path = os.path.join(output_dir, "evaluation_results.json")
+        with open(eval_path, "w") as f:
+            json.dump(summary, f, indent=2)
+        print(f"[+] Evaluation saved to {eval_path}")
+
+    except ImportError:
+        print("[!] evaluate module not found. Run: pip install numpy")
+    except Exception as e:
+        print(f"[!] Evaluation failed: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Roboflow <-> LLM Weed Detection Bridge")
     parser.add_argument("--download", action="store_true", help="Download from Roboflow")
@@ -873,6 +912,8 @@ def main():
                         help=f"Model to use: {list(MODEL_REGISTRY.keys())}")
     parser.add_argument("--model-size", type=str, default=None, help="(deprecated) Use --model-key instead")
     parser.add_argument("--format", type=str, default="yolov8")
+    parser.add_argument("--evaluate", action="store_true",
+                        help="Run evaluation after detection (compare against ground truth)")
     args = parser.parse_args()
 
     # Handle backward compat: --model-size -> --model-key
@@ -890,11 +931,15 @@ def main():
                 if out_path:
                     up_proj = args.upload_project or f"{args.project}-{model_name}"
                     upload_to_roboflow(os.path.join(out_path, "detected"), up_proj)
+                    if args.evaluate:
+                        _run_evaluation(dl_path, out_path, model_key)
         elif args.download:
             download_from_roboflow(args.project, args.version, args.format)
         elif args.detect:
             source = args.source or os.path.join(DOWNLOAD_DIR, args.project)
-            detect_images(source, model_key=model_key)
+            out_path = detect_images(source, model_key=model_key)
+            if args.evaluate and out_path:
+                _run_evaluation(source, out_path, model_key)
         elif args.upload:
             source = args.source or os.path.join(LABELED_DIR, "detected")
             up_proj = args.upload_project or f"{args.project}-llm-labeled"
