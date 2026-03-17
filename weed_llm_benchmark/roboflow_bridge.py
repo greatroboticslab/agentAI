@@ -319,14 +319,10 @@ def load_model(model_key="qwen7b"):
     if model_type == "qwen":
         from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
         print(f"[*] Loading {model_id}...")
-        # Avoid device_map entirely — in transformers 5.0, ANY device_map value
-        # (including {"": 0}) triggers accelerate's weight materialization which
-        # is pathologically slow (~48s/weight x 729 = 10+ hours).
-        # Instead: load to CPU then .cuda()
         model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            model_id, torch_dtype=torch.bfloat16,
+            model_id, torch_dtype=torch.bfloat16, device_map="auto",
             cache_dir=os.path.join(HF_CACHE, "hub"),
-        ).cuda()
+        )
         # Limit pixels to prevent OOM on V100-32GB with high-res images
         min_pixels = 256 * 28 * 28
         max_pixels = 1280 * 28 * 28
@@ -354,19 +350,14 @@ def load_model(model_key="qwen7b"):
         return model, tokenizer, model_type
 
     elif model_type == "internvl":
-        from transformers import AutoModel, AutoTokenizer, PreTrainedModel
-        # Monkey-patch for transformers 5.0: InternVL2's custom code references
-        # all_tied_weights_keys which was removed in transformers 5.0.
-        # Must be dict (not set) because callers do .keys() on it.
-        if not hasattr(PreTrainedModel, 'all_tied_weights_keys'):
-            PreTrainedModel.all_tied_weights_keys = {}
-            print("[*] Patched all_tied_weights_keys for transformers 5.0 compat")
+        from transformers import AutoModel, AutoTokenizer
         print(f"[*] Loading {model_id}...")
+        # Requires compat env (transformers 4.46) — 4.57+ breaks .generate()
         model = AutoModel.from_pretrained(
             model_id, trust_remote_code=True,
-            torch_dtype=torch.bfloat16,
+            torch_dtype=torch.bfloat16, device_map="auto",
             cache_dir=os.path.join(HF_CACHE, "hub"),
-        ).cuda()
+        )
         tokenizer = AutoTokenizer.from_pretrained(
             model_id, trust_remote_code=True,
             cache_dir=os.path.join(HF_CACHE, "hub"),
@@ -377,19 +368,14 @@ def load_model(model_key="qwen7b"):
 
     elif model_type == "florence":
         from transformers import AutoModelForCausalLM, AutoProcessor
-        from transformers import PretrainedConfig
         print(f"[*] Loading {model_id}...")
-        # Florence-2's config code does self.forced_bos_token_id which was removed
-        # in transformers 5.0. The error happens INSIDE AutoConfig.from_pretrained,
-        # so we must patch the base class BEFORE loading config.
-        if not hasattr(PretrainedConfig, 'forced_bos_token_id'):
-            PretrainedConfig.forced_bos_token_id = None
-            print("[*] Patched forced_bos_token_id for transformers 5.0 compat")
+        # Florence-2 custom code lacks _no_split_modules so device_map="auto"
+        # is unsupported. Load to CPU then .cuda().
         model = AutoModelForCausalLM.from_pretrained(
             model_id, trust_remote_code=True,
-            torch_dtype=torch.float16, device_map={"": 0},
+            torch_dtype=torch.float16,
             cache_dir=os.path.join(HF_CACHE, "hub"),
-        )
+        ).cuda()
         processor = AutoProcessor.from_pretrained(
             model_id, trust_remote_code=True,
             cache_dir=os.path.join(HF_CACHE, "hub"),
@@ -626,9 +612,13 @@ def _infer_florence(model, processor, image_path):
 
     detections = []
     for bbox, label in zip(bboxes, labels):
+        x1, y1, x2, y2 = bbox
+        # Normalize to [0, 1] using original image dims to avoid
+        # ambiguity in convert_bbox_to_yolo's heuristic
         detections.append({
             "label": label.lower() if label else "object",
-            "bbox": [round(b, 1) for b in bbox],
+            "bbox": [x1 / image.width, y1 / image.height,
+                     x2 / image.width, y2 / image.height],
             "confidence": "medium",
         })
 
@@ -784,27 +774,40 @@ def extract_json(text):
 
 
 def convert_bbox_to_yolo(bbox, img_w, img_h):
-    """Convert [x1, y1, x2, y2] (pixel or percent) to YOLO format [cx, cy, w, h] normalized."""
-    x1, y1, x2, y2 = bbox
+    """Convert [x1, y1, x2, y2] to YOLO format [cx, cy, w, h] normalized [0,1].
 
-    # If values > 1 but <= 100, treat as percentage
-    if all(0 <= v <= 100 for v in bbox) and any(v > 1 for v in bbox):
-        x1 = x1 / 100 * img_w
-        y1 = y1 / 100 * img_h
-        x2 = x2 / 100 * img_w
-        y2 = y2 / 100 * img_h
+    Handles multiple coordinate systems:
+      - [0, 1]:    Already normalized fractions
+      - [0, 100]:  Percentage coordinates
+      - [0, 1000]: Qwen2.5-VL / grounding-model normalized coords
+      - Otherwise:  Absolute pixel coordinates → normalize by img dims
+    """
+    x1, y1, x2, y2 = [float(v) for v in bbox]
+    max_val = max(x1, y1, x2, y2)
 
-    # Clamp to image bounds
-    x1 = max(0, min(x1, img_w))
-    y1 = max(0, min(y1, img_h))
-    x2 = max(0, min(x2, img_w))
-    y2 = max(0, min(y2, img_h))
+    if max_val <= 1.0:
+        # Already [0, 1] normalized
+        pass
+    elif max_val <= 100 and all(0 <= v <= 100 for v in [x1, y1, x2, y2]):
+        # Percentage [0, 100]
+        x1, y1, x2, y2 = x1 / 100, y1 / 100, x2 / 100, y2 / 100
+    elif max_val <= 1000 and max(img_w, img_h) > 1000:
+        # Qwen2.5-VL style [0, 1000] normalized coords
+        # (model outputs in [0,999] range, image is much larger)
+        x1, y1, x2, y2 = x1 / 1000, y1 / 1000, x2 / 1000, y2 / 1000
+    else:
+        # Absolute pixel coordinates
+        x1, y1, x2, y2 = x1 / img_w, y1 / img_h, x2 / img_w, y2 / img_h
 
-    # Convert to YOLO format
-    cx = (x1 + x2) / 2 / img_w
-    cy = (y1 + y2) / 2 / img_h
-    w = (x2 - x1) / img_w
-    h = (y2 - y1) / img_h
+    # Clamp to [0, 1]
+    x1, y1 = max(0, min(x1, 1)), max(0, min(y1, 1))
+    x2, y2 = max(0, min(x2, 1)), max(0, min(y2, 1))
+
+    # Convert to YOLO center format
+    cx = (x1 + x2) / 2
+    cy = (y1 + y2) / 2
+    w = x2 - x1
+    h = y2 - y1
 
     return cx, cy, w, h
 
@@ -935,15 +938,20 @@ def detect_images(source_dir, model_size="7b", output_dir=None, model_key=None):
                     bbox = det.get("bbox") or det.get("bbox_2d")
                     if not bbox or len(bbox) != 4:
                         continue
-                    x1, y1, x2, y2 = bbox
-                    # Handle percentage coords
-                    if all(0 <= v <= 100 for v in bbox) and any(v > 1 for v in bbox):
-                        x1 = int(x1 / 100 * img_w)
-                        y1 = int(y1 / 100 * img_h)
-                        x2 = int(x2 / 100 * img_w)
-                        y2 = int(y2 / 100 * img_h)
+                    bx1, by1, bx2, by2 = [float(v) for v in bbox]
+                    max_bval = max(bx1, by1, bx2, by2)
+                    # Convert to pixel coords for drawing
+                    if max_bval <= 1.0:
+                        x1, y1 = int(bx1 * img_w), int(by1 * img_h)
+                        x2, y2 = int(bx2 * img_w), int(by2 * img_h)
+                    elif max_bval <= 100 and all(0 <= v <= 100 for v in [bx1, by1, bx2, by2]):
+                        x1, y1 = int(bx1 / 100 * img_w), int(by1 / 100 * img_h)
+                        x2, y2 = int(bx2 / 100 * img_w), int(by2 / 100 * img_h)
+                    elif max_bval <= 1000 and max(img_w, img_h) > 1000:
+                        x1, y1 = int(bx1 / 1000 * img_w), int(by1 / 1000 * img_h)
+                        x2, y2 = int(bx2 / 1000 * img_w), int(by2 / 1000 * img_h)
                     else:
-                        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                        x1, y1, x2, y2 = int(bx1), int(by1), int(bx2), int(by2)
 
                     label = det.get("label", "?")
                     species = det.get("species", "")

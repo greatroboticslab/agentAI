@@ -47,17 +47,19 @@ echo "============================================"
 # Initialize conda
 eval "$(conda shell.bash hook)"
 
-# Activate conda env based on model
+# Select conda env based on model
+# - bench:  transformers 4.57 (Qwen2.5-VL, MiniCPM, etc.)
+# - compat: transformers 4.46 (InternVL2, Florence-2 need older API)
 case "$MODEL_KEY" in
-    minicpm)
-        echo "[*] Activating conda env: minicpm"
-        conda activate minicpm
+    internvl2|florence2)
+        ENV_NAME="compat"
         ;;
     *)
-        echo "[*] Activating conda env: qwen"
-        conda activate qwen
+        ENV_NAME="bench"
         ;;
 esac
+echo "[*] Activating conda env: $ENV_NAME"
+conda activate "$ENV_NAME"
 
 export HF_HOME="/ocean/projects/cis240145p/byler/hf_cache"
 export TRANSFORMERS_CACHE="/ocean/projects/cis240145p/byler/hf_cache/hub"

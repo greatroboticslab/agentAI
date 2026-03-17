@@ -204,6 +204,32 @@ Per-class validation results:
 
 ---
 
+### Session 7 — 2026-03-17: Fixed coordinate conversion, completed 4 HF models
+
+**Critical bug fix**: Qwen2.5-VL outputs bbox coords in [0, 1000] normalized range, but `convert_bbox_to_yolo` was dividing by original image dimensions (~3024x4032), producing tiny normalized values. Fixed with multi-scale coordinate detection.
+
+**Environment fix**: Created `compat` conda env (transformers==4.46.3) for InternVL2 and Florence-2, which are incompatible with transformers 4.57+.
+
+**Results (CottonWeedDet12, 848 test images)**:
+
+| Model | mAP@0.5 | mAP@0.5:0.95 | Prec@0.5 | Rec@0.5 | F1@0.5 | Time |
+|-------|---------|--------------|----------|---------|--------|------|
+| YOLO11n (fine-tuned) | **0.929** | 0.865 | 0.930 | 0.850 | 0.888 | — |
+| Florence-2-large | **0.329** | 0.302 | 0.692 | 0.431 | 0.531 | 662s |
+| InternVL2-8B | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3799s |
+| Qwen2.5-VL-3B | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
+| Qwen2.5-VL-7B | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
+| llama3.2-vision-11b | 0.000 | 0.000 | 0.005 | 0.007 | 0.006 | 11370s |
+| moondream/llava/bakllava | 0.000 | 0.000 | — | — | — | — |
+
+**Key findings**:
+- Florence-2 is the best LLM (mAP=0.329, Prec=0.692) and fastest (662s)
+- YOLO still 2.8x better than the best LLM
+- Models without native grounding (llama, llava) produce ~0 mAP
+- Smaller Qwen (3B) slightly outperforms larger (7B) — likely higher detection rate (844 vs 655/848)
+
+---
+
 ## Phase 3: YOLO+LLM Fusion (Planned)
 
 3 strategies: supplement, filter, weighted
