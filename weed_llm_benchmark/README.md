@@ -40,6 +40,28 @@ A benchmark framework for evaluating how well open-source vision LLMs can detect
 
 **Goal**: Determine which vision LLMs are most effective at weed detection before deploying them in a real agricultural pipeline. The framework tests each model's ability to return valid bounding boxes, identify weed species, and produce reliable JSON output.
 
+## Benchmark Results
+
+Evaluated on **CottonWeedDet12** test set (848 images, 12 weed species, 1,464 ground truth boxes).
+
+| Model | mAP@0.5 | mAP@0.5:0.95 | Precision | Recall | F1 | Inference Time |
+|-------|---------|--------------|-----------|--------|-----|---------------|
+| **YOLO11n** (fine-tuned) | **0.929** | **0.865** | 0.930 | 0.850 | 0.888 | ~2s/848img |
+| Florence-2-large (1.5GB) | 0.329 | 0.302 | **0.692** | 0.431 | 0.531 | 662s |
+| InternVL2-8B (16GB) | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3799s |
+| Qwen2.5-VL-3B (6GB) | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
+| Qwen2.5-VL-7B (14GB) | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
+| Llama 3.2 Vision 11B | 0.000 | 0.000 | 0.005 | 0.007 | 0.006 | 11370s |
+| Moondream 1.8B | 0.000 | 0.000 | — | — | — | 1184s |
+| LLaVA 7B / 13B / BakLLaVA | 0.000 | 0.000 | — | — | — | — |
+
+**Key findings:**
+- **YOLO dominates**: Fine-tuned YOLO11n achieves 0.929 mAP@0.5, 2.8x better than the best LLM.
+- **Florence-2 is the best LLM**: Highest mAP (0.329) and precision (0.692), and fastest inference (662s for 848 images). Its native `<OD>` object detection task produces well-calibrated bounding boxes.
+- **Native grounding is essential**: Models without built-in bounding box support (LLaVA, Llama Vision) produce near-zero mAP regardless of model size.
+- **Smaller can be better**: Qwen2.5-VL-3B slightly outperforms 7B (0.196 vs 0.176 mAP), likely due to higher detection rate (844/848 vs 655/848 images with detections).
+- **Coordinate format matters**: Qwen2.5-VL outputs in [0, 1000] normalized space; Florence-2 outputs absolute pixels. Proper coordinate conversion is critical for accurate evaluation.
+
 ## Model Support
 
 The framework is **model-agnostic** — the core pipeline (prompt -> JSON response -> extract bboxes -> YOLO format -> upload) works with any vision LLM. Two integration paths are provided:

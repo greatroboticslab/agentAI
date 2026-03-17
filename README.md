@@ -76,10 +76,25 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 |-------|--------|-------------|
 | Phase 0: Evaluation Module | Done | `evaluate.py` (mAP, precision, recall), `datasets.py`, format converters |
 | Phase 1: YOLO Baseline | **Done** | YOLO11n fine-tuned on CottonWeedDet12 — mAP@0.5=**0.929**, P=0.930, R=0.850 |
-| Phase 2: Full LLM Benchmark | **In Progress** | 19 vision LLMs (Qwen3-VL, Grounding DINO, PaliGemma2, YOLO-World, etc.) |
+| Phase 2: Full LLM Benchmark | **In Progress** | 9/15 models completed, 6 running on cluster |
 | Phase 3: YOLO+LLM Fusion | Planned | 3 strategies: supplement, filter, weighted |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
 | Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
+
+#### Benchmark Results (CottonWeedDet12, 848 test images)
+
+| Model | Type | mAP@0.5 | mAP@0.5:0.95 | Precision | Recall | F1 | Time |
+|-------|------|---------|--------------|-----------|--------|-----|------|
+| **YOLO11n** (fine-tuned) | Detector | **0.929** | **0.865** | 0.930 | 0.850 | 0.888 | — |
+| Florence-2-large | VLM | 0.329 | 0.302 | **0.692** | 0.431 | 0.531 | 662s |
+| InternVL2-8B | VLM | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3799s |
+| Qwen2.5-VL-3B | VLM | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
+| Qwen2.5-VL-7B | VLM | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
+| Llama 3.2 Vision 11B | VLM | 0.000 | 0.000 | 0.005 | 0.007 | 0.006 | 11370s |
+| Moondream 1.8B | VLM | 0.000 | 0.000 | — | — | — | 1184s |
+| LLaVA 7B / 13B / BakLLaVA | VLM | 0.000 | 0.000 | — | — | — | — |
+
+*Remaining models (Grounding DINO, Qwen3-VL-8B, PaliGemma2, MiniCPM-V 4.5, Molmo-7B, DeepSeek-VL2) running on PSC Bridges-2 cluster.*
 
 ## Technology Stack
 
