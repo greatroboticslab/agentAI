@@ -385,17 +385,18 @@ def load_model(model_key="qwen7b"):
         return model, processor, model_type
 
     elif model_type == "qwen3":
-        from transformers import AutoModelForCausalLM, AutoProcessor
+        from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
         print(f"[*] Loading {model_id}...")
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id, trust_remote_code=True,
-            torch_dtype=torch.bfloat16,
+        # Use .cuda() — device_map="auto" hangs on Qwen3-VL
+        model = Qwen3VLForConditionalGeneration.from_pretrained(
+            model_id, torch_dtype=torch.bfloat16,
             cache_dir=os.path.join(HF_CACHE, "hub"),
         ).cuda()
+        print(f"[*] Model on GPU, loading processor...")
         min_pixels = 256 * 28 * 28
         max_pixels = 1280 * 28 * 28
         processor = AutoProcessor.from_pretrained(
-            model_id, trust_remote_code=True,
+            model_id,
             cache_dir=os.path.join(HF_CACHE, "hub"),
             min_pixels=min_pixels, max_pixels=max_pixels,
         )

@@ -67,18 +67,31 @@ def get_experiment_id(dataset, model):
 
 
 def load_checkpoint():
-    """Load progress checkpoint."""
+    """Load progress checkpoint (handles corrupted files from concurrent writes)."""
     if os.path.exists(CHECKPOINT_FILE):
-        with open(CHECKPOINT_FILE) as f:
-            return json.load(f)
+        try:
+            with open(CHECKPOINT_FILE) as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            # Corrupted by concurrent writes — extract first valid JSON object
+            raw = open(CHECKPOINT_FILE).read()
+            depth = 0
+            for i, c in enumerate(raw):
+                if c == '{': depth += 1
+                elif c == '}': depth -= 1
+                if depth == 0 and i > 0:
+                    return json.loads(raw[:i+1])
+            print("[!] Checkpoint fully corrupted, starting fresh")
     return {"completed": {}, "failed": {}, "start_time": datetime.now().isoformat()}
 
 
 def save_checkpoint(checkpoint):
-    """Save progress checkpoint."""
+    """Save progress checkpoint atomically (write to temp, then rename)."""
     os.makedirs(RESULT_DIR, exist_ok=True)
-    with open(CHECKPOINT_FILE, "w") as f:
+    tmp_path = CHECKPOINT_FILE + ".tmp"
+    with open(tmp_path, "w") as f:
         json.dump(checkpoint, f, indent=2)
+    os.replace(tmp_path, CHECKPOINT_FILE)
 
 
 def run_hf_experiment(dataset_key, model_key):

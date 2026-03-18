@@ -1674,9 +1674,9 @@ flysky:
 
 ## 12. Execution Standards
 
-### Instructions for Claude Code
+### Development Guidelines
 
-When developing, Claude Code should:
+When developing, contributors should:
 
 1. **Read this document first** (`PLAN.md`) to understand current progress and overall architecture
 2. **Confirm current Phase**; only work on tasks in the current Phase

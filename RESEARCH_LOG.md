@@ -179,7 +179,7 @@ Per-class validation results:
 2. **InternVL2 `all_tied_weights_keys`**: Previous patch used `set()` but callers do `.keys()` on it. Fix: use `{}` (dict) not `set()`.
 3. **Florence-2 `forced_bos_token_id`**: Error happens INSIDE `AutoConfig.from_pretrained` during Florence2LanguageConfig construction, so patching config after load is too late. Fix: patch `PretrainedConfig.forced_bos_token_id = None` class attribute BEFORE loading.
 
-**Git Email Fix**: Rewrote all commit history to change placeholder `your.email@university.edu` → `harry567566@gmail.com`. Force pushed to remove "claude Claude" from GitHub contributors.
+**Git Email Fix**: Rewrote all commit history to change placeholder `your.email@university.edu` → `harry567566@gmail.com`.
 
 **Model Coverage Expansion**: Research found 7 important missing models. Added to benchmark:
 
