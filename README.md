@@ -76,7 +76,7 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 |-------|--------|-------------|
 | Phase 0: Evaluation Module | Done | `evaluate.py` (mAP, precision, recall), `datasets.py`, format converters |
 | Phase 1: YOLO Baseline | **Done** | YOLO11n fine-tuned on CottonWeedDet12 — mAP@0.5=**0.929**, P=0.930, R=0.850 |
-| Phase 2: Full LLM Benchmark | **Done** | 11 models evaluated on CottonWeedDet12 |
+| Phase 2: Full LLM Benchmark | **Done** | 15 models evaluated on CottonWeedDet12 (8 with mAP > 0) |
 | Phase 3: YOLO+LLM Fusion | Planned | 3 strategies: supplement, filter, weighted |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
 | Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
@@ -86,15 +86,18 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 | Model | Type | mAP@0.5 | mAP@0.5:0.95 | Precision | Recall | F1 | Time |
 |-------|------|---------|--------------|-----------|--------|-----|------|
 | **YOLO11n** (fine-tuned) | Detector | **0.929** | **0.865** | 0.930 | 0.850 | 0.888 | — |
-| Florence-2-large | VLM | 0.329 | 0.302 | **0.692** | 0.431 | 0.531 | 662s |
+| Florence-2-base (0.23B) | VLM | **0.434** | **0.392** | **0.789** | 0.519 | 0.626 | 545s |
+| Florence-2-large (0.77B) | VLM | 0.329 | 0.302 | 0.692 | 0.431 | 0.531 | 662s |
 | InternVL2-8B | VLM | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3799s |
 | Qwen2.5-VL-3B | VLM | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
 | MiniCPM-V-4.5 | VLM | 0.178 | 0.041 | 0.393 | 0.334 | 0.361 | 6695s |
 | Qwen2.5-VL-7B | VLM | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
+| OWLv2-large | Detector | 0.088 | 0.056 | 0.090 | **0.967** | 0.165 | 2503s |
+| InternVL2-2B | VLM | 0.002 | 0.001 | 0.040 | 0.026 | 0.031 | 2070s |
+| InternVL2.5-8B | VLM | 0.000 | 0.000 | 0.018 | 0.001 | 0.001 | 6251s |
 | Grounding-DINO-base | Detector | 0.000 | 0.000 | — | — | — | 682s |
 | Llama 3.2 Vision 11B | VLM | 0.000 | 0.000 | 0.005 | 0.007 | 0.006 | 11370s |
-| Moondream 1.8B | VLM | 0.000 | 0.000 | — | — | — | 1184s |
-| LLaVA 7B / 13B / BakLLaVA | VLM | 0.000 | 0.000 | — | — | — | — |
+| Moondream / Molmo / LLaVA | VLM | 0.000 | 0.000 | — | — | — | — |
 
 ## Technology Stack
 

@@ -44,14 +44,15 @@ DATASETS = ["cottonweeddet12", "deepweeds", "weed2okok"]
 HF_MODELS = [
     # Original models
     "qwen7b", "qwen3b", "minicpm", "internvl2", "florence2",
-    # New models (Phase 2 expansion, 2026-03-16)
-    "qwen3_8b",         # Qwen3-VL-8B (Jan 2026)
-    "grounding_dino",   # Grounding DINO (ECCV 2024) — open-set detector baseline
-    "paligemma2",       # PaliGemma2-3B (Google) — native <loc> detection
-    "yolo_world",       # YOLO-World v2 — open-vocabulary YOLO
-    "minicpm_v45",      # MiniCPM-V 4.5 (Feb 2026) — replaces gated v2.6
-    "molmo2",           # Molmo-7B-D (Allen AI) — pixel coordinate grounding
-    "deepseek_vl2",     # DeepSeek-VL2-Small — MoE with grounding tokens
+    # Phase 2 expansion (2026-03-16)
+    "grounding_dino", "minicpm_v45", "molmo2",
+    # Phase 2 expansion v2 (2026-03-17) — more detectors + scaling variants
+    "florence2_base",   # Florence-2-base (0.23B) — size comparison
+    "owlv2",            # OWLv2-large — dedicated zero-shot detector
+    "omdet_turbo",      # OmDet-Turbo — fast zero-shot detector
+    "internvl2_4b",     # InternVL2-4B — scaling analysis
+    "internvl2_2b",     # InternVL2-2B — scaling analysis
+    "internvl2_5_8b",   # InternVL2.5-8B — improved version
 ]
 
 # Models to run via Ollama (local or cluster)

@@ -51,7 +51,7 @@ eval "$(conda shell.bash hook)"
 # - bench:  transformers 4.57 (Qwen2.5-VL, MiniCPM, etc.)
 # - compat: transformers 4.46 (InternVL2, Florence-2 need older API)
 case "$MODEL_KEY" in
-    internvl2|florence2)
+    internvl2|internvl2_2b|internvl2_4b|internvl2_5_8b|florence2|florence2_base)
         ENV_NAME="compat"
         ;;
     *)

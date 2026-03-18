@@ -284,6 +284,56 @@ MODEL_REGISTRY = {
         "size": "~8GB",
         "description": "MoE VLM with grounding tokens (Dec 2024)",
     },
+    # ---- New models added 2026-03-17 (Phase 2 expansion v2) ----
+    "florence2_base": {
+        "name": "Florence-2-base",
+        "model_id": "microsoft/Florence-2-base",
+        "type": "florence",
+        "size": "~0.9GB",
+        "description": "Florence-2 base (0.23B) — smaller detection baseline",
+    },
+    "owlv2": {
+        "name": "OWLv2-large",
+        "model_id": "google/owlv2-large-patch14-ensemble",
+        "type": "owlv2",
+        "size": "~1.75GB",
+        "description": "Google zero-shot object detector with text queries",
+    },
+    "omdet_turbo": {
+        "name": "OmDet-Turbo",
+        "model_id": "omlab/omdet-turbo-swin-tiny-hf",
+        "type": "omdet",
+        "size": "~0.9GB",
+        "description": "Fast zero-shot detector (100 FPS on COCO)",
+    },
+    "internvl2_4b": {
+        "name": "InternVL2-4B",
+        "model_id": "OpenGVLab/InternVL2-4B",
+        "type": "internvl",
+        "size": "~8GB",
+        "description": "Mid-size InternVL2 for scaling analysis",
+    },
+    "internvl2_2b": {
+        "name": "InternVL2-2B",
+        "model_id": "OpenGVLab/InternVL2-2B",
+        "type": "internvl",
+        "size": "~4GB",
+        "description": "Smallest InternVL2 for scaling analysis",
+    },
+    "internvl2_5_8b": {
+        "name": "InternVL2.5-8B",
+        "model_id": "OpenGVLab/InternVL2_5-8B",
+        "type": "internvl",
+        "size": "~16GB",
+        "description": "Improved InternVL2 (Dec 2024)",
+    },
+    "mm_gdino": {
+        "name": "MM-Grounding-DINO-L",
+        "model_id": "ShilongLiu/GroundingDINO",
+        "type": "grounding_dino",
+        "size": "~1.5GB",
+        "description": "Improved Grounding DINO with better zero-shot AP",
+    },
 }
 
 
@@ -483,6 +533,30 @@ def load_model(model_key="qwen7b"):
         print(f"[+] {info['name']} loaded.")
         return model, tokenizer, model_type
 
+    elif model_type == "owlv2":
+        from transformers import Owlv2ForObjectDetection, Owlv2Processor
+        print(f"[*] Loading {model_id}...")
+        model = Owlv2ForObjectDetection.from_pretrained(
+            model_id, cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
+        processor = Owlv2Processor.from_pretrained(
+            model_id, cache_dir=os.path.join(HF_CACHE, "hub"),
+        )
+        print(f"[+] {info['name']} loaded.")
+        return model, processor, model_type
+
+    elif model_type == "omdet":
+        from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
+        print(f"[*] Loading {model_id}...")
+        model = AutoModelForZeroShotObjectDetection.from_pretrained(
+            model_id, cache_dir=os.path.join(HF_CACHE, "hub"),
+        ).cuda()
+        processor = AutoProcessor.from_pretrained(
+            model_id, cache_dir=os.path.join(HF_CACHE, "hub"),
+        )
+        print(f"[+] {info['name']} loaded.")
+        return model, processor, model_type
+
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -518,6 +592,8 @@ def run_inference(model, processor, image_path, model_type="qwen"):
         "yolo_world": _infer_yolo_world,
         "molmo": _infer_molmo,
         "deepseek_vl": _infer_deepseek_vl,
+        "owlv2": _infer_owlv2,
+        "omdet": _infer_omdet,
     }
     if model_type not in dispatch:
         raise ValueError(f"Unknown model type: {model_type}")
@@ -633,7 +709,7 @@ def _infer_grounding_dino(model, processor, image_path):
     from PIL import Image
 
     image = Image.open(image_path).convert("RGB")
-    text = "weed . plant ."  # period-separated classes for GDINO
+    text = "weed"  # single query works better than multi-class for GDINO
 
     inputs = processor(images=image, text=text, return_tensors="pt").to(model.device)
     with torch.no_grad():
@@ -651,6 +727,66 @@ def _infer_grounding_dino(model, processor, image_path):
         detections.append({
             "label": label if isinstance(label, str) else "weed",
             "bbox": [round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1)],
+            "confidence": round(score.item(), 3),
+        })
+    return json.dumps({"detections": detections})
+
+
+def _infer_owlv2(model, processor, image_path):
+    """OWLv2: zero-shot object detection with text queries."""
+    import torch
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    texts = [["weed", "weed plant", "broadleaf weed", "grass weed"]]
+    inputs = processor(text=texts, images=image, return_tensors="pt").to(model.device)
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    target_sizes = torch.tensor([image.size[::-1]]).to(model.device)
+    results = processor.post_process_object_detection(
+        outputs=outputs, target_sizes=target_sizes, threshold=0.1
+    )[0]
+
+    detections = []
+    for score, label_id, box in zip(results["scores"], results["labels"], results["boxes"]):
+        x1, y1, x2, y2 = box.tolist()
+        # Normalize to [0, 1] for consistent coordinate handling
+        detections.append({
+            "label": "weed",
+            "bbox": [x1 / image.width, y1 / image.height,
+                     x2 / image.width, y2 / image.height],
+            "confidence": round(score.item(), 3),
+        })
+    return json.dumps({"detections": detections})
+
+
+def _infer_omdet(model, processor, image_path):
+    """OmDet-Turbo: fast zero-shot object detection."""
+    import torch
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    text_labels = [["weed", "plant"]]
+    inputs = processor(image, text=text_labels, return_tensors="pt").to(model.device)
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    results = processor.post_process_grounded_object_detection(
+        outputs, text_labels,
+        threshold=0.2,
+        target_sizes=[image.size[::-1]]
+    )[0]
+
+    detections = []
+    for score, label, box in zip(results["scores"], results["text_labels"], results["boxes"]):
+        x1, y1, x2, y2 = box.tolist()
+        detections.append({
+            "label": label if isinstance(label, str) else "weed",
+            "bbox": [x1 / image.width, y1 / image.height,
+                     x2 / image.width, y2 / image.height],
             "confidence": round(score.item(), 3),
         })
     return json.dumps({"detections": detections})
