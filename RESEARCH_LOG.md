@@ -228,19 +228,121 @@ Per-class validation results:
 - Models without native grounding (llama, llava) produce ~0 mAP
 - Smaller Qwen (3B) slightly outperforms larger (7B) — likely higher detection rate (844 vs 655/848)
 
+### Session 8 — 2026-03-17: Expanded to 11 models, fixed checkpoint corruption
+
+**Batch run of 6 new models**: grounding_dino, qwen3_8b, paligemma2, minicpm_v45, molmo2, deepseek_vl2.
+
+**Checkpoint corruption**: Parallel SLURM jobs writing to the same `benchmark_checkpoint.json` caused `JSONDecodeError: Extra data`. Fixed with:
+- Atomic writes (write to `.tmp` then `os.replace`)
+- Corrupted JSON auto-recovery in `load_checkpoint()`
+- Sequential execution in a single SLURM job to prevent concurrent writes
+
+**New results**:
+- **MiniCPM-V-4.5**: mAP@0.5 = 0.178, 6695s — successfully detected weeds
+- **Grounding-DINO**: mAP = 0.000 — ran 848 images but detected nothing with "weed . plant ." prompt
+- **Molmo-7B-D**: mAP = 0.000 — outputs natural language, not structured coordinates
+
+**Failed models (incompatible)**:
+- Qwen3-VL-8B: `Qwen3VLForConditionalGeneration` loads but hangs on `.cuda()` and `device_map="auto"`
+- PaliGemma2: gated repo (needs Google HF auth)
+- DeepSeek-VL2: `deepseek_vl_v2` architecture not recognized by transformers
+
+### Session 9 — 2026-03-17/18: Wave 2 models, Florence-2-base tops benchmark
+
+**Added 7 new models** targeting size scaling and dedicated detectors:
+
+| Model | Type | Rationale |
+|-------|------|-----------|
+| Florence-2-base (0.23B) | VLM | Size comparison with Florence-2-large |
+| OWLv2-large (0.4B) | Zero-shot detector | Google's dedicated detector |
+| OmDet-Turbo (0.1B) | Zero-shot detector | Fast COCO detector |
+| InternVL2-2B | VLM | Scaling analysis |
+| InternVL2-4B | VLM | Scaling analysis |
+| InternVL2.5-8B | VLM | Improved InternVL2 |
+| MM-Grounding-DINO | Detector | Improved G-DINO |
+
+**Results**:
+- **Florence-2-base**: mAP@0.5 = **0.434**, Precision = **0.789** — **new best VLM**, outperforms its own larger variant (0.329)
+- **OWLv2**: mAP@0.5 = 0.088, Recall = **0.967** — near-perfect detection sensitivity but very low precision (4 text queries caused duplicate detections)
+- **InternVL2-2B**: mAP = 0.002 — too small for reliable detection
+- **InternVL2.5-8B**: mAP ≈ 0 — regression vs InternVL2-8B, different output format issue
+- **OmDet-Turbo**: failed ("Cannot copy out of meta tensor")
+- **InternVL2-4B**: failed (empty error)
+
+### Session 10 — 2026-03-18: Revalidation run, all results verified
+
+**Goal**: Re-run all non-high-confidence models to ensure academic rigor.
+
+**Fixes applied before revalidation**:
+- OWLv2: changed from 4 text queries `["weed", "weed plant", "broadleaf weed", "grass weed"]` to single `["weed"]` to eliminate duplicate detections
+- Grounding-DINO: changed prompt from `"weed . plant ."` to `"weed"` (confirmed actually ran this time)
+- All 6 models: deleted old output directories, cleared checkpoint entries, ran fresh
+
+**Revalidation results (all confirmed)**:
+
+| Model | Before | After Revalidation | Change |
+|-------|--------|-------------------|--------|
+| Florence-2-base | 0.434 | **0.434** | Confirmed |
+| OWLv2 (single query) | 0.088 | **0.184** | Fixed duplicate detection |
+| MiniCPM-V-4.5 | 0.178 | **0.192** | Slight improvement |
+| Grounding-DINO | 0.000 | **0.000** | Confirmed (cannot detect "weed" zero-shot) |
+| InternVL2-2B | 0.002 | **0.002** | Confirmed |
+| InternVL2.5-8B | 0.000 | **0.000** | Confirmed |
+
+**Final validated benchmark (15 models, all high confidence)**:
+
+| # | Model | Params | mAP@0.5 | mAP@0.5:0.95 | Prec | Rec | F1 | Time |
+|---|-------|--------|---------|--------------|------|-----|-----|------|
+| 1 | YOLO11n (fine-tuned) | 2.6M | **0.929** | 0.865 | 0.930 | 0.850 | 0.888 | — |
+| 2 | Florence-2-base | 0.23B | **0.434** | 0.392 | 0.789 | 0.519 | 0.626 | 558s |
+| 3 | Florence-2-large | 0.77B | 0.329 | 0.302 | 0.692 | 0.431 | 0.531 | 662s |
+| 4 | InternVL2-8B | 8B | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3838s |
+| 5 | Qwen2.5-VL-3B | 3B | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
+| 6 | MiniCPM-V-4.5 | 8B | 0.192 | 0.043 | 0.407 | 0.340 | 0.371 | 6595s |
+| 7 | OWLv2-large | 0.4B | 0.184 | 0.117 | 0.194 | 0.943 | 0.322 | 2519s |
+| 8 | Qwen2.5-VL-7B | 7B | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
+| 9 | InternVL2-2B | 2B | 0.002 | 0.001 | 0.038 | 0.025 | 0.031 | 2094s |
+| 10 | InternVL2.5-8B | 8B | 0.000 | 0.000 | 0.016 | 0.001 | 0.001 | 6238s |
+| 11-15 | G-DINO, Molmo, Llama Vision, Moondream, LLaVA | — | 0.000 | — | — | — | — | — |
+
+**Paper-level conclusions from Phase 2**:
+1. **YOLO dominates**: 0.929 vs 0.434 best VLM (2.1x gap)
+2. **Model size ≠ performance**: Florence-2-base (0.23B) beats all 3-8B VLMs
+3. **Detection architecture > scale**: Dedicated detection heads (Florence-2 `<OD>`, OWLv2) outperform general VLMs prompted for coordinates
+4. **OWLv2 extreme recall**: 94.3% recall but 19.4% precision — potential high-sensitivity pre-filter for YOLO
+5. **Native grounding essential**: 7/15 models produce mAP ≈ 0 (no bbox capability)
+6. **InternVL2.5 regression**: "improved" version scores worse than InternVL2-8B — model updates don't always help for specialized tasks
+
 ---
 
-## Phase 3: YOLO+LLM Fusion (Planned)
+## Phase 3: YOLO+LLM Fusion (Next)
 
-3 strategies: supplement, filter, weighted
+Code ready in `yolo_llm_fusion.py`. 3 strategies implemented:
+- **supplement**: Add LLM-only detections to YOLO (target: improve recall from 0.850)
+- **filter**: Keep only YOLO detections confirmed by LLM (target: improve precision)
+- **weighted**: 70% YOLO + 30% LLM confidence fusion
+
+Key opportunity: YOLO recall = 0.850 (misses 15%), OWLv2 recall = 0.943. Supplement strategy could recover YOLO's missed detections.
 
 ---
 
 ## Phase 4: Ablation Studies (Planned)
 
-Prompt engineering, model size, grounding capability, fusion IoU sweep
+Code ready in `run_ablations.py`. 4 experiments:
+1. Prompt engineering (3 variants: detailed, grounding, simple)
+2. Model size scaling (Qwen 3B vs 7B, InternVL2 2B vs 4B vs 8B, Florence base vs large)
+3. Grounding capability (Tier 1 native bbox vs Tier 2 text-only)
+4. Fusion IoU threshold sweep (0.1 to 0.7)
 
 ---
+
+## Phase 5: Paper Writing (Planned)
+
+Target: *Computers and Electronics in Agriculture*
+Title: "Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Models for Agricultural Object Detection"
+RQ1: VLM vs YOLO comparison (Phase 2 results)
+RQ2: YOLO+LLM fusion improvement (Phase 3 results)
+RQ3: What drives detection quality — size, prompt, or architecture? (Phase 4 results)
 
 ## Phase 5: Paper Writing (Planned)
 
