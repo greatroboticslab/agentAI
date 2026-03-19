@@ -368,6 +368,25 @@ LLM "rescue rate" is extremely low — LLMs almost never detect weeds that YOLO 
 
 ---
 
+## Phase 3B: Cross-Species Generalization (Next)
+
+**Hypothesis**: LLMs generalize better to unseen weed species than fine-tuned YOLO, because LLMs have broad pre-training knowledge while YOLO only knows its training species.
+
+**Method**: Leave-4-Out experiment on CottonWeedDet12.
+- **Hold-out species** (YOLO never sees during training): Morningglory, Goosegrass, Eclipta, Nutsedge (YOLO's 4 weakest species from Phase 1 validation)
+- **Training species** (8 remaining): Carpetweeds, Crabgrass, PalmerAmaranth, PricklySida, Purslane, Ragweed, Sicklepod, SpottedSpurge
+
+**Experiments**:
+1. Re-train YOLO on 8-species subset only
+2. Run YOLO (8-species) on test images containing hold-out species → zero-shot detection
+3. Run Florence-2-base + OWLv2 on the same images → zero-shot detection
+4. Compare: does LLM outperform YOLO on unseen species?
+5. If yes → use LLM detections as pseudo-labels → augment YOLO training → re-train → verify improvement
+
+**Expected outcome**: YOLO should detect unseen species poorly (trained only on 8/12 species), while LLMs may maintain detection ability through broad visual knowledge. If confirmed, this demonstrates LLMs' practical value as zero-shot annotators for expanding YOLO's training data to new species.
+
+---
+
 ## Phase 4: Ablation Studies (Planned)
 
 Code ready in `run_ablations.py`. 4 experiments:
@@ -382,6 +401,7 @@ Code ready in `run_ablations.py`. 4 experiments:
 
 Target: *Computers and Electronics in Agriculture*
 Title: "Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Models for Agricultural Object Detection"
-RQ1: VLM vs YOLO comparison (Phase 2 results)
-RQ2: YOLO+LLM fusion improvement (Phase 3 results)
-RQ3: What drives detection quality — size, prompt, or architecture? (Phase 4 results)
+RQ1: VLM vs YOLO comparison on known species (Phase 2 results)
+RQ2: YOLO+LLM fusion on known species (Phase 3 results)
+RQ3: LLM advantage on unseen species + LLM-augmented YOLO training (Phase 3B results)
+RQ4: What drives detection quality — size, prompt, or architecture? (Phase 4 results)
