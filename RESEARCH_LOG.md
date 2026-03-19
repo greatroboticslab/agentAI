@@ -315,14 +315,56 @@ Per-class validation results:
 
 ---
 
-## Phase 3: YOLO+LLM Fusion (Next)
+## Phase 3: YOLO+LLM Fusion (Complete)
 
-Code ready in `yolo_llm_fusion.py`. 3 strategies implemented:
-- **supplement**: Add LLM-only detections to YOLO (target: improve recall from 0.850)
-- **filter**: Keep only YOLO detections confirmed by LLM (target: improve precision)
-- **weighted**: 70% YOLO + 30% LLM confidence fusion
+### Session 11 — 2026-03-19: Fusion experiments complete
 
-Key opportunity: YOLO recall = 0.850 (misses 15%), OWLv2 recall = 0.943. Supplement strategy could recover YOLO's missed detections.
+Ran 6 experiments in `run_phase3_fusion.py` using existing YOLO and LLM detection results.
+
+**E1: Pairwise YOLO + Single LLM Fusion (7 LLMs × 3 strategies = 21 configs)**
+
+YOLO baseline: P=0.821, R=0.915, F1=0.865
+
+| LLM Partner | supplement F1 | filter F1 | weighted F1 | Best |
+|-------------|---------------|-----------|-------------|------|
+| OWLv2 | 0.326 (-0.539) | **0.883 (+0.018)** | 0.326 (-0.539) | filter ↑ |
+| Florence-2-base | 0.818 (-0.048) | 0.682 (-0.183) | 0.818 (-0.048) | — |
+| Florence-2-large | 0.799 (-0.066) | 0.607 (-0.259) | 0.799 (-0.066) | — |
+| InternVL2-8B | 0.793 (-0.072) | 0.630 (-0.235) | 0.793 (-0.072) | — |
+| MiniCPM-V-4.5 | 0.771 (-0.095) | 0.716 (-0.150) | 0.771 (-0.095) | — |
+| Qwen2.5-VL-3B | 0.759 (-0.106) | 0.616 (-0.250) | 0.759 (-0.106) | — |
+| Qwen2.5-VL-7B | 0.769 (-0.097) | 0.542 (-0.323) | 0.769 (-0.097) | — |
+
+**Only YOLO + OWLv2 filter improves F1** (+0.018): OWLv2's 94.3% recall confirms almost all true YOLO detections while filtering some false positives (precision 0.821→0.869).
+
+**E3: Complementarity Analysis (key finding)**
+
+LLM "rescue rate" is extremely low — LLMs almost never detect weeds that YOLO misses:
+- Florence-2-base: 9/1464 GT boxes (0.6%) rescued
+- OWLv2: 25/1464 (1.7%) rescued
+- All other LLMs: <0.2% rescue rate
+- YOLO misses ~8% of GT boxes, and LLMs miss most of the same ones
+
+**E5: Multi-LLM Ensemble**
+
+| Min votes | Prec | Rec | F1 | ΔF1 |
+|-----------|------|-----|-----|-----|
+| ≥1 | 0.206 | 0.962 | 0.339 | -0.526 |
+| ≥2 | 0.598 | 0.921 | 0.726 | -0.140 |
+| ≥3 | 0.780 | 0.919 | 0.844 | -0.022 |
+
+3-LLM consensus approaches but does not exceed YOLO alone.
+
+**E6: Bootstrap Statistical Significance**
+- YOLO alone: F1 = 0.865 ± 0.009, 95% CI [0.851, 0.883]
+- YOLO+Florence supplement: F1 = 0.817 (below YOLO CI → significantly worse)
+
+**Paper conclusions for RQ2**:
+1. YOLO+LLM fusion provides marginal improvement only via OWLv2 filter (+0.018 F1)
+2. LLMs cannot supplement YOLO's missed detections (rescue rate <1%)
+3. Supplement strategy universally degrades performance due to LLM false positives
+4. A well-trained YOLO detector already captures the detection space that LLMs can cover
+5. Multi-LLM consensus (≥3 votes) can approach but not exceed fine-tuned YOLO
 
 ---
 
@@ -343,7 +385,3 @@ Title: "Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Mode
 RQ1: VLM vs YOLO comparison (Phase 2 results)
 RQ2: YOLO+LLM fusion improvement (Phase 3 results)
 RQ3: What drives detection quality — size, prompt, or architecture? (Phase 4 results)
-
-## Phase 5: Paper Writing (Planned)
-
-Generate figures, tables, write paper

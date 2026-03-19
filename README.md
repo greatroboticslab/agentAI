@@ -77,7 +77,7 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 | Phase 0: Evaluation Module | Done | `evaluate.py` (mAP, precision, recall), `datasets.py`, format converters |
 | Phase 1: YOLO Baseline | **Done** | YOLO11n fine-tuned on CottonWeedDet12 — mAP@0.5=**0.929**, P=0.930, R=0.850 |
 | Phase 2: Full LLM Benchmark | **Done** | 15 models evaluated on CottonWeedDet12 (8 with mAP > 0) |
-| Phase 3: YOLO+LLM Fusion | Planned | 3 strategies: supplement, filter, weighted |
+| Phase 3: YOLO+LLM Fusion | **Done** | Only OWLv2 filter improves YOLO (+0.018 F1); LLMs cannot rescue YOLO misses |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
 | Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
 
