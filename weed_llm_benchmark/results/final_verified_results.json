@@ -1,0 +1,93 @@
+{
+  "metadata": {
+    "dataset": "CottonWeedDet12",
+    "test_images": 848,
+    "gt_boxes": 1464,
+    "species": 12,
+    "evaluation_metric": "IoU-based greedy matching, mAP via 11-point interpolation",
+    "cluster": "PSC Bridges-2, Tesla V100-SXM2-32GB",
+    "date_completed": "2026-03-18",
+    "note": "All results verified via revalidation run (Session 10). Phase 3 results from run_phase3_fusion.py."
+  },
+  "phase2_benchmark": {
+    "yolo11n_finetuned": {
+      "params": "2.6M", "type": "detector", "env": "ultralytics",
+      "mAP@0.5": 0.929, "mAP@0.5:0.95": 0.865, "precision": 0.930, "recall": 0.850, "f1": 0.888,
+      "training": {"epochs": 100, "batch": 60, "optimizer": "AdamW", "lr": 0.000625, "time_hours": 2.75}
+    },
+    "florence2_base": {
+      "params": "0.23B", "model_id": "microsoft/Florence-2-base", "type": "VLM", "env": "compat (transformers 4.46)",
+      "mAP@0.5": 0.434, "mAP@0.5:0.95": 0.392, "precision": 0.789, "recall": 0.519, "f1": 0.626, "time_s": 558
+    },
+    "florence2_large": {
+      "params": "0.77B", "model_id": "microsoft/Florence-2-large", "type": "VLM", "env": "compat (transformers 4.46)",
+      "mAP@0.5": 0.329, "mAP@0.5:0.95": 0.302, "precision": 0.692, "recall": 0.431, "f1": 0.531, "time_s": 662
+    },
+    "internvl2_8b": {
+      "params": "8B", "model_id": "OpenGVLab/InternVL2-8B", "type": "VLM", "env": "compat (transformers 4.46)",
+      "mAP@0.5": 0.208, "mAP@0.5:0.95": 0.091, "precision": 0.545, "recall": 0.354, "f1": 0.429, "time_s": 3838
+    },
+    "qwen25vl_3b": {
+      "params": "3B", "model_id": "Qwen/Qwen2.5-VL-3B-Instruct", "type": "VLM", "env": "bench (transformers 4.57)",
+      "mAP@0.5": 0.196, "mAP@0.5:0.95": 0.068, "precision": 0.333, "recall": 0.249, "f1": 0.285, "time_s": 5898,
+      "note": "Coordinates in [0,1000] normalized space, converted via multi-scale detection"
+    },
+    "minicpm_v45": {
+      "params": "8B", "model_id": "openbmb/MiniCPM-V-4_5", "type": "VLM", "env": "bench (transformers 4.57)",
+      "mAP@0.5": 0.192, "mAP@0.5:0.95": 0.043, "precision": 0.407, "recall": 0.340, "f1": 0.371, "time_s": 6595
+    },
+    "owlv2_large": {
+      "params": "0.4B", "model_id": "google/owlv2-large-patch14-ensemble", "type": "detector", "env": "bench (transformers 4.57)",
+      "mAP@0.5": 0.184, "mAP@0.5:0.95": 0.117, "precision": 0.194, "recall": 0.943, "f1": 0.322, "time_s": 2519,
+      "note": "Single text query 'weed' to avoid duplicate detections"
+    },
+    "qwen25vl_7b": {
+      "params": "7B", "model_id": "Qwen/Qwen2.5-VL-7B-Instruct", "type": "VLM", "env": "bench (transformers 4.57)",
+      "mAP@0.5": 0.176, "mAP@0.5:0.95": 0.059, "precision": 0.334, "recall": 0.214, "f1": 0.261, "time_s": 6047,
+      "note": "Coordinates in [0,1000] normalized space"
+    },
+    "internvl2_2b": {
+      "params": "2B", "model_id": "OpenGVLab/InternVL2-2B", "type": "VLM", "env": "compat (transformers 4.46)",
+      "mAP@0.5": 0.002, "mAP@0.5:0.95": 0.001, "precision": 0.038, "recall": 0.025, "f1": 0.031, "time_s": 2094
+    },
+    "internvl25_8b": {
+      "params": "8B", "model_id": "OpenGVLab/InternVL2_5-8B", "type": "VLM", "env": "compat (transformers 4.46)",
+      "mAP@0.5": 0.000, "precision": 0.016, "recall": 0.001, "f1": 0.001, "time_s": 6238
+    },
+    "grounding_dino": {
+      "params": "0.17B", "model_id": "IDEA-Research/grounding-dino-base", "type": "detector",
+      "mAP@0.5": 0.000, "note": "Text prompt 'weed' produces 0 detections on agricultural images"
+    },
+    "llama32_vision_11b": {
+      "params": "11B", "model_id": "meta-llama/Llama-3.2-11B-Vision-Instruct", "type": "VLM",
+      "mAP@0.5": 0.000, "precision": 0.005, "recall": 0.007, "f1": 0.006, "time_s": 11370
+    },
+    "moondream_1_8b": {"params": "1.8B", "mAP@0.5": 0.000, "note": "Ollama, imprecise bbox"},
+    "molmo_7b": {"params": "7B", "mAP@0.5": 0.000, "note": "Natural language output, no structured coords"},
+    "llava_7b_13b_bakllava": {"mAP@0.5": 0.000, "note": "Cannot produce bounding boxes"}
+  },
+  "phase3_fusion": {
+    "yolo_baseline": {"precision": 0.821, "recall": 0.915, "f1": 0.865, "tp": 1340, "fp": 293, "fn": 124},
+    "best_fusion": {
+      "config": "YOLO + OWLv2 filter (IoU=0.3)",
+      "precision": 0.869, "recall": 0.897, "f1": 0.883, "delta_f1": 0.018,
+      "note": "Only fusion config that improves over YOLO alone"
+    },
+    "complement_analysis": {
+      "florence2_base_rescue_rate": 0.006, "owlv2_rescue_rate": 0.017,
+      "note": "LLMs rescue <2% of YOLO misses; errors are highly correlated"
+    },
+    "ensemble_3vote": {"precision": 0.780, "recall": 0.919, "f1": 0.844, "delta_f1": -0.022},
+    "bootstrap_ci": {
+      "yolo_only": {"mean_f1": 0.865, "std": 0.009, "ci95": [0.851, 0.883]},
+      "yolo_florence_supplement": {"mean_f1": 0.817}
+    }
+  },
+  "raw_data_location": {
+    "note": "Per-image detection results stored on PSC Bridges-2 cluster",
+    "llm_detections": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/llm_labeled/{model}_cottonweeddet12/detection_results.json",
+    "yolo_predictions": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/phase3/yolo_preds/",
+    "yolo_training": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/runs/detect/runs/yolo11n_cottonweeddet12/",
+    "phase3_experiments": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/phase3/"
+  }
+}

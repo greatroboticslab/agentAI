@@ -1,0 +1,20 @@
+{
+  "yolo_only": {
+    "mean_f1": 0.865,
+    "std_f1": 0.0086,
+    "ci_95_low": 0.8508,
+    "ci_95_high": 0.8832
+  },
+  "yolo+florence_supplement": {
+    "mean_f1": 0.8174,
+    "std_f1": 0.008,
+    "ci_95_low": 0.8032,
+    "ci_95_high": 0.8331
+  },
+  "yolo+florence_filter": {
+    "mean_f1": 0.6821,
+    "std_f1": 0.0128,
+    "ci_95_low": 0.6587,
+    "ci_95_high": 0.7086
+  }
+}]0;byler@br013:~(base) [byler@bridges2-login013 ~]$ exit

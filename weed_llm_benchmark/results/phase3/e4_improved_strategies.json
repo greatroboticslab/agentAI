@@ -1,0 +1,100 @@
+[
+  {
+    "strategy": "specialized_owlv2+florence",
+    "tp": 771,
+    "fp": 66,
+    "fn": 693,
+    "precision": 0.9211,
+    "recall": 0.5266,
+    "f1": 0.6701,
+    "delta_f1": -0.1953
+  },
+  {
+    "strategy": "supplement_conf0.0",
+    "llm": "florence2_base",
+    "tp": 1346,
+    "fp": 483,
+    "fn": 118,
+    "precision": 0.7359,
+    "recall": 0.9194,
+    "f1": 0.8175,
+    "delta_f1": -0.0479
+  },
+  {
+    "strategy": "supplement_conf0.3",
+    "llm": "florence2_base",
+    "tp": 1346,
+    "fp": 483,
+    "fn": 118,
+    "precision": 0.7359,
+    "recall": 0.9194,
+    "f1": 0.8175,
+    "delta_f1": -0.0479
+  },
+  {
+    "strategy": "supplement_conf0.5",
+    "llm": "florence2_base",
+    "tp": 1346,
+    "fp": 483,
+    "fn": 118,
+    "precision": 0.7359,
+    "recall": 0.9194,
+    "f1": 0.8175,
+    "delta_f1": -0.0479
+  },
+  {
+    "strategy": "supplement_conf0.7",
+    "llm": "florence2_base",
+    "tp": 1346,
+    "fp": 483,
+    "fn": 118,
+    "precision": 0.7359,
+    "recall": 0.9194,
+    "f1": 0.8175,
+    "delta_f1": -0.0479
+  },
+  {
+    "strategy": "supplement_conf0.0",
+    "llm": "owlv2",
+    "tp": 1421,
+    "fp": 5821,
+    "fn": 43,
+    "precision": 0.1962,
+    "recall": 0.9706,
+    "f1": 0.3264,
+    "delta_f1": -0.539
+  },
+  {
+    "strategy": "supplement_conf0.3",
+    "llm": "owlv2",
+    "tp": 1421,
+    "fp": 5821,
+    "fn": 43,
+    "precision": 0.1962,
+    "recall": 0.9706,
+    "f1": 0.3264,
+    "delta_f1": -0.539
+  },
+  {
+    "strategy": "supplement_conf0.5",
+    "llm": "owlv2",
+    "tp": 1421,
+    "fp": 5821,
+    "fn": 43,
+    "precision": 0.1962,
+    "recall": 0.9706,
+    "f1": 0.3264,
+    "delta_f1": -0.539
+  },
+  {
+    "strategy": "supplement_conf0.7",
+    "llm": "owlv2",
+    "tp": 1421,
+    "fp": 5821,
+    "fn": 43,
+    "precision": 0.1962,
+    "recall": 0.9706,
+    "f1": 0.3264,
+    "delta_f1": -0.539
+  }
+]]0;byler@br011:~(base) [byler@bridges2-login011 ~]$ exit
