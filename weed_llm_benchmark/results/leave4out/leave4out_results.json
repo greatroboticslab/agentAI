@@ -1,0 +1,662 @@
+{
+  "yolo_8species": {
+    "model": "YOLO (8-species)",
+    "tp": 481,
+    "fp": 336,
+    "fn": 290,
+    "precision": 0.5887,
+    "recall": 0.6239,
+    "f1": 0.6058,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 61,
+        "fn": 11,
+        "recall": 0.8472
+      },
+      "Crabgrass": {
+        "tp": 6,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "Eclipta": {
+        "tp": 122,
+        "fn": 36,
+        "recall": 0.7722
+      },
+      "Goosegrass": {
+        "tp": 62,
+        "fn": 84,
+        "recall": 0.4247
+      },
+      "Morningglory": {
+        "tp": 92,
+        "fn": 82,
+        "recall": 0.5287
+      },
+      "Nutsedge": {
+        "tp": 74,
+        "fn": 72,
+        "recall": 0.5068
+      },
+      "PalmerAmaranth": {
+        "tp": 22,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "PricklySida": {
+        "tp": 24,
+        "fn": 1,
+        "recall": 0.96
+      },
+      "Purslane": {
+        "tp": 5,
+        "fn": 1,
+        "recall": 0.8333
+      },
+      "Sicklepod": {
+        "tp": 7,
+        "fn": 2,
+        "recall": 0.7778
+      },
+      "SpottedSpurge": {
+        "tp": 6,
+        "fn": 1,
+        "recall": 0.8571
+      }
+    }
+  },
+  "yolo_12species": {
+    "model": "YOLO (12-species, full)",
+    "tp": 674,
+    "fp": 179,
+    "fn": 97,
+    "precision": 0.7902,
+    "recall": 0.8742,
+    "f1": 0.83,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 66,
+        "fn": 6,
+        "recall": 0.9167
+      },
+      "Crabgrass": {
+        "tp": 5,
+        "fn": 1,
+        "recall": 0.8333
+      },
+      "Eclipta": {
+        "tp": 136,
+        "fn": 22,
+        "recall": 0.8608
+      },
+      "Goosegrass": {
+        "tp": 123,
+        "fn": 23,
+        "recall": 0.8425
+      },
+      "Morningglory": {
+        "tp": 145,
+        "fn": 29,
+        "recall": 0.8333
+      },
+      "Nutsedge": {
+        "tp": 135,
+        "fn": 11,
+        "recall": 0.9247
+      },
+      "PalmerAmaranth": {
+        "tp": 21,
+        "fn": 1,
+        "recall": 0.9545
+      },
+      "PricklySida": {
+        "tp": 24,
+        "fn": 1,
+        "recall": 0.96
+      },
+      "Purslane": {
+        "tp": 6,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "Sicklepod": {
+        "tp": 7,
+        "fn": 2,
+        "recall": 0.7778
+      },
+      "SpottedSpurge": {
+        "tp": 6,
+        "fn": 1,
+        "recall": 0.8571
+      }
+    }
+  },
+  "florence2_base": {
+    "model": "florence2_base (zero-shot)",
+    "tp": 284,
+    "fp": 107,
+    "fn": 487,
+    "precision": 0.7263,
+    "recall": 0.3684,
+    "f1": 0.4888,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 29,
+        "fn": 43,
+        "recall": 0.4028
+      },
+      "Crabgrass": {
+        "tp": 3,
+        "fn": 3,
+        "recall": 0.5
+      },
+      "Eclipta": {
+        "tp": 83,
+        "fn": 75,
+        "recall": 0.5253
+      },
+      "Goosegrass": {
+        "tp": 53,
+        "fn": 93,
+        "recall": 0.363
+      },
+      "Morningglory": {
+        "tp": 47,
+        "fn": 127,
+        "recall": 0.2701
+      },
+      "Nutsedge": {
+        "tp": 41,
+        "fn": 105,
+        "recall": 0.2808
+      },
+      "PalmerAmaranth": {
+        "tp": 10,
+        "fn": 12,
+        "recall": 0.4545
+      },
+      "PricklySida": {
+        "tp": 11,
+        "fn": 14,
+        "recall": 0.44
+      },
+      "Purslane": {
+        "tp": 1,
+        "fn": 5,
+        "recall": 0.1667
+      },
+      "Sicklepod": {
+        "tp": 3,
+        "fn": 6,
+        "recall": 0.3333
+      },
+      "SpottedSpurge": {
+        "tp": 3,
+        "fn": 4,
+        "recall": 0.4286
+      }
+    }
+  },
+  "florence2": {
+    "model": "florence2 (zero-shot)",
+    "tp": 226,
+    "fp": 140,
+    "fn": 545,
+    "precision": 0.6175,
+    "recall": 0.2931,
+    "f1": 0.3975,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 24,
+        "fn": 48,
+        "recall": 0.3333
+      },
+      "Crabgrass": {
+        "tp": 2,
+        "fn": 4,
+        "recall": 0.3333
+      },
+      "Eclipta": {
+        "tp": 71,
+        "fn": 87,
+        "recall": 0.4494
+      },
+      "Goosegrass": {
+        "tp": 49,
+        "fn": 97,
+        "recall": 0.3356
+      },
+      "Morningglory": {
+        "tp": 31,
+        "fn": 143,
+        "recall": 0.1782
+      },
+      "Nutsedge": {
+        "tp": 29,
+        "fn": 117,
+        "recall": 0.1986
+      },
+      "PalmerAmaranth": {
+        "tp": 8,
+        "fn": 14,
+        "recall": 0.3636
+      },
+      "PricklySida": {
+        "tp": 5,
+        "fn": 20,
+        "recall": 0.2
+      },
+      "Purslane": {
+        "tp": 0,
+        "fn": 6,
+        "recall": 0.0
+      },
+      "Sicklepod": {
+        "tp": 4,
+        "fn": 5,
+        "recall": 0.4444
+      },
+      "SpottedSpurge": {
+        "tp": 3,
+        "fn": 4,
+        "recall": 0.4286
+      }
+    }
+  },
+  "owlv2": {
+    "model": "owlv2 (zero-shot)",
+    "tp": 708,
+    "fp": 2508,
+    "fn": 63,
+    "precision": 0.2201,
+    "recall": 0.9183,
+    "f1": 0.3552,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 68,
+        "fn": 4,
+        "recall": 0.9444
+      },
+      "Crabgrass": {
+        "tp": 6,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "Eclipta": {
+        "tp": 138,
+        "fn": 20,
+        "recall": 0.8734
+      },
+      "Goosegrass": {
+        "tp": 132,
+        "fn": 14,
+        "recall": 0.9041
+      },
+      "Morningglory": {
+        "tp": 156,
+        "fn": 18,
+        "recall": 0.8966
+      },
+      "Nutsedge": {
+        "tp": 141,
+        "fn": 5,
+        "recall": 0.9658
+      },
+      "PalmerAmaranth": {
+        "tp": 21,
+        "fn": 1,
+        "recall": 0.9545
+      },
+      "PricklySida": {
+        "tp": 25,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "Purslane": {
+        "tp": 6,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "Sicklepod": {
+        "tp": 9,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "SpottedSpurge": {
+        "tp": 6,
+        "fn": 1,
+        "recall": 0.8571
+      }
+    }
+  },
+  "internvl2": {
+    "model": "internvl2 (zero-shot)",
+    "tp": 210,
+    "fp": 196,
+    "fn": 561,
+    "precision": 0.5172,
+    "recall": 0.2724,
+    "f1": 0.3568,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 21,
+        "fn": 51,
+        "recall": 0.2917
+      },
+      "Crabgrass": {
+        "tp": 1,
+        "fn": 5,
+        "recall": 0.1667
+      },
+      "Eclipta": {
+        "tp": 50,
+        "fn": 108,
+        "recall": 0.3165
+      },
+      "Goosegrass": {
+        "tp": 41,
+        "fn": 105,
+        "recall": 0.2808
+      },
+      "Morningglory": {
+        "tp": 37,
+        "fn": 137,
+        "recall": 0.2126
+      },
+      "Nutsedge": {
+        "tp": 37,
+        "fn": 109,
+        "recall": 0.2534
+      },
+      "PalmerAmaranth": {
+        "tp": 10,
+        "fn": 12,
+        "recall": 0.4545
+      },
+      "PricklySida": {
+        "tp": 6,
+        "fn": 19,
+        "recall": 0.24
+      },
+      "Purslane": {
+        "tp": 0,
+        "fn": 6,
+        "recall": 0.0
+      },
+      "Sicklepod": {
+        "tp": 5,
+        "fn": 4,
+        "recall": 0.5556
+      },
+      "SpottedSpurge": {
+        "tp": 2,
+        "fn": 5,
+        "recall": 0.2857
+      }
+    }
+  },
+  "qwen3b": {
+    "model": "qwen3b (zero-shot)",
+    "tp": 122,
+    "fp": 340,
+    "fn": 649,
+    "precision": 0.2641,
+    "recall": 0.1582,
+    "f1": 0.1979,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 14,
+        "fn": 58,
+        "recall": 0.1944
+      },
+      "Crabgrass": {
+        "tp": 1,
+        "fn": 5,
+        "recall": 0.1667
+      },
+      "Eclipta": {
+        "tp": 31,
+        "fn": 127,
+        "recall": 0.1962
+      },
+      "Goosegrass": {
+        "tp": 31,
+        "fn": 115,
+        "recall": 0.2123
+      },
+      "Morningglory": {
+        "tp": 23,
+        "fn": 151,
+        "recall": 0.1322
+      },
+      "Nutsedge": {
+        "tp": 9,
+        "fn": 137,
+        "recall": 0.0616
+      },
+      "PalmerAmaranth": {
+        "tp": 5,
+        "fn": 17,
+        "recall": 0.2273
+      },
+      "PricklySida": {
+        "tp": 3,
+        "fn": 22,
+        "recall": 0.12
+      },
+      "Purslane": {
+        "tp": 0,
+        "fn": 6,
+        "recall": 0.0
+      },
+      "Sicklepod": {
+        "tp": 1,
+        "fn": 8,
+        "recall": 0.1111
+      },
+      "SpottedSpurge": {
+        "tp": 4,
+        "fn": 3,
+        "recall": 0.5714
+      }
+    }
+  },
+  "minicpm_v45": {
+    "model": "minicpm_v45 (zero-shot)",
+    "tp": 182,
+    "fp": 348,
+    "fn": 589,
+    "precision": 0.3434,
+    "recall": 0.2361,
+    "f1": 0.2798,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 20,
+        "fn": 52,
+        "recall": 0.2778
+      },
+      "Crabgrass": {
+        "tp": 1,
+        "fn": 5,
+        "recall": 0.1667
+      },
+      "Eclipta": {
+        "tp": 48,
+        "fn": 110,
+        "recall": 0.3038
+      },
+      "Goosegrass": {
+        "tp": 41,
+        "fn": 105,
+        "recall": 0.2808
+      },
+      "Morningglory": {
+        "tp": 31,
+        "fn": 143,
+        "recall": 0.1782
+      },
+      "Nutsedge": {
+        "tp": 22,
+        "fn": 124,
+        "recall": 0.1507
+      },
+      "PalmerAmaranth": {
+        "tp": 6,
+        "fn": 16,
+        "recall": 0.2727
+      },
+      "PricklySida": {
+        "tp": 5,
+        "fn": 20,
+        "recall": 0.2
+      },
+      "Purslane": {
+        "tp": 2,
+        "fn": 4,
+        "recall": 0.3333
+      },
+      "Sicklepod": {
+        "tp": 3,
+        "fn": 6,
+        "recall": 0.3333
+      },
+      "SpottedSpurge": {
+        "tp": 3,
+        "fn": 4,
+        "recall": 0.4286
+      }
+    }
+  },
+  "qwen7b": {
+    "model": "qwen7b (zero-shot)",
+    "tp": 123,
+    "fp": 306,
+    "fn": 648,
+    "precision": 0.2867,
+    "recall": 0.1595,
+    "f1": 0.205,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 16,
+        "fn": 56,
+        "recall": 0.2222
+      },
+      "Crabgrass": {
+        "tp": 0,
+        "fn": 6,
+        "recall": 0.0
+      },
+      "Eclipta": {
+        "tp": 30,
+        "fn": 128,
+        "recall": 0.1899
+      },
+      "Goosegrass": {
+        "tp": 25,
+        "fn": 121,
+        "recall": 0.1712
+      },
+      "Morningglory": {
+        "tp": 26,
+        "fn": 148,
+        "recall": 0.1494
+      },
+      "Nutsedge": {
+        "tp": 10,
+        "fn": 136,
+        "recall": 0.0685
+      },
+      "PalmerAmaranth": {
+        "tp": 4,
+        "fn": 18,
+        "recall": 0.1818
+      },
+      "PricklySida": {
+        "tp": 4,
+        "fn": 21,
+        "recall": 0.16
+      },
+      "Purslane": {
+        "tp": 0,
+        "fn": 6,
+        "recall": 0.0
+      },
+      "Sicklepod": {
+        "tp": 3,
+        "fn": 6,
+        "recall": 0.3333
+      },
+      "SpottedSpurge": {
+        "tp": 5,
+        "fn": 2,
+        "recall": 0.7143
+      }
+    }
+  },
+  "yolo_augmented": {
+    "model": "YOLO (8sp + LLM augmented)",
+    "tp": 506,
+    "fp": 369,
+    "fn": 265,
+    "precision": 0.5783,
+    "recall": 0.6563,
+    "f1": 0.6148,
+    "per_class": {
+      "Carpetweeds": {
+        "tp": 65,
+        "fn": 7,
+        "recall": 0.9028
+      },
+      "Crabgrass": {
+        "tp": 6,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "Eclipta": {
+        "tp": 121,
+        "fn": 37,
+        "recall": 0.7658
+      },
+      "Goosegrass": {
+        "tp": 68,
+        "fn": 78,
+        "recall": 0.4658
+      },
+      "Morningglory": {
+        "tp": 91,
+        "fn": 83,
+        "recall": 0.523
+      },
+      "Nutsedge": {
+        "tp": 91,
+        "fn": 55,
+        "recall": 0.6233
+      },
+      "PalmerAmaranth": {
+        "tp": 22,
+        "fn": 0,
+        "recall": 1.0
+      },
+      "PricklySida": {
+        "tp": 23,
+        "fn": 2,
+        "recall": 0.92
+      },
+      "Purslane": {
+        "tp": 5,
+        "fn": 1,
+        "recall": 0.8333
+      },
+      "Sicklepod": {
+        "tp": 8,
+        "fn": 1,
+        "recall": 0.8889
+      },
+      "SpottedSpurge": {
+        "tp": 6,
+        "fn": 1,
+        "recall": 0.8571
+      }
+    }
+  }
+}
