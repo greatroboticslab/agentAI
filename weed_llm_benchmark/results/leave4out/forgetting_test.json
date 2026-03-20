@@ -1,0 +1,14 @@
+{
+  "original_8sp": {
+    "precision": 0.8805,
+    "recall": 0.9567,
+    "f1": 0.917
+  },
+  "augmented": {
+    "precision": 0.8436,
+    "recall": 0.9495,
+    "f1": 0.8934
+  },
+  "delta_f1": -0.0236,
+  "note": "LLM-augmented YOLO shows mild catastrophic forgetting: -2.4% F1 on original 8 species while gaining +0.9% on 4 unseen species"
+}

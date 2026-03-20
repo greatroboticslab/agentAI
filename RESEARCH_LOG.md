@@ -396,7 +396,17 @@ LLM "rescue rate" is extremely low — LLMs almost never detect weeds that YOLO 
 4. **LLM pseudo-label augmentation provides small improvement** (+0.009 F1) — proof of concept that LLM annotations can expand YOLO's species coverage
 5. **Gap to full YOLO (0.830) remains large** — LLM pseudo-labels alone insufficient; human-in-the-loop refinement needed for production
 
-**Practical implication**: When farmers encounter new weed species not in YOLO's training data, Florence-2-base can serve as a high-precision zero-shot annotator (72.6% precision), and OWLv2 as a high-recall pre-filter (91.8% recall). These LLM-generated annotations can bootstrap YOLO re-training for rapid species coverage expansion.
+**Catastrophic forgetting test** (Session 12 addendum):
+Testing augmented YOLO on the ORIGINAL 8 training species:
+
+| Model | On original 8 species F1 | On new 4 species F1 |
+|-------|--------------------------|---------------------|
+| YOLO (8sp) | 0.917 | 0.606 |
+| YOLO (8sp + LLM aug) | 0.893 (-0.024) | 0.615 (+0.009) |
+
+Mild catastrophic forgetting confirmed: -2.4% on known species, +0.9% on unknown species. Indicates a precision-coverage tradeoff that needs anti-forgetting techniques (EWC, replay buffers) for production deployment.
+
+**Practical implication**: When farmers encounter new weed species not in YOLO's training data, Florence-2-base can serve as a high-precision zero-shot annotator (72.6% precision), and OWLv2 as a high-recall pre-filter (91.8% recall). These LLM-generated annotations can bootstrap YOLO re-training, but anti-forgetting mechanisms are needed to preserve existing species performance.
 
 ---
 
