@@ -368,22 +368,35 @@ LLM "rescue rate" is extremely low — LLMs almost never detect weeds that YOLO 
 
 ---
 
-## Phase 3B: Cross-Species Generalization (Next)
+## Phase 3B: Cross-Species Generalization (Complete)
 
-**Hypothesis**: LLMs generalize better to unseen weed species than fine-tuned YOLO, because LLMs have broad pre-training knowledge while YOLO only knows its training species.
+### Session 12 — 2026-03-19: Leave-4-Out experiment complete
 
-**Method**: Leave-4-Out experiment on CottonWeedDet12.
-- **Hold-out species** (YOLO never sees during training): Morningglory, Goosegrass, Eclipta, Nutsedge (YOLO's 4 weakest species from Phase 1 validation)
-- **Training species** (8 remaining): Carpetweeds, Crabgrass, PalmerAmaranth, PricklySida, Purslane, Ragweed, Sicklepod, SpottedSpurge
+**Method**: Held out 4 species (Morningglory, Goosegrass, Eclipta, Nutsedge) from YOLO training. Trained YOLO on 8 remaining species. Tested all models on images containing held-out species.
 
-**Experiments**:
-1. Re-train YOLO on 8-species subset only
-2. Run YOLO (8-species) on test images containing hold-out species → zero-shot detection
-3. Run Florence-2-base + OWLv2 on the same images → zero-shot detection
-4. Compare: does LLM outperform YOLO on unseen species?
-5. If yes → use LLM detections as pseudo-labels → augment YOLO training → re-train → verify improvement
+**Results**:
 
-**Expected outcome**: YOLO should detect unseen species poorly (trained only on 8/12 species), while LLMs may maintain detection ability through broad visual knowledge. If confirmed, this demonstrates LLMs' practical value as zero-shot annotators for expanding YOLO's training data to new species.
+| Model | Prec | Rec | F1 | Notes |
+|-------|------|-----|-----|-------|
+| YOLO (12sp, upper bound) | 0.790 | 0.874 | **0.830** | Seen all species |
+| YOLO (8sp + LLM augmented) | 0.578 | 0.656 | **0.615** | +0.009 from LLM pseudo-labels |
+| YOLO (8sp only) | 0.589 | 0.624 | 0.606 | Never seen 4 holdout species |
+| Florence-2-base (zero-shot) | **0.726** | 0.368 | 0.489 | Highest precision on unseen species |
+| Florence-2-large (zero-shot) | 0.618 | 0.293 | 0.398 | |
+| OWLv2 (zero-shot) | 0.220 | **0.918** | 0.355 | Near-perfect recall on unseen species |
+| InternVL2-8B | 0.517 | 0.272 | 0.357 | |
+| MiniCPM-V-4.5 | 0.343 | 0.236 | 0.280 | |
+| Qwen2.5-VL-7B | 0.287 | 0.160 | 0.205 | |
+| Qwen2.5-VL-3B | 0.264 | 0.158 | 0.198 | |
+
+**Key findings**:
+1. **YOLO degrades 27% on unseen species** (F1: 0.830→0.606) — confirms domain limitation
+2. **Florence-2-base precision exceeds YOLO-8sp** (0.726 > 0.589) — LLM is MORE reliable on unknown species
+3. **OWLv2 maintains 91.8% recall** on unseen species — detects nearly all novel weeds
+4. **LLM pseudo-label augmentation provides small improvement** (+0.009 F1) — proof of concept that LLM annotations can expand YOLO's species coverage
+5. **Gap to full YOLO (0.830) remains large** — LLM pseudo-labels alone insufficient; human-in-the-loop refinement needed for production
+
+**Practical implication**: When farmers encounter new weed species not in YOLO's training data, Florence-2-base can serve as a high-precision zero-shot annotator (72.6% precision), and OWLv2 as a high-recall pre-filter (91.8% recall). These LLM-generated annotations can bootstrap YOLO re-training for rapid species coverage expansion.
 
 ---
 
