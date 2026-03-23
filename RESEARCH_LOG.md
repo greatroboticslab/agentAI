@@ -408,6 +408,25 @@ Mild catastrophic forgetting confirmed: -2.4% on known species, +0.9% on unknown
 
 **Practical implication**: When farmers encounter new weed species not in YOLO's training data, Florence-2-base can serve as a high-precision zero-shot annotator (72.6% precision), and OWLv2 as a high-recall pre-filter (91.8% recall). These LLM-generated annotations can bootstrap YOLO re-training, but anti-forgetting mechanisms are needed to preserve existing species performance.
 
+### Session 13 — 2026-03-23: BA-LPW anti-forgetting experiment
+
+**Background-Aware Label Propagation (BA-LPW)**: Attempted to solve catastrophic forgetting by creating complete labels for new-species images — using YOLO to annotate old species + Florence-2 to annotate new species before retraining.
+
+**Hypothesis**: Forgetting occurs because old species in new images lack labels ("background relegation"). Complete labels should prevent this.
+
+**Results**:
+
+| Method | Old 8sp F1 | New 4sp F1 | Old Δ | New Δ |
+|--------|-----------|-----------|-------|-------|
+| YOLO 8sp (baseline) | 0.917 | 0.606 | — | — |
+| YOLO naive aug | 0.893 | 0.615 | -0.024 | +0.009 |
+| YOLO BA-LPW | 0.895 | 0.601 | -0.022 | -0.005 |
+
+**Conclusion**: BA-LPW provides marginal improvement over naive augmentation on old species (-0.022 vs -0.024) but does not solve the forgetting problem. Background relegation is not the primary cause; weight overwriting during gradient updates is the deeper issue. More advanced methods needed:
+- Self-distillation (Teach YOLO to Remember, 2025)
+- Elastic Weight Consolidation (EWC)
+- Teacher-student knowledge distillation from old model
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)
