@@ -79,6 +79,7 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 | Phase 2: Full LLM Benchmark | **Done** | 15 models evaluated on CottonWeedDet12 (8 with mAP > 0) |
 | Phase 3: YOLO+LLM Fusion | **Done** | Only OWLv2 filter improves YOLO (+0.018 F1); LLMs cannot rescue YOLO misses |
 | Phase 3B: Cross-Species Generalization | **Done** | YOLO drops 27% on unseen species; Florence-2 precision exceeds YOLO; LLM augmentation +0.009 F1 |
+| Phase 3C: Anti-Forgetting Methods | **In Progress** | BA-LPW marginal; testing self-distillation + EWC next |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
 | Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
 
