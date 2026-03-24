@@ -422,10 +422,32 @@ Mild catastrophic forgetting confirmed: -2.4% on known species, +0.9% on unknown
 | YOLO naive aug | 0.893 | 0.615 | -0.024 | +0.009 |
 | YOLO BA-LPW | 0.895 | 0.601 | -0.022 | -0.005 |
 
-**Conclusion**: BA-LPW provides marginal improvement over naive augmentation on old species (-0.022 vs -0.024) but does not solve the forgetting problem. Background relegation is not the primary cause; weight overwriting during gradient updates is the deeper issue. More advanced methods needed:
-- Self-distillation (Teach YOLO to Remember, 2025)
-- Elastic Weight Consolidation (EWC)
-- Teacher-student knowledge distillation from old model
+**Conclusion**: BA-LPW provides marginal improvement over naive augmentation on old species (-0.022 vs -0.024) but does not solve the forgetting problem. Background relegation is not the primary cause; weight overwriting during gradient updates is the deeper issue.
+
+**Anti-forgetting methods submitted** (4 approaches): replay buffer, frozen backbone, progressive fine-tuning, combined. Cluster infrastructure issue (home directory permissions) interrupted execution — pending re-run.
+
+### Next Direction: R-Super Inspired + SAM/Depth Enhancement
+
+Based on professor's guidance and R-Super (MICCAI 2025 Best Paper runner-up):
+
+**Key insight from R-Super**: Don't use LLM outputs as hard pseudo-labels (noisy, causes forgetting). Instead, transform them into soft training constraints (loss functions):
+- **Count constraint**: Florence-2 detects N weeds → penalize YOLO if prediction count ≠ N
+- **Size constraint**: LLM bbox covers X% of image → constrain predicted bbox proportions
+- **Location constraint**: LLM says "weed in center" → spatial prior for detection
+
+**Professor's suggestion**: Introduce SAM (Segment Anything) + Depth Anything to give LLM richer visual information for more accurate labeling:
+```
+Pipeline:
+1. SAM segments all objects in image → precise boundaries
+2. Depth Anything estimates depth map → 3D spatial context
+3. Feed segmentation masks + depth map + image to LLM
+4. LLM produces better-informed labels considering shape and depth
+5. Use these enriched labels as soft constraints for YOLO training
+```
+
+**Rationale**: When LLM's visual knowledge is limited (e.g., unfamiliar weed species), additional modalities (segmentation, depth) provide geometric/structural cues that help LLM reason better about object boundaries and spatial relationships.
+
+**Status**: Pending implementation after cluster infrastructure recovery.
 
 ---
 
