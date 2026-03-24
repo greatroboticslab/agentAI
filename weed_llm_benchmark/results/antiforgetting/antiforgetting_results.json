@@ -1,0 +1,8 @@
+{
+  "yolo_8sp": {"old_species": {"precision": 0.880, "recall": 0.957, "f1": 0.917}, "new_species": {"precision": 0.589, "recall": 0.624, "f1": 0.606}},
+  "naive_aug": {"old_species": {"precision": 0.844, "recall": 0.949, "f1": 0.893}, "new_species": {"precision": 0.578, "recall": 0.656, "f1": 0.615}},
+  "balpw": {"old_species": {"precision": 0.843, "recall": 0.954, "f1": 0.895}, "new_species": {"precision": 0.538, "recall": 0.680, "f1": 0.601}},
+  "m1_replay50": {"old_species": {"precision": 0.827, "recall": 0.957, "f1": 0.887}, "new_species": {"precision": 0.510, "recall": 0.682, "f1": 0.584}},
+  "m2_frozen": {"old_species": {"precision": 0.474, "recall": 0.092, "f1": 0.155}, "new_species": {"precision": 0.418, "recall": 0.158, "f1": 0.230}},
+  "note": "All methods fail to solve catastrophic forgetting. Replay worsens it (-0.030), frozen backbone catastrophically fails (0.155). BA-LPW is best but marginal (-0.022). Next: improve label quality via SAM+Depth, or use soft-constraint losses (R-Super)."
+}

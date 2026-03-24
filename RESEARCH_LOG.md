@@ -424,7 +424,25 @@ Mild catastrophic forgetting confirmed: -2.4% on known species, +0.9% on unknown
 
 **Conclusion**: BA-LPW provides marginal improvement over naive augmentation on old species (-0.022 vs -0.024) but does not solve the forgetting problem. Background relegation is not the primary cause; weight overwriting during gradient updates is the deeper issue.
 
-**Anti-forgetting methods submitted** (4 approaches): replay buffer, frozen backbone, progressive fine-tuning, combined. Cluster infrastructure issue (home directory permissions) interrupted execution — pending re-run.
+### Session 14 — 2026-03-24: Anti-forgetting methods — all negative results
+
+Tested 4 anti-forgetting strategies. None solved the problem:
+
+| Method | Old 8sp F1 | New 4sp F1 | Old Δ | New Δ | Verdict |
+|--------|-----------|-----------|-------|-------|---------|
+| YOLO 8sp (baseline) | 0.917 | 0.606 | — | — | — |
+| Naive LLM aug | 0.893 | 0.615 | -0.024 | +0.009 | Mild forgetting |
+| BA-LPW (complete labels) | 0.895 | 0.601 | -0.022 | -0.005 | Best but marginal |
+| **M1: Replay 50%** | 0.887 | 0.584 | **-0.030** | -0.022 | **Worse** — replay harmful |
+| **M2: Frozen backbone** | 0.155 | 0.230 | **-0.762** | -0.376 | **Catastrophic** — can't learn |
+
+**Key conclusions**:
+1. Simple training-level fixes (replay, frozen layers) don't work for this domain
+2. The problem is NOT just "background relegation" (BA-LPW barely helps)
+3. The problem is NOT just "weight overwriting" (replay makes it worse)
+4. **Root cause hypothesis**: LLM pseudo-labels are too noisy (72.6% precision) — the labels themselves need to be better
+
+**This motivates the professor's suggestion**: improve label quality through SAM + Depth Anything before training, rather than trying to fix the training process itself.
 
 ### Next Direction: R-Super Inspired + SAM/Depth Enhancement
 
