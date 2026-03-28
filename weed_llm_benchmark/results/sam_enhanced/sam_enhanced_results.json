@@ -1,0 +1,19 @@
+{
+  "yolo_8sp": {
+    "old_species": {"precision": 0.8805, "recall": 0.9567, "f1": 0.917},
+    "new_species": {"precision": 0.5887, "recall": 0.6239, "f1": 0.606}
+  },
+  "naive_aug": {
+    "old_species": {"precision": 0.8436, "recall": 0.9495, "f1": 0.893},
+    "new_species": {"precision": 0.5783, "recall": 0.6563, "f1": 0.615}
+  },
+  "balpw": {
+    "old_species": {"precision": 0.8431, "recall": 0.9538, "f1": 0.895},
+    "new_species": {"precision": 0.538, "recall": 0.680, "f1": 0.601}
+  },
+  "sam_enhanced": {
+    "old_species": {"precision": 0.849, "recall": null, "f1": 0.849},
+    "new_species": {"precision": null, "recall": null, "f1": 0.496}
+  },
+  "note": "SAM+Florence-2 produced worse results than all other methods. Root cause: SAM segments too many non-weed objects (soil, rocks, debris), and Florence-2 caption-based classification (keyword matching: green/leaf/plant) has too many false positives. Need more precise classification than simple caption keyword matching."
+}

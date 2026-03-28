@@ -76,11 +76,11 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 |-------|--------|-------------|
 | Phase 0: Evaluation Module | Done | `evaluate.py` (mAP, precision, recall), `datasets.py`, format converters |
 | Phase 1: YOLO Baseline | **Done** | YOLO11n fine-tuned on CottonWeedDet12 — mAP@0.5=**0.929**, P=0.930, R=0.850 |
-| Phase 2: Full LLM Benchmark | **Done** | 15 models evaluated on CottonWeedDet12 (8 with mAP > 0) |
+| Phase 2: Full LLM Benchmark | **Done** | 15 models evaluated on CottonWeedDet12 (9 with mAP > 0) |
 | Phase 3: YOLO+LLM Fusion | **Done** | Only OWLv2 filter improves YOLO (+0.018 F1); LLMs cannot rescue YOLO misses |
 | Phase 3B: Cross-Species Generalization | **Done** | YOLO drops 27% on unseen species; Florence-2 precision exceeds YOLO; LLM augmentation +0.009 F1 |
 | Phase 3C: Anti-Forgetting Methods | **Done** | All simple methods fail; label quality (SAM+Depth) is the bottleneck |
-| Phase 3D: SAM+Depth Enhanced Labeling | **Next** | Use SAM segmentation + Depth Anything to improve LLM label quality |
+| Phase 3D: SAM+Depth Enhanced Labeling | **Done** | SAM+Florence-2 caption: worse (-6.8% old, -11% new); caption classification too noisy |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
 | Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
 

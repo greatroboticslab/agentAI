@@ -465,7 +465,41 @@ Pipeline:
 
 **Rationale**: When LLM's visual knowledge is limited (e.g., unfamiliar weed species), additional modalities (segmentation, depth) provide geometric/structural cues that help LLM reason better about object boundaries and spatial relationships.
 
-**Status**: Pending implementation after cluster infrastructure recovery.
+### Session 15 — 2026-03-28: SAM-Enhanced LLM Labeling (negative result)
+
+**Method**: SAM (Segment Anything Model) segments all objects in holdout images → crop each segment → Florence-2 classifies each crop via `<CAPTION>` task → keyword matching (weed/plant/grass/leaf/green/vegetation) → YOLO-format labels → merge with YOLO old-species labels → train YOLO.
+
+**Implementation details**:
+- SAM ViT-B (`sam_vit_b_01ec64.pth`), points_per_side=16, pred_iou_thresh=0.86
+- 1161/1458 holdout images segmented (remaining crashed on INT_MAX for high-res images)
+- ~4888 SAM segments extracted, filtered by area ratio (0.01-0.8)
+- Florence-2-base (`microsoft/Florence-2-base`) classifies each crop
+- Classification: caption keyword matching — any mention of weed/plant/grass/leaf/green/vegetation = weed
+- Merged with BA-LPW old-species labels (YOLO-detected)
+- Training: fine-tune from 8-species YOLO, 50 epochs, lr=0.001
+
+**Results**:
+
+| Method | Old 8sp F1 | New 4sp F1 | Old Δ | New Δ |
+|--------|-----------|-----------|-------|-------|
+| YOLO 8sp (baseline) | 0.917 | 0.606 | — | — |
+| Naive LLM aug | 0.893 | 0.615 | -0.024 | +0.009 |
+| BA-LPW | 0.895 | 0.601 | -0.022 | -0.005 |
+| **SAM + Florence-2** | **0.849** | **0.496** | **-0.068** | **-0.110** |
+
+**Conclusion**: SAM-enhanced labeling performed **worst** of all methods.
+
+**Root cause analysis**:
+1. **SAM over-segments**: produces masks for soil, rocks, debris, leaf litter — not just weeds
+2. **Caption classification too loose**: keyword matching (green/leaf/plant) has very high false positive rate — soil patches with any vegetation get labeled as weed
+3. **Noise amplification**: more false positive labels → worse YOLO training than direct Florence-2 detection
+4. **Florence-2 direct detection (mAP=0.434, precision=0.789) is actually more precise** than SAM+Florence-2 caption classification — because Florence-2's native `<OD>` task was trained specifically for object detection, while caption keywords are not discriminative enough
+
+**Lessons learned**:
+- SAM provides precise boundaries but no semantic understanding — need a strong classifier on top
+- Caption-based classification is too noisy for agricultural domain
+- Florence-2's native `<OD>` detection mode is better than SAM+Florence-2 caption mode
+- Next: need domain-specific classification (fine-tuned classifier or more targeted prompts), or use Florence-2 `<OD>` directly on SAM crops instead of `<CAPTION>`
 
 ---
 
