@@ -97,10 +97,50 @@
 - `run_full_benchmark.py` — HF_MODELS expanded with 7 new entries
 - `setup_and_train.sh` — batch=-1 (auto), workers=5
 
+## 2026-03-17/18 - Phase 2 Complete, Phase 3 Fusion
+
+### Phase 2 Complete (15 models evaluated)
+- Florence-2-base (0.23B): mAP=0.434, best VLM — smallest model outperforms all 3-8B VLMs
+- Fixed coordinate conversion: Qwen2.5-VL [0,1000] normalized → multi-scale detection
+- Created `compat` env (transformers 4.46) for InternVL2/Florence-2 compatibility
+- Revalidation run confirmed all 15 models with IoU spot checks
+
+### Phase 3: YOLO+LLM Fusion (6 experiments)
+- `run_phase3_fusion.py` — pairwise fusion, IoU sweep, complementarity, ensemble, bootstrap CI
+- Only OWLv2 filter improves YOLO (+0.018 F1)
+- LLM rescue rate <1%: LLMs cannot detect weeds that YOLO misses on known species
+
+## 2026-03-19 - Phase 3B: Cross-Species Generalization
+
+### Leave-4-Out Experiment
+- `run_leave4out.py` — holds out 4 species, trains YOLO on 8, tests on unseen
+- YOLO drops 27% on unseen species (F1: 0.830→0.606)
+- Florence-2 precision exceeds YOLO on unseen (0.726 > 0.589)
+- LLM pseudo-label augmentation: +0.9% new, -2.4% forgetting
+
+## 2026-03-23/24 - Phase 3C: Anti-Forgetting Methods
+
+### All simple methods failed
+- `run_balpw.py` — background-aware label propagation: -0.022 (marginal)
+- `run_antiforgetting.py` — replay 50%: -0.030 (worse); frozen: F1=0.155 (catastrophic)
+- Root cause: LLM pseudo-label noise (27.4% FP), not training strategy
+
+## 2026-03-25/28 - Phase 3D/3E: SAM + Agent Optimizer
+
+### SAM-Enhanced Labeling (negative result)
+- `run_sam_enhanced.py` — SAM segments → Florence-2 caption classification
+- Result: WORST method (-6.8% old, -11% new) — SAM over-segments, caption keywords too noisy
+
+### Autonomous Agent Optimizer — FIRST PRECISION IMPROVEMENT
+- `run_agent_optimizer.py` — OPRO-inspired self-improving agent
+- Tests 5 strategies automatically with multi-VLM consensus label generation
+- **Best result: Florence+OWLv2 consensus** → unseen species F1: 0.606 → **0.622 (+0.016)**, forgetting only -0.020
+- Key finding: 2-model consensus (high-precision + high-recall) beats 7-model voting
+- Architecture: StrategyBrain → LabelGenerator → TrainManager → Evaluator → iterate
+
 ## TODO
-- [ ] Finish running all 12 HF models + 6 Ollama models on CottonWeedDet12
-- [ ] Download new model weights to cluster (qwen3_8b, grounding_dino, paligemma2, etc.)
-- [ ] Test YOLO+LLM fusion strategies
-- [ ] Run ablation studies
+- [ ] Refine agent optimizer (second round with parameter tuning)
+- [ ] Implement R-Super soft constraint losses
+- [ ] Fine-tune Florence-2 on weed domain data
 - [ ] Generate paper figures and tables
 - [ ] Write paper

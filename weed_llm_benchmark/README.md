@@ -69,6 +69,43 @@ Evaluated on **CottonWeedDet12** test set (848 images, 12 weed species, 1,464 gr
 - **Native grounding is essential**: Models without built-in bbox support (LLaVA, Llama Vision, Molmo) produce near-zero mAP regardless of model size.
 - **Coordinate format matters**: Qwen2.5-VL outputs in [0, 1000] normalized space; Florence-2 outputs absolute pixels. Proper coordinate conversion is critical.
 
+## Cross-Species Generalization & Agent Optimization
+
+### Problem: YOLO fails on unseen weed species
+
+When YOLO encounters weed species not in its training data, performance drops 27%:
+
+| Model | Known Species F1 | **Unseen Species F1** |
+|-------|------------------|-----------------------|
+| YOLO (trained on 8/12 species) | 0.917 | **0.606** |
+| YOLO (trained on all 12) | 0.917 | 0.830 (upper bound) |
+
+### Solution: Multi-VLM Consensus Pseudo-Labeling
+
+An autonomous agent (inspired by OPRO, ICLR 2024) optimizes YOLO by generating high-quality pseudo-labels through multi-model consensus:
+
+```
+Step 1: OWLv2 (recall=0.918) detects candidate weed locations
+Step 2: Florence-2-base (precision=0.789) validates each candidate
+Step 3: Only boxes where BOTH models agree are kept as labels
+Step 4: Merge with YOLO-detected old-species labels (no background relegation)
+Step 5: Fine-tune YOLO on consensus labels + 30% replay buffer of old data
+```
+
+### Results: 5 strategies tested automatically
+
+| Strategy | VLMs Used | Old F1 | New F1 | Old Δ | New Δ |
+|----------|-----------|--------|--------|-------|-------|
+| **Florence+OWLv2 consensus** | 2 models, ≥2 votes | 0.897 | **0.622** | -0.020 | **+0.016** |
+| Florence-only (low lr) | 1 model | 0.895 | 0.619 | -0.022 | +0.013 |
+| 3-model consensus | 3 models, ≥2 votes | 0.889 | 0.599 | -0.028 | -0.007 |
+| 7-model consensus | 7 models, ≥3 votes | 0.880 | 0.589 | -0.037 | -0.016 |
+| Consensus + frozen backbone | 2 models, freeze=10 | 0.488 | 0.424 | -0.429 | -0.181 |
+
+**Best result**: Florence+OWLv2 consensus improves unseen species from 0.606 → **0.622 (+2.6%)** with only 2.0% forgetting.
+
+**Key insight**: Quality > quantity for pseudo-labels. Two complementary models (one high-precision + one high-recall) outperform 7 models voting together.
+
 ## Model Support
 
 The framework is **model-agnostic** — the core pipeline (prompt -> JSON response -> extract bboxes -> YOLO format -> upload) works with any vision LLM. Two integration paths are provided:

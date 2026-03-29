@@ -1,0 +1,37 @@
+{
+  "baseline": {"old_f1": 0.917, "new_f1": 0.606},
+  "strategies": {
+    "consensus_flo+owl": {
+      "description": "Florence-2-base + OWLv2 consensus (min 2 votes, IoU>0.3), YOLO old-species labels, lr=0.001, 50 epochs, replay=30%",
+      "vlm_models": ["florence2_base", "owlv2"],
+      "min_votes": 2, "consensus_iou": 0.3, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3,
+      "old_f1": 0.897, "new_f1": 0.622, "delta_old": -0.020, "delta_new": 0.016
+    },
+    "florence_only_lowlr": {
+      "description": "Florence-2-base only (min 1 vote), YOLO old-species labels, lr=0.0005, 50 epochs, replay=50%",
+      "vlm_models": ["florence2_base"],
+      "min_votes": 1, "lr": 0.0005, "epochs": 50, "replay_ratio": 0.5,
+      "old_f1": 0.895, "new_f1": 0.619, "delta_old": -0.022, "delta_new": 0.013
+    },
+    "3model_2vote": {
+      "description": "Florence-2-base + OWLv2 + InternVL2 (min 2 votes), lr=0.001, 50 epochs, replay=30%",
+      "vlm_models": ["florence2_base", "owlv2", "internvl2"],
+      "min_votes": 2, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3,
+      "old_f1": 0.889, "new_f1": 0.599, "delta_old": -0.028, "delta_new": -0.007
+    },
+    "7model_3vote": {
+      "description": "All 7 VLMs (min 3 votes), lr=0.001, 50 epochs, replay=30%",
+      "vlm_models": ["florence2_base", "florence2", "owlv2", "internvl2", "qwen3b", "minicpm_v45", "qwen7b"],
+      "min_votes": 3, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3,
+      "old_f1": 0.880, "new_f1": 0.589, "delta_old": -0.037, "delta_new": -0.016
+    },
+    "consensus_frozen": {
+      "description": "Florence-2-base + OWLv2 consensus, frozen backbone (10 layers), lr=0.005, 50 epochs, replay=30%",
+      "vlm_models": ["florence2_base", "owlv2"],
+      "min_votes": 2, "freeze_layers": 10, "lr": 0.005, "epochs": 50, "replay_ratio": 0.3,
+      "old_f1": 0.488, "new_f1": 0.424, "delta_old": -0.429, "delta_new": -0.181
+    }
+  },
+  "best_strategy": "consensus_flo+owl",
+  "conclusion": "2-model consensus (Florence-2 high precision + OWLv2 high recall) achieves first precision improvement on unseen species (+0.016 F1) with minimal forgetting (-0.020). More models voting is worse, not better. Quality > quantity for pseudo-label consensus."
+}

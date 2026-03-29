@@ -499,7 +499,60 @@ Pipeline:
 - SAM provides precise boundaries but no semantic understanding — need a strong classifier on top
 - Caption-based classification is too noisy for agricultural domain
 - Florence-2's native `<OD>` detection mode is better than SAM+Florence-2 caption mode
-- Next: need domain-specific classification (fine-tuned classifier or more targeted prompts), or use Florence-2 `<OD>` directly on SAM crops instead of `<CAPTION>`
+
+### Session 16 — 2026-03-28: Autonomous Agent Optimizer — FIRST PRECISION IMPROVEMENT
+
+**Design**: Built an OPRO-inspired (ICLR 2024) self-improving agent that autonomously tries different VLM pseudo-labeling strategies to optimize YOLO. Inspired by HyperAgents (Meta 2026) and AutoML-Agent (ICML 2025).
+
+**Architecture**:
+```
+StrategyBrain (proposes strategy configs)
+    → LabelGenerator (multi-VLM consensus filtering)
+    → TrainManager (YOLO training with anti-forgetting)
+    → Evaluator (old + new species, forgetting check)
+    → Results fed back to StrategyBrain → iterate
+```
+
+**Multi-VLM Consensus Label Generation Method**:
+1. For each holdout image, collect detections from selected VLMs
+2. Cluster overlapping boxes across VLMs (IoU > threshold)
+3. Keep only clusters where ≥ min_votes different VLMs agree
+4. Use the bbox from the highest-precision VLM in each cluster
+5. Merge with YOLO-detected old-species labels (BA-LPW style)
+6. Train YOLO on merged labels + replay buffer of old training data
+
+**5 strategies tested automatically**:
+
+| # | Strategy | VLMs | Votes | lr | Replay | Old F1 | New F1 | Old Δ | New Δ |
+|---|----------|------|-------|-----|--------|--------|--------|-------|-------|
+| 0 | Florence+OWLv2 consensus | flo2+owl | ≥2 | 0.001 | 30% | 0.897 | **0.622** | -0.020 | **+0.016** |
+| 1 | Florence-only low-lr | flo2 | ≥1 | 0.0005 | 50% | 0.895 | 0.619 | -0.022 | +0.013 |
+| 2 | 3-model 2-vote | flo2+owl+iv2 | ≥2 | 0.001 | 30% | 0.889 | 0.599 | -0.028 | -0.007 |
+| 3 | 7-model 3-vote | all 7 VLMs | ≥3 | 0.001 | 30% | 0.880 | 0.589 | -0.037 | -0.016 |
+| 4 | Consensus + frozen | flo2+owl | ≥2 | 0.005 | 30% | 0.488 | 0.424 | -0.429 | -0.181 |
+
+**FIRST PRECISION IMPROVEMENT ACHIEVED**: Strategy 0 (Florence+OWLv2 consensus) improves unseen species F1 from 0.606 → **0.622 (+0.016)** with only -0.020 forgetting on old species.
+
+**Key findings**:
+1. **2-model consensus is optimal** — Florence-2 (precision=0.789) × OWLv2 (recall=0.918) is the best pairing
+2. **More models voting is WORSE** — 3-model (-0.007), 7-model (-0.016). Adding weaker models dilutes quality
+3. **Quality > quantity**: one precise model (Florence-2) + one high-recall model (OWLv2) > many mediocre models
+4. **Frozen backbone still catastrophic** — confirms this is not a viable anti-forgetting approach for YOLO
+5. **Replay buffer + low lr helps** — 30-50% replay with lr=0.001 keeps forgetting manageable (-0.020 to -0.022)
+
+**Comparison with ALL previous methods**:
+
+| Method | Old F1 | New F1 | Old Δ | New Δ | Phase |
+|--------|--------|--------|-------|-------|-------|
+| YOLO 8sp baseline | 0.917 | 0.606 | — | — | 3B |
+| **Agent: Flo+OWL consensus** | **0.897** | **0.622** | **-0.020** | **+0.016** | **3E** |
+| Naive LLM aug | 0.893 | 0.615 | -0.024 | +0.009 | 3B |
+| BA-LPW | 0.895 | 0.601 | -0.022 | -0.005 | 3C |
+| Replay 50% | 0.887 | 0.584 | -0.030 | -0.022 | 3C |
+| SAM+Florence caption | 0.849 | 0.496 | -0.068 | -0.110 | 3D |
+| Frozen backbone | 0.155 | 0.230 | -0.762 | -0.376 | 3C |
+
+**The agent's Florence+OWLv2 consensus strategy is the best method we've found** — highest new species improvement (+0.016) with lowest forgetting (-0.020).
 
 ---
 
