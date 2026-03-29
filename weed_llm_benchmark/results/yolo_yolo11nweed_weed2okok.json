@@ -1,0 +1,425 @@
+[
+  {
+    "image": "20210907_153931_x264_mp4-207_jpg.rf.510939897f9e4125c854bdcf3f598da0.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.6452,
+        "bbox": [
+          21.14,
+          47.23,
+          63.11,
+          74.9
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.3653,
+        "bbox": [
+          64.04,
+          71.31,
+          81.68,
+          84.46
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.062
+  },
+  {
+    "image": "IMG-20230711-WA0087_jpg.rf.b7a21b9b450483276ac74fe9b9deec63.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.4599,
+        "bbox": [
+          12.9,
+          18.52,
+          89.37,
+          55.09
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.044
+  },
+  {
+    "image": "IMG-20230711-WA0127_jpg.rf.15101359dc43d7b428fbdaa43739e5da.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.5559,
+        "bbox": [
+          60.84,
+          69.08,
+          74.07,
+          91.68
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.04
+  },
+  {
+    "image": "IMG-20230711-WA0164_jpg.rf.089ad5f5e261b73ee7355b2b701c9a40.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.3538,
+        "bbox": [
+          37.38,
+          74.02,
+          68.32,
+          93.64
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.038
+  },
+  {
+    "image": "IMG-20230711-WA0227_jpg.rf.00bac1245e91f6c97bfc09ce4a13f44d.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.039
+  },
+  {
+    "image": "IMG-20230711-WA0eyrtkyi183_jpg.rf.7c600b35b53bb7666ca4c6d2cc2eac75.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.4121,
+        "bbox": [
+          12.98,
+          47.01,
+          46.61,
+          77.32
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.039
+  },
+  {
+    "image": "IMG-20230711-oiuytfvhgh0137_jpg.rf.64941d5ba066e94a3d8194904280c897.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.6735,
+        "bbox": [
+          24.15,
+          24.61,
+          75.15,
+          65.4
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.455,
+        "bbox": [
+          32.81,
+          63.96,
+          58.75,
+          83.4
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.046
+  },
+  {
+    "image": "IMG-202307tfhtftfdfhjgmjk11-WA0186_jpg.rf.6b2cd77aee69f26e965c71dcbc691925.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.2609,
+        "bbox": [
+          77.78,
+          77.33,
+          90.84,
+          88.73
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.039
+  },
+  {
+    "image": "IMG-202307vghjkyu1-WA0132_jpg.rf.dac2eb9a1a19411ad40b39a0253a3f34.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.8093,
+        "bbox": [
+          29.07,
+          27.84,
+          63.97,
+          67.91
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.038
+  },
+  {
+    "image": "IMG-20230aerkhghjA0031-Copy_jpg.rf.412eb17c43a7a4c5a0f85b7564029986.jpg",
+    "num_detections": 6,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.7099,
+        "bbox": [
+          55.11,
+          88.6,
+          66.47,
+          99.82
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.5349,
+        "bbox": [
+          65.95,
+          83.81,
+          80.11,
+          95.73
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.4321,
+        "bbox": [
+          69.86,
+          54.03,
+          76.96,
+          60.17
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.3734,
+        "bbox": [
+          72.49,
+          68.26,
+          92.78,
+          81.74
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.3396,
+        "bbox": [
+          90.53,
+          41.38,
+          99.99,
+          51.56
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.285,
+        "bbox": [
+          31.63,
+          83.83,
+          39.49,
+          92.25
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.038
+  },
+  {
+    "image": "IMG-20230aerkhkjljA0031-Copy_jpg.rf.c6d9948dd9cf28389f93e1fefcfcd3e3.jpg",
+    "num_detections": 7,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.7041,
+        "bbox": [
+          55.02,
+          88.65,
+          66.71,
+          99.91
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.6145,
+        "bbox": [
+          66.13,
+          83.71,
+          80.2,
+          96.2
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.5186,
+        "bbox": [
+          69.82,
+          54.06,
+          76.99,
+          60.22
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.4034,
+        "bbox": [
+          90.64,
+          41.53,
+          99.97,
+          51.44
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.3776,
+        "bbox": [
+          72.47,
+          68.18,
+          93.19,
+          81.95
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.2793,
+        "bbox": [
+          52.38,
+          26.24,
+          59.53,
+          33.76
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.2672,
+        "bbox": [
+          13.04,
+          80.05,
+          26.19,
+          96.64
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.037
+  },
+  {
+    "image": "IMG-2023czvczvcdzcdzvcxv_jpg.rf.02c14306152bf92c5154602d71713a9c.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.3171,
+        "bbox": [
+          24.41,
+          37.69,
+          66.96,
+          63.33
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.038
+  },
+  {
+    "image": "IMG-2023wert0711-WA0083_jpg.rf.53be106cfd91391376de83a74550e22c.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.401,
+        "bbox": [
+          0.01,
+          60.92,
+          20.46,
+          99.24
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.3685,
+        "bbox": [
+          16.34,
+          73.91,
+          44.58,
+          100.0
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.3444,
+        "bbox": [
+          65.5,
+          34.15,
+          100.0,
+          99.38
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.038
+  },
+  {
+    "image": "IMG-20cxsdsdsc0141_jpg.rf.b6eb0fc5c9a5fc2068fad72ccbd872ff.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.3025,
+        "bbox": [
+          49.44,
+          54.84,
+          91.37,
+          84.02
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.037
+  },
+  {
+    "image": "ertyhhfdfrIMG-20230711-WA0020_jpg.rf.13c87caa3ba1c36ef909e0184d5ff9e9.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.369,
+        "bbox": [
+          29.48,
+          24.42,
+          38.59,
+          34.09
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.039
+  }
+]

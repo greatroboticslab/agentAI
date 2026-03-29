@@ -1,0 +1,7928 @@
+[
+  {
+    "image": "20210628_iPhoneSE_YL_101.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_102.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_110.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_114.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_122.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_125.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_140.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_143.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_148.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_152.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_158.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.045
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_170.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_173.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_177.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_188.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_193.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.252,
+        "bbox": [
+          0.18,
+          8.03,
+          69.07,
+          96.12
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_196.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_23.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_28.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_47.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2563,
+        "bbox": [
+          53.1,
+          56.25,
+          67.3,
+          65.58
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_62.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_63.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4101,
+        "bbox": [
+          42.6,
+          50.43,
+          51.58,
+          62.92
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_64.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_7.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_75.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.41,
+        "bbox": [
+          23.37,
+          61.23,
+          34.31,
+          75.24
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210628_iPhoneSE_YL_94.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_10.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_102.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_103.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_109.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_115.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_118.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3981,
+        "bbox": [
+          27.93,
+          36.12,
+          79.84,
+          61.88
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_12.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_123.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.2956,
+        "bbox": [
+          9.18,
+          18.62,
+          84.45,
+          89.03
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_131.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_133.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_14.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_149.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_151.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_154.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_156.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_186.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_201.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.301,
+        "bbox": [
+          0.31,
+          6.01,
+          81.4,
+          90.96
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_205.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_212.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.3669,
+        "bbox": [
+          14.18,
+          0.25,
+          75.46,
+          75.98
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_213.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_216.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_222.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_228.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_24.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_245.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_247.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_255.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.5921,
+        "bbox": [
+          11.92,
+          11.75,
+          92.48,
+          89.59
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_258.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.2929,
+        "bbox": [
+          11.78,
+          6.63,
+          65.0,
+          39.63
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_260.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_267.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_43.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3397,
+        "bbox": [
+          16.5,
+          3.91,
+          75.07,
+          74.72
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_44.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_47.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.2959,
+        "bbox": [
+          30.81,
+          9.64,
+          67.33,
+          41.95
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_49.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_52.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_58.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_7.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_73.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_76.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_87.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_93.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210712_iPhoneSE_YL_96.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210804_iPhoneSE_YL_13.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.4266,
+        "bbox": [
+          12.8,
+          14.43,
+          93.43,
+          97.84
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_102.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_103.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_105.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3797,
+        "bbox": [
+          2.57,
+          10.76,
+          99.25,
+          88.51
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_119.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.045
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_122.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_133.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "umbrella",
+        "confidence": 0.2763,
+        "bbox": [
+          42.63,
+          85.26,
+          61.23,
+          94.63
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_143.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_147.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_149.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_18.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_25.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.042
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_35.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_39.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_44.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_45.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4327,
+        "bbox": [
+          48.39,
+          42.03,
+          66.67,
+          51.97
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_46.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "orange",
+        "confidence": 0.2782,
+        "bbox": [
+          33.5,
+          56.85,
+          62.22,
+          93.93
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.058
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_47.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_49.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.052
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_51.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_52.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_56.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.04
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_63.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_64.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2852,
+        "bbox": [
+          42.69,
+          50.82,
+          70.11,
+          82.77
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_67.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_77.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_79.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_83.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3278,
+        "bbox": [
+          21.61,
+          15.17,
+          85.9,
+          90.33
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_89.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210805_iPhoneSE_YL_99.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_156.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_161.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.04
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_173.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_184.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.045
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_192.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_196.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_208.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.4386,
+        "bbox": [
+          63.16,
+          34.25,
+          72.82,
+          45.84
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_218.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_219.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_235.jpg",
+    "num_detections": 4,
+    "detections": [
+      {
+        "label": "umbrella",
+        "confidence": 0.6508,
+        "bbox": [
+          29.47,
+          18.28,
+          45.98,
+          31.37
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "umbrella",
+        "confidence": 0.6161,
+        "bbox": [
+          26.76,
+          37.5,
+          48.25,
+          56.6
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "umbrella",
+        "confidence": 0.4542,
+        "bbox": [
+          3.99,
+          40.26,
+          21.16,
+          64.41
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "umbrella",
+        "confidence": 0.3315,
+        "bbox": [
+          63.06,
+          34.75,
+          70.43,
+          45.12
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_242.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_245.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_249.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "umbrella",
+        "confidence": 0.363,
+        "bbox": [
+          55.54,
+          49.13,
+          74.56,
+          69.6
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_260.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_263.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.037
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_295.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_307.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_310.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_313.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.038
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_315.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_316.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_318.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_323.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_343.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_345.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_353.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_357.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_370.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_374.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_378.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_385.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_388.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_390.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_391.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_393.jpg",
+    "num_detections": 5,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.5801,
+        "bbox": [
+          3.71,
+          13.32,
+          25.54,
+          39.22
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.5414,
+        "bbox": [
+          6.26,
+          51.4,
+          16.12,
+          62.3
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.435,
+        "bbox": [
+          58.29,
+          57.95,
+          70.98,
+          72.74
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.421,
+        "bbox": [
+          59.77,
+          42.35,
+          70.86,
+          58.0
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2797,
+        "bbox": [
+          70.11,
+          31.64,
+          84.54,
+          50.62
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_399.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_415.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.4124,
+        "bbox": [
+          0.43,
+          6.92,
+          100.0,
+          97.95
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_422.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_424.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_427.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_436.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_439.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_446.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2858,
+        "bbox": [
+          56.96,
+          22.86,
+          77.19,
+          40.49
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210806_iPhoneSE_YL_449.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_1584.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_1585.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.4924,
+        "bbox": [
+          26.53,
+          22.93,
+          85.82,
+          79.63
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_1588.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.055
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_468.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.039
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_471.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_472.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_478.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_479.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3956,
+        "bbox": [
+          35.51,
+          33.71,
+          75.85,
+          46.22
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_481.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_507.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_516.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_519.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.042
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_525.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_528.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_531.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_557.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_559.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_568.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "umbrella",
+        "confidence": 0.6022,
+        "bbox": [
+          56.17,
+          25.53,
+          92.94,
+          56.31
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_572.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.04
+  },
+  {
+    "image": "20210809_iPhoneSE_YL_574.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_580.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_582.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_583.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3646,
+        "bbox": [
+          18.29,
+          26.94,
+          79.53,
+          54.52
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.058
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_589.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.046
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_609.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_610.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_621.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_623.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_630.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210810_iPhoneSE_YL_638.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210811_iPhoneSE_YL_649.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210812_NIKOND3300_YL_10.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.5991,
+        "bbox": [
+          21.67,
+          20.75,
+          79.46,
+          90.03
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1001.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1006.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.5132,
+        "bbox": [
+          14.04,
+          16.77,
+          96.85,
+          99.12
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1028.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1065.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.056
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1066.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.046
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1071.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.2625,
+        "bbox": [
+          29.5,
+          7.06,
+          76.71,
+          34.13
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1079.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1080.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1093.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2584,
+        "bbox": [
+          44.25,
+          23.21,
+          91.23,
+          61.96
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.037
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1100.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1106.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.06
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1109.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1110.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "orange",
+        "confidence": 0.4341,
+        "bbox": [
+          38.98,
+          49.48,
+          63.19,
+          75.84
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.2857,
+        "bbox": [
+          55.95,
+          39.41,
+          81.96,
+          54.85
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.058
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1111.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.057
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1124.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.059
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1126.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1131.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1147.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.047
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1150.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1153.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.054
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1161.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "orange",
+        "confidence": 0.8325,
+        "bbox": [
+          31.6,
+          58.49,
+          58.84,
+          86.65
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.6754,
+        "bbox": [
+          34.95,
+          28.31,
+          57.71,
+          57.45
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1162.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.057
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1165.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.06
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1168.jpg",
+    "num_detections": 7,
+    "detections": [
+      {
+        "label": "orange",
+        "confidence": 0.7087,
+        "bbox": [
+          53.41,
+          21.69,
+          71.94,
+          47.33
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.6434,
+        "bbox": [
+          32.57,
+          49.58,
+          51.51,
+          71.87
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.6219,
+        "bbox": [
+          25.3,
+          26.74,
+          52.88,
+          52.65
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.5746,
+        "bbox": [
+          52.79,
+          48.41,
+          68.44,
+          72.66
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.4085,
+        "bbox": [
+          64.64,
+          32.32,
+          87.63,
+          49.77
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.314,
+        "bbox": [
+          63.86,
+          48.64,
+          85.2,
+          69.93
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.2501,
+        "bbox": [
+          34.24,
+          26.78,
+          52.84,
+          47.6
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1181.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1189.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.2754,
+        "bbox": [
+          0.21,
+          33.45,
+          51.84,
+          70.0
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "bird",
+        "confidence": 0.2657,
+        "bbox": [
+          57.79,
+          26.59,
+          90.4,
+          57.27
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.038
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1190.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1196.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1199.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "umbrella",
+        "confidence": 0.7865,
+        "bbox": [
+          34.99,
+          28.62,
+          61.42,
+          49.21
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "umbrella",
+        "confidence": 0.514,
+        "bbox": [
+          18.62,
+          22.26,
+          31.38,
+          33.74
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "umbrella",
+        "confidence": 0.4884,
+        "bbox": [
+          4.89,
+          32.98,
+          24.97,
+          54.09
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1206.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_1210.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.2589,
+        "bbox": [
+          49.5,
+          63.65,
+          74.34,
+          88.92
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_678.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.053
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_690.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_706.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.58,
+        "bbox": [
+          31.03,
+          56.43,
+          44.53,
+          69.62
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.5644,
+        "bbox": [
+          28.47,
+          48.01,
+          41.84,
+          59.06
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.2513,
+        "bbox": [
+          30.47,
+          49.45,
+          44.52,
+          69.73
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.052
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_717.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.055
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_741.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_756.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.2981,
+        "bbox": [
+          42.08,
+          70.72,
+          50.77,
+          94.9
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_758.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.5854,
+        "bbox": [
+          19.89,
+          38.79,
+          74.9,
+          86.98
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_766.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.049
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_778.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_779.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.057
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_785.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.047
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_804.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_805.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_819.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_826.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3942,
+        "bbox": [
+          17.89,
+          14.87,
+          90.4,
+          92.69
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "potted plant",
+        "confidence": 0.2626,
+        "bbox": [
+          7.63,
+          3.3,
+          92.45,
+          98.92
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_832.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3502,
+        "bbox": [
+          7.34,
+          63.34,
+          26.53,
+          75.96
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_838.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.5338,
+        "bbox": [
+          13.24,
+          2.14,
+          67.52,
+          94.44
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_871.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_873.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_874.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.056
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_875.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_881.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_885.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.6031,
+        "bbox": [
+          92.13,
+          45.48,
+          98.92,
+          49.19
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_887.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3346,
+        "bbox": [
+          0.83,
+          5.67,
+          94.48,
+          96.13
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_891.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.4635,
+        "bbox": [
+          11.96,
+          9.62,
+          83.0,
+          94.71
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_893.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_898.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.4688,
+        "bbox": [
+          8.77,
+          4.02,
+          88.75,
+          99.64
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_906.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.049
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_908.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_930.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_940.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_944.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_945.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_947.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_949.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_950.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_963.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3101,
+        "bbox": [
+          26.56,
+          13.82,
+          82.28,
+          94.56
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.056
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_983.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210812_iPhoneSE_YL_989.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1224.jpg",
+    "num_detections": 4,
+    "detections": [
+      {
+        "label": "orange",
+        "confidence": 0.4349,
+        "bbox": [
+          66.64,
+          42.91,
+          96.42,
+          63.67
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.3848,
+        "bbox": [
+          20.53,
+          64.94,
+          46.22,
+          87.83
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.3527,
+        "bbox": [
+          63.8,
+          67.35,
+          82.83,
+          85.78
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.2731,
+        "bbox": [
+          16.18,
+          38.42,
+          48.75,
+          58.33
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1246.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1250.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1251.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.059
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1255.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1258.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1263.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1265.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1267.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "orange",
+        "confidence": 0.3146,
+        "bbox": [
+          27.39,
+          6.19,
+          57.35,
+          42.8
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1271.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1276.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1280.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1281.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1282.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.049
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1285.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1294.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1303.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.055
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1314.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1316.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.049
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1323.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.053
+  },
+  {
+    "image": "20210813_iPhoneSE_YL_1324.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.06
+  },
+  {
+    "image": "20210814_iPhoneSE_YL_1317.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210818_iPhoneSE_YL_1327.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "banana",
+        "confidence": 0.2576,
+        "bbox": [
+          31.47,
+          14.23,
+          93.37,
+          84.62
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.047
+  },
+  {
+    "image": "20210818_iPhoneSE_YL_1329.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.056
+  },
+  {
+    "image": "20210818_iPhoneSE_YL_1334.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.056
+  },
+  {
+    "image": "20210818_iPhoneSE_YL_1335.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.05
+  },
+  {
+    "image": "20210818_iPhoneSE_YL_1336.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3342,
+        "bbox": [
+          11.91,
+          7.85,
+          89.27,
+          79.56
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.039
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1345.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.5248,
+        "bbox": [
+          54.09,
+          64.22,
+          64.43,
+          71.07
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1352.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.4227,
+        "bbox": [
+          15.15,
+          32.54,
+          28.91,
+          42.77
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "carrot",
+        "confidence": 0.2631,
+        "bbox": [
+          29.35,
+          88.14,
+          35.22,
+          93.38
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1356.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1358.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.052
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1366.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "banana",
+        "confidence": 0.6523,
+        "bbox": [
+          57.41,
+          46.32,
+          82.55,
+          84.22
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "banana",
+        "confidence": 0.6,
+        "bbox": [
+          9.11,
+          30.74,
+          38.15,
+          64.17
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.047
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1370.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1378.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.048
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1393.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1394.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.37,
+        "bbox": [
+          8.79,
+          31.55,
+          81.21,
+          92.48
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1396.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3527,
+        "bbox": [
+          37.19,
+          16.59,
+          72.88,
+          72.07
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1405.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.4748,
+        "bbox": [
+          34.67,
+          4.03,
+          99.63,
+          99.04
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "carrot",
+        "confidence": 0.3843,
+        "bbox": [
+          85.35,
+          29.62,
+          94.66,
+          41.35
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.042
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1406.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1415.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "banana",
+        "confidence": 0.3797,
+        "bbox": [
+          20.5,
+          34.66,
+          82.75,
+          90.61
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.037
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1418.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1424.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1435.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.6667,
+        "bbox": [
+          54.66,
+          56.63,
+          76.97,
+          69.72
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.039
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1437.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1451.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.055
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1455.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1457.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1467.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1470.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1480.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "umbrella",
+        "confidence": 0.4681,
+        "bbox": [
+          8.62,
+          47.34,
+          42.28,
+          77.47
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.049
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1485.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1486.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1490.jpg",
+    "num_detections": 4,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.5703,
+        "bbox": [
+          77.47,
+          68.35,
+          90.52,
+          79.1
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "banana",
+        "confidence": 0.5409,
+        "bbox": [
+          35.85,
+          45.17,
+          91.2,
+          93.6
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.4074,
+        "bbox": [
+          67.63,
+          82.22,
+          82.98,
+          94.3
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "banana",
+        "confidence": 0.2639,
+        "bbox": [
+          37.13,
+          62.82,
+          54.05,
+          74.38
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1492.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.081
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1499.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1504.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.048
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1508.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1520.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "sports ball",
+        "confidence": 0.2793,
+        "bbox": [
+          34.74,
+          11.1,
+          50.37,
+          33.56
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1521.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.052
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1524.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.2768,
+        "bbox": [
+          95.85,
+          61.6,
+          99.97,
+          70.76
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "orange",
+        "confidence": 0.2644,
+        "bbox": [
+          37.21,
+          6.99,
+          41.5,
+          13.37
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1528.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1529.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.339,
+        "bbox": [
+          36.06,
+          57.9,
+          73.12,
+          97.66
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.047
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1532.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1536.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1537.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.2735,
+        "bbox": [
+          14.93,
+          21.82,
+          82.41,
+          96.2
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1548.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3729,
+        "bbox": [
+          0.0,
+          9.94,
+          97.23,
+          78.25
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1556.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1562.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1568.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.046
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1573.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1575.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210820_iPhoneSE_YL_1576.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_101.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.101
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_106.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_13.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.093
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_15.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.106
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_25.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_27.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_33.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_35.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.6668,
+        "bbox": [
+          80.53,
+          95.75,
+          87.03,
+          99.96
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.163
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_51.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.101
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_63.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.101
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_79.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.101
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_86.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.108
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_93.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3076,
+        "bbox": [
+          11.28,
+          31.93,
+          73.69,
+          67.94
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.097
+  },
+  {
+    "image": "20210827_NIKOND3300_YL_98.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.094
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_10.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.081
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_106.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_112.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_117.jpg",
+    "num_detections": 5,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4773,
+        "bbox": [
+          41.62,
+          49.92,
+          77.85,
+          70.51
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "sports ball",
+        "confidence": 0.3837,
+        "bbox": [
+          0.0,
+          96.07,
+          13.01,
+          99.97
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.3628,
+        "bbox": [
+          57.16,
+          55.4,
+          77.61,
+          69.92
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "frisbee",
+        "confidence": 0.2695,
+        "bbox": [
+          0.03,
+          96.16,
+          13.07,
+          99.95
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2627,
+        "bbox": [
+          41.79,
+          53.38,
+          59.13,
+          63.24
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_121.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_125.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3696,
+        "bbox": [
+          80.41,
+          59.42,
+          99.93,
+          77.18
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_128.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.5376,
+        "bbox": [
+          25.07,
+          62.56,
+          50.79,
+          89.17
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "fire hydrant",
+        "confidence": 0.3011,
+        "bbox": [
+          38.24,
+          2.55,
+          55.59,
+          15.66
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_13.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_130.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3078,
+        "bbox": [
+          14.58,
+          35.54,
+          24.34,
+          43.34
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.097
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_132.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.1
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_133.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_142.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_144.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_15.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2815,
+        "bbox": [
+          25.95,
+          39.81,
+          38.23,
+          52.68
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.267,
+        "bbox": [
+          39.5,
+          38.86,
+          55.47,
+          52.89
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_154.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_167.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_168.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_175.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_19.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2661,
+        "bbox": [
+          58.2,
+          14.87,
+          69.74,
+          34.15
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_199.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_201.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3691,
+        "bbox": [
+          15.48,
+          63.01,
+          28.39,
+          74.46
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_212.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_214.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3681,
+        "bbox": [
+          58.6,
+          38.79,
+          69.07,
+          51.14
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_219.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_23.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_231.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_232.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_237.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_241.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_242.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_25.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_253.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bed",
+        "confidence": 0.2663,
+        "bbox": [
+          2.64,
+          0.17,
+          99.78,
+          99.33
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_255.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_256.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_258.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_26.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.258,
+        "bbox": [
+          44.38,
+          32.98,
+          61.09,
+          46.08
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_263.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_28.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_289.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_294.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.632,
+        "bbox": [
+          23.02,
+          37.51,
+          39.93,
+          48.06
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2566,
+        "bbox": [
+          33.51,
+          58.65,
+          54.09,
+          72.94
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_299.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4245,
+        "bbox": [
+          35.37,
+          37.95,
+          57.46,
+          51.25
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_302.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "teddy bear",
+        "confidence": 0.2786,
+        "bbox": [
+          60.11,
+          31.19,
+          99.78,
+          70.05
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "teddy bear",
+        "confidence": 0.2779,
+        "bbox": [
+          32.81,
+          40.78,
+          63.08,
+          65.71
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_304.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_308.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_318.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_47.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "clock",
+        "confidence": 0.5279,
+        "bbox": [
+          40.73,
+          86.87,
+          45.1,
+          91.47
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_68.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2522,
+        "bbox": [
+          44.9,
+          23.01,
+          68.61,
+          66.17
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_75.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_78.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4016,
+        "bbox": [
+          67.43,
+          47.5,
+          84.79,
+          74.65
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.3905,
+        "bbox": [
+          10.43,
+          16.22,
+          35.24,
+          48.87
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.3872,
+        "bbox": [
+          60.35,
+          44.11,
+          84.59,
+          74.57
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_83.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4442,
+        "bbox": [
+          59.35,
+          45.79,
+          79.03,
+          67.59
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.309,
+        "bbox": [
+          9.56,
+          39.79,
+          24.17,
+          57.28
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210827_iPhone11Pro_BT_98.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_101.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_105.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_118.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_12.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_125.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_13.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3056,
+        "bbox": [
+          30.74,
+          40.45,
+          77.39,
+          70.99
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_132.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_137.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_141.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_147.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.5815,
+        "bbox": [
+          6.81,
+          19.48,
+          19.78,
+          32.6
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_149.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_159.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_169.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_176.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_179.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_186.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_191.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_199.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_206.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_211.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_216.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_218.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_230.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_232.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_234.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_238.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_244.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_25.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_250.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_258.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_276.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.5488,
+        "bbox": [
+          22.82,
+          38.29,
+          57.88,
+          64.19
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_44.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_45.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_59.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "fire hydrant",
+        "confidence": 0.3406,
+        "bbox": [
+          14.22,
+          44.01,
+          33.68,
+          82.86
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_6.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_66.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_75.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_8.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4379,
+        "bbox": [
+          45.59,
+          36.05,
+          76.0,
+          71.85
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_83.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210827_iPhoneSE_YL_90.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_102.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_104.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_107.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_108.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.106
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_11.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_118.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3379,
+        "bbox": [
+          26.34,
+          18.38,
+          61.3,
+          61.52
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_128.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.4816,
+        "bbox": [
+          34.06,
+          12.29,
+          65.35,
+          76.17
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_14.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_145.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_147.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_149.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.5959,
+        "bbox": [
+          15.26,
+          27.54,
+          74.97,
+          53.3
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_150.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_157.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.5608,
+        "bbox": [
+          37.79,
+          19.27,
+          80.48,
+          80.61
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_161.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_170.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.1
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_178.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_179.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.8097,
+        "bbox": [
+          34.4,
+          31.51,
+          68.21,
+          82.91
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_180.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_186.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.094
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_190.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_202.jpg",
+    "num_detections": 7,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.5556,
+        "bbox": [
+          60.7,
+          52.03,
+          64.08,
+          57.9
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.4443,
+        "bbox": [
+          60.78,
+          51.92,
+          65.2,
+          60.71
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.3785,
+        "bbox": [
+          41.11,
+          65.12,
+          43.94,
+          69.81
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.374,
+        "bbox": [
+          66.27,
+          45.52,
+          69.26,
+          52.13
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.3553,
+        "bbox": [
+          56.13,
+          43.53,
+          59.66,
+          48.81
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.3103,
+        "bbox": [
+          61.48,
+          45.34,
+          65.0,
+          51.36
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "apple",
+        "confidence": 0.2634,
+        "bbox": [
+          45.58,
+          55.72,
+          49.05,
+          60.88
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_21.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_210.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.102
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_223.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_29.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_42.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_47.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_49.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.6374,
+        "bbox": [
+          0.01,
+          40.32,
+          13.73,
+          66.44
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_58.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.094
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_62.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3383,
+        "bbox": [
+          21.34,
+          24.18,
+          70.95,
+          85.93
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_63.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_77.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_81.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_85.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210903_NIKOND3300_YL_89.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.3895,
+        "bbox": [
+          33.04,
+          89.39,
+          40.27,
+          95.32
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210903_YALAL00_EO_2.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210903_YALAL00_EO_29.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210903_YALAL00_EO_43.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.6895,
+        "bbox": [
+          48.44,
+          49.02,
+          61.16,
+          71.34
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210903_YALAL00_EO_5.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210903_YALAL00_EO_52.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.056
+  },
+  {
+    "image": "20210903_YALAL00_EO_54.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.2749,
+        "bbox": [
+          5.16,
+          11.01,
+          56.91,
+          78.15
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.06
+  },
+  {
+    "image": "20210903_YALAL00_EO_60.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210903_YALAL00_EO_7.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.4129,
+        "bbox": [
+          0.02,
+          78.23,
+          6.26,
+          82.69
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.059
+  },
+  {
+    "image": "20210903_YALAL00_EO_73.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210903_YALAL00_EO_74.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_107.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_109.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_11.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_112.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_117.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.5536,
+        "bbox": [
+          73.59,
+          66.19,
+          84.3,
+          75.28
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.263,
+        "bbox": [
+          66.23,
+          52.28,
+          79.28,
+          62.44
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2617,
+        "bbox": [
+          54.91,
+          66.08,
+          66.89,
+          75.16
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_12.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_141.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_145.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_155.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_31.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_35.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_36.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_39.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_42.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_43.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_46.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_56.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.2796,
+        "bbox": [
+          41.22,
+          46.16,
+          49.27,
+          67.02
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2695,
+        "bbox": [
+          41.23,
+          46.16,
+          49.26,
+          67.0
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_62.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_66.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_73.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_8.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210903_iPhone11Pro_BT_82.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_11.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_114.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_118.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.7376,
+        "bbox": [
+          23.86,
+          27.09,
+          73.59,
+          66.15
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_121.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_149.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_161.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_162.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_169.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_184.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_188.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.3113,
+        "bbox": [
+          35.53,
+          29.07,
+          82.89,
+          77.19
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_190.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_192.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_193.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_20.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_202.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_203.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_212.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_214.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_222.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3202,
+        "bbox": [
+          34.27,
+          9.02,
+          91.32,
+          69.81
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_227.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_24.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_242.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_247.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_27.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_35.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_58.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.6493,
+        "bbox": [
+          38.36,
+          46.49,
+          58.49,
+          62.71
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "bird",
+        "confidence": 0.3108,
+        "bbox": [
+          13.12,
+          38.4,
+          31.57,
+          50.92
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_62.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.2531,
+        "bbox": [
+          20.83,
+          25.85,
+          68.82,
+          59.83
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_69.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_89.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "person",
+        "confidence": 0.2897,
+        "bbox": [
+          67.7,
+          25.55,
+          82.89,
+          44.07
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_91.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210903_iPhoneSE_YL_99.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_101.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_37.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_4.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3046,
+        "bbox": [
+          19.31,
+          24.83,
+          78.84,
+          74.18
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_42.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.4469,
+        "bbox": [
+          37.56,
+          15.94,
+          62.2,
+          29.69
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.093
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_53.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.108
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_61.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.106
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_78.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.104
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_83.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.2806,
+        "bbox": [
+          22.09,
+          32.32,
+          77.27,
+          67.1
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_85.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.098
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_89.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.1
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_91.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_92.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210904_NIKOND3300_YL_95.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.096
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_106.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_109.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_125.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_132.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_139.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_140.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.285,
+        "bbox": [
+          21.87,
+          35.64,
+          67.91,
+          67.89
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_2.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_20.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_3.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_31.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_48.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_55.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.6643,
+        "bbox": [
+          33.71,
+          30.81,
+          71.87,
+          60.1
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_57.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "sports ball",
+        "confidence": 0.483,
+        "bbox": [
+          9.5,
+          26.96,
+          12.32,
+          30.37
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_62.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_63.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_65.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_67.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_69.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_81.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_82.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210904_iPhoneSE_YL_95.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_1.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_109.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_111.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "surfboard",
+        "confidence": 0.2566,
+        "bbox": [
+          89.5,
+          79.4,
+          99.97,
+          87.44
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_114.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.361,
+        "bbox": [
+          49.03,
+          55.57,
+          78.35,
+          99.35
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_119.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.3197,
+        "bbox": [
+          10.56,
+          8.38,
+          56.61,
+          75.96
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_139.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_156.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_16.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.7452,
+        "bbox": [
+          29.96,
+          5.67,
+          55.79,
+          33.68
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "kite",
+        "confidence": 0.6775,
+        "bbox": [
+          33.76,
+          40.18,
+          92.76,
+          78.66
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "kite",
+        "confidence": 0.2545,
+        "bbox": [
+          88.05,
+          0.06,
+          99.98,
+          21.05
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_163.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_17.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.5002,
+        "bbox": [
+          33.7,
+          21.98,
+          94.97,
+          70.22
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_175.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_180.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_195.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_197.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.061
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_198.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_203.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_206.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_209.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.6972,
+        "bbox": [
+          70.06,
+          24.97,
+          87.88,
+          44.03
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_217.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_222.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_230.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.5057,
+        "bbox": [
+          15.58,
+          6.31,
+          59.68,
+          87.02
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_234.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_239.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_241.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_245.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_256.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_26.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.7196,
+        "bbox": [
+          1.65,
+          24.35,
+          8.65,
+          39.08
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "carrot",
+        "confidence": 0.2939,
+        "bbox": [
+          0.02,
+          21.88,
+          3.08,
+          29.78
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_262.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_277.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_278.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_28.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_280.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "banana",
+        "confidence": 0.3681,
+        "bbox": [
+          81.11,
+          87.57,
+          87.78,
+          99.93
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_287.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_295.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_298.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_302.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_312.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_319.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_321.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_337.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_339.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "orange",
+        "confidence": 0.4256,
+        "bbox": [
+          41.76,
+          32.63,
+          44.44,
+          37.42
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_340.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_343.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.3419,
+        "bbox": [
+          28.68,
+          19.36,
+          69.22,
+          82.48
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_351.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "skis",
+        "confidence": 0.2843,
+        "bbox": [
+          59.59,
+          13.48,
+          92.06,
+          22.91
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_355.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_356.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.7642,
+        "bbox": [
+          13.33,
+          20.96,
+          74.34,
+          63.31
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_362.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_367.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.4006,
+        "bbox": [
+          23.14,
+          18.67,
+          83.89,
+          68.94
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_369.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_374.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_381.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_400.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "apple",
+        "confidence": 0.2622,
+        "bbox": [
+          24.06,
+          10.49,
+          32.34,
+          19.2
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_416.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.8198,
+        "bbox": [
+          26.11,
+          10.3,
+          72.64,
+          74.84
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_421.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_424.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.3627,
+        "bbox": [
+          16.43,
+          15.12,
+          56.06,
+          43.96
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "potted plant",
+        "confidence": 0.2552,
+        "bbox": [
+          36.75,
+          61.1,
+          84.63,
+          92.13
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_430.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_432.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_435.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_44.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.289,
+        "bbox": [
+          75.06,
+          47.83,
+          85.36,
+          64.42
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_447.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_451.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_454.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_466.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.063
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_5.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_50.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.2799,
+        "bbox": [
+          27.75,
+          28.22,
+          73.17,
+          91.71
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_57.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_7.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210906_iPhoneSE_YL_76.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_111.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_121.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_24.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_39.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_42.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_43.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_47.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.062
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_56.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.83,
+        "bbox": [
+          24.19,
+          5.14,
+          91.32,
+          48.91
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_6.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.2504,
+        "bbox": [
+          60.47,
+          73.58,
+          65.54,
+          85.17
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_61.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_73.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_74.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_86.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210908_iPhoneSE_YL_88.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_108.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_119.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.096
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_133.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_140.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.103
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_20.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.096
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_35.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_45.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.105
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_49.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_56.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_7.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.093
+  },
+  {
+    "image": "20210909_NIKOND3300_YL_92.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.093
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_12.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_13.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "banana",
+        "confidence": 0.3531,
+        "bbox": [
+          24.6,
+          19.73,
+          63.64,
+          51.97
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_22.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.2713,
+        "bbox": [
+          64.02,
+          0.0,
+          73.23,
+          4.79
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_27.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_28.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_29.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_4.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_40.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210909_iPhoneSE_YL_8.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_11.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "sports ball",
+        "confidence": 0.4823,
+        "bbox": [
+          95.71,
+          34.24,
+          99.96,
+          41.44
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "kite",
+        "confidence": 0.3124,
+        "bbox": [
+          48.53,
+          35.68,
+          85.12,
+          78.68
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.094
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_112.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.096
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_113.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_118.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.105
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_123.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.106
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_127.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.109
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_128.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_129.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.104
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_133.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_135.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.094
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_136.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.093
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_141.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.102
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_145.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.097
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_157.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_160.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_165.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_178.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_180.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.108
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_182.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.097
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_186.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.093
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_2.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.6051,
+        "bbox": [
+          23.65,
+          14.52,
+          60.08,
+          74.72
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_212.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4927,
+        "bbox": [
+          26.62,
+          21.32,
+          60.8,
+          49.3
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.097
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_217.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.098
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_227.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_23.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.093
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_233.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "teddy bear",
+        "confidence": 0.489,
+        "bbox": [
+          19.64,
+          14.02,
+          39.06,
+          52.33
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.1
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_239.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.096
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_240.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.094
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_28.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "kite",
+        "confidence": 0.3509,
+        "bbox": [
+          38.65,
+          39.77,
+          57.28,
+          60.67
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_30.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_34.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_36.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.102
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_40.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_44.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.093
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_45.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.095
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_53.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_57.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.105
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_61.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.111
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_68.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.104
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_75.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_82.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3464,
+        "bbox": [
+          42.46,
+          42.11,
+          53.68,
+          61.65
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.09
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_85.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.092
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_86.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.547,
+        "bbox": [
+          37.53,
+          48.89,
+          47.71,
+          63.91
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.106
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_97.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.099
+  },
+  {
+    "image": "20210910_NIKOND3300_YL_99.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_106.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_109.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_116.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_121.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3042,
+        "bbox": [
+          42.88,
+          67.44,
+          60.96,
+          75.43
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_130.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_131.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_145.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_149.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_150.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_159.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_181.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_193.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_194.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_198.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_20.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_23.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_26.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.6305,
+        "bbox": [
+          25.49,
+          39.37,
+          60.87,
+          68.55
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_36.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.089
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_38.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_4.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.088
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_46.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_50.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_58.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.4197,
+        "bbox": [
+          67.92,
+          75.51,
+          77.53,
+          83.26
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_64.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_72.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_73.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_76.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.107
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_77.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.086
+  },
+  {
+    "image": "20210910_iPhone11Pro_BT_8.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.085
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_108.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_109.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_115.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_117.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_124.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_134.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.5246,
+        "bbox": [
+          38.05,
+          28.0,
+          84.18,
+          64.82
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_136.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_139.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_154.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "orange",
+        "confidence": 0.6717,
+        "bbox": [
+          22.31,
+          20.9,
+          32.87,
+          25.41
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_158.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_160.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_164.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_166.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_168.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "teddy bear",
+        "confidence": 0.2674,
+        "bbox": [
+          40.11,
+          32.57,
+          56.34,
+          58.93
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_17.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_188.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_199.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_21.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_219.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_222.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_230.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_241.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_244.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "carrot",
+        "confidence": 0.7468,
+        "bbox": [
+          14.04,
+          23.92,
+          25.29,
+          29.11
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_30.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4844,
+        "bbox": [
+          34.52,
+          11.36,
+          67.07,
+          54.35
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_32.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_36.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_49.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_51.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_52.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_59.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_70.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_74.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210910_iPhoneSE_YL_80.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_101.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_102.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_108.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_109.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "teddy bear",
+        "confidence": 0.2827,
+        "bbox": [
+          31.07,
+          27.43,
+          64.45,
+          58.99
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_115.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_119.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2724,
+        "bbox": [
+          56.83,
+          68.69,
+          93.03,
+          90.58
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2571,
+        "bbox": [
+          57.0,
+          58.4,
+          93.03,
+          90.84
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_120.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_122.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_130.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.087
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_137.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_152.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_153.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_157.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_159.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_163.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_165.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_17.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.081
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_170.jpg",
+    "num_detections": 4,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.4032,
+        "bbox": [
+          31.39,
+          33.52,
+          68.77,
+          65.3
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.361,
+        "bbox": [
+          39.06,
+          33.36,
+          54.24,
+          43.4
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.3277,
+        "bbox": [
+          31.63,
+          48.9,
+          41.2,
+          56.85
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2771,
+        "bbox": [
+          57.93,
+          40.23,
+          69.11,
+          47.93
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.081
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_178.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.084
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_183.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3795,
+        "bbox": [
+          29.66,
+          17.5,
+          70.18,
+          65.36
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_196.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_219.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_22.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_224.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_23.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_230.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_236.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_240.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.2966,
+        "bbox": [
+          38.59,
+          17.95,
+          71.17,
+          75.93
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_243.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_254.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_258.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_261.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.091
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_267.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.064
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_269.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_28.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_29.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "frisbee",
+        "confidence": 0.473,
+        "bbox": [
+          0.02,
+          87.08,
+          9.92,
+          97.54
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_48.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3307,
+        "bbox": [
+          60.9,
+          51.88,
+          74.0,
+          70.53
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_53.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.067
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_55.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_67.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.081
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_80.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "frisbee",
+        "confidence": 0.2732,
+        "bbox": [
+          72.0,
+          87.38,
+          99.94,
+          98.89
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.083
+  },
+  {
+    "image": "20210912_CanonEOS4000D_YL_98.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_100.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_108.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_114.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_117.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_124.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_125.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "frisbee",
+        "confidence": 0.5117,
+        "bbox": [
+          84.14,
+          88.35,
+          99.9,
+          99.9
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_135.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_147.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.065
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_20.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_25.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_27.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_39.jpg",
+    "num_detections": 4,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.655,
+        "bbox": [
+          48.6,
+          54.97,
+          65.15,
+          66.9
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.6011,
+        "bbox": [
+          36.69,
+          49.48,
+          46.03,
+          60.49
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.5344,
+        "bbox": [
+          50.86,
+          43.51,
+          66.83,
+          51.59
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2968,
+        "bbox": [
+          36.82,
+          42.98,
+          67.43,
+          67.23
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_40.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_59.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_60.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2769,
+        "bbox": [
+          59.58,
+          34.56,
+          70.72,
+          45.78
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_69.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.5876,
+        "bbox": [
+          44.18,
+          26.21,
+          89.85,
+          59.04
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_72.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_75.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.071
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_84.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.3286,
+        "bbox": [
+          27.61,
+          43.36,
+          36.87,
+          52.08
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.082
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_93.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "potted plant",
+        "confidence": 0.4093,
+        "bbox": [
+          16.19,
+          10.48,
+          55.08,
+          58.31
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210912_iPhoneSE_YL_95.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_1.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_10.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_108.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.069
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_109.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.066
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_12.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_121.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_123.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.07
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_124.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.068
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_148.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_16.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.077
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_20.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3455,
+        "bbox": [
+          73.0,
+          36.65,
+          87.23,
+          55.29
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "bird",
+        "confidence": 0.2771,
+        "bbox": [
+          66.57,
+          50.88,
+          79.2,
+          70.14
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.076
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_34.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.079
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_41.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_53.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_54.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3868,
+        "bbox": [
+          19.71,
+          17.38,
+          84.91,
+          65.95
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.08
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_83.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.072
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_86.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "bird",
+        "confidence": 0.3089,
+        "bbox": [
+          77.91,
+          21.18,
+          84.8,
+          29.19
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.075
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_89.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.074
+  },
+  {
+    "image": "20210913_iPhoneSE_YL_98.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.073
+  },
+  {
+    "image": "20220129_CanonEOS4000D_EO_2.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.08
+  },
+  {
+    "image": "20220129_CanonEOS4000D_EO_3.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.078
+  },
+  {
+    "image": "20220129_CanonEOS4000D_EO_33.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.2736,
+        "bbox": [
+          40.43,
+          35.44,
+          54.15,
+          71.77
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.086
+  },
+  {
+    "image": "20220129_CanonEOS4000D_EO_35.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "broccoli",
+        "confidence": 0.5008,
+        "bbox": [
+          52.83,
+          59.42,
+          68.41,
+          71.37
+        ],
+        "source": "yolo_zero_shot"
+      },
+      {
+        "label": "broccoli",
+        "confidence": 0.2588,
+        "bbox": [
+          72.87,
+          91.75,
+          82.02,
+          98.1
+        ],
+        "source": "yolo_zero_shot"
+      }
+    ],
+    "time_s": 0.074
+  }
+]

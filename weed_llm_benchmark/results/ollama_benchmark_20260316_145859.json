@@ -1,0 +1,14 @@
+[
+  {
+    "success": true,
+    "response": "\n [{\"detection\":[{\"label\":\"crop\", \"confidence\":0.65},{\"label\":\"crop\", \"confidence\":0.66},{\"label\":\"crop\", \"confidence\":0.68},{\"label\":\"crop\", \"confidence\":0.71}]",
+    "total_duration_s": 0.4077301025390625,
+    "model": "moondream",
+    "eval_count": 52,
+    "json_valid": false,
+    "parsed_json": null,
+    "image": "20210628_iPhoneSE_YL_101.jpg",
+    "tier": 0,
+    "description": "user-specified"
+  }
+]

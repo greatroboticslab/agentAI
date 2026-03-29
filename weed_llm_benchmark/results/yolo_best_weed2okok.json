@@ -1,0 +1,348 @@
+[
+  {
+    "image": "20210907_153931_x264_mp4-207_jpg.rf.510939897f9e4125c854bdcf3f598da0.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.6469,
+        "bbox": [
+          13.06,
+          29.76,
+          64.89,
+          77.74
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.3153,
+        "bbox": [
+          62.48,
+          70.68,
+          80.17,
+          90.47
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.2585,
+        "bbox": [
+          13.02,
+          41.18,
+          31.75,
+          57.54
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.044
+  },
+  {
+    "image": "IMG-20230711-WA0087_jpg.rf.b7a21b9b450483276ac74fe9b9deec63.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.7217,
+        "bbox": [
+          0.0,
+          0.0,
+          100.0,
+          59.49
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.5285,
+        "bbox": [
+          0.0,
+          0.0,
+          100.0,
+          91.38
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.034
+  },
+  {
+    "image": "IMG-20230711-WA0127_jpg.rf.15101359dc43d7b428fbdaa43739e5da.jpg",
+    "num_detections": 0,
+    "detections": [],
+    "time_s": 0.034
+  },
+  {
+    "image": "IMG-20230711-WA0164_jpg.rf.089ad5f5e261b73ee7355b2b701c9a40.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.5766,
+        "bbox": [
+          0.0,
+          1.02,
+          100.0,
+          99.47
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.034
+  },
+  {
+    "image": "IMG-20230711-WA0227_jpg.rf.00bac1245e91f6c97bfc09ce4a13f44d.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.6475,
+        "bbox": [
+          5.83,
+          32.53,
+          77.82,
+          74.66
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.034
+  },
+  {
+    "image": "IMG-20230711-WA0eyrtkyi183_jpg.rf.7c600b35b53bb7666ca4c6d2cc2eac75.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.8481,
+        "bbox": [
+          15.47,
+          23.77,
+          77.96,
+          78.71
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.037
+  },
+  {
+    "image": "IMG-20230711-oiuytfvhgh0137_jpg.rf.64941d5ba066e94a3d8194904280c897.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.7845,
+        "bbox": [
+          0.0,
+          14.81,
+          76.51,
+          97.78
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.038
+  },
+  {
+    "image": "IMG-202307tfhtftfdfhjgmjk11-WA0186_jpg.rf.6b2cd77aee69f26e965c71dcbc691925.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.9382,
+        "bbox": [
+          16.3,
+          20.06,
+          93.8,
+          87.01
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.036
+  },
+  {
+    "image": "IMG-202307vghjkyu1-WA0132_jpg.rf.dac2eb9a1a19411ad40b39a0253a3f34.jpg",
+    "num_detections": 2,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.6028,
+        "bbox": [
+          1.85,
+          27.27,
+          62.76,
+          100.0
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.4364,
+        "bbox": [
+          33.28,
+          28.25,
+          62.59,
+          66.88
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.036
+  },
+  {
+    "image": "IMG-20230aerkhghjA0031-Copy_jpg.rf.412eb17c43a7a4c5a0f85b7564029986.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.7096,
+        "bbox": [
+          0.0,
+          0.41,
+          91.24,
+          100.0
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.5324,
+        "bbox": [
+          91.93,
+          41.56,
+          100.0,
+          50.26
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.4125,
+        "bbox": [
+          0.73,
+          36.27,
+          7.11,
+          45.03
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.035
+  },
+  {
+    "image": "IMG-20230aerkhkjljA0031-Copy_jpg.rf.c6d9948dd9cf28389f93e1fefcfcd3e3.jpg",
+    "num_detections": 3,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.6927,
+        "bbox": [
+          0.0,
+          0.4,
+          92.21,
+          100.0
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.598,
+        "bbox": [
+          91.98,
+          41.58,
+          100.0,
+          50.23
+        ],
+        "source": "yolo_fine_tuned"
+      },
+      {
+        "label": "0",
+        "confidence": 0.4797,
+        "bbox": [
+          0.36,
+          36.94,
+          6.68,
+          44.6
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.035
+  },
+  {
+    "image": "IMG-2023czvczvcdzcdzvcxv_jpg.rf.02c14306152bf92c5154602d71713a9c.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.3904,
+        "bbox": [
+          0.16,
+          26.86,
+          75.14,
+          98.98
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.036
+  },
+  {
+    "image": "IMG-2023wert0711-WA0083_jpg.rf.53be106cfd91391376de83a74550e22c.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.9364,
+        "bbox": [
+          0.16,
+          8.05,
+          100.0,
+          99.59
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.036
+  },
+  {
+    "image": "IMG-20cxsdsdsc0141_jpg.rf.b6eb0fc5c9a5fc2068fad72ccbd872ff.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.9361,
+        "bbox": [
+          0.0,
+          1.05,
+          100.0,
+          99.84
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.035
+  },
+  {
+    "image": "ertyhhfdfrIMG-20230711-WA0020_jpg.rf.13c87caa3ba1c36ef909e0184d5ff9e9.jpg",
+    "num_detections": 1,
+    "detections": [
+      {
+        "label": "0",
+        "confidence": 0.8347,
+        "bbox": [
+          13.54,
+          10.64,
+          100.0,
+          100.0
+        ],
+        "source": "yolo_fine_tuned"
+      }
+    ],
+    "time_s": 0.036
+  }
+]

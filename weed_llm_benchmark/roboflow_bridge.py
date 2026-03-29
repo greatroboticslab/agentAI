@@ -738,7 +738,8 @@ def _infer_owlv2(model, processor, image_path):
     from PIL import Image
 
     image = Image.open(image_path).convert("RGB")
-    texts = [["weed", "weed plant", "broadleaf weed", "grass weed"]]
+    # Single query to avoid duplicate detections of the same object
+    texts = [["weed"]]
     inputs = processor(text=texts, images=image, return_tensors="pt").to(model.device)
 
     with torch.no_grad():
