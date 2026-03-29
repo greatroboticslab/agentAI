@@ -554,6 +554,33 @@ StrategyBrain (proposes strategy configs)
 
 **The agent's Florence+OWLv2 consensus strategy is the best method we've found** — highest new species improvement (+0.016) with lowest forgetting (-0.020).
 
+### Session 17 — 2026-03-29: Florence-2 Fine-tuning (negative result)
+
+**Method**: Fine-tune Florence-2-base on 8 known weed species (3 epochs, 1500 samples, lr=1e-5, AdamW), then use fine-tuned model to generate pseudo-labels for unseen species with OWLv2 consensus, train YOLO with 30% replay.
+
+**Full metrics (including mAP@0.5:0.95)**:
+
+| Method | Old mAP50 | Old mAP50-95 | Old F1 | New mAP50 | New mAP50-95 | New F1 |
+|--------|-----------|-------------|--------|-----------|-------------|--------|
+| Baseline (YOLO 8sp) | **0.881** | **0.839** | **0.917** | 0.589 | 0.518 | 0.606 |
+| Agent consensus (best) | 0.851 | 0.810 | 0.897 | 0.559 | 0.493 | **0.621** |
+| Florence-2 fine-tune | 0.768 | 0.732 | 0.853 | 0.516 | 0.458 | 0.596 |
+
+**Result**: Florence-2 fine-tuning **degraded** both old species (-11.3% mAP50) and new species. The fine-tuned model generates worse pseudo-labels than the zero-shot version.
+
+**Root cause analysis**:
+1. Florence-2's `<OD>` task training format is complex (autoregressive token generation) — simple loss computation may not correctly learn the detection task
+2. Only 3 epochs on 1500 samples may be too few for meaningful adaptation
+3. The model may have overfit to the 8 known species' visual patterns, losing generalization
+
+**Conclusion**: Agent consensus (Florence+OWLv2 zero-shot) remains the best approach. Fine-tuning VLMs for pseudo-labeling requires more careful training methodology.
+
+**All-time best result summary**:
+- Best method: Agent Florence+OWLv2 consensus
+- New species: F1 0.606→0.621 (+2.6%), mAP50 0.589→0.559, mAP50-95 0.518→0.493
+- Old species: F1 0.917→0.897 (-2.0%), mAP50 0.881→0.851, mAP50-95 0.839→0.810
+- Tradeoff: +2.6% new species F1, -2.0% old species F1
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)

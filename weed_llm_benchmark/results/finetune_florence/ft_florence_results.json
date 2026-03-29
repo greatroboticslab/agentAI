@@ -1,0 +1,18 @@
+{
+  "baseline": {
+    "old": {"mAP@0.5": 0.8805, "mAP@0.5:0.95": 0.8388, "precision": 0.881, "recall": 0.957, "f1": 0.917},
+    "new": {"mAP@0.5": 0.5887, "mAP@0.5:0.95": 0.5177, "precision": 0.589, "recall": 0.624, "f1": 0.606}
+  },
+  "ft_florence": {
+    "old": {"mAP@0.5": 0.7679, "mAP@0.5:0.95": 0.7318, "precision": 0.768, "recall": 0.853, "f1": 0.853},
+    "new": {"mAP@0.5": 0.5161, "mAP@0.5:0.95": 0.4575, "precision": 0.516, "recall": 0.596, "f1": 0.596},
+    "method": "Fine-tuned Florence-2-base on 8 species (3 epochs, 1500 samples), then pseudo-labels + OWLv2 consensus + 30% replay, YOLO 50 epochs lr=0.001",
+    "conclusion": "NEGATIVE: fine-tuning degraded both old (-11.3% mAP) and new species. Likely cause: incorrect training target format or insufficient epochs."
+  },
+  "agent_consensus": {
+    "old": {"mAP@0.5": 0.8510, "mAP@0.5:0.95": 0.8104, "precision": 0.851, "recall": 0.897, "f1": 0.897},
+    "new": {"mAP@0.5": 0.5585, "mAP@0.5:0.95": 0.4934, "precision": 0.559, "recall": 0.699, "f1": 0.621},
+    "method": "Florence-2-base + OWLv2 zero-shot consensus (min 2 votes, IoU>0.3) + YOLO old-species labels + 30% replay, lr=0.001, 50 epochs",
+    "conclusion": "BEST METHOD: +0.016 F1 on new species with manageable forgetting (-0.020 F1 on old)"
+  }
+}

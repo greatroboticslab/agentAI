@@ -138,9 +138,21 @@
 - Key finding: 2-model consensus (high-precision + high-recall) beats 7-model voting
 - Architecture: StrategyBrain → LabelGenerator → TrainManager → Evaluator → iterate
 
+## 2026-03-29 - Florence-2 Fine-tuning (negative) + Full mAP Evaluation
+
+### Florence-2 Fine-tuning (negative result)
+- `run_finetune_florence.py` — fine-tune Florence-2-base on 8 species, generate pseudo-labels, train YOLO
+- Result: WORSE than zero-shot (-11.3% mAP on old, -7.3% mAP on new)
+- Cause: autoregressive OD training format too complex for simple fine-tuning
+
+### Full mAP@0.5:0.95 Evaluation
+- First comprehensive evaluation with mAP at all IoU thresholds (0.5 to 0.95)
+- Agent consensus remains best: new F1 +2.6%, old F1 -2.0%
+- mAP50-95 shows tighter bbox evaluation: all methods lose more at strict IoU
+
 ## TODO
-- [ ] Refine agent optimizer (second round with parameter tuning)
-- [ ] Implement R-Super soft constraint losses
-- [ ] Fine-tune Florence-2 on weed domain data
+- [ ] Implement closed-loop HyperAgent self-improvement system
+- [ ] Agent Round 2: refine best strategy with parameter tuning
+- [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables
 - [ ] Write paper
