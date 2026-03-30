@@ -1,0 +1,34 @@
+{
+  "brain_model": "Qwen/Qwen2.5-7B-Instruct",
+  "rounds": [
+    {
+      "config": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3,
+                 "use_yolo_old": true, "lr": 0.001, "epochs": 50, "freeze_layers": 0, "replay_ratio": 0.3,
+                 "name": "seed_consensus_flo+owl"},
+      "result": {"old_f1": 0.897, "new_f1": 0.622, "forgetting": false},
+      "note": "Seed from Phase 3E (best known result)"
+    },
+    {
+      "config": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3,
+                 "use_yolo_old": true, "lr": 0.001, "epochs": 50, "freeze_layers": 5, "replay_ratio": 0.5,
+                 "name": "seed_consensus_flo+owl_replay50_freeze5"},
+      "result": {"old_f1": 0.890, "new_f1": 0.595, "forgetting": true},
+      "reasoning": "Qwen proposed: increase replay to 50% and freeze 5 layers to prevent forgetting"
+    },
+    {
+      "config": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 3, "consensus_iou": 0.3,
+                 "use_yolo_old": true, "lr": 0.001, "epochs": 50, "freeze_layers": 0, "replay_ratio": 0.3,
+                 "name": "seed_consensus_flo+owl_3votes"},
+      "result": {"old_f1": 0.883, "new_f1": 0.605, "forgetting": true},
+      "reasoning": "Qwen proposed: increase min_votes to 3 for stricter consensus"
+    },
+    {
+      "config": {"vlm_models": ["florence2_base"], "min_votes": 3, "consensus_iou": 0.3,
+                 "use_yolo_old": true, "lr": 0.001, "epochs": 50, "freeze_layers": 0, "replay_ratio": 0.3,
+                 "name": "florence2_3votes"},
+      "result": {"old_f1": 0.870, "new_f1": 0.607, "forgetting": true},
+      "reasoning": "Qwen proposed: use only Florence-2 with higher vote threshold"
+    }
+  ],
+  "conclusion": "HyperAgent closed loop worked technically (Qwen analyzed + proposed + executed 3 rounds). But Qwen-7B's strategies all caused forgetting. The seed strategy (Florence+OWLv2 2-vote consensus) remains the best. Brain model needs stronger reasoning capability to discover novel strategies beyond simple parameter variations."
+}

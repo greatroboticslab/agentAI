@@ -581,6 +581,31 @@ StrategyBrain (proposes strategy configs)
 - Old species: F1 0.917→0.897 (-2.0%), mAP50 0.881→0.851, mAP50-95 0.839→0.810
 - Tradeoff: +2.6% new species F1, -2.0% old species F1
 
+### Session 18 — 2026-03-29/30: HyperAgent Closed-Loop System
+
+**Design**: Real LLM (Qwen2.5-7B-Instruct) as Brain in a closed-loop optimization system. Brain analyzes experiment history via natural language reasoning, proposes new strategies as JSON configs. System executes (generate labels → train YOLO → evaluate), feeds results back to Brain. GPU memory managed by alternating Brain/YOLO loading.
+
+**Implementation**: `run_hyperagent.py`
+- Brain loads Qwen2.5-7B → reads full experiment history → generates reasoning + JSON strategy
+- Brain unloads → YOLO trains on GPU → evaluates on old+new species
+- Results appended to history → Brain loads again → proposes next strategy
+- 3 rounds executed
+
+**Results**:
+
+| Round | Strategy (proposed by Qwen) | Old F1 | New F1 | Forgetting? |
+|-------|----------------------------|--------|--------|-------------|
+| 0 (seed) | Florence+OWLv2 2-vote consensus | 0.897 | **0.622** | No |
+| 1 (Qwen) | Same + replay 50% + freeze 5 layers | 0.890 | 0.595 | **Yes** |
+| 2 (Qwen) | Same + 3-vote consensus | 0.883 | 0.605 | **Yes** |
+| 3 (Qwen) | Florence-2 only, 3 votes | 0.870 | 0.607 | **Yes** |
+
+**Conclusion**: The closed-loop system **worked technically** — Qwen successfully analyzed history, reasoned about strategies, and produced valid JSON configs that executed correctly. However, all 3 Qwen-proposed strategies performed worse than the seed. Qwen-7B tends to propose "intuitively reasonable" changes (more freeze, more votes, more replay) that we already proved don't work.
+
+**Root cause**: Qwen-7B lacks deep enough reasoning to discover genuinely novel strategies. It repeats conventional wisdom rather than finding counter-intuitive solutions. A stronger reasoning model (e.g., DeepSeek-R1, Qwen-72B, or future models) might perform better.
+
+**Key insight for the paper**: The HyperAgent architecture is sound (modular, swappable Brain). The bottleneck is Brain intelligence, not system design. As open-source LLMs improve, this system will automatically benefit.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)

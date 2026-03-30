@@ -150,9 +150,24 @@
 - Agent consensus remains best: new F1 +2.6%, old F1 -2.0%
 - mAP50-95 shows tighter bbox evaluation: all methods lose more at strict IoU
 
+## 2026-03-29/30 - HyperAgent Closed-Loop System
+
+### HyperAgent with Qwen2.5-7B Brain
+- `run_hyperagent.py` — real LLM-brained closed-loop optimization
+- Qwen2.5-7B-Instruct as Brain: analyzes history → reasons in natural language → proposes JSON strategy
+- GPU memory management: alternately loads Brain (14GB) and YOLO (5.5GB)
+- 3 rounds executed: all Qwen-proposed strategies caused forgetting
+- System architecture works (modular, swappable Brain) but Qwen-7B reasoning insufficient
+- Brain proposed: freeze layers, more votes, more replay — all already proven ineffective
+- Seed strategy (Florence+OWLv2 2-vote consensus, +0.016 F1) remains best
+
+### Key finding
+- HyperAgent bottleneck is Brain intelligence, not system design
+- Stronger reasoning models (DeepSeek-R1, Qwen-72B) may discover novel strategies
+- Architecture is future-proof: swap Brain model to benefit from LLM improvements
+
 ## TODO
-- [ ] Implement closed-loop HyperAgent self-improvement system
-- [ ] Agent Round 2: refine best strategy with parameter tuning
+- [ ] Try stronger Brain model (DeepSeek-R1 or Qwen-72B-AWQ)
 - [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables
 - [ ] Write paper
