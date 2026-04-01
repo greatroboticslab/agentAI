@@ -225,8 +225,9 @@ while not converged:
 - [x] `orchestrator.py` (343 lines) — main while loop, 6-step round, baseline, seeding, run log
 - [x] `run.py` (106 lines) — CLI with argparse, logging setup, --list-brains/--list-vlms
 - [x] Syntax verify all files (12/12 passed)
-- [ ] Upload to cluster + verify imports
-- [ ] Submit test run on cluster
+- [x] Upload to cluster + verify imports (ALL_IMPORTS_OK on login node)
+- [x] Submit test run on cluster (Job 38326705, Qwen2.5-7B Brain, 3 rounds)
+- [ ] Check job results when complete
 - [ ] Record results and update docs
 
 **10 Hard Lessons (NEVER violate)**:
