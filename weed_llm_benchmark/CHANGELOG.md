@@ -166,14 +166,14 @@
 - Stronger reasoning models (DeepSeek-R1, Qwen-72B) may discover novel strategies
 - Architecture is future-proof: swap Brain model to benefit from LLM improvements
 
-## 2026-03-31 - Framework Refactor: WeedOptimizer (Claude Code-inspired)
+## 2026-03-31 - Framework Refactor: WeedOptimizer (agent-style architecture)
 
 ### CURRENT TASK — Read this section to resume work
 
 **Goal**: Refactor single-file `weed_optimizer_framework.py` (698 lines) into a proper
-multi-module framework inspired by Claude Code's architecture (while loop + tool calling).
+multi-module framework using agent-style architecture (while loop + tool calling).
 
-**Architecture** (Claude Code pattern: Brain + Tools + Memory):
+**Architecture** (Brain + Tools + Memory pattern):
 ```
 weed_optimizer_framework/          # Python package
 ├── __init__.py                    # Package init + version
@@ -191,7 +191,7 @@ weed_optimizer_framework/          # Python package
 └── run.py                         # CLI entry point with argparse
 ```
 
-**Core design principle** (from Claude Code):
+**Core design principle** (agent tool-calling loop):
 ```
 while not converged:
     strategy = brain.analyze_and_propose(memory)     # Brain thinks
@@ -227,8 +227,8 @@ while not converged:
 - [x] Syntax verify all files (12/12 passed)
 - [x] Upload to cluster + verify imports (ALL_IMPORTS_OK on login node)
 - [x] Submit test run on cluster (Job 38326705, Qwen2.5-7B Brain, 3 rounds)
-- [ ] Check job results when complete
-- [ ] Record results and update docs
+- [x] Check job results — COMPLETED (2h44m), framework ran successfully
+- [x] Record results and update docs
 
 **10 Hard Lessons (NEVER violate)**:
 1. NEVER freeze backbone (F1=0.155 catastrophic)
@@ -246,16 +246,22 @@ while not converged:
 
 **Cluster info**: Bridges-2 (PSC), conda env `bench` (transformers 4.57) or `compat` (4.46), V100-32GB
 
+### Framework test results (Job 38326705)
+- Framework ran 2 rounds (auto-stopped after 2 no-improve rounds)
+- Round 1: new_f1=0.624 (slight improvement) but old_f1=0.893 → FORGETTING
+- Round 2: new_f1=0.617, old_f1=0.883 → FORGETTING
+- Seed (Phase 3E consensus) remains best: new_f1=0.622 with old_f1=0.897
+- First full mAP baseline: old_mAP50=0.953, new_mAP50=0.525
+
 ### HOW TO RESUME
 When user says "阅读changelog然后继续":
 1. Read this CHANGELOG.md
-2. Check "Build progress" checklist above — find first unchecked item
-3. Continue building from there
-4. After each file: verify syntax, update checklist, commit to GitHub
-5. After all files done: upload to cluster, verify imports, submit test run
+2. Check "CURRENT TASK" section for next steps
+3. Framework is complete and tested — move to TODO items below
+4. Always update this file after completing each task
 
-## TODO (after framework)
-- [ ] Try stronger Brain model (DeepSeek-R1 or Qwen-72B-AWQ)
+## TODO
+- [ ] Try stronger Brain model (DeepSeek-R1-7B) — may discover novel strategies
 - [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

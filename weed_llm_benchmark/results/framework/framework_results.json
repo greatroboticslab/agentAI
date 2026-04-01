@@ -1,0 +1,45 @@
+{
+  "description": "Weed Optimizer Framework test run — 3 rounds with Qwen2.5-7B Brain",
+  "job_id": 38326705,
+  "elapsed": "02:43:44",
+  "brain_model": "Qwen/Qwen2.5-7B-Instruct",
+  "baseline": {
+    "old_f1": 0.917, "new_f1": 0.6058,
+    "old_map50": 0.9533, "new_map50": 0.5246
+  },
+  "experiments": [
+    {
+      "iteration": 0,
+      "name": "seed_best_known_phase3e",
+      "old_f1": 0.897, "new_f1": 0.622,
+      "old_map50": 0.851, "new_map50": 0.559,
+      "forgetting": false,
+      "source": "Phase 3E seed (historical)"
+    },
+    {
+      "iteration": 1,
+      "name": "Dual-VLM Fine-Tuning with Consensus Filtering",
+      "old_f1": 0.8926, "new_f1": 0.6236,
+      "old_map50": 0.9472, "new_map50": 0.5895,
+      "forgetting": true,
+      "proposed_by": "Qwen2.5-7B"
+    },
+    {
+      "iteration": 2,
+      "name": "Consensus Filtering with Optimized VLMs and Learning Rate",
+      "old_f1": 0.8825, "new_f1": 0.6172,
+      "old_map50": 0.9517, "new_map50": 0.5951,
+      "old_map50_95": 0.8913, "new_map50_95": 0.5146,
+      "old_precision": 0.8170, "old_recall": 0.9596,
+      "new_precision": 0.5446, "new_recall": 0.7121,
+      "forgetting": true,
+      "proposed_by": "Qwen2.5-7B"
+    }
+  ],
+  "conclusion": "Framework ran successfully. Qwen-7B proposed 2 strategies, both caused forgetting (old_f1 < 0.90). Stopped after 2 consecutive no-improvement rounds. Architecture validated.",
+  "full_metrics_available": true,
+  "new_baseline_with_map": {
+    "old_f1": 0.917, "old_map50": 0.9533, "old_map50_95": "pending",
+    "new_f1": 0.6058, "new_map50": 0.5246, "new_map50_95": "pending"
+  }
+}
