@@ -166,7 +166,94 @@
 - Stronger reasoning models (DeepSeek-R1, Qwen-72B) may discover novel strategies
 - Architecture is future-proof: swap Brain model to benefit from LLM improvements
 
-## TODO
+## 2026-03-31 - Framework Refactor: WeedOptimizer (Claude Code-inspired)
+
+### CURRENT TASK — Read this section to resume work
+
+**Goal**: Refactor single-file `weed_optimizer_framework.py` (698 lines) into a proper
+multi-module framework inspired by Claude Code's architecture (while loop + tool calling).
+
+**Architecture** (Claude Code pattern: Brain + Tools + Memory):
+```
+weed_optimizer_framework/          # Python package
+├── __init__.py                    # Package init + version
+├── config.py                      # All paths, constants, model registry, cluster config
+├── brain.py                       # SuperBrain — swappable LLM (Qwen→DeepSeek→future)
+├── memory.py                      # Persistent memory (experiments, 10 hard lessons, baselines)
+├── monitor.py                     # Quality monitor (forgetting, drift, per-class, mAP tracking)
+├── tools/
+│   ├── __init__.py                # ToolRegistry base class + dispatch
+│   ├── vlm_pool.py                # VLM model loading + inference (READ-ONLY, never fine-tuned)
+│   ├── yolo_trainer.py            # YOLO training with replay buffer management
+│   ├── evaluator.py               # Full eval: mAP@0.5, mAP@0.5:0.95, per-class P/R/F1
+│   └── label_gen.py               # Multi-VLM consensus label generation
+├── orchestrator.py                # Main while loop (Brain→Tools→Evaluate→Brain)
+└── run.py                         # CLI entry point with argparse
+```
+
+**Core design principle** (from Claude Code):
+```
+while not converged:
+    strategy = brain.analyze_and_propose(memory)     # Brain thinks
+    if not monitor.validate(strategy): adjust()      # Safety check
+    labels = tools.call("generate_labels", strategy)  # Tool execution
+    model = tools.call("train_yolo", labels)          # Tool execution
+    result = tools.call("evaluate", model)            # Tool execution
+    memory.record(strategy, result)                   # Persist
+    brain.reflect(result)                             # Brain learns
+```
+
+**Key rules**:
+- ONLY YOLO gets fine-tuned. All VLMs are read-only tools.
+- Old species F1 must stay ≥0.90 (forgetting threshold)
+- 10 hard-coded lessons from 18 sessions prevent repeating known failures
+- Brain is swappable: currently Qwen2.5-7B, future DeepSeek-R1 or Qwen-72B
+- Full mAP@0.5:0.95 evaluation required (not just F1)
+- Atomic file writes (.tmp → os.replace) for checkpoint safety
+- GPU memory: alternate Brain (14GB) and YOLO (5.5GB), never simultaneous
+
+**Build progress** (2,319 lines across 12 files):
+- [x] `config.py` (169 lines) — paths, constants, VLM registry (7 models), Brain registry (3 models)
+- [x] `memory.py` (271 lines) — persistent memory, 10 hard lessons, experiment history, Brain context generation
+- [x] `monitor.py` (198 lines) — strategy validation, forgetting detection, per-class analysis, drift detection
+- [x] `tools/__init__.py` (91 lines) — ToolRegistry with timing, stats, GPU-awareness
+- [x] `tools/vlm_pool.py` (153 lines) — VLM metadata, label access, pair recommendation, agreement analysis
+- [x] `tools/yolo_trainer.py` (195 lines) — dataset assembly, replay buffer, YOLO training, cleanup
+- [x] `tools/evaluator.py` (311 lines) — FULL mAP@0.5 + mAP@0.5:0.95, per-class P/R/F1, PASCAL VOC AP
+- [x] `tools/label_gen.py` (187 lines) — multi-VLM consensus with IoU clustering, box validation
+- [x] `brain.py` (279 lines) — SuperBrain: analyze, propose, reflect, diagnose; chat template; JSON parsing
+- [x] `orchestrator.py` (343 lines) — main while loop, 6-step round, baseline, seeding, run log
+- [x] `run.py` (106 lines) — CLI with argparse, logging setup, --list-brains/--list-vlms
+- [x] Syntax verify all files (12/12 passed)
+- [ ] Upload to cluster + verify imports
+- [ ] Submit test run on cluster
+- [ ] Record results and update docs
+
+**10 Hard Lessons (NEVER violate)**:
+1. NEVER freeze backbone (F1=0.155 catastrophic)
+2. Replay >50% makes forgetting WORSE
+3. SAM + caption classification too noisy (-11%)
+4. Fine-tuning VLMs degrades zero-shot ability (-11.3%)
+5. 2 complementary models > 7 mediocre models voting
+6. Florence-2 + OWLv2 is the best VLM pair
+7. Florence-2 confidence scores are NOT calibrated
+8. Old species F1 must stay ≥0.90
+9. Label noise (27.4% FP) is the ROOT CAUSE of failures
+10. YOLO drops 27% F1 on unseen species
+
+**Best result so far**: Florence+OWLv2 2-vote consensus → new F1: 0.606→0.622 (+2.6%), old F1: 0.917→0.897 (-2.0%)
+
+**Cluster info**: Bridges-2 (PSC), conda env `bench` (transformers 4.57) or `compat` (4.46), V100-32GB
+
+### HOW TO RESUME
+When user says "阅读changelog然后继续":
+1. Read this CHANGELOG.md
+2. Check "Build progress" checklist above — find first unchecked item
+3. Continue building from there
+4. After each file: verify syntax, update checklist, commit to GitHub
+5. After all files done: upload to cluster, verify imports, submit test run
+
+## TODO (after framework)
 - [ ] Try stronger Brain model (DeepSeek-R1 or Qwen-72B-AWQ)
 - [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables
