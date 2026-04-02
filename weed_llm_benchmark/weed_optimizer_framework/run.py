@@ -87,6 +87,9 @@ def main():
     # Resolve brain model
     if args.brain_id:
         brain_model_id = args.brain_id
+    elif args.backend == "ollama" or ":" in args.brain:
+        # Ollama model names like "qwen2.5:7b" — pass directly
+        brain_model_id = args.brain
     elif args.brain in Config.BRAIN_MODELS:
         brain_model_id = Config.BRAIN_MODELS[args.brain]["hf_id"]
     else:
