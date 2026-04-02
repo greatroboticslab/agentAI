@@ -3,8 +3,9 @@
 CLI entry point for the Weed Optimizer Framework.
 
 Usage:
-    python -m weed_optimizer_framework.run                       # default: Qwen2.5-7B, 3 rounds
-    python -m weed_optimizer_framework.run --brain deepseek_r1_7b --rounds 5
+    python -m weed_optimizer_framework.run                                    # agent mode (default)
+    python -m weed_optimizer_framework.run --mode strategy                    # rigid pipeline mode
+    python -m weed_optimizer_framework.run --brain deepseek_r1_7b --rounds 5  # stronger brain
     python -m weed_optimizer_framework.run --list-brains
     python -m weed_optimizer_framework.run --list-vlms
 """
@@ -66,6 +67,8 @@ def main():
                         help="List available brain models")
     parser.add_argument("--list-vlms", action="store_true",
                         help="List available VLM tools")
+    parser.add_argument("--mode", default="agent", choices=["agent", "strategy"],
+                        help="agent=Brain decides each step; strategy=rigid pipeline (default: agent)")
     parser.add_argument("--log-file", default=None,
                         help="Save log to file")
 
@@ -98,6 +101,7 @@ def main():
         brain_model_id=brain_model_id,
         max_rounds=args.rounds,
         max_no_improve=args.no_improve_limit,
+        mode=args.mode,
     )
     orchestrator.run()
 
