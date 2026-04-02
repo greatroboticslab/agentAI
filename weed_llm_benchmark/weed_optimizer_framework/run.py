@@ -69,6 +69,8 @@ def main():
                         help="List available VLM tools")
     parser.add_argument("--mode", default="agent", choices=["agent", "strategy"],
                         help="agent=Brain decides each step; strategy=rigid pipeline (default: agent)")
+    parser.add_argument("--backend", default="auto", choices=["auto", "ollama", "hf", "fallback"],
+                        help="Brain backend: ollama (native tool calling), hf (direct model), fallback (no LLM)")
     parser.add_argument("--log-file", default=None,
                         help="Save log to file")
 
@@ -97,12 +99,16 @@ def main():
     setup_logging(log_file)
 
     # Run
+    from .brain import SuperBrain
+    brain = SuperBrain(model_id=brain_model_id, backend=args.backend)
+
     orchestrator = Orchestrator(
         brain_model_id=brain_model_id,
         max_rounds=args.rounds,
         max_no_improve=args.no_improve_limit,
         mode=args.mode,
     )
+    orchestrator.brain = brain  # use our configured brain
     orchestrator.run()
 
 

@@ -640,6 +640,23 @@ Baseline (first full mAP measurement): old_F1=0.917, old_mAP50=0.953, new_F1=0.6
 
 **Conclusion**: Framework architecture is **validated and production-ready**. The system correctly orchestrates Brain→Labels→Train→Evaluate→Reflect cycles, validates strategies against lessons, detects forgetting, and auto-stops. Next: try stronger Brain (DeepSeek-R1).
 
+### Session 20 — 2026-04-02: Agent mode testing + Ollama upgrade
+
+**Agent mode v1** (Job 38354715): FAILED — Qwen-7B couldn't output JSON action format, fell back to repeating "generate_consensus" 30 times. Never trained or evaluated.
+
+**Agent mode v2** (Job 38373824, simplified prompt): Partially fixed — Qwen-7B now outputs numbered choices correctly, but always picks "1" (inspect_labels). 20x inspect loop, never progressed to training. Brain can follow format but makes bad decisions.
+
+**Root cause analysis**: Qwen-7B is fundamentally too weak for agentic decision-making. Even with simplified prompts, it cannot reason about *when* to move from inspection to training. The problem is not format/parsing — it's intelligence.
+
+**Solution: Ollama function calling (v1.2 upgrade)**:
+- Ollama provides native function calling (model outputs structured tool calls, not free text)
+- Three backends: Ollama (best), HuggingFace (fallback), predetermined pipeline (no LLM)
+- Forced progression: if Brain repeats same action 2+ times, auto-advance
+- Job chain: SLURM script auto-submits next round if improvement found
+- Framework: 2,318 → 2,868 lines (+550)
+
+**Key architectural insight for the paper**: The tool-calling pattern (Brain→Tools→Observe→Brain) is proven effective in commercial AI coding assistants. However, the quality of the Brain LLM is the primary bottleneck. With Qwen-7B: format works but decisions fail. With stronger models or native function calling: the architecture becomes truly adaptive.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)

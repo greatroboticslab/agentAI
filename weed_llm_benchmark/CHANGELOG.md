@@ -254,7 +254,20 @@ while not converged:
 
 Agent mode actions: inspect_labels → run_vlm_inference → generate_consensus → train_yolo → evaluate → done
 
-**Testing**: Job 38354715 (agent mode, Qwen2.5-7B Brain, 3 rounds)
+**Test results**:
+- Job 38354715 (v1): FAILED — Qwen-7B couldn't output JSON, 30x fallback loop
+- Job 38373824 (v2, simplified prompt): FAILED — Qwen-7B outputs "1" repeatedly, 20x inspect loop
+- Root cause: Qwen-7B can output format but makes terrible decisions (loops on inspect, never trains)
+
+### v1.2 Upgrade: Ollama function calling + forced progression + job chain (2,868 lines)
+- `brain.py` (436 lines): Three backends — Ollama (native tool calling), HuggingFace, fallback pipeline
+- Ollama function calling: model outputs structured tool calls natively, no JSON parsing needed
+- Forced progression: if Brain repeats same action 2+ times, auto-advance to next step
+- Job chain: SLURM script auto-submits next job if framework hasn't converged
+- `run_framework_ollama.sh`: starts Ollama server, pulls model, runs framework, auto-chains
+- `--backend ollama|hf|fallback|auto` flag added to CLI
+
+**Testing**: Pending — needs Ollama + qwen2.5:7b on cluster
 
 ### Framework test results (Job 38326705, strategy mode)
 - Framework ran 2 rounds (auto-stopped after 2 no-improve rounds)

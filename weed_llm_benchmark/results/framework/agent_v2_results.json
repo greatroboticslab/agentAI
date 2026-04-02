@@ -1,0 +1,28 @@
+{
+  "description": "Agent mode v2 test — simplified prompt + smart fallback",
+  "job_id": 38373824,
+  "elapsed": "00:32:05",
+  "brain_model": "Qwen/Qwen2.5-7B-Instruct",
+  "mode": "agent",
+  "status": "FAILED — Brain stuck in inspect loop",
+  "rounds": [
+    {
+      "round": 1,
+      "actions": ["inspect_labels x10"],
+      "result": "No training or evaluation performed",
+      "diagnosis": "Qwen-7B always outputs '1' (inspect), never progresses to train/evaluate"
+    },
+    {
+      "round": 2,
+      "actions": ["run_vlm_inference x2", "inspect_labels x8"],
+      "result": "No training or evaluation performed",
+      "diagnosis": "Same issue — Brain can output numbered format but makes bad decisions"
+    }
+  ],
+  "previous_tests": {
+    "job_38354715_agent_v1": "30x fallback (generate_consensus) — couldn't parse JSON",
+    "job_38326705_strategy": "Completed but all strategies caused forgetting"
+  },
+  "conclusion": "Qwen-7B is insufficient as Brain for agent mode. Format parsing is solved (simplified prompt works), but decision quality is too poor. Need: (1) Ollama function calling for proper tool use, (2) stronger model or mandatory pipeline progression.",
+  "next_steps": ["Implement Ollama function calling", "Add forced pipeline progression", "Job chain for auto-continuation"]
+}

@@ -88,6 +88,7 @@ class Orchestrator:
 
         self._print_summary()
         self._save_run_log()
+        self._write_continuation_flag()
 
     # =========================================================
     # MODE 2: AGENT MODE — Brain decides each step
@@ -140,6 +141,7 @@ class Orchestrator:
 
         final_result = None
         actions_taken = []
+        action_counts = {}  # track repeated actions
 
         for step in range(max_actions):
             logger.info(f"\n--- Step {step + 1}/{max_actions} ---")
@@ -147,6 +149,24 @@ class Orchestrator:
             # Brain decides next action (step_num for smart fallback)
             action = self.brain.decide_next_action(context_history, step_num=step)
             action_name = action.get("action", "done")
+
+            # Prevent infinite loops: if same action repeated 2+ times, force progression
+            action_counts[action_name] = action_counts.get(action_name, 0) + 1
+            if action_counts[action_name] > 2 and action_name not in ("done", "evaluate"):
+                logger.warning(f"Action '{action_name}' repeated {action_counts[action_name]} times, forcing progression")
+                # Force next logical step
+                if not self._current_label_dir:
+                    action = {"action": "generate_consensus",
+                              "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
+                              "reasoning": "Forced: too many repeats, moving to consensus"}
+                elif not self._current_model_path:
+                    action = {"action": "train_yolo",
+                              "params": {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
+                              "reasoning": "Forced: labels ready, moving to training"}
+                else:
+                    action = {"action": "evaluate", "params": {},
+                              "reasoning": "Forced: model ready, moving to evaluation"}
+                action_name = action["action"]
             params = action.get("params", {})
             reasoning = action.get("reasoning", "")
 
@@ -472,3 +492,30 @@ class Orchestrator:
             json.dump(log_data, f, indent=2, default=str)
         os.replace(tmp, log_path)
         logger.info(f"Run log saved to {log_path}")
+
+    def _write_continuation_flag(self):
+        """Write should_continue.txt if more optimization rounds could help.
+
+        This enables SLURM job chaining: the current job's script checks
+        for this file and auto-submits the next job.
+        """
+        flag_path = os.path.join(Config.FRAMEWORK_DIR, "should_continue.txt")
+
+        # Continue if: we found improvements and haven't hit diminishing returns
+        should_continue = False
+        if len(self.memory.experiments) >= 2:
+            latest = self.memory.experiments[-1]["result"]
+            if latest.get("new_f1", 0) > self.memory.baseline.get("new_f1", 0):
+                should_continue = True  # still improving
+            if not latest.get("forgetting", True):
+                should_continue = True  # no forgetting, worth trying more
+
+        if should_continue:
+            with open(flag_path, "w") as f:
+                f.write(f"continue\ntotal_experiments={len(self.memory.experiments)}\n")
+            logger.info(f"Continuation flag written: {flag_path}")
+        else:
+            # Remove flag if exists
+            if os.path.exists(flag_path):
+                os.remove(flag_path)
+            logger.info("No continuation needed")

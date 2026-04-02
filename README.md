@@ -84,7 +84,7 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 | Phase 3E: Agent Optimizer | **Done** | **First improvement!** Florence+OWLv2 consensus: +0.016 F1 on unseen species, -0.020 forgetting |
 | Phase 3F: Florence-2 Fine-tune | **Done** | Negative: fine-tuning degraded both old (-11%) and new species |
 | Phase 4: HyperAgent Closed-Loop | **Done** | Qwen2.5-7B Brain: 3 rounds executed, system works but Brain needs stronger reasoning |
-| Phase 4B: Weed Optimizer Framework | **Done** | Modular refactor: 12 files, 2,319 lines. Full mAP evaluation. Cluster-tested (Job 38326705). |
+| Phase 4B: Weed Optimizer Framework | **Done** | 12 files, 2,868 lines. Ollama function calling + job chain. Three Brain backends. |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
 | Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
 
