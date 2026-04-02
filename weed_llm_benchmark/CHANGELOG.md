@@ -246,7 +246,17 @@ while not converged:
 
 **Cluster info**: Bridges-2 (PSC), conda env `bench` (transformers 4.57) or `compat` (4.46), V100-32GB
 
-### Framework test results (Job 38326705)
+### v1.1 Upgrade: Agent mode + VLM live inference (2,318→2,682 lines)
+- `brain.py`: Agent mode — Brain decides ONE action per step, sees result, decides next
+- `tools/vlm_pool.py`: Live inference for Florence-2 + OWLv2 (load→detect→return boxes)
+- `orchestrator.py`: Two modes — `agent` (Brain controls flow) and `strategy` (rigid pipeline)
+- `run.py`: Added `--mode agent|strategy` flag
+
+Agent mode actions: inspect_labels → run_vlm_inference → generate_consensus → train_yolo → evaluate → done
+
+**Testing**: Job 38354715 (agent mode, Qwen2.5-7B Brain, 3 rounds)
+
+### Framework test results (Job 38326705, strategy mode)
 - Framework ran 2 rounds (auto-stopped after 2 no-improve rounds)
 - Round 1: new_f1=0.624 (slight improvement) but old_f1=0.893 → FORGETTING
 - Round 2: new_f1=0.617, old_f1=0.883 → FORGETTING
