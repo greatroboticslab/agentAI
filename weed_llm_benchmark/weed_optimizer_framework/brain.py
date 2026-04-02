@@ -84,96 +84,145 @@ class SuperBrain:
     # MODE 2: AGENT MODE — Brain decides one action at a time
     # =========================================================
 
-    def decide_next_action(self, context_history):
+    def decide_next_action(self, context_history, step_num=0):
         """Brain looks at accumulated context and decides what to do next.
+
+        Uses a simplified numbered-choice format that 7B models can handle.
+        If Brain can't decide, uses a smart fallback pipeline that progresses
+        through logical steps instead of repeating the same action.
 
         Args:
             context_history: list of {"role": "system"|"observation", "content": str}
+            step_num: current step within the round (for smart fallback)
 
         Returns:
             {"action": str, "params": dict, "reasoning": str}
         """
         prompt = self._build_agent_prompt(context_history)
-        response = self._generate(prompt, max_tokens=512)
-        action = self._parse_action(response)
+        response = self._generate(prompt, max_tokens=256)
+        action = self._parse_action(response, step_num)
         logger.info(f"[Brain] Action: {action.get('action')} — {action.get('reasoning', '')[:80]}")
         return action
 
     def _build_agent_prompt(self, context_history):
-        """Build the agent-mode prompt with full context history."""
-        # Format history
+        """Simplified prompt — numbered choices for 7B models."""
+        # Compact history (last 3 entries only to keep prompt short)
         history_text = ""
-        for entry in context_history:
+        for entry in context_history[-4:]:
             role = entry["role"]
-            content = entry["content"]
-            if role == "system":
-                history_text += f"\n[SYSTEM] {content}\n"
-            elif role == "observation":
-                history_text += f"\n[OBSERVATION] {content}\n"
+            content = entry["content"][:300]  # truncate long observations
+            history_text += f"[{role.upper()}] {content}\n\n"
 
-        actions_text = "\n".join(f"  - {name}: {desc}" for name, desc in AGENT_ACTIONS.items())
+        return f"""You are an AI agent optimizing weed detection. Choose your next action.
 
-        return f"""You are the Brain of a weed detection optimization system.
-You make decisions ONE STEP AT A TIME. After each action, you see the result and decide next.
-
-RULES:
-1. ONLY YOLO gets fine-tuned. VLMs are read-only tools.
-2. Old species F1 must stay above 0.90.
-3. Respect all lessons in the context below.
-4. Think carefully before each action — you can inspect, adjust, then train.
-
-AVAILABLE ACTIONS:
-{actions_text}
-
-CONTEXT AND HISTORY:
+HISTORY:
 {history_text}
 
-OUTPUT FORMAT — You MUST output valid JSON:
-{{"action": "action_name", "params": {{"key": "value"}}, "reasoning": "why this action"}}
+ACTIONS (pick a number):
+1. inspect_labels - Check VLM label quality
+2. run_vlm - Run Florence-2 or OWLv2 on images
+3. consensus - Generate consensus labels from VLMs
+4. train - Train YOLO with labels
+5. evaluate - Test YOLO on old+new species
+6. done - Stop this round
 
-Example actions:
-{{"action": "inspect_labels", "params": {{"vlm_key": "florence2_base", "sample_size": 20}}, "reasoning": "Check Florence-2 label quality before using them"}}
-{{"action": "run_vlm_inference", "params": {{"vlm_key": "owlv2", "max_images": 50}}, "reasoning": "Generate fresh OWLv2 detections on holdout images"}}
-{{"action": "generate_consensus", "params": {{"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3}}, "reasoning": "Create consensus labels from two best VLMs"}}
-{{"action": "train_yolo", "params": {{"lr": 0.001, "epochs": 50, "replay_ratio": 0.3}}, "reasoning": "Train YOLO with consensus labels"}}
-{{"action": "evaluate", "params": {{}}, "reasoning": "Check if training improved detection"}}
-{{"action": "done", "params": {{"reason": "Evaluation shows no improvement, stopping"}}, "reasoning": "No further actions will help"}}
+RESPOND WITH JUST THE NUMBER AND OPTIONAL PARAMETERS.
+Example responses:
+"1" (inspect Florence-2 labels)
+"3" (generate consensus)
+"4 lr=0.0005 epochs=40" (train with custom params)
+"5" (evaluate)
+"6" (done)
 
-What is your NEXT action? Think step by step, then output JSON:"""
+Your choice:"""
 
-    def _parse_action(self, response):
-        """Parse an action from Brain's response."""
-        # Try to find JSON
+    def _parse_action(self, response, step_num=0):
+        """Parse action from Brain's response. Much more lenient parsing.
+
+        Accepts: "3", "train", '{"action": "train"}', or natural language with keywords.
+        Falls back to a smart pipeline that progresses through steps.
+        """
+        text = response.strip().lower()
+
+        # 1. Try numbered choice (most likely for simplified prompt)
+        first_char = text[0] if text else ""
+        if first_char in "123456":
+            return self._action_from_number(first_char, text)
+
+        # 2. Try JSON (for capable models)
         json_match = re.search(r'\{[^{}]*"action"\s*:\s*"[^"]*"[^{}]*\}', response, re.DOTALL)
         if json_match:
             try:
                 action = json.loads(json_match.group())
                 if "action" in action and action["action"] in AGENT_ACTIONS:
                     action.setdefault("params", {})
-                    action.setdefault("reasoning", "")
+                    action.setdefault("reasoning", "parsed from JSON")
                     return action
             except json.JSONDecodeError:
                 pass
 
-        # Code block pattern
-        code_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
-        if code_match:
-            try:
-                action = json.loads(code_match.group(1))
-                if "action" in action:
-                    action.setdefault("params", {})
-                    action.setdefault("reasoning", "")
-                    return action
-            except json.JSONDecodeError:
-                pass
+        # 3. Try keyword matching
+        for keyword, action_name in [
+            ("inspect", "inspect_labels"), ("check", "inspect_labels"),
+            ("run_vlm", "run_vlm_inference"), ("inference", "run_vlm_inference"),
+            ("florence", "run_vlm_inference"), ("owlv2", "run_vlm_inference"),
+            ("consensus", "generate_consensus"), ("label", "generate_consensus"),
+            ("train", "train_yolo"), ("yolo", "train_yolo"),
+            ("evaluat", "evaluate"), ("test", "evaluate"),
+            ("done", "done"), ("stop", "done"), ("finish", "done"),
+        ]:
+            if keyword in text:
+                return {"action": action_name, "params": {}, "reasoning": f"Keyword: {keyword}"}
 
-        # Fallback: default action sequence
-        logger.warning("[Brain] Could not parse action, using fallback")
-        return {
-            "action": "generate_consensus",
-            "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
-            "reasoning": "Fallback: generate consensus with best known pair",
+        # 4. Smart fallback pipeline — progresses through steps
+        return self._smart_fallback(step_num)
+
+    def _action_from_number(self, num, full_text):
+        """Convert numbered choice to action dict."""
+        action_map = {
+            "1": ("inspect_labels", {"vlm_key": "florence2_base", "sample_size": 20}),
+            "2": ("run_vlm_inference", {"vlm_key": "florence2_base", "max_images": 50}),
+            "3": ("generate_consensus", {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3}),
+            "4": ("train_yolo", {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
+            "5": ("evaluate", {}),
+            "6": ("done", {"reason": "Brain decided to stop"}),
         }
+        action_name, default_params = action_map.get(num, ("done", {}))
+
+        # Parse optional params from text like "4 lr=0.0005 epochs=40"
+        params = dict(default_params)
+        for match in re.finditer(r'(\w+)\s*=\s*([0-9.]+)', full_text):
+            key, val = match.group(1), match.group(2)
+            try:
+                params[key] = float(val) if '.' in val else int(val)
+            except ValueError:
+                pass
+
+        return {"action": action_name, "params": params, "reasoning": f"Brain chose option {num}"}
+
+    # Smart fallback: predetermined intelligent pipeline
+    FALLBACK_PIPELINE = [
+        {"action": "inspect_labels", "params": {"vlm_key": "florence2_base", "sample_size": 20},
+         "reasoning": "Smart fallback step 1: inspect best VLM labels"},
+        {"action": "inspect_labels", "params": {"vlm_key": "owlv2", "sample_size": 20},
+         "reasoning": "Smart fallback step 2: inspect second VLM labels"},
+        {"action": "generate_consensus", "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
+         "reasoning": "Smart fallback step 3: generate consensus from best pair"},
+        {"action": "train_yolo", "params": {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
+         "reasoning": "Smart fallback step 4: train YOLO"},
+        {"action": "evaluate", "params": {},
+         "reasoning": "Smart fallback step 5: evaluate results"},
+        {"action": "done", "params": {"reason": "Completed full pipeline"},
+         "reasoning": "Smart fallback step 6: round complete"},
+    ]
+
+    def _smart_fallback(self, step_num):
+        """Return the next action in a predetermined pipeline."""
+        logger.warning(f"[Brain] Using smart fallback (step {step_num})")
+        if step_num < len(self.FALLBACK_PIPELINE):
+            return dict(self.FALLBACK_PIPELINE[step_num])
+        return {"action": "done", "params": {"reason": "All fallback steps exhausted"},
+                "reasoning": "Fallback pipeline complete"}
 
     # =========================================================
     # MODE 1: STRATEGY MODE — Brain proposes full strategy JSON

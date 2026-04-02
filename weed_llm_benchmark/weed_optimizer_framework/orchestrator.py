@@ -144,8 +144,8 @@ class Orchestrator:
         for step in range(max_actions):
             logger.info(f"\n--- Step {step + 1}/{max_actions} ---")
 
-            # Brain decides next action
-            action = self.brain.decide_next_action(context_history)
+            # Brain decides next action (step_num for smart fallback)
+            action = self.brain.decide_next_action(context_history, step_num=step)
             action_name = action.get("action", "done")
             params = action.get("params", {})
             reasoning = action.get("reasoning", "")
