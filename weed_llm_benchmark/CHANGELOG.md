@@ -267,7 +267,21 @@ Agent mode actions: inspect_labels → run_vlm_inference → generate_consensus 
 - `run_framework_ollama.sh`: starts Ollama server, pulls model, runs framework, auto-chains
 - `--backend ollama|hf|fallback|auto` flag added to CLI
 
-**Testing**: Pending — needs Ollama + qwen2.5:7b on cluster
+**Test results** (Jobs 38381066 + 38390009, total 4h56m):
+- Ollama function calling WORKS — native tool calls, Brain made real decisions
+- Brain tried: different VLM combos (flo+owl, flo+large, flo+owl+intern), min_votes 2/3
+- Job chain auto-submitted 2nd job, auto-stopped when no improvement
+- Memory persisted across jobs: 5 experiments + 4 lessons
+
+| Iter | Old F1 | New F1 | Forgetting? |
+|------|--------|--------|-------------|
+| 0 seed | 0.897 | **0.622** | No |
+| 1 agent | 0.893 | 0.624 | Yes |
+| 2 agent | 0.883 | 0.617 | Yes |
+| 3 chain | 0.886 | 0.595 | Yes |
+| 4 chain | 0.895 | 0.583 | Yes |
+
+Architecture validated. Precision bottleneck: label noise (27.4% FP), not framework
 
 ### Framework test results (Job 38326705, strategy mode)
 - Framework ran 2 rounds (auto-stopped after 2 no-improve rounds)

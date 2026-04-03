@@ -1,0 +1,23 @@
+{
+  "description": "Ollama function calling agent mode — full test with job chaining",
+  "jobs": [38381066, 38390009],
+  "elapsed_total": "4h56m",
+  "brain": "qwen2.5:7b via Ollama",
+  "backend": "ollama",
+  "mode": "agent",
+  "experiments": [
+    {"iter": 0, "name": "seed_phase3e", "old_f1": 0.897, "new_f1": 0.622, "forgetting": false},
+    {"iter": 1, "name": "agent_round_1", "old_f1": 0.8926, "new_f1": 0.6236, "old_map50": 0.9472, "new_map50": 0.5895, "forgetting": true},
+    {"iter": 2, "name": "agent_round_2", "old_f1": 0.8825, "new_f1": 0.6172, "old_map50": 0.9517, "new_map50": 0.5951, "new_map50_95": 0.5146, "forgetting": true},
+    {"iter": 3, "name": "agent_round_1_chain", "old_f1": 0.8861, "new_f1": 0.5954, "forgetting": true},
+    {"iter": 4, "name": "agent_round_2_chain", "old_f1": 0.8949, "new_f1": 0.5832, "forgetting": true}
+  ],
+  "framework_achievements": {
+    "ollama_function_calling": "Working — native tool calls, no JSON parsing",
+    "brain_decisions": "Real decisions — tried different VLM combos, min_votes, iou",
+    "job_chaining": "Working — auto-submitted next job, auto-stopped when converged",
+    "memory_persistence": "Working — 5 experiments + 4 lessons across 2 jobs",
+    "forced_progression": "Working — prevented infinite inspect loops"
+  },
+  "precision_conclusion": "All agent strategies cause forgetting (old_f1 < 0.90). Root cause: label noise 27.4% FP. Framework architecture is validated but cannot overcome data quality issue."
+}

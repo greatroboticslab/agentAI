@@ -657,6 +657,34 @@ Baseline (first full mAP measurement): old_F1=0.917, old_mAP50=0.953, new_F1=0.6
 
 **Key architectural insight for the paper**: The tool-calling pattern (Brain→Tools→Observe→Brain) is proven effective in commercial AI coding assistants. However, the quality of the Brain LLM is the primary bottleneck. With Qwen-7B: format works but decisions fail. With stronger models or native function calling: the architecture becomes truly adaptive.
 
+### Session 20b — 2026-04-02: Ollama function calling SUCCESS + Job chaining
+
+**Ollama native function calling** (Jobs 38381066 + 38390009):
+- Qwen2.5:7b via Ollama with native tool calling — **first time Brain makes real autonomous decisions**
+- Brain called tools with varied parameters: different VLM combos, min_votes 2/3, different IoU
+- Forced progression prevented infinite loops (action repeated >2x → auto-advance)
+- Job chain: 1st job auto-submitted 2nd, 2nd auto-stopped when no improvement
+
+| Iter | Mode | Old F1 | New F1 | mAP50 old/new | Forgetting? |
+|------|------|--------|--------|---------------|-------------|
+| 0 seed | - | 0.897 | **0.622** | 0.851/0.559 | No |
+| 1 agent | Ollama | 0.893 | 0.624 | 0.947/0.590 | Yes |
+| 2 agent | Ollama | 0.883 | 0.617 | 0.952/0.595 | Yes |
+| 3 chain | Ollama | 0.886 | 0.595 | -/- | Yes |
+| 4 chain | Ollama | 0.895 | 0.583 | -/- | Yes |
+
+**Framework architecture: FULLY VALIDATED**:
+- Ollama function calling: native tool calls work perfectly
+- Agent loop: Brain→Tool→Observe→Brain cycle runs correctly
+- Job chaining: automatic continuation across SLURM jobs
+- Memory persistence: experiments + lessons survive across jobs
+- Forced progression: prevents Brain from looping on same action
+- Auto-stop: halts when no improvement detected
+
+**Precision conclusion**: All 4 agent rounds caused forgetting (old_f1 < 0.90). The framework architecture is sound, but the underlying data quality problem (27.4% false positive rate in VLM pseudo-labels) remains the bottleneck. No amount of strategy optimization can overcome noisy training data.
+
+**Next direction (from Professor Zhang)**: Add web tools — agent visits plant.id API for expert weed identification, browses GitHub weed-detection repos to discover and integrate new models. This could improve label quality by adding high-quality external sources.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)
