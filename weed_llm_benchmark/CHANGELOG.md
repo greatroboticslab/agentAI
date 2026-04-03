@@ -319,8 +319,24 @@ When user says "阅读changelog然后继续":
 3. Framework is complete and tested — move to TODO items below
 4. Always update this file after completing each task
 
+## 2026-04-03 - Clone-and-Train + plant.id setup
+
+### Professor's Two Tasks status
+1. **plant.id API** — code done (`tools/web_identifier.py`), needs API key from https://admin.kindwise.com/signup (free, 100 calls, no credit card)
+2. **Clone + Train** — `run_clone_and_train.py` submitted (Job 38416097):
+   - Git clone DeepWeeds from GitHub
+   - Download DETR weed detector from HuggingFace, evaluate zero-shot
+   - Train YOLOv8s on CottonWeedDet12 from COCO pretrained (100 epochs)
+   - Compare against our YOLO11n baseline
+
+### Files added
+- `run_clone_and_train.py` — full pipeline: clone → download → train → evaluate → compare
+- `run_clone_and_train.sh` — SLURM script for cluster
+
 ## TODO
-- [ ] Try stronger Brain model (DeepSeek-R1-7B) — may discover novel strategies
+- [ ] Get plant.id API key, test real identification on weed images
+- [ ] Check Job 38416097 (clone+train) results
+- [ ] Try stronger Brain model (DeepSeek-R1-7B)
 - [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

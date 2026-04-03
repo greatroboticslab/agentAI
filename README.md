@@ -85,6 +85,8 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 | Phase 3F: Florence-2 Fine-tune | **Done** | Negative: fine-tuning degraded both old (-11%) and new species |
 | Phase 4: HyperAgent Closed-Loop | **Done** | Qwen2.5-7B Brain: 3 rounds executed, system works but Brain needs stronger reasoning |
 | Phase 4B: Weed Optimizer Framework | **Done** | 14 files, 3,522 lines. Ollama function calling, job chain, plant.id API, HuggingFace model discovery. |
+| Phase 4C: Clone + Train External Models | **Running** | Clone DeepWeeds (GitHub), train YOLOv8s on CottonWeedDet12, compare vs YOLO11n |
+| Phase 4D: plant.id Integration | **Pending** | Professional weed ID via web API (100 free calls), needs API key signup |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
 | Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
 
