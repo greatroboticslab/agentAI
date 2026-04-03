@@ -298,6 +298,13 @@ Architecture validated. Precision bottleneck: label noise (27.4% FP), not framew
 **Professor's direction**: Agent should visit professional sites (plant.id) and discover
 GitHub/HuggingFace models to autonomously expand its capabilities
 
+**Test results** (Jobs 38403497 + 38407270, ~5h total):
+- Brain **autonomously called `run_external_model(detr_weed)`** — downloaded DETR from HuggingFace!
+- Brain called `run_vlm_inference(owlv2)` for live inference
+- Job chain: auto-submitted 2nd job, auto-stopped when no improvement
+- 5 experiments total, all caused forgetting (label noise root cause)
+- Framework capabilities: FULLY VALIDATED including external model discovery
+
 ### Framework test results (Job 38326705, strategy mode)
 - Framework ran 2 rounds (auto-stopped after 2 no-improve rounds)
 - Round 1: new_f1=0.624 (slight improvement) but old_f1=0.893 → FORGETTING

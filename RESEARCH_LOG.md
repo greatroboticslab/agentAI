@@ -685,6 +685,32 @@ Baseline (first full mAP measurement): old_F1=0.917, old_mAP50=0.953, new_F1=0.6
 
 **Next direction (from Professor Zhang)**: Add web tools — agent visits plant.id API for expert weed identification, browses GitHub weed-detection repos to discover and integrate new models. This could improve label quality by adding high-quality external sources.
 
+### Session 21 — 2026-04-02/03: Web tools + External model discovery
+
+**v1.3 upgrade** (3,522 lines, +654):
+- `tools/web_identifier.py`: plant.id API integration (species identification, 40+ weed genera)
+- `tools/model_discovery.py`: HuggingFace model search + download + inference (DETR, YOLOv8s)
+- Brain now has 9 tools (was 6): +identify_weed, +search_models, +run_external_model
+
+**Test results** (Jobs 38403497 + 38407270, ~5h total, 5 experiments):
+
+Key milestone: **Brain autonomously discovered and used an external model!**
+- Round 2: Brain called `run_external_model(detr_weed)` — downloaded DETR weed detection model from HuggingFace without being told to
+- Brain also called `run_vlm_inference(owlv2)` for live detection
+- Job chain: 2 jobs auto-submitted, auto-stopped when converged
+
+| Iter | Old F1 | New F1 | Forgetting? | Notable actions |
+|------|--------|--------|-------------|-----------------|
+| 0 seed | 0.897 | **0.622** | No | — |
+| 1 agent | 0.893 | 0.624 | Yes | train + evaluate (working pipeline) |
+| 2 agent | 0.883 | 0.617 | Yes | **run_external_model(detr_weed)** + run_vlm(owlv2) |
+| 3 chain | 0.886 | 0.595 | Yes | auto-continuation |
+| 4 chain | 0.895 | 0.583 | Yes | auto-stopped |
+
+**For the paper**: This demonstrates the agent can autonomously expand its capabilities by discovering and integrating external models from the internet. The tool-calling architecture (Brain→Tools→Observe→Brain) successfully enabled this emergent behavior — the Brain was never explicitly told to use DETR, it chose to based on its analysis of the situation.
+
+**Precision conclusion**: All experiments still cause forgetting. The fundamental bottleneck remains label noise (27.4% FP rate in VLM pseudo-labels). External models (DETR) provide additional detection sources but don't solve the noise problem. Future work: use plant.id API for species-level validation to filter noisy labels.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)

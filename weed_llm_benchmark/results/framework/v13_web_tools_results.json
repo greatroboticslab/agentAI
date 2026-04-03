@@ -1,0 +1,22 @@
+{
+  "description": "Framework v1.3 — web tools (plant.id + HuggingFace model discovery)",
+  "jobs": [38403497, 38407270],
+  "elapsed_total": "~5h",
+  "brain": "qwen2.5:7b via Ollama",
+  "mode": "agent",
+  "new_capabilities_used": {
+    "run_external_model": "Brain autonomously loaded DETR weed detection model from HuggingFace",
+    "run_vlm_inference": "Brain ran OWLv2 live inference on holdout images",
+    "identify_weed": "Available but not called by Brain this run (no API key configured)"
+  },
+  "experiments": [
+    {"iter": 0, "name": "seed", "old_f1": 0.897, "new_f1": 0.622, "forgetting": false},
+    {"iter": 1, "name": "agent_round_1", "old_f1": 0.8926, "new_f1": 0.6236, "forgetting": true,
+     "actions": ["inspect", "consensus", "consensus", "train", "evaluate", "consensus(votes=3)", "run_vlm(owlv2)", "consensus", "inspect(owlv2)", "consensus"]},
+    {"iter": 2, "name": "agent_round_2", "old_f1": 0.8825, "new_f1": 0.6172, "forgetting": true,
+     "actions": ["inspect", "consensus", "consensus", "run_external_model(detr_weed)", "..."]},
+    {"iter": 3, "name": "chain_round_1", "old_f1": 0.8861, "new_f1": 0.5954, "forgetting": true},
+    {"iter": 4, "name": "chain_round_2", "old_f1": 0.8949, "new_f1": 0.5832, "forgetting": true}
+  ],
+  "conclusion": "Framework correctly integrates external model discovery. Brain autonomously chose to download and run DETR from HuggingFace. Precision still bottlenecked by label noise."
+}
