@@ -101,6 +101,47 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "identify_weed",
+            "description": "Use plant.id web API to professionally identify weed species in images. Limited free calls.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "max_images": {"type": "integer", "description": "Number of images to identify (default 5, max 10)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_models",
+            "description": "Search HuggingFace for weed detection models. Discovers new models beyond our VLM pool.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query (default: weed detection)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_external_model",
+            "description": "Download and run an external weed detection model from HuggingFace. Available: detr_weed, yolov8s_weed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_key": {"type": "string", "description": "Model key: detr_weed, detr_deformable_weed, yolov8s_weed"},
+                    "max_images": {"type": "integer", "description": "Max images to process (default 50)"},
+                },
+                "required": ["model_key"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "done",
             "description": "End this optimization round. Use when evaluation is complete or when further actions won't help.",
             "parameters": {
@@ -225,14 +266,20 @@ class SuperBrain:
 
     def _build_system_prompt(self):
         """Concise system prompt for Ollama."""
-        return """You are optimizing a YOLO weed detector. Use the tools to:
-1. First inspect or generate labels (inspect_labels, generate_consensus)
-2. Then train YOLO (train_yolo)
-3. Then evaluate (evaluate)
-4. Stop when done (done)
+        return """You are optimizing a YOLO weed detector. Available tools:
+- inspect_labels: check VLM label quality
+- run_vlm_inference: run Florence-2 or OWLv2 live on images
+- generate_consensus: combine VLM detections (best: florence2_base + owlv2)
+- train_yolo: train YOLO with labels (ONLY model that gets fine-tuned)
+- evaluate: test on old + new species
+- identify_weed: use plant.id API for expert species identification
+- search_models: find new weed detection models on HuggingFace
+- run_external_model: download and run external model (detr_weed, yolov8s_weed)
+- done: finish round
 
 RULES: Only YOLO gets fine-tuned. Old species F1 must stay above 0.90.
-Best VLM pair: florence2_base (precision=0.789) + owlv2 (recall=0.943)."""
+Best VLM pair: florence2_base (precision=0.789) + owlv2 (recall=0.943).
+You can also use external models (DETR, YOLOv8s) as additional label sources."""
 
     # =========================================================
     # BACKEND 2: HUGGINGFACE — Direct model loading

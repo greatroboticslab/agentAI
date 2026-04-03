@@ -283,6 +283,21 @@ Agent mode actions: inspect_labels → run_vlm_inference → generate_consensus 
 
 Architecture validated. Precision bottleneck: label noise (27.4% FP), not framework
 
+### v1.3: Web tools — plant.id API + HuggingFace model discovery (3,522 lines)
+- `tools/web_identifier.py` (222 lines): plant.id API for expert weed species identification
+  - Base64 image → species name + confidence + is_weed classification
+  - 40+ known weed genera for automatic weed/crop classification
+  - Free tier: 10/month; paid: unlimited
+- `tools/model_discovery.py` (338 lines): HuggingFace model search + download + inference
+  - Pre-researched: DETR-weed, Deformable-DETR-weed, YOLOv8s-weed
+  - Live HuggingFace Hub search for new models
+  - Download → load → batch inference → save as YOLO labels
+- Brain now has 9 actions (was 6): +identify_weed, +search_models, +run_external_model
+- Orchestrator integrates all new tools into agent loop
+
+**Professor's direction**: Agent should visit professional sites (plant.id) and discover
+GitHub/HuggingFace models to autonomously expand its capabilities
+
 ### Framework test results (Job 38326705, strategy mode)
 - Framework ran 2 rounds (auto-stopped after 2 no-improve rounds)
 - Round 1: new_f1=0.624 (slight improvement) but old_f1=0.893 → FORGETTING

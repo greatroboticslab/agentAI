@@ -23,6 +23,8 @@ from .tools.label_gen import generate_consensus_labels
 from .tools.yolo_trainer import train_yolo
 from .tools.evaluator import evaluate_full
 from .tools.vlm_pool import VLMPool
+from .tools.web_identifier import WebIdentifier
+from .tools.model_discovery import ModelDiscovery
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,8 @@ class Orchestrator:
         self.brain = SuperBrain(model_id=brain_model_id)
         self.monitor = QualityMonitor()
         self.vlm_pool = VLMPool()
+        self.web_identifier = WebIdentifier()
+        self.model_discovery = ModelDiscovery()
         self.tools = ToolRegistry()
 
         # Register tools
@@ -135,6 +139,8 @@ class Orchestrator:
         context_history = [
             {"role": "system", "content": self.memory.get_summary_for_brain()},
             {"role": "system", "content": f"VLM Pool:\n{self.vlm_pool.get_summary_for_brain()}"},
+            {"role": "system", "content": f"External:\n{self.web_identifier.get_summary_for_brain()}"},
+            {"role": "system", "content": f"Models:\n{self.model_discovery.get_summary_for_brain()}"},
             {"role": "system", "content": f"Round {round_num + 1}/{self.max_rounds}. "
                                           f"Iteration {iteration}. Choose your first action."},
         ]
@@ -269,8 +275,46 @@ class Orchestrator:
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 
+                elif action_name == "identify_weed":
+                    # Use plant.id or local identification
+                    max_imgs = params.get("max_images", 5)
+                    holdout_dir = os.path.join(Config.HOLDOUT_DIR, "test", "images")
+                    results = self.web_identifier.identify_batch(
+                        holdout_dir, max_images=max_imgs, use_api=True)
+                    n_weeds = sum(1 for r in results.values() if r.get("is_weed"))
+                    species = set(r.get("species", "?") for r in results.values() if r.get("is_weed"))
+                    obs = (f"Web identification: {len(results)} images, {n_weeds} contain weeds. "
+                           f"Species found: {species}. "
+                           f"API usage: {self.web_identifier.get_usage_info()}")
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
+                elif action_name == "search_models":
+                    # Search HuggingFace for new models
+                    query = params.get("query", "weed detection")
+                    results = self.model_discovery.search_huggingface(query)
+                    obs = f"HuggingFace search '{query}': {len(results)} models found.\n"
+                    for r in results[:5]:
+                        obs += f"  - {r.get('model_id', '?')} (downloads: {r.get('downloads', '?')})\n"
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
+                elif action_name == "run_external_model":
+                    # Run an external model from HuggingFace
+                    model_key = params.get("model_key", "detr_weed")
+                    max_imgs = params.get("max_images", 50)
+                    holdout_dir = os.path.join(Config.HOLDOUT_DIR, "train", "images")
+                    detections = self.model_discovery.infer_batch(model_key, holdout_dir, max_imgs)
+                    out_dir = os.path.join(Config.FRAMEWORK_DIR, f"ext_{model_key}_iter{iteration}")
+                    count = self.model_discovery.save_detections_as_labels(detections, out_dir)
+                    self.model_discovery.unload_all()
+                    obs = (f"External model {model_key}: {len(detections)} images, "
+                           f"{count} detections saved to {out_dir}")
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
                 else:
-                    obs = f"Unknown action: {action_name}. Available: {list(action.keys())}"
+                    obs = f"Unknown action: {action_name}"
                     context_history.append({"role": "observation", "content": obs})
 
             except Exception as e:
