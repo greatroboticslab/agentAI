@@ -333,9 +333,22 @@ When user says "阅读changelog然后继续":
 - `run_clone_and_train.py` — full pipeline: clone → download → train → evaluate → compare
 - `run_clone_and_train.sh` — SLURM script for cluster
 
+### Clone + Train results (Job 38416097, 1h53m)
+- Git cloned DeepWeeds from GitHub ✅
+- Downloaded DETR-ResNet50 from HuggingFace → zero-shot F1=0.000 (class mismatch)
+- **Trained YOLOv8s on CottonWeedDet12 (100 epochs) → F1=0.888** ✅
+- Compared with our YOLO11n baseline → F1=0.917
+
+| Model | Source | Precision | Recall | F1 |
+|-------|--------|-----------|--------|-----|
+| YOLO11n (ours) | Fine-tuned | **0.881** | 0.957 | **0.917** |
+| YOLOv8s (clone+train) | COCO→CottonWeed | 0.820 | **0.970** | 0.888 |
+| DETR (HuggingFace) | Zero-shot | 0.000 | 0.000 | 0.000 |
+
+**Professor's Task 2: DONE** — cloned, trained, evaluated, compared.
+
 ## TODO
-- [ ] Get plant.id API key, test real identification on weed images
-- [ ] Check Job 38416097 (clone+train) results
+- [ ] Get plant.id API key, test real weed identification (Professor Task 1)
 - [ ] Try stronger Brain model (DeepSeek-R1-7B)
 - [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables

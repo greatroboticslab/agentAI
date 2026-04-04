@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-04-03T14:57:47",
+  "job_id": 38416097,
+  "elapsed": "01:53:23",
+  "description": "Clone and train external weed detection models on CottonWeedDet12",
+  "results": [
+    {"model": "DETR-ResNet50-weed", "source": "HuggingFace (machinelearningzuu)", "precision": 0.0, "recall": 0.0, "f1": 0.0, "note": "Zero-shot: class mismatch, no detections"},
+    {"model": "YOLOv8s-CottonWeed", "source": "COCO pretrained → fine-tuned 100 epochs", "precision": 0.8195, "recall": 0.9697, "f1": 0.8883, "tp": 672, "fp": 148, "fn": 21},
+    {"model": "YOLO11n-baseline", "source": "Our baseline (leave-4-out)", "precision": 0.8805, "recall": 0.9567, "f1": 0.917, "tp": 663, "fp": 90, "fn": 30}
+  ],
+  "conclusion": "YOLOv8s trained from COCO achieves F1=0.888, close to our YOLO11n (0.917). Higher recall but lower precision. DETR zero-shot fails completely on our data."
+}
