@@ -51,7 +51,7 @@ class WebIdentifier:
         self.api_key = api_key or os.environ.get("PLANT_API_KEY", "")
         self.api_available = bool(self.api_key)
         self.usage_count = 0
-        self.usage_limit = 10  # free tier
+        self.usage_limit = 50  # 50 one-time credits
 
         if self.api_available:
             logger.info("[WebID] plant.id API key found")
@@ -123,7 +123,17 @@ class WebIdentifier:
         }
 
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            # Resize image if too large (>1MB causes timeouts)
+            import io
+            from PIL import Image as PILImage
+            img = PILImage.open(image_path)
+            if os.path.getsize(image_path) > 500_000:  # >500KB
+                img.thumbnail((800, 800))
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=80)
+                image_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+            response = requests.post(url, json=payload, headers=headers, timeout=60)
             response.raise_for_status()
             data = response.json()
             self.usage_count += 1

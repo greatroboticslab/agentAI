@@ -1,0 +1,18 @@
+{
+  "test_date": "2026-04-04",
+  "api_key_status": "valid",
+  "local_test": {
+    "status": "SUCCESS",
+    "http_status": 201,
+    "test_image": "synthetic green 100x100",
+    "top_result": "Xylotheca kraussiana (1.7%)",
+    "note": "API responds correctly with species identification"
+  },
+  "cluster_test": {
+    "status": "TIMEOUT",
+    "error": "Connection aborted - Bridges-2 blocks external HTTPS API calls",
+    "workaround": "Run plant.id locally, upload results to cluster"
+  },
+  "credits_remaining": 49,
+  "credits_total": 50
+}
