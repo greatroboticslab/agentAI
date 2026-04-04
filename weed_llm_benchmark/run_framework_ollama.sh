@@ -28,14 +28,16 @@ OLLAMA_PID=$!
 sleep 5
 
 # Pull model if not cached
-echo "Loading model..."
-/ocean/projects/cis240145p/byler/ollama/bin/ollama pull qwen2.5:7b 2>&1 | tail -3
+# Brain model: deepseek-r1:7b for stronger reasoning (fallback: qwen2.5:7b)
+BRAIN_MODEL="${1:-deepseek-r1:7b}"
+echo "Loading Brain model: $BRAIN_MODEL"
+/ocean/projects/cis240145p/byler/ollama/bin/ollama pull $BRAIN_MODEL 2>&1 | tail -3
 
 # Run framework with Ollama backend
 python -m weed_optimizer_framework.run \
     --mode agent \
     --backend ollama \
-    --brain qwen2.5:7b \
+    --brain $BRAIN_MODEL \
     --rounds 3
 
 EXIT_CODE=$?

@@ -347,9 +347,30 @@ When user says "阅读changelog然后继续":
 
 **Professor's Task 2: DONE** — cloned, trained, evaluated, compared.
 
+## 2026-04-04 - Push toward ideal autonomous system
+
+### Three upgrades toward fully autonomous framework
+1. **DeepSeek-R1:7b as Brain** — stronger reasoning model, same VRAM as Qwen-7B
+   - `run_framework_ollama.sh` now accepts model as argument: `sbatch run_framework_ollama.sh deepseek-r1:7b`
+   - Testing: Job 38432901
+2. **Pre-cache layer** for plant.id API (cluster network workaround)
+   - `precache.py`: run locally with internet → saves API results to JSON cache
+   - `web_identifier.py`: checks cache first, then API, then local fallback
+   - plant.id API key configured (49 credits remaining)
+3. **3+ model consensus** to reduce label noise
+   - `label_gen.py`: now loads external model detections (DETR, YOLOv8s) alongside VLM labels
+   - Auto-discovers `ext_*` directories from previous `run_external_model` calls
+   - More diverse model families → lower false positive rate (target: <20% FP vs current 27.4%)
+
+### Files modified
+- `run_framework_ollama.sh` — parameterized Brain model (`$1`, default deepseek-r1:7b)
+- `tools/label_gen.py` — added `extra_label_dirs` support, auto-discover ext_ dirs
+- `tools/web_identifier.py` — added cache-first lookup from `api_cache.json`
+- `precache.py` — NEW: pre-cache plant.id + HuggingFace search results
+
 ## TODO
-- [ ] Get plant.id API key, test real weed identification (Professor Task 1)
-- [ ] Try stronger Brain model (DeepSeek-R1-7B)
+- [ ] Check Job 38432901 (DeepSeek-R1 Brain) results
+- [ ] Run precache.py locally with real weed images for plant.id
 - [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

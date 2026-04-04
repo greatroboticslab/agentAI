@@ -47,11 +47,25 @@ class WebIdentifier:
 
         API key can be provided directly or via PLANT_API_KEY env var.
         If no key, only local identification is available.
+        Checks pre-cached results first (from precache.py).
         """
         self.api_key = api_key or os.environ.get("PLANT_API_KEY", "")
         self.api_available = bool(self.api_key)
         self.usage_count = 0
         self.usage_limit = 50  # 50 one-time credits
+
+        # Load pre-cached results (from local precache.py run)
+        self._cache = {}
+        cache_path = os.path.join(Config.FRAMEWORK_DIR, "api_cache.json")
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path) as f:
+                    data = json.load(f)
+                self._cache = data.get("plant_id", {})
+                if self._cache:
+                    logger.info(f"[WebID] Loaded {len(self._cache)} cached plant.id results")
+            except (json.JSONDecodeError, KeyError):
+                pass
 
         if self.api_available:
             logger.info("[WebID] plant.id API key found")
@@ -68,6 +82,12 @@ class WebIdentifier:
         Returns:
             dict with species, confidence, is_weed, common_names, etc.
         """
+        # Check cache first (free, no API call)
+        stem = Path(image_path).stem
+        if stem in self._cache:
+            logger.debug(f"[WebID] Cache hit: {stem}")
+            return self._cache[stem]
+
         if use_api and self.api_available and self.usage_count < self.usage_limit:
             return self._identify_via_api(image_path)
         else:

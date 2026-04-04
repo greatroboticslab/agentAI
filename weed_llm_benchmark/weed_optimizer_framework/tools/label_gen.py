@@ -74,11 +74,32 @@ def _cluster_boxes(all_boxes, iou_threshold):
     return clusters
 
 
+def _load_external_boxes(ext_dir, stem):
+    """Load boxes from an external model's label directory."""
+    boxes = []
+    label_file = os.path.join(ext_dir, f"{stem}.txt")
+    if not os.path.exists(label_file):
+        return boxes
+    with open(label_file) as f:
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) >= 5:
+                cx, cy, w, h = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
+                if 0 < w < 1 and 0 < h < 1 and 0 < cx < 1 and 0 < cy < 1:
+                    boxes.append((cx, cy, w, h, os.path.basename(ext_dir)))
+    return boxes
+
+
 def generate_consensus_labels(strategy, iteration):
-    """Generate consensus pseudo-labels from multiple VLMs.
+    """Generate consensus pseudo-labels from multiple VLMs + external models.
+
+    Now supports 3+ model consensus by also loading detections from external
+    model directories (DETR, YOLOv8s, etc.) alongside VLM pre-generated labels.
+    More diverse models = lower false positive rate.
 
     Args:
-        strategy: dict with vlm_models, min_votes, consensus_iou, use_yolo_old
+        strategy: dict with vlm_models, min_votes, consensus_iou, use_yolo_old,
+                  extra_label_dirs (optional: list of paths to external model labels)
         iteration: current iteration number (for output directory naming)
 
     Returns:
@@ -88,17 +109,27 @@ def generate_consensus_labels(strategy, iteration):
     min_votes = strategy.get("min_votes", 2)
     iou_threshold = strategy.get("consensus_iou", 0.3)
     use_yolo_old = strategy.get("use_yolo_old", True)
+    extra_label_dirs = strategy.get("extra_label_dirs", [])
+
+    # Also auto-discover external model label dirs from previous runs
+    for f in os.listdir(Config.FRAMEWORK_DIR) if os.path.isdir(Config.FRAMEWORK_DIR) else []:
+        ext_path = os.path.join(Config.FRAMEWORK_DIR, f)
+        if f.startswith("ext_") and os.path.isdir(ext_path) and ext_path not in extra_label_dirs:
+            extra_label_dirs.append(ext_path)
+    if extra_label_dirs:
+        logger.info(f"External model dirs for consensus: {[os.path.basename(d) for d in extra_label_dirs]}")
 
     # Validate VLM keys
     valid_vlms = [v for v in vlm_keys if v in Config.VLM_REGISTRY]
     if len(valid_vlms) < len(vlm_keys):
         invalid = set(vlm_keys) - set(valid_vlms)
         logger.warning(f"Invalid VLM keys ignored: {invalid}")
-    if not valid_vlms:
-        raise ValueError(f"No valid VLM keys in {vlm_keys}")
+    if not valid_vlms and not extra_label_dirs:
+        raise ValueError(f"No valid VLM keys in {vlm_keys} and no external label dirs")
 
-    # Ensure min_votes doesn't exceed number of VLMs
-    min_votes = min(min_votes, len(valid_vlms))
+    # Ensure min_votes doesn't exceed total number of sources
+    total_sources = len(valid_vlms) + len(extra_label_dirs)
+    min_votes = min(min_votes, max(total_sources, 1))
 
     # Output directory
     label_dir = os.path.join(Config.FRAMEWORK_DIR, f"labels_iter{iteration}")
@@ -141,12 +172,18 @@ def generate_consensus_labels(strategy, iteration):
                     old_lines.append(f"{cls_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
                     stats["yolo_old_boxes"] += 1
 
-        # --- VLM consensus for new species ---
+        # --- VLM + external model consensus for new species ---
         all_boxes = []
         for vlm_key in valid_vlms:
             boxes = _load_vlm_boxes(vlm_key, stem)
             all_boxes.extend(boxes)
             stats["total_vlm_boxes"] += len(boxes)
+
+        # Load external model detections (DETR, YOLOv8s, etc.)
+        for ext_dir in extra_label_dirs:
+            ext_boxes = _load_external_boxes(ext_dir, stem)
+            all_boxes.extend(ext_boxes)
+            stats["total_vlm_boxes"] += len(ext_boxes)
 
         new_lines = []
         if all_boxes:
