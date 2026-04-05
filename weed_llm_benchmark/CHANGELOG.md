@@ -368,8 +368,41 @@ When user says "阅读changelog然后继续":
 - `tools/web_identifier.py` — added cache-first lookup from `api_cache.json`
 - `precache.py` — NEW: pre-cache plant.id + HuggingFace search results
 
+### DeepSeek-R1 Brain test results
+- **Job 38432901** (v1, no text fallback): DeepSeek-R1:7b does NOT support Ollama function calling
+  - Every call returned 400 "does not support tools"
+  - All actions fell to fallback pipeline → same results as Qwen-7B
+  - BUT: 3-model consensus auto-discovered ext_detr_weed + ext_yolov8s dirs ✅
+- **Fix applied**: `_ollama_text_decide()` — detects "no tools" error, switches to numbered text prompt
+  - DeepSeek-R1 gets "Pick 1-8" → outputs reasoning + number → parsed into action
+- **Job 38477380** (v2, with text fallback): RUNNING
+  - Text mode triggered correctly (`deepseek-r1:7b doesn't support tools, using text mode`)
+  - First call timed out (model cold-start ~5min > Ollama timeout), fell to fallback
+  - Subsequent calls should work once model is loaded
+
+### Framework file inventory (14 Python files, 3,522+ lines)
+```
+weed_optimizer_framework/
+├── __init__.py          (16)   Package init
+├── config.py           (169)   Paths, VLM registry (7), Brain registry (3)
+├── brain.py            (480+)  SuperBrain: Ollama/HF/fallback, text mode for DeepSeek-R1
+├── memory.py           (270)   10 hard lessons, experiment history, persistence
+├── monitor.py          (198)   Strategy validation, forgetting detection, drift
+├── orchestrator.py     (500+)  Agent loop, strategy mode, job chain, forced progression
+├── run.py              (110)   CLI: --mode --backend --brain
+├── precache.py         (100)   Pre-cache plant.id + HF search for offline cluster use
+├── tools/
+│   ├── __init__.py      (91)   ToolRegistry with timing
+│   ├── vlm_pool.py     (358)   VLM live inference (Florence-2, OWLv2)
+│   ├── evaluator.py    (311)   mAP@0.5 + mAP@0.5:0.95, PASCAL VOC AP
+│   ├── label_gen.py    (200+)  Multi-VLM + external model consensus
+│   ├── yolo_trainer.py (195)   YOLO training with replay buffer
+│   ├── web_identifier.py(230)  plant.id API + cache-first lookup
+│   └── model_discovery.py(338) HuggingFace search + download + inference
+```
+
 ## TODO
-- [ ] Check Job 38432901 (DeepSeek-R1 Brain) results
+- [ ] Check Job 38477380 (DeepSeek-R1 text mode) results
 - [ ] Run precache.py locally with real weed images for plant.id
 - [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables
