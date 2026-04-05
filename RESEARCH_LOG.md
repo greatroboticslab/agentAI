@@ -711,6 +711,53 @@ Key milestone: **Brain autonomously discovered and used an external model!**
 
 **Precision conclusion**: All experiments still cause forgetting. The fundamental bottleneck remains label noise (27.4% FP rate in VLM pseudo-labels). External models (DETR) provide additional detection sources but don't solve the noise problem. Future work: use plant.id API for species-level validation to filter noisy labels.
 
+### Session 22 — 2026-04-03: Clone-and-Train (Professor Task 2)
+
+**`run_clone_and_train.py`** — Professor's direction: "clone and train existing weed detection model"
+
+Pipeline: Git clone DeepWeeds → download DETR from HuggingFace → train YOLOv8s on CottonWeedDet12 (100 epochs) → compare against YOLO11n baseline.
+
+**Results** (Job 38416097, 1h53m):
+
+| Model | Source | Precision | Recall | F1 |
+|-------|--------|-----------|--------|-----|
+| **YOLO11n** (our baseline) | Fine-tuned on 8 species | **0.881** | 0.957 | **0.917** |
+| YOLOv8s (clone+train) | COCO → CottonWeedDet12 100ep | 0.820 | **0.970** | 0.888 |
+| DETR-ResNet50 (HuggingFace) | Zero-shot | 0.000 | 0.000 | 0.000 |
+
+**Analysis**: YOLOv8s achieves F1=0.888 (close to YOLO11n 0.917). Higher recall but lower precision. DETR zero-shot fails completely — class mismatch with our dataset. The clone+train approach validates that our CottonWeedDet12 setup is correct and reproducible with different model architectures.
+
+### Session 23 — 2026-04-04: plant.id API + DeepSeek-R1 Brain + 3-model consensus
+
+**plant.id API** (Professor Task 1):
+- API key obtained from admin.kindwise.com (49 credits remaining)
+- Local test: Status 201, successfully identified plant species
+- Cluster test: TIMEOUT — Bridges-2 blocks external HTTPS
+- Solution: `precache.py` runs locally with internet, saves results to `api_cache.json`, cluster reads from cache
+- `web_identifier.py` updated: cache-first → API → local fallback
+
+**DeepSeek-R1:7b Brain** (stronger reasoning model):
+- Job 38432901 (v1): DeepSeek-R1 does NOT support Ollama function calling (400 error)
+  - All calls fell to fallback pipeline, same results as Qwen-7B
+  - Positive: 3-model consensus auto-discovered `ext_detr_weed` + `ext_yolov8s` dirs
+- Fix: `_ollama_text_decide()` — detects "no tools" error, uses numbered text prompt
+- Job 38477380 (v2): RUNNING with text fallback fix
+
+**3-model consensus** (label noise reduction):
+- `label_gen.py` now loads external model detections alongside VLM pre-generated labels
+- Auto-discovers `ext_*` directories from previous `run_external_model` calls
+- Goal: more diverse model families → lower FP rate (target: <20% vs current 27.4%)
+
+**Framework v2.0 file inventory** (14 Python files):
+- `brain.py` (480+): 3 backends (Ollama/HF/fallback) + text mode for DeepSeek-R1
+- `orchestrator.py` (500+): agent loop + strategy mode + job chain + forced progression
+- `tools/vlm_pool.py` (358): live inference for Florence-2 + OWLv2
+- `tools/evaluator.py` (311): full mAP@0.5 + mAP@0.5:0.95
+- `tools/label_gen.py` (200+): multi-VLM + external model consensus
+- `tools/web_identifier.py` (230): plant.id API + cache
+- `tools/model_discovery.py` (338): HuggingFace search + download + inference
+- `precache.py` (100): offline API caching for cluster
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)
