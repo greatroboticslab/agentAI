@@ -219,14 +219,15 @@ class SuperBrain:
     # =========================================================
 
     def _ollama_decide(self, context_history):
-        """Use Ollama's native function calling to pick a tool."""
+        """Use Ollama to pick a tool. Tries native function calling first,
+        falls back to text-based reasoning if model doesn't support tools."""
         import ollama
 
         # Build messages
         messages = [
             {"role": "system", "content": self._build_system_prompt()},
         ]
-        for entry in context_history[-6:]:  # keep context manageable
+        for entry in context_history[-6:]:
             role = entry["role"]
             content = entry["content"][:500]
             if role == "system":
@@ -234,16 +235,16 @@ class SuperBrain:
             elif role == "observation":
                 messages.append({"role": "user", "content": f"[Result] {content}"})
 
-        messages.append({"role": "user", "content": "What tool should I call next?"})
+        messages.append({"role": "user", "content": "What tool should I call next? Reply with the tool name."})
 
         try:
+            # Try native function calling first
             response = ollama.chat(
                 model=self.model_id,
                 messages=messages,
                 tools=TOOL_DEFINITIONS,
             )
 
-            # Check for tool calls
             if response.message.tool_calls:
                 tc = response.message.tool_calls[0]
                 action = {
@@ -254,14 +255,55 @@ class SuperBrain:
                 logger.info(f"[Brain/Ollama] Tool call: {action['action']} {action['params']}")
                 return action
             else:
-                # Model responded with text instead of tool call
                 text = response.message.content or ""
-                logger.warning(f"[Brain/Ollama] No tool call, text: {text[:100]}")
-                # Try to extract action from text
+                logger.info(f"[Brain/Ollama] Text response: {text[:100]}")
                 return self._parse_text_action(text)
 
         except Exception as e:
+            error_msg = str(e)
+            if "does not support tools" in error_msg:
+                # Model doesn't support function calling — use text mode
+                logger.info(f"[Brain/Ollama] {self.model_id} doesn't support tools, using text mode")
+                return self._ollama_text_decide(messages)
             logger.error(f"[Brain/Ollama] Error: {e}")
+            return self._smart_fallback(0)
+
+    def _ollama_text_decide(self, messages):
+        """Text-based decision for models without function calling (e.g. DeepSeek-R1)."""
+        import ollama
+
+        # Simpler prompt that asks for a numbered choice
+        messages[-1] = {"role": "user", "content": """Pick the next action by number:
+1=inspect_labels 2=run_vlm 3=consensus 4=train_yolo 5=evaluate 6=search_models 7=run_external_model 8=done
+Reply with JUST the number."""}
+
+        try:
+            response = ollama.chat(model=self.model_id, messages=messages)
+            text = response.message.content or ""
+            logger.info(f"[Brain/Ollama/Text] Response: {text[:150]}")
+
+            # Parse number from response (DeepSeek-R1 may include reasoning)
+            for char in text:
+                if char in "12345678":
+                    action_map = {
+                        "1": ("inspect_labels", {"vlm_key": "florence2_base", "sample_size": 20}),
+                        "2": ("run_vlm_inference", {"vlm_key": "florence2_base", "max_images": 50}),
+                        "3": ("generate_consensus", {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3}),
+                        "4": ("train_yolo", {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
+                        "5": ("evaluate", {}),
+                        "6": ("search_models", {"query": "weed detection"}),
+                        "7": ("run_external_model", {"model_key": "detr_weed", "max_images": 50}),
+                        "8": ("done", {"reason": "Brain chose to stop"}),
+                    }
+                    name, params = action_map[char]
+                    return {"action": name, "params": params,
+                            "reasoning": f"DeepSeek-R1 chose {char}: {name}"}
+
+            # Try keyword matching on the full text
+            return self._parse_text_action(text)
+
+        except Exception as e:
+            logger.error(f"[Brain/Ollama/Text] Error: {e}")
             return self._smart_fallback(0)
 
     def _build_system_prompt(self):
