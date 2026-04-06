@@ -409,9 +409,23 @@ weed_optimizer_framework/
 - Precision: old_f1=0.8825, new_f1=0.6172 (forgetting — label noise root cause unchanged)
 - Chain job 38486968 auto-submitted
 
+### DeepSeek-R1 chain results (Job 38486968, 2h34m)
+- Round 1: run_external(7) → run_vlm(2) → inspect → consensus → consensus → run_vlm → **train(4)** → evaluate → run_external(7)
+- Round 2: consensus → consensus → train → evaluate → stop
+- Results: old_f1=0.886/0.895, new_f1=0.595/0.583 (both forgetting)
+- System correctly auto-stopped: "No continuation needed"
+- **Full autonomous loop validated**: 2 jobs × 2 rounds, auto-chain, auto-stop
+
+### All DeepSeek-R1 experiments summary (3 jobs, 7h20m total)
+| Job | Iter | Old F1 | New F1 | DeepSeek-R1 behavior |
+|-----|------|--------|--------|---------------------|
+| 38477380 | 1 | 0 | 0 | search_models + done (label dir bug) |
+| 38477380 | 2 | 0.883 | 0.617 | run_external×2, run_vlm, train, eval |
+| 38486968 | 3 | 0.886 | 0.595 | run_external, run_vlm×2, train, eval |
+| 38486968 | 4 | 0.895 | 0.583 | consensus×2, train, eval, auto-stop |
+
 ## TODO
-- [ ] Check Job 38486968 (DeepSeek-R1 chain) results
 - [ ] Run precache.py locally with real weed images for plant.id
-- [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
+- [ ] YOLO self-training filter (train → filter with high-conf predictions → retrain)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

@@ -780,6 +780,8 @@ Pipeline: Git clone DeepWeeds → download DETR from HuggingFace → train YOLOv
 | Diverse exploration | No | **Yes** (tried multiple VLMs, external models) |
 | Precision improvement | None | None (label noise bottleneck) |
 
+**Chain job** (38486968, 2h34m): DeepSeek-R1 continued exploring — run_external, run_vlm, consensus, train, eval. Auto-stopped after 2 no-improve rounds ("No continuation needed"). Full autonomous loop validated: 3 jobs, 7h20m, auto-chain, auto-stop.
+
 **Key insight for the paper**: Brain intelligence directly determines the quality of autonomous agent behavior. With identical framework architecture, DeepSeek-R1 demonstrates genuine multi-step reasoning (explore → gather resources → train → evaluate → stop), while Qwen-7B loops on a single action. However, neither model can overcome the fundamental label noise bottleneck (27.4% FP). The path to precision improvement lies in better label filtering, not smarter Brains.
 
 ---
