@@ -439,8 +439,27 @@ Two new tools that make the framework a TRUE reasoning loop:
 
 3. **Brain prompt redesigned** — 10 actions (was 8), emphasizes THINK→ACT
 
+### v2.1 test results (Job 38506488, 2h34m, DeepSeek-R1)
+**Brain behavior breakthrough — first genuine reasoning loop:**
+- DeepSeek-R1 chose `filter_labels(9)` — understood label noise is root cause
+- DeepSeek-R1 chose `analyze_failure(8)` — thought about WHY before acting
+- Brain's analysis output: "Root cause is 27.4% FP from Florence-2... implement
+  confidence calibration... use data cleaning... employ 2-model consensus"
+- This is the first time Brain produced actionable root cause analysis
+
+**Bug found: 0 consensus boxes**
+- External model dirs (5× ext_detr/yolov8s) were duplicates of same model across iterations
+- External models only had labels for 50 images, VLMs had 1458 → most images had no ext labels
+- min_votes required sources that weren't present → 0 consensus
+
+### v2.2 bug fix + 5-hour extended run
+- `label_gen.py`: de-duplicate ext_* dirs by model type (keep latest iteration only)
+- `label_gen.py`: adaptive min_votes — require min(min_votes, sources_present_for_this_image)
+  So if only VLMs have labels for an image, consensus works with VLMs alone
+- `run_framework_ollama.sh`: extended to 8 rounds, no-improve-limit=6 (~5h exploration)
+
 ## TODO
-- [ ] Upload v2.1 to cluster and test with DeepSeek-R1
+- [ ] Check v2.2 extended run results (Job pending)
 - [ ] Run precache.py locally with real weed images for plant.id
 - [ ] Generate paper figures and tables
 - [ ] Write paper

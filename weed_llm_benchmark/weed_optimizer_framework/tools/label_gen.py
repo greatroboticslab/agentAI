@@ -112,12 +112,22 @@ def generate_consensus_labels(strategy, iteration):
     extra_label_dirs = strategy.get("extra_label_dirs", [])
 
     # Also auto-discover external model label dirs from previous runs
-    for f in os.listdir(Config.FRAMEWORK_DIR) if os.path.isdir(Config.FRAMEWORK_DIR) else []:
+    # De-duplicate: only keep one dir per model type (e.g. one detr_weed, one yolov8s_weed)
+    seen_models = set()
+    for f in sorted(os.listdir(Config.FRAMEWORK_DIR), reverse=True) if os.path.isdir(Config.FRAMEWORK_DIR) else []:
         ext_path = os.path.join(Config.FRAMEWORK_DIR, f)
-        if f.startswith("ext_") and os.path.isdir(ext_path) and ext_path not in extra_label_dirs:
-            extra_label_dirs.append(ext_path)
+        if f.startswith("ext_") and os.path.isdir(ext_path):
+            # Extract model name: "ext_detr_weed_iter2" → "detr_weed"
+            parts = f.split("_iter")[0].replace("ext_", "")
+            if parts not in seen_models and ext_path not in extra_label_dirs:
+                # Prefer latest iteration (sorted reverse)
+                n_files = len([x for x in os.listdir(ext_path) if x.endswith('.txt')])
+                if n_files > 0:
+                    extra_label_dirs.append(ext_path)
+                    seen_models.add(parts)
     if extra_label_dirs:
-        logger.info(f"External model dirs for consensus: {[os.path.basename(d) for d in extra_label_dirs]}")
+        logger.info(f"External model dirs for consensus: {[os.path.basename(d) for d in extra_label_dirs]} "
+                    f"(de-duplicated by model type)")
 
     # Validate VLM keys
     valid_vlms = [v for v in vlm_keys if v in Config.VLM_REGISTRY]
@@ -188,10 +198,16 @@ def generate_consensus_labels(strategy, iteration):
         new_lines = []
         if all_boxes:
             clusters = _cluster_boxes(all_boxes, iou_threshold)
+
+            # Count how many sources actually have labels for THIS image
+            sources_present = set(b[4] for b in all_boxes)
+            # Adaptive min_votes: require min_votes OR all present sources, whichever is smaller
+            effective_min = min(min_votes, max(len(sources_present), 1))
+
             for cluster in clusters:
-                # Count unique VLMs in this cluster
+                # Count unique sources in this cluster
                 vlm_sources = set(all_boxes[k][4] for k in cluster)
-                if len(vlm_sources) >= min_votes:
+                if len(vlm_sources) >= effective_min:
                     # Pick the box from the highest-precision VLM
                     best_idx = max(cluster,
                                    key=lambda k: Config.get_vlm_precision(all_boxes[k][4]))

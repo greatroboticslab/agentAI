@@ -34,11 +34,13 @@ echo "Loading Brain model: $BRAIN_MODEL"
 /ocean/projects/cis240145p/byler/ollama/bin/ollama pull $BRAIN_MODEL 2>&1 | tail -3
 
 # Run framework with Ollama backend
+# Extended run: 8 rounds, stop after 6 consecutive no-improve (allows ~5h exploration)
 python -m weed_optimizer_framework.run \
     --mode agent \
     --backend ollama \
     --brain $BRAIN_MODEL \
-    --rounds 3
+    --rounds 8 \
+    --no-improve-limit 6
 
 EXIT_CODE=$?
 

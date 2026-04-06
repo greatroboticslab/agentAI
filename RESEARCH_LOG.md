@@ -784,6 +784,29 @@ Pipeline: Git clone DeepWeeds → download DETR from HuggingFace → train YOLOv
 
 **Key insight for the paper**: Brain intelligence directly determines the quality of autonomous agent behavior. With identical framework architecture, DeepSeek-R1 demonstrates genuine multi-step reasoning (explore → gather resources → train → evaluate → stop), while Qwen-7B loops on a single action. However, neither model can overcome the fundamental label noise bottleneck (27.4% FP). The path to precision improvement lies in better label filtering, not smarter Brains.
 
+### Session 25 — 2026-04-06: v2.1 test + bug fix + extended run setup
+
+**v2.1 test** (Job 38506488, 2h34m, DeepSeek-R1):
+
+Brain behavior breakthrough — **first genuine reasoning loop**:
+- Step 1: inspect_labels
+- Step 2: **filter_labels (chose 9)** — Brain understood label noise is root cause!
+- Step 3: **analyze_failure (chose 8)** — Brain thought about WHY before acting!
+- Brain's analysis: *"Root cause is 27.4% FP from Florence-2... implement confidence calibration, use data cleaning, employ 2-model consensus"*
+- After evaluate: Brain chose analyze_failure AGAIN → genuine reflect-then-act loop
+
+Precision: old_f1=0.8926/0.8825 (forgetting), same as before.
+
+**Bug found and fixed: 0 consensus boxes**
+- Root cause 1: 5 ext_* dirs were duplicates of same model across iterations (detr_weed_iter1-5)
+- Root cause 2: External models only had labels for 50/1458 images → most images had no external labels → consensus required votes from absent sources → 0 boxes
+- Fix: de-duplicate ext_* by model type + adaptive min_votes (require min(min_votes, sources_actually_present))
+
+**v2.2 setup: 5-hour extended exploration run**
+- Rounds: 8 (was 3), no-improve-limit: 6 (was 2)
+- Goal: observe Brain behavior over extended period for paper analysis
+- Even without precision improvement, the agent's decision patterns are valuable research data
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)
