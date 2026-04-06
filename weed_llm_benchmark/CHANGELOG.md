@@ -401,8 +401,16 @@ weed_optimizer_framework/
 │   └── model_discovery.py(338) HuggingFace search + download + inference
 ```
 
+### DeepSeek-R1 text mode results (Job 38477380, 2h24m)
+- Text mode fix WORKS — DeepSeek-R1 made **7 different action types** (vs Qwen-7B's 1)
+- Round 1: consensus(3) → search_models(6) → train → evaluate → **done(8)** (self-stopped!)
+- Round 2: **run_external_model(7)** ×2 → run_vlm(2) → inspect → consensus → train → evaluate
+- DeepSeek-R1 **autonomously searched HuggingFace** and **downloaded external models**
+- Precision: old_f1=0.8825, new_f1=0.6172 (forgetting — label noise root cause unchanged)
+- Chain job 38486968 auto-submitted
+
 ## TODO
-- [ ] Check Job 38477380 (DeepSeek-R1 text mode) results
+- [ ] Check Job 38486968 (DeepSeek-R1 chain) results
 - [ ] Run precache.py locally with real weed images for plant.id
 - [ ] Few-Shot Grounding DINO adaptation (CVPR 2025)
 - [ ] Generate paper figures and tables

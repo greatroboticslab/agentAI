@@ -758,6 +758,30 @@ Pipeline: Git clone DeepWeeds → download DETR from HuggingFace → train YOLOv
 - `tools/model_discovery.py` (338): HuggingFace search + download + inference
 - `precache.py` (100): offline API caching for cluster
 
+### Session 24 — 2026-04-05: DeepSeek-R1 Brain results
+
+**Job 38432901** (v1, no text fallback): DeepSeek-R1 doesn't support Ollama tools → 400 error → all fallback. Fix: `_ollama_text_decide()`.
+
+**Job 38477380** (v2, text mode): **SUCCESS** — DeepSeek-R1 made autonomous decisions.
+
+| Round | DeepSeek-R1 Actions | Result |
+|-------|-------------------|--------|
+| 1 | consensus(3) → search_models(6) → train → eval → **done(8)** | old_f1=0, new_f1=0 (label dir issue) |
+| 2 | **run_external(7)×2** → run_vlm(2) → inspect → consensus → train → eval | old_f1=0.8825, new_f1=0.6172 (forgetting) |
+
+**DeepSeek-R1 vs Qwen-7B comparison (key paper result)**:
+
+| Capability | Qwen-7B | DeepSeek-R1 |
+|-----------|---------|-------------|
+| Unique action types chosen | 1 (always inspect) | **7** (inspect, consensus, search, run_ext, run_vlm, train, done) |
+| Searched external models | Never | **Yes** (chose search_models) |
+| Downloaded external models | Never | **Yes** (chose run_external_model) |
+| Self-decided to stop | Never | **Yes** (chose done) |
+| Diverse exploration | No | **Yes** (tried multiple VLMs, external models) |
+| Precision improvement | None | None (label noise bottleneck) |
+
+**Key insight for the paper**: Brain intelligence directly determines the quality of autonomous agent behavior. With identical framework architecture, DeepSeek-R1 demonstrates genuine multi-step reasoning (explore → gather resources → train → evaluate → stop), while Qwen-7B loops on a single action. However, neither model can overcome the fundamental label noise bottleneck (27.4% FP). The path to precision improvement lies in better label filtering, not smarter Brains.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)
