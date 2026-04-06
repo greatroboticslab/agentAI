@@ -313,6 +313,82 @@ class Orchestrator:
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 
+                elif action_name == "analyze_failure":
+                    # Brain analyzes why the last experiment failed
+                    focus = params.get("focus", "forgetting")
+                    # Gather analysis context
+                    last_exp = self.memory.experiments[-1] if self.memory.experiments else {}
+                    last_result = last_exp.get("result", {})
+                    lessons = [l["lesson"] for l in self.memory.get_all_lessons()[-5:]]
+
+                    analysis_prompt = (
+                        f"Analyzing failure (focus: {focus}):\n"
+                        f"  Last result: old_f1={last_result.get('old_f1', '?')}, "
+                        f"new_f1={last_result.get('new_f1', '?')}, "
+                        f"forgetting={last_result.get('forgetting', '?')}\n"
+                        f"  Baseline: old_f1={self.memory.baseline.get('old_f1', '?')}, "
+                        f"new_f1={self.memory.baseline.get('new_f1', '?')}\n"
+                        f"  Recent lessons: {lessons}\n"
+                        f"  Known: VLM pseudo-labels have 27.4% false positive rate\n"
+                        f"  Known: 2-model consensus is best, but noise still too high\n"
+                    )
+
+                    # Ask Brain to analyze (if Ollama available)
+                    try:
+                        import ollama
+                        r = ollama.chat(
+                            model=self.brain.model_id,
+                            messages=[{"role": "user", "content":
+                                f"You are analyzing why a weed detection experiment failed.\n\n"
+                                f"{analysis_prompt}\n"
+                                f"What is the root cause? What specific action should be taken next? "
+                                f"Be concrete and actionable. 3-5 sentences."}]
+                        )
+                        analysis = r.message.content or "No analysis generated"
+                    except Exception:
+                        analysis = (
+                            f"Root cause: label noise (27.4% FP). VLM pseudo-labels contain false "
+                            f"positives that teach YOLO wrong patterns, causing forgetting. "
+                            f"Recommended: use filter_labels to remove low-confidence detections "
+                            f"before training. Two-pass approach: train once, filter with YOLO's "
+                            f"own predictions at conf>0.7, retrain on cleaned labels."
+                        )
+
+                    obs = f"FAILURE ANALYSIS:\n{analysis}"
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
+                elif action_name == "filter_labels":
+                    # YOLO self-training filter: use high-confidence predictions to clean labels
+                    conf_thresh = params.get("confidence_threshold", 0.7)
+
+                    if not self._current_label_dir:
+                        obs = "ERROR: No labels to filter. Generate consensus labels first."
+                        context_history.append({"role": "observation", "content": obs})
+                        continue
+
+                    # Need a trained YOLO to filter with
+                    filter_model = self._current_model_path or Config.YOLO_8SP_WEIGHTS
+                    if not os.path.exists(filter_model):
+                        obs = "ERROR: No YOLO model available for filtering."
+                        context_history.append({"role": "observation", "content": obs})
+                        continue
+
+                    from .tools.label_filter import filter_labels_with_yolo
+                    filtered_dir, filter_stats = filter_labels_with_yolo(
+                        model_path=filter_model,
+                        label_dir=self._current_label_dir,
+                        image_dir=os.path.join(Config.HOLDOUT_DIR, "train", "images"),
+                        conf_threshold=conf_thresh,
+                        iteration=iteration,
+                    )
+                    self._current_label_dir = filtered_dir  # use filtered labels for next train
+                    obs = (f"Label filtering (conf>{conf_thresh}): "
+                           f"{filter_stats['original']} original → {filter_stats['kept']} kept, "
+                           f"{filter_stats['removed']} removed ({filter_stats['removal_rate']:.1%} noise removed)")
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
                 else:
                     obs = f"Unknown action: {action_name}"
                     context_history.append({"role": "observation", "content": obs})

@@ -142,6 +142,33 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "analyze_failure",
+            "description": "Analyze WHY the last experiment failed or caused forgetting. Think deeply about root causes before trying the next strategy. Use after evaluate shows bad results.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "focus": {"type": "string", "description": "What to analyze: label_noise, forgetting, precision, recall"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "filter_labels",
+            "description": "Filter noisy pseudo-labels using YOLO's own high-confidence predictions. Two-pass training: first train on noisy labels, then use YOLO's conf>0.7 predictions to remove false positives, retrain on filtered labels. This directly attacks the 27% FP noise problem.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "description": "YOLO confidence threshold for filtering (default 0.7)"},
+                    "label_dir": {"type": "string", "description": "Directory of labels to filter (default: current consensus labels)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "done",
             "description": "End this optimization round. Use when evaluation is complete or when further actions won't help.",
             "parameters": {
@@ -274,7 +301,12 @@ class SuperBrain:
 
         # Simpler prompt that asks for a numbered choice
         messages[-1] = {"role": "user", "content": """Pick the next action by number:
-1=inspect_labels 2=run_vlm 3=consensus 4=train_yolo 5=evaluate 6=search_models 7=run_external_model 8=done
+1=inspect_labels 2=run_vlm 3=consensus 4=train_yolo 5=evaluate
+6=search_models 7=run_external_model 8=analyze_failure 9=filter_labels 10=done
+
+IMPORTANT: If the last evaluation showed forgetting, pick 8 (analyze_failure) FIRST to understand why before trying something new.
+If label noise is the problem, pick 9 (filter_labels) to clean up noisy pseudo-labels.
+
 Reply with JUST the number."""}
 
         try:
@@ -283,8 +315,13 @@ Reply with JUST the number."""}
             logger.info(f"[Brain/Ollama/Text] Response: {text[:150]}")
 
             # Parse number from response (DeepSeek-R1 may include reasoning)
+            # Check for two-digit numbers first (10)
+            if "10" in text:
+                return {"action": "done", "params": {"reason": "Brain chose to stop"},
+                        "reasoning": "DeepSeek-R1 chose 10: done"}
+
             for char in text:
-                if char in "12345678":
+                if char in "123456789":
                     action_map = {
                         "1": ("inspect_labels", {"vlm_key": "florence2_base", "sample_size": 20}),
                         "2": ("run_vlm_inference", {"vlm_key": "florence2_base", "max_images": 50}),
@@ -293,7 +330,8 @@ Reply with JUST the number."""}
                         "5": ("evaluate", {}),
                         "6": ("search_models", {"query": "weed detection"}),
                         "7": ("run_external_model", {"model_key": "detr_weed", "max_images": 50}),
-                        "8": ("done", {"reason": "Brain chose to stop"}),
+                        "8": ("analyze_failure", {"focus": "forgetting"}),
+                        "9": ("filter_labels", {"confidence_threshold": 0.7}),
                     }
                     name, params = action_map[char]
                     return {"action": name, "params": params,
@@ -308,20 +346,24 @@ Reply with JUST the number."""}
 
     def _build_system_prompt(self):
         """Concise system prompt for Ollama."""
-        return """You are optimizing a YOLO weed detector. Available tools:
+        return """You are optimizing a YOLO weed detector. You must THINK before acting.
+
+CRITICAL WORKFLOW:
+1. If previous evaluation showed forgetting → FIRST analyze_failure to understand why
+2. The #1 problem is label noise (27% false positives). Use filter_labels to fix it.
+3. Only then: generate labels → train → evaluate
+
+Available tools:
+- analyze_failure: THINK about why the last experiment failed (USE THIS FIRST after bad results)
+- filter_labels: remove noisy labels using YOLO's own high-confidence predictions (ATTACKS ROOT CAUSE)
 - inspect_labels: check VLM label quality
-- run_vlm_inference: run Florence-2 or OWLv2 live on images
 - generate_consensus: combine VLM detections (best: florence2_base + owlv2)
-- train_yolo: train YOLO with labels (ONLY model that gets fine-tuned)
+- train_yolo: train YOLO (ONLY model fine-tuned). Old F1 must stay ≥0.90
 - evaluate: test on old + new species
-- identify_weed: use plant.id API for expert species identification
-- search_models: find new weed detection models on HuggingFace
-- run_external_model: download and run external model (detr_weed, yolov8s_weed)
+- search_models / run_external_model: discover and use external models
 - done: finish round
 
-RULES: Only YOLO gets fine-tuned. Old species F1 must stay above 0.90.
-Best VLM pair: florence2_base (precision=0.789) + owlv2 (recall=0.943).
-You can also use external models (DETR, YOLOv8s) as additional label sources."""
+KEY LESSON: label noise (27% FP) is the root bottleneck. Smarter strategies won't help if labels are wrong."""
 
     # =========================================================
     # BACKEND 2: HUGGINGFACE — Direct model loading
@@ -392,17 +434,19 @@ Reply with just the number:"""
     FALLBACK_PIPELINE = [
         {"action": "inspect_labels", "params": {"vlm_key": "florence2_base", "sample_size": 20},
          "reasoning": "Pipeline step 1: inspect best VLM labels"},
-        {"action": "inspect_labels", "params": {"vlm_key": "owlv2", "sample_size": 20},
-         "reasoning": "Pipeline step 2: inspect second VLM"},
         {"action": "generate_consensus",
          "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
-         "reasoning": "Pipeline step 3: generate consensus from best pair"},
+         "reasoning": "Pipeline step 2: generate consensus from best pair"},
+        {"action": "filter_labels", "params": {"confidence_threshold": 0.7},
+         "reasoning": "Pipeline step 3: filter noisy labels with YOLO high-conf predictions"},
         {"action": "train_yolo", "params": {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
-         "reasoning": "Pipeline step 4: train YOLO"},
+         "reasoning": "Pipeline step 4: train YOLO on filtered labels"},
         {"action": "evaluate", "params": {},
          "reasoning": "Pipeline step 5: evaluate"},
+        {"action": "analyze_failure", "params": {"focus": "forgetting"},
+         "reasoning": "Pipeline step 6: analyze if there was forgetting"},
         {"action": "done", "params": {"reason": "Pipeline complete"},
-         "reasoning": "Pipeline step 6: done"},
+         "reasoning": "Pipeline step 7: done"},
     ]
 
     def _smart_fallback(self, step_num):

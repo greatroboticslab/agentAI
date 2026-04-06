@@ -424,8 +424,23 @@ weed_optimizer_framework/
 | 38486968 | 3 | 0.886 | 0.595 | run_external, run_vlm×2, train, eval |
 | 38486968 | 4 | 0.895 | 0.583 | consensus×2, train, eval, auto-stop |
 
+### v2.1: Brain analysis + YOLO self-training filter (4,021 lines, 16 files)
+Two new tools that make the framework a TRUE reasoning loop:
+
+1. **`analyze_failure` tool** — Brain THINKS about why experiments fail before acting
+   - Generates root cause analysis via Ollama (3-5 sentences)
+   - Analysis injected into context → next action is INFORMED by reasoning
+   - System prompt: "If forgetting → analyze FIRST, then act"
+
+2. **`filter_labels` tool** (`tools/label_filter.py`, 160 lines) — Attacks 27% FP root cause
+   - YOLO self-training: run YOLO at conf>0.7 → keep only confirmed pseudo-labels
+   - Old species labels always kept (no filtering on known classes)
+   - Fallback pipeline: consensus → **filter** → train (was: consensus → train)
+
+3. **Brain prompt redesigned** — 10 actions (was 8), emphasizes THINK→ACT
+
 ## TODO
+- [ ] Upload v2.1 to cluster and test with DeepSeek-R1
 - [ ] Run precache.py locally with real weed images for plant.id
-- [ ] YOLO self-training filter (train → filter with high-conf predictions → retrain)
 - [ ] Generate paper figures and tables
 - [ ] Write paper
