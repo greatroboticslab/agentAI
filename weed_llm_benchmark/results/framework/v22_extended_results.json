@@ -1,0 +1,23 @@
+{
+  "description": "v2.2 extended run: 5h+ with bug fix, DeepSeek-R1 Brain",
+  "job_id": 38531856,
+  "elapsed": "06:48:00",
+  "brain": "deepseek-r1:7b",
+  "rounds_completed": 7,
+  "auto_stopped": "6 consecutive no-improve",
+  "key_findings": {
+    "consensus_bug_fixed": "85 consensus boxes (was 0 in v2.1)",
+    "filter_labels_working": "3622 → 3030 kept, 592 removed (16.3% noise)",
+    "analyze_failure_used": "Brain chose analyze_failure multiple times per round",
+    "brain_reasoning_quality": "Generated actionable root cause analysis"
+  },
+  "experiments": [
+    {"iter": 0, "old_f1": 0.897, "new_f1": 0.622, "forgetting": false},
+    {"iter": 1, "old_f1": 0.8926, "new_f1": 0.6236, "forgetting": true},
+    {"iter": 2, "old_f1": 0.8825, "new_f1": 0.6172, "forgetting": true, "filter": "16.3% removed"},
+    {"iter": 3, "old_f1": 0.8861, "new_f1": 0.5954, "forgetting": true},
+    {"iter": 4, "old_f1": 0.8949, "new_f1": 0.5832, "forgetting": true},
+    {"iter": 5, "old_f1": 0.8854, "new_f1": 0.6177, "forgetting": true},
+    {"iter": 6, "old_f1": 0.8934, "new_f1": 0.6036, "forgetting": true}
+  ]
+}

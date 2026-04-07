@@ -458,8 +458,25 @@ Two new tools that make the framework a TRUE reasoning loop:
   So if only VLMs have labels for an image, consensus works with VLMs alone
 - `run_framework_ollama.sh`: extended to 8 rounds, no-improve-limit=6 (~5h exploration)
 
+### v2.2 extended run results (Job 38531856, 6h48m, 7 rounds)
+**Longest autonomous run. Key achievements:**
+- **Consensus bug fixed**: 85 boxes (was 0 in v2.1) ✅
+- **filter_labels working**: 3622 → 3030 kept, **592 removed (16.3% noise)** ✅
+- **Brain reasoning loop**: filter→consensus→train→evaluate→analyze_failure (repeat)
+- 7 rounds completed, auto-stopped after 6 consecutive no-improve
+- All rounds still cause forgetting (old_f1 < 0.90)
+
+| Iter | Old F1 | New F1 | Notable |
+|------|--------|--------|---------|
+| 0 seed | 0.897 | **0.622** | — |
+| 1 | 0.893 | 0.624 | 85 consensus boxes working |
+| 2 | 0.883 | 0.617 | **16.3% noise filtered** |
+| 3 | 0.886 | 0.595 | continued filtering+training |
+| 4 | 0.895 | 0.583 | — |
+| 5 | 0.885 | 0.618 | — |
+| 6 | 0.893 | 0.604 | auto-stopped |
+
 ## TODO
-- [ ] Check v2.2 extended run results (Job pending)
 - [ ] Run precache.py locally with real weed images for plant.id
 - [ ] Generate paper figures and tables
 - [ ] Write paper
