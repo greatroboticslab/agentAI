@@ -176,6 +176,7 @@ def train_yolo(strategy, label_dir, iteration):
         patience=strategy.get("patience", 15),
         lr0=strategy.get("lr", 0.001),
         freeze=strategy.get("freeze_layers", 0),
+        workers=4,  # limit to prevent OOM (cluster has 5 CPUs/task)
         verbose=False,
     )
 

@@ -176,6 +176,7 @@ def train_yolo_with_lora(strategy, label_dir, iteration):
             patience=strategy.get("patience", 15),
             lr0=strategy.get("lr", 0.0005),  # lower for LoRA stability
             freeze=22,  # backbone+neck frozen, train head (where LoRA is)
+            workers=4,  # limit to prevent OOM
             verbose=False,
         )
     finally:
