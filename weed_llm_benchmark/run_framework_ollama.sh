@@ -33,15 +33,25 @@ BRAIN_MODEL="${1:-deepseek-r1:7b}"
 echo "Loading Brain model: $BRAIN_MODEL"
 /ocean/projects/cis240145p/byler/ollama/bin/ollama pull $BRAIN_MODEL 2>&1 | tail -3
 
-# Run framework with Ollama backend
-# Extended run: 12 rounds, stop after 10 no-improve (max ~7.5h exploration)
-# Brain has 13 tools including freeze_train, distill_train, lora_train
+# Run mode: "quick" (1h test, 3 rounds) or "long" (8h, 12 rounds)
+RUN_MODE="${2:-quick}"
+if [ "$RUN_MODE" = "long" ]; then
+    ROUNDS=12
+    NO_IMPROVE=10
+    echo "Mode: LONG (12 rounds, ~8h)"
+else
+    ROUNDS=3
+    NO_IMPROVE=2
+    echo "Mode: QUICK (3 rounds, ~1h)"
+fi
+
+# Brain has 13 tools: freeze_train, lora_train, distill_train, etc.
 python -m weed_optimizer_framework.run \
     --mode agent \
     --backend ollama \
     --brain $BRAIN_MODEL \
-    --rounds 12 \
-    --no-improve-limit 10
+    --rounds $ROUNDS \
+    --no-improve-limit $NO_IMPROVE
 
 EXIT_CODE=$?
 
