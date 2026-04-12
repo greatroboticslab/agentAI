@@ -385,6 +385,36 @@ class Orchestrator:
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 
+                elif action_name == "lora_train":
+                    # LoRA: inject adapters into head Conv2d, freeze backbone+neck
+                    if not self._current_label_dir:
+                        obs = "ERROR: No labels generated yet."
+                        context_history.append({"role": "observation", "content": obs})
+                        continue
+
+                    from .tools.lora_yolo import train_yolo_with_lora
+
+                    lora_strategy = {
+                        "lora_rank": params.get("lora_rank", 16),
+                        "lora_alpha": params.get("lora_alpha", 32.0),
+                        "lr": params.get("lr", 0.0005),
+                        "epochs": params.get("epochs", 50),
+                        "replay_ratio": 0.3,
+                        "batch_size": -1,
+                        "patience": 15,
+                    }
+                    logger.info(f"LORA TRAIN: rank={lora_strategy['lora_rank']}, "
+                                f"alpha={lora_strategy['lora_alpha']}, lr={lora_strategy['lr']}")
+                    try:
+                        model_path = train_yolo_with_lora(lora_strategy, self._current_label_dir, iteration)
+                        self._current_model_path = model_path
+                        obs = f"LoRA training complete: {model_path}"
+                    except Exception as e:
+                        obs = f"LoRA training failed: {e}. Tried to inject LoRA adapters into YOLO head."
+                        logger.error(obs)
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
                 elif action_name == "distill_train":
                     # Self-distillation training (Teach YOLO to Remember)
                     if not self._current_label_dir:

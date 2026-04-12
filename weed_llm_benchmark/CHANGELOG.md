@@ -503,9 +503,31 @@ Did NOT hardcode anything — added as new Brain tools so agent can choose.
 **Brain decision space**: 12 tools — Brain can now autonomously choose between
 freeze, distill, filter, consensus, analyze, etc. No hardcoding.
 
+## 2026-04-11 - v2.4: REAL LoRA implementation + 8-hour run
+
+### LoRA actually implemented (not just freeze)
+Per user request to also try LoRA (not just freeze), wrote real Conv2d LoRA:
+- `tools/lora_yolo.py` (180 lines) — `ConvLoRA` nn.Module wraps Conv2d with low-rank adapter
+- `inject_lora_into_yolo()` — finds head Conv2d layers, replaces with ConvLoRA
+- `train_yolo_with_lora()` — trains with adapters injected, original weights frozen
+- LoRA rank=16, alpha=32, lr=0.0005 (low for stability)
+- Falls back to head-only training if injection fails
+
+### Brain now has 13 tools (was 12)
+Added `lora_train` action so Brain can autonomously choose between:
+- 10: freeze_train (Wang 2025 backbone freeze)
+- 11: distill_train (self-distillation)
+- 12: lora_train (Professor's LoRA suggestion, REAL implementation)
+- 13: done
+
+### 8-hour extended run
+- run_framework_ollama.sh: rounds=12, no-improve-limit=10
+- Allows ~7.5h exploration with all anti-forgetting methods
+- Job 38809867 RUNNING on v011
+
 ## TODO
-- [ ] Test new freeze_train and distill_train tools on cluster
-- [ ] If Wang 2025 freeze works, try LoRA-Edge variant from Nature 2025 paper
+- [ ] Check Job 38809867 (8-hour LoRA + freeze test) results
+- [ ] If LoRA works, document as paper contribution
 - [ ] Add visual RAG classification layer
 - [ ] Generate paper figures and tables
 - [ ] Write paper

@@ -873,6 +873,40 @@ Professor Zhang suggested LoRA + data mixing + RAG for catastrophic forgetting. 
 
 **Future**: If freeze works, optionally try LoRA-Edge variant. Visual RAG layer for fine-grained species discrimination.
 
+### Session 27 — 2026-04-11: REAL LoRA + 8-hour test
+
+User chose option B+: try BOTH freeze (proven) AND LoRA (Professor's suggestion). Implement real LoRA, not just talk about it.
+
+**Real LoRA implementation** (`tools/lora_yolo.py`, 180 lines):
+- `ConvLoRA` nn.Module: wraps Conv2d with parallel low-rank adapter
+  - Original Conv frozen (requires_grad=False)
+  - lora_A: in_ch → rank (random init)
+  - lora_B: rank → out_ch (zero init, so initial contribution = 0)
+  - Forward: y = original(x) + lora_B(lora_A(x)) * scaling
+- `inject_lora_into_yolo()`: finds Conv2d in detection head (model.20-22.*), wraps each
+- `train_yolo_with_lora()`: trains with adapters, falls back to head-only freeze if injection fails
+- Rank=16, alpha=32, lr=0.0005
+
+**Brain has 13 tools now**. New action 12: `lora_train`.
+
+**Honest design choices:**
+- LoRA only injected into head Conv2d (most fine-grained learning)
+- 1x1 convs skipped (too small to benefit)
+- freeze=22 ensures backbone+neck stays frozen (LoRA contribution comes from head)
+- Low LR for stability (LoRA params start near zero)
+
+**8-hour extended run** (Job 38809867):
+- Brain: DeepSeek-R1:7b
+- 12 rounds max, 10 no-improve before stop
+- All 13 tools available
+- Will record which methods Brain chooses and which work
+
+This is the first run where Brain has access to:
+1. Wang 2025 freeze (proven on YOLOv8)
+2. Self-distillation (CVPR 2025)
+3. **Real LoRA on YOLO Conv2d layers** (Professor's request)
+4. Plus all previous tools (consensus, filter, analyze, search, etc.)
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)

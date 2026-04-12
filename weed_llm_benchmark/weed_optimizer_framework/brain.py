@@ -172,6 +172,22 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "lora_train",
+            "description": "LoRA training (Low-Rank Adaptation). Injects small trainable adapters into YOLO Conv2d layers, freezes original weights. Parameter-efficient: only ~1% of params train. Theory: preserves base knowledge while adapting to new species. Wang Nature 2025 LoRA-Edge style.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lora_rank": {"type": "integer", "description": "LoRA rank (default 16, smaller = more conservative)"},
+                    "lora_alpha": {"type": "number", "description": "LoRA scaling alpha (default 32.0)"},
+                    "lr": {"type": "number", "description": "Learning rate (default 0.0005, low for LoRA stability)"},
+                    "epochs": {"type": "integer", "description": "Training epochs (default 50)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "distill_train",
             "description": "Self-distillation training (Teach YOLO to Remember 2025). Old YOLO acts as teacher, new YOLO learns to match teacher's predictions on old species while adding new species. Combats catastrophic forgetting via knowledge preservation.",
             "parameters": {
@@ -335,14 +351,15 @@ class SuperBrain:
         messages[-1] = {"role": "user", "content": """Pick the next action by number:
 1=inspect_labels 2=run_vlm 3=consensus 4=train_yolo 5=evaluate
 6=search_models 7=run_external_model 8=analyze_failure 9=filter_labels
-10=freeze_train 11=distill_train 12=done
+10=freeze_train 11=distill_train 12=lora_train 13=done
 
 ANTI-FORGETTING TOOLS (use these to preserve old species knowledge):
 - 10 freeze_train: Wang 2025 method, freeze backbone layers 0-9 (proven to work)
 - 11 distill_train: self-distillation from old YOLO, "Teach YOLO to Remember"
+- 12 lora_train: LoRA adapters in detection head (Professor's suggestion)
 - 9 filter_labels: remove noisy pseudo-labels with YOLO's high-conf predictions
 
-If forgetting is the problem, try 10 (freeze_train) or 11 (distill_train).
+If forgetting is the problem, try 10/11/12 (anti-forgetting training methods).
 Reply with JUST the number."""}
 
         try:
@@ -353,7 +370,8 @@ Reply with JUST the number."""}
             # Parse number from response (DeepSeek-R1 may include reasoning)
             # Check for two-digit numbers first (10, 11, 12)
             two_digit_map = {
-                "12": ("done", {"reason": "Brain chose to stop"}),
+                "13": ("done", {"reason": "Brain chose to stop"}),
+                "12": ("lora_train", {"lora_rank": 16, "lora_alpha": 32.0, "lr": 0.0005, "epochs": 50}),
                 "11": ("distill_train", {"distill_alpha": 0.5, "lr": 0.0005, "epochs": 50}),
                 "10": ("freeze_train", {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
             }
@@ -398,6 +416,7 @@ CRITICAL WORKFLOW:
 Anti-forgetting tools (USE THESE for old species preservation):
 - freeze_train: Wang 2025 method, freezes backbone layers 0-9, proven 0% COCO degradation
 - distill_train: self-distillation from old YOLO, "Teach YOLO to Remember" (CVPR 2025)
+- lora_train: LoRA adapters in head, parameter-efficient (Professor's suggestion)
 - filter_labels: remove 27% FP noise via YOLO high-conf filtering
 
 Other tools:
