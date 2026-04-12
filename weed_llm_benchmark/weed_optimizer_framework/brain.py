@@ -359,7 +359,7 @@ ANTI-FORGETTING TOOLS (use these to preserve old species knowledge):
 - 12 lora_train: LoRA adapters in detection head (Professor's suggestion)
 - 9 filter_labels: remove noisy pseudo-labels with YOLO's high-conf predictions
 
-If forgetting is the problem, try 10/11/12 (anti-forgetting training methods).
+If forgetting is the problem, try BOTH 10 (freeze) AND 12 (LoRA) to compare.
 Reply with JUST the number."""}
 
         try:
@@ -503,15 +503,21 @@ Reply with just the number:"""
          "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
          "reasoning": "Pipeline step 2: generate consensus from best pair"},
         {"action": "filter_labels", "params": {"confidence_threshold": 0.7},
-         "reasoning": "Pipeline step 3: filter noisy labels with YOLO high-conf predictions"},
-        {"action": "train_yolo", "params": {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
-         "reasoning": "Pipeline step 4: train YOLO on filtered labels"},
+         "reasoning": "Pipeline step 3: filter noisy labels"},
+        {"action": "freeze_train", "params": {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
+         "reasoning": "Pipeline step 4: Wang 2025 backbone freeze training"},
         {"action": "evaluate", "params": {},
-         "reasoning": "Pipeline step 5: evaluate"},
+         "reasoning": "Pipeline step 5: evaluate freeze_train"},
         {"action": "analyze_failure", "params": {"focus": "forgetting"},
-         "reasoning": "Pipeline step 6: analyze if there was forgetting"},
-        {"action": "done", "params": {"reason": "Pipeline complete"},
-         "reasoning": "Pipeline step 7: done"},
+         "reasoning": "Pipeline step 6: analyze freeze results"},
+        {"action": "lora_train", "params": {"lora_rank": 16, "lora_alpha": 32.0, "lr": 0.0005, "epochs": 50},
+         "reasoning": "Pipeline step 7: LoRA training for comparison"},
+        {"action": "evaluate", "params": {},
+         "reasoning": "Pipeline step 8: evaluate LoRA"},
+        {"action": "analyze_failure", "params": {"focus": "forgetting"},
+         "reasoning": "Pipeline step 9: compare freeze vs LoRA"},
+        {"action": "done", "params": {"reason": "Pipeline complete — tested freeze + LoRA"},
+         "reasoning": "Pipeline step 10: done"},
     ]
 
     def _smart_fallback(self, step_num):
