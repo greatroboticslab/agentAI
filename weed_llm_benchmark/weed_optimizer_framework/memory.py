@@ -47,10 +47,10 @@ class Memory:
         self.hard_lessons = [
             {
                 "id": "HL01",
-                "lesson": "NEVER freeze backbone layers — causes catastrophic failure (F1=0.155)",
-                "evidence": "Phase 3C: frozen backbone test",
-                "severity": "critical",
-                "constraint": {"field": "freeze_layers", "max": 3},
+                "lesson": "Freezing FULL backbone (15+ layers) causes catastrophic failure (F1=0.155). However, freezing first 10 layers (Wang 2025) preserves COCO knowledge while allowing new species learning.",
+                "evidence": "Phase 3C frozen=full failed; Wang 2025 arXiv 2505.01016 shows freeze=10 works",
+                "severity": "high",
+                "constraint": {"field": "freeze_layers", "max": 14, "min_safe": 0, "recommended": [0, 5, 10]},
             },
             {
                 "id": "HL02",

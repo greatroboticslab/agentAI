@@ -476,7 +476,36 @@ Two new tools that make the framework a TRUE reasoning loop:
 | 5 | 0.885 | 0.618 | — |
 | 6 | 0.893 | 0.604 | auto-stopped |
 
+## 2026-04-11 - Anti-forgetting tools (Professor Zhang's LoRA direction)
+
+### Background
+Professor Zhang suggested LoRA, data mixing, and RAG to solve catastrophic forgetting.
+Deep research findings:
+- **LoRA on YOLO**: Ultralytics rejected support (Issue #16983), every public attempt failed (mAP -10), only 1 Nature paper used custom variant. Not turnkey.
+- **Wang 2025 (arXiv 2505.01016)**: Backbone freezing (layers 0-9) actually works on YOLOv8, **0% COCO degradation** while learning new domain.
+- **Teach YOLO to Remember (2503.04688)**: Self-distillation for continual YOLO.
+- **Visual RAG (CVPR 2024 RALF)**: Retrieval-augmented for open-vocab detection.
+- **Gemma 3**: Cannot do native object detection (no loc tokens), but can be VLM voter.
+
+### Implementation: chose Option C (proven methods + Brain-driven)
+Did NOT hardcode anything — added as new Brain tools so agent can choose.
+
+**New tools added:**
+- `freeze_train`: Wang 2025 backbone freezing (freeze 0-10 layers)
+- `distill_train`: Self-distillation approximation (low LR + partial freeze)
+
+**Updated:**
+- `memory.py` HL01: Differentiates "freeze full backbone" (catastrophic) from "freeze layers 0-10" (works)
+- `monitor.py`: Validation max raised from 3 to 14 (Wang 2025 supports up to layer 14)
+- `brain.py`: 12 actions now (was 10), system prompt mentions anti-forgetting tools
+- `orchestrator.py`: New action handlers for freeze_train and distill_train
+
+**Brain decision space**: 12 tools — Brain can now autonomously choose between
+freeze, distill, filter, consensus, analyze, etc. No hardcoding.
+
 ## TODO
-- [ ] Run precache.py locally with real weed images for plant.id
+- [ ] Test new freeze_train and distill_train tools on cluster
+- [ ] If Wang 2025 freeze works, try LoRA-Edge variant from Nature 2025 paper
+- [ ] Add visual RAG classification layer
 - [ ] Generate paper figures and tables
 - [ ] Write paper

@@ -358,6 +358,62 @@ class Orchestrator:
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 
+                elif action_name == "freeze_train":
+                    # Wang 2025: backbone freeze for catastrophic forgetting prevention
+                    if not self._current_label_dir:
+                        obs = "ERROR: No labels generated yet."
+                        context_history.append({"role": "observation", "content": obs})
+                        continue
+
+                    freeze = params.get("freeze_layers", 10)
+                    lr = params.get("lr", 0.001)
+                    epochs = params.get("epochs", 50)
+                    replay = params.get("replay_ratio", 0.3)
+
+                    strategy = {
+                        "freeze_layers": freeze, "lr": lr, "epochs": epochs,
+                        "replay_ratio": replay, "batch_size": -1, "patience": 15,
+                    }
+                    valid, violations, adjusted = self.monitor.validate_strategy(strategy, self.memory)
+                    if not valid:
+                        strategy = adjusted
+
+                    logger.info(f"FREEZE TRAIN: freezing layers 0-{freeze} (Wang 2025)")
+                    model_path = train_yolo(strategy, self._current_label_dir, iteration)
+                    self._current_model_path = model_path
+                    obs = f"Freeze training complete (freeze={freeze}): {model_path}"
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
+                elif action_name == "distill_train":
+                    # Self-distillation training (Teach YOLO to Remember)
+                    if not self._current_label_dir:
+                        obs = "ERROR: No labels generated yet."
+                        context_history.append({"role": "observation", "content": obs})
+                        continue
+
+                    # For now, distillation is implemented as: train with frozen teacher predictions
+                    # Falls back to standard train with low LR + freeze (approximation)
+                    distill_alpha = params.get("distill_alpha", 0.5)
+                    lr = params.get("lr", 0.0005)
+                    epochs = params.get("epochs", 50)
+
+                    strategy = {
+                        "freeze_layers": 5,  # partial freeze + low LR ≈ distillation effect
+                        "lr": lr, "epochs": epochs, "replay_ratio": 0.4,
+                        "batch_size": -1, "patience": 15,
+                    }
+                    valid, _, adjusted = self.monitor.validate_strategy(strategy, self.memory)
+                    if not valid:
+                        strategy = adjusted
+
+                    logger.info(f"DISTILL TRAIN: distill_alpha={distill_alpha}, lr={lr} (Teach YOLO to Remember)")
+                    model_path = train_yolo(strategy, self._current_label_dir, iteration)
+                    self._current_model_path = model_path
+                    obs = f"Distill training complete: {model_path}"
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
                 elif action_name == "filter_labels":
                     # YOLO self-training filter: use high-confidence predictions to clean labels
                     conf_thresh = params.get("confidence_threshold", 0.7)

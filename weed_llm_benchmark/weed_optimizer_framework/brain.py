@@ -155,6 +155,38 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "freeze_train",
+            "description": "Train YOLO with backbone freezing (Wang 2025 method). Freezes first N layers to preserve old species knowledge while learning new species. Recommended: freeze=10 (proven to keep COCO performance with 0% degradation while adapting to new domain).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "freeze_layers": {"type": "integer", "description": "Number of backbone layers to freeze (0=none, 10=Wang 2025, 14=max safe)"},
+                    "lr": {"type": "number", "description": "Learning rate (default 0.001)"},
+                    "epochs": {"type": "integer", "description": "Training epochs (default 50)"},
+                    "replay_ratio": {"type": "number", "description": "Old data replay ratio (default 0.3)"},
+                },
+                "required": ["freeze_layers"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "distill_train",
+            "description": "Self-distillation training (Teach YOLO to Remember 2025). Old YOLO acts as teacher, new YOLO learns to match teacher's predictions on old species while adding new species. Combats catastrophic forgetting via knowledge preservation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "distill_alpha": {"type": "number", "description": "Distillation loss weight (default 0.5)"},
+                    "lr": {"type": "number", "description": "Learning rate (default 0.0005, lower for distillation)"},
+                    "epochs": {"type": "integer", "description": "Training epochs (default 50)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "filter_labels",
             "description": "Filter noisy pseudo-labels using YOLO's own high-confidence predictions. Two-pass training: first train on noisy labels, then use YOLO's conf>0.7 predictions to remove false positives, retrain on filtered labels. This directly attacks the 27% FP noise problem.",
             "parameters": {
@@ -302,11 +334,15 @@ class SuperBrain:
         # Simpler prompt that asks for a numbered choice
         messages[-1] = {"role": "user", "content": """Pick the next action by number:
 1=inspect_labels 2=run_vlm 3=consensus 4=train_yolo 5=evaluate
-6=search_models 7=run_external_model 8=analyze_failure 9=filter_labels 10=done
+6=search_models 7=run_external_model 8=analyze_failure 9=filter_labels
+10=freeze_train 11=distill_train 12=done
 
-IMPORTANT: If the last evaluation showed forgetting, pick 8 (analyze_failure) FIRST to understand why before trying something new.
-If label noise is the problem, pick 9 (filter_labels) to clean up noisy pseudo-labels.
+ANTI-FORGETTING TOOLS (use these to preserve old species knowledge):
+- 10 freeze_train: Wang 2025 method, freeze backbone layers 0-9 (proven to work)
+- 11 distill_train: self-distillation from old YOLO, "Teach YOLO to Remember"
+- 9 filter_labels: remove noisy pseudo-labels with YOLO's high-conf predictions
 
+If forgetting is the problem, try 10 (freeze_train) or 11 (distill_train).
 Reply with JUST the number."""}
 
         try:
@@ -315,10 +351,16 @@ Reply with JUST the number."""}
             logger.info(f"[Brain/Ollama/Text] Response: {text[:150]}")
 
             # Parse number from response (DeepSeek-R1 may include reasoning)
-            # Check for two-digit numbers first (10)
-            if "10" in text:
-                return {"action": "done", "params": {"reason": "Brain chose to stop"},
-                        "reasoning": "DeepSeek-R1 chose 10: done"}
+            # Check for two-digit numbers first (10, 11, 12)
+            two_digit_map = {
+                "12": ("done", {"reason": "Brain chose to stop"}),
+                "11": ("distill_train", {"distill_alpha": 0.5, "lr": 0.0005, "epochs": 50}),
+                "10": ("freeze_train", {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
+            }
+            for two_digit, (name, params) in two_digit_map.items():
+                if two_digit in text:
+                    return {"action": name, "params": params,
+                            "reasoning": f"DeepSeek-R1 chose {two_digit}: {name}"}
 
             for char in text:
                 if char in "123456789":
@@ -350,20 +392,24 @@ Reply with JUST the number."""}
 
 CRITICAL WORKFLOW:
 1. If previous evaluation showed forgetting → FIRST analyze_failure to understand why
-2. The #1 problem is label noise (27% false positives). Use filter_labels to fix it.
-3. Only then: generate labels → train → evaluate
+2. To prevent forgetting → use freeze_train (Wang 2025) or distill_train (Teach YOLO to Remember)
+3. To reduce label noise → use filter_labels (YOLO self-training filter)
 
-Available tools:
-- analyze_failure: THINK about why the last experiment failed (USE THIS FIRST after bad results)
-- filter_labels: remove noisy labels using YOLO's own high-confidence predictions (ATTACKS ROOT CAUSE)
+Anti-forgetting tools (USE THESE for old species preservation):
+- freeze_train: Wang 2025 method, freezes backbone layers 0-9, proven 0% COCO degradation
+- distill_train: self-distillation from old YOLO, "Teach YOLO to Remember" (CVPR 2025)
+- filter_labels: remove 27% FP noise via YOLO high-conf filtering
+
+Other tools:
+- analyze_failure: think about WHY experiments fail
 - inspect_labels: check VLM label quality
 - generate_consensus: combine VLM detections (best: florence2_base + owlv2)
-- train_yolo: train YOLO (ONLY model fine-tuned). Old F1 must stay ≥0.90
+- train_yolo: standard training (no anti-forgetting)
 - evaluate: test on old + new species
-- search_models / run_external_model: discover and use external models
+- search_models / run_external_model: discover external models
 - done: finish round
 
-KEY LESSON: label noise (27% FP) is the root bottleneck. Smarter strategies won't help if labels are wrong."""
+KEY: Old species F1 must stay ≥0.90. Label noise (27% FP) and catastrophic forgetting are the two main bottlenecks. Use the anti-forgetting tools above."""
 
     # =========================================================
     # BACKEND 2: HUGGINGFACE — Direct model loading

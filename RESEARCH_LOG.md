@@ -840,6 +840,39 @@ Precision: old_f1=0.8926/0.8825 (forgetting), same as before.
 - System correctly auto-stopped when no improvement detected
 - The framework architecture is validated; precision bottleneck is data quality, not system design
 
+### Session 26 — 2026-04-11: Anti-forgetting tools (Professor's LoRA direction)
+
+Professor Zhang suggested LoRA + data mixing + RAG for catastrophic forgetting. Did deep literature research before implementing.
+
+**Research findings:**
+
+| Approach | Honest assessment |
+|----------|-------------------|
+| LoRA on YOLO | Ultralytics declined support; every public attempt failed (-10 mAP); only Nature 2025 paper used custom variant |
+| LoRA forgetting prevention | Biderman 2024: forgets 14-23% less but learns 10-20% less. Shuttleworth 2024: low-rank LoRA causes MORE forgetting in continual settings ("intruder dimensions") |
+| **Backbone freeze (Wang 2025)** | **arXiv 2505.01016: freeze layers 0-9 → 0% COCO degradation while learning new domain. Proven on YOLOv8.** |
+| Self-distillation (CVPR 2025) | "Teach YOLO to Remember" — established recipe |
+| Visual RAG (RALF, CVPR 2024) | Real and growing field, +3.4 mAP on novel COCO categories |
+| Gemma 3 | Cannot do detection (no loc tokens), but valid as VLM voter |
+
+**Decision (option C from user)**: Implement proven methods (freeze + distill) AS BRAIN TOOLS, not hardcoded scripts. Let agent decide when to use them.
+
+**Implementation:**
+- `freeze_train` tool: Wang 2025 method, freeze layers 0-10
+- `distill_train` tool: self-distillation approximation
+- `memory.py`: HL01 hard lesson updated — distinguishes full freeze (catastrophic) from partial freeze 0-10 (works)
+- `monitor.py`: validation max raised 3 → 14 (allows Wang 2025 freeze=10)
+- `brain.py`: 12 tools available (was 10)
+- System prompt: explicitly tells Brain "if forgetting → use freeze_train or distill_train"
+
+**Why we did NOT do LoRA**:
+1. Every public Ultralytics LoRA attempt failed (mAP -10)
+2. LoRA in continual learning settings introduces "intruder dimensions" that increase forgetting
+3. Wang 2025 backbone freeze achieves the same goal with proven results
+4. Time: LoRA from-scratch implementation is 2-4 weeks; freeze test is hours
+
+**Future**: If freeze works, optionally try LoRA-Edge variant. Visual RAG layer for fine-grained species discrimination.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)

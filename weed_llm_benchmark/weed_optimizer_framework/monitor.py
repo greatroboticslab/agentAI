@@ -29,9 +29,9 @@ class QualityMonitor:
         adjusted = dict(strategy)
         constraints = memory.get_critical_constraints()
 
-        # HL01: No excessive freezing
+        # HL01: No excessive freezing (but freeze 0-10 is OK per Wang 2025)
         freeze = adjusted.get("freeze_layers", 0)
-        max_freeze = constraints.get("HL01", {}).get("max", 3)
+        max_freeze = constraints.get("HL01", {}).get("max", 14)
         if freeze > max_freeze:
             violations.append(f"HL01: freeze_layers={freeze} > max={max_freeze}")
             adjusted["freeze_layers"] = max_freeze
