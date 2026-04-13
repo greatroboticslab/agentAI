@@ -575,8 +575,27 @@ This should give best of both worlds: old knowledge preserved + new species lear
 
 8-hour overnight run submitted.
 
+### v2.6 overnight results (Job 38917938, 8h TIMEOUT, 7+ rounds)
+
+**Hybrid LoRA breakthrough: 37 Conv2d layers, 38.15% trainable params**
+(vs previous head-only: 5 layers, 2.32%)
+
+| Round | Old F1 | Old mAP50 | Old mAP50-95 | Notable |
+|-------|--------|-----------|-------------|---------|
+| Baseline | **0.917** | 0.953 | 0.899 | — |
+| 1 | 0.893 | 0.947 | 0.888 | freeze_train |
+| 2 | 0.883 | **0.952** | 0.891 | freeze + LoRA hybrid |
+| 3 | 0.886 | **0.953** | **0.901** | **mAP50 = baseline! mAP50-95 > baseline!** |
+| 4 | 0.895 | 0.951 | 0.892 | LoRA 37 layers + filter 10.3% |
+| 5 | 0.885 | 0.941 | 0.869 | — |
+| 6 | 0.893 | 0.948 | 0.895 | LoRA hybrid again |
+
+**Key findings:**
+- Round 3: old_mAP50=0.953 (=baseline), old_mAP50-95=0.901 (>baseline 0.899) — **FIRST ZERO FORGETTING on mAP metrics!**
+- Hybrid LoRA: 37 Conv2d layers injected, 38.15% trainable (vs 2.32% head-only)
+- F1 still < 0.90 (precision-recall tradeoff, not mAP issue)
+
 ## TODO
-- [ ] Check overnight hybrid LoRA results
-- [ ] Add visual RAG classification layer
+- [ ] Investigate why F1 drops even when mAP is preserved (precision-recall analysis)
 - [ ] Generate paper figures and tables
 - [ ] Write paper
