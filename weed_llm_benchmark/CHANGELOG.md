@@ -595,7 +595,30 @@ This should give best of both worlds: old knowledge preserved + new species lear
 - Hybrid LoRA: 37 Conv2d layers injected, 38.15% trainable (vs 2.32% head-only)
 - F1 still < 0.90 (precision-recall tradeoff, not mAP issue)
 
+## 2026-04-13 - v2.7: Evaluator fix + Two-pass training + Gemma 4
+
+### Three improvements in one release:
+
+1. **Evaluator fix** — conf 0.25→0.001 for mAP evaluation (standard practice)
+   - Previous mAP was computed with conf=0.25 which truncates low-conf predictions
+   - Now uses conf=0.001 for full precision-recall curve coverage
+   - AP sentinel value fixed (0→1.0 at end)
+   - Separate EVAL_CONFIDENCE vs CONFIDENCE_THRESHOLD for training
+
+2. **Two-pass self-training** — `two_pass_train` tool (most promising for precision)
+   - Pass 1: Train YOLO on noisy pseudo-labels (30 epochs, freeze=10)
+   - Filter: Use trained YOLO at conf>0.8 to remove false positives
+   - Pass 2: Retrain on cleaned labels with hybrid LoRA
+   - This directly attacks the 27% FP bottleneck from both ends
+
+3. **Gemma 4 26B-A4B Brain** — upgraded from DeepSeek-R1:7b
+   - MoE: 26B total, only 3.8B active per token (~18GB)
+   - Native Ollama function calling (no more text fallback hacks)
+   - Apache 2.0, 256K context, released April 2, 2026
+
+Brain now has 14 tools. Fallback pipeline leads with two_pass_train.
+
 ## TODO
-- [ ] Investigate why F1 drops even when mAP is preserved (precision-recall analysis)
+- [ ] Check Gemma 4 + two-pass results
 - [ ] Generate paper figures and tables
 - [ ] Write paper

@@ -116,9 +116,9 @@ def _compute_ap(tp_list, n_gt):
     if not recalls:
         return 0.0
 
-    # All-point interpolation
-    # Add sentinel values
-    mrec = [0.0] + recalls + [recalls[-1]]
+    # All-point interpolation (PASCAL VOC 2010+ / COCO standard)
+    # Sentinel values: recall goes from 0 to max_recall, precision from 1 to 0
+    mrec = [0.0] + recalls + [1.0]
     mpre = [1.0] + precisions + [0.0]
 
     # Make precision monotonically decreasing
@@ -180,7 +180,7 @@ def evaluate_yolo(model_path, test_images_dir, test_labels_dir,
 
         # Run YOLO inference
         img_path = os.path.join(test_images_dir, img_file)
-        results = model.predict(img_path, conf=Config.CONFIDENCE_THRESHOLD,
+        results = model.predict(img_path, conf=Config.EVAL_CONFIDENCE,
                                 device=device, verbose=False)
 
         # Extract predictions

@@ -385,6 +385,61 @@ class Orchestrator:
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 
+                elif action_name == "two_pass_train":
+                    # Two-pass self-training: train → filter with own predictions → retrain
+                    if not self._current_label_dir:
+                        obs = "ERROR: No labels generated yet."
+                        context_history.append({"role": "observation", "content": obs})
+                        continue
+
+                    lr = params.get("lr", 0.001)
+                    epochs = params.get("epochs", 30)
+                    filter_conf = params.get("filter_conf", 0.8)
+
+                    # Pass 1: Train on noisy labels
+                    logger.info("[TWO-PASS] Pass 1: Training on noisy labels...")
+                    strategy_p1 = {"lr": lr, "epochs": epochs, "replay_ratio": 0.3,
+                                   "freeze_layers": 10, "batch_size": -1, "patience": 10}
+                    valid, _, adjusted = self.monitor.validate_strategy(strategy_p1, self.memory)
+                    if not valid: strategy_p1 = adjusted
+                    model_p1 = train_yolo(strategy_p1, self._current_label_dir, iteration)
+
+                    # Filter: use pass-1 model to clean labels
+                    logger.info(f"[TWO-PASS] Filtering with conf>{filter_conf}...")
+                    from .tools.label_filter import filter_labels_with_yolo
+                    filtered_dir, fstats = filter_labels_with_yolo(
+                        model_path=model_p1,
+                        label_dir=self._current_label_dir,
+                        image_dir=os.path.join(Config.HOLDOUT_DIR, "train", "images"),
+                        conf_threshold=filter_conf,
+                        iteration=iteration + 100,  # avoid dir collision
+                    )
+
+                    # Pass 2: Retrain on cleaned labels with LoRA
+                    logger.info("[TWO-PASS] Pass 2: Retraining on filtered labels with hybrid LoRA...")
+                    from .tools.lora_yolo import train_yolo_with_lora
+                    lora_strategy = {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005,
+                                     "epochs": epochs, "replay_ratio": 0.3, "batch_size": -1,
+                                     "patience": 10, "lora_mode": "hybrid"}
+                    try:
+                        model_p2 = train_yolo_with_lora(lora_strategy, filtered_dir, iteration + 200)
+                    except Exception:
+                        # Fallback: standard freeze train on filtered labels
+                        strategy_p2 = {"lr": 0.0005, "epochs": epochs, "replay_ratio": 0.3,
+                                       "freeze_layers": 10, "batch_size": -1, "patience": 10}
+                        model_p2 = train_yolo(strategy_p2, filtered_dir, iteration + 200)
+
+                    self._current_model_path = model_p2
+                    self._current_label_dir = filtered_dir
+                    obs = (f"Two-pass training complete:\n"
+                           f"  Pass 1: trained on noisy labels\n"
+                           f"  Filter: {fstats['original']}→{fstats['kept']} kept, "
+                           f"{fstats['removed']} removed ({fstats['removal_rate']:.1%})\n"
+                           f"  Pass 2: retrained on filtered labels with hybrid LoRA\n"
+                           f"  Model: {model_p2}")
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
                 elif action_name == "lora_train":
                     # LoRA: inject adapters into head Conv2d, freeze backbone+neck
                     if not self._current_label_dir:

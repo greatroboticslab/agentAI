@@ -172,6 +172,20 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "two_pass_train",
+            "description": "TWO-PASS self-training: (1) train YOLO on noisy labels, (2) use trained YOLO to filter labels at high confidence, (3) retrain on cleaned labels with hybrid LoRA. This directly attacks the 27% label noise bottleneck. Most promising method for precision improvement.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "epochs": {"type": "integer", "description": "Epochs per pass (default 30)"},
+                    "filter_conf": {"type": "number", "description": "Filter confidence threshold (default 0.8)"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "lora_train",
             "description": "LoRA training (Low-Rank Adaptation). Injects small trainable adapters into YOLO Conv2d layers, freezes original weights. Parameter-efficient: only ~1% of params train. Theory: preserves base knowledge while adapting to new species. Wang Nature 2025 LoRA-Edge style.",
             "parameters": {
@@ -351,15 +365,13 @@ class SuperBrain:
         messages[-1] = {"role": "user", "content": """Pick the next action by number:
 1=inspect_labels 2=run_vlm 3=consensus 4=train_yolo 5=evaluate
 6=search_models 7=run_external_model 8=analyze_failure 9=filter_labels
-10=freeze_train 11=distill_train 12=lora_train 13=done
+10=freeze_train 11=distill_train 12=two_pass_train 13=lora_train 14=done
 
-ANTI-FORGETTING TOOLS (use these to preserve old species knowledge):
-- 10 freeze_train: Wang 2025 method, freeze backbone layers 0-9 (proven to work)
-- 11 distill_train: self-distillation from old YOLO, "Teach YOLO to Remember"
-- 12 lora_train: LoRA adapters in detection head (Professor's suggestion)
-- 9 filter_labels: remove noisy pseudo-labels with YOLO's high-conf predictions
+BEST METHOD FOR PRECISION: 12 two_pass_train (train→filter→retrain with LoRA)
+ANTI-FORGETTING: 10 freeze, 11 distill, 13 lora (hybrid: backbone LoRA + head full)
+NOISE REDUCTION: 9 filter_labels, 12 two_pass_train
 
-If forgetting is the problem, try BOTH 10 (freeze) AND 12 (LoRA) to compare.
+TRY 12 (two_pass_train) FIRST — it combines noise reduction + LoRA in one step.
 Reply with JUST the number."""}
 
         try:
@@ -370,8 +382,9 @@ Reply with JUST the number."""}
             # Parse number from response (DeepSeek-R1 may include reasoning)
             # Check for two-digit numbers first (10, 11, 12)
             two_digit_map = {
-                "13": ("done", {"reason": "Brain chose to stop"}),
-                "12": ("lora_train", {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50, "lora_mode": "hybrid"}),
+                "14": ("done", {"reason": "Brain chose to stop"}),
+                "13": ("lora_train", {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50, "lora_mode": "hybrid"}),
+                "12": ("two_pass_train", {"epochs": 30, "filter_conf": 0.8}),
                 "11": ("distill_train", {"distill_alpha": 0.5, "lr": 0.0005, "epochs": 50}),
                 "10": ("freeze_train", {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
             }
@@ -502,22 +515,18 @@ Reply with just the number:"""
         {"action": "generate_consensus",
          "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
          "reasoning": "Pipeline step 2: generate consensus from best pair"},
-        {"action": "filter_labels", "params": {"confidence_threshold": 0.8},
-         "reasoning": "Pipeline step 3: aggressive filter (conf>0.8) to reduce 27% FP"},
+        {"action": "two_pass_train", "params": {"epochs": 30, "filter_conf": 0.8},
+         "reasoning": "Pipeline step 3: TWO-PASS (train→filter→retrain with LoRA) — best method"},
+        {"action": "evaluate", "params": {},
+         "reasoning": "Pipeline step 4: evaluate two-pass results"},
+        {"action": "analyze_failure", "params": {"focus": "forgetting"},
+         "reasoning": "Pipeline step 5: analyze results"},
         {"action": "freeze_train", "params": {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
-         "reasoning": "Pipeline step 4: Wang 2025 backbone freeze training"},
+         "reasoning": "Pipeline step 6: Wang 2025 freeze for comparison"},
         {"action": "evaluate", "params": {},
-         "reasoning": "Pipeline step 5: evaluate freeze_train"},
-        {"action": "analyze_failure", "params": {"focus": "forgetting"},
-         "reasoning": "Pipeline step 6: analyze freeze results"},
-        {"action": "lora_train", "params": {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50, "lora_mode": "hybrid"},
-         "reasoning": "Pipeline step 7: Hybrid LoRA (backbone LoRA + head fully trained)"},
-        {"action": "evaluate", "params": {},
-         "reasoning": "Pipeline step 8: evaluate LoRA"},
-        {"action": "analyze_failure", "params": {"focus": "forgetting"},
-         "reasoning": "Pipeline step 9: compare freeze vs LoRA"},
-        {"action": "done", "params": {"reason": "Pipeline complete — tested freeze + LoRA"},
-         "reasoning": "Pipeline step 10: done"},
+         "reasoning": "Pipeline step 7: evaluate freeze"},
+        {"action": "done", "params": {"reason": "Pipeline complete — tested two-pass + freeze"},
+         "reasoning": "Pipeline step 8: done"},
     ]
 
     def _smart_fallback(self, step_num):

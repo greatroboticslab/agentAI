@@ -105,17 +105,22 @@ class Config:
         "qwen25_7b": {
             "hf_id": "Qwen/Qwen2.5-7B-Instruct",
             "vram_gb": 14,
-            "description": "Current default. Adequate for strategy generation.",
+            "description": "Legacy default.",
         },
         "deepseek_r1_7b": {
             "hf_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
             "vram_gb": 14,
-            "description": "Stronger reasoning. Good for discovering novel strategies.",
+            "description": "Good reasoning but no native tool calling.",
         },
-        "qwen25_72b_awq": {
-            "hf_id": "Qwen/Qwen2.5-72B-Instruct-AWQ",
-            "vram_gb": 20,
-            "description": "Most intelligent. May push V100-32GB limits.",
+        "gemma4_26b": {
+            "hf_id": "gemma4:26b",
+            "vram_gb": 18,
+            "description": "Gemma 4 MoE (26B/3.8B active). Native tool calling. Best quality-per-VRAM.",
+        },
+        "qwen3_14b": {
+            "hf_id": "qwen3:14b",
+            "vram_gb": 10,
+            "description": "Qwen3 14B. Most reliable tool calling. Fits easily on V100.",
         },
     }
 
@@ -137,7 +142,8 @@ class Config:
     # --- Quality thresholds ---
     FORGETTING_THRESHOLD = 0.90    # old F1 must stay above this
     MIN_CONSENSUS_BOXES = 5        # min pseudo-labels to proceed with training
-    CONFIDENCE_THRESHOLD = 0.25    # YOLO inference confidence
+    CONFIDENCE_THRESHOLD = 0.25    # YOLO inference for label generation / detection
+    EVAL_CONFIDENCE = 0.001        # Low conf for mAP evaluation (full PR curve, standard practice)
     IOU_MATCH_THRESHOLD = 0.5      # IoU for TP/FP matching in evaluation
 
     # --- mAP evaluation IoU thresholds ---
