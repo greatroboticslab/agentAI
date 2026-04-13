@@ -25,13 +25,41 @@ echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
 echo "Starting Ollama server..."
 /ocean/projects/cis240145p/byler/ollama/bin/ollama serve &
 OLLAMA_PID=$!
-sleep 5
 
-# Pull model if not cached
-# Brain model: deepseek-r1:7b for stronger reasoning (fallback: qwen2.5:7b)
+# Wait for Ollama server to be ready (up to 60s)
+echo "Waiting for Ollama server..."
+for i in $(seq 1 60); do
+    if curl -s http://127.0.0.1:11434/api/tags > /dev/null 2>&1; then
+        echo "Ollama server ready (${i}s)"
+        break
+    fi
+    sleep 1
+done
+
+# Pull model — retry up to 3 times
 BRAIN_MODEL="${1:-qwen3:14b}"
-echo "Loading Brain model: $BRAIN_MODEL"
-/ocean/projects/cis240145p/byler/ollama/bin/ollama pull $BRAIN_MODEL 2>&1 | tail -3
+echo "Pulling Brain model: $BRAIN_MODEL"
+for attempt in 1 2 3; do
+    /ocean/projects/cis240145p/byler/ollama/bin/ollama pull $BRAIN_MODEL 2>&1
+    # Verify model was downloaded
+    if /ocean/projects/cis240145p/byler/ollama/bin/ollama list 2>&1 | grep -q "$BRAIN_MODEL"; then
+        echo "Model $BRAIN_MODEL ready (attempt $attempt)"
+        break
+    fi
+    echo "Pull attempt $attempt failed, retrying in 10s..."
+    sleep 10
+done
+
+# Final check
+if ! /ocean/projects/cis240145p/byler/ollama/bin/ollama list 2>&1 | grep -q "$BRAIN_MODEL"; then
+    echo "ERROR: Failed to pull $BRAIN_MODEL after 3 attempts"
+    echo "Available models:"
+    /ocean/projects/cis240145p/byler/ollama/bin/ollama list 2>&1
+    echo "Falling back to any available model..."
+    BRAIN_MODEL=$(/ocean/projects/cis240145p/byler/ollama/bin/ollama list 2>&1 | tail -1 | awk '{print $1}')
+    echo "Using fallback: $BRAIN_MODEL"
+fi
+echo "Brain model: $BRAIN_MODEL"
 
 # Run mode: "quick" (1h test, 3 rounds) or "long" (8h, 12 rounds)
 RUN_MODE="${2:-quick}"
