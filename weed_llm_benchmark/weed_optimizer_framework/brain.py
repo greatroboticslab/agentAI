@@ -177,7 +177,7 @@ TOOL_DEFINITIONS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "lora_rank": {"type": "integer", "description": "LoRA rank (default 16, smaller = more conservative)"},
+                    "lora_rank": {"type": "integer", "description": "LoRA rank (default 64, higher = more capacity for new species)"},
                     "lora_alpha": {"type": "number", "description": "LoRA scaling alpha (default 32.0)"},
                     "lr": {"type": "number", "description": "Learning rate (default 0.0005, low for LoRA stability)"},
                     "epochs": {"type": "integer", "description": "Training epochs (default 50)"},
@@ -371,7 +371,7 @@ Reply with JUST the number."""}
             # Check for two-digit numbers first (10, 11, 12)
             two_digit_map = {
                 "13": ("done", {"reason": "Brain chose to stop"}),
-                "12": ("lora_train", {"lora_rank": 16, "lora_alpha": 32.0, "lr": 0.0005, "epochs": 50}),
+                "12": ("lora_train", {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50}),
                 "11": ("distill_train", {"distill_alpha": 0.5, "lr": 0.0005, "epochs": 50}),
                 "10": ("freeze_train", {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
             }
@@ -391,7 +391,7 @@ Reply with JUST the number."""}
                         "6": ("search_models", {"query": "weed detection"}),
                         "7": ("run_external_model", {"model_key": "detr_weed", "max_images": 50}),
                         "8": ("analyze_failure", {"focus": "forgetting"}),
-                        "9": ("filter_labels", {"confidence_threshold": 0.7}),
+                        "9": ("filter_labels", {"confidence_threshold": 0.8}),
                     }
                     name, params = action_map[char]
                     return {"action": name, "params": params,
@@ -502,16 +502,16 @@ Reply with just the number:"""
         {"action": "generate_consensus",
          "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
          "reasoning": "Pipeline step 2: generate consensus from best pair"},
-        {"action": "filter_labels", "params": {"confidence_threshold": 0.7},
-         "reasoning": "Pipeline step 3: filter noisy labels"},
+        {"action": "filter_labels", "params": {"confidence_threshold": 0.8},
+         "reasoning": "Pipeline step 3: aggressive filter (conf>0.8) to reduce 27% FP"},
         {"action": "freeze_train", "params": {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
          "reasoning": "Pipeline step 4: Wang 2025 backbone freeze training"},
         {"action": "evaluate", "params": {},
          "reasoning": "Pipeline step 5: evaluate freeze_train"},
         {"action": "analyze_failure", "params": {"focus": "forgetting"},
          "reasoning": "Pipeline step 6: analyze freeze results"},
-        {"action": "lora_train", "params": {"lora_rank": 16, "lora_alpha": 32.0, "lr": 0.0005, "epochs": 50},
-         "reasoning": "Pipeline step 7: LoRA training for comparison"},
+        {"action": "lora_train", "params": {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50},
+         "reasoning": "Pipeline step 7: LoRA r=64 (4x more capacity than r=16)"},
         {"action": "evaluate", "params": {},
          "reasoning": "Pipeline step 8: evaluate LoRA"},
         {"action": "analyze_failure", "params": {"focus": "forgetting"},
