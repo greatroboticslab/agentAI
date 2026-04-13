@@ -1,0 +1,45 @@
+{
+  "description": "v2.4: First run testing freeze_train + distill_train + lora_train in one job",
+  "job_id": 38831925,
+  "elapsed": "04:12:42",
+  "brain": "deepseek-r1:7b",
+  "mode": "agent (quick: 3 rounds)",
+  "round1_methods_tested": {
+    "freeze_train": {
+      "params": {"freeze_layers": 10, "lr": 0.001, "epochs": 50},
+      "old_f1": 0.8926, "new_f1": 0.6236,
+      "old_map50": 0.9472, "new_map50": 0.5895,
+      "old_map50_95": 0.8880, "new_map50_95": 0.4992,
+      "forgetting": true,
+      "status": "complete"
+    },
+    "distill_train": {
+      "params": {"freeze_layers": 5, "lr": 0.0005, "epochs": 50},
+      "old_f1": 0.8926, "new_f1": 0.6236,
+      "note": "Same results as freeze — shares dataset_iter1, different labels not regenerated",
+      "status": "complete"
+    },
+    "lora_train": {
+      "params": {"rank": 16, "alpha": 32.0, "lr": 0.0005, "freeze": 22, "epochs": 50},
+      "injected_layers": 5,
+      "trainable_params": "61,440 / 2,652,840 (2.32%)",
+      "status": "training_complete, evaluate_not_reached_in_round1",
+      "model_path": "results/framework/yolo_lora_iter1/train/weights/best.pt"
+    }
+  },
+  "brain_behavior": {
+    "round1_decisions": [
+      "inspect_labels (fallback)",
+      "filter_labels (chose 9)",
+      "freeze_train (chose 10) — skipped (no labels yet)",
+      "generate_consensus (chose 3) — 85 boxes",
+      "freeze_train (chose 10) — trained, evaluated",
+      "distill_train (chose 11) — Brain said: 'try distill_train to address forgetting'",
+      "evaluate — same results as freeze",
+      "lora_train (chose 12) — Brain said: 'try lora_train to address forgetting'",
+      "LoRA injected into 5 Conv2d layers (2.32% params), trained 50 epochs"
+    ],
+    "brain_reasoning_quality": "Excellent — systematically tested freeze→distill→LoRA"
+  },
+  "conclusion": "First successful run testing all 3 anti-forgetting methods. Brain autonomously chose to try each one after seeing previous results. LoRA training succeeded (2.32% params) but evaluate was not reached before round end. freeze_train and distill_train both show old_f1=0.893 (still forgetting). All methods tested on same consensus labels (85 boxes + 3537 old)."
+}

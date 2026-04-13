@@ -525,9 +525,25 @@ Added `lora_train` action so Brain can autonomously choose between:
 - Allows ~7.5h exploration with all anti-forgetting methods
 - Job 38809867 RUNNING on v011
 
+### v2.4 test results (Job 38831925, 4h12m) — THREE METHODS IN ONE RUN
+**Brain autonomously tested freeze → distill → LoRA in sequence:**
+
+Round 1 Brain decisions:
+1. filter→consensus(85 boxes)→**freeze_train**(chose 10)→evaluate
+2. Brain: *"try distill_train"*→**distill_train**(chose 11)→evaluate
+3. Brain: *"try lora_train"*→**lora_train**(chose 12)→training complete
+
+| Method | Trainable% | Freeze | Old F1 | New F1 | Status |
+|--------|-----------|--------|--------|--------|--------|
+| freeze_train | 100% | 10 | 0.8926 | 0.6236 | Complete |
+| distill_train | 100% | 5 | 0.8926 | 0.6236 | Complete |
+| **LoRA** | **2.32%** | 22 | — | — | Trained, eval pending |
+
+LoRA: 5 Conv2d adapters injected, 61,440/2,652,840 params (2.32%)
+Model saved: yolo_lora_iter1/train/weights/best.pt
+
 ## TODO
-- [ ] Check Job 38809867 (8-hour LoRA + freeze test) results
-- [ ] If LoRA works, document as paper contribution
+- [ ] Evaluate LoRA model manually (saved but not evaluated in framework run)
 - [ ] Add visual RAG classification layer
 - [ ] Generate paper figures and tables
 - [ ] Write paper

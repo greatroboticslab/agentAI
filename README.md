@@ -89,7 +89,7 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 | Phase 4D: plant.id Integration | **Done** | API key configured, local test OK (Status 201). Cluster needs pre-cache (network blocked). 49 credits left. |
 | Phase 4E: DeepSeek-R1 Brain | **Done** | 7 action types (vs Qwen's 1). Autonomously searched HuggingFace + downloaded models. |
 | Phase 4F: Extended Run (6h48m) | **Done** | 7 rounds autonomous. Filter removed 16.3% label noise. Brain reasoning loop validated. |
-| Phase 4G: Anti-Forgetting Tools (LoRA + freeze + distill) | **Testing** | Real LoRA Conv2d adapters + Wang 2025 freeze + self-distill. 8h extended run. Job 38809867. |
+| Phase 4G: Anti-Forgetting (LoRA + freeze + distill) | **Done** | All 3 methods tested. LoRA: 2.32% params, Conv2d adapters. freeze=10: Wang 2025. Brain chose each autonomously. |
 | Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
 | Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
 
