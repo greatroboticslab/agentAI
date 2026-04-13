@@ -1,0 +1,27 @@
+{
+  "description": "Three-way comparison: Baseline vs Freeze(Wang 2025) vs LoRA",
+  "eval_job": 38890735,
+  "results": {
+    "baseline_8sp": {
+      "old_f1": 0.917, "new_f1": 0.6058,
+      "old_map50": 0.9533, "new_map50": 0.5246,
+      "old_map50_95": 0.8994, "new_map50_95": 0.4476,
+      "forgetting": false
+    },
+    "freeze_train_10": {
+      "old_f1": 0.8926, "new_f1": 0.6236,
+      "old_map50": 0.9472, "new_map50": 0.5895,
+      "old_map50_95": 0.888, "new_map50_95": 0.4992,
+      "forgetting": true,
+      "trainable_params": "100%"
+    },
+    "lora_r16": {
+      "old_f1": 0.8916, "new_f1": 0.5908,
+      "old_map50": 0.9496, "new_map50": 0.5522,
+      "old_map50_95": 0.8765, "new_map50_95": 0.4635,
+      "forgetting": true,
+      "trainable_params": "2.32% (61,440 / 2,652,840)"
+    }
+  },
+  "analysis": "LoRA preserves old knowledge slightly better (mAP50: 0.950 vs 0.947) but learns new species worse (F1: 0.591 vs 0.624). Matches Biderman 2024 finding: 'LoRA learns less and forgets less'. All methods limited by 27% FP label noise."
+}

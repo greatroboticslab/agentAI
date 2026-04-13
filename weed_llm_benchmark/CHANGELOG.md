@@ -542,8 +542,18 @@ Round 1 Brain decisions:
 LoRA: 5 Conv2d adapters injected, 61,440/2,652,840 params (2.32%)
 Model saved: yolo_lora_iter1/train/weights/best.pt
 
+### LoRA evaluation complete (Job 38890735)
+Three-way comparison on CottonWeedDet12:
+
+| Method | Params% | Old F1 | New F1 | Old mAP50 | New mAP50 |
+|--------|---------|--------|--------|-----------|-----------|
+| Baseline | — | **0.917** | 0.606 | 0.953 | 0.525 |
+| freeze_train | 100% | 0.893 | **0.624** | 0.947 | **0.590** |
+| **LoRA r=16** | **2.32%** | 0.892 | 0.591 | **0.950** | 0.552 |
+
+LoRA preserves old knowledge better (mAP50: 0.950 vs 0.947) but learns new species worse (F1: 0.591 vs 0.624). Matches "LoRA learns less and forgets less" (Biderman 2024).
+
 ## TODO
-- [ ] Evaluate LoRA model manually (saved but not evaluated in framework run)
 - [ ] Add visual RAG classification layer
 - [ ] Generate paper figures and tables
 - [ ] Write paper

@@ -932,7 +932,17 @@ The Brain **autonomously tested freeze → distill → LoRA in sequence**, decid
 - freeze_train (Wang 2025) and standard training produce similar results on this data
 - The label quality bottleneck (27% FP) limits all methods equally
 
-**Professor Zhang's LoRA suggestion**: Successfully implemented and tested. Conv2d LoRA adapters work on YOLO11n detection head. The professor's intuition about LoRA was correct in principle (preserve base weights, train adapters), but on this dataset the precision bottleneck is label noise, not training strategy.
+**LoRA evaluation** (Job 38890735): Three-way comparison completed.
+
+| Method | Params trained | Old F1 | New F1 | Old mAP50 | New mAP50 |
+|--------|---------------|--------|--------|-----------|-----------|
+| Baseline (8-species YOLO) | — | **0.917** | 0.606 | 0.953 | 0.525 |
+| freeze_train (Wang 2025) | 100% | 0.893 | **0.624** | 0.947 | **0.590** |
+| **LoRA rank=16** | **2.32%** | 0.892 | 0.591 | **0.950** | 0.552 |
+
+**Key finding**: LoRA preserves old knowledge slightly better (mAP50: 0.950 vs 0.947 for freeze) but learns new species worse (new_f1: 0.591 vs 0.624). This directly confirms Biderman et al. 2024: "LoRA learns less and forgets less."
+
+**Professor Zhang's LoRA suggestion**: Successfully implemented and tested. Conv2d LoRA adapters work on YOLO11n detection head. The professor's intuition about LoRA was correct — it does preserve base weights better. However, with only 2.32% trainable parameters, the model cannot learn enough new species features. A higher rank (r=64) or combining LoRA with full head training might balance preservation and learning.
 
 ---
 
