@@ -138,15 +138,11 @@ def evaluate_yolo(model_path, test_images_dir, test_labels_dir,
                   iou_thresholds=None, binary_mode=True):
     """Evaluate a YOLO model with full metrics.
 
-    Args:
-        model_path: path to YOLO .pt weights
-        test_images_dir: directory of test images
-        test_labels_dir: directory of test labels (YOLO format)
-        iou_thresholds: list of IoU thresholds for mAP computation
-        binary_mode: if True, treat all classes as "weed" (ignore class ID)
+    Uses TWO confidence thresholds:
+    - conf=0.001 for mAP (full PR curve, standard academic practice)
+    - conf=0.25 for F1/P/R (practical detection threshold)
 
-    Returns:
-        dict with keys: f1, precision, recall, map50, map50_95, per_class
+    This gives both academically correct mAP AND practically meaningful F1.
     """
     import torch
     from ultralytics import YOLO
@@ -157,19 +153,14 @@ def evaluate_yolo(model_path, test_images_dir, test_labels_dir,
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = YOLO(model_path)
 
-    # Collect all predictions and ground truths
-    all_tp_lists = {t: [] for t in iou_thresholds}  # per IoU threshold
-    total_gt = 0
-    total_tp_50 = 0  # for F1 at IoU=0.5
-    total_fp_50 = 0
-    total_fn_50 = 0
-
-    per_class_stats = {}  # class_name -> {tp, fp, fn}
-
     image_files = sorted([
         f for f in os.listdir(test_images_dir)
         if f.lower().endswith(('.jpg', '.jpeg', '.png'))
     ])
+
+    # ============ PASS 1: mAP with conf=0.001 (full PR curve) ============
+    all_tp_lists = {t: [] for t in iou_thresholds}
+    total_gt = 0
 
     for img_file in image_files:
         stem = Path(img_file).stem
@@ -178,64 +169,59 @@ def evaluate_yolo(model_path, test_images_dir, test_labels_dir,
         if not gt_boxes and not os.path.exists(label_path):
             continue
 
-        # Run YOLO inference
         img_path = os.path.join(test_images_dir, img_file)
-        results = model.predict(img_path, conf=Config.EVAL_CONFIDENCE,
-                                device=device, verbose=False)
+        results = model.predict(img_path, conf=0.001, device=device, verbose=False)
 
-        # Extract predictions
         predictions = []
         for r in results:
             for box in r.boxes:
                 cx, cy, w, h = box.xywhn[0].tolist()
-                predictions.append({
-                    "box": [cx, cy, w, h],
-                    "conf": float(box.conf[0]),
-                    "class": int(box.cls[0]),
-                })
+                predictions.append({"box": [cx, cy, w, h], "conf": float(box.conf[0])})
 
         total_gt += len(gt_boxes)
 
-        # Evaluate at each IoU threshold
         for iou_t in iou_thresholds:
-            if binary_mode:
-                # Binary: all classes = weed
-                gt_simple = [{"box": g["box"]} for g in gt_boxes]
-                pred_simple = [{"box": p["box"], "conf": p["conf"]} for p in predictions]
-            else:
-                gt_simple = gt_boxes
-                pred_simple = predictions
-
-            tp_list, fn_count = _match_predictions_to_gt(pred_simple, gt_simple, iou_t)
+            gt_simple = [{"box": g["box"]} for g in gt_boxes]
+            tp_list, _ = _match_predictions_to_gt(predictions, gt_simple, iou_t)
             all_tp_lists[iou_t].extend(tp_list)
 
-            # F1 at IoU=0.5
-            if iou_t == 0.5:
-                tp_count = sum(1 for _, is_tp in tp_list if is_tp)
-                fp_count = sum(1 for _, is_tp in tp_list if not is_tp)
-                total_tp_50 += tp_count
-                total_fp_50 += fp_count
-                total_fn_50 += fn_count
-
-    # Compute mAP at each threshold
+    # Compute mAP
     aps = {}
     for iou_t in iou_thresholds:
-        ap = _compute_ap(all_tp_lists[iou_t], total_gt)
-        aps[iou_t] = round(ap, 4)
-
-    # mAP@0.5
+        aps[iou_t] = round(_compute_ap(all_tp_lists[iou_t], total_gt), 4)
     map50 = aps.get(0.5, 0.0)
-
-    # mAP@0.5:0.95
     map50_95_thresholds = [t for t in iou_thresholds if 0.5 <= t <= 0.95]
-    if map50_95_thresholds:
-        map50_95 = round(np.mean([aps[t] for t in map50_95_thresholds]), 4)
-    else:
-        map50_95 = map50
+    map50_95 = round(np.mean([aps[t] for t in map50_95_thresholds]), 4) if map50_95_thresholds else map50
 
-    # F1, Precision, Recall at IoU=0.5
-    precision = total_tp_50 / (total_tp_50 + total_fp_50) if (total_tp_50 + total_fp_50) > 0 else 0
-    recall = total_tp_50 / (total_tp_50 + total_fn_50) if (total_tp_50 + total_fn_50) > 0 else 0
+    # ============ PASS 2: F1/P/R with conf=0.25 (practical threshold) ============
+    total_tp = 0
+    total_fp = 0
+    total_fn = 0
+
+    for img_file in image_files:
+        stem = Path(img_file).stem
+        label_path = os.path.join(test_labels_dir, stem + ".txt")
+        gt_boxes = _load_gt_labels(label_path)
+        if not gt_boxes and not os.path.exists(label_path):
+            continue
+
+        img_path = os.path.join(test_images_dir, img_file)
+        results = model.predict(img_path, conf=0.25, device=device, verbose=False)
+
+        predictions = []
+        for r in results:
+            for box in r.boxes:
+                cx, cy, w, h = box.xywhn[0].tolist()
+                predictions.append({"box": [cx, cy, w, h], "conf": float(box.conf[0])})
+
+        gt_simple = [{"box": g["box"]} for g in gt_boxes]
+        tp_list, fn_count = _match_predictions_to_gt(predictions, gt_simple, 0.5)
+        total_tp += sum(1 for _, is_tp in tp_list if is_tp)
+        total_fp += sum(1 for _, is_tp in tp_list if not is_tp)
+        total_fn += fn_count
+
+    precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0
+    recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
     # Cleanup
@@ -251,7 +237,6 @@ def evaluate_yolo(model_path, test_images_dir, test_labels_dir,
         "map50_95": map50_95,
         "aps_by_iou": aps,
         "total_gt": total_gt,
-        "total_predictions": total_tp_50 + total_fp_50,
         "total_images": len(image_files),
     }
 

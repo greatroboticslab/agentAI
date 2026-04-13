@@ -29,7 +29,7 @@ sleep 5
 
 # Pull model if not cached
 # Brain model: deepseek-r1:7b for stronger reasoning (fallback: qwen2.5:7b)
-BRAIN_MODEL="${1:-deepseek-r1:7b}"
+BRAIN_MODEL="${1:-qwen3:14b}"
 echo "Loading Brain model: $BRAIN_MODEL"
 /ocean/projects/cis240145p/byler/ollama/bin/ollama pull $BRAIN_MODEL 2>&1 | tail -3
 
