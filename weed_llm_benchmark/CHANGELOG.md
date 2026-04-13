@@ -553,7 +553,30 @@ Three-way comparison on CottonWeedDet12:
 
 LoRA preserves old knowledge better (mAP50: 0.950 vs 0.947) but learns new species worse (F1: 0.591 vs 0.624). Matches "LoRA learns less and forgets less" (Biderman 2024).
 
+### v2.5 results (Job 38899475, 2h16m) — LoRA r=64 + conf>0.8 filter
+- Filter conf>0.8 removed **22.8%** noise (was 16.3% at conf>0.7) ✅
+- Old mAP50=0.952 (almost baseline 0.953!) — nearly zero forgetting in mAP ✅
+- New mAP50-95=0.515 (best ever, was 0.499) ✅
+- BUT Old F1=0.883 (below 0.90 threshold — precision/recall tradeoff)
+
+## 2026-04-13 - v2.6: Hybrid LoRA (Professor's Gemini suggestion)
+
+Professor shared Gemini analysis confirming LoRA limitations.
+Key recommendation: **Hybrid approach — LoRA on backbone, fully train head.**
+
+Implementation:
+- `lora_yolo.py`: Added `lora_mode="hybrid"` — LoRA adapters on backbone+neck,
+  head Conv2d fully trainable (not restricted to LoRA's low-rank bottleneck)
+- `inject_lora_into_yolo`: 4 modes now: head, backbone, hybrid, all
+- Brain default: hybrid mode with r=64, freeze=20 (head layers 20-22 fully train)
+
+Theory: Backbone protected by LoRA (preserves old), head fully open (learns new).
+This should give best of both worlds: old knowledge preserved + new species learned.
+
+8-hour overnight run submitted.
+
 ## TODO
+- [ ] Check overnight hybrid LoRA results
 - [ ] Add visual RAG classification layer
 - [ ] Generate paper figures and tables
 - [ ] Write paper

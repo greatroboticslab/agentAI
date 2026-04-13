@@ -944,6 +944,26 @@ The Brain **autonomously tested freeze → distill → LoRA in sequence**, decid
 
 **Professor Zhang's LoRA suggestion**: Successfully implemented and tested. Conv2d LoRA adapters work on YOLO11n detection head. The professor's intuition about LoRA was correct — it does preserve base weights better. However, with only 2.32% trainable parameters, the model cannot learn enough new species features. A higher rank (r=64) or combining LoRA with full head training might balance preservation and learning.
 
+### Session 29 — 2026-04-13: Hybrid LoRA (Professor's Gemini suggestion)
+
+**v2.5 results** (Job 38899475, LoRA r=64 + filter conf>0.8):
+- Filter conf>0.8: removed 22.8% noise (best yet)
+- Old mAP50=0.952 (nearly baseline 0.953!) — LoRA preserves old knowledge well
+- New mAP50-95=0.515 (best ever) — higher rank helped
+- Old F1=0.883 (still below 0.90 threshold)
+
+**Professor shared Gemini analysis**: Confirms LoRA can't learn new classes well due to "capacity bottleneck" and "frozen backbone constraints." Key recommendation: **Hybrid approach — LoRA on backbone, fully train detection head.**
+
+**v2.6 Hybrid LoRA implementation**:
+```
+Before (head-only LoRA):     After (hybrid):
+Backbone: frozen             Backbone: LoRA adapters (protected)
+Neck: frozen                 Neck: LoRA adapters (protected)
+Head: LoRA (2.32% params)    Head: FULLY trainable (100% params)
+```
+
+This should give best of both worlds: backbone preserved via LoRA (no forgetting) + head fully open to learn new weed species features.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)

@@ -67,7 +67,11 @@ def inject_lora_into_yolo(yolo_model, target_layers="head", rank=16, alpha=32.0)
 
     Args:
         yolo_model: ultralytics.YOLO instance
-        target_layers: "head" (only detection head), "all" (all conv layers)
+        target_layers:
+            "head" — only detection head (layers 20-22)
+            "backbone" — backbone + neck (layers 0-21), LoRA preserves old knowledge
+            "hybrid" — LoRA on backbone+neck, head stays fully trainable (Gemini recommendation)
+            "all" — all conv layers
         rank: LoRA rank (smaller = fewer params, more conservative)
         alpha: LoRA scaling factor
 
@@ -82,12 +86,20 @@ def inject_lora_into_yolo(yolo_model, target_layers="head", rank=16, alpha=32.0)
         if not isinstance(module, nn.Conv2d):
             continue
 
-        # Filter: only head layers (typically named with high indices)
+        # Filter by target strategy
         if target_layers == "head":
-            # YOLO11n has model.model[0..22] structure
-            # Detection head is the last few layers (model.22.cv2.* etc.)
             if not any(p in name for p in [".22.", ".21.", ".20."]):
                 continue
+        elif target_layers == "backbone":
+            # LoRA on backbone+neck (layers 0-21), skip head
+            if any(p in name for p in [".22."]):
+                continue
+        elif target_layers == "hybrid":
+            # LoRA ONLY on backbone+neck (layers 0-21)
+            # Head layers are left as-is (fully trainable via freeze < 22)
+            if any(p in name for p in [".22.", ".21.", ".20."]):
+                continue
+        # "all" = no filter
 
         # Skip 1x1 convs (already small)
         if module.kernel_size == (1, 1):
@@ -140,12 +152,13 @@ def train_yolo_with_lora(strategy, label_dir, iteration):
 
     model = YOLO(base_weights)
 
-    # LoRA strategy: try real Conv2d injection
-    rank = strategy.get("lora_rank", 16)
-    alpha = strategy.get("lora_alpha", 32.0)
+    # LoRA strategy
+    rank = strategy.get("lora_rank", 64)
+    alpha = strategy.get("lora_alpha", 128.0)
+    lora_mode = strategy.get("lora_mode", "hybrid")  # "head", "backbone", "hybrid"
 
     try:
-        injected = inject_lora_into_yolo(model, target_layers="head", rank=rank, alpha=alpha)
+        injected = inject_lora_into_yolo(model, target_layers=lora_mode, rank=rank, alpha=alpha)
         if injected:
             trainable, total = count_trainable_params(model.model)
             logger.info(f"[LoRA] Trainable params: {trainable:,}/{total:,} "
@@ -166,6 +179,10 @@ def train_yolo_with_lora(strategy, label_dir, iteration):
     try:
         # For LoRA: low LR (LoRA params are randomly initialized for A, zero for B)
         # Use freeze=22 to ensure backbone+neck stays frozen even if injection partial
+        # Hybrid mode: freeze=20 (backbone+neck frozen via LoRA, head fully trainable)
+        # Head-only mode: freeze=22 (everything frozen except LoRA adapters in head)
+        freeze_val = 20 if lora_mode == "hybrid" else 22
+
         model.train(
             data=data_yaml,
             epochs=strategy.get("epochs", 50),
@@ -174,9 +191,9 @@ def train_yolo_with_lora(strategy, label_dir, iteration):
             project=project_dir,
             name="train",
             patience=strategy.get("patience", 15),
-            lr0=strategy.get("lr", 0.0005),  # lower for LoRA stability
-            freeze=22,  # backbone+neck frozen, train head (where LoRA is)
-            workers=4,  # limit to prevent OOM
+            lr0=strategy.get("lr", 0.0005),
+            freeze=freeze_val,
+            workers=4,
             verbose=False,
         )
     finally:

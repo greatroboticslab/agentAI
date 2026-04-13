@@ -371,7 +371,7 @@ Reply with JUST the number."""}
             # Check for two-digit numbers first (10, 11, 12)
             two_digit_map = {
                 "13": ("done", {"reason": "Brain chose to stop"}),
-                "12": ("lora_train", {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50}),
+                "12": ("lora_train", {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50, "lora_mode": "hybrid"}),
                 "11": ("distill_train", {"distill_alpha": 0.5, "lr": 0.0005, "epochs": 50}),
                 "10": ("freeze_train", {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
             }
@@ -510,8 +510,8 @@ Reply with just the number:"""
          "reasoning": "Pipeline step 5: evaluate freeze_train"},
         {"action": "analyze_failure", "params": {"focus": "forgetting"},
          "reasoning": "Pipeline step 6: analyze freeze results"},
-        {"action": "lora_train", "params": {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50},
-         "reasoning": "Pipeline step 7: LoRA r=64 (4x more capacity than r=16)"},
+        {"action": "lora_train", "params": {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50, "lora_mode": "hybrid"},
+         "reasoning": "Pipeline step 7: Hybrid LoRA (backbone LoRA + head fully trained)"},
         {"action": "evaluate", "params": {},
          "reasoning": "Pipeline step 8: evaluate LoRA"},
         {"action": "analyze_failure", "params": {"focus": "forgetting"},
