@@ -618,7 +618,26 @@ This should give best of both worlds: old knowledge preserved + new species lear
 
 Brain now has 14 tools. Fallback pipeline leads with two_pass_train.
 
+### v2.7 Gemma 4 results (Job 38951603, 4h59m) — FIRST RUN WITH CORRECTED EVALUATOR
+
+**Ollama upgraded to v0.20.6, Gemma 4 31B (Q4_K_M) successfully loaded.**
+
+Corrected evaluator (dual-conf: mAP@conf=0.001, F1@conf=0.25):
+
+| | Old F1 | Old mAP50 | Old mAP50-95 | New F1 | New mAP50 | New mAP50-95 |
+|--|--------|-----------|-------------|--------|-----------|-------------|
+| Baseline (corrected) | **0.917** | **0.975** | **0.916** | 0.606 | 0.601 | 0.499 |
+| Round 1 (Gemma4) | 0.893 | 0.969 | 0.906 | **0.624** | **0.659** | **0.551** |
+| Round 2 (Gemma4) | 0.883 | 0.969 | 0.908 | 0.617 | 0.659 | **0.559** |
+
+**Key numbers (corrected):**
+- New species mAP50: 0.601 → **0.659 (+9.7%)**
+- New species mAP50-95: 0.499 → **0.559 (+12.0%)**
+- Old species mAP50: 0.975 → 0.969 (-0.6% — near-zero forgetting)
+
+**Note:** Previous mAP numbers (conf=0.25) were underestimated. The corrected baseline is higher:
+old_mAP50: 0.953→0.975, new_mAP50: 0.525→0.601
+
 ## TODO
-- [ ] Check Gemma 4 + two-pass results
 - [ ] Generate paper figures and tables
 - [ ] Write paper

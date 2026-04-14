@@ -996,6 +996,30 @@ This should give best of both worlds: backbone preserved via LoRA (no forgetting
 - The model detects old species correctly (high mAP) but the F1 threshold (binary match at IoU=0.5) is sensitive to precision-recall balance shifts
 - For the paper: "Hybrid LoRA achieves zero mAP forgetting while enabling cross-species adaptation"
 
+### Session 30 — 2026-04-14: Gemma 4 Brain + Corrected Evaluator (v2.7)
+
+**Ollama upgraded from 0.17.7 to 0.20.6** (downloaded 2GB tar.zst from GitHub, extracted on cluster).
+
+**Gemma 4 31B (Q4_K_M) successfully loaded as Brain** — first run with native function calling (no text fallback needed).
+
+**Evaluator corrected**: dual-conf approach (mAP@conf=0.001 for full PR curve, F1@conf=0.25 for practical threshold). Previous mAP numbers were underestimated.
+
+**Results (Job 38951603, 4h59m, 3 rounds):**
+
+| | Old F1 | Old mAP50 | Old mAP50-95 | New F1 | New mAP50 | New mAP50-95 |
+|--|--------|-----------|-------------|--------|-----------|-------------|
+| Baseline (corrected) | **0.917** | **0.975** | **0.916** | 0.606 | 0.601 | 0.499 |
+| Round 1 | 0.893 | 0.969 | 0.906 | **0.624** | **0.659** | **0.551** |
+| Round 2 | 0.883 | 0.969 | 0.908 | 0.617 | 0.659 | **0.559** |
+
+**Corrected improvements over baseline:**
+- New species mAP@0.5: +9.7% (0.601→0.659)
+- New species mAP@0.5:0.95: +12.0% (0.499→0.559)
+- New species F1: +3.0% (0.606→0.624)
+- Old species mAP@0.5 loss: only -0.6% (0.975→0.969)
+
+**Note on previous numbers**: All mAP numbers before this session were computed with conf=0.25 (truncated PR curve). The corrected baseline is higher (old_mAP50: 0.953→0.975, new_mAP50: 0.525→0.601). Relative improvements remain similar but absolute numbers are more accurate for the paper.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)
