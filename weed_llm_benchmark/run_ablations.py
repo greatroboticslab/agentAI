@@ -39,7 +39,7 @@ def ensure_result_dir():
 def ablation_prompt_engineering(dataset_key, model_key="qwen7b"):
     """Test 3 prompt variants on the same model and dataset."""
     from config import WEED_DETECTION_PROMPT, QWEN_GROUNDING_PROMPT, WEED_DETECTION_PROMPT_SIMPLE
-    from datasets import get_dataset_path, is_downloaded
+    from local_datasets import get_dataset_path, is_downloaded
     from evaluate import evaluate_dataset, load_predictions_from_json, load_yolo_labels
 
     print(f"\n{'='*60}")
@@ -136,7 +136,7 @@ def ablation_prompt_engineering(dataset_key, model_key="qwen7b"):
 # ============================================================
 def ablation_model_size(dataset_key):
     """Compare Qwen-7B vs Qwen-3B (same architecture, different size)."""
-    from datasets import get_dataset_path, is_downloaded
+    from local_datasets import get_dataset_path, is_downloaded
     from evaluate import evaluate_dataset, load_predictions_from_json, load_yolo_labels
 
     print(f"\n{'='*60}")
@@ -191,7 +191,7 @@ def ablation_model_size(dataset_key):
 # ============================================================
 def ablation_grounding(dataset_key):
     """Compare Tier 1 (native bbox) vs Tier 2/3 (text-only) models."""
-    from datasets import get_dataset_path
+    from local_datasets import get_dataset_path
     from evaluate import evaluate_dataset, load_predictions_from_json, load_yolo_labels
 
     print(f"\n{'='*60}")
@@ -255,7 +255,7 @@ def ablation_grounding(dataset_key):
 # ============================================================
 def ablation_fusion_iou(dataset_key, yolo_json=None, llm_json=None):
     """Sweep IoU threshold from 0.1 to 0.7 for YOLO+LLM fusion."""
-    from datasets import get_dataset_path
+    from local_datasets import get_dataset_path
     from evaluate import evaluate_dataset, load_predictions_from_json, load_yolo_labels
     from yolo_llm_fusion import fuse_detections
 

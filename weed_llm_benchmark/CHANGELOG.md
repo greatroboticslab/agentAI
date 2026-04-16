@@ -723,9 +723,33 @@ v3.0.1 fixed the *architecture* (Brain function calling, tool definitions, fallb
 - yolov10x.pt confirmed loads (31.8M params) — kept in fallback list
 - Auto-registered cottonweed_sp8 (3442) + cottonweed_holdout (2206) = 5648 bbox-labeled (below 50K gate ✓ — will force download)
 
+## 2026-04-16 - v3.0.3: Unshadow HuggingFace `datasets` package
+
+### Why v3.0.2 failed on cluster (Job 39397819, 8h TIMEOUT on v009)
+Brain called `download_dataset('weedsense')` 4 times — every attempt failed with:
+```
+ERROR: cannot import name 'load_dataset' from 'datasets'
+(/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets.py)
+```
+
+The project had a top-level `datasets.py` (v1.x dataset registry) that **shadowed the HuggingFace `datasets` package**. `dataset_discovery.py` does `from datasets import load_dataset` — Python imported the local file, which has no `load_dataset`. Every WeedSense fetch died at import.
+
+After 4 failed downloads Brain fell back to v2.x pseudo-label pipeline (`generate_consensus` → `two_pass_train`) and burned the remaining ~8h training on the SAME 5648 images. Job hit 8h walltime at 09:47 — no v3.0 behavior happened.
+
+### Fix
+- Renamed `datasets.py` → `local_datasets.py` (git mv)
+- Updated 3 legacy scripts to import from the new name: `run_full_benchmark.py`, `run_cross_dataset.py`, `run_ablations.py`
+- HuggingFace `datasets` package now imports cleanly, so `_download_hf` can actually run
+
+### Secondary observations from the run (not fixed yet)
+- Brain correctly preferred v3.0 tools first (download → more downloads) — gating worked
+- `DATA GATE` system message was injected correctly (Brain chose download over mega as first action)
+- qwen3:14b CPU-offloaded (11/41 layers on GPU) — slow but functional; consider switching to a 7B model for speed
+
 ## TODO
-- [ ] Upload v3.0.2 and submit job with qwen3:14b Brain
-- [ ] Verify WeedSense (`baselab/weedsense`) HF id actually exists and yields bboxes
-- [ ] Confirm yolo26x.pt loads cleanly after fresh download (or falls back to yolo11x)
+- [ ] Upload v3.0.3 and re-submit
+- [ ] Watch for "Downloading 'weedsense' (120341 images)..." **without** the import error
+- [ ] Verify `baselab/weedsense` HF id actually exists (first real test this run)
+- [ ] Confirm yolo26x.pt load on GPU compute node (/ocean has ample disk)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

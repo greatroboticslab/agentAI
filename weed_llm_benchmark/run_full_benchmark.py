@@ -97,7 +97,7 @@ def save_checkpoint(checkpoint):
 
 def run_hf_experiment(dataset_key, model_key):
     """Run a HuggingFace model on a dataset."""
-    from datasets import get_dataset_path, is_downloaded, download_dataset
+    from local_datasets import get_dataset_path, is_downloaded, download_dataset
 
     # Ensure dataset is available
     if not is_downloaded(dataset_key):
@@ -156,7 +156,7 @@ def run_hf_experiment(dataset_key, model_key):
 
 def run_ollama_experiment(dataset_key, model_name):
     """Run an Ollama model on a dataset."""
-    from datasets import get_dataset_path, is_downloaded, download_dataset
+    from local_datasets import get_dataset_path, is_downloaded, download_dataset
 
     if not is_downloaded(dataset_key):
         print(f"[*] Downloading {dataset_key}...")

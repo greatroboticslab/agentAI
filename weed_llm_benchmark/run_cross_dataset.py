@@ -63,7 +63,7 @@ def step1_yolo_zero_shot():
 
     if not os.path.isdir(dw_test_imgs):
         print("[*] Downloading DeepWeeds from Roboflow...")
-        from datasets import download_dataset
+        from local_datasets import download_dataset
         download_dataset("deepweeds")
 
     if not os.path.isdir(dw_test_imgs):
