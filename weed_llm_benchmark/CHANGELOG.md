@@ -776,8 +776,23 @@ After 4 failed downloads Brain fell back to v2.x pseudo-label pipeline (`generat
 - Round 20+: cumulative 100+ datasets → 100K+ real bbox images
 - Brain doesn't re-download what's already in registry (dedup by hf_id).
 
+## 2026-04-16 - v3.0.5: Fix RGBA save crash + broaden harvest discovery
+
+### Findings from Job 39591434 (v3.0.4, cancelled mid-run)
+- Brain correctly called `harvest_new_datasets({max_new: 5})` as first action — prompt + tool design working.
+- Harvest iterated all queries. 3 candidates filtered out correctly (classification, no bbox).
+- 1 candidate **passed** filter: `susnato/plant_disease_detection_processed` (`task_categories=['object-detection']`, schema has `objects`). **But download crashed** with `cannot write mode RGBA as JPEG` — PIL can't save RGBA as JPEG without conversion.
+- Brain then called `train_yolo_mega` with only the existing 5648 local images merged (nothing new was added this round). Cancelled before training finished.
+
+### v3.0.5 fixes
+1. **RGBA/LA/P/CMYK → RGB flatten** before JPEG save in `_download_hf`. Alpha channel is pasted onto white background. Count + log per-dataset save errors but don't abort the whole dataset.
+2. **Broaden discovery (Phase 1 — task-filtered bulk)**: use `HfApi.list_datasets(filter="task_categories:object-detection", limit=200)` directly, then keep only datasets whose id contains any of `weed/crop/plant/leaf/fruit/rice/wheat/corn/cotton/soybean/tomato/agri/farm/pest/disease`. Much higher precision than text search.
+3. **Broaden discovery (Phase 2 — keyword fallback)**: expanded to 24 queries including broad terms (`weed`, `crop`, `plant`, `leaf`, `fruit`, `agriculture`, `pest`, `insect`, `plant disease`, etc.) + specific dataset names (`plantvillage`, `plantdoc`, `deepweeds`).
+4. **Try alternate dataset configs** when the default config has no bbox. Sort configs with `detect`/`bbox`/`yolo`/`coco` keywords first.
+5. **Better skip logs**: explicit `reason` stored per-harvest so the registry records WHY a candidate was accepted (sibling pattern vs tag vs config).
+
 ## TODO
-- [ ] Deploy v3.0.4 and submit a job — verify `harvest_new_datasets` actually fires and downloads 5 new bbox datasets
-- [ ] Add Kaggle / Roboflow sources in a v3.0.5 (HF alone has ~tens of weed bbox datasets, not hundreds)
+- [ ] Deploy v3.0.5, submit job — verify Phase 1 bulk list finds agricultural bbox datasets
+- [ ] Add Kaggle / Roboflow sources in a v3.0.6 if HF yield stays sparse
 - [ ] Generate paper figures and tables
 - [ ] Write paper

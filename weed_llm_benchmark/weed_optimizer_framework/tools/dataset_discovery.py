@@ -420,6 +420,7 @@ class DatasetDiscovery:
             count = 0
             label_count = 0
             all_classes = set()
+            save_errors = 0
 
             iterator = ds if use_streaming else iter(ds)
             for item in iterator:
@@ -432,7 +433,28 @@ class DatasetDiscovery:
                 w = getattr(img, "width", item.get("width", 0))
                 h = getattr(img, "height", item.get("height", 0))
                 stem = f"{count:06d}"
-                img.save(os.path.join(img_dir, f"{stem}.jpg"))
+                # JPEG can't save RGBA/P/LA/CMYK — convert to RGB first
+                try:
+                    if img.mode not in ("RGB", "L"):
+                        # Flatten alpha onto white if present
+                        if img.mode in ("RGBA", "LA"):
+                            bg = img.__class__.new("RGB", img.size, (255, 255, 255))
+                            try:
+                                # Paste with alpha as mask
+                                bg.paste(img.convert("RGBA"), mask=img.convert("RGBA").split()[-1])
+                            except Exception:
+                                bg = img.convert("RGB")
+                            img = bg
+                        else:
+                            img = img.convert("RGB")
+                    img.save(os.path.join(img_dir, f"{stem}.jpg"))
+                except Exception as e:
+                    save_errors += 1
+                    if save_errors <= 3:
+                        logger.warning(f"[Dataset] {name} save fail on #{count} "
+                                        f"mode={getattr(img,'mode','?')}: {str(e)[:100]}")
+                    count += 1
+                    continue
 
                 if has_bbox and w and h:
                     lines, classes = self._extract_yolo_labels(item, w, h)
@@ -485,10 +507,15 @@ class DatasetDiscovery:
     # =========================================================
 
     DEFAULT_HARVEST_QUERIES = [
-        "weed detection", "weed bounding box", "weed yolo",
-        "crop detection", "crop disease detection", "plant detection",
-        "agriculture object detection", "agricultural bbox",
-        "pest detection", "plant disease bbox",
+        # Broad agricultural vision — covers weed/crop/plant/pest/disease
+        "weed", "crop", "plant", "leaf", "fruit",
+        "agriculture", "agricultural", "farm",
+        "pest", "insect",
+        "plant disease", "crop disease", "leaf disease",
+        "weed detection", "crop detection", "plant detection",
+        "weed yolo", "agriculture yolo", "plant yolo",
+        "weed bounding box", "crop bounding box",
+        "plantvillage", "plantdoc", "deepweeds",
     ]
 
     def _card_suggests_bbox(self, ds_info):
@@ -549,79 +576,123 @@ class DatasetDiscovery:
         results = []
         seen_ids = set()
 
+        # ------------ Phase 1: task-filtered bulk discovery (high precision) ------------
+        logger.info("[Harvest] Phase 1: task=object-detection bulk list")
+        try:
+            det = list(api.list_datasets(
+                filter="task_categories:object-detection",
+                sort="downloads", direction=-1, limit=200,
+            ))
+        except Exception as e:
+            logger.warning(f"[Harvest] task-filter list failed: {e}")
+            det = []
+
+        # Keep only ones whose id/description mentions agricultural vocab
+        AG_VOCAB = ("weed", "crop", "plant", "leaf", "fruit", "flower", "seed", "grain",
+                    "rice", "wheat", "corn", "maize", "cotton", "soybean", "tomato",
+                    "potato", "agri", "farm", "pest", "insect", "disease")
+
+        prioritized = []
+        for d in det:
+            name_l = d.id.lower()
+            if any(v in name_l for v in AG_VOCAB):
+                prioritized.append(d)
+        logger.info(f"[Harvest] Phase 1: {len(prioritized)}/{len(det)} bulk results matched agriculture vocab")
+
+        # ------------ Phase 2: keyword search fallback ------------
+        keyword_results = []
         for q in queries:
-            if len(results) >= max_new:
-                break
-            logger.info(f"[Harvest] Query: '{q}'")
             try:
                 found = list(api.list_datasets(search=q, sort="downloads",
-                                                direction=-1, limit=15))
+                                                direction=-1, limit=10))
+                keyword_results.extend(found)
             except Exception as e:
                 logger.warning(f"[Harvest] search failed '{q}': {e}")
                 continue
 
-            for d in found:
-                if len(results) >= max_new:
-                    break
-                if d.id in seen_ids:
-                    continue
-                seen_ids.add(d.id)
-                if self.is_duplicate(d.id):
-                    continue
+        # Combine: task-filtered priorities first, then keyword results
+        combined = prioritized + keyword_results
+        logger.info(f"[Harvest] Phase 2: {len(keyword_results)} keyword hits; "
+                    f"processing {len(combined)} total candidates")
 
-                # Fast metadata check
+        for d in combined:
+            if len(results) >= max_new:
+                break
+            if d.id in seen_ids:
+                continue
+            seen_ids.add(d.id)
+            if self.is_duplicate(d.id):
+                continue
+
+            # Fast metadata check
+            try:
+                info = api.dataset_info(d.id)
+            except Exception as e:
+                logger.debug(f"[Harvest] info fail {d.id}: {e}")
+                continue
+            has_bbox_hint, reason = self._card_suggests_bbox(info)
+            if not has_bbox_hint:
+                logger.debug(f"[Harvest] skip {d.id}: {reason}")
+                continue
+
+            # Optional full schema confirmation (slower; one streaming iter).
+            # Try default config + alternative configs if default has no bbox.
+            probe_ok = not confirm_schema
+            if confirm_schema:
+                from datasets import load_dataset
+                configs_to_try = [None]
                 try:
-                    info = api.dataset_info(d.id)
-                except Exception as e:
-                    logger.debug(f"[Harvest] info fail {d.id}: {e}")
-                    continue
-                has_bbox_hint, reason = self._card_suggests_bbox(info)
-                if not has_bbox_hint:
-                    logger.debug(f"[Harvest] skip {d.id}: {reason}")
-                    continue
-
-                # Optional full schema confirmation (slower; one streaming iter)
-                if confirm_schema:
+                    from datasets import get_dataset_config_names
+                    extra = get_dataset_config_names(d.id)
+                    # Try detection-looking configs first
+                    detection_first = sorted(extra,
+                        key=lambda c: 0 if any(k in c.lower()
+                                                for k in ("detect", "bbox", "yolo", "coco"))
+                                      else 1)
+                    configs_to_try = [None] + detection_first[:3]
+                except Exception:
+                    pass
+                for cfg in configs_to_try:
                     try:
-                        from datasets import load_dataset
-                        probe = load_dataset(d.id, split="train", streaming=True)
+                        probe = load_dataset(d.id, cfg, split="train", streaming=True) \
+                                if cfg else load_dataset(d.id, split="train", streaming=True)
                         item = next(iter(probe))
-                        has_bbox_real = any(k in item for k in
-                                             ("objects", "bbox", "boxes", "bboxes",
-                                              "annotations"))
-                        if not has_bbox_real:
-                            logger.info(f"[Harvest] skip {d.id}: schema keys "
-                                        f"{list(item.keys())} no bbox")
-                            continue
+                        if any(k in item for k in ("objects", "bbox", "boxes",
+                                                     "bboxes", "annotations")):
+                            probe_ok = True
+                            if cfg:
+                                reason = f"{reason}; config={cfg}"
+                            break
                     except Exception as e:
-                        logger.info(f"[Harvest] probe fail {d.id}: {str(e)[:150]}")
+                        logger.debug(f"[Harvest] probe {d.id} cfg={cfg} err: {str(e)[:120]}")
                         continue
+                if not probe_ok:
+                    logger.info(f"[Harvest] skip {d.id}: no bbox in any tested config")
+                    continue
 
-                # Good candidate — download
-                slug = self._slugify(d.id)
-                logger.info(f"[Harvest] Downloading {d.id} (slug={slug}) — "
-                            f"hint reason: {reason}")
-                local_path = os.path.join(self.data_dir, slug)
-                os.makedirs(local_path, exist_ok=True)
+            # Good candidate — download
+            slug = self._slugify(d.id)
+            logger.info(f"[Harvest] Downloading {d.id} (slug={slug}) — {reason}")
+            local_path = os.path.join(self.data_dir, slug)
+            os.makedirs(local_path, exist_ok=True)
 
-                # Register as known first, then download
-                if slug not in self.registry["datasets"]:
-                    self.registry["datasets"][slug] = {
-                        "source": "huggingface", "hf_id": d.id,
-                        "images": 0, "classes": "?",
-                        "annotation": "bbox_suspected", "format": "hf",
-                        "description": f"Auto-harvested via query: {q}",
-                        "status": "known", "local_path": None, "local_images": 0,
-                        "class_names": [], "downloaded_at": None,
-                        "used_for_training": False, "training_runs": [],
-                        "harvest_query": q, "harvest_reason": reason,
-                    }
+            if slug not in self.registry["datasets"]:
+                self.registry["datasets"][slug] = {
+                    "source": "huggingface", "hf_id": d.id,
+                    "images": 0, "classes": "?",
+                    "annotation": "bbox_suspected", "format": "hf",
+                    "description": f"Auto-harvested: {reason}",
+                    "status": "known", "local_path": None, "local_images": 0,
+                    "class_names": [], "downloaded_at": None,
+                    "used_for_training": False, "training_runs": [],
+                    "harvest_reason": reason,
+                }
 
-                _, stats = self._download_hf(slug, d.id, local_path, max_images_per_ds)
-                results.append({
-                    "hf_id": d.id, "slug": slug, "query": q,
-                    "stats": stats, "reason": reason,
-                })
+            _, stats = self._download_hf(slug, d.id, local_path, max_images_per_ds)
+            results.append({
+                "hf_id": d.id, "slug": slug,
+                "stats": stats, "reason": reason,
+            })
 
         self._save_registry()
         return {
