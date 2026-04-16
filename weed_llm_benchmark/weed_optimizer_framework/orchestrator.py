@@ -149,13 +149,19 @@ class Orchestrator:
             return total
 
         bbox_count = _current_bbox_count()
-        MEGA_THRESHOLD = getattr(Config, "MEGA_TRAIN_MIN_IMAGES", 50000)
+        MEGA_THRESHOLD = getattr(Config, "MEGA_TRAIN_MIN_IMAGES", 1000)
+
+        # Count how many bbox-datasets total vs. user's internet-collection goal
+        bbox_datasets = sum(1 for info in self.dataset_discovery.registry.get("datasets", {}).values()
+                            if info.get("annotation") in ("bbox", "bbox+segmentation", "yolo")
+                            and info.get("status") in ("downloaded", "used_for_training"))
 
         # Build initial context for the Brain
         data_status = (
-            f"Downloaded bbox-labeled images: {bbox_count}\n"
-            f"Threshold for train_yolo_mega: {MEGA_THRESHOLD}\n"
-            f"Status: {'READY for mega training' if bbox_count >= MEGA_THRESHOLD else 'INSUFFICIENT — download more datasets before train_yolo_mega'}"
+            f"Cumulative bbox-labeled images: {bbox_count} across {bbox_datasets} datasets\n"
+            f"Min for train_yolo_mega: {MEGA_THRESHOLD}\n"
+            f"Goal: keep harvesting +5 new datasets every round (internet-scale)\n"
+            f"Mega gate: {'READY' if bbox_count >= MEGA_THRESHOLD else 'INSUFFICIENT — harvest first'}"
         )
         context_history = [
             {"role": "system", "content": self.memory.get_summary_for_brain()},
@@ -280,17 +286,15 @@ class Orchestrator:
                     logger.info(obs)
 
                 elif action_name == "train_yolo_mega":
-                    # v3.0: HARD GATE — require enough bbox-labeled images downloaded
+                    # v3.0 cumulative gate: small threshold + grows with every harvest
                     current_bbox = _current_bbox_count()
                     threshold = MEGA_THRESHOLD
                     force = bool(params.get("force"))
                     if current_bbox < threshold and not force:
                         obs = (
-                            f"BLOCKED: train_yolo_mega requires {threshold} bbox-labeled images, "
-                            f"only {current_bbox} currently downloaded. "
-                            f"Call download_dataset for weedsense (120K), deepweeds (17K), "
-                            f"crop_weed_research (4K), grass_weeds (2.5K), etc. until threshold is met. "
-                            f"To override the gate, pass force=true in params (not recommended)."
+                            f"BLOCKED: train_yolo_mega needs at least {threshold} bbox images, "
+                            f"only {current_bbox} present. Call harvest_new_datasets first to "
+                            f"grow the pool. Or pass force=true to train on what's there."
                         )
                         context_history.append({"role": "observation", "content": obs})
                         logger.warning(obs)
@@ -369,6 +373,40 @@ class Orchestrator:
                         obs = f"Dataset '{ds_name}': {json.dumps(stats)}\nPath: {path}"
                     except Exception as e:
                         obs = f"Download failed for '{ds_name}': {e}"
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
+                elif action_name == "harvest_new_datasets":
+                    # Find and download up to N NEW bbox datasets this run
+                    max_new = params.get("max_new", 5)
+                    max_imgs = params.get("max_images_per_ds", 30000)
+                    queries = params.get("queries")
+                    try:
+                        result = self.dataset_discovery.harvest_new_datasets(
+                            max_new=max_new,
+                            max_images_per_ds=max_imgs,
+                            queries=queries,
+                        )
+                        ok = sum(1 for r in result.get("results", [])
+                                 if r["stats"].get("status") == "downloaded")
+                        new_imgs = sum(r["stats"].get("images", 0)
+                                       for r in result.get("results", []))
+                        new_labeled = sum(r["stats"].get("labeled", 0)
+                                          for r in result.get("results", []))
+                        obs = (f"Harvest: downloaded {ok}/{max_new} new datasets. "
+                               f"+{new_imgs} images ({new_labeled} with bboxes).\n")
+                        for r in result.get("results", []):
+                            s = r["stats"]
+                            obs += (f"  {r['hf_id']}: {s.get('status')} "
+                                    f"imgs={s.get('images', '?')} "
+                                    f"labeled={s.get('labeled', '?')} "
+                                    f"kind={s.get('annotation_kind', '?')}\n")
+                        if ok == 0:
+                            obs += ("No new bbox datasets found this round — HF pool may be "
+                                    "exhausted for these queries. Try custom `queries` "
+                                    "param with different keywords next time.\n")
+                    except Exception as e:
+                        obs = f"Harvest failed: {type(e).__name__}: {e}"
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 

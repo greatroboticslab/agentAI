@@ -163,11 +163,15 @@ class Config:
     FORGETTING_THRESHOLD = 0.90    # old F1 must stay above this
     MIN_CONSENSUS_BOXES = 5        # min pseudo-labels to proceed with training
 
-    # --- v3.0 mega training gate ---
-    # Brain must download at least this many bbox-labeled images before train_yolo_mega fires.
-    # Rationale: user wants "tens of thousands to hundreds of thousands" — 5648 is not enough.
+    # --- v3.0 mega training gate (cumulative-friendly) ---
+    # Two knobs:
+    #  MEGA_MIN_IMAGES: always-OK threshold. If count >= this, mega trains no matter what.
+    #    Set low (1000) so even round 1 can train — strategy is "collect + train" every round.
+    #  MEGA_GROWTH_CHECK: when count < MIN, mega allowed only if this round added new datasets
+    #    (otherwise we'd train twice on the same pool).
+    # Over many rounds accumulation grows toward the user's target (100K+).
     # Override via env: WEED_MEGA_MIN_IMAGES=<n>
-    MEGA_TRAIN_MIN_IMAGES = int(os.environ.get("WEED_MEGA_MIN_IMAGES", "50000"))
+    MEGA_TRAIN_MIN_IMAGES = int(os.environ.get("WEED_MEGA_MIN_IMAGES", "1000"))
     CONFIDENCE_THRESHOLD = 0.25    # YOLO inference for label generation / detection
     EVAL_CONFIDENCE = 0.001        # Low conf for mAP evaluation (full PR curve, standard practice)
     IOU_MATCH_THRESHOLD = 0.5      # IoU for TP/FP matching in evaluation

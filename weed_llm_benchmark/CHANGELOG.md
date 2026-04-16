@@ -746,10 +746,38 @@ After 4 failed downloads Brain fell back to v2.x pseudo-label pipeline (`generat
 - `DATA GATE` system message was injected correctly (Brain chose download over mega as first action)
 - qwen3:14b CPU-offloaded (11/41 layers on GPU) — slow but functional; consider switching to a 7B model for speed
 
+## 2026-04-16 - v3.0.4: harvest_new_datasets tool + cumulative strategy
+
+### What user actually wanted (clarified this session)
+"Each run finds 5 NEW weed-or-crop datasets and permanently stores them. 5 is a throttle to prevent overload, not a goal. Theoretical target: collect every weed/crop dataset on the internet. Accuracy over speed. mAP@0.95."
+
+### What v3.0.3 got wrong
+- Hardcoded a 50K hard gate — single-run semantic. User wants cross-run accumulation.
+- Treated `baselab/weedsense` as the 120K bbox savior. Reality: its default HF config has only `image` (no bboxes). Not a bbox detection dataset.
+- Queries were all weed-specific. User wants weed **OR** crop.
+- Fallback pipeline did multiple specific `download_dataset` calls — rigid. User wants adaptive discovery per round.
+
+### Fixes
+1. **`dataset_discovery.harvest_new_datasets(max_new=5, max_images_per_ds=30000)`** — new primary tool.
+   - Iterates default queries: weed detection, weed bounding box, crop detection, plant detection, agriculture object detection, pest detection.
+   - For each HF result: dedup against registry, fast-filter by `task_categories`/tags/sibling files (e.g. `.xml`, `annotations.json`, `labels.txt`).
+   - Optional schema confirmation via streaming `next(iter(ds))`.
+   - Downloads up to 5 passing candidates, registers permanently.
+   - Returns `{"downloaded": n, "results": [...]}` — gracefully returns 0 if nothing new.
+2. **`brain.py`**: added `harvest_new_datasets` tool definition (19 tools total). System prompt rewritten: "harvest first every round, then mega train, accumulation grows to 100K+ across runs". Text-mode map adds `18=harvest_new_datasets`. KEYWORD_TABLE matches `harvest`.
+3. **`orchestrator.py`**: new `harvest_new_datasets` handler reporting per-dataset stats + "no new bbox datasets this round" message when HF pool exhausted for those queries.
+4. **`brain.FALLBACK_PIPELINE`**: simplified to `harvest → mega → evaluate → done` (4 steps).
+5. **`config.MEGA_TRAIN_MIN_IMAGES = 1000`** (was 50000). Rationale: after a few rounds each adds ~5 datasets, accumulation naturally grows. Hard 50K gate made sense if 120K was already available in one call — it wasn't.
+
+### How it scales
+- Round 1: harvest 5 datasets (~N1 new images) → train mega on everything
+- Round 2: harvest 5 MORE datasets (different, deduped) → train mega on N1+N2
+- ...
+- Round 20+: cumulative 100+ datasets → 100K+ real bbox images
+- Brain doesn't re-download what's already in registry (dedup by hf_id).
+
 ## TODO
-- [ ] Upload v3.0.3 and re-submit
-- [ ] Watch for "Downloading 'weedsense' (120341 images)..." **without** the import error
-- [ ] Verify `baselab/weedsense` HF id actually exists (first real test this run)
-- [ ] Confirm yolo26x.pt load on GPU compute node (/ocean has ample disk)
+- [ ] Deploy v3.0.4 and submit a job — verify `harvest_new_datasets` actually fires and downloads 5 new bbox datasets
+- [ ] Add Kaggle / Roboflow sources in a v3.0.5 (HF alone has ~tens of weed bbox datasets, not hundreds)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

@@ -481,6 +481,159 @@ class DatasetDiscovery:
             return local_path, {"status": "error", "error": str(e)}
 
     # =========================================================
+    # HARVEST — each run discovers N new datasets, accumulates forever
+    # =========================================================
+
+    DEFAULT_HARVEST_QUERIES = [
+        "weed detection", "weed bounding box", "weed yolo",
+        "crop detection", "crop disease detection", "plant detection",
+        "agriculture object detection", "agricultural bbox",
+        "pest detection", "plant disease bbox",
+    ]
+
+    def _card_suggests_bbox(self, ds_info):
+        """Fast heuristic from HF dataset_info (no actual data load):
+        - task_categories contains 'object-detection'
+        - tags include detection/yolo/bbox
+        - siblings list has .xml, annotations.json, labels.txt patterns
+        Returns (has_bbox_hint, reason).
+        """
+        try:
+            card = getattr(ds_info, "card_data", None) or {}
+            tags = getattr(ds_info, "tags", []) or []
+            # task_categories check
+            tasks = []
+            if isinstance(card, dict):
+                tasks = card.get("task_categories") or []
+            else:
+                tasks = getattr(card, "task_categories", []) or []
+            if any("detection" in str(t).lower() for t in tasks):
+                return True, f"task_categories={tasks}"
+            # tags check
+            for t in tags:
+                tl = str(t).lower()
+                if any(k in tl for k in ["object-detection", "yolo", "bbox", "bounding-box"]):
+                    return True, f"tag={t}"
+            # sibling file patterns
+            siblings = [getattr(s, "rfilename", "") for s in getattr(ds_info, "siblings", [])]
+            patterns = [".xml", "annotations.json", "annotation", "labels.txt", "/labels/"]
+            for p in patterns:
+                if any(p in s.lower() for s in siblings):
+                    return True, f"sibling pattern {p}"
+            return False, "no bbox hints in card/tags/siblings"
+        except Exception as e:
+            return False, f"card probe err: {e}"
+
+    def _slugify(self, hf_id):
+        return hf_id.replace("/", "__").replace("-", "_").lower()[:60]
+
+    def harvest_new_datasets(self, max_new=5, queries=None, confirm_schema=True,
+                              max_images_per_ds=30000):
+        """Search HF for NEW datasets, fast-filter by card metadata, download up to max_new.
+
+        Strategy:
+        - Iterate queries (weed + crop + plant + agriculture)
+        - For each search result: skip if already in registry; skip if card says no bbox hints
+        - For passing candidates, optionally confirm schema by loading first item
+        - Download up to max_new — each one registered permanently
+
+        Returns: {attempted: n, downloaded: n, results: [{hf_id, local_images, labeled, kind}]}
+        """
+        try:
+            from huggingface_hub import HfApi
+        except ImportError:
+            return {"status": "error", "error": "huggingface_hub not installed"}
+
+        api = HfApi()
+        queries = queries or self.DEFAULT_HARVEST_QUERIES
+        results = []
+        seen_ids = set()
+
+        for q in queries:
+            if len(results) >= max_new:
+                break
+            logger.info(f"[Harvest] Query: '{q}'")
+            try:
+                found = list(api.list_datasets(search=q, sort="downloads",
+                                                direction=-1, limit=15))
+            except Exception as e:
+                logger.warning(f"[Harvest] search failed '{q}': {e}")
+                continue
+
+            for d in found:
+                if len(results) >= max_new:
+                    break
+                if d.id in seen_ids:
+                    continue
+                seen_ids.add(d.id)
+                if self.is_duplicate(d.id):
+                    continue
+
+                # Fast metadata check
+                try:
+                    info = api.dataset_info(d.id)
+                except Exception as e:
+                    logger.debug(f"[Harvest] info fail {d.id}: {e}")
+                    continue
+                has_bbox_hint, reason = self._card_suggests_bbox(info)
+                if not has_bbox_hint:
+                    logger.debug(f"[Harvest] skip {d.id}: {reason}")
+                    continue
+
+                # Optional full schema confirmation (slower; one streaming iter)
+                if confirm_schema:
+                    try:
+                        from datasets import load_dataset
+                        probe = load_dataset(d.id, split="train", streaming=True)
+                        item = next(iter(probe))
+                        has_bbox_real = any(k in item for k in
+                                             ("objects", "bbox", "boxes", "bboxes",
+                                              "annotations"))
+                        if not has_bbox_real:
+                            logger.info(f"[Harvest] skip {d.id}: schema keys "
+                                        f"{list(item.keys())} no bbox")
+                            continue
+                    except Exception as e:
+                        logger.info(f"[Harvest] probe fail {d.id}: {str(e)[:150]}")
+                        continue
+
+                # Good candidate — download
+                slug = self._slugify(d.id)
+                logger.info(f"[Harvest] Downloading {d.id} (slug={slug}) — "
+                            f"hint reason: {reason}")
+                local_path = os.path.join(self.data_dir, slug)
+                os.makedirs(local_path, exist_ok=True)
+
+                # Register as known first, then download
+                if slug not in self.registry["datasets"]:
+                    self.registry["datasets"][slug] = {
+                        "source": "huggingface", "hf_id": d.id,
+                        "images": 0, "classes": "?",
+                        "annotation": "bbox_suspected", "format": "hf",
+                        "description": f"Auto-harvested via query: {q}",
+                        "status": "known", "local_path": None, "local_images": 0,
+                        "class_names": [], "downloaded_at": None,
+                        "used_for_training": False, "training_runs": [],
+                        "harvest_query": q, "harvest_reason": reason,
+                    }
+
+                _, stats = self._download_hf(slug, d.id, local_path, max_images_per_ds)
+                results.append({
+                    "hf_id": d.id, "slug": slug, "query": q,
+                    "stats": stats, "reason": reason,
+                })
+
+        self._save_registry()
+        return {
+            "status": "ok",
+            "queries_tried": len([q for q in queries]),
+            "candidates_passed_filter": len(results),
+            "downloaded": len([r for r in results
+                               if r["stats"].get("status") == "downloaded"]),
+            "results": results,
+        }
+
+    # =========================================================
     # LIST & SUMMARY
     # =========================================================
 
