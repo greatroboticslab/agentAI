@@ -684,9 +684,48 @@ Job 39363972 completed 1h56m of training but **never activated any v3.0 feature*
 ### Why this matters
 Without these fixes, every run is just v2.7 with extra (unused) code. Next run should actually see YOLO11x training on merged real-labeled data (WeedSense 120K + others).
 
+## 2026-04-16 - v3.0.2: Actually make v3.0 behavior match v3.0 intent
+
+### Context
+v3.0.1 fixed the *architecture* (Brain function calling, tool definitions, fallback pipeline) — but Job 39393048 still produced a trivial run: yolo11x on the same 5,648 images. User caught the regression: "为什么是 yolo11 以及之前的 5000 多个标注". Three separate bugs conspired to make v3.0 a no-op.
+
+### Root causes
+1. **Default model was too conservative.** Config set `DETECTION_MODEL = "yolo11x.pt"` as a "safe" choice — but `yolo26x.pt` URL does exist in ultralytics 8.4+ GitHub assets (verified Apr 16: download in progress at 113MB).
+2. **HF download silently dropped bboxes.** `_download_hf` saved `item["image"]` only. WeedSense et al. have annotations in `item["objects"]["bbox"]` (COCO schema) — never extracted, so even if download fired the merged dataset had 0 bbox labels from HF.
+3. **No gate on mega training.** Brain saw 5,648 images pre-registered from leave4out splits and immediately called `train_yolo_mega` — bypassing the download step entirely. The pipeline "worked" but trained on the old data.
+
+### Fixes
+1. **`config.py`**:
+   - `DETECTION_MODEL = "yolo26x.pt"` (overridable via env `WEED_DETECTION_MODEL`)
+   - `DETECTION_MODEL_FALLBACKS = [yolo26x, yolo12x, yolo11x, yolov10x, yolo11l]` — ordered, mega_trainer walks the list
+   - `MEGA_TRAIN_MIN_IMAGES = 50000` (overridable via env `WEED_MEGA_MIN_IMAGES`)
+
+2. **`dataset_discovery.py._download_hf`**: Rewrote as schema-aware converter.
+   - Probes dataset schema before downloading
+   - Handles `objects.bbox`/`objects.category` (HF detection), flat `bbox`/`labels`, `annotations` list
+   - Converts to YOLO format (class cx cy w h, normalized) and writes per-image `.txt` labels
+   - Records `local_labeled`, `class_ids_seen`, `annotation` kind in registry
+
+3. **`orchestrator.py`**: Hard gate on `train_yolo_mega`.
+   - Computes current bbox-labeled count each round
+   - Injects `DATA GATE: READY/INSUFFICIENT` into Brain context
+   - If Brain calls `train_yolo_mega` below threshold: returns `BLOCKED: ...only X of 50000 downloaded` observation, does not execute. Brain sees the block and knows to download more.
+   - Override: `force=True` in params
+
+4. **`brain.py`**:
+   - System prompt: hard rules about the gate, preferred sequence: search → download weedsense → (download more) → mega → evaluate → done
+   - `FALLBACK_PIPELINE`: `download_dataset("weedsense", max_images=60000)` crosses the gate in one shot
+   - Text decide & `_parse_text_action`: `download` keyword pulls 60K max
+
+### Verification on cluster (Apr 16)
+- ultralytics 8.4.37 ✓
+- yolo26x.pt URL exists ✓ (113MB download in progress; login-node $HOME disk shortage resolved by working from /ocean)
+- yolov10x.pt confirmed loads (31.8M params) — kept in fallback list
+- Auto-registered cottonweed_sp8 (3442) + cottonweed_holdout (2206) = 5648 bbox-labeled (below 50K gate ✓ — will force download)
+
 ## TODO
-- [ ] Upload v3.0.1 and re-submit with Gemma4 Brain
-- [ ] Verify `search_datasets` and `download_dataset` actually fire
-- [ ] Verify `train_yolo_mega` uses yolo11x.pt and merges WeedSense
+- [ ] Upload v3.0.2 and submit job with qwen3:14b Brain
+- [ ] Verify WeedSense (`baselab/weedsense`) HF id actually exists and yields bboxes
+- [ ] Confirm yolo26x.pt loads cleanly after fresh download (or falls back to yolo11x)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

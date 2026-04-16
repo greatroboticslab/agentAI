@@ -17,16 +17,22 @@ class Config:
     HF_CACHE = os.environ.get("HF_HOME", "/ocean/projects/cis240145p/byler/hf_cache")
 
     # --- Detection model (v3.0: pursue accuracy limit, real-time speed not required) ---
-    # Default = yolo11x (verified available in ultralytics 8.3+, 56.9M params, COCO mAP50-95=54.7)
-    # Brain/strategy can override via base_model, with fallback chain below.
-    DETECTION_MODEL = "yolo11x.pt"
-    # Ordered fallback list — first entry that loads successfully wins.
-    DETECTION_MODEL_FALLBACKS = ["yolo11x.pt", "yolo11l.pt", "yolo11m.pt"]
+    # Default = yolo26x (verified URL in ultralytics 8.4+ GitHub assets, 55.7M params).
+    # mega_trainer walks DETECTION_MODEL_FALLBACKS in order — first one that loads wins.
+    # Override via env: WEED_DETECTION_MODEL=<name.pt>
+    DETECTION_MODEL = os.environ.get("WEED_DETECTION_MODEL", "yolo26x.pt")
+    DETECTION_MODEL_FALLBACKS = [
+        "yolo26x.pt",    # latest (Apr 2026), mAP50-95=57.5, 55.7M
+        "yolo12x.pt",    # mAP50-95=55.2, 59.1M (if ultralytics 8.4+)
+        "yolo11x.pt",    # mAP50-95=54.7, 56.9M (stable)
+        "yolov10x.pt",   # mAP50-95=54.4, 31.8M (confirmed loads on cluster)
+        "yolo11l.pt",    # mAP50-95=53.4, 25.3M (smaller fallback)
+    ]
     DETECTION_MODEL_VARIANTS = {
-        "yolo11x": {"params": "56.9M", "mAP50_95": 54.7, "description": "Largest YOLO11, ultralytics-verified"},
-        "yolo11l": {"params": "25.3M", "mAP50_95": 53.4, "description": "Large YOLO11"},
-        "yolo12x": {"params": "59.1M", "mAP50_95": 55.2, "description": "YOLO12 (may need newer ultralytics)"},
-        "yolo26x": {"params": "55.7M", "mAP50_95": 57.5, "description": "YOLO26 (experimental, may not be available)"},
+        "yolo26x": {"params": "55.7M", "mAP50_95": 57.5, "description": "Latest, best accuracy (Apr 2026)"},
+        "yolo12x": {"params": "59.1M", "mAP50_95": 55.2, "description": "YOLO12 (ultralytics 8.4+)"},
+        "yolo11x": {"params": "56.9M", "mAP50_95": 54.7, "description": "YOLO11 largest, stable"},
+        "yolov10x": {"params": "31.8M", "mAP50_95": 54.4, "description": "Confirmed loads on cluster"},
         "rt-detr-x": {"params": "65M", "mAP50_95": 54.8, "description": "Transformer detector"},
     }
 
@@ -156,6 +162,12 @@ class Config:
     # --- Quality thresholds ---
     FORGETTING_THRESHOLD = 0.90    # old F1 must stay above this
     MIN_CONSENSUS_BOXES = 5        # min pseudo-labels to proceed with training
+
+    # --- v3.0 mega training gate ---
+    # Brain must download at least this many bbox-labeled images before train_yolo_mega fires.
+    # Rationale: user wants "tens of thousands to hundreds of thousands" — 5648 is not enough.
+    # Override via env: WEED_MEGA_MIN_IMAGES=<n>
+    MEGA_TRAIN_MIN_IMAGES = int(os.environ.get("WEED_MEGA_MIN_IMAGES", "50000"))
     CONFIDENCE_THRESHOLD = 0.25    # YOLO inference for label generation / detection
     EVAL_CONFIDENCE = 0.001        # Low conf for mAP evaluation (full PR curve, standard practice)
     IOU_MATCH_THRESHOLD = 0.5      # IoU for TP/FP matching in evaluation

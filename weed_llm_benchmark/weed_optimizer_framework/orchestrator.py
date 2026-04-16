@@ -137,12 +137,33 @@ class Orchestrator:
         self._current_label_dir = None
         self._current_model_path = None
 
+        # v3.0 gating: compute current labeled-bbox image count
+        def _current_bbox_count():
+            total = 0
+            for info in self.dataset_discovery.registry.get("datasets", {}).values():
+                if info.get("status") not in ("downloaded", "used_for_training"):
+                    continue
+                if info.get("annotation") not in ("bbox", "bbox+segmentation", "yolo"):
+                    continue
+                total += info.get("local_images", 0)
+            return total
+
+        bbox_count = _current_bbox_count()
+        MEGA_THRESHOLD = getattr(Config, "MEGA_TRAIN_MIN_IMAGES", 50000)
+
         # Build initial context for the Brain
+        data_status = (
+            f"Downloaded bbox-labeled images: {bbox_count}\n"
+            f"Threshold for train_yolo_mega: {MEGA_THRESHOLD}\n"
+            f"Status: {'READY for mega training' if bbox_count >= MEGA_THRESHOLD else 'INSUFFICIENT — download more datasets before train_yolo_mega'}"
+        )
         context_history = [
             {"role": "system", "content": self.memory.get_summary_for_brain()},
             {"role": "system", "content": f"VLM Pool:\n{self.vlm_pool.get_summary_for_brain()}"},
             {"role": "system", "content": f"External:\n{self.web_identifier.get_summary_for_brain()}"},
             {"role": "system", "content": f"Models:\n{self.model_discovery.get_summary_for_brain()}"},
+            {"role": "system", "content": f"Data:\n{self.dataset_discovery.get_summary_for_brain()}"},
+            {"role": "system", "content": f"DATA GATE: {data_status}"},
             {"role": "system", "content": f"Round {round_num + 1}/{self.max_rounds}. "
                                           f"Iteration {iteration}. Choose your first action."},
         ]
@@ -259,21 +280,35 @@ class Orchestrator:
                     logger.info(obs)
 
                 elif action_name == "train_yolo_mega":
-                    # v3.0: merge all downloaded real-labeled datasets + train LARGEST YOLO
-                    from .tools.mega_trainer import train_yolo_mega
-                    mega_strategy = dict(params)
-                    try:
-                        model_path, summary = train_yolo_mega(mega_strategy, iteration)
-                        self._current_model_path = model_path
-                        obs = (f"Mega training complete:\n"
-                               f"  base={summary['base_model']}, imgs={summary['merged_images']}, "
-                               f"classes={summary['num_classes']}\n"
-                               f"  datasets={summary['datasets_used']}\n"
-                               f"  best.pt={model_path}")
-                    except Exception as e:
-                        obs = f"Mega training failed: {e}. Download datasets first."
-                    context_history.append({"role": "observation", "content": obs})
-                    logger.info(obs)
+                    # v3.0: HARD GATE — require enough bbox-labeled images downloaded
+                    current_bbox = _current_bbox_count()
+                    threshold = MEGA_THRESHOLD
+                    force = bool(params.get("force"))
+                    if current_bbox < threshold and not force:
+                        obs = (
+                            f"BLOCKED: train_yolo_mega requires {threshold} bbox-labeled images, "
+                            f"only {current_bbox} currently downloaded. "
+                            f"Call download_dataset for weedsense (120K), deepweeds (17K), "
+                            f"crop_weed_research (4K), grass_weeds (2.5K), etc. until threshold is met. "
+                            f"To override the gate, pass force=true in params (not recommended)."
+                        )
+                        context_history.append({"role": "observation", "content": obs})
+                        logger.warning(obs)
+                    else:
+                        from .tools.mega_trainer import train_yolo_mega
+                        mega_strategy = dict(params)
+                        try:
+                            model_path, summary = train_yolo_mega(mega_strategy, iteration)
+                            self._current_model_path = model_path
+                            obs = (f"Mega training complete:\n"
+                                   f"  base={summary['base_model']}, imgs={summary['merged_images']}, "
+                                   f"classes={summary['num_classes']}\n"
+                                   f"  datasets={summary['datasets_used']}\n"
+                                   f"  best.pt={model_path}")
+                        except Exception as e:
+                            obs = f"Mega training failed: {e}. Check dataset_discovery.download_dataset results."
+                        context_history.append({"role": "observation", "content": obs})
+                        logger.info(obs)
 
                 elif action_name == "evaluate":
                     if not self._current_model_path:

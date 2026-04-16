@@ -419,7 +419,7 @@ Reply with JUST the number."""}
             # Parse number from response (two-digit first)
             two_digit_map = {
                 "17": ("train_yolo_mega", {"epochs": 100, "imgsz": 640}),
-                "16": ("download_dataset", {"name": "weedsense"}),
+                "16": ("download_dataset", {"name": "weedsense", "max_images": 60000}),
                 "15": ("search_datasets", {"query": "weed detection"}),
                 "14": ("done", {"reason": "Brain chose to stop"}),
                 "13": ("lora_train", {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50, "lora_mode": "hybrid"}),
@@ -458,29 +458,38 @@ Reply with JUST the number."""}
 
     def _build_system_prompt(self):
         """Concise system prompt for Ollama."""
-        return """You are optimizing a YOLO weed detector. You must THINK before acting.
+        return """You are optimizing a YOLO weed detector. Goal: ACCURACY CEILING (mAP@0.5:0.95 peak). Real-time speed doesn't matter.
 
-V3.0 DIRECTION (pursue ACCURACY LIMIT with massive real labels):
-1. search_datasets → discover new weed datasets on HuggingFace (319K+ available)
-2. download_dataset → grab them cumulatively (weedsense 120K, deepweeds 17K, etc.)
-3. train_yolo_mega → train LARGEST YOLO (Config.DETECTION_MODEL) on ALL downloaded data merged
-4. evaluate → measure mAP@0.5:0.95 on held-out
+HARD RULES (v3.0):
+1. You MUST download datasets until the 'DATA GATE' system message reports READY.
+   The gate requires ≥50,000 bbox-labeled images. 5000 is NOT enough.
+2. Do NOT call train_yolo_mega before the gate is READY — the orchestrator will BLOCK the call
+   and print "BLOCKED: train_yolo_mega requires 50000 bbox-labeled images, only X currently downloaded."
+   If that happens, call download_dataset again — don't retry train_yolo_mega.
+3. When gate is not READY, the correct next action is almost always download_dataset or search_datasets.
+4. Downloaded datasets are CUMULATIVE: each new download adds to the pool; train_yolo_mega merges EVERYTHING.
 
-PREFER v3.0 pipeline over pseudo-label pipeline whenever possible — real labels beat VLM consensus.
-Already-downloaded datasets are kept and REUSED every train_yolo_mega call (cumulative).
+PREFERRED SEQUENCE:
+  search_datasets (see what's available/new on HF)
+  → download_dataset("weedsense")   # 120K images, by itself crosses the gate
+  → download_dataset("deepweeds")   # +17K if bbox, else classification-only
+  → download_dataset("crop_weed_research")   # +4K bbox
+  → download_dataset("grass_weeds") → download_dataset("weed_crop_aerial") → ...
+  → (only now) train_yolo_mega(epochs=100, imgsz=640)
+  → evaluate
+  → done
 
-Dataset tools (v3.0 — USE FIRST):
-- search_datasets: search HuggingFace for new weed/crop detection datasets (auto-dedups)
-- download_dataset: download by name (weedsense/deepweeds/crop_weed_research/grass_weeds/weed_crop_aerial)
-- train_yolo_mega: merge all downloaded bbox datasets and train Config.DETECTION_MODEL (yolo11x/26x)
+DATASET TOOLS:
+- search_datasets: search HuggingFace for new weed/crop bbox datasets (auto-dedup, auto-register)
+- download_dataset: download by name. Known: weedsense, deepweeds, crop_weed_research, grass_weeds,
+  weed_crop_aerial, rice_weeds_ph, weeds7kpd. Brain can also pass arbitrary HF id it found via search.
+- train_yolo_mega: merge all downloaded bbox datasets; train Config.DETECTION_MODEL (latest YOLO).
 
-Legacy tools (v2.x — only if mega training not possible):
-- inspect_labels / run_vlm_inference / generate_consensus: build pseudo-labels
-- train_yolo / freeze_train / distill_train / lora_train / two_pass_train: continual-learning methods
-- filter_labels: remove FP noise
-- analyze_failure / search_models / run_external_model / evaluate / done
-
-Goal: highest mAP@0.5 and mAP@0.5:0.95. Real-time speed no longer matters — use biggest model + most data."""
+LEGACY TOOLS (only if mega path is blocked and cannot unblock):
+- inspect_labels / run_vlm_inference / generate_consensus — build pseudo-labels
+- train_yolo / freeze_train / distill_train / lora_train / two_pass_train — continual learning
+- filter_labels / analyze_failure / search_models / run_external_model / identify_weed
+- evaluate / done"""
 
     # =========================================================
     # BACKEND 2: HUGGINGFACE — Direct model loading
@@ -549,15 +558,15 @@ Reply with just the number:"""
     # =========================================================
 
     FALLBACK_PIPELINE = [
-        # v3.0 direction first: discover + download + train biggest YOLO on real-labeled data
+        # v3.0: crosses MEGA gate (>=50K) with weedsense alone, then train
         {"action": "search_datasets", "params": {"query": "weed detection"},
-         "reasoning": "Pipeline 1: discover available weed datasets"},
-        {"action": "download_dataset", "params": {"name": "weedsense"},
-         "reasoning": "Pipeline 2: download WeedSense (120K images, 16 species, real bboxes)"},
+         "reasoning": "Pipeline 1: discover available weed datasets + status"},
+        {"action": "download_dataset", "params": {"name": "weedsense", "max_images": 60000},
+         "reasoning": "Pipeline 2: download WeedSense 60K (crosses the 50K gate in one shot)"},
         {"action": "download_dataset", "params": {"name": "crop_weed_research"},
-         "reasoning": "Pipeline 3: download crop_weed_research (4K images, bbox VOC)"},
+         "reasoning": "Pipeline 3: download crop_weed_research (4K bbox VOC, adds to pool)"},
         {"action": "download_dataset", "params": {"name": "weed_crop_aerial"},
-         "reasoning": "Pipeline 4: download weed_crop_aerial (1.2K images, YOLO ready)"},
+         "reasoning": "Pipeline 4: download weed_crop_aerial (1.2K, aerial diversity)"},
         {"action": "train_yolo_mega", "params": {"epochs": 100, "imgsz": 640},
          "reasoning": "Pipeline 5: train LARGEST YOLO on ALL downloaded real-labeled data"},
         {"action": "evaluate", "params": {},
@@ -585,7 +594,7 @@ Reply with just the number:"""
         KEYWORD_TABLE = [
             ("train_yolo_mega", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),
             ("search_datasets", "search_datasets", {"query": "weed detection"}),
-            ("download_dataset", "download_dataset", {"name": "weedsense"}),
+            ("download_dataset", "download_dataset", {"name": "weedsense", "max_images": 60000}),
             ("mega", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),
             ("search_models", "search_models", {"query": "weed detection"}),
             ("two_pass_train", "two_pass_train", {"epochs": 30, "filter_conf": 0.8}),
@@ -601,7 +610,7 @@ Reply with just the number:"""
             ("consensus", "generate_consensus", {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3}),
             ("inspect", "inspect_labels", {"vlm_key": "florence2_base", "sample_size": 20}),
             ("evaluat", "evaluate", {}),
-            ("download", "download_dataset", {"name": "weedsense"}),
+            ("download", "download_dataset", {"name": "weedsense", "max_images": 60000}),
             ("dataset", "search_datasets", {"query": "weed detection"}),
             ("train_yolo", "train_yolo", {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
             ("train", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),

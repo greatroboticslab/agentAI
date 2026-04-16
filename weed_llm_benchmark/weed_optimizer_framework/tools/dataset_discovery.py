@@ -303,40 +303,162 @@ class DatasetDiscovery:
 
         return local_path, {"status": "unsupported_source"}
 
+    def _extract_yolo_labels(self, item, width, height):
+        """Convert various HF dataset annotation schemas to YOLO-format lines.
+
+        Handles:
+          - HuggingFace "detection" schema: item["objects"]["bbox"] + ["category"]
+          - Flat: item["bbox"]/["boxes"] + item["labels"]/["category"]/["class"]
+          - COCO bbox = [x, y, w, h] (absolute pixels)
+          - VOC/xyxy bbox = [x1, y1, x2, y2]
+        Returns (yolo_lines, class_names_seen).
+        """
+        def _to_yolo(box, cls):
+            if len(box) != 4:
+                return None
+            # Heuristic: if the 3rd value > the 1st AND 4th > 2nd, treat as xyxy
+            # Otherwise assume xywh (COCO)
+            if box[2] > box[0] and box[3] > box[1] and box[2] > 1.0 and box[3] > 1.0:
+                # Could be either; check if width/height exceed image dims
+                if box[2] > width or box[3] > height:
+                    x1, y1, x2, y2 = box
+                    w, h = x2 - x1, y2 - y1
+                    cx, cy = x1 + w/2, y1 + h/2
+                else:
+                    # Assume xywh
+                    x, y, w, h = box
+                    cx, cy = x + w/2, y + h/2
+            else:
+                x, y, w, h = box
+                cx, cy = x + w/2, y + h/2
+            if width <= 0 or height <= 0:
+                return None
+            return f"{int(cls)} {cx/width:.6f} {cy/height:.6f} {w/width:.6f} {h/height:.6f}"
+
+        lines = []
+        classes_seen = set()
+
+        # Pattern 1: HF object detection "objects" dict
+        if "objects" in item and isinstance(item["objects"], dict):
+            objs = item["objects"]
+            bboxes = objs.get("bbox") or objs.get("boxes") or []
+            cats = (objs.get("category") or objs.get("categories")
+                    or objs.get("label") or objs.get("labels") or objs.get("class_id") or [])
+            for b, c in zip(bboxes, cats):
+                line = _to_yolo(list(b), c)
+                if line:
+                    lines.append(line)
+                    classes_seen.add(int(c))
+            return lines, classes_seen
+
+        # Pattern 2: flat keys
+        bboxes = item.get("bbox") or item.get("boxes") or item.get("bboxes")
+        cats = item.get("labels") or item.get("category") or item.get("categories") or item.get("class")
+        if bboxes is not None and cats is not None:
+            # Some datasets have per-image single box with scalar label
+            if not isinstance(bboxes[0], (list, tuple)):
+                bboxes = [bboxes]
+                cats = [cats]
+            for b, c in zip(bboxes, cats):
+                line = _to_yolo(list(b), c)
+                if line:
+                    lines.append(line)
+                    classes_seen.add(int(c))
+            return lines, classes_seen
+
+        # Pattern 3: annotations list
+        if "annotations" in item and isinstance(item["annotations"], list):
+            for a in item["annotations"]:
+                b = a.get("bbox") or a.get("box")
+                c = a.get("category_id") or a.get("label") or a.get("class")
+                if b and c is not None:
+                    line = _to_yolo(list(b), c)
+                    if line:
+                        lines.append(line)
+                        classes_seen.add(int(c))
+            return lines, classes_seen
+
+        return [], set()
+
     def _download_hf(self, name, hf_id, local_path, max_images):
-        """Download from HuggingFace with progress logging."""
+        """Download from HuggingFace with schema-aware YOLO label extraction."""
         try:
             from datasets import load_dataset
+            from datasets import get_dataset_config_names
 
             expected = KNOWN_DATASETS.get(name, {}).get("images", 0)
             limit = max_images or expected or 999999
 
-            if expected > 10000:
-                # Stream large datasets
-                ds = load_dataset(hf_id, split="train", streaming=True)
-                img_dir = os.path.join(local_path, "images")
-                os.makedirs(img_dir, exist_ok=True)
-                count = 0
-                for item in ds:
-                    if count >= limit:
-                        break
-                    if "image" in item:
-                        img = item["image"]
-                        img.save(os.path.join(img_dir, f"{count:06d}.jpg"))
-                    count += 1
-                    if count % 5000 == 0:
-                        logger.info(f"[Dataset] {name}: {count}/{limit} images...")
-            else:
-                ds = load_dataset(hf_id, split="train")
-                count = len(ds)
-                ds.save_to_disk(local_path)
+            # Probe schema (small sample, non-streaming)
+            logger.info(f"[Dataset] Probing {hf_id} schema...")
+            try:
+                probe_ds = load_dataset(hf_id, split="train", streaming=True)
+                probe_item = next(iter(probe_ds))
+                schema_keys = list(probe_item.keys())
+                logger.info(f"[Dataset] {name} schema keys: {schema_keys}")
+            except Exception as e:
+                logger.warning(f"[Dataset] Probe failed ({e}); proceeding anyway")
+                probe_item = None
 
-            # Update registry
+            # Decide annotation type: bbox-capable or classification-only
+            has_bbox = probe_item is not None and (
+                "objects" in probe_item or "bbox" in probe_item
+                or "boxes" in probe_item or "bboxes" in probe_item
+                or "annotations" in probe_item
+            )
+            annotation_kind = "bbox" if has_bbox else "classification"
+
+            # Use streaming for large datasets to avoid RAM blowup
+            use_streaming = expected > 10000 or limit > 10000
+            ds = load_dataset(hf_id, split="train", streaming=use_streaming)
+
+            img_dir = os.path.join(local_path, "images")
+            lbl_dir = os.path.join(local_path, "labels")
+            os.makedirs(img_dir, exist_ok=True)
+            os.makedirs(lbl_dir, exist_ok=True)
+
+            count = 0
+            label_count = 0
+            all_classes = set()
+
+            iterator = ds if use_streaming else iter(ds)
+            for item in iterator:
+                if count >= limit:
+                    break
+                if "image" not in item:
+                    count += 1
+                    continue
+                img = item["image"]
+                w = getattr(img, "width", item.get("width", 0))
+                h = getattr(img, "height", item.get("height", 0))
+                stem = f"{count:06d}"
+                img.save(os.path.join(img_dir, f"{stem}.jpg"))
+
+                if has_bbox and w and h:
+                    lines, classes = self._extract_yolo_labels(item, w, h)
+                    if lines:
+                        with open(os.path.join(lbl_dir, f"{stem}.txt"), "w") as f:
+                            f.write("\n".join(lines))
+                        label_count += 1
+                        all_classes.update(classes)
+                    else:
+                        # Empty label file still counts as "image with no objects"
+                        open(os.path.join(lbl_dir, f"{stem}.txt"), "w").close()
+
+                count += 1
+                if count % 2000 == 0:
+                    logger.info(f"[Dataset] {name}: {count}/{limit} imgs, "
+                                f"{label_count} labeled, classes={len(all_classes)}")
+
+            # Register result
             self.registry["datasets"].setdefault(name, {**KNOWN_DATASETS.get(name, {})})
             self.registry["datasets"][name].update({
                 "status": "downloaded",
                 "local_path": local_path,
                 "local_images": count,
+                "local_labeled": label_count,
+                "class_ids_seen": sorted(all_classes),
+                "annotation": annotation_kind,
                 "downloaded_at": datetime.now().isoformat(),
             })
             self.registry["total_downloaded"] = sum(
@@ -344,8 +466,15 @@ class DatasetDiscovery:
             )
             self._save_registry()
 
-            logger.info(f"[Dataset] '{name}': {count} images downloaded")
-            return local_path, {"status": "downloaded", "images": count}
+            logger.info(f"[Dataset] '{name}': {count} imgs, {label_count} with bbox labels, "
+                        f"{len(all_classes)} classes, kind={annotation_kind}")
+            return local_path, {
+                "status": "downloaded",
+                "images": count,
+                "labeled": label_count,
+                "classes": len(all_classes),
+                "annotation_kind": annotation_kind,
+            }
 
         except Exception as e:
             logger.error(f"[Dataset] Download failed: {e}")
