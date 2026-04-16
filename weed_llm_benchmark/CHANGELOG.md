@@ -638,6 +638,30 @@ Corrected evaluator (dual-conf: mAP@conf=0.001, F1@conf=0.25):
 **Note:** Previous mAP numbers (conf=0.25) were underestimated. The corrected baseline is higher:
 old_mAP50: 0.953→0.975, new_mAP50: 0.525→0.601
 
+## 2026-04-15 - v3.0: YOLO26x + Dataset Discovery + Dashboard
+
+### Major upgrade: pursuing theoretical precision limit
+
+1. **YOLO26x** — latest model (Apr 2026), mAP50-95=57.5 on COCO
+   - Replaces YOLO11n (2.6M params, mAP=39.5) with YOLO26x (55.7M params, mAP=57.5)
+   - 22x more parameters, +18 mAP points on COCO
+   - Config: `DETECTION_MODEL = "yolo26x.pt"` with 5 variant options
+
+2. **Dataset Discovery** — Brain autonomously searches+downloads weed datasets
+   - `tools/dataset_discovery.py`: HuggingFace search, auto-download, metadata tracking
+   - Pre-researched: WeedSense (120K), DeepWeeds (17K), crop_weed_research (4K), more
+   - Total available: ~319,000 images across all known datasets
+   - Brain tools: `search_datasets`, `download_dataset`
+
+3. **Dashboard** — real-time Streamlit monitoring (16 files, 1,095 lines)
+   - 9 tabs: Overview, Brain Timeline, Experiments, Labels, Models, Species, Memory, Architecture, Cluster
+
+### Direction change
+Previous: fixed CottonWeedDet12 (5,648 imgs) + VLM pseudo-labels
+New: Brain finds 100K+ real-annotated datasets + trains largest YOLO model
+
 ## TODO
+- [ ] Test YOLO26x + WeedSense (120K) training on cluster
+- [ ] Merge multiple datasets into unified training set
 - [ ] Generate paper figures and tables
 - [ ] Write paper

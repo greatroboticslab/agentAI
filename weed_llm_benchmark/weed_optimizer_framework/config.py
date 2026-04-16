@@ -16,6 +16,18 @@ class Config:
     FRAMEWORK_DIR = os.path.join(BASE_DIR, "results", "framework")
     HF_CACHE = os.environ.get("HF_HOME", "/ocean/projects/cis240145p/byler/hf_cache")
 
+    # --- Detection model ---
+    # YOLO26x: latest (2026), highest mAP50-95=57.5 on COCO, 55.7M params
+    # Brain can also choose other models: yolo12x, yolo11x, rt-detr-x
+    DETECTION_MODEL = "yolo26x.pt"  # auto-downloads from Ultralytics
+    DETECTION_MODEL_VARIANTS = {
+        "yolo26x": {"params": "55.7M", "mAP50_95": 57.5, "description": "Best accuracy (2026)"},
+        "yolo26l": {"params": "38.6M", "mAP50_95": 56.4, "description": "Large, good balance"},
+        "yolo12x": {"params": "59.1M", "mAP50_95": 55.2, "description": "YOLO12 largest"},
+        "yolo11x": {"params": "56.9M", "mAP50_95": 54.7, "description": "Previous gen"},
+        "rt-detr-x": {"params": "65M", "mAP50_95": 54.8, "description": "Transformer detector"},
+    }
+
     # --- Leave-4-Out dataset paths ---
     L4O_DIR = os.path.join(BASE_DIR, "results", "leave4out")
     SP8_DIR = os.path.join(L4O_DIR, "dataset_8species")

@@ -24,6 +24,7 @@ from .tools.yolo_trainer import train_yolo
 from .tools.evaluator import evaluate_full
 from .tools.vlm_pool import VLMPool
 from .tools.web_identifier import WebIdentifier
+from .tools.dataset_discovery import DatasetDiscovery
 from .tools.model_discovery import ModelDiscovery
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class Orchestrator:
         self.vlm_pool = VLMPool()
         self.web_identifier = WebIdentifier()
         self.model_discovery = ModelDiscovery()
+        self.dataset_discovery = DatasetDiscovery()
         self.tools = ToolRegistry()
 
         # Register tools
@@ -286,6 +288,33 @@ class Orchestrator:
                     obs = (f"Web identification: {len(results)} images, {n_weeds} contain weeds. "
                            f"Species found: {species}. "
                            f"API usage: {self.web_identifier.get_usage_info()}")
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
+                elif action_name == "search_datasets":
+                    # Search for weed datasets
+                    query = params.get("query", "weed detection")
+                    available = self.dataset_discovery.list_available()
+                    hf_results = self.dataset_discovery.search_huggingface(query)
+                    obs = f"Known datasets ({len(available)}):\n"
+                    for d in available:
+                        status = "DOWNLOADED" if d["downloaded"] else "not downloaded"
+                        obs += f"  {d['name']}: {d['images']} imgs, {d['classes']} classes [{status}]\n"
+                    obs += f"\nHuggingFace search '{query}': {len(hf_results)} results\n"
+                    obs += f"Total available: ~319,000 images\n"
+                    obs += f"Total downloaded: {self.dataset_discovery.get_total_images()} images"
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
+                elif action_name == "download_dataset":
+                    # Download a weed dataset
+                    ds_name = params.get("name", "weedsense")
+                    max_imgs = params.get("max_images")
+                    try:
+                        path, stats = self.dataset_discovery.download_dataset(ds_name, max_imgs)
+                        obs = f"Dataset '{ds_name}': {json.dumps(stats)}\nPath: {path}"
+                    except Exception as e:
+                        obs = f"Download failed for '{ds_name}': {e}"
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 

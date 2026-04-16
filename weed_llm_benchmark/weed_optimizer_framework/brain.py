@@ -155,6 +155,27 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "search_datasets",
+            "description": "Search for weed detection datasets on HuggingFace and list all available datasets with download status. Use this to find more training data.",
+            "parameters": {"type": "object", "properties": {
+                "query": {"type": "string", "description": "Search query (default: weed detection)"},
+            }},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "download_dataset",
+            "description": "Download a weed dataset. Available: weedsense (120K imgs!), deepweeds (17K), crop_weed_research (4K), grass_weeds (2.5K), weed_crop_aerial (1.2K). More data = better model.",
+            "parameters": {"type": "object", "properties": {
+                "name": {"type": "string", "description": "Dataset key: weedsense, deepweeds, crop_weed_research, grass_weeds, weed_crop_aerial"},
+                "max_images": {"type": "integer", "description": "Limit images (null=all)"},
+            }, "required": ["name"]},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "freeze_train",
             "description": "Train YOLO with backbone freezing (Wang 2025 method). Freezes first N layers to preserve old species knowledge while learning new species. Recommended: freeze=10 (proven to keep COCO performance with 0% degradation while adapting to new domain).",
             "parameters": {
