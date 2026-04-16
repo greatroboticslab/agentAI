@@ -154,9 +154,12 @@ def train_yolo(strategy, label_dir, iteration):
 
     # Train
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    base_weights = Config.YOLO_8SP_WEIGHTS
-    if not os.path.exists(base_weights):
+    # Strategy can override base weights (v3.0: yolo11x/yolo26x); default = 8-species for forgetting studies
+    base_weights = strategy.get("base_model") or Config.YOLO_8SP_WEIGHTS
+    if not os.path.exists(base_weights) and not base_weights.endswith(".pt"):
         raise FileNotFoundError(f"Base YOLO weights not found: {base_weights}")
+    # If base_weights is bare name like 'yolo11x.pt', ultralytics auto-downloads
+    logger.info(f"Base weights: {base_weights}")
 
     model = YOLO(base_weights)
     project_dir = os.path.join(Config.FRAMEWORK_DIR, f"yolo_iter{iteration}")

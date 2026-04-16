@@ -258,6 +258,23 @@ class Orchestrator:
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 
+                elif action_name == "train_yolo_mega":
+                    # v3.0: merge all downloaded real-labeled datasets + train LARGEST YOLO
+                    from .tools.mega_trainer import train_yolo_mega
+                    mega_strategy = dict(params)
+                    try:
+                        model_path, summary = train_yolo_mega(mega_strategy, iteration)
+                        self._current_model_path = model_path
+                        obs = (f"Mega training complete:\n"
+                               f"  base={summary['base_model']}, imgs={summary['merged_images']}, "
+                               f"classes={summary['num_classes']}\n"
+                               f"  datasets={summary['datasets_used']}\n"
+                               f"  best.pt={model_path}")
+                    except Exception as e:
+                        obs = f"Mega training failed: {e}. Download datasets first."
+                    context_history.append({"role": "observation", "content": obs})
+                    logger.info(obs)
+
                 elif action_name == "evaluate":
                     if not self._current_model_path:
                         # Evaluate baseline
@@ -292,17 +309,19 @@ class Orchestrator:
                     logger.info(obs)
 
                 elif action_name == "search_datasets":
-                    # Search for weed datasets
+                    # Search for weed datasets (deduped + tracks discovered ones)
                     query = params.get("query", "weed detection")
-                    available = self.dataset_discovery.list_available()
+                    known = self.dataset_discovery.list_all()
                     hf_results = self.dataset_discovery.search_huggingface(query)
-                    obs = f"Known datasets ({len(available)}):\n"
-                    for d in available:
-                        status = "DOWNLOADED" if d["downloaded"] else "not downloaded"
-                        obs += f"  {d['name']}: {d['images']} imgs, {d['classes']} classes [{status}]\n"
-                    obs += f"\nHuggingFace search '{query}': {len(hf_results)} results\n"
-                    obs += f"Total available: ~319,000 images\n"
-                    obs += f"Total downloaded: {self.dataset_discovery.get_total_images()} images"
+                    new_hf = [r for r in hf_results if not r.get("already_known")]
+                    obs = f"Registry ({len(known)} datasets):\n"
+                    for d in known:
+                        marker = "TRAINED" if d["used"] else ("DL" if d["status"] == "downloaded" else "—")
+                        obs += f"  [{marker}] {d['name']}: {d['images']} imgs, {d['annotation']}\n"
+                    obs += f"\nHuggingFace search '{query}': {len(hf_results)} results, {len(new_hf)} NEW\n"
+                    for r in new_hf[:8]:
+                        obs += f"  • {r.get('hf_id')} (dl={r.get('downloads', 0)})\n"
+                    obs += f"\n{self.dataset_discovery.get_summary_for_brain()}"
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
 

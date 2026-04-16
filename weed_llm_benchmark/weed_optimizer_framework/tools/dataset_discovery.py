@@ -91,33 +91,79 @@ class DatasetDiscovery:
         if os.path.exists(REGISTRY_PATH):
             try:
                 with open(REGISTRY_PATH) as f:
-                    return json.load(f)
+                    registry = json.load(f)
+                self._discover_preexisting(registry)
+                self._save_registry(registry)
+                return registry
             except (json.JSONDecodeError, KeyError):
                 pass
 
-        # Initialize from known datasets
         registry = {"datasets": {}, "discovered": [], "total_downloaded": 0}
         for name, info in KNOWN_DATASETS.items():
             registry["datasets"][name] = {
                 **info,
-                "status": "known",       # known / downloaded / used_for_training
+                "status": "known",
                 "local_path": None,
                 "local_images": 0,
+                "class_names": info.get("class_names", []),
                 "downloaded_at": None,
                 "used_for_training": False,
-                "training_runs": [],      # list of {timestamp, model, epochs, result}
+                "training_runs": [],
             }
-            # Check if already downloaded locally
+        self._discover_preexisting(registry)
+        self._save_registry(registry)
+        return registry
+
+    def _discover_preexisting(self, registry):
+        """Detect datasets that already exist on disk (cluster mount + local downloads)."""
+        # Scan the downloads dir for any known dataset
+        for name in KNOWN_DATASETS:
             path = os.path.join(self.data_dir, name)
             if os.path.isdir(path):
                 n = sum(1 for f in Path(path).rglob("*") if f.suffix.lower() in
                         ('.jpg', '.jpeg', '.png', '.bmp'))
-                if n > 0:
+                if n > 0 and name in registry["datasets"]:
                     registry["datasets"][name]["status"] = "downloaded"
                     registry["datasets"][name]["local_path"] = path
                     registry["datasets"][name]["local_images"] = n
-        self._save_registry(registry)
-        return registry
+
+        # Auto-register existing leave4out splits so mega_trainer has something to train on
+        # even if HF downloads haven't happened yet
+        def _register_local(key, root_dir, class_names, desc):
+            if not os.path.isdir(root_dir):
+                return
+            n = sum(1 for f in Path(root_dir).rglob("*") if f.suffix.lower() in
+                    ('.jpg', '.jpeg', '.png', '.bmp'))
+            if n < 10:
+                return
+            entry = registry["datasets"].get(key, {})
+            entry.update({
+                "source": "local", "hf_id": None,
+                "images": n, "classes": len(class_names),
+                "annotation": "bbox", "format": "yolo",
+                "description": desc,
+                "status": "downloaded", "local_path": root_dir, "local_images": n,
+                "class_names": class_names,
+                "downloaded_at": entry.get("downloaded_at"),
+                "used_for_training": entry.get("used_for_training", False),
+                "training_runs": entry.get("training_runs", []),
+            })
+            registry["datasets"][key] = entry
+
+        _register_local(
+            "cottonweed_sp8", Config.SP8_DIR,
+            [Config.ALL_CLASSES[i] for i in sorted(Config.TRAIN_SPECIES_IDS)],
+            "CottonWeedDet12 8-species train split (pre-existing, YOLO format)"
+        )
+        _register_local(
+            "cottonweed_holdout", Config.HOLDOUT_DIR,
+            [Config.ALL_CLASSES[i] for i in sorted(Config.HOLDOUT_SPECIES_IDS)],
+            "CottonWeedDet12 4-species holdout split (pre-existing, YOLO format)"
+        )
+
+        registry["total_downloaded"] = sum(
+            d.get("local_images", 0) for d in registry["datasets"].values()
+        )
 
     def _save_registry(self, registry=None):
         """Save registry with atomic write."""

@@ -252,6 +252,19 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "train_yolo_mega",
+            "description": "V3.0 PREFERRED. Merge ALL downloaded real-labeled datasets and train the LARGEST YOLO (Config.DETECTION_MODEL). Use this after downloading at least one bbox dataset. Not for pseudo-labels — for real annotations only. Cumulative: each call retrains on everything downloaded so far.",
+            "parameters": {"type": "object", "properties": {
+                "base_model": {"type": "string", "description": "Override base weights (yolo11x.pt/yolo26x.pt/etc.). Omit for Config default."},
+                "epochs": {"type": "integer", "description": "Training epochs (default 100)"},
+                "imgsz": {"type": "integer", "description": "Image size (default 640; use 1024 for max accuracy if VRAM allows)"},
+                "lr": {"type": "number", "description": "Learning rate (default 0.001)"},
+            }},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "done",
             "description": "End this optimization round. Use when evaluation is complete or when further actions won't help.",
             "parameters": {
@@ -382,17 +395,20 @@ class SuperBrain:
         """Text-based decision for models without function calling (e.g. DeepSeek-R1)."""
         import ollama
 
-        # Simpler prompt that asks for a numbered choice
+        # v3.0 direction: prioritize dataset discovery + mega training
         messages[-1] = {"role": "user", "content": """Pick the next action by number:
+15=search_datasets 16=download_dataset 17=train_yolo_mega
 1=inspect_labels 2=run_vlm 3=consensus 4=train_yolo 5=evaluate
 6=search_models 7=run_external_model 8=analyze_failure 9=filter_labels
 10=freeze_train 11=distill_train 12=two_pass_train 13=lora_train 14=done
 
-BEST METHOD FOR PRECISION: 12 two_pass_train (train→filter→retrain with LoRA)
-ANTI-FORGETTING: 10 freeze, 11 distill, 13 lora (hybrid: backbone LoRA + head full)
-NOISE REDUCTION: 9 filter_labels, 12 two_pass_train
+V3.0 PRIORITY (pursuing accuracy LIMIT with massive real-labeled data):
+  15 search_datasets → find new weed datasets on HuggingFace
+  16 download_dataset → grab WeedSense (120K!), DeepWeeds (17K), etc.
+  17 train_yolo_mega → train LARGEST YOLO on ALL downloaded datasets merged
 
-TRY 12 (two_pass_train) FIRST — it combines noise reduction + LoRA in one step.
+Recommended early-round sequence: 15 → 16 (weedsense) → 16 (deepweeds) → 17 → 5
+Only use 1-14 (pseudo-label pipeline) if 17 isn't feasible yet.
 Reply with JUST the number."""}
 
         try:
@@ -400,9 +416,11 @@ Reply with JUST the number."""}
             text = response.message.content or ""
             logger.info(f"[Brain/Ollama/Text] Response: {text[:150]}")
 
-            # Parse number from response (DeepSeek-R1 may include reasoning)
-            # Check for two-digit numbers first (10, 11, 12)
+            # Parse number from response (two-digit first)
             two_digit_map = {
+                "17": ("train_yolo_mega", {"epochs": 100, "imgsz": 640}),
+                "16": ("download_dataset", {"name": "weedsense"}),
+                "15": ("search_datasets", {"query": "weed detection"}),
                 "14": ("done", {"reason": "Brain chose to stop"}),
                 "13": ("lora_train", {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50, "lora_mode": "hybrid"}),
                 "12": ("two_pass_train", {"epochs": 30, "filter_conf": 0.8}),
@@ -412,7 +430,7 @@ Reply with JUST the number."""}
             for two_digit, (name, params) in two_digit_map.items():
                 if two_digit in text:
                     return {"action": name, "params": params,
-                            "reasoning": f"DeepSeek-R1 chose {two_digit}: {name}"}
+                            "reasoning": f"Brain chose {two_digit}: {name}"}
 
             for char in text:
                 if char in "123456789":
@@ -429,7 +447,7 @@ Reply with JUST the number."""}
                     }
                     name, params = action_map[char]
                     return {"action": name, "params": params,
-                            "reasoning": f"DeepSeek-R1 chose {char}: {name}"}
+                            "reasoning": f"Brain chose {char}: {name}"}
 
             # Try keyword matching on the full text
             return self._parse_text_action(text)
@@ -442,27 +460,27 @@ Reply with JUST the number."""}
         """Concise system prompt for Ollama."""
         return """You are optimizing a YOLO weed detector. You must THINK before acting.
 
-CRITICAL WORKFLOW:
-1. If previous evaluation showed forgetting → FIRST analyze_failure to understand why
-2. To prevent forgetting → use freeze_train (Wang 2025) or distill_train (Teach YOLO to Remember)
-3. To reduce label noise → use filter_labels (YOLO self-training filter)
+V3.0 DIRECTION (pursue ACCURACY LIMIT with massive real labels):
+1. search_datasets → discover new weed datasets on HuggingFace (319K+ available)
+2. download_dataset → grab them cumulatively (weedsense 120K, deepweeds 17K, etc.)
+3. train_yolo_mega → train LARGEST YOLO (Config.DETECTION_MODEL) on ALL downloaded data merged
+4. evaluate → measure mAP@0.5:0.95 on held-out
 
-Anti-forgetting tools (USE THESE for old species preservation):
-- freeze_train: Wang 2025 method, freezes backbone layers 0-9, proven 0% COCO degradation
-- distill_train: self-distillation from old YOLO, "Teach YOLO to Remember" (CVPR 2025)
-- lora_train: LoRA adapters in head, parameter-efficient (Professor's suggestion)
-- filter_labels: remove 27% FP noise via YOLO high-conf filtering
+PREFER v3.0 pipeline over pseudo-label pipeline whenever possible — real labels beat VLM consensus.
+Already-downloaded datasets are kept and REUSED every train_yolo_mega call (cumulative).
 
-Other tools:
-- analyze_failure: think about WHY experiments fail
-- inspect_labels: check VLM label quality
-- generate_consensus: combine VLM detections (best: florence2_base + owlv2)
-- train_yolo: standard training (no anti-forgetting)
-- evaluate: test on old + new species
-- search_models / run_external_model: discover external models
-- done: finish round
+Dataset tools (v3.0 — USE FIRST):
+- search_datasets: search HuggingFace for new weed/crop detection datasets (auto-dedups)
+- download_dataset: download by name (weedsense/deepweeds/crop_weed_research/grass_weeds/weed_crop_aerial)
+- train_yolo_mega: merge all downloaded bbox datasets and train Config.DETECTION_MODEL (yolo11x/26x)
 
-KEY: Old species F1 must stay ≥0.90. Label noise (27% FP) and catastrophic forgetting are the two main bottlenecks. Use the anti-forgetting tools above."""
+Legacy tools (v2.x — only if mega training not possible):
+- inspect_labels / run_vlm_inference / generate_consensus: build pseudo-labels
+- train_yolo / freeze_train / distill_train / lora_train / two_pass_train: continual-learning methods
+- filter_labels: remove FP noise
+- analyze_failure / search_models / run_external_model / evaluate / done
+
+Goal: highest mAP@0.5 and mAP@0.5:0.95. Real-time speed no longer matters — use biggest model + most data."""
 
     # =========================================================
     # BACKEND 2: HUGGINGFACE — Direct model loading
@@ -531,23 +549,21 @@ Reply with just the number:"""
     # =========================================================
 
     FALLBACK_PIPELINE = [
-        {"action": "inspect_labels", "params": {"vlm_key": "florence2_base", "sample_size": 20},
-         "reasoning": "Pipeline step 1: inspect best VLM labels"},
-        {"action": "generate_consensus",
-         "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
-         "reasoning": "Pipeline step 2: generate consensus from best pair"},
-        {"action": "two_pass_train", "params": {"epochs": 30, "filter_conf": 0.8},
-         "reasoning": "Pipeline step 3: TWO-PASS (train→filter→retrain with LoRA) — best method"},
+        # v3.0 direction first: discover + download + train biggest YOLO on real-labeled data
+        {"action": "search_datasets", "params": {"query": "weed detection"},
+         "reasoning": "Pipeline 1: discover available weed datasets"},
+        {"action": "download_dataset", "params": {"name": "weedsense"},
+         "reasoning": "Pipeline 2: download WeedSense (120K images, 16 species, real bboxes)"},
+        {"action": "download_dataset", "params": {"name": "crop_weed_research"},
+         "reasoning": "Pipeline 3: download crop_weed_research (4K images, bbox VOC)"},
+        {"action": "download_dataset", "params": {"name": "weed_crop_aerial"},
+         "reasoning": "Pipeline 4: download weed_crop_aerial (1.2K images, YOLO ready)"},
+        {"action": "train_yolo_mega", "params": {"epochs": 100, "imgsz": 640},
+         "reasoning": "Pipeline 5: train LARGEST YOLO on ALL downloaded real-labeled data"},
         {"action": "evaluate", "params": {},
-         "reasoning": "Pipeline step 4: evaluate two-pass results"},
-        {"action": "analyze_failure", "params": {"focus": "forgetting"},
-         "reasoning": "Pipeline step 5: analyze results"},
-        {"action": "freeze_train", "params": {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
-         "reasoning": "Pipeline step 6: Wang 2025 freeze for comparison"},
-        {"action": "evaluate", "params": {},
-         "reasoning": "Pipeline step 7: evaluate freeze"},
-        {"action": "done", "params": {"reason": "Pipeline complete — tested two-pass + freeze"},
-         "reasoning": "Pipeline step 8: done"},
+         "reasoning": "Pipeline 6: evaluate mega-trained YOLO on old + new species"},
+        {"action": "done", "params": {"reason": "v3.0 mega pipeline complete"},
+         "reasoning": "Pipeline 7: done"},
     ]
 
     def _smart_fallback(self, step_num):
@@ -565,13 +581,37 @@ Reply with just the number:"""
     def _parse_text_action(self, text):
         """Parse action from free-text response (fallback for Ollama no-tool-call)."""
         text_lower = text.lower()
-        for keyword, action_name in [
-            ("inspect", "inspect_labels"), ("consensus", "generate_consensus"),
-            ("train", "train_yolo"), ("evaluat", "evaluate"),
-            ("done", "done"), ("stop", "done"),
-        ]:
+        # Order matters — match most specific first (v3.0 tools before legacy)
+        KEYWORD_TABLE = [
+            ("train_yolo_mega", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),
+            ("search_datasets", "search_datasets", {"query": "weed detection"}),
+            ("download_dataset", "download_dataset", {"name": "weedsense"}),
+            ("mega", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),
+            ("search_models", "search_models", {"query": "weed detection"}),
+            ("two_pass_train", "two_pass_train", {"epochs": 30, "filter_conf": 0.8}),
+            ("two_pass", "two_pass_train", {"epochs": 30, "filter_conf": 0.8}),
+            ("lora_train", "lora_train", {"lora_rank": 64, "lora_alpha": 128.0, "lr": 0.0005, "epochs": 50, "lora_mode": "hybrid"}),
+            ("distill_train", "distill_train", {"distill_alpha": 0.5, "lr": 0.0005, "epochs": 50}),
+            ("freeze_train", "freeze_train", {"freeze_layers": 10, "lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
+            ("filter_labels", "filter_labels", {"confidence_threshold": 0.8}),
+            ("analyze_failure", "analyze_failure", {"focus": "forgetting"}),
+            ("generate_consensus", "generate_consensus", {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3}),
+            ("run_vlm", "run_vlm_inference", {"vlm_key": "florence2_base", "max_images": 50}),
+            ("inspect_labels", "inspect_labels", {"vlm_key": "florence2_base", "sample_size": 20}),
+            ("consensus", "generate_consensus", {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3}),
+            ("inspect", "inspect_labels", {"vlm_key": "florence2_base", "sample_size": 20}),
+            ("evaluat", "evaluate", {}),
+            ("download", "download_dataset", {"name": "weedsense"}),
+            ("dataset", "search_datasets", {"query": "weed detection"}),
+            ("train_yolo", "train_yolo", {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3}),
+            ("train", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),
+            ("done", "done", {"reason": "Brain chose to stop"}),
+            ("stop", "done", {"reason": "Brain chose to stop"}),
+        ]
+        for keyword, action_name, default_params in KEYWORD_TABLE:
             if keyword in text_lower:
-                return {"action": action_name, "params": {}, "reasoning": f"Text keyword: {keyword}"}
+                return {"action": action_name, "params": default_params,
+                        "reasoning": f"Text keyword: {keyword}"}
         return self._smart_fallback(0)
 
     def _parse_numbered_action(self, response, step_num=0):

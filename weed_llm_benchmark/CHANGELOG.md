@@ -660,8 +660,33 @@ old_mAP50: 0.953→0.975, new_mAP50: 0.525→0.601
 Previous: fixed CottonWeedDet12 (5,648 imgs) + VLM pseudo-labels
 New: Brain finds 100K+ real-annotated datasets + trains largest YOLO model
 
+## 2026-04-16 - v3.0.1: Fix v3.0 not activating (Job 39363972 never used new features)
+
+### Root-cause of v3.0 no-op run
+Job 39363972 completed 1h56m of training but **never activated any v3.0 feature**:
+- YOLO11n still used (not yolo11x/yolo26x) — `yolo_trainer.py` hardcoded `Config.YOLO_8SP_WEIGHTS`
+- Brain (Gemma4) output plain text ("filter_labels"), no `search_datasets`/`download_dataset` call
+- `_parse_text_action` keyword table missed the new v3.0 tool names, plus `filter_labels`/`lora_train`/etc.
+- `FALLBACK_PIPELINE` still started with `inspect_labels` + `generate_consensus` (legacy path)
+- DETECTION_MODEL="yolo26x.pt" but never propagated into any trainer
+
+### Fixes (cancelled job, applied fixes, re-run pending)
+1. **`yolo_trainer.py`**: `base_weights = strategy.get("base_model") or Config.YOLO_8SP_WEIGHTS` (strategy override)
+2. **`tools/mega_trainer.py`** (new): `train_yolo_mega` — merges all downloaded real-labeled datasets into one YOLO dataset (union of class names, per-dataset ID remap), trains `Config.DETECTION_MODEL` with ordered fallback list if primary model unavailable
+3. **`config.py`**: `DETECTION_MODEL = "yolo11x.pt"` (verified in ultralytics 8.3+) with `DETECTION_MODEL_FALLBACKS = [yolo11x, yolo11l, yolo11m]`; yolo26x kept as experimental option
+4. **`brain.py`** — `TOOL_DEFINITIONS`: added `train_yolo_mega` (18 tools total)
+5. **`brain.py`** — `_build_system_prompt`: v3.0 priority: `search_datasets → download_dataset → train_yolo_mega → evaluate`; legacy tools demoted
+6. **`brain.py`** — `_ollama_text_decide`: added numbers 15/16/17 for search_datasets/download_dataset/train_yolo_mega
+7. **`brain.py`** — `_parse_text_action`: keyword table now covers all 18 tools (Gemma4 text-mode responses get routed correctly)
+8. **`brain.py`** — `FALLBACK_PIPELINE`: rewritten as `search → download weedsense → download crop_weed_research → download weed_crop_aerial → train_yolo_mega → evaluate → done`
+9. **`orchestrator.py`**: added `train_yolo_mega` handler, updated `search_datasets` handler to use new `list_all()`/dedup API, shows newly discovered HF datasets
+
+### Why this matters
+Without these fixes, every run is just v2.7 with extra (unused) code. Next run should actually see YOLO11x training on merged real-labeled data (WeedSense 120K + others).
+
 ## TODO
-- [ ] Test YOLO26x + WeedSense (120K) training on cluster
-- [ ] Merge multiple datasets into unified training set
+- [ ] Upload v3.0.1 and re-submit with Gemma4 Brain
+- [ ] Verify `search_datasets` and `download_dataset` actually fire
+- [ ] Verify `train_yolo_mega` uses yolo11x.pt and merges WeedSense
 - [ ] Generate paper figures and tables
 - [ ] Write paper
