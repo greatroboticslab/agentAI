@@ -694,6 +694,46 @@ class DatasetDiscovery:
                 "stats": stats, "reason": reason,
             })
 
+        # ------------ Phase 3: GitHub (if HF quota not hit) ------------
+        if len(results) < max_new:
+            try:
+                from .extra_sources import harvest_github_datasets
+                gh_quota = max_new - len(results)
+                gh = harvest_github_datasets(
+                    data_dir=self.data_dir,
+                    queries=[q for q in queries if any(k in q for k in ("weed", "crop", "plant", "agri"))] or queries[:3],
+                    already_known_cb=lambda s: s in self.registry["datasets"] or self.is_duplicate(s),
+                    max_new=min(gh_quota, 3),
+                )
+                for entry in gh:
+                    self.registry["datasets"][entry["slug"]] = entry["info"]
+                    results.append({
+                        "hf_id": entry["hf_id"], "slug": entry["slug"],
+                        "stats": entry["stats"], "reason": entry["reason"],
+                    })
+            except Exception as e:
+                logger.warning(f"[Harvest] GitHub phase failed: {e}")
+
+        # ------------ Phase 4: Kaggle (if kagglehub + creds present) ------------
+        if len(results) < max_new:
+            try:
+                from .extra_sources import harvest_kaggle_datasets
+                kg_quota = max_new - len(results)
+                kg = harvest_kaggle_datasets(
+                    data_dir=self.data_dir,
+                    queries=[q for q in queries if any(k in q for k in ("weed", "crop", "plant", "agri"))] or queries[:3],
+                    already_known_cb=lambda s: s in self.registry["datasets"] or self.is_duplicate(s),
+                    max_new=min(kg_quota, 2),
+                )
+                for entry in kg:
+                    self.registry["datasets"][entry["slug"]] = entry["info"]
+                    results.append({
+                        "hf_id": entry["hf_id"], "slug": entry["slug"],
+                        "stats": entry["stats"], "reason": entry["reason"],
+                    })
+            except Exception as e:
+                logger.warning(f"[Harvest] Kaggle phase failed: {e}")
+
         self._save_registry()
         return {
             "status": "ok",

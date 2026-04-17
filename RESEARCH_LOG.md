@@ -1022,6 +1022,57 @@ This should give best of both worlds: backbone preserved via LoRA (no forgetting
 
 ---
 
+### Session 31 — 2026-04-16/17: v3.0.5 run forensics + v3.0.6 fixes
+
+**Goal of v3.0**: stop comparing YOLO11n+pseudo-labels against itself; pursue accuracy
+ceiling with latest YOLO (yolo26x, 59M params) trained on internet-scale REAL bbox data.
+
+**Job 39592795 — v3.0.5 verdict after 8h wallclock**:
+
+| thing | claim | reality |
+|---|---|---|
+| yolo26x loads | CHANGELOG v3.0.2 "verified" | train path hardcoded YOLO11n (2.58M params) |
+| mega trains | v3.0.2 — hard data gate in place | 6h21m of training → FileNotFoundError on best.pt |
+| harvest runs | v3.0.4 added the tool | ran but Brain called it 3× (pool empty after call 1) |
+| rounds | quick mode = 3 rounds | 1 full round before walltime; round 2 killed at 12s |
+
+Only the harvest tool actually worked — `Francesco/weed-crop-aerial` (823 bbox) was
+the one new dataset pulled in. Rest of the run re-trained yolo11n on 5648 images for
+the Nth time. Architecture claimed v3.0 but behavior was still v2.7.
+
+**Root causes (from grep'ing slurm_ollama_39592795.out):**
+- `yolo_trainer.py` line 158: `base_weights = strategy.get("base_model") or Config.YOLO_8SP_WEIGHTS`
+  — fallback path never consulted `Config.DETECTION_MODEL`. Orchestrator's `train_yolo`
+  handler never injects `base_model`.
+- `mega_trainer.py` line 217: `best_pt = project_dir/train/weights/best.pt` — ultralytics
+  auto-increments (`train` already existed from `yolo_iter2/train*`), saved to `train2`
+  instead, our check missed it → mega "failed" after a successful training.
+- `orchestrator.py` line 189: repeat-action forcing routed to `generate_consensus` (v2.x)
+  even when v3.0 had enough real data for `train_yolo_mega`.
+
+**v3.0.6 fixes deployed Apr 17:**
+1. `yolo_trainer.py`: candidate list — DETECTION_MODEL + FALLBACKS, YOLO_8SP_WEIGHTS only
+   opt-in via `strategy.use_legacy_baseline=True`.
+2. `yolo_trainer.py` + `mega_trainer.py`: `_resolve_best_pt()` reads `model.trainer.save_dir`,
+   then scans newest `train*/weights/best.pt` by mtime.
+3. `orchestrator.py`: repeat-limit for `harvest_new_datasets`/`search_datasets` is 1 (not 2);
+   force-progress target chosen by `_current_bbox_count()` vs `MEGA_TRAIN_MIN_IMAGES`.
+4. `brain.py`: HARD RULES added ("Call harvest EXACTLY ONCE per round"); mega fallback
+   epochs 100→50 to fit 50-epoch yolo26x runs in walltime.
+5. **v3.0.6 feature — `tools/extra_sources.py`**: GitHub repo scanner + Kaggle `datasets list`
+   wired into harvest Phase 3/4. Answers professor direction: "agent browses GitHub
+   weed-detection repos, clones, trains autonomously". Graceful degrade if creds missing.
+
+**Verification before submit:**
+- `YOLO('yolo26x.pt')` on cluster login node → 58,993,368 params ✓
+- Local `search_github_repos('weed detection')` → 5 plausible Roboflow-style repos
+- All imports pass on cluster (base conda env)
+
+**Job 39682578 submitted (qwen3:14b, quick=3 rounds)**. Predicted outcome: round 1
+harvests 1-3 GitHub repos + 0-1 HF dataset, trains yolo26x on ~8K+ images, evaluates.
+
+---
+
 ## Phase 4: Ablation Studies (Planned)
 
 Code ready in `run_ablations.py`. 4 experiments:

@@ -1,0 +1,419 @@
+{
+  "meta": {
+    "created": "2026-04-13T21:17:56.258607",
+    "total_iterations": 5,
+    "framework_version": "1.0.0"
+  },
+  "baseline": {
+    "old_f1": 0.917,
+    "old_map50": 0.9749,
+    "old_map50_95": 0.9163,
+    "new_f1": 0.6058,
+    "new_map50": 0.6009,
+    "new_map50_95": 0.4988
+  },
+  "current_best": {
+    "iteration": 0,
+    "strategy": {
+      "vlm_models": [
+        "florence2_base",
+        "owlv2"
+      ],
+      "min_votes": 2,
+      "consensus_iou": 0.3,
+      "use_yolo_old": true,
+      "lr": 0.001,
+      "epochs": 50,
+      "freeze_layers": 0,
+      "replay_ratio": 0.3,
+      "name": "seed_best_known_phase3e"
+    },
+    "old_f1": 0.897,
+    "new_f1": 0.622,
+    "old_map50": 0.851,
+    "new_map50": 0.559,
+    "old_map50_95": 0.81,
+    "new_map50_95": 0.493
+  },
+  "hard_lessons": [
+    {
+      "id": "HL01",
+      "lesson": "Freezing FULL backbone (15+ layers) causes catastrophic failure (F1=0.155). However, freezing first 10 layers (Wang 2025) preserves COCO knowledge while allowing new species learning.",
+      "evidence": "Phase 3C frozen=full failed; Wang 2025 arXiv 2505.01016 shows freeze=10 works",
+      "severity": "high",
+      "constraint": {
+        "field": "freeze_layers",
+        "max": 14,
+        "min_safe": 0,
+        "recommended": [
+          0,
+          5,
+          10
+        ]
+      }
+    },
+    {
+      "id": "HL02",
+      "lesson": "Replay buffer >50% makes forgetting WORSE (-3.0% vs -2.4%)",
+      "evidence": "Phase 3C: replay50 test",
+      "severity": "high",
+      "constraint": {
+        "field": "replay_ratio",
+        "max": 0.5
+      }
+    },
+    {
+      "id": "HL03",
+      "lesson": "SAM + caption keyword classification is too noisy (-11% new species)",
+      "evidence": "Phase 3D: SAM-enhanced test",
+      "severity": "high",
+      "constraint": {
+        "field": "use_sam_caption",
+        "forbidden": true
+      }
+    },
+    {
+      "id": "HL04",
+      "lesson": "Fine-tuning VLMs (Florence-2) degrades their zero-shot ability (-11.3% mAP)",
+      "evidence": "Phase 3F: Florence-2 fine-tune test",
+      "severity": "high",
+      "constraint": {
+        "field": "finetune_vlm",
+        "forbidden": true
+      }
+    },
+    {
+      "id": "HL05",
+      "lesson": "2 complementary models (high-prec + high-recall) beat 7 models voting",
+      "evidence": "Phase 3E: agent optimizer 5-strategy test",
+      "severity": "high",
+      "constraint": {
+        "field": "vlm_models",
+        "max_count": 4
+      }
+    },
+    {
+      "id": "HL06",
+      "lesson": "Florence-2-base (prec=0.789) + OWLv2 (rec=0.918) is the best VLM pair",
+      "evidence": "Phase 3E: consensus_flo+owl achieved +0.016 F1",
+      "severity": "info"
+    },
+    {
+      "id": "HL07",
+      "lesson": "Florence-2 <OD> mode does NOT output calibrated confidence \u2014 threshold filtering doesn't work",
+      "evidence": "Phase 3E: conf 0.3/0.5/0.7 all gave identical results",
+      "severity": "high"
+    },
+    {
+      "id": "HL08",
+      "lesson": "Old species F1 must stay above 0.90 \u2014 reject any training causing more forgetting",
+      "evidence": "All phases: forgetting is the primary constraint",
+      "severity": "critical",
+      "constraint": {
+        "field": "old_f1_threshold",
+        "min": 0.9
+      }
+    },
+    {
+      "id": "HL09",
+      "lesson": "Label noise (27.4% FP from Florence-2) is the ROOT CAUSE of all failures",
+      "evidence": "All pseudo-label approaches degrade YOLO because of noise accumulation",
+      "severity": "critical"
+    },
+    {
+      "id": "HL10",
+      "lesson": "YOLO trained on 8/12 species drops 27% F1 on unseen 4 species",
+      "evidence": "Phase 3B: Leave-4-Out experiment",
+      "severity": "info"
+    }
+  ],
+  "learned_lessons": [
+    {
+      "id": "LL00",
+      "lesson": "Implementing continuous learning strategies is crucial, as current retraining cycles risk catastrophic forgetting and significant performance degradation.",
+      "evidence": "Agent round 1",
+      "severity": "info",
+      "timestamp": "2026-04-13T23:49:39.741352"
+    },
+    {
+      "id": "LL01",
+      "lesson": "**The agent is suffering from catastrophic forgetting, indicating that the focus on new data is degrading its proficiency on previously learned tasks and requiring strategies like continual learning o",
+      "evidence": "Agent round 2",
+      "severity": "info",
+      "timestamp": "2026-04-14T02:13:42.426762"
+    },
+    {
+      "id": "LL02",
+      "lesson": "Reflection failed: Failed to connect to Ollama. Please check that Ollama is downloaded, running and accessible. https://ollama.com/download",
+      "evidence": "Agent round 1",
+      "severity": "info",
+      "timestamp": "2026-04-14T04:19:03.205213"
+    }
+  ],
+  "experiments": [
+    {
+      "iteration": 0,
+      "timestamp": "2026-04-13T21:24:51.429752",
+      "strategy": {
+        "vlm_models": [
+          "florence2_base",
+          "owlv2"
+        ],
+        "min_votes": 2,
+        "consensus_iou": 0.3,
+        "use_yolo_old": true,
+        "lr": 0.001,
+        "epochs": 50,
+        "freeze_layers": 0,
+        "replay_ratio": 0.3,
+        "name": "seed_best_known_phase3e"
+      },
+      "result": {
+        "old_f1": 0.897,
+        "new_f1": 0.622,
+        "old_map50": 0.851,
+        "new_map50": 0.559,
+        "old_map50_95": 0.81,
+        "new_map50_95": 0.493,
+        "forgetting": false
+      },
+      "brain_reasoning": "Seed: Phase 3E Florence+OWLv2 consensus"
+    },
+    {
+      "iteration": 1,
+      "timestamp": "2026-04-13T23:49:39.757231",
+      "strategy": {
+        "name": "agent_round_1",
+        "mode": "agent",
+        "actions_taken": [
+          "generate_consensus",
+          "inspect_labels",
+          "inspect_labels",
+          "train_yolo",
+          "evaluate",
+          "train_yolo",
+          "evaluate",
+          "evaluate",
+          "evaluate",
+          "evaluate"
+        ],
+        "num_actions": 10
+      },
+      "result": {
+        "old_f1": 0.8926,
+        "old_precision": 0.8388,
+        "old_recall": 0.9538,
+        "old_map50": 0.9685,
+        "old_map50_95": 0.9056,
+        "old_aps": {
+          "0.5": 0.9685,
+          "0.55": 0.9647,
+          "0.6": 0.9602,
+          "0.65": 0.9529,
+          "0.7": 0.9405,
+          "0.75": 0.9331,
+          "0.8": 0.9224,
+          "0.85": 0.8928,
+          "0.9": 0.8462,
+          "0.95": 0.6749
+        },
+        "new_f1": 0.6236,
+        "new_precision": 0.5612,
+        "new_recall": 0.7017,
+        "new_map50": 0.6589,
+        "new_map50_95": 0.5512,
+        "new_aps": {
+          "0.5": 0.6589,
+          "0.55": 0.6459,
+          "0.6": 0.6322,
+          "0.65": 0.6198,
+          "0.7": 0.6029,
+          "0.75": 0.5792,
+          "0.8": 0.5514,
+          "0.85": 0.5186,
+          "0.9": 0.4509,
+          "0.95": 0.2527
+        },
+        "forgetting": true
+      },
+      "brain_reasoning": "[\"Text keyword: consensus\", \"Pipeline step 1: inspect best VLM labels\", \"Pipeline step 1: inspect best VLM labels\", \"Forced: labels ready, moving to training\", \"Text keyword: evaluat\", \"Text keyword: train\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\"]"
+    },
+    {
+      "iteration": 2,
+      "timestamp": "2026-04-14T02:13:42.429758",
+      "strategy": {
+        "name": "agent_round_2",
+        "mode": "agent",
+        "actions_taken": [
+          "inspect_labels",
+          "generate_consensus",
+          "inspect_labels",
+          "train_yolo",
+          "evaluate",
+          "evaluate",
+          "evaluate",
+          "evaluate",
+          "evaluate",
+          "train_yolo"
+        ],
+        "num_actions": 10
+      },
+      "result": {
+        "old_f1": 0.8825,
+        "old_precision": 0.817,
+        "old_recall": 0.9596,
+        "old_map50": 0.9693,
+        "old_map50_95": 0.9081,
+        "old_aps": {
+          "0.5": 0.9693,
+          "0.55": 0.9668,
+          "0.6": 0.9598,
+          "0.65": 0.9543,
+          "0.7": 0.9483,
+          "0.75": 0.939,
+          "0.8": 0.9235,
+          "0.85": 0.8848,
+          "0.9": 0.835,
+          "0.95": 0.6999
+        },
+        "new_f1": 0.6172,
+        "new_precision": 0.5446,
+        "new_recall": 0.7121,
+        "new_map50": 0.6588,
+        "new_map50_95": 0.5589,
+        "new_aps": {
+          "0.5": 0.6588,
+          "0.55": 0.6436,
+          "0.6": 0.6263,
+          "0.65": 0.6168,
+          "0.7": 0.6021,
+          "0.75": 0.5818,
+          "0.8": 0.5578,
+          "0.85": 0.5231,
+          "0.9": 0.4753,
+          "0.95": 0.3037
+        },
+        "forgetting": true
+      },
+      "brain_reasoning": "[\"Pipeline step 1: inspect best VLM labels\", \"Text keyword: consensus\", \"Pipeline step 1: inspect best VLM labels\", \"Forced: labels ready, moving to training\", \"Text keyword: evaluat\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Text keyword: train\"]"
+    },
+    {
+      "iteration": 3,
+      "timestamp": "2026-04-14T04:19:03.208117",
+      "strategy": {
+        "name": "agent_round_1",
+        "mode": "agent",
+        "actions_taken": [
+          "generate_consensus",
+          "freeze_train",
+          "evaluate",
+          "distill_train",
+          "inspect_labels",
+          "inspect_labels",
+          "evaluate",
+          "evaluate",
+          "evaluate",
+          "evaluate"
+        ],
+        "num_actions": 10
+      },
+      "result": {
+        "old_f1": 0.8861,
+        "old_precision": 0.823,
+        "old_recall": 0.9596,
+        "old_map50": 0.9675,
+        "old_map50_95": 0.9133,
+        "old_aps": {
+          "0.5": 0.9675,
+          "0.55": 0.967,
+          "0.6": 0.9606,
+          "0.65": 0.9533,
+          "0.7": 0.9469,
+          "0.75": 0.9393,
+          "0.8": 0.9266,
+          "0.85": 0.8936,
+          "0.9": 0.8462,
+          "0.95": 0.7323
+        },
+        "new_f1": 0.5954,
+        "new_precision": 0.5214,
+        "new_recall": 0.6939,
+        "new_map50": 0.6103,
+        "new_map50_95": 0.5154,
+        "new_aps": {
+          "0.5": 0.6103,
+          "0.55": 0.5996,
+          "0.6": 0.5869,
+          "0.65": 0.5686,
+          "0.7": 0.5541,
+          "0.75": 0.5328,
+          "0.8": 0.5175,
+          "0.85": 0.485,
+          "0.9": 0.4314,
+          "0.95": 0.2676
+        },
+        "forgetting": true
+      },
+      "brain_reasoning": "[\"Ollama qwen3:14b tool call\", \"Ollama qwen3:14b tool call\", \"Ollama qwen3:14b tool call\", \"Ollama qwen3:14b tool call\", \"Pipeline step 1: inspect best VLM labels\", \"Pipeline step 1: inspect best VLM labels\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\"]"
+    },
+    {
+      "iteration": 4,
+      "timestamp": "2026-04-14T05:42:45.309104",
+      "strategy": {
+        "name": "agent_round_2",
+        "mode": "agent",
+        "actions_taken": [
+          "inspect_labels",
+          "inspect_labels",
+          "generate_consensus",
+          "train_yolo",
+          "evaluate",
+          "evaluate",
+          "evaluate",
+          "evaluate",
+          "evaluate",
+          "evaluate"
+        ],
+        "num_actions": 10
+      },
+      "result": {
+        "old_f1": 0.8949,
+        "old_precision": 0.8394,
+        "old_recall": 0.9582,
+        "old_map50": 0.9699,
+        "old_map50_95": 0.909,
+        "old_aps": {
+          "0.5": 0.9699,
+          "0.55": 0.963,
+          "0.6": 0.9564,
+          "0.65": 0.9509,
+          "0.7": 0.939,
+          "0.75": 0.9321,
+          "0.8": 0.9117,
+          "0.85": 0.8875,
+          "0.9": 0.8513,
+          "0.95": 0.7287
+        },
+        "new_f1": 0.5832,
+        "new_precision": 0.5043,
+        "new_recall": 0.6913,
+        "new_map50": 0.6197,
+        "new_map50_95": 0.522,
+        "new_aps": {
+          "0.5": 0.6197,
+          "0.55": 0.6061,
+          "0.6": 0.5898,
+          "0.65": 0.5765,
+          "0.7": 0.5615,
+          "0.75": 0.5405,
+          "0.8": 0.5175,
+          "0.85": 0.4982,
+          "0.9": 0.4401,
+          "0.95": 0.2696
+        },
+        "forgetting": true
+      },
+      "brain_reasoning": "[\"Pipeline step 1: inspect best VLM labels\", \"Pipeline step 1: inspect best VLM labels\", \"Forced: too many repeats, moving to consensus\", \"Forced: labels ready, moving to training\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\", \"Forced: model ready, moving to evaluation\"]"
+    }
+  ]
+}

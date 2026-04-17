@@ -791,8 +791,75 @@ After 4 failed downloads Brain fell back to v2.x pseudo-label pipeline (`generat
 4. **Try alternate dataset configs** when the default config has no bbox. Sort configs with `detect`/`bbox`/`yolo`/`coco` keywords first.
 5. **Better skip logs**: explicit `reason` stored per-harvest so the registry records WHY a candidate was accepted (sibling pattern vs tag vs config).
 
+## 2026-04-17 - v3.0.6: Fix trainer regressions + GitHub/Kaggle sources
+
+### What Job 39592795 (v3.0.5) taught us (8h run, one round completed)
+Verified v3.0.5 with harvest_new_datasets worked but three blockers kept it from
+demonstrating the v3.0 thesis ("latest YOLO + massive real data"):
+1. **yolo26x was NEVER loaded.** `yolo_trainer.py` read `Config.YOLO_8SP_WEIGHTS`
+   (5.5MB YOLO11n) whenever Brain fell off `train_yolo_mega` into `train_yolo`.
+   Log literally says `YOLO11n summary (fused): 101 layers, 2,583,907 parameters`.
+   The whole v3.0 direction was silently downgraded.
+2. **mega training ran 6h21m and threw FileNotFoundError on best.pt.** Ultralytics
+   auto-increments save_dir (train → train2 → train22 …) whenever the project dir
+   already exists; our hardcoded `project_dir/train/weights/best.pt` check missed
+   the actual save location. 6h21m of wallclock was burned on what was effectively
+   a successful training that we couldn't find.
+3. **Brain called `harvest_new_datasets` 3×.** Pool exhausted after the first call
+   (0 new datasets), but Brain kept trying. Orchestrator force-progressed on the
+   3rd call to `generate_consensus` — the v2.x pseudo-label path — and spent the
+   remaining walltime on the same 5648 images yet again.
+
+### Fixes — P1/P2/P3
+
+1. **`yolo_trainer.py`** — candidate-list selection matching `mega_trainer`:
+   - `strategy["base_model"]` (explicit) > `Config.DETECTION_MODEL + FALLBACKS` > `YOLO_8SP_WEIGHTS`
+   - Only keeps YOLO_8SP_WEIGHTS as default when `strategy["use_legacy_baseline"]=True`
+     (the leave-4-out forgetting studies). New fallback training uses yolo26x by default.
+   - Added `_resolve_best_pt(model, project_dir)` reading `model.trainer.save_dir` first,
+     then scanning newest `train*/weights/best.pt` by mtime.
+
+2. **`mega_trainer.py`** — same `_resolve_best_pt` helper after `model.train(...)`.
+   `FileNotFoundError` now reports the project dir's actual subdir contents for
+   faster triage.
+
+3. **`orchestrator.py`** — repeat-call handling rewritten. When `harvest_new_datasets`
+   or `search_datasets` repeats once (not twice), force-progression runs
+   `train_yolo_mega` (v3.0) instead of `generate_consensus` (v2.x) — but only if
+   `MEGA_TRAIN_MIN_IMAGES` is met. Harvest observation now explicitly tells Brain
+   "DO NOT CALL harvest_new_datasets AGAIN THIS ROUND".
+
+4. **`brain.py`** — system prompt adds HARD RULES block ("Call harvest EXACTLY
+   ONCE per round"). FALLBACK_PIPELINE epochs reduced 100→50 (yolo26x is 22×
+   larger; 50 epochs on ~10K images fits 4-5h on V100 with room for round 2).
+
+### v3.0.6 feature: GitHub + Kaggle as dataset sources
+
+HuggingFace object-detection pool for weed/crop is thin — v3.0.5 harvested 1
+dataset/round before exhausting queries. Professor direction is "agent browses
+GitHub weed-detection repos". New module `tools/extra_sources.py`:
+
+- **GitHub phase** (after HF): search public GitHub API for "weed/crop dataset yolo",
+  shallow-clone top starred repos, scan for `data.yaml` + `images/` + `labels/`,
+  register if ≥50 imgs + ≥1 label. Uses unauth API (60 req/hr — enough for weekly
+  harvests). Graceful degrade if `git` missing.
+- **Kaggle phase** (after GitHub): searches via `kaggle datasets list -s`, downloads
+  via `kagglehub.dataset_download`. Silently skips if `kagglehub` not installed or
+  `~/.kaggle/kaggle.json` missing.
+- **Wired into `dataset_discovery.harvest_new_datasets`** as Phase 3 (GitHub) and
+  Phase 4 (Kaggle) after the two HF phases. Max-new quota is shared; dedup by slug
+  (`gh_owner__repo`, `kg_owner__name`) so re-runs skip.
+
+### Verification (Apr 17)
+- `ultralytics 8.4.37` loads yolo26x.pt on cluster login node — **58,993,368 params**.
+- Local dry-run of `search_github_repos('weed detection')` returned 5 plausible repos
+  (tehreemnoor/YOLOv5-Weed-Detection-Model, chhavii17/YOLOv8-Weed-Detection, etc.).
+- Job 39682578 submitted for cluster test. Expected behavior: round 1 harvests via
+  HF+GitHub+Kaggle, mega-trains yolo26x on accumulated data, evaluates, moves on.
+
 ## TODO
-- [ ] Deploy v3.0.5, submit job — verify Phase 1 bulk list finds agricultural bbox datasets
-- [ ] Add Kaggle / Roboflow sources in a v3.0.6 if HF yield stays sparse
+- [ ] Watch Job 39682578 — verify yolo26x trains (not yolo11n) and best.pt resolves
+- [ ] If GitHub cloning yields useful datasets, curate a seed list for faster rounds
+- [ ] Roboflow Universe source (v3.0.7) — needs API key already in `.roboflow_key`
 - [ ] Generate paper figures and tables
 - [ ] Write paper

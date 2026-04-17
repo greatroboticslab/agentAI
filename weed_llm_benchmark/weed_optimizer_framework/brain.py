@@ -482,6 +482,12 @@ REQUIRED FIRST ACTION of every round:
   → finds and downloads up to 5 HF bbox datasets not already in registry
   → returns 0 if nothing new found (that's fine, move on)
 
+HARD RULES (violate → orchestrator force-overrides):
+  * Call harvest_new_datasets EXACTLY ONCE per round. If it returns 0, DO NOT retry — pool
+    is exhausted this round; move on.
+  * After harvest (regardless of count) → train_yolo_mega → evaluate → done.
+  * Never call the same tool twice in a row unless its observation explicitly tells you to.
+
 AFTER HARVEST (remaining flow):
   train_yolo_mega(epochs=100, imgsz=640)   # trains latest YOLO on ALL registered bbox data
   evaluate                                  # measures mAP on old + new species
@@ -570,9 +576,12 @@ Reply with just the number:"""
 
     FALLBACK_PIPELINE = [
         # v3.0: harvest 5 new datasets → train largest YOLO on all registered bbox data
+        # epochs=50 balances: yolo26x is 22x larger than yolo11n; with ~10K images and
+        # autobatch on V100-32GB, 50 epochs fits comfortably in 4-5h (leaves room for
+        # a 2nd round in an 8h walltime).
         {"action": "harvest_new_datasets", "params": {"max_new": 5, "max_images_per_ds": 30000},
-         "reasoning": "Pipeline 1: harvest up to 5 NEW bbox datasets from HF (weed/crop/plant)"},
-        {"action": "train_yolo_mega", "params": {"epochs": 100, "imgsz": 640},
+         "reasoning": "Pipeline 1: harvest up to 5 NEW bbox datasets (HF + GitHub + Kaggle)"},
+        {"action": "train_yolo_mega", "params": {"epochs": 50, "imgsz": 640, "patience": 15},
          "reasoning": "Pipeline 2: train latest YOLO on ALL registered bbox-labeled data"},
         {"action": "evaluate", "params": {},
          "reasoning": "Pipeline 3: evaluate mega-trained YOLO"},
@@ -599,7 +608,7 @@ Reply with just the number:"""
         KEYWORD_TABLE = [
             ("harvest_new_datasets", "harvest_new_datasets", {"max_new": 5, "max_images_per_ds": 30000}),
             ("harvest", "harvest_new_datasets", {"max_new": 5, "max_images_per_ds": 30000}),
-            ("train_yolo_mega", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),
+            ("train_yolo_mega", "train_yolo_mega", {"epochs": 50, "imgsz": 640, "patience": 15}),
             ("search_datasets", "search_datasets", {"query": "weed detection"}),
             ("download_dataset", "download_dataset", {"name": "weedsense", "max_images": 60000}),
             ("mega", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),

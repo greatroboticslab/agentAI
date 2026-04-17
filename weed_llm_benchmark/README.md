@@ -69,6 +69,44 @@ Evaluated on **CottonWeedDet12** test set (848 images, 12 weed species, 1,464 gr
 - **Native grounding is essential**: Models without built-in bbox support (LLaVA, Llama Vision, Molmo) produce near-zero mAP regardless of model size.
 - **Coordinate format matters**: Qwen2.5-VL outputs in [0, 1000] normalized space; Florence-2 outputs absolute pixels. Proper coordinate conversion is critical.
 
+## v3.0 — Autonomous Agent Collects the Internet's Weed Data
+
+Starting v3.0, the framework's primary mode is an autonomous research agent that
+accumulates real-bbox datasets across runs and trains the latest YOLO (yolo26x,
+~59M params) on the union — no more circular self-distillation on the same 5K images.
+
+**Per-round loop (Brain decides, orchestrator enforces):**
+```
+harvest_new_datasets(max_new=5)           # pulls NEW datasets from 3 sources:
+                                          #   Phase 1: HF task=object-detection filter
+                                          #   Phase 2: HF keyword search
+                                          #   Phase 3: GitHub repos with YOLO data
+                                          #   Phase 4: Kaggle `datasets list` (optional)
+train_yolo_mega(epochs=50, imgsz=640)     # merges registry, trains yolo26x
+evaluate                                  # mAP on old + new species
+done
+```
+
+**Cumulative registry** (`results/framework/dataset_registry.json`) dedups by slug
+across runs. Goal: 100K+ real bbox images over many rounds.
+
+**Run it:**
+```bash
+sbatch run_framework_ollama.sh qwen3:14b quick   # 3 rounds, ~8h walltime
+sbatch run_framework_ollama.sh qwen3:14b long    # 12 rounds
+```
+
+**Key modules:**
+- `weed_optimizer_framework/brain.py` — Ollama+function-calling agent (19 tools)
+- `weed_optimizer_framework/orchestrator.py` — DATA GATE + repeat-call guard
+- `weed_optimizer_framework/tools/dataset_discovery.py` — registry + harvest
+- `weed_optimizer_framework/tools/extra_sources.py` — **GitHub + Kaggle** (v3.0.6)
+- `weed_optimizer_framework/tools/mega_trainer.py` — merges datasets → yolo26x train
+- `weed_optimizer_framework/config.py` — `DETECTION_MODEL = "yolo26x.pt"` with ordered fallbacks
+
+See CHANGELOG.md for v3.0.0 → v3.0.6 bug history (each revision exists because the
+previous one's architecture didn't match its intended behavior).
+
 ## Cross-Species Generalization & Agent Optimization
 
 ### Problem: YOLO fails on unseen weed species

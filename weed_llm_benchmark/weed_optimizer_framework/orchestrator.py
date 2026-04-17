@@ -185,15 +185,23 @@ class Orchestrator:
             action = self.brain.decide_next_action(context_history, step_num=step)
             action_name = action.get("action", "done")
 
-            # Prevent infinite loops: if same action repeated 2+ times, force progression
+            # Prevent infinite loops: if same action repeated 2+ times, force progression.
+            # v3.0-aware: if Brain loops on harvest/search (common when HF pool exhausted), force mega
+            # training on the accumulated real-labeled data instead of falling back to v2.x consensus.
             action_counts[action_name] = action_counts.get(action_name, 0) + 1
-            if action_counts[action_name] > 2 and action_name not in ("done", "evaluate"):
+            repeat_limit = 1 if action_name in ("harvest_new_datasets", "search_datasets") else 2
+            if action_counts[action_name] > repeat_limit and action_name not in ("done", "evaluate"):
                 logger.warning(f"Action '{action_name}' repeated {action_counts[action_name]} times, forcing progression")
-                # Force next logical step
-                if not self._current_label_dir:
+                bbox_now = _current_bbox_count()
+                if bbox_now >= MEGA_THRESHOLD and not self._current_model_path:
+                    # v3.0 path: enough real data, go straight to mega training
+                    action = {"action": "train_yolo_mega",
+                              "params": {"epochs": 100, "imgsz": 640, "force": True},
+                              "reasoning": f"Forced: harvest/search exhausted, {bbox_now} bbox imgs ready for mega"}
+                elif not self._current_label_dir and not self._current_model_path:
                     action = {"action": "generate_consensus",
                               "params": {"vlm_models": ["florence2_base", "owlv2"], "min_votes": 2, "consensus_iou": 0.3},
-                              "reasoning": "Forced: too many repeats, moving to consensus"}
+                              "reasoning": "Forced: insufficient real data and no labels yet, falling back to v2.x consensus"}
                 elif not self._current_model_path:
                     action = {"action": "train_yolo",
                               "params": {"lr": 0.001, "epochs": 50, "replay_ratio": 0.3},
@@ -402,9 +410,13 @@ class Orchestrator:
                                     f"labeled={s.get('labeled', '?')} "
                                     f"kind={s.get('annotation_kind', '?')}\n")
                         if ok == 0:
-                            obs += ("No new bbox datasets found this round — HF pool may be "
-                                    "exhausted for these queries. Try custom `queries` "
-                                    "param with different keywords next time.\n")
+                            obs += ("HARVEST COMPLETE: 0 new datasets this round. HF pool "
+                                    "exhausted for current queries. DO NOT CALL harvest_new_datasets "
+                                    "AGAIN THIS ROUND — proceed to train_yolo_mega on accumulated data, "
+                                    "or call evaluate/done to end the round.\n")
+                        else:
+                            obs += ("HARVEST COMPLETE: added datasets to registry. "
+                                    "Next action should be train_yolo_mega (not another harvest).\n")
                     except Exception as e:
                         obs = f"Harvest failed: {type(e).__name__}: {e}"
                     context_history.append({"role": "observation", "content": obs})

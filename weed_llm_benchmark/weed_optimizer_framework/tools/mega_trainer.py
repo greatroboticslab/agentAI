@@ -22,6 +22,31 @@ logger = logging.getLogger(__name__)
 IMG_EXTS = ('.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG', '.bmp')
 
 
+def _resolve_best_pt(model, project_dir):
+    """Resolve actual best.pt after ultralytics training (handles train, train2, ... dirs)."""
+    try:
+        save_dir = getattr(getattr(model, "trainer", None), "save_dir", None)
+        if save_dir:
+            cand = Path(save_dir) / "weights" / "best.pt"
+            if cand.exists():
+                return str(cand)
+    except Exception:
+        pass
+    try:
+        train_dirs = sorted(
+            (p for p in Path(project_dir).glob("train*") if p.is_dir()),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for d in train_dirs:
+            cand = d / "weights" / "best.pt"
+            if cand.exists():
+                return str(cand)
+    except Exception:
+        pass
+    return None
+
+
 def _find_images(root):
     """Recursively find image files under root."""
     return [p for p in Path(root).rglob("*") if p.suffix in IMG_EXTS]
@@ -210,13 +235,18 @@ def train_yolo_mega(strategy, iteration):
         verbose=False,
     )
 
+    # Resolve actual save_dir (ultralytics increments train/train2/... if dir exists)
+    best_pt = _resolve_best_pt(model, project_dir)
+
     del model
     torch.cuda.empty_cache()
     gc.collect()
 
-    best_pt = os.path.join(project_dir, "train", "weights", "best.pt")
-    if not os.path.exists(best_pt):
-        raise FileNotFoundError(f"Mega training failed: {best_pt} not found")
+    if not best_pt or not os.path.exists(best_pt):
+        raise FileNotFoundError(
+            f"Mega training finished but best.pt not found under {project_dir}. "
+            f"Existing subdirs: {[p.name for p in Path(project_dir).glob('*') if p.is_dir()]}"
+        )
 
     # Mark all used datasets as trained
     disc = DatasetDiscovery()

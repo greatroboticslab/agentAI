@@ -154,14 +154,40 @@ def train_yolo(strategy, label_dir, iteration):
 
     # Train
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # Strategy can override base weights (v3.0: yolo11x/yolo26x); default = 8-species for forgetting studies
-    base_weights = strategy.get("base_model") or Config.YOLO_8SP_WEIGHTS
-    if not os.path.exists(base_weights) and not base_weights.endswith(".pt"):
-        raise FileNotFoundError(f"Base YOLO weights not found: {base_weights}")
-    # If base_weights is bare name like 'yolo11x.pt', ultralytics auto-downloads
-    logger.info(f"Base weights: {base_weights}")
+    # Base weights selection:
+    #   1. strategy["base_model"] — explicit override (highest priority)
+    #   2. strategy["use_legacy_baseline"]=True — use YOLO_8SP_WEIGHTS (leave4out / forgetting studies)
+    #   3. Config.DETECTION_MODEL — v3.0 default (yolo26x with fallbacks)
+    candidates = []
+    if strategy.get("base_model"):
+        candidates.append(strategy["base_model"])
+    elif strategy.get("use_legacy_baseline") and os.path.exists(Config.YOLO_8SP_WEIGHTS):
+        candidates.append(Config.YOLO_8SP_WEIGHTS)
+    else:
+        candidates.append(Config.DETECTION_MODEL)
+        for fb in getattr(Config, "DETECTION_MODEL_FALLBACKS", []):
+            if fb not in candidates:
+                candidates.append(fb)
+        # Legacy fallback as last resort
+        if os.path.exists(Config.YOLO_8SP_WEIGHTS):
+            candidates.append(Config.YOLO_8SP_WEIGHTS)
 
-    model = YOLO(base_weights)
+    model = None
+    base_weights = None
+    last_err = None
+    for cand in candidates:
+        try:
+            logger.info(f"Trying base model: {cand}")
+            model = YOLO(cand)
+            base_weights = cand
+            break
+        except Exception as e:
+            last_err = e
+            logger.warning(f"{cand} unavailable: {e}")
+    if model is None:
+        raise RuntimeError(f"No base model loaded. Tried: {candidates}. Last error: {last_err}")
+
+    logger.info(f"Base weights chosen: {base_weights}")
     project_dir = os.path.join(Config.FRAMEWORK_DIR, f"yolo_iter{iteration}")
 
     logger.info(f"Training YOLO: lr={strategy.get('lr', 0.001)}, "
@@ -183,6 +209,9 @@ def train_yolo(strategy, label_dir, iteration):
         verbose=False,
     )
 
+    # Resolve actual save_dir (ultralytics auto-increments: train, train2, train3, ...)
+    best_pt = _resolve_best_pt(model, project_dir)
+
     # Cleanup
     del model
     torch.cuda.empty_cache()
@@ -191,9 +220,39 @@ def train_yolo(strategy, label_dir, iteration):
     # Remove assembled dataset to save disk
     shutil.rmtree(ds_dir, ignore_errors=True)
 
-    best_pt = os.path.join(project_dir, "train", "weights", "best.pt")
-    if not os.path.exists(best_pt):
-        raise FileNotFoundError(f"Training failed: {best_pt} not found")
+    if not best_pt or not os.path.exists(best_pt):
+        raise FileNotFoundError(f"Training failed: best.pt not found under {project_dir}")
 
     logger.info(f"Training complete: {best_pt}")
     return best_pt
+
+
+def _resolve_best_pt(model, project_dir):
+    """Resolve the actual best.pt path after ultralytics training.
+
+    Ultralytics auto-increments save_dir (train, train2, ...) when the dir already exists.
+    Prefer model.trainer.save_dir; fall back to the newest train*/ subdir under project_dir.
+    """
+    # Preferred: ask the trainer directly
+    try:
+        save_dir = getattr(getattr(model, "trainer", None), "save_dir", None)
+        if save_dir:
+            cand = Path(save_dir) / "weights" / "best.pt"
+            if cand.exists():
+                return str(cand)
+    except Exception:
+        pass
+    # Fallback: newest train*/ dir by mtime
+    try:
+        train_dirs = sorted(
+            (p for p in Path(project_dir).glob("train*") if p.is_dir()),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for d in train_dirs:
+            cand = d / "weights" / "best.pt"
+            if cand.exists():
+                return str(cand)
+    except Exception:
+        pass
+    return None
