@@ -37,7 +37,7 @@ for i in $(seq 1 60); do
 done
 
 # Pull model — retry up to 3 times
-BRAIN_MODEL="${1:-qwen3:14b}"
+BRAIN_MODEL="${1:-gemma4}"
 echo "Pulling Brain model: $BRAIN_MODEL"
 for attempt in 1 2 3; do
     /ocean/projects/cis240145p/byler/ollama/bin/ollama pull $BRAIN_MODEL 2>&1
