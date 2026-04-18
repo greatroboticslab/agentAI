@@ -17,10 +17,16 @@ export HF_HOME=/ocean/projects/cis240145p/byler/hf_cache
 export OLLAMA_HOST=127.0.0.1:11434
 export OLLAMA_MODELS=/ocean/projects/cis240145p/byler/ollama/models
 
+# v3.0.9: Kaggle v2 API token for autonomous dataset search.
+# Brain uses `_kaggle_http_search()` with bearer auth — no ~/.kaggle/kaggle.json needed.
+export KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN:-KGAT_67eb9458d9e565587c47c967c5249584}
+# Redirect kagglehub cache off the tiny HOME quota onto /ocean (7TB budget).
+export KAGGLEHUB_CACHE=${KAGGLEHUB_CACHE:-/ocean/projects/cis240145p/byler/kagglehub_cache}
+mkdir -p "$KAGGLEHUB_CACHE" 2>/dev/null
+
 # v3.0.7: mega gate — target is 50K real bbox images cumulative.
-# For the first v3.0.7 run without Kaggle creds, keep at 15K so mega can fire
-# with whatever HF+GitHub+Roboflow yield. Raise to 50K once Kaggle creds land.
-export WEED_MEGA_MIN_IMAGES=${WEED_MEGA_MIN_IMAGES:-15000}
+# With Kaggle autonomous search active (v3.0.9), 50K is reachable per round.
+export WEED_MEGA_MIN_IMAGES=${WEED_MEGA_MIN_IMAGES:-50000}
 
 echo "=== Weed Optimizer Framework — OLLAMA AGENT ==="
 echo "Date: $(date)"

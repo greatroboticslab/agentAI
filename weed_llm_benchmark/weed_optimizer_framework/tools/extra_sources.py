@@ -195,74 +195,86 @@ def harvest_github_datasets(data_dir, queries, already_known_cb, max_new=3):
 # KAGGLE
 # =========================================================
 
-def _kaggle_cli_search(query, max_results=5):
-    try:
-        r = subprocess.run(
-            ["kaggle", "datasets", "list", "-s", query],
-            capture_output=True, timeout=30,
-        )
-        if r.returncode != 0:
-            return []
-        results = []
-        for line in r.stdout.decode("utf-8", errors="ignore").splitlines()[2:]:
-            parts = line.split()
-            if len(parts) >= 1 and "/" in parts[0]:
-                results.append({"ref": parts[0], "title": " ".join(parts[1:])[:80]})
-                if len(results) >= max_results:
-                    break
-        return results
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
+def _kaggle_token():
+    """Pick up Kaggle v2 token from env. Returns None if unset."""
+    return os.environ.get("KAGGLE_API_TOKEN") or os.environ.get("KAGGLE_KEY")
 
 
-# Curated Kaggle weed/crop bbox datasets — known to have YOLO labels.
-# Added to every harvest run as seeds (in addition to CLI search results).
-CURATED_KAGGLE = [
-    # ref, est_images, description
-    ("ravirajsinh45/crop-and-weed-detection", 1300, "Crop-weed YOLO bbox (ravirajsinh45)"),
-    ("gavinarmstrong/open-sprayer-images", 6000, "Open Sprayer weed images"),
-    ("jaidalmotra/cotton-weed-dataset", 4000, "Cotton weed"),
-    ("fpeccia/weed-detection-in-soybean-crops", 15000, "Soybean weed (large)"),
-    ("vbookshelf/v2-plant-seedlings-dataset", 5500, "V2 Plant seedlings"),
-]
+def _kaggle_http_search(query, token, max_results=20):
+    """Autonomous search via Kaggle v1 datasets/list REST API (v2 bearer).
 
-
-def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=3):
-    """Search + download Kaggle datasets via kagglehub + kaggle CLI.
-
-    Strategy: merge CURATED_KAGGLE seeds with `kaggle datasets list -s` results.
-    Needs ~/.kaggle/kaggle.json or env creds. Silently skips if missing.
+    Returns list of {ref, title, size_mb, downloads, votes}.
     """
+    try:
+        import urllib.parse, urllib.request, json
+        url = (f"https://www.kaggle.com/api/v1/datasets/list"
+               f"?search={urllib.parse.quote(query)}&page=1&sortBy=hottest")
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "User-Agent": "weed-llm-benchmark",
+        })
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.load(r)
+    except Exception as e:
+        logger.warning(f"[Kaggle] HTTP search '{query}' failed: {e}")
+        return []
+    out = []
+    for d in data:
+        ref = d.get("ref") or f"{d.get('ownerName','?')}/{d.get('datasetSlug','?')}"
+        if "/" not in ref:
+            continue
+        out.append({
+            "ref": ref,
+            "title": d.get("title", ""),
+            "size_mb": d.get("totalBytes", 0) // (1024 * 1024) if d.get("totalBytes") else 0,
+            "downloads": d.get("downloadCount", 0),
+            "votes": d.get("voteCount", 0),
+        })
+        if len(out) >= max_results:
+            break
+    return out
+
+
+def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
+    """Autonomously search Kaggle + download matching weed/crop bbox datasets.
+
+    Uses KAGGLE_API_TOKEN env (v2 bearer auth). No hardcoded slugs — Brain's
+    query terms drive discovery. Ranks by downloads, skips already-known slugs.
+    Filters by name for agriculture keywords before downloading.
+    """
+    token = _kaggle_token()
+    if not token:
+        logger.info("[Kaggle] KAGGLE_API_TOKEN not set — skipping")
+        return []
     try:
         import kagglehub  # noqa
     except ImportError:
         logger.info("[Kaggle] kagglehub not installed — skipping")
         return []
-    # Verify creds present — try a dummy listing
-    if shutil.which("kaggle") is None:
-        logger.info("[Kaggle] `kaggle` CLI missing, using curated-only mode")
 
-    # Build candidate list
+    # Build candidate pool from autonomous search across all queries
+    AG_VOCAB = ("weed", "crop", "plant", "leaf", "fruit", "rice", "wheat",
+                "corn", "cotton", "soybean", "agri", "farm", "pest", "disease",
+                "seedling", "tomato", "potato")
     seen = set()
     candidates = []
+    for q in queries:
+        for kr in _kaggle_http_search(q, token, max_results=30):
+            ref = kr["ref"]
+            if ref in seen:
+                continue
+            seen.add(ref)
+            # Cheap sanity: title/slug must hint agriculture
+            haystack = f"{ref} {kr.get('title','')}".lower()
+            if not any(v in haystack for v in AG_VOCAB):
+                continue
+            candidates.append({**kr, "source_query": q})
 
-    # 1. Curated seeds (always tried)
-    for ref, est, desc in CURATED_KAGGLE:
-        if ref in seen:
-            continue
-        seen.add(ref)
-        candidates.append({"ref": ref, "title": desc, "source": "curated"})
-
-    # 2. Search results (if CLI available)
-    if shutil.which("kaggle") is not None:
-        for q in queries:
-            for kr in _kaggle_cli_search(q, max_results=5):
-                if kr["ref"] in seen:
-                    continue
-                seen.add(kr["ref"])
-                candidates.append({**kr, "source": f"search:{q}"})
-
-    logger.info(f"[Kaggle] {len(candidates)} candidates (curated + search)")
+    # Rank by downloads desc
+    candidates.sort(key=lambda c: -c.get("downloads", 0))
+    logger.info(f"[Kaggle] {len(candidates)} autonomous candidates from "
+                f"{len(queries)} search queries")
 
     results = []
     for c in candidates:
@@ -272,8 +284,8 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=3):
         slug = "kg_" + ref.replace("/", "__").lower()
         if already_known_cb(slug):
             continue
-
         try:
+            # kagglehub picks up KAGGLE_API_TOKEN automatically
             path = kagglehub.dataset_download(ref)
         except Exception as e:
             logger.debug(f"[Kaggle] {ref}: download failed ({str(e)[:100]})")
@@ -284,10 +296,8 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=3):
         img_count = _count_images(path)
         lbl_count = _count_labels(path)
         if img_count < 50:
-            logger.debug(f"[Kaggle] {ref}: too few images ({img_count}), skip")
+            logger.debug(f"[Kaggle] {ref}: too few images ({img_count}) — skip")
             continue
-        # Allow label-less datasets through (some cotton-weed Kaggle sets are image-only);
-        # mega_trainer will ignore them via the annotation filter.
 
         local_path = os.path.join(data_dir, slug)
         if os.path.exists(local_path):
@@ -298,8 +308,8 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=3):
             logger.warning(f"[Kaggle] copy {ref} failed: {e}")
             continue
 
-        logger.info(f"[Kaggle] ✓ {ref} ({c['source']}): {img_count} imgs, "
-                    f"{lbl_count} labels → {slug}")
+        logger.info(f"[Kaggle] ✓ {ref} (q={c['source_query']}, dl={c['downloads']}): "
+                    f"{img_count} imgs, {lbl_count} labels")
         info = {
             "source": "kaggle", "hf_id": None, "kaggle_ref": ref,
             "images": img_count, "classes": "?",
@@ -308,12 +318,12 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=3):
             "status": "downloaded", "local_path": local_path,
             "local_images": img_count, "class_names": [],
             "downloaded_at": None, "used_for_training": False,
-            "training_runs": [], "harvest_reason": f"kaggle:{c['source']}",
+            "training_runs": [], "harvest_reason": f"kaggle:{c['source_query']}",
         }
         results.append({
             "slug": slug, "info": info,
             "stats": {"status": "downloaded", "images": img_count,
                       "labeled": lbl_count, "annotation_kind": "yolo"},
-            "hf_id": ref, "reason": f"kaggle:{c['source']}",
+            "hf_id": ref, "reason": f"kaggle:{c['source_query']}",
         })
     return results

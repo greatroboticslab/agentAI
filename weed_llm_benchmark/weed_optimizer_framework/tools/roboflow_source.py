@@ -26,19 +26,11 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Curated Roboflow Universe projects — verified weed/crop detection with bbox.
-# Each entry: (workspace, project_id, version, est_images, description).
-# `version` can be an int or "latest".
-# This list is the safety net when search returns nothing.
-CURATED_PROJECTS = [
-    # These slugs are illustrative — search fallback will recover if any 404.
-    ("augmented-startups", "weed-detection-dlodq", "latest", 4000, "weed detection"),
-    ("roboflow-universe-projects", "weeds-nxe1w", "latest", 3000, "weeds"),
-    ("weed-detection-ros4r", "weed-detection-ros4r", "latest", 2500, "weed ROS"),
-    ("ws-1", "crop-and-weed-detection-xzlff", "latest", 2000, "crop vs weed"),
-    ("agroai", "agricultural-weeds-detection-yz4iu", "latest", 3500, "agricultural weeds"),
-    ("iitrpr", "crop-weed-cws4c", "latest", 2200, "crop-weed IITR"),
-]
+# v3.0.9: CURATED_PROJECTS removed per autonomy principle — no human-seeded slugs.
+# Roboflow Universe has no public search API (probed 2026-04-18: 403/401 on all
+# candidate endpoints), so Brain cannot autonomously discover projects here.
+# Until Roboflow exposes a search API or user provides workspace URLs at runtime,
+# this source is a no-op — keeping the code so it's easy to re-enable later.
 
 
 def load_api_key():
@@ -210,7 +202,7 @@ def harvest_roboflow_datasets(data_dir, queries, already_known_cb, max_new=10):
         logger.info("[Roboflow] roboflow package missing — skipping")
         return []
 
-    # Build candidate pool
+    # Autonomous search only — no curated seeds (per v3.0.9 autonomy principle).
     seen = set()
     candidates = []
     for q in queries:
@@ -224,18 +216,14 @@ def harvest_roboflow_datasets(data_dir, queries, already_known_cb, max_new=10):
                 "version": "latest", "est_images": r.get("images", 0),
                 "description": r.get("description", ""), "source_query": q,
             })
-    for ws, proj, ver, est, desc in CURATED_PROJECTS:
-        key = (ws, proj)
-        if key in seen:
-            continue
-        seen.add(key)
-        candidates.append({
-            "workspace": ws, "project": proj, "version": ver,
-            "est_images": est, "description": desc, "source_query": "curated",
-        })
 
-    # Sort: API-search results first (likely more relevant), then by est_images desc
-    candidates.sort(key=lambda c: (c["source_query"] == "curated", -c["est_images"]))
+    if not candidates:
+        logger.info("[Roboflow] 0 candidates (public search unavailable); "
+                    "skipping Roboflow this round")
+        return []
+
+    # Sort by est_images desc
+    candidates.sort(key=lambda c: -c["est_images"])
 
     logger.info(f"[Roboflow] {len(candidates)} candidates (search + curated)")
     results = []

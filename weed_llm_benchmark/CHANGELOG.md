@@ -985,10 +985,70 @@ case the path to 50K requires:
   * More permissive GitHub scanner (allow repos with images/ + labels/ even
     when data.yaml is named differently)
 
+## 2026-04-18 - v3.0.9: Delete CURATED lists, Kaggle autonomous search
+
+### User caught another drift
+> "我最初的要求是brain自己去搜索数据集 无限扩充 而不是 你让我人为的找数据集 然后丢进去"
+
+v3.0.7 introduced `roboflow_source.CURATED_PROJECTS` (6 hardcoded slugs) and
+`extra_sources.CURATED_KAGGLE` (5 hardcoded refs). Both violate the v3.0
+autonomy principle — Brain must discover datasets by searching, not consume
+a human-seeded list. User granted a Kaggle API v2 token
+(`KAGGLE_API_TOKEN=KGAT_...`) to make real autonomous search possible.
+
+### Deletions + replacements
+
+1. **`tools/extra_sources.py`**:
+   - `CURATED_KAGGLE` list: DELETED
+   - New `_kaggle_http_search(query, token)` — calls `kaggle.com/api/v1/datasets/list?search=...`
+     with `Authorization: Bearer KGAT_...` (v2 API). Returns ranked list of real
+     datasets sorted by downloads.
+   - `harvest_kaggle_datasets`: autonomous search only. Queries Kaggle for each
+     term in Brain's query list, filters by agriculture vocab, ranks by
+     downloads, downloads top N via `kagglehub.dataset_download`.
+   - `_kaggle_cli_search` removed (unused).
+
+2. **`tools/roboflow_source.py`**:
+   - `CURATED_PROJECTS` list: DELETED
+   - Probed 5 Roboflow Universe public search endpoints (2026-04-18): all
+     return 401/403/HTML. Without a programmatic search API, Roboflow is
+     incompatible with the autonomy principle, so this source is a no-op
+     this release. Infrastructure kept for when Roboflow opens Universe search.
+
+3. **`run_framework_ollama.sh`**:
+   - `export KAGGLE_API_TOKEN=KGAT_...` (default; respects user override)
+   - `export KAGGLEHUB_CACHE=/ocean/projects/cis240145p/byler/kagglehub_cache`
+     — default `~/.cache/kagglehub` hit HOME disk quota on first probe; moved
+     to /ocean (7TB budget).
+   - `WEED_MEGA_MIN_IMAGES=50000` (raised from 15K — with autonomous Kaggle,
+     50K per harvest round is plausible).
+
+4. **Memory files added (durable guardrails):**
+   - `feedback_brain_autonomous.md`: "Brain searches; no human-curated lists.
+     If a source has no search API, drop it — don't paper over."
+   - `reference_kaggle_token.md`: token value, env var name, deployment notes.
+
+### Local verification (2026-04-18)
+`_kaggle_http_search('weed detection')` returns 6 real datasets:
+```
+fpeccia/weed-detection-in-soybean-crops        (dl=13110, 2421MB)
+ravirajsinh45/crop-and-weed-detection-data...  (dl=14501,   79MB)
+vbookshelf/v2-plant-seedlings-dataset          (dl=14551, 3268MB)
+vinayakshanawad/weedcrop-image-dataset         (dl= 5179,  251MB)
+vvatsalggupta/weed-detection                   (dl= 1055,  367MB)
+roshan81/weed-detection                        (dl=   66,   79MB)
+```
+
+### Cluster deployment
+- Token persisted in `~/.bashrc` on Bridges-2 ✓
+- `KAGGLEHUB_CACHE=/ocean/...` persisted (initial `_FOLDER` name was wrong;
+  correct env var is `KAGGLEHUB_CACHE`) ✓
+- `kagglehub.dataset_download()` confirmed works with v2 bearer token (first
+  attempt hit HOME quota; second attempt into /ocean succeeded)
+
 ## TODO
-- [ ] Probe weedsense split names on cluster — if `train` only, 120K claim was bogus
-- [ ] **Ask user for Kaggle creds** — hard blocker for 50K without Kaggle phase
-- [ ] Ask user for any Roboflow Universe URLs they know (e.g. workspaces they've used)
-- [ ] Submit v3.0.8 job once weedsense yield verified
+- [ ] Submit v3.0.9 SLURM job with `WEED_MEGA_MIN_IMAGES=50000` + Kaggle active
+- [ ] Verify harvest adds ≥30K images in one round (stretch: ≥50K)
+- [ ] If Roboflow Universe ever opens a search API, re-enable that source
 - [ ] Generate paper figures and tables
 - [ ] Write paper
