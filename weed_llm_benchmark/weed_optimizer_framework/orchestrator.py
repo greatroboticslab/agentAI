@@ -298,6 +298,17 @@ class Orchestrator:
                     current_bbox = _current_bbox_count()
                     threshold = MEGA_THRESHOLD
                     force = bool(params.get("force"))
+                    # v3.0.8: auto-release gate when harvest is dry this round,
+                    # so we don't regress to the v2.x pseudo-label path.
+                    harvest_was_dry = any(
+                        a.get("action") == "harvest_new_datasets"
+                        and a.get("_harvest_result", {}).get("downloaded", 0) == 0
+                        for a in actions_taken
+                    )
+                    if harvest_was_dry and current_bbox < threshold and not force:
+                        logger.info(f"[Gate] auto-releasing (harvest dry): training on "
+                                    f"{current_bbox} bbox imgs (<{threshold})")
+                        force = True
                     if current_bbox < threshold and not force:
                         obs = (
                             f"BLOCKED: train_yolo_mega needs at least {threshold} bbox images, "
@@ -401,6 +412,8 @@ class Orchestrator:
                                        for r in result.get("results", []))
                         new_labeled = sum(r["stats"].get("labeled", 0)
                                           for r in result.get("results", []))
+                        # v3.0.8: stash yield in action record for gate auto-release
+                        action["_harvest_result"] = {"downloaded": ok, "new_imgs": new_imgs}
                         obs = (f"Harvest: downloaded {ok}/{max_new} new datasets. "
                                f"+{new_imgs} images ({new_labeled} with bboxes).\n")
                         for r in result.get("results", []):

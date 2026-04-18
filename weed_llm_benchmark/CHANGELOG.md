@@ -931,9 +931,64 @@ individual workspaces via the `roboflow` Python client.
   5/6 others 404 (slugs were speculative)
 - Job 39760438 submitted (gemma4, quick=3 rounds, MEGA_MIN=15K env)
 
+## 2026-04-18 - v3.0.8: Gate auto-release + all-splits iteration
+
+### Job 39760438 forensics (v3.0.7 run, gemma4, quick=3)
+Harvest ran fully:
+- HF Phase 1/2: scanned 177 candidates, **0 new downloaded** (pool exhausted;
+  yesterday's job already pulled the two Francesco-adjacent bbox sets).
+- Roboflow search API: 19× 401 Unauthorized (the public endpoint doesn't
+  accept our workspace-scoped key — search is not publicly indexed).
+- Roboflow curated: 6 tried. 5/6 return 404 (my guessed slugs don't exist).
+  The 1/6 that resolved (`roboflow-universe-projects/weeds-nxe1w`) failed at
+  download with "File is not a zip file" — roboflow pkg bug or private project.
+- Kaggle: `kaggle` CLI not on cluster; all 5 curated seeds 403 Forbidden at
+  `kagglehub.dataset_download` (no `~/.kaggle/kaggle.json`).
+
+Net new: **0 images**. Registry still 11,608.
+
+Then the v3.0.7 MEGA_MIN=15000 gate **blocked** `train_yolo_mega` 3 times.
+Orchestrator force-progression routed to `generate_consensus` (v2.x path).
+Result: the remaining 7h trained yolo26x on the OLD 5,648 leave4out
+pseudo-labels instead of the 11K merged real data. **Regression**:
+
+| | New species mAP50-95 |
+|---|---|
+| Job 39682959 (v3.0.6, no gate) | **0.902** |
+| Job 39760438 (v3.0.7, strict gate) | 0.51 - 0.56 |
+
+### v3.0.8 fixes
+
+1. **`orchestrator.py` — gate auto-release.** If `harvest_new_datasets` already
+   ran this round and returned 0 new, subsequent `train_yolo_mega` auto-sets
+   `force=True` instead of blocking. Rationale: pool is dry; blocking only
+   punts Brain to v2.x fallback which is worse than training on what we have.
+   Tracked via `action["_harvest_result"]` attached in harvest handler.
+
+2. **`dataset_discovery.download_dataset(force=False)` param.** v3.0.7's
+   all-configs fix never ran on weedsense because harvest skips registered
+   datasets. `force=True` bypasses the dedup check so Brain can explicitly
+   re-download weedsense and benefit from the config/split iteration.
+
+3. **`dataset_discovery._download_hf` — iterate ALL SPLITS.** v3.0.7 iterated
+   configs but weedsense has only 1 config; 120K claim (if real) must live
+   in train/val/test splits, not multiple configs. Now also iterates
+   `get_dataset_split_names()` for every config. Stems include both cfg+split
+   tags.
+
+### Caveat on weedsense
+Probe showed `weedsense has 1 configs: default`. If splits also only return
+`train`, then the "120K" claim was wrong and weedsense caps at 1131. In that
+case the path to 50K requires:
+  * User-provided `~/.kaggle/kaggle.json` (unlocks 5 curated × ~3-15K = ~25K+)
+  * User-provided Roboflow Universe URLs (manual seeds for curated list)
+  * More permissive GitHub scanner (allow repos with images/ + labels/ even
+    when data.yaml is named differently)
+
 ## TODO
-- [ ] Watch Job 39760438 — confirm harvest hits ≥15K and mega yolo26x trains
-- [ ] Ask user for `~/.kaggle/kaggle.json` to unlock Kaggle phase (5 curated datasets, ~30K+)
-- [ ] Expand `CURATED_PROJECTS` in roboflow_source.py — needs real Universe slugs
+- [ ] Probe weedsense split names on cluster — if `train` only, 120K claim was bogus
+- [ ] **Ask user for Kaggle creds** — hard blocker for 50K without Kaggle phase
+- [ ] Ask user for any Roboflow Universe URLs they know (e.g. workspaces they've used)
+- [ ] Submit v3.0.8 job once weedsense yield verified
 - [ ] Generate paper figures and tables
 - [ ] Write paper

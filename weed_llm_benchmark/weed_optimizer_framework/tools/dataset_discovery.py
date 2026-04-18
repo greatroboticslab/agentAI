@@ -277,10 +277,14 @@ class DatasetDiscovery:
     # DOWNLOAD — with dedup check
     # =========================================================
 
-    def download_dataset(self, name, max_images=None):
-        """Download a dataset. Checks for duplicates first."""
-        # Dedup check
-        if self.is_downloaded(name):
+    def download_dataset(self, name, max_images=None, force=False):
+        """Download a dataset. Checks for duplicates first.
+
+        v3.0.8: `force=True` bypasses the dedup check so v3.0.7's all-configs
+        improvement can re-download weedsense (stuck at 1131 because harvest
+        skips already-registered datasets).
+        """
+        if self.is_downloaded(name) and not force:
             info = self.registry["datasets"][name]
             logger.info(f"[Dataset] '{name}' already downloaded ({info['local_images']} images). Skipping.")
             return info.get("local_path", ""), {"status": "already_downloaded",
@@ -383,13 +387,18 @@ class DatasetDiscovery:
     def _download_hf(self, name, hf_id, local_path, max_images):
         """Download from HuggingFace with schema-aware YOLO label extraction.
 
-        v3.0.7: iterate ALL dataset configs (weedsense has 16 species configs;
-        loading only the default gave 1131 when the total is 120K+). Sum across
-        configs, prefix stems with cfg tag to avoid collisions.
+        v3.0.7: iterate ALL dataset configs.
+        v3.0.8: also iterate ALL splits (train/validation/test/...). Some HF
+        datasets (e.g. baselab/weedsense) only have 1 config but split their
+        120K images across multiple splits — loading only 'train' gave 1131.
         """
         try:
             from datasets import load_dataset
             from datasets import get_dataset_config_names
+            try:
+                from datasets import get_dataset_split_names
+            except Exception:
+                get_dataset_split_names = None
         except Exception as e:
             return local_path, {"status": "error", "error": f"datasets import: {e}"}
 
@@ -422,85 +431,105 @@ class DatasetDiscovery:
                     break
                 cfg_tag = (cfg or "default").replace("/", "_")[:40]
 
-                # Probe this config
-                try:
-                    probe_ds = (load_dataset(hf_id, cfg, split="train", streaming=True)
-                                if cfg else load_dataset(hf_id, split="train", streaming=True))
-                    probe_item = next(iter(probe_ds))
-                except Exception as e:
-                    logger.warning(f"[Dataset] {hf_id}/{cfg_tag}: probe failed "
-                                   f"({str(e)[:100]}) — skip")
-                    continue
+                # Enumerate splits for this config
+                splits = ["train"]
+                if get_dataset_split_names:
+                    try:
+                        sp = (get_dataset_split_names(hf_id, cfg)
+                              if cfg else get_dataset_split_names(hf_id))
+                        if sp:
+                            splits = list(sp)
+                    except Exception:
+                        pass
+                logger.info(f"[Dataset] {name}/{cfg_tag}: splits={splits}")
 
-                has_bbox = any(k in probe_item for k in
-                               ("objects", "bbox", "boxes", "bboxes", "annotations"))
-                if has_bbox:
-                    annotation_kind = "bbox"
-                logger.info(f"[Dataset] {name}/{cfg_tag}: keys={list(probe_item.keys())[:6]} "
-                            f"bbox={has_bbox}")
-
-                use_streaming = expected > 10000 or (limit - count) > 10000
-                try:
-                    ds = (load_dataset(hf_id, cfg, split="train", streaming=use_streaming)
-                          if cfg else load_dataset(hf_id, split="train", streaming=use_streaming))
-                except Exception as e:
-                    logger.warning(f"[Dataset] {hf_id}/{cfg_tag}: load failed "
-                                   f"({str(e)[:100]}) — skip")
-                    continue
-
-                iterator = ds if use_streaming else iter(ds)
                 cfg_start = count
-
-                for item in iterator:
+                for split in splits:
                     if count >= limit:
                         break
-                    if "image" not in item:
-                        count += 1
-                        continue
-                    img = item["image"]
-                    w = getattr(img, "width", item.get("width", 0))
-                    h = getattr(img, "height", item.get("height", 0))
-                    stem = f"{cfg_tag}_{count:06d}"
-
+                    split_tag = split.replace("/", "_")[:20]
+                    # Probe this (cfg, split)
                     try:
-                        if img.mode not in ("RGB", "L"):
-                            if img.mode in ("RGBA", "LA"):
-                                bg = img.__class__.new("RGB", img.size, (255, 255, 255))
-                                try:
-                                    bg.paste(img.convert("RGBA"),
-                                             mask=img.convert("RGBA").split()[-1])
-                                except Exception:
-                                    bg = img.convert("RGB")
-                                img = bg
-                            else:
-                                img = img.convert("RGB")
-                        img.save(os.path.join(img_dir, f"{stem}.jpg"))
+                        probe_ds = (load_dataset(hf_id, cfg, split=split, streaming=True)
+                                    if cfg else load_dataset(hf_id, split=split, streaming=True))
+                        probe_item = next(iter(probe_ds))
                     except Exception as e:
-                        save_errors += 1
-                        if save_errors <= 3:
-                            logger.warning(f"[Dataset] {name} save fail on #{count} "
-                                           f"mode={getattr(img,'mode','?')}: {str(e)[:100]}")
-                        count += 1
+                        logger.warning(f"[Dataset] {hf_id}/{cfg_tag}/{split_tag}: probe failed "
+                                       f"({str(e)[:100]}) — skip")
                         continue
 
-                    if has_bbox and w and h:
-                        lines, classes = self._extract_yolo_labels(item, w, h)
-                        if lines:
-                            with open(os.path.join(lbl_dir, f"{stem}.txt"), "w") as f:
-                                f.write("\n".join(lines))
-                            label_count += 1
-                            all_classes.update(classes)
-                        else:
-                            open(os.path.join(lbl_dir, f"{stem}.txt"), "w").close()
+                    has_bbox = any(k in probe_item for k in
+                                   ("objects", "bbox", "boxes", "bboxes", "annotations"))
+                    if has_bbox:
+                        annotation_kind = "bbox"
+                    logger.info(f"[Dataset] {name}/{cfg_tag}/{split_tag}: "
+                                f"keys={list(probe_item.keys())[:6]} bbox={has_bbox}")
 
-                    count += 1
-                    if count % 2000 == 0:
-                        logger.info(f"[Dataset] {name}/{cfg_tag}: {count}/{limit} imgs, "
-                                    f"{label_count} labeled, classes={len(all_classes)}")
+                    use_streaming = expected > 10000 or (limit - count) > 10000
+                    try:
+                        ds = (load_dataset(hf_id, cfg, split=split, streaming=use_streaming)
+                              if cfg else load_dataset(hf_id, split=split, streaming=use_streaming))
+                    except Exception as e:
+                        logger.warning(f"[Dataset] {hf_id}/{cfg_tag}/{split_tag}: load failed "
+                                       f"({str(e)[:100]}) — skip")
+                        continue
 
+                    iterator = ds if use_streaming else iter(ds)
+                    split_start = count
+
+                    for item in iterator:
+                        if count >= limit:
+                            break
+                        if "image" not in item:
+                            count += 1
+                            continue
+                        img = item["image"]
+                        w = getattr(img, "width", item.get("width", 0))
+                        h = getattr(img, "height", item.get("height", 0))
+                        stem = f"{cfg_tag}_{split_tag}_{count:06d}"
+
+                        try:
+                            if img.mode not in ("RGB", "L"):
+                                if img.mode in ("RGBA", "LA"):
+                                    bg = img.__class__.new("RGB", img.size, (255, 255, 255))
+                                    try:
+                                        bg.paste(img.convert("RGBA"),
+                                                 mask=img.convert("RGBA").split()[-1])
+                                    except Exception:
+                                        bg = img.convert("RGB")
+                                    img = bg
+                                else:
+                                    img = img.convert("RGB")
+                            img.save(os.path.join(img_dir, f"{stem}.jpg"))
+                        except Exception as e:
+                            save_errors += 1
+                            if save_errors <= 3:
+                                logger.warning(f"[Dataset] {name} save fail on #{count} "
+                                               f"mode={getattr(img,'mode','?')}: {str(e)[:100]}")
+                            count += 1
+                            continue
+
+                        if has_bbox and w and h:
+                            lines, classes = self._extract_yolo_labels(item, w, h)
+                            if lines:
+                                with open(os.path.join(lbl_dir, f"{stem}.txt"), "w") as f:
+                                    f.write("\n".join(lines))
+                                label_count += 1
+                                all_classes.update(classes)
+                            else:
+                                open(os.path.join(lbl_dir, f"{stem}.txt"), "w").close()
+
+                        count += 1
+                        if count % 2000 == 0:
+                            logger.info(f"[Dataset] {name}/{cfg_tag}/{split_tag}: {count}/{limit} imgs, "
+                                        f"{label_count} labeled, classes={len(all_classes)}")
+                    # end for-item
+                    logger.info(f"[Dataset] {name}/{cfg_tag}/{split_tag}: "
+                                f"+{count - split_start} imgs this split")
+                # end for-split
                 cfg_added = count - cfg_start
-                logger.info(f"[Dataset] {name}/{cfg_tag}: +{cfg_added} imgs "
-                            f"(total {count}, {label_count} labeled)")
+                logger.info(f"[Dataset] {name}/{cfg_tag}: +{cfg_added} imgs total "
+                            f"({label_count} labeled)")
 
             # All configs processed — register result
             self.registry["datasets"].setdefault(name, {**KNOWN_DATASETS.get(name, {})})
