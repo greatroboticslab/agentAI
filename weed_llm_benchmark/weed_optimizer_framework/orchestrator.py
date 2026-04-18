@@ -298,15 +298,19 @@ class Orchestrator:
                     current_bbox = _current_bbox_count()
                     threshold = MEGA_THRESHOLD
                     force = bool(params.get("force"))
-                    # v3.0.8: auto-release gate when harvest is dry this round,
-                    # so we don't regress to the v2.x pseudo-label path.
-                    harvest_was_dry = any(
-                        a.get("action") == "harvest_new_datasets"
-                        and a.get("_harvest_result", {}).get("downloaded", 0) == 0
+                    # v3.0.10: auto-release when harvest couldn't GROW the bbox pool,
+                    # not just when downloaded==0. v3.0.9 Kaggle pulled 380K
+                    # classification images — downloaded>0 but bbox delta was 0 —
+                    # and we blocked anyway, regressing to v2.x pseudo-label path.
+                    bbox_deltas = [
+                        a.get("_harvest_result", {}).get("bbox_delta")
                         for a in actions_taken
-                    )
-                    if harvest_was_dry and current_bbox < threshold and not force:
-                        logger.info(f"[Gate] auto-releasing (harvest dry): training on "
+                        if a.get("action") == "harvest_new_datasets"
+                    ]
+                    harvest_ran = len(bbox_deltas) > 0
+                    harvest_no_bbox_growth = harvest_ran and max(bbox_deltas or [0]) == 0
+                    if harvest_no_bbox_growth and current_bbox < threshold and not force:
+                        logger.info(f"[Gate] auto-releasing (harvest added no bbox): training on "
                                     f"{current_bbox} bbox imgs (<{threshold})")
                         force = True
                     if current_bbox < threshold and not force:
@@ -400,6 +404,7 @@ class Orchestrator:
                     max_new = params.get("max_new", 5)
                     max_imgs = params.get("max_images_per_ds", 30000)
                     queries = params.get("queries")
+                    bbox_before = _current_bbox_count()
                     try:
                         result = self.dataset_discovery.harvest_new_datasets(
                             max_new=max_new,
@@ -412,8 +417,15 @@ class Orchestrator:
                                        for r in result.get("results", []))
                         new_labeled = sum(r["stats"].get("labeled", 0)
                                           for r in result.get("results", []))
-                        # v3.0.8: stash yield in action record for gate auto-release
-                        action["_harvest_result"] = {"downloaded": ok, "new_imgs": new_imgs}
+                        bbox_after = _current_bbox_count()
+                        bbox_delta = bbox_after - bbox_before
+                        # v3.0.10: bbox_delta drives gate auto-release (not `ok`).
+                        # downloaded>0 doesn't mean bbox-labeled>0.
+                        action["_harvest_result"] = {
+                            "downloaded": ok, "new_imgs": new_imgs,
+                            "bbox_delta": bbox_delta,
+                            "bbox_before": bbox_before, "bbox_after": bbox_after,
+                        }
                         obs = (f"Harvest: downloaded {ok}/{max_new} new datasets. "
                                f"+{new_imgs} images ({new_labeled} with bboxes).\n")
                         for r in result.get("results", []):

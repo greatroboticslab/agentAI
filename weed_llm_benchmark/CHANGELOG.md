@@ -1046,9 +1046,50 @@ roshan81/weed-detection                        (dl=   66,   79MB)
 - `kagglehub.dataset_download()` confirmed works with v2 bearer token (first
   attempt hit HOME quota; second attempt into /ocean succeeded)
 
+## 2026-04-18 - v3.0.10: Kaggle bbox pre-filter + gate on bbox delta
+
+### Job 39928698 (v3.0.9) reality check
+Kaggle autonomous search worked beautifully — 211 candidates from 18 queries,
+downloaded 3 large datasets (`vipoooool/new-plant-diseases`, `emmarex/plantdisease`,
+`abdallahalidev/plantvillage`) totaling **+379,959 images**. BUT: all three are
+**classification** datasets (plant disease), not bbox detection. Log shows
+"+379959 images (0 with bboxes)".
+
+v3.0.9 had two filter bugs:
+  1. Kaggle pre-filter required only agriculture vocab, not detection keywords.
+     "plantvillage" matches "plant" + "village" so it passed — even though it
+     has 0 bboxes.
+  2. Post-download code registered 0-label datasets as `annotation="image_only"`.
+     Mega trainer ignores those (correct), but they still pollute the registry.
+  3. Gate auto-release in v3.0.8 triggered on `downloaded == 0`. With Kaggle
+     downloading 3 non-bbox sets, `downloaded > 0`, so auto-release DIDN'T fire,
+     mega stayed BLOCKED (11,608 < 50,000), Brain force-progressed to v2.x again.
+
+### v3.0.10 fixes
+
+1. **`extra_sources.harvest_kaggle_datasets`**: require BOTH agriculture vocab
+   AND a detection hint (`detection`, `bbox`, `bounding`, `yolo`, `coco`, `voc`,
+   `object`, `localization`, `grounding`) before downloading. Plant-disease
+   classification slugs now pre-skip.
+2. **Post-download hard reject**: if `lbl_count == 0`, don't register AND
+   don't copy to `datasets/`. Registry only gets real bbox contributors.
+3. **`orchestrator` gate auto-release**: now keyed on `bbox_delta` (bbox_count
+   after harvest minus before), not on total `downloaded`. If harvest adds 0
+   bbox images — regardless of total images added — mega auto-force-releases.
+4. **Cleaned registry** on cluster: dropped 3 `image_only` entries + their
+   `datasets/` dirs (~380K images of plant-disease classification, no value
+   for bbox training). Reclaimed ~3-4GB of /ocean.
+
+### Expected behavior v3.0.10
+- Kaggle pre-filter catches "plantvillage"-style classification slugs before
+  download.
+- If a rare match slips through, post-download count=0 rejects cleanly.
+- If net bbox delta across all sources is 0, mega auto-fires on what we have
+  (no regression to v2.x).
+
 ## TODO
-- [ ] Submit v3.0.9 SLURM job with `WEED_MEGA_MIN_IMAGES=50000` + Kaggle active
-- [ ] Verify harvest adds ≥30K images in one round (stretch: ≥50K)
-- [ ] If Roboflow Universe ever opens a search API, re-enable that source
+- [ ] Watch v3.0.10 job (submitted 2026-04-18) — confirm 0 polluting entries
+- [ ] If Kaggle pre-filter still lets classification sets through, tighten
+      keywords or add schema-probe step
 - [ ] Generate paper figures and tables
 - [ ] Write paper

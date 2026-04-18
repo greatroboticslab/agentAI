@@ -253,10 +253,15 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
         logger.info("[Kaggle] kagglehub not installed — skipping")
         return []
 
-    # Build candidate pool from autonomous search across all queries
+    # v3.0.10: filter for agriculture AND detection (not classification-only).
+    # v3.0.9 pulled in 380K plant-disease classification images from "plantvillage"-
+    # style sets because the AG filter alone let them through. Mega trainer ignores
+    # them (annotation != bbox), so they waste disk + registry without value.
     AG_VOCAB = ("weed", "crop", "plant", "leaf", "fruit", "rice", "wheat",
-                "corn", "cotton", "soybean", "agri", "farm", "pest", "disease",
-                "seedling", "tomato", "potato")
+                "corn", "cotton", "soybean", "agri", "farm", "pest", "seedling",
+                "tomato", "potato")
+    DETECTION_HINTS = ("detection", "bbox", "bounding", "yolo", "coco", "voc",
+                       "object", "localization", "grounding")
     seen = set()
     candidates = []
     for q in queries:
@@ -265,9 +270,12 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
             if ref in seen:
                 continue
             seen.add(ref)
-            # Cheap sanity: title/slug must hint agriculture
             haystack = f"{ref} {kr.get('title','')}".lower()
             if not any(v in haystack for v in AG_VOCAB):
+                continue
+            # Also require at least one detection-flavored keyword — otherwise
+            # it's almost certainly a classification dataset (plant-disease, etc.)
+            if not any(h in haystack for h in DETECTION_HINTS):
                 continue
             candidates.append({**kr, "source_query": q})
 
@@ -298,6 +306,12 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
         if img_count < 50:
             logger.debug(f"[Kaggle] {ref}: too few images ({img_count}) — skip")
             continue
+        # v3.0.10: hard reject classification-only datasets. Registry is for
+        # bbox training material; image_only entries contribute nothing.
+        if lbl_count == 0:
+            logger.info(f"[Kaggle] {ref}: {img_count} imgs but 0 .txt labels — "
+                        f"classification dataset, rejecting (not copied to registry)")
+            continue
 
         local_path = os.path.join(data_dir, slug)
         if os.path.exists(local_path):
@@ -313,7 +327,7 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
         info = {
             "source": "kaggle", "hf_id": None, "kaggle_ref": ref,
             "images": img_count, "classes": "?",
-            "annotation": "yolo" if lbl_count > 0 else "image_only",
+            "annotation": "yolo",  # v3.0.10: only bbox sets reach here
             "format": "yolo", "description": c["title"][:300],
             "status": "downloaded", "local_path": local_path,
             "local_images": img_count, "class_names": [],
