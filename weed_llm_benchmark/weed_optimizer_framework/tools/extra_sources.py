@@ -253,15 +253,14 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
         logger.info("[Kaggle] kagglehub not installed — skipping")
         return []
 
-    # v3.0.10: filter for agriculture AND detection (not classification-only).
-    # v3.0.9 pulled in 380K plant-disease classification images from "plantvillage"-
-    # style sets because the AG filter alone let them through. Mega trainer ignores
-    # them (annotation != bbox), so they waste disk + registry without value.
+    # v3.0.11: agriculture filter only. Classification datasets are kept now —
+    # autolabel_dataset will convert them to YOLO bbox via OWLv2 (class-known
+    # → high-quality localization). Dropping the detection-hint requirement is
+    # what unlocks the 380K+ plant-classification pool that's the only way to
+    # hit the user's "几万到几十万" target.
     AG_VOCAB = ("weed", "crop", "plant", "leaf", "fruit", "rice", "wheat",
                 "corn", "cotton", "soybean", "agri", "farm", "pest", "seedling",
-                "tomato", "potato")
-    DETECTION_HINTS = ("detection", "bbox", "bounding", "yolo", "coco", "voc",
-                       "object", "localization", "grounding")
+                "tomato", "potato", "disease")
     seen = set()
     candidates = []
     for q in queries:
@@ -272,10 +271,6 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
             seen.add(ref)
             haystack = f"{ref} {kr.get('title','')}".lower()
             if not any(v in haystack for v in AG_VOCAB):
-                continue
-            # Also require at least one detection-flavored keyword — otherwise
-            # it's almost certainly a classification dataset (plant-disease, etc.)
-            if not any(h in haystack for h in DETECTION_HINTS):
                 continue
             candidates.append({**kr, "source_query": q})
 
@@ -306,12 +301,11 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
         if img_count < 50:
             logger.debug(f"[Kaggle] {ref}: too few images ({img_count}) — skip")
             continue
-        # v3.0.10: hard reject classification-only datasets. Registry is for
-        # bbox training material; image_only entries contribute nothing.
-        if lbl_count == 0:
-            logger.info(f"[Kaggle] {ref}: {img_count} imgs but 0 .txt labels — "
-                        f"classification dataset, rejecting (not copied to registry)")
-            continue
+        # v3.0.11: classification-only sets are now KEPT and marked for auto-label.
+        # OWLv2 will generate pseudo-bboxes in a later step. Converts 380K+
+        # plant-classification images into usable training data — matches the user's
+        # "几万到几十万" target that real-bbox searches alone can't hit.
+        is_autolabel_candidate = (lbl_count == 0)
 
         local_path = os.path.join(data_dir, slug)
         if os.path.exists(local_path):
@@ -322,12 +316,13 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
             logger.warning(f"[Kaggle] copy {ref} failed: {e}")
             continue
 
+        annotation = "needs_autolabel" if is_autolabel_candidate else "yolo"
         logger.info(f"[Kaggle] ✓ {ref} (q={c['source_query']}, dl={c['downloads']}): "
-                    f"{img_count} imgs, {lbl_count} labels")
+                    f"{img_count} imgs, {lbl_count} labels, annotation={annotation}")
         info = {
             "source": "kaggle", "hf_id": None, "kaggle_ref": ref,
             "images": img_count, "classes": "?",
-            "annotation": "yolo",  # v3.0.10: only bbox sets reach here
+            "annotation": annotation,
             "format": "yolo", "description": c["title"][:300],
             "status": "downloaded", "local_path": local_path,
             "local_images": img_count, "class_names": [],

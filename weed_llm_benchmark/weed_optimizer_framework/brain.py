@@ -264,6 +264,18 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "autolabel_pending",
+            "description": "V3.0.11 tool. Run OWLv2 to generate pseudo-bbox labels for every dataset currently in `needs_autolabel` state. Classification datasets (plant-village, plant-disease, etc.) become usable for YOLO training. Since the class is KNOWN to be present in the image (classification GT), OWLv2 localization yields cleaner labels than blind VLM consensus (27% FP). Call after harvest_new_datasets when classification sets were added.",
+            "parameters": {"type": "object", "properties": {
+                "conf_threshold": {"type": "number", "description": "OWLv2 score threshold (default 0.12; lower=more fallback, higher=fewer labels)"},
+                "max_images_per_ds": {"type": "integer", "description": "Per-dataset cap for fast iteration (default: all)"},
+                "max_datasets": {"type": "integer", "description": "Max datasets to autolabel this call (default: all pending)"},
+            }},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "train_yolo_mega",
             "description": "V3.0 PREFERRED. Merge ALL downloaded real-labeled datasets and train the LARGEST YOLO (Config.DETECTION_MODEL). Use this after downloading at least one bbox dataset. Not for pseudo-labels — for real annotations only. Cumulative: each call retrains on everything downloaded so far.",
             "parameters": {"type": "object", "properties": {
@@ -490,9 +502,13 @@ HARD RULES (violate → orchestrator force-overrides):
   * Never call the same tool twice in a row unless its observation explicitly tells you to.
 
 AFTER HARVEST (remaining flow):
-  train_yolo_mega(epochs=100, imgsz=640)   # trains latest YOLO on ALL registered bbox data
-  evaluate                                  # measures mAP on old + new species
-  done                                      # end round
+  autolabel_pending                          # v3.0.11: OWLv2 pseudo-label every
+                                             # needs_autolabel dataset (classification →
+                                             # bbox). Unlocks the 380K+ plant-classification
+                                             # pool that real-bbox search alone can't hit.
+  train_yolo_mega(epochs=50, imgsz=640)    # trains yolo26x on real+autolabel union
+  evaluate                                   # measures mAP on old + new species
+  done                                       # end round
 
 NOTES:
 - Total accumulation matters more than any single round. Don't panic if a round adds 0.
@@ -576,18 +592,17 @@ Reply with just the number:"""
     # =========================================================
 
     FALLBACK_PIPELINE = [
-        # v3.0: harvest 5 new datasets → train largest YOLO on all registered bbox data
-        # epochs=50 balances: yolo26x is 22x larger than yolo11n; with ~10K images and
-        # autobatch on V100-32GB, 50 epochs fits comfortably in 4-5h (leaves room for
-        # a 2nd round in an 8h walltime).
+        # v3.0.11: harvest → autolabel pending → train mega on bbox+autolabel union
         {"action": "harvest_new_datasets", "params": {"max_new": 15, "max_images_per_ds": 50000},
-         "reasoning": "Pipeline 1: harvest up to 5 NEW bbox datasets (HF + GitHub + Kaggle)"},
+         "reasoning": "Pipeline 1: harvest NEW datasets (HF + GitHub + Kaggle autonomous search)"},
+        {"action": "autolabel_pending", "params": {"conf_threshold": 0.12},
+         "reasoning": "Pipeline 2: OWLv2 pseudo-label all needs_autolabel datasets (classification → bbox)"},
         {"action": "train_yolo_mega", "params": {"epochs": 50, "imgsz": 640, "patience": 15},
-         "reasoning": "Pipeline 2: train latest YOLO on ALL registered bbox-labeled data"},
+         "reasoning": "Pipeline 3: train yolo26x on union of real bbox + auto-labeled data"},
         {"action": "evaluate", "params": {},
-         "reasoning": "Pipeline 3: evaluate mega-trained YOLO"},
-        {"action": "done", "params": {"reason": "v3.0 harvest+mega cycle complete"},
-         "reasoning": "Pipeline 4: done"},
+         "reasoning": "Pipeline 4: evaluate mega-trained YOLO"},
+        {"action": "done", "params": {"reason": "v3.0 harvest+autolabel+mega cycle complete"},
+         "reasoning": "Pipeline 5: done"},
     ]
 
     def _smart_fallback(self, step_num):
@@ -609,6 +624,8 @@ Reply with just the number:"""
         KEYWORD_TABLE = [
             ("harvest_new_datasets", "harvest_new_datasets", {"max_new": 15, "max_images_per_ds": 50000}),
             ("harvest", "harvest_new_datasets", {"max_new": 15, "max_images_per_ds": 50000}),
+            ("autolabel_pending", "autolabel_pending", {"conf_threshold": 0.12}),
+            ("autolabel", "autolabel_pending", {"conf_threshold": 0.12}),
             ("train_yolo_mega", "train_yolo_mega", {"epochs": 50, "imgsz": 640, "patience": 15}),
             ("search_datasets", "search_datasets", {"query": "weed detection"}),
             ("download_dataset", "download_dataset", {"name": "weedsense", "max_images": 60000}),

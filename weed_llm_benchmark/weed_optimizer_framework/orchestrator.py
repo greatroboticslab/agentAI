@@ -137,13 +137,17 @@ class Orchestrator:
         self._current_label_dir = None
         self._current_model_path = None
 
-        # v3.0 gating: compute current labeled-bbox image count
+        # v3.0 gating: compute current labeled-bbox image count.
+        # v3.0.11: include yolo_autolabel (OWLv2-pseudo-bbox on classification sets)
+        # because mega_trainer trains on them.
         def _current_bbox_count():
             total = 0
             for info in self.dataset_discovery.registry.get("datasets", {}).values():
                 if info.get("status") not in ("downloaded", "used_for_training"):
                     continue
-                if info.get("annotation") not in ("bbox", "bbox+segmentation", "yolo"):
+                if info.get("annotation") not in (
+                    "bbox", "bbox+segmentation", "yolo", "yolo_autolabel"
+                ):
                     continue
                 total += info.get("local_images", 0)
             return total
@@ -398,6 +402,71 @@ class Orchestrator:
                         obs = f"Download failed for '{ds_name}': {e}"
                     context_history.append({"role": "observation", "content": obs})
                     logger.info(obs)
+
+                elif action_name == "autolabel_pending":
+                    # v3.0.11: run OWLv2 on every dataset whose annotation ==
+                    # needs_autolabel, converting classification images into
+                    # YOLO bbox labels. Mega trainer then picks them up via
+                    # annotation == "yolo_autolabel".
+                    from .tools.autolabel import autolabel_dataset
+                    conf = params.get("conf_threshold", 0.12)
+                    max_imgs = params.get("max_images_per_ds")
+                    max_ds = params.get("max_datasets")
+                    pending = [
+                        slug for slug, v in self.dataset_discovery.registry["datasets"].items()
+                        if v.get("annotation") == "needs_autolabel"
+                        and v.get("status") == "downloaded"
+                        and v.get("local_path")
+                    ]
+                    if max_ds:
+                        pending = pending[:max_ds]
+                    if not pending:
+                        obs = ("No datasets with annotation=needs_autolabel. "
+                               "Either no classification sets were harvested this run, "
+                               "or they were already auto-labeled. Proceed to train_yolo_mega.")
+                        context_history.append({"role": "observation", "content": obs})
+                        logger.info(obs)
+                    else:
+                        registry_cb = {
+                            "get": lambda s: self.dataset_discovery.registry["datasets"].get(s),
+                            "update": lambda s, u: (
+                                self.dataset_discovery.registry["datasets"][s].update(u),
+                                self.dataset_discovery._save_registry(),
+                            ),
+                        }
+                        summary_lines = [f"Autolabel: {len(pending)} dataset(s) pending"]
+                        total_with_owl = 0
+                        total_fallback = 0
+                        total_empty = 0
+                        for slug in pending:
+                            try:
+                                r = autolabel_dataset(
+                                    slug, registry_cb,
+                                    conf_threshold=conf,
+                                    max_images=max_imgs,
+                                )
+                                if r.get("status") == "ok":
+                                    total_with_owl += r.get("labeled_with_owl", 0)
+                                    total_fallback += r.get("labeled_with_fallback", 0)
+                                    total_empty += r.get("empty", 0)
+                                    summary_lines.append(
+                                        f"  {slug}: owl={r.get('labeled_with_owl',0)} "
+                                        f"fb={r.get('labeled_with_fallback',0)} "
+                                        f"empty={r.get('empty',0)} "
+                                        f"prompt={r.get('prompt','?')!r}"
+                                    )
+                                else:
+                                    summary_lines.append(f"  {slug}: {r.get('status','error')}")
+                            except Exception as e:
+                                summary_lines.append(f"  {slug}: EXCEPTION {type(e).__name__}: {str(e)[:120]}")
+                        summary_lines.append(
+                            f"TOTAL: owl={total_with_owl} fallback={total_fallback} "
+                            f"empty={total_empty} — registry annotation flipped to "
+                            f"yolo_autolabel; call train_yolo_mega next."
+                        )
+                        obs = "\n".join(summary_lines)
+                        context_history.append({"role": "observation", "content": obs})
+                        logger.info(obs)
 
                 elif action_name == "harvest_new_datasets":
                     # Find and download up to N NEW bbox datasets this run

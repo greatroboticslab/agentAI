@@ -1087,9 +1087,76 @@ v3.0.9 had two filter bugs:
 - If net bbox delta across all sources is 0, mega auto-fires on what we have
   (no regression to v2.x).
 
+## 2026-04-18 - v3.0.11: Auto-label pipeline — unlock 300K+ classification images
+
+### The real bottleneck (strategic)
+User asked "how do we hit 几万到几十万 training data when most discovered
+datasets are classification?" The answer: don't reject them — **auto-label
+with OWLv2**. Classification datasets come with GT class labels, so OWLv2
+just needs to localize (which it's good at: recall=0.943). Much cleaner
+signal than the old blind VLM consensus (27% FP rate) because we know the
+class is present.
+
+380K+ plant-classification images (plantvillage 162K, plantdoc, plant-disease,
+new-plant-diseases 175K, etc.) are now usable training data instead of
+registry garbage.
+
+### v3.0.11 changes
+
+1. **`tools/autolabel.py` (new)** — `autolabel_dataset(slug, conf=0.12)`:
+   - Picks OWLv2 text prompt from dataset metadata (weed/plant/disease/fruit/etc.)
+   - For each image: OWLv2 → (box, score) → keep score ≥ conf
+   - If no box passes: fallback to whole-image bbox (weak but preserves the image)
+   - Writes YOLO format labels as `{parent}/labels/{stem}.txt`
+   - Flips registry `annotation: needs_autolabel → yolo_autolabel`
+
+2. **`extra_sources.harvest_kaggle_datasets`**:
+   - Reverted v3.0.10 hard-reject. 0-label downloads now register as
+     `annotation="needs_autolabel"`.
+   - Removed DETECTION_HINTS filter — classification sets are wanted.
+
+3. **`dataset_discovery._download_hf`**: default `annotation_kind` changed
+   from `"classification"` to `"needs_autolabel"` for image-only HF sets.
+
+4. **`brain.py`**:
+   - New tool `autolabel_pending` registered (TOOL_DEFINITIONS).
+   - FALLBACK_PIPELINE: `harvest → autolabel_pending → train_yolo_mega → evaluate → done`.
+   - System prompt documents the new step.
+   - KEYWORD_TABLE: `"autolabel"` → `autolabel_pending`.
+
+5. **`orchestrator.py`**:
+   - New handler for `autolabel_pending`: scans registry for
+     `needs_autolabel` slugs, runs `autolabel_dataset` on each, reports
+     per-dataset stats (with_owl / with_fallback / empty).
+   - `_current_bbox_count` now counts `yolo_autolabel` toward the gate.
+
+6. **`mega_trainer._merge_datasets`**: accepts `yolo_autolabel` annotation.
+
+### Deploy
+- Bundled and pushed to cluster.
+- Cancelled Job 39930873 (v3.0.10, just started; gate auto-release was
+  untested but on its own couldn't have hit 50K anyway).
+- Submitted Job 39933687 (v3.0.11, gemma4, quick=3, MIN=50K).
+
+### Expected behavior
+- Round 1 harvest pulls Kaggle classification datasets (plantvillage etc.)
+  as `needs_autolabel` (no longer rejected).
+- Round 1 autolabel runs OWLv2 on each pending dataset, generates pseudo-bboxes.
+- Registry bbox count jumps from 11.6K to potentially 400K+.
+- Mega training sees gate ≥ 50K, trains yolo26x on union of real + autolabel.
+- New species mAP should benefit from the diverse plant/weed localization
+  signal the 300K+ images provide.
+
+### Risks
+- OWLv2 fallback (whole-image bbox) on low-confidence images could introduce
+  noise. `conf_threshold=0.12` is permissive — may need tuning.
+- Auto-label takes GPU time: ~2-3h for 380K images on V100. Fits in 8h walltime
+  alongside 1-2h mega train but leaves little slack.
+
 ## TODO
-- [ ] Watch v3.0.10 job (submitted 2026-04-18) — confirm 0 polluting entries
-- [ ] If Kaggle pre-filter still lets classification sets through, tighten
-      keywords or add schema-probe step
+- [ ] Watch Job 39933687 — confirm autolabel fires on ≥1 dataset and bbox_count jumps
+- [ ] If OWLv2 conf=0.12 gives >20% fallback rate, lower to 0.08
+- [ ] Consider Florence-2 <OD> as an alternative pseudo-labeler (gets real labels
+      not just "plant"; may be cleaner)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

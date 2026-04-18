@@ -99,8 +99,12 @@ def _merge_datasets(out_dir, val_fraction=0.1):
         local_path = info.get("local_path")
         if not local_path or not os.path.isdir(local_path):
             continue
-        if info.get("annotation") not in ("bbox", "bbox+segmentation", "yolo"):
-            # Skip classification-only datasets (no bboxes)
+        if info.get("annotation") not in ("bbox", "bbox+segmentation", "yolo", "yolo_autolabel"):
+            # v3.0.11: yolo_autolabel = OWLv2-generated pseudo-bboxes on
+            # classification datasets. Quality is lower than real bbox but
+            # these datasets (plant-village etc) are orders of magnitude
+            # larger than the hand-labeled pool, and class-known OWLv2 is
+            # much cleaner than blind VLM consensus (27% FP → target <10% FP).
             continue
 
         imgs = _find_images(local_path)

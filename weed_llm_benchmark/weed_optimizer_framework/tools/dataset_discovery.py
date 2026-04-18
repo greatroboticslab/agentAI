@@ -423,7 +423,10 @@ class DatasetDiscovery:
         label_count = 0
         all_classes = set()
         save_errors = 0
-        annotation_kind = "classification"
+        # v3.0.11: default to needs_autolabel for image-only datasets (was
+        # "classification"). Brain's autolabel_dataset tool will upgrade them
+        # to yolo_autolabel after running OWLv2.
+        annotation_kind = "needs_autolabel"
 
         try:
             for cfg in configs:
