@@ -429,7 +429,7 @@ Reply with JUST the number."""}
 
             # Parse number from response (two-digit first)
             two_digit_map = {
-                "18": ("harvest_new_datasets", {"max_new": 5, "max_images_per_ds": 30000}),
+                "18": ("harvest_new_datasets", {"max_new": 15, "max_images_per_ds": 50000}),
                 "17": ("train_yolo_mega", {"epochs": 100, "imgsz": 640}),
                 "16": ("download_dataset", {"name": "weedsense", "max_images": 60000}),
                 "15": ("search_datasets", {"query": "weed detection"}),
@@ -478,8 +478,9 @@ V3.0 PHILOSOPHY — "collect the internet, train the biggest model":
 - Only AFTER harvesting should you train.
 
 REQUIRED FIRST ACTION of every round:
-  harvest_new_datasets(max_new=5)
-  → finds and downloads up to 5 HF bbox datasets not already in registry
+  harvest_new_datasets(max_new=15)
+  → finds and downloads up to 15 NEW bbox datasets from HF + GitHub + Kaggle + Roboflow Universe
+  → v3.0 north-star is 50K+ real bbox images (currently ~9K); harvest aggressively
   → returns 0 if nothing new found (that's fine, move on)
 
 HARD RULES (violate → orchestrator force-overrides):
@@ -579,7 +580,7 @@ Reply with just the number:"""
         # epochs=50 balances: yolo26x is 22x larger than yolo11n; with ~10K images and
         # autobatch on V100-32GB, 50 epochs fits comfortably in 4-5h (leaves room for
         # a 2nd round in an 8h walltime).
-        {"action": "harvest_new_datasets", "params": {"max_new": 5, "max_images_per_ds": 30000},
+        {"action": "harvest_new_datasets", "params": {"max_new": 15, "max_images_per_ds": 50000},
          "reasoning": "Pipeline 1: harvest up to 5 NEW bbox datasets (HF + GitHub + Kaggle)"},
         {"action": "train_yolo_mega", "params": {"epochs": 50, "imgsz": 640, "patience": 15},
          "reasoning": "Pipeline 2: train latest YOLO on ALL registered bbox-labeled data"},
@@ -606,8 +607,8 @@ Reply with just the number:"""
         text_lower = text.lower()
         # Order matters — match most specific first (v3.0 tools before legacy)
         KEYWORD_TABLE = [
-            ("harvest_new_datasets", "harvest_new_datasets", {"max_new": 5, "max_images_per_ds": 30000}),
-            ("harvest", "harvest_new_datasets", {"max_new": 5, "max_images_per_ds": 30000}),
+            ("harvest_new_datasets", "harvest_new_datasets", {"max_new": 15, "max_images_per_ds": 50000}),
+            ("harvest", "harvest_new_datasets", {"max_new": 15, "max_images_per_ds": 50000}),
             ("train_yolo_mega", "train_yolo_mega", {"epochs": 50, "imgsz": 640, "patience": 15}),
             ("search_datasets", "search_datasets", {"query": "weed detection"}),
             ("download_dataset", "download_dataset", {"name": "weedsense", "max_images": 60000}),

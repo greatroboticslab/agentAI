@@ -1022,6 +1022,55 @@ This should give best of both worlds: backbone preserved via LoRA (no forgetting
 
 ---
 
+### Session 32 — 2026-04-18: Scale audit (v3.0.7)
+
+User asked the bluntest possible question: "你说的大量数据集做到了吗?几万到几十万?"
+Audit:
+
+| Registry total at v3.0.6 | 9,303 images |
+| Original north-star | 10,000 – 100,000+ |
+| Gap | 10-30× |
+
+Every revision from v3.0.1 to v3.0.6 fixed the NEXT bug in the pipeline (RGBA
+crash, yolo26x path, best.pt path, Brain repeat-call, qwen3 regression, GitHub
+source) and declared incremental progress. Not one of them audited the
+denominator — the total bbox image count — against the stated goal. Job
+39682959's stellar eval numbers (new species mAP50-95=0.902) came from yolo26x
+overfitting on a 9K merged set, not from the "massive real data" thesis.
+
+**v3.0.7 acknowledges the gap and tries to close it:**
+- `tools/roboflow_source.py`: Roboflow Universe integration (key already in
+  `.roboflow_key`). Tested curated slugs on cluster — 1/6 verified real, 5/6
+  slugs I'd guessed don't exist. Infrastructure ready for the verified one +
+  future additions.
+- `tools/dataset_discovery._download_hf`: iterate ALL HF configs (weedsense has
+  16, we were only loading the default → 1131 images; expected gain to tens
+  of thousands once run on cluster).
+- `tools/extra_sources.CURATED_KAGGLE`: 5 known bbox-labeled Kaggle weed
+  datasets. Cluster doesn't have `~/.kaggle/kaggle.json` yet, so phase no-ops.
+- `config.MEGA_TRAIN_MIN_IMAGES = 50000` (was 1000) — forces harvest to fulfill
+  scale ambition before training fires. `run_framework_ollama.sh` sets env
+  default to 15000 for this run (pragmatic without Kaggle creds).
+- `brain.py` harvest default `max_new` 5→15.
+- Memory: `feedback_polaris_scale.md` — durable rule: audit registry total at
+  session start; don't declare win based on mAP at 9K denominator.
+
+**Source yield audit** (worst realistic, best realistic):
+
+| Source | Now per round | With creds |
+|---|---|---|
+| HF object-detection filter | ~1 | ~1 |
+| HF keyword search | ~2 | ~2 |
+| GitHub (v3.0.6) | ~3 repos × 1-3K | same |
+| Roboflow curated | 1 × ~500-2K | 20 × ~2K = 40K (needs slugs) |
+| Kaggle curated | **0 (no creds)** | 5 × ~5K = 25K |
+| weedsense all-configs | 1K → ??? | same |
+
+**Submitted Job 39760438** (gemma4, quick=3, MEGA_MIN=15K). Outcome will
+determine whether 15K is hittable without Kaggle, or we must wait for creds.
+
+---
+
 ### Session 31 — 2026-04-16/17: v3.0.5 run forensics + v3.0.6 fixes
 
 **Goal of v3.0**: stop comparing YOLO11n+pseudo-labels against itself; pursue accuracy

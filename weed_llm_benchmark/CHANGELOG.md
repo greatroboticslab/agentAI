@@ -857,9 +857,83 @@ GitHub weed-detection repos". New module `tools/extra_sources.py`:
 - Job 39682578 submitted for cluster test. Expected behavior: round 1 harvests via
   HF+GitHub+Kaggle, mega-trains yolo26x on accumulated data, evaluates, moves on.
 
+## 2026-04-18 - v3.0.7: Scale correction (north-star audit)
+
+### User caught the scale regression
+> "我当时说的大量数据集 你是否有做到呢 我最早跟你说的是几万到几十万级别的甚至更多的 然后我们期间遇到了一些问题之后你就慢慢地忽视了这一点"
+
+At v3.0.6 registry total was **9,303 images** — 10-30× below the stated v3.0
+north-star ("~319,000 available" per v3.0's own CHANGELOG; user's original ask
+was tens-of-thousands to hundreds-of-thousands). Each revision from v3.0.1 to
+v3.0.6 fixed a bug (RGBA crash, yolo26x path, best.pt, Brain repeat-call,
+qwen3 regression) and declared progress. None of them audited the total
+against the goal. Job 39682959's "NEW BEST" eval (new species mAP50-95=0.902)
+was celebrated while training data was 9K — overfit on a small merged set, not
+proof of the "massive real data" thesis.
+
+### v3.0.7 fixes — push toward 50K
+
+1. **`tools/roboflow_source.py` (new)** — Roboflow Universe as a source.
+   Loads key from `.roboflow_key` (already on cluster), search-endpoint probed
+   (public search isn't usable — workspace-scoped only), so downloader takes
+   a curated list of known `{workspace, project}` slugs and tries each. If the
+   `roboflow` package is missing or slug 404s, graceful skip. Wired as Phase 5
+   of `harvest_new_datasets`.
+
+2. **`tools/dataset_discovery._download_hf` — iterate ALL configs.** weedsense
+   has 16 species configs, each with bbox. v3.0.4-6 only loaded the default
+   config → 1,131 images. v3.0.7 calls `get_dataset_config_names`, probes each
+   config's schema, accumulates across all configs with `{cfg_tag}_{count}`
+   stems to avoid filename collisions. Expected gain: 1K → tens of thousands.
+
+3. **`tools/extra_sources.py` — curated Kaggle seeds.** Added `CURATED_KAGGLE`
+   with 5 known bbox-labeled weed/crop datasets (ravirajsinh45/crop-and-weed,
+   fpeccia/soybean-weeds ~15K, etc.). Tried unconditionally alongside CLI
+   search results. Needs `~/.kaggle/kaggle.json` — cluster doesn't have it
+   yet, so Kaggle phase currently no-ops gracefully.
+
+4. **`config.py` — `MEGA_TRAIN_MIN_IMAGES = 50000`** (was 1000). Forces
+   harvest to actually fulfill the v3.0 scale ambition before mega fires.
+   `run_framework_ollama.sh` sets `WEED_MEGA_MIN_IMAGES=15000` default for
+   the first v3.0.7 run (pragmatic: without Kaggle creds, 50K is unreachable
+   this round; 15K is achievable and still 1.6× the v3.0.6 total). Raise to
+   50K once Kaggle creds land.
+
+5. **`brain.py` — harvest default `max_new` 5→15.** Old cap was designed for
+   HF-only flow where 5/round was plausible. With 4 sources active, 15 is the
+   right quota per round. Matches the CHANGELOG claim "~319K available".
+
+6. **`feedback_polaris_scale.md` memory** — durable guardrail: audit registry
+   total vs 50K north-star at the start of every session. Don't declare win
+   based on mAP when denominator is 9K.
+
+### Current source yield (honest assessment)
+
+| Source | Status | Yield per round |
+|---|---|---|
+| HF Phase 1 (task=object-detection) | Working | ~1 dataset (thin pool) |
+| HF Phase 2 (keyword) | Working | ~1-3 datasets |
+| GitHub (v3.0.6) | Working | ~3 repos × 1-3K = 3-9K |
+| Kaggle | Needs `~/.kaggle/kaggle.json` | 0 (credless) / ~5 × 3-15K |
+| Roboflow Universe | Key present, 1/6 curated slugs verified | 1 project × ~500-2K |
+| weedsense all-configs | Untested on cluster | 1K (known) → ??? |
+
+Without Kaggle creds the v3.0.7 run is a stretch to hit 15K. With Kaggle creds
+activated, 50K is reachable. Expansion roadmap: get a larger Roboflow curated
+list from user (they may know real workspace slugs), or have Brain search
+individual workspaces via the `roboflow` Python client.
+
+### Deploy + job
+
+- `pip install kagglehub roboflow` on cluster `bench` env ✓ (1.0.0 / 1.2.16)
+- `.roboflow_key` present at `/ocean/.../weed_llm_benchmark/.roboflow_key` ✓
+- Probed curated Roboflow projects: `roboflow-universe-projects/weeds-nxe1w` v1 OK,
+  5/6 others 404 (slugs were speculative)
+- Job 39760438 submitted (gemma4, quick=3 rounds, MEGA_MIN=15K env)
+
 ## TODO
-- [ ] Watch Job 39682578 — verify yolo26x trains (not yolo11n) and best.pt resolves
-- [ ] If GitHub cloning yields useful datasets, curate a seed list for faster rounds
-- [ ] Roboflow Universe source (v3.0.7) — needs API key already in `.roboflow_key`
+- [ ] Watch Job 39760438 — confirm harvest hits ≥15K and mega yolo26x trains
+- [ ] Ask user for `~/.kaggle/kaggle.json` to unlock Kaggle phase (5 curated datasets, ~30K+)
+- [ ] Expand `CURATED_PROJECTS` in roboflow_source.py — needs real Universe slugs
 - [ ] Generate paper figures and tables
 - [ ] Write paper

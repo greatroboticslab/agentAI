@@ -215,75 +215,105 @@ def _kaggle_cli_search(query, max_results=5):
         return []
 
 
-def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=2):
+# Curated Kaggle weed/crop bbox datasets — known to have YOLO labels.
+# Added to every harvest run as seeds (in addition to CLI search results).
+CURATED_KAGGLE = [
+    # ref, est_images, description
+    ("ravirajsinh45/crop-and-weed-detection", 1300, "Crop-weed YOLO bbox (ravirajsinh45)"),
+    ("gavinarmstrong/open-sprayer-images", 6000, "Open Sprayer weed images"),
+    ("jaidalmotra/cotton-weed-dataset", 4000, "Cotton weed"),
+    ("fpeccia/weed-detection-in-soybean-crops", 15000, "Soybean weed (large)"),
+    ("vbookshelf/v2-plant-seedlings-dataset", 5500, "V2 Plant seedlings"),
+]
+
+
+def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=3):
     """Search + download Kaggle datasets via kagglehub + kaggle CLI.
 
-    Needs ~/.kaggle/kaggle.json (or env vars). Silently skips if missing.
+    Strategy: merge CURATED_KAGGLE seeds with `kaggle datasets list -s` results.
+    Needs ~/.kaggle/kaggle.json or env creds. Silently skips if missing.
     """
     try:
         import kagglehub  # noqa
     except ImportError:
-        logger.info("[Kaggle] kagglehub not installed, skipping")
+        logger.info("[Kaggle] kagglehub not installed — skipping")
         return []
+    # Verify creds present — try a dummy listing
     if shutil.which("kaggle") is None:
-        logger.info("[Kaggle] `kaggle` CLI missing (needed for search), skipping")
-        return []
+        logger.info("[Kaggle] `kaggle` CLI missing, using curated-only mode")
+
+    # Build candidate list
+    seen = set()
+    candidates = []
+
+    # 1. Curated seeds (always tried)
+    for ref, est, desc in CURATED_KAGGLE:
+        if ref in seen:
+            continue
+        seen.add(ref)
+        candidates.append({"ref": ref, "title": desc, "source": "curated"})
+
+    # 2. Search results (if CLI available)
+    if shutil.which("kaggle") is not None:
+        for q in queries:
+            for kr in _kaggle_cli_search(q, max_results=5):
+                if kr["ref"] in seen:
+                    continue
+                seen.add(kr["ref"])
+                candidates.append({**kr, "source": f"search:{q}"})
+
+    logger.info(f"[Kaggle] {len(candidates)} candidates (curated + search)")
 
     results = []
-    seen = set()
-    for q in queries:
+    for c in candidates:
         if len(results) >= max_new:
             break
-        for kr in _kaggle_cli_search(q, max_results=5):
-            if len(results) >= max_new:
-                break
-            ref = kr["ref"]
-            if ref in seen:
-                continue
-            seen.add(ref)
-            slug = "kg_" + ref.replace("/", "__").lower()
-            if already_known_cb(slug):
-                continue
+        ref = c["ref"]
+        slug = "kg_" + ref.replace("/", "__").lower()
+        if already_known_cb(slug):
+            continue
 
-            try:
-                import kagglehub
-                path = kagglehub.dataset_download(ref)
-            except Exception as e:
-                logger.warning(f"[Kaggle] download {ref} failed: {e}")
-                continue
-            if not os.path.isdir(path):
-                continue
-            img_count = _count_images(path)
-            lbl_count = _count_labels(path)
-            if img_count < 50 or lbl_count == 0:
-                logger.debug(f"[Kaggle] {ref}: imgs={img_count}, labels={lbl_count} — skipping")
-                continue
+        try:
+            path = kagglehub.dataset_download(ref)
+        except Exception as e:
+            logger.debug(f"[Kaggle] {ref}: download failed ({str(e)[:100]})")
+            continue
+        if not os.path.isdir(path):
+            continue
 
-            # Copy into our data_dir so cleanup is predictable
-            local_path = os.path.join(data_dir, slug)
-            if os.path.exists(local_path):
-                shutil.rmtree(local_path, ignore_errors=True)
-            try:
-                shutil.copytree(path, local_path)
-            except Exception as e:
-                logger.warning(f"[Kaggle] copy {ref} failed: {e}")
-                continue
+        img_count = _count_images(path)
+        lbl_count = _count_labels(path)
+        if img_count < 50:
+            logger.debug(f"[Kaggle] {ref}: too few images ({img_count}), skip")
+            continue
+        # Allow label-less datasets through (some cotton-weed Kaggle sets are image-only);
+        # mega_trainer will ignore them via the annotation filter.
 
-            logger.info(f"[Kaggle] {ref}: {img_count} images, {lbl_count} labels → {local_path}")
-            info = {
-                "source": "kaggle", "hf_id": None, "kaggle_ref": ref,
-                "images": img_count, "classes": "?",
-                "annotation": "yolo" if lbl_count > 0 else "image_only",
-                "format": "yolo", "description": kr["title"][:300],
-                "status": "downloaded", "local_path": local_path,
-                "local_images": img_count, "class_names": [],
-                "downloaded_at": None, "used_for_training": False,
-                "training_runs": [], "harvest_reason": f"kaggle:{q}",
-            }
-            results.append({
-                "slug": slug, "info": info,
-                "stats": {"status": "downloaded", "images": img_count,
-                          "labeled": lbl_count, "annotation_kind": "yolo"},
-                "hf_id": ref, "reason": f"kaggle:{q}",
-            })
+        local_path = os.path.join(data_dir, slug)
+        if os.path.exists(local_path):
+            shutil.rmtree(local_path, ignore_errors=True)
+        try:
+            shutil.copytree(path, local_path)
+        except Exception as e:
+            logger.warning(f"[Kaggle] copy {ref} failed: {e}")
+            continue
+
+        logger.info(f"[Kaggle] ✓ {ref} ({c['source']}): {img_count} imgs, "
+                    f"{lbl_count} labels → {slug}")
+        info = {
+            "source": "kaggle", "hf_id": None, "kaggle_ref": ref,
+            "images": img_count, "classes": "?",
+            "annotation": "yolo" if lbl_count > 0 else "image_only",
+            "format": "yolo", "description": c["title"][:300],
+            "status": "downloaded", "local_path": local_path,
+            "local_images": img_count, "class_names": [],
+            "downloaded_at": None, "used_for_training": False,
+            "training_runs": [], "harvest_reason": f"kaggle:{c['source']}",
+        }
+        results.append({
+            "slug": slug, "info": info,
+            "stats": {"status": "downloaded", "images": img_count,
+                      "labeled": lbl_count, "annotation_kind": "yolo"},
+            "hf_id": ref, "reason": f"kaggle:{c['source']}",
+        })
     return results

@@ -381,98 +381,128 @@ class DatasetDiscovery:
         return [], set()
 
     def _download_hf(self, name, hf_id, local_path, max_images):
-        """Download from HuggingFace with schema-aware YOLO label extraction."""
+        """Download from HuggingFace with schema-aware YOLO label extraction.
+
+        v3.0.7: iterate ALL dataset configs (weedsense has 16 species configs;
+        loading only the default gave 1131 when the total is 120K+). Sum across
+        configs, prefix stems with cfg tag to avoid collisions.
+        """
         try:
             from datasets import load_dataset
             from datasets import get_dataset_config_names
+        except Exception as e:
+            return local_path, {"status": "error", "error": f"datasets import: {e}"}
 
-            expected = KNOWN_DATASETS.get(name, {}).get("images", 0)
-            limit = max_images or expected or 999999
+        expected = KNOWN_DATASETS.get(name, {}).get("images", 0)
+        limit = max_images or expected or 999999
 
-            # Probe schema (small sample, non-streaming)
-            logger.info(f"[Dataset] Probing {hf_id} schema...")
-            try:
-                probe_ds = load_dataset(hf_id, split="train", streaming=True)
-                probe_item = next(iter(probe_ds))
-                schema_keys = list(probe_item.keys())
-                logger.info(f"[Dataset] {name} schema keys: {schema_keys}")
-            except Exception as e:
-                logger.warning(f"[Dataset] Probe failed ({e}); proceeding anyway")
-                probe_item = None
+        try:
+            configs = get_dataset_config_names(hf_id) or [None]
+        except Exception:
+            configs = [None]
+        if not configs:
+            configs = [None]
+        logger.info(f"[Dataset] {hf_id}: {len(configs)} config(s): "
+                    f"{configs[:5]}{'...' if len(configs) > 5 else ''}")
 
-            # Decide annotation type: bbox-capable or classification-only
-            has_bbox = probe_item is not None and (
-                "objects" in probe_item or "bbox" in probe_item
-                or "boxes" in probe_item or "bboxes" in probe_item
-                or "annotations" in probe_item
-            )
-            annotation_kind = "bbox" if has_bbox else "classification"
+        img_dir = os.path.join(local_path, "images")
+        lbl_dir = os.path.join(local_path, "labels")
+        os.makedirs(img_dir, exist_ok=True)
+        os.makedirs(lbl_dir, exist_ok=True)
 
-            # Use streaming for large datasets to avoid RAM blowup
-            use_streaming = expected > 10000 or limit > 10000
-            ds = load_dataset(hf_id, split="train", streaming=use_streaming)
+        count = 0
+        label_count = 0
+        all_classes = set()
+        save_errors = 0
+        annotation_kind = "classification"
 
-            img_dir = os.path.join(local_path, "images")
-            lbl_dir = os.path.join(local_path, "labels")
-            os.makedirs(img_dir, exist_ok=True)
-            os.makedirs(lbl_dir, exist_ok=True)
-
-            count = 0
-            label_count = 0
-            all_classes = set()
-            save_errors = 0
-
-            iterator = ds if use_streaming else iter(ds)
-            for item in iterator:
+        try:
+            for cfg in configs:
                 if count >= limit:
                     break
-                if "image" not in item:
-                    count += 1
-                    continue
-                img = item["image"]
-                w = getattr(img, "width", item.get("width", 0))
-                h = getattr(img, "height", item.get("height", 0))
-                stem = f"{count:06d}"
-                # JPEG can't save RGBA/P/LA/CMYK — convert to RGB first
+                cfg_tag = (cfg or "default").replace("/", "_")[:40]
+
+                # Probe this config
                 try:
-                    if img.mode not in ("RGB", "L"):
-                        # Flatten alpha onto white if present
-                        if img.mode in ("RGBA", "LA"):
-                            bg = img.__class__.new("RGB", img.size, (255, 255, 255))
-                            try:
-                                # Paste with alpha as mask
-                                bg.paste(img.convert("RGBA"), mask=img.convert("RGBA").split()[-1])
-                            except Exception:
-                                bg = img.convert("RGB")
-                            img = bg
-                        else:
-                            img = img.convert("RGB")
-                    img.save(os.path.join(img_dir, f"{stem}.jpg"))
+                    probe_ds = (load_dataset(hf_id, cfg, split="train", streaming=True)
+                                if cfg else load_dataset(hf_id, split="train", streaming=True))
+                    probe_item = next(iter(probe_ds))
                 except Exception as e:
-                    save_errors += 1
-                    if save_errors <= 3:
-                        logger.warning(f"[Dataset] {name} save fail on #{count} "
-                                        f"mode={getattr(img,'mode','?')}: {str(e)[:100]}")
-                    count += 1
+                    logger.warning(f"[Dataset] {hf_id}/{cfg_tag}: probe failed "
+                                   f"({str(e)[:100]}) — skip")
                     continue
 
-                if has_bbox and w and h:
-                    lines, classes = self._extract_yolo_labels(item, w, h)
-                    if lines:
-                        with open(os.path.join(lbl_dir, f"{stem}.txt"), "w") as f:
-                            f.write("\n".join(lines))
-                        label_count += 1
-                        all_classes.update(classes)
-                    else:
-                        # Empty label file still counts as "image with no objects"
-                        open(os.path.join(lbl_dir, f"{stem}.txt"), "w").close()
+                has_bbox = any(k in probe_item for k in
+                               ("objects", "bbox", "boxes", "bboxes", "annotations"))
+                if has_bbox:
+                    annotation_kind = "bbox"
+                logger.info(f"[Dataset] {name}/{cfg_tag}: keys={list(probe_item.keys())[:6]} "
+                            f"bbox={has_bbox}")
 
-                count += 1
-                if count % 2000 == 0:
-                    logger.info(f"[Dataset] {name}: {count}/{limit} imgs, "
-                                f"{label_count} labeled, classes={len(all_classes)}")
+                use_streaming = expected > 10000 or (limit - count) > 10000
+                try:
+                    ds = (load_dataset(hf_id, cfg, split="train", streaming=use_streaming)
+                          if cfg else load_dataset(hf_id, split="train", streaming=use_streaming))
+                except Exception as e:
+                    logger.warning(f"[Dataset] {hf_id}/{cfg_tag}: load failed "
+                                   f"({str(e)[:100]}) — skip")
+                    continue
 
-            # Register result
+                iterator = ds if use_streaming else iter(ds)
+                cfg_start = count
+
+                for item in iterator:
+                    if count >= limit:
+                        break
+                    if "image" not in item:
+                        count += 1
+                        continue
+                    img = item["image"]
+                    w = getattr(img, "width", item.get("width", 0))
+                    h = getattr(img, "height", item.get("height", 0))
+                    stem = f"{cfg_tag}_{count:06d}"
+
+                    try:
+                        if img.mode not in ("RGB", "L"):
+                            if img.mode in ("RGBA", "LA"):
+                                bg = img.__class__.new("RGB", img.size, (255, 255, 255))
+                                try:
+                                    bg.paste(img.convert("RGBA"),
+                                             mask=img.convert("RGBA").split()[-1])
+                                except Exception:
+                                    bg = img.convert("RGB")
+                                img = bg
+                            else:
+                                img = img.convert("RGB")
+                        img.save(os.path.join(img_dir, f"{stem}.jpg"))
+                    except Exception as e:
+                        save_errors += 1
+                        if save_errors <= 3:
+                            logger.warning(f"[Dataset] {name} save fail on #{count} "
+                                           f"mode={getattr(img,'mode','?')}: {str(e)[:100]}")
+                        count += 1
+                        continue
+
+                    if has_bbox and w and h:
+                        lines, classes = self._extract_yolo_labels(item, w, h)
+                        if lines:
+                            with open(os.path.join(lbl_dir, f"{stem}.txt"), "w") as f:
+                                f.write("\n".join(lines))
+                            label_count += 1
+                            all_classes.update(classes)
+                        else:
+                            open(os.path.join(lbl_dir, f"{stem}.txt"), "w").close()
+
+                    count += 1
+                    if count % 2000 == 0:
+                        logger.info(f"[Dataset] {name}/{cfg_tag}: {count}/{limit} imgs, "
+                                    f"{label_count} labeled, classes={len(all_classes)}")
+
+                cfg_added = count - cfg_start
+                logger.info(f"[Dataset] {name}/{cfg_tag}: +{cfg_added} imgs "
+                            f"(total {count}, {label_count} labeled)")
+
+            # All configs processed — register result
             self.registry["datasets"].setdefault(name, {**KNOWN_DATASETS.get(name, {})})
             self.registry["datasets"][name].update({
                 "status": "downloaded",
@@ -482,22 +512,24 @@ class DatasetDiscovery:
                 "class_ids_seen": sorted(all_classes),
                 "annotation": annotation_kind,
                 "downloaded_at": datetime.now().isoformat(),
+                "configs_iterated": len(configs),
             })
             self.registry["total_downloaded"] = sum(
                 d.get("local_images", 0) for d in self.registry["datasets"].values()
             )
             self._save_registry()
 
-            logger.info(f"[Dataset] '{name}': {count} imgs, {label_count} with bbox labels, "
-                        f"{len(all_classes)} classes, kind={annotation_kind}")
+            logger.info(f"[Dataset] '{name}': {count} imgs across {len(configs)} cfg(s), "
+                        f"{label_count} labeled, {len(all_classes)} classes, "
+                        f"kind={annotation_kind}")
             return local_path, {
                 "status": "downloaded",
                 "images": count,
                 "labeled": label_count,
                 "classes": len(all_classes),
                 "annotation_kind": annotation_kind,
+                "configs": len(configs),
             }
-
         except Exception as e:
             logger.error(f"[Dataset] Download failed: {e}")
             return local_path, {"status": "error", "error": str(e)}
@@ -723,7 +755,7 @@ class DatasetDiscovery:
                     data_dir=self.data_dir,
                     queries=[q for q in queries if any(k in q for k in ("weed", "crop", "plant", "agri"))] or queries[:3],
                     already_known_cb=lambda s: s in self.registry["datasets"] or self.is_duplicate(s),
-                    max_new=min(kg_quota, 2),
+                    max_new=min(kg_quota, 3),
                 )
                 for entry in kg:
                     self.registry["datasets"][entry["slug"]] = entry["info"]
@@ -733,6 +765,30 @@ class DatasetDiscovery:
                     })
             except Exception as e:
                 logger.warning(f"[Harvest] Kaggle phase failed: {e}")
+
+        # ------------ Phase 5: Roboflow Universe (bulk driver) ------------
+        # Roboflow is the north-star source — one project typically gives 1K-10K
+        # bbox images, so a single harvest round can easily add 20K+ images.
+        if len(results) < max_new:
+            try:
+                from .roboflow_source import harvest_roboflow_datasets
+                rf_quota = max_new - len(results)
+                rf_queries = [q for q in queries if any(k in q for k in ("weed", "crop", "plant", "agri"))] or queries[:3]
+                rf = harvest_roboflow_datasets(
+                    data_dir=self.data_dir,
+                    queries=rf_queries,
+                    already_known_cb=lambda s: s in self.registry["datasets"] or self.is_duplicate(s),
+                    # Allow Roboflow to dominate the quota since it's the big source
+                    max_new=max(rf_quota, 8),
+                )
+                for entry in rf:
+                    self.registry["datasets"][entry["slug"]] = entry["info"]
+                    results.append({
+                        "hf_id": entry["hf_id"], "slug": entry["slug"],
+                        "stats": entry["stats"], "reason": entry["reason"],
+                    })
+            except Exception as e:
+                logger.warning(f"[Harvest] Roboflow phase failed: {e}")
 
         self._save_registry()
         return {

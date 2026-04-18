@@ -17,6 +17,11 @@ export HF_HOME=/ocean/projects/cis240145p/byler/hf_cache
 export OLLAMA_HOST=127.0.0.1:11434
 export OLLAMA_MODELS=/ocean/projects/cis240145p/byler/ollama/models
 
+# v3.0.7: mega gate — target is 50K real bbox images cumulative.
+# For the first v3.0.7 run without Kaggle creds, keep at 15K so mega can fire
+# with whatever HF+GitHub+Roboflow yield. Raise to 50K once Kaggle creds land.
+export WEED_MEGA_MIN_IMAGES=${WEED_MEGA_MIN_IMAGES:-15000}
+
 echo "=== Weed Optimizer Framework — OLLAMA AGENT ==="
 echo "Date: $(date)"
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"

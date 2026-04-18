@@ -171,7 +171,11 @@ class Config:
     #    (otherwise we'd train twice on the same pool).
     # Over many rounds accumulation grows toward the user's target (100K+).
     # Override via env: WEED_MEGA_MIN_IMAGES=<n>
-    MEGA_TRAIN_MIN_IMAGES = int(os.environ.get("WEED_MEGA_MIN_IMAGES", "1000"))
+    # v3.0.7: raised to 50K to force harvest to actually fulfill the north-star
+    # scale ambition before training fires. v3.0.4-6 had this at 1K which let
+    # 9K-sized "massive" training through. User caught the scale regression.
+    # Override via env WEED_MEGA_MIN_IMAGES=<n>.
+    MEGA_TRAIN_MIN_IMAGES = int(os.environ.get("WEED_MEGA_MIN_IMAGES", "50000"))
     CONFIDENCE_THRESHOLD = 0.25    # YOLO inference for label generation / detection
     EVAL_CONFIDENCE = 0.001        # Low conf for mAP evaluation (full PR curve, standard practice)
     IOU_MATCH_THRESHOLD = 0.5      # IoU for TP/FP matching in evaluation
