@@ -1153,10 +1153,70 @@ registry garbage.
 - Auto-label takes GPU time: ~2-3h for 380K images on V100. Fits in 8h walltime
   alongside 1-2h mega train but leaves little slack.
 
+## 2026-04-19 - v3.0.12: Orchestrator guardrail — autolabel before mega
+
+### Job 39933687 (v3.0.11) post-mortem
+v3.0.11 autolabel module worked on paper, but Brain never called it.
+Actual behavior:
+```
+19:39 harvest_new_datasets → 2h39m Kaggle downloads
+22:18 +379,959 images (0 with bboxes), 3 needs_autolabel registered
+22:19 Brain: "train_yolo_mega"  ← skipped autolabel_pending!
+22:19 Gate: auto-release (bbox_delta=0) → training on 11,608 old bbox
+03:37 walltime hit at epoch 50/50 57% — no eval, no Round 2
+```
+
+Gemma 4 parsed its text response "train_yolo_mega" straight from the keyword
+table after seeing the harvest observation. FALLBACK_PIPELINE is advisory, not
+enforcing. So 380K autolabel-ready images sat on disk while mega burned 5h on
+the stale 11K pool.
+
+**Critical insight:** when classification data is harvested but mega gets
+called anyway, the Gate's v3.0.10 "auto-release on bbox_delta=0" fix is
+counterproductive — it ALLOWS mega to skip autolabel, locking in the
+regression. The gate logic was right for empty harvest, wrong for
+classification harvest.
+
+### v3.0.12 fix: orchestrator guardrail
+
+In `orchestrator.train_yolo_mega` handler: if any registry entry has
+`annotation=needs_autolabel`, the handler now **synthesizes and immediately
+executes an `autolabel_pending` action** in place of the mega call. This
+converts the "Brain forgot" case into "orchestrator auto-ran". After autolabel
+completes, the loop continues and Brain's next choice picks up the now-labeled
+data.
+
+Also strengthened Brain system prompt with explicit HARD RULE: "After harvest,
+if observation mentions needs_autolabel, call autolabel_pending BEFORE
+train_yolo_mega". Belt-and-suspenders with the orchestrator guardrail.
+
+### Registry state before v3.0.12 job
+```
+total: 391,567 images
+  Ready bbox/yolo    : 11,608 images across 8 datasets
+  needs_autolabel    : 379,959 images across 3 datasets
+    kg_abdallahalidev__plantvillage-dataset      : 162,916
+    kg_emmarex__plantdisease                     :  41,276
+    kg_vipoooool__new-plant-diseases-dataset     : 175,767
+```
+
+Next job won't re-download — all 380K already on disk. Only needs OWLv2 to
+label them.
+
+### Deploy
+- Submitted Job 40035529 (gemma4, quick=3). Expected flow:
+  1. Ollama boot (~30 min)
+  2. Harvest — likely 0 new (dedup; HF/Kaggle queries return already-known)
+  3. train_yolo_mega call → GUARDRAIL REROUTES to autolabel_pending
+  4. OWLv2 labels 380K images (~2-3h on V100)
+  5. Brain calls train_yolo_mega again → trains yolo26x on ~400K
+  6. evaluate
+  7. fits in 8h walltime
+
 ## TODO
-- [ ] Watch Job 39933687 — confirm autolabel fires on ≥1 dataset and bbox_count jumps
-- [ ] If OWLv2 conf=0.12 gives >20% fallback rate, lower to 0.08
-- [ ] Consider Florence-2 <OD> as an alternative pseudo-labeler (gets real labels
-      not just "plant"; may be cleaner)
+- [ ] Watch Job 40035529 — verify guardrail reroute fires, autolabel runs, mega
+      trains on ~400K images
+- [ ] Tune OWLv2 conf=0.12 if fallback rate is high
+- [ ] Consider Florence-2 <OD> as alternative labeler
 - [ ] Generate paper figures and tables
 - [ ] Write paper

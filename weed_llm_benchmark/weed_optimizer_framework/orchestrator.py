@@ -298,6 +298,75 @@ class Orchestrator:
                     logger.info(obs)
 
                 elif action_name == "train_yolo_mega":
+                    # v3.0.12: if any dataset is in needs_autolabel state, do NOT
+                    # train — that means harvest pulled classification data that
+                    # isn't bbox-usable yet. Brain (Gemma 4) tends to skip
+                    # autolabel_pending and go straight to mega. Reroute now to
+                    # avoid wasting walltime training on the old 11K while 300K+
+                    # autolabel candidates sit on disk.
+                    pending_autolabel = [
+                        slug for slug, info in self.dataset_discovery.registry["datasets"].items()
+                        if info.get("annotation") == "needs_autolabel"
+                        and info.get("status") == "downloaded"
+                        and info.get("local_path")
+                    ]
+                    if pending_autolabel and not params.get("force"):
+                        obs = (
+                            f"GUARDRAIL REROUTE: {len(pending_autolabel)} dataset(s) have "
+                            f"annotation=needs_autolabel ({pending_autolabel[:3]}...). "
+                            f"Running autolabel_pending automatically before mega to avoid "
+                            f"training on stale pool while these sit unused. Call "
+                            f"train_yolo_mega again after autolabel completes."
+                        )
+                        logger.warning(obs)
+                        context_history.append({"role": "observation", "content": obs})
+                        # Synthesize an autolabel_pending action
+                        action = {
+                            "action": "autolabel_pending",
+                            "params": {"conf_threshold": 0.12},
+                            "reasoning": "Guardrail reroute: needs_autolabel data exists",
+                        }
+                        action_name = "autolabel_pending"
+                        params = action["params"]
+                        # Fall through to the autolabel_pending handler below
+                        # by re-entering the dispatch via a synthesized action
+                        from .tools.autolabel import autolabel_dataset
+                        registry_cb = {
+                            "get": lambda s: self.dataset_discovery.registry["datasets"].get(s),
+                            "update": lambda s, u: (
+                                self.dataset_discovery.registry["datasets"][s].update(u),
+                                self.dataset_discovery._save_registry(),
+                            ),
+                        }
+                        total_owl = total_fb = total_empty = 0
+                        summary = [f"Autolabel: {len(pending_autolabel)} pending"]
+                        for slug in pending_autolabel:
+                            try:
+                                r = autolabel_dataset(slug, registry_cb,
+                                                      conf_threshold=0.12)
+                                if r.get("status") == "ok":
+                                    total_owl += r.get("labeled_with_owl", 0)
+                                    total_fb += r.get("labeled_with_fallback", 0)
+                                    total_empty += r.get("empty", 0)
+                                    summary.append(
+                                        f"  {slug}: owl={r.get('labeled_with_owl',0)} "
+                                        f"fb={r.get('labeled_with_fallback',0)} "
+                                        f"empty={r.get('empty',0)}"
+                                    )
+                                else:
+                                    summary.append(f"  {slug}: {r.get('status')}")
+                            except Exception as e:
+                                summary.append(f"  {slug}: {type(e).__name__}: {str(e)[:100]}")
+                        summary.append(
+                            f"TOTAL: owl={total_owl} fb={total_fb} empty={total_empty}. "
+                            f"Registry flipped to yolo_autolabel. Now call train_yolo_mega."
+                        )
+                        obs = "\n".join(summary)
+                        context_history.append({"role": "observation", "content": obs})
+                        logger.info(obs)
+                        actions_taken[-1] = action  # record the reroute
+                        continue  # let Brain choose again (should pick mega now)
+
                     # v3.0 cumulative gate: small threshold + grows with every harvest
                     current_bbox = _current_bbox_count()
                     threshold = MEGA_THRESHOLD

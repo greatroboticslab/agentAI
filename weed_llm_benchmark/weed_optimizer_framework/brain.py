@@ -498,7 +498,12 @@ REQUIRED FIRST ACTION of every round:
 HARD RULES (violate → orchestrator force-overrides):
   * Call harvest_new_datasets EXACTLY ONCE per round. If it returns 0, DO NOT retry — pool
     is exhausted this round; move on.
-  * After harvest (regardless of count) → train_yolo_mega → evaluate → done.
+  * v3.0.11: After harvest, if the observation mentions any datasets with
+    annotation=needs_autolabel OR says "X with bboxes" is less than total downloaded
+    images, you MUST call autolabel_pending BEFORE train_yolo_mega. Mega will refuse
+    to run when needs_autolabel data exists and will auto-redirect you.
+  * Correct round shape: harvest → autolabel_pending (if classification added) →
+    train_yolo_mega → evaluate → done.
   * Never call the same tool twice in a row unless its observation explicitly tells you to.
 
 AFTER HARVEST (remaining flow):
