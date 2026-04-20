@@ -477,10 +477,15 @@ class Orchestrator:
                     # needs_autolabel, converting classification images into
                     # YOLO bbox labels. Mega trainer then picks them up via
                     # annotation == "yolo_autolabel".
+                    # v3.0.15: add per-round image cap so mega+evaluate get
+                    # walltime. Without cap, v3.0.14 burned all 8h on autolabel
+                    # and never trained. OWLv2-large at ~1.7 img/sec means
+                    # 20K imgs ~3h — leaves 4-5h for mega+eval.
                     from .tools.autolabel import autolabel_dataset
                     conf = params.get("conf_threshold", 0.12)
-                    max_imgs = params.get("max_images_per_ds")
+                    max_imgs = params.get("max_images_per_ds", 15000)
                     max_ds = params.get("max_datasets")
+                    max_total = params.get("max_total_images", 20000)
                     pending = [
                         slug for slug, v in self.dataset_discovery.registry["datasets"].items()
                         if v.get("annotation") == "needs_autolabel"
@@ -503,21 +508,33 @@ class Orchestrator:
                                 self.dataset_discovery._save_registry(),
                             ),
                         }
-                        summary_lines = [f"Autolabel: {len(pending)} dataset(s) pending"]
+                        summary_lines = [f"Autolabel: {len(pending)} dataset(s) pending "
+                                         f"(caps: per_ds={max_imgs} total={max_total})"]
                         total_with_owl = 0
                         total_fallback = 0
                         total_empty = 0
+                        total_processed_this_round = 0
                         for slug in pending:
+                            if total_processed_this_round >= max_total:
+                                summary_lines.append(
+                                    f"  {slug}: SKIPPED (round cap reached: "
+                                    f"{total_processed_this_round}/{max_total})"
+                                )
+                                continue
+                            remaining = max_total - total_processed_this_round
+                            per_ds_cap = min(max_imgs, remaining)
                             try:
                                 r = autolabel_dataset(
                                     slug, registry_cb,
                                     conf_threshold=conf,
-                                    max_images=max_imgs,
+                                    max_images=per_ds_cap,
                                 )
                                 if r.get("status") == "ok":
+                                    ds_total = r.get("labeled_with_owl", 0) + r.get("labeled_with_fallback", 0)
                                     total_with_owl += r.get("labeled_with_owl", 0)
                                     total_fallback += r.get("labeled_with_fallback", 0)
                                     total_empty += r.get("empty", 0)
+                                    total_processed_this_round += ds_total
                                     summary_lines.append(
                                         f"  {slug}: owl={r.get('labeled_with_owl',0)} "
                                         f"fb={r.get('labeled_with_fallback',0)} "
@@ -530,8 +547,8 @@ class Orchestrator:
                                 summary_lines.append(f"  {slug}: EXCEPTION {type(e).__name__}: {str(e)[:120]}")
                         summary_lines.append(
                             f"TOTAL: owl={total_with_owl} fallback={total_fallback} "
-                            f"empty={total_empty} — registry annotation flipped to "
-                            f"yolo_autolabel; call train_yolo_mega next."
+                            f"empty={total_empty} processed={total_processed_this_round}/{max_total} — "
+                            f"registry flipped to yolo_autolabel; call train_yolo_mega next."
                         )
                         obs = "\n".join(summary_lines)
                         context_history.append({"role": "observation", "content": obs})

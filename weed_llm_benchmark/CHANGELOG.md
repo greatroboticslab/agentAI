@@ -1303,9 +1303,46 @@ rare, halving is the backstop.
 - Cancelled Job 40068162 before it wrote more garbage labels.
 - Submitted Job 40069494 (gemma4, quick=3).
 
+## 2026-04-20 - v3.0.15: Per-round autolabel cap so mega gets walltime
+
+### Job 40069494 (v3.0.14) — autolabel works, but eats all walltime
+
+**v3.0.14 OOM fix worked beautifully:**
+- `kg_emmarex__plantdisease` COMPLETE: 41,276 processed, **40,294 OWL detections + 982 fallback** (97.6% real detection rate, avg 1.33 boxes/image)
+- `kg_vipoooool__new-plant-diseases`: 48,590 labeled (resumed from 26K + 22K new)
+- `kg_abdallahalidev__plantvillage`: 3,500 started (**99.8% OWL** — near-perfect on close-ups)
+- **Registry state after run**: 12,908 real bbox + 93,366 autolabeled = **106,274 usable training images** (over 50K gate!)
+
+**Still didn't reach mega:** 8h walltime all spent in autolabel at ~1.7 img/sec.
+
+### v3.0.15 fix: per-round cap in autolabel_pending
+
+Orchestrator handler now caps:
+- `max_total_images` (default 20000) — total across all datasets this round
+- `max_images_per_ds` (default 15000) — single-dataset cap
+- At 1.7 img/sec → 20K images = ~3.3h autolabel, leaves 4-5h for mega + evaluate
+
+Per-dataset cap additionally accounts for remaining budget: each dataset gets
+`min(15000, remaining_round_budget)`. Once round budget hit, remaining datasets
+are SKIPPED this round (not deleted; registry entry stays needs_autolabel for
+next round).
+
+### Deploy
+Submitted Job 40113954 (gemma4, quick=3). Expected:
+```
+30 min  Ollama boot
+ 5 min  harvest (some new; some HF dedup)
+3 h     autolabel ~20K (finish plantvillage partial + start other pending sets)
+3 h     mega yolo26x on ~125K (real 13K + autolabel ~112K)
+30 min  evaluate
+```
+
+**This is the run where we should finally see end-to-end eval numbers on
+~100K training images** (the first time since v3.0.6's 9K baseline).
+
 ## TODO
-- [ ] Watch Job 40069494 — confirm batch=4 fits on V100, OWL actually detects
-      (`owl > 0` in log), autolabel completes under 2h, mega trains on ~100K
-- [ ] If batch=4 also OOMs, try `google/owlv2-base-patch16-ensemble` (smaller)
+- [ ] Watch Job 40113954 — confirm mega fires and evaluate produces numbers
+- [ ] Compare new species mAP50-95 vs v3.0.6 baseline (0.902 on 9K)
+- [ ] If OWL autolabel labels are low quality, try Florence-2 <OD> alternative
 - [ ] Generate paper figures and tables
 - [ ] Write paper
