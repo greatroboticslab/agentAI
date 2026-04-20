@@ -1122,6 +1122,62 @@ harvests 1-3 GitHub repos + 0-1 HF dataset, trains yolo26x on ~8K+ images, evalu
 
 ---
 
+### Session 33-35 — 2026-04-17/20: v3.0.7 → v3.0.15 — Scale, Autonomy, Autolabel
+
+**Topic**: push from 11K bbox training images to 100K+ via autonomous discovery
+and auto-labeling of classification datasets. User asked at session 33 why we
+were stuck at 9K when v3.0 thesis claimed 100K+ — led to a forensic audit that
+each v3.0.x revision had fixed the previous bug without ever auditing the
+denominator against the goal.
+
+**Four strategic pivots across these sessions:**
+
+1. **v3.0.9** — deleted CURATED_KAGGLE and CURATED_PROJECTS lists. User caught
+   that I had violated the autonomy principle by hardcoding dataset slugs. Real
+   Kaggle autonomous search via v2 bearer token (`KAGGLE_API_TOKEN=KGAT_...`)
+   returns 211 candidates/query across 18 queries.
+
+2. **v3.0.11** — `tools/autolabel.py`: OWLv2 pseudo-labels classification
+   datasets. Kaggle/HF "weed detection" queries overwhelmingly return
+   classification sets (plantvillage 162K, plant-disease 175K, etc.). Previously
+   rejected — now turned into bbox training data. Class is known from the
+   dataset's GT, so OWLv2 only needs to localize (its strength: recall=0.943).
+
+3. **v3.0.12-v3.0.14** — orchestrator guardrails and autolabel engineering:
+   Brain (Gemma 4) repeatedly skipped autolabel_pending → auto-reroute synthesis;
+   OWLv2 at batch=16 OOMed every batch (V100 32GB) → batch=4 + recursive halving
+   on OOM (`_run_with_oom_retry`); resume logic (skip existing .txt) preserves
+   progress across walltime cancels; incremental registry save every 500 images.
+
+4. **v3.0.15** — per-round autolabel cap (20K images/round) so mega actually gets
+   walltime. Previous runs burned all 8h on autolabel with no training.
+
+**Job history through Session 35:**
+
+| Job | Result |
+|---|---|
+| 39933687 (v3.0.11) | Harvest downloaded 380K classification images; Brain skipped autolabel; mega trained old 11K; walltime hit mid-train |
+| 40035529 (v3.0.12) | Orchestrator guardrail rerouted mega→autolabel ✓; OWLv2 at 1 img/sec; 26K/175K before walltime |
+| 40068162 (v3.0.13) | Resume from 26K worked ✓; batch=16 OOMed all batches; `owl=0 fb=512` garbage fallback → cancelled |
+| 40069494 (v3.0.14) | batch=4 + OOM halving worked ✓; plantdisease 41K COMPLETE (97.6% OWL detection); 93K total autolabeled; no mega due to walltime |
+| 40113954 (v3.0.15) | Submitted 2026-04-20; first run with per-round cap should complete end-to-end pipeline |
+
+**Registry state after Session 35 (2026-04-20):**
+- Real bbox: 12,908 images across 8 datasets
+- Autolabeled (yolo_autolabel): 93,366 images across 3 datasets
+- **Combined usable: 106,274 images** — over the 50K MEGA gate for the first time
+- Pending needs_autolabel: 94K across 8 more datasets
+
+**What's validated vs still hypothetical:**
+- *Validated*: autonomous Kaggle/HF/GitHub search; OWLv2 auto-labeling quality
+  (97.6% OWL detection rate on plantdisease, 99.8% on plantvillage); registry
+  cumulative state across runs; orchestrator guardrails for Brain misbehaviors.
+- *Not yet validated*: end-to-end pipeline completion (harvest → autolabel →
+  mega on 100K+ → evaluate) has never finished within a single walltime.
+  v3.0.6 Job 39682959 was the last complete run but only on 9K images.
+
+---
+
 ## Phase 4: Ablation Studies (Planned)
 
 Code ready in `run_ablations.py`. 4 experiments:

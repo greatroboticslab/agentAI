@@ -77,35 +77,54 @@ accumulates real-bbox datasets across runs and trains the latest YOLO (yolo26x,
 
 **Per-round loop (Brain decides, orchestrator enforces):**
 ```
-harvest_new_datasets(max_new=5)           # pulls NEW datasets from 3 sources:
+harvest_new_datasets(max_new=15)          # autonomous search across 4 sources:
                                           #   Phase 1: HF task=object-detection filter
                                           #   Phase 2: HF keyword search
                                           #   Phase 3: GitHub repos with YOLO data
-                                          #   Phase 4: Kaggle `datasets list` (optional)
-train_yolo_mega(epochs=50, imgsz=640)     # merges registry, trains yolo26x
+                                          #   Phase 4: Kaggle v2 API (KGAT_... token)
+autolabel_pending(max_total=20000)        # v3.0.11+: OWLv2 pseudo-labels the
+                                          #   classification datasets (plantvillage
+                                          #   163K, plant-disease 41K etc.) into
+                                          #   YOLO bbox format. Caps per-round
+                                          #   to leave walltime for training.
+train_yolo_mega(epochs=50, imgsz=640)     # merges registry, trains yolo26x on
+                                          #   bbox ∪ autolabel union (100K+ images)
 evaluate                                  # mAP on old + new species
 done
 ```
 
 **Cumulative registry** (`results/framework/dataset_registry.json`) dedups by slug
-across runs. Goal: 100K+ real bbox images over many rounds.
+across runs. As of v3.0.15: 12,908 real-bbox + 93,366 autolabeled = **106,274
+training images**, with 94K more in `needs_autolabel` pool across 8 datasets.
+
+**Brain autonomy** — no human-curated dataset seed lists. All discovery via:
+- HuggingFace `HfApi.list_datasets` + keyword search
+- GitHub API `/search/repositories` + shallow clone + YOLO-format sniff
+- Kaggle v1 REST API with v2 bearer token (`KAGGLE_API_TOKEN=KGAT_...`)
+
+Auto-label pipeline (v3.0.11+) turns classification datasets (which Kaggle/HF
+return by default under "weed detection" queries) into bbox training data:
+class is known from the dataset's GT, OWLv2 just needs to localize — much cleaner
+signal than the old blind VLM consensus (27% FP rate).
 
 **Run it:**
 ```bash
-sbatch run_framework_ollama.sh qwen3:14b quick   # 3 rounds, ~8h walltime
-sbatch run_framework_ollama.sh qwen3:14b long    # 12 rounds
+sbatch run_framework_ollama.sh gemma4 quick   # 3 rounds, ~8h walltime
+sbatch run_framework_ollama.sh gemma4 long    # 12 rounds
 ```
 
 **Key modules:**
-- `weed_optimizer_framework/brain.py` — Ollama+function-calling agent (19 tools)
-- `weed_optimizer_framework/orchestrator.py` — DATA GATE + repeat-call guard
-- `weed_optimizer_framework/tools/dataset_discovery.py` — registry + harvest
-- `weed_optimizer_framework/tools/extra_sources.py` — **GitHub + Kaggle** (v3.0.6)
-- `weed_optimizer_framework/tools/mega_trainer.py` — merges datasets → yolo26x train
-- `weed_optimizer_framework/config.py` — `DETECTION_MODEL = "yolo26x.pt"` with ordered fallbacks
+- `weed_optimizer_framework/brain.py` — Ollama+function-calling agent (20 tools, Gemma 4 default)
+- `weed_optimizer_framework/orchestrator.py` — DATA GATE + guardrails (auto-reroute mega→autolabel when needs_autolabel exists; per-round image cap; repeat-call guard)
+- `weed_optimizer_framework/tools/dataset_discovery.py` — registry + harvest (HF phases 1+2)
+- `weed_optimizer_framework/tools/extra_sources.py` — GitHub + Kaggle autonomous search
+- `weed_optimizer_framework/tools/autolabel.py` — OWLv2 batched inference (batch=4 + OOM halving), resume logic, per-dataset cap
+- `weed_optimizer_framework/tools/mega_trainer.py` — merges `bbox|yolo|yolo_autolabel` datasets → yolo26x train
+- `weed_optimizer_framework/config.py` — `DETECTION_MODEL = "yolo26x.pt"` + fallbacks, `MEGA_TRAIN_MIN_IMAGES=50000`
 
-See CHANGELOG.md for v3.0.0 → v3.0.6 bug history (each revision exists because the
-previous one's architecture didn't match its intended behavior).
+See CHANGELOG.md for v3.0.0 → v3.0.15 full history (each revision exists because the
+previous one's architecture didn't match its intended behavior — this is an honest
+forensic log, not a release-note gloss).
 
 ## Cross-Species Generalization & Agent Optimization
 
