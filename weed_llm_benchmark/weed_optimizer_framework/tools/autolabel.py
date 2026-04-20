@@ -1,28 +1,24 @@
 """
 Auto-label classification datasets with OWLv2 → convert to YOLO bbox format.
 
-Why: most "weed detection" datasets discovered by Kaggle/HF search are actually
-classification (plant disease, plantvillage, etc.). Rejecting them caps us at
-~11K bbox images. Auto-labeling turns 380K+ classification images into bbox
-training data — a much cleaner signal than blind VLM consensus because the
-class IS known to be present (GT from classification), so OWLv2 only has to
-localize, not identify.
+v3.0.13: batched inference + resume + per-dataset cap. v3.0.12 single-image
+OWLv2 on V100 ran at ~1 img/sec — 380K images needed 100h, won't fit 8h
+walltime. Batching to 16 images/forward + fp16 gets 15-20 img/sec (~10x).
+
+Why auto-label at all: most "weed detection" matches on Kaggle/HF are actually
+classification (plantvillage, plant-disease, etc.). Rejecting them caps us at
+~11K bbox images. Autolabeling turns 380K+ into usable bbox training data —
+cleaner signal than blind VLM consensus because the class IS known to be
+present.
 
 Pipeline:
-  1. Pick OWLv2 with a text prompt per dataset (derived from dataset description
-     or a safe default like "plant weed leaf").
-  2. For each image:
-     - Run OWLv2 → list of (box, score)
-     - Keep boxes with score >= conf_threshold
-     - If no box passes, write an empty label (skip in training) or fall back
-       to whole-image box (weak but lossless).
-  3. Write YOLO labels to the dataset's `labels/` dir alongside `images/`.
-  4. Flip registry annotation from `needs_autolabel` → `yolo_autolabel` so
-     mega_trainer picks them up.
-
-mega_trainer expects paths like `images/x.jpg` + `labels/x.txt`. Our Kaggle
-downloads are copied from kagglehub cache with arbitrary internal layouts, so
-we walk the dataset dir for images and place labels as siblings.
+  1. For each image, check if label .txt already exists (resume).
+  2. Batch N images, run OWLv2 with text prompt inferred from dataset description.
+  3. Per image: keep boxes with score >= conf_threshold, else fallback
+     whole-image bbox.
+  4. Write YOLO labels as `{parent}/labels/{stem}.txt`.
+  5. Flip registry annotation: needs_autolabel → yolo_autolabel.
+  6. Save registry every 500 images so walltime-cancelled runs preserve progress.
 """
 
 import os
@@ -42,7 +38,6 @@ def _pick_prompt(dataset_info):
     name = (dataset_info.get("kaggle_ref") or dataset_info.get("hf_id")
             or dataset_info.get("github_name") or "").lower()
     hay = f"{desc} {name}"
-    # Order matters: most specific first
     if "weed" in hay:
         return "a weed"
     if "disease" in hay or "blight" in hay or "rust" in hay or "mildew" in hay:
@@ -61,18 +56,14 @@ def _pick_prompt(dataset_info):
 
 
 def _find_images(root):
-    """Recursively find image files under root."""
     images = []
     for ext in IMG_EXTS:
         images.extend(Path(root).rglob(f"*{ext}"))
-    # Drop any inside an existing labels/ dir
     return [p for p in images if "labels" not in p.parts]
 
 
 def _label_path_for(img_path):
-    """Sibling label path: {parent}/labels/{stem}.txt (mega_trainer-compatible)."""
     p = Path(img_path)
-    # If image is under .../images/..., map to .../labels/...
     if "images" in p.parts:
         parts = list(p.parts)
         idx = parts.index("images")
@@ -83,22 +74,28 @@ def _label_path_for(img_path):
     return lbl
 
 
-def autolabel_dataset(slug, registry_cb, conf_threshold=0.12, max_images=None,
-                      prompt=None, fallback_whole_image=True, class_id=0):
+def autolabel_dataset(slug, registry_cb, conf_threshold=0.12, max_images=30000,
+                      prompt=None, fallback_whole_image=True, class_id=0,
+                      batch_size=16, save_every=500):
     """Generate YOLO-format bbox labels for an unlabeled dataset using OWLv2.
+
+    v3.0.13 changes:
+      * Batched inference (batch_size=16 default) — ~10-20x speedup on V100
+      * fp16 model weights for memory + throughput
+      * Resume: skip images whose label .txt already exists
+      * max_images default 30000 (was None) to fit 8h walltime across 3 datasets
+      * Periodic registry save every `save_every` images
 
     Args:
       slug: dataset slug (key into registry)
       registry_cb: dict {"get": fn(slug)->info, "update": fn(slug, updates)}
-      conf_threshold: OWLv2 score filter (0.10-0.15 works for class-known images)
-      max_images: cap per-dataset for fast iteration; None = all
+      conf_threshold: OWLv2 score filter (0.10-0.15 works)
+      max_images: per-dataset cap (30000 = ~30 min on V100 with batch=16)
       prompt: override the inferred text prompt
-      fallback_whole_image: if OWLv2 returns nothing, emit a whole-image bbox
-      class_id: YOLO class id to assign (default 0 = single-class generic weed)
-
-    Returns:
-      dict with keys: status, images, labeled_with_owl, labeled_with_fallback,
-                     empty, prompt, avg_boxes_per_image
+      fallback_whole_image: if OWLv2 returns nothing, emit whole-image bbox
+      class_id: YOLO class id (default 0 = single-class generic)
+      batch_size: OWLv2 forward-pass batch size
+      save_every: save registry after processing this many images
     """
     info = registry_cb["get"](slug)
     if not info:
@@ -108,16 +105,34 @@ def autolabel_dataset(slug, registry_cb, conf_threshold=0.12, max_images=None,
         return {"status": "no_local_path"}
 
     text_prompt = prompt or _pick_prompt(info)
-    logger.info(f"[Autolabel] {slug}: prompt={text_prompt!r}, conf>={conf_threshold}")
-
-    images = _find_images(local_path)
+    images_all = _find_images(local_path)
     if max_images:
-        images = images[:max_images]
-    if not images:
+        images_all = images_all[:max_images]
+    if not images_all:
         return {"status": "no_images"}
-    logger.info(f"[Autolabel] {slug}: {len(images)} images to process")
 
-    # Load OWLv2 once
+    # Resume: drop images whose label already exists
+    images = []
+    resumed = 0
+    for p in images_all:
+        lbl = _label_path_for(p)
+        if lbl.exists() and lbl.stat().st_size > 0:
+            resumed += 1
+            continue
+        images.append(p)
+
+    logger.info(f"[Autolabel] {slug}: prompt={text_prompt!r} conf>={conf_threshold} "
+                f"total={len(images_all)} resumed={resumed} todo={len(images)} "
+                f"batch={batch_size}")
+
+    if not images:
+        # All done already — just flip the registry annotation
+        stats = {"status": "ok", "images": len(images_all), "resumed": resumed,
+                 "labeled_with_owl": 0, "labeled_with_fallback": 0,
+                 "empty": 0, "total_boxes": 0, "prompt": text_prompt}
+        _flip_registry(registry_cb, slug, stats, text_prompt, conf_threshold, resumed)
+        return stats
+
     try:
         import torch
         from transformers import Owlv2Processor, Owlv2ForObjectDetection
@@ -126,96 +141,147 @@ def autolabel_dataset(slug, registry_cb, conf_threshold=0.12, max_images=None,
         return {"status": "owlv2_import_failed", "error": str(e)[:200]}
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info(f"[Autolabel] loading OWLv2 on {device}...")
+    # fp16 on CUDA for 2x memory + speed; fp32 on CPU for correctness
+    dtype = torch.float16 if device == "cuda" else torch.float32
+    logger.info(f"[Autolabel] loading OWLv2 on {device} ({dtype})...")
     processor = Owlv2Processor.from_pretrained("google/owlv2-large-patch14-ensemble")
     model = Owlv2ForObjectDetection.from_pretrained(
-        "google/owlv2-large-patch14-ensemble"
+        "google/owlv2-large-patch14-ensemble", torch_dtype=dtype,
     ).to(device)
     model.eval()
 
-    texts = [[text_prompt]]
+    texts_per_image = [[text_prompt]]
     stats = {
-        "status": "ok", "images": len(images),
+        "status": "ok", "images": len(images_all), "resumed": resumed,
         "labeled_with_owl": 0, "labeled_with_fallback": 0, "empty": 0,
         "total_boxes": 0, "prompt": text_prompt,
     }
 
-    for idx, img_path in enumerate(images):
-        try:
-            image = Image.open(img_path).convert("RGB")
-        except Exception as e:
-            logger.debug(f"[Autolabel] skip unreadable {img_path}: {e}")
-            stats["empty"] += 1
-            continue
-        w, h = image.size
+    processed = 0
+    skipped_unreadable = 0
 
-        lines = []
+    for batch_start in range(0, len(images), batch_size):
+        batch_paths = images[batch_start : batch_start + batch_size]
+        batch_pil = []
+        batch_sizes = []
+        batch_valid_paths = []
+        for p in batch_paths:
+            try:
+                im = Image.open(p).convert("RGB")
+                batch_pil.append(im)
+                batch_sizes.append(im.size)  # (w, h)
+                batch_valid_paths.append(p)
+            except Exception:
+                skipped_unreadable += 1
+
+        if not batch_pil:
+            processed += len(batch_paths)
+            continue
+
+        # OWLv2 expects parallel lists: texts[i] applies to image[i]
+        texts_batch = [[text_prompt]] * len(batch_pil)
+
         try:
-            inputs = processor(text=texts, images=image, return_tensors="pt")
-            inputs = {k: v.to(device) for k, v in inputs.items()}
+            inputs = processor(text=texts_batch, images=batch_pil, return_tensors="pt",
+                               padding=True)
+            # Move + cast
+            for k, v in inputs.items():
+                if v.dtype in (torch.float32, torch.float16):
+                    inputs[k] = v.to(device=device, dtype=dtype)
+                else:
+                    inputs[k] = v.to(device)
+
             with torch.no_grad():
                 outputs = model(**inputs)
-            target_sizes = torch.tensor([[h, w]]).to(device)
+
+            # target_sizes as (H, W) for post_process
+            target_sizes = torch.tensor([[h, w] for (w, h) in batch_sizes]).to(device)
             results = processor.post_process_object_detection(
                 outputs, target_sizes=target_sizes, threshold=conf_threshold
             )
-            if results and len(results[0]["scores"]) > 0:
-                for score, box in zip(results[0]["scores"], results[0]["boxes"]):
-                    x1, y1, x2, y2 = box.tolist()
-                    cx = ((x1 + x2) / 2) / w
-                    cy = ((y1 + y2) / 2) / h
-                    bw = (x2 - x1) / w
-                    bh = (y2 - y1) / h
-                    if 0.01 < bw < 0.98 and 0.01 < bh < 0.98:
-                        lines.append(f"{class_id} {cx:.6f} {cy:.6f} {bw:.6f} {bh:.6f}")
         except Exception as e:
-            logger.debug(f"[Autolabel] OWL err on {img_path.name}: {str(e)[:80]}")
+            logger.warning(f"[Autolabel] batch err ({len(batch_pil)} imgs): "
+                           f"{type(e).__name__}: {str(e)[:120]} — falling back whole-image")
+            results = [{"scores": [], "boxes": []} for _ in batch_pil]
 
-        if lines:
-            stats["labeled_with_owl"] += 1
-        elif fallback_whole_image:
-            # Whole image as single bbox — weak but preserves the image in training
-            lines = [f"{class_id} 0.5 0.5 1.0 1.0"]
-            stats["labeled_with_fallback"] += 1
-        else:
-            stats["empty"] += 1
-            continue
+        # Write labels per image
+        for (img_path, (w, h), r) in zip(batch_valid_paths, batch_sizes, results):
+            lines = []
+            scores = r["scores"] if hasattr(r["scores"], "__iter__") else []
+            boxes = r["boxes"] if hasattr(r["boxes"], "__iter__") else []
+            for score, box in zip(scores, boxes):
+                try:
+                    x1, y1, x2, y2 = box.tolist()
+                except Exception:
+                    x1, y1, x2, y2 = list(box)
+                cx = ((x1 + x2) / 2) / w
+                cy = ((y1 + y2) / 2) / h
+                bw = (x2 - x1) / w
+                bh = (y2 - y1) / h
+                if 0.01 < bw < 0.98 and 0.01 < bh < 0.98:
+                    lines.append(f"{class_id} {cx:.6f} {cy:.6f} {bw:.6f} {bh:.6f}")
 
-        stats["total_boxes"] += len(lines)
-        lbl_path = _label_path_for(img_path)
-        os.makedirs(lbl_path.parent, exist_ok=True)
-        lbl_path.write_text("\n".join(lines) + "\n")
+            if lines:
+                stats["labeled_with_owl"] += 1
+            elif fallback_whole_image:
+                lines = [f"{class_id} 0.5 0.5 1.0 1.0"]
+                stats["labeled_with_fallback"] += 1
+            else:
+                stats["empty"] += 1
+                processed += 1
+                continue
 
-        if (idx + 1) % 500 == 0:
-            logger.info(f"[Autolabel] {slug}: {idx+1}/{len(images)} — "
-                        f"owl={stats['labeled_with_owl']} "
-                        f"fb={stats['labeled_with_fallback']}")
+            stats["total_boxes"] += len(lines)
+            lbl_path = _label_path_for(img_path)
+            os.makedirs(lbl_path.parent, exist_ok=True)
+            lbl_path.write_text("\n".join(lines) + "\n")
+            processed += 1
 
-    # Cleanup GPU
+        # Account for unreadable images in this batch
+        processed += (len(batch_paths) - len(batch_valid_paths))
+
+        if processed % save_every < batch_size:
+            logger.info(f"[Autolabel] {slug}: {processed}/{len(images)} (resumed+{resumed}) "
+                        f"owl={stats['labeled_with_owl']} fb={stats['labeled_with_fallback']} "
+                        f"unread={skipped_unreadable}")
+            # Incremental registry save so walltime-cancel preserves progress
+            _flip_registry(registry_cb, slug, stats, text_prompt, conf_threshold,
+                           resumed, in_progress=True)
+
+    # Final save
+    stats["empty"] += skipped_unreadable
+    _flip_registry(registry_cb, slug, stats, text_prompt, conf_threshold, resumed)
+
     del model, processor
-    import gc as _gc; _gc.collect()
+    gc.collect()
     try:
         import torch as _t; _t.cuda.empty_cache()
     except Exception:
         pass
 
-    stats["avg_boxes_per_image"] = round(stats["total_boxes"] / max(stats["images"], 1), 2)
+    stats["avg_boxes_per_image"] = round(
+        stats["total_boxes"] / max(stats["labeled_with_owl"] + stats["labeled_with_fallback"], 1), 2
+    )
+    logger.info(f"[Autolabel] {slug}: COMPLETE. owl={stats['labeled_with_owl']} "
+                f"fallback={stats['labeled_with_fallback']} empty={stats['empty']} "
+                f"resumed={resumed} avg_boxes={stats.get('avg_boxes_per_image', 0)}")
+    return stats
 
-    # Flip registry annotation
-    total_labeled = stats["labeled_with_owl"] + stats["labeled_with_fallback"]
+
+def _flip_registry(registry_cb, slug, stats, prompt, conf, resumed, in_progress=False):
+    """Update registry entry with autolabel progress."""
+    total_labeled = stats["labeled_with_owl"] + stats["labeled_with_fallback"] + resumed
     registry_cb["update"](slug, {
         "annotation": "yolo_autolabel",
-        "autolabel_prompt": text_prompt,
-        "autolabel_conf": conf_threshold,
+        "autolabel_prompt": prompt,
+        "autolabel_conf": conf,
+        "autolabel_in_progress": in_progress,
         "autolabel_stats": {
             "with_owl": stats["labeled_with_owl"],
             "with_fallback": stats["labeled_with_fallback"],
             "empty": stats["empty"],
+            "resumed": resumed,
             "total_boxes": stats["total_boxes"],
         },
         "local_labeled": total_labeled,
     })
-    logger.info(f"[Autolabel] {slug}: COMPLETE. owl={stats['labeled_with_owl']} "
-                f"fallback={stats['labeled_with_fallback']} empty={stats['empty']} "
-                f"avg_boxes={stats['avg_boxes_per_image']}")
-    return stats

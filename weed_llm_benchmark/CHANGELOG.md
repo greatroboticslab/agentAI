@@ -1213,10 +1213,65 @@ label them.
   6. evaluate
   7. fits in 8h walltime
 
+## 2026-04-19 - v3.0.13: Batched OWLv2 + resume + per-ds cap
+
+### Job 40035529 (v3.0.12) forensics
+**v3.0.12 guardrail fired correctly**:
+  1. Ollama+Gemma boot
+  2. harvest returned 0 new (dedup; HF exhausted; GitHub rate-limited)
+  3. Brain called train_yolo_mega → **orchestrator rerouted to autolabel_pending** ✓
+  4. Autolabel started processing kg_vipoooool__new-plant-diseases-dataset
+     (175K images)
+
+**Then reality hit**: OWLv2 single-image forward pass on V100 = **~1 img/sec**.
+Walltime 8h processed only 26,000 / 175,767 of the FIRST dataset. Never got to
+plantdisease (41K) or plantvillage (163K). Never trained mega.
+Status at walltime: `owl=19,463 fb=6,537` — labels WERE being written, the
+guardrail worked end-to-end. Just too slow.
+
+Math: 380K images at 1 img/sec = 105h. Impossible within 8h walltime.
+
+### v3.0.13 fixes to `tools/autolabel.py`
+
+1. **Batched inference (`batch_size=16`)**. One forward pass now processes 16
+   images in parallel. Expected 10-20x speedup on V100.
+
+2. **fp16 model weights on CUDA**. `torch_dtype=torch.float16` cuts memory in
+   half and boosts throughput. CPU still uses fp32 for correctness.
+
+3. **Resume logic**. Before processing, skip any image whose label .txt
+   already exists. The previous run's 26K labels carry over. Next run picks
+   up from image 26,001 instead of restart.
+
+4. **Default per-dataset cap raised-but-bounded**: `max_images=30000` (was
+   `None` = all). Caps total work at ~3 × 30K = 90K images = ~1.5h on V100
+   with batch=16. Leaves 6h+ for mega training + eval.
+
+5. **Incremental registry save**. Every `save_every=500` processed images,
+   flip `autolabel_in_progress=True` and save registry. If walltime cancels
+   mid-dataset, the annotation is still usable by mega_trainer via the
+   already-written .txt files, and the next run resumes cleanly.
+
+6. **Defensive batch error handling**. If OWLv2 chokes on a batch (rare OOM
+   or malformed image), falls through to whole-image fallback for that batch
+   instead of dying.
+
+### Expected v3.0.13 timeline
+```
+30 min  Ollama + Gemma 4 boot
+ 5 min  harvest (0 new, dedup)
+30 min  autolabel resume: ~4K remaining new-plant-diseases + 30K plantdisease
+45 min  autolabel: 30K plantvillage-dataset
+           → registry flip to yolo_autolabel on all 3 datasets
+2-3h    mega train yolo26x on ~100K (real 11K + autolabel 90K)
+30 min  evaluate (old + new species)
+------
+~4-5h total, fits easily in 8h walltime
+```
+
 ## TODO
-- [ ] Watch Job 40035529 — verify guardrail reroute fires, autolabel runs, mega
-      trains on ~400K images
-- [ ] Tune OWLv2 conf=0.12 if fallback rate is high
-- [ ] Consider Florence-2 <OD> as alternative labeler
+- [ ] Watch Job 40068162 — confirm batch speedup (should see 10+ img/sec), mega
+      fires on ~100K union, evaluate produces numbers
+- [ ] If fp16 causes OWLv2 numerical issues, fallback to fp32 + batch=8
 - [ ] Generate paper figures and tables
 - [ ] Write paper
