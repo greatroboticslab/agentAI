@@ -76,7 +76,7 @@ def _label_path_for(img_path):
 
 def autolabel_dataset(slug, registry_cb, conf_threshold=0.12, max_images=30000,
                       prompt=None, fallback_whole_image=True, class_id=0,
-                      batch_size=16, save_every=500):
+                      batch_size=4, save_every=500):
     """Generate YOLO-format bbox labels for an unlabeled dataset using OWLv2.
 
     v3.0.13 changes:
@@ -181,28 +181,49 @@ def autolabel_dataset(slug, registry_cb, conf_threshold=0.12, max_images=30000,
         # OWLv2 expects parallel lists: texts[i] applies to image[i]
         texts_batch = [[text_prompt]] * len(batch_pil)
 
-        try:
-            inputs = processor(text=texts_batch, images=batch_pil, return_tensors="pt",
+        # v3.0.14: OOM-aware subdivision — if full batch OOMs, split in half and retry
+        # until each sub-batch fits. Otherwise whole-image fallback returns garbage
+        # signal (owl=0 for all), defeating the point of autolabel.
+        def _run(pil_list, size_list):
+            txt = [[text_prompt]] * len(pil_list)
+            inputs = processor(text=txt, images=pil_list, return_tensors="pt",
                                padding=True)
-            # Move + cast
             for k, v in inputs.items():
                 if v.dtype in (torch.float32, torch.float16):
                     inputs[k] = v.to(device=device, dtype=dtype)
                 else:
                     inputs[k] = v.to(device)
-
             with torch.no_grad():
-                outputs = model(**inputs)
-
-            # target_sizes as (H, W) for post_process
-            target_sizes = torch.tensor([[h, w] for (w, h) in batch_sizes]).to(device)
-            results = processor.post_process_object_detection(
-                outputs, target_sizes=target_sizes, threshold=conf_threshold
+                out = model(**inputs)
+            tgt = torch.tensor([[hh, ww] for (ww, hh) in size_list]).to(device)
+            return processor.post_process_object_detection(
+                out, target_sizes=tgt, threshold=conf_threshold
             )
-        except Exception as e:
-            logger.warning(f"[Autolabel] batch err ({len(batch_pil)} imgs): "
-                           f"{type(e).__name__}: {str(e)[:120]} — falling back whole-image")
-            results = [{"scores": [], "boxes": []} for _ in batch_pil]
+
+        def _run_with_oom_retry(pil_list, size_list, _depth=0):
+            try:
+                return _run(pil_list, size_list)
+            except Exception as e:
+                msg = str(e)[:200]
+                is_oom = "OutOfMemoryError" in type(e).__name__ or "out of memory" in msg
+                if is_oom and len(pil_list) > 1 and _depth < 4:
+                    try:
+                        torch.cuda.empty_cache()
+                    except Exception:
+                        pass
+                    mid = len(pil_list) // 2
+                    logger.info(f"[Autolabel] OOM at batch={len(pil_list)}, "
+                                f"splitting {len(pil_list)} -> {mid}+{len(pil_list)-mid}")
+                    a = _run_with_oom_retry(pil_list[:mid], size_list[:mid], _depth + 1)
+                    b = _run_with_oom_retry(pil_list[mid:], size_list[mid:], _depth + 1)
+                    return a + b
+                # Final fallback: empty results (whole-image bbox will be used)
+                logger.warning(f"[Autolabel] unrecoverable batch err "
+                               f"({len(pil_list)} imgs depth={_depth}): "
+                               f"{type(e).__name__}: {msg[:120]}")
+                return [{"scores": [], "boxes": []} for _ in pil_list]
+
+        results = _run_with_oom_retry(batch_pil, batch_sizes)
 
         # Write labels per image
         for (img_path, (w, h), r) in zip(batch_valid_paths, batch_sizes, results):

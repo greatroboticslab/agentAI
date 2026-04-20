@@ -1269,9 +1269,43 @@ Math: 380K images at 1 img/sec = 105h. Impossible within 8h walltime.
 ~4-5h total, fits easily in 8h walltime
 ```
 
+## 2026-04-20 - v3.0.14: OOM-aware batch subdivision
+
+### Job 40068162 (v3.0.13) reality
+**Good:** v3.0.13 resume worked cleanly (resumed=26078 from prior walltime
+cancel). Brain called autolabel_pending directly — HARD RULE in prompt took
+effect. **Harvest also found 3 new datasets this round with 1,301 real bbox
+images** (v3.0.11 filter relaxation kept working).
+
+**Bad:** OWLv2-large-patch14-ensemble at 960×960 + batch=16 =
+**12.82 GiB per batch**. V100 has 31.73 GiB but with OWLv2 model weights +
+gradients + KV + Python runtime, <12 GiB available for batch tensors.
+**Every batch OOMed**. The defensive `except` I added in v3.0.13 caught
+the exception and fell through to whole-image bbox fallback. Result:
+`owl=0, fb=512` — all 512 labels written were trivial whole-image bboxes
+`0.5 0.5 1.0 1.0`. No localization signal. Batched inference was
+defeated by OOM → ran at same 1.4 img/sec as v3.0.12, producing garbage.
+
+### v3.0.14 fix: recursive halving
+
+Instead of "whole batch OOMs → everyone gets whole-image fallback":
+```
+try batch=N
+  OOM → try halves (N/2 + N/2)
+    OOM → try quarters...
+    fit → real OWL detections
+```
+Implemented as `_run_with_oom_retry` with max depth 4 (N/2/2/2/2 = N/16).
+Default `batch_size=4` (was 16) so first try usually fits. OOM is now
+rare, halving is the backstop.
+
+### Deploy
+- Cancelled Job 40068162 before it wrote more garbage labels.
+- Submitted Job 40069494 (gemma4, quick=3).
+
 ## TODO
-- [ ] Watch Job 40068162 — confirm batch speedup (should see 10+ img/sec), mega
-      fires on ~100K union, evaluate produces numbers
-- [ ] If fp16 causes OWLv2 numerical issues, fallback to fp32 + batch=8
+- [ ] Watch Job 40069494 — confirm batch=4 fits on V100, OWL actually detects
+      (`owl > 0` in log), autolabel completes under 2h, mega trains on ~100K
+- [ ] If batch=4 also OOMs, try `google/owlv2-base-patch16-ensemble` (smaller)
 - [ ] Generate paper figures and tables
 - [ ] Write paper
