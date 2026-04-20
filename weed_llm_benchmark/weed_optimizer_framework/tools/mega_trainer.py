@@ -52,6 +52,30 @@ def _find_images(root):
     return [p for p in Path(root).rglob("*") if p.suffix in IMG_EXTS]
 
 
+def _dhash(img_path, hash_size=8):
+    """64-bit dHash for image duplicate detection. Pure PIL + numpy, no new deps.
+
+    Standard dHash: resize to (hash_size+1, hash_size) grayscale, take horizontal
+    pixel differences, pack as int. Two images with identical dHash are visually
+    identical or near-identical (JPEG re-encoding, slight resize).
+    """
+    try:
+        from PIL import Image
+        import numpy as np
+        img = Image.open(img_path).convert("L").resize(
+            (hash_size + 1, hash_size), Image.LANCZOS
+        )
+        arr = np.array(img, dtype=np.int16)
+        diff = arr[:, 1:] > arr[:, :-1]
+        # Pack 64 bits into one Python int
+        out = 0
+        for bit in diff.flatten():
+            out = (out << 1) | int(bit)
+        return out
+    except Exception:
+        return None
+
+
 def _find_label_for_image(img_path, dataset_root):
     """Find YOLO label (.txt) corresponding to img_path. Supports:
     - Sibling labels dir: images/x.jpg -> labels/x.txt
@@ -93,7 +117,15 @@ def _merge_datasets(out_dir, val_fraction=0.1):
     class_name_to_id = {}
     used_datasets = []
 
-    stats = {"datasets": 0, "images": 0, "labels": 0, "skipped_no_label": 0}
+    stats = {"datasets": 0, "images": 0, "labels": 0, "skipped_no_label": 0,
+             "skipped_duplicates": 0, "unique_hashes": 0}
+    # v3.0.16: cross-dataset image dedup via dHash. PlantVillage has 4+ Kaggle
+    # mirrors in our registry (abdallahalidev, mohitsingh1804, arjuntejaswi,
+    # vipoooool-augmented) — training on duplicates inflates apparent scale
+    # and biases model toward over-represented sources. dHash exact match
+    # catches identical+near-identical uploads; augmentations of the same
+    # base image also tend to hash the same at 8x8 resolution.
+    seen_hashes = {}
 
     for ds_name, info in registry.items():
         local_path = info.get("local_path")
@@ -120,11 +152,22 @@ def _merge_datasets(out_dir, val_fraction=0.1):
             ds_class_map[i] = class_name_to_id[name]
 
         ds_img_count = 0
+        ds_dup_count = 0
         for img in imgs:
             lbl = _find_label_for_image(img, local_path)
             if lbl is None:
                 stats["skipped_no_label"] += 1
                 continue
+
+            # v3.0.16: image-hash dedup across ALL datasets
+            h = _dhash(img)
+            if h is not None:
+                if h in seen_hashes:
+                    # Already saw an identical image from another dataset
+                    stats["skipped_duplicates"] += 1
+                    ds_dup_count += 1
+                    continue
+                seen_hashes[h] = ds_name
 
             # Optionally remap class IDs using ds_class_map
             with open(lbl) as f:
@@ -155,7 +198,8 @@ def _merge_datasets(out_dir, val_fraction=0.1):
         if ds_img_count > 0:
             used_datasets.append(ds_name)
             stats["datasets"] += 1
-            logger.info(f"[Merge] {ds_name}: {ds_img_count} images")
+            logger.info(f"[Merge] {ds_name}: {ds_img_count} unique images "
+                        f"(+{ds_dup_count} deduped vs prior datasets)")
 
     # Build names list sorted by assigned id
     names_list = sorted(class_name_to_id.keys(), key=lambda n: class_name_to_id[n])
@@ -170,7 +214,11 @@ def _merge_datasets(out_dir, val_fraction=0.1):
         f.write(f"nc: {len(names_list)}\n")
         f.write(f"names: {names_list}\n")
 
-    logger.info(f"[Merge] Total: {stats['images']} images from {stats['datasets']} datasets; {len(names_list)} classes")
+    stats["unique_hashes"] = len(seen_hashes)
+    logger.info(f"[Merge] Total: {stats['images']} unique images from "
+                f"{stats['datasets']} datasets; {len(names_list)} classes. "
+                f"Cross-dataset duplicates skipped: {stats['skipped_duplicates']}. "
+                f"(dedup via 8x8 dHash exact-match)")
     return out_dir, data_yaml, stats, used_datasets, names_list
 
 

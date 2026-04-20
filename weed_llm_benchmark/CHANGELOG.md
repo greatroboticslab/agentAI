@@ -1340,9 +1340,55 @@ Submitted Job 40113954 (gemma4, quick=3). Expected:
 **This is the run where we should finally see end-to-end eval numbers on
 ~100K training images** (the first time since v3.0.6's 9K baseline).
 
+## 2026-04-20 - v3.0.16: Cross-dataset image-hash dedup in mega_trainer
+
+### Why this is critical
+User (Session 36) asked "are these datasets unique?" — caught a latent failure
+mode. Registry slugs are unique but **image content is not**. PlantVillage has
+four Kaggle mirrors in our registry:
+  - `kg_abdallahalidev__plantvillage-dataset`   (162,916 images)
+  - `kg_mohitsingh1804__plantvillage`            (54,305 images)
+  - `kg_arjuntejaswi__plant-village`             (20,638 images)
+  - `kg_vipoooool__new-plant-diseases-dataset`   (175,767 augmented images)
+
+All four are derivatives of the same PlantVillage source dataset. Without
+dedup, mega_trainer would see the same base image up to 4× — inflating
+apparent scale and biasing the model toward PlantVillage-style close-ups.
+
+### Registry audit (pre-dedup, 2026-04-20)
+```
+Real bbox (human-labeled):     12,908    10 datasets
+Classification (autolabeled):  93,366     3 datasets
+Classification (pending):      93,790     8 datasets
+Classification TOTAL:         187,156    11 datasets
+Combined pre-dedup:           200,064    21 datasets
+```
+
+### v3.0.16 fix: dHash exact-match dedup
+
+New `_dhash(img_path)` in mega_trainer.py — pure PIL+numpy, no new deps.
+Resizes image to 9×8 grayscale, computes horizontal pixel differences,
+packs 64 bits into a Python int. Two images with identical dHash are
+visually identical or near-identical (JPEG re-encoding, slight resize).
+
+In `_merge_datasets`: maintains a cross-dataset `seen_hashes = {hash: slug}`
+dict. When a new image's hash is already seen, skip copying it to merged
+and increment `stats["skipped_duplicates"]`. First occurrence wins;
+deterministic because registry iteration order is stable.
+
+Log now reports per-dataset: "X unique images (+Y deduped vs prior
+datasets)". Total line reports total duplicates removed.
+
+### Deploy
+- Cancelled Job 40113954 before it could train on duplicated data.
+- Submitted Job 40114079 (gemma4, quick=3, dedup active).
+- Expected: mega sees maybe 50-70K unique images post-dedup vs 106K before.
+
 ## TODO
-- [ ] Watch Job 40113954 — confirm mega fires and evaluate produces numbers
+- [ ] Watch Job 40114079 — confirm dedup count in log, mega trains on
+      unique set, first end-to-end eval at 50K+ unique scale
+- [ ] If dHash exact-match misses augmentations, add Hamming-distance fuzzy
+      match (≤5 bits distance = near-dup)
 - [ ] Compare new species mAP50-95 vs v3.0.6 baseline (0.902 on 9K)
-- [ ] If OWL autolabel labels are low quality, try Florence-2 <OD> alternative
 - [ ] Generate paper figures and tables
 - [ ] Write paper
