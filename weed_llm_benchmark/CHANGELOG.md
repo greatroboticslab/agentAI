@@ -1384,9 +1384,56 @@ datasets)". Total line reports total duplicates removed.
 - Submitted Job 40114079 (gemma4, quick=3, dedup active).
 - Expected: mega sees maybe 50-70K unique images post-dedup vs 106K before.
 
+## 2026-04-20 - v3.0.17: Fix guardrail/round-cap infinite loop
+
+### Job 40114079 (v3.0.16) — autolabel worked, but guardrail+cap deadlock
+Timeline (8h walltime):
+```
+12:48  Round 1 starts
+13:23  Harvest: 3 new classification datasets (+118K images)
+13:23-17:24 (4h)  autolabel_pending run 1:
+   - kg_arjuntejaswi plant-village 15K COMPLETE (14699 owl / 301 fb, 98%)
+   - kg_rashikrahmanpritom plant-disease-recognition 1.5K COMPLETE (99.9%)
+   - kg_smaranjitghose corn/maize 3.5K COMPLETE
+   - 8 more datasets SKIPPED (v3.0.15 round cap 20K/20K reached)
+17:27  Action: train_yolo_mega  ← Brain tried to train
+       ↓
+       GUARDRAIL REROUTE: "still 8 datasets needs_autolabel, autolabel first"
+       ↓
+17:29-20:49 (3.3h)  autolabel_pending run 2 (guardrail-synthesized):
+   - rice-leaf 120 COMPLETE
+   - v2-plant-seedlings 11K COMPLETE
+   - agriculture-crop 1.1K (prompt 'a plant' didn't match → 1094 fallback)
+   - mohitsingh1804 plantvillage: got to 7500/30K before walltime
+20:49  TIME LIMIT
+```
+
+**Zero mega training again.** Bug: v3.0.12 guardrail + v3.0.15 round cap
+formed an infinite loop. Round cap intentionally defers datasets to NEXT
+round (keeping `annotation=needs_autolabel`). Guardrail sees those and
+reroutes mega back to autolabel. Walltime eats itself.
+
+### v3.0.17 fix
+Guardrail respects `actions_taken` history: if `autolabel_pending` already
+ran this round, don't reroute. It's expected that `needs_autolabel` entries
+remain after a capped autolabel run — that's the DESIGN, not a bug.
+
+One-line change in `orchestrator.train_yolo_mega` handler:
+```python
+autolabel_already_ran = any(
+    a.get("action") == "autolabel_pending" for a in actions_taken
+)
+if pending_autolabel and not params.get("force") and not autolabel_already_ran:
+    # reroute (original behavior)
+```
+
+### Deploy
+Submitted Job 40124683. Expected: harvest → autolabel (20K cap) → mega →
+evaluate. Since no re-reroute, mega should finally fire.
+
 ## TODO
-- [ ] Watch Job 40114079 — confirm dedup count in log, mega trains on
-      unique set, first end-to-end eval at 50K+ unique scale
+- [ ] Watch Job 40124683 — confirm autolabel completes (cap hit), mega
+      actually starts, dedup stats appear, evaluate produces numbers
 - [ ] If dHash exact-match misses augmentations, add Hamming-distance fuzzy
       match (≤5 bits distance = near-dup)
 - [ ] Compare new species mAP50-95 vs v3.0.6 baseline (0.902 on 9K)

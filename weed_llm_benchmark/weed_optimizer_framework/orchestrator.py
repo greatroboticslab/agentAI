@@ -298,19 +298,23 @@ class Orchestrator:
                     logger.info(obs)
 
                 elif action_name == "train_yolo_mega":
-                    # v3.0.12: if any dataset is in needs_autolabel state, do NOT
-                    # train — that means harvest pulled classification data that
-                    # isn't bbox-usable yet. Brain (Gemma 4) tends to skip
-                    # autolabel_pending and go straight to mega. Reroute now to
-                    # avoid wasting walltime training on the old 11K while 300K+
-                    # autolabel candidates sit on disk.
+                    # v3.0.12: if any dataset is in needs_autolabel state, reroute.
+                    # v3.0.17: BUT if autolabel_pending already ran this round, let
+                    # mega proceed — v3.0.15's per-round cap intentionally defers
+                    # remaining datasets to the NEXT round, so seeing needs_autolabel
+                    # entries after autolabel ran is expected, not a bug. Without this
+                    # skip, guardrail + round cap formed an infinite loop (Job
+                    # 40114079: autolabel → mega → reroute → autolabel → walltime).
+                    autolabel_already_ran = any(
+                        a.get("action") == "autolabel_pending" for a in actions_taken
+                    )
                     pending_autolabel = [
                         slug for slug, info in self.dataset_discovery.registry["datasets"].items()
                         if info.get("annotation") == "needs_autolabel"
                         and info.get("status") == "downloaded"
                         and info.get("local_path")
                     ]
-                    if pending_autolabel and not params.get("force"):
+                    if pending_autolabel and not params.get("force") and not autolabel_already_ran:
                         obs = (
                             f"GUARDRAIL REROUTE: {len(pending_autolabel)} dataset(s) have "
                             f"annotation=needs_autolabel ({pending_autolabel[:3]}...). "
