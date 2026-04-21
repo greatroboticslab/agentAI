@@ -598,12 +598,18 @@ Reply with just the number:"""
 
     FALLBACK_PIPELINE = [
         # v3.0.11: harvest → autolabel pending → train mega on bbox+autolabel union
+        # v3.0.18: epochs 50→5, imgsz 640→512, patience 3 — Job 40124683 showed
+        # 1 epoch on 100K unique images takes ~2h on V100 with yolo26x. 50 epochs =
+        # ~100h, impossible in 8h walltime. 5 epochs × 512px ≈ 3.5h, fits.
+        # Accuracy-vs-walltime tradeoff: first epoch usually gets most of the lift
+        # when starting from pretrained COCO weights (yolo26x.pt). Can raise
+        # epochs in follow-up runs via Ultralytics resume=True.
         {"action": "harvest_new_datasets", "params": {"max_new": 15, "max_images_per_ds": 50000},
          "reasoning": "Pipeline 1: harvest NEW datasets (HF + GitHub + Kaggle autonomous search)"},
         {"action": "autolabel_pending", "params": {"conf_threshold": 0.12},
          "reasoning": "Pipeline 2: OWLv2 pseudo-label all needs_autolabel datasets (classification → bbox)"},
-        {"action": "train_yolo_mega", "params": {"epochs": 50, "imgsz": 640, "patience": 15},
-         "reasoning": "Pipeline 3: train yolo26x on union of real bbox + auto-labeled data"},
+        {"action": "train_yolo_mega", "params": {"epochs": 5, "imgsz": 512, "patience": 3},
+         "reasoning": "Pipeline 3: train yolo26x on union (short run fits walltime; resume later)"},
         {"action": "evaluate", "params": {},
          "reasoning": "Pipeline 4: evaluate mega-trained YOLO"},
         {"action": "done", "params": {"reason": "v3.0 harvest+autolabel+mega cycle complete"},
@@ -631,7 +637,7 @@ Reply with just the number:"""
             ("harvest", "harvest_new_datasets", {"max_new": 15, "max_images_per_ds": 50000}),
             ("autolabel_pending", "autolabel_pending", {"conf_threshold": 0.12}),
             ("autolabel", "autolabel_pending", {"conf_threshold": 0.12}),
-            ("train_yolo_mega", "train_yolo_mega", {"epochs": 50, "imgsz": 640, "patience": 15}),
+            ("train_yolo_mega", "train_yolo_mega", {"epochs": 5, "imgsz": 512, "patience": 3}),
             ("search_datasets", "search_datasets", {"query": "weed detection"}),
             ("download_dataset", "download_dataset", {"name": "weedsense", "max_images": 60000}),
             ("mega", "train_yolo_mega", {"epochs": 100, "imgsz": 640}),

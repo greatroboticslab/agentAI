@@ -1431,11 +1431,62 @@ if pending_autolabel and not params.get("force") and not autolabel_already_ran:
 Submitted Job 40124683. Expected: harvest → autolabel (20K cap) → mega →
 evaluate. Since no re-reroute, mega should finally fire.
 
+## 2026-04-21 - v3.0.18: Reduce mega to 5 epochs × imgsz 512 so it fits walltime
+
+### Job 40124683 (v3.0.17) — FIRST end-to-end (almost)
+Guardrail fix worked. Timeline (8h walltime 23:41 → 07:41):
+
+```
+23:41      Round 1 starts
+23:43-00:20 harvest  +237,113 images from 3 NEW classification datasets
+                     (biggest harvest round yet; Brain found alinedobrovsky,
+                     kushagra3204-wheat, mdwaquarazam agri-crops, etc.)
+00:21-04:27 autolabel_pending processed 20K (cap):
+              - mdwaquarazam 829: owl=196 fb=633 (weak prompt)
+              - alinedobrovsky plant-disease-merged 15K: owl=10874 fb=4126,
+                avg 4.43 boxes/img (excellent multi-object detection!)
+              - kushagra3204 wheat 4K: owl=2292 fb=1879, avg 4.14 boxes/img
+              - 3 datasets SKIPPED by round cap (deferred to next round)
+04:27      train_yolo_mega — GUARDRAIL DID NOT REROUTE ✓✓ (v3.0.17 fix)
+04:41-06:22 _merge_datasets with v3.0.16 dHash dedup (1h41m):
+              Total 21 datasets iterated.
+              100,569 UNIQUE images / 65,007 cross-dataset duplicates skipped.
+              PlantVillage mirrors collapsed spectacularly:
+                kg_emmarex: 12K unique (29K deduped, 70% overlap)
+                kg_mohitsingh1804: 1K unique (6.5K deduped, 85% overlap)
+                kg_abdallahalidev: 4K unique (nearly all already seen)
+                kg_vipoooool: 46K unique (3K deduped — mostly augmentations)
+06:22      Mega training STARTS yolo26x on 100,569 unique × 12 classes ✓
+06:22-07:41 Epoch 1/50 got to 43% (9,308/21,536 iters) at walltime kill.
+             Per-iter: 4-5 it/s at batch ~5, imgsz=640
+             Rate: ~2h per full epoch → 50 epochs = 100h. Way beyond 8h.
+```
+
+**No evaluate, no best.pt yet.** But this is the first job that:
+- (a) completed harvest + autolabel + merge,
+- (b) proved dedup catches 40% cross-dataset duplicates,
+- (c) proved guardrail loop is fixed,
+- (d) actually started mega training on 100K unique images.
+
+### v3.0.18 fix: training hyperparams for walltime
+
+- epochs: 50 → **5** (first epoch on pretrained yolo26x captures most lift)
+- imgsz: 640 → **512** (1.5× faster, minor accuracy cost)
+- patience: 15 → **3** (early stop)
+
+Expected: 5 epochs × 512px ≈ 3.5h on 100K unique. Total round:
+```
+30min Ollama + 40min harvest + 3h autolabel + 1.5h dedup-merge + 3.5h train + 30min eval
+= ~9h  ← still tight
+```
+If it overruns, next iteration will shorten further (epochs=3 or skip some
+autolabel).
+
+Submitted Job 40135781.
+
 ## TODO
-- [ ] Watch Job 40124683 — confirm autolabel completes (cap hit), mega
-      actually starts, dedup stats appear, evaluate produces numbers
-- [ ] If dHash exact-match misses augmentations, add Hamming-distance fuzzy
-      match (≤5 bits distance = near-dup)
-- [ ] Compare new species mAP50-95 vs v3.0.6 baseline (0.902 on 9K)
+- [ ] Watch Job 40135781 — the "did mega complete + evaluate?" question
+- [ ] If walltime still tight, consider Ultralytics resume=True across jobs
+- [ ] Compare new species mAP vs v3.0.6 baseline (0.902 on 9K)
 - [ ] Generate paper figures and tables
 - [ ] Write paper
