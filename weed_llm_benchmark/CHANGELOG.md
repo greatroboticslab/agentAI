@@ -1550,12 +1550,49 @@ here is that PIPELINE WORKS and we have first real P/R/mAP at scale.
   labeler quality. Future: evaluate against a clean hand-labeled val
   (e.g. cottonweed holdout) for a more honest number.
 
+## 2026-04-22 - v3.0.19: Auto-chain training until mAP plateau
+
+### User requirement
+"不用限定在8h 我希望他自己不断训练直到 mAP95 接近拟合" — let it run
+however many rounds needed, stop when metric saturates.
+
+### Three changes
+
+**1. Progressive training (`mega_trainer.py`)**
+Each mega run reads `registry["last_mega_weights"]`. If a prior round wrote
+best.pt, use that as base instead of `Config.DETECTION_MODEL`. Registry gets
+updated with the new best.pt + `mega_round_count += 1`. This is transfer-
+learning continuation (not ultralytics `resume=True`) so the dataset can
+grow between rounds. Override with `fresh_start=True` to reset.
+
+**2. Auto-chain with plateau detection (`orchestrator._write_continuation_flag`)**
+Replaced the old "continue if improving" heuristic with:
+  - Stop if `mega_round_count >= 30` (safety cap)
+  - Stop if last 3 mega evals' new_map50_95 spread < 0.005 (plateau)
+  - Otherwise write `should_continue.txt`
+`run_framework_ollama.sh` already auto-submits next job when flag present.
+Now passes `$BRAIN_MODEL` and `$RUN_MODE` forward so Gemma stays selected.
+
+**3. Per-dataset dHash cache (`mega_trainer._merge_datasets`)**
+Prior rounds recomputed dHash for all 185K images every time (~2h on
+Bridges-2 I/O). Now cache per-image hash in `registry[slug]["dhash_cache"]`
+keyed by relative path. First encounter writes; subsequent rounds read.
+Saves ~2h per chained round.
+
+### Deployment
+Submitted Job 40144842 (gemma4, quick). First job in auto-chain:
+  - Uses yolo26x.pt init (no prior best.pt yet; `fresh_start` implicit)
+  - Writes `last_mega_weights` after mega completes
+  - Plateau detection disabled in first round (needs ≥3 data points)
+
+Subsequent jobs (auto-submitted by chain logic):
+  - Use prior best.pt as base → progressive fine-tuning
+  - dHash cache hit → merge step drops from ~2h to minutes
+  - Runs until `mega_round_count=30` or 3-round plateau
+
 ## TODO
-- [x] First end-to-end eval ✓ (Job 40135781)
-- [ ] v3.0.19: Ultralytics resume=True so mega can continue across jobs
-      (5-epoch partial → next job resumes and finishes)
+- [ ] Watch auto-chain — how many rounds before plateau? target mAP50-95?
 - [ ] Also evaluate best.pt against the v3.0.6 cottonweed leave4out holdout
-      for apples-to-apples comparison
-- [ ] Cache dHash per-dataset in registry (avoid 2h recompute)
+      for apples-to-apples comparison (independent val set)
 - [ ] Generate paper figures and tables
 - [ ] Write paper

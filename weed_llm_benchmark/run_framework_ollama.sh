@@ -102,9 +102,12 @@ echo "Date: $(date)"
 
 # ============================================
 # JOB CHAIN: auto-submit next round if needed
+# v3.0.19: orchestrator decides continuation via plateau detection.
+# Preserve Brain model + mode through the chain so subsequent jobs
+# keep gemma4 + quick (not the shell default if it drifts).
 # ============================================
 if [ -f results/framework/should_continue.txt ]; then
     rm results/framework/should_continue.txt
-    echo "Auto-submitting next optimization round..."
-    sbatch run_framework_ollama.sh
+    echo "Auto-submitting next optimization round (chain continues)..."
+    sbatch run_framework_ollama.sh "$BRAIN_MODEL" "$RUN_MODE"
 fi

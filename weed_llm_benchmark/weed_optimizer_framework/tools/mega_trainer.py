@@ -151,6 +151,12 @@ def _merge_datasets(out_dir, val_fraction=0.1):
                 class_name_to_id[name] = len(class_name_to_id)
             ds_class_map[i] = class_name_to_id[name]
 
+        # v3.0.19: load dHash cache for this dataset if present. First run writes
+        # the cache; subsequent rounds skip the 2-3ms-per-image hash compute
+        # (185K images × 2ms = 6min saved per round; with auto-chain this
+        # compounds over many rounds).
+        cache = info.get("dhash_cache") or {}
+        cache_updated = False
         ds_img_count = 0
         ds_dup_count = 0
         for img in imgs:
@@ -160,7 +166,15 @@ def _merge_datasets(out_dir, val_fraction=0.1):
                 continue
 
             # v3.0.16: image-hash dedup across ALL datasets
-            h = _dhash(img)
+            # v3.0.19: read from per-dataset cache first
+            rel_key = str(img.relative_to(local_path))
+            if rel_key in cache:
+                h = cache[rel_key]
+            else:
+                h = _dhash(img)
+                if h is not None:
+                    cache[rel_key] = h
+                    cache_updated = True
             if h is not None:
                 if h in seen_hashes:
                     # Already saw an identical image from another dataset
@@ -195,11 +209,16 @@ def _merge_datasets(out_dir, val_fraction=0.1):
             stats["images"] += 1
             stats["labels"] += 1
 
+        # v3.0.19: persist newly-computed hashes so next round skips recompute
+        if cache_updated:
+            registry[ds_name]["dhash_cache"] = cache
+
         if ds_img_count > 0:
             used_datasets.append(ds_name)
             stats["datasets"] += 1
             logger.info(f"[Merge] {ds_name}: {ds_img_count} unique images "
-                        f"(+{ds_dup_count} deduped vs prior datasets)")
+                        f"(+{ds_dup_count} deduped vs prior datasets; "
+                        f"hash cache {'updated' if cache_updated else 'hit'})")
 
     # Build names list sorted by assigned id
     names_list = sorted(class_name_to_id.keys(), key=lambda n: class_name_to_id[n])
@@ -219,6 +238,8 @@ def _merge_datasets(out_dir, val_fraction=0.1):
                 f"{stats['datasets']} datasets; {len(names_list)} classes. "
                 f"Cross-dataset duplicates skipped: {stats['skipped_duplicates']}. "
                 f"(dedup via 8x8 dHash exact-match)")
+    # v3.0.19: persist dHash caches written back to registry entries
+    disc._save_registry()
     return out_dir, data_yaml, stats, used_datasets, names_list
 
 
@@ -245,10 +266,18 @@ def train_yolo_mega(strategy, iteration):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Try requested base model, then fallbacks
+    # v3.0.19: progressive training — if a prior round saved best.pt, use it as
+    # base so each job picks up where the last left off. Data set can grow between
+    # rounds so this is transfer-learning-continuation, not ultralytics `resume=True`.
+    # registry["last_mega_weights"] is the checkpoint written by prior mega run.
     candidates = []
     if strategy.get("base_model"):
         candidates.append(strategy["base_model"])
+    disc = DatasetDiscovery()
+    last_ckpt = disc.registry.get("last_mega_weights")
+    if last_ckpt and os.path.exists(last_ckpt) and not strategy.get("fresh_start"):
+        logger.info(f"[Mega] Progressive: continuing from prior best.pt = {last_ckpt}")
+        candidates.append(last_ckpt)
     candidates.append(Config.DETECTION_MODEL)
     for fb in getattr(Config, "DETECTION_MODEL_FALLBACKS", []):
         if fb not in candidates:
@@ -310,12 +339,20 @@ def train_yolo_mega(strategy, iteration):
             result_summary={"iteration": iteration, "merged_images": stats["images"]},
         )
 
+    # v3.0.19: persist best.pt path for next round's progressive training
+    disc.registry["last_mega_weights"] = best_pt
+    disc.registry["mega_round_count"] = disc.registry.get("mega_round_count", 0) + 1
+    disc._save_registry()
+    logger.info(f"[Mega] Saved last_mega_weights={best_pt} "
+                f"(mega_round_count={disc.registry['mega_round_count']})")
+
     summary = {
         "best_pt": best_pt,
         "merged_images": stats["images"],
         "datasets_used": used_datasets,
         "num_classes": len(names_list),
         "base_model": base_weights,
+        "mega_round_count": disc.registry["mega_round_count"],
     }
     logger.info(f"[Mega] Complete: {summary}")
     return best_pt, summary

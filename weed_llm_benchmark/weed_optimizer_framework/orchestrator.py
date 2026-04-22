@@ -1072,28 +1072,58 @@ class Orchestrator:
         logger.info(f"Run log saved to {log_path}")
 
     def _write_continuation_flag(self):
-        """Write should_continue.txt if more optimization rounds could help.
+        """Write should_continue.txt to enable SLURM job chaining.
 
-        This enables SLURM job chaining: the current job's script checks
-        for this file and auto-submits the next job.
+        v3.0.19 policy: keep training forever UNTIL mAP50-95 plateaus. User
+        explicitly requested "not limited to 8h, let it train until fit".
+        Plateau detection: stop if last 3 mega rounds' new_map50_95 deltas
+        are all < 0.005. Safety cap: stop at total_mega_rounds >= 30.
         """
         flag_path = os.path.join(Config.FRAMEWORK_DIR, "should_continue.txt")
 
-        # Continue if: we found improvements and haven't hit diminishing returns
-        should_continue = False
-        if len(self.memory.experiments) >= 2:
-            latest = self.memory.experiments[-1]["result"]
-            if latest.get("new_f1", 0) > self.memory.baseline.get("new_f1", 0):
-                should_continue = True  # still improving
-            if not latest.get("forgetting", True):
-                should_continue = True  # no forgetting, worth trying more
+        # Load mega round count from registry (written by mega_trainer)
+        try:
+            mega_rounds = (
+                self.dataset_discovery.registry.get("mega_round_count", 0)
+            )
+        except Exception:
+            mega_rounds = 0
+
+        # Collect recent mega eval results
+        recent_mAP95 = []
+        for e in self.memory.experiments[-5:]:
+            r = e.get("result", {}) or {}
+            m = r.get("new_map50_95")
+            if m is not None and m > 0:
+                recent_mAP95.append(m)
+
+        stop_reason = None
+
+        # Safety cap
+        if mega_rounds >= 30:
+            stop_reason = f"safety cap: mega_round_count={mega_rounds} >= 30"
+
+        # Plateau
+        if stop_reason is None and len(recent_mAP95) >= 3:
+            last3 = recent_mAP95[-3:]
+            max_delta = max(last3) - min(last3)
+            if max_delta < 0.005:
+                stop_reason = (
+                    f"plateau: last 3 mAP50-95 spread {max_delta:.4f} "
+                    f"(values: {[round(x,4) for x in last3]})"
+                )
+
+        should_continue = (stop_reason is None)
 
         if should_continue:
             with open(flag_path, "w") as f:
-                f.write(f"continue\ntotal_experiments={len(self.memory.experiments)}\n")
-            logger.info(f"Continuation flag written: {flag_path}")
+                f.write(f"continue\n"
+                        f"total_experiments={len(self.memory.experiments)}\n"
+                        f"mega_round_count={mega_rounds}\n"
+                        f"recent_mAP95={recent_mAP95}\n")
+            logger.info(f"Continuation flag written: mega_rounds={mega_rounds}, "
+                        f"recent mAP50-95={recent_mAP95}")
         else:
-            # Remove flag if exists
             if os.path.exists(flag_path):
                 os.remove(flag_path)
-            logger.info("No continuation needed")
+            logger.info(f"Chain STOP — {stop_reason}")
