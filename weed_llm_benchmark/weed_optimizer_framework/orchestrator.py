@@ -343,27 +343,46 @@ class Orchestrator:
                             ),
                         }
                         total_owl = total_fb = total_empty = 0
-                        summary = [f"Autolabel: {len(pending_autolabel)} pending"]
+                        total_processed = 0
+                        # v3.0.20: MUST respect a round cap here. Prior version let
+                        # autolabel_dataset() use default max_images=30000, which on
+                        # 1.7 img/sec OWLv2 = 5h+ for ONE dataset and ate all
+                        # walltime (Job 40144842 hit this). Cap per-dataset at
+                        # 8000 and total at 15000, matching v3.0.15 round budget.
+                        GUARD_PER_DS = 8000
+                        GUARD_TOTAL = 15000
+                        summary = [f"Autolabel (guardrail): {len(pending_autolabel)} pending, "
+                                   f"caps per_ds={GUARD_PER_DS} total={GUARD_TOTAL}"]
                         for slug in pending_autolabel:
+                            if total_processed >= GUARD_TOTAL:
+                                summary.append(f"  {slug}: SKIPPED (guardrail round cap "
+                                               f"{total_processed}/{GUARD_TOTAL})")
+                                continue
+                            remaining = GUARD_TOTAL - total_processed
+                            per_ds_cap = min(GUARD_PER_DS, remaining)
                             try:
                                 r = autolabel_dataset(slug, registry_cb,
-                                                      conf_threshold=0.12)
+                                                      conf_threshold=0.12,
+                                                      max_images=per_ds_cap)
                                 if r.get("status") == "ok":
+                                    got = r.get("labeled_with_owl", 0) + r.get("labeled_with_fallback", 0)
                                     total_owl += r.get("labeled_with_owl", 0)
                                     total_fb += r.get("labeled_with_fallback", 0)
                                     total_empty += r.get("empty", 0)
+                                    total_processed += got
                                     summary.append(
                                         f"  {slug}: owl={r.get('labeled_with_owl',0)} "
                                         f"fb={r.get('labeled_with_fallback',0)} "
-                                        f"empty={r.get('empty',0)}"
+                                        f"empty={r.get('empty',0)} cap={per_ds_cap}"
                                     )
                                 else:
                                     summary.append(f"  {slug}: {r.get('status')}")
                             except Exception as e:
                                 summary.append(f"  {slug}: {type(e).__name__}: {str(e)[:100]}")
                         summary.append(
-                            f"TOTAL: owl={total_owl} fb={total_fb} empty={total_empty}. "
-                            f"Registry flipped to yolo_autolabel. Now call train_yolo_mega."
+                            f"TOTAL: owl={total_owl} fb={total_fb} empty={total_empty} "
+                            f"processed={total_processed}/{GUARD_TOTAL}. "
+                            f"Registry flipped. Now call train_yolo_mega."
                         )
                         obs = "\n".join(summary)
                         context_history.append({"role": "observation", "content": obs})
@@ -1089,6 +1108,20 @@ class Orchestrator:
         except Exception:
             mega_rounds = 0
 
+        # v3.0.20: also check if ANY pending_autolabel datasets still exist.
+        # Even if mega didn't run this round (e.g. walltime ate all 8h on
+        # autolabel), we MUST continue the chain so the next job picks up
+        # and trains. Without this, Job 40144842 broke the chain after
+        # guardrail burned walltime on one autolabel dataset.
+        try:
+            any_pending_autolabel = any(
+                (v.get("annotation") == "needs_autolabel" and
+                 v.get("status") == "downloaded" and v.get("local_path"))
+                for v in self.dataset_discovery.registry["datasets"].values()
+            )
+        except Exception:
+            any_pending_autolabel = False
+
         # Collect recent mega eval results
         recent_mAP95 = []
         for e in self.memory.experiments[-5:]:
@@ -1103,7 +1136,7 @@ class Orchestrator:
         if mega_rounds >= 30:
             stop_reason = f"safety cap: mega_round_count={mega_rounds} >= 30"
 
-        # Plateau
+        # Plateau — only when we actually have mega eval data
         if stop_reason is None and len(recent_mAP95) >= 3:
             last3 = recent_mAP95[-3:]
             max_delta = max(last3) - min(last3)
@@ -1113,7 +1146,14 @@ class Orchestrator:
                     f"(values: {[round(x,4) for x in last3]})"
                 )
 
-        should_continue = (stop_reason is None)
+        # v3.0.20: if there's still autolabel work pending or mega_rounds=0,
+        # force continuation (chain must not break just because first round
+        # was walltime-eaten by harvest+autolabel).
+        force_continue = any_pending_autolabel or mega_rounds == 0
+
+        should_continue = (stop_reason is None) or force_continue
+        if force_continue and stop_reason is not None:
+            logger.info(f"[Chain] stop_reason ignored due to force_continue: {stop_reason}")
 
         if should_continue:
             with open(flag_path, "w") as f:

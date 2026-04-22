@@ -1590,9 +1590,46 @@ Subsequent jobs (auto-submitted by chain logic):
   - dHash cache hit → merge step drops from ~2h to minutes
   - Runs until `mega_round_count=30` or 3-round plateau
 
+## 2026-04-22 - v3.0.20: Fix guardrail-bypasses-cap + chain-break-on-partial
+
+### Job 40144842 (v3.0.19) forensics — chain died on first round
+Two bugs compounded:
+
+**Bug 1 — guardrail bypassed v3.0.15 round cap.** When Brain called
+train_yolo_mega while needs_autolabel existed, v3.0.12's guardrail
+synthesized an inline `autolabel_dataset()` loop. That loop passed no
+`max_images` → fell back to the function default (30,000). Job 40144842:
+the first dataset `kg_loki4514__rice-leaf-diseases-detection` processed
+all 30,000 images at 1.7 img/sec = **6h12m just for ONE dataset**.
+Walltime ate the remaining 1.5h before any other dataset, mega, or eval.
+
+**Bug 2 — chain broke when mega didn't run.** `_write_continuation_flag`
+only wrote `should_continue.txt` if mega evaluations showed improvement
+or plateau wasn't hit. When mega never ran (eaten by autolabel), no
+eval data existed → default didn't write flag → auto-chain stopped.
+
+### v3.0.20 fixes (orchestrator.py only)
+
+**Guardrail cap**: guardrail's inline loop now enforces
+`GUARD_PER_DS = 8000` and `GUARD_TOTAL = 15000`, matching v3.0.15's
+autolabel_pending action. ~1.7 img/sec × 8000 = 1.3h per dataset;
+total 15K = ~2.5h. Leaves ~5h for mega on 8h walltime.
+
+**Chain force-continue**: `_write_continuation_flag` also checks:
+- `any_pending_autolabel` → force continuation
+- `mega_round_count == 0` → force continuation
+Either triggers `force_continue=True` which overrides stop_reason.
+This means the chain can't die on early rounds where harvest/autolabel
+ate walltime; it keeps going until mega runs and plateaus.
+
+### Deploy
+Submitted Job 40162939. Expected behavior:
+- Round 1 (this one): harvest (maybe 0 new, dedup), autolabel capped
+  at 15K, mega with progressive init → first eval number, chain continues
+- Round 2+ : from prior best.pt, dHash cache hits, mega trains more
+
 ## TODO
-- [ ] Watch auto-chain — how many rounds before plateau? target mAP50-95?
-- [ ] Also evaluate best.pt against the v3.0.6 cottonweed leave4out holdout
-      for apples-to-apples comparison (independent val set)
+- [ ] Watch chain for 2-3 jobs — verify no more walltime-eaters
+- [ ] Evaluate best.pt against v3.0.6 cottonweed leave4out holdout
 - [ ] Generate paper figures and tables
 - [ ] Write paper
