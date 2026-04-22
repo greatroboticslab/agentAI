@@ -1484,9 +1484,78 @@ autolabel).
 
 Submitted Job 40135781.
 
+## 2026-04-22 - Job 40135781 RESULTS — First end-to-end v3.0 metric
+
+### First real 100K+ scale mAP number on autonomous pipeline
+
+Job 40135781 (v3.0.18) ran harvest → autolabel → merge+dedup → mega →
+evaluate for the first time since v3.0's inception. Ran into walltime
+at epoch 2 of 5 but got ONE complete validation pass on epoch 1.
+
+**Timeline (8h walltime, 15:40 → 23:38):**
+```
+15:40-16:12  Harvest          +127,353 images (3 NEW datasets)
+16:13-19:36  Autolabel        20K processed (nirmalsankalana 15K + 
+                              rizwan potato 4K + cookiefinder tomato 1K)
+                              OWL rate 62%, avg 1.77-4.79 boxes/img
+19:39-21:53  Merge+Dedup      120,072 UNIQUE / 65,504 duplicates removed
+                              (24 datasets, 12 classes)
+21:53-23:38  Mega train       Epoch 1 complete + epoch 2 partial (walltime)
+             ONE val pass     12,011 val images, 27,044 instances
+```
+
+**Epoch 1 validation on 120K unique training:**
+| Metric | Value |
+|---|---|
+| Precision | 0.401 |
+| Recall | 0.369 |
+| mAP@0.5 | 0.325 |
+| mAP@0.5:0.95 | 0.252 |
+
+### Context for these numbers
+
+The 0.252 mAP@0.5:0.95 looks "low" next to v3.0.6's 0.902 but measures a
+different, much harder thing:
+
+| | v3.0.6 (Job 39682959) | v3.0.18 (Job 40135781) |
+|---|---|---|
+| Train size | 9K (cottonweed hand-labeled) | **120K unique (24 mixed datasets)** |
+| Train epochs | 50 (complete) | 1 (partial epoch 2 cut) |
+| imgsz | 640 | 512 |
+| Val set | leave4out cotton holdout | 12K mixed plant-disease+crop+weed val |
+| Classes | 12 cottonweed species | 12 merged across 24 datasets |
+| Label quality | Human-verified | **OWLv2 auto-label (noisy)** |
+| mAP@0.5:0.95 | 0.902 | 0.252 |
+
+The v3.0.18 val set itself is auto-labeled — so mAP is bounded by autolabel
+quality (OWLv2 mistakes in val mean wrong ground truth). The real signal
+here is that PIPELINE WORKS and we have first real P/R/mAP at scale.
+
+### What the autonomous agent achieved
+
+- **24 datasets discovered, downloaded, processed** with zero human curation.
+- Kaggle v2 API + HF object-detection filter + GitHub repo scan each contributed.
+- Classification datasets (plant-disease, plantvillage) converted to YOLO bbox
+  via OWLv2 (97-99% real detection rate on close-ups).
+- Cross-dataset dedup removed 65K duplicates (PlantVillage's 4 Kaggle mirrors
+  collapsed 70-85% as predicted).
+- Mega trainer saw 100K+ unique images for the first time.
+
+### Unresolved
+
+- Only 1 epoch completed. Need more epochs for better mAP.
+- Merge step took 2h (dHash 185K images is expensive). Could parallelize
+  or cache hashes per-dataset in registry.
+- Val set shares autolabel noise with train → metric is upper-bounded by
+  labeler quality. Future: evaluate against a clean hand-labeled val
+  (e.g. cottonweed holdout) for a more honest number.
+
 ## TODO
-- [ ] Watch Job 40135781 — the "did mega complete + evaluate?" question
-- [ ] If walltime still tight, consider Ultralytics resume=True across jobs
-- [ ] Compare new species mAP vs v3.0.6 baseline (0.902 on 9K)
+- [x] First end-to-end eval ✓ (Job 40135781)
+- [ ] v3.0.19: Ultralytics resume=True so mega can continue across jobs
+      (5-epoch partial → next job resumes and finishes)
+- [ ] Also evaluate best.pt against the v3.0.6 cottonweed leave4out holdout
+      for apples-to-apples comparison
+- [ ] Cache dHash per-dataset in registry (avoid 2h recompute)
 - [ ] Generate paper figures and tables
 - [ ] Write paper
