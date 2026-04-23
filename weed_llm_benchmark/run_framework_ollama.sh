@@ -32,6 +32,42 @@ echo "=== Weed Optimizer Framework — OLLAMA AGENT ==="
 echo "Date: $(date)"
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
 
+# v3.0.21: chain depth hard cap + stop_flag pre-check. Prevents accidental
+# infinite chain if mega never runs and orchestrator never writes stop_flag.
+CHAIN_DEPTH_FILE=results/framework/chain_depth.txt
+CHAIN_DEPTH=$(cat "$CHAIN_DEPTH_FILE" 2>/dev/null || echo 0)
+CHAIN_DEPTH=$((CHAIN_DEPTH + 1))
+mkdir -p results/framework
+echo "$CHAIN_DEPTH" > "$CHAIN_DEPTH_FILE"
+echo "Chain depth: $CHAIN_DEPTH"
+if [ "$CHAIN_DEPTH" -gt 40 ]; then
+    echo "ABORT: chain depth $CHAIN_DEPTH > 40 safety cap"
+    exit 0
+fi
+if [ -f results/framework/stop_chain.txt ]; then
+    echo "ABORT: stop_chain.txt present at start → not running this job"
+    cat results/framework/stop_chain.txt
+    exit 0
+fi
+
+# v3.0.21: BULLETPROOF auto-chain. Pre-queue a follow-up job with afterany
+# dependency so it runs no matter how this one ends (success, walltime, crash).
+# Orchestrator writes results/framework/stop_chain.txt when plateau detected,
+# and this script scancels the queued follow-up at its own end if that flag
+# exists. Previously we relied on post-python `if [-f should_continue]; sbatch`
+# which SLURM's walltime SIGKILL could skip entirely — killing the chain.
+PRE_ARGS_1="${1:-gemma4}"
+PRE_ARGS_2="${2:-quick}"
+NEXT_JOB_ID=$(sbatch --parsable --dependency=afterany:${SLURM_JOB_ID:-0} \
+    run_framework_ollama.sh "$PRE_ARGS_1" "$PRE_ARGS_2" 2>/dev/null | tail -1)
+if [ -n "$NEXT_JOB_ID" ] && [ "$NEXT_JOB_ID" -eq "$NEXT_JOB_ID" ] 2>/dev/null; then
+    echo "$NEXT_JOB_ID" > results/framework/next_job_id.txt
+    echo "Pre-queued next-in-chain job: $NEXT_JOB_ID (afterany dependency)"
+else
+    echo "Pre-queue failed or not applicable (likely first-run probe)"
+    rm -f results/framework/next_job_id.txt
+fi
+
 # Start Ollama server in background
 echo "Starting Ollama server..."
 /ocean/projects/cis240145p/byler/ollama/bin/ollama serve &
@@ -101,13 +137,16 @@ echo "=== Done (exit=$EXIT_CODE) ==="
 echo "Date: $(date)"
 
 # ============================================
-# JOB CHAIN: auto-submit next round if needed
-# v3.0.19: orchestrator decides continuation via plateau detection.
-# Preserve Brain model + mode through the chain so subsequent jobs
-# keep gemma4 + quick (not the shell default if it drifts).
+# v3.0.21: CHAIN TEARDOWN — cancel the pre-queued follow-up ONLY if
+# orchestrator wrote stop_chain.txt (plateau or safety cap reached).
+# If walltime killed us before this point, follow-up still runs from
+# its afterany dependency — exactly what we want for bulletproofness.
 # ============================================
-if [ -f results/framework/should_continue.txt ]; then
-    rm results/framework/should_continue.txt
-    echo "Auto-submitting next optimization round (chain continues)..."
-    sbatch run_framework_ollama.sh "$BRAIN_MODEL" "$RUN_MODE"
+if [ -f results/framework/stop_chain.txt ] && [ -f results/framework/next_job_id.txt ]; then
+    NEXT_ID=$(cat results/framework/next_job_id.txt | tr -d '\n')
+    echo "Orchestrator requested chain stop — cancelling follow-up job $NEXT_ID"
+    scancel "$NEXT_ID" 2>&1 || true
+    rm -f results/framework/stop_chain.txt results/framework/next_job_id.txt
+else
+    echo "Chain continues — follow-up job already queued (afterany)."
 fi

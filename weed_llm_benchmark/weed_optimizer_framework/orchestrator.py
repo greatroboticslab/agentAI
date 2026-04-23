@@ -1091,14 +1091,27 @@ class Orchestrator:
         logger.info(f"Run log saved to {log_path}")
 
     def _write_continuation_flag(self):
-        """Write should_continue.txt to enable SLURM job chaining.
+        """Write stop_chain.txt ONLY when orchestrator decides to stop.
 
-        v3.0.19 policy: keep training forever UNTIL mAP50-95 plateaus. User
-        explicitly requested "not limited to 8h, let it train until fit".
-        Plateau detection: stop if last 3 mega rounds' new_map50_95 deltas
-        are all < 0.005. Safety cap: stop at total_mega_rounds >= 30.
+        v3.0.21: inverted semantics. Shell pre-queues a follow-up job with
+        `--dependency=afterany` at its START. That job runs no matter how
+        this one ends (crash, walltime SIGKILL, success). We only OPT OUT
+        by writing stop_chain.txt, which the shell checks to scancel the
+        queued follow-up. Previously we wrote should_continue.txt AFTER
+        python finished — which walltime SIGKILL could skip entirely,
+        killing the chain.
+
+        Stop conditions:
+          - Plateau: last 3 mega evals' new_map50_95 spread < 0.005
+          - Safety cap: mega_round_count >= 30
+        Either triggers chain teardown.
         """
-        flag_path = os.path.join(Config.FRAMEWORK_DIR, "should_continue.txt")
+        stop_flag = os.path.join(Config.FRAMEWORK_DIR, "stop_chain.txt")
+        # Clean legacy flag from earlier versions
+        legacy = os.path.join(Config.FRAMEWORK_DIR, "should_continue.txt")
+        if os.path.exists(legacy):
+            try: os.remove(legacy)
+            except Exception: pass
 
         # Load mega round count from registry (written by mega_trainer)
         try:
@@ -1146,24 +1159,23 @@ class Orchestrator:
                     f"(values: {[round(x,4) for x in last3]})"
                 )
 
-        # v3.0.20: if there's still autolabel work pending or mega_rounds=0,
-        # force continuation (chain must not break just because first round
-        # was walltime-eaten by harvest+autolabel).
+        # v3.0.20: force continuation during warmup/autolabel phase
         force_continue = any_pending_autolabel or mega_rounds == 0
 
-        should_continue = (stop_reason is None) or force_continue
-        if force_continue and stop_reason is not None:
-            logger.info(f"[Chain] stop_reason ignored due to force_continue: {stop_reason}")
+        should_stop = (stop_reason is not None) and (not force_continue)
 
-        if should_continue:
-            with open(flag_path, "w") as f:
-                f.write(f"continue\n"
-                        f"total_experiments={len(self.memory.experiments)}\n"
+        if should_stop:
+            # Opt OUT of chain: write stop flag so shell scancels the pre-queued follow-up
+            with open(stop_flag, "w") as f:
+                f.write(f"stop\n"
+                        f"reason={stop_reason}\n"
                         f"mega_round_count={mega_rounds}\n"
                         f"recent_mAP95={recent_mAP95}\n")
-            logger.info(f"Continuation flag written: mega_rounds={mega_rounds}, "
-                        f"recent mAP50-95={recent_mAP95}")
+            logger.info(f"Chain STOP signalled: {stop_reason}")
         else:
-            if os.path.exists(flag_path):
-                os.remove(flag_path)
-            logger.info(f"Chain STOP — {stop_reason}")
+            # Default: chain continues via pre-queued follow-up. Don't write stop_flag.
+            if os.path.exists(stop_flag):
+                os.remove(stop_flag)
+            reason_suffix = f" (force_continue; {stop_reason})" if force_continue and stop_reason else ""
+            logger.info(f"Chain continues: mega_rounds={mega_rounds}, "
+                        f"recent mAP50-95={recent_mAP95}{reason_suffix}")

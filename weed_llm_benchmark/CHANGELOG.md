@@ -1628,8 +1628,52 @@ Submitted Job 40162939. Expected behavior:
   at 15K, mega with progressive init → first eval number, chain continues
 - Round 2+ : from prior best.pt, dHash cache hits, mega trains more
 
+## 2026-04-22 - v3.0.21: Bulletproof chain via pre-queued dependent jobs
+
+### Job 40162939 (v3.0.20) — chain died AGAIN
+Same symptom, different cause. Timeline:
+```
+01:43-02:15  harvest  +131K imgs (3 new, 739 real bbox)
+02:15-02:15  GUARDRAIL reroute (4 needs_autolabel detected)
+02:15-08:27  autolabel ran [caps from v3.0.20 worked]: 3 datasets, 15K budget
+08:27-16:43  dedup-merge 244K raw → 154,721 UNIQUE (3h14m cache-build)
+16:43-20:30  mega training Epoch 1/5 at 4% (1.7 it/s, 512 batch ~5)
+20:30        walltime SIGKILL
+```
+
+Chain didn't continue because SIGKILL hit before shell's post-python
+`if [-f should_continue.txt]; sbatch` could execute. The flag semantics
+assumed python completes normally, but walltime can axe shell too.
+
+### v3.0.21 fix: inverted chain semantics
+Instead of "python writes should_continue when work remains", now:
+- Shell PRE-QUEUES next job at its START using `--dependency=afterany`.
+- Next job runs automatically when this one ends, regardless of HOW.
+- Orchestrator writes `stop_chain.txt` only when plateau/cap detected.
+- Shell at END (if it survives walltime) scancels pre-queued job ONLY
+  if `stop_chain.txt` is present.
+- Next job at its START checks `stop_chain.txt` and exits early if present
+  (belt-and-suspenders — handles "walltime killed current shell before
+  it could scancel").
+
+Plus safety: chain depth counter caps at 40 (prevent infinite loop if
+orchestrator never writes stop_flag).
+
+### Three states now
+- Normal: orchestrator decides nothing → next job already queued, runs next.
+- Plateau/cap: orchestrator writes `stop_chain.txt` → current shell
+  scancels next, OR next job sees flag at start and exits cleanly.
+- Walltime: current shell killed mid-exit → next job runs from afterany,
+  its own start-check doesn't see stop_flag → it continues the chain.
+
+### Deploy
+- Cleaned `chain_depth.txt`, `stop_chain.txt`, `should_continue.txt`,
+  `next_job_id.txt` on cluster.
+- Submitted Job 40177598 to kick off the v3.0.21 chain.
+
 ## TODO
-- [ ] Watch chain for 2-3 jobs — verify no more walltime-eaters
-- [ ] Evaluate best.pt against v3.0.6 cottonweed leave4out holdout
+- [ ] Watch first v3.0.21 chain — does 40177598 successfully pre-queue 40177599,
+      and does that one run whether or not 40177598 hits walltime?
+- [ ] Also evaluate best.pt against v3.0.6 cottonweed leave4out holdout
 - [ ] Generate paper figures and tables
 - [ ] Write paper
