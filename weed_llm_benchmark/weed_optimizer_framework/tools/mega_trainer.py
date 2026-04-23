@@ -23,13 +23,20 @@ IMG_EXTS = ('.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG', '.bmp')
 
 
 def _resolve_best_pt(model, project_dir):
-    """Resolve actual best.pt after ultralytics training (handles train, train2, ... dirs)."""
+    """Resolve actual best.pt after ultralytics training.
+
+    v3.0.22: fallback to last.pt if best.pt doesn't exist (walltime cut
+    training before first val epoch → no best.pt but last.pt saved every
+    epoch). Prefer best.pt > newer last.pt. Without this fallback, the
+    progressive training chain stalls: if mega gets cut mid-epoch-1, no
+    best.pt → no last_mega_weights in registry → next round starts from
+    yolo26x again → infinite no-progress loop.
+    """
+    candidates = []
     try:
         save_dir = getattr(getattr(model, "trainer", None), "save_dir", None)
         if save_dir:
-            cand = Path(save_dir) / "weights" / "best.pt"
-            if cand.exists():
-                return str(cand)
+            candidates.append(Path(save_dir) / "weights")
     except Exception:
         pass
     try:
@@ -39,11 +46,21 @@ def _resolve_best_pt(model, project_dir):
             reverse=True,
         )
         for d in train_dirs:
-            cand = d / "weights" / "best.pt"
-            if cand.exists():
-                return str(cand)
+            candidates.append(d / "weights")
     except Exception:
         pass
+
+    # Preference 1: best.pt from the most recently-modified train dir
+    for wdir in candidates:
+        cand = wdir / "best.pt"
+        if cand.exists():
+            return str(cand)
+    # Preference 2: last.pt fallback (walltime cut before first val)
+    for wdir in candidates:
+        cand = wdir / "last.pt"
+        if cand.exists():
+            logger.warning(f"[Mega] best.pt not found, using last.pt fallback: {cand}")
+            return str(cand)
     return None
 
 
@@ -202,7 +219,18 @@ def _merge_datasets(out_dir, val_fraction=0.1):
             # Split: 1/10 to val
             bucket = "valid" if (ds_img_count % int(1 / val_fraction)) == 0 else "train"
             dst_stem = f"{ds_name}_{img.stem}"
-            shutil.copy2(img, os.path.join(out_dir, bucket, "images", dst_stem + img.suffix))
+            dst_img = os.path.join(out_dir, bucket, "images", dst_stem + img.suffix)
+            # v3.0.22: SYMLINK instead of copy. 244K file copies on /ocean took
+            # 3h in v3.0.20 merge. Symlinks are nearly instant and ultralytics
+            # follows them transparently. Labels still get written fresh (class
+            # remapping differs per merge).
+            try:
+                if os.path.exists(dst_img):
+                    os.remove(dst_img)
+                os.symlink(os.path.abspath(img), dst_img)
+            except OSError:
+                # Fallback to copy if symlink fails (rare on /ocean)
+                shutil.copy2(img, dst_img)
             with open(os.path.join(out_dir, bucket, "labels", dst_stem + ".txt"), "w") as f:
                 f.write(new_label_text)
             ds_img_count += 1
@@ -314,6 +342,8 @@ def train_yolo_mega(strategy, iteration):
         lr0=strategy.get("lr", 0.001),
         workers=strategy.get("workers", 4),
         verbose=False,
+        save_period=1,  # v3.0.22: save last.pt every epoch so walltime-cut
+                         # mid-training still leaves a usable checkpoint
     )
 
     # Resolve actual save_dir (ultralytics increments train/train2/... if dir exists)

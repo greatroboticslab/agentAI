@@ -1671,9 +1671,43 @@ orchestrator never writes stop_flag).
   `next_job_id.txt` on cluster.
 - Submitted Job 40177598 to kick off the v3.0.21 chain.
 
+## 2026-04-22 - v3.0.22: Symlink merge + last.pt fallback + save_period=1
+
+### Proactive audit of v3.0.21 chain
+User asked "你确定这次没问题了吗?" Self-audit found 2 latent risks that
+would have stalled the chain even with the bulletproof pre-queue:
+
+**Risk A: Merge was 3h14m due to 244K file copies on /ocean.**
+v3.0.19's dHash cache only saved dHash compute time; it didn't touch the
+`shutil.copy2()` per-image to the merged directory. On Bridges-2's parallel
+filesystem, small-file I/O is the bottleneck. Fix: use `os.symlink` instead
+of copy — ultralytics follows symlinks transparently, and this drops merge
+to minutes.
+
+**Risk B: best.pt not saved if walltime kills before first val epoch.**
+Ultralytics only writes best.pt after a validation epoch (which happens
+once per training epoch). Job 40162939 hit walltime at epoch 1 @ 4% → no
+val → no best.pt. Progressive training chain depends on `last_mega_weights`
+being a real file. Without best.pt, next round starts fresh from yolo26x
+→ no progress accumulation → infinite restart loop.
+
+Fixes in `mega_trainer.py`:
+1. `_resolve_best_pt` now returns `last.pt` as fallback if `best.pt`
+   missing. Preference: best.pt over last.pt over None.
+2. `model.train(..., save_period=1)` so ultralytics saves per-epoch
+   checkpoints (in addition to periodic `last.pt`).
+3. In `_merge_datasets`, `os.symlink(abs_src, dst)` replaces
+   `shutil.copy2`. If symlink fails (rare on /ocean), fallback to copy.
+
+### Deploy
+- Cancelled Job 40177598 + its pre-queued follow-up via `scancel -u byler`.
+- Cleaned chain state files.
+- Submitted fresh Job (next id) with v3.0.22 code. Pre-queue should now
+  form a bulletproof chain where each round actually progresses.
+
 ## TODO
-- [ ] Watch first v3.0.21 chain — does 40177598 successfully pre-queue 40177599,
-      and does that one run whether or not 40177598 hits walltime?
+- [ ] Watch v3.0.22 chain — symlink merge under 10 min? last.pt rescues
+      incomplete mega? progressive training accumulates?
 - [ ] Also evaluate best.pt against v3.0.6 cottonweed leave4out holdout
 - [ ] Generate paper figures and tables
 - [ ] Write paper
