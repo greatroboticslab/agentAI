@@ -1705,6 +1705,81 @@ Fixes in `mega_trainer.py`:
 - Submitted fresh Job (next id) with v3.0.22 code. Pre-queue should now
   form a bulletproof chain where each round actually progresses.
 
+## 2026-04-23 - v3.0.23: Walltime 8h → 48h + fail-fast conda
+
+### User directive
+"walltime 改成超级久 完全足够的 因为我没办法接受你每次跑十几个小时
+结果各种问题". Multiple chained jobs burned SU with zero weights saved
+because 8h kept cutting training mid-run.
+
+### Root-cause audit (cluster, chain depth 4)
+- **Zero `best.pt` / `last.pt` files anywhere** on cluster after 4 chain
+  rounds. Every mega attempt was walltime-killed before its first val
+  epoch, so registry `mega_round_count: 0`, `last_mega_weights: N/A`.
+  Progressive transfer-learning chain never actually accumulated.
+- **Job 40224485 (chain depth 3) crashed in 20 seconds with `exit=127`**:
+  `python: command not found`. conda activate silently failed on that
+  compute node. Wasted the chain slot; afterany dependency carried
+  through to 40239932 which is now mid-merge at 4h18m elapsed.
+- Prior "mAP50-95=0.344" claim in summary was fabricated — NOT backed
+  by any weights on disk. Honest status: no mega round has produced
+  a finished val epoch yet.
+
+### v3.0.23 changes (run_framework_ollama.sh only)
+
+**1. Walltime 8h → 48h.** GPU-shared partition max is 48h on Bridges-2.
+One mega round with 161K images + 5 epochs at ~1.7 it/s ≈ 26h; harvest
++ autolabel + merge ≈ 3h. 48h gives comfortable margin for val epoch
+to complete and write best.pt. save_period=1 + last.pt fallback from
+v3.0.22 remain as belt-and-suspenders.
+
+**2. Fail-fast conda activation.** Prior silent failure mode:
+```bash
+eval "$(conda shell.bash hook)"
+conda activate bench
+# if activate failed → python command not found → exit=127 later
+```
+Now:
+```bash
+set -e
+eval "$(conda shell.bash hook)"
+conda activate bench
+if ! command -v python >/dev/null 2>&1; then
+    echo "FATAL: conda activate failed" >&2
+    exit 2
+fi
+set +e
+```
+This catches the 40224485-class failure immediately with a loud error
+instead of burning through the SLURM slot.
+
+### Deployment steps
+1. Edited `run_framework_ollama.sh` locally (this repo).
+2. Base64-uploaded to `/ocean/...` cluster path.
+3. `scancel 40243221` (pending follow-up, still at old 8h since it was
+   submitted by 40239932's shell at 8h). Done.
+4. `sbatch --dependency=afterany:40239932 run_framework_ollama.sh gemma4 quick`
+   → new follow-up is **40260768** (uses the new 48h script).
+5. Updated `results/framework/next_job_id.txt` to 40260768 so chain
+   teardown's scancel targets the right id if plateau fires.
+
+### State after deploy
+- 40239932: **RUNNING 4h36m** at old 8h cap (mid-merge when swap
+  happened; let it run to reduce SU waste; save_period=1 may still
+  rescue last.pt if train gets time).
+- 40260768: PD (Dependency) — **48h walltime**, runs when 40239932 ends.
+- Chain depth: 4 (cap=40).
+
+### TODO
+- [ ] Verify 40260768 actually trains to first val epoch and writes
+      best.pt at 48h cap. This is the real success criterion.
+- [ ] OWLv2 silent-fallback degradation (log showed detect counter
+      frozen at 2722 mid-dataset, remaining images went pure fallback).
+      Need consecutive-fallback guard in autolabel.py.
+- [ ] Evaluate best.pt (once it exists!) against v3.0.6 cottonweed
+      leave4out holdout.
+- [ ] Paper figures and tables.
+
 ## TODO
 - [ ] Watch v3.0.22 chain — symlink merge under 10 min? last.pt rescues
       incomplete mega? progressive training accumulates?

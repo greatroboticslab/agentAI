@@ -5,11 +5,28 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=48G
-#SBATCH --time=08:00:00
+#SBATCH --time=48:00:00
 #SBATCH --output=results/framework/slurm_ollama_%j.out
 
+# v3.0.23: walltime 8h → 48h (GPU-shared partition max).
+# Prior chain kept dying mid-training on 8h cap; with merge ~30min + autolabel
+# ~2.5h there was no room for a 5-epoch mega training pass to complete a val
+# epoch. 48h gives ~45h for actual training even after harvest/autolabel/merge.
+# Auto-chain + save_period=1 + last.pt fallback still protect against 48h
+# cap being hit, but in practice a single round should now always finish.
+
+# v3.0.23: fail-fast conda activation. Job 40224485 died with exit=127
+# "python: command not found" because conda didn't activate — silent failure.
+# Now abort the job immediately if the env isn't actually active.
+set -e
 eval "$(conda shell.bash hook)"
 conda activate bench
+if ! command -v python >/dev/null 2>&1; then
+    echo "FATAL: conda activate failed — python not on PATH. Aborting." >&2
+    exit 2
+fi
+echo "Conda env active: $(which python)"
+set +e
 
 cd /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark
 export PYTHONPATH=.:$PYTHONPATH
