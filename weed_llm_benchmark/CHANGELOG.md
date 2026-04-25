@@ -1770,19 +1770,66 @@ instead of burning through the SLURM slot.
 - 40260768: PD (Dependency) — **48h walltime**, runs when 40239932 ends.
 - Chain depth: 4 (cap=40).
 
-### TODO
-- [ ] Verify 40260768 actually trains to first val epoch and writes
-      best.pt at 48h cap. This is the real success criterion.
-- [ ] OWLv2 silent-fallback degradation (log showed detect counter
-      frozen at 2722 mid-dataset, remaining images went pure fallback).
-      Need consecutive-fallback guard in autolabel.py.
-- [ ] Evaluate best.pt (once it exists!) against v3.0.6 cottonweed
-      leave4out holdout.
-- [ ] Paper figures and tables.
+## 2026-04-24 - v3.0.23 RESULT: First complete training round, real mAP
+
+### Job 40260768 (chain depth 5, 48h walltime) — SUCCESS
+
+**First time the v3.0 chain has reached a finished val epoch and written
+real weights since the framework was rebuilt.** Prior 4 chained jobs all
+died on 8h cap before any save_period checkpoint fired.
+
+### Pipeline that ran end-to-end
+- harvest: 0 new (catalog is saturated for now)
+- merge: dHash cache hit on every dataset → seconds, not hours
+- **autolabel: OWLv2 → owl=15,531 fallback=3,672 empty=0
+  processed=19,203 / 20,000** across needs_autolabel pool
+- **mega train: 175,701 unique images, 37 datasets, 12 classes,
+  yolo26x base, 5 epochs at imgsz=512, batch≈5, ~2.67 it/s,
+  val=10% holdout split (≈16K)**
+
+### Per-epoch metrics (results.csv)
+
+```
+epoch  time(s)  mAP50    mAP50-95  P       R
+1      9713     0.4149   0.3352    0.5820  0.3860
+2      15894    0.4746   0.3861    0.6976  0.4171
+3      21316    0.4733   0.3682    0.7291  0.3913
+4      26488    0.4753   0.3557    0.7582  0.3760
+5      32185    0.5041   0.3794    0.7330  0.4134
+```
+
+Peak: **mAP50 = 0.504, mAP50-95 = 0.386 (epoch 2 mAP50-95 highest)**.
+Total training wall time: ~8h56m. best.pt and last.pt = 118 MB each.
+
+### Caveat — internal val ≠ paper mAP
+The 16K val set is 10% of the 175K merged corpus, which is dominated by
+OWLv2-autolabeled classification images (whole-image fallback bbox where
+OWLv2 found nothing). Numbers above reflect performance on that mixed,
+mildly-noisy distribution. For a clean apples-to-apples vs the v3.0.6
+YOLO baseline (cottonweed leave-4-out, F1=0.606 on unseen species),
+must run a separate eval pass against the hand-labeled holdout.
+
+### Chain state
+- 40260768 still RUNNING 19h18m on 48h walltime — orchestrator is on
+  next iteration after train_yolo_mega returned (likely harvest →
+  autolabel → train pass 2, this time progressive from best.pt).
+- 40263468 PD (Dependency) — pre-queued 48h follow-up.
+- Chain depth 5, cap 40.
+
+### What this fixes vs prior attempts
+- v3.0.18 ran an autolabel-only round on 12K val: mAP50=0.325. That
+  was a one-shot ad-hoc eval, not part of an auto-chain.
+- v3.0.22 added save_period=1 + last.pt fallback, but on 8h walltime
+  no epoch ever finished, so save_period never fired.
+- v3.0.23 (48h walltime + fail-fast conda) cleared the path.
 
 ## TODO
-- [ ] Watch v3.0.22 chain — symlink merge under 10 min? last.pt rescues
-      incomplete mega? progressive training accumulates?
-- [ ] Also evaluate best.pt against v3.0.6 cottonweed leave4out holdout
-- [ ] Generate paper figures and tables
-- [ ] Write paper
+- [ ] OWLv2 silent-fallback degradation guard (autolabel.py): detect N
+      consecutive pure-fallback batches, rebuild OWLv2 session or abort
+      dataset. Saw detect-counter freeze at 2722/3500 on
+      leaf-disease-segmentation in 40177722.
+- [ ] Evaluate v3.0.23 best.pt against v3.0.6 cottonweed leave4out
+      holdout for paper-grade comparison.
+- [ ] Watch chain depth 6+ (40263468 onward) — does progressive
+      transfer-learning actually improve mAP50 / mAP50-95?
+- [ ] Paper figures and tables.

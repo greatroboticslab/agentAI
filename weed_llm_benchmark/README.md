@@ -94,8 +94,8 @@ done
 ```
 
 **Cumulative registry** (`results/framework/dataset_registry.json`) dedups by slug
-across runs. As of v3.0.15: 12,908 real-bbox + 93,366 autolabeled = **106,274
-training images**, with 94K more in `needs_autolabel` pool across 8 datasets.
+across runs. As of v3.0.23: **175,701 unique training images from 37 datasets, 12 classes**
+after dHash-based cross-dataset dedup (126,179 duplicate images skipped).
 
 **Brain autonomy** — no human-curated dataset seed lists. All discovery via:
 - HuggingFace `HfApi.list_datasets` + keyword search
@@ -109,9 +109,22 @@ signal than the old blind VLM consensus (27% FP rate).
 
 **Run it:**
 ```bash
-sbatch run_framework_ollama.sh gemma4 quick   # 3 rounds, ~8h walltime
+sbatch run_framework_ollama.sh gemma4 quick   # 3 rounds, 48h walltime (v3.0.23)
 sbatch run_framework_ollama.sh gemma4 long    # 12 rounds
 ```
+The shell pre-queues a follow-up via `--dependency=afterany`, so the chain
+self-continues until plateau (3-round mAP spread < 0.005) or chain depth 40.
+
+**v3.0.23 first-completed-round result (Job 40260768, 5 epochs, 175K imgs):**
+| Epoch | mAP50 | mAP50-95 | P | R |
+|---|---|---|---|---|
+| 1 | 0.415 | 0.335 | 0.582 | 0.386 |
+| 2 | 0.475 | **0.386** | 0.698 | 0.417 |
+| 5 | **0.504** | 0.379 | 0.733 | 0.413 |
+
+Numbers are on the internal 10% val split (mixed real-bbox + OWLv2-autolabeled).
+For paper-grade comparison vs the v3.0.6 cottonweed leave-4-out YOLO baseline
+(F1=0.606 on unseen species), run `evaluate.py` against the hand-labeled holdout.
 
 **Key modules:**
 - `weed_optimizer_framework/brain.py` — Ollama+function-calling agent (20 tools, Gemma 4 default)

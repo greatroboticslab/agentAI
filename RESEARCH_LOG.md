@@ -1172,9 +1172,38 @@ denominator against the goal.
 - *Validated*: autonomous Kaggle/HF/GitHub search; OWLv2 auto-labeling quality
   (97.6% OWL detection rate on plantdisease, 99.8% on plantvillage); registry
   cumulative state across runs; orchestrator guardrails for Brain misbehaviors.
-- *Not yet validated*: end-to-end pipeline completion (harvest → autolabel →
-  mega on 100K+ → evaluate) has never finished within a single walltime.
-  v3.0.6 Job 39682959 was the last complete run but only on 9K images.
+- *Validated (v3.0.23)*: full end-to-end pipeline (harvest → autolabel →
+  175K-image mega → 5-epoch train → save weights → eval) on Bridges-2
+  V100-32GB. 8h56m training. Peak val mAP50=0.504 mAP50-95=0.386.
+- *Not yet validated*: paper-grade eval on hand-labeled holdout (vs the
+  v3.0.6 cottonweed leave-4-out F1=0.606 unseen-species baseline).
+
+---
+
+## Session 36 (2026-04-24) — v3.0.23: First complete v3.0 round
+
+After 5 chained jobs (40177598/698/722, 40224485, 40239932) all died on
+8h walltime cap before any val epoch, raised walltime 8h → 48h and added
+fail-fast conda activation. Result: Job 40260768 ran the full pipeline
+end-to-end for the first time:
+
+- **175,701 unique training images** from 37 datasets, 12 classes
+  (126,179 cross-dataset duplicates removed via dHash)
+- harvest → merge (dHash cache hit, seconds) → autolabel (OWLv2:
+  owl=15,531 / fallback=3,672 / 19,203 processed) → 5-epoch mega
+- Per-epoch: epoch 1 mAP50=0.415, epoch 2 mAP50=0.475 mAP50-95=0.386
+  (peak), epoch 5 mAP50=0.504 mAP50-95=0.379
+- 8h56m training, ~2.67 it/s on V100-32GB at imgsz=512 batch=5
+- best.pt + last.pt + epoch0–4.pt all saved (save_period=1 + 48h
+  walltime gave room)
+
+Caveat: val split is 10% of the 175K mixed corpus — many OWLv2-fallback
+whole-image bbox samples in there. For paper-grade comparison vs the
+v3.0.6 cottonweed leave-4-out F1=0.606 baseline, need a clean eval pass
+against hand-labeled holdout (TODO).
+
+Chain continues: 40260768 still alive at 19h+ on 48h, 40263468 PD via
+afterany. Subsequent rounds use best.pt as progressive base.
 
 ---
 
