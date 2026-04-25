@@ -1891,16 +1891,74 @@ the autonomous-collection accuracy ceiling."
 - `results/v3_0_23_eval.json` — full per-class breakdown both splits
 - `eval_v3_0_23.py`, `run_eval_v3_0_23.sh` — reproducible eval
 
+## 2026-04-25 - v3.0.24: Found the contamination bug, clean fresh training
+
+### The smoking gun (after 0.40 mAP audit)
+
+Reading `autolabel.py` line 248 + `mega_trainer._merge_datasets` lines 163-217
+revealed: **OWLv2 autolabel writes `class_id=0` for ALL pseudo-labels.**
+Then `_merge_datasets` builds `class_name_to_id` from the FIRST dataset
+that has `class_names` (typically cottonweed_sp8 → "Carpetweeds" gets id 0).
+Since autolabel datasets have no `class_names` in registry, their `class_id=0`
+labels pass through unchanged. Result:
+
+> **All 175,701 OWLv2-autolabeled images are tagged as Carpetweeds in training.**
+
+This explains the per-class regression EXACTLY:
+- Carpetweeds 0.88 mAP — over-trained on 175K assorted plant disease/pest
+  images all labeled as Carpetweeds
+- Crabgrass/PalmerAmaranth/PricklySida/Sicklepod 0.74-0.90 — only seen in
+  real bbox cottonweed datasets, signal stayed clean
+- Eclipta/Goosegrass/Morningglory/Nutsedge 0.0-0.04 — drowned by 175K of
+  "Carpetweeds" (the model learned to call almost every plant Carpetweeds)
+
+This is a **data labeling pipeline bug**, not a model capacity / data
+relevance issue. Backbone changes (MambaVision, Co-DETR) wouldn't help.
+
+### v3.0.24 fix (mega_trainer.py only)
+
+**1. `_merge_datasets(include_autolabel=False)` default — skip yolo_autolabel.**
+Removes the contamination immediately. Real-bbox-only training corpus is
+~10-15K images from cottonweed datasets + a few weed-specific GH/Kaggle
+sources. Loses the 175K scale but gains correct labels.
+
+**2. Defaults bumped to v3.0.6 baseline parity:**
+- `epochs=5 → 100` (the v3.0.6 YOLO11n that hit mAP50-95=0.865 used 100)
+- `imgsz=640 → 1024` (V100-32GB at batch=5 fits)
+- `patience=30 → 50`
+- `cos_lr=True`, `mosaic=1.0`, `mixup=0.1` for limited-data regularization
+
+**3. Brain interface unchanged.** `train_yolo_mega(strategy, iteration)`
+still takes the same strategy dict; `include_autolabel` defaults to False
+but Brain or operator can pass True if a future version implements proper
+per-dataset class assignment (v3.0.25+ TODO).
+
+### Deploy
+
+- Halted v3.0.23 chain via `stop_chain.txt` so 40263468 finishes its
+  current job naturally (don't waste burned SU) but 40292351 won't start.
+- Submitted **Job 40295310** as a separate fresh run (NOT in chain) using
+  `run_v3_0_24_clean.sh`. 48h walltime. 100 epochs at imgsz=1024.
+- Auto-evaluates on cottonweeddet12 test+valid at end of training, writes
+  `results/v3_0_24_eval/v3_0_24_eval.json`.
+
+### Predicted outcome
+Training on ~10-15K real-bbox cottonweed data with proper labels at
+imgsz=1024 for 100 epochs should land mAP50-95 ≥ 0.80 (close to v3.0.6
+baseline 0.865, since we have a bigger model — yolo26x vs YOLO11n —
+and slightly less data — 10K vs 5.6K — net should be similar or better).
+If we see ≥ 0.80, the autonomous-architecture-with-clean-labels works.
+Then v3.0.25 re-introduces the 175K autolabel data with proper per-dataset
+class mapping (or as a separate "background plant" class) for further gains.
+
 ## TODO
-- [ ] Push mAP50-95 from 0.40 → 0.90+ WITHOUT breaking the autonomous
-      collection architecture. Levers to research:
-      - Domain filter: only datasets with class-name overlap to weeds
-      - Class-balanced sampling (5x oversample for the 4 zero classes)
-      - Higher imgsz (512 → 1024) and more epochs (5 → 100)
-      - Pretrain-on-175K → fine-tune-on-5648 staged training
-      - Bigger backbone (Co-DETR, MambaVision, InternImage)
-      - OWLv2 confidence threshold filter (drop conf<0.3 pseudolabels)
+- [ ] Watch v3.0.24 (Job 40295310) — does mAP50-95 hit ≥ 0.80 on
+      cwd12 test/valid? If yes, the bug fix is validated.
+- [ ] v3.0.25: re-introduce 175K autolabel data with per-dataset class
+      assignment (each dataset gets its own class name → unique class_id).
+      Or: tag all autolabel as a single "background_plant" class so it
+      acts as a hard-negative for the 12 weed classes.
+- [ ] CLIP relevance filter (#45) — still useful even after class fix.
+- [ ] Class-balanced sampling for the 4 weak classes (#46).
 - [ ] OWLv2 silent-fallback degradation guard (autolabel.py)
-- [ ] Watch chain depth 6+ (40263468 onward) — does progressive
-      transfer-learning actually improve mAP?
-- [ ] Paper: write "When more data hurts" section using v3.0.23 eval.
+- [ ] Paper: "When more data hurts" + recovery via class-correct labeling.

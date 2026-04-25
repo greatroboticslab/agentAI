@@ -118,8 +118,20 @@ def _find_label_for_image(img_path, dataset_root):
     return None
 
 
-def _merge_datasets(out_dir, val_fraction=0.1):
+def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False):
     """Merge all downloaded datasets (with labels) into one YOLO-format dataset.
+
+    Args:
+      out_dir: where to write merged data
+      val_fraction: fraction of images to put in val split
+      include_autolabel: v3.0.24 default False. yolo_autolabel data is written by
+        OWLv2 with hard-coded class_id=0, which then gets remapped to whichever
+        class was assigned id=0 first (typically Carpetweeds). This contaminates
+        all 175K autolabel images with the same wrong class label, destroying
+        the 4 underrepresented species' learning signal. v3.0.23 evaluation
+        confirmed this: Carpetweeds 0.88 mAP (over-represented) vs
+        Eclipta/Goosegrass/Morningglory/Nutsedge ~0.02 (drowned). Fix: skip
+        yolo_autolabel until proper per-dataset class mapping is implemented.
 
     Returns: (merged_dir, data_yaml, stats, merged_names_list)
     """
@@ -135,7 +147,8 @@ def _merge_datasets(out_dir, val_fraction=0.1):
     used_datasets = []
 
     stats = {"datasets": 0, "images": 0, "labels": 0, "skipped_no_label": 0,
-             "skipped_duplicates": 0, "unique_hashes": 0}
+             "skipped_duplicates": 0, "unique_hashes": 0,
+             "skipped_autolabel": 0}
     # v3.0.16: cross-dataset image dedup via dHash. PlantVillage has 4+ Kaggle
     # mirrors in our registry (abdallahalidev, mohitsingh1804, arjuntejaswi,
     # vipoooool-augmented) — training on duplicates inflates apparent scale
@@ -144,16 +157,18 @@ def _merge_datasets(out_dir, val_fraction=0.1):
     # base image also tend to hash the same at 8x8 resolution.
     seen_hashes = {}
 
+    valid_annotations = {"bbox", "bbox+segmentation", "yolo"}
+    if include_autolabel:
+        valid_annotations.add("yolo_autolabel")
+
     for ds_name, info in registry.items():
         local_path = info.get("local_path")
         if not local_path or not os.path.isdir(local_path):
             continue
-        if info.get("annotation") not in ("bbox", "bbox+segmentation", "yolo", "yolo_autolabel"):
-            # v3.0.11: yolo_autolabel = OWLv2-generated pseudo-bboxes on
-            # classification datasets. Quality is lower than real bbox but
-            # these datasets (plant-village etc) are orders of magnitude
-            # larger than the hand-labeled pool, and class-known OWLv2 is
-            # much cleaner than blind VLM consensus (27% FP → target <10% FP).
+        ann = info.get("annotation")
+        if ann not in valid_annotations:
+            if ann == "yolo_autolabel":
+                stats["skipped_autolabel"] += 1
             continue
 
         imgs = _find_images(local_path)
@@ -265,6 +280,7 @@ def _merge_datasets(out_dir, val_fraction=0.1):
     logger.info(f"[Merge] Total: {stats['images']} unique images from "
                 f"{stats['datasets']} datasets; {len(names_list)} classes. "
                 f"Cross-dataset duplicates skipped: {stats['skipped_duplicates']}. "
+                f"yolo_autolabel datasets skipped: {stats['skipped_autolabel']}. "
                 f"(dedup via 8x8 dHash exact-match)")
     # v3.0.19: persist dHash caches written back to registry entries
     disc._save_registry()
@@ -276,15 +292,20 @@ def train_yolo_mega(strategy, iteration):
 
     Strategy keys:
       base_model: override, defaults to Config.DETECTION_MODEL
-      epochs, batch_size, lr, patience, workers, imgsz
+      epochs (default 100), batch_size, lr (default 0.001),
+      patience (default 50), workers, imgsz (default 1024),
+      include_autolabel (default False, v3.0.24 — see _merge_datasets docstring)
 
     Returns: (best_pt_path, result_summary)
     """
     import torch
     from ultralytics import YOLO
 
+    include_autolabel = bool(strategy.get("include_autolabel", False))
     merged_dir = os.path.join(Config.FRAMEWORK_DIR, f"merged_iter{iteration}")
-    _, data_yaml, stats, used_datasets, names_list = _merge_datasets(merged_dir)
+    _, data_yaml, stats, used_datasets, names_list = _merge_datasets(
+        merged_dir, include_autolabel=include_autolabel
+    )
 
     if stats["images"] < 100:
         raise ValueError(
@@ -330,20 +351,27 @@ def train_yolo_mega(strategy, iteration):
                 f"classes={len(names_list)}, datasets={used_datasets}")
     project_dir = os.path.join(Config.FRAMEWORK_DIR, f"mega_iter{iteration}")
 
+    # v3.0.24: defaults raised to match v3.0.6 YOLO11n baseline that achieved
+    # mAP50-95=0.865 on cottonweeddet12 (5648 imgs, 100 epochs, imgsz=640).
+    # Now using yolo26x as base + cleaner real-bbox-only data + imgsz 1024,
+    # we expect to meet or exceed that baseline.
     model.train(
         data=data_yaml,
         epochs=strategy.get("epochs", 100),
         batch=strategy.get("batch_size", -1),
-        imgsz=strategy.get("imgsz", 640),
+        imgsz=strategy.get("imgsz", 1024),
         device=device,
         project=project_dir,
         name="train",
-        patience=strategy.get("patience", 30),
+        patience=strategy.get("patience", 50),
         lr0=strategy.get("lr", 0.001),
         workers=strategy.get("workers", 4),
         verbose=False,
         save_period=1,  # v3.0.22: save last.pt every epoch so walltime-cut
                          # mid-training still leaves a usable checkpoint
+        cos_lr=True,    # v3.0.24: cosine LR schedule for longer training
+        mosaic=1.0,     # v3.0.24: full mosaic for the smaller real-bbox corpus
+        mixup=0.1,      # v3.0.24: mild mixup helps with limited data
     )
 
     # Resolve actual save_dir (ultralytics increments train/train2/... if dir exists)
