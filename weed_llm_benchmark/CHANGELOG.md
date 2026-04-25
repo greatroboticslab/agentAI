@@ -1823,13 +1823,84 @@ must run a separate eval pass against the hand-labeled holdout.
   no epoch ever finished, so save_period never fired.
 - v3.0.23 (48h walltime + fail-fast conda) cleared the path.
 
+## 2026-04-25 - v3.0.23 CLEAN EVAL: First honest paper-grade numbers
+
+### Job 40293571 (1 GPU, 30min walltime, parallel to chain)
+Built `eval_v3_0_23.py` + `run_eval_v3_0_23.sh`. Loads
+`mega_iter6/train8/weights/best.pt` (the v3.0.23 mAP50=0.504 weights
+from internal val), remaps cottonweeddet12 class IDs to v3.0.23 order
+via name match, runs `model.val()` on the 848-image test split + the
+1129-image valid split (both human-labeled).
+
+### The honest numbers
+
+| Eval set | imgs | mAP50 | mAP50-95 | P | R |
+|---|---|---|---|---|---|
+| cwd12 test | 848 | 0.4234 | 0.4017 | 0.6282 | 0.4480 |
+| cwd12 valid | 1129 | 0.4220 | 0.4041 | 0.6082 | 0.4445 |
+
+The two splits agree to 3 decimal places — the 0.40 number is real,
+not noise.
+
+### Per-class breakdown reveals catastrophic failure on 4 classes
+
+mAP50-95 strong (>0.68): Carpetweeds 0.88, Crabgrass 0.90, PalmerAmaranth
+0.82, PricklySida 0.74, Sicklepod 0.79.
+
+mAP50-95 mediocre (0.15-0.40): Purslane 0.39, Ragweed 0.18, SpottedSpurge
+0.16.
+
+mAP50-95 **near zero**: **Eclipta 0.02, Goosegrass 0.00, Morningglory
+0.04, Nutsedge 0.01** — these 4 species essentially weren't learned.
+
+### Comparison vs v3.0.6 baseline — we REGRESSED
+
+| Approach | Train data | mAP50 | mAP50-95 |
+|---|---|---|---|
+| YOLO11n FT (v3.0.6, 2026-03-16) | cottonweeddet12 only (5,648) | **0.929** | **0.865** |
+| **v3.0.23 (current)** | **175K from 37 datasets** | **0.42** | **0.40** |
+
+Going from 5,648 hand-curated images to 175,701 autonomously-collected
+images **dropped mAP50-95 from 0.87 to 0.40**. This is a -54% relative
+regression, not progress.
+
+### Root cause hypothesis (4 candidates)
+
+1. **Signal dilution**: 175K is dominated by plantvillage / rice-disease /
+   pest detection datasets that share NO classes with the 12 cotton weeds.
+   Model spent capacity learning those instead.
+2. **OWLv2 mislabel pollution**: external datasets' OWLv2-generated bboxes
+   may be tagged with WRONG class IDs (e.g., a Goosegrass image labeled
+   as Carpetweeds because that prompt fired strongest).
+3. **Class imbalance**: the 4 zero-mAP classes have very few training
+   samples in 175K relative to the dominant classes — 5 epochs is not
+   enough to learn them.
+4. **OWLv2 fallback contamination**: when OWLv2 fails to detect, fallback
+   is whole-image bbox = noisy supervision that drags everything down.
+
+### Negative result is publishable
+
+This is a clean experimental finding:
+**Autonomous web-scale data collection without domain filtering hurts
+detection accuracy on the target task.** The framework demonstrably
+"works" (175K trained end-to-end), but more data ≠ better when the
+data is off-distribution. Paper Section needed: "When more data hurts:
+the autonomous-collection accuracy ceiling."
+
+### Saved
+- `results/v3_0_23_eval.json` — full per-class breakdown both splits
+- `eval_v3_0_23.py`, `run_eval_v3_0_23.sh` — reproducible eval
+
 ## TODO
-- [ ] OWLv2 silent-fallback degradation guard (autolabel.py): detect N
-      consecutive pure-fallback batches, rebuild OWLv2 session or abort
-      dataset. Saw detect-counter freeze at 2722/3500 on
-      leaf-disease-segmentation in 40177722.
-- [ ] Evaluate v3.0.23 best.pt against v3.0.6 cottonweed leave4out
-      holdout for paper-grade comparison.
+- [ ] Push mAP50-95 from 0.40 → 0.90+ WITHOUT breaking the autonomous
+      collection architecture. Levers to research:
+      - Domain filter: only datasets with class-name overlap to weeds
+      - Class-balanced sampling (5x oversample for the 4 zero classes)
+      - Higher imgsz (512 → 1024) and more epochs (5 → 100)
+      - Pretrain-on-175K → fine-tune-on-5648 staged training
+      - Bigger backbone (Co-DETR, MambaVision, InternImage)
+      - OWLv2 confidence threshold filter (drop conf<0.3 pseudolabels)
+- [ ] OWLv2 silent-fallback degradation guard (autolabel.py)
 - [ ] Watch chain depth 6+ (40263468 onward) — does progressive
-      transfer-learning actually improve mAP50 / mAP50-95?
-- [ ] Paper figures and tables.
+      transfer-learning actually improve mAP?
+- [ ] Paper: write "When more data hurts" section using v3.0.23 eval.

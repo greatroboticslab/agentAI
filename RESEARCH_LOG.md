@@ -1205,6 +1205,27 @@ against hand-labeled holdout (TODO).
 Chain continues: 40260768 still alive at 19h+ on 48h, 40263468 PD via
 afterany. Subsequent rounds use best.pt as progressive base.
 
+### Apr 25 — Clean eval, honest paper number, REGRESSION discovered
+
+Job 40293571 evaluated v3.0.23 best.pt against cottonweeddet12 test (848)
+and valid (1129) human-labeled splits. Results agree to 3 decimals:
+**mAP50 ≈ 0.42, mAP50-95 ≈ 0.40**.
+
+vs YOLO11n FT baseline (cottonweeddet12 alone, 5,648 imgs, 100 epochs):
+mAP50=0.929, mAP50-95=0.865. **We regressed -0.46 mAP50-95 by adding
+175K autonomous-collected images.**
+
+Per-class: 4 species (Eclipta, Goosegrass, Morningglory, Nutsedge) have
+near-zero mAP. Hypothesis: 175K is dominated by plantvillage / disease /
+pest data that share no classes with these 4, so capacity went to learning
+those instead of the rare-in-corpus weeds.
+
+This is the paper's negative result: **autonomous web-scale collection
+without domain filtering hurts target-task accuracy.** Framework works
+end-to-end (architecture validated), but the data-mixing strategy needs
+rethinking. Next session: domain filter + class-balanced sampling +
+higher imgsz + pretrain-then-finetune staging.
+
 ---
 
 ## Phase 4: Ablation Studies (Planned)

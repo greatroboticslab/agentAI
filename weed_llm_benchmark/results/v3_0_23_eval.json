@@ -1,0 +1,66 @@
+{
+  "_note": "Clean evaluation of v3.0.23 best.pt (mega_iter6/train8/weights/best.pt) against human-labeled cottonweeddet12 test + valid splits. Class IDs remapped from original cottonweeddet12 order to v3.0.23 merged order via name match. Job 40293571, Apr 25 2026 13:18 EDT, V100-32GB.",
+  "best_pt_source": "results/framework/mega_iter6/train8/weights/best.pt (118MB, epoch 5 of 5)",
+  "v3_0_23_class_order": ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge", "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"],
+  "cwd12_test": {
+    "n_classes_with_data": 12,
+    "n_images": 848,
+    "mAP50": 0.4234,
+    "mAP50_95": 0.4017,
+    "precision": 0.6282,
+    "recall": 0.4480,
+    "per_class_mAP50_95": {
+      "Carpetweeds": 0.8377,
+      "Crabgrass": 0.8993,
+      "PalmerAmaranth": 0.8236,
+      "PricklySida": 0.6810,
+      "Purslane": 0.3995,
+      "Ragweed": 0.1811,
+      "Sicklepod": 0.7715,
+      "SpottedSpurge": 0.1557,
+      "Eclipta": 0.0211,
+      "Goosegrass": 0.0,
+      "Morningglory": 0.0371,
+      "Nutsedge": 0.0133
+    }
+  },
+  "cwd12_valid": {
+    "n_classes_with_data": 12,
+    "n_images": 1129,
+    "mAP50": 0.4220,
+    "mAP50_95": 0.4041,
+    "precision": 0.6082,
+    "recall": 0.4445,
+    "per_class_mAP50_95": {
+      "Carpetweeds": 0.8767,
+      "Crabgrass": 0.8993,
+      "PalmerAmaranth": 0.7860,
+      "PricklySida": 0.7410,
+      "Purslane": 0.3846,
+      "Ragweed": 0.1613,
+      "Sicklepod": 0.7948,
+      "SpottedSpurge": 0.1472,
+      "Eclipta": 0.0244,
+      "Goosegrass": 0.0001,
+      "Morningglory": 0.0246,
+      "Nutsedge": 0.0092
+    }
+  },
+  "comparison": {
+    "yolo11n_FT_v3_0_6_baseline": {
+      "_note": "Old baseline: YOLO11n fine-tuned on cottonweeddet12 alone (5648 imgs), 100 epochs, V100-32GB. From CHANGELOG 2026-03-16 entry.",
+      "mAP50": 0.929,
+      "mAP50_95": 0.865,
+      "precision": 0.930,
+      "recall": 0.850,
+      "train_data_size": 5648
+    },
+    "v3_0_23_current": {
+      "mAP50_avg": 0.4227,
+      "mAP50_95_avg": 0.4029,
+      "train_data_size": 175701,
+      "delta_mAP50_95": "-0.46 vs baseline"
+    }
+  },
+  "key_finding": "Adding 175K autonomous-collected images REGRESSED mAP50-95 from 0.87 to 0.40 vs the simple YOLO11n baseline trained on only cottonweeddet12. Per-class breakdown shows 4 species (Eclipta, Goosegrass, Morningglory, Nutsedge) have near-zero mAP, indicating the model failed to learn them despite training data containing samples. Hypothesis: signal dilution by off-target datasets (plantvillage, rice-disease, etc.) + OWLv2 mislabel pollution. This is a publishable negative result — autonomous web-scale data collection without domain filtering hurts accuracy."
+}

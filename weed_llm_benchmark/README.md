@@ -115,16 +115,28 @@ sbatch run_framework_ollama.sh gemma4 long    # 12 rounds
 The shell pre-queues a follow-up via `--dependency=afterany`, so the chain
 self-continues until plateau (3-round mAP spread < 0.005) or chain depth 40.
 
-**v3.0.23 first-completed-round result (Job 40260768, 5 epochs, 175K imgs):**
-| Epoch | mAP50 | mAP50-95 | P | R |
-|---|---|---|---|---|
-| 1 | 0.415 | 0.335 | 0.582 | 0.386 |
-| 2 | 0.475 | **0.386** | 0.698 | 0.417 |
-| 5 | **0.504** | 0.379 | 0.733 | 0.413 |
+**v3.0.23 results — internal val + clean human-labeled eval:**
 
-Numbers are on the internal 10% val split (mixed real-bbox + OWLv2-autolabeled).
-For paper-grade comparison vs the v3.0.6 cottonweed leave-4-out YOLO baseline
-(F1=0.606 on unseen species), run `evaluate.py` against the hand-labeled holdout.
+Internal val (10% of 175K mixed corpus, includes OWLv2 fallback labels):
+| Epoch | mAP50 | mAP50-95 |
+|---|---|---|
+| 5 (best.pt) | 0.504 | 0.379 |
+
+Clean human-labeled eval (cottonweeddet12 test + valid, Job 40293571):
+| Eval set | imgs | mAP50 | mAP50-95 |
+|---|---|---|---|
+| cwd12 test | 848 | 0.4234 | **0.4017** |
+| cwd12 valid | 1129 | 0.4220 | **0.4041** |
+
+**Critical finding:** the v3.0.6 YOLO11n baseline trained on the 5,648-image
+cottonweeddet12 alone got mAP50=0.929, mAP50-95=0.865. Our v3.0.23 with
+175K autonomously-collected images regressed to mAP50-95=0.40. Per-class
+analysis shows 4 species (Eclipta, Goosegrass, Morningglory, Nutsedge)
+have near-zero mAP — they were drowned in plantvillage / rice-disease /
+pest data that shares no classes with the 12 cotton weeds. **More data ≠
+better when the data is off-target.** Path to fix: domain-filtered merge,
+class-balanced sampling, higher imgsz, longer training, pretrain → fine-tune
+staged training. See `results/v3_0_23_eval.json` for full breakdown.
 
 **Key modules:**
 - `weed_optimizer_framework/brain.py` — Ollama+function-calling agent (20 tools, Gemma 4 default)
