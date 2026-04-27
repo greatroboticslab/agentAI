@@ -1951,14 +1951,77 @@ If we see ≥ 0.80, the autonomous-architecture-with-clean-labels works.
 Then v3.0.25 re-introduces the 175K autolabel data with proper per-dataset
 class mapping (or as a separate "background plant" class) for further gains.
 
-## TODO
-- [ ] Watch v3.0.24 (Job 40295310) — does mAP50-95 hit ≥ 0.80 on
-      cwd12 test/valid? If yes, the bug fix is validated.
-- [ ] v3.0.25: re-introduce 175K autolabel data with per-dataset class
-      assignment (each dataset gets its own class name → unique class_id).
-      Or: tag all autolabel as a single "background_plant" class so it
-      acts as a hard-negative for the 12 weed classes.
-- [ ] CLIP relevance filter (#45) — still useful even after class fix.
-- [ ] Class-balanced sampling for the 4 weak classes (#46).
-- [ ] OWLv2 silent-fallback degradation guard (autolabel.py)
-- [ ] Paper: "When more data hurts" + recovery via class-correct labeling.
+## 2026-04-27 - v3.0.24 RESULT: 79 epochs, internal val mAP50-95 = 0.677
+
+### Job 40295310 — full 48h walltime, walltime-cut at epoch 80
+Started Apr 25 ~16:00 EDT, ended Apr 27 15:53 EDT. 79 epochs completed
+(walltime cut mid-epoch-80, but save_period=1 captured all completed epochs).
+
+### Final training metrics (internal val, 2,751 imgs from 27K merged corpus)
+| Epoch | mAP50 | mAP50-95 |
+|---|---|---|
+| 11 | 0.7459 | 0.5026 |
+| 30 | 0.8583 | 0.6240 |
+| 50 | 0.8808 | 0.6513 |
+| 75 | 0.8917 | 0.6731 |
+| 79 (final) | **0.8938** | **0.6770** |
+
+vs v3.0.23 internal val (mAP50-95 = 0.379): **+78% improvement** by
+removing the class_id=0 contamination + bumping epochs/imgsz.
+
+### Training corpus (27,454 unique images, 12 weed classes only)
+12 datasets after dHash dedup:
+- cottonweed_sp8 (3,442)
+- cottonweed_holdout (2,206)
+- francesco__weed_crop_aerial (786)
+- gh_tehreemnoor__yolov5-weed-detection-model (2,006)
+- gh_07931350__weed-yolo (164)
+- gh_vuyyurusairamreddy__coconut-tree-disease (491)
+- gh_vumhvg__yolov9-beehive-dataset (763)
+- gh_lunaimer__tomatoweightai (128)
+- kg_ravirajsinh45__crop-and-weed-detection-bbox (1,190)
+- kg_farukalam__tomato-leaf-diseases (450)
+- kg_vinayakshanawad__weedcrop-image-dataset (2,774)
+- kg_rupankarmajumdar__crop-pests (rest)
+
+37 yolo_autolabel datasets (~175K images) skipped per v3.0.24 fix —
+preserved on disk and in registry for v3.0.25 re-introduction.
+
+### Caveats
+- Internal val (10% split of 27K merged) is ON-DISTRIBUTION with training,
+  so 0.677 likely overestimates true cwd12 holdout performance.
+- 4 species (Eclipta, Goosegrass, Morningglory, Nutsedge) had near-zero
+  mAP in v3.0.23 due to contamination. v3.0.24 is expected to fix this
+  on cottonweed datasets but may not show in raw aggregates.
+- Plateau at epoch 70+ (delta ~0.001/epoch). Walltime cap at 79 was
+  near-optimal; would not have benefited much from longer training on
+  this corpus.
+
+### Auto-eval against cottonweeddet12 holdout
+First eval (Job 40325013) failed due to staging-script label-path bug
+(images in `test/images/`, labels in `test/labels/` — not co-located).
+Fixed via path remap. Second eval Job 40327811 PD waiting for GPU.
+
+## TODO (Round B = v3.0.25 architecture)
+- [ ] **CRITICAL: per-dataset class assignment in autolabel.py**.
+      Stop hard-coding class_id=0. Each dataset's OWLv2 detections get
+      mapped to a class derived from dataset metadata. Datasets containing
+      a 12-class weed get the correct class_id; off-target datasets
+      (plantvillage etc.) get auxiliary classes (12+) so they don't
+      contaminate the 12 weed slots. nc grows from 12 to ~30-50.
+- [ ] **Parallel training + data acquisition** (per professor's suggestion):
+      separate SLURM jobs for (a) training and (b) Brain-driven harvest +
+      autolabel. They share registry but write to different paths so no
+      conflict. Training picks up new datasets between rounds.
+- [ ] **Auto early-stop on plateau** — detect mAP50-95 plateau across
+      last K epochs, write stop flag, exit before 72h cap if converged.
+- [ ] **NEVER_TRAIN list**: cottonweeddet12, weedsense, francesco
+      (the cleanest hand-labeled sets) get held out from training
+      entirely. They become the immutable evaluation gold standard.
+- [ ] **OWLv2 conf threshold + drop fallback bbox** — only keep real
+      detections with conf >= 0.3; if OWLv2 finds nothing, image becomes
+      hard negative (empty .txt) instead of whole-image junk.
+- [ ] **Class-balanced sampling** — oversample weak classes via
+      symlink duplication or weighted sampler.
+- [ ] **CLIP relevance filter** (deferred — not blocking v3.0.25).
+- [ ] **Walltime 72h** + auto-resume from latest best.pt across runs.
