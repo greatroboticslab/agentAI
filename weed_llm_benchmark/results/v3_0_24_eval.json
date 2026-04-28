@@ -1,0 +1,46 @@
+{
+  "cwd12_test": {
+    "n_classes_with_data": 12,
+    "mAP50": 0.4247787557245945,
+    "mAP50_95": 0.419311909719497,
+    "precision": 0.4414136239310181,
+    "recall": 0.5318060768530551,
+    "per_class_mAP50_95": {
+      "Carpetweeds": 0.8947951682227309,
+      "Crabgrass": 0.9740329683804229,
+      "PalmerAmaranth": 0.9100940506152911,
+      "PricklySida": 0.7486245613956343,
+      "Purslane": 0.36506243263236454,
+      "Ragweed": 0.48485124479617053,
+      "Sicklepod": 0.39326260742667396,
+      "SpottedSpurge": 0.2608613623717738,
+      "Eclipta": 1.8218623481781378e-05,
+      "Goosegrass": 0.0,
+      "Morningglory": 3.9062499999999994e-05,
+      "Nutsedge": 0.0001012396694214876
+    }
+  },
+  "cwd12_valid": {
+    "n_classes_with_data": 12,
+    "mAP50": 0.4125308173474651,
+    "mAP50_95": 0.4063354533010018,
+    "precision": 0.44048333166957837,
+    "recall": 0.5402914008855052,
+    "per_class_mAP50_95": {
+      "Carpetweeds": 0.9224477295701135,
+      "Crabgrass": 0.9594844166522108,
+      "PalmerAmaranth": 0.9088032524964648,
+      "PricklySida": 0.774989473546193,
+      "Purslane": 0.2799621180031599,
+      "Ragweed": 0.3356614594561672,
+      "Sicklepod": 0.47533170630456906,
+      "SpottedSpurge": 0.2191635692324217,
+      "Eclipta": 0.0,
+      "Goosegrass": 0.0,
+      "Morningglory": 8.064516129032261e-05,
+      "Nutsedge": 0.00010106918943125838
+    }
+  }
+}]0;byler@br011:~(base) [byler@bridges2-login011 ~]$ exit
+logout
+Connection to bridges2.psc.edu closed.

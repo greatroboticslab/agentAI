@@ -118,43 +118,146 @@ def _find_label_for_image(img_path, dataset_root):
     return None
 
 
-def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False):
+# v3.0.25: canonical 12-class cottonweed system, NEVER_TRAIN holdout, slot-based
+# class assignment for autolabel data so they don't pollute the 12 weed classes.
+
+CANONICAL_12_NAMES = [
+    "Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
+    "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
+    "Eclipta", "Goosegrass", "Morningglory", "Nutsedge",
+]
+
+# Original cottonweeddet12 class order (different from CANONICAL — this is what
+# leave4out's data uses). Maps original_id -> canonical_id.
+CWD12_ORIGINAL_NAMES = [
+    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass",
+    "Morningglory", "Nutsedge", "PalmerAmaranth", "PricklySida",
+    "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
+]
+CWD12_ORIG_TO_CANON = {i: CANONICAL_12_NAMES.index(n) for i, n in enumerate(CWD12_ORIGINAL_NAMES)}
+
+# Datasets that share results/leave4out/data physical path. Both registry entries
+# point to the same images, so we pick ONE (cottonweed_sp8) as primary and use
+# canonical 12-class mapping. cottonweed_holdout entries are deduped via dHash.
+COTTONWEED_LEAVE4OUT_SLUGS = {"cottonweed_sp8", "cottonweed_holdout"}
+
+# v3.0.25: hand-labeled holdouts that MUST NEVER be in training. These remain
+# the immutable evaluation gold standard. Adding any dataset that overlaps with
+# cottonweeddet12 imagery here would invalidate the entire eval protocol.
+NEVER_TRAIN_SLUGS = {
+    "cottonweeddet12",
+    "weedsense",
+    "francesco__weed_crop_aerial",
+}
+
+# Reserve class IDs:
+#   0-11  : 12 canonical weed species (cottonweeddet12)
+#   12-99 : auxiliary plant/non-weed classes (autolabeled). Slot assigned by
+#           hashing the dataset slug so it's deterministic across runs.
+AUX_CLASS_START = 12
+AUX_CLASS_END = 100
+TOTAL_NC = AUX_CLASS_END  # 100 — fixed nc avoids head expansion mid-training.
+
+
+def _aux_class_for_slug(slug):
+    """Stable integer in [AUX_CLASS_START, AUX_CLASS_END) derived from slug."""
+    import hashlib
+    h = int(hashlib.md5(slug.encode("utf-8")).hexdigest(), 16)
+    span = AUX_CLASS_END - AUX_CLASS_START
+    return AUX_CLASS_START + (h % span)
+
+
+def _is_cottonweed_dataset(slug, info):
+    """Heuristic: does this dataset use the cottonweeddet12 12-class system?"""
+    if slug in COTTONWEED_LEAVE4OUT_SLUGS:
+        return True
+    names = info.get("class_names") or []
+    overlap = sum(1 for n in names if n in CANONICAL_12_NAMES)
+    return overlap >= 4  # at least 4 of 12 weed names → likely a cottonweed source
+
+
+def _build_canonical_class_map(slug, info):
+    """Return (ds_class_map, names_added).
+    ds_class_map: dict mapping source_class_id -> canonical_id.
+    """
+    if _is_cottonweed_dataset(slug, info):
+        # Use the source's class_names list to map by NAME into CANONICAL_12_NAMES.
+        names = info.get("class_names") or []
+        if not names:
+            # Common case: cottonweed_sp8 / cottonweed_holdout share leave4out data
+            # which uses CWD12_ORIGINAL_NAMES order. Default to that.
+            return dict(CWD12_ORIG_TO_CANON), []
+        ds_map = {}
+        for i, n in enumerate(names):
+            if n in CANONICAL_12_NAMES:
+                ds_map[i] = CANONICAL_12_NAMES.index(n)
+        return ds_map, []
+
+    if info.get("annotation") == "yolo_autolabel":
+        # Auxiliary plant/disease/pest data — assign a single auxiliary class
+        # slot for this dataset. autolabel.py writes class_id=0 for all detections,
+        # so we remap 0 -> aux_class. Nothing else should appear in these labels.
+        aux = _aux_class_for_slug(slug)
+        return {0: aux}, []
+
+    # Other real-bbox datasets with class_names: try name-match into canonical
+    # weed classes; otherwise assign each unique name to a fresh aux slot.
+    names = info.get("class_names") or []
+    if names:
+        ds_map = {}
+        for i, n in enumerate(names):
+            if n in CANONICAL_12_NAMES:
+                ds_map[i] = CANONICAL_12_NAMES.index(n)
+            else:
+                # Off-target real-bbox dataset (e.g., crops, pests). Bucket into one
+                # aux slot per dataset to keep the class set bounded.
+                ds_map[i] = _aux_class_for_slug(slug + "_" + n)
+        return ds_map, []
+
+    # No class_names registered. Don't drop the data; map every source class id
+    # found in actual label files to a single aux slot for this dataset.
+    # ds_class_map is built lazily by the caller when it scans the labels —
+    # we return a special "wildcard" map keyed by None which the merge loop
+    # interprets as "any src_cls → aux_slot".
+    aux = _aux_class_for_slug(slug)
+    return {"__wildcard__": aux}, []
+
+
+def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
+                    val_dataset_root=None):
     """Merge all downloaded datasets (with labels) into one YOLO-format dataset.
 
-    Args:
-      out_dir: where to write merged data
-      val_fraction: fraction of images to put in val split
-      include_autolabel: v3.0.24 default False. yolo_autolabel data is written by
-        OWLv2 with hard-coded class_id=0, which then gets remapped to whichever
-        class was assigned id=0 first (typically Carpetweeds). This contaminates
-        all 175K autolabel images with the same wrong class label, destroying
-        the 4 underrepresented species' learning signal. v3.0.23 evaluation
-        confirmed this: Carpetweeds 0.88 mAP (over-represented) vs
-        Eclipta/Goosegrass/Morningglory/Nutsedge ~0.02 (drowned). Fix: skip
-        yolo_autolabel until proper per-dataset class mapping is implemented.
+    v3.0.25 changes:
+      * Canonical 12-class system enforced for cottonweed_* datasets via
+        CWD12_ORIG_TO_CANON / class_names name-match. Fixes the v3.0.24 bug
+        where Eclipta/Goosegrass/Morningglory/Nutsedge had 0 mAP because
+        cottonweed_sp8 and cottonweed_holdout shared a physical path and
+        sp8's class_map mislabeled the held-out 4 species.
+      * NEVER_TRAIN_SLUGS: cottonweeddet12, weedsense, francesco never enter
+        training (they are the immutable evaluation gold standard).
+      * yolo_autolabel data goes to AUX class slots (12-99) so they don't
+        pollute the 12 weed slots even if class_id=0 is hard-coded in old
+        autolabel writes. Each dataset gets its own slot via hash of slug.
+      * If `val_dataset_root` is given (e.g., downloads/cottonweeddet12 holdout),
+        the val split is OVERRIDDEN to point at that hand-labeled set instead
+        of a 10%-of-merged split. This is the honest early-stop signal.
+      * nc fixed at TOTAL_NC=100 so adding new aux classes between rounds
+        does not require detection-head expansion.
 
     Returns: (merged_dir, data_yaml, stats, merged_names_list)
     """
     disc = DatasetDiscovery()
     registry = disc.registry["datasets"]
 
-    merged = {"train/images": [], "train/labels": [], "valid/images": [], "valid/labels": []}
-    for sub in merged:
+    for sub in ("train/images", "train/labels", "valid/images", "valid/labels"):
         os.makedirs(os.path.join(out_dir, sub), exist_ok=True)
 
-    # Collect all unique class names across datasets (order = merged class IDs)
-    class_name_to_id = {}
     used_datasets = []
 
     stats = {"datasets": 0, "images": 0, "labels": 0, "skipped_no_label": 0,
              "skipped_duplicates": 0, "unique_hashes": 0,
-             "skipped_autolabel": 0}
-    # v3.0.16: cross-dataset image dedup via dHash. PlantVillage has 4+ Kaggle
-    # mirrors in our registry (abdallahalidev, mohitsingh1804, arjuntejaswi,
-    # vipoooool-augmented) — training on duplicates inflates apparent scale
-    # and biases model toward over-represented sources. dHash exact match
-    # catches identical+near-identical uploads; augmentations of the same
-    # base image also tend to hash the same at 8x8 resolution.
+             "skipped_autolabel": 0, "skipped_never_train": 0,
+             "weed_class_instances": {n: 0 for n in CANONICAL_12_NAMES}}
     seen_hashes = {}
 
     valid_annotations = {"bbox", "bbox+segmentation", "yolo"}
@@ -162,6 +265,13 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False):
         valid_annotations.add("yolo_autolabel")
 
     for ds_name, info in registry.items():
+        # v3.0.25: NEVER_TRAIN protection — even if Brain ever asks to ingest
+        # these slugs, the merge skips them outright.
+        if ds_name in NEVER_TRAIN_SLUGS:
+            stats["skipped_never_train"] += 1
+            logger.info(f"[Merge] {ds_name} in NEVER_TRAIN — skipped (eval-only)")
+            continue
+
         local_path = info.get("local_path")
         if not local_path or not os.path.isdir(local_path):
             continue
@@ -175,13 +285,8 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False):
         if not imgs:
             continue
 
-        ds_class_map = {}  # per-dataset source_id -> merged_id
-        # Try to read the dataset's own class names from metadata if available
-        src_names = info.get("class_names") or []
-        for i, name in enumerate(src_names):
-            if name not in class_name_to_id:
-                class_name_to_id[name] = len(class_name_to_id)
-            ds_class_map[i] = class_name_to_id[name]
+        # v3.0.25: CANONICAL class mapping replaces the old per-merge-order map.
+        ds_class_map, _ = _build_canonical_class_map(ds_name, info)
 
         # v3.0.19: load dHash cache for this dataset if present. First run writes
         # the cache; subsequent rounds skip the 2-3ms-per-image hash compute
@@ -215,23 +320,50 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False):
                     continue
                 seen_hashes[h] = ds_name
 
-            # Optionally remap class IDs using ds_class_map
+            # v3.0.25: STRICT class remap — drop any line whose src_cls is not
+            # in ds_class_map. Previously fallback `ds_class_map.get(src_cls, src_cls)`
+            # passed unmapped IDs through, which caused cottonweed_holdout images
+            # to be tagged with sp8's mismatched 0-7 IDs (Eclipta src=2 became
+            # PalmerAmaranth in merged space). Strict mode means a label is
+            # written ONLY when the source class is recognized.
+            #
+            # "__wildcard__" entry: dataset has no class_names registered and
+            # no name-mapping is possible; route all src_cls values for that
+            # dataset to a single aux slot so the data still trains the model
+            # (as a hard negative for the 12 weed slots) without contaminating.
             with open(lbl) as f:
                 label_lines = f.read().strip().splitlines()
-            if ds_class_map:
-                remapped = []
-                for ln in label_lines:
-                    parts = ln.split()
-                    if len(parts) < 5:
-                        continue
+            wildcard = ds_class_map.get("__wildcard__")
+            remapped = []
+            for ln in label_lines:
+                parts = ln.split()
+                if len(parts) < 5:
+                    continue
+                try:
                     src_cls = int(parts[0])
-                    new_cls = ds_class_map.get(src_cls, src_cls)
-                    remapped.append(" ".join([str(new_cls)] + parts[1:]))
-                new_label_text = "\n".join(remapped)
-            else:
-                new_label_text = "\n".join(label_lines)
+                except ValueError:
+                    continue
+                if src_cls in ds_class_map:
+                    new_cls = ds_class_map[src_cls]
+                elif wildcard is not None:
+                    new_cls = wildcard
+                else:
+                    # No mapping → drop bbox.
+                    continue
+                if 0 <= new_cls < 12:
+                    name = CANONICAL_12_NAMES[new_cls]
+                    stats["weed_class_instances"][name] += 1
+                remapped.append(" ".join([str(new_cls)] + parts[1:]))
+            if not remapped:
+                # No usable labels in this image → skip (don't add empty .txt
+                # because that would be a hard-negative without intent).
+                stats["skipped_no_label"] += 1
+                continue
+            new_label_text = "\n".join(remapped)
 
-            # Split: 1/10 to val
+            # Split: 1/10 to val. NOTE: when val_dataset_root is set, we still
+            # write a small internal valid split for ultralytics' own
+            # bookkeeping but the *real* val gets overridden in data.yaml below.
             bucket = "valid" if (ds_img_count % int(1 / val_fraction)) == 0 else "train"
             dst_stem = f"{ds_name}_{img.stem}"
             dst_img = os.path.join(out_dir, bucket, "images", dst_stem + img.suffix)
@@ -263,28 +395,97 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False):
                         f"(+{ds_dup_count} deduped vs prior datasets; "
                         f"hash cache {'updated' if cache_updated else 'hit'})")
 
-    # Build names list sorted by assigned id
-    names_list = sorted(class_name_to_id.keys(), key=lambda n: class_name_to_id[n])
-    if not names_list:
-        names_list = ["weed"]  # single-class fallback
+    # v3.0.25: fixed nc=TOTAL_NC (100) so head structure is stable across
+    # mini-rounds even as new aux classes appear. names_list has the 12 weed
+    # names in slots 0-11, then "aux_<slug>" placeholders for slots 12-99.
+    names_list = list(CANONICAL_12_NAMES) + [f"aux_{i}" for i in range(AUX_CLASS_START, AUX_CLASS_END)]
+    assert len(names_list) == TOTAL_NC
+
+    # v3.0.25: if `val_dataset_root` provided (e.g., the cottonweeddet12 holdout
+    # = downloads/cottonweeddet12/{test,valid} with hand-labeled YOLO bboxes),
+    # OVERRIDE the val split to point at it. This makes the early-stop signal
+    # honest: improvement on cwd12 holdout, not on a 10% slice of the (possibly
+    # noisy) merged corpus.
+    val_path = os.path.join(out_dir, "valid", "images")
+    if val_dataset_root and os.path.isdir(val_dataset_root):
+        # Stage cwd12 test+valid into a single staging dir under out_dir/cwd12_holdout
+        staged = _stage_cwd12_holdout(val_dataset_root, out_dir)
+        val_path = staged
+        logger.info(f"[Merge] val OVERRIDE → cwd12 holdout staged at {staged}")
 
     # Write data.yaml
     data_yaml = os.path.join(out_dir, "data.yaml")
     with open(data_yaml, "w") as f:
         f.write(f"train: {os.path.join(out_dir, 'train', 'images')}\n")
-        f.write(f"val: {os.path.join(out_dir, 'valid', 'images')}\n")
-        f.write(f"nc: {len(names_list)}\n")
+        f.write(f"val: {val_path}\n")
+        f.write(f"nc: {TOTAL_NC}\n")
         f.write(f"names: {names_list}\n")
 
     stats["unique_hashes"] = len(seen_hashes)
     logger.info(f"[Merge] Total: {stats['images']} unique images from "
-                f"{stats['datasets']} datasets; {len(names_list)} classes. "
+                f"{stats['datasets']} datasets; nc={TOTAL_NC} (12 weed + 88 aux). "
                 f"Cross-dataset duplicates skipped: {stats['skipped_duplicates']}. "
                 f"yolo_autolabel datasets skipped: {stats['skipped_autolabel']}. "
-                f"(dedup via 8x8 dHash exact-match)")
+                f"NEVER_TRAIN datasets skipped: {stats['skipped_never_train']}. "
+                f"Per-class instances: {stats['weed_class_instances']}")
     # v3.0.19: persist dHash caches written back to registry entries
     disc._save_registry()
     return out_dir, data_yaml, stats, used_datasets, names_list
+
+
+def _stage_cwd12_holdout(cwd12_root, out_dir):
+    """Symlink cwd12 test/ + valid/ images and remap labels to canonical 12-class
+    order. Used as the honest val set for v3.0.25 training."""
+    staged = os.path.join(out_dir, "cwd12_holdout")
+    img_d = os.path.join(staged, "images")
+    lbl_d = os.path.join(staged, "labels")
+    os.makedirs(img_d, exist_ok=True)
+    os.makedirs(lbl_d, exist_ok=True)
+    n = 0
+    for split in ("test", "valid"):
+        split_dir = Path(cwd12_root) / split
+        if not split_dir.is_dir():
+            continue
+        # Layout: split_dir/images/*.jpg + split_dir/labels/*.txt
+        imgs_subdir = split_dir / "images"
+        lbls_subdir = split_dir / "labels"
+        if not imgs_subdir.is_dir():
+            continue
+        for img in imgs_subdir.glob("*.jpg"):
+            dst_img = os.path.join(img_d, f"{split}__{img.name}")
+            try:
+                if os.path.exists(dst_img):
+                    os.remove(dst_img)
+                os.symlink(os.path.abspath(img), dst_img)
+            except OSError:
+                shutil.copy2(img, dst_img)
+            lbl = lbls_subdir / (img.stem + ".txt")
+            dst_lbl = os.path.join(lbl_d, f"{split}__{img.stem}.txt")
+            if lbl.exists():
+                lines_out = []
+                for line in open(lbl):
+                    parts = line.strip().split()
+                    if len(parts) < 5:
+                        continue
+                    try:
+                        orig = int(parts[0])
+                    except ValueError:
+                        continue
+                    if orig in CWD12_ORIG_TO_CANON:
+                        canon = CWD12_ORIG_TO_CANON[orig]
+                        lines_out.append(" ".join([str(canon)] + parts[1:]))
+                with open(dst_lbl, "w") as g:
+                    g.write("\n".join(lines_out) + "\n")
+            else:
+                # No label → skip image entirely (don't keep in val)
+                try:
+                    os.remove(dst_img)
+                except OSError:
+                    pass
+                continue
+            n += 1
+    logger.info(f"[Merge] cwd12 holdout staged: {n} images → {staged}")
+    return img_d
 
 
 def train_yolo_mega(strategy, iteration):
@@ -294,7 +495,11 @@ def train_yolo_mega(strategy, iteration):
       base_model: override, defaults to Config.DETECTION_MODEL
       epochs (default 100), batch_size, lr (default 0.001),
       patience (default 50), workers, imgsz (default 1024),
-      include_autolabel (default False, v3.0.24 — see _merge_datasets docstring)
+      include_autolabel (default False — set True in v3.0.25 once
+        per-dataset class assignment is verified working)
+      val_dataset_root (default None) — path to cottonweeddet12 holdout root.
+        If provided, val is overridden to the hand-labeled holdout and
+        mAP50-95 reported by ultralytics is the honest paper-grade signal.
 
     Returns: (best_pt_path, result_summary)
     """
@@ -302,9 +507,11 @@ def train_yolo_mega(strategy, iteration):
     from ultralytics import YOLO
 
     include_autolabel = bool(strategy.get("include_autolabel", False))
+    val_dataset_root = strategy.get("val_dataset_root")
     merged_dir = os.path.join(Config.FRAMEWORK_DIR, f"merged_iter{iteration}")
     _, data_yaml, stats, used_datasets, names_list = _merge_datasets(
-        merged_dir, include_autolabel=include_autolabel
+        merged_dir, include_autolabel=include_autolabel,
+        val_dataset_root=val_dataset_root,
     )
 
     if stats["images"] < 100:

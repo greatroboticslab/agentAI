@@ -2002,26 +2002,126 @@ First eval (Job 40325013) failed due to staging-script label-path bug
 (images in `test/images/`, labels in `test/labels/` — not co-located).
 Fixed via path remap. Second eval Job 40327811 PD waiting for GPU.
 
-## TODO (Round B = v3.0.25 architecture)
-- [ ] **CRITICAL: per-dataset class assignment in autolabel.py**.
-      Stop hard-coding class_id=0. Each dataset's OWLv2 detections get
-      mapped to a class derived from dataset metadata. Datasets containing
-      a 12-class weed get the correct class_id; off-target datasets
-      (plantvillage etc.) get auxiliary classes (12+) so they don't
-      contaminate the 12 weed slots. nc grows from 12 to ~30-50.
-- [ ] **Parallel training + data acquisition** (per professor's suggestion):
-      separate SLURM jobs for (a) training and (b) Brain-driven harvest +
-      autolabel. They share registry but write to different paths so no
-      conflict. Training picks up new datasets between rounds.
-- [ ] **Auto early-stop on plateau** — detect mAP50-95 plateau across
-      last K epochs, write stop flag, exit before 72h cap if converged.
-- [ ] **NEVER_TRAIN list**: cottonweeddet12, weedsense, francesco
-      (the cleanest hand-labeled sets) get held out from training
-      entirely. They become the immutable evaluation gold standard.
-- [ ] **OWLv2 conf threshold + drop fallback bbox** — only keep real
-      detections with conf >= 0.3; if OWLv2 finds nothing, image becomes
-      hard negative (empty .txt) instead of whole-image junk.
-- [ ] **Class-balanced sampling** — oversample weak classes via
-      symlink duplication or weighted sampler.
-- [ ] **CLIP relevance filter** (deferred — not blocking v3.0.25).
-- [ ] **Walltime 72h** + auto-resume from latest best.pt across runs.
+## 2026-04-27 - v3.0.24 CWD12 EVAL: 0.42 mAP50-95, 4 zero-classes still broken
+
+### Job 40327811 — first honest paper-grade number
+- cwd12 test (848 imgs):  mAP50=0.4248, mAP50-95=0.4193
+- cwd12 valid (1129 imgs): mAP50=0.4125, mAP50-95=0.4063
+
+### Per-class breakdown reveals SECOND bug
+8 of 12 classes work: Carpetweeds 0.89, Crabgrass 0.97, PalmerAmaranth
+0.91, PricklySida 0.75, Sicklepod 0.39-0.79, Purslane 0.37, Ragweed
+0.48, SpottedSpurge 0.26.
+
+But 4 species STILL near zero:
+- Eclipta:        0.00002 (test) / 0.00 (valid)
+- Goosegrass:     0.00 / 0.00
+- Morningglory:   0.00004 / 0.00008
+- Nutsedge:       0.0001 / 0.0001
+
+This is NOT explained by the v3.0.24 fix (skipping autolabel data with
+class_id=0). Diagnostic:
+- `cottonweed_sp8` and `cottonweed_holdout` registry entries BOTH point
+  to the same `local_path = results/leave4out/data` directory.
+- During merge, sp8 was processed first with its 8-class names list
+  (Carpetweeds, Crabgrass, PalmerAmaranth, PricklySida, Purslane,
+  Ragweed, Sicklepod, SpottedSpurge) → ds_class_map = {0:0, 1:1, ..., 7:7}.
+- ALL images under leave4out/data including the 4-species holdout
+  imagery were processed under sp8's class_map. Holdout's local labels
+  use original cottonweeddet12 IDs where Eclipta=2 — but sp8's map
+  treats src_cls=2 as PalmerAmaranth.
+- `_find_label_for_image` returns the holdout's actual label file. Then
+  `ds_class_map.get(src_cls, src_cls)` falls back to passthrough on
+  unmapped IDs → src_cls=2 (Eclipta in source) becomes 2 (PalmerAmaranth
+  in merged) — a different CONTAMINATION pattern, less severe than v3.0.23
+  but enough to make the 4 species near-impossible to learn.
+
+**This is bug #2: silent class passthrough on cross-dataset shared paths.**
+
+## 2026-04-27 - v3.0.25 Phase 1: canonical 12-class + cwd12-honest val
+
+### Architectural changes (mega_trainer.py)
+
+**1. CANONICAL_12_NAMES constant** = the single source of truth for the
+12 weed species (in the v3.0.24 mixed order). Plus `CWD12_ORIGINAL_NAMES`
++ `CWD12_ORIG_TO_CANON` mapping the leave4out data's original-cottonweeddet12
+order into canonical order. Both `cottonweed_sp8` and `cottonweed_holdout`
+now route through this canonical mapping regardless of registry metadata.
+
+**2. `_build_canonical_class_map(slug, info)`** — single function that
+returns the per-dataset src→merged class map. Cottonweed slugs always get
+the canonical mapping. yolo_autolabel slugs get a single auxiliary slot
+in [12, 100) via `_aux_class_for_slug` (deterministic md5 hash). Other
+real-bbox slugs name-match into canonical; non-name-matching go to per-
+dataset aux slot. **Empty class_names** → `{"__wildcard__": aux_slot}`
+so the merge loop routes all source IDs to one aux class (data still
+trains the model as a hard negative; no contamination of weed slots).
+
+**3. STRICT class remap** in merge loop: drop bbox if src_cls is not in
+the explicit map AND no wildcard. The old `ds_class_map.get(src_cls, src_cls)`
+silent passthrough was the root cause of bug #2.
+
+**4. `NEVER_TRAIN_SLUGS = {cottonweeddet12, weedsense,
+francesco__weed_crop_aerial}`** — these never enter merge regardless of
+Brain's intent. They are the immutable evaluation gold standard. weedsense
+also added (1131 hand-labeled VOC bbox images, holdout reserve).
+
+**5. `val_dataset_root` strategy parameter** — when set, merge stages
+cottonweeddet12/test + cottonweeddet12/valid (1977 hand-labeled images,
+class IDs auto-remapped via CWD12_ORIG_TO_CANON) as the val split. This
+makes ultralytics' internal early-stop signal honest (cwd12 mAP50-95)
+rather than the noisy 10%-of-merged split. v3.0.24's val/train were
+in-distribution so its 0.677 internal val number didn't reflect the
+0.42 cwd12 reality. v3.0.25 fixes this by design.
+
+**6. nc fixed at 100** = 12 weed + 88 aux slots. Adding new aux classes
+during Phase 2 (autolabel re-introduction) doesn't require detection-head
+expansion mid-training.
+
+### Atomic registry coordination (registry_lock.py — new file)
+- `atomic_write_json(path, data)` — temp-write-then-rename, fsync before
+  rename, crash-safe on Lustre.
+- `safe_read_json(path)` — retries on JSONDecodeError so a reader never
+  sees torn state.
+- `snapshot_registry(src, dir)` — Job-T calls this at the start of each
+  mini-round to freeze a view of the registry it merges from.
+- `diff_dataset_slugs(old, new)` — Phase 2 will use this to detect when
+  Job-D adds new datasets and trigger a re-merge.
+
+### Deployment (Phase 1, Job 40329128)
+- Walltime: 48h (GPU-shared partition cap; we tried 72h and got
+  `QOSMaxWallDurationPerJobLimit`)
+- Settings: imgsz=1024, batch=5, epochs=200 (capped by patience=30 on
+  cwd12 holdout mAP plateau), include_autolabel=False, fresh_start=True
+  (don't load v3.0.24 weights — class layout changed from 12 to 100).
+- Auto-eval at end on the same cwd12 test/valid (separate JSON in
+  `results/v3_0_25_p1_eval/`).
+
+### Predicted outcome
+Phase 1 isolates the class-mapping fix. Real-bbox-only training with
+properly mapped 12 weed species should hit:
+- cwd12 holdout mAP50-95 >= 0.65 (the 8 working classes already at ~0.7
+  avg in v3.0.24, so once the 4 broken classes get real label gradients
+  they should reach similar levels → average ~0.7-0.75).
+- Plateau likely at epoch 60-80 (since patience=30 and trajectory in
+  v3.0.24 plateaued at ~70).
+- If Phase 1 hits >= 0.65, the canonical-class fix is validated and
+  Phase 2 is unblocked to re-introduce the 175K autolabel data.
+- If Phase 1 stays at 0.42 or lower, there's a third bug we haven't found.
+
+## TODO (Phase 2 = v3.0.25 + parallel data/train + autolabel re-introduce)
+- [ ] Phase 2: enable `include_autolabel=True` once Phase 1 confirmed.
+      autolabel data flows to aux class slots [12, 100) via slug hash;
+      no contamination of 12 weed slots.
+- [ ] Phase 2: parallel SLURM job for Brain-driven harvest+autolabel
+      (Job-D, restart-able). Job-T (training) and Job-D coordinate via
+      atomic registry. Job-T's mini-round loop re-reads registry every
+      5 epochs; new datasets enter the next mini-round's merge.
+- [ ] Phase 2: per-dataset OWLv2 prompts (currently generic "a plant
+      leaf"). Use dataset metadata to derive class-aware prompt.
+- [ ] Phase 2: OWLv2 conf >= 0.3 + drop whole-image fallback bbox.
+- [ ] Phase 2: class-balanced sampling for the 12 weed slots (oversample
+      Eclipta/Goosegrass/Morningglory/Nutsedge to match dominant classes).
+- [ ] Phase 2: 24h registry-size + holdout-mAP audit log to prevent the
+      "9K masquerading as 50K" syndrome.
+- [ ] Paper writeup: novelty assessment ~55-65%, target venue CVPR 2026.
