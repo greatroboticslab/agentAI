@@ -2109,19 +2109,68 @@ properly mapped 12 weed species should hit:
   Phase 2 is unblocked to re-introduce the 175K autolabel data.
 - If Phase 1 stays at 0.42 or lower, there's a third bug we haven't found.
 
-## TODO (Phase 2 = v3.0.25 + parallel data/train + autolabel re-introduce)
-- [ ] Phase 2: enable `include_autolabel=True` once Phase 1 confirmed.
-      autolabel data flows to aux class slots [12, 100) via slug hash;
-      no contamination of 12 weed slots.
-- [ ] Phase 2: parallel SLURM job for Brain-driven harvest+autolabel
-      (Job-D, restart-able). Job-T (training) and Job-D coordinate via
-      atomic registry. Job-T's mini-round loop re-reads registry every
-      5 epochs; new datasets enter the next mini-round's merge.
-- [ ] Phase 2: per-dataset OWLv2 prompts (currently generic "a plant
-      leaf"). Use dataset metadata to derive class-aware prompt.
-- [ ] Phase 2: OWLv2 conf >= 0.3 + drop whole-image fallback bbox.
-- [ ] Phase 2: class-balanced sampling for the 12 weed slots (oversample
-      Eclipta/Goosegrass/Morningglory/Nutsedge to match dominant classes).
-- [ ] Phase 2: 24h registry-size + holdout-mAP audit log to prevent the
-      "9K masquerading as 50K" syndrome.
-- [ ] Paper writeup: novelty assessment ~55-65%, target venue CVPR 2026.
+## 2026-04-28/29 - v3.0.25 Phase 1 progress + Phase 2 prepared
+
+### Phase 1 (Job 40329128) is running but plateauing early
+After 14 epochs / 26h28m of 48h walltime:
+- cwd12 holdout mAP50-95: 0.5145 (epoch 1) → 0.5539 (epoch 14)
+- Last 5 epochs: only +0.005 mAP50-95 (plateau)
+- Per-class instance counts confirm class fix: Eclipta 485, Goosegrass
+  75, Morningglory 992, Nutsedge 956 (all > 0, vs v3.0.24 effectively 0).
+- Best.pt continuously updated; final number at walltime ≈ 0.56-0.58.
+
+The plateau is faster than expected. Diagnosis: the merged 84K corpus
+contains ~7K weed bbox instances spread across 12 classes, but 77K aux
+images training "non-weed" eat most of the GPU capacity. Goosegrass at
+75 instances vs Carpetweeds at 1474 = 20:1 imbalance. The 4 classes
+that were 0 in v3.0.24 now learn but are still under-sampled.
+
+### Phase 2 (Job 40357694, queued afterany 40329128)
+
+Phase 2 implements the Phase-2 plan from the v3.0.25 design doc:
+
+**1. `include_autolabel=True`**: re-introduces the 148K yolo_autolabel
+data. They route through the aux class system (`_aux_class_for_slug` 
+hashes slug → slot in [12, 100)) so they do NOT pollute the 12 weed
+slots. They train aux classes (regularization) and learn general plant
+features that should transfer to the 12 weed task.
+
+**2. Class-balanced oversampling** (`_oversample_weak_weed_classes`,
+new function in `mega_trainer.py`): after merge, scan train labels,
+count per-weed-class instances, and for any weed class < 500 instances,
+create symlink duplicates of images containing that class until target
+is reached. Goosegrass goes from 75 → 500 via ~7x duplication of its
+75 source files. Cap at 10x per file to prevent pathological inflation.
+Symlink duplication beats WeightedRandomSampler because it works with
+ultralytics' default dataloader (no fork required).
+
+**3. Progressive from Phase 1**: strategy passes
+`base_model = mega_iterv3_0_25_p1/.../best.pt` so Phase 2 starts with
+the canonical-12-class detection head already initialized. lr=0.0005
+(half of P1's 0.001) to continue training without breaking learned
+weights.
+
+**4. Same val OVERRIDE**: cwd12 holdout (1977 hand-labeled imgs).
+
+### Predicted outcome (Phase 2)
+- Total training corpus: 84K (P1) + ~148K (autolabel) = ~230K imgs.
+- Per-weed-class min instances: 500 (after oversampling).
+- mAP50-95 trajectory: 0.55 (P1 inherit) → 0.65-0.75 (P2 plateau).
+- If P2 hits 0.65+, the autonomous-discovery + aux-class + balance
+  architecture is validated end-to-end; v3.0.26 then adds parallel
+  Job-D + hot reload + ensemble for the final push toward 0.85+.
+
+## TODO (Phase 3 = v3.0.26 if Phase 2 hits ≥ 0.65)
+- [ ] Parallel Job-D: separate SLURM job running Brain harvest+autolabel
+      continuously, atomic registry write. Job-T re-merges every K
+      mini-rounds.
+- [ ] Per-dataset OWLv2 prompts (auto-derived from dataset description
+      keywords).
+- [ ] Drop OWLv2 fallback whole-image bbox (only keep real detections
+      with conf >= 0.3).
+- [ ] CLIP relevance filter to drop kg_parohod__warp-style off-target
+      datasets at harvest time.
+- [ ] Ensemble + WBF + multi-scale TTA at inference.
+- [ ] FGD knowledge distillation (yolo26x teacher → yolo11m student).
+- [ ] Paper draft for CVPR 2026 — "When more data hurts" + recovery
+      via canonical class system + aux-slot routing.

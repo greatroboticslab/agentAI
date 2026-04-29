@@ -395,6 +395,16 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                         f"(+{ds_dup_count} deduped vs prior datasets; "
                         f"hash cache {'updated' if cache_updated else 'hit'})")
 
+    # v3.0.25 Phase 2: class-balanced oversampling for the 12 weed classes.
+    # After the main merge, scan the merged train/labels and for every weed
+    # class with < target_min_instances, create symlink duplicates of images
+    # containing that class until target is reached. This corrects the 20:1
+    # imbalance (Carpetweeds 1474 vs Goosegrass 75 in Phase 1) without
+    # introducing new images / new label content.
+    target_min = 500  # each weed class gets at least 500 instances
+    if any(c < target_min for c in stats["weed_class_instances"].values()):
+        _oversample_weak_weed_classes(out_dir, target_min, stats)
+
     # v3.0.25: fixed nc=TOTAL_NC (100) so head structure is stable across
     # mini-rounds even as new aux classes appear. names_list has the 12 weed
     # names in slots 0-11, then "aux_<slug>" placeholders for slots 12-99.
@@ -431,6 +441,108 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     # v3.0.19: persist dHash caches written back to registry entries
     disc._save_registry()
     return out_dir, data_yaml, stats, used_datasets, names_list
+
+
+def _oversample_weak_weed_classes(out_dir, target_min, stats):
+    """v3.0.25 Phase 2: balance weed classes via symlink duplication.
+
+    For each of the 12 canonical weed classes with fewer than `target_min`
+    instances in the merged train set, find images in train/labels/ that
+    contain at least one instance of that class and create symlink copies
+    (with new stem `oversample_{cls}_{copy_idx}_{orig}`) until the class
+    reaches `target_min` instances. Aux classes (12-99) are not touched.
+
+    Why symlink duplication beats WeightedRandomSampler:
+    - Compatible with ultralytics' standard dataloader (no fork required).
+    - dHash dedup already ran, so duplicates here are intentional, not
+      data leak — they're the same image/label being seen N times per epoch.
+    - Standard practice in detection (LVIS uses exemplar replay similarly).
+    """
+    train_lbl_dir = os.path.join(out_dir, "train", "labels")
+    train_img_dir = os.path.join(out_dir, "train", "images")
+    if not os.path.isdir(train_lbl_dir):
+        return
+
+    # Index: which label files contain each canonical weed class.
+    cls_to_files = {i: [] for i in range(12)}
+    label_files = list(Path(train_lbl_dir).glob("*.txt"))
+    for lbl in label_files:
+        try:
+            content = lbl.read_text()
+        except Exception:
+            continue
+        seen = set()
+        for line in content.splitlines():
+            parts = line.split()
+            if not parts:
+                continue
+            try:
+                cid = int(parts[0])
+            except ValueError:
+                continue
+            if 0 <= cid < 12:
+                seen.add(cid)
+        for cid in seen:
+            cls_to_files[cid].append(lbl)
+
+    stats["oversample"] = {}
+    counts = stats["weed_class_instances"]
+    for cid, name in enumerate(CANONICAL_12_NAMES):
+        cur = counts.get(name, 0)
+        if cur >= target_min or not cls_to_files[cid]:
+            stats["oversample"][name] = {"before": cur, "after": cur, "copies": 0}
+            continue
+        # How many additional copies of this set of images do we need?
+        # Each label file may contribute multiple instances; estimate average.
+        files = cls_to_files[cid]
+        avg_per_file = max(cur / max(len(files), 1), 1)
+        need_extra = max(target_min - cur, 0)
+        copies_per_file = int(need_extra / max(avg_per_file * len(files), 1)) + 1
+        # Cap at 10x copies per file to avoid pathological inflation.
+        copies_per_file = min(copies_per_file, 10)
+        added_inst = 0
+        for lbl in files:
+            stem = lbl.stem
+            # Find sibling image (try common extensions).
+            img_link = None
+            for ext in (".jpg", ".jpeg", ".png", ".bmp"):
+                cand = Path(train_img_dir) / (stem + ext)
+                if cand.exists():
+                    img_link = cand
+                    break
+            if img_link is None:
+                continue
+            label_text = lbl.read_text()
+            for k in range(1, copies_per_file + 1):
+                new_stem = f"oversample_{cid}_{k}_{stem}"
+                new_img = Path(train_img_dir) / (new_stem + img_link.suffix)
+                new_lbl = Path(train_lbl_dir) / (new_stem + ".txt")
+                if new_img.exists() and new_lbl.exists():
+                    continue
+                try:
+                    if new_img.exists():
+                        new_img.unlink()
+                    # Symlink to the SAME source the original symlinks to.
+                    src = os.readlink(img_link) if img_link.is_symlink() else os.path.abspath(img_link)
+                    os.symlink(src, new_img)
+                except OSError:
+                    shutil.copy2(img_link, new_img)
+                new_lbl.write_text(label_text)
+                # Count new instances of this class added.
+                for line in label_text.splitlines():
+                    parts = line.split()
+                    if parts and parts[0].isdigit() and int(parts[0]) == cid:
+                        added_inst += 1
+        stats["oversample"][name] = {
+            "before": cur,
+            "after": cur + added_inst,
+            "copies_per_file": copies_per_file,
+            "files_used": len(files),
+            "added_inst": added_inst,
+        }
+        counts[name] = cur + added_inst
+    logger.info(f"[Merge] Oversample to balance weed classes (target_min={target_min}): "
+                f"{stats['oversample']}")
 
 
 def _stage_cwd12_holdout(cwd12_root, out_dir):
