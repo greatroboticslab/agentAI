@@ -6,6 +6,53 @@
 
 **Primary metric:** cwd12 holdout mAP50-95 ≥ **0.90**
 
+## 🔒 FRAMEWORK REQUIREMENTS (FIXED — DO NOT DRIFT)
+
+These are non-negotiable. Every phase, every report, every code change
+must serve all five simultaneously. No requirement gets sacrificed for
+short-term metric improvement.
+
+**REQ-1 PARALLEL (per professor's directive)**
+Job-T (training) and Job-D (Brain harvest + OWLv2 autolabel) run as
+SEPARATE concurrent SLURM jobs. Coordination via atomic registry I/O
+(temp-write-then-rename, see registry_lock.py). Hot-reload: new datasets
+enter the running training job between mini-rounds, not just between
+SLURM jobs. v3.0.25 P1/P2 are sequential because the parallel arch is
+v3.0.26's primary deliverable — Phase 2 must NOT be the final word.
+
+**REQ-2 LARGE-SCALE DATA (autonomous,几十万到百万级)**
+Brain autonomously discovers + downloads + pseudo-labels datasets from
+Kaggle / HuggingFace / GitHub / Roboflow. No human-curated dataset list,
+ever. Target scale: ≥ 100K, ideally 500K-1M+ training images. Current
+244K (v3.0.25 P2 merge) is a milestone, not a ceiling.
+
+**REQ-3 HIGH QUALITY (every dataset goes through filters)**
+- Cross-dataset image dedup via dHash (already implemented)
+- Per-dataset class assignment via canonical mapping or aux slot (so
+  no class-id contamination, see _build_canonical_class_map)
+- OWLv2 confidence threshold (raise to 0.3 in v3.0.26)
+- Drop OWLv2 fallback whole-image bbox (v3.0.26 TODO)
+- CLIP-based domain relevance filter (v3.0.26 TODO) to drop kg_parohod__
+  warp-style off-target datasets at harvest time
+- Per-class instance counts logged every merge (audit signal)
+
+**REQ-4 CONTINUOUSLY GROWING (registry never shrinks)**
+dataset_registry.json is append-only across all runs. Every dataset Brain
+ever discovers stays in the registry, with full metadata + dHash cache +
+labels. Phases may temporarily exclude data from training (e.g., P1
+skipped autolabel) but the data on disk and in the registry is permanent.
+Each chain run extends the registry; nothing is deleted.
+
+**REQ-5 RELIABLE+ACCURATE TEST SET (NEVER_TRAIN holdout, immutable)**
+The cwd12 test+valid (1977 imgs hand-labeled by Yang Lu et al.) is the
+ONLY validation that counts for the research metric. Plus weedsense
+(1131 hand-labeled VOC bbox) and francesco__weed_crop_aerial (786) as
+secondary holdouts. These slugs are in NEVER_TRAIN_SLUGS in mega_trainer.py;
+they cannot enter training even if Brain or operator tries to add them.
+Internal val (10% split of merged corpus) is NEVER reported as the
+research metric — it is only used for ultralytics' optimizer-side
+mechanics.
+
 **Architecture constraint:** Fully autonomous — Brain LLM discovers + downloads
 + pseudo-labels datasets continuously. No human-curated dataset lists.
 
