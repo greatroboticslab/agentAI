@@ -1,5 +1,46 @@
 # Changelog
 
+---
+
+## 🎯 RESEARCH GOAL (FIXED — DO NOT DRIFT)
+
+**Primary metric:** cwd12 holdout mAP50-95 ≥ **0.90**
+
+**Architecture constraint:** Fully autonomous — Brain LLM discovers + downloads
++ pseudo-labels datasets continuously. No human-curated dataset lists.
+
+**Validation set:** human-labeled cottonweeddet12 holdout (test 848 + valid
+1129 = 1977 imgs). Never enters training. Never substituted for "internal val"
+or any in-distribution split.
+
+**Parallel architecture (per professor):** Job-T (training) and Job-D
+(harvest+autolabel) run concurrently; new datasets enter training as they
+arrive (hot-reload). Must not conflict via atomic registry I/O.
+
+**Anti-drift rules for any future entry in this changelog:**
+1. NEVER claim a milestone is "paper-grade" or "good enough" if mAP50-95 < 0.90.
+2. NEVER substitute internal-val or training-distribution mAP for the cwd12 number.
+3. EVERY phase report must include the gap to 0.90 ("we are at X, need +Y to reach 0.90").
+4. EVERY plateau requires a concrete next-action plan to bridge the gap, not pessimism.
+5. Honest reporting includes the goal, not just the current number.
+
+**Currently published baselines (for context, NOT new ceiling):**
+- v3.0.6 YOLO11n on cwd12 alone (5648 imgs, 100 epochs): mAP50-95 = 0.865
+- DINOv3+YOLO26 lettuce (200K curated imgs): mAP50-95 = 0.869
+- Our goal of ≥ 0.90 EXCEEDS published SOTA on this class of task. That is
+  the research contribution. Don't accept lower.
+
+**Path to ≥ 0.90 (concrete, multi-round):**
+- v3.0.25 P1: canonical class fix → cwd12 0.5617 (current)
+- v3.0.25 P2: + autolabel re-enable + class balance → target 0.70-0.80
+- v3.0.26: + parallel Job-D + hot reload + better OWLv2 prompts + WBF
+            ensemble → target 0.85-0.92
+- v3.0.27 (if needed): FGD knowledge distillation + multi-scale TTA + aug
+            tuning + Co-DETR teacher → target 0.90+
+- Continue iterating phases; each must close the gap to 0.90.
+
+---
+
 ## 2026-03-10 - Initial Setup
 
 ### Created
