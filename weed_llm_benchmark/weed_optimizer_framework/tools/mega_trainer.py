@@ -150,6 +150,30 @@ NEVER_TRAIN_SLUGS = {
     "francesco__weed_crop_aerial",
 }
 
+# v3.0.28: stem-level defence. Even for SLUGS that are legitimately merge-eligible
+# (e.g., cottonweed_sp8 / cottonweed_holdout, which contain the cwd12 train split
+# AND a copy of the test+valid images mixed together), drop any image whose
+# filename stem matches a cwd12 test/valid stem. This is the only correct fix for
+# the v3.0.27 leak where 2,313 holdout copies entered training under cottonweed_*
+# prefixes and bypassed the slug-level NEVER_TRAIN check.
+def _load_holdout_stems():
+    """Stems of cwd12 test+valid (the immutable eval set). Resolved against both
+    a cwd-relative path and the absolute project path so this works regardless
+    of caller cwd."""
+    stems = set()
+    candidates = [
+        Path("downloads/cottonweeddet12") / "test" / "images",
+        Path("downloads/cottonweeddet12") / "valid" / "images",
+        Path("/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark") / "downloads/cottonweeddet12" / "test" / "images",
+        Path("/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark") / "downloads/cottonweeddet12" / "valid" / "images",
+    ]
+    for c in candidates:
+        if c.is_dir():
+            for ext in ("*.jpg", "*.JPG", "*.jpeg", "*.png"):
+                for p in c.glob(ext):
+                    stems.add(p.stem)
+    return stems
+
 # Reserve class IDs:
 #   0-11  : 12 canonical weed species (cottonweeddet12)
 #   12-99 : auxiliary plant/non-weed classes (autolabeled). Slot assigned by
@@ -257,8 +281,15 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     stats = {"datasets": 0, "images": 0, "labels": 0, "skipped_no_label": 0,
              "skipped_duplicates": 0, "unique_hashes": 0,
              "skipped_autolabel": 0, "skipped_never_train": 0,
+             "skipped_holdout_stem": 0,
              "weed_class_instances": {n: 0 for n in CANONICAL_12_NAMES}}
     seen_hashes = {}
+
+    # v3.0.28: load cwd12 holdout stems to block alias contamination at the
+    # per-image level. See NEVER_TRAIN_SLUGS comment above for rationale.
+    holdout_stems = _load_holdout_stems()
+    logger.info(f"[Merge] holdout stem filter active: {len(holdout_stems)} stems "
+                f"blocked from training regardless of source slug")
 
     valid_annotations = {"bbox", "bbox+segmentation", "yolo"}
     if include_autolabel:
@@ -300,6 +331,14 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
             lbl = _find_label_for_image(img, local_path)
             if lbl is None:
                 stats["skipped_no_label"] += 1
+                continue
+
+            # v3.0.28: stem-level holdout filter. cottonweed_sp8 and
+            # cottonweed_holdout legitimately provide cwd12 train images, but
+            # their physical directories ALSO contain copies of test+valid
+            # imagery (the v3.0.27 leak). Drop here regardless of slug.
+            if img.stem in holdout_stems:
+                stats["skipped_holdout_stem"] += 1
                 continue
 
             # v3.0.16: image-hash dedup across ALL datasets
@@ -437,6 +476,7 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                 f"Cross-dataset duplicates skipped: {stats['skipped_duplicates']}. "
                 f"yolo_autolabel datasets skipped: {stats['skipped_autolabel']}. "
                 f"NEVER_TRAIN datasets skipped: {stats['skipped_never_train']}. "
+                f"v3.0.28 holdout-stem filter dropped: {stats['skipped_holdout_stem']}. "
                 f"Per-class instances: {stats['weed_class_instances']}")
     # v3.0.19: persist dHash caches written back to registry entries
     disc._save_registry()

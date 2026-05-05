@@ -1246,3 +1246,39 @@ RQ1: VLM vs YOLO comparison on known species (Phase 2 results)
 RQ2: YOLO+LLM fusion on known species (Phase 3 results)
 RQ3: LLM advantage on unseen species + LLM-augmented YOLO training (Phase 3B results)
 RQ4: What drives detection quality — size, prompt, or architecture? (Phase 4 results)
+
+---
+
+## Session 38 (2026-05-05) — v3.0.27 LEAK RETRACTION + v3.0.28 clean re-run
+
+User pushed back on the "0.910" result with: "我们的模型是多少数据集训练
+出来的，然后你用测试集去微调了？" Forced an audit. Found that two registry
+slugs (`cottonweed_sp8`, `cottonweed_holdout`) physically held the entire
+cwd12 holdout (1977 imgs split as 1229+748) under non-blocked slug names, so
+they slipped past the slug-level `NEVER_TRAIN_SLUGS` filter.
+
+Strict exact-suffix audit confirmed: 2,313 holdout-stem copies were physically
+present in `merged_iterv3_0_25_p2/train/images` (the v3.0.26 phase_3 pretrain
+data that v3.0.27 finetuned on). The 0.910 result is memorization, not
+generalization — first-epoch FT mAP50-95 was 0.836 on the supposedly
+"unseen" holdout, which is the smoking gun.
+
+All cwd12 holdout numbers from v3.0.24 → v3.0.27 are retracted. Only the
+v3.0.6 baseline (0.865, COCO-only pretrain → cwd12 train, never touched merge
+corpus) remains valid.
+
+**Fix (v3.0.28)**: stem-level holdout filter in `mega_trainer.py`. Reads cwd12
+test+valid stems at merge start; drops any image whose stem matches,
+regardless of slug. Verified on cluster: filter blocks exactly 1,977 imgs
+(1229 from cottonweed_sp8 + 748 from cottonweed_holdout).
+
+**Submitted (clean)**:
+- Job 40612856 — v3.0.28 SAFETY NET: yolo26x from COCO on cwd12 train alone,
+  200 ep, imgsz=1024. Expected 0.85-0.92.
+- Job 40612870 — v3.0.28 CLEAN PRETRAIN: yolo26x from COCO on de-leaked
+  merge corpus, fresh_start=True, 100 ep, imgsz=1024 batch=5, 48h walltime.
+  Auto-chains FT (Job-T2 via afterok) on success.
+
+Concurrent Job-D (40594926) still running but idle (Brain not finding new
+slugs for ~9h). Will replace Job-D with a refreshed harvest after clean
+numbers land.

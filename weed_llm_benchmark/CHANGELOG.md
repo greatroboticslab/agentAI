@@ -2333,3 +2333,97 @@ datasets accumulate in registry for v3.0.28 pretrain expansion.
 - [ ] Paper draft for CVPR 2026 — "When more data hurts: pretrain →
       finetune is the recovery path. Hot-reload parallel architecture
       enables both at scale."
+
+## 2026-05-05 — v3.0.28: 🚨 RETRACTION of v3.0.27 0.910 (data leak) + clean re-run
+
+### What happened
+
+User pushed back on the v3.0.27 0.910 result with a direct question: "我们的
+模型是多少数据集训练出来的，然后你用测试集去微调了？" Forced an audit. The
+0.910 was contaminated. Retracting.
+
+### How the leak happened
+
+The slug-level `NEVER_TRAIN_SLUGS = {cottonweeddet12, weedsense,
+francesco__weed_crop_aerial}` was insufficient. The dataset registry contains
+two SEPARATE slugs that physically hold copies of the cottonweeddet12 holdout:
+
+- `cottonweed_sp8` → `results/leave4out/dataset_8species/` (3,442 imgs, 1,229
+  of which are cwd12 test+valid stems)
+- `cottonweed_holdout` → `results/leave4out/dataset_holdout/` (2,206 imgs, 748
+  of which are cwd12 test+valid stems)
+
+Combined, these slugs hold **all 1,977 cwd12 holdout images** (1229+748=1977)
+under non-blocked slug names. Every merge from v3.0.24 onward pulled these
+into training under prefixes like `cottonweed_sp8_<stem>`, with v3.0.25 phase 2
+oversampling some of them up to 10× via `_oversample_weak_weed_classes`.
+
+### Audit numbers (strict exact-suffix match, post-strip of merge prefix)
+
+| Merged train dir | total imgs | cottonweed_*-derived | LEAKED holdout copies |
+|---|---|---|---|
+| `merged_iterv3_0_25_p2/train/images` (v3.0.26 phase_3 base) | 141,397 | 6,643 | **2,313** |
+| `merged_iterv3_0_25_p1/train/images` | 74,412 | 4,485 | 1,567 |
+| `merged_iterv3_0_24_clean/train/images` | 23,589 | 5,082 | 1,779 |
+
+### Smoking gun
+
+v3.0.27 finetune epoch 1 hit mAP50-95 = 0.836 on the holdout. A genuine
+out-of-distribution pretrain → fresh FT does not reach 0.83 in one epoch on
+the test set. That trajectory is memorization, not generalization.
+
+### Affected versions (all retract their cwd12 holdout numbers)
+
+| Version | Reported cwd12 mAP50-95 | Status |
+|---|---|---|
+| v3.0.24 | 0.42 | RETRACT — but also class-id contamination so number was low anyway |
+| v3.0.25 P1 | 0.55 | RETRACT |
+| v3.0.25 P2 | (mid-train ~0.56) | RETRACT |
+| v3.0.26 phase 2/3 | 0.5932 | RETRACT |
+| v3.0.27 | **0.910** | **RETRACT** |
+
+The v3.0.6 baseline (0.865) is unaffected — it never used the contaminated
+merge corpus.
+
+### v3.0.28 fix: stem-level holdout filter
+
+`weed_optimizer_framework/tools/mega_trainer.py` patched:
+
+1. New `_load_holdout_stems()` reads `downloads/cottonweeddet12/{test,valid}/
+   images/*.jpg` stems (1,977 of them) at merge start.
+2. The per-image merge loop now drops any image whose `.stem` is in
+   `holdout_stems`, regardless of which slug owns the file. New stat counter
+   `skipped_holdout_stem` is printed in the merge summary.
+3. The slug-level `NEVER_TRAIN_SLUGS` set is unchanged because cottonweed_sp8
+   and cottonweed_holdout legitimately ALSO contain the cwd12 train portion
+   (3,671 imgs together). Banning by slug would discard those legitimate train
+   samples; the per-stem filter is the correct surgical fix.
+
+Verified on cluster: with patch active, `cottonweed_sp8` drops 1,229 / 3,442
+imgs (matches earlier audit), `cottonweed_holdout` drops 748 / 2,206. Total
+filtered = 1,977 = full cwd12 holdout. Defense-in-depth: also catches any
+future Brain-discovered alias that re-downloads cwd12 under a new name.
+
+### Submitted clean re-runs
+
+**Job 40612856 (v3.0.28 SAFETY NET)**: yolo26x trained from COCO weights
+directly on cwd12 train (3,671), 200 epochs, imgsz=1024, strong aug. No merge
+corpus involved → trivially clean. Expected: 0.85-0.92 (matches or beats v3.0.6
+baseline of 0.865 due to bigger model). Walltime 12h.
+
+**Job 40612870 (v3.0.28 CLEAN PRETRAIN)**: yolo26x from COCO on the patched
+merge corpus (~139K imgs after stem filter + dHash dedup), `fresh_start=True`
+to forbid resuming from any contaminated checkpoint. include_autolabel=True.
+Walltime 48h. Auto-chains to `run_v3_0_28_clean_ft.sh` (FT on cwd12 train,
+12h walltime) on success.
+
+### Remaining tasks (after clean numbers land)
+
+- [ ] If clean v3.0.28 < 0.90: stack ensemble + multi-scale TTA via
+      `eval_v3_0_27_ensemble.py` (already coded). Expect +0.02-0.05.
+- [ ] Update RESEARCH_LOG.md with the retraction + clean trajectory.
+- [ ] Push to GitHub: code patch + CHANGELOG + RESEARCH_LOG + result files
+      (per feedback_github_updates).
+- [ ] Paper section on "data leakage was the headline result, not 0.91" —
+      this audit IS a contribution: most agricultural-CV papers don't audit
+      this carefully.
