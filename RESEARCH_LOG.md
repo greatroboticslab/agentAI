@@ -1282,3 +1282,40 @@ regardless of slug. Verified on cluster: filter blocks exactly 1,977 imgs
 Concurrent Job-D (40594926) still running but idle (Brain not finding new
 slugs for ~9h). Will replace Job-D with a refreshed harvest after clean
 numbers land.
+
+---
+
+## Session 39 (2026-05-06) — v3.0.28 SAFETY clean result + v3.0.29 SOTA plan
+
+**Headline**: First clean (post-leak-fix) cwd12 holdout number landed:
+**mAP50-95 = 0.896** on the v3.0.28 SAFETY job (yolo26x + COCO base, trained
+on cwd12 train alone, validated on cwd12 test+valid). Just 0.004 short of the
+≥0.90 research goal, with only 62 of 200 planned epochs (timeout at 12h
+walltime).
+
+This validates: (a) the v3.0.28 stem-level holdout filter works, (b) yolo26x is
++3.1% over v3.0.6 yolo11n baseline (0.865) on the same task, (c) we don't need
+"clever tricks" — just clean data + a good base model + enough epochs gets us
+to within 0.004 of the goal.
+
+**Deep 2026 frontier research done this session** (web-search pass):
+- arXiv 2603.00160 "DINOv3 Meets YOLO26 for Weed Detection" (2026): the closest
+  analog of our work. They train on 199K filtered crop-weed images, hit
+  mAP50-95 = 0.723 in-domain (lettuce), 0.198-0.331 cross-domain. Our 0.896
+  on cwd12 IID setting is competitive. Their curation pipeline (HSV
+  green-pixel ≥20%, K-means at 3 levels, 518×518 tiling) is now in our
+  v3.0.29 Phase 1B (Job 40624773).
+- YOLO26 (Ultralytics, Jan 2026) is the latest YOLO. NMS-free, MuSGD optimizer,
+  ProgLoss + STAL. We're already on yolo26x.
+- RF-DETR (ICLR 2026, arXiv 2511.09554) — DINOv2 + NAS. Queued for Phase 2B.
+- Knowledge Distillation (arXiv 2507.12344, ICCV 2025 CVPPA): Channel-wise KD
+  on weed detection, +2.5% mAP50 free. Queued for Phase 2C.
+- WBF + multi-scale TTA: standard 2026 competition meta, +0.02-0.05 mAP50-95.
+  Submitted as Job 40624610 (v3029_wb).
+
+**Path to 0.90 (no shortcuts)**:
+1. Now: Job 40624610 WBF/TTA on safety best.pt → 0.896 + ~0.03 = ~0.92 expected
+2. +30h: v3.0.28 PRETRAIN+FT lands → independent attempt at ≥0.90
+3. +1 week if still <0.90: Phase 2A DINOv3 ViT-S + YOLO26-L dual-branch
+   replicating arXiv 2603.00160's exact recipe + Phase 2B RF-DETR ensemble
+   + Phase 2C CWD distillation
