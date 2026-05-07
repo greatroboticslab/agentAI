@@ -2525,3 +2525,77 @@ novel; the integration is the v3.0 thesis.
 - +30h: v3.0.28 PRETRAIN finishes → chained FT runs (~5h)
 - +35h: PRETRAIN+FT clean number lands → second attempt at ≥0.90
 - +1 day to +1 week: Phase 2A/2B/2C if still <0.90
+
+## 2026-05-07 — Sanity check on 0.896 + WBF/TTA result audit
+
+### Job 40655183 — ultralytics .val() reproduction tests
+
+| Test | Config | mAP50-95 |
+|---|---|---|
+| T1 | ultralytics .val() imgsz=1024 augment=False | **0.8953** |
+| T2 | ultralytics .val() imgsz=1024 augment=True  | **0.8953** ← identical to T1 |
+| T3 | ultralytics .val() imgsz=1280 augment=True  | 0.8643 (-0.031) |
+
+**Critical finding**: ultralytics emits warning `"Model does not support
+'augment=True', reverting to single-scale prediction."` for YOLO26 architecture.
+The 2026 YOLO26 model is too new — built-in TTA isn't wired up. T1 == T2
+verifies this.
+
+**T3 worse than T1**: pushing imgsz=1280 outside trained scale (1024) hurts
+mAP at high IoU thresholds. Multi-scale TTA on a single model trained at one
+scale is HARMFUL for this architecture.
+
+### My WBF eval (Job 40624610) gave 0.744 — likely not a bug
+
+per-class numbers were sensible (4 weak classes from 0 → 0.62-0.72;
+strong classes 0.77-0.83). The discrepancy from 0.8953 likely comes from:
+1. Multi-scale [768, 1024, 1280, 1536] views feeding WBF — small/large
+   scales produce noisy boxes, WBF averages them with the 1024 best-quality
+   predictions, dragging down high-IoU localization.
+2. Hflip might confuse a model not trained for h-symmetric weeds.
+3. WBF works best ensembling DIFFERENT models (YOLO + DETR), not multi-scale
+   of the SAME model.
+
+**WBF/TTA path is dead for v3.0.28 SAFETY** unless we have multi-architecture
+ensemble (Phase 2A + 2B).
+
+### CALIBRATED understanding: don't trust any single number
+
+User pushback (correctly): the v3.0.27 0.910 contamination teaches us that no
+single mAP number is canonical until verified via independent tools.
+
+| Number | Source | Status |
+|---|---|---|
+| 0.910 | ultralytics during v3.0.27 FT training | RETRACTED — leak |
+| 0.5932 | ultralytics during v3.0.26 phase 2 | RETRACTED — leak |
+| 0.8953 | ultralytics .val() (T1, T2, training all match) | claimed clean |
+| 0.744 | our custom WBF/TTA + custom mAP | possibly more strict |
+
+**The honest cwd12 holdout mAP50-95 baseline is somewhere in [0.74, 0.90]**.
+The research goal of ≥0.90 needs to be the strict-eval upper bound, not just
+the ultralytics-generous number.
+
+### Path forward (no shortcuts)
+
+1. **pycocotools cross-check** — gold-standard COCO eval as third-party
+   adjudicator. Settles 0.8953 vs 0.744 dispute.
+2. **Resubmit safety with 24h walltime** — completing the 200 planned epochs
+   (instead of 62) might push slightly higher. Cheap experiment.
+3. **Phase 2A: DINOv3 ViT-S + YOLO26-L dual-branch** (arXiv 2603.00160) —
+   the real architectural upgrade.
+4. **Phase 2B: RF-DETR** (arXiv 2511.09554, ICLR 2026) — different
+   architecture for genuine multi-model ensemble (not multi-scale of same).
+5. **Phase 2C: CWD/MGD distillation** (arXiv 2507.12344).
+
+### Curate result (Job 40624773)
+
+Filter dropped 22.4% (473K of 2.1M). But threshold 20% green-pixel was too
+strict for cwd12 (cotton field photos with brown soil, white cotton):
+- `cottonweed_sp8` (cwd12 train portion): 8.4% kept (should be 100%!)
+- `cottonweed_holdout`: 5.9% kept
+- `gh_07931350__weed-yolo`: 0% kept (real weed dataset)
+- `kg_vinayakshanawad__weedcrop-image-dataset`: 3.2% kept
+
+Need v3.0.29.1B: lower threshold to 5%, OR exempt slugs whose names match
+known-good keywords (cotton, weed, crop), OR replace with CLIP relevance
+scoring.

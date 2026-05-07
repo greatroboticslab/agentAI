@@ -1319,3 +1319,36 @@ to within 0.004 of the goal.
 3. +1 week if still <0.90: Phase 2A DINOv3 ViT-S + YOLO26-L dual-branch
    replicating arXiv 2603.00160's exact recipe + Phase 2B RF-DETR ensemble
    + Phase 2C CWD distillation
+
+---
+
+## Session 40 (2026-05-07) — sanity check + user calibration on "no single number is truth"
+
+User pushback was sharp and correct: "the previous high mAP95 was contaminated, so this round is normal" — meaning we should NOT assume 0.896 is the canonical truth just because ultralytics reports it. The 0.910 contamination teaches us to verify every number with independent tools.
+
+### Sanity check (Job 40655183) result
+
+| Test | Tool | mAP50-95 |
+|---|---|---|
+| T1 | ultralytics .val() imgsz=1024 augment=False | 0.8953 |
+| T2 | ultralytics .val() imgsz=1024 augment=True  | 0.8953 (silently fell back to single-scale; YOLO26 doesn't support augment) |
+| T3 | ultralytics .val() imgsz=1280 augment=True  | 0.8643 |
+| WBF/TTA (Job 40624610) | our custom multi-scale + WBF + custom mAP | 0.7440 |
+
+### Calibrated reading of the result space
+
+- 0.8953 ≈ ultralytics' "house" mAP. Reproducible across runs. Maybe slightly generous (matchers, IoU rounding).
+- 0.7440 ≈ our custom matcher + multi-scale TTA fusing low-quality views with high-quality. Multi-scale TTA on a single model HURTS at high IoU thresholds.
+- 0.8643 ≈ what happens when you push a 1024-trained model to 1280 inference.
+
+The TRUE canonical number requires pycocotools (industry-standard COCO eval). Submitted Job 40655360 to settle this.
+
+### Ongoing
+
+- Job 40655360 (pycocotools cross-check) — definitive answer on canonical mAP
+- Job 40655361 (v3.0.29.1 safety_long, 24h walltime, 200 epochs from current best.pt) — settles whether the plateau is real or just early stopping
+- Job 40612870 (v3.0.28 PRETRAIN) — still running, 1d 22h elapsed, mAP oscillating around 0.578 (much worse than safety; probably won't beat safety even with chained FT)
+
+### Lesson learned
+
+Don't anchor on a number from one tool. Always cross-check via pycocotools (or another independent eval) before declaring victory. This is the v3.0.27 lesson generalized.
