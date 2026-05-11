@@ -2644,3 +2644,84 @@ For our IID cwd12 task expect mAP50-95 pyco ≥ 0.78.
 If 0.78+ → +3.4% absolute progress, biggest single-step gain since stem-leak fix.
 If 0.85+ → only 0.05 short of 0.90, Phase 2C (KD) becomes the next push.
 If <0.75 → Phase 2A DINOv3+YOLO26 custom dual-branch is needed.
+
+## 2026-05-11 — v3.0.30 Continuous Job-D + public dashboard (REQ-1 + REQ-4 restored, + transparency)
+
+### User reframing (the partnership directive)
+
+> "我们的目的就是 一个可以自动收集数据集的程序 不断的跑 可能跑几天效果不大
+>  但是 几个月 一年呢？" + "你不是工具 我们是研究搭档"
+
+Translated to engineering:
+1. Job-D must run **continuously for months/years**, not just 48h
+2. Full **public transparency** on what's been discovered (slugs, crops,
+   real-vs-AI labels, daily growth)
+3. **Dashboard accessible via internet** (not just on cluster)
+4. I should **proactively design things the user didn't say** — partner mode
+
+### v3.0.30 Job-D continuous (Job 40755735)
+
+`run_v3_0_30_jobd_continuous.sh` — based on v3.0.26 jobd, plus:
+
+- **Self-chain**: at end of each 48h run, `sbatch --dependency=afterany:$SLURM_JOB_ID`
+  resubmits a fresh Job-D. Infinite chain limited only by SU budget + kill switch.
+- **Kill switch**: `touch .stop_jobd` in repo root → chain breaks gracefully
+  on next run-end.
+- **Idle guard**: if last 20 harvest iterations had ZERO new slugs, write
+  `.jobd_exhausted` and DO NOT chain (avoid burning SU on dead Brain). To
+  resume: `touch .jobd_force_resume && rm .jobd_exhausted`.
+- **Dashboard regen hook**: every Job-D run-end regenerates static HTML and
+  writes per-run summary to `results/framework/jobd_runs/`.
+
+### Public dashboard (docs/dashboard/)
+
+`tools/dashboard_generator.py` — pure-stdlib static HTML generator. Pulls
+live state from `dataset_registry.json` + `jobd_runs/*.json` +
+`*pycoco*summary.json`. Produces 4 pages:
+
+- **index.html** — totals + scale stats + latest mAP + how-autonomy-works
+- **datasets.html** — searchable table of all slugs (slug / source / #imgs /
+  annotation type / crop / description), with NEVER_TRAIN badge
+- **categories.html** — annotation type, crop/topic, source breakdowns,
+  12-class GT instance count in cwd12 holdout
+- **progress.html** — canonical mAP history + Job-D run log (iters,
+  new_slugs, exhausted flag) over time
+
+First run snapshot (71 slugs):
+- Crops covered: Plant disease 27 / Mixed crops 17 / Generic weed 6 /
+  Rice 5 / Cotton 4 / Tomato 4 / Pest 5 / Potato 3 / Corn / Wheat / Lettuce
+  / Guava / Coconut / Soybean / Non-target (drop) 3 / Unclassified 12
+- Sources: Kaggle 51 / Curated seed 10 / GitHub 6 / Roboflow 2 / Other 2
+- Real bbox slugs: 26 / OWLv2 AI-labeled slugs: 40
+- Latest cwd12 mAP50-95 pycocotools: 0.7446 (safety yolo26x)
+
+### Deployment plan (GitHub Pages)
+
+`docs/` committed to main branch. To enable public URL:
+1. github.com/greatroboticslab/agentAI/settings/pages
+2. Source: "Deploy from a branch" → Branch: `main` → Folder: `/docs`
+3. Public URL becomes: `https://greatroboticslab.github.io/agentAI/`
+
+Job-D continuous will git-push the regenerated dashboard each run-end
+(requires cluster-side git push perms; will set up SSH key + git config
+in next iteration).
+
+### Proactive additions (not asked but added)
+
+5. Idle guard so we don't waste SU when Brain is exhausted
+6. Kill switch + force_resume for manual control
+7. Per-run summary in `jobd_runs/` for time-series analytics
+8. NEVER_TRAIN badge in datasets table (continuous visual reminder)
+9. 12-class GT distribution table (shows under-sampled weak classes:
+   SpottedSpurge 42, Sicklepod 76, Ragweed 91)
+10. Footer cites cwd12 as immutable evaluation reference + repo link
+
+### Known gaps (TODO v3.0.30.1)
+
+- imgs=0 in totals — registry per-slug doesn't have image counts; need to
+  walk `local_path` and count. Other counts (slugs, real-vs-AI, crops) are right.
+- Daily new-slug growth chart (need history of jobd_runs first)
+- Autolabel confidence histogram per slug
+- Dedup overlap matrix (which slugs are 50%+ duplicates of each other)
+- Brain search query log (which keywords work)
+- Auto git-push from cluster (need SSH key)

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Categories — Autonomous Weed Detection</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          max-width: 1200px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  nav { background: #fafafa; padding: 0.7rem 1rem; border-radius: 8px;
+         margin-bottom: 1.5rem; font-size: 0.95rem; }
+  nav a { text-decoration: none; color: #444; margin-right: 0.5rem; }
+  nav a.active { font-weight: 600; color: #2a7; }
+  h1 { margin-top: 0.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  th { background: #f5f5f5; cursor: pointer; }
+  tr:hover { background: #fafafa; }
+  .stat { display: inline-block; background: #f3f9f5; padding: 0.6rem 1rem;
+           border-radius: 6px; margin-right: 0.7rem; margin-bottom: 0.6rem; }
+  .stat b { font-size: 1.4rem; color: #2a7; }
+  .badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px;
+            font-size: 0.78rem; margin-right: 0.2rem; }
+  .badge-real { background: #d4f0d4; color: #285; }
+  .badge-ai { background: #ffe5b4; color: #864; }
+  .badge-cls { background: #eee; color: #777; }
+  .badge-drop { background: #ffd4d4; color: #844; }
+  .small { color: #888; font-size: 0.85rem; }
+  input.search { padding: 0.4rem 0.6rem; font-size: 0.95rem;
+                  border: 1px solid #ccc; border-radius: 4px; width: 320px; }
+  footer { margin-top: 3rem; font-size: 0.8rem; color: #888;
+            border-top: 1px solid #eee; padding-top: 1rem; }
+</style></head><body>
+<nav><a href="index.html" class="">Home</a> · <a href="datasets.html" class="">Datasets</a> · <a href="categories.html" class="active">Categories</a> · <a href="progress.html" class="">Progress</a> <span class="small">— autonomous weed detection · greatroboticslab</span></nav>
+<h1>Categories</h1>
+
+<h2>Annotation type</h2>
+<table><thead><tr><th>Type</th><th>#slugs</th></tr></thead><tbody><tr><td>AI-labeled (OWLv2)</td><td>40</td></tr><tr><td>Real YOLO (human)</td><td>17</td></tr><tr><td>Real bbox (human)</td><td>8</td></tr><tr><td>Classification only (no bbox)</td><td>3</td></tr><tr><td>bbox_suspected</td><td>2</td></tr><tr><td>Real bbox+seg (human)</td><td>1</td></tr></tbody></table>
+
+<h2>Crop / topic</h2>
+<table><thead><tr><th>Crop / topic</th><th>#slugs</th></tr></thead><tbody><tr><td>Plant disease (general)</td><td>27</td></tr><tr><td>Mixed crops</td><td>17</td></tr><tr><td>Unclassified</td><td>12</td></tr><tr><td>Generic weed</td><td>6</td></tr><tr><td>Rice</td><td>5</td></tr><tr><td>Pest/Insect</td><td>5</td></tr><tr><td>Cotton</td><td>4</td></tr><tr><td>Tomato</td><td>4</td></tr><tr><td>Non-target (drop)</td><td>3</td></tr><tr><td>Potato</td><td>3</td></tr><tr><td>Coconut</td><td>1</td></tr><tr><td>Corn/Maize</td><td>1</td></tr><tr><td>Wheat</td><td>1</td></tr><tr><td>Guava</td><td>1</td></tr></tbody></table>
+
+<h2>Source</h2>
+<table><thead><tr><th>Source</th><th>#slugs</th></tr></thead><tbody><tr><td>Kaggle</td><td>51</td></tr><tr><td>Curated (seed)</td><td>10</td></tr><tr><td>GitHub</td><td>6</td></tr><tr><td>Other</td><td>2</td></tr><tr><td>Roboflow</td><td>2</td></tr></tbody></table>
+
+<h2>12 cottonweed classes — ground-truth count in cwd12 holdout (1977 imgs)</h2>
+<table><thead><tr><th>Class</th><th>#instances</th></tr></thead><tbody><tr><td>Carpetweeds</td><td>688</td></tr><tr><td>Crabgrass</td><td>456</td></tr><tr><td>PalmerAmaranth</td><td>278</td></tr><tr><td>PricklySida</td><td>180</td></tr><tr><td>Purslane</td><td>109</td></tr><tr><td>Ragweed</td><td>91</td></tr><tr><td>Sicklepod</td><td>76</td></tr><tr><td>SpottedSpurge</td><td>42</td></tr><tr><td>Eclipta</td><td>353</td></tr><tr><td>Goosegrass</td><td>320</td></tr><tr><td>Morningglory</td><td>349</td></tr><tr><td>Nutsedge</td><td>315</td></tr></tbody></table>
+
+<footer>Generated 2026-05-11 18:32 UTC ·
+  cwd12 holdout test set (1,977 hand-labeled imgs) is the NEVER_TRAIN evaluation reference ·
+  <a href="https://github.com/greatroboticslab/agentAI">repo</a></footer>
+</body></html>

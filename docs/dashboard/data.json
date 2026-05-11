@@ -1,0 +1,871 @@
+{
+ "totals": {
+  "slugs": 71,
+  "real_bbox_slugs": 26,
+  "autolabel_slugs": 40,
+  "downloaded_imgs": 0
+ },
+ "crop_counts": {
+  "Unclassified": 12,
+  "Cotton": 4,
+  "Generic weed": 6,
+  "Mixed crops": 17,
+  "Rice": 5,
+  "Coconut": 1,
+  "Non-target (drop)": 3,
+  "Tomato": 4,
+  "Plant disease (general)": 27,
+  "Corn/Maize": 1,
+  "Wheat": 1,
+  "Pest/Insect": 5,
+  "Potato": 3,
+  "Guava": 1
+ },
+ "source_counts": {
+  "Curated (seed)": 10,
+  "Other": 2,
+  "Roboflow": 2,
+  "GitHub": 6,
+  "Kaggle": 51
+ },
+ "annotation_counts": {
+  "Real bbox+seg (human)": 1,
+  "Classification only (no bbox)": 3,
+  "Real bbox (human)": 8,
+  "bbox_suspected": 2,
+  "Real YOLO (human)": 17,
+  "AI-labeled (OWLv2)": 40
+ },
+ "datasets_for_table": [
+  {
+   "slug": "weedsense",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox+seg (human)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "Largest weed dataset. 16 species, VOC XML bboxes + segmentation.",
+   "never_train": true
+  },
+  {
+   "slug": "deepweeds",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Classification only (no bbox)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "8 Australian weed species + negative. Classification only.",
+   "never_train": false
+  },
+  {
+   "slug": "cottonweeddet12",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox (human)",
+   "crops": [
+    "Cotton",
+    "Generic weed"
+   ],
+   "description": "Current primary dataset. 12 cotton weed species.",
+   "never_train": true
+  },
+  {
+   "slug": "crop_weed_research",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox (human)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "Crop and weed bounding boxes in Pascal VOC.",
+   "never_train": false
+  },
+  {
+   "slug": "grass_weeds",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox (human)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "Grass vs weeds, COCO format.",
+   "never_train": false
+  },
+  {
+   "slug": "weed_crop_aerial",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox (human)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "Aerial weed-crop, YOLO format ready.",
+   "never_train": false
+  },
+  {
+   "slug": "rice_weeds_ph",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Classification only (no bbox)",
+   "crops": [
+    "Rice"
+   ],
+   "description": "10 rice weed species from Philippines.",
+   "never_train": false
+  },
+  {
+   "slug": "weeds7kpd",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Classification only (no bbox)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "7K+ weed images, 3 classes.",
+   "never_train": false
+  },
+  {
+   "slug": "cottonweed_sp8",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox (human)",
+   "crops": [
+    "Cotton",
+    "Generic weed"
+   ],
+   "description": "CottonWeedDet12 8-species train split (pre-existing, YOLO format)",
+   "never_train": false
+  },
+  {
+   "slug": "cottonweed_holdout",
+   "source": "Curated (seed)",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox (human)",
+   "crops": [
+    "Cotton",
+    "Generic weed"
+   ],
+   "description": "CottonWeedDet12 4-species holdout split (pre-existing, YOLO format)",
+   "never_train": false
+  },
+  {
+   "slug": "susnato__plant_disease_detection_processed",
+   "source": "Other",
+   "n_imgs": 0,
+   "annotation_h": "bbox_suspected",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "Auto-harvested via query: plant detection",
+   "never_train": false
+  },
+  {
+   "slug": "francesco__weed_crop_aerial",
+   "source": "Roboflow",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox (human)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "Auto-harvested: task_categories=['object-detection']",
+   "never_train": true
+  },
+  {
+   "slug": "agyaatcoder__plantdoc",
+   "source": "Other",
+   "n_imgs": 0,
+   "annotation_h": "bbox_suspected",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "Auto-harvested: task_categories=['object-detection']",
+   "never_train": false
+  },
+  {
+   "slug": "gh_tehreemnoor__yolov5-weed-detection-model",
+   "source": "GitHub",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Generic weed"
+   ],
+   "description": "GitHub \u26052: \ud83c\udf3f Weed Detection Model \u2013 YOLOv5 This repository contains a custom-trained YOLOv5 object detection model designed to identify four common weed species: - Lantana - Siam Weed - Parthenium - Snake Weed  The model was trained on a self-curated and annotated dataset using Roboflow for labeling",
+   "never_train": false
+  },
+  {
+   "slug": "gh_07931350__weed-yolo",
+   "source": "GitHub",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Generic weed"
+   ],
+   "description": "GitHub \u26051: This project contains the WEED-YOLO model structure, the datasets used, and related content.",
+   "never_train": false
+  },
+  {
+   "slug": "gh_vuyyurusairamreddy__real-time-coconut-tree-disease-detection-and-management-using-yolov8-and-machine-learning-techniques",
+   "source": "GitHub",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Coconut",
+    "Mixed crops"
+   ],
+   "description": "GitHub \u26055: This project uses YOLOv8 and Machine Learning to detect coconut tree diseases in real-time, helping farmers take quick action. It leverages computer vision, custom dataset training, and real-time inference to enhance crop health and yield. \ud83d\ude80\ud83c\udf31",
+   "never_train": false
+  },
+  {
+   "slug": "gh_vumhvg__train-yolov9-beehive-dataset",
+   "source": "GitHub",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Mixed crops",
+    "Non-target (drop)"
+   ],
+   "description": "GitHub \u26051: The repository was used to train the YOLOv9 model based on a dataset of bee colonies collected at the Vietnam National University of Agriculture (VNUA).",
+   "never_train": false
+  },
+  {
+   "slug": "gh_lunaimer__tomatoweightai-yolov8-based-tomato-detection-and-weight-estimation-system",
+   "source": "GitHub",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Tomato"
+   ],
+   "description": "GitHub \u26051: YOLOv8-based computer vision system for tomato detection, size analysis, and weight estimation. Features real-time processing, QR code integration, and custom dataset training for agricultural applications.",
+   "never_train": false
+  },
+  {
+   "slug": "kg_vipoooool__new-plant-diseases-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "New Plant Diseases Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_emmarex__plantdisease",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "PlantVillage Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_abdallahalidev__plantvillage-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "PlantVillage Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_arjuntejaswi__plant-village",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant Village",
+   "never_train": false
+  },
+  {
+   "slug": "kg_rashikrahmanpritom__plant-disease-recognition-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant disease recognition dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_smaranjitghose__corn-or-maize-leaf-disease-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Corn/Maize",
+    "Plant disease (general)"
+   ],
+   "description": "Corn or Maize Leaf Disease Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_vbookshelf__rice-leaf-diseases",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Rice",
+    "Plant disease (general)"
+   ],
+   "description": "Rice Leaf Diseases Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_vbookshelf__v2-plant-seedlings-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "V2 Plant Seedlings Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_ravirajsinh45__crop-and-weed-detection-data-with-bounding-boxes",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Mixed crops",
+    "Generic weed"
+   ],
+   "description": "crop and weed detection data with bounding boxes",
+   "never_train": false
+  },
+  {
+   "slug": "kg_aman2000jaiswal__agriculture-crop-images",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "Agriculture crop images",
+   "never_train": false
+  },
+  {
+   "slug": "kg_mohitsingh1804__plantvillage",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "PlantVillage",
+   "never_train": false
+  },
+  {
+   "slug": "kg_mdwaquarazam__agricultural-crops-image-classification",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "Agricultural crops image classification",
+   "never_train": false
+  },
+  {
+   "slug": "kg_alinedobrovsky__plant-disease-classification-merged-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant Disease Classification Merged Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_kushagra3204__wheat-plant-diseases",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Wheat",
+    "Plant disease (general)"
+   ],
+   "description": "Wheat Plant Diseases",
+   "never_train": false
+  },
+  {
+   "slug": "kg_nirmalsankalana__crop-pest-and-disease-detection",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Mixed crops",
+    "Pest/Insect"
+   ],
+   "description": "Crop Pest and Disease Detection",
+   "never_train": false
+  },
+  {
+   "slug": "kg_rizwan123456789__potato-disease-leaf-datasetpld",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Potato"
+   ],
+   "description": " Potato Disease Leaf Dataset(PLD)",
+   "never_train": false
+  },
+  {
+   "slug": "kg_cookiefinder__tomato-disease-multiple-sources",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Tomato"
+   ],
+   "description": "Tomato Disease Multiple Sources",
+   "never_train": false
+  },
+  {
+   "slug": "kg_sadmansakibmahi__plant-disease-expert",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant Disease Expert",
+   "never_train": false
+  },
+  {
+   "slug": "kg_loki4514__rice-leaf-diseases-detection",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Rice",
+    "Plant disease (general)"
+   ],
+   "description": "Rice Leaf Diseases Detection",
+   "never_train": false
+  },
+  {
+   "slug": "kg_tushar5harma__plant-village-dataset-updated",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant Village Dataset (Updated)",
+   "never_train": false
+  },
+  {
+   "slug": "kg_marquis03__plants-classification",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "Plants Classification",
+   "never_train": false
+  },
+  {
+   "slug": "kg_lavaman151__plantifydr-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "PlantifyDr Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_farukalam__tomato-leaf-diseases-detection-computer-vision",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Tomato",
+    "Plant disease (general)"
+   ],
+   "description": "Tomato Leaf Diseases Detection Computer Vision",
+   "never_train": false
+  },
+  {
+   "slug": "kg_vencerlanz09__agricultural-pests-image-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Pest/Insect"
+   ],
+   "description": "Agricultural Pests Image Dataset ",
+   "never_train": false
+  },
+  {
+   "slug": "kg_hafiznouman786__potato-plant-diseases-data",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Potato",
+    "Plant disease (general)"
+   ],
+   "description": "\ud83c\udf31 Potato Plant Diseases Data \ud83c\udf42",
+   "never_train": false
+  },
+  {
+   "slug": "kg_jawadali1045__20k-multi-class-crop-disease-images",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "20k+ Multi-Class Crop Disease Images",
+   "never_train": false
+  },
+  {
+   "slug": "kg_saroz014__plant-disease",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant Disease",
+   "never_train": false
+  },
+  {
+   "slug": "kg_vinayakshanawad__weedcrop-image-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "WeedCrop Image Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_tarundalal__dangerous-insects-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Pest/Insect"
+   ],
+   "description": "Dangerous Farm Insects Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_fakhrealam9537__leaf-disease-segmentation-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Leaf disease segmentation dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_asheniranga__leaf-disease-dataset-combination",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Leaf Disease Dataset (combination)",
+   "never_train": false
+  },
+  {
+   "slug": "kg_nirmalsankalana__plant-diseases-training-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant Leaf Diseases Training Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_charuchaudhry__plantvillage-tomato-leaf-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Tomato",
+    "Plant disease (general)"
+   ],
+   "description": "plantvillage Tomato leaf dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_abdulhasibuddin__plant-doc-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "Plant Doc Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_nafishamoin__new-bangladeshi-crop-disease",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "New Bangladeshi Crop Disease",
+   "never_train": false
+  },
+  {
+   "slug": "kg_dhamur__cotton-plant-disease",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Cotton",
+    "Plant disease (general)"
+   ],
+   "description": "Cotton plant disease \ud83c\udf31\ud83c\udf42\ud83c\udf42\ud83c\udf31",
+   "never_train": false
+  },
+  {
+   "slug": "kg_mexwell__crop-diseases-classification",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "\ud83c\udf31 Crop Diseases Classification",
+   "never_train": false
+  },
+  {
+   "slug": "kg_hsmcaju__d-kap",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Kashmiri Apple Plant Disease Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_asadullahgalib__guava-disease-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Guava"
+   ],
+   "description": "Guava Fruit Disease Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "gh_minhvuongvu__train-yolov9-beehive-dataset",
+   "source": "GitHub",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Mixed crops",
+    "Non-target (drop)"
+   ],
+   "description": "GitHub \u26051: The repository was used to train the YOLOv9 model based on a dataset of bee colonies collected at the Vietnam National University of Agriculture (VNUA).",
+   "never_train": false
+  },
+  {
+   "slug": "kg_rupankarmajumdar__crop-pests-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Mixed crops",
+    "Pest/Insect"
+   ],
+   "description": "AgroPest-12: Image Dataset for Crop Pest Detection",
+   "never_train": false
+  },
+  {
+   "slug": "kg_nirmalsankalana__plantdoc-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "PlantDoc Classification dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_karagwaanntreasure__plant-disease-detection",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant Disease Detection",
+   "never_train": false
+  },
+  {
+   "slug": "kg_imsparsh__deepweeds",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Unclassified"
+   ],
+   "description": "DeepWeeds",
+   "never_train": false
+  },
+  {
+   "slug": "kg_jay7080dev__rice-plant-diseases-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Rice",
+    "Plant disease (general)"
+   ],
+   "description": "Rice Plant diseases dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_shubham2703__five-crop-diseases-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "Five Crop Diseases Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "francesco__insects_mytwu",
+   "source": "Roboflow",
+   "n_imgs": 0,
+   "annotation_h": "Real bbox (human)",
+   "crops": [
+    "Pest/Insect"
+   ],
+   "description": "Auto-harvested: task_categories=['object-detection']",
+   "never_train": false
+  },
+  {
+   "slug": "kg_parohod__warp-waste-recycling-plant-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Non-target (drop)"
+   ],
+   "description": "WaRP - Waste Recycling Plant Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_kamal01__top-agriculture-crop-disease",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Mixed crops"
+   ],
+   "description": "Top Agriculture Crop Disease India",
+   "never_train": false
+  },
+  {
+   "slug": "kg_rajkumar898__rice-plant-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Rice"
+   ],
+   "description": "Rice Plant Dataset",
+   "never_train": false
+  },
+  {
+   "slug": "kg_sebastianpalaciob__plantvillage-for-object-detection-yolo",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "Real YOLO (human)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "PlantVillage for object detection YOLO",
+   "never_train": false
+  },
+  {
+   "slug": "kg_saroz014__plant-diseases",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Plant disease (general)"
+   ],
+   "description": "Plant Diseases",
+   "never_train": false
+  },
+  {
+   "slug": "kg_aarishasifkhan__plantvillage-potato-disease-dataset",
+   "source": "Kaggle",
+   "n_imgs": 0,
+   "annotation_h": "AI-labeled (OWLv2)",
+   "crops": [
+    "Potato",
+    "Plant disease (general)"
+   ],
+   "description": "Potato Disease Data | PlantVillage",
+   "never_train": false
+  }
+ ],
+ "latest_pyco": {
+  "label": "v3_0_29",
+  "mAP50_95": 0.7446400719001353,
+  "mAP50": 0.9320928673566515,
+  "model_label": "v3_0_29"
+ },
+ "pyco_history": [
+  {
+   "label": "v3_0_29",
+   "mAP50_95": 0.7446400719001353,
+   "mAP50": 0.9320928673566515,
+   "model_label": "v3_0_29"
+  }
+ ],
+ "jobd_runs": [],
+ "twelve_class_gt": {
+  "Carpetweeds": 688,
+  "Crabgrass": 456,
+  "PalmerAmaranth": 278,
+  "PricklySida": 180,
+  "Purslane": 109,
+  "Ragweed": 91,
+  "Sicklepod": 76,
+  "SpottedSpurge": 42,
+  "Eclipta": 353,
+  "Goosegrass": 320,
+  "Morningglory": 349,
+  "Nutsedge": 315
+ },
+ "generated_at": "2026-05-11T18:32:05.169253+00:00"
+}

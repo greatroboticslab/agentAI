@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Progress — Autonomous Weed Detection</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          max-width: 1200px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  nav { background: #fafafa; padding: 0.7rem 1rem; border-radius: 8px;
+         margin-bottom: 1.5rem; font-size: 0.95rem; }
+  nav a { text-decoration: none; color: #444; margin-right: 0.5rem; }
+  nav a.active { font-weight: 600; color: #2a7; }
+  h1 { margin-top: 0.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  th { background: #f5f5f5; cursor: pointer; }
+  tr:hover { background: #fafafa; }
+  .stat { display: inline-block; background: #f3f9f5; padding: 0.6rem 1rem;
+           border-radius: 6px; margin-right: 0.7rem; margin-bottom: 0.6rem; }
+  .stat b { font-size: 1.4rem; color: #2a7; }
+  .badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px;
+            font-size: 0.78rem; margin-right: 0.2rem; }
+  .badge-real { background: #d4f0d4; color: #285; }
+  .badge-ai { background: #ffe5b4; color: #864; }
+  .badge-cls { background: #eee; color: #777; }
+  .badge-drop { background: #ffd4d4; color: #844; }
+  .small { color: #888; font-size: 0.85rem; }
+  input.search { padding: 0.4rem 0.6rem; font-size: 0.95rem;
+                  border: 1px solid #ccc; border-radius: 4px; width: 320px; }
+  footer { margin-top: 3rem; font-size: 0.8rem; color: #888;
+            border-top: 1px solid #eee; padding-top: 1rem; }
+</style></head><body>
+<nav><a href="index.html" class="">Home</a> · <a href="datasets.html" class="">Datasets</a> · <a href="categories.html" class="">Categories</a> · <a href="progress.html" class="active">Progress</a> <span class="small">— autonomous weed detection · greatroboticslab</span></nav>
+<h1>Progress</h1>
+
+<h2>Goal</h2>
+<p>Research goal: <b>cwd12 mAP50-95 ≥ 0.90 (pycocotools canonical)</b>.
+Above the v3.0.6 published baseline (~0.71 pyco / 0.865 ultralytics) and the
+2026 DINOv3+YOLO26 in-domain published result (0.723 pyco).</p>
+
+<h2>Canonical mAP history (pycocotools)</h2>
+<table><thead><tr><th>Model / run</th><th>mAP50-95</th><th>mAP50</th></tr></thead>
+<tbody><tr><td>v3_0_29</td><td>0.7446</td><td>0.9321</td></tr></tbody></table>
+
+<h2>Job-D continuous harvest runs</h2>
+<p><span class="small">Each row is one 48h Job-D iteration. "new_slugs" is how many
+NEW dataset slugs Brain discovered in that window. Goal: never-ending growth.</span></p>
+<table><thead><tr><th>SLURM job</th><th>iters</th><th>new_slugs</th><th>elapsed</th><th>exhausted</th></tr></thead>
+<tbody></tbody></table>
+
+<footer>Generated 2026-05-11 18:32 UTC ·
+  cwd12 holdout test set (1,977 hand-labeled imgs) is the NEVER_TRAIN evaluation reference ·
+  <a href="https://github.com/greatroboticslab/agentAI">repo</a></footer>
+</body></html>
