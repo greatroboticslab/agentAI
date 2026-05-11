@@ -2599,3 +2599,48 @@ strict for cwd12 (cotton field photos with brown soil, white cotton):
 Need v3.0.29.1B: lower threshold to 5%, OR exempt slugs whose names match
 known-good keywords (cotton, weed, crop), OR replace with CLIP relevance
 scoring.
+
+## 2026-05-11 — v3.0.29 Phase 2B RF-DETR submitted (Job 40755677)
+
+### 4-day idle gap
+
+After 2026-05-07 safety_long timed out at 0.888 ult / ~0.74 pyco, we went
+idle for 4 days waiting for user go-ahead on Phase 2A vs 2B. User pushback:
+"下一步做什么都你来决定 只需要最终达成我们的研究目标就可以了" — decide and
+execute, don't ask.
+
+### Decision: Phase 2B (RF-DETR) before Phase 2A (custom DINOv3+YOLO26)
+
+| Criterion | Phase 2A (DINOv3+YOLO26 dual-branch) | Phase 2B (RF-DETR) |
+|---|---|---|
+| Paper grade | arXiv 2603.00160 (Mar 2026) | ICLR 2026 (arXiv 2511.09554) |
+| Code complexity | ~500 LOC custom fusion | ~50 LOC pip package |
+| GPU time | 48h | 12-24h |
+| Expected pyco gain | +0.05-0.07 | +0.05-0.10 |
+| Risk | High (custom integration) | Low (mature pip package) |
+
+Going with 2B first — better risk/reward. If 2B doesn't crack 0.90, then 2A.
+
+### RF-DETR setup
+
+- Package: `pip install rfdetr` (Roboflow, Apache 2.0)
+- Backbone: DINOv2 ViT (frozen by default during finetune)
+- Head: NAS-discovered DETR-style decoder
+- Model: RFDETRMedium (balance for V100-32GB)
+- Resolution: 728 (RF-DETR requires multiple of 56)
+- Train: cwd12 train (3,671) — stem-filtered, no leak
+- Val/Test: cwd12 valid (1,129) + test (848) — NEVER_TRAIN
+- Eval: pycocotools (industry standard, NOT ultralytics)
+- Epochs 60, batch 4, grad_accum 4 (effective batch 16), lr 1e-4
+- 24h walltime, output `mega_iterv3_0_29_rfdetr/`
+
+### Expected outcome
+
+Baseline pyco truth = 0.7446 (safety yolo26x).
+RF-DETR has stronger backbone (DINOv2) + transformer decoder; on
+RF100-VL cross-domain benchmark it exceeded 60 mAP (vs yolo at ~50).
+For our IID cwd12 task expect mAP50-95 pyco ≥ 0.78.
+
+If 0.78+ → +3.4% absolute progress, biggest single-step gain since stem-leak fix.
+If 0.85+ → only 0.05 short of 0.90, Phase 2C (KD) becomes the next push.
+If <0.75 → Phase 2A DINOv3+YOLO26 custom dual-branch is needed.
