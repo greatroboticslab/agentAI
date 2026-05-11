@@ -2725,3 +2725,79 @@ in next iteration).
 - Dedup overlap matrix (which slugs are 50%+ duplicates of each other)
 - Brain search query log (which keywords work)
 - Auto git-push from cluster (need SSH key)
+
+## 2026-05-11 — v3.0.30 Live dashboard server with Cloudflare Tunnel (Job 40757404)
+
+### Why option B over option A
+
+User chose: "数据集是不断增加的 也就是说 我要实时看到效果". Option A (shrink
+samples + git push images to GitHub) was the safe path but caps real-time
+freshness at "push cadence". Option B (live FastAPI server on cluster +
+public tunnel) gives true real-time but adds the moving piece of a public
+tunnel. User explicitly accepted the complexity: "确保你的b 要做的很好".
+
+### Architecture (option B as deployed)
+
+```
+your-browser
+  ↓ HTTPS, stable URL
+harry567566.github.io/weed-dashboard/         ← GitHub Pages, smart redirector
+  ↓ JS fetch tunnel_url.json (auto-updated by cluster)
+  ↓ JS redirect
+https://<random>.trycloudflare.com           ← Cloudflare quick tunnel
+  ↓ Cloudflare outbound to cluster
+cluster compute node FastAPI:8080            ← Job-S 40757404 (self-chaining)
+  ├─ GET /api/state          → live registry JSON (60s cache)
+  ├─ GET /api/sample/{slug}/{img}  → on-demand bbox-rendered thumbnail
+  ├─ GET /api/img/{slug}/{img}     → original full-res
+  ├─ GET /dashboard/{page}.html    → static pages (regen on miss)
+  └─ /ocean/.../downloads/{slug}/{img}     ← reads directly from cluster disk
+```
+
+### Robustness features
+
+- **Stable user-facing URL**: `harry567566.github.io/weed-dashboard/` never
+  changes. Underneath it JS-redirects to whatever the current cluster tunnel
+  URL is.
+- **Graceful fallback**: if cluster is down, redirector falls through to
+  static `dashboard/index.html` snapshot.
+- **Self-chain**: Job-S walltime 48h, then `afterany` resubmits.
+- **Auto-update tunnel URL**: each Job-S run pushes its tunnel URL to
+  `harry567566/weed-dashboard/tunnel_url.json` so the redirector picks up
+  the new URL on next page load.
+- **Cache layer**: rendered bbox thumbnails cached at
+  `/ocean/.../dashboard_cache/` so repeat requests are fast.
+- **Kill switch**: `touch .stop_dashserver` breaks the chain.
+
+### Build-out steps done this session
+
+1. Installed `cloudflared 2024.5.0` to `/ocean/projects/cis240145p/byler/harry/bin/`.
+   The "latest" cloudflared segfaulted on the cluster's CPU; pinned 2024.5.0 works.
+2. `pip install fastapi uvicorn` in the `bench` conda env (cluster).
+3. Wrote `tools/dashboard_server.py` (441 LOC) — FastAPI app with on-demand
+   bbox rendering, disk cache, state API.
+4. Wrote `run_v3_0_30_dashboard_server.sh` (162 LOC) — SLURM wrapper:
+   uvicorn → cloudflared → git push URL → self-chain.
+5. Saved GitHub PAT to `/jet/home/byler/.gh_pat` (chmod 600).
+6. Updated `harry567566/weed-dashboard/index.html` to be a smart redirector
+   (JS reads `tunnel_url.json`, redirects to live cluster, falls back to
+   static snapshot).
+7. Submitted Job 40757404. Will obtain tunnel URL on start and push it.
+
+### How to verify when Job-S starts running
+
+Once Job 40757404 transitions PD → R:
+1. Watch `results/framework/v3_0_30_dashboard_server_40757404.out` for the
+   line `PUBLIC DASHBOARD URL: https://...trycloudflare.com`.
+2. Open `https://harry567566.github.io/weed-dashboard/` — JS auto-routes.
+3. Check `https://github.com/harry567566/weed-dashboard/blob/main/tunnel_url.json`
+   to see the current URL pushed by cluster.
+
+### Known limitations
+
+- Each Job-S restart gets a NEW Cloudflare quick-tunnel URL. The cluster
+  pushes that URL to GitHub Pages so the user sees no change.
+- Cluster down or queue full → tunnel down. Fallback static snapshot still
+  serves from `harry567566/weed-dashboard/dashboard/`.
+- Free Cloudflare quick tunnel: no SLA, occasional reconnects. Upgrade to
+  named tunnel later if user signs up at dash.cloudflare.com.

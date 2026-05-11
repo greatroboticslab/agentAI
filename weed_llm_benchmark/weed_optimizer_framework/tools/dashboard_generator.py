@@ -207,7 +207,8 @@ that <b>never enters training</b>.</p>
 
 
 def build_datasets(state: dict) -> str:
-    rows = []
+    samples = state.get("per_slug_samples", {})
+    cards = []
     for d in state["datasets_for_table"]:
         label_badge = {
             "Real bbox (human)":        '<span class="badge badge-real">real bbox</span>',
@@ -219,33 +220,71 @@ def build_datasets(state: dict) -> str:
         crops = " ".join(f'<span class="badge">{html_lib.escape(c)}</span>'
                          for c in d["crops"])
         never = ' <span class="badge badge-drop">NEVER_TRAIN</span>' if d["never_train"] else ""
-        rows.append(
-            f'<tr><td><code>{html_lib.escape(d["slug"])}</code>{never}</td>'
-            f'<td>{html_lib.escape(d["source"])}</td>'
-            f'<td>{d["n_imgs"]:,}</td>'
-            f'<td>{label_badge}</td>'
-            f'<td>{crops}</td>'
-            f'<td class="small">{html_lib.escape(d["description"][:120])}</td></tr>'
+
+        # Image gallery (with rendered bboxes if available)
+        slug_samples = samples.get(d["slug"], {}).get("samples", [])
+        if slug_samples:
+            gallery_html = '<div class="gallery">' + "".join(
+                f'<a href="{s["img"]}" target="_blank">'
+                f'<img src="{s["img"]}" loading="lazy" '
+                f'title="{s["n_boxes"]} box(es)" alt=""></a>'
+                for s in slug_samples
+            ) + '</div>'
+            box_color_legend = (
+                "🟢 green = human bbox" if d["annotation_h"].startswith("Real")
+                else "🟠 orange = AI/OWLv2 label" if d["annotation_h"].startswith("AI")
+                else "⬜️ grey = no label"
+            )
+            gallery_block = (
+                f'<div class="gallery-block">{gallery_html}'
+                f'<div class="small">{box_color_legend} · '
+                f'click any image to enlarge</div></div>'
+            )
+        else:
+            gallery_block = '<div class="small">(no samples rendered yet)</div>'
+
+        searchable_text = f"{d['slug']} {d['source']} {d['annotation_h']} {' '.join(d['crops'])} {d['description'][:200]}"
+        cards.append(
+            f'<div class="card{ " card-never" if d["never_train"] else "" }" data-search="{html_lib.escape(searchable_text.lower())}">'
+            f'<div class="card-head">'
+            f'<code class="slug">{html_lib.escape(d["slug"])}</code>{never} '
+            f'{label_badge} '
+            f'<span class="badge">{html_lib.escape(d["source"])}</span> '
+            f'{crops}'
+            f'</div>'
+            f'<div class="small desc">{html_lib.escape(d["description"][:200])}</div>'
+            f'{gallery_block}'
+            f'</div>'
         )
 
     body = f"""
-<p><span class="small">All slugs Brain has discovered. Real-bbox slugs feed training directly;
-AI-labeled slugs go to auxiliary class slots; classification-only slugs are not used
-unless they pass autolabel. NEVER_TRAIN slugs (cwd12, weedsense, francesco) are blocked
-at merge time. Click column headers to sort.</span></p>
-<p><input type="text" id="q" class="search" placeholder="search slug / crop / source…"
-   onkeyup="filter()"></p>
-<table id="t"><thead>
-  <tr><th>Slug</th><th>Source</th><th>#imgs</th><th>Annotation</th>
-      <th>Crop / domain</th><th>Description</th></tr>
-</thead><tbody>
-{"".join(rows)}
-</tbody></table>
+<p><span class="small">All slugs the Brain has discovered. Each card shows
+6 sample images with bboxes drawn on top so you can SEE label quality at a
+glance. Green = human-labeled. Orange = AI/OWLv2-labeled. Red border =
+NEVER_TRAIN (blocked from training).</span></p>
+<p><input type="text" id="q" class="search" placeholder="search slug / crop / source / annotation…"
+   onkeyup="filter()" autofocus></p>
+<div id="cards">
+{"".join(cards)}
+</div>
+<style>
+.card {{ border: 1px solid #ddd; border-radius: 8px; padding: 0.7rem 1rem;
+         margin-bottom: 1rem; background: #fff; }}
+.card-never {{ border: 2px solid #c33; background: #fff8f8; }}
+.card-head {{ margin-bottom: 0.4rem; }}
+.card .slug {{ font-size: 1.05rem; font-weight: 500; margin-right: 0.4rem; }}
+.card .desc {{ margin-bottom: 0.5rem; color: #666; }}
+.gallery {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.3rem; }}
+.gallery img {{ width: 180px; height: 140px; object-fit: cover;
+                border-radius: 4px; border: 1px solid #eee; cursor: zoom-in; }}
+</style>
 <script>
 function filter() {{
   var q = document.getElementById('q').value.toLowerCase();
-  var rows = document.querySelectorAll('#t tbody tr');
-  for (var r of rows) {{ r.style.display = r.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none'; }}
+  var cards = document.querySelectorAll('#cards .card');
+  for (var c of cards) {{
+    c.style.display = (q === '' || c.dataset.search.indexOf(q) >= 0) ? '' : 'none';
+  }}
 }}
 </script>
 """
@@ -401,6 +440,15 @@ def main():
         pyco_history.append(entry)
         latest_pyco = entry
 
+    # Per-slug sample galleries (rendered by dashboard_samples.py)
+    samples_summary = {}
+    samples_summary_path = out_dir / "samples" / "_samples_summary.json"
+    if samples_summary_path.exists():
+        try:
+            samples_summary = json.loads(samples_summary_path.read_text())
+        except Exception:
+            pass
+
     # Per-Job-D run summaries
     jobd_runs = []
     for p in sorted(glob.glob(f"{args.results_dir}/jobd_runs/*.json")):
@@ -443,6 +491,7 @@ def main():
         "pyco_history": pyco_history,
         "jobd_runs": jobd_runs,
         "twelve_class_gt": twelve_class_gt,
+        "per_slug_samples": samples_summary,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
