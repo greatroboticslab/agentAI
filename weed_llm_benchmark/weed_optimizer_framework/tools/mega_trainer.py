@@ -281,7 +281,7 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     stats = {"datasets": 0, "images": 0, "labels": 0, "skipped_no_label": 0,
              "skipped_duplicates": 0, "unique_hashes": 0,
              "skipped_autolabel": 0, "skipped_never_train": 0,
-             "skipped_holdout_stem": 0,
+             "skipped_holdout_stem": 0, "skipped_user_flag": 0,
              "weed_class_instances": {n: 0 for n in CANONICAL_12_NAMES}}
     seen_hashes = {}
 
@@ -290,6 +290,26 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     holdout_stems = _load_holdout_stems()
     logger.info(f"[Merge] holdout stem filter active: {len(holdout_stems)} stems "
                 f"blocked from training regardless of source slug")
+
+    # v3.0.30.1: user-driven REQ-3 quality feedback — slugs the user marked
+    # as garbage via the dashboard get skipped here. The flags file is
+    # written by dashboard_server.py (POST /api/flag/{slug}).
+    flags_path = os.path.join(os.path.dirname(__file__), "..", "..",
+                              "results", "framework", "dataset_flags.json")
+    flags_path = os.path.abspath(flags_path)
+    user_flags = {}
+    if os.path.isfile(flags_path):
+        try:
+            import json as _json
+            with open(flags_path) as f:
+                user_flags = _json.load(f)
+            garbage = [s for s, fd in user_flags.items()
+                       if isinstance(fd, dict) and fd.get("flag") == "garbage"]
+            logger.info(f"[Merge] user-flag filter active: {len(garbage)} slugs "
+                        f"marked garbage will be skipped: {garbage[:5]}"
+                        f"{'…' if len(garbage) > 5 else ''}")
+        except Exception as e:
+            logger.warning(f"[Merge] could not load user flags from {flags_path}: {e}")
 
     valid_annotations = {"bbox", "bbox+segmentation", "yolo"}
     if include_autolabel:
@@ -301,6 +321,14 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
         if ds_name in NEVER_TRAIN_SLUGS:
             stats["skipped_never_train"] += 1
             logger.info(f"[Merge] {ds_name} in NEVER_TRAIN — skipped (eval-only)")
+            continue
+
+        # v3.0.30.1: user flagged this slug as garbage from the dashboard.
+        slug_flag = (user_flags.get(ds_name) or {}).get("flag")
+        if slug_flag == "garbage":
+            stats["skipped_user_flag"] += 1
+            logger.info(f"[Merge] {ds_name} user-flagged GARBAGE — skipped. "
+                        f"reason: {(user_flags[ds_name] or {}).get('reason','')[:80]}")
             continue
 
         local_path = info.get("local_path")
@@ -477,6 +505,7 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                 f"yolo_autolabel datasets skipped: {stats['skipped_autolabel']}. "
                 f"NEVER_TRAIN datasets skipped: {stats['skipped_never_train']}. "
                 f"v3.0.28 holdout-stem filter dropped: {stats['skipped_holdout_stem']}. "
+                f"v3.0.30 user-flag GARBAGE skipped: {stats['skipped_user_flag']}. "
                 f"Per-class instances: {stats['weed_class_instances']}")
     # v3.0.19: persist dHash caches written back to registry entries
     disc._save_registry()

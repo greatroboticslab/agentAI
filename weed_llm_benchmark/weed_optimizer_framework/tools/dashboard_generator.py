@@ -26,6 +26,7 @@ import html as html_lib
 import json
 import os
 import re
+import urllib.parse
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -208,6 +209,7 @@ that <b>never enters training</b>.</p>
 
 def build_datasets(state: dict) -> str:
     samples = state.get("per_slug_samples", {})
+    flags = state.get("flags", {})
     cards = []
     for d in state["datasets_for_table"]:
         label_badge = {
@@ -224,9 +226,13 @@ def build_datasets(state: dict) -> str:
         # Image gallery (with rendered bboxes if available)
         slug_samples = samples.get(d["slug"], {}).get("samples", [])
         if slug_samples:
+            def _enc(p):
+                # URL-encode path components but keep '/'
+                return "/".join(urllib.parse.quote(seg, safe='')
+                                for seg in p.split("/"))
             gallery_html = '<div class="gallery">' + "".join(
-                f'<a href="{s["img"]}" target="_blank">'
-                f'<img src="{s["img"]}" loading="lazy" '
+                f'<a href="{_enc(s["img"])}" target="_blank">'
+                f'<img src="{_enc(s["img"])}" loading="lazy" '
                 f'title="{s["n_boxes"]} box(es)" alt=""></a>'
                 for s in slug_samples
             ) + '</div>'
@@ -240,20 +246,51 @@ def build_datasets(state: dict) -> str:
                 f'<div class="small">{box_color_legend} · '
                 f'click any image to enlarge</div></div>'
             )
+        elif not d.get("has_local_data", True):
+            gallery_block = ('<div class="small placeholder">'
+                             '📥 <i>not downloaded yet</i> — Brain has indexed this slug, '
+                             'but actual image files have not been fetched yet.</div>')
         else:
-            gallery_block = '<div class="small">(no samples rendered yet)</div>'
+            gallery_block = ('<div class="small placeholder">'
+                             '🖼 <i>samples not yet rendered</i> — will appear after the '
+                             'next Job-D / live-server pass.</div>')
 
-        searchable_text = f"{d['slug']} {d['source']} {d['annotation_h']} {' '.join(d['crops'])} {d['description'][:200]}"
+        # Flag UI per card (works only when served by live cluster /api/flag)
+        slug_flag = (flags.get(d["slug"]) or {}).get("flag")
+        flag_indicator = ""
+        if slug_flag == "garbage":
+            flag_indicator = '<span class="badge badge-drop">🗑 FLAGGED GARBAGE</span>'
+        elif slug_flag == "good":
+            flag_indicator = '<span class="badge badge-real">✅ FLAGGED GOOD</span>'
+        elif slug_flag == "unsure":
+            flag_indicator = '<span class="badge">❓ FLAGGED UNSURE</span>'
+
+        flag_controls = (
+            f'<div class="flag-controls" data-slug="{html_lib.escape(d["slug"])}">'
+            f'<button class="flag-btn flag-garbage" onclick="setFlag(this,\'garbage\')">🗑 Mark garbage</button>'
+            f'<button class="flag-btn flag-good" onclick="setFlag(this,\'good\')">✅ Mark good</button>'
+            f'<button class="flag-btn flag-unsure" onclick="setFlag(this,\'unsure\')">❓ Unsure</button>'
+            f'<button class="flag-btn flag-clear" onclick="setFlag(this,\'clear\')">⟲ Clear</button>'
+            f'<span class="flag-status"></span>'
+            f'</div>'
+        )
+
+        searchable_text = f"{d['slug']} {d['source']} {d['annotation_h']} {' '.join(d['crops'])} {d['description'][:200]} {slug_flag or ''}"
         cards.append(
-            f'<div class="card{ " card-never" if d["never_train"] else "" }" data-search="{html_lib.escape(searchable_text.lower())}">'
+            f'<div class="card{ " card-never" if d["never_train"] else "" }'
+            f'{ " card-garbage" if slug_flag == "garbage" else "" }" '
+            f'data-search="{html_lib.escape(searchable_text.lower())}" '
+            f'data-slug="{html_lib.escape(d["slug"])}">'
             f'<div class="card-head">'
             f'<code class="slug">{html_lib.escape(d["slug"])}</code>{never} '
+            f'{flag_indicator} '
             f'{label_badge} '
             f'<span class="badge">{html_lib.escape(d["source"])}</span> '
             f'{crops}'
             f'</div>'
             f'<div class="small desc">{html_lib.escape(d["description"][:200])}</div>'
             f'{gallery_block}'
+            f'{flag_controls}'
             f'</div>'
         )
 
@@ -262,7 +299,11 @@ def build_datasets(state: dict) -> str:
 6 sample images with bboxes drawn on top so you can SEE label quality at a
 glance. Green = human-labeled. Orange = AI/OWLv2-labeled. Red border =
 NEVER_TRAIN (blocked from training).</span></p>
-<p><input type="text" id="q" class="search" placeholder="search slug / crop / source / annotation…"
+<p id="api-banner" class="api-banner">
+  <span id="api-status">⟳ checking cluster API…</span>
+  <span class="small"> · Flag buttons only work when the live cluster server is reachable.</span>
+</p>
+<p><input type="text" id="q" class="search" placeholder="search slug / crop / source / annotation / flag…"
    onkeyup="filter()" autofocus></p>
 <div id="cards">
 {"".join(cards)}
@@ -271,14 +312,104 @@ NEVER_TRAIN (blocked from training).</span></p>
 .card {{ border: 1px solid #ddd; border-radius: 8px; padding: 0.7rem 1rem;
          margin-bottom: 1rem; background: #fff; }}
 .card-never {{ border: 2px solid #c33; background: #fff8f8; }}
+.card-garbage {{ opacity: 0.55; background: #fafafa; }}
 .card-head {{ margin-bottom: 0.4rem; }}
 .card .slug {{ font-size: 1.05rem; font-weight: 500; margin-right: 0.4rem; }}
 .card .desc {{ margin-bottom: 0.5rem; color: #666; }}
 .gallery {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.3rem; }}
 .gallery img {{ width: 180px; height: 140px; object-fit: cover;
-                border-radius: 4px; border: 1px solid #eee; cursor: zoom-in; }}
+                border-radius: 4px; border: 1px solid #eee; cursor: zoom-in;
+                background: #f0f0f0; }}
+.placeholder {{ background: #f7f7f7; padding: 0.8rem; border-radius: 4px;
+                color: #888; margin-bottom: 0.3rem; }}
+.flag-controls {{ margin-top: 0.5rem; font-size: 0.85rem; }}
+.flag-btn {{ margin-right: 0.3rem; padding: 0.2rem 0.6rem; cursor: pointer;
+             border: 1px solid #ccc; border-radius: 4px; background: white;
+             font-size: 0.85rem; }}
+.flag-btn:hover {{ background: #f5f5f5; }}
+.flag-btn:disabled {{ opacity: 0.4; cursor: not-allowed; }}
+.flag-garbage:hover {{ background: #ffe0e0; }}
+.flag-good:hover {{ background: #d8f0d8; }}
+.flag-status {{ margin-left: 0.6rem; color: #777; font-size: 0.85rem; }}
+.api-banner {{ background: #f3f9f5; padding: 0.6rem 1rem; border-radius: 6px; }}
+.api-banner.api-down {{ background: #fff0e0; }}
+.api-banner.api-up   {{ background: #d4f0d4; }}
 </style>
 <script>
+let API_BASE = "";  // resolved on load
+async function findApi() {{
+  // First: if we're served from the live cluster tunnel, same-origin works
+  try {{
+    const probe = await fetch("/healthz", {{cache: "no-store"}});
+    if (probe.ok) {{
+      API_BASE = "";
+      document.getElementById("api-status").textContent =
+        "✅ live cluster server (same origin) — flag buttons active";
+      document.getElementById("api-banner").classList.add("api-up");
+      return;
+    }}
+  }} catch (e) {{ /* not live, try GitHub Pages → tunnel */ }}
+  // Otherwise: we're on GitHub Pages → fetch tunnel URL from root
+  try {{
+    const r = await fetch("../tunnel_url.json?cb=" + Date.now(), {{cache: "no-store"}});
+    if (r.ok) {{
+      const j = await r.json();
+      API_BASE = j.url || "";
+      // probe
+      try {{
+        const p = await fetch(API_BASE + "/healthz");
+        if (p.ok) {{
+          document.getElementById("api-status").textContent =
+            "✅ live cluster API at " + API_BASE + " — flag buttons active";
+          document.getElementById("api-banner").classList.add("api-up");
+          // reload flags from live API
+          const fr = await fetch(API_BASE + "/api/flags");
+          if (fr.ok) {{
+            const flags = await fr.json();
+            for (const slug in flags) {{
+              const card = document.querySelector(".card[data-slug=\\"" + slug + "\\"]");
+              if (card) {{
+                const fc = card.querySelector(".flag-status");
+                if (fc) fc.textContent = "flag=" + flags[slug].flag;
+              }}
+            }}
+          }}
+          return;
+        }}
+      }} catch (e) {{ /* tunnel URL stale */ }}
+    }}
+  }} catch (e) {{ /* no tunnel_url.json */ }}
+  document.getElementById("api-status").textContent =
+    "⚠️ cluster API unreachable — flag buttons disabled (only static snapshot)";
+  document.getElementById("api-banner").classList.add("api-down");
+  document.querySelectorAll(".flag-btn").forEach(b => b.disabled = true);
+}}
+findApi();
+
+async function setFlag(btn, flag) {{
+  const card = btn.closest(".card");
+  const slug = card.dataset.slug;
+  const statusEl = card.querySelector(".flag-status");
+  const reason = flag === "garbage"
+    ? (prompt("Why is this garbage? (optional, helps Brain avoid similar)", "") || "")
+    : "";
+  statusEl.textContent = "saving…";
+  try {{
+    const r = await fetch(API_BASE + "/api/flag/" + encodeURIComponent(slug), {{
+      method: "POST",
+      headers: {{"Content-Type": "application/json"}},
+      body: JSON.stringify({{flag: flag, reason: reason}}),
+    }});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    statusEl.textContent = "flag=" + (j.current ? j.current.flag : "cleared");
+    if (flag === "garbage") card.classList.add("card-garbage");
+    else card.classList.remove("card-garbage");
+  }} catch (e) {{
+    statusEl.textContent = "FAILED: " + e.message;
+  }}
+}}
+
 function filter() {{
   var q = document.getElementById('q').value.toLowerCase();
   var cards = document.querySelectorAll('#cards .card');

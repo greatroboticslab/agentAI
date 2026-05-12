@@ -2801,3 +2801,63 @@ Once Job 40757404 transitions PD → R:
   serves from `harry567566/weed-dashboard/dashboard/`.
 - Free Cloudflare quick tunnel: no SLA, occasional reconnects. Upgrade to
   named tunnel later if user signs up at dash.cloudflare.com.
+
+## 2026-05-11/12 — v3.0.30.1: user-flag UI + REQ-3 feedback loop
+
+### User feedback on Live dashboard
+
+After first opening `harry567566.github.io/weed-dashboard/` user said:
+1. Progress page needs context (mAP alone is meaningless — also need dataset count, categories)
+2. Many cards say "no samples rendered yet" or show white blanks
+3. Many datasets look like obvious garbage (kg_parohod__warp-recycling etc)
+   — user wants to MARK datasets as garbage from the UI; next merge skips them
+
+### Build (this session)
+
+**Backend (`dashboard_server.py`)**:
+- `POST /api/flag/{slug}` with `{flag, reason}` writes/upserts to
+  `results/framework/dataset_flags.json`
+- `GET /api/flags` returns current state
+- CORS enabled so the GitHub Pages JS can call the tunnel API directly
+- State endpoint now includes `flag` per dataset
+
+**Frontend (`dashboard_generator.py`)**:
+- Each card has 4 flag buttons: 🗑 garbage / ✅ good / ❓ unsure / ⟲ clear
+- Garbage prompt asks user for an optional reason (helps Brain learn later)
+- Garbage-flagged cards visually dim with `card-garbage` style
+- API base auto-resolves: same-origin first (when served from cluster),
+  else fetches `tunnel_url.json` from GitHub Pages, falls back to "disabled"
+- Existing flags are loaded on page-open from live API
+
+**Trainer (`mega_trainer.py`)**:
+- At merge start, reads `dataset_flags.json`
+- Any slug with `flag=="garbage"` is skipped (incremented in
+  `stats["skipped_user_flag"]`) with reason logged
+- Surfaces in the final merge log line
+
+**Other fixes**:
+- URL-encoded image filenames in static HTML — fixes white blanks for slugs
+  with spaces/parens in filenames (e.g. `diabroticaspeciosa (1971).jpg`)
+- Differentiated "(not downloaded yet — Brain indexed but not fetched)"
+  vs "(samples not yet rendered)" placeholders so user knows WHY a card is
+  empty
+- LIVE `/api/state` now correctly walks `local_path` and counts images
+  (`downloaded_imgs` went from 0 → 1,542,072 once live server reports it)
+- Job-S 40757404 cancelled to pick up new code; resubmitted as 40770062
+  (PD, waiting on priority)
+
+### How it closes the loop
+
+User opens dashboard → sees a garbage slug → clicks 🗑 → reason saved →
+`dataset_flags.json` updated on cluster → next time `mega_trainer._merge_datasets`
+runs (any future training), that slug is automatically skipped. No code change
+needed. **REQ-3 quality is now user-driven, real-time, and persistent.**
+
+### Status
+
+- 3 SLURM jobs queued/running:
+  - 40755735 v3030_jD — Job-D harvest R, 6h+ elapsed
+  - 40770062 v3030_dS — Dashboard server PD (waiting priority)
+  - RF-DETR 40755677 FAILED (missing pytorch_lightning); resubmitting with
+    `pip install rfdetr[train,loggers]`
+- Once 40770062 R: flag UI fully active at `harry567566.github.io/weed-dashboard/`
