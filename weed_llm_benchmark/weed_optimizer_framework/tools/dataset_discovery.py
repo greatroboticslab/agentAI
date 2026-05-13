@@ -570,17 +570,66 @@ class DatasetDiscovery:
     # HARVEST — each run discovers N new datasets, accumulates forever
     # =========================================================
 
+    # v3.0.30.3 — user-tuned 2026-05-12: ONLY weed/crop/field plants.
+    # Reject pest/insect/disease/tree/indoor per direct user spec:
+    #   "我们只要plant. 但是这个plant主要是weed和作物 以及少部分的什么花朵啊
+    #    或者什么路边的小草啊什么乱七八糟的在草地上或者农田上经常出现的植物.
+    #    而不是大树啊虫害啊什么的乱七八糟的的"
+    # → Accept: weed, crop, field plant, common roadside grass, agricultural flower
+    # → Reject: pest, insect, disease, tree, decorative/indoor plant
     DEFAULT_HARVEST_QUERIES = [
-        # Broad agricultural vision — covers weed/crop/plant/pest/disease
-        "weed", "crop", "plant", "leaf", "fruit",
-        "agriculture", "agricultural", "farm",
-        "pest", "insect",
-        "plant disease", "crop disease", "leaf disease",
-        "weed detection", "crop detection", "plant detection",
-        "weed yolo", "agriculture yolo", "plant yolo",
-        "weed bounding box", "crop bounding box",
-        "plantvillage", "plantdoc", "deepweeds",
+        # Direct weed targets
+        "weed", "weed detection", "weed yolo", "weed bounding box",
+        "weed segmentation", "weed dataset",
+        # Crop targets (the things weeds compete with)
+        "crop detection", "crop dataset", "crop yolo",
+        "cotton field", "rice field", "wheat field", "corn field", "maize field",
+        "soybean field", "sugar beet field", "lettuce field",
+        # Field / agricultural scenes (likely to contain weeds among crops)
+        "agricultural field", "farmland", "field crops",
+        "uav crop", "uav weed", "drone agriculture",
+        # Common roadside/field grass + small wild plants
+        "grass dataset", "wild plants field", "plant seedling",
+        # Specific weed-related projects
+        "cottonweed", "deepweeds", "weedsense", "broadleaf weed",
+        "grass weed", "weed species",
+        # Real-bbox-hinting keywords
+        "yolo agriculture", "coco agriculture", "bounding box field",
     ]
+
+    # Positive matches: a slug name / description containing any of these is
+    # a likely WEED/CROP/FIELD-PLANT detection candidate.
+    AG_VOCAB_ACCEPT = (
+        "weed", "crop", "field", "farm", "agri", "agriculture",
+        "cotton", "rice", "wheat", "corn", "maize", "soybean", "soy",
+        "sugar beet", "sugarbeet", "lettuce", "tomato", "potato",
+        "seedling", "sprout", "grass", "broadleaf",
+        "uav", "drone", "aerial",
+        "cottonweed", "deepweeds", "weedsense",
+    )
+
+    # Reject overrides: even if a slug matches positive vocab, drop it if it
+    # also matches reject vocab. Per 2026-05-12 user spec.
+    AG_VOCAB_REJECT = (
+        # pests + insects
+        "pest", "insect", "bug-detect", "fly", "mosquito", "beetle",
+        "weevil", "caterpillar", "earthworm", "grasshopper",
+        "bee", "beehive", "honeybee", "spider",
+        # diseases / classification
+        "disease", "blight", "rust", "rot-detect", "infection",
+        "virus", "fungus", "mildew", "lesion",
+        "plantvillage", "plant-village", "leafsnap",
+        "plantdoc", "plant-doc", "plantifydr",
+        "leaf-disease", "leaf disease", "leaf-classify",
+        # not plants at all
+        "warp", "recycling", "waste",
+        # trees and indoor/decorative (off-domain)
+        "tree-detect", "tree species", "tree-classification",
+        "houseplant", "indoor plant", "decorative",
+        "bonsai", "succulent",
+        # generic classification (not detection)
+        "classification", "image-classification",
+    )
 
     def _card_suggests_bbox(self, ds_info):
         """Fast heuristic from HF dataset_info (no actual data load):
@@ -618,6 +667,47 @@ class DatasetDiscovery:
     def _slugify(self, hf_id):
         return hf_id.replace("/", "__").replace("-", "_").lower()[:60]
 
+    def _is_relevant_dataset(self, slug_or_id: str, description: str = "") -> bool:
+        """v3.0.30.3 relevance filter (user spec 2026-05-12):
+        ACCEPT: weed / crop / field-plant / agricultural-flower / roadside-grass
+        REJECT: pest / insect / disease / tree / indoor / decorative / classification-only
+
+        Returns True if candidate likely contains weed-detection-relevant content.
+
+        Both vocab lists are class attributes (AG_VOCAB_ACCEPT, AG_VOCAB_REJECT).
+        """
+        blob = (slug_or_id + " " + (description or "")).lower()
+        # First check reject — fail-fast on obvious off-domain
+        for r in self.AG_VOCAB_REJECT:
+            if r in blob:
+                return False
+        # Then require at least one positive match
+        for a in self.AG_VOCAB_ACCEPT:
+            if a in blob:
+                return True
+        return False
+
+    def _is_already_flagged_garbage(self, candidate_slug: str) -> bool:
+        """Check if user (or prior Brain run) has marked this slug as garbage
+        via the dashboard. Stops Brain from re-suggesting the same junk.
+
+        Reads results/framework/dataset_flags.json. Returns True if flagged."""
+        import os, json
+        flags_path = os.path.join(
+            os.path.dirname(__file__), "..", "..",
+            "results", "framework", "dataset_flags.json",
+        )
+        flags_path = os.path.abspath(flags_path)
+        if not os.path.isfile(flags_path):
+            return False
+        try:
+            with open(flags_path) as f:
+                flags = json.load(f)
+        except Exception:
+            return False
+        entry = flags.get(candidate_slug)
+        return bool(entry) and entry.get("flag") == "garbage"
+
     def harvest_new_datasets(self, max_new=5, queries=None, confirm_schema=True,
                               max_images_per_ds=30000):
         """Search HF for NEW datasets, fast-filter by card metadata, download up to max_new.
@@ -651,17 +741,16 @@ class DatasetDiscovery:
             logger.warning(f"[Harvest] task-filter list failed: {e}")
             det = []
 
-        # Keep only ones whose id/description mentions agricultural vocab
-        AG_VOCAB = ("weed", "crop", "plant", "leaf", "fruit", "flower", "seed", "grain",
-                    "rice", "wheat", "corn", "maize", "cotton", "soybean", "tomato",
-                    "potato", "agri", "farm", "pest", "insect", "disease")
-
+        # v3.0.30.3: tightened relevance — only weed/crop/field-plants, no
+        # pest/insect/disease/tree (user spec 2026-05-12).
         prioritized = []
         for d in det:
             name_l = d.id.lower()
-            if any(v in name_l for v in AG_VOCAB):
+            if self._is_relevant_dataset(name_l,
+                getattr(d, "description", "") or ""):
                 prioritized.append(d)
-        logger.info(f"[Harvest] Phase 1: {len(prioritized)}/{len(det)} bulk results matched agriculture vocab")
+        logger.info(f"[Harvest] Phase 1: {len(prioritized)}/{len(det)} "
+                    f"bulk results passed weed/crop/field-plant filter")
 
         # ------------ Phase 2: keyword search fallback ------------
         keyword_results = []
@@ -674,11 +763,21 @@ class DatasetDiscovery:
                 logger.warning(f"[Harvest] search failed '{q}': {e}")
                 continue
 
-        # Combine: task-filtered priorities first, then keyword results
-        combined = prioritized + keyword_results
-        logger.info(f"[Harvest] Phase 2: {len(keyword_results)} keyword hits; "
-                    f"processing {len(combined)} total candidates")
+        # v3.0.30.3: same relevance filter applied to keyword hits.
+        keyword_filtered = []
+        for d in keyword_results:
+            if self._is_relevant_dataset(d.id.lower(),
+                                          getattr(d, "description", "") or ""):
+                keyword_filtered.append(d)
+        logger.info(f"[Harvest] Phase 2: {len(keyword_filtered)}/{len(keyword_results)} "
+                    f"keyword hits passed weed/crop/field-plant filter")
 
+        # Combine: task-filtered priorities first, then keyword results
+        combined = prioritized + keyword_filtered
+        logger.info(f"[Harvest] processing {len(combined)} total candidates")
+
+        n_rejected_garbage = 0
+        n_rejected_irrelevant = 0
         for d in combined:
             if len(results) >= max_new:
                 break
@@ -686,6 +785,17 @@ class DatasetDiscovery:
                 continue
             seen_ids.add(d.id)
             if self.is_duplicate(d.id):
+                continue
+            # v3.0.30.3: enforce relevance + flag filter at every entry point.
+            slug_guess = self._slugify(d.id)
+            if self._is_already_flagged_garbage(slug_guess):
+                n_rejected_garbage += 1
+                logger.info(f"[Harvest] skip {d.id} — previously flagged garbage")
+                continue
+            if not self._is_relevant_dataset(d.id.lower(),
+                                              getattr(d, "description", "") or ""):
+                n_rejected_irrelevant += 1
+                logger.info(f"[Harvest] skip {d.id} — failed weed/crop/field filter")
                 continue
 
             # Fast metadata check
@@ -785,14 +895,25 @@ class DatasetDiscovery:
                 kg_quota = max_new - len(results)
                 kg = harvest_kaggle_datasets(
                     data_dir=self.data_dir,
-                    queries=[q for q in queries if any(k in q for k in ("weed", "crop", "plant", "agri"))] or queries[:3],
-                    already_known_cb=lambda s: s in self.registry["datasets"] or self.is_duplicate(s),
+                    queries=[q for q in queries if any(k in q for k in ("weed", "crop", "field", "agri"))] or queries[:3],
+                    already_known_cb=lambda s: (
+                        s in self.registry["datasets"]
+                        or self.is_duplicate(s)
+                        or self._is_already_flagged_garbage(s)
+                    ),
                     max_new=min(kg_quota, 3),
                 )
+                # v3.0.30.3: post-filter Kaggle results too (extra_sources doesn't
+                # know our reject vocab yet).
                 for entry in kg:
-                    self.registry["datasets"][entry["slug"]] = entry["info"]
+                    slug = entry["slug"]
+                    desc = entry.get("info", {}).get("description", "") or ""
+                    if not self._is_relevant_dataset(slug, desc):
+                        logger.info(f"[Harvest] kaggle skip {slug} — failed weed/crop filter")
+                        continue
+                    self.registry["datasets"][slug] = entry["info"]
                     results.append({
-                        "hf_id": entry["hf_id"], "slug": entry["slug"],
+                        "hf_id": entry["hf_id"], "slug": slug,
                         "stats": entry["stats"], "reason": entry["reason"],
                     })
             except Exception as e:
@@ -809,14 +930,24 @@ class DatasetDiscovery:
                 rf = harvest_roboflow_datasets(
                     data_dir=self.data_dir,
                     queries=rf_queries,
-                    already_known_cb=lambda s: s in self.registry["datasets"] or self.is_duplicate(s),
+                    already_known_cb=lambda s: (
+                        s in self.registry["datasets"]
+                        or self.is_duplicate(s)
+                        or self._is_already_flagged_garbage(s)
+                    ),
                     # Allow Roboflow to dominate the quota since it's the big source
                     max_new=max(rf_quota, 8),
                 )
+                # v3.0.30.3: post-filter Roboflow results too
                 for entry in rf:
-                    self.registry["datasets"][entry["slug"]] = entry["info"]
+                    slug = entry["slug"]
+                    desc = entry.get("info", {}).get("description", "") or ""
+                    if not self._is_relevant_dataset(slug, desc):
+                        logger.info(f"[Harvest] roboflow skip {slug} — failed weed/crop filter")
+                        continue
+                    self.registry["datasets"][slug] = entry["info"]
                     results.append({
-                        "hf_id": entry["hf_id"], "slug": entry["slug"],
+                        "hf_id": entry["hf_id"], "slug": slug,
                         "stats": entry["stats"], "reason": entry["reason"],
                     })
             except Exception as e:

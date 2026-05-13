@@ -2861,3 +2861,83 @@ needed. **REQ-3 quality is now user-driven, real-time, and persistent.**
   - RF-DETR 40755677 FAILED (missing pytorch_lightning); resubmitting with
     `pip install rfdetr[train,loggers]`
 - Once 40770062 R: flag UI fully active at `harry567566.github.io/weed-dashboard/`
+
+## 2026-05-12 — v3.0.30.3 Brain relevance filter (user-driven quality tightening)
+
+### User feedback (after visual audit of dashboard)
+
+> "我们只要plant. 但是这个plant主要是weed和作物 以及少部分的什么花朵啊
+>  或者什么路边的小草啊什么乱七八糟的在草地上或者农田上经常出现的植物.
+>  而不是大树啊虫害啊什么的乱七八糟的的"
+
+User flagged 6 garbage slugs via dashboard:
+1. kg_parohod__warp-waste-recycling-plant-dataset (recycling, not plants)
+2. gh_vumhvg__train-yolov9-beehive-dataset (beehives, not weeds)
+3. kg_lavaman151__plantifydr-dataset (102K disease classification)
+4. kg_marquis03__plants-classification (30K classification, no bbox)
+5. kg_nirmalsankalana__plantdoc-dataset (disease)
+6. kg_abdulhasibuddin__plant-doc-dataset (disease)
+
+These get auto-skipped at next mega_trainer merge (already wired v3.0.30.1).
+
+### Lesson learned → upstream fix
+
+Previous DEFAULT_HARVEST_QUERIES included "pest", "insect", "plant disease",
+"crop disease" — Brain dutifully harvested 17 plant-disease slugs (847K imgs,
+55% of total corpus). All garbage for WEED DETECTION.
+
+### v3.0.30.3 changes to `tools/dataset_discovery.py`
+
+1. **DEFAULT_HARVEST_QUERIES rewritten**:
+   - Removed: pest, insect, plant disease, crop disease, leaf disease, fruit,
+     plantvillage, plantdoc
+   - Added: cotton/rice/wheat/corn/maize field, soybean field, sugar beet,
+     lettuce field, uav crop, drone agriculture, plant seedling, broadleaf weed,
+     grass weed, weed species
+
+2. **New `AG_VOCAB_ACCEPT`**: weed, crop, field, farm, agri, cotton, rice,
+   wheat, corn, maize, soybean, sugar beet, lettuce, tomato, potato, seedling,
+   sprout, grass, broadleaf, uav, drone, aerial, cottonweed, deepweeds, weedsense.
+
+3. **New `AG_VOCAB_REJECT`** — auto-fails any slug containing:
+   - pest words: pest, insect, bug, fly, mosquito, beetle, weevil,
+     caterpillar, earthworm, grasshopper, bee, beehive, honeybee, spider
+   - disease words: disease, blight, rust, rot, infection, virus, fungus,
+     mildew, lesion, plantvillage, plantdoc, plantifydr, leaf-disease,
+     leaf-classify
+   - non-plant: warp, recycling, waste
+   - off-domain: tree-detect, tree species, houseplant, indoor plant,
+     decorative, bonsai, succulent
+   - non-detection: classification, image-classification
+
+4. **New `_is_relevant_dataset(slug, description)`**: reject takes precedence
+   over accept. Called at every entry point (HF Phase 1 bulk list, HF Phase 2
+   keyword search, Kaggle, Roboflow).
+
+5. **New `_is_already_flagged_garbage(slug)`**: reads
+   `results/framework/dataset_flags.json`. Brain won't re-suggest user-flagged
+   garbage on future harvests.
+
+### Verified 14 test cases (all pass)
+
+ACCEPT: cottonweed_sp8, gh_tehreemnoor__yolov5-weed-detection, weedcrop,
+deepweeds, francesco__weed_crop_aerial
+
+REJECT: plantifydr, agricultural-pests, beehive, warp-recycling, plantdisease,
+plants-classification, plantvillage, tree-detection, houseplant
+
+### Cumulative quality discipline
+
+```
+v3.0.27 leak (cottonweed_sp8/holdout contained cwd12 holdout)
+  → v3.0.28 stem-level holdout filter (per-image)
+v3.0.30 user spots garbage in dashboard
+  → v3.0.30.1 user-flag UI + mega_trainer skip
+v3.0.30.3 (now) user specifies what's relevant
+  → Brain stops harvesting pest/disease/tree/indoor at the source
+
+Triple defense in depth:
+  1. Brain rejects irrelevant slugs at discovery time
+  2. User can flag any slug as garbage via dashboard
+  3. mega_trainer skips both at merge time
+```
