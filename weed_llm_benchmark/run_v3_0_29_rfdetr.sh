@@ -46,7 +46,7 @@ python -m weed_optimizer_framework.tools.train_rfdetr \
     --epochs 60 \
     --batch 4 \
     --grad-accum 4 \
-    --resolution 728 \
+    --resolution 576 \
     --lr 1e-4
 
 EXIT_CODE=$?

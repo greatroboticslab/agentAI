@@ -2941,3 +2941,55 @@ Triple defense in depth:
   2. User can flag any slug as garbage via dashboard
   3. mega_trainer skips both at merge time
 ```
+
+## 2026-05-12 (end of session) — current state snapshot for /clear continuity
+
+### Running jobs (cluster, all parallel)
+
+| Job | Role | Status |
+|---|---|---|
+| 40800343 v3030_jD | **Job-D harvest with NEW relevance filter** | 🟢 R 2h 40m |
+| 40770062 v3030_dS | Dashboard live server (Cloudflare Tunnel) | 🟢 R 23h |
+| 40803244 v3029_rfd | **RF-DETR attempt #4** (resolution=576) | 🟡 PD |
+
+### RF-DETR failure trail (3 failures, now retrying)
+
+| Attempt | jobid | Failure | Fix |
+|---|---|---|---|
+| #1 | 40755677 | `ModuleNotFoundError: pytorch_lightning` | `pip install rfdetr[train,loggers]` |
+| #2 | 40770150 | `resolution=728 % 32 != 0` | resolution=768 |
+| #3 | 40797172 | pos_embeddings mismatch (1297 expected ≠ 2305 at 768) | **resolution=576** (matches checkpoint: 36×16=576) |
+| #4 | **40803244** | pending | hope for actual training |
+
+### Persistent state (survives session /clear)
+
+- **dataset_flags.json**: 6 garbage flags (parohod, beehive, plantifydr,
+  plants-classification, plantdoc x2)
+- **Brain filter** in `dataset_discovery.py`: AG_VOCAB_ACCEPT + AG_VOCAB_REJECT
+  + `_is_relevant_dataset` + `_is_already_flagged_garbage`
+- **mega_trainer skips**: flagged slugs + holdout stems + NEVER_TRAIN
+- **Live tunnel URL** at https://github.com/harry567566/weed-dashboard/blob/main/tunnel_url.json
+  (Job-S auto-updates each chain)
+- **Static fallback** at https://harry567566.github.io/weed-dashboard/dashboard/
+- **Cluster files** at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/
+
+### Truth anchors
+
+- v3.0.6 baseline (yolo11n on cwd12 train alone): ~0.71 pycocotools
+- v3.0.28 SAFETY (yolo26x on cwd12 train alone): **0.7446 pycocotools** ← current best
+- v3.0.27 0.910 → RETRACTED (data leak)
+- GOAL: cwd12 mAP50-95 ≥ 0.90 pycocotools
+
+### Per-class baseline (v3.0.28 SAFETY pycoco)
+
+Strong: Purslane 0.840, Ragweed 0.804, Crabgrass 0.799, SpottedSpurge 0.790
+Weak: Morningglory 0.627, Goosegrass 0.636, Eclipta 0.698, Nutsedge 0.716
+(targeted improvement areas)
+
+### Next steps (when session resumes)
+
+1. Check RF-DETR 40803244 — if running > 1h, training actually started
+2. Check Job-D 40800343 jobd_runs/ output — what new (clean) slugs found
+3. If user has flagged more datasets via dashboard, mega_trainer auto-skips next merge
+4. After RF-DETR success → Phase 2A DINOv3+YOLO26 dual-branch OR Phase 2C distillation
+5. Eventually: v3.0.31 PRETRAIN on cleaned 20-40K real bbox + 100K+ clean autolabel
