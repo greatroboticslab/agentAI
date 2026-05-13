@@ -467,13 +467,106 @@ def build_progress(state: dict) -> str:
         for r in runs
     )
 
-    pyco_history = state.get("pyco_history", [])
-    pyco_rows = "".join(
-        f'<tr><td>{html_lib.escape(p["label"])}</td>'
-        f'<td>{p["mAP50_95"]:.4f}</td>'
-        f'<td>{p["mAP50"]:.4f}</td></tr>'
-        for p in pyco_history
-    )
+    # Rich per-result cards from meta JSONs (loaded by main())
+    result_metas = state.get("result_metas", [])
+    cards = []
+    for m in result_metas:
+        summary = m.get("summary", {})
+        td = m.get("training_data", {})
+        rc = m.get("run_config", {})
+        vd = m.get("validation_data", {})
+        per_class = m.get("per_class_AP", {})
+
+        mAP_main = summary.get("mAP50_95", 0)
+        mAP_50   = summary.get("mAP50", 0)
+        mAP_75   = summary.get("mAP75", 0)
+        gap_to_goal = 0.90 - mAP_main
+
+        # per-class table
+        if per_class:
+            pc_rows = "".join(
+                f'<tr><td>{html_lib.escape(name)}</td>'
+                f'<td>{v["AP50_95"]:.3f}</td>'
+                f'<td>{v["AP50"]:.3f}</td>'
+                f'<td>{v["n_gt"]}</td></tr>'
+                for name, v in per_class.items()
+            )
+            pc_html = (
+                '<details><summary>per-class breakdown</summary>'
+                '<table class="pc-table"><thead><tr><th>class</th>'
+                '<th>AP50-95</th><th>AP50</th><th>n_gt</th></tr></thead>'
+                f'<tbody>{pc_rows}</tbody></table></details>'
+            )
+        else:
+            pc_html = '<div class="small">per-class breakdown: not yet computed</div>'
+
+        # training data block
+        slugs_used = td.get("n_slugs_used", "?")
+        train_imgs = td.get("n_images_train", "?")
+        train_classes = td.get("n_classes", "?")
+        train_src = td.get("primary_source", "(not captured)")
+        uses_brain = td.get("uses_brain_harvested", None)
+        uses_autolabel = td.get("include_autolabel", None)
+
+        # run config block
+        epochs_str = f"{rc.get('epochs_completed','?')} / {rc.get('epochs_planned','?')}"
+        exit_reason = rc.get("exit_reason", "")
+        imgsz = rc.get("imgsz", "?")
+        batch = rc.get("batch", "?")
+        lr0 = rc.get("lr0", "?")
+        slurm = rc.get("slurm_job_id", "?")
+
+        cards.append(f"""
+<div class="result-card">
+  <div class="result-head">
+    <span class="result-label">{html_lib.escape(m.get('label', 'unknown run'))}</span>
+    <span class="result-mainmap">mAP50-95 = <b>{mAP_main:.4f}</b></span>
+    <span class="small">(gap to 0.90: {gap_to_goal:+.4f})</span>
+  </div>
+  <div class="result-row">
+    <div class="result-col">
+      <h4>Result (pycocotools canonical)</h4>
+      <table>
+        <tr><td>mAP50-95</td><td><b>{mAP_main:.4f}</b></td></tr>
+        <tr><td>mAP50</td><td>{mAP_50:.4f}</td></tr>
+        <tr><td>mAP75</td><td>{mAP_75:.4f}</td></tr>
+        <tr><td>val images</td><td>{summary.get('n_images', vd.get('n_images', '?'))}</td></tr>
+        <tr><td>val annotations</td><td>{summary.get('n_annotations', vd.get('n_annotations', '?'))}</td></tr>
+        <tr><td>predictions made</td><td>{summary.get('n_predictions', '?')}</td></tr>
+      </table>
+    </div>
+    <div class="result-col">
+      <h4>Training data</h4>
+      <table>
+        <tr><td>source</td><td>{html_lib.escape(str(train_src))}</td></tr>
+        <tr><td># slugs used</td><td><b>{slugs_used}</b></td></tr>
+        <tr><td># training imgs</td><td><b>{train_imgs:,}</b></td></tr>
+        <tr><td># classes</td><td>{train_classes}</td></tr>
+        <tr><td>uses Brain-harvested?</td><td>{('yes' if uses_brain else 'no') if uses_brain is not None else '?'}</td></tr>
+        <tr><td>uses autolabel?</td><td>{('yes' if uses_autolabel else 'no') if uses_autolabel is not None else '?'}</td></tr>
+      </table>
+    </div>
+    <div class="result-col">
+      <h4>Run config</h4>
+      <table>
+        <tr><td>model</td><td>{html_lib.escape(str(m.get('model_arch', '?')))}</td></tr>
+        <tr><td>epochs</td><td>{html_lib.escape(epochs_str)}</td></tr>
+        <tr><td>imgsz</td><td>{imgsz}</td></tr>
+        <tr><td>batch</td><td>{batch}</td></tr>
+        <tr><td>lr0</td><td>{lr0}</td></tr>
+        <tr><td>SLURM job</td><td>{html_lib.escape(str(slurm))}</td></tr>
+        <tr><td>exit</td><td class="small">{html_lib.escape(exit_reason)}</td></tr>
+      </table>
+    </div>
+  </div>
+  {pc_html}
+  <div class="small notes">{html_lib.escape(m.get('notes', ''))}</div>
+</div>""")
+
+    if not cards:
+        cards_html = "<p class='small'>No detailed result metadata yet. Run <code>build_result_meta.py</code> to generate.</p>"
+    else:
+        cards_html = "".join(cards)
 
     body = f"""
 <h2>Goal</h2>
@@ -481,15 +574,35 @@ def build_progress(state: dict) -> str:
 Above the v3.0.6 published baseline (~0.71 pyco / 0.865 ultralytics) and the
 2026 DINOv3+YOLO26 in-domain published result (0.723 pyco).</p>
 
-<h2>Canonical mAP history (pycocotools)</h2>
-<table><thead><tr><th>Model / run</th><th>mAP50-95</th><th>mAP50</th></tr></thead>
-<tbody>{pyco_rows}</tbody></table>
+<h2>Results — full context for every mAP number</h2>
+<style>
+.result-card {{ border: 1px solid #ddd; border-radius: 8px; padding: 1rem;
+                margin-bottom: 1.5rem; background: #fff; }}
+.result-head {{ font-size: 1.1rem; padding-bottom: 0.6rem;
+                border-bottom: 1px solid #eee; margin-bottom: 0.8rem; }}
+.result-head .result-label {{ font-weight: 600; color: #2a7; margin-right: 0.8rem; }}
+.result-head .result-mainmap {{ background: #f3f9f5; padding: 0.2rem 0.5rem;
+                                 border-radius: 4px; }}
+.result-row {{ display: grid; grid-template-columns: 1fr 1fr 1fr;
+               gap: 1rem; margin-bottom: 0.6rem; }}
+.result-col h4 {{ margin: 0.2rem 0 0.4rem 0; font-size: 0.95rem; color: #555; }}
+.result-col table {{ font-size: 0.85rem; }}
+.result-col td:first-child {{ color: #777; padding-right: 0.6rem; }}
+.result-col td:last-child  {{ text-align: right; font-family: monospace; }}
+.pc-table {{ margin: 0.5rem 0; font-size: 0.85rem; }}
+.pc-table th {{ background: #f5f5f5; padding: 0.2rem 0.6rem; }}
+.notes {{ color: #888; padding-top: 0.5rem; border-top: 1px solid #eee;
+          margin-top: 0.6rem; }}
+details summary {{ cursor: pointer; padding: 0.3rem 0; color: #666;
+                   font-size: 0.9rem; }}
+</style>
+{cards_html}
 
 <h2>Job-D continuous harvest runs</h2>
 <p><span class="small">Each row is one 48h Job-D iteration. "new_slugs" is how many
 NEW dataset slugs Brain discovered in that window. Goal: never-ending growth.</span></p>
 <table><thead><tr><th>SLURM job</th><th>iters</th><th>new_slugs</th><th>elapsed</th><th>exhausted</th></tr></thead>
-<tbody>{run_rows}</tbody></table>
+<tbody>{run_rows or '<tr><td colspan="5" class="small">no Job-D runs logged yet</td></tr>'}</tbody></table>
 """
     return page_template("Progress", body, nav_active="progress")
 
@@ -580,6 +693,16 @@ def main():
         except Exception:
             pass
 
+    # Rich result-meta JSONs (per pycoco summary, captures training context)
+    result_metas = []
+    for p in sorted(glob.glob(f"{args.results_dir}/*pycoco*meta.json"),
+                    key=os.path.getmtime):
+        try:
+            with open(p) as f:
+                result_metas.append(json.load(f))
+        except Exception:
+            pass
+
     # Per-Job-D run summaries
     jobd_runs = []
     for p in sorted(glob.glob(f"{args.results_dir}/jobd_runs/*.json")):
@@ -623,6 +746,7 @@ def main():
         "jobd_runs": jobd_runs,
         "twelve_class_gt": twelve_class_gt,
         "per_slug_samples": samples_summary,
+        "result_metas": result_metas,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 

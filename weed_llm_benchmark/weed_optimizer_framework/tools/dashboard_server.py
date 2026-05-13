@@ -191,6 +191,15 @@ def _build_state() -> dict:
         except Exception:
             pass
 
+    # Rich per-result metadata (training context + per-class AP)
+    state["result_metas"] = []
+    for p in sorted((PYCOCO_GLOB).glob("*pycoco*meta.json"),
+                    key=lambda x: x.stat().st_mtime):
+        try:
+            state["result_metas"].append(json.loads(p.read_text()))
+        except Exception:
+            pass
+
     # Per-Job-D run summaries
     if JOBD_DIR.is_dir():
         for p in sorted(JOBD_DIR.glob("*.json")):
