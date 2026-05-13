@@ -192,7 +192,10 @@ def main():
     ap.add_argument("--weight-decay", type=float, default=1e-4)
     args = ap.parse_args()
 
-    assert args.resolution % 56 == 0, "RF-DETR resolution must be divisible by 56"
+    # RFDETRMedium requires resolution divisible by patch_size * num_windows = 16*2 = 32
+    # (docs say 56 but that's older; actual check is mod 32 for Medium)
+    assert args.resolution % 32 == 0, \
+        f"RF-DETR Medium requires resolution divisible by 32, got {args.resolution}"
 
     out_root = Path(args.out).resolve()
     cwd12_root = Path(args.cwd12).resolve()

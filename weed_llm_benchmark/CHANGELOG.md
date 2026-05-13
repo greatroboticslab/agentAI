@@ -2993,3 +2993,88 @@ Weak: Morningglory 0.627, Goosegrass 0.636, Eclipta 0.698, Nutsedge 0.716
 3. If user has flagged more datasets via dashboard, mega_trainer auto-skips next merge
 4. After RF-DETR success → Phase 2A DINOv3+YOLO26 dual-branch OR Phase 2C distillation
 5. Eventually: v3.0.31 PRETRAIN on cleaned 20-40K real bbox + 100K+ clean autolabel
+
+## 2026-05-13 — v3.0.30.5: Job-D harvest silently dead — fix + RF-DETR truly training
+
+### Symptom on session resume
+
+Job-D 40800343 had been "RUNNING" 2.9h. Every 5-min iteration logged:
+```
+[Job-D] harvest_new_datasets not available
+[Job-D] this iter found 0 new slugs (registry now 71)
+```
+35 iterations, 0 new slugs, registry frozen at 71 since v3.0.30.3 deploy.
+**REQ-2 (autonomous discovery) and REQ-4 (continuously growing) had been
+quietly violated for ~3 days.** Pure SU burn.
+
+### Root cause
+
+`run_v3_0_30_jobd_continuous.sh:88` did:
+```python
+try:
+    from weed_optimizer_framework.tools.dataset_discovery import harvest_new_datasets
+    HARVEST_FN = harvest_new_datasets
+except Exception:
+    HARVEST_FN = None
+```
+But `harvest_new_datasets` is a **method on the `DatasetDiscovery` class**
+(`dataset_discovery.py:711`), not a module-level function. ImportError caught
+silently → `HARVEST_FN = None` → every iteration logged the warning + slept.
+
+This pattern existed since v3.0.30 first release; the warning never triggered
+an alarm because no one was watching the log line every 5 minutes.
+
+### Fix
+
+Removed the broken try/except import block. Replaced with direct method call
+on the already-instantiated `disc = DatasetDiscovery()`:
+```python
+try:
+    disc.harvest_new_datasets()
+except Exception as e:
+    log.warning(f"[Job-D] harvest failed: {e}")
+```
+No more silent failure mode — any future error will surface explicitly with
+the exception message in the log.
+
+### Smoke test on login node (per cluster_jobs invariant)
+
+```
+has_method= True
+queries_count= 35  (DEFAULT_HARVEST_QUERIES weed/crop/field after v3.0.30.3)
+queries_first3= ['weed', 'weed detection', 'weed yolo']
+reject_plantifydr= True   (AG_VOCAB_REJECT working)
+accept_cottonweed= True   (AG_VOCAB_ACCEPT working)
+flagged_parohod= True     (dataset_flags.json read)
+```
+
+### Action
+
+- `scancel 40800343` (broken)
+- `sbatch run_v3_0_30_jobd_continuous.sh` → **40803346 PD**
+- Old script backed up to `run_v3_0_30_jobd_continuous.sh.bak.40800343`
+
+### RF-DETR #4 status update — IT'S TRAINING
+
+Job 40803244 cleared the env-load phase, model loaded (33.4M params, DINOv2
+backbone + DETR head), and ran a val pass at epoch 0:
+```
+mAP50-95: 0.0829 (untrained baseline)
+Best EMA mAP improved to 0.0698 (epoch 0)
+```
+Per-class AP at epoch 0 is single-digits as expected (random init head).
+Real number lands at epoch ~30-60 (hours from now, 24h walltime).
+
+### Cluster job state after fix
+
+| Job | Role | Status |
+|---|---|---|
+| 40770062 v3030_dS | Dashboard live server | 🟢 R 24h |
+| 40803244 v3029_rfd | **RF-DETR #4 — actually training** epoch 0 | 🟢 R 15m |
+| 40803346 v3030_jD | **Job-D fixed harvest** | 🟡 PD |
+
+### Truth anchors (unchanged)
+
+- Best honest cwd12 mAP50-95 pyco = **0.7446** (v3.0.28 SAFETY)
+- Goal: ≥ 0.90 → **gap = -0.156**
+- Next data point: RF-DETR final mAP (expected 0.78-0.85 if backbone helps)

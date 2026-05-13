@@ -84,11 +84,10 @@ from weed_optimizer_framework.tools import registry_lock
 REPO = "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"
 REGISTRY_PATH = f"{REPO}/results/framework/dataset_registry.json"
 
-try:
-    from weed_optimizer_framework.tools.dataset_discovery import harvest_new_datasets
-    HARVEST_FN = harvest_new_datasets
-except Exception:
-    HARVEST_FN = None
+# v3.0.30.5 fix: harvest_new_datasets is a method on DatasetDiscovery, not a
+# module-level function. The previous import-as-function pattern silently failed
+# (ImportError caught) and Job-D burned 2.9h doing nothing in run 40800343.
+# Now we just call disc.harvest_new_datasets() directly each iteration.
 
 # Track per-iteration findings for idle-guard
 new_slug_history = []  # list[int] — new slugs found per iteration
@@ -106,13 +105,10 @@ while time.time() - start < WALL_BUDGET_SEC:
     pre_size = len(disc.registry.get("datasets", {}))
 
     # Brain harvest
-    if HARVEST_FN is not None:
-        try:
-            HARVEST_FN()
-        except Exception as e:
-            log.warning(f"[Job-D] harvest failed: {e}")
-    else:
-        log.warning("[Job-D] harvest_new_datasets not available")
+    try:
+        disc.harvest_new_datasets()
+    except Exception as e:
+        log.warning(f"[Job-D] harvest failed: {e}")
 
     # Recount post-harvest
     disc2 = DatasetDiscovery()
