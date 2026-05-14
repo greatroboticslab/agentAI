@@ -21,6 +21,39 @@ from pathlib import Path
 
 from PIL import Image
 
+
+def _patch_supervision_for_rfdetr():
+    """Add empty .metadata and .data dicts to sv.Detections instances.
+
+    rfdetr 1.6+ writes .metadata['source_image'] and .data['source_shape']
+    in predict() (detr.py:1259-1260) but supervision 0.6.0 — the version
+    pinned by groundingdino-py — has neither attribute, causing predict()
+    to crash with "'Detections' object has no attribute 'metadata'" for
+    every image (v3.0.29 attempt #4 eval failure: 0 preds, exit 1).
+
+    We monkey-patch instead of upgrading supervision globally because
+    upgrading would break groundingdino-py.
+    """
+    import supervision as sv
+    if getattr(sv.Detections, "_rfdetr_patched", False):
+        return
+    _orig_init = sv.Detections.__init__
+
+    def _patched_init(self, *args, **kwargs):
+        _orig_init(self, *args, **kwargs)
+        if not hasattr(self, "metadata") or self.metadata is None:
+            object.__setattr__(self, "metadata", {})
+        if not hasattr(self, "data") or self.data is None:
+            object.__setattr__(self, "data", {})
+
+    sv.Detections.__init__ = _patched_init
+    sv.Detections._rfdetr_patched = True
+
+
+# Apply patch at module import time so any path through rfdetr (train OR eval)
+# sees a Detections class that won't crash inside predict().
+_patch_supervision_for_rfdetr()
+
 CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
                 "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
                 "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
@@ -187,9 +220,14 @@ def main():
     ap.add_argument("--batch", type=int, default=4)
     ap.add_argument("--grad-accum", type=int, default=4)
     ap.add_argument("--resolution", type=int, default=728,
-                    help="must be divisible by 56")
+                    help="must be divisible by 32 (RF-DETR Medium)")
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--weight-decay", type=float, default=1e-4)
+    ap.add_argument("--eval-only", action="store_true",
+                    help="skip training, only run pycocotools eval")
+    ap.add_argument("--weights", default=None,
+                    help="checkpoint to eval (defaults to "
+                         "{out}/run/checkpoint_best_total.pth)")
     args = ap.parse_args()
 
     # RFDETRMedium requires resolution divisible by patch_size * num_windows = 16*2 = 32
@@ -200,9 +238,25 @@ def main():
     out_root = Path(args.out).resolve()
     cwd12_root = Path(args.cwd12).resolve()
     out_root.mkdir(parents=True, exist_ok=True)
+    dataset_dir = out_root / "dataset"
+
+    # ----- eval-only path: skip 12h training; just inference + pycocotools -----
+    if args.eval_only:
+        weights = Path(args.weights) if args.weights else \
+            out_root / "run" / "checkpoint_best_total.pth"
+        if not weights.exists():
+            print(f"[eval-only] weights not found: {weights}")
+            sys.exit(1)
+        # Stage dataset only if eval splits don't exist (e.g. fresh dir)
+        valid_ann = dataset_dir / "valid" / "_annotations.coco.json"
+        test_ann = dataset_dir / "test" / "_annotations.coco.json"
+        if not (valid_ann.exists() and test_ann.exists()):
+            stage_dataset(dataset_dir, cwd12_root)
+        print(f"[eval-only] running pycocotools eval on {weights}")
+        eval_canonical(out_root, weights, args.resolution)
+        return
 
     # 1. Stage data
-    dataset_dir = out_root / "dataset"
     stage_dataset(dataset_dir, cwd12_root)
 
     # 2. Train

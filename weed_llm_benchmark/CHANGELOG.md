@@ -3078,3 +3078,117 @@ Real number lands at epoch ~30-60 (hours from now, 24h walltime).
 - Best honest cwd12 mAP50-95 pyco = **0.7446** (v3.0.28 SAFETY)
 - Goal: ≥ 0.90 → **gap = -0.156**
 - Next data point: RF-DETR final mAP (expected 0.78-0.85 if backbone helps)
+
+## 2026-05-13 — v3.0.30.6: RF-DETR eval rescue + Job-D HF API fix
+
+### What landed when we resumed
+
+RF-DETR job 40803244 was **gone from squeue** by session resume — it had
+finished 60 epochs and reported `Best total checkpoint saved from EMA
+(regular=0.8915, ema=0.8994)`. Tantalizing — 0.8994 is 0.0006 below the
+0.90 goal.
+
+But the **canonical pycocotools eval crashed**:
+```
+[eval]   pred fail on valid__20210913_iPhoneSE_YL_106.jpg:
+        'Detections' object has no attribute 'metadata'
+... × all 1977 images
+[eval] total preds: 0
+=== Done (exit=1) ===
+```
+- `v3_0_29_rfdetr_combined_pred.json` is `[]`
+- No `v3_0_29_rfdetr_pycoco_summary.json` was written
+
+So 0.8994 is **only** the rfdetr internal val number — equivalent class to
+v3.0.28's 0.896 ult / 0.7446 pyco split. Per `feedback_research_goal_locked`
++ `feedback_honest_reporting`: this is NOT a 0.90 result. We need a real
+pycocotools number on the saved checkpoint before any claim.
+
+### Root cause of eval crash
+
+- `supervision == 0.6.0` is pinned by `groundingdino-py` in our `bench` env
+- `rfdetr 1.6.5.post0` (`detr.py:1259-1260`) writes
+  `detections.metadata["source_image"] = ...` and
+  `detections.data["source_shape"] = ...`
+- supervision 0.6.0's Detections has neither attribute (`metadata` arrived
+  in supervision 0.25, `data` in 0.21)
+
+Cannot upgrade supervision globally without breaking groundingdino-py.
+
+### Fix #1: monkey-patch supervision.Detections inside train_rfdetr.py
+
+```python
+def _patch_supervision_for_rfdetr():
+    import supervision as sv
+    if getattr(sv.Detections, "_rfdetr_patched", False):
+        return
+    _orig_init = sv.Detections.__init__
+    def _patched_init(self, *args, **kwargs):
+        _orig_init(self, *args, **kwargs)
+        if not hasattr(self, "metadata") or self.metadata is None:
+            object.__setattr__(self, "metadata", {})
+        if not hasattr(self, "data") or self.data is None:
+            object.__setattr__(self, "data", {})
+    sv.Detections.__init__ = _patched_init
+    sv.Detections._rfdetr_patched = True
+
+_patch_supervision_for_rfdetr()  # at module import time
+```
+Verified locally with the exact rfdetr write pattern — both metadata + data
+become writable dicts. Idempotent (won't re-wrap on repeated import).
+
+### Fix #2: --eval-only mode (skip 12h retrain)
+
+`train_rfdetr.py` gained `--eval-only --weights PATH` flags. With the
+already-saved `checkpoint_best_total.pth` (133 MB, EMA 0.8994), we skip the
+full training loop and run pure inference + pycocotools on cwd12 holdout.
+- Stages dataset only if eval splits are absent (idempotent)
+- Loads checkpoint, runs predict() on 1977 imgs, writes pyco summary
+
+`run_v3_0_29_5_rfdetr_eval.sh` — 1.5h walltime sbatch wrapper. Submitted as
+job **40825950** (PD, queued behind priority).
+
+### Fix #3: Job-D HF API direction kwarg deprecation
+
+Job-D 40803346 (post-import-fix) revealed a second silent failure:
+```
+WARNING: [Harvest] task-filter list failed:
+  HfApi.list_datasets() got an unexpected keyword argument 'direction'
+× 35 keyword searches all fail
+```
+`huggingface_hub` upgraded and removed `direction=-1` kwarg. Fix: drop the
+kwarg from all 3 call sites in `dataset_discovery.py` (lines 243, 738, 760).
+`sort="downloads"` already returns highest-first by default.
+
+Verified on login node:
+- Phase 1 task-filter: 5 object-detection datasets returned
+- Phase 2 keyword: "Mobiusi/Weed-Detection-Dataset" found via "weed detection"
+- Full `harvest_new_datasets(max_new=0)` runs end-to-end without exception
+
+Current Job-D 40803346 has the **broken** module already imported in-memory.
+Don't disrupt it — registry is still growing via Kaggle (which still works).
+Next chain (~28h from now) reads disk → picks up the HF fix automatically.
+
+### Why we don't restart Job-D now
+
+Cancel + resubmit costs queue-wait (PD several hours). Current job has 19h
+of warm Ollama + working Kaggle/GitHub paths. Net benefit of restart: a few
+extra HF slugs over the next 28h. Not worth disrupting in-flight harvest.
+
+### Cluster job state
+
+| Job | Role | Status |
+|---|---|---|
+| 40770062 v3030_dS | Dashboard live server | 🟢 R 1d 19h |
+| 40803346 v3030_jD | Job-D harvest (HF still broken in-mem; Kaggle OK) | 🟢 R 19h |
+| 40825950 v3029_rfd_eval | **RF-DETR pyco eval** | 🟡 PD priority |
+
+### What we're waiting on
+
+- Job 40825950 lands → first **honest** RF-DETR cwd12 pyco mAP50-95 number
+- That number drives the next phase decision:
+  - ≥ 0.85 → distillation OR WBF ensemble (yolo26x + RF-DETR)
+  - 0.78–0.85 → DINOv3+YOLO26 dual-branch (Phase 2A)
+  - 0.74–0.78 → retrain longer (current 60 epochs) OR RFDETRLarge
+  - < 0.74 → architecture isn't the bottleneck; expand clean data
+- Goal anchor: **cwd12 mAP50-95 ≥ 0.90 pyco**, current **0.7446**, gap **−0.156**

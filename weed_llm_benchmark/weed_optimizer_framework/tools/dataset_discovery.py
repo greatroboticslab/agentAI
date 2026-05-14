@@ -239,8 +239,10 @@ class DatasetDiscovery:
         try:
             from huggingface_hub import HfApi
             api = HfApi()
+            # huggingface_hub removed `direction` kwarg (v3.0.30.6 fix);
+            # sort="downloads" already returns highest-downloads-first.
             datasets = api.list_datasets(search=query, sort="downloads",
-                                          direction=-1, limit=max_results)
+                                          limit=max_results)
             results = []
             new_found = 0
             for d in datasets:
@@ -735,7 +737,7 @@ class DatasetDiscovery:
         try:
             det = list(api.list_datasets(
                 filter="task_categories:object-detection",
-                sort="downloads", direction=-1, limit=200,
+                sort="downloads", limit=200,
             ))
         except Exception as e:
             logger.warning(f"[Harvest] task-filter list failed: {e}")
@@ -757,7 +759,7 @@ class DatasetDiscovery:
         for q in queries:
             try:
                 found = list(api.list_datasets(search=q, sort="downloads",
-                                                direction=-1, limit=10))
+                                                limit=10))
                 keyword_results.extend(found)
             except Exception as e:
                 logger.warning(f"[Harvest] search failed '{q}': {e}")
