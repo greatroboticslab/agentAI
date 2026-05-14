@@ -228,6 +228,8 @@ def main():
     ap.add_argument("--weights", default=None,
                     help="checkpoint to eval (defaults to "
                          "{out}/run/checkpoint_best_total.pth)")
+    ap.add_argument("--model", choices=["medium", "large"], default="medium",
+                    help="RF-DETR variant (medium=33M, large=87M)")
     args = ap.parse_args()
 
     # RFDETRMedium requires resolution divisible by patch_size * num_windows = 16*2 = 32
@@ -252,18 +254,21 @@ def main():
         test_ann = dataset_dir / "test" / "_annotations.coco.json"
         if not (valid_ann.exists() and test_ann.exists()):
             stage_dataset(dataset_dir, cwd12_root)
-        print(f"[eval-only] running pycocotools eval on {weights}")
-        eval_canonical(out_root, weights, args.resolution)
+        print(f"[eval-only] running pycocotools eval on {weights} ({args.model})")
+        eval_canonical(out_root, weights, args.resolution, args.model)
         return
 
     # 1. Stage data
     stage_dataset(dataset_dir, cwd12_root)
 
     # 2. Train
-    print("\n[train] importing rfdetr...")
-    from rfdetr import RFDETRMedium
+    print(f"\n[train] importing rfdetr {args.model}...")
+    if args.model == "large":
+        from rfdetr import RFDETRLarge as RFDETRClass
+    else:
+        from rfdetr import RFDETRMedium as RFDETRClass
 
-    model = RFDETRMedium()
+    model = RFDETRClass()
     output_dir = out_root / "run"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -302,12 +307,16 @@ def main():
 
     # 3. Canonical pycocotools eval on cwd12 test+valid combined
     print("\n[eval] pycocotools canonical eval...")
-    eval_canonical(out_root, best_pt, args.resolution)
+    eval_canonical(out_root, best_pt, args.resolution, args.model)
 
 
-def eval_canonical(out_root: Path, weights: Path, resolution: int):
+def eval_canonical(out_root: Path, weights: Path, resolution: int,
+                    model_size: str = "medium"):
     """Run RF-DETR predictions on combined cwd12 test+valid, eval via pycocotools."""
-    from rfdetr import RFDETRMedium
+    if model_size == "large":
+        from rfdetr import RFDETRLarge as RFDETRClass
+    else:
+        from rfdetr import RFDETRMedium as RFDETRClass
     from pycocotools.coco import COCO
     from pycocotools.cocoeval import COCOeval
 
@@ -356,8 +365,8 @@ def eval_canonical(out_root: Path, weights: Path, resolution: int):
         json.dump(combined, f)
 
     print(f"[eval] combined: {len(combined['images'])} images, {len(combined['annotations'])} anns")
-    print(f"[eval] loading model {weights}")
-    model = RFDETRMedium(pretrain_weights=str(weights))
+    print(f"[eval] loading model {weights} ({model_size})")
+    model = RFDETRClass(pretrain_weights=str(weights))
 
     preds = []
     img_files = sorted(combined_dir.glob("*.jpg"))
