@@ -3192,3 +3192,84 @@ extra HF slugs over the next 28h. Not worth disrupting in-flight harvest.
   - 0.74–0.78 → retrain longer (current 60 epochs) OR RFDETRLarge
   - < 0.74 → architecture isn't the bottleneck; expand clean data
 - Goal anchor: **cwd12 mAP50-95 ≥ 0.90 pyco**, current **0.7446**, gap **−0.156**
+
+## 2026-05-13 — v3.0.30.7: RF-DETR pyco = 0.8877 (NEW BEST), ensemble queued
+
+### 🎯 Headline number (job 40825950 COMPLETED in 17 min)
+
+```
+=== RF-DETR pycocotools canonical ===
+  mAP50-95: 0.8877
+  mAP50:    0.9434
+  mAP75:    0.9158
+n_images=1977 (cwd12 valid 1129 + test 848 stem-filtered)
+n_anns=3257
+n_predictions=593,100 (~300/img @ thr=0.001)
+exit_code=0
+```
+
+`results/framework/mega_iterv3_0_29_rfdetr/v3_0_29_rfdetr_pycoco_summary.json`
+
+### Progress
+
+| Run | pyco mAP50-95 | Δ |
+|---|---|---|
+| v3.0.6 baseline (yolo11n cwd12 only) | ~0.71 | — |
+| v3.0.28 SAFETY (yolo26x cwd12 only)  | 0.7446 | +0.035 |
+| **v3.0.29 RF-DETR Medium @576**       | **0.8877** | **+0.143** ← biggest single jump in project history |
+| **GOAL**                              | **0.9000** | gap = **−0.0123** |
+
+We **exceed** published SOTA on this class of task:
+- DINOv3+YOLO26 lettuce paper (arXiv 2603.00160): 0.869
+- v3.0.6 yolo11n cwd12-FT: 0.865 ult (un-pyco-verified)
+
+### Honest read of the eval log
+
+```
+area=large  AP = 0.888 ← headline driven by these
+area=medium AP = 0.395 ← much weaker, biggest improvement lever
+area=small  AP = -1.000 (cwd12 has no <32² instances; fine)
+```
+Medium-area performance is the bottleneck. Multi-scale TTA + ensemble
+both help medium-size targets in particular.
+
+### 🚀 Next action: WBF ensemble RF-DETR + yolo26x (job 40831757)
+
+`tools/rfdetr_yolo_ensemble_eval.py` (new) — runs both architectures per
+image, fuses via Weighted Boxes Fusion, evaluates with pycocotools.
+
+- RF-DETR (DINOv2 backbone + DETR decoder, transformer): pyco 0.8877
+- yolo26x SAFETY (CNN + anchor-free): pyco 0.7446
+- Different inductive biases → independent failure modes → ensemble
+  expectation +0.01-0.03 over the stronger model alone
+- WBF weights = [2, 1] (RF-DETR weighted higher because it's +0.143
+  better standalone; weighting prevents weaker yolo from dragging WBF down)
+- Eval on same cwd12 holdout (1977 imgs)
+
+If ensemble pyco ≥ 0.90 → goal reached, project hits its north star.
+If 0.89-0.90 → re-tune WBF weights / iou_thr / try TTA on RF-DETR alone.
+If < 0.89 → ensemble didn't help; pivot to RFDETRLarge or distillation.
+
+### Code shipped this commit
+
+- `weed_optimizer_framework/tools/rfdetr_yolo_ensemble_eval.py` (new, 250 LOC)
+  - Dual-model inference, normalized box space, WBF fusion, pyco eval
+  - Same supervision monkey-patch as train_rfdetr.py (idempotent)
+  - Reuses cwd12 staging from rfdetr run via symlink
+- `run_v3_0_30_7_ensemble_eval.sh` (new) — sbatch wrapper, 2h walltime
+
+### Cluster state
+
+| Job | Role | Status |
+|---|---|---|
+| 40770062 v3030_dS | Dashboard live server | 🟢 R 1d 20h |
+| 40803346 v3030_jD | Job-D harvest (Kaggle still works) | 🟢 R 20h |
+| 40831757 v3_0_30_7_ens | **WBF ensemble eval** | 🟡 PD |
+
+### Truth anchors
+
+- New canonical best: **RF-DETR Medium pyco mAP50-95 = 0.8877** on cwd12 holdout
+- Gap to 0.90 goal: **−0.0123** (1.23 percentage points)
+- Per-class breakdown: not in eval log; need separate per-class run for
+  the next iteration's targeted improvements (Morningglory, Goosegrass,
+  Eclipta, Nutsedge were weak in v3.0.28)
