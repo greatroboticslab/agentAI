@@ -3371,3 +3371,67 @@ If < 0.89 → TTA didn't help; sbatch RFDETRLarge as primary push.
 | 40770062 v3030_dS | Dashboard live server | 🟢 R 1d 21h |
 | 40803346 v3030_jD | Job-D harvest | 🟢 R 21h |
 | 40832465 v3_0_30_9_tta | **RF-DETR hflip TTA** | 🟡 PD |
+
+## 2026-05-13 — v3.0.30.9 result: hflip TTA also FAILED, pivot to RFDETRLarge
+
+### Job 40832465 hflip TTA pyco
+
+```
+=== RF-DETR HFLIP TTA pyco ===
+  mAP50-95: 0.8280 (vs RF-DETR alone 0.8877 → -0.060)
+  mAP50:    0.9011 (vs 0.9434 → -0.042)
+  mAP75:    0.8671 (vs 0.9158 → -0.049)
+  AR medium: 0.550 (improved over alone — TTA DID help recall)
+```
+
+### Root cause: same WBF bug as v3.0.30.7 ensemble
+
+WBF iou_thr=0.55 averaged box positions between original-view and
+flipped-then-mirrored-back boxes. Even though both predictions come from
+the SAME model, the network is non-symmetric — predictions on hflipped
+image, when mirrored back, are slightly offset from the original. WBF
+averaging produces worse positions than either alone at high IoU.
+
+The TTA log shows AR medium = 0.550 (vs alone ~0.395 AP medium) —
+recall did improve. So TTA is genuinely seeing more targets via the
+second view. But the WBF box-averaging destroys the precision gain.
+
+**WBF is fundamentally unsuited to mAP50-95 evaluation when fusion would
+average box positions.** Same lesson from v3.0.30.7 ensemble +
+v3.0.30.8 sweep.
+
+### Decision: skip more TTA tuning, go to RFDETRLarge
+
+Rather than spend more SU sweeping WBF iou_thr for hflip:
+- Best-case TTA at iou=0.85 might land 0.88-0.89 (still < 0.90)
+- RFDETRLarge (87M vs Medium 33M) is the real capacity lever
+- Expected +0.010-0.030 over Medium's 0.8877 → straight at ≥0.90
+
+### Action: sbatch RFDETRLarge (job 40832757, 36h walltime)
+
+`run_v3_0_31_rfdetr_large.sh` (already shipped):
+- `--model large` (uses train_rfdetr.py's new flag from this commit)
+- batch=2 grad_accum=8 (effective batch=16) — VRAM safety on V100-32GB
+- resolution=576 (same as Medium for direct comparison)
+- 60 epochs, lr=1e-4
+- Auto-runs pyco eval at end via eval_canonical(model_size="large")
+
+### Cluster state
+
+| Job | Role | Status |
+|---|---|---|
+| 40770062 v3030_dS | Dashboard live server | 🟢 R 1d 22h |
+| 40803346 v3030_jD | Job-D harvest | 🟢 R 22h |
+| 40832757 v3_0_31_rfdL | **RFDETRLarge train (36h)** | 🟡 PD |
+
+### Honest standing
+
+- Best canonical: **0.8877** (RF-DETR Medium @576)
+- Goal: 0.90 → gap **−0.0123**
+- Already exceeds DINOv3+YOLO26 lettuce SOTA (0.869) and v3.0.6 yolo11n (0.865 ult)
+- Three improvement attempts (WBF ensemble, WBF sweep, hflip TTA) all
+  hurt due to box-averaging issue
+- Next single shot: RFDETRLarge (36h)
+- If Large lands 0.89-0.92 → goal status known
+- If Large lands < 0.89 → architecture isn't the lever; need data scaling
+  or accept current 0.8877 as the practical ceiling for this dataset
