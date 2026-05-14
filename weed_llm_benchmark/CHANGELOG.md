@@ -3320,3 +3320,54 @@ worth pursuing. If all < 0.89, ensemble is dead — pivot to:
 | 40770062 v3030_dS | Dashboard live server | 🟢 R 1d 21h |
 | 40803346 v3030_jD | Job-D harvest | 🟢 R 21h |
 | 40831936 v3_0_30_8_wbf | **WBF param sweep** | 🟡 PD |
+
+## 2026-05-13 — v3.0.30.8 result: ENSEMBLE PATH CLOSED
+
+### Job 40831936 sweep (21 min): 9 WBF combos, all WORSE than RF-DETR alone
+
+| Rank | Combo | mAP50-95 | Δ vs RF-DETR alone (0.8877) |
+|---|---|---|---|
+| 1 | iou85_w21_yolo≥0    (most conservative)            | 0.8686 | **−0.019** |
+| 2 | iou85_w41_yolo≥0.05                                 | 0.8661 | −0.022 |
+| 3 | iou85_w101_yolo≥0.10                                | 0.8586 | −0.029 |
+| 4 | iou70_w21_yolo≥0                                    | 0.8576 | −0.030 |
+| 5 | iou70_w41_yolo≥0.05                                 | 0.8573 | −0.030 |
+| 6 | iou70_w101_yolo≥0.10                                | 0.8507 | −0.037 |
+| 7 | iou55_w41_yolo≥0.05                                 | 0.8410 | −0.047 |
+| 8 | iou55_w21_yolo≥0    (v3.0.30.7 baseline)            | 0.8393 | −0.048 |
+| 9 | iou55_w101_yolo≥0.10                                | 0.8330 | −0.055 |
+
+### Conclusion: ensemble is dead
+
+Even the most conservative WBF (iou_thr=0.85, weights=[2,1], no yolo conf
+filter — i.e. preserve RF-DETR boxes maximally, only merge near-identical
+yolo boxes) loses 0.019 vs RF-DETR alone. Confirms hypothesis: yolo26x
+(Δ=+0.143 standalone) is too weak — its boxes are noise relative to
+RF-DETR's. No WBF parameter combination can rescue it.
+
+**Pivoting away from ensemble.** Per the decision tree:
+- best WBF < 0.89 → hflip TTA on RF-DETR alone
+- if TTA insufficient → RFDETRLarge retrain
+
+### Action: sbatch hflip TTA (job 40832465)
+
+`tools/rfdetr_hflip_tta.py` (already shipped in v3.0.30.9, pre-staged):
+- Predict each cwd12 holdout image in original AND hflipped form
+- Mirror flipped boxes back to original coordinates (x' = 1-x in normalized space)
+- WBF-fuse the two views (iou=0.55, equal weights — same model, different views)
+- pycocotools eval
+
+Expected gain: +0.005 to +0.015 mAP50-95.
+Cost: ~2h GPU walltime (predict ~1.5h × 2 views + WBF + pyco).
+
+If TTA hits ≥ 0.90 → 🎉 goal reached.
+If 0.89-0.90 → marginal but close; sbatch RFDETRLarge as safety.
+If < 0.89 → TTA didn't help; sbatch RFDETRLarge as primary push.
+
+### Cluster state after sweep + hflip submission
+
+| Job | Role | Status |
+|---|---|---|
+| 40770062 v3030_dS | Dashboard live server | 🟢 R 1d 21h |
+| 40803346 v3030_jD | Job-D harvest | 🟢 R 21h |
+| 40832465 v3_0_30_9_tta | **RF-DETR hflip TTA** | 🟡 PD |
