@@ -3435,3 +3435,85 @@ Rather than spend more SU sweeping WBF iou_thr for hflip:
 - If Large lands 0.89-0.92 → goal status known
 - If Large lands < 0.89 → architecture isn't the lever; need data scaling
   or accept current 0.8877 as the practical ceiling for this dataset
+
+## 2026-05-14 — v3.0.31.1 + v3.0.32: parallel architecture & data scaling
+
+### User audit caught critical thesis violation
+
+User asked: "我们一个不断收集数据集 一个网站 一个不断训练（用累积数据）对吗?"
+Honest answer: **NO** — training has been on cwd12-train-only (3,671
+imgs) since v3.0.28 SAFETY (post-leak retraction). Brain has accumulated
+~1.5M imgs / 73 slugs but NONE entered training in 6 days. Violates
+REQ-2 (massive autonomous data) + REQ-4 (cumulative training) — the
+v3.0 north star.
+
+### v3.0.31.1: RFDETRLarge resolution fix
+
+First Large attempt (job 40832757) crashed at startup:
+```
+size mismatch for backbone.0.encoder.encoder.embeddings.position_embeddings:
+  expects shape [1, 1937, 384] (44²+1=1937 → resolution 704)
+  model configured  [1, 1297, 384] (36²+1=1297 → resolution 576)
+```
+Large was pretrained at resolution 704 (Medium at 576). Fixed:
+`--resolution 704` in `run_v3_0_31_rfdetr_large.sh`. Re-submitted as
+**job 40839152** (running, 36h walltime).
+
+### v3.0.32: yolo26x CUMULATIVE training (the missing link)
+
+`run_v3_0_32_yolo26x_cumulative.sh` (new) — actually uses Brain's
+collected data:
+- mega_trainer.train_yolo_mega with `include_autolabel=True` +
+  `val_dataset_root=cwd12_root`
+- Triple defense ensures no leak (verified on login node):
+  1. `NEVER_TRAIN_SLUGS` skips cwd12 / weedsense / francesco
+  2. v3.0.28 stem-level filter blocks 1977 cwd12 holdout stems even
+     from legitimate cottonweed_sp8 / cottonweed_holdout
+  3. user `dataset_flags.json` garbage skip (6 user-flagged slugs)
+- Strategy: yolo26x.pt base (COCO weights, never seen cwd12 holdout),
+  fresh_start, epochs=30, batch=6 imgsz=896, patience=10, lr=1e-3
+- After train: independent pycocotools eval on cwd12 holdout (NOT
+  ultralytics generous val — that's how v3.0.27 0.910 leak slipped)
+- Submitted as **job 40839159** (PD priority, 36h walltime)
+
+### Two orthogonal levers measured cleanly
+
+| Run | Variable | Other constant | What it tests |
+|---|---|---|---|
+| **40839152** v3.0.31 RFDETRLarge | architecture (87M Large vs 33M Medium) | data (cwd12 only) | Architecture scaling |
+| **40839159** v3.0.32 yolo26x cumulative | data (~100K-1.5M vs 3,671 cwd12) | architecture (yolo26x) | Data scaling |
+
+Together: 2 honest data points that disentangle "is the bottleneck
+architecture or data?". No more confounded experiments.
+
+### Dashboard 40770062 hit walltime, didn't auto-chain
+
+Dashboard server timed out at 48h walltime. SLURM hard-killed; the
+`sbatch --dependency=afterany:$SLURM_JOB_ID` self-chain hook didn't
+fire (script never reached cleanup). Resubmitted manually as 40839165.
+Long-term fix: use `--signal=B:USR1@600` to trigger pre-walltime cleanup
+hook. Tracked separately.
+
+### Cluster state
+
+| Job | Role | Status |
+|---|---|---|
+| 40803346 v3030_jD | Job-D harvest (Kaggle path) | 🟢 R 1d 0h |
+| 40839152 v3_0_31_rfdL | **RFDETRLarge** (architecture) | 🟢 R 2m |
+| 40839159 v3_0_32_cum | **yolo26x cumulative** (data) | 🟡 PD priority |
+| 40839165 v3030_dS | Dashboard (resubmit) | 🟡 PD |
+
+### On user's DeepSeek V4 question
+
+Honest verdict: **DeepSeek V4 (LLM) won't move detection mAP**. Three
+positions where it could fit:
+- Detection main path: LLMs don't predict bbox; can't replace RF-DETR
+- Brain (Job-D dataset selection): possible but not the bottleneck;
+  Job-D currently constrained by HF API broken in-mem state, not Brain
+  decision quality (Gemma 4 is fine)
+- Autolabel VLM: DeepSeek-VL2/V4 has grounding; could be tried later
+  vs OWLv2, but current bottleneck is detection model not autolabel
+
+The mAP-moving model upgrades are detection-side: RFDETRLarge (in
+flight), DINO-DETR, Co-DETR. LLM upgrades affect data discovery, not
+detection accuracy.

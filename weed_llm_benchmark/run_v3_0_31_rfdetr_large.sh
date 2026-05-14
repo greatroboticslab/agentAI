@@ -37,6 +37,9 @@ echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
 
 OUT=$REPO/results/framework/mega_iterv3_0_31_rfdetr_large
 
+# v3.0.31.1 fix: RFDETRLarge checkpoint was pretrained at resolution 704
+# (44²+1=1937 pos embeddings), NOT 576 like Medium. First attempt
+# (40832757) crashed with pos_embedding size mismatch [1, 1937] vs [1, 1297].
 python -m weed_optimizer_framework.tools.train_rfdetr \
     --model large \
     --out "$OUT" \
@@ -44,7 +47,7 @@ python -m weed_optimizer_framework.tools.train_rfdetr \
     --epochs 60 \
     --batch 2 \
     --grad-accum 8 \
-    --resolution 576 \
+    --resolution 704 \
     --lr 1e-4 \
     --weight-decay 1e-4
 
