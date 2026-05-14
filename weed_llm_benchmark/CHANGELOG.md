@@ -3273,3 +3273,50 @@ If < 0.89 → ensemble didn't help; pivot to RFDETRLarge or distillation.
 - Per-class breakdown: not in eval log; need separate per-class run for
   the next iteration's targeted improvements (Morningglory, Goosegrass,
   Eclipta, Nutsedge were weak in v3.0.28)
+
+## 2026-05-13 — v3.0.30.8: Ensemble FAILED, sweep + pivot plan
+
+### Job 40831757 result: WBF ensemble HURT
+
+```
+ENSEMBLE PYCO (RF-DETR @576 + yolo26x @1024, WBF iou=0.55 weights=[2,1])
+  mAP50-95: 0.8393  ← WORSE than RF-DETR alone (0.8877) by -0.048
+  mAP50:    0.9248
+  mAP75:    0.8945
+  n_predictions: 363,259 (vs 593,100 RF-DETR alone)
+  img_overlap: both=1977, neither=0
+```
+
+### Honest read
+
+- mAP50-95 dropped most (-0.048), mAP50 dropped less (-0.019).
+- The high-IoU thresholds penalize box-position noise the most.
+- WBF averages box positions when models agree — yolo26x's worse
+  positions dragged RF-DETR's clean boxes off-target.
+- WBF literature: ensemble helps when models are roughly comparable
+  strength. Here Δ = +0.143 (RF-DETR vs yolo26x). yolo is essentially
+  a noise contributor, not a complementary signal.
+
+### Fix attempt: WBF param sweep (job 40831936, 40 min)
+
+`tools/wbf_sweep.py` (new, 280 LOC):
+- Phase A: cache per-model preds to `per_model_cache.json` (one-time GPU)
+- Phase B: sweep 9 WBF combos on cached preds (CPU, fast):
+  iou_thr ∈ {0.55, 0.70, 0.85} × weights ∈ {[2,1], [4,1], [10,1]}
+  with yolo_min_conf in {0.0, 0.05, 0.10}
+- Higher iou_thr → less aggressive merging (preserve RF-DETR's positions)
+- Higher RF-DETR weight → yolo only contributes to consensus, not position
+- Higher yolo_min_conf → drop yolo's noisy low-conf garbage
+
+Expected: best combo lands 0.85-0.89. If best ≥ 0.89, ensemble path
+worth pursuing. If all < 0.89, ensemble is dead — pivot to:
+1. RF-DETR TTA (hflip + multi-scale, write `rfdetr_tta_eval.py`)
+2. RFDETRLarge retrain (87M params vs Medium 33M, 24h)
+
+### Cluster state
+
+| Job | Role | Status |
+|---|---|---|
+| 40770062 v3030_dS | Dashboard live server | 🟢 R 1d 21h |
+| 40803346 v3030_jD | Job-D harvest | 🟢 R 21h |
+| 40831936 v3_0_30_8_wbf | **WBF param sweep** | 🟡 PD |
