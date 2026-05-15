@@ -3517,3 +3517,66 @@ positions where it could fit:
 The mAP-moving model upgrades are detection-side: RFDETRLarge (in
 flight), DINO-DETR, Co-DETR. LLM upgrades affect data discovery, not
 detection accuracy.
+
+## 2026-05-15 — v3.0.31 RFDETRLarge result + v3.0.32 timeout
+
+### 🎯 RFDETRLarge (job 40839152) DONE in 14h 36m
+
+```
+=== RF-DETR pycocotools canonical (Large @704) ===
+  mAP50-95: 0.8949  ← +0.007 over Medium (0.8877)
+  mAP50:    0.9478
+  mAP75:    0.9234
+  area=large  AP = 0.895 (vs Medium 0.888)
+  area=medium AP = 0.445 (vs Medium 0.395)  ← +0.05, biggest gain
+  AR medium = 0.750 (vs Medium ~0.65)
+```
+
+**Gap to 0.90 = −0.0051** (only 0.5 pp away). Architecture scaling helped,
+biggest win came on medium-area objects (which we identified as the
+bottleneck after the Medium eval).
+
+### v3.0.32 cumulative training TIMEOUT @ epoch 7/30
+
+Job 40839159 hit 36h walltime. Got through 7 of 30 epochs.
+
+Mismatch: design used 30 epochs × batch=6 imgsz=896 on a 202,846-image
+merged corpus = ~1M iterations needed = ~104 hours @ 2.7 it/s. The 36h
+walltime was 3× too small. Should have used:
+- imgsz=640 (3× faster) OR
+- epochs=10 (3× fewer iterations) OR
+- subsample autolabel slugs
+
+But — `best.pt` exists (validation ran several times during the 7 epochs).
+Submitted v3.0.32 PYCO eval-only as job 40877439 to read its number.
+Even at 7/30 epochs trained on 202K imgs (vs cwd12-only at 3,671 imgs),
+this gives us the data-scaling datapoint.
+
+### Job-D 40803346 also TIMEOUT (48h) — same self-chain bug
+
+Resubmitted as 40877440. Long-term fix still pending.
+
+### Honest 4-corner experiment table
+
+| Model | Data | pyco mAP50-95 | gap to 0.90 |
+|---|---|---|---|
+| yolo26x | cwd12-train (3,671) | 0.7446 | −0.156 |
+| RF-DETR Medium @576 | cwd12-train (3,671) | 0.8877 | −0.012 |
+| RF-DETR Large @704 | cwd12-train (3,671) | **0.8949** | **−0.005** |
+| yolo26x | cumulative (202K, 7/30 ep) | TBD (job 40877439) | — |
+
+### Cluster state
+
+| Job | Role | Status |
+|---|---|---|
+| 40839165 v3030_dS | Dashboard (replacement) | 🟢 R 1d 15h |
+| 40877439 v3_0_32_eval | **v3.0.32 pyco eval** | 🟡 PD |
+| 40877440 v3030_jD | Job-D resubmit | 🟡 PD |
+
+### v3.0.33 decision tree (after 40877439 lands)
+
+| v3.0.32 yolo26x cumulative pyco | Interpretation | v3.0.33 path |
+|---|---|---|
+| ≥ 0.78 | Cumulative data IS lever | Train RF-DETR Medium on cumulative (best of both) |
+| 0.74-0.78 | Marginal data benefit | Medium+Large WBF (iou=0.85) — peer ensemble |
+| < 0.74 | Cumulative data doesn't help (yet) | Hflip TTA on Large with iou=0.85 fix |
