@@ -3652,3 +3652,53 @@ Either ≥ 0.90 → goal reached.
 - v3.0.32 cumulative attempt = data approach needs autolabel quality fix
   before it can contribute (v3.0.34+ work)
 - v3.0.33 = pure architecture + TTA push, two parallel paths
+
+## 2026-05-15 — v3.0.33 BOTH FAIL, v3.0.34 X1 (NMS fusion) submitted
+
+### Path A (Large + hflip + WBF iou=0.85): 0.8757 ← −0.019 vs Large alone
+### Path D (Med + Large WBF iou=0.85 weights=[1,1.5]): 0.8771 ← −0.018 vs Large alone
+
+### Pattern across 5 WBF experiments — all negative
+
+| Run | iou_thr | Δ vs best single |
+|---|---|---|
+| v3.0.30.7 yolo+RF [2,1] | 0.55 | −0.048 |
+| v3.0.30.8 sweep best [2,1] | 0.85 | −0.019 |
+| v3.0.30.9 hflip TTA | 0.55 | −0.060 |
+| v3.0.33 D Med+Large [1,1.5] | 0.85 | −0.018 |
+| v3.0.33 A Large+hflip | 0.85 | −0.019 |
+
+### Structural conclusion: WBF is wrong tool for our task
+
+WBF's design averages overlapping box positions (weighted by score). For
+mAP50-95 which evaluates IoU thresholds 0.50→0.95, even tiny position
+drift severely hurts mAP at high IoU thresholds. Even with iou_thr=0.85
+(only merging near-identical boxes), the merged predictions lose ~0.018
+because the few merges that DO happen replace strong boxes with averaged
+ones that have worse positions.
+
+### v3.0.34 X1: NMS-fusion replaces WBF (job 40878315)
+
+`rfdetr_hflip_tta.py` extended with `--fusion {wbf,nms}` (default nms):
+- New `_greedy_nms()` helper (per-class greedy NMS at iou_thr=0.5)
+- For each cluster of overlapping boxes: keep highest-conf box, drop
+  others. **No position averaging** — Large's strong boxes preserved.
+- Recall benefit retained: hflip view's UNIQUE detections (no overlap
+  with original predictions) still get added to the final set.
+
+Submitted as job 40878315 (Large + hflip + NMS-fusion). Same setup as
+Path A but fusion=nms instead of wbf.
+
+If X1 ≥ 0.90 → goal reached.
+If X1 still < 0.8949 (Large alone) → TTA path also dead; consider:
+  - X2: Train Large more epochs (60 → 120, ~28h)
+  - X3: Train Large at higher resolution (704 → 800)
+  - X4: Accept 0.8949 as practical ceiling for this dataset
+
+### Cluster state
+
+| Job | Role | Status |
+|---|---|---|
+| 40839165 v3030_dS | Dashboard | 🟢 R 1d 16h |
+| 40877440 v3030_jD | Job-D | 🟢 R 1h |
+| 40878315 v3034x1_LhN | **X1: Large+hflip+NMS** | 🟡 PD |

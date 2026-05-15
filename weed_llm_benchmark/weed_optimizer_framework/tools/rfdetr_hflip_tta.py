@@ -77,6 +77,61 @@ def predict_rfdetr_norm(model, img_path_or_pil, w, h, threshold):
     return boxes, confs, classes
 
 
+def _greedy_nms(boxes, scores, classes, iou_thr=0.5):
+    """Per-class greedy NMS: keep highest-conf box, drop boxes with IoU > thr.
+
+    Unlike WBF, NO position averaging. Preserves the strong model's box
+    positions intact. Drops redundant overlapping predictions.
+
+    Args:
+        boxes: list of [x1, y1, x2, y2] in any normalized space
+        scores: list of float
+        classes: list of int
+        iou_thr: drop boxes with IoU > this against a kept box
+    Returns: kept boxes, scores, classes lists
+    """
+    import numpy as np
+    if not boxes:
+        return [], [], []
+    boxes_np = np.array(boxes, dtype=np.float32)
+    scores_np = np.array(scores, dtype=np.float32)
+    classes_np = np.array(classes, dtype=np.int32)
+
+    keep_idx = []
+    for c in np.unique(classes_np):
+        cls_mask = classes_np == c
+        idxs = np.where(cls_mask)[0]
+        cls_boxes = boxes_np[cls_mask]
+        cls_scores = scores_np[cls_mask]
+        order = np.argsort(-cls_scores)
+        suppressed = np.zeros(len(idxs), dtype=bool)
+        for i in order:
+            if suppressed[i]:
+                continue
+            keep_idx.append(idxs[i])
+            for j in order:
+                if j == i or suppressed[j]:
+                    continue
+                # IoU
+                xx1 = max(cls_boxes[i, 0], cls_boxes[j, 0])
+                yy1 = max(cls_boxes[i, 1], cls_boxes[j, 1])
+                xx2 = min(cls_boxes[i, 2], cls_boxes[j, 2])
+                yy2 = min(cls_boxes[i, 3], cls_boxes[j, 3])
+                w = max(0.0, xx2 - xx1)
+                h = max(0.0, yy2 - yy1)
+                inter = w * h
+                area_i = (cls_boxes[i, 2] - cls_boxes[i, 0]) * (cls_boxes[i, 3] - cls_boxes[i, 1])
+                area_j = (cls_boxes[j, 2] - cls_boxes[j, 0]) * (cls_boxes[j, 3] - cls_boxes[j, 1])
+                union = area_i + area_j - inter
+                iou = inter / union if union > 0 else 0
+                if iou > iou_thr:
+                    suppressed[j] = True
+    keep_idx.sort()
+    return ([boxes[k] for k in keep_idx],
+            [scores[k] for k in keep_idx],
+            [classes[k] for k in keep_idx])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rfdetr-weights", required=True)
@@ -84,8 +139,12 @@ def main():
     ap.add_argument("--cwd12", default="downloads/cottonweeddet12")
     ap.add_argument("--threshold", type=float, default=0.001)
     ap.add_argument("--wbf-iou", type=float, default=0.85,
-                    help="default 0.85 (was 0.55 in v3.0.30.9; lower iou caused -0.060 from box averaging)")
+                    help="WBF iou_thr (only when --fusion=wbf)")
     ap.add_argument("--wbf-skip", type=float, default=0.001)
+    ap.add_argument("--nms-iou", type=float, default=0.5,
+                    help="NMS iou_thr (only when --fusion=nms)")
+    ap.add_argument("--fusion", choices=["wbf", "nms"], default="nms",
+                    help="nms preserves box positions; wbf averages them")
     ap.add_argument("--model", choices=["medium", "large"], default="medium")
     args = ap.parse_args()
 
@@ -181,33 +240,34 @@ def main():
         except Exception:
             pass
 
-        # WBF the two views
+        # Fuse the two views
         if not orig_boxes and not flip_boxes_mirrored:
             continue
-        boxes_list = []
-        scores_list = []
-        labels_list = []
-        weights = []
-        if orig_boxes:
-            boxes_list.append(orig_boxes)
-            scores_list.append(orig_conf)
-            labels_list.append(orig_cls)
-            weights.append(1.0)
-        if flip_boxes_mirrored:
-            boxes_list.append(flip_boxes_mirrored)
-            scores_list.append(flip_conf)
-            labels_list.append(flip_cls)
-            weights.append(1.0)
 
-        try:
-            f_box, f_score, f_label = weighted_boxes_fusion(
-                boxes_list, scores_list, labels_list,
-                weights=weights, iou_thr=args.wbf_iou,
-                skip_box_thr=args.wbf_skip,
+        if args.fusion == "wbf":
+            boxes_list = []; scores_list = []; labels_list = []; weights = []
+            if orig_boxes:
+                boxes_list.append(orig_boxes); scores_list.append(orig_conf)
+                labels_list.append(orig_cls); weights.append(1.0)
+            if flip_boxes_mirrored:
+                boxes_list.append(flip_boxes_mirrored); scores_list.append(flip_conf)
+                labels_list.append(flip_cls); weights.append(1.0)
+            try:
+                f_box, f_score, f_label = weighted_boxes_fusion(
+                    boxes_list, scores_list, labels_list,
+                    weights=weights, iou_thr=args.wbf_iou,
+                    skip_box_thr=args.wbf_skip,
+                )
+            except Exception as e:
+                print(f"  [wbf] fail on {img_path.name}: {e}")
+                continue
+        else:  # nms — preserves box positions, no averaging
+            all_boxes = list(orig_boxes) + list(flip_boxes_mirrored)
+            all_conf = list(orig_conf) + list(flip_conf)
+            all_cls = list(orig_cls) + list(flip_cls)
+            f_box, f_score, f_label = _greedy_nms(
+                all_boxes, all_conf, all_cls, iou_thr=args.nms_iou
             )
-        except Exception as e:
-            print(f"  [wbf] fail on {img_path.name}: {e}")
-            continue
 
         img_id = file_id_map[img_path.name]
         for j in range(len(f_box)):
@@ -245,7 +305,9 @@ def main():
         "weights": str(args.rfdetr_weights),
         "model_size": args.model,
         "tta_strategy": "hflip",
-        "wbf_iou": args.wbf_iou,
+        "fusion": args.fusion,
+        "wbf_iou": args.wbf_iou if args.fusion == "wbf" else None,
+        "nms_iou": args.nms_iou if args.fusion == "nms" else None,
         "wbf_skip": args.wbf_skip,
         "n_images": len(combined["images"]),
         "n_annotations": len(combined["annotations"]),
