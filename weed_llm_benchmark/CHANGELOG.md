@@ -3702,3 +3702,64 @@ If X1 still < 0.8949 (Large alone) → TTA path also dead; consider:
 | 40839165 v3030_dS | Dashboard | 🟢 R 1d 16h |
 | 40877440 v3030_jD | Job-D | 🟢 R 1h |
 | 40878315 v3034x1_LhN | **X1: Large+hflip+NMS** | 🟡 PD |
+
+## 2026-05-15 — v3.0.34 X1 result: NMS-fusion = 0.8911, still −0.004 vs Large alone
+
+### Job 40878315 NMS-fusion result
+
+```
+fusion=nms (greedy per-class iou_thr=0.5)
+  mAP50-95: 0.8911 (vs Large alone 0.8949: -0.004)
+  mAP50:    0.9514 (vs 0.9478: +0.004 — recall up)
+  mAP75:    0.9146 (vs 0.9234: -0.009 — precision down)
+```
+
+### What's happening
+
+NMS-fusion at iou=0.5 captures the hflip view's UNIQUE detections (good
+recall, mAP50 up) but the hflip-then-flipback round trip isn't perfectly
+inverse — the network's predictions on the flipped image, even after
+mirroring, are slightly offset from the original. Box pairs offset by
+30-50% IoU survive NMS (which suppresses at >0.5 only) and appear as
+duplicate predictions → mAP75 / mAP50-95 drop.
+
+Could try NMS iou=0.4 (more aggressive), but risks killing valid
+neighboring-object boxes.
+
+### TTA path is also dead
+
+Across all fusion modes tested:
+- WBF iou ∈ {0.55, 0.7, 0.85}, weights ∈ {[2,1], [4,1], [10,1], [1,1.5]}
+- NMS iou=0.5
+- Cross-model (yolo+RF), peer-arch (Med+Large), same-model (hflip)
+
+**None outperforms the best single model (Large 0.8949).** Fundamental
+constraint: any addition of a second prediction stream introduces
+position noise (averaging via WBF) or duplicate noise (NMS); both hurt
+mAP50-95 more than the extra recall helps.
+
+### v3.0.34 X2: train Large for 100 epochs (was 60)
+
+Job 40878511, 36h walltime. Same setup as v3.0.31 RFDETRLarge but
+epochs=100 instead of 60. v3.0.31 ran 60 epochs in 14.5h so 100 epochs
+fits comfortably. If the model hadn't fully converged at epoch 60,
+extra training may push past 0.90.
+
+Expected: 0.8949 + 0.005-0.015 = 0.90-0.91.
+
+### If X2 also fails (lands < 0.90)
+
+Detection-side levers exhausted with current data (cwd12 train only,
+3,671 imgs). Remaining options:
+1. Accept 0.8949 as practical ceiling and pivot to writing the paper
+   (already exceeds DINOv3+YOLO26 SOTA 0.869 and v3.0.6 yolo11n 0.865)
+2. Long-term: fix autolabel quality so cumulative data actually helps
+   (v3.0.35+ work — CLIP relevance filter, OWLv2 conf threshold tightening)
+
+### Cluster state
+
+| Job | Role | Status |
+|---|---|---|
+| 40839165 v3030_dS | Dashboard | 🟢 R 1d 17h |
+| 40877440 v3030_jD | Job-D | 🟢 R 1.5h |
+| 40878511 v3034x2_L100 | **X2: Large 100 epochs (24-28h)** | 🟡 PD |
