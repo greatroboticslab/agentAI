@@ -3580,3 +3580,75 @@ Resubmitted as 40877440. Long-term fix still pending.
 | ≥ 0.78 | Cumulative data IS lever | Train RF-DETR Medium on cumulative (best of both) |
 | 0.74-0.78 | Marginal data benefit | Medium+Large WBF (iou=0.85) — peer ensemble |
 | < 0.74 | Cumulative data doesn't help (yet) | Hflip TTA on Large with iou=0.85 fix |
+
+## 2026-05-15 — v3.0.32 RESULT + v3.0.33 dual paths submitted
+
+### v3.0.32 cumulative pyco mAP50-95 = **0.5760** (job 40877439)
+
+```
+yolo26x trained 7/30 epochs on 202K cumulative imgs:
+  mAP50-95: 0.5760  ← MUCH worse than yolo26x cwd12-only (0.7446)
+  mAP50:    0.6142
+  mAP75:    0.5948
+```
+
+### Why data scaling FAILED at this configuration
+
+1. **Under-trained**: 7/30 epochs (timeout). Model didn't converge.
+2. **Signal dilution**: cwd12-style data is only 3,671 / 202K = **1.8%**
+   of training corpus. The other 98% trained the model on aux classes
+   (12-99) and OWLv2 autolabel artifacts.
+3. **Autolabel noise**: ~41 slugs are OWLv2-generated; per CHANGELOG
+   v3.0.27 leak history, OWLv2 false positives accumulate as label noise.
+4. **Class imbalance**: head structure has 100 classes (12 weed + 88 aux),
+   loss diluted across all of them.
+
+### Honest interpretation
+
+This is NOT "data didn't help" in general — it's **"this 202K dataset
+configuration is worse than cwd12 alone for the cwd12 metric."** The v3.0
+thesis (cumulative growing data) requires:
+- Better autolabel quality (CLIP relevance filter, conf threshold, etc.)
+- Higher cwd12-style ratio in training (resample to bias toward target)
+- Longer training to converge
+
+These are v3.0.34+ work items. For the immediate 0.90 goal, ignore
+cumulative path and push the cwd12-only architectural lever.
+
+### v3.0.33 — two cheap paths in parallel (both 2h GPU)
+
+**Path A: hflip TTA on Large + WBF iou=0.85** (job 40877957)
+- Updated `rfdetr_hflip_tta.py`: added `--model {medium,large}` and
+  changed default `--wbf-iou` from 0.55 → 0.85 (the v3.0.30.9 hflip TTA
+  failed at iou=0.55 because WBF averaged box positions; iou=0.85
+  preserves boxes intact, only merges near-identical predictions)
+- Submitted as job 40877957
+- Expected: 0.8949 → 0.895-0.910
+
+**Path D: Medium + Large peer-strength WBF** (job 40877963)
+- New `rfdetr_medium_large_wbf.py` (200 LOC)
+- Both RF-DETR family: Medium 0.8877, Large 0.8949 (Δ=0.007 — peer)
+- WBF iou=0.85 weights=[1, 1.5] (Large slightly heavier)
+- Same-architecture but different scale → moderately independent failure
+  modes, no strength gap to drag down WBF
+- Submitted as job 40877963
+- Expected: 0.895-0.910
+
+Either ≥ 0.90 → goal reached.
+
+### Cluster state
+
+| Job | Role | Status |
+|---|---|---|
+| 40839165 v3030_dS | Dashboard | 🟢 R 1d 15h |
+| 40877440 v3030_jD | Job-D resubmit (post-TIMEOUT) | 🟢 R 20m |
+| 40877957 v3033a_LhT | **Path A: Large+hflip iou=0.85** | 🟡 PD |
+| 40877963 v3033d_MLW | **Path D: Med+Large WBF iou=0.85** | 🟡 PD priority |
+
+### Truth anchors
+
+- Best canonical: **0.8949** (RFDETRLarge @704)
+- Goal: 0.90 → gap **−0.0051**
+- v3.0.32 cumulative attempt = data approach needs autolabel quality fix
+  before it can contribute (v3.0.34+ work)
+- v3.0.33 = pure architecture + TTA push, two parallel paths

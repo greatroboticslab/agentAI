@@ -83,8 +83,10 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--cwd12", default="downloads/cottonweeddet12")
     ap.add_argument("--threshold", type=float, default=0.001)
-    ap.add_argument("--wbf-iou", type=float, default=0.55)
+    ap.add_argument("--wbf-iou", type=float, default=0.85,
+                    help="default 0.85 (was 0.55 in v3.0.30.9; lower iou caused -0.060 from box averaging)")
     ap.add_argument("--wbf-skip", type=float, default=0.001)
+    ap.add_argument("--model", choices=["medium", "large"], default="medium")
     args = ap.parse_args()
 
     out_root = Path(args.out).resolve()
@@ -137,9 +139,12 @@ def main():
         json.dump(combined, f)
 
     # Load model
-    print(f"[tta] loading RF-DETR from {args.rfdetr_weights}")
-    from rfdetr import RFDETRMedium
-    model = RFDETRMedium(pretrain_weights=str(args.rfdetr_weights))
+    print(f"[tta] loading RF-DETR ({args.model}) from {args.rfdetr_weights}")
+    if args.model == "large":
+        from rfdetr import RFDETRLarge as RFDETRClass
+    else:
+        from rfdetr import RFDETRMedium as RFDETRClass
+    model = RFDETRClass(pretrain_weights=str(args.rfdetr_weights))
 
     from ensemble_boxes import weighted_boxes_fusion
 
@@ -238,6 +243,7 @@ def main():
 
     summary = {
         "weights": str(args.rfdetr_weights),
+        "model_size": args.model,
         "tta_strategy": "hflip",
         "wbf_iou": args.wbf_iou,
         "wbf_skip": args.wbf_skip,
