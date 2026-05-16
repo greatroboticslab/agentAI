@@ -502,8 +502,15 @@ def api_img(slug: str, filename: str):
 
 
 @app.get("/api/slug/{slug}/samples")
-def api_slug_samples(slug: str, n: int = 12):
-    """Return list of filenames for this slug's sample images."""
+def api_slug_samples(slug: str, n: int = 12, offset: int = 0):
+    """Return list of filenames for this slug's sample images.
+
+    v3.0.35.1: added `offset` for pagination + raised `n` cap (was 12).
+    `n` clamped at 1000 to prevent huge JSON. For all-image listing use the
+    /gallery/{slug} HTML endpoint which paginates server-side.
+    """
+    n = min(max(int(n), 1), 1000)
+    offset = max(int(offset), 0)
     if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
         raise HTTPException(400, "bad slug")
     try:
@@ -515,9 +522,162 @@ def api_slug_samples(slug: str, n: int = 12):
     if not local or not os.path.isdir(local):
         raise HTTPException(404)
     files = []
-    for p in Path(local).rglob("*"):
+    skipped = 0
+    seen = set()
+    for p in sorted(Path(local).rglob("*")):
         if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp"):
+            # Dedup by filename (cwd12 has copies in train/test/valid subdirs)
+            if p.name in seen:
+                continue
+            seen.add(p.name)
+            if skipped < offset:
+                skipped += 1
+                continue
             files.append(p.name)
             if len(files) >= n:
                 break
-    return {"slug": slug, "samples": files}
+    return {"slug": slug, "samples": files, "offset": offset,
+            "returned": len(files)}
+
+
+@app.get("/api/slug/{slug}/count")
+def api_slug_count(slug: str):
+    """Total unique image count for this slug (for gallery pagination)."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = json.load(f)
+        local = reg["datasets"][slug].get("local_path")
+    except Exception:
+        raise HTTPException(404)
+    if not local or not os.path.isdir(local):
+        raise HTTPException(404)
+    seen = set()
+    for p in Path(local).rglob("*"):
+        if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp"):
+            seen.add(p.name)
+    return {"slug": slug, "total_unique": len(seen)}
+
+
+@app.get("/gallery/{slug}", response_class=HTMLResponse)
+def gallery(slug: str, page: int = 1, per_page: int = 24):
+    """v3.0.35.1: Full-gallery view of all images in a slug, paginated.
+
+    Each thumbnail is the bbox-rendered version (uses /api/sample/...).
+    Click → opens the original full-res image via /api/img/...
+    """
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    per_page = min(max(int(per_page), 1), 200)
+    page = max(int(page), 1)
+    offset = (page - 1) * per_page
+
+    # Get registry info
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = json.load(f)
+        info = reg["datasets"].get(slug, {})
+        local = info.get("local_path")
+    except Exception:
+        raise HTTPException(404)
+    if not local or not os.path.isdir(local):
+        raise HTTPException(404, f"slug {slug} has no local_path")
+
+    # Collect all unique filenames
+    all_files = []
+    seen = set()
+    for p in sorted(Path(local).rglob("*")):
+        if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp"):
+            if p.name not in seen:
+                seen.add(p.name)
+                all_files.append(p.name)
+    total = len(all_files)
+    n_pages = max(1, (total + per_page - 1) // per_page)
+    page = min(page, n_pages)
+    offset = (page - 1) * per_page
+    page_files = all_files[offset:offset + per_page]
+
+    # Build HTML
+    annot = info.get("annotation", "?")
+    src = info.get("source", "?")
+    cards = []
+    for fname in page_files:
+        thumb_url = f"/api/sample/{slug}/{fname}"
+        full_url  = f"/api/img/{slug}/{fname}"
+        cards.append(f'''
+        <div class="card">
+          <a href="{full_url}" target="_blank">
+            <img src="{thumb_url}" alt="{fname}" loading="lazy"/>
+          </a>
+          <div class="caption">{fname}</div>
+        </div>''')
+
+    # Pagination links
+    def page_link(p):
+        return f'<a href="/gallery/{slug}?page={p}&per_page={per_page}">{p}</a>'
+    nav_pages = []
+    # Show: 1, prev, current-2..current+2, next, last
+    show_set = {1, n_pages, page}
+    for p in range(max(1, page-2), min(n_pages, page+2)+1):
+        show_set.add(p)
+    sorted_pages = sorted(show_set)
+    prev_p = None
+    nav = []
+    for p in sorted_pages:
+        if prev_p is not None and p - prev_p > 1:
+            nav.append('<span class="gap">…</span>')
+        if p == page:
+            nav.append(f'<span class="current">{p}</span>')
+        else:
+            nav.append(page_link(p))
+        prev_p = p
+    nav_html = ' '.join(nav)
+
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>{slug} — gallery (page {page}/{n_pages})</title>
+<style>
+  body {{ font-family: -apple-system, sans-serif; margin: 0; padding: 20px; background: #f5f5f7; color: #333; }}
+  header {{ background: #fff; padding: 16px 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
+  header h1 {{ margin: 0 0 8px 0; font-size: 22px; }}
+  header .meta {{ color: #666; font-size: 14px; }}
+  header a {{ color: #06c; text-decoration: none; }}
+  header a:hover {{ text-decoration: underline; }}
+  .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }}
+  .card {{ background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: transform 0.15s; }}
+  .card:hover {{ transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.12); }}
+  .card img {{ width: 100%; height: 180px; object-fit: cover; display: block; background: #eee; }}
+  .card .caption {{ padding: 8px 10px; font-size: 11px; color: #888; word-break: break-all; }}
+  nav.pagination {{ text-align: center; margin: 24px 0; }}
+  nav.pagination a, nav.pagination span {{ display: inline-block; padding: 6px 12px; margin: 0 3px; border-radius: 6px; font-size: 14px; }}
+  nav.pagination a {{ background: #fff; color: #06c; text-decoration: none; border: 1px solid #ddd; }}
+  nav.pagination a:hover {{ background: #06c; color: #fff; }}
+  nav.pagination .current {{ background: #06c; color: #fff; font-weight: 600; }}
+  nav.pagination .gap {{ color: #999; }}
+</style>
+</head>
+<body>
+<header>
+  <h1>📂 {slug}</h1>
+  <div class="meta">
+    {total} unique images · page {page}/{n_pages} ({per_page}/page)
+    · annotation: <code>{annot}</code>
+    · source: <code>{src}</code>
+    · <a href="/dashboard/datasets.html">← back to all datasets</a>
+  </div>
+</header>
+
+<nav class="pagination">{nav_html}</nav>
+
+<div class="grid">
+  {''.join(cards) if cards else '<p>No images on this page.</p>'}
+</div>
+
+<nav class="pagination">{nav_html}</nav>
+</body>
+</html>'''
+    return HTMLResponse(html)

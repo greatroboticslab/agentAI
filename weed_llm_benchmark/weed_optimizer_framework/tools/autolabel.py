@@ -205,8 +205,11 @@ def autolabel_dataset(slug, registry_cb, conf_threshold=0.30, max_images=30000,
             with torch.no_grad():
                 out = model(**inputs)
             tgt = torch.tensor([[hh, ww] for (ww, hh) in size_list]).to(device)
-            return processor.post_process_object_detection(
-                out, target_sizes=tgt, threshold=conf_threshold
+            # transformers renamed: post_process_object_detection -> post_process_grounded_object_detection
+            # new signature requires text_labels parameter
+            return processor.post_process_grounded_object_detection(
+                out, target_sizes=tgt, threshold=conf_threshold,
+                text_labels=txt,
             )
 
         def _run_with_oom_retry(pil_list, size_list, _depth=0):

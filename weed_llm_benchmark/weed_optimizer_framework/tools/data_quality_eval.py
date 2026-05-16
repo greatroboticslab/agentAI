@@ -153,8 +153,11 @@ def run_t1_owlv2_baseline(samples, conf=0.30, prompt="weed"):
         with torch.no_grad():
             out = model(**inputs)
         target_sizes = torch.tensor([im.size[::-1]]).to("cuda")
-        results = proc.post_process_object_detection(
-            out, target_sizes=target_sizes, threshold=conf
+        # transformers renamed: post_process_object_detection -> post_process_grounded_object_detection
+        # new signature requires text_labels parameter
+        results = proc.post_process_grounded_object_detection(
+            out, target_sizes=target_sizes, threshold=conf,
+            text_labels=[[prompt]],
         )[0]
         preds = []
         for box, score in zip(results["boxes"].cpu().numpy(),
@@ -308,8 +311,11 @@ def run_t4_gemma_verify(samples, conf=0.30):
         with torch.no_grad():
             out = model(**inputs)
         target_sizes = torch.tensor([im.size[::-1]]).to("cuda")
-        results = proc.post_process_object_detection(
-            out, target_sizes=target_sizes, threshold=conf
+        # transformers renamed: post_process_object_detection -> post_process_grounded_object_detection
+        # new signature requires text_labels parameter
+        results = proc.post_process_grounded_object_detection(
+            out, target_sizes=target_sizes, threshold=conf,
+            text_labels=[[prompt]],
         )[0]
         boxes = results["boxes"].cpu().numpy().tolist()
         scores = results["scores"].cpu().numpy().tolist()

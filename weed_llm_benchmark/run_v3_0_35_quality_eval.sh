@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=24G
-#SBATCH --time=06:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=results/framework/v3_0_35_quality_eval_%j.out
 
 # v3.0.35 — Empirical benchmark: OWLv2 vs Gemma 4 vision for weed detection /
@@ -52,7 +52,7 @@ OUT=$REPO/results/framework/v3_0_35_quality_eval
 python -m weed_optimizer_framework.tools.data_quality_eval \
     --cwd12 downloads/cottonweeddet12 \
     --out "$OUT" \
-    --sample-n 100 \
+    --sample-n 1977 \
     --owlv2-conf 0.30 \
     --owlv2-prompt "weed" \
     --tests "T1,T2,T3,T4"
