@@ -74,8 +74,8 @@ def _label_path_for(img_path):
     return lbl
 
 
-def autolabel_dataset(slug, registry_cb, conf_threshold=0.12, max_images=30000,
-                      prompt=None, fallback_whole_image=True, class_id=0,
+def autolabel_dataset(slug, registry_cb, conf_threshold=0.30, max_images=30000,
+                      prompt=None, fallback_whole_image=False, class_id=0,
                       batch_size=4, save_every=500):
     """Generate YOLO-format bbox labels for an unlabeled dataset using OWLv2.
 
@@ -86,13 +86,22 @@ def autolabel_dataset(slug, registry_cb, conf_threshold=0.12, max_images=30000,
       * max_images default 30000 (was None) to fit 8h walltime across 3 datasets
       * Periodic registry save every `save_every` images
 
+    v3.0.35 P0 quality fix (2026-05-15):
+      * conf_threshold raised 0.12 → 0.30 (was producing massive FP noise that
+        dominated v3.0.32 cumulative training — 202K images at conf=0.12 gave
+        pyco 0.5760, much worse than 3,671 cwd12 alone at 0.7446)
+      * fallback_whole_image default flipped to False — emitting a whole-image
+        bbox when OWLv2 finds nothing was a worst-case garbage label that
+        accumulated across slugs Brain harvested
+
     Args:
       slug: dataset slug (key into registry)
       registry_cb: dict {"get": fn(slug)->info, "update": fn(slug, updates)}
-      conf_threshold: OWLv2 score filter (0.10-0.15 works)
+      conf_threshold: OWLv2 score filter (v3.0.35: default 0.30)
       max_images: per-dataset cap (30000 = ~30 min on V100 with batch=16)
       prompt: override the inferred text prompt
-      fallback_whole_image: if OWLv2 returns nothing, emit whole-image bbox
+      fallback_whole_image: if True, emit whole-image bbox when OWLv2 finds
+        nothing (v3.0.35: default False — was a noise source)
       class_id: YOLO class id (default 0 = single-class generic)
       batch_size: OWLv2 forward-pass batch size
       save_every: save registry after processing this many images
