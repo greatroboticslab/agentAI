@@ -3763,3 +3763,90 @@ Detection-side levers exhausted with current data (cwd12 train only,
 | 40839165 v3030_dS | Dashboard | 🟢 R 1d 17h |
 | 40877440 v3030_jD | Job-D | 🟢 R 1.5h |
 | 40878511 v3034x2_L100 | **X2: Large 100 epochs (24-28h)** | 🟡 PD |
+
+## 2026-05-15/16 — X2 + v3.0.35 results: architecture ceiling at 0.8953
+
+### v3.0.34 X2 result (job 40878511, 23h 25m)
+
+```
+RFDETRLarge @704, 100 epochs:
+  pyco mAP50-95: 0.8953
+  pyco mAP50:    0.9470
+  pyco mAP75:    0.9216
+```
+
+Compared to v3.0.31 RFDETRLarge 60-ep (0.8949): **+0.0004 — essentially noise**.
+
+→ **Architecture-side lever exhausted**. cwd12-only training with RF-DETR
+has converged at ~0.895. Training longer doesn't help. The gap to 0.90
+(−0.0047) cannot be closed by training the same model longer.
+
+### v3.0.35 Quality Benchmark result (job 40884184, 9h 35m, full cwd12 1977)
+
+| Test | Method | Result | Verdict |
+|---|---|---|---|
+| **T1** | OWLv2 baseline conf=0.30 prompt="weed" | P=0.887 R=**0.592** F1=0.710 | High precision but low recall — misses 41% of weeds |
+| **T2** | Gemma 4 → direct bbox coords | F1=**0.012** (6284 FP, 59 TP) | Catastrophic. VLMs cannot do bbox regression |
+| **T3** | Gemma 4 image relevance yes/no | 94% on 50 positives | ⚠️ **NO negatives tested** — script couldn't find non-weed images on disk |
+| **T4** | Gemma 4 bbox verify (crop+ask) | FP rejection **0.0%** | Useless as verifier — answers "yes" to EVERY crop |
+
+### Hard conclusions
+
+1. **Gemma 4 cannot do bbox** (T2 confirmed)
+2. **Gemma 4 cannot verify bbox** (T4: 0% FP rejection — rubber-stamps everything)
+3. **Gemma 4 image-level relevance: unknown** until T3 re-tested with proper negatives
+
+### Architecture ceiling reality
+
+| Run | pyco mAP50-95 |
+|---|---|
+| yolo26x cwd12-only 100ep | 0.7446 |
+| RF-DETR Medium cwd12-only 60ep | 0.8877 |
+| RF-DETR Large cwd12-only 60ep | 0.8949 |
+| **RF-DETR Large cwd12-only 100ep** | **0.8953** ← practical ceiling |
+| **Goal** | **0.9000** |
+| Gap | **−0.0047** |
+
+Already exceeds DINOv3+YOLO26 lettuce SOTA (0.869) by +0.026 absolute.
+
+### Professor's NEW direction (collection-phase similarity)
+
+After the FLUX synthesis debate, Hongbo revised to:
+> "Have model compare what existing data look like vs what it collected.
+>  Discard if similarity too far apart. Not for training using synthetic
+>  — for during collection phase."
+
+This is exactly right and aligned with self-supervised similarity
+filtering / anchor-based curation in published literature. v3.0.36 will
+implement this via **DINOv2 feature similarity**, not LLM:
+
+- Reference pool = trusted real-bbox slugs (cwd12 + weedsense +
+  crop_weed_research + grass_weeds + weed_crop_aerial + francesco)
+- New image → DINOv2 embedding → top-K KNN cosine to reference → keep
+  if avg > calibrated threshold
+- Multi-category natively supported (pool spans weed/cotton/grass/aerial
+  — DINOv2 features cluster naturally; new image accepted if close to
+  ANY cluster)
+- 100× faster than Gemma 4, same backbone as RF-DETR
+
+### Why DINOv2 over Gemma 4 for this role
+
+Gemma 4 just empirically failed on bbox tasks (T2, T4). For image-level
+similarity, DINOv2:
+- Purpose-built for visual representation learning
+- Same backbone as our detector (alignment with what detector cares about)
+- Image embedding inference: ~50ms vs Gemma 4's 1-5s
+- No "rubber stamp" behavior (cosine similarity is calibrated geometry)
+
+### Registry audit confirms real noise source
+
+80 slugs total:
+- 16 weed, 15 crop, 25 other-category (rice/tomato/cotton/etc.)
+- **35 UNCATEGORIZED** — these include `commonforms`, `mytwu`, `yonder`,
+  `colo` — agricultural-unrelated, passed vocab filter because their
+  short names didn't match any reject word
+- These 35 garbage slugs are the dominant noise source in v3.0.32
+  cumulative training (which produced pyco 0.5760)
+
+DINOv2 curator should drop these at collection time without affecting
+legitimate weed/crop slugs.
