@@ -422,25 +422,47 @@ def main():
 
     # T3 needs negatives
     if "T3" in tests:
+        REPO = "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"
         neg_paths = []
+
+        # v3.0.35.2: better negative sourcing strategy. Prior version tried
+        # flagged-garbage slug downloads/ paths but those datasets weren't
+        # on disk (Brain dropped them at harvest, not download). Now try:
+        # 1. Explicit --negative-dir if user provided
+        # 2. Registry slugs whose names look "UNCATEGORIZED" (real noise:
+        #    commonforms, mytwu, yonder, colo — these ARE downloaded)
+        # 3. Fallback: any registry slug NOT in our TRUSTED reference set
         if args.negative_dir and os.path.isdir(args.negative_dir):
             neg_paths = sorted(str(p) for p in Path(args.negative_dir).glob("*.jpg"))[:50]
+            print(f"  T3 negatives source: --negative-dir ({len(neg_paths)})")
         else:
-            # Try to find a flagged-garbage slug
-            REPO = "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"
-            flag_path = f"{REPO}/results/framework/dataset_flags.json"
-            if os.path.exists(flag_path):
-                flags = json.load(open(flag_path))
-                for slug in flags:
-                    p = Path(REPO) / "downloads" / slug
-                    if p.is_dir():
-                        for img in p.rglob("*.jpg"):
+            # Try UNCATEGORIZED slugs (downloaded but non-agricultural)
+            UNCAT_KEYWORDS = ["commonforms", "mytwu", "yonder", "colo",
+                              "warp", "beehive", "plantifydr", "plantdoc",
+                              "plants-classification"]
+            try:
+                reg = json.load(open(f"{REPO}/results/framework/dataset_registry.json"))
+                for slug, info in reg.get("datasets", {}).items():
+                    if not isinstance(info, dict): continue
+                    sl = slug.lower()
+                    if not any(k in sl for k in UNCAT_KEYWORDS): continue
+                    lp = info.get("local_path") or ""
+                    if not lp or not os.path.isdir(lp):
+                        # Also try downloads/<slug>
+                        lp = f"{REPO}/downloads/{slug}"
+                        if not os.path.isdir(lp): continue
+                    for img in Path(lp).rglob("*"):
+                        if img.suffix.lower() in (".jpg", ".jpeg", ".png"):
                             neg_paths.append(str(img))
                             if len(neg_paths) >= 50: break
                     if len(neg_paths) >= 50: break
-        print(f"  T3 negatives: {len(neg_paths)} images")
-        results["T3"] = run_t3_gemma_relevance(sampled[:len(neg_paths) or 50],
-                                                neg_paths)
+            except Exception as e:
+                print(f"  T3 negatives registry scan failed: {e}")
+            print(f"  T3 negatives source: UNCATEGORIZED slugs ({len(neg_paths)})")
+
+        if not neg_paths:
+            print(f"  T3 WARN: no negative images found — T3 will only test positives")
+        results["T3"] = run_t3_gemma_relevance(sampled, neg_paths)
 
     # T4 on sample (uses both OWLv2 + Gemma)
     if "T4" in tests:
