@@ -129,12 +129,26 @@ def _sample_images(slug_dir: Path, n: int, seed: int = 0) -> list[Path]:
 
 
 def _load_dinov2():
-    """Load DINOv2 model on GPU. Returns (model, processor)."""
+    """Load the DINO backbone on GPU. Returns (model, processor).
+
+    Backbone is configurable via the DINO_BACKBONE env var, so the
+    fine-grained-classification roles (dino_label_verifier) can use a
+    plant-specialised checkpoint while the coarse domain-FILTER role keeps
+    the generic model. Any transformers-loadable DINOv2 repo works as-is;
+    default is the generic facebook/dinov2-base (what v3.0.36 validated).
+
+    Recommended plant-specialised options (drop-in once mirrored to a
+    transformers-compatible repo): the PlantCLEF-2024 fine-tuned DINOv2
+    ViT (1.4M plant images, 800+ species) — same architecture, plant
+    features. See CHANGELOG v3.0.38 notes.
+    """
+    import os
     import torch
     from transformers import AutoImageProcessor, AutoModel
-    log.info("Loading DINOv2-base (facebook/dinov2-base)...")
-    proc = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
-    model = AutoModel.from_pretrained("facebook/dinov2-base").cuda().eval()
+    backbone = os.environ.get("DINO_BACKBONE", "facebook/dinov2-base")
+    log.info(f"Loading DINO backbone: {backbone}")
+    proc = AutoImageProcessor.from_pretrained(backbone)
+    model = AutoModel.from_pretrained(backbone).cuda().eval()
     log.info(f"  loaded. params={sum(p.numel() for p in model.parameters())/1e6:.1f}M")
     return model, proc
 

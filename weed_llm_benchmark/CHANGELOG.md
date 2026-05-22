@@ -3948,3 +3948,81 @@ training until the data is genuinely clean.
 - **v3.0.39 (after B+C): RF-DETR Large on object-level-cleaned cumulative
   corpus** — the cumulative-training experiment re-run on data that is
   actually clean.
+
+---
+
+## 2026-05-22 — v3.0.38-C label verifier + v3.0.39 FLUX synth; consolidated plan
+
+### Locked goal (restated)
+
+cwd12 holdout pyco mAP50-95 ≥ **0.90**. Current best 0.8953 (RF-DETR
+Large). Gap **−0.0047**. Architecture lever exhausted → the goal is now
+pursued through data quality + targeted synthetic augmentation.
+
+### The data pipeline (what each component is FOR)
+
+One frozen DINO backbone, used in three distinct roles — plus a
+generator. The roles answer different questions and must not be confused:
+
+| Component | Question | Method | Catches |
+|---|---|---|---|
+| dinov2_curator (v3.0.36) | is this DATASET weeds/crops? | whole-image cosine sim | off-domain datasets |
+| dinov2_object_curator (v3.0.38-B) | does this BOX look like a weed object? | per-bbox cosine sim | off-distribution boxes |
+| dino_label_verifier (v3.0.38-C) | is this box's LABEL right? | supervised linear head on DINO feats | swapped/wrong class labels |
+| synth_cutpaste / synth_diffusion | — | generate clean-GT objects/images | (feeds the above + training) |
+
+Similarity filtering is unsupervised "in/out"; it cannot see a class
+swap (a PalmerAmaranth crop labelled Crabgrass still looks like a weed).
+Catching that needs the supervised verifier — same idea as cleanlab /
+Confident-Learning "swapped label" detection, with an independent model.
+
+### v3.0.38-C — dino_label_verifier.py (NEW)
+
+A linear classification head (multinomial logistic regression, numpy —
+the head is tiny) on FROZEN DINO features. Trained on the cut-paste
+synthetic object bank, whose crops have guaranteed-correct labels.
+`verify` crops every labelled bbox of every registry slug, predicts the
+species, and flags boxes only on HIGH-confidence disagreement
+(Confident-Learning principle). Non-destructive — produces
+verify_scores.json for review; nothing auto-flagged.
+
+### Backbone is now configurable (DINO_BACKBONE env var)
+
+`_load_dinov2()` reads DINO_BACKBONE (default facebook/dinov2-base, what
+v3.0.36 validated). The fine-grained classification role (verifier)
+should use a plant-specialised checkpoint — the PlantCLEF-2024
+fine-tuned DINOv2 ViT (1.4M plant imgs, 800+ species; same architecture)
+or BioCLIP 2. Generic DINOv2 stays for the coarse domain-filter role.
+
+### v3.0.39 — synth_diffusion.py (NEW): FLUX for the professor's direction
+
+Prof. Zhang has repeatedly required synthetic data be used FOR TRAINING
+(not curation-only). Naive standalone cut-paste trains a detector to only
+~45% mAP (domain gap). The strong form, implemented here:
+**FLUX.1-Fill inpainting conditioned on a bbox layout** — real field
+background, boxes we choose, FLUX paints a photoreal weed of a target
+species into each box. Realism (closes sim-to-real gap) + pixel-exact GT
+(we own the boxes). Generated images are meant as TRAINING AUGMENTATION
+mixed with real data, biased to weak cwd12 classes (where synthetic
+demonstrably helps — DODA +15.6 AP wheat, Gen2Det +18% COCO few-shot).
+Closed loop (S3OD / ICLR'26 style): generated images can be re-checked by
+the object curator + verifier before entering training.
+FLUX.1-Fill-dev is gated — needs `huggingface-cli login` on the cluster.
+
+### Complete plan v3.0.38 → v3.0.40
+
+- **38-A** RF-DETR Large cwd12-only 2-seed re-test (job 40912927) —
+  is 0.8953 the true ceiling or within seed noise of 0.90?
+- **38-B** object-level DINOv2 curator — flag bad boxes inside OK datasets
+- **38-C** DINO label verifier — flag swapped-class labels
+- **39**  FLUX synthetic augmentation — generate clean weak-class data,
+  DINO-verified, mixed into real training
+- **40**  RF-DETR Large on (object-cleaned cumulative corpus + FLUX
+  augmentation) — the decisive run at ≥ 0.90
+
+### Cluster scripts
+
+run_v3_0_38_curator.sh runs the full v3.0.38-B/C pipeline (cut-paste
+bank/backgrounds/compose → object reference → score-objects → verifier
+train/verify/report). run_v3_0_39_synth_diffusion.sh runs FLUX generation.
+Both non-destructive; outputs are scores + sample montages for review.

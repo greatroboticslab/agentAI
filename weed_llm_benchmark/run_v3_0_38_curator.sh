@@ -61,7 +61,22 @@ echo ""; echo "### STEP 5: score every slug at object level ###"
 python -m weed_optimizer_framework.tools.dinov2_object_curator score-objects
 echo "step5 exit=$?"
 
-echo ""; echo "### STEP 6: report ###"
+echo ""; echo "### STEP 6: object-curator report ###"
 python -m weed_optimizer_framework.tools.dinov2_object_curator report
 
+echo ""; echo "### STEP 7: train DINO label-verifier head (v3.0.38-C) ###"
+python -m weed_optimizer_framework.tools.dino_label_verifier train
+echo "step7 exit=$?"
+
+echo ""; echo "### STEP 8: verify every slug's labels ###"
+python -m weed_optimizer_framework.tools.dino_label_verifier verify
+echo "step8 exit=$?"
+
+echo ""; echo "### STEP 9: label-verifier report ###"
+python -m weed_optimizer_framework.tools.dino_label_verifier report
+
 echo ""; echo "=== v3.0.38-B/C DONE ($(date)) ==="
+echo "Review (non-destructive — nothing auto-flagged):"
+echo "  results/framework/dinov2_object_curator/object_scores.json"
+echo "  results/framework/dino_label_verifier/verify_scores.json"
+echo "  results/framework/synth_cutpaste/images/   (synthetic samples)"

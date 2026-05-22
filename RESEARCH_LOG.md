@@ -1391,3 +1391,42 @@ A data-quality filter that works at the *dataset* level (v3.0.36 DINOv2
 curator) does not fix *instance*-level label noise. The unit of curation
 has to match the unit of noise. Autolabel errors are per-box, so the
 curator must be per-box.
+
+---
+
+## 2026-05-22 — v3.0.38-C label verifier + v3.0.39 FLUX synthesis
+
+Built the rest of the v3.0.38 data-quality stack and the v3.0.39
+synthetic-training module:
+
+- **dino_label_verifier.py** — a supervised linear head on frozen DINO
+  features. Filtering (similarity) answers "in/out"; only a classifier
+  answers "is the *label* right". Trained on the cut-paste synthetic bank
+  (guaranteed-correct labels), it flags swapped-class boxes at high
+  confidence (Confident-Learning principle). This is the third and last
+  curation gate.
+- **synth_diffusion.py** — FLUX.1-Fill layout-conditioned generation.
+  Honours Prof. Zhang's requirement that synthetic data also train the
+  detector, in the form the literature shows actually works: inpaint
+  photoreal weeds into chosen boxes on real backgrounds → realism + exact
+  GT, used as augmentation biased to weak classes.
+- DINO backbone made configurable (DINO_BACKBONE) so the fine-grained
+  verifier role can use a plant-specialised checkpoint (PlantCLEF-2024
+  DINOv2 / BioCLIP 2) while the coarse filter keeps generic DINOv2.
+
+Research grounding done this session: DINOv2 self-curation, cleanlab
+ObjectLab / Confident Learning, BioCLIP 2, PlantCLEF-2024 ViT, Simple
+Copy-Paste, DODA, Gen2Det, S3OD, FLORA, weed-detection diffusion
+augmentation. Conclusion: FLUX is the right generative base; the
+breakthrough is layout-conditioning + a DINO-verified closed loop.
+
+Honest caveat carried forward: cwd12 is not a low-data target, so
+synthetic augmentation's gain is expected mainly on weak/rare classes,
+not a blanket +mAP. The plan biases generation accordingly.
+
+### Blocker
+
+Cluster ssh (bridges2) hangs after the password prompt across this
+session — v3.0.38-A result (job 40912927) not yet retrieved and the
+v3.0.38/39 jobs not yet submitted. All code is committed + pushed, so the
+cluster side is a `git pull` + `sbatch` once a login session is healthy.
