@@ -230,6 +230,10 @@ def main():
                          "{out}/run/checkpoint_best_total.pth)")
     ap.add_argument("--model", choices=["medium", "large"], default="medium",
                     help="RF-DETR variant (medium=33M, large=87M)")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="random seed for training. v3.0.38: vary across runs "
+                         "to measure seed variance of the ~0.895 ceiling; "
+                         "None = RF-DETR library default")
     args = ap.parse_args()
 
     # RFDETRMedium requires resolution divisible by patch_size * num_windows = 16*2 = 32
@@ -279,6 +283,16 @@ def main():
     print(f"[train]   dataset_dir={dataset_dir}")
     print(f"[train]   output_dir={output_dir}")
 
+    # v3.0.38: RF-DETR's public train() is `train(self, **kwargs)` with no
+    # `seed` field (verified on cluster). Forcing a seed through kwargs risks
+    # a config-validation crash, so --seed is a run LABEL only: each value
+    # gets its own output dir, and genuine run-to-run variance comes from
+    # GPU / cuDNN nondeterminism (RF-DETR does not enable deterministic
+    # algorithms). That spread is exactly the ceiling-variance signal we
+    # want — is the 0.895 plateau within noise of the 0.90 goal?
+    if args.seed is not None:
+        print(f"[train]   run label seed={args.seed} "
+              f"(variance source: GPU/cuDNN nondeterminism)")
     model.train(
         dataset_dir=str(dataset_dir),
         epochs=args.epochs,

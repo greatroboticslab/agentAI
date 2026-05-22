@@ -71,6 +71,15 @@ Evaluated on **CottonWeedDet12** test set (848 images, 12 weed species, 1,464 gr
 
 ## v3.0 — Autonomous Agent Collects the Internet's Weed Data
 
+> **Current status (v3.0.38, 2026-05):** architecture lever exhausted at
+> RF-DETR Large pyco mAP50-95 = **0.8953** (goal ≥ 0.90, gap −0.0047).
+> Single-stage cumulative training on autonomously-collected data failed
+> twice (data noise), so the focus is now **data-quality curation**:
+> whole-image DINOv2 dataset filter (v3.0.36, works) + object-level
+> DINOv2 curator + cut-paste synthetic anchor (v3.0.38). See CHANGELOG.md
+> for the authoritative, up-to-date log — the sections below describe the
+> earlier v3.0.23-era pipeline.
+
 Starting v3.0, the framework's primary mode is an autonomous research agent that
 accumulates real-bbox datasets across runs and trains the latest YOLO (yolo26x,
 ~59M params) on the union — no more circular self-distillation on the same 5K images.

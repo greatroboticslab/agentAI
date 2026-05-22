@@ -1352,3 +1352,42 @@ The TRUE canonical number requires pycocotools (industry-standard COCO eval). Su
 ### Lesson learned
 
 Don't anchor on a number from one tool. Always cross-check via pycocotools (or another independent eval) before declaring victory. This is the v3.0.27 lesson generalized.
+
+---
+
+## 2026-05-19 — v3.0.36/35.2 landed, v3.0.37 timeout, v3.0.38 = clean-first
+
+**v3.0.36 DINOv2 curator (job 40891360)** — success. Whole-image DINOv2
+similarity cleanly separates good vs off-domain data (trusted slugs mean
+0.78, untrusted 0.26, zero overlap). 51 garbage slugs auto-flagged.
+Validates Prof. Zhang's collection-phase similarity-comparison idea.
+
+**v3.0.35.2 T3 re-test (job 40891361)** — Gemma 4 image-level relevance
+= 96% accuracy with proper negatives. Settles the T1-T4 matrix: Gemma 4
+cannot do bbox (T2) or bbox-verify (T4), but can do image-level relevance
+(T3). DINOv2 cosine + Gemma 4 relevance are two agreeing image filters.
+
+**v3.0.37 yolo26x cumulative-clean (job 40896313)** — TIMEOUT at 18h,
+epoch 19/30, no pyco. In-training cwd12 val ~0.59 and declining. Three
+problems: (1) yolo26x ceiling is 0.7446 — can't reach 0.90; (2) walltime
+too short; (3) clean data still dragged val below yolo26x's own
+cwd12-only number. Conclusion: removing whole garbage datasets is not
+enough — bad autolabel boxes *inside* good datasets are the residual
+noise. Single-stage cumulative training has now failed twice (0.576,
+~0.59).
+
+**Decision (with user, 2026-05-19): clean the data at object level
+BEFORE the next cumulative training run.** Two parallel tracks:
+- our object-level DINOv2 curator (per-bbox crop comparison)
+- Prof. Zhang's copy-paste synthetic + DINO classification head
+
+**v3.0.38-A submitted now:** RF-DETR Large cwd12-only, seeds 101+102,
+60ep — adds 2 points to v3.0.31 (0.8949) / X2 (0.8953) for an honest
+ceiling mean ± std. Gap to 0.90 goal still −0.0047.
+
+### Lesson learned
+
+A data-quality filter that works at the *dataset* level (v3.0.36 DINOv2
+curator) does not fix *instance*-level label noise. The unit of curation
+has to match the unit of noise. Autolabel errors are per-box, so the
+curator must be per-box.

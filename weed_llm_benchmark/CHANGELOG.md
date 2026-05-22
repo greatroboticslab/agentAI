@@ -3850,3 +3850,101 @@ similarity, DINOv2:
 
 DINOv2 curator should drop these at collection time without affecting
 legitimate weed/crop slugs.
+
+---
+
+## 2026-05-19 — v3.0.36/35.2 results landed, v3.0.37 TIMEOUT, v3.0.38 plan
+
+### v3.0.36 DINOv2 curator (job 40891360) — ✅ SUCCESS
+
+Whole-image DINOv2 similarity scoring of every registry slug vs the
+trusted reference pool. Clean separation:
+
+```
+Trusted slug scores:   n=5  mean=0.7807  min=0.7362  25%ile=0.7694
+Untrusted slug scores: n=66 mean=0.2621  min=0.0720  75%ile=0.3663
+Suggested threshold (midpoint): 0.5679
+```
+
+→ DINOv2 feature space cleanly separates good vs off-domain data
+(0.78 vs 0.26 — no overlap). **51 garbage slugs auto-flagged**
+(`auto_flagged_by=dinov2_curator` in dataset_flags.json; 108 flag
+entries total incl. manual). This empirically validates Hongbo's
+collection-phase similarity-comparison direction.
+
+Caveat: 3 trusted slugs (crop_weed_research, grass_weeds,
+weed_crop_aerial) showed `missing_path` — reference pool built from
+5 slugs not 8. Pool still valid (cwd12 variants + weedsense) but worth
+re-staging those paths.
+
+### v3.0.35.2 T3 re-test (job 40891361) — ✅ Gemma 4 relevance USABLE
+
+Gemma 4 image-level relevance, this time with proper negatives
+(UNCATEGORIZED slug images as non-weed):
+
+```
+accuracy=0.96  (94 TP / 50 TN / 0 FP_err / 6 FN_err) on 100 pos + 50 neg
+→ USEFUL as an image-level filter
+```
+
+So the T1-T4 verdict is settled: Gemma 4 **cannot** do bbox (T2 F1=0.012)
+or bbox verification (T4 0% FP rejection), but **can** do image-level
+relevance (T3 96%). We now have TWO independent image-level filters that
+agree — DINOv2 cosine (0.78/0.26) and Gemma 4 relevance (96%).
+
+### v3.0.37 yolo26x cumulative-clean (job 40896313) — ❌ TIMEOUT
+
+Trained yolo26x on the DINOv2-cleaned cumulative corpus (51 garbage
+slugs flagged out). Result: **TIMEOUT at 18h walltime, epoch ~19/30**,
+no pyco eval ran. In-training cwd12-holdout val mAP50-95 hovered
+**~0.59 and was declining** (epoch 12 = 0.601 → epoch 19 dropping).
+
+Honest read — three problems, the experiment was mis-designed:
+1. **Used yolo26x** — ceiling is 0.7446 even cwd12-only, so it cannot
+   reach the 0.90 goal by construction.
+2. **Timed out** — 30ep @896px on the ~50K-img corpus doesn't fit 18h.
+3. **Clean data still hurt** — val ~0.59 < yolo26x's own cwd12-only
+   0.7446. Removing 51 whole garbage *datasets* did NOT rescue it.
+
+→ Conclusion: the residual noise is NOT whole garbage datasets — it is
+**bad autolabel boxes inside otherwise-OK datasets**. Whole-image
+DINOv2 curation cannot catch a wrong bbox in a good image. This is
+exactly what Hongbo's object-level ("iterate all objects, compare all")
+direction addresses.
+
+### Architecture ceiling — unchanged
+
+| Run | pyco mAP50-95 |
+|---|---|
+| RF-DETR Large cwd12-only 60ep (v3.0.31) | 0.8949 |
+| RF-DETR Large cwd12-only 100ep (v3.0.34 X2) | 0.8953 |
+| **Goal** | **0.9000** |
+| **Gap** | **−0.0047** |
+
+Single-stage joint training on cumulative data has now failed twice
+(v3.0.32 raw = 0.5760; v3.0.37 clean = ~0.59 timeout). That path is
+closed until the data is cleaned at the *object* level.
+
+### v3.0.38 plan — clean first, then train (per user decision 2026-05-19)
+
+User direction: pursue our own object-level curation AND Hongbo's
+synthetic-comparison approach in parallel; do not re-run cumulative
+training until the data is genuinely clean.
+
+- **v3.0.38-A (cluster, submitted): RF-DETR Large cwd12-only 2-seed
+  re-test — job 40912927 (array 1-2), PENDING.** Seeds 101 + 102, 60ep
+  each, identical config to v3.0.31. Adds 2 data points to the existing
+  2 (0.8949 / 0.8953) → honest mean ± std of the ceiling. RF-DETR's
+  public `train(**kwargs)` has no `seed` field, so `--seed` is a run
+  label; run-to-run variance comes from GPU/cuDNN nondeterminism.
+  Script: run_v3_0_38_rfdetr_seed.sh; code: train_rfdetr.py +--seed.
+- **v3.0.38-B: object-level DINOv2 curator.** Crop every bbox, DINO-embed
+  each crop, compare to an object-level reference pool. Flags bad boxes
+  inside good datasets — the residual autolabel noise.
+- **v3.0.38-C: copy-paste synthetic generator + DINO classification head.**
+  Cut real weed objects from trusted slugs, paste on varied backgrounds
+  (exact bbox GT). Use as reference pool; train an MLP head on DINO
+  features to classify good/bad collected data (Hongbo's direction).
+- **v3.0.39 (after B+C): RF-DETR Large on object-level-cleaned cumulative
+  corpus** — the cumulative-training experiment re-run on data that is
+  actually clean.
