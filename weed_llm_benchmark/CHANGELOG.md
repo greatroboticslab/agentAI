@@ -4069,3 +4069,49 @@ run_v3_0_38_curator.sh runs the full v3.0.38-B/C pipeline (cut-paste
 bank/backgrounds/compose → object reference → score-objects → verifier
 train/verify/report). run_v3_0_39_synth_diffusion.sh runs FLUX generation.
 Both non-destructive; outputs are scores + sample montages for review.
+
+## 2026-05-22 — v3.0.38-B/C + v3.0.39 both submitted, running on cluster
+
+### Submitted
+
+- **job 40962044** v3_0_38_cur — curator pipeline (9 steps end-to-end:
+  cut-paste bank → backgrounds → compose → DINOv2 object reference →
+  score-objects → object-report → verifier train → verify → report).
+  Status R 2h31 on v002, currently at STEP 7 (label-verifier head
+  training, 8/12 classes embedded).
+- **job 40963121** v3_0_39_flux — FLUX.1-Fill layout-conditioned
+  synthesis (600 imgs, 28 steps, weak-class biased). Status PD waiting
+  for GPU. HF auth set up (token written, repo access confirmed: gated:
+  auto / accessible: ok).
+
+### Cluster environment changes this session
+
+- diffusers 0.37.1 + accelerate 1.13.0 installed in `bench` env.
+- HF token persisted in ~/.cache/huggingface/token and HUGGING_FACE_HUB_TOKEN
+  exported in ~/.bashrc. SLURM jobs source bashrc via conda activate so
+  the token is available to job processes.
+
+### Data signal from curator log (already useful)
+
+cwd12 synthetic-bank class counts (per-class crops collected from
+trusted slugs by `synth_cutpaste bank`):
+
+| class | crops | class | crops |
+|---|---|---|---|
+| Carpetweeds | 400 | Morningglory | 400 |
+| Crabgrass | 400 | Nutsedge | 400 |
+| Eclipta | 400 | PalmerAmaranth | 400 |
+| **Goosegrass** | **75** | PricklySida | 350 |
+
+Goosegrass 5× under-represented vs the majority — concrete confirmation
+that the class-imbalance angle is real, and a precise target list for
+the v3.0.39 FLUX weak-class augmentation.
+
+### Ssh-stability lesson
+
+bridges2 ssh today: a tiny remote command takes ~50s end-to-end; complex
+ones (git+pip+sbatch) take minutes. Earlier session calls timed out
+because expect timeout was 60s. Correct setting: ≥180s for trivial, ≥480s
+for multi-step, with `exp_continue` after the password prompt so the
+expect loop keeps polling. Captured in memory
+([[cluster_ssh_is_slow_not_broken]]).
