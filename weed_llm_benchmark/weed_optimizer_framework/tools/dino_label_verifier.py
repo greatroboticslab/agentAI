@@ -247,7 +247,11 @@ def verify_slugs():
     cls_to_id = {c: i for i, c in enumerate(classes)}
     log.info(f"loaded head: {len(classes)} classes")
 
-    reg = _load_registry()
+    # v3.0.38.1 bug fix: registry shape is {"datasets": {<slug>: ...}, ...};
+    # the previous code iterated top-level keys (datasets, discovered, ...)
+    # and verified 0 real slugs. Mirror dinov2_curator: dive into "datasets".
+    reg_raw = _load_registry()
+    reg = reg_raw.get("datasets", reg_raw)
     model, proc = _load_dinov2()
     scores = {}
 

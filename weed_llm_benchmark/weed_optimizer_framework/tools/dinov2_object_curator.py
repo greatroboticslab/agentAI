@@ -176,7 +176,9 @@ def _collect_slug_crops(slug_dir: Path, max_objects: int, max_images: int,
 def build_object_reference():
     """Embed trusted-slug GT object crops + synthetic object bank crops."""
     log.info("=== Building OBJECT reference pool ===")
-    reg = _load_registry()
+    # v3.0.38.1: registry shape is {"datasets": {...}, ...}; dive in.
+    reg_raw = _load_registry()
+    reg = reg_raw.get("datasets", reg_raw)
     model, proc = _load_dinov2()
     all_emb = []
     meta = {"sources": {}, "built_at": time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -268,7 +270,13 @@ def score_all_objects():
         sys.exit(1)
     ref = np.load(OBJ_REF_POOL)
     log.info(f"Loaded object reference pool: {ref.shape}")
-    reg = _load_registry()
+    # v3.0.38.1 bug fix: the registry JSON has shape
+    #   {"datasets": {<slug>: {...}, ...}, "discovered": [...], ...}
+    # The previous code iterated top-level keys and missed every real slug,
+    # producing 0 scored slugs. Mirror dinov2_curator.score_all_slugs: pull
+    # the inner "datasets" dict.
+    reg_raw = _load_registry()
+    reg = reg_raw.get("datasets", reg_raw)
     model, proc = _load_dinov2()
     scores = {}
     slugs = list(reg.keys())
