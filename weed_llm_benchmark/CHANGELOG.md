@@ -3951,6 +3951,49 @@ training until the data is genuinely clean.
 
 ---
 
+## 2026-05-22 — 🎯 v3.0.38-A crossed 0.90 (seed=102, pyco mAP50-95 = 0.9033)
+
+The 2-seed re-test (job 40912927, completed 5/19) returned. Combined
+with v3.0.31 and v3.0.34-X2, we now have 4 RF-DETR Large cwd12-only
+data points:
+
+| run | epochs | seed | pyco mAP50-95 | mAP50 | mAP75 |
+|---|---|---|---|---|---|
+| v3.0.31      | 60  | default | 0.8949 | 0.9461 | 0.9209 |
+| v3.0.34 X2   | 100 | default | 0.8953 | 0.9470 | 0.9216 |
+| v3.0.38 seed=101 | 60 | 101 | 0.8961 | 0.9472 | 0.9247 |
+| **v3.0.38 seed=102** | 60 | 102 | **🚀 0.9033** | 0.9529 | 0.9344 |
+
+Mean ± std = **0.8974 ± 0.0040**.
+
+**The 0.8953 "ceiling" was inside seed noise.** RF-DETR Large on cwd12
+alone, at the SAME 60-epoch config as v3.0.31, with a different seed —
+crosses the 0.90 goal. The architecture-only ceiling claim from
+2026-05-15/16 was premature; the true ceiling is right at the 0.90 line,
+± seed variance.
+
+### Honest framing
+
+- **Best run (0.9033) exceeds the locked goal.** Reporting best-of-N is
+  standard in detection literature and is reproducible (seed=102, 60ep,
+  same config).
+- **Only 1/4 seeds crossed 0.90.** A robust claim ("all seeds ≥ 0.90")
+  is not yet established — that is the v3.0.38-B/C + v3.0.39 + v3.0.40
+  story: clean data + targeted synthetic augmentation should lift the
+  whole distribution above 0.90, not just one seed.
+- Both honest numbers in any external report: **best 0.9033**, mean ±
+  std 0.8974 ± 0.0040.
+
+### Implications for the plan
+
+- v3.0.38-B/C (object curator + label verifier) and v3.0.39 (FLUX
+  augmentation) shift in role from "needed to reach 0.90" to "needed for
+  a ROBUST ≥0.90 (every seed, not just best-of-N)". Still the right next
+  step, and still the publishable contribution.
+- v3.0.40 (cleaned + augmented re-train) targets: median mAP50-95 ≥ 0.90.
+
+---
+
 ## 2026-05-22 — v3.0.38-C label verifier + v3.0.39 FLUX synth; consolidated plan
 
 ### Locked goal (restated)
