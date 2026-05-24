@@ -119,25 +119,47 @@ def _load_flux():
         else:
             log.error(f"failed to load {FLUX_FILL_MODEL}: {e}")
         sys.exit(2)
-    # v3.0.39.1 fix: FLUX.1-Fill-dev is ~24GB in bf16 — full pipeline on a
-    # 32GB V100 hits CUDA OOM (job 40963655). enable_model_cpu_offload()
-    # keeps idle components on CPU; the active component (T5 OR transformer
-    # OR VAE) sits on GPU one at a time. Peak GPU usage drops to ~14GB
-    # at the cost of ~1.5x per-image latency from CPU<->GPU shuffling.
-    try:
-        pipe.enable_model_cpu_offload()
-        log.info("FLUX pipeline loaded with model CPU offload "
-                 "(GPU peak ~14GB, fits V100-32GB).")
-    except Exception as e:
-        log.warning(f"enable_model_cpu_offload failed ({e}); falling back to "
-                    f"full GPU pipe.to('cuda') — may OOM on 32GB.")
+    # Three placement modes, picked by env + visible-GPU count:
+    #   FORCE_FLUX_NO_OFFLOAD=1  → place transformer/T5/VAE on cuda:0 / cuda:1
+    #                              if 2+ GPUs visible (v3.0.39.3 path, full
+    #                              speed, ~10s/img). If only 1 GPU visible
+    #                              it falls back to pipe.to('cuda') and may OOM.
+    #   default                  → enable_model_cpu_offload() — 1 GPU, idle
+    #                              components on CPU, ~14GB GPU peak but
+    #                              ~5min/img (v3.0.39.1 path, infeasible at scale).
+    n_gpu = torch.cuda.device_count() if torch.cuda.is_available() else 0
+    force_no_offload = os.environ.get("FORCE_FLUX_NO_OFFLOAD") == "1"
+    if force_no_offload and n_gpu >= 2:
+        # Manually split heavy components across the two cards
+        try:
+            pipe.transformer.to("cuda:0")
+            pipe.text_encoder_2.to("cuda:1")   # T5 is the other big chunk
+            for name in ("text_encoder", "vae"):
+                comp = getattr(pipe, name, None)
+                if comp is not None:
+                    comp.to("cuda:0")
+            log.info(f"FLUX placed across {n_gpu} GPUs "
+                     f"(transformer→cuda:0, T5→cuda:1, vae/text_encoder→cuda:0)")
+        except Exception as e:
+            log.warning(f"manual multi-GPU placement failed ({e}); "
+                        f"falling back to pipe.to('cuda:0')")
+            pipe = pipe.to("cuda:0")
+    elif force_no_offload:
+        log.warning(f"FORCE_FLUX_NO_OFFLOAD=1 but only {n_gpu} GPU visible; "
+                    f"trying full pipe.to('cuda') — may OOM on 32GB cards.")
         try:
             pipe = pipe.to("cuda")
         except torch.cuda.OutOfMemoryError as oom:
-            log.error(f"CUDA OOM loading FLUX onto GPU: {oom}")
-            log.error("Need either a larger GPU, or enable_model_cpu_offload "
-                      "(diffusers >= 0.30 ships this).")
+            log.error(f"CUDA OOM: {oom}")
+            log.error("Drop FORCE_FLUX_NO_OFFLOAD or request 2x GPUs.")
             sys.exit(2)
+    else:
+        try:
+            pipe.enable_model_cpu_offload()
+            log.info("FLUX loaded with model CPU offload (~14GB peak, slow).")
+        except Exception as e:
+            log.warning(f"enable_model_cpu_offload failed ({e}); fallback")
+            pipe = pipe.to("cuda")
     pipe.set_progress_bar_config(disable=True)
     log.info("FLUX.1-Fill pipeline ready.")
     return pipe
