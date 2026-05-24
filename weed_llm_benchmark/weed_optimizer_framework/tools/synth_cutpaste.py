@@ -163,13 +163,68 @@ def _exg_mask(rgb: np.ndarray) -> np.ndarray:
 
 
 # ----------------------------------------------------------------------------
+# Canonical 12-class resolution (v3.0.39.4 bug fix)
+# ----------------------------------------------------------------------------
+# Bug found 2026-05-24: Goosegrass / Crabgrass bank crops were broadleaf
+# plants (not grasses) — because build_bank trusted `info["class_names"][cid]`
+# blindly, but some slugs' class_names list is mis-ordered vs the actual
+# label-file class IDs (the same bug mega_trainer fixed in v3.0.25 via
+# CANONICAL_12 name-matching). Side effect: the linear head was trained on
+# mislabeled crops, so its 0.667 held-out accuracy is partly noise.
+#
+# Resolution: only accept a bank crop if its (slug, src_cid) maps to one of
+# the CANONICAL_12 names via NAME-matching (fall back to the well-known
+# original cwd12 ordering only for cottonweed_* slugs that lack class_names).
+# Anything that doesn't map gets dropped — keeps the bank clean by design.
+
+# cwd12's original published class ordering (5648-image release):
+_CWD12_ORIG = [
+    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
+    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
+    "Sicklepod", "SpottedSpurge",
+]
+
+
+def _norm(s: str) -> str:
+    """Normalise a class name for comparison (lower, strip non-alnum)."""
+    return "".join(ch for ch in str(s).lower() if ch.isalnum())
+
+
+_CANON_NORM = {_norm(c): c for c in CANONICAL_12}
+
+
+def _canon_name_for_label(slug: str, info: dict, src_cid: int) -> str | None:
+    """Map (slug, src_class_id) -> a CANONICAL_12 name, or None to skip.
+
+    1. If the slug has class_names registered, name-match into CANONICAL_12
+       (case/punct-insensitive). Drops anything that doesn't match — better
+       to lose a crop than to bank it under the wrong species.
+    2. If class_names absent AND slug is cottonweed-related, fall back to
+       the published cwd12 ordering (_CWD12_ORIG).
+    3. Otherwise return None.
+    """
+    names = info.get("class_names") if isinstance(info, dict) else None
+    if names and 0 <= src_cid < len(names):
+        return _CANON_NORM.get(_norm(names[src_cid]))
+    if "cottonweed" in slug.lower() and 0 <= src_cid < len(_CWD12_ORIG):
+        return _CWD12_ORIG[src_cid]
+    return None
+
+
+# ----------------------------------------------------------------------------
 # Stage 1: object bank
 # ----------------------------------------------------------------------------
 def build_bank(max_per_class: int = 400, margin: float = 0.06):
-    """Crop every GT bbox from trusted slugs into object_bank/<class>/."""
+    """Crop every GT bbox from trusted slugs into object_bank/<class>/.
+
+    v3.0.39.4: class names are resolved through CANONICAL_12 (via
+    _canon_name_for_label). Crops whose label cannot be mapped to one of the
+    12 canonical cwd12 species are DROPPED, not banked under a slug name.
+    """
     BANK_DIR.mkdir(parents=True, exist_ok=True)
     reg = _load_registry()
     per_class: dict[str, int] = {}
+    skipped_unmapped: dict[str, int] = {}
     total = 0
     t0 = time.time()
 
@@ -179,8 +234,8 @@ def build_bank(max_per_class: int = 400, margin: float = 0.06):
             log.warning(f"  [{slug}] no local path — skipped")
             continue
         info = reg.get(slug, {})
-        names = info.get("class_names") or []
         n_slug = 0
+        n_drop = 0
         for img_path in _iter_images(slug_dir, cap=4000):
             lbl = _find_label(img_path, slug_dir)
             if lbl is None:
@@ -199,11 +254,10 @@ def build_bank(max_per_class: int = 400, margin: float = 0.06):
                     cx, cy, bw, bh = map(float, parts[1:5])
                 except ValueError:
                     continue
-                # class label: prefer the dataset's own name, else slug
-                cname = names[cid] if 0 <= cid < len(names) else slug
-                cname = "".join(c for c in str(cname) if c.isalnum() or c in "_-")
-                if not cname:
-                    cname = slug
+                cname = _canon_name_for_label(slug, info, cid)
+                if cname is None:
+                    n_drop += 1
+                    continue
                 if per_class.get(cname, 0) >= max_per_class:
                     continue
                 # crop with margin
@@ -222,12 +276,15 @@ def build_bank(max_per_class: int = 400, margin: float = 0.06):
                 per_class[cname] = idx + 1
                 n_slug += 1
                 total += 1
-        log.info(f"  [{slug}] cropped {n_slug} objects")
+        skipped_unmapped[slug] = n_drop
+        log.info(f"  [{slug}] cropped {n_slug} canonical objects "
+                 f"(skipped {n_drop} unmappable)")
 
     meta = {
         "built_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "total_objects": total,
         "per_class": per_class,
+        "skipped_unmapped_per_slug": skipped_unmapped,
         "max_per_class": max_per_class,
     }
     with open(SYNTH_DIR / "bank_meta.json", "w") as f:
