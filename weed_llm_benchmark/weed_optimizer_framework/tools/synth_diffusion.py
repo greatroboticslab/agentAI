@@ -110,13 +110,35 @@ def _load_flux():
     try:
         pipe = FluxFillPipeline.from_pretrained(
             FLUX_FILL_MODEL, torch_dtype=torch.bfloat16)
-        pipe = pipe.to("cuda")
-        pipe.set_progress_bar_config(disable=True)
     except Exception as e:
-        log.error(f"failed to load {FLUX_FILL_MODEL}: {e}")
-        log.error("FLUX.1-Fill-dev is gated — accept the license and run "
-                  "`huggingface-cli login` on the cluster first.")
+        msg = str(e)
+        if "gated" in msg.lower() or "401" in msg or "403" in msg:
+            log.error(f"FLUX repo gated/unauthorized: {e}")
+            log.error("Accept the FLUX.1-Fill-dev license on HuggingFace and "
+                      "run `huggingface-cli login` on the cluster.")
+        else:
+            log.error(f"failed to load {FLUX_FILL_MODEL}: {e}")
         sys.exit(2)
+    # v3.0.39.1 fix: FLUX.1-Fill-dev is ~24GB in bf16 — full pipeline on a
+    # 32GB V100 hits CUDA OOM (job 40963655). enable_model_cpu_offload()
+    # keeps idle components on CPU; the active component (T5 OR transformer
+    # OR VAE) sits on GPU one at a time. Peak GPU usage drops to ~14GB
+    # at the cost of ~1.5x per-image latency from CPU<->GPU shuffling.
+    try:
+        pipe.enable_model_cpu_offload()
+        log.info("FLUX pipeline loaded with model CPU offload "
+                 "(GPU peak ~14GB, fits V100-32GB).")
+    except Exception as e:
+        log.warning(f"enable_model_cpu_offload failed ({e}); falling back to "
+                    f"full GPU pipe.to('cuda') — may OOM on 32GB.")
+        try:
+            pipe = pipe.to("cuda")
+        except torch.cuda.OutOfMemoryError as oom:
+            log.error(f"CUDA OOM loading FLUX onto GPU: {oom}")
+            log.error("Need either a larger GPU, or enable_model_cpu_offload "
+                      "(diffusers >= 0.30 ships this).")
+            sys.exit(2)
+    pipe.set_progress_bar_config(disable=True)
     log.info("FLUX.1-Fill pipeline ready.")
     return pipe
 
