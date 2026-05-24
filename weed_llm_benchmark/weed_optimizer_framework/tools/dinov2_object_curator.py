@@ -90,30 +90,10 @@ CURATOR_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ----------------------------------------------------------------------------
-# Embedding (PIL crops, in-memory — mirrors dinov2_curator._embed_images
-# but skips Image.open since callers already hold PIL objects)
+# Embedding — delegate to dinov2_curator._embed_pils so any backbone
+# (DINOv2 / OpenCLIP / HF CLIP) works transparently via DINO_BACKBONE.
 # ----------------------------------------------------------------------------
-def _embed_crops(model, proc, crops: list, batch_size: int = 32) -> np.ndarray:
-    """DINOv2-embed a list of PIL crops. Returns [N, 768] CLS embeddings."""
-    import torch
-    out = []
-    for i in range(0, len(crops), batch_size):
-        batch = []
-        for c in crops[i:i + batch_size]:
-            try:
-                batch.append(c.convert("RGB"))
-            except Exception:
-                pass
-        if not batch:
-            continue
-        inputs = proc(images=batch, return_tensors="pt").to("cuda")
-        with torch.no_grad():
-            res = model(**inputs)
-        cls = res.last_hidden_state[:, 0, :].cpu().numpy()
-        out.append(cls)
-    if not out:
-        return np.zeros((0, 768), dtype=np.float32)
-    return np.concatenate(out, axis=0).astype(np.float32)
+from weed_optimizer_framework.tools.dinov2_curator import _embed_pils as _embed_crops
 
 
 # ----------------------------------------------------------------------------

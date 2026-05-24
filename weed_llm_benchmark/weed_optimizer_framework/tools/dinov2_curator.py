@@ -129,54 +129,109 @@ def _sample_images(slug_dir: Path, n: int, seed: int = 0) -> list[Path]:
 
 
 def _load_dinov2():
-    """Load the DINO backbone on GPU. Returns (model, processor).
+    """Load the embedding backbone on GPU. Returns (model, processor).
 
-    Backbone is configurable via the DINO_BACKBONE env var, so the
-    fine-grained-classification roles (dino_label_verifier) can use a
-    plant-specialised checkpoint while the coarse domain-FILTER role keeps
-    the generic model. Any transformers-loadable DINOv2 repo works as-is;
-    default is the generic facebook/dinov2-base (what v3.0.36 validated).
+    Backbone is configurable via the DINO_BACKBONE env var. Two backends
+    are auto-detected from the name:
 
-    Recommended plant-specialised options (drop-in once mirrored to a
-    transformers-compatible repo): the PlantCLEF-2024 fine-tuned DINOv2
-    ViT (1.4M plant images, 800+ species) — same architecture, plant
-    features. See CHANGELOG v3.0.38 notes.
+      - "hf-hub:<repo>"  → OpenCLIP (BioCLIP 2 etc.) — biology-specialised
+                           fine-grained features, used by the verifier role.
+                           Processor is the open_clip preprocess_val callable.
+      - anything else    → HF transformers AutoModel + AutoImageProcessor
+                           (default: facebook/dinov2-base; also covers any
+                           DINOv2-compatible repo, PlantCLEF-2024 once
+                           mirrored to a transformers layout, etc.).
+
+    All downstream code uses _embed_pils(model, proc, pils) which
+    duck-types on the model to route correctly. The (model, proc) tuple
+    shape is preserved for backwards compatibility with existing callers.
     """
     import os
     import torch
-    from transformers import AutoImageProcessor, AutoModel
     backbone = os.environ.get("DINO_BACKBONE", "facebook/dinov2-base")
-    log.info(f"Loading DINO backbone: {backbone}")
-    proc = AutoImageProcessor.from_pretrained(backbone)
-    model = AutoModel.from_pretrained(backbone).cuda().eval()
-    log.info(f"  loaded. params={sum(p.numel() for p in model.parameters())/1e6:.1f}M")
-    return model, proc
+    log.info(f"Loading backbone: {backbone}")
+    if backbone.startswith("hf-hub:") or backbone.startswith("openclip:"):
+        # OpenCLIP path (BioCLIP 2 etc.)
+        try:
+            import open_clip
+        except ImportError:
+            log.error("open_clip required for hf-hub:/openclip: backbones — "
+                      "install: pip install open_clip_torch")
+            raise
+        oc_name = backbone.split(":", 1)[1] if backbone.startswith("openclip:") \
+                  else backbone  # open_clip accepts 'hf-hub:owner/repo' directly
+        model, _train_pre, preprocess = open_clip.create_model_and_transforms(oc_name)
+        model = model.cuda().eval()
+        try:
+            n_params = sum(p.numel() for p in model.parameters()) / 1e6
+            log.info(f"  loaded openclip {oc_name}. params={n_params:.1f}M")
+        except Exception:
+            pass
+        # Return preprocess as the "proc" — _embed_pils handles both shapes
+        return model, preprocess
+    else:
+        from transformers import AutoImageProcessor, AutoModel
+        proc = AutoImageProcessor.from_pretrained(backbone)
+        model = AutoModel.from_pretrained(backbone).cuda().eval()
+        log.info(f"  loaded hf {backbone}. "
+                 f"params={sum(p.numel() for p in model.parameters())/1e6:.1f}M")
+        return model, proc
+
+
+def _embed_pils(model, proc, pils: list, batch_size: int = 16) -> np.ndarray:
+    """Embed a list of PIL images with whichever backbone is loaded.
+
+    Auto-detects the model kind:
+      - open_clip CLIP model has .encode_image
+      - HF transformers DINOv2 has .last_hidden_state (used as CLS token)
+      - HF CLIP-style has .get_image_features
+    All paths produce an L2-NOT-normalised [N, D] numpy array; callers
+    normalise as needed (existing _normalize helper).
+    """
+    import torch
+    out = []
+    is_openclip = hasattr(model, "encode_image")
+    is_hf_clip = hasattr(model, "get_image_features") and not is_openclip
+    for i in range(0, len(pils), batch_size):
+        batch_pils = []
+        for c in pils[i:i + batch_size]:
+            try:
+                batch_pils.append(c.convert("RGB"))
+            except Exception:
+                pass
+        if not batch_pils:
+            continue
+        with torch.no_grad():
+            if is_openclip:
+                # proc is open_clip's preprocess_val callable
+                tensors = torch.stack([proc(p) for p in batch_pils]).cuda()
+                feats = model.encode_image(tensors)
+            else:
+                inputs = proc(images=batch_pils, return_tensors="pt").to("cuda")
+                # Drop any text-side fields a CLIP processor might add
+                inputs = {k: v for k, v in inputs.items()
+                          if k in ("pixel_values", "pixel_mask")}
+                if is_hf_clip:
+                    feats = model.get_image_features(**inputs)
+                else:
+                    res = model(**inputs)
+                    feats = res.last_hidden_state[:, 0, :]
+        out.append(feats.cpu().numpy())
+    if not out:
+        return np.zeros((0, 768), dtype=np.float32)
+    return np.concatenate(out, axis=0).astype(np.float32)
 
 
 def _embed_images(model, proc, img_paths: list[Path], batch_size: int = 16) -> np.ndarray:
-    """DINOv2 embed a list of images. Returns [N, 768] np array (CLS token)."""
-    import torch
-    embeddings = []
-    for i in range(0, len(img_paths), batch_size):
-        batch = img_paths[i:i+batch_size]
-        pils = []
-        for p in batch:
-            try:
-                im = Image.open(p).convert("RGB")
-                pils.append(im)
-            except Exception as e:
-                log.warning(f"  skip {p.name}: {e}")
-        if not pils:
-            continue
-        inputs = proc(images=pils, return_tensors="pt").to("cuda")
-        with torch.no_grad():
-            out = model(**inputs)
-        # CLS token = pooled embedding [N, 768]
-        cls = out.last_hidden_state[:, 0, :].cpu().numpy()
-        embeddings.append(cls)
-    if not embeddings:
-        return np.zeros((0, 768), dtype=np.float32)
-    return np.concatenate(embeddings, axis=0).astype(np.float32)
+    """Embed a list of image FILE PATHS. Routes through _embed_pils so any
+    backbone (DINOv2 / OpenCLIP / HF CLIP) works transparently."""
+    pils = []
+    for p in img_paths:
+        try:
+            pils.append(Image.open(p).convert("RGB"))
+        except Exception as e:
+            log.warning(f"  skip {p.name}: {e}")
+    return _embed_pils(model, proc, pils, batch_size=batch_size)
 
 
 def _normalize(x: np.ndarray) -> np.ndarray:
