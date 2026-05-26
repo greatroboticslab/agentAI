@@ -837,3 +837,836 @@ def synth_montage(kind: str):
     if not p.is_file():
         raise HTTPException(404, "no montage yet")
     return FileResponse(str(p), media_type="image/jpeg")
+
+
+
+
+# ----------------------------------------------------------------------------
+# v3.0.41 Phase 0 — /audit gallery (REDESIGNED 2026-05-25 per user feedback)
+# The original /audit served pre-baked 6×N montage JPEGs which crushed
+# per-image quality and lacked per-class navigation. This rewrite serves
+# every image individually at native resolution and organises navigation
+# around the 12 cwd12 species so a reviewer can answer, for each species:
+#   1. What does the ORIGINAL cwd12 labelled data look like?
+#   2. What did we DO to FLUX for this class (prompt, training, etc.)?
+#   3. What did FLUX OUTPUT for this class? Does it match the species?
+# ----------------------------------------------------------------------------
+import re as _re_audit
+from typing import List as _List_audit, Tuple as _Tuple_audit
+
+_CWD12 = [
+    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
+    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
+    "Sicklepod", "SpottedSpurge",
+]
+_CWD12_ZH = {
+    "Carpetweeds": "毯草", "Crabgrass": "马唐", "Eclipta": "鳢肠",
+    "Goosegrass": "蟋蟀草", "Morningglory": "牵牛花", "Nutsedge": "莎草",
+    "PalmerAmaranth": "苋菜 / 帕氏苋", "PricklySida": "刺苋",
+    "Purslane": "马齿苋", "Ragweed": "豚草", "Sicklepod": "决明",
+    "SpottedSpurge": "斑地锦",
+}
+
+# FLUX setup as actually used in v3.0.39 (vanilla text-to-image).
+# Mirrors weed_optimizer_framework/tools/synth_diffusion.SPECIES_PROMPT.
+_FLUX_SPECIES_PROMPT = {
+    "Carpetweeds":    "a carpetweed plant, small green sprawling weed",
+    "Crabgrass":      "a crabgrass plant, spreading grassy weed",
+    "Eclipta":        "an eclipta weed plant, green leaves",
+    "Goosegrass":     "a goosegrass plant, flat rosette grassy weed",
+    "Morningglory":   "a morningglory weed, heart-shaped leaves vine",
+    "Nutsedge":       "a nutsedge plant, upright grass-like weed",
+    "PalmerAmaranth": "a palmer amaranth pigweed plant, broadleaf weed",
+    "PricklySida":    "a prickly sida weed plant, broadleaf",
+    "Purslane":       "a purslane plant, fleshy red-stemmed weed",
+    "Ragweed":        "a ragweed plant, lobed green leaves",
+    "Sicklepod":      "a sicklepod weed plant, paired oval leaflets",
+    "SpottedSpurge":  "a spotted spurge plant, low mat-forming weed",
+}
+_FLUX_PROMPT_SUFFIX = (", top-down view, cotton field soil background, daylight, "
+                       "photorealistic, sharp focus")
+
+# Filesystem roots
+_BANK_DIR = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
+_FLUX_IMG_DIR = REPO / "results" / "framework" / "synth_diffusion" / "images"
+_FLUX_LBL_DIR = REPO / "results" / "framework" / "synth_diffusion" / "labels"
+
+
+def _bank_files(cls: str) -> _List_audit[str]:
+    d = _BANK_DIR / cls
+    if not d.is_dir():
+        return []
+    return sorted(p.name for p in d.iterdir()
+                  if p.suffix.lower() in (".png", ".jpg", ".jpeg"))
+
+
+def _flux_files_for_class(cls: str) -> _List_audit[_Tuple_audit[str, list]]:
+    """List of (filename, [list of (cx,cy,bw,bh) bboxes of this class])."""
+    if cls not in _CWD12 or not _FLUX_LBL_DIR.is_dir():
+        return []
+    cid = _CWD12.index(cls)
+    out = []
+    for lbl in sorted(_FLUX_LBL_DIR.glob("*.txt")):
+        try:
+            content = lbl.read_text().splitlines()
+        except Exception:
+            continue
+        boxes = []
+        for line in content:
+            parts = line.split()
+            if len(parts) < 5:
+                continue
+            try:
+                lcid = int(parts[0])
+                cx, cy, bw, bh = map(float, parts[1:5])
+            except ValueError:
+                continue
+            if lcid == cid:
+                boxes.append((cx, cy, bw, bh))
+        if boxes:
+            img_name = lbl.stem + ".jpg"
+            if (_FLUX_IMG_DIR / img_name).is_file():
+                out.append((img_name, boxes))
+    return out
+
+
+# ---------------------------------------------------------------- raw serving
+@app.get("/audit/raw/bank/{cls}/{filename}")
+def audit_raw_bank(cls: str, filename: str):
+    if not _re_audit.match(r"^[A-Za-z0-9_]+$", cls):
+        raise HTTPException(400, "bad class name")
+    if not _re_audit.match(r"^[A-Za-z0-9_.-]+\.(png|jpg|jpeg|PNG|JPG|JPEG)$", filename):
+        raise HTTPException(400, "bad filename")
+    p = _BANK_DIR / cls / filename
+    if not p.is_file():
+        raise HTTPException(404)
+    ext = p.suffix.lower()
+    media = "image/png" if ext == ".png" else "image/jpeg"
+    return FileResponse(str(p), media_type=media)
+
+
+@app.get("/audit/raw/flux/{filename}")
+def audit_raw_flux(filename: str):
+    if not _re_audit.match(r"^[A-Za-z0-9_.-]+\.(jpg|jpeg|JPG|JPEG)$", filename):
+        raise HTTPException(400, "bad filename")
+    p = _FLUX_IMG_DIR / filename
+    if not p.is_file():
+        raise HTTPException(404)
+    return FileResponse(str(p), media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------- HTML shell
+_AUDIT_CSS = """
+  body { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+         margin: 0; padding: 24px; background: #f4f4f7; color: #1c1c1e; }
+  header { background: #fff; padding: 20px 24px; border-radius: 12px;
+           margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+  header h1 { margin: 0 0 4px 0; font-size: 22px; }
+  header .sub { color: #666; font-size: 14px; }
+  header a { color: #06c; text-decoration: none; }
+  header a:hover { text-decoration: underline; }
+  .crumbs { color: #888; font-size: 13px; margin-bottom: 10px; }
+  .crumbs a { color: #06c; text-decoration: none; }
+  section { background: #fff; padding: 20px 24px; border-radius: 12px;
+            margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+  section h2 { margin: 0 0 6px 0; font-size: 18px; }
+  section .desc { color: #555; font-size: 13px; margin: 0 0 14px 0; }
+  .grid-classes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                  gap: 14px; }
+  .class-card { background: #fafafa; border-radius: 10px; overflow: hidden;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: transform 0.15s;
+                text-decoration: none; color: inherit; display: block; }
+  .class-card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.12); }
+  .class-card img { width: 100%; height: 160px; object-fit: cover; display: block; background: #eee; }
+  .class-card .name { padding: 8px 12px 4px; font-weight: 600; font-size: 14px; }
+  .class-card .zh { padding: 0 12px; color: #666; font-size: 12px; }
+  .class-card .counts { padding: 4px 12px 10px; color: #888; font-size: 11px; font-family: ui-monospace, monospace; }
+  .grid-imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+               gap: 12px; }
+  .img-card { background: #fafafa; border-radius: 8px; overflow: hidden;
+              box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .img-card a { display: block; }
+  .img-card img { width: 100%; height: 240px; object-fit: contain; background: #fff;
+                  display: block; cursor: zoom-in; }
+  .img-card .meta { padding: 6px 10px; color: #888; font-size: 11px;
+                    font-family: ui-monospace, monospace; word-break: break-all; }
+  .method-box { background: #fdf6e3; border-left: 4px solid #d4a017;
+                padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; }
+  .method-box code { background: #fff7e0; padding: 2px 6px; border-radius: 3px;
+                     font-size: 13px; }
+  .method-row { display: flex; gap: 12px; margin-top: 6px; font-size: 14px; }
+  .method-row .k { color: #666; min-width: 110px; }
+  .method-row .v { color: #222; font-family: ui-monospace, monospace; }
+"""
+
+
+# ---------------------------------------------------------------- /audit landing
+@app.get("/audit", response_class=HTMLResponse)
+def audit_landing():
+    cards = []
+    total_bank = 0
+    total_flux = 0
+    for cls in _CWD12:
+        bank = _bank_files(cls)
+        flux = _flux_files_for_class(cls)
+        total_bank += len(bank)
+        total_flux += len(flux)
+        # thumbnail = first bank image if available, else placeholder
+        if bank:
+            thumb = f"/audit/raw/bank/{cls}/{bank[0]}"
+        else:
+            thumb = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='160'%3E%3Crect width='220' height='160' fill='%23ccc'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23666' font-size='14'%3Eno samples%3C/text%3E%3C/svg%3E"
+        zh = _CWD12_ZH.get(cls, "")
+        cards.append(f'''
+        <a class="class-card" href="/audit/class/{cls}">
+          <img src="{thumb}" alt="{cls}" loading="lazy"/>
+          <div class="name">{cls}</div>
+          <div class="zh">{zh}</div>
+          <div class="counts">bank {len(bank)}  ·  flux {len(flux)}</div>
+        </a>''')
+
+    html = f'''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit — cwd12 数据 + FLUX 输出</title>
+<style>{_AUDIT_CSS}</style>
+</head><body>
+<header>
+  <h1>🔬 数据审计 — cwd12 真实数据 + FLUX 合成输出</h1>
+  <div class="sub">
+    <strong>{total_bank}</strong> 张真实 crop · <strong>{total_flux}</strong> 张 FLUX 合成
+    含目标类 · <strong>{len(_CWD12)}</strong> 个物种
+    · <a href="/audit/method">📘 方法论说明(FLUX 配置 / 训练 / 当前状态)</a>
+    · <a href="/">← dashboard 首页</a>
+  </div>
+</header>
+<section>
+  <h2>按类浏览</h2>
+  <p class="desc">点任一类卡片进入该类详情:左列是真实 cwd12 crop,右列是 FLUX 合成在该类的输出,
+     底部说明对该类使用的 prompt 和方法。每张图都是原生分辨率,可点击放大。</p>
+  <div class="grid-classes">{''.join(cards)}</div>
+</section>
+</body></html>'''
+    return HTMLResponse(html)
+
+
+# ---------------------------------------------------------------- /audit/method
+@app.get("/audit/method", response_class=HTMLResponse)
+def audit_method():
+    rows = []
+    for cls in _CWD12:
+        prompt = _FLUX_SPECIES_PROMPT.get(cls, "") + _FLUX_PROMPT_SUFFIX
+        rows.append(f"<tr><td><strong>{cls}</strong> ({_CWD12_ZH.get(cls,'')})</td>"
+                    f"<td><code>{prompt}</code></td></tr>")
+    table = "<table>" + "".join(rows) + "</table>"
+
+    html = f'''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLUX 方法论 / Methodology</title>
+<style>{_AUDIT_CSS}
+  table {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
+  th, td {{ padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }}
+  td:first-child {{ width: 200px; }}
+  code {{ background: #f4f4f7; padding: 2px 5px; border-radius: 3px; font-size: 12px; }}
+  .ko {{ color: #c00; }}
+  .ok {{ color: #080; }}
+</style>
+</head><body>
+<header>
+  <h1>📘 FLUX 方法论 / 当前状态</h1>
+  <div class="sub"><a href="/audit">← back to audit</a></div>
+</header>
+
+<section>
+  <h2>项目 FLUX 阶段汇总</h2>
+  <p class="desc">截至当前所有 FLUX 尝试,以及对应 outcome。诚实记录,不掩盖失败。</p>
+  <ul>
+    <li><strong>v3.0.39</strong> vanilla text-to-image 文生图(本页 prompt 列表)—
+        <span class="ko">视觉证伪</span>:文字 prompt 不足以让 FLUX 生成正确的
+        cwd12 物种(Goosegrass 出仙人掌,Ragweed 出粉花等)。</li>
+    <li><strong>v3.0.39.1</strong> 修 CUDA OOM,enable_model_cpu_offload —
+        <span class="ko">速度 5min/张</span>,600 张不可行,killed @ 42 张。</li>
+    <li><strong>v3.0.39.2</strong> BioCLIP 2 backbone 测试 —
+        <span class="ko">分类头准确率 0.615</span>,反而比通用 DINOv2 (0.667) 差,假设证伪。</li>
+    <li><strong>v3.0.39.3</strong> 2× V100 multi-GPU —
+        <span class="ko">9 分钟失败</span>(multi-GPU placement)。</li>
+    <li><strong>v3.0.39.4</strong> bank canonical mapping fix —
+        <span class="ok">bank 12 类齐全</span>,但 Goosegrass 视觉仍可疑(用户审计中)。</li>
+    <li><strong>v3.0.41 Phase 0</strong>(当前)bank rebuild SLURM job —
+        <span class="ok">已完成</span>;Phase 1 (LoRA 微调)<strong>等用户审完 bank
+        正确性后再启动</strong>。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>FLUX 当前配置(v3.0.39 系列实际跑过的)</h2>
+  <div class="method-box">
+    <div class="method-row"><span class="k">模型:</span>
+        <span class="v">black-forest-labs/FLUX.1-Fill-dev (bf16, ~24GB)</span></div>
+    <div class="method-row"><span class="k">推理模式:</span>
+        <span class="v">text-to-image with mask(伪 inpainting,mask 区域内重画)</span></div>
+    <div class="method-row"><span class="k">LoRA 微调:</span>
+        <span class="v ko">无(vanilla,即裸模型;这是为什么物种不正确)</span></div>
+    <div class="method-row"><span class="k">分辨率:</span>
+        <span class="v">768 × 768</span></div>
+    <div class="method-row"><span class="k">推理步数:</span>
+        <span class="v">28</span></div>
+    <div class="method-row"><span class="k">guidance_scale:</span>
+        <span class="v">30.0</span></div>
+    <div class="method-row"><span class="k">类采样:</span>
+        <span class="v">原计划弱类偏置(cwd12_class_counts.json),实测未生效 → 接近均匀</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>当前每类使用的 prompt</h2>
+  <p class="desc">每个 species 都拼接以下 suffix:<code>{_FLUX_PROMPT_SUFFIX}</code></p>
+  {table}
+</section>
+
+<section>
+  <h2>计划中(Phase 1 LoRA 微调,等用户审计 bank 通过后启动)</h2>
+  <p>FLORA 论文 (arXiv 2508.21712) 的 recipe:</p>
+  <ul>
+    <li>每类 30 张干净 crop 作为 LoRA 训练集</li>
+    <li>rank 32, alpha 16, 5 epochs, attention layers only</li>
+    <li>8-bit AdamW, bfloat16, 512²,gradient checkpointing</li>
+    <li>trigger 词:<code>cwd12-Goosegrass</code> 等(class-specific token)</li>
+    <li>推理:在真实 cwd12 图上 mask 一个真实 bbox,LoRA + FLUX inpaint
+        → 物种正确 + bbox 像素精确</li>
+  </ul>
+  <p><em>这一步还没启动,等用户在 /audit 上确认 bank 真实性正确后再做。</em></p>
+</section>
+</body></html>'''
+    return HTMLResponse(html)
+
+
+# ---------------------------------------------------------------- /audit/class/{name}
+@app.get("/audit/class/{cls}", response_class=HTMLResponse)
+def audit_class(cls: str):
+    if cls not in _CWD12:
+        raise HTTPException(404, f"unknown cwd12 class {cls!r}")
+    bank = _bank_files(cls)
+    flux = _flux_files_for_class(cls)
+    cid = _CWD12.index(cls)
+    zh = _CWD12_ZH.get(cls, "")
+    prompt = _FLUX_SPECIES_PROMPT.get(cls, "") + _FLUX_PROMPT_SUFFIX
+
+    bank_cards = "".join(
+        f'<div class="img-card"><a href="/audit/raw/bank/{cls}/{fn}" target="_blank">'
+        f'<img src="/audit/raw/bank/{cls}/{fn}" loading="lazy"/></a>'
+        f'<div class="meta">{fn}</div></div>'
+        for fn in bank)
+
+    flux_cards = "".join(
+        f'<div class="img-card"><a href="/audit/raw/flux/{fn}" target="_blank">'
+        f'<img src="/audit/raw/flux/{fn}" loading="lazy"/></a>'
+        f'<div class="meta">{fn} · {len(boxes)} bbox(es) of {cls}</div></div>'
+        for fn, boxes in flux)
+
+    html = f'''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{cls} — audit</title>
+<style>{_AUDIT_CSS}</style>
+</head><body>
+<header>
+  <div class="crumbs"><a href="/audit">← 全部类</a></div>
+  <h1>{cls} <span style="color:#888;font-size:18px;">/ {zh}</span></h1>
+  <div class="sub">
+    cwd12 class_id <code>{cid}</code>
+    · <strong>{len(bank)}</strong> 张真实 crop
+    · <strong>{len(flux)}</strong> 张 FLUX 输出含此类
+  </div>
+</header>
+
+<section>
+  <h2>① 原始 cwd12 数据(真实标注 bbox crop)</h2>
+  <p class="desc">从 cwd12 真实标注 bbox 抠出的 {len(bank)} 张本类 crop。
+     这是 LoRA 微调的训练源、分类头的训练源、以及合成对比的"ground truth"参考。
+     点任一张可看原生 PNG。</p>
+  <div class="grid-imgs">{bank_cards or '<p style="color:#888">(尚无该类 crop)</p>'}</div>
+</section>
+
+<section>
+  <h2>② 对 FLUX 做了什么(本类配置)</h2>
+  <div class="method-box">
+    <div class="method-row"><span class="k">阶段:</span>
+        <span class="v">v3.0.39 vanilla text-to-image(无 LoRA 微调)</span></div>
+    <div class="method-row"><span class="k">FLUX 知道这个物种吗:</span>
+        <span class="v">通用文生图,<strong>FLUX 没有在 cwd12 上微调过</strong> ——
+        靠 prompt 文字推断。这是 v3.0.39 失败的根因。</span></div>
+    <div class="method-row"><span class="k">所用 prompt:</span></div>
+  </div>
+  <pre style="background:#f4f4f7;padding:12px 16px;border-radius:6px;font-size:13px;overflow-x:auto;">{prompt}</pre>
+  <p class="desc">下一步(Phase 1)计划:用上面这一段 ① 的真实 crop(30 张)训练
+     class-specific LoRA,trigger token <code>cwd12-{cls}</code>,把 FLUX 教会这个物种。
+     <a href="/audit/method">完整方法论 →</a></p>
+</section>
+
+<section>
+  <h2>③ FLUX 输出(含本类 bbox 的合成图)</h2>
+  <p class="desc">v3.0.39 阶段生成的 42 张合成图中,含 <strong>{cls}</strong> bbox 的有
+     {len(flux)} 张。每张点开是原生分辨率,可视觉判断 FLUX 画出来的是不是真的 {cls}。</p>
+  <div class="grid-imgs">{flux_cards or '<p style="color:#888">(无 FLUX 输出含本类 ——「弱类偏置」配置未生效,导致部分类未覆盖到)</p>'}</div>
+</section>
+</body></html>'''
+    return HTMLResponse(html)
+
+
+# ----------------------------------------------------------------------------
+# v3.0.42 — /classes Roboflow-Lite human verification UI (2026-05-26)
+#
+# Per user direction:
+#   "我们其实不管做FLUX还是其他的 最重要的问题是先确保该分类的数据集没问题…
+#    每次新采集的数据集都按类分类… 可以点进类里面来人眼核实数据集的质量…
+#    可以自己选择标注box… 一个小的roboflow私人版本… 最重要的就是这些榜样
+#    数据集 因为如果没有确定的高质量对应分类数据集以及标注框的话我们后面的
+#    所有都是白做"
+#
+# v1 (this commit) ships:
+#   GET  /classes                — landing page, all known species
+#   GET  /classes/{cls}          — per-class viewer with ✓ ✗ buttons + filters
+#   POST /api/exemplar/{cls}     — record a verification verdict
+#   GET  /api/exemplar/{cls}     — return current verdict map for class
+#   GET  /thumb/{kind}/{cls}/{file}?w=256
+#                                — cached thumbnail (huge speedup vs raw)
+#
+# v2 (later) will add in-browser bbox draw/correct.
+# ----------------------------------------------------------------------------
+
+import hashlib as _hl
+import json as _json
+import re as _re_cls
+import time as _time_cls
+from typing import Dict as _Dict_cls, List as _List_cls
+
+_CLS_EXEMPLAR_DIR = REPO / "results" / "framework" / "class_exemplars"
+_CLS_EXEMPLAR_DIR.mkdir(parents=True, exist_ok=True)
+
+_THUMB_DIR = REPO / "results" / "framework" / "cache" / "thumbs"
+_THUMB_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ---------------------------------------------------------------- thumbnails
+def _thumb_path_for(kind: str, cls: str, fname: str, w: int) -> Path:
+    safe = _re_cls.sub(r'[^A-Za-z0-9_.-]', '_', f"{kind}__{cls}__{fname}_{w}")
+    return _THUMB_DIR / (safe + ".jpg")
+
+
+def _source_for(kind: str, cls: str, fname: str) -> Optional[Path]:
+    """Resolve the underlying source file for a thumbnail request.
+    kind = 'bank'  → synth_cutpaste/object_bank/{cls}/{fname}
+    kind = 'flux'  → synth_diffusion/images/{fname}  (cls ignored — just locates file)
+    """
+    if kind == "bank":
+        p = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls / fname
+        return p if p.is_file() else None
+    if kind == "flux":
+        p = REPO / "results" / "framework" / "synth_diffusion" / "images" / fname
+        return p if p.is_file() else None
+    return None
+
+
+@app.get("/thumb/{kind}/{cls}/{filename}")
+def thumb_serve(kind: str, cls: str, filename: str, w: int = 256):
+    """Serve a cached small thumbnail (default 256px). Huge speedup vs raw on
+    /ocean. Cache key includes mtime so source changes invalidate."""
+    if kind not in ("bank", "flux"):
+        raise HTTPException(400)
+    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+        raise HTTPException(400)
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+\.(png|jpg|jpeg|PNG|JPG|JPEG)$', filename):
+        raise HTTPException(400)
+    if not 64 <= w <= 1024:
+        w = 256
+    src = _source_for(kind, cls, filename)
+    if src is None:
+        raise HTTPException(404)
+    cache = _thumb_path_for(kind, cls, filename, w)
+    if (not cache.is_file()) or (cache.stat().st_mtime < src.stat().st_mtime):
+        try:
+            from PIL import Image as _Im
+            im = _Im.open(src).convert("RGB")
+            im.thumbnail((w, w), _Im.LANCZOS)
+            tmp = cache.with_suffix(".tmp.jpg")
+            im.save(tmp, "JPEG", quality=86, optimize=True)
+            os.replace(tmp, cache)
+        except Exception as e:
+            log.warning(f"thumb generate fail {src}: {e}")
+            return FileResponse(str(src), media_type="image/jpeg")
+    return FileResponse(
+        str(cache), media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
+
+
+# ---------------------------------------------------------------- exemplar log
+def _exemplar_file(cls: str) -> Path:
+    return _CLS_EXEMPLAR_DIR / f"{cls}.jsonl"
+
+
+def _exemplar_state(cls: str) -> _Dict_cls[str, str]:
+    """Replay the jsonl log -> {img_key: latest verdict}."""
+    p = _exemplar_file(cls)
+    state: dict[str, str] = {}
+    if not p.is_file():
+        return state
+    try:
+        with open(p) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = _json.loads(line)
+                    if "img" in ev and "verdict" in ev:
+                        state[ev["img"]] = ev["verdict"]
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return state
+
+
+@app.get("/api/exemplar/{cls}")
+def api_exemplar_get(cls: str):
+    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+        raise HTTPException(400)
+    return JSONResponse(_exemplar_state(cls))
+
+
+@app.post("/api/exemplar/{cls}")
+async def api_exemplar_post(cls: str, payload: dict = Body(...)):
+    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+        raise HTTPException(400)
+    img = payload.get("img", "")
+    verdict = payload.get("verdict", "")
+    if not isinstance(img, str) or not isinstance(verdict, str):
+        raise HTTPException(400, "missing img/verdict")
+    if verdict not in ("exemplar", "bad", "rebox", "clear"):
+        raise HTTPException(400, "verdict must be exemplar|bad|rebox|clear")
+    if "/" in img and not _re_cls.match(r'^[A-Za-z0-9_./-]+$', img):
+        raise HTTPException(400, "bad img path chars")
+    ev = {
+        "img": img, "verdict": verdict,
+        "ts": _time_cls.time(),
+        "ts_h": _time_cls.strftime("%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime()),
+    }
+    fp = _exemplar_file(cls)
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    with open(fp, "a") as f:
+        f.write(_json.dumps(ev) + "\n")
+    return JSONResponse({"ok": True, **ev})
+
+
+# ---------------------------------------------------------------- /classes
+def _all_known_classes() -> _List_cls[str]:
+    """Union of CANONICAL_12 + any class folder in synth_cutpaste/object_bank."""
+    out = list(_CWD12)
+    bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
+    if bd.is_dir():
+        for d in bd.iterdir():
+            if d.is_dir() and d.name not in out:
+                out.append(d.name)
+    return sorted(out)
+
+
+def _class_image_pool(cls: str) -> _List_cls[tuple[str, str]]:
+    """Return [(kind, filename), ...] for all images claimed to be `cls`.
+    Cross-source: bank crops + FLUX outputs containing this class."""
+    pool: list[tuple[str, str]] = []
+    # bank
+    bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls
+    if bd.is_dir():
+        for p in sorted(bd.iterdir()):
+            if p.suffix.lower() in (".png", ".jpg", ".jpeg"):
+                pool.append(("bank", p.name))
+    # flux (only if cls is in CANONICAL_12 — labels use that integer encoding)
+    if cls in _CWD12:
+        cid = _CWD12.index(cls)
+        ld = REPO / "results" / "framework" / "synth_diffusion" / "labels"
+        if ld.is_dir():
+            for lbl in sorted(ld.glob("*.txt")):
+                try:
+                    for line in lbl.read_text().splitlines():
+                        parts = line.split()
+                        if parts and parts[0].isdigit() and int(parts[0]) == cid:
+                            img_name = lbl.stem + ".jpg"
+                            if ((REPO / "results" / "framework" / "synth_diffusion" /
+                                 "images" / img_name)).is_file():
+                                pool.append(("flux", img_name))
+                            break
+                except Exception:
+                    pass
+    return pool
+
+
+_CLASSES_CSS = """
+  body { font-family: -apple-system, "PingFang SC", sans-serif;
+         margin: 0; padding: 18px; background: #f2f3f7; color: #1a1a1d; }
+  header { background: #fff; padding: 16px 22px; border-radius: 10px;
+           margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  header h1 { margin: 0 0 4px 0; font-size: 20px; }
+  header a { color: #06c; text-decoration: none; }
+  header .sub { color: #666; font-size: 13px; }
+  .layout { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
+  .sidebar { background: #fff; border-radius: 10px; padding: 12px 0;
+             box-shadow: 0 1px 3px rgba(0,0,0,0.06); height: calc(100vh - 120px);
+             overflow-y: auto; position: sticky; top: 16px; }
+  .sidebar a { display: block; padding: 7px 14px; color: #333;
+               text-decoration: none; font-size: 13px; border-left: 3px solid transparent; }
+  .sidebar a:hover { background: #f4f7fc; }
+  .sidebar a.active { background: #e8f1ff; border-left-color: #06c;
+                      color: #06c; font-weight: 600; }
+  .sidebar .row-counts { color: #888; font-size: 11px; font-family: ui-monospace, monospace; }
+  main { background: #fff; border-radius: 10px; padding: 16px 22px;
+         box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  main h2 { margin: 0 0 4px 0; font-size: 20px; }
+  .meta { color: #666; font-size: 13px; margin-bottom: 12px; }
+  .filters { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+  .filters button { background: #f4f4f7; border: 1px solid #ddd;
+                    padding: 6px 14px; border-radius: 20px; cursor: pointer;
+                    font-size: 13px; }
+  .filters button.on { background: #06c; color: #fff; border-color: #06c; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 12px; }
+  .card { background: #fafafa; border-radius: 6px; overflow: hidden;
+          position: relative; transition: outline 0.15s; outline: 2px solid transparent; }
+  .card.exemplar { outline-color: #38a169; }
+  .card.bad     { outline-color: #e53e3e; outline-style: dashed; opacity: 0.55; }
+  .card.rebox   { outline-color: #f59e0b; }
+  .card img { width: 100%; height: 160px; object-fit: cover;
+              cursor: zoom-in; display: block; background: #eee; }
+  .card .meta-row { padding: 6px 8px; font-size: 11px; color: #777;
+                    font-family: ui-monospace, monospace; word-break: break-all;
+                    border-top: 1px solid #eee; max-height: 28px; overflow: hidden; }
+  .card .verdict-row { display: flex; gap: 4px; padding: 6px 8px;
+                       border-top: 1px solid #eee; }
+  .card .verdict-row button { flex: 1; padding: 4px 0; border: 1px solid #ddd;
+                              background: #fff; cursor: pointer; font-size: 14px;
+                              border-radius: 4px; transition: all 0.1s; }
+  .card .verdict-row button.ok { color: #38a169; }
+  .card .verdict-row button.ng { color: #e53e3e; }
+  .card .verdict-row button.rb { color: #f59e0b; }
+  .card .verdict-row button:hover { background: #f0f0f0; }
+  .card .verdict-row button.on.ok { background: #38a169; color: #fff; border-color: #38a169; }
+  .card .verdict-row button.on.ng { background: #e53e3e; color: #fff; border-color: #e53e3e; }
+  .card .verdict-row button.on.rb { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+  .card .src-tag { position: absolute; top: 4px; left: 4px;
+                   background: rgba(0,0,0,0.65); color: #fff; font-size: 10px;
+                   padding: 2px 6px; border-radius: 3px; }
+  .badge { display: inline-block; padding: 2px 6px; border-radius: 3px;
+           font-size: 11px; font-weight: 600; margin-left: 4px; }
+  .badge.exemplar { background: #d1fae5; color: #065f46; }
+  .badge.bad { background: #fee2e2; color: #991b1b; }
+  .badge.rebox { background: #fef3c7; color: #92400e; }
+  .help { background: #fffbe6; border-left: 3px solid #f59e0b; padding: 8px 12px;
+          border-radius: 5px; font-size: 13px; margin: 10px 0; }
+"""
+
+
+@app.get("/classes", response_class=HTMLResponse)
+def classes_landing():
+    rows = []
+    for cls in _all_known_classes():
+        pool = _class_image_pool(cls)
+        state = _exemplar_state(cls)
+        n_total = len(pool)
+        n_ex = sum(1 for v in state.values() if v == "exemplar")
+        n_bad = sum(1 for v in state.values() if v == "bad")
+        zh = _CWD12_ZH.get(cls, "")
+        # thumbnail from first bank crop, or fallback
+        thumb_url = ""
+        for kind, fn in pool:
+            thumb_url = f"/thumb/{kind}/{cls}/{fn}?w=256"
+            break
+        rows.append((cls, zh, n_total, n_ex, n_bad, thumb_url))
+
+    cards = "".join(
+        f'''
+        <a class="class-card" href="/classes/{cls}">
+          <img src="{thumb}" loading="lazy" alt="{cls}"/>
+          <div class="name">{cls}
+            {(f'<span class="badge exemplar">✓ {n_ex}</span>' if n_ex else '')}
+            {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
+          </div>
+          <div class="zh">{zh}</div>
+          <div class="counts">total {n_total} · 已审 {n_ex+n_bad}/{n_total}</div>
+        </a>'''
+        for cls, zh, n_total, n_ex, n_bad, thumb in rows
+    )
+
+    html = f'''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Classes — human verification</title>
+<style>{_AUDIT_CSS}</style>
+</head><body>
+<header>
+  <h1>📋 Classes — human-in-the-loop 类级数据审计</h1>
+  <div class="sub">
+    点任一类进入,逐张人眼判定 ✓ 榜样 / ✗ 标错。
+    通过的图自动加入该类"榜样集",作为 LoRA / curator / 训练的可信源。
+    · <a href="/audit">← 旧 /audit 视图</a>
+    · <a href="/">dashboard 首页</a>
+  </div>
+</header>
+<section>
+  <div class="grid-classes">{cards}</div>
+</section>
+</body></html>'''
+    return HTMLResponse(html)
+
+
+@app.get("/classes/{cls}", response_class=HTMLResponse)
+def classes_detail(cls: str):
+    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+        raise HTTPException(400)
+    pool = _class_image_pool(cls)
+    if not pool and cls not in _CWD12:
+        raise HTTPException(404, f"unknown class {cls!r}")
+    state = _exemplar_state(cls)
+    zh = _CWD12_ZH.get(cls, "")
+
+    # sidebar of all classes
+    sidebar_rows = []
+    for c in _all_known_classes():
+        st = _exemplar_state(c) if c != cls else state
+        n_total = len(_class_image_pool(c)) if c != cls else len(pool)
+        n_ex = sum(1 for v in st.values() if v == "exemplar")
+        cls_attr = ' class="active"' if c == cls else ""
+        sidebar_rows.append(
+            f'<a href="/classes/{c}"{cls_attr}>'
+            f'<div>{c}</div>'
+            f'<div class="row-counts">{n_total} · ✓{n_ex}</div>'
+            f'</a>')
+    sidebar = "".join(sidebar_rows)
+
+    cards = []
+    n_ex = n_bad = n_rb = n_un = 0
+    for kind, fn in pool:
+        key = f"{kind}/{cls}/{fn}" if kind == "bank" else f"{kind}/{fn}"
+        verdict = state.get(key, "")
+        if verdict == "exemplar":  n_ex += 1
+        elif verdict == "bad":     n_bad += 1
+        elif verdict == "rebox":   n_rb += 1
+        else:                      n_un += 1
+        klass = " " + verdict if verdict else " unverified"
+        thumb_url = f"/thumb/{kind}/{cls}/{fn}?w=256"
+        full_url = (f"/audit/raw/bank/{cls}/{fn}" if kind == "bank"
+                    else f"/audit/raw/flux/{fn}")
+        cards.append(f'''
+        <div class="card{klass}" data-img="{key}" data-kind="{kind}">
+          <span class="src-tag">{kind}</span>
+          <a href="{full_url}" target="_blank">
+            <img src="{thumb_url}" loading="lazy" alt="{fn}"/>
+          </a>
+          <div class="meta-row">{fn}</div>
+          <div class="verdict-row">
+            <button class="ok{(' on' if verdict=='exemplar' else '')}"
+              title="榜样 (1)" data-v="exemplar">✓</button>
+            <button class="ng{(' on' if verdict=='bad' else '')}"
+              title="错标 (2)" data-v="bad">✗</button>
+            <button class="rb{(' on' if verdict=='rebox' else '')}"
+              title="bbox 不准 (3)" data-v="rebox">🔄</button>
+          </div>
+        </div>''')
+
+    html = f'''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{cls} — verify</title>
+<style>{_CLASSES_CSS}</style>
+</head><body>
+<header>
+  <h1>📋 类审计 · {cls} <span style="color:#888;font-weight:normal;">/ {zh}</span></h1>
+  <div class="sub">
+    共 <strong>{len(pool)}</strong> 张候选 ·
+    <span class="badge exemplar">✓ 榜样 {n_ex}</span>
+    <span class="badge bad">✗ 错标 {n_bad}</span>
+    <span class="badge rebox">🔄 bbox 待修 {n_rb}</span>
+    · 未审 {n_un}
+    · <a href="/classes">← 所有类</a>
+    · <a href="/audit/class/{cls}">旧视图</a>
+  </div>
+</header>
+<div class="help">
+  快捷键:鼠标悬停在缩略图上,按 <kbd>1</kbd>=榜样 ✓,<kbd>2</kbd>=错标 ✗,<kbd>3</kbd>=bbox 待修 🔄,<kbd>0</kbd>=清除。
+  点击缩略图弹出原图新窗口。下方过滤器按状态筛选。
+</div>
+<div class="layout">
+  <aside class="sidebar">{sidebar}</aside>
+  <main>
+    <div class="filters">
+      <button class="on" data-f="all">全部 {len(pool)}</button>
+      <button data-f="unverified">未审 {n_un}</button>
+      <button data-f="exemplar">榜样 ✓ {n_ex}</button>
+      <button data-f="bad">错标 ✗ {n_bad}</button>
+      <button data-f="rebox">bbox 修 🔄 {n_rb}</button>
+    </div>
+    <div class="grid" id="grid">{''.join(cards)}</div>
+  </main>
+</div>
+<script>
+const CLS = {_json.dumps(cls)};
+
+async function setVerdict(card, verdict) {{
+  const img = card.dataset.img;
+  // optimistic UI
+  for (const c of ['exemplar','bad','rebox','unverified']) card.classList.remove(c);
+  card.classList.add(verdict === 'clear' ? 'unverified' : verdict);
+  card.querySelectorAll('.verdict-row button').forEach(b => b.classList.remove('on'));
+  if (verdict !== 'clear') {{
+    const target = card.querySelector(`.verdict-row button[data-v="${{verdict}}"]`);
+    if (target) target.classList.add('on');
+  }}
+  try {{
+    await fetch(`/api/exemplar/${{CLS}}`, {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{img, verdict}}),
+    }});
+  }} catch (e) {{
+    console.error('save failed', e);
+    card.style.outlineColor = 'magenta';
+  }}
+}}
+
+document.querySelectorAll('.card .verdict-row button').forEach(btn => {{
+  btn.addEventListener('click', e => {{
+    e.preventDefault();
+    const card = btn.closest('.card');
+    const v = btn.dataset.v;
+    const isOn = btn.classList.contains('on');
+    setVerdict(card, isOn ? 'clear' : v);
+  }});
+}});
+
+document.querySelectorAll('.filters button').forEach(btn => {{
+  btn.addEventListener('click', () => {{
+    document.querySelectorAll('.filters button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    const f = btn.dataset.f;
+    document.querySelectorAll('#grid .card').forEach(card => {{
+      let show = false;
+      if (f === 'all') show = true;
+      else if (f === 'unverified') show = card.classList.contains('unverified');
+      else show = card.classList.contains(f);
+      card.style.display = show ? '' : 'none';
+    }});
+  }});
+}});
+
+// keyboard shortcuts when hovering a card
+let hovered = null;
+document.querySelectorAll('.card').forEach(c => {{
+  c.addEventListener('mouseenter', () => hovered = c);
+  c.addEventListener('mouseleave', () => {{ if (hovered === c) hovered = null; }});
+}});
+document.addEventListener('keydown', e => {{
+  if (!hovered) return;
+  if (e.key === '1') setVerdict(hovered, 'exemplar');
+  else if (e.key === '2') setVerdict(hovered, 'bad');
+  else if (e.key === '3') setVerdict(hovered, 'rebox');
+  else if (e.key === '0') setVerdict(hovered, 'clear');
+}});
+</script>
+</body></html>'''
+    return HTMLResponse(html)

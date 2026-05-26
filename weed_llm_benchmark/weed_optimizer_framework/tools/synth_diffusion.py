@@ -237,8 +237,14 @@ def _sample_boxes(size: int, k: int, rng: random.Random):
 
 # ----------------------------------------------------------------------------
 def generate(n_images: int = 600, steps: int = 28, guidance: float = 30.0,
-             objs_per_image=(1, 3), seed: int = 0):
-    """Generate n FLUX-inpainted synthetic images with exact YOLO + COCO GT."""
+             objs_per_image=(1, 3), seed: int = 0,
+             force_class: str | None = None):
+    """Generate n FLUX-inpainted synthetic images with exact YOLO + COCO GT.
+
+    If force_class is given (must be a CANONICAL_12 species name), EVERY
+    pasted bbox is generated for that one class — used to produce a
+    balanced 12-class /audit comparison set (one SLURM array task per class).
+    """
     OUT_IMG_DIR.mkdir(parents=True, exist_ok=True)
     OUT_LBL_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -252,9 +258,18 @@ def generate(n_images: int = 600, steps: int = 28, guidance: float = 30.0,
         sys.exit(1)
 
     pipe = _load_flux()
-    species_w = _weak_class_weights()
-    species = list(species_w.keys())
-    weights = [species_w[c] for c in species]
+    if force_class is not None:
+        if force_class not in CANONICAL_12:
+            log.error(f"force_class {force_class!r} not in CANONICAL_12")
+            sys.exit(1)
+        log.info(f"FORCE_CLASS = {force_class} — all generated bboxes will be "
+                 f"this species (12-class balanced /audit set)")
+        species = [force_class]
+        weights = [1.0]
+    else:
+        species_w = _weak_class_weights()
+        species = list(species_w.keys())
+        weights = [species_w[c] for c in species]
     cls_id = {c: i for i, c in enumerate(CANONICAL_12)}
 
     rng = random.Random(seed)
@@ -265,7 +280,22 @@ def generate(n_images: int = 600, steps: int = 28, guidance: float = 30.0,
     t0 = time.time()
     made = 0
 
-    for i in range(n_images):
+    # Disambiguate filenames per force_class so array tasks don't overwrite
+    # each other (each writes fluxsynth_<class>_NNNNNN.jpg).
+    name_prefix = f"fluxsynth_{force_class}_" if force_class else "fluxsynth_"
+
+    # Find a starting index that doesn't collide with anything already there
+    existing = sorted(OUT_IMG_DIR.glob(f"{name_prefix}*.jpg"))
+    start_idx = 0
+    if existing:
+        try:
+            last = existing[-1].stem.split("_")[-1]
+            start_idx = int(last) + 1
+        except Exception:
+            start_idx = len(existing)
+
+    for j in range(n_images):
+        i = start_idx + j
         bg = Image.open(rng.choice(bgs)).convert("RGB").resize(
             (CANVAS, CANVAS), Image.BILINEAR)
         k = rng.randint(*objs_per_image)
@@ -296,7 +326,7 @@ def generate(n_images: int = 600, steps: int = 28, guidance: float = 30.0,
             anns.append((cls_id[sp], cx, cy, bw, bh))
         if not lines:
             continue
-        name = f"fluxsynth_{i:06d}"
+        name = f"{name_prefix}{i:06d}"
         canvas.save(OUT_IMG_DIR / f"{name}.jpg", quality=92)
         (OUT_LBL_DIR / f"{name}.txt").write_text("\n".join(lines))
         img_id = i + 1
@@ -354,11 +384,16 @@ def main():
     ap.add_argument("--guidance", type=float, default=30.0,
                     help="FLUX.1-Fill guidance scale")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--class-name", default=None,
+                    help="force every generated bbox to this species "
+                         "(one of CANONICAL_12) — used for balanced 12-class "
+                         "/audit comparison set")
     args = ap.parse_args()
     DIFF_DIR.mkdir(parents=True, exist_ok=True)
     if args.command == "generate":
         generate(n_images=args.n, steps=args.steps,
-                 guidance=args.guidance, seed=args.seed)
+                 guidance=args.guidance, seed=args.seed,
+                 force_class=args.class_name)
     elif args.command == "montage":
         _build_montage()
 
