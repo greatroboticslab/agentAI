@@ -309,6 +309,55 @@ class DatasetDiscovery:
 
         return local_path, {"status": "unsupported_source"}
 
+    @staticmethod
+    def _extract_class_names_from_hf_features(features) -> list:
+        """Walk HF Features tree looking for a ClassLabel (.names list).
+        Most HF object-detection datasets nest like:
+          {'image': Image, 'objects': Sequence({'category': ClassLabel(names=[...])})}
+        We return the first non-empty .names found, or [].
+
+        This closes the long-standing gap where _download_hf collected
+        integer class_ids_seen but never recorded the actual class names —
+        the root cause of the 78-empty-class_names registry state."""
+        try:
+            from datasets import ClassLabel, Sequence
+        except Exception:
+            return []
+
+        def walk(f):
+            if isinstance(f, ClassLabel) and f.names:
+                return list(f.names)
+            if isinstance(f, Sequence):
+                return walk(f.feature)
+            if isinstance(f, dict):
+                for v in f.values():
+                    r = walk(v)
+                    if r:
+                        return r
+            return None
+
+        try:
+            if hasattr(features, "values"):
+                for v in features.values():
+                    r = walk(v)
+                    if r:
+                        return r
+        except Exception:
+            pass
+        return []
+
+    @staticmethod
+    def _detect_class_names_filesystem(slug: str, local_path: str) -> tuple:
+        """Fallback: reuse class_metadata_backfiller's detector on the
+        downloaded directory (yaml/classes.txt/subdirs). Returns (names, source)."""
+        try:
+            from .class_metadata_backfiller import detect_class_names as _det
+            from pathlib import Path as _P
+            return _det(slug, _P(local_path))
+        except Exception as e:
+            logger.debug(f"[Dataset] backfiller fallback failed for {slug}: {e}")
+            return [], ""
+
     def _extract_yolo_labels(self, item, width, height):
         """Convert various HF dataset annotation schemas to YOLO-format lines.
 
@@ -425,6 +474,10 @@ class DatasetDiscovery:
         label_count = 0
         all_classes = set()
         save_errors = 0
+        # v3.0.42.5: actual class-name strings from HF features (not just IDs).
+        # Populated from ClassLabel.names of the first probed (cfg, split).
+        extracted_class_names: list = []
+        class_names_source: str = ""
         # v3.0.11: default to needs_autolabel for image-only datasets (was
         # "classification"). Brain's autolabel_dataset tool will upgrade them
         # to yolo_autolabel after running OWLv2.
@@ -462,6 +515,21 @@ class DatasetDiscovery:
                         logger.warning(f"[Dataset] {hf_id}/{cfg_tag}/{split_tag}: probe failed "
                                        f"({str(e)[:100]}) — skip")
                         continue
+
+                    # v3.0.42.5: extract class names from HF schema once.
+                    # Streaming datasets expose .features; ClassLabel.names is
+                    # the real source of class strings. First successful extract wins.
+                    if not extracted_class_names:
+                        try:
+                            feats = getattr(probe_ds, "features", None)
+                            names = self._extract_class_names_from_hf_features(feats)
+                            if names:
+                                extracted_class_names = names
+                                class_names_source = f"hf_features:{cfg_tag}/{split_tag}"
+                                logger.info(f"[Dataset] {name}: class_names from HF features "
+                                            f"({len(names)}): {names[:8]}{'...' if len(names) > 8 else ''}")
+                        except Exception as e:
+                            logger.debug(f"[Dataset] features extract fail {name}: {e}")
 
                     has_bbox = any(k in probe_item for k in
                                    ("objects", "bbox", "boxes", "bboxes", "annotations"))
@@ -536,9 +604,25 @@ class DatasetDiscovery:
                 logger.info(f"[Dataset] {name}/{cfg_tag}: +{cfg_added} imgs total "
                             f"({label_count} labeled)")
 
+            # v3.0.42.5: if HF features didn't yield names, fall back to the
+            # filesystem-based detector (yaml/classes.txt/subdirs). This closes
+            # Q1+Q2 (auto-display of new harvests by class) at harvest time
+            # instead of needing a separate backfiller pass.
+            if not extracted_class_names:
+                try:
+                    fs_names, fs_src = self._detect_class_names_filesystem(name, local_path)
+                    if fs_names:
+                        extracted_class_names = fs_names
+                        class_names_source = f"fs:{fs_src}"
+                        logger.info(f"[Dataset] {name}: class_names from filesystem "
+                                    f"({fs_src}, {len(fs_names)}): "
+                                    f"{fs_names[:8]}{'...' if len(fs_names) > 8 else ''}")
+                except Exception as e:
+                    logger.debug(f"[Dataset] fs fallback fail {name}: {e}")
+
             # All configs processed — register result
             self.registry["datasets"].setdefault(name, {**KNOWN_DATASETS.get(name, {})})
-            self.registry["datasets"][name].update({
+            update_dict = {
                 "status": "downloaded",
                 "local_path": local_path,
                 "local_images": count,
@@ -547,7 +631,14 @@ class DatasetDiscovery:
                 "annotation": annotation_kind,
                 "downloaded_at": datetime.now().isoformat(),
                 "configs_iterated": len(configs),
-            })
+            }
+            # Only WRITE class_names if we extracted any — never clobber a
+            # previously curated set with [].
+            if extracted_class_names:
+                update_dict["class_names"] = extracted_class_names
+                update_dict["class_names_source"] = class_names_source
+                update_dict["class_names_backfilled_at"] = int(__import__("time").time())
+            self.registry["datasets"][name].update(update_dict)
             self.registry["total_downloaded"] = sum(
                 d.get("local_images", 0) for d in self.registry["datasets"].values()
             )
