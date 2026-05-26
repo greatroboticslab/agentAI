@@ -867,6 +867,146 @@ _CWD12_ZH = {
     "SpottedSpurge": "斑地锦",
 }
 
+# ----------------- registry class index (canonical -> [(slug, cid, raw)]) ----
+import re as _re_canon
+
+def _canon_class(raw: str) -> str:
+    """Normalize species name from registry to canonical form.
+    Matches CWD12 case+punctuation-insensitive; else PascalCase the input."""
+    if not isinstance(raw, str) or not raw.strip():
+        return ""
+    alnum = _re_canon.sub(r'[^A-Za-z0-9]', '', raw).lower()
+    if not alnum:
+        return ""
+    for c12 in _CWD12:
+        if _re_canon.sub(r'[^A-Za-z0-9]', '', c12).lower() == alnum:
+            return c12
+    parts = _re_canon.split(r'[^A-Za-z0-9]+', raw)
+    return "".join(p[:1].upper() + p[1:].lower() for p in parts if p)
+
+
+_registry_index_cache: dict = {"mtime": 0.0, "index": {}, "empty_slugs": []}
+
+def _load_registry_index() -> dict:
+    """Returns {canon_class_name: [(slug, class_id, raw_name), ...]}.
+    Side-effect populates _registry_index_cache['empty_slugs'] for slugs
+    with local data but missing class_names — surfaces metadata-gap."""
+    if not REGISTRY_PATH.exists():
+        return {}
+    try:
+        mtime = REGISTRY_PATH.stat().st_mtime
+    except Exception:
+        mtime = 0.0
+    if _registry_index_cache["mtime"] == mtime:
+        return _registry_index_cache["index"]
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = json.load(f)
+    except Exception:
+        return {}
+    idx: dict = {}
+    empty: list = []
+    for slug, info in (reg.get("datasets") or {}).items():
+        cn = info.get("class_names") or []
+        lp = info.get("local_path") or ""
+        has_local = bool(lp and os.path.isdir(lp))
+        if not cn:
+            if has_local:
+                empty.append(slug)
+            continue
+        if not has_local:
+            continue
+        for cid, raw in enumerate(cn):
+            canon = _canon_class(raw)
+            if not canon:
+                continue
+            idx.setdefault(canon, []).append((slug, cid, raw))
+    _registry_index_cache.update({"mtime": mtime, "index": idx, "empty_slugs": empty})
+    return idx
+
+
+def _registry_empty_slugs() -> list:
+    _load_registry_index()
+    return list(_registry_index_cache.get("empty_slugs", []))
+
+
+_pool_cache_dir = REPO / "results" / "framework" / "cache" / "class_pool"
+_pool_cache_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _reg_pool_for_class(cls: str, per_slug_cap: int = 200) -> list:
+    """For each slug containing `cls`, sample up to per_slug_cap images whose
+    label has a bbox of that class_id. Cached on disk by registry mtime."""
+    idx = _load_registry_index()
+    entries = idx.get(cls, [])
+    if not entries:
+        return []
+    try:
+        reg_mtime = int(REGISTRY_PATH.stat().st_mtime) if REGISTRY_PATH.exists() else 0
+    except Exception:
+        reg_mtime = 0
+    cache_fp = _pool_cache_dir / f"{cls}.json"
+    if cache_fp.is_file():
+        try:
+            cached = json.loads(cache_fp.read_text())
+            if cached.get("reg_mtime") == reg_mtime and cached.get("cap") == per_slug_cap:
+                return cached.get("entries", [])
+        except Exception:
+            pass
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = json.load(f)
+    except Exception:
+        return []
+    out: list = []
+    for slug, cid, _raw in entries:
+        info = (reg.get("datasets") or {}).get(slug) or {}
+        lp = info.get("local_path")
+        if not lp or not os.path.isdir(lp):
+            continue
+        local_p = Path(lp)
+        n_added = 0
+        try:
+            for lbl in sorted(local_p.rglob("*.txt")):
+                if "labels" not in lbl.parts:
+                    continue
+                try:
+                    txt = lbl.read_text(errors="ignore")
+                except Exception:
+                    continue
+                has = False
+                for line in txt.splitlines():
+                    p = line.split()
+                    if p and p[0].isdigit() and int(p[0]) == cid:
+                        has = True
+                        break
+                if not has:
+                    continue
+                img_path = None
+                for ext in (".jpg", ".png", ".jpeg", ".JPG", ".PNG", ".JPEG"):
+                    cand = Path(str(lbl).replace("/labels/", "/images/")).with_suffix(ext)
+                    if cand.is_file():
+                        img_path = cand
+                        break
+                if img_path is None:
+                    continue
+                out.append({
+                    "kind": "reg", "slug": slug,
+                    "fname": img_path.name, "cid": cid,
+                })
+                n_added += 1
+                if n_added >= per_slug_cap:
+                    break
+        except Exception as e:
+            log.warning(f"reg pool walk fail {slug}/{cls}: {e}")
+    try:
+        cache_fp.write_text(json.dumps({
+            "reg_mtime": reg_mtime, "cap": per_slug_cap, "entries": out
+        }))
+    except Exception:
+        pass
+    return out
+
 # FLUX setup as actually used in v3.0.39 (vanilla text-to-image).
 # Mirrors weed_optimizer_framework/tools/synth_diffusion.SPECIES_PROMPT.
 _FLUX_SPECIES_PROMPT = {
@@ -1299,6 +1439,106 @@ def thumb_serve(kind: str, cls: str, filename: str, w: int = 256):
     )
 
 
+# -------- registry-source thumb / raw with target-class bbox highlighted -----
+def _render_class_thumb(img_path: Path, label_path: Optional[Path],
+                        target_cid: int, out: Path, max_width: int) -> bool:
+    """Draw target class bboxes in red, others in dim gray, then thumbnail."""
+    img = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
+    if img is None:
+        return False
+    h, w = img.shape[:2]
+    if label_path is not None:
+        for cid, (cx, cy, bw, bh) in parse_yolo_labels(label_path):
+            x1 = int(max(0, (cx - bw / 2) * w))
+            y1 = int(max(0, (cy - bh / 2) * h))
+            x2 = int(min(w, (cx + bw / 2) * w))
+            y2 = int(min(h, (cy + bh / 2) * h))
+            if cid == target_cid:
+                color = (0, 0, 220); thick = max(3, w // 150)
+            else:
+                color = (140, 140, 140); thick = max(1, w // 400)
+            cv2.rectangle(img, (x1, y1), (x2, y2), color, thick)
+    if w > max_width * 2:
+        scale = (max_width * 2) / w
+        img = cv2.resize(img, (int(w * scale), int(h * scale)),
+                         interpolation=cv2.INTER_AREA)
+    tmp = out.with_suffix(".tmp.jpg")
+    cv2.imwrite(str(tmp), img, [cv2.IMWRITE_JPEG_QUALITY, 82])
+    try:
+        from PIL import Image as _Im
+        im = _Im.open(tmp).convert("RGB")
+        im.thumbnail((max_width, max_width), _Im.LANCZOS)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        im.save(out, "JPEG", quality=86, optimize=True)
+    finally:
+        try: tmp.unlink()
+        except FileNotFoundError: pass
+    return True
+
+
+@app.get("/thumb_reg/{slug}/{cls}/{filename}")
+def thumb_reg_serve(slug: str, cls: str, filename: str, w: int = 256):
+    """Cached thumb of a registry-slug image with target-class bbox in red."""
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
+        raise HTTPException(400, "bad slug")
+    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+        raise HTTPException(400, "bad cls")
+    if "/" in filename or ".." in filename or filename.startswith("."):
+        raise HTTPException(400, "bad fname")
+    if not 64 <= w <= 1024:
+        w = 256
+    idx = _load_registry_index()
+    pair = next(((s, c) for s, c, _ in idx.get(cls, []) if s == slug), None)
+    if pair is None:
+        raise HTTPException(404, "class not in this slug")
+    _, target_cid = pair
+    found = find_image_in_slug(slug, filename)
+    if found is None:
+        raise HTTPException(404, "image not found")
+    img_path, local_p = found
+    safe = _re_cls.sub(r'[^A-Za-z0-9_.-]', '_', f"reg__{slug}__{cls}__{filename}_{w}")
+    cache = _THUMB_DIR / (safe + ".jpg")
+    if (not cache.is_file()) or (cache.stat().st_mtime < img_path.stat().st_mtime):
+        lbl = find_label_for_image(img_path, local_p)
+        ok = _render_class_thumb(img_path, lbl, target_cid, cache, w)
+        if not ok:
+            return FileResponse(str(img_path), media_type="image/jpeg")
+    return FileResponse(
+        str(cache), media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
+
+
+@app.get("/raw_reg/{slug}/{cls}/{filename}")
+def raw_reg_serve(slug: str, cls: str, filename: str):
+    """Full-res image with target-class bbox highlighted (cached on disk)."""
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
+        raise HTTPException(400)
+    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+        raise HTTPException(400)
+    if "/" in filename or ".." in filename or filename.startswith("."):
+        raise HTTPException(400)
+    idx = _load_registry_index()
+    pair = next(((s, c) for s, c, _ in idx.get(cls, []) if s == slug), None)
+    if pair is None:
+        raise HTTPException(404)
+    _, target_cid = pair
+    found = find_image_in_slug(slug, filename)
+    if found is None:
+        raise HTTPException(404)
+    img_path, local_p = found
+    lbl = find_label_for_image(img_path, local_p)
+    out_dir = REPO / "results" / "framework" / "cache" / "reg_full"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe = _re_cls.sub(r'[^A-Za-z0-9_.-]', '_', f"{slug}__{cls}__{filename}")
+    out = out_dir / (safe + ".jpg")
+    if (not out.is_file()) or (out.stat().st_mtime < img_path.stat().st_mtime):
+        ok = _render_class_thumb(img_path, lbl, target_cid, out, max_width=1600)
+        if not ok:
+            return FileResponse(str(img_path), media_type="image/jpeg")
+    return FileResponse(str(out), media_type="image/jpeg")
+
+
 # ---------------------------------------------------------------- exemplar log
 def _exemplar_file(cls: str) -> Path:
     return _CLS_EXEMPLAR_DIR / f"{cls}.jsonl"
@@ -1360,27 +1600,31 @@ async def api_exemplar_post(cls: str, payload: dict = Body(...)):
 
 # ---------------------------------------------------------------- /classes
 def _all_known_classes() -> _List_cls[str]:
-    """Union of CANONICAL_12 + any class folder in synth_cutpaste/object_bank."""
-    out = list(_CWD12)
+    """Union of CANONICAL_12 + bank folders + registry slugs' class_names.
+    Auto-grows: when a slug with new class_names is registered, that class
+    appears here automatically (next /classes load picks up registry mtime change)."""
+    out: set = set(_CWD12)
     bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
     if bd.is_dir():
         for d in bd.iterdir():
-            if d.is_dir() and d.name not in out:
-                out.append(d.name)
+            if d.is_dir():
+                out.add(d.name)
+    for c in _load_registry_index().keys():
+        out.add(c)
     return sorted(out)
 
 
-def _class_image_pool(cls: str) -> _List_cls[tuple[str, str]]:
-    """Return [(kind, filename), ...] for all images claimed to be `cls`.
-    Cross-source: bank crops + FLUX outputs containing this class."""
-    pool: list[tuple[str, str]] = []
-    # bank
+def _class_image_pool(cls: str) -> _List_cls[dict]:
+    """Return [{kind, slug, fname, cid}, ...] for all images claimed to be `cls`.
+    Cross-source: bank crops + FLUX outputs + registered real-bbox datasets."""
+    pool: list = []
+    # 1) bank
     bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls
     if bd.is_dir():
         for p in sorted(bd.iterdir()):
             if p.suffix.lower() in (".png", ".jpg", ".jpeg"):
-                pool.append(("bank", p.name))
-    # flux (only if cls is in CANONICAL_12 — labels use that integer encoding)
+                pool.append({"kind": "bank", "slug": None, "fname": p.name, "cid": None})
+    # 2) flux (only if cls is in CANONICAL_12 — labels encode that integer)
     if cls in _CWD12:
         cid = _CWD12.index(cls)
         ld = REPO / "results" / "framework" / "synth_diffusion" / "labels"
@@ -1393,11 +1637,37 @@ def _class_image_pool(cls: str) -> _List_cls[tuple[str, str]]:
                             img_name = lbl.stem + ".jpg"
                             if ((REPO / "results" / "framework" / "synth_diffusion" /
                                  "images" / img_name)).is_file():
-                                pool.append(("flux", img_name))
+                                pool.append({"kind": "flux", "slug": None,
+                                             "fname": img_name, "cid": cid})
                             break
                 except Exception:
                     pass
+    # 3) registry-tracked real datasets (sp8, holdout, future harvests)
+    pool.extend(_reg_pool_for_class(cls))
     return pool
+
+
+def _pool_entry_urls(entry: dict, cls: str) -> tuple:
+    """Return (exemplar_key, thumb_url, raw_url, src_tag) for a pool entry dict."""
+    kind = entry["kind"]
+    fn = entry["fname"]
+    slug = entry.get("slug")
+    if kind == "bank":
+        return (f"bank/{cls}/{fn}",
+                f"/thumb/bank/{cls}/{fn}?w=256",
+                f"/audit/raw/bank/{cls}/{fn}",
+                "bank")
+    if kind == "flux":
+        return (f"flux/{fn}",
+                f"/thumb/flux/{cls}/{fn}?w=256",
+                f"/audit/raw/flux/{fn}",
+                "flux")
+    if kind == "reg":
+        return (f"reg/{slug}/{fn}",
+                f"/thumb_reg/{slug}/{cls}/{fn}?w=256",
+                f"/raw_reg/{slug}/{cls}/{fn}",
+                slug or "reg")
+    return (f"unk/{fn}", "", "", "?")
 
 
 _CLASSES_CSS = """
@@ -1471,15 +1741,20 @@ def classes_landing():
         pool = _class_image_pool(cls)
         state = _exemplar_state(cls)
         n_total = len(pool)
+        # source breakdown
+        n_bank = sum(1 for e in pool if e["kind"] == "bank")
+        n_flux = sum(1 for e in pool if e["kind"] == "flux")
+        n_reg  = sum(1 for e in pool if e["kind"] == "reg")
         n_ex = sum(1 for v in state.values() if v == "exemplar")
         n_bad = sum(1 for v in state.values() if v == "bad")
         zh = _CWD12_ZH.get(cls, "")
-        # thumbnail from first bank crop, or fallback
         thumb_url = ""
-        for kind, fn in pool:
-            thumb_url = f"/thumb/{kind}/{cls}/{fn}?w=256"
+        for entry in pool:
+            _, t, _, _ = _pool_entry_urls(entry, cls)
+            thumb_url = t
             break
-        rows.append((cls, zh, n_total, n_ex, n_bad, thumb_url))
+        rows.append((cls, zh, n_total, n_bank, n_flux, n_reg,
+                     n_ex, n_bad, thumb_url))
 
     cards = "".join(
         f'''
@@ -1490,15 +1765,33 @@ def classes_landing():
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
           <div class="zh">{zh}</div>
-          <div class="counts">total {n_total} · 已审 {n_ex+n_bad}/{n_total}</div>
+          <div class="counts">total {n_total} · bank {n_bank} · flux {n_flux} · real {n_reg}</div>
+          <div class="counts">已审 {n_ex+n_bad}/{n_total}</div>
         </a>'''
-        for cls, zh, n_total, n_ex, n_bad, thumb in rows
+        for cls, zh, n_total, n_bank, n_flux, n_reg, n_ex, n_bad, thumb in rows
     )
+
+    # ----- metadata-gap surface: slugs with local data but no class_names -----
+    empty_slugs = _registry_empty_slugs()
+    banner = ""
+    if empty_slugs:
+        sample = ", ".join(empty_slugs[:6])
+        more = f" (+{len(empty_slugs)-6} 更多)" if len(empty_slugs) > 6 else ""
+        banner = f'''
+  <div class="help" style="background:#fee;border-left-color:#c00;">
+    ⚠️ <strong>Registry metadata gap</strong>:{len(empty_slugs)} 个已下载的 slugs <strong>class_names 为空</strong>,
+    其图片<strong>不会</strong>出现在下面任何类里。需要先跑 backfill 工具补元数据。<br>
+    举例:<code>{sample}</code>{more}
+  </div>'''
 
     html = f'''<!DOCTYPE html><html lang="zh"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Classes — human verification</title>
-<style>{_AUDIT_CSS}</style>
+<style>{_AUDIT_CSS}
+  .help {{ background: #fffbe6; border-left: 3px solid #f59e0b;
+          padding: 8px 12px; border-radius: 5px; font-size: 13px;
+          margin: 10px 0; }}
+</style>
 </head><body>
 <header>
   <h1>📋 Classes — human-in-the-loop 类级数据审计</h1>
@@ -1509,6 +1802,7 @@ def classes_landing():
     · <a href="/">dashboard 首页</a>
   </div>
 </header>
+{banner}
 <section>
   <div class="grid-classes">{cards}</div>
 </section>
@@ -1542,20 +1836,21 @@ def classes_detail(cls: str):
 
     cards = []
     n_ex = n_bad = n_rb = n_un = 0
-    for kind, fn in pool:
-        key = f"{kind}/{cls}/{fn}" if kind == "bank" else f"{kind}/{fn}"
+    src_breakdown: dict = {}
+    for entry in pool:
+        key, thumb_url, full_url, src_tag = _pool_entry_urls(entry, cls)
+        kind = entry["kind"]
+        fn = entry["fname"]
+        src_breakdown[src_tag] = src_breakdown.get(src_tag, 0) + 1
         verdict = state.get(key, "")
         if verdict == "exemplar":  n_ex += 1
         elif verdict == "bad":     n_bad += 1
         elif verdict == "rebox":   n_rb += 1
         else:                      n_un += 1
         klass = " " + verdict if verdict else " unverified"
-        thumb_url = f"/thumb/{kind}/{cls}/{fn}?w=256"
-        full_url = (f"/audit/raw/bank/{cls}/{fn}" if kind == "bank"
-                    else f"/audit/raw/flux/{fn}")
         cards.append(f'''
-        <div class="card{klass}" data-img="{key}" data-kind="{kind}">
-          <span class="src-tag">{kind}</span>
+        <div class="card{klass}" data-img="{key}" data-kind="{kind}" data-src="{src_tag}">
+          <span class="src-tag">{src_tag}</span>
           <a href="{full_url}" target="_blank">
             <img src="{thumb_url}" loading="lazy" alt="{fn}"/>
           </a>
@@ -1569,6 +1864,7 @@ def classes_detail(cls: str):
               title="bbox 不准 (3)" data-v="rebox">🔄</button>
           </div>
         </div>''')
+    src_summary = " · ".join(f"{k} {v}" for k, v in sorted(src_breakdown.items()))
 
     html = f'''<!DOCTYPE html><html lang="zh"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1578,7 +1874,7 @@ def classes_detail(cls: str):
 <header>
   <h1>📋 类审计 · {cls} <span style="color:#888;font-weight:normal;">/ {zh}</span></h1>
   <div class="sub">
-    共 <strong>{len(pool)}</strong> 张候选 ·
+    共 <strong>{len(pool)}</strong> 张候选 ({src_summary}) ·
     <span class="badge exemplar">✓ 榜样 {n_ex}</span>
     <span class="badge bad">✗ 错标 {n_bad}</span>
     <span class="badge rebox">🔄 bbox 待修 {n_rb}</span>
