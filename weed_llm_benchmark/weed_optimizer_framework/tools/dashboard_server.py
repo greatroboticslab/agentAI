@@ -934,13 +934,22 @@ _pool_cache_dir = REPO / "results" / "framework" / "cache" / "class_pool"
 _pool_cache_dir.mkdir(parents=True, exist_ok=True)
 
 
-def _reg_pool_for_class(cls: str, per_slug_cap: int = 200) -> list:
+def _reg_pool_for_class(cls: str, per_slug_cap: int = 200,
+                         include_junk: bool = False) -> list:
     """For each slug containing `cls`, sample up to per_slug_cap images whose
-    label has a bbox of that class_id. Cached on disk by registry mtime."""
+    label has a bbox of that class_id. Cached on disk by registry mtime.
+
+    v3.0.43: by default exclude slugs marked '✗ junk' via /slugs UI.
+    Pass include_junk=True to override."""
     idx = _load_registry_index()
     entries = idx.get(cls, [])
     if not entries:
         return []
+    if not include_junk:
+        verdicts = _slug_verdict_state()
+        entries = [(s, c, r) for s, c, r in entries if verdicts.get(s) != "junk"]
+        if not entries:
+            return []
     try:
         reg_mtime = int(REGISTRY_PATH.stat().st_mtime) if REGISTRY_PATH.exists() else 0
     except Exception:
@@ -1382,6 +1391,36 @@ from typing import Dict as _Dict_cls, List as _List_cls
 _CLS_EXEMPLAR_DIR = REPO / "results" / "framework" / "class_exemplars"
 _CLS_EXEMPLAR_DIR.mkdir(parents=True, exist_ok=True)
 
+# v3.0.43: slug-level verdict log (separate from class-level exemplar log).
+# Users can mark whole slugs as ✓ keep / ✗ junk / 🤔 unsure — used to hide
+# garbage from /classes by default and speed up audit.
+_SLUG_VERDICT_FILE = REPO / "results" / "framework" / "slug_verdicts.jsonl"
+_SLUG_VERDICT_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _slug_verdict_state() -> dict:
+    """Replay slug_verdicts.jsonl → {slug: latest_verdict}.
+    verdict ∈ {keep, junk, unsure}. 'clear' removes the slug entry."""
+    state: dict = {}
+    if not _SLUG_VERDICT_FILE.is_file():
+        return state
+    try:
+        for line in _SLUG_VERDICT_FILE.read_text().splitlines():
+            if not line.strip():
+                continue
+            ev = _json.loads(line)
+            slug = ev.get("slug", "")
+            v = ev.get("verdict", "")
+            if not slug or not v:
+                continue
+            if v == "clear":
+                state.pop(slug, None)
+            else:
+                state[slug] = v
+    except Exception:
+        pass
+    return state
+
 _THUMB_DIR = REPO / "results" / "framework" / "cache" / "thumbs"
 _THUMB_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -1689,6 +1728,46 @@ def api_exemplars_export_all():
     return JSONResponse(out)
 
 
+# ---- slug-level verdicts: ✓ keep / ✗ junk / 🤔 unsure ----
+@app.get("/api/slug_verdicts")
+def api_slug_verdicts_all():
+    """Return full {slug: verdict} map."""
+    state = _slug_verdict_state()
+    counts = {"keep": 0, "junk": 0, "unsure": 0}
+    for v in state.values():
+        counts[v] = counts.get(v, 0) + 1
+    return JSONResponse({"verdicts": state, "counts": counts})
+
+
+@app.post("/api/slug_verdict/{slug}")
+async def api_slug_verdict_post(slug: str, payload: dict = Body(...)):
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
+        raise HTTPException(400, "bad slug chars")
+    verdict = payload.get("verdict", "")
+    if verdict not in ("keep", "junk", "unsure", "clear"):
+        raise HTTPException(400, "verdict must be keep|junk|unsure|clear")
+    note = payload.get("note", "")
+    if not isinstance(note, str):
+        note = ""
+    ev = {
+        "slug": slug, "verdict": verdict,
+        "note": note[:200],
+        "ts": _time_cls.time(),
+        "ts_h": _time_cls.strftime("%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime()),
+    }
+    with open(_SLUG_VERDICT_FILE, "a") as f:
+        f.write(_json.dumps(ev) + "\n")
+    # Verdict changed → invalidate per-class pool caches so junk slugs vanish
+    # from /classes on next load.
+    try:
+        for p in _pool_cache_dir.glob("*.json"):
+            try: p.unlink()
+            except Exception: pass
+    except Exception:
+        pass
+    return JSONResponse({"ok": True, **ev})
+
+
 # ---- refresh: invalidate all caches so next /classes load re-scans -------
 @app.post("/api/refresh_registry")
 @app.get("/api/refresh_registry")
@@ -1953,6 +2032,211 @@ _CLASSES_CSS = """
 """
 
 
+@app.get("/slugs", response_class=HTMLResponse)
+def slugs_landing():
+    """Slug-level cleanup: ✓ keep / ✗ junk / 🤔 unsure on whole slugs.
+    Faster than per-image audit when a slug is obviously garbage (plant
+    disease imported by accident, etc.)."""
+    # Load registry once
+    if not REGISTRY_PATH.exists():
+        return HTMLResponse("<h1>no registry</h1>", status_code=404)
+    with open(REGISTRY_PATH) as f:
+        reg = json.load(f)
+    datasets = reg.get("datasets", {})
+    verdicts = _slug_verdict_state()
+
+    # Build rows. Sort: junk last, then unsure, then keep, then unverified.
+    rows = []
+    for slug, info in datasets.items():
+        cn = info.get("class_names") or []
+        lp = info.get("local_path") or ""
+        st = info.get("status", "?")
+        n_imgs = info.get("local_images") or info.get("images") or 0
+        used = info.get("used_for_training", False)
+        verdict = verdicts.get(slug, "")
+        rows.append({
+            "slug": slug, "cn": cn, "lp": lp, "status": st,
+            "n_imgs": n_imgs, "used": used, "verdict": verdict,
+            "has_local": bool(lp and os.path.isdir(lp)),
+        })
+    # Sort by verdict (unverified first, junk last)
+    def sort_key(r):
+        order = {"": 0, "keep": 1, "unsure": 2, "junk": 3}
+        return (order.get(r["verdict"], 0), -r["n_imgs"])
+    rows.sort(key=sort_key)
+
+    # Render table
+    tr_html = []
+    for r in rows:
+        cn_str = ", ".join(r["cn"][:4]) + (f" (+{len(r['cn'])-4})" if len(r["cn"]) > 4 else "")
+        if not r["cn"]:
+            cn_str = '<span style="color:#c00">empty</span>'
+        used_badge = '<span class="badge badge-used">TRAINED</span>' if r["used"] else ""
+        local_badge = '' if r["has_local"] else '<span class="badge badge-no-local">no local</span>'
+        v_class = f" verdict-{r['verdict']}" if r["verdict"] else ""
+        v_buttons = "".join(
+            f'<button class="vbtn {k}{"" if r["verdict"]!=k else " on"}" '
+            f'data-v="{k}" title="{lbl}">{sym}</button>'
+            for k, sym, lbl in [
+                ("keep", "✓", "保留 (good slug)"),
+                ("junk", "✗", "删除 (garbage slug)"),
+                ("unsure", "🤔", "存疑"),
+            ]
+        )
+        tr_html.append(f'''
+        <tr class="srow{v_class}" data-slug="{r["slug"]}" data-verdict="{r["verdict"]}">
+          <td class="slug-col">
+            <a href="/classes#q={r["slug"][:10]}" title="filter /classes by this slug">{r["slug"]}</a>
+            {used_badge} {local_badge}
+          </td>
+          <td>{r["status"]}</td>
+          <td class="num">{r["n_imgs"]}</td>
+          <td class="num">{len(r["cn"])}</td>
+          <td class="cn-col">{cn_str}</td>
+          <td class="verdict-col">{v_buttons}</td>
+        </tr>''')
+
+    n_keep = sum(1 for v in verdicts.values() if v == "keep")
+    n_junk = sum(1 for v in verdicts.values() if v == "junk")
+    n_unsure = sum(1 for v in verdicts.values() if v == "unsure")
+    n_unverified = len(datasets) - n_keep - n_junk - n_unsure
+
+    html = f'''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slugs — registry cleanup</title>
+<style>
+  body {{ font-family: -apple-system, "PingFang SC", sans-serif;
+         margin: 0; padding: 16px; background: #f2f3f7; color: #1a1a1d; }}
+  header {{ background: #fff; padding: 14px 22px; border-radius: 10px;
+           margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
+  header h1 {{ margin: 0 0 4px 0; font-size: 20px; }}
+  header .sub {{ color: #666; font-size: 13px; }}
+  header a {{ color: #06c; text-decoration: none; }}
+  .summary {{ background: #fff; padding: 10px 16px; border-radius: 8px;
+              margin-bottom: 12px; display: flex; gap: 18px; flex-wrap: wrap;
+              font-size: 14px; }}
+  .filter-bar {{ background: #fff; padding: 10px 16px; border-radius: 8px;
+                margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }}
+  .filter-bar button {{ background: #f4f4f7; border: 1px solid #ddd;
+                       padding: 5px 12px; border-radius: 16px; cursor: pointer;
+                       font-size: 13px; }}
+  .filter-bar button.on {{ background: #06c; color: #fff; border-color: #06c; }}
+  table {{ width: 100%; border-collapse: collapse; background: #fff;
+          border-radius: 8px; overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06); font-size: 13px; }}
+  th, td {{ padding: 9px 12px; text-align: left; border-bottom: 1px solid #f0f0f0; }}
+  th {{ background: #fafafa; font-weight: 600; font-size: 12px; color: #555; }}
+  td.num {{ text-align: right; font-family: ui-monospace, monospace; }}
+  td.slug-col {{ font-family: ui-monospace, monospace; word-break: break-all;
+                 max-width: 360px; }}
+  td.cn-col {{ color: #666; font-size: 12px; max-width: 320px; word-break: break-all; }}
+  td.verdict-col {{ white-space: nowrap; }}
+  .vbtn {{ background: #fff; border: 1px solid #ccc; padding: 4px 10px;
+          margin: 0 2px; border-radius: 4px; cursor: pointer; font-size: 14px; }}
+  .vbtn.keep.on   {{ background: #38a169; color: #fff; border-color: #38a169; }}
+  .vbtn.junk.on   {{ background: #e53e3e; color: #fff; border-color: #e53e3e; }}
+  .vbtn.unsure.on {{ background: #f59e0b; color: #fff; border-color: #f59e0b; }}
+  .srow.verdict-junk td {{ opacity: 0.55; text-decoration: line-through; }}
+  .srow.verdict-keep {{ background: #f0fff4; }}
+  .srow.verdict-unsure {{ background: #fffbeb; }}
+  .badge {{ display: inline-block; padding: 1px 6px; border-radius: 3px;
+           font-size: 10px; font-weight: 600; margin-left: 4px;
+           vertical-align: middle; }}
+  .badge-used {{ background: #dbeafe; color: #1e40af; }}
+  .badge-no-local {{ background: #fee2e2; color: #991b1b; }}
+</style>
+</head><body>
+<header>
+  <h1>📦 Slugs — registry-level 清理</h1>
+  <div class="sub">
+    每行一个 slug — ✓ 保留 / ✗ 删除(垃圾) / 🤔 存疑。
+    标 ✗ 的 slug 默认从 /classes 隐藏。
+    · <a href="/classes">/classes 类级审计</a>
+    · <a href="/">dashboard 首页</a>
+    · <a href="/api/slug_verdicts">📥 JSON</a>
+  </div>
+</header>
+<div class="summary">
+  <div>📊 总 <strong>{len(datasets)}</strong> 个 slugs</div>
+  <div>✓ keep: <strong>{n_keep}</strong></div>
+  <div>🤔 unsure: <strong>{n_unsure}</strong></div>
+  <div>✗ junk: <strong>{n_junk}</strong></div>
+  <div>未审: <strong>{n_unverified}</strong></div>
+</div>
+<div class="filter-bar" id="filter-bar">
+  <button class="on" data-f="all">全部 {len(datasets)}</button>
+  <button data-f="unverified">未审 {n_unverified}</button>
+  <button data-f="keep">✓ keep {n_keep}</button>
+  <button data-f="unsure">🤔 unsure {n_unsure}</button>
+  <button data-f="junk">✗ junk {n_junk}</button>
+  <button data-f="has_classnames">有 class_names</button>
+  <button data-f="empty_classnames">无 class_names</button>
+</div>
+<table>
+<thead>
+<tr><th>Slug</th><th>状态</th><th class="num"># 图</th><th class="num"># 类</th><th>class_names 预览</th><th>verdict</th></tr>
+</thead>
+<tbody id="slugs-tbody">
+{''.join(tr_html)}
+</tbody>
+</table>
+<script>
+async function setSlugVerdict(row, verdict) {{
+  const slug = row.dataset.slug;
+  row.classList.remove('verdict-keep','verdict-junk','verdict-unsure');
+  if (verdict !== 'clear') row.classList.add('verdict-' + verdict);
+  row.dataset.verdict = verdict === 'clear' ? '' : verdict;
+  row.querySelectorAll('.vbtn').forEach(b => b.classList.remove('on'));
+  if (verdict !== 'clear') {{
+    const b = row.querySelector(`.vbtn.${{verdict}}`);
+    if (b) b.classList.add('on');
+  }}
+  try {{
+    await fetch('/api/slug_verdict/' + encodeURIComponent(slug), {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{verdict}}),
+    }});
+  }} catch (e) {{
+    console.error('slug verdict save failed', e);
+  }}
+}}
+document.querySelectorAll('.vbtn').forEach(b => {{
+  b.addEventListener('click', () => {{
+    const row = b.closest('.srow');
+    const v = b.dataset.v;
+    const isOn = b.classList.contains('on');
+    setSlugVerdict(row, isOn ? 'clear' : v);
+  }});
+}});
+// Filter buttons
+document.querySelectorAll('.filter-bar button').forEach(b => {{
+  b.addEventListener('click', () => {{
+    document.querySelectorAll('.filter-bar button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    const f = b.dataset.f;
+    document.querySelectorAll('.srow').forEach(r => {{
+      let show = false;
+      if (f === 'all') show = true;
+      else if (f === 'unverified') show = !r.dataset.verdict;
+      else if (f === 'has_classnames') {{
+        const cnCol = r.querySelector('.cn-col');
+        show = cnCol && !cnCol.innerHTML.includes('empty');
+      }}
+      else if (f === 'empty_classnames') {{
+        const cnCol = r.querySelector('.cn-col');
+        show = cnCol && cnCol.innerHTML.includes('empty');
+      }}
+      else show = r.dataset.verdict === f;
+      r.style.display = show ? '' : 'none';
+    }});
+  }});
+}});
+</script>
+</body></html>'''
+    return HTMLResponse(html)
+
+
 @app.get("/classes", response_class=HTMLResponse)
 def classes_landing():
     rows = []
@@ -2066,6 +2350,7 @@ def classes_landing():
     · <a href="/audit">← 旧 /audit 视图</a>
     · <a href="/">dashboard 首页</a>
     · <a href="/api/exemplars_export">📥 导出榜样集</a>
+    · <a href="/slugs">📦 slug 级清理</a>
     · <a href="javascript:void(0)" onclick="refreshRegistry()">♻️ 刷新 registry</a>
   </div>
 </header>
