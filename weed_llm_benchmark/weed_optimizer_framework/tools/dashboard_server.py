@@ -1689,6 +1689,39 @@ def api_exemplars_export_all():
     return JSONResponse(out)
 
 
+# ---- refresh: invalidate all caches so next /classes load re-scans -------
+@app.post("/api/refresh_registry")
+@app.get("/api/refresh_registry")
+def api_refresh_registry():
+    """Wipe registry-index + class-pool disk caches so /classes re-scans on
+    next load. Use after Brain harvest_new_datasets() adds new slugs."""
+    # 1) in-memory registry index — force reload by zeroing mtime cache
+    _registry_index_cache["mtime"] = 0.0
+    _registry_index_cache["index"] = {}
+    _registry_index_cache["empty_slugs"] = []
+    # 2) disk class_pool cache — delete files (next access rebuilds)
+    n_removed = 0
+    try:
+        for p in _pool_cache_dir.glob("*.json"):
+            try:
+                p.unlink(); n_removed += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+    # 3) registry mtime for fresh signal
+    try:
+        reg_mtime = REGISTRY_PATH.stat().st_mtime if REGISTRY_PATH.exists() else 0
+    except Exception:
+        reg_mtime = 0
+    return JSONResponse({
+        "ok": True,
+        "pool_cache_files_removed": n_removed,
+        "registry_mtime": reg_mtime,
+        "msg": "caches invalidated — next /classes load will rescan",
+    })
+
+
 # ---------------------------------------------------------------- /classes
 def _all_known_classes() -> _List_cls[str]:
     """Union of CANONICAL_12 + bank folders + registry slugs' class_names.
@@ -2033,6 +2066,7 @@ def classes_landing():
     · <a href="/audit">← 旧 /audit 视图</a>
     · <a href="/">dashboard 首页</a>
     · <a href="/api/exemplars_export">📥 导出榜样集</a>
+    · <a href="javascript:void(0)" onclick="refreshRegistry()">♻️ 刷新 registry</a>
   </div>
 </header>
 {banner}
@@ -2046,6 +2080,19 @@ def classes_landing():
   <div class="filter-empty-note" id="filter-empty">没有匹配的类。</div>
 </section>
 <script>
+async function refreshRegistry() {{
+  const ok = confirm('Wipe cached registry index + class pool? Page will reload.');
+  if (!ok) return;
+  try {{
+    const r = await fetch('/api/refresh_registry', {{method: 'POST'}});
+    const data = await r.json();
+    alert('Refresh OK. Removed ' + data.pool_cache_files_removed + ' cache files. Reloading.');
+    location.reload();
+  }} catch (e) {{
+    alert('Refresh failed: ' + e);
+  }}
+}}
+
 const tabs = document.querySelectorAll('.filter-tab');
 const search = document.getElementById('filter-search');
 const cards = document.querySelectorAll('.class-card');

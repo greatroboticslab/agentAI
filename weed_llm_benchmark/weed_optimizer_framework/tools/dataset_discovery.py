@@ -87,13 +87,25 @@ class DatasetDiscovery:
     # =========================================================
 
     def _load_registry(self):
-        """Load dataset registry (tracks downloaded, used, discovered)."""
+        """Load dataset registry (tracks downloaded, used, discovered).
+
+        v3.0.42.5: don't blindly re-save on every __init__ — registry grew to
+        50+MB after class_names backfill, and atomic os.replace is flaky on
+        Lustre for large files. Only save if _discover_preexisting actually
+        added new entries."""
         if os.path.exists(REGISTRY_PATH):
             try:
                 with open(REGISTRY_PATH) as f:
                     registry = json.load(f)
+                before_keys = set(registry.get("datasets", {}).keys())
                 self._discover_preexisting(registry)
-                self._save_registry(registry)
+                after_keys = set(registry.get("datasets", {}).keys())
+                if after_keys != before_keys:
+                    # New local datasets discovered — worth saving.
+                    try:
+                        self._save_registry(registry)
+                    except Exception as e:
+                        logger.warning(f"[Dataset] registry resave failed (continuing): {e}")
                 return registry
             except (json.JSONDecodeError, KeyError):
                 pass
