@@ -1598,6 +1598,97 @@ async def api_exemplar_post(cls: str, payload: dict = Body(...)):
     return JSONResponse({"ok": True, **ev})
 
 
+# ---- exemplar EXPORT: closes the human-in-loop circle ----
+# Human ✓ marks → exportable manifest → downstream LoRA / curator training.
+
+def _exemplar_export_entry(cls: str, img_key: str) -> dict:
+    """Resolve an exemplar key into a usable training entry.
+    img_key formats:
+      'bank/{cls}/{fname}'      → cropped object on transparent bg
+      'flux/{fname}'            → FLUX synthetic full scene
+      'reg/{slug}/{fname}'      → full real-bbox image
+    Returns dict with kind, source_path (absolute), bbox_class_id (if reg),
+    and direct URLs for the dashboard."""
+    parts = img_key.split("/", 2)
+    if len(parts) < 2:
+        return {"key": img_key, "error": "malformed_key"}
+    kind = parts[0]
+    if kind == "bank" and len(parts) == 3:
+        fn = parts[2]
+        p = (REPO / "results" / "framework" / "synth_cutpaste" /
+             "object_bank" / cls / fn)
+        return {
+            "key": img_key, "kind": "bank", "class": cls, "fname": fn,
+            "path": str(p) if p.is_file() else None,
+            "thumb_url": f"/thumb/bank/{cls}/{fn}?w=256",
+            "raw_url": f"/audit/raw/bank/{cls}/{fn}",
+        }
+    if kind == "flux" and len(parts) >= 2:
+        fn = parts[1] if len(parts) == 2 else parts[2]
+        p = REPO / "results" / "framework" / "synth_diffusion" / "images" / fn
+        return {
+            "key": img_key, "kind": "flux", "class": cls, "fname": fn,
+            "path": str(p) if p.is_file() else None,
+            "thumb_url": f"/thumb/flux/{cls}/{fn}?w=256",
+            "raw_url": f"/audit/raw/flux/{fn}",
+        }
+    if kind == "reg" and len(parts) == 3:
+        slug = parts[1]
+        fn = parts[2]
+        # resolve class_id from registry index
+        idx = _load_registry_index()
+        pair = next(((s, c) for s, c, _ in idx.get(cls, []) if s == slug), None)
+        cid = pair[1] if pair else None
+        return {
+            "key": img_key, "kind": "reg", "class": cls,
+            "slug": slug, "fname": fn, "class_id_in_slug": cid,
+            "thumb_url": f"/thumb_reg/{slug}/{cls}/{fn}?w=256",
+            "raw_url": f"/raw_reg/{slug}/{cls}/{fn}",
+        }
+    return {"key": img_key, "error": "unknown_kind", "raw_kind": kind}
+
+
+@app.get("/api/exemplars_export/{cls}")
+def api_exemplars_export_class(cls: str):
+    """Return all ✓ exemplar entries for a class as a usable manifest."""
+    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+        raise HTTPException(400)
+    state = _exemplar_state(cls)
+    entries = [
+        _exemplar_export_entry(cls, k)
+        for k, v in state.items() if v == "exemplar"
+    ]
+    return JSONResponse({
+        "class": cls,
+        "n_exemplars": len(entries),
+        "n_bad": sum(1 for v in state.values() if v == "bad"),
+        "n_rebox": sum(1 for v in state.values() if v == "rebox"),
+        "exported_at": _time_cls.strftime(
+            "%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime()),
+        "entries": entries,
+    })
+
+
+@app.get("/api/exemplars_export")
+def api_exemplars_export_all():
+    """Full manifest: every class with at least one ✓ exemplar."""
+    out: dict = {"by_class": {}, "total_exemplars": 0,
+                 "exported_at": _time_cls.strftime(
+                     "%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())}
+    for cls in _all_known_classes():
+        state = _exemplar_state(cls)
+        ex_keys = [k for k, v in state.items() if v == "exemplar"]
+        if not ex_keys:
+            continue
+        out["by_class"][cls] = {
+            "n_exemplars": len(ex_keys),
+            "entries": [_exemplar_export_entry(cls, k) for k in ex_keys],
+        }
+        out["total_exemplars"] += len(ex_keys)
+    out["n_classes_with_exemplars"] = len(out["by_class"])
+    return JSONResponse(out)
+
+
 # ---------------------------------------------------------------- /classes
 def _all_known_classes() -> _List_cls[str]:
     """Union of CANONICAL_12 + bank folders + registry slugs' class_names.
@@ -1645,6 +1736,56 @@ def _class_image_pool(cls: str) -> _List_cls[dict]:
     # 3) registry-tracked real datasets (sp8, holdout, future harvests)
     pool.extend(_reg_pool_for_class(cls))
     return pool
+
+
+# ---- topic classification: organize 348 classes into navigable groups ----
+_WEED_KEYWORDS = (
+    "weed", "grass", "purslane", "amaranth", "morningglory", "ragweed",
+    "sicklepod", "spurge", "nutsedge", "lantana", "parthenium", "carpetweed",
+    "crabgrass", "goosegrass", "eclipta", "sida", "siamweed", "snakeweed",
+    "pigweed", "smartweed", "chickweed", "fathen", "mayweed", "shepherd",
+    "cranesbill", "knotweed", "silkybent", "blackgrass", "cleavers",
+    "charlock", "kochia", "buttercup", "thistle", "nightshade",
+)
+_DISEASE_KEYWORDS = (
+    "blight", "rot", "mildew", "rust", "spot", "scab", "virus", "mosaic",
+    "healthy", "disease", "bacterial", "septoria", "anthrac", "canker",
+    "yellow", "scald", "smut", "hispa", "blast", "esca", "powdery",
+    "leafminer", "monilia", "phytoph", "fusarium",
+)
+_PEST_KEYWORDS = (
+    "ant", "bee", "beetle", "caterpillar", "earthworm", "earwig",
+    "grasshopper", "moth", "slug", "snail", "wasp", "weevil", "aphid",
+    "thrip", "armyworm", "borer", "looper", "fly", "mite", "bug",
+    "insect", "pest",
+)
+_CROP_KEYWORDS = (
+    "apple", "tomato", "potato", "pepper", "corn", "maize", "rice",
+    "wheat", "grape", "peach", "cherry", "strawberry", "cassava",
+    "guava", "coconut", "lemon", "banana", "olive", "cucumber",
+    "almond", "cardamom", "chilli", "clove", "tobacco", "coffee",
+    "aloevera", "ginger", "galangal", "curcuma", "eggplant", "bilimbi",
+    "cantaloupe", "papaya", "mango", "soybean", "cotton", "sugarcane",
+    "groundnut", "bellpepper", "watermelon", "pineapple", "carrot",
+)
+
+
+def _class_topic(cls: str) -> str:
+    """Categorize a class name for UI filtering."""
+    if cls in _CWD12:
+        return "cwd12"
+    cl = cls.lower()
+    # WEED first — many disease/crop names also contain crop substrings, but
+    # weed indicators are more specific to the laser-robot research goal.
+    if any(k in cl for k in _WEED_KEYWORDS):
+        return "weed"
+    if any(k in cl for k in _DISEASE_KEYWORDS):
+        return "disease"
+    if any(k in cl for k in _PEST_KEYWORDS):
+        return "pest"
+    if any(k in cl for k in _CROP_KEYWORDS):
+        return "crop"
+    return "other"
 
 
 def _class_summary_landing(cls: str) -> dict:
@@ -1782,6 +1923,8 @@ _CLASSES_CSS = """
 @app.get("/classes", response_class=HTMLResponse)
 def classes_landing():
     rows = []
+    topic_counts: dict = {"all": 0, "cwd12": 0, "weed": 0, "disease": 0,
+                          "pest": 0, "crop": 0, "other": 0}
     for cls in _all_known_classes():
         summary = _class_summary_landing(cls)
         state = _exemplar_state(cls)
@@ -1794,14 +1937,18 @@ def classes_landing():
         n_bad = sum(1 for v in state.values() if v == "bad")
         zh = _CWD12_ZH.get(cls, "")
         thumb_url = summary["first_thumb"]
+        topic = _class_topic(cls)
+        topic_counts["all"] += 1
+        topic_counts[topic] = topic_counts.get(topic, 0) + 1
         rows.append((cls, zh, n_total_est, n_bank, n_flux,
-                     n_reg_slugs, n_reg_est, n_ex, n_bad, thumb_url))
+                     n_reg_slugs, n_reg_est, n_ex, n_bad, thumb_url, topic))
 
     cards = "".join(
         f'''
-        <a class="class-card" href="/classes/{cls}">
+        <a class="class-card" href="/classes/{cls}" data-topic="{topic}" data-name="{cls.lower()}">
           <img src="{thumb}" loading="lazy" alt="{cls}"/>
           <div class="name">{cls}
+            <span class="topic-tag tag-{topic}">{topic}</span>
             {(f'<span class="badge exemplar">✓ {n_ex}</span>' if n_ex else '')}
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
@@ -1809,7 +1956,24 @@ def classes_landing():
           <div class="counts">bank {n_bank} · flux {n_flux} · real ≤{n_reg_est} ({n_reg_slugs} slugs)</div>
           <div class="counts">已审 {n_ex+n_bad}</div>
         </a>'''
-        for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb in rows
+        for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb, topic in rows
+    )
+
+    # Build filter bar + search input
+    tab_def = [
+        ("cwd12", "🌟 CWD12", "primary 12 species (real bbox in sp8+holdout)"),
+        ("weed",  "🌱 Other weeds", "Lantana, Parthenium, weeds/grasses, etc."),
+        ("disease", "🦠 Disease", "leaf disease classes from PlantVillage etc."),
+        ("pest", "🐛 Pest", "insect/pest species"),
+        ("crop", "🌾 Crop", "crop / produce classes"),
+        ("other", "❓ Other", "everything else"),
+        ("all",  "📋 All", "no filter"),
+    ]
+    tab_html = "".join(
+        f'<button class="filter-tab{(" on" if k=="all" else "")}" '
+        f'data-topic="{k}" title="{desc}">{label} '
+        f'<span class="tab-count">{topic_counts.get(k,0)}</span></button>'
+        for k, label, desc in tab_def
     )
 
     # ----- metadata-gap surface: slugs with local data but no class_names -----
@@ -1832,6 +1996,33 @@ def classes_landing():
   .help {{ background: #fffbe6; border-left: 3px solid #f59e0b;
           padding: 8px 12px; border-radius: 5px; font-size: 13px;
           margin: 10px 0; }}
+  .filter-bar {{ background: #fff; padding: 12px 16px; border-radius: 10px;
+                margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }}
+  .filter-tab {{ background: #f4f4f7; border: 1px solid #ddd;
+                padding: 6px 14px; border-radius: 20px; cursor: pointer;
+                font-size: 13px; transition: all 0.1s; }}
+  .filter-tab:hover {{ background: #e8e8ec; }}
+  .filter-tab.on {{ background: #06c; color: #fff; border-color: #06c; }}
+  .filter-tab .tab-count {{ background: rgba(0,0,0,0.1); padding: 1px 7px;
+                            border-radius: 10px; margin-left: 4px;
+                            font-size: 11px; font-family: ui-monospace, monospace; }}
+  .filter-tab.on .tab-count {{ background: rgba(255,255,255,0.25); }}
+  .filter-search {{ flex: 1; min-width: 160px; max-width: 280px;
+                    padding: 7px 12px; border: 1px solid #ddd; border-radius: 16px;
+                    font-size: 13px; outline: none; margin-left: auto; }}
+  .filter-search:focus {{ border-color: #06c; }}
+  .filter-empty-note {{ width: 100%; color: #888; font-size: 12px;
+                        padding: 30px; text-align: center; display: none; }}
+  .topic-tag {{ display: inline-block; padding: 1px 6px; border-radius: 3px;
+               font-size: 10px; font-weight: 600; margin-left: 4px;
+               vertical-align: middle; opacity: 0.8; }}
+  .tag-cwd12   {{ background: #fde68a; color: #92400e; }}
+  .tag-weed    {{ background: #bbf7d0; color: #065f46; }}
+  .tag-disease {{ background: #fecaca; color: #991b1b; }}
+  .tag-pest    {{ background: #ddd6fe; color: #5b21b6; }}
+  .tag-crop    {{ background: #c7d2fe; color: #3730a3; }}
+  .tag-other   {{ background: #e5e7eb; color: #4b5563; }}
 </style>
 </head><body>
 <header>
@@ -1841,12 +2032,74 @@ def classes_landing():
     通过的图自动加入该类"榜样集",作为 LoRA / curator / 训练的可信源。
     · <a href="/audit">← 旧 /audit 视图</a>
     · <a href="/">dashboard 首页</a>
+    · <a href="/api/exemplars_export">📥 导出榜样集</a>
   </div>
 </header>
 {banner}
+<div class="filter-bar" id="filter-bar">
+  {tab_html}
+  <input class="filter-search" id="filter-search" type="search"
+         placeholder="🔎 类名搜索 (e.g. Goose, weed, tomato)" autocomplete="off"/>
+</div>
 <section>
-  <div class="grid-classes">{cards}</div>
+  <div class="grid-classes" id="grid-classes">{cards}</div>
+  <div class="filter-empty-note" id="filter-empty">没有匹配的类。</div>
 </section>
+<script>
+const tabs = document.querySelectorAll('.filter-tab');
+const search = document.getElementById('filter-search');
+const cards = document.querySelectorAll('.class-card');
+const empty = document.getElementById('filter-empty');
+let currentTopic = 'all';
+let currentQuery = '';
+
+function applyFilter() {{
+  let nShown = 0;
+  cards.forEach(c => {{
+    const topic = c.dataset.topic;
+    const name = c.dataset.name || '';
+    const topicOk = (currentTopic === 'all') || (topic === currentTopic);
+    const queryOk = !currentQuery || name.includes(currentQuery);
+    const ok = topicOk && queryOk;
+    c.style.display = ok ? '' : 'none';
+    if (ok) nShown++;
+  }});
+  empty.style.display = nShown === 0 ? 'block' : 'none';
+}}
+
+tabs.forEach(t => t.addEventListener('click', () => {{
+  tabs.forEach(x => x.classList.remove('on'));
+  t.classList.add('on');
+  currentTopic = t.dataset.topic;
+  applyFilter();
+}}));
+search.addEventListener('input', e => {{
+  currentQuery = e.target.value.toLowerCase().trim();
+  applyFilter();
+}});
+
+// Preserve filter state via URL hash so refresh keeps view
+function hashState() {{
+  const params = new URLSearchParams();
+  if (currentTopic !== 'all') params.set('t', currentTopic);
+  if (currentQuery) params.set('q', currentQuery);
+  history.replaceState(null, '', '#' + params.toString());
+}}
+const obs = new MutationObserver(hashState);
+[document].forEach(d => d.addEventListener('input', hashState));
+tabs.forEach(t => t.addEventListener('click', hashState));
+
+// Restore state from URL
+const initParams = new URLSearchParams(window.location.hash.slice(1));
+if (initParams.get('t')) {{
+  const tab = document.querySelector(`.filter-tab[data-topic="${{initParams.get('t')}}"]`);
+  if (tab) tab.click();
+}}
+if (initParams.get('q')) {{
+  search.value = initParams.get('q');
+  search.dispatchEvent(new Event('input'));
+}}
+</script>
 </body></html>'''
     return HTMLResponse(html)
 

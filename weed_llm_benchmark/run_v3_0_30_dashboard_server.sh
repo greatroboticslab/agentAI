@@ -73,12 +73,22 @@ if [ -x /ocean/projects/cis240145p/byler/harry/bin/cloudflared ]; then
     nohup /ocean/projects/cis240145p/byler/harry/bin/cloudflared tunnel --no-autoupdate \
         --url http://127.0.0.1:8080 > "$LOG_TUNNEL" 2>&1 &
     CF_PID=$!
-    # cloudflared prints "https://....trycloudflare.com" on stderr
+    # cloudflared prints "https://....trycloudflare.com" on stderr.
+    # IMPORTANT: filter out api.trycloudflare.com — that's Cloudflare's own
+    # API endpoint, which appears in error messages when the tunnel HTTP POST
+    # times out. Without this filter, a failed tunnel silently publishes
+    # api.trycloudflare.com to GitHub Pages and the dashboard 404s.
     for i in $(seq 1 30); do
-        URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG_TUNNEL" | head -1)
+        URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG_TUNNEL" \
+              | grep -v '//api\.' | head -1)
         if [ -n "$URL" ]; then
             TUNNEL_URL="$URL"
             echo "[tunnel] cloudflared URL: $TUNNEL_URL"
+            break
+        fi
+        # also detect explicit cloudflared failure to skip waiting
+        if grep -q 'failed to request quick Tunnel\|context deadline exceeded' "$LOG_TUNNEL" 2>/dev/null; then
+            echo "[tunnel] cloudflared upstream API failed; falling back"
             break
         fi
         sleep 1
