@@ -1647,6 +1647,51 @@ def _class_image_pool(cls: str) -> _List_cls[dict]:
     return pool
 
 
+def _class_summary_landing(cls: str) -> dict:
+    """Lightweight per-class summary for /classes landing — does NOT walk
+    registry labels. Cheap enough that listing 50+ classes is sub-second.
+    Returns {n_bank, n_flux, n_reg_est, n_reg_slugs, first_thumb}."""
+    out = {"n_bank": 0, "n_flux": 0, "n_reg_est": 0, "n_reg_slugs": 0,
+           "first_thumb": ""}
+    # bank — cheap iterdir
+    bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls
+    if bd.is_dir():
+        try:
+            imgs = [p for p in sorted(bd.iterdir())
+                    if p.suffix.lower() in (".png", ".jpg", ".jpeg")]
+            out["n_bank"] = len(imgs)
+            if imgs:
+                out["first_thumb"] = f"/thumb/bank/{cls}/{imgs[0].name}?w=256"
+        except Exception:
+            pass
+    # flux — small (60-100 imgs total), walk is fine
+    if cls in _CWD12:
+        cid = _CWD12.index(cls)
+        ld = REPO / "results" / "framework" / "synth_diffusion" / "labels"
+        if ld.is_dir():
+            n = 0
+            first_flux = ""
+            for lbl in sorted(ld.glob("*.txt")):
+                try:
+                    for line in lbl.read_text().splitlines():
+                        p = line.split()
+                        if p and p[0].isdigit() and int(p[0]) == cid:
+                            n += 1
+                            if not first_flux:
+                                first_flux = lbl.stem + ".jpg"
+                            break
+                except Exception:
+                    pass
+            out["n_flux"] = n
+            if not out["first_thumb"] and first_flux:
+                out["first_thumb"] = f"/thumb/flux/{cls}/{first_flux}?w=256"
+    # reg — DO NOT walk labels. Use cap × #slugs as estimate.
+    slugs = _load_registry_index().get(cls, [])
+    out["n_reg_slugs"] = len(slugs)
+    out["n_reg_est"] = 200 * len(slugs)  # upper-bound (cap is 200/slug)
+    return out
+
+
 def _pool_entry_urls(entry: dict, cls: str) -> tuple:
     """Return (exemplar_key, thumb_url, raw_url, src_tag) for a pool entry dict."""
     kind = entry["kind"]
@@ -1738,23 +1783,19 @@ _CLASSES_CSS = """
 def classes_landing():
     rows = []
     for cls in _all_known_classes():
-        pool = _class_image_pool(cls)
+        summary = _class_summary_landing(cls)
         state = _exemplar_state(cls)
-        n_total = len(pool)
-        # source breakdown
-        n_bank = sum(1 for e in pool if e["kind"] == "bank")
-        n_flux = sum(1 for e in pool if e["kind"] == "flux")
-        n_reg  = sum(1 for e in pool if e["kind"] == "reg")
+        n_bank = summary["n_bank"]
+        n_flux = summary["n_flux"]
+        n_reg_slugs = summary["n_reg_slugs"]
+        n_reg_est = summary["n_reg_est"]
+        n_total_est = n_bank + n_flux + n_reg_est
         n_ex = sum(1 for v in state.values() if v == "exemplar")
         n_bad = sum(1 for v in state.values() if v == "bad")
         zh = _CWD12_ZH.get(cls, "")
-        thumb_url = ""
-        for entry in pool:
-            _, t, _, _ = _pool_entry_urls(entry, cls)
-            thumb_url = t
-            break
-        rows.append((cls, zh, n_total, n_bank, n_flux, n_reg,
-                     n_ex, n_bad, thumb_url))
+        thumb_url = summary["first_thumb"]
+        rows.append((cls, zh, n_total_est, n_bank, n_flux,
+                     n_reg_slugs, n_reg_est, n_ex, n_bad, thumb_url))
 
     cards = "".join(
         f'''
@@ -1765,10 +1806,10 @@ def classes_landing():
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
           <div class="zh">{zh}</div>
-          <div class="counts">total {n_total} · bank {n_bank} · flux {n_flux} · real {n_reg}</div>
-          <div class="counts">已审 {n_ex+n_bad}/{n_total}</div>
+          <div class="counts">bank {n_bank} · flux {n_flux} · real ≤{n_reg_est} ({n_reg_slugs} slugs)</div>
+          <div class="counts">已审 {n_ex+n_bad}</div>
         </a>'''
-        for cls, zh, n_total, n_bank, n_flux, n_reg, n_ex, n_bad, thumb in rows
+        for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb in rows
     )
 
     # ----- metadata-gap surface: slugs with local data but no class_names -----
@@ -1820,11 +1861,15 @@ def classes_detail(cls: str):
     state = _exemplar_state(cls)
     zh = _CWD12_ZH.get(cls, "")
 
-    # sidebar of all classes
+    # sidebar of all classes — uses cheap estimate (don't walk labels per class)
     sidebar_rows = []
     for c in _all_known_classes():
         st = _exemplar_state(c) if c != cls else state
-        n_total = len(_class_image_pool(c)) if c != cls else len(pool)
+        if c == cls:
+            n_total = len(pool)
+        else:
+            sm = _class_summary_landing(c)
+            n_total = sm["n_bank"] + sm["n_flux"] + sm["n_reg_est"]
         n_ex = sum(1 for v in st.values() if v == "exemplar")
         cls_attr = ' class="active"' if c == cls else ""
         sidebar_rows.append(
