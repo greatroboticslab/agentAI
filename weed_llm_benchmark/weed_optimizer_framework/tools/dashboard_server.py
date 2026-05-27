@@ -2684,6 +2684,31 @@ def _class_topic(cls: str) -> str:
     return "other"
 
 
+_registry_parse_cache = {"mtime": 0.0, "data": None}
+
+
+def _get_cached_registry() -> dict:
+    """Module-level cached parse of dataset_registry.json (52MB).
+    mtime-invalidated. Use instead of opening + json.load every call —
+    355× per /classes render was timing out the cloudflare tunnel."""
+    if not REGISTRY_PATH.exists():
+        return {}
+    try:
+        mt = REGISTRY_PATH.stat().st_mtime
+    except Exception:
+        return _registry_parse_cache["data"] or {}
+    if _registry_parse_cache["mtime"] == mt and _registry_parse_cache["data"]:
+        return _registry_parse_cache["data"]
+    try:
+        with open(REGISTRY_PATH) as f:
+            data = _json.load(f)
+        _registry_parse_cache["mtime"] = mt
+        _registry_parse_cache["data"] = data
+        return data
+    except Exception:
+        return _registry_parse_cache["data"] or {}
+
+
 def _inline_thumb_data_uri(src_path: Path, w: int = 200) -> str:
     """Read an image from disk, scale to w pixels max, return data: URI.
     Falls back to '' if anything fails. Used for /classes landing cards so
@@ -2757,19 +2782,20 @@ def _class_summary_landing(cls: str) -> dict:
 
     # v3.0.43.14: mark classes whose source slug was downloaded in the last
     # 24h with a 'new today' flag — surface tonight's data on /classes.
+    # v3.0.43.17 PERF FIX: registry is 52MB. Use module-level cached parse
+    # instead of reloading 355× per /classes render (which timed out the
+    # Cloudflare tunnel at 100s+).
     out["is_new_today"] = False
     if slugs:
         try:
-            with open(REGISTRY_PATH) as f:
-                _reg_for_age = _json.load(f)
+            reg_cached = _get_cached_registry()
             now = time.time()
             for sg_tuple in slugs:
                 slug = sg_tuple[0]
-                info = (_reg_for_age.get("datasets") or {}).get(slug) or {}
+                info = (reg_cached.get("datasets") or {}).get(slug) or {}
                 dl_at = info.get("downloaded_at")
                 if not dl_at: continue
                 try:
-                    # parse ISO timestamp like '2026-05-27T05:30:42'
                     from datetime import datetime as _dt
                     t = _dt.fromisoformat(dl_at.replace("Z", "+00:00")).timestamp()
                     if (now - t) < 24 * 3600:
@@ -2812,8 +2838,7 @@ def _class_summary_landing(cls: str) -> dict:
         else:
             # Cache miss — do the search (max 1 slug, no rglob) and persist
             try:
-                with open(REGISTRY_PATH) as f:
-                    reg = _json.load(f)
+                reg = _get_cached_registry()
                 # Only the FIRST slug, not 3 — speed > exhaustive search
                 for slug_tuple in slugs[:1]:
                     slug = slug_tuple[0]
