@@ -651,6 +651,41 @@ class DatasetDiscovery:
                 update_dict["class_names_source"] = class_names_source
                 update_dict["class_names_backfilled_at"] = int(__import__("time").time())
             self.registry["datasets"][name].update(update_dict)
+
+            # v3.0.43.3: auto-classify each new class_name into a topic
+            # (weed/disease/pest/crop/other) via Brain LLM + keyword hybrid.
+            # Persists to class_topic_overrides.json so /classes UI groups
+            # new species correctly the moment harvest finishes.
+            if extracted_class_names:
+                try:
+                    from .topic_classifier import classify_batch
+                    from .class_topic_store import load_overrides
+                    existing = load_overrides()
+                    new_classes = [c for c in extracted_class_names if c not in existing]
+                    if new_classes:
+                        results = classify_batch(
+                            new_classes, use_llm=True, persist=True,
+                        )
+                        # Summary log for audit
+                        by_source = {}
+                        by_topic = {}
+                        for r in results:
+                            by_source[r["source"]] = by_source.get(r["source"], 0) + 1
+                            t = r.get("topic", "?")
+                            by_topic[t] = by_topic.get(t, 0) + 1
+                        logger.info(
+                            f"[Dataset] {name}: auto-classified {len(results)} new "
+                            f"class topics — by_source={by_source} by_topic={by_topic}"
+                        )
+                    else:
+                        logger.info(
+                            f"[Dataset] {name}: all {len(extracted_class_names)} "
+                            f"classes already have topic overrides — skip LLM"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"[Dataset] {name}: topic auto-classify failed (continuing): {e}"
+                    )
             self.registry["total_downloaded"] = sum(
                 d.get("local_images", 0) for d in self.registry["datasets"].values()
             )

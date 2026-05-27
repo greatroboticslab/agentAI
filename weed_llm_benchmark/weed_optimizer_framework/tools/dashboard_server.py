@@ -2036,57 +2036,26 @@ _CROP_KEYWORDS = (
 )
 
 
-# v3.0.43.2: persistent topic overrides — written by Brain agent (LLM-classified
-# new species) AND user (UI corrections). Takes precedence over keyword heuristic.
-# Three-layer fallback chain:
-#   1. _class_topic_overrides.json (Brain + user)
+# v3.0.43.2: persistent topic overrides — Brain agent (LLM-classified new
+# species during harvest) + user (UI corrections). Takes precedence over
+# keyword heuristic. Three-layer fallback chain:
+#   1. class_topic_overrides.json (Brain + user)
 #   2. keyword heuristic (this file)
 #   3. 'other'
+# v3.0.43.3: store moved to a shared module so dataset_discovery can write
+# without duplicating IO logic.
 _CLASS_TOPIC_OVERRIDES_FILE = REPO / "results" / "framework" / "class_topic_overrides.json"
-_topic_override_cache = {"mtime": 0.0, "data": {}}
-
-
-def _load_topic_overrides() -> dict:
-    """Load class→topic override map. Cached by mtime."""
-    if not _CLASS_TOPIC_OVERRIDES_FILE.exists():
-        return {}
-    try:
-        mt = _CLASS_TOPIC_OVERRIDES_FILE.stat().st_mtime
-    except Exception:
-        return {}
-    if _topic_override_cache["mtime"] == mt:
-        return _topic_override_cache["data"]
-    try:
-        with open(_CLASS_TOPIC_OVERRIDES_FILE) as f:
-            data = json.load(f) or {}
-    except Exception:
-        return _topic_override_cache["data"]
-    _topic_override_cache["mtime"] = mt
-    _topic_override_cache["data"] = data
-    return data
+# Make the env var visible to class_topic_store before we import it.
+os.environ.setdefault("CLASS_TOPIC_OVERRIDES_FILE", str(_CLASS_TOPIC_OVERRIDES_FILE))
+from .class_topic_store import (
+    load_overrides as _load_topic_overrides,
+    save_override as _save_override_raw,
+)
 
 
 def _save_topic_override(cls: str, topic: str) -> bool:
-    """Persist a single class→topic override. Returns True if written."""
-    if topic not in ("cwd12", "weed", "disease", "pest", "crop", "other"):
-        return False
-    data = dict(_load_topic_overrides())  # snapshot
-    if topic == "_clear_":
-        data.pop(cls, None)
-    else:
-        data[cls] = topic
-    try:
-        _CLASS_TOPIC_OVERRIDES_FILE.parent.mkdir(parents=True, exist_ok=True)
-        tmp = _CLASS_TOPIC_OVERRIDES_FILE.with_suffix(".tmp")
-        with open(tmp, "w") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp, _CLASS_TOPIC_OVERRIDES_FILE)
-        # bump cache so next read sees the change
-        _topic_override_cache["mtime"] = 0.0
-        return True
-    except Exception as e:
-        log.warning(f"topic override save fail: {e}")
-        return False
+    """Backwards-compatible thin wrapper around class_topic_store.save_override."""
+    return _save_override_raw(cls, topic)
 
 
 def _class_topic(cls: str) -> str:
