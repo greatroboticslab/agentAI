@@ -2096,6 +2096,107 @@ _CLUSTER_ACTIONS = {
 }
 
 
+@app.get("/api/job_log/{jobid}")
+def api_job_log(jobid: str, tail: int = 200):
+    """Return the last `tail` lines of the SLURM output file for jobid.
+
+    SLURM writes to results/framework/<name>_<jobid>.out (with SBATCH --output).
+    We glob for *_{jobid}.out to find the file regardless of name."""
+    if not _re_cls.match(r'^[0-9_]+$', jobid):
+        raise HTTPException(400, "bad jobid chars")
+    if not 1 <= tail <= 2000:
+        tail = 200
+
+    # Search standard locations
+    candidates = []
+    search_dirs = [
+        REPO / "results" / "framework",
+        REPO / "results",
+        REPO / "logs",
+    ]
+    for d in search_dirs:
+        if d.is_dir():
+            candidates.extend(d.glob(f"*_{jobid}.out"))
+            candidates.extend(d.glob(f"*_{jobid}.log"))
+            candidates.extend(d.glob(f"*{jobid}*.out"))
+
+    # De-dup + sort by mtime
+    seen: set = set()
+    files: list = []
+    for p in candidates:
+        rp = str(p.resolve())
+        if rp in seen: continue
+        seen.add(rp)
+        files.append(p)
+    files.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
+
+    if not files:
+        return JSONResponse({
+            "ok": False, "jobid": jobid,
+            "msg": f"no output file found for job {jobid} in standard locations",
+            "searched": [str(d) for d in search_dirs],
+        }, status_code=404)
+
+    main = files[0]
+    try:
+        size = main.stat().st_size
+        # Efficient tail read for large files: seek to end, read last ~64KB
+        max_bytes = min(size, 256 * 1024)  # cap at 256KB
+        with open(main, "rb") as f:
+            f.seek(max(0, size - max_bytes))
+            data = f.read().decode("utf-8", errors="replace")
+        # If we truncated, prepend marker
+        lines = data.splitlines()
+        if size > max_bytes:
+            lines = ["… (file truncated, showing last %d bytes) …" % max_bytes] + lines
+        if len(lines) > tail:
+            lines = lines[-tail:]
+    except Exception as e:
+        raise HTTPException(500, f"read fail: {e}")
+
+    return JSONResponse({
+        "ok": True, "jobid": jobid,
+        "file": str(main),
+        "file_size_bytes": size,
+        "mtime": main.stat().st_mtime,
+        "lines_returned": len(lines),
+        "tail_requested": tail,
+        "content": "\n".join(lines),
+        "other_files": [str(f) for f in files[1:6]],  # show up to 5 alternates
+    })
+
+
+@app.get("/api/recent_jobs")
+def api_recent_jobs(n: int = 20):
+    """List the N most recent job .out files (by mtime). Useful for the
+    /control 'old jobs' picker — view logs from already-finished jobs."""
+    if not 1 <= n <= 100:
+        n = 20
+    pat_dir = REPO / "results" / "framework"
+    if not pat_dir.is_dir():
+        return JSONResponse({"jobs": []})
+    files = sorted(pat_dir.glob("*.out"),
+                    key=lambda p: p.stat().st_mtime, reverse=True)[:n]
+    import re as _re
+    out = []
+    for f in files:
+        m = _re.search(r"_(\d+)\.out$", f.name)
+        if not m: continue
+        jid = m.group(1)
+        name_part = f.name[: m.start()].rstrip("_")
+        try:
+            mt = f.stat().st_mtime
+            sz = f.stat().st_size
+        except Exception:
+            continue
+        out.append({
+            "jobid": jid, "name": name_part,
+            "size": sz, "mtime": mt,
+            "mtime_h": time.strftime("%m-%d %H:%M", time.localtime(mt)),
+        })
+    return JSONResponse({"jobs": out})
+
+
 @app.get("/api/cluster_actions")
 def api_cluster_actions_list():
     """List allowed actions for the /control UI."""
@@ -2546,6 +2647,40 @@ def control_page():
              border-radius: 5px; max-height: 200px; overflow-y: auto;
              white-space: pre-wrap; }
   .refresh-info { font-size: 11px; color: #999; margin-top: 6px; }
+  .log-btn { background: #06c; color: #fff; border: none;
+             padding: 3px 9px; border-radius: 3px; font-size: 11px;
+             cursor: pointer; }
+  .log-btn:hover { background: #048; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+              display: none; align-items: center; justify-content: center;
+              z-index: 100; }
+  .modal-bg.show { display: flex; }
+  .modal-box { background: #1a1a1d; color: #d4d4d4;
+               width: min(95vw, 1100px); height: min(85vh, 700px);
+               border-radius: 8px; display: flex; flex-direction: column;
+               box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  .modal-head { padding: 10px 16px; background: #2a2a2d;
+                border-radius: 8px 8px 0 0; color: #fff;
+                font-family: ui-monospace, monospace; font-size: 12px;
+                display: flex; align-items: center; gap: 10px; }
+  .modal-head .title { flex: 1; }
+  .modal-head .close-btn { background: #c00; color: #fff; border: none;
+                            padding: 4px 12px; border-radius: 3px;
+                            cursor: pointer; font-size: 12px; }
+  .modal-head .auto-poll { color: #4f4; font-size: 11px; }
+  .modal-body { flex: 1; overflow-y: auto; padding: 10px 16px;
+                font-family: ui-monospace, monospace; font-size: 11px;
+                white-space: pre-wrap; word-break: break-all;
+                background: #1a1a1d; color: #d4d4d4; }
+  .recent-jobs { display: grid;
+                 grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                 gap: 6px; }
+  .recent-job { background: #fafafa; padding: 7px 10px; border-radius: 5px;
+                font-size: 12px; cursor: pointer; transition: all 0.1s;
+                border-left: 3px solid #06c; }
+  .recent-job:hover { background: #e8f1ff; }
+  .recent-job .n { font-family: ui-monospace, monospace; color: #06c; }
+  .recent-job .t { color: #888; font-size: 10px; }
 </style>
 </head><body>
 <h1>🎛️ Cluster Control Panel</h1>
@@ -2568,15 +2703,32 @@ def control_page():
 <div class="section">
   <h3>📋 SLURM queue (squeue)</h3>
   <table id="jobs-table">
-    <thead><tr><th>jobid</th><th>name</th><th>state</th><th>time</th><th>cpus</th><th>mem</th><th>reason</th></tr></thead>
-    <tbody><tr><td colspan="7" style="color:#999;text-align:center">loading…</td></tr></tbody>
+    <thead><tr><th>jobid</th><th>name</th><th>state</th><th>time</th><th>cpus</th><th>mem</th><th>reason</th><th>log</th></tr></thead>
+    <tbody><tr><td colspan="8" style="color:#999;text-align:center">loading…</td></tr></tbody>
   </table>
   <div class="refresh-info" id="last-refresh"></div>
 </div>
 
 <div class="section">
+  <h3>📁 recent .out files (clickable — view log)</h3>
+  <div class="recent-jobs" id="recent-jobs"><div style="color:#999">loading…</div></div>
+</div>
+
+<div class="section">
   <h3>📜 latest action output</h3>
   <pre class="log-out" id="action-log">(no action yet)</pre>
+</div>
+
+<!-- Log viewer modal -->
+<div class="modal-bg" id="log-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="title" id="log-modal-title">job log</div>
+      <span class="auto-poll" id="log-modal-status">●</span>
+      <button class="close-btn" onclick="closeLog()">✗ close (esc)</button>
+    </div>
+    <div class="modal-body" id="log-modal-body">loading…</div>
+  </div>
 </div>
 
 <script>
@@ -2638,7 +2790,7 @@ function renderStats(d) {
 function renderJobs(jobs) {
   const tbody = document.querySelector('#jobs-table tbody');
   if (!jobs.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:#999">no jobs</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="color:#999">no jobs</td></tr>';
     return;
   }
   tbody.innerHTML = jobs.map(j =>
@@ -2650,9 +2802,100 @@ function renderJobs(jobs) {
       <td class="mono">${j.cpus||'?'}</td>
       <td class="mono">${j.mem||'?'}</td>
       <td class="mono" style="color:#888">${j.reason}</td>
+      <td><button class="log-btn" onclick="openLog('${j.jobid}','${j.name}')">📜 log</button></td>
     </tr>`
   ).join('');
 }
+
+async function loadRecentJobs() {
+  try {
+    const r = await fetch('/api/recent_jobs?n=15');
+    const d = await r.json();
+    const jobs = d.jobs || [];
+    if (!jobs.length) {
+      document.getElementById('recent-jobs').innerHTML =
+        '<div style="color:#999">no recent jobs</div>';
+      return;
+    }
+    const html = jobs.map(j =>
+      `<div class="recent-job" onclick="openLog('${j.jobid}','${j.name}')">
+         <div class="n">${j.jobid} · ${j.name}</div>
+         <div class="t">${j.mtime_h} · ${(j.size/1024).toFixed(1)}KB</div>
+       </div>`
+    ).join('');
+    document.getElementById('recent-jobs').innerHTML = html;
+  } catch (e) {
+    document.getElementById('recent-jobs').innerHTML =
+      '<div style="color:#c00">recent jobs load fail: ' + e + '</div>';
+  }
+}
+
+// ============ Log viewer modal ============
+let _logPollTimer = null;
+let _logCurrentJob = null;
+
+async function openLog(jobid, name) {
+  _logCurrentJob = {jobid, name};
+  document.getElementById('log-modal-title').textContent = `${jobid} · ${name||'?'}`;
+  document.getElementById('log-modal-body').textContent = 'loading…';
+  document.getElementById('log-modal').classList.add('show');
+  await refreshLog();
+  if (_logPollTimer) clearInterval(_logPollTimer);
+  _logPollTimer = setInterval(refreshLog, 3000);
+}
+
+async function refreshLog() {
+  if (!_logCurrentJob) return;
+  const {jobid} = _logCurrentJob;
+  const status = document.getElementById('log-modal-status');
+  const body = document.getElementById('log-modal-body');
+  status.style.color = '#ff4';
+  status.textContent = '⟳ fetching…';
+  try {
+    const r = await fetch(`/api/job_log/${jobid}?tail=500`);
+    if (!r.ok) {
+      const err = await r.json().catch(()=>({msg:r.statusText}));
+      body.textContent = `HTTP ${r.status}: ${err.msg || err.detail || ''}`;
+      status.style.color = '#f44';
+      status.textContent = '✗ error';
+      return;
+    }
+    const d = await r.json();
+    // Set scroll to bottom after content updates (tail-follow)
+    const wasNearBottom = (body.scrollTop + body.clientHeight + 50)
+                          >= body.scrollHeight;
+    const header = `# file: ${d.file}\n# size: ${(d.file_size_bytes/1024).toFixed(1)}KB  `
+                   + `lines: ${d.lines_returned}/${d.tail_requested}  `
+                   + `mtime: ${new Date(d.mtime*1000).toLocaleTimeString()}\n`
+                   + `# (auto-refresh 3s — close to stop)\n${'─'.repeat(80)}\n`;
+    body.textContent = header + d.content;
+    if (wasNearBottom) body.scrollTop = body.scrollHeight;
+    status.style.color = '#4f4';
+    status.textContent = `● live · ${new Date().toLocaleTimeString()}`;
+  } catch (e) {
+    body.textContent = 'fetch error: ' + e;
+    status.style.color = '#f44';
+    status.textContent = '✗ error';
+  }
+}
+
+function closeLog() {
+  document.getElementById('log-modal').classList.remove('show');
+  if (_logPollTimer) {
+    clearInterval(_logPollTimer);
+    _logPollTimer = null;
+  }
+  _logCurrentJob = null;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLog();
+});
+
+// Close modal when clicking outside the box
+document.getElementById('log-modal').addEventListener('click', e => {
+  if (e.target.id === 'log-modal') closeLog();
+});
 
 async function loadActions() {
   try {
@@ -2691,8 +2934,10 @@ async function trigger(action) {
 }
 
 loadActions();
+loadRecentJobs();
 poll();
 setInterval(poll, 5000);
+setInterval(loadRecentJobs, 30000);  // recent jobs change slowly
 </script>
 </body></html>''')
 
