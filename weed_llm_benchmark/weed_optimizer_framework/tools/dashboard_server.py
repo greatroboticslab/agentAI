@@ -463,12 +463,62 @@ def root():
   .section-h { color: #555; font-size: 13px; text-transform: uppercase;
                letter-spacing: 0.5px; margin: 18px 0 8px 0; }
   .footer { color: #999; font-size: 12px; margin-top: 30px; text-align: center; }
+  .live-banner { background: linear-gradient(90deg, #2a7 0%, #28a 100%);
+                 color: #fff; padding: 10px 16px; border-radius: 8px;
+                 margin-bottom: 14px; font-size: 13px;
+                 display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .live-banner.idle { background: linear-gradient(90deg, #888 0%, #aaa 100%); }
+  .live-banner .pulse { width: 8px; height: 8px; background: #fff;
+                        border-radius: 50%; animation: pulse 1.5s infinite; }
+  .live-banner.idle .pulse { animation: none; opacity: 0.5; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .live-banner a { color: #fff; text-decoration: underline; font-weight: 600; }
 </style>
 </head><body>
 <h1>🌱 Autonomous Weed Detection — dashboard hub</h1>
 <div class="sub">
   Track A (data harvest) + Track B (training) — pick a tool below.
 </div>
+
+<div class="live-banner idle" id="live-banner">
+  <span class="pulse"></span>
+  <span id="live-banner-text">loading status…</span>
+</div>
+
+<script>
+  // Refresh live banner with current cluster status
+  async function updateBanner() {
+    try {
+      const r = await fetch('/api/cluster_status');
+      const d = await r.json();
+      const jobs = d.jobs || [];
+      const reg = d.registry || {};
+      const agentRunning = jobs.find(j =>
+        ['dl_known','brain_hrv','topic_bf','smoke','lora_'].some(p => (j.name||'').startsWith(p))
+        && j.state === 'RUNNING');
+      const banner = document.getElementById('live-banner');
+      const txt = document.getElementById('live-banner-text');
+      if (agentRunning) {
+        banner.classList.remove('idle');
+        txt.innerHTML = `🤖 <strong>${agentRunning.name}</strong> RUNNING (${agentRunning.time}) — `
+          + `<a href="/control">monitor 📺</a> · `
+          + `registry ${reg.n_downloaded||'?'}/${reg.n_slugs||'?'} slugs, `
+          + `${(reg.total_imgs||0).toLocaleString()} imgs · `
+          + `${d.n_topic_overrides||0} topic overrides`;
+      } else {
+        banner.classList.add('idle');
+        txt.innerHTML = `💤 idle — no agent jobs · registry ${reg.n_downloaded||'?'}/${reg.n_slugs||'?'} slugs, `
+          + `${(reg.total_imgs||0).toLocaleString()} imgs · `
+          + `<a href="/control">trigger agent ▶️</a>`;
+      }
+    } catch(e) {
+      document.getElementById('live-banner-text').innerHTML =
+        'error fetching status: ' + e;
+    }
+  }
+  updateBanner();
+  setInterval(updateBanner, 7000);
+</script>
 
 <div class="section-h">🎛️ Cluster control (v3.0.43.4)</div>
 <div class="grid">
