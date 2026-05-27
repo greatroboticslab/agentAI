@@ -2116,7 +2116,12 @@ _CLUSTER_ACTIONS = {
     "brain_harvest": {
         "type": "sbatch",
         "script": "run_v3_0_43_brain_harvest_oneshot.sh",
-        "label": "Brain 一轮 harvest_new_datasets (1 GPU, ~30 min)",
+        "label": "Brain 一轮 harvest_new_datasets — 找 + 抓 NEW 数据集 (~30 min)",
+    },
+    "download_known_slugs": {
+        "type": "sbatch",
+        "script": "run_v3_0_43_download_known_slugs.sh",
+        "label": "下载所有 status=known 的 HF slug 到 /ocean cluster (~30min-2hr)",
     },
     "topic_backfill": {
         "type": "sbatch",
