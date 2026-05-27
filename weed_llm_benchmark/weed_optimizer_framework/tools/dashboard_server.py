@@ -1889,6 +1889,39 @@ async def api_slug_verdict_post(slug: str, payload: dict = Body(...)):
     return JSONResponse({"ok": True, **ev})
 
 
+# ---- topic override: user/Brain corrects misclassified species ----
+@app.get("/api/class_topic")
+def api_class_topic_list():
+    """Return the full override map."""
+    return JSONResponse({
+        "overrides": _load_topic_overrides(),
+        "file": str(_CLASS_TOPIC_OVERRIDES_FILE),
+        "valid_topics": ["cwd12", "weed", "disease", "pest", "crop", "other"],
+    })
+
+
+@app.post("/api/class_topic/{cls}")
+async def api_class_topic_set(cls: str, payload: dict = Body(...)):
+    """Set topic for a specific class.
+    Topic must be one of: cwd12 | weed | disease | pest | crop | other | _clear_.
+    _clear_ removes the override (falls back to keyword heuristic).
+
+    Future autonomous agent: after Brain LLM classifies a new species, it
+    POSTs here to persist. User can override too via /classes UI."""
+    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+        raise HTTPException(400, "bad class name chars")
+    topic = payload.get("topic", "")
+    if topic not in ("cwd12", "weed", "disease", "pest", "crop", "other", "_clear_"):
+        raise HTTPException(400, "invalid topic")
+    ok = _save_topic_override(cls, topic)
+    if not ok:
+        raise HTTPException(500, "save failed")
+    return JSONResponse({
+        "ok": True, "cls": cls, "topic": topic,
+        "effective_topic": _class_topic(cls),
+    })
+
+
 # ---- refresh: invalidate all caches so next /classes load re-scans -------
 @app.post("/api/refresh_registry")
 @app.get("/api/refresh_registry")
@@ -2003,8 +2036,76 @@ _CROP_KEYWORDS = (
 )
 
 
+# v3.0.43.2: persistent topic overrides — written by Brain agent (LLM-classified
+# new species) AND user (UI corrections). Takes precedence over keyword heuristic.
+# Three-layer fallback chain:
+#   1. _class_topic_overrides.json (Brain + user)
+#   2. keyword heuristic (this file)
+#   3. 'other'
+_CLASS_TOPIC_OVERRIDES_FILE = REPO / "results" / "framework" / "class_topic_overrides.json"
+_topic_override_cache = {"mtime": 0.0, "data": {}}
+
+
+def _load_topic_overrides() -> dict:
+    """Load class→topic override map. Cached by mtime."""
+    if not _CLASS_TOPIC_OVERRIDES_FILE.exists():
+        return {}
+    try:
+        mt = _CLASS_TOPIC_OVERRIDES_FILE.stat().st_mtime
+    except Exception:
+        return {}
+    if _topic_override_cache["mtime"] == mt:
+        return _topic_override_cache["data"]
+    try:
+        with open(_CLASS_TOPIC_OVERRIDES_FILE) as f:
+            data = json.load(f) or {}
+    except Exception:
+        return _topic_override_cache["data"]
+    _topic_override_cache["mtime"] = mt
+    _topic_override_cache["data"] = data
+    return data
+
+
+def _save_topic_override(cls: str, topic: str) -> bool:
+    """Persist a single class→topic override. Returns True if written."""
+    if topic not in ("cwd12", "weed", "disease", "pest", "crop", "other"):
+        return False
+    data = dict(_load_topic_overrides())  # snapshot
+    if topic == "_clear_":
+        data.pop(cls, None)
+    else:
+        data[cls] = topic
+    try:
+        _CLASS_TOPIC_OVERRIDES_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _CLASS_TOPIC_OVERRIDES_FILE.with_suffix(".tmp")
+        with open(tmp, "w") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp, _CLASS_TOPIC_OVERRIDES_FILE)
+        # bump cache so next read sees the change
+        _topic_override_cache["mtime"] = 0.0
+        return True
+    except Exception as e:
+        log.warning(f"topic override save fail: {e}")
+        return False
+
+
 def _class_topic(cls: str) -> str:
-    """Categorize a class name for UI filtering."""
+    """Categorize a class name for UI filtering.
+
+    v3.0.43.2: three-layer chain:
+      1. user/Brain override file (highest priority)
+      2. keyword heuristic
+      3. 'other'
+
+    Future autonomous agent: Brain LLM (Gemma) classifies new species names
+    on harvest, writes result via /api/class_topic POST. UI also lets human
+    correct misclassifications. This file's hardcoded keyword list is the
+    floor, not the ceiling."""
+    # Layer 1: explicit override
+    overrides = _load_topic_overrides()
+    if cls in overrides:
+        return overrides[cls]
+    # Layer 2: keyword heuristic
     if cls in _CWD12:
         return "cwd12"
     cl = cls.lower()
@@ -2018,17 +2119,42 @@ def _class_topic(cls: str) -> str:
         return "pest"
     if any(k in cl for k in _CROP_KEYWORDS):
         return "crop"
+    # Layer 3: tested all rules, no match
     return "other"
+
+
+def _inline_thumb_data_uri(src_path: Path, w: int = 200) -> str:
+    """Read an image from disk, scale to w pixels max, return data: URI.
+    Falls back to '' if anything fails. Used for /classes landing cards so
+    the page works even when many sub-requests would be slow / blocked by
+    user's network."""
+    try:
+        from PIL import Image as _Im
+        import io as _io, base64 as _b64
+        im = _Im.open(src_path).convert("RGB")
+        im.thumbnail((w, w), _Im.LANCZOS)
+        buf = _io.BytesIO()
+        im.save(buf, "JPEG", quality=80, optimize=True)
+        b64 = _b64.b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{b64}"
+    except Exception as e:
+        log.debug(f"inline thumb fail {src_path}: {e}")
+        return ""
 
 
 def _class_summary_landing(cls: str) -> dict:
     """Lightweight per-class summary for /classes landing — does NOT walk
     registry labels. Cheap enough that listing 50+ classes is sub-second.
-    Returns {n_bank, n_flux, n_reg_est, n_reg_slugs, first_thumb}."""
+    Returns {n_bank, n_flux, n_reg_est, n_reg_slugs, first_thumb, first_thumb_data}.
+
+    v3.0.43.2: first_thumb_data is a base64 data URI inlined into the HTML
+    so the card always renders even if the user's network blocks subrequests
+    to /thumb/... (e.g. through aggressive corporate firewalls)."""
     out = {"n_bank": 0, "n_flux": 0, "n_reg_est": 0, "n_reg_slugs": 0,
-           "first_thumb": ""}
+           "first_thumb": "", "first_thumb_data": ""}
     # bank — cheap iterdir
     bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls
+    first_src = None
     if bd.is_dir():
         try:
             imgs = [p for p in sorted(bd.iterdir())
@@ -2036,6 +2162,7 @@ def _class_summary_landing(cls: str) -> dict:
             out["n_bank"] = len(imgs)
             if imgs:
                 out["first_thumb"] = f"/thumb/bank/{cls}/{imgs[0].name}?w=256"
+                first_src = imgs[0]
         except Exception:
             pass
     # flux — small (60-100 imgs total), walk is fine
@@ -2059,10 +2186,16 @@ def _class_summary_landing(cls: str) -> dict:
             out["n_flux"] = n
             if not out["first_thumb"] and first_flux:
                 out["first_thumb"] = f"/thumb/flux/{cls}/{first_flux}?w=256"
+                ffp = REPO / "results" / "framework" / "synth_diffusion" / "images" / first_flux
+                if ffp.is_file():
+                    first_src = ffp
     # reg — DO NOT walk labels. Use cap × #slugs as estimate.
     slugs = _load_registry_index().get(cls, [])
     out["n_reg_slugs"] = len(slugs)
     out["n_reg_est"] = 200 * len(slugs)  # upper-bound (cap is 200/slug)
+    # Inline thumbnail data URI for robust display
+    if first_src is not None:
+        out["first_thumb_data"] = _inline_thumb_data_uri(first_src, w=200)
     return out
 
 
@@ -2374,19 +2507,26 @@ def classes_landing():
         n_ex = sum(1 for v in state.values() if v == "exemplar")
         n_bad = sum(1 for v in state.values() if v == "bad")
         zh = _CWD12_ZH.get(cls, "")
+        # v3.0.43.2: prefer inline data URI (works even with network blocking
+        # subrequests); fall back to /thumb/ URL.
+        thumb_inline = summary.get("first_thumb_data", "")
         thumb_url = summary["first_thumb"]
+        thumb_src = thumb_inline if thumb_inline else thumb_url
+        # Whether the topic came from override (Brain/user) or keyword heuristic
+        is_override = cls in _load_topic_overrides()
         topic = _class_topic(cls)
         topic_counts["all"] += 1
         topic_counts[topic] = topic_counts.get(topic, 0) + 1
         rows.append((cls, zh, n_total_est, n_bank, n_flux,
-                     n_reg_slugs, n_reg_est, n_ex, n_bad, thumb_url, topic))
+                     n_reg_slugs, n_reg_est, n_ex, n_bad, thumb_src, topic, is_override))
 
     cards = "".join(
         f'''
-        <a class="class-card" href="/classes/{cls}" data-topic="{topic}" data-name="{cls.lower()}">
-          <img src="{thumb}" loading="lazy" alt="{cls}"/>
+        <a class="class-card" href="/classes/{cls}" data-topic="{topic}" data-name="{cls.lower()}" data-cls="{cls}">
+          {(f'<img src="{thumb}" loading="lazy" alt="{cls}"/>' if thumb
+            else f'<div class="no-thumb">no image</div>')}
           <div class="name">{cls}
-            <span class="topic-tag tag-{topic}">{topic}</span>
+            <span class="topic-tag tag-{topic}" title="{'手动覆盖' if is_override else '关键词启发式 (我硬编码的, 可改: PATCH /api/class_topic/' + cls + ')'}">{topic}{'★' if is_override else ''}</span>
             {(f'<span class="badge exemplar">✓ {n_ex}</span>' if n_ex else '')}
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
@@ -2394,7 +2534,7 @@ def classes_landing():
           <div class="counts">bank {n_bank} · flux {n_flux} · real ≤{n_reg_est} ({n_reg_slugs} slugs)</div>
           <div class="counts">已审 {n_ex+n_bad}</div>
         </a>'''
-        for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb, topic in rows
+        for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb, topic, is_override in rows
     )
 
     # Build filter bar + search input
@@ -2461,6 +2601,9 @@ def classes_landing():
   .tag-pest    {{ background: #ddd6fe; color: #5b21b6; }}
   .tag-crop    {{ background: #c7d2fe; color: #3730a3; }}
   .tag-other   {{ background: #e5e7eb; color: #4b5563; }}
+  .no-thumb {{ width: 100%; height: 180px; background: #f0f0f0; color: #aaa;
+              display: flex; align-items: center; justify-content: center;
+              font-size: 12px; }}
 </style>
 </head><body>
 <header>
