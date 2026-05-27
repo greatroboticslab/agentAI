@@ -436,6 +436,17 @@ def root():
   Track A (data harvest) + Track B (training) — pick a tool below.
 </div>
 
+<div class="section-h">🎛️ Cluster control (v3.0.43.4)</div>
+<div class="grid">
+  <a class="card new" href="/control" style="border-left-color:#c70;">
+    <div class="icon">🎛️</div>
+    <div class="title">/control — 控制台</div>
+    <div class="desc">实时 squeue / ollama / registry 状态 + 一键
+    重启 dashboard / Brain harvest / topic backfill /缓存清理。
+    <strong>你不再需要叫我做这些。</strong></div>
+  </a>
+</div>
+
 <div class="section-h">🆕 Human-in-the-loop verification (v3.0.42–43)</div>
 <div class="grid">
   <a class="card new" href="/classes">
@@ -1923,6 +1934,234 @@ async def api_class_topic_set(cls: str, payload: dict = Body(...)):
 
 
 # ---- refresh: invalidate all caches so next /classes load re-scans -------
+# ===========================================================
+# /control — operator-facing cluster control panel (v3.0.43.4)
+# ===========================================================
+# User asked: don't make me depend on Claude to deploy / restart / browse
+# cluster state. Surface everything as a dashboard page that I can hit
+# directly with a button.
+# ===========================================================
+
+def _shell(cmd: list, timeout: int = 15) -> dict:
+    """Run a command, return {ok, stdout, stderr, returncode}."""
+    import subprocess
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return {"ok": r.returncode == 0, "stdout": r.stdout,
+                "stderr": r.stderr, "returncode": r.returncode}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "stdout": "", "stderr": "TIMEOUT",
+                "returncode": -1}
+    except Exception as e:
+        return {"ok": False, "stdout": "", "stderr": str(e),
+                "returncode": -2}
+
+
+@app.get("/api/cluster_status")
+def api_cluster_status():
+    """Return a structured snapshot of cluster state — what /control polls."""
+    out: dict = {"generated_at": time.time()}
+
+    # SLURM job queue for our user
+    sq = _shell(["squeue", "-u", "byler",
+                 "-o", "%i\t%j\t%T\t%M\t%R\t%C\t%m"], timeout=10)
+    jobs = []
+    if sq["ok"]:
+        for line in sq["stdout"].strip().split("\n")[1:]:  # skip header
+            parts = line.split("\t")
+            if len(parts) >= 5:
+                jobs.append({
+                    "jobid": parts[0].strip(),
+                    "name": parts[1].strip(),
+                    "state": parts[2].strip(),
+                    "time": parts[3].strip(),
+                    "reason": parts[4].strip(),
+                    "cpus": parts[5].strip() if len(parts) > 5 else "",
+                    "mem": parts[6].strip() if len(parts) > 6 else "",
+                })
+    out["jobs"] = jobs
+    out["squeue_ok"] = sq["ok"]
+
+    # Current dashboard job (this process)
+    out["my_slurm_job_id"] = os.environ.get("SLURM_JOB_ID", "")
+
+    # Tunnel URL: read from logs/tunnel_${SLURM_JOB_ID}.log (this job)
+    jid = out["my_slurm_job_id"]
+    tunnel_url = ""
+    if jid:
+        tlog = REPO / "logs" / f"tunnel_{jid}.log"
+        if tlog.exists():
+            try:
+                content = tlog.read_text()
+                import re as _re
+                matches = _re.findall(r"https://[a-z][a-z0-9-]+\.trycloudflare\.com",
+                                       content)
+                # Filter out api.trycloudflare.com (cloudflared metric)
+                matches = [m for m in matches if "//api." not in m]
+                if matches:
+                    tunnel_url = matches[0]
+            except Exception:
+                pass
+    out["tunnel_url"] = tunnel_url
+
+    # Ollama state
+    ol_bin = "/ocean/projects/cis240145p/byler/ollama/bin/ollama"
+    if os.path.isfile(ol_bin):
+        # Check if reachable
+        try:
+            import urllib.request as _urlreq
+            r = _urlreq.urlopen("http://127.0.0.1:11434/api/tags", timeout=2)
+            ol_data = _json.loads(r.read())
+            out["ollama"] = {
+                "running": True,
+                "models": [m.get("name", "?") for m in ol_data.get("models", [])][:10],
+            }
+        except Exception as e:
+            out["ollama"] = {"running": False, "error": str(e)[:80]}
+    else:
+        out["ollama"] = {"running": False, "error": "binary not found"}
+
+    # Registry stats
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = _json.load(f)
+        ds = reg.get("datasets", {})
+        n_with_classnames = sum(
+            1 for v in ds.values() if (v.get("class_names") or []))
+        n_downloaded = sum(1 for v in ds.values() if v.get("status") == "downloaded")
+        out["registry"] = {
+            "n_slugs": len(ds),
+            "n_downloaded": n_downloaded,
+            "n_with_classnames": n_with_classnames,
+            "total_imgs": sum(v.get("local_images", 0) for v in ds.values()),
+        }
+    except Exception as e:
+        out["registry"] = {"error": str(e)[:80]}
+
+    # Topic overrides count
+    try:
+        out["n_topic_overrides"] = len(_load_topic_overrides())
+    except Exception:
+        out["n_topic_overrides"] = 0
+
+    # Exemplar marks count
+    try:
+        n_ex = 0; n_bad = 0
+        if _CLS_EXEMPLAR_DIR.is_dir():
+            for fp in _CLS_EXEMPLAR_DIR.glob("*.jsonl"):
+                try:
+                    cls = fp.stem
+                    st = _exemplar_state(cls)
+                    n_ex += sum(1 for v in st.values() if v == "exemplar")
+                    n_bad += sum(1 for v in st.values() if v == "bad")
+                except Exception:
+                    pass
+        out["exemplars"] = {"n_keep": n_ex, "n_bad": n_bad}
+    except Exception:
+        out["exemplars"] = {"n_keep": 0, "n_bad": 0}
+
+    # Slug verdicts
+    try:
+        sv = _slug_verdict_state()
+        cnt = {}
+        for v in sv.values():
+            cnt[v] = cnt.get(v, 0) + 1
+        out["slug_verdicts"] = {"counts": cnt, "total": len(sv)}
+    except Exception:
+        out["slug_verdicts"] = {"counts": {}, "total": 0}
+
+    return JSONResponse(out)
+
+
+# Map of action_id → (script_path, allowed?). Whitelist.
+_CLUSTER_ACTIONS = {
+    "restart_dashboard": {
+        "type": "restart_self",
+        "label": "重启 dashboard server (cancels current job + sbatch new)",
+    },
+    "brain_harvest": {
+        "type": "sbatch",
+        "script": "run_v3_0_43_brain_harvest_oneshot.sh",
+        "label": "Brain 一轮 harvest_new_datasets (1 GPU, ~30 min)",
+    },
+    "topic_backfill": {
+        "type": "sbatch",
+        "script": "run_v3_0_43_topic_backfill.sh",
+        "label": "Ollama + topic_backfill_all (1 GPU, ~15 min)",
+    },
+    "refresh_registry": {
+        "type": "refresh",
+        "label": "wipe class-pool cache + reload registry index",
+    },
+}
+
+
+@app.get("/api/cluster_actions")
+def api_cluster_actions_list():
+    """List allowed actions for the /control UI."""
+    return JSONResponse({k: {"label": v["label"], "type": v["type"]}
+                          for k, v in _CLUSTER_ACTIONS.items()})
+
+
+@app.post("/api/cluster_action/{action}")
+def api_cluster_action(action: str):
+    """Trigger one of the whitelisted actions. Returns the sbatch output
+    (job id) or success marker.
+
+    SECURITY: actions are whitelisted by name. No arbitrary shell injection.
+    The dashboard URL is unguessable trycloudflare URL — acceptable risk
+    for a research dashboard."""
+    if action not in _CLUSTER_ACTIONS:
+        raise HTTPException(400, f"unknown action {action!r}")
+    spec = _CLUSTER_ACTIONS[action]
+
+    if spec["type"] == "refresh":
+        # delegate to /api/refresh_registry logic
+        _registry_index_cache["mtime"] = 0.0
+        _registry_index_cache["index"] = {}
+        n = 0
+        try:
+            for p in _pool_cache_dir.glob("*.json"):
+                p.unlink(); n += 1
+        except Exception:
+            pass
+        return {"ok": True, "action": action,
+                "msg": f"cleared {n} pool cache files"}
+
+    if spec["type"] == "sbatch":
+        script_path = REPO / spec["script"]
+        if not script_path.is_file():
+            raise HTTPException(500, f"script not found: {script_path}")
+        r = _shell(["sbatch", str(script_path)], timeout=15)
+        return {"ok": r["ok"], "action": action,
+                "stdout": r["stdout"].strip(), "stderr": r["stderr"].strip(),
+                "msg": (r["stdout"].strip()
+                        if r["ok"] else r["stderr"].strip())}
+
+    if spec["type"] == "restart_self":
+        # Submit a new dashboard job, then ask SLURM to cancel us a few sec later
+        script_path = REPO / "run_v3_0_30_dashboard_server.sh"
+        sbatch_r = _shell(["sbatch", str(script_path)], timeout=15)
+        if not sbatch_r["ok"]:
+            return {"ok": False, "action": action,
+                    "msg": "sbatch failed: " + sbatch_r["stderr"]}
+        msg = sbatch_r["stdout"].strip()
+        # Defer our own scancel so the response can return first
+        jid = os.environ.get("SLURM_JOB_ID", "")
+        if jid:
+            # Background cancel after 8s — gives client time to receive 200
+            import subprocess as _sp
+            _sp.Popen(
+                ["bash", "-c", f"sleep 8 && scancel {jid}"],
+                stdout=_sp.DEVNULL, stderr=_sp.DEVNULL, start_new_session=True,
+            )
+        return {"ok": True, "action": action, "msg": msg,
+                "note": "new dashboard job queued; this one will exit in 8s",
+                "next_step": "wait ~90s then refresh github.io"}
+
+    raise HTTPException(500, "unhandled action type")
+
+
 @app.post("/api/refresh_registry")
 @app.get("/api/refresh_registry")
 def api_refresh_registry():
@@ -2253,6 +2492,209 @@ _CLASSES_CSS = """
   .help { background: #fffbe6; border-left: 3px solid #f59e0b; padding: 8px 12px;
           border-radius: 5px; font-size: 13px; margin: 10px 0; }
 """
+
+
+@app.get("/control", response_class=HTMLResponse)
+def control_page():
+    """Operator-facing control panel. Lives at /control. Polls /api/cluster_status
+    every 5 s; action buttons POST /api/cluster_action/{name}."""
+    return HTMLResponse('''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎛️ Cluster Control Panel</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif;
+         max-width: 1200px; margin: 20px auto; padding: 1rem; color: #1a1a1d;
+         background: #f2f3f7; }
+  h1 { margin: 0 0 6px 0; font-size: 22px; }
+  .sub { color: #666; margin-bottom: 22px; font-size: 14px; }
+  .nav { font-size: 13px; margin-bottom: 12px; }
+  .nav a { color: #06c; margin-right: 12px; }
+  .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 10px; margin-bottom: 16px; }
+  .stat { background: #fff; padding: 12px 14px; border-radius: 8px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .stat .v { font-size: 22px; font-weight: 600; color: #06c; }
+  .stat .v.warn { color: #c70; }
+  .stat .v.bad { color: #c00; }
+  .stat .v.ok { color: #2a7; }
+  .stat .l { font-size: 12px; color: #666; }
+  .section { background: #fff; padding: 12px 18px; border-radius: 8px;
+             box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 14px; }
+  .section h3 { font-size: 14px; margin: 0 0 10px 0; color: #555;
+                text-transform: uppercase; letter-spacing: 0.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+  th { color: #666; font-weight: 600; font-size: 11px; }
+  td.mono { font-family: ui-monospace, monospace; font-size: 12px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 3px;
+           font-size: 11px; font-weight: 600; }
+  .badge.R { background: #d1fae5; color: #065f46; }
+  .badge.PD { background: #fef3c7; color: #92400e; }
+  .badge.CD, .badge.F { background: #fee2e2; color: #991b1b; }
+  .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+             gap: 10px; }
+  .act-btn { background: #fff; padding: 12px 14px; border-radius: 8px;
+             border: 1px solid #ddd; cursor: pointer; font-size: 13px;
+             text-align: left; transition: all 0.1s; }
+  .act-btn:hover { border-color: #06c; background: #f0f8ff; }
+  .act-btn .l { font-weight: 600; color: #06c; margin-bottom: 4px; }
+  .act-btn .d { font-size: 11px; color: #666; }
+  .act-btn.danger:hover { border-color: #c00; background: #fff5f5; }
+  .act-btn.danger .l { color: #c00; }
+  .log-out { font-family: ui-monospace, monospace; font-size: 11px;
+             background: #1a1a1d; color: #d4d4d4; padding: 10px;
+             border-radius: 5px; max-height: 200px; overflow-y: auto;
+             white-space: pre-wrap; }
+  .refresh-info { font-size: 11px; color: #999; margin-top: 6px; }
+</style>
+</head><body>
+<h1>🎛️ Cluster Control Panel</h1>
+<div class="sub">实时监控 + 一键操作 — 你不需要叫我做这些</div>
+<div class="nav">
+  <a href="/">🏠 hub</a>
+  <a href="/classes">📋 classes</a>
+  <a href="/slugs">📦 slugs</a>
+  <a href="/api/cluster_status">📥 JSON</a>
+</div>
+
+<div class="grid-stats" id="stats"></div>
+
+<div class="section">
+  <h3>🔘 actions — 点击触发(后端 sbatch / 缓存清理)</h3>
+  <div class="actions" id="actions"></div>
+  <div class="refresh-info" id="last-action"></div>
+</div>
+
+<div class="section">
+  <h3>📋 SLURM queue (squeue)</h3>
+  <table id="jobs-table">
+    <thead><tr><th>jobid</th><th>name</th><th>state</th><th>time</th><th>cpus</th><th>mem</th><th>reason</th></tr></thead>
+    <tbody><tr><td colspan="7" style="color:#999;text-align:center">loading…</td></tr></tbody>
+  </table>
+  <div class="refresh-info" id="last-refresh"></div>
+</div>
+
+<div class="section">
+  <h3>📜 latest action output</h3>
+  <pre class="log-out" id="action-log">(no action yet)</pre>
+</div>
+
+<script>
+async function poll() {
+  try {
+    const r = await fetch('/api/cluster_status');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    renderStats(d);
+    renderJobs(d.jobs || []);
+    document.getElementById('last-refresh').textContent =
+      'last poll: ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('last-refresh').textContent =
+      'poll error: ' + e.message;
+  }
+}
+
+function renderStats(d) {
+  const reg = d.registry || {};
+  const ex = d.exemplars || {};
+  const sv = d.slug_verdicts || {counts:{}};
+  const ol = d.ollama || {};
+  const jobs = d.jobs || [];
+  const nR = jobs.filter(j => j.state === 'RUNNING').length;
+  const nPD = jobs.filter(j => j.state === 'PENDING').length;
+  const stats = [
+    { l: 'tunnel URL',  v: d.tunnel_url ? '✓ live' : '? no tunnel',
+      cls: d.tunnel_url ? 'ok' : 'bad' },
+    { l: 'this dashboard job', v: d.my_slurm_job_id || '?',
+      cls: d.my_slurm_job_id ? 'ok' : 'bad' },
+    { l: 'jobs running',  v: nR, cls: nR > 0 ? 'ok' : '' },
+    { l: 'jobs pending',  v: nPD, cls: nPD > 0 ? 'warn' : '' },
+    { l: 'ollama',  v: ol.running ? '✓' : '✗',
+      cls: ol.running ? 'ok' : 'bad',
+      sub: ol.running ? (ol.models||[]).join(',').slice(0,40) : (ol.error||'') },
+    { l: 'registry slugs', v: reg.n_slugs || '?',
+      sub: 'with class_names: ' + (reg.n_with_classnames||0) },
+    { l: 'total images',  v: (reg.total_imgs||0).toLocaleString() },
+    { l: 'topic overrides', v: d.n_topic_overrides || 0,
+      sub: 'Brain + 人工已分类' },
+    { l: '✓ exemplars (all classes)',  v: ex.n_keep || 0,
+      cls: (ex.n_keep||0) > 0 ? 'ok' : '' },
+    { l: '✗ bad (all classes)',  v: ex.n_bad || 0,
+      cls: (ex.n_bad||0) > 0 ? 'bad' : '' },
+    { l: '✓ keep slugs', v: sv.counts.keep || 0 },
+    { l: '✗ junk slugs', v: sv.counts.junk || 0,
+      cls: (sv.counts.junk||0) > 0 ? 'bad' : '' },
+  ];
+  const html = stats.map(s =>
+    `<div class="stat"><div class="v ${s.cls||''}">${s.v}</div>
+     <div class="l">${s.l}</div>
+     ${s.sub ? `<div class="l" style="font-size:10px;color:#aaa;margin-top:3px">${s.sub}</div>` : ''}
+     </div>`
+  ).join('');
+  document.getElementById('stats').innerHTML = html;
+}
+
+function renderJobs(jobs) {
+  const tbody = document.querySelector('#jobs-table tbody');
+  if (!jobs.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#999">no jobs</td></tr>';
+    return;
+  }
+  tbody.innerHTML = jobs.map(j =>
+    `<tr>
+      <td class="mono">${j.jobid}</td>
+      <td class="mono">${j.name}</td>
+      <td><span class="badge ${j.state}">${j.state}</span></td>
+      <td class="mono">${j.time}</td>
+      <td class="mono">${j.cpus||'?'}</td>
+      <td class="mono">${j.mem||'?'}</td>
+      <td class="mono" style="color:#888">${j.reason}</td>
+    </tr>`
+  ).join('');
+}
+
+async function loadActions() {
+  try {
+    const r = await fetch('/api/cluster_actions');
+    const acts = await r.json();
+    const html = Object.entries(acts).map(([k, v]) => {
+      const danger = k.includes('restart') ? ' danger' : '';
+      return `<div class="act-btn${danger}" onclick="trigger('${k}')">
+                <div class="l">${k}</div>
+                <div class="d">${v.label}</div>
+              </div>`;
+    }).join('');
+    document.getElementById('actions').innerHTML = html;
+  } catch (e) {
+    document.getElementById('actions').innerHTML =
+      '<div style="color:#c00">failed to load actions: ' + e + '</div>';
+  }
+}
+
+async function trigger(action) {
+  if (action === 'restart_dashboard') {
+    if (!confirm('重启 dashboard? 当前页面 ~90 秒后会重连(刷新 github.io 看新 URL)')) return;
+  }
+  const log = document.getElementById('action-log');
+  const li = document.getElementById('last-action');
+  log.textContent = `→ triggering ${action}…`;
+  try {
+    const r = await fetch('/api/cluster_action/' + action, {method:'POST'});
+    const data = await r.json();
+    log.textContent = JSON.stringify(data, null, 2);
+    li.textContent = `last action: ${action} @ ${new Date().toLocaleTimeString()}`;
+    if (action !== 'restart_dashboard') poll();
+  } catch (e) {
+    log.textContent = 'error: ' + e.message;
+  }
+}
+
+loadActions();
+poll();
+setInterval(poll, 5000);
+</script>
+</body></html>''')
 
 
 @app.get("/slugs", response_class=HTMLResponse)
