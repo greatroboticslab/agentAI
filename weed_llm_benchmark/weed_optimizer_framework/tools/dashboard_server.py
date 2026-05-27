@@ -2504,43 +2504,70 @@ def _class_summary_landing(cls: str) -> dict:
     out["n_reg_est"] = 200 * len(slugs)  # upper-bound (cap is 200/slug)
 
     # v3.0.43.6: when bank+flux missed (non-CWD12 class), fall back to a
-    # representative image from the first slug that has this class. We
-    # DON'T parse labels here — just grab the first jpg/png in the slug's
-    # tree. Cheap, gives the user a preview, not exact "this class only".
+    # representative image from the first slug that has this class.
+    # v3.0.43.7: cache the resolved path to disk so subsequent loads don't
+    # repeat the rglob (which was hitting 30s timeouts for ~350 classes).
     if first_src is None and slugs:
+        thumb_cache_p = _pool_cache_dir / f"_thumb_src_{cls}.txt"
         try:
-            with open(REGISTRY_PATH) as f:
-                reg = _json.load(f)
-            for slug_tuple in slugs[:3]:  # try up to 3 slugs
-                slug = slug_tuple[0]
-                info = (reg.get("datasets") or {}).get(slug) or {}
-                lp = info.get("local_path")
-                if not lp or not os.path.isdir(lp):
-                    continue
-                lpp = Path(lp)
-                # Try common subpaths first, then rglob
-                tried = [lpp / "images", lpp / "train" / "images", lpp]
-                for try_d in tried:
-                    if not try_d.is_dir():
+            reg_mtime = REGISTRY_PATH.stat().st_mtime if REGISTRY_PATH.exists() else 0
+        except Exception:
+            reg_mtime = 0
+        cached = None
+        cache_hit_empty = False
+        if thumb_cache_p.is_file():
+            try:
+                cstat = thumb_cache_p.stat()
+                if cstat.st_mtime >= reg_mtime:
+                    txt = thumb_cache_p.read_text().strip()
+                    if not txt:
+                        cache_hit_empty = True  # we already searched; no thumb
+                    else:
+                        cp = Path(txt)
+                        if cp.is_file():
+                            cached = cp
+            except Exception:
+                pass
+        if cached is not None:
+            first_src = cached
+        elif cache_hit_empty:
+            pass  # nothing to find, skip search
+        else:
+            # Cache miss — do the search (max 1 slug, no rglob) and persist
+            try:
+                with open(REGISTRY_PATH) as f:
+                    reg = _json.load(f)
+                # Only the FIRST slug, not 3 — speed > exhaustive search
+                for slug_tuple in slugs[:1]:
+                    slug = slug_tuple[0]
+                    info = (reg.get("datasets") or {}).get(slug) or {}
+                    lp = info.get("local_path")
+                    if not lp or not os.path.isdir(lp):
                         continue
-                    for p in try_d.iterdir():
-                        if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
-                            first_src = p
+                    lpp = Path(lp)
+                    # Try common subpaths only (no rglob — too slow on Lustre)
+                    for try_d in (lpp / "images", lpp / "train" / "images",
+                                   lpp / "valid" / "images", lpp):
+                        if not try_d.is_dir():
+                            continue
+                        try:
+                            for p in try_d.iterdir():
+                                if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                                    first_src = p
+                                    break
+                        except Exception:
+                            pass
+                        if first_src:
                             break
                     if first_src:
                         break
-                if first_src is None:
-                    # rglob fallback, bounded
-                    try:
-                        for i, p in enumerate(lpp.rglob("*.jpg")):
-                            first_src = p
-                            break
-                    except Exception:
-                        pass
-                if first_src:
-                    break
-        except Exception as e:
-            log.debug(f"reg-fallback thumb fail {cls}: {e}")
+                # Persist whatever we found (or empty if nothing)
+                try:
+                    thumb_cache_p.write_text(str(first_src) if first_src else "")
+                except Exception:
+                    pass
+            except Exception as e:
+                log.debug(f"reg-fallback thumb fail {cls}: {e}")
 
     # Inline thumbnail data URI for robust display.
     # CWD12 (bank+flux) → 200px; non-CWD12 (reg) → 140px to keep page light.

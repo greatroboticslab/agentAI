@@ -38,7 +38,7 @@ if ! curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1 ; then
 fi
 
 # Run a single harvest_new_datasets round
-python - <<'PYEOF' 2>&1 | tee -a $REPO/results/framework/v3_0_43_brain_harvest_oneshot.log
+python -u - <<'PYEOF' 2>&1 | tee -a $REPO/results/framework/v3_0_43_brain_harvest_oneshot.log
 import os, sys, time, json
 sys.path.insert(0, ".")
 from weed_optimizer_framework.tools.dataset_discovery import DatasetDiscovery
