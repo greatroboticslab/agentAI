@@ -397,10 +397,131 @@ def api_set_flag(slug: str, body: dict = Body(default=None)):
             "current": flags.get(slug)}
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def root():
-    # Smart index: redirect to /dashboard/index.html (regenerate fresh first)
-    return RedirectResponse(url="/dashboard/index.html", status_code=302)
+    """Hub page — links to all dashboard tools, old + new.
+    v3.0.43.1: previously redirected to the old static index.html which had
+    no links to /classes or /slugs. Users (incl. the project owner) couldn't
+    discover them. This hub fixes discoverability."""
+    return HTMLResponse('''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autonomous weed detection — hub</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif;
+         max-width: 900px; margin: 40px auto; padding: 1rem; color: #1a1a1d;
+         background: #f2f3f7; }
+  h1 { margin: 0 0 6px 0; font-size: 22px; }
+  .sub { color: #666; margin-bottom: 22px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 14px; margin-bottom: 22px; }
+  .card { background: #fff; padding: 16px 18px; border-radius: 10px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+          text-decoration: none; color: inherit; transition: transform 0.1s; }
+  .card:hover { transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
+  .card .icon { font-size: 28px; margin-bottom: 8px; }
+  .card .title { font-size: 16px; font-weight: 600; margin-bottom: 6px;
+                 color: #06c; }
+  .card .desc { font-size: 13px; color: #555; line-height: 1.45; }
+  .card.new { border-left: 4px solid #38a169; }
+  .card.old { border-left: 4px solid #888; }
+  .card.api { border-left: 4px solid #06c; background: #f6f9ff; }
+  .section-h { color: #555; font-size: 13px; text-transform: uppercase;
+               letter-spacing: 0.5px; margin: 18px 0 8px 0; }
+  .footer { color: #999; font-size: 12px; margin-top: 30px; text-align: center; }
+</style>
+</head><body>
+<h1>🌱 Autonomous Weed Detection — dashboard hub</h1>
+<div class="sub">
+  Track A (data harvest) + Track B (training) — pick a tool below.
+</div>
+
+<div class="section-h">🆕 Human-in-the-loop verification (v3.0.42–43)</div>
+<div class="grid">
+  <a class="card new" href="/classes">
+    <div class="icon">📋</div>
+    <div class="title">/classes — 类级人工审计</div>
+    <div class="desc">每个类(CWD12 + 348 总类)逐张点 ✓ 榜样 / ✗ 错标 / 🔄 bbox 修。
+    7 个 filter tab + 搜索框。三源混排:bank/flux/真实 reg。</div>
+  </a>
+  <a class="card new" href="/slugs">
+    <div class="icon">📦</div>
+    <div class="title">/slugs — slug 级清理</div>
+    <div class="desc">80 个数据集 slug 列表,批量 ✓ keep / ✗ junk / 🤔 unsure。
+    ✗ 后自动从 /classes 隐藏 — 不用逐张点垃圾类。</div>
+  </a>
+  <a class="card new" href="/classes/Goosegrass">
+    <div class="icon">🌾</div>
+    <div class="title">直接进 Goosegrass</div>
+    <div class="desc">最难类 — 看 bank + flux + holdout 真图(红框 bbox 标本类)
+    混排,审定后写到 exemplar 集供训练。</div>
+  </a>
+</div>
+
+<div class="section-h">📊 旧版静态 dashboard</div>
+<div class="grid">
+  <a class="card old" href="/dashboard/index.html">
+    <div class="icon">🏠</div>
+    <div class="title">主页(stats)</div>
+    <div class="desc">总览:n_datasets / n_imgs / latest mAP. 由 dashboard_generator
+    定期 regenerate(可能滞后几天)。</div>
+  </a>
+  <a class="card old" href="/dashboard/datasets.html">
+    <div class="icon">📑</div>
+    <div class="title">Datasets 列表</div>
+    <div class="desc">所有 slug 的元数据列表(只读)。新功能 /slugs 是它的可写版。</div>
+  </a>
+  <a class="card old" href="/dashboard/categories.html">
+    <div class="icon">🏷️</div>
+    <div class="title">Categories</div>
+    <div class="desc">按 crop/topic 分桶统计。</div>
+  </a>
+  <a class="card old" href="/dashboard/progress.html">
+    <div class="icon">📈</div>
+    <div class="title">Progress</div>
+    <div class="desc">训练历史 / mAP 时序。</div>
+  </a>
+  <a class="card old" href="/audit">
+    <div class="icon">🔍</div>
+    <div class="title">/audit(旧)</div>
+    <div class="desc">v3.0.41 之前的 per-class 大图浏览,被 /classes 取代。</div>
+  </a>
+</div>
+
+<div class="section-h">🔌 API endpoints (JSON)</div>
+<div class="grid">
+  <a class="card api" href="/api/exemplars_export">
+    <div class="icon">📥</div>
+    <div class="title">/api/exemplars_export</div>
+    <div class="desc">所有 ✓ 榜样图导出 manifest。供 LoRA / training agent 读取。</div>
+  </a>
+  <a class="card api" href="/api/slug_verdicts">
+    <div class="icon">📥</div>
+    <div class="title">/api/slug_verdicts</div>
+    <div class="desc">所有 slug ✓/✗/🤔 判定 JSON。</div>
+  </a>
+  <a class="card api" href="/api/state">
+    <div class="icon">📊</div>
+    <div class="title">/api/state</div>
+    <div class="desc">整体 registry 状态(60s cache)。</div>
+  </a>
+  <a class="card api" href="/api/refresh_registry">
+    <div class="icon">♻️</div>
+    <div class="title">/api/refresh_registry</div>
+    <div class="desc">harvest 后强制清缓存。</div>
+  </a>
+  <a class="card api" href="/healthz">
+    <div class="icon">❤️</div>
+    <div class="title">/healthz</div>
+    <div class="desc">liveness probe.</div>
+  </a>
+</div>
+
+<div class="footer">
+  v3.0.43.1 hub · server pid自启 · for direct 路径:
+  /classes · /slugs · /classes/{species} · /dashboard/{page}.html
+</div>
+</body></html>''')
 
 
 @app.get("/dashboard/{page}")
