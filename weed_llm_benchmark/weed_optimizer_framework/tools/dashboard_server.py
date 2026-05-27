@@ -2502,9 +2502,51 @@ def _class_summary_landing(cls: str) -> dict:
     slugs = _load_registry_index().get(cls, [])
     out["n_reg_slugs"] = len(slugs)
     out["n_reg_est"] = 200 * len(slugs)  # upper-bound (cap is 200/slug)
-    # Inline thumbnail data URI for robust display
+
+    # v3.0.43.6: when bank+flux missed (non-CWD12 class), fall back to a
+    # representative image from the first slug that has this class. We
+    # DON'T parse labels here — just grab the first jpg/png in the slug's
+    # tree. Cheap, gives the user a preview, not exact "this class only".
+    if first_src is None and slugs:
+        try:
+            with open(REGISTRY_PATH) as f:
+                reg = _json.load(f)
+            for slug_tuple in slugs[:3]:  # try up to 3 slugs
+                slug = slug_tuple[0]
+                info = (reg.get("datasets") or {}).get(slug) or {}
+                lp = info.get("local_path")
+                if not lp or not os.path.isdir(lp):
+                    continue
+                lpp = Path(lp)
+                # Try common subpaths first, then rglob
+                tried = [lpp / "images", lpp / "train" / "images", lpp]
+                for try_d in tried:
+                    if not try_d.is_dir():
+                        continue
+                    for p in try_d.iterdir():
+                        if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                            first_src = p
+                            break
+                    if first_src:
+                        break
+                if first_src is None:
+                    # rglob fallback, bounded
+                    try:
+                        for i, p in enumerate(lpp.rglob("*.jpg")):
+                            first_src = p
+                            break
+                    except Exception:
+                        pass
+                if first_src:
+                    break
+        except Exception as e:
+            log.debug(f"reg-fallback thumb fail {cls}: {e}")
+
+    # Inline thumbnail data URI for robust display.
+    # CWD12 (bank+flux) → 200px; non-CWD12 (reg) → 140px to keep page light.
     if first_src is not None:
-        out["first_thumb_data"] = _inline_thumb_data_uri(first_src, w=200)
+        thumb_w = 200 if cls in _CWD12 else 140
+        out["first_thumb_data"] = _inline_thumb_data_uri(first_src, w=thumb_w)
     return out
 
 
