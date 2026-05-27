@@ -2,7 +2,7 @@
 
 Usage on cluster (where Ollama / Gemma is reachable):
   python -m weed_optimizer_framework.tools.topic_backfill_all \\
-      [--dry-run] [--model gemma3:27b] [--limit 50]
+      [--dry-run] [--model gemma4:latest] [--limit 50]
 
 Without --dry-run, results write to class_topic_overrides.json.
 With --limit, only the first N classes (alphabetical) are processed —
@@ -66,7 +66,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true",
                     help="print what would be classified; no writes")
-    ap.add_argument("--model", default="gemma3:27b",
+    ap.add_argument("--model", default="gemma4:latest",
                     help="Ollama model name for Brain LLM")
     ap.add_argument("--limit", type=int, default=None,
                     help="only process first N alphabetical (test mode)")

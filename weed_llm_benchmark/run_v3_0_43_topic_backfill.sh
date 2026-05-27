@@ -37,8 +37,8 @@ if ! curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1 ; then
     done
 fi
 
-# Pre-pull the model we use (gemma3:27b)
-MODEL=gemma3:27b
+# Pre-pull the model we use (gemma4:latest)
+MODEL=gemma4:latest
 echo "[ollama] ensuring $MODEL is pulled…"
 /ocean/projects/cis240145p/byler/ollama/bin/ollama list 2>&1 | head -20
 if ! /ocean/projects/cis240145p/byler/ollama/bin/ollama list 2>&1 | grep -q "$MODEL" ; then

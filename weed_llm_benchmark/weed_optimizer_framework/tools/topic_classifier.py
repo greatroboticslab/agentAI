@@ -103,7 +103,7 @@ Class name: {cls}
 Answer:"""
 
 
-def classify_llm(cls: str, model: str = "gemma3:27b",
+def classify_llm(cls: str, model: str = "gemma4:latest",
                  timeout_s: float = 10.0) -> Tuple[Optional[str], float]:
     """Returns (topic_str_or_None, confidence). None if LLM unreachable."""
     try:
@@ -136,7 +136,7 @@ def classify_llm(cls: str, model: str = "gemma3:27b",
 
 
 def classify(cls: str, use_llm: bool = True,
-             model: str = "gemma3:27b",
+             model: str = "gemma4:latest",
              persist: bool = True) -> dict:
     """Resolve topic for `cls` using overrides → LLM (optional) → keywords.
 
@@ -191,7 +191,7 @@ def classify(cls: str, use_llm: bool = True,
 
 
 def classify_batch(class_names: list, use_llm: bool = True,
-                    model: str = "gemma3:27b",
+                    model: str = "gemma4:latest",
                     persist: bool = True) -> list:
     """Classify many names. Skips ones already in overrides."""
     overrides = load_overrides()
