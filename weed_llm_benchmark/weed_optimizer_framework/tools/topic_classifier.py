@@ -149,6 +149,13 @@ def classify(cls: str, use_llm: bool = True,
         "keyword_topic": None, "llm_topic": None,
     }
 
+    # Layer 0 (v3.0.43.16): CWD12 inviolable — never override these 12 species
+    # to 'weed' just because LLM said so. They have their own UI filter tab.
+    if cls in _CWD12:
+        out.update({"topic": "cwd12", "source": "cwd12_canonical",
+                    "confidence": 1.0})
+        return out
+
     # Layer 1: existing override (already classified before)
     overrides = load_overrides()
     if cls in overrides:

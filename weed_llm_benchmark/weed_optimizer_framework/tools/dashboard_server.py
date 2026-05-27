@@ -2653,22 +2653,22 @@ def _save_topic_override(cls: str, topic: str) -> bool:
 def _class_topic(cls: str) -> str:
     """Categorize a class name for UI filtering.
 
-    v3.0.43.2: three-layer chain:
-      1. user/Brain override file (highest priority)
-      2. keyword heuristic
-      3. 'other'
-
-    Future autonomous agent: Brain LLM (Gemma) classifies new species names
-    on harvest, writes result via /api/class_topic POST. UI also lets human
-    correct misclassifications. This file's hardcoded keyword list is the
-    floor, not the ceiling."""
-    # Layer 1: explicit override
+    v3.0.43.16 (corrected ordering): CWD12 is INVIOLABLE — it's our
+    project-specific filter category; LLM doesn't know about it, so its
+    overrides must never demote a CWD12 species to plain 'weed'.
+    Layer chain:
+      1. CWD12 hardcoded set (highest priority, project-specific)
+      2. user/Brain override file
+      3. keyword heuristic
+      4. 'other'"""
+    # Layer 1: CWD12 inviolable
+    if cls in _CWD12:
+        return "cwd12"
+    # Layer 2: explicit override (Brain LLM / user)
     overrides = _load_topic_overrides()
     if cls in overrides:
         return overrides[cls]
-    # Layer 2: keyword heuristic
-    if cls in _CWD12:
-        return "cwd12"
+    # Layer 3: keyword heuristic
     cl = cls.lower()
     # WEED first — many disease/crop names also contain crop substrings, but
     # weed indicators are more specific to the laser-robot research goal.
