@@ -122,11 +122,10 @@ def _count_labels(root):
 def clone_github_repo(clone_url, dest_dir, depth=1, timeout=180):
     """Clone a GitHub repo with depth=1 + 3-min timeout.
 
-    v3.0.43.18:
-      - Reduced default timeout 300→180s (the 300s plant-disease repo stuck
-        the entire brain_harvest tonight; tighter cap is enough for actual repos)
-      - Inject PAT into URL if available, for higher rate limit + private repo
-        access (we only use public, but auth still helps Cloudflare front)
+    v3.0.43.18: PAT auth + tighter timeout.
+    v3.0.43.19 SECURITY FIX: never let the PAT-embedded URL appear in
+    exception strings or logs. subprocess.TimeoutExpired stringifies as
+    the cmd list, which would leak the secret.
     """
     pat = _github_pat()
     auth_url = clone_url
@@ -139,8 +138,24 @@ def clone_github_repo(clone_url, dest_dir, depth=1, timeout=180):
             capture_output=True, timeout=timeout,
         )
         return r.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+    except subprocess.TimeoutExpired:
+        # NEVER stringify TimeoutExpired — its repr contains the cmd list
+        # which contains auth_url which contains the PAT.
+        logger.warning(
+            f"[GitHub] clone failed {clone_url}: "
+            f"TimeoutExpired after {timeout}s (cmd hidden — contains auth secret)"
+        )
+        return False
+    except FileNotFoundError as e:
+        # 'git' binary missing — safe to log.
         logger.warning(f"[GitHub] clone failed {clone_url}: {e}")
+        return False
+    except Exception as e:
+        # Catch-all — strip PAT from any leaked string before logging.
+        msg = str(e)
+        if pat and pat in msg:
+            msg = msg.replace(pat, "<PAT_REDACTED>")
+        logger.warning(f"[GitHub] clone failed {clone_url}: {msg}")
         return False
 
 
