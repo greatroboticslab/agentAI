@@ -1991,6 +1991,98 @@ def _shell(cmd: list, timeout: int = 15) -> dict:
                 "returncode": -2}
 
 
+@app.get("/api/disk_usage")
+def api_disk_usage():
+    """`df` for /ocean (the data root). Cheap. Lustre du is too slow."""
+    r = _shell(["df", "-h", str(REPO)], timeout=6)
+    if not r["ok"]:
+        return JSONResponse({"error": r["stderr"][:120]}, status_code=500)
+    lines = r["stdout"].strip().split("\n")
+    if len(lines) < 2:
+        return JSONResponse({"raw": r["stdout"]})
+    parts = lines[1].split()
+    return JSONResponse({
+        "filesystem": parts[0] if len(parts) > 0 else "",
+        "size":       parts[1] if len(parts) > 1 else "",
+        "used":       parts[2] if len(parts) > 2 else "",
+        "avail":      parts[3] if len(parts) > 3 else "",
+        "use_pct":    parts[4] if len(parts) > 4 else "",
+        "mount":      parts[5] if len(parts) > 5 else "",
+        "raw": r["stdout"][:400],
+    })
+
+
+@app.get("/api/agent_progress")
+def api_agent_progress():
+    """Parse the latest agent job (dl_known, brain_hrv, topic_bf) log file
+    for progress markers like '[dl_known] [3/8] === deepweeds ==='.
+
+    Returns a structured 'what is the agent currently doing' summary —
+    surfaced on /control as a stat card."""
+    pat_dir = REPO / "results" / "framework"
+    if not pat_dir.is_dir():
+        return JSONResponse({"no_agent_jobs": True})
+
+    # Only look at agent-launched jobs (not dashboard self-runs)
+    agent_patterns = ("v3_0_43_dl_known", "v3_0_43_brain_harvest",
+                       "v3_0_43_topic_backfill", "v3_0_41_brain_harvest")
+    candidates = []
+    for pat in agent_patterns:
+        candidates.extend(pat_dir.glob(f"{pat}_*.out"))
+    if not candidates:
+        return JSONResponse({"no_agent_jobs": True})
+    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+
+    import re as _re
+    try:
+        size = latest.stat().st_size
+        # Tail 64KB to find progress markers
+        with open(latest, "rb") as f:
+            f.seek(max(0, size - 65536))
+            tail = f.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
+    # Extract progress markers
+    m_jobid = _re.search(r"_(\d+)\.out$", latest.name)
+    jobid = m_jobid.group(1) if m_jobid else ""
+    # name part = filename minus _jobid.out
+    name_part = latest.name[: m_jobid.start()] if m_jobid else latest.stem
+
+    # Try job state
+    state = ""
+    sq = _shell(["squeue", "-j", jobid, "-h", "-o", "%T"], timeout=6)
+    if sq["ok"] and sq["stdout"].strip():
+        state = sq["stdout"].strip()
+
+    # Parse progress like `[dl_known] [3/8] === deepweeds ===`
+    progress = None
+    for line in tail.splitlines()[::-1]:
+        m = _re.search(r"\[(\d+)/(\d+)\][^=]*=== ([^=]+?) ===", line)
+        if m:
+            progress = {
+                "current": int(m.group(1)),
+                "total": int(m.group(2)),
+                "current_item": m.group(3).strip(),
+                "raw_line": line.strip()[:160],
+            }
+            break
+
+    # Last few non-empty lines for log_tail
+    log_tail = [l for l in tail.splitlines()[-15:] if l.strip()][-8:]
+
+    return JSONResponse({
+        "job_name": name_part,
+        "jobid": jobid,
+        "state": state or "FINISHED",
+        "log_file": str(latest),
+        "log_size": size,
+        "progress": progress,
+        "log_tail": log_tail,
+        "mtime": latest.stat().st_mtime,
+    })
+
+
 @app.get("/api/cluster_status")
 def api_cluster_status():
     """Return a structured snapshot of cluster state — what /control polls."""
@@ -2802,6 +2894,13 @@ def control_page():
 
 <div class="grid-stats" id="stats"></div>
 
+<div class="section" id="agent-section">
+  <h3>🤖 agent 当前活动(latest dl_known / brain_harvest / topic_backfill)</h3>
+  <div id="agent-progress">
+    <span style="color:#999">loading…</span>
+  </div>
+</div>
+
 <div class="section">
   <h3>🔘 actions — 点击触发(后端 sbatch / 缓存清理)</h3>
   <div class="actions" id="actions"></div>
@@ -2855,6 +2954,69 @@ async function poll() {
   }
 }
 
+async function pollAgentProgress() {
+  try {
+    const r = await fetch('/api/agent_progress');
+    const d = await r.json();
+    const el = document.getElementById('agent-progress');
+    if (d.no_agent_jobs) {
+      el.innerHTML = '<span style="color:#888">no agent jobs yet — click 🤖 brain_harvest or 📥 download_known_slugs</span>';
+      return;
+    }
+    const stateBadge = `<span class="badge ${d.state}">${d.state}</span>`;
+    let progressHtml = '';
+    if (d.progress) {
+      const p = d.progress;
+      const pct = Math.round(p.current * 100 / p.total);
+      progressHtml = `
+        <div style="margin:8px 0">
+          <div style="font-weight:600">🌱 currently: ${p.current_item}</div>
+          <div style="margin:6px 0">step ${p.current} / ${p.total}
+            (${pct}%)</div>
+          <div style="height:6px; background:#eee; border-radius:3px; overflow:hidden">
+            <div style="height:100%; background:#06c; width:${pct}%"></div>
+          </div>
+        </div>`;
+    }
+    const tailHtml = (d.log_tail||[]).slice(-5).map(l =>
+      '<div>' + l.replace(/[<>]/g, c => ({'<':'&lt;','>':'&gt;'}[c])) + '</div>'
+    ).join('');
+    el.innerHTML = `
+      <div style="display:flex; gap:14px; align-items:center; font-size:13px">
+        <span><strong>${d.job_name}</strong></span>
+        <span class="mono">${d.jobid}</span>
+        ${stateBadge}
+        <span style="color:#888">log: ${(d.log_size/1024).toFixed(1)}KB</span>
+        <button class="log-btn" onclick="openLog('${d.jobid}','${d.job_name}')">📜 full log</button>
+      </div>
+      ${progressHtml}
+      <pre style="background:#1a1a1d; color:#d4d4d4; padding:8px 10px;
+                  border-radius:5px; font-size:11px; margin:6px 0 0 0;
+                  white-space:pre-wrap; max-height:120px; overflow-y:auto">
+${tailHtml}
+      </pre>`;
+  } catch (e) {
+    document.getElementById('agent-progress').innerHTML =
+      '<span style="color:#c00">agent_progress fetch err: ' + e + '</span>';
+  }
+}
+
+async function pollDiskUsage() {
+  // Lightweight; piggyback on stats render
+  try {
+    const r = await fetch('/api/disk_usage');
+    const d = await r.json();
+    return d;
+  } catch (e) {
+    return null;
+  }
+}
+
+let _diskUsage = null;
+async function refreshDiskUsage() {
+  _diskUsage = await pollDiskUsage();
+}
+
 function renderStats(d) {
   const reg = d.registry || {};
   const ex = d.exemplars || {};
@@ -2863,6 +3025,7 @@ function renderStats(d) {
   const jobs = d.jobs || [];
   const nR = jobs.filter(j => j.state === 'RUNNING').length;
   const nPD = jobs.filter(j => j.state === 'PENDING').length;
+  const du = _diskUsage || {};
   const stats = [
     { l: 'tunnel URL',  v: d.tunnel_url ? '✓ live' : '? no tunnel',
       cls: d.tunnel_url ? 'ok' : 'bad' },
@@ -2885,6 +3048,8 @@ function renderStats(d) {
     { l: '✓ keep slugs', v: sv.counts.keep || 0 },
     { l: '✗ junk slugs', v: sv.counts.junk || 0,
       cls: (sv.counts.junk||0) > 0 ? 'bad' : '' },
+    { l: '/ocean used',  v: du.used || '?',
+      sub: 'avail: ' + (du.avail||'?') + ' (' + (du.use_pct||'?') + ')' },
   ];
   const html = stats.map(s =>
     `<div class="stat"><div class="v ${s.cls||''}">${s.v}</div>
@@ -3043,9 +3208,13 @@ async function trigger(action) {
 
 loadActions();
 loadRecentJobs();
+refreshDiskUsage();
+pollAgentProgress();
 poll();
 setInterval(poll, 5000);
 setInterval(loadRecentJobs, 30000);  // recent jobs change slowly
+setInterval(refreshDiskUsage, 60000); // disk usage changes slowly
+setInterval(pollAgentProgress, 8000); // agent progress mid-frequency
 </script>
 </body></html>''')
 
