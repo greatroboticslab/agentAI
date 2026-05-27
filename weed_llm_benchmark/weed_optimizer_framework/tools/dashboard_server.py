@@ -1991,6 +1991,66 @@ def _shell(cmd: list, timeout: int = 15) -> dict:
                 "returncode": -2}
 
 
+@app.post("/api/cancel_job/{jobid}")
+def api_cancel_job(jobid: str):
+    """Cancel a SLURM job by ID. Only allow cancelling job names we recognize
+    as 'safe to interrupt' (agent jobs, not the dashboard itself)."""
+    if not _re_cls.match(r'^[0-9]+$', jobid):
+        raise HTTPException(400, "bad jobid")
+    # Check job name to prevent self-killing
+    sq = _shell(["squeue", "-j", jobid, "-h", "-o", "%j"], timeout=8)
+    name = (sq["stdout"] or "").strip()
+    if not name:
+        return JSONResponse({"ok": False, "msg": f"job {jobid} not in queue"})
+    # Whitelist: agent jobs only. Don't cancel the dashboard from /control
+    # (use restart_dashboard action for that instead).
+    SAFE_PREFIXES = ("dl_known", "brain_hrv", "topic_bf", "smoke", "lora_")
+    if not any(name.startswith(p) for p in SAFE_PREFIXES):
+        return JSONResponse({"ok": False, "msg":
+            f"refuse to cancel {name!r} — only agent jobs cancellable from UI"})
+    r = _shell(["scancel", jobid], timeout=8)
+    return JSONResponse({"ok": r["ok"], "jobid": jobid, "name": name,
+                          "msg": r["stdout"] or r["stderr"] or "cancelled"})
+
+
+# Cluster-actions history log (append-only)
+_ACTIONS_LOG = REPO / "results" / "framework" / "cluster_actions.jsonl"
+_ACTIONS_LOG.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _log_action(action: str, result: dict):
+    """Persist a /control action invocation for the history panel."""
+    try:
+        ev = {
+            "ts": time.time(),
+            "ts_h": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+            "action": action,
+            "result": result,
+        }
+        with open(_ACTIONS_LOG, "a") as f:
+            f.write(_json.dumps(ev) + "\n")
+    except Exception as e:
+        log.warning(f"action log fail: {e}")
+
+
+@app.get("/api/action_history")
+def api_action_history(n: int = 50):
+    """Last N action invocations (from cluster_actions.jsonl)."""
+    if not 1 <= n <= 500:
+        n = 50
+    if not _ACTIONS_LOG.is_file():
+        return JSONResponse({"history": []})
+    try:
+        lines = _ACTIONS_LOG.read_text().splitlines()
+        events = []
+        for ln in lines[-n:]:
+            try: events.append(_json.loads(ln))
+            except Exception: pass
+        return JSONResponse({"history": events})
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
+
 @app.get("/api/disk_usage")
 def api_disk_usage():
     """`df` for /ocean (the data root). Cheap. Lustre du is too slow."""
@@ -2357,39 +2417,44 @@ def api_cluster_action(action: str):
                 p.unlink(); n += 1
         except Exception:
             pass
-        return {"ok": True, "action": action,
-                "msg": f"cleared {n} pool cache files"}
+        result = {"ok": True, "action": action,
+                  "msg": f"cleared {n} pool cache files"}
+        _log_action(action, result)
+        return result
 
     if spec["type"] == "sbatch":
         script_path = REPO / spec["script"]
         if not script_path.is_file():
             raise HTTPException(500, f"script not found: {script_path}")
         r = _shell(["sbatch", str(script_path)], timeout=15)
-        return {"ok": r["ok"], "action": action,
-                "stdout": r["stdout"].strip(), "stderr": r["stderr"].strip(),
-                "msg": (r["stdout"].strip()
-                        if r["ok"] else r["stderr"].strip())}
+        result = {"ok": r["ok"], "action": action,
+                  "stdout": r["stdout"].strip(),
+                  "stderr": r["stderr"].strip(),
+                  "msg": (r["stdout"].strip()
+                          if r["ok"] else r["stderr"].strip())}
+        _log_action(action, result)
+        return result
 
     if spec["type"] == "restart_self":
-        # Submit a new dashboard job, then ask SLURM to cancel us a few sec later
         script_path = REPO / "run_v3_0_30_dashboard_server.sh"
         sbatch_r = _shell(["sbatch", str(script_path)], timeout=15)
         if not sbatch_r["ok"]:
-            return {"ok": False, "action": action,
-                    "msg": "sbatch failed: " + sbatch_r["stderr"]}
+            result = {"ok": False, "action": action,
+                      "msg": "sbatch failed: " + sbatch_r["stderr"]}
+            _log_action(action, result); return result
         msg = sbatch_r["stdout"].strip()
-        # Defer our own scancel so the response can return first
         jid = os.environ.get("SLURM_JOB_ID", "")
         if jid:
-            # Background cancel after 8s — gives client time to receive 200
             import subprocess as _sp
             _sp.Popen(
                 ["bash", "-c", f"sleep 8 && scancel {jid}"],
                 stdout=_sp.DEVNULL, stderr=_sp.DEVNULL, start_new_session=True,
             )
-        return {"ok": True, "action": action, "msg": msg,
-                "note": "new dashboard job queued; this one will exit in 8s",
-                "next_step": "wait ~90s then refresh github.io"}
+        result = {"ok": True, "action": action, "msg": msg,
+                  "note": "new dashboard job queued; this one will exit in 8s",
+                  "next_step": "wait ~90s then refresh github.io"}
+        _log_action(action, result)
+        return result
 
     raise HTTPException(500, "unhandled action type")
 
@@ -2851,6 +2916,17 @@ def control_page():
              padding: 3px 9px; border-radius: 3px; font-size: 11px;
              cursor: pointer; }
   .log-btn:hover { background: #048; }
+  .kill-btn { background: #c00; color: #fff; border: none;
+              padding: 3px 9px; border-radius: 3px; font-size: 11px;
+              cursor: pointer; margin-left: 4px; }
+  .kill-btn:hover { background: #900; }
+  .history-item { display: grid; grid-template-columns: 140px 160px 1fr;
+                   gap: 8px; padding: 5px 0; border-bottom: 1px solid #f0f0f0;
+                   font-size: 12px; }
+  .history-item:last-child { border-bottom: none; }
+  .history-item .ts { font-family: ui-monospace, monospace; color: #888; }
+  .history-item .act { font-weight: 600; color: #06c; }
+  .history-item .msg { color: #555; word-break: break-all; }
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.55);
               display: none; align-items: center; justify-content: center;
               z-index: 100; }
@@ -2919,6 +2995,11 @@ def control_page():
 <div class="section">
   <h3>📁 recent .out files (clickable — view log)</h3>
   <div class="recent-jobs" id="recent-jobs"><div style="color:#999">loading…</div></div>
+</div>
+
+<div class="section">
+  <h3>📚 action history (overnight + ongoing)</h3>
+  <div id="action-history"><div style="color:#999">loading…</div></div>
 </div>
 
 <div class="section">
@@ -3066,8 +3147,11 @@ function renderJobs(jobs) {
     tbody.innerHTML = '<tr><td colspan="8" style="color:#999">no jobs</td></tr>';
     return;
   }
-  tbody.innerHTML = jobs.map(j =>
-    `<tr>
+  // Whitelist of cancellable job-name prefixes
+  const cancellable = ['dl_known','brain_hrv','topic_bf','smoke','lora_'];
+  tbody.innerHTML = jobs.map(j => {
+    const canKill = cancellable.some(p => (j.name||'').startsWith(p));
+    return `<tr>
       <td class="mono">${j.jobid}</td>
       <td class="mono">${j.name}</td>
       <td><span class="badge ${j.state}">${j.state}</span></td>
@@ -3075,9 +3159,48 @@ function renderJobs(jobs) {
       <td class="mono">${j.cpus||'?'}</td>
       <td class="mono">${j.mem||'?'}</td>
       <td class="mono" style="color:#888">${j.reason}</td>
-      <td><button class="log-btn" onclick="openLog('${j.jobid}','${j.name}')">📜 log</button></td>
-    </tr>`
-  ).join('');
+      <td><button class="log-btn" onclick="openLog('${j.jobid}','${j.name}')">📜 log</button>
+        ${canKill ? `<button class="kill-btn" onclick="cancelJob('${j.jobid}','${j.name}')">✗ kill</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function cancelJob(jobid, name) {
+  if (!confirm(`Cancel job ${jobid} (${name})? It will lose all progress.`)) return;
+  try {
+    const r = await fetch('/api/cancel_job/' + jobid, {method:'POST'});
+    const data = await r.json();
+    alert(JSON.stringify(data, null, 2));
+    poll();
+  } catch (e) {
+    alert('cancel failed: ' + e.message);
+  }
+}
+
+async function loadActionHistory() {
+  try {
+    const r = await fetch('/api/action_history?n=30');
+    const d = await r.json();
+    const events = (d.history || []).reverse(); // newest first
+    if (!events.length) {
+      document.getElementById('action-history').innerHTML =
+        '<div style="color:#999">no actions yet</div>';
+      return;
+    }
+    document.getElementById('action-history').innerHTML = events.map(e => {
+      const msg = (e.result && (e.result.msg || JSON.stringify(e.result))) || '';
+      const t = e.ts_h ? e.ts_h.replace('UTC','') : '?';
+      return `<div class="history-item">
+        <span class="ts">${t}</span>
+        <span class="act">${e.action}</span>
+        <span class="msg">${msg.toString().replace(/[<>]/g, c => ({'<':'&lt;','>':'&gt;'}[c]))}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('action-history').innerHTML =
+      '<div style="color:#c00">history fetch err: ' + e + '</div>';
+  }
 }
 
 async function loadRecentJobs() {
@@ -3208,13 +3331,15 @@ async function trigger(action) {
 
 loadActions();
 loadRecentJobs();
+loadActionHistory();
 refreshDiskUsage();
 pollAgentProgress();
 poll();
 setInterval(poll, 5000);
-setInterval(loadRecentJobs, 30000);  // recent jobs change slowly
-setInterval(refreshDiskUsage, 60000); // disk usage changes slowly
-setInterval(pollAgentProgress, 8000); // agent progress mid-frequency
+setInterval(loadRecentJobs, 30000);
+setInterval(loadActionHistory, 15000);
+setInterval(refreshDiskUsage, 60000);
+setInterval(pollAgentProgress, 8000);
 </script>
 </body></html>''')
 
