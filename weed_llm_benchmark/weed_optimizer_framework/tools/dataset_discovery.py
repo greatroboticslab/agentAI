@@ -73,6 +73,42 @@ KNOWN_DATASETS = {
 
 REGISTRY_PATH = os.path.join(Config.FRAMEWORK_DIR, "dataset_registry.json")
 
+# v3.0.43.18: HF schema blacklist — record hf_ids whose schema we can't read
+# so we don't waste time re-probing them on every harvest round.
+HF_SCHEMA_BLACKLIST_PATH = os.path.join(
+    Config.FRAMEWORK_DIR, "hf_schema_blacklist.json"
+)
+
+
+def _load_hf_blacklist() -> dict:
+    """Return {hf_id: {reason, ts, n_failed_probes}}."""
+    if not os.path.isfile(HF_SCHEMA_BLACKLIST_PATH):
+        return {}
+    try:
+        with open(HF_SCHEMA_BLACKLIST_PATH) as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
+
+
+def _blacklist_hf_id(hf_id: str, reason: str):
+    """Mark an HF id as 'don't waste time on this — schema doesn't fit'."""
+    bl = _load_hf_blacklist()
+    existing = bl.get(hf_id, {})
+    bl[hf_id] = {
+        "reason": reason[:200],
+        "ts": datetime.now().isoformat(),
+        "n_failed_probes": existing.get("n_failed_probes", 0) + 1,
+    }
+    try:
+        os.makedirs(os.path.dirname(HF_SCHEMA_BLACKLIST_PATH), exist_ok=True)
+        tmp = HF_SCHEMA_BLACKLIST_PATH + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(bl, f, indent=2)
+        os.replace(tmp, HF_SCHEMA_BLACKLIST_PATH)
+    except Exception as e:
+        logger.warning(f"[HF blacklist] write fail: {e}")
+
 
 class DatasetDiscovery:
     """Search, download, track, and deduplicate weed detection datasets."""
@@ -918,6 +954,9 @@ class DatasetDiscovery:
 
         n_rejected_garbage = 0
         n_rejected_irrelevant = 0
+        n_rejected_blacklisted = 0
+        # v3.0.43.18: load HF schema blacklist once per harvest
+        hf_blacklist = _load_hf_blacklist()
         for d in combined:
             if len(results) >= max_new:
                 break
@@ -925,6 +964,14 @@ class DatasetDiscovery:
                 continue
             seen_ids.add(d.id)
             if self.is_duplicate(d.id):
+                continue
+            # v3.0.43.18: skip HF ids we previously failed to schema-probe
+            if d.id in hf_blacklist:
+                n_rejected_blacklisted += 1
+                logger.debug(
+                    f"[Harvest] skip {d.id} — in HF schema blacklist "
+                    f"(reason: {hf_blacklist[d.id].get('reason', '?')[:60]})"
+                )
                 continue
             # v3.0.30.3: enforce relevance + flag filter at every entry point.
             slug_guess = self._slugify(d.id)
@@ -966,6 +1013,7 @@ class DatasetDiscovery:
                     configs_to_try = [None] + detection_first[:3]
                 except Exception:
                     pass
+                last_err = ""
                 for cfg in configs_to_try:
                     try:
                         probe = load_dataset(d.id, cfg, split="train", streaming=True) \
@@ -978,10 +1026,18 @@ class DatasetDiscovery:
                                 reason = f"{reason}; config={cfg}"
                             break
                     except Exception as e:
-                        logger.debug(f"[Harvest] probe {d.id} cfg={cfg} err: {str(e)[:120]}")
+                        last_err = str(e)[:150]
+                        logger.debug(f"[Harvest] probe {d.id} cfg={cfg} err: {last_err}")
                         continue
                 if not probe_ok:
                     logger.info(f"[Harvest] skip {d.id}: no bbox in any tested config")
+                    # v3.0.43.18: blacklist so we don't re-probe this id
+                    # on every harvest round
+                    _blacklist_hf_id(
+                        d.id,
+                        reason=f"probe_no_bbox_or_cast_error: {last_err}" if last_err
+                                else "no_bbox_in_probe",
+                    )
                     continue
 
             # Good candidate — download

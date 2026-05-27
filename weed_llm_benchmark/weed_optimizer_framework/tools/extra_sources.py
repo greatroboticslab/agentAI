@@ -26,20 +26,45 @@ logger = logging.getLogger(__name__)
 # GITHUB
 # =========================================================
 
-def search_github_repos(query, max_results=10):
-    """Search GitHub for repos via public API (60 req/hr unauth).
+# v3.0.43.18: read PAT from disk to lift rate limit from 60/h → 5000/h
+def _github_pat() -> str:
+    """Return the GitHub PAT from /jet/home/byler/.gh_pat (the file used
+    by the dashboard runner to push tunnel_url.json). Empty string if missing."""
+    for p in ("/jet/home/byler/.gh_pat",
+              os.path.expanduser("~/.gh_pat")):
+        try:
+            if os.path.isfile(p):
+                with open(p) as f:
+                    return f.read().strip()
+        except Exception:
+            pass
+    return ""
 
+
+def search_github_repos(query, max_results=10):
+    """Search GitHub for repos.
+
+    v3.0.43.18: uses PAT auth (5000 req/h) instead of unauth (60 req/h).
     Returns [{full_name, clone_url, stars, description}].
     """
     try:
         q = urllib.parse.quote(f"{query} yolo dataset")
         url = f"https://api.github.com/search/repositories?q={q}&sort=stars&per_page={max_results}"
-        req = urllib.request.Request(url, headers={
+        headers = {
             "User-Agent": "weed-llm-benchmark",
             "Accept": "application/vnd.github+json",
-        })
+        }
+        pat = _github_pat()
+        if pat:
+            headers["Authorization"] = f"token {pat}"
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as r:
             data = json.load(r)
+            # Log remaining rate-limit count so we know when we're close
+            try:
+                remaining = r.headers.get("X-RateLimit-Remaining", "?")
+                logger.debug(f"[GitHub] search ok, rate-limit remaining={remaining}")
+            except Exception: pass
         results = []
         for item in data.get("items", []):
             results.append({
@@ -94,10 +119,23 @@ def _count_labels(root):
     return sum(1 for _ in Path(root).rglob("*.txt"))
 
 
-def clone_github_repo(clone_url, dest_dir, depth=1, timeout=300):
+def clone_github_repo(clone_url, dest_dir, depth=1, timeout=180):
+    """Clone a GitHub repo with depth=1 + 3-min timeout.
+
+    v3.0.43.18:
+      - Reduced default timeout 300→180s (the 300s plant-disease repo stuck
+        the entire brain_harvest tonight; tighter cap is enough for actual repos)
+      - Inject PAT into URL if available, for higher rate limit + private repo
+        access (we only use public, but auth still helps Cloudflare front)
+    """
+    pat = _github_pat()
+    auth_url = clone_url
+    if pat and clone_url.startswith("https://github.com/"):
+        auth_url = clone_url.replace("https://github.com/",
+                                       f"https://{pat}@github.com/", 1)
     try:
         r = subprocess.run(
-            ["git", "clone", "--depth", str(depth), clone_url, dest_dir],
+            ["git", "clone", "--depth", str(depth), auth_url, dest_dir],
             capture_output=True, timeout=timeout,
         )
         return r.returncode == 0
@@ -236,6 +274,42 @@ def _kaggle_http_search(query, token, max_results=20):
     return out
 
 
+# v3.0.43.18: thread-based timeout for any blocking C-extension call.
+# kagglehub.dataset_download can hang indefinitely on extraction step;
+# we observed a 70-min stall on a 959KB CSV during the 2026-05-27 brain_hrv
+# overnight run. signal.alarm can't be used in non-main thread (uvicorn worker);
+# threading is the safe option. Caveat: thread leaks if the wrapped call is
+# truly stuck in C — SLURM walltime eventually reaps the job.
+import threading as _threading
+
+def _run_with_timeout(fn, args=(), kwargs=None, timeout_s=600, fn_name=""):
+    """Run `fn(*args, **kwargs)` in a daemon thread; raise TimeoutError if
+    it doesn't return within timeout_s seconds."""
+    kwargs = kwargs or {}
+    result_holder = {"out": None, "err": None, "done": False}
+
+    def runner():
+        try:
+            result_holder["out"] = fn(*args, **kwargs)
+        except BaseException as e:
+            result_holder["err"] = e
+        finally:
+            result_holder["done"] = True
+
+    t = _threading.Thread(target=runner, daemon=True,
+                          name=f"timeout_wrap_{fn_name}")
+    t.start()
+    t.join(timeout=timeout_s)
+    if not result_holder["done"]:
+        raise TimeoutError(
+            f"{fn_name or fn.__name__} did not return within {timeout_s}s "
+            f"(thread leaked; will die at SLURM walltime)"
+        )
+    if result_holder["err"]:
+        raise result_holder["err"]
+    return result_holder["out"]
+
+
 def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
     """Autonomously search Kaggle + download matching weed/crop bbox datasets.
 
@@ -288,8 +362,16 @@ def harvest_kaggle_datasets(data_dir, queries, already_known_cb, max_new=5):
         if already_known_cb(slug):
             continue
         try:
-            # kagglehub picks up KAGGLE_API_TOKEN automatically
-            path = kagglehub.dataset_download(ref)
+            # v3.0.43.18: 8-minute hard timeout. kagglehub has hung 70+ min on
+            # the 'Extracting files' phase before — never letting harvest finish.
+            path = _run_with_timeout(
+                kagglehub.dataset_download, args=(ref,),
+                timeout_s=480,
+                fn_name=f"kagglehub.dataset_download({ref})",
+            )
+        except TimeoutError as e:
+            logger.warning(f"[Kaggle] {ref}: {e}")
+            continue
         except Exception as e:
             logger.debug(f"[Kaggle] {ref}: download failed ({str(e)[:100]})")
             continue
