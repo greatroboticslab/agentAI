@@ -520,8 +520,14 @@ def root():
   setInterval(updateBanner, 7000);
 </script>
 
-<div class="section-h">🎛️ Cluster control (v3.0.43.4)</div>
+<div class="section-h">🎛️ Cluster control (v3.0.43)</div>
 <div class="grid">
+  <a class="card new" href="/morning_report" style="border-left-color:#2a7;">
+    <div class="icon">☀️</div>
+    <div class="title">/morning_report — overnight 总结</div>
+    <div class="desc">一页看 overnight progress:新 slugs、action history、agent jobs 最新输出。
+    早上一杯咖啡时间看完。</div>
+  </a>
   <a class="card new" href="/control" style="border-left-color:#c70;">
     <div class="icon">🎛️</div>
     <div class="title">/control — 控制台</div>
@@ -2933,6 +2939,188 @@ _CLASSES_CSS = """
   .help { background: #fffbe6; border-left: 3px solid #f59e0b; padding: 8px 12px;
           border-radius: 5px; font-size: 13px; margin: 10px 0; }
 """
+
+
+@app.get("/morning_report", response_class=HTMLResponse)
+def morning_report():
+    """One-page 'what happened overnight' summary. Read once with morning coffee."""
+    # Action history
+    history = []
+    if _ACTIONS_LOG.is_file():
+        try:
+            for line in _ACTIONS_LOG.read_text().splitlines():
+                try: history.append(_json.loads(line))
+                except Exception: pass
+        except Exception: pass
+
+    # Registry stats now
+    n_slugs = n_dl = n_cn = total_imgs = 0
+    new_today_slugs = []
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = _json.load(f)
+        ds = reg.get("datasets", {})
+        n_slugs = len(ds)
+        n_dl = sum(1 for v in ds.values() if v.get("status") == "downloaded")
+        n_cn = sum(1 for v in ds.values() if (v.get("class_names") or []))
+        total_imgs = sum(v.get("local_images", 0) for v in ds.values())
+        # Slugs downloaded in last 24h
+        from datetime import datetime as _dt
+        now = time.time()
+        for slug, info in ds.items():
+            d_at = info.get("downloaded_at")
+            if not d_at: continue
+            try:
+                t = _dt.fromisoformat(d_at.replace("Z", "+00:00")).timestamp()
+                if (now - t) < 24 * 3600:
+                    new_today_slugs.append({
+                        "slug": slug, "downloaded_at": d_at[:19],
+                        "local_images": info.get("local_images", 0),
+                        "class_names": (info.get("class_names") or [])[:5],
+                    })
+            except Exception:
+                pass
+        new_today_slugs.sort(key=lambda s: s["downloaded_at"], reverse=True)
+    except Exception:
+        pass
+
+    # Topic overrides
+    n_ov = len(_load_topic_overrides())
+
+    # Recent agent jobs
+    pat_dir = REPO / "results" / "framework"
+    agent_jobs = []
+    for pat in ("v3_0_43_dl_known", "v3_0_43_brain_harvest", "v3_0_43_topic_backfill"):
+        for f in pat_dir.glob(f"{pat}_*.out"):
+            import re as _re
+            m = _re.search(r"_(\d+)\.out$", f.name)
+            if not m: continue
+            try:
+                mt = f.stat().st_mtime
+                # Read last line for status
+                content = f.read_text(errors="replace")
+                last_lines = [l for l in content.splitlines() if l.strip()][-3:]
+            except Exception:
+                continue
+            agent_jobs.append({
+                "name": pat.replace("v3_0_43_", "").replace("_", "-"),
+                "jobid": m.group(1),
+                "mtime": mt,
+                "mtime_h": time.strftime("%m-%d %H:%M", time.localtime(mt)),
+                "tail": last_lines,
+            })
+    agent_jobs.sort(key=lambda j: j["mtime"], reverse=True)
+    agent_jobs = agent_jobs[:10]
+
+    # Build HTML
+    hist_html = ""
+    for ev in list(reversed(history))[:30]:
+        msg = (ev.get("result") or {}).get("msg", "")
+        hist_html += (f'<div class="hist-row"><span class="ts">{ev.get("ts_h","")}</span>'
+                       f'<span class="act">{ev.get("action","")}</span>'
+                       f'<span class="m">{str(msg)[:120]}</span></div>')
+    if not hist_html:
+        hist_html = "<div style='color:#888'>no actions logged yet</div>"
+
+    new_slugs_html = ""
+    for s in new_today_slugs[:20]:
+        cn = ", ".join(s["class_names"][:3]) or "<em>empty</em>"
+        new_slugs_html += (f'<div class="slug-row">'
+                            f'<span class="slug-name">{s["slug"]}</span>'
+                            f'<span class="slug-imgs">{s["local_images"]} imgs</span>'
+                            f'<span class="slug-cls">{cn}</span>'
+                            f'<span class="slug-ts">{s["downloaded_at"]}</span>'
+                            f'</div>')
+    if not new_slugs_html:
+        new_slugs_html = "<div style='color:#888'>no new slugs in last 24h</div>"
+
+    jobs_html = ""
+    for j in agent_jobs:
+        tail = "<br>".join(t[:100].replace("<","&lt;") for t in j["tail"])
+        jobs_html += (f'<div class="job-row">'
+                       f'<span class="job-name">{j["name"]}</span>'
+                       f'<span class="job-id">{j["jobid"]}</span>'
+                       f'<span class="job-ts">{j["mtime_h"]}</span>'
+                       f'<div class="job-tail">{tail}</div>'
+                       f'</div>')
+    if not jobs_html:
+        jobs_html = "<div style='color:#888'>no agent jobs found</div>"
+
+    return HTMLResponse(f'''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>☀️ Morning Report</title>
+<style>
+  body {{ font-family: -apple-system, "PingFang SC", sans-serif;
+         max-width: 1100px; margin: 30px auto; padding: 1rem;
+         background: #f2f3f7; color: #1a1a1d; }}
+  h1 {{ font-size: 24px; margin: 0 0 8px 0; }}
+  .sub {{ color: #666; font-size: 14px; margin-bottom: 20px; }}
+  .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px; margin-bottom: 20px; }}
+  .stat {{ background: #fff; padding: 12px 14px; border-radius: 8px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06); text-align: center; }}
+  .stat .v {{ font-size: 22px; font-weight: 600; color: #06c; }}
+  .stat .l {{ font-size: 11px; color: #666; }}
+  .section {{ background: #fff; padding: 14px 18px; border-radius: 8px;
+             box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 16px; }}
+  .section h3 {{ margin: 0 0 12px 0; font-size: 14px; color: #555;
+                text-transform: uppercase; letter-spacing: 0.5px; }}
+  .hist-row, .slug-row, .job-row {{ display: grid; gap: 8px; padding: 6px 0;
+                                     border-bottom: 1px solid #f0f0f0; font-size: 12px; }}
+  .hist-row {{ grid-template-columns: 160px 160px 1fr; }}
+  .slug-row {{ grid-template-columns: 1fr 80px 1fr 140px; }}
+  .job-row {{ grid-template-columns: 140px 90px 90px; align-items: start;
+              padding: 8px 0; }}
+  .job-tail {{ grid-column: 1 / -1; font-family: ui-monospace, monospace;
+               font-size: 10px; color: #555; background: #fafafa;
+               padding: 5px 8px; border-radius: 4px; margin-top: 4px; }}
+  .ts, .slug-ts {{ font-family: ui-monospace, monospace; color: #888; font-size: 11px; }}
+  .act, .slug-name, .job-name {{ font-weight: 600; color: #06c; font-family: ui-monospace, monospace; }}
+  .slug-imgs, .job-id {{ text-align: right; font-family: ui-monospace, monospace; color: #555; }}
+  .slug-cls {{ color: #666; word-break: break-all; }}
+  .nav {{ margin-bottom: 20px; font-size: 13px; }}
+  .nav a {{ color: #06c; margin-right: 12px; }}
+</style>
+</head><body>
+<h1>☀️ Morning Report</h1>
+<div class="sub">Snapshot of cluster state and overnight progress.</div>
+<div class="nav">
+  <a href="/">🏠 hub</a>
+  <a href="/control">🎛️ control</a>
+  <a href="/classes">📋 classes</a>
+  <a href="/slugs">📦 slugs</a>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="v">{n_slugs}</div><div class="l">total slugs</div></div>
+  <div class="stat"><div class="v">{n_dl}</div><div class="l">downloaded</div></div>
+  <div class="stat"><div class="v">{n_cn}</div><div class="l">with class_names</div></div>
+  <div class="stat"><div class="v">{total_imgs:,}</div><div class="l">total imgs</div></div>
+  <div class="stat"><div class="v">{n_ov}</div><div class="l">topic overrides</div></div>
+  <div class="stat"><div class="v">{len(new_today_slugs)}</div><div class="l">new today (24h)</div></div>
+</div>
+
+<div class="section">
+  <h3>🆕 new slugs (last 24h)</h3>
+  {new_slugs_html}
+</div>
+
+<div class="section">
+  <h3>📚 action history (cluster_actions.jsonl)</h3>
+  {hist_html}
+</div>
+
+<div class="section">
+  <h3>🤖 recent agent jobs (last 3 lines of each)</h3>
+  {jobs_html}
+</div>
+
+<div class="sub">
+  Auto-refresh: <a href="/morning_report">🔄 reload</a> ·
+  raw JSON: <a href="/api/action_history">history</a> /
+  <a href="/api/cluster_status">cluster</a>
+</div>
+</body></html>''')
 
 
 @app.get("/control", response_class=HTMLResponse)
