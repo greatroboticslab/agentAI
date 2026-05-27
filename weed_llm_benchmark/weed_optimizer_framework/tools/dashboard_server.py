@@ -2749,6 +2749,31 @@ def _class_summary_landing(cls: str) -> dict:
     out["n_reg_slugs"] = len(slugs)
     out["n_reg_est"] = 200 * len(slugs)  # upper-bound (cap is 200/slug)
 
+    # v3.0.43.14: mark classes whose source slug was downloaded in the last
+    # 24h with a 'new today' flag — surface tonight's data on /classes.
+    out["is_new_today"] = False
+    if slugs:
+        try:
+            with open(REGISTRY_PATH) as f:
+                _reg_for_age = _json.load(f)
+            now = time.time()
+            for sg_tuple in slugs:
+                slug = sg_tuple[0]
+                info = (_reg_for_age.get("datasets") or {}).get(slug) or {}
+                dl_at = info.get("downloaded_at")
+                if not dl_at: continue
+                try:
+                    # parse ISO timestamp like '2026-05-27T05:30:42'
+                    from datetime import datetime as _dt
+                    t = _dt.fromisoformat(dl_at.replace("Z", "+00:00")).timestamp()
+                    if (now - t) < 24 * 3600:
+                        out["is_new_today"] = True
+                        break
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     # v3.0.43.6: when bank+flux missed (non-CWD12 class), fall back to a
     # representative image from the first slug that has this class.
     # v3.0.43.7: cache the resolved path to disk so subsequent loads don't
@@ -3623,18 +3648,28 @@ def classes_landing():
         # Whether the topic came from override (Brain/user) or keyword heuristic
         is_override = cls in _load_topic_overrides()
         topic = _class_topic(cls)
+        is_new_today = summary.get("is_new_today", False)
         topic_counts["all"] += 1
         topic_counts[topic] = topic_counts.get(topic, 0) + 1
         rows.append((cls, zh, n_total_est, n_bank, n_flux,
-                     n_reg_slugs, n_reg_est, n_ex, n_bad, thumb_src, topic, is_override))
+                     n_reg_slugs, n_reg_est, n_ex, n_bad, thumb_src, topic, is_override, is_new_today))
+
+    # Sort: new-today first, then CWD12, then by name
+    def sort_key(r):
+        cls = r[0]
+        is_new = r[12]
+        is_cwd12 = cls in _CWD12
+        return (0 if is_new else (1 if is_cwd12 else 2), cls.lower())
+    rows.sort(key=sort_key)
 
     cards = "".join(
         f'''
-        <a class="class-card" href="/classes/{cls}" data-topic="{topic}" data-name="{cls.lower()}" data-cls="{cls}">
+        <a class="class-card{' new-today' if is_new_today else ''}" href="/classes/{cls}" data-topic="{topic}" data-name="{cls.lower()}" data-cls="{cls}" data-new="{int(is_new_today)}">
           {(f'<img src="{thumb}" loading="lazy" alt="{cls}"/>' if thumb
             else f'<div class="no-thumb">no image</div>')}
           <div class="name">{cls}
-            <span class="topic-tag tag-{topic}" title="{'手动覆盖' if is_override else '关键词启发式 (我硬编码的, 可改: PATCH /api/class_topic/' + cls + ')'}">{topic}{'★' if is_override else ''}</span>
+            {('<span class="new-badge">🆕 NEW</span>' if is_new_today else '')}
+            <span class="topic-tag tag-{topic}" title="{'手动覆盖' if is_override else '关键词启发式'}">{topic}{'★' if is_override else ''}</span>
             {(f'<span class="badge exemplar">✓ {n_ex}</span>' if n_ex else '')}
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
@@ -3642,7 +3677,7 @@ def classes_landing():
           <div class="counts">bank {n_bank} · flux {n_flux} · real ≤{n_reg_est} ({n_reg_slugs} slugs)</div>
           <div class="counts">已审 {n_ex+n_bad}</div>
         </a>'''
-        for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb, topic, is_override in rows
+        for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb, topic, is_override, is_new_today in rows
     )
 
     # Build filter bar + search input
@@ -3712,6 +3747,15 @@ def classes_landing():
   .no-thumb {{ width: 100%; height: 180px; background: #f0f0f0; color: #aaa;
               display: flex; align-items: center; justify-content: center;
               font-size: 12px; }}
+  .class-card.new-today {{ box-shadow: 0 0 0 3px #2a7;
+                            animation: pulse-new 2s infinite; }}
+  @keyframes pulse-new {{
+    0%, 100% {{ box-shadow: 0 0 0 3px #2a7; }}
+    50% {{ box-shadow: 0 0 0 3px #4c9; }}
+  }}
+  .new-badge {{ display: inline-block; padding: 1px 6px; border-radius: 3px;
+                background: #2a7; color: #fff; font-size: 10px;
+                font-weight: 700; margin-left: 4px; }}
 </style>
 </head><body>
 <header>
