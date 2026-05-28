@@ -2926,8 +2926,19 @@ def _class_summary_landing(cls: str) -> dict:
     if first_src is None and slugs:
         try:
             reg = _get_cached_registry()
-            _WRAPPERS = ("", "Dataset", "dataset", "PlantVillage", "data",
-                         "Data", "train", "valid", "test", "images")
+            # v3.0.43.22d: wrapper parents now cover 2-level nesting
+            # (data/train/<raw>, kg_kushagra3204) and arbitrary single
+            # wrappers (Rice_Image_Dataset/<raw>, kg_muratkokludataset).
+            # Match is case-insensitive: a folder 'almond' satisfies class
+            # 'Almond'. The case-insensitive scan of a parent is capped at
+            # 500 entries so a flat image dir (no class subdirs) bails fast
+            # instead of stat-storming.
+            _WRAPPERS = (
+                "", "Dataset", "dataset", "PlantVillage", "data", "Data",
+                "train", "valid", "test", "images", "Rice_Image_Dataset",
+                "data/train", "data/valid", "dataset/train", "dataset/valid",
+                "train/images", "Dataset/train",
+            )
             for slug_tuple in slugs[:3]:
                 slug = slug_tuple[0]
                 raw = slug_tuple[2] if len(slug_tuple) >= 3 else None
@@ -2938,9 +2949,27 @@ def _class_summary_landing(cls: str) -> dict:
                 if not lp or not os.path.isdir(lp):
                     continue
                 lpp = Path(lp)
+                raw_l = raw.lower()
                 for w in _WRAPPERS:
-                    base = (lpp / w / raw) if w else (lpp / raw)
+                    parent = (lpp / w) if w else lpp
+                    if not parent.is_dir():
+                        continue
+                    base = parent / raw
                     if not base.is_dir():
+                        # case-insensitive fallback, bounded to 500 entries
+                        base = None
+                        try:
+                            n = 0
+                            for d in parent.iterdir():
+                                n += 1
+                                if n > 500:
+                                    break
+                                if d.is_dir() and d.name.lower() == raw_l:
+                                    base = d
+                                    break
+                        except Exception:
+                            base = None
+                    if base is None or not base.is_dir():
                         continue
                     for imgdir in (base, base / "images"):
                         if not imgdir.is_dir():
