@@ -1236,12 +1236,20 @@ def _find_label_dirs(local_p: Path, max_dirs: int = 64) -> list:
 
 
 def _reg_pool_for_class(cls: str, per_slug_cap: int = 200,
-                         include_junk: bool = False) -> list:
+                         include_junk: bool = False,
+                         max_scan_per_slug: int = 4000) -> list:
     """For each slug containing `cls`, sample up to per_slug_cap images whose
     label has a bbox of that class_id. Cached on disk by registry mtime.
 
     v3.0.43: by default exclude slugs marked '✗ junk' via /slugs UI.
-    Pass include_junk=True to override."""
+    Pass include_junk=True to override.
+
+    v3.0.43.22c: max_scan_per_slug bounds how many label .txt files we READ
+    per slug before giving up — a per-class-folder detection slug
+    (kg_karagwaanntreasure: 23 folders × ~1-2K txt = 20K+ files) otherwise
+    made every disease class read tens of thousands of files. The landing
+    thumb no longer calls this at all (it uses the class-folder name); this
+    cap only protects the class-detail view."""
     idx = _load_registry_index()
     entries = idx.get(cls, [])
     if not entries:
@@ -1281,15 +1289,19 @@ def _reg_pool_for_class(cls: str, per_slug_cap: int = 200,
         label_dirs = _find_label_dirs(local_p)
         if not label_dirs:
             continue
+        n_scanned = 0
         try:
             for ldir in label_dirs:
-                if n_added >= per_slug_cap:
+                if n_added >= per_slug_cap or n_scanned >= max_scan_per_slug:
                     break
                 try:
                     lbls = sorted(ldir.glob("*.txt"))
                 except Exception:
                     continue
                 for lbl in lbls:
+                    n_scanned += 1
+                    if n_scanned >= max_scan_per_slug:
+                        break
                     try:
                         txt = lbl.read_text(errors="ignore")
                     except Exception:
@@ -2903,10 +2915,56 @@ def _class_summary_landing(cls: str) -> dict:
     # image regardless of class. So if a slug has 6 classes (Am/Co/Por/Eu/...),
     # ALL 6 class cards showed the same thumb. Fix: use _reg_pool_for_class
     # which actually walks labels and returns images CONTAINING this class.
+    # v3.0.43.22c: FAST class-specific thumb via class-NAMED folder. Big
+    # plant-disease slugs store images per class:
+    #   {lp}/Dataset/<raw>/(images/)*.jpg, {lp}/PlantVillage/<raw>/*.jpg,
+    #   {lp}/<raw>/*.jpg. The folder name already identifies the class, so we
+    #   need ZERO label reads. The old code here called
+    #   _reg_pool_for_class(cap=10) which read 20K+ label .txt per disease
+    #   class on detection slugs (kg_karagwaanntreasure) → 70-85s/class,
+    #   5-6h prewarm. This targeted probe is ~30 stats/class.
     if first_src is None and slugs:
         try:
-            # Use the proper class-specific pool builder (disk-cached).
-            # First entry is an image whose label contains this class's bbox.
+            reg = _get_cached_registry()
+            _WRAPPERS = ("", "Dataset", "dataset", "PlantVillage", "data",
+                         "Data", "train", "valid", "test", "images")
+            for slug_tuple in slugs[:3]:
+                slug = slug_tuple[0]
+                raw = slug_tuple[2] if len(slug_tuple) >= 3 else None
+                if not raw:
+                    continue
+                info = (reg.get("datasets") or {}).get(slug) or {}
+                lp = info.get("local_path")
+                if not lp or not os.path.isdir(lp):
+                    continue
+                lpp = Path(lp)
+                for w in _WRAPPERS:
+                    base = (lpp / w / raw) if w else (lpp / raw)
+                    if not base.is_dir():
+                        continue
+                    for imgdir in (base, base / "images"):
+                        if not imgdir.is_dir():
+                            continue
+                        try:
+                            for p in imgdir.iterdir():
+                                if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                                    first_src = p
+                                    break
+                        except Exception:
+                            pass
+                        if first_src:
+                            break
+                    if first_src:
+                        break
+                if first_src:
+                    break
+        except Exception as e:
+            log.debug(f"class-folder thumb fail {cls}: {e}")
+    # Type-A (shared flat images/+labels/, class encoded by cid): no
+    # class-named folder, so fall to the label-reading pool — but it's now
+    # scan-capped and these slugs are small (weedsense 1.1K, cottonweed 3.4K).
+    if first_src is None and slugs:
+        try:
             pool = _reg_pool_for_class(cls, per_slug_cap=10)
             if pool:
                 e0 = pool[0]
