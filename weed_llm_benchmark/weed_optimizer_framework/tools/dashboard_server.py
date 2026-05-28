@@ -1181,6 +1181,58 @@ _pool_cache_dir = REPO / "results" / "framework" / "cache" / "class_pool"
 _pool_cache_dir.mkdir(parents=True, exist_ok=True)
 
 
+def _scandir_subdirs(d: Path, cap: int = 600) -> list:
+    """Return subdirectories of `d`, scanning at most `cap` entries. A flat
+    image dir (no subdirs) bails after `cap` os.scandir entries instead of
+    enumerating tens of thousands of files — this is the bound that keeps
+    folder discovery from stat-storming on Lustre."""
+    subs: list = []
+    try:
+        with os.scandir(d) as it:
+            n = 0
+            for e in it:
+                n += 1
+                if n > cap:
+                    break
+                try:
+                    if e.is_dir():
+                        subs.append(Path(e.path))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return subs
+
+
+def _find_class_folder(lpp: Path, raw: str, max_depth: int = 3,
+                       max_visit: int = 400):
+    """Bounded BFS for a directory named `raw` (case-insensitive) under lpp.
+    v3.0.43.22e: replaces the brittle hardcoded-wrapper list (Dataset/,
+    PlantVillage/, data/train/, Rice_Image_Dataset/, …). Real slugs nest
+    class folders under arbitrary wrapper names (PlantDiseasesDataset/Apple,
+    Agricultural-crops/almond, BangladeshiCrops/BangladeshiCrops/Crop___Disease/
+    Potato). BFS descends only into container dirs via _scandir_subdirs (so a
+    flat image dir is cheap), capped at max_visit dir-stats total."""
+    raw_l = raw.lower()
+    from collections import deque
+    q = deque([(lpp, 0)])
+    visited = 0
+    while q and visited < max_visit:
+        d, depth = q.popleft()
+        subs = _scandir_subdirs(d)
+        for sd in subs:
+            visited += 1
+            if sd.name.lower() == raw_l:
+                return sd
+            if visited >= max_visit:
+                return None
+        if depth < max_depth:
+            # descend breadth-first into the first 40 container dirs
+            for sd in subs[:40]:
+                q.append((sd, depth + 1))
+    return None
+
+
 def _find_label_dirs(local_p: Path, max_dirs: int = 64) -> list:
     """Return YOLO `labels/` directories under local_p WITHOUT a full-tree
     rglob. v3.0.43.22: the old code did `local_p.rglob('*.txt')` which on
@@ -2926,20 +2978,10 @@ def _class_summary_landing(cls: str) -> dict:
     if first_src is None and slugs:
         try:
             reg = _get_cached_registry()
-            # v3.0.43.22d: wrapper parents now cover 2-level nesting
-            # (data/train/<raw>, kg_kushagra3204) and arbitrary single
-            # wrappers (Rice_Image_Dataset/<raw>, kg_muratkokludataset).
-            # Match is case-insensitive: a folder 'almond' satisfies class
-            # 'Almond'. The case-insensitive scan of a parent is capped at
-            # 500 entries so a flat image dir (no class subdirs) bails fast
-            # instead of stat-storming.
-            _WRAPPERS = (
-                "", "Dataset", "dataset", "PlantVillage", "data", "Data",
-                "train", "valid", "test", "images", "Rice_Image_Dataset",
-                "data/train", "data/valid", "dataset/train", "dataset/valid",
-                "train/images", "Dataset/train",
-            )
-            for slug_tuple in slugs[:3]:
+            # v3.0.43.22e: bounded BFS auto-discovery of the class-named
+            # folder, replacing the hardcoded-wrapper guessing (which missed
+            # PlantDiseasesDataset/, Agricultural-crops/, BangladeshiCrops/…).
+            for slug_tuple in slugs[:4]:
                 slug = slug_tuple[0]
                 raw = slug_tuple[2] if len(slug_tuple) >= 3 else None
                 if not raw:
@@ -2948,41 +2990,19 @@ def _class_summary_landing(cls: str) -> dict:
                 lp = info.get("local_path")
                 if not lp or not os.path.isdir(lp):
                     continue
-                lpp = Path(lp)
-                raw_l = raw.lower()
-                for w in _WRAPPERS:
-                    parent = (lpp / w) if w else lpp
-                    if not parent.is_dir():
+                base = _find_class_folder(Path(lp), raw)
+                if base is None:
+                    continue
+                for imgdir in (base, base / "images"):
+                    if not imgdir.is_dir():
                         continue
-                    base = parent / raw
-                    if not base.is_dir():
-                        # case-insensitive fallback, bounded to 500 entries
-                        base = None
-                        try:
-                            n = 0
-                            for d in parent.iterdir():
-                                n += 1
-                                if n > 500:
-                                    break
-                                if d.is_dir() and d.name.lower() == raw_l:
-                                    base = d
-                                    break
-                        except Exception:
-                            base = None
-                    if base is None or not base.is_dir():
-                        continue
-                    for imgdir in (base, base / "images"):
-                        if not imgdir.is_dir():
-                            continue
-                        try:
-                            for p in imgdir.iterdir():
-                                if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
-                                    first_src = p
-                                    break
-                        except Exception:
-                            pass
-                        if first_src:
-                            break
+                    try:
+                        for p in imgdir.iterdir():
+                            if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                                first_src = p
+                                break
+                    except Exception:
+                        pass
                     if first_src:
                         break
                 if first_src:
