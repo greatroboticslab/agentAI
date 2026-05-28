@@ -1132,6 +1132,26 @@ def _canon_class(raw: str) -> str:
     return "".join(p[:1].upper() + p[1:].lower() for p in parts if p)
 
 
+# v3.0.43.23 (user request): pseudo-classes that are NOT real species —
+# they're PlantVillage image-VARIANT folders (color/grayscale/segmented) or
+# junk folder names mis-extracted as class_names by the harvester. They have
+# no meaningful per-class thumbnail and pollute /classes. Filtered out of the
+# class index entirely. Matched on lowercased-alphanumeric form so case and
+# punctuation don't matter. Source data stays on disk; only the bogus
+# "class" is hidden.
+_JUNK_CLASS_ALNUM = frozenset({
+    "color", "grayscale", "segmented", "nonsegmentedv2",
+    "cropimages", "somemoreimages", "testcropimage",
+})
+
+
+def _is_junk_class(canon: str) -> bool:
+    """True if `canon` is a known non-species pseudo-class to hide."""
+    if not canon:
+        return False
+    return _re_canon.sub(r'[^A-Za-z0-9]', '', canon).lower() in _JUNK_CLASS_ALNUM
+
+
 _registry_index_cache: dict = {"mtime": 0.0, "index": {}, "empty_slugs": []}
 
 def _load_registry_index() -> dict:
@@ -1166,6 +1186,8 @@ def _load_registry_index() -> dict:
         for cid, raw in enumerate(cn):
             canon = _canon_class(raw)
             if not canon:
+                continue
+            if _is_junk_class(canon):   # v3.0.43.23: hide non-species pseudo-classes
                 continue
             idx.setdefault(canon, []).append((slug, cid, raw))
     _registry_index_cache.update({"mtime": mtime, "index": idx, "empty_slugs": empty})
