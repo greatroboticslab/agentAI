@@ -1193,12 +1193,22 @@ def _find_label_dirs(local_p: Path, max_dirs: int = 64) -> list:
         local_p/<wrapper>/<split>/labels (2-level nesting)
 
     A classification slug returns [] instantly, so the caller skips it."""
+    # v3.0.43.22b: NEVER iterate a dir full of image files. The first cut
+    # descended into every depth-1 child, so a flat {lp}/{class}/*.jpg
+    # classification slug triggered tens of thousands of .is_dir() stats on
+    # Lustre (AppleAppleScab took 5 min). Now: depth-1 checks only
+    # {child}/labels (one stat each), and we descend a level deeper ONLY
+    # into known split/wrapper dirs (train/valid/data/dataset/…) which hold
+    # a handful of subdirs, never raw images.
+    _SPLIT_HINTS = {
+        "train", "training", "valid", "validation", "val", "test", "testing",
+        "images", "data", "dataset", "yolo", "splits", "obj_train_data",
+        "obj_val_data", "obj_test_data",
+    }
     found: list = []
-    # depth 0
     d0 = local_p / "labels"
     if d0.is_dir():
         found.append(d0)
-    # depth 1 + depth 2 (bounded iterdir, never a recursive walk)
     try:
         for child in local_p.iterdir():
             if not child.is_dir() or child.name == "labels":
@@ -1208,7 +1218,8 @@ def _find_label_dirs(local_p: Path, max_dirs: int = 64) -> list:
                 found.append(d1)
                 if len(found) >= max_dirs:
                     return found
-            else:
+            elif child.name.lower() in _SPLIT_HINTS:
+                # cheap descent: split dirs contain few subdirs, not raw imgs
                 try:
                     for gchild in child.iterdir():
                         if gchild.is_dir():
