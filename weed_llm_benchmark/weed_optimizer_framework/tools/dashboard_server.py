@@ -2883,6 +2883,40 @@ def _class_summary_landing(cls: str) -> dict:
                             break
                     if first_src:
                         break
+                # v3.0.43.21: classification-style fallback — if no YOLO
+                # images/labels structure, try the raw-class-named subdir
+                # under common parents (PlantVillage/, dataset/, data/, lp/).
+                # Many plant-disease classification slugs store imgs as:
+                #   {lp}/PlantVillage/Potato___Early_blight/*.jpg
+                # The raw class name is the third tuple element from idx.
+                if first_src is None and slugs:
+                    raw = slugs[0][2] if len(slugs[0]) >= 3 else None
+                    if raw:
+                        for slug_tuple in slugs[:2]:
+                            slug = slug_tuple[0]
+                            info = (reg.get("datasets") or {}).get(slug) or {}
+                            lp = info.get("local_path")
+                            if not lp or not os.path.isdir(lp):
+                                continue
+                            lpp = Path(lp)
+                            cand_parents = [lpp, lpp / "PlantVillage",
+                                            lpp / "dataset", lpp / "data",
+                                            lpp / "train", lpp / "valid",
+                                            lpp / "test"]
+                            for parent in cand_parents:
+                                target = parent / raw
+                                if target.is_dir():
+                                    try:
+                                        for p in target.iterdir():
+                                            if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                                                first_src = p
+                                                break
+                                    except Exception:
+                                        pass
+                                if first_src:
+                                    break
+                            if first_src:
+                                break
                 # Persist whatever we found (or empty if nothing)
                 try:
                     thumb_cache_p.write_text(str(first_src) if first_src else "")
