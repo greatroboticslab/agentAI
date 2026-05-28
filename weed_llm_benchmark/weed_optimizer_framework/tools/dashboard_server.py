@@ -82,6 +82,31 @@ app.add_middleware(
 @app.on_event("startup")
 def _prewarm_classes_cache():
     import threading
+    # v3.0.43.22: uvicorn runs --workers 2, so this startup hook fires in
+    # BOTH processes → two prewarm threads racing on the same cache dir
+    # (duplicate work + Lustre contention). Guard with an atomic lock file
+    # so only the first worker prewarms; the second exits immediately.
+    lock_fp = _pool_cache_dir / ".prewarm.lock"
+    try:
+        _pool_cache_dir.mkdir(parents=True, exist_ok=True)
+        # O_CREAT|O_EXCL is atomic across processes on the same node.
+        fd = os.open(str(lock_fp), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+    except FileExistsError:
+        # Stale lock (>2h) → take over; else another worker owns prewarm.
+        try:
+            if time.time() - lock_fp.stat().st_mtime > 7200:
+                lock_fp.unlink(missing_ok=True)
+                os.close(os.open(str(lock_fp), os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            else:
+                log.info("[prewarm] another worker owns the lock — skipping")
+                return
+        except Exception:
+            log.info("[prewarm] lock contention — skipping")
+            return
+    except Exception as e:
+        log.debug(f"[prewarm] lock setup failed ({e}) — proceeding anyway")
     def worker():
         try:
             import time as _t
@@ -1156,6 +1181,49 @@ _pool_cache_dir = REPO / "results" / "framework" / "cache" / "class_pool"
 _pool_cache_dir.mkdir(parents=True, exist_ok=True)
 
 
+def _find_label_dirs(local_p: Path, max_dirs: int = 64) -> list:
+    """Return YOLO `labels/` directories under local_p WITHOUT a full-tree
+    rglob. v3.0.43.22: the old code did `local_p.rglob('*.txt')` which on
+    classification slugs (108K-434K images, NO labels/ at all) walked the
+    entire Lustre tree and took 70-85s PER CLASS — prewarm of 267 classes
+    took 5-6 hours. Here we probe only the common bounded locations:
+
+        local_p/labels
+        local_p/<split>/labels          (train/valid/test/...)
+        local_p/<wrapper>/<split>/labels (2-level nesting)
+
+    A classification slug returns [] instantly, so the caller skips it."""
+    found: list = []
+    # depth 0
+    d0 = local_p / "labels"
+    if d0.is_dir():
+        found.append(d0)
+    # depth 1 + depth 2 (bounded iterdir, never a recursive walk)
+    try:
+        for child in local_p.iterdir():
+            if not child.is_dir() or child.name == "labels":
+                continue
+            d1 = child / "labels"
+            if d1.is_dir():
+                found.append(d1)
+                if len(found) >= max_dirs:
+                    return found
+            else:
+                try:
+                    for gchild in child.iterdir():
+                        if gchild.is_dir():
+                            d2 = gchild / "labels"
+                            if d2.is_dir():
+                                found.append(d2)
+                                if len(found) >= max_dirs:
+                                    return found
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return found
+
+
 def _reg_pool_for_class(cls: str, per_slug_cap: int = 200,
                          include_junk: bool = False) -> list:
     """For each slug containing `cls`, sample up to per_slug_cap images whose
@@ -1197,37 +1265,47 @@ def _reg_pool_for_class(cls: str, per_slug_cap: int = 200,
             continue
         local_p = Path(lp)
         n_added = 0
+        # v3.0.43.22: bounded label-dir probe — NO full-tree rglob. A
+        # classification slug (no labels/ anywhere) yields [] instantly.
+        label_dirs = _find_label_dirs(local_p)
+        if not label_dirs:
+            continue
         try:
-            for lbl in sorted(local_p.rglob("*.txt")):
-                if "labels" not in lbl.parts:
-                    continue
-                try:
-                    txt = lbl.read_text(errors="ignore")
-                except Exception:
-                    continue
-                has = False
-                for line in txt.splitlines():
-                    p = line.split()
-                    if p and p[0].isdigit() and int(p[0]) == cid:
-                        has = True
-                        break
-                if not has:
-                    continue
-                img_path = None
-                for ext in (".jpg", ".png", ".jpeg", ".JPG", ".PNG", ".JPEG"):
-                    cand = Path(str(lbl).replace("/labels/", "/images/")).with_suffix(ext)
-                    if cand.is_file():
-                        img_path = cand
-                        break
-                if img_path is None:
-                    continue
-                out.append({
-                    "kind": "reg", "slug": slug,
-                    "fname": img_path.name, "cid": cid,
-                })
-                n_added += 1
+            for ldir in label_dirs:
                 if n_added >= per_slug_cap:
                     break
+                try:
+                    lbls = sorted(ldir.glob("*.txt"))
+                except Exception:
+                    continue
+                for lbl in lbls:
+                    try:
+                        txt = lbl.read_text(errors="ignore")
+                    except Exception:
+                        continue
+                    has = False
+                    for line in txt.splitlines():
+                        p = line.split()
+                        if p and p[0].isdigit() and int(p[0]) == cid:
+                            has = True
+                            break
+                    if not has:
+                        continue
+                    img_path = None
+                    for ext in (".jpg", ".png", ".jpeg", ".JPG", ".PNG", ".JPEG"):
+                        cand = Path(str(lbl).replace("/labels/", "/images/")).with_suffix(ext)
+                        if cand.is_file():
+                            img_path = cand
+                            break
+                    if img_path is None:
+                        continue
+                    out.append({
+                        "kind": "reg", "slug": slug,
+                        "fname": img_path.name, "cid": cid,
+                    })
+                    n_added += 1
+                    if n_added >= per_slug_cap:
+                        break
         except Exception as e:
             log.warning(f"reg pool walk fail {slug}/{cls}: {e}")
     try:
