@@ -2810,6 +2810,26 @@ def _class_summary_landing(cls: str) -> dict:
     # representative image from the first slug that has this class.
     # v3.0.43.7: cache the resolved path to disk so subsequent loads don't
     # repeat the rglob (which was hitting 30s timeouts for ~350 classes).
+    # v3.0.43.20 (USER BUG REPORT): the previous code picked the SLUG's first
+    # image regardless of class. So if a slug has 6 classes (Am/Co/Por/Eu/...),
+    # ALL 6 class cards showed the same thumb. Fix: use _reg_pool_for_class
+    # which actually walks labels and returns images CONTAINING this class.
+    if first_src is None and slugs:
+        try:
+            # Use the proper class-specific pool builder (disk-cached).
+            # First entry is an image whose label contains this class's bbox.
+            pool = _reg_pool_for_class(cls, per_slug_cap=10)
+            if pool:
+                e0 = pool[0]
+                slug = e0.get("slug"); fn = e0.get("fname")
+                if slug and fn:
+                    found = find_image_in_slug(slug, fn)
+                    if found is not None:
+                        first_src = found[0]
+        except Exception as e:
+            log.debug(f"reg-fallback class-specific thumb fail {cls}: {e}")
+    # OLD path (slug-first-image, NOT class-specific) — kept as final fallback
+    # if class-specific lookup failed
     if first_src is None and slugs:
         thumb_cache_p = _pool_cache_dir / f"_thumb_src_{cls}.txt"
         try:

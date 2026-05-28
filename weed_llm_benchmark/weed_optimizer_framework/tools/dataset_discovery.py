@@ -786,25 +786,44 @@ class DatasetDiscovery:
 
     # Reject overrides: even if a slug matches positive vocab, drop it if it
     # also matches reject vocab. Per 2026-05-12 user spec.
+    # v3.0.43.20 (2026-05-27): user audited /classes, found 14+ garbage slugs
+    # that bypassed earlier filter. Reject now includes their exact substrings
+    # so Brain CAN'T re-harvest these on next round.
     AG_VOCAB_REJECT = (
-        # pests + insects
+        # pests + insects (we keep disease but NOT bug)
         "pest", "insect", "bug-detect", "fly", "mosquito", "beetle",
         "weevil", "caterpillar", "earthworm", "grasshopper",
-        "bee", "beehive", "honeybee", "spider",
-        # diseases / classification
-        "disease", "blight", "rust", "rot-detect", "infection",
+        "bee", "beehive", "honeybee", "spider", "ant-detect",
+        # ** v3.0.43.20 NEW: non-plant categories that slipped through **
+        "price_tag", "price-tag",        # d_shatnev__price_tag_detection
+        "commonform",                    # jbarrow/kurianmelvin/wewocram commonforms (forms!)
+        "yonder",                        # astralhf__yonder
+        "d-kap", "dkap",                 # kg_hsmcaju__d-kap
+        "uvh_coco",                      # surenreddy__uvh_coco (generic COCO)
+        "cheque", "bofa",                # ashishkamra79__bofa_cheques
+        "tomatoweight",                  # gh_lunaimer (QR code, not weed)
+        "qr-code", "qr_code", "qr-detect",
+        "kapr", "kapp",                  # generic noise
+        "agropestic",                    # pesticide dataset (off domain)
+        "dangerous-insect", "scenes",    # wider non-plant scenes
+        "warehouse", "robotics-arm",
+        # NEW: trees specifically — coconut DISEASE is plant disease so OK, but
+        # tree-* slugs are typically inventory not weed
+        # plantdoc kept in reject (plant doc is generic doc, NOT weed-focused)
+        # weeds vs leafdoc decision: still reject classification-only sets unless
+        # they're clearly weed-labeled
+        # diseases / classification — KEPT in reject for HARVEST (Brain shouldn't
+        # ACTIVELY seek these). Existing plant-disease in registry is KEPT
+        # because they may contribute leaf visual prior after OWLv2 autolabel.
+        "blight", "rust-detect", "rot-detect", "infection",
         "virus", "fungus", "mildew", "lesion",
-        "plantvillage", "plant-village", "leafsnap",
-        "plantdoc", "plant-doc", "plantifydr",
-        "leaf-disease", "leaf disease", "leaf-classify",
-        # not plants at all
+        # tree/non-plant retained
         "warp", "recycling", "waste",
-        # trees and indoor/decorative (off-domain)
-        "tree-detect", "tree species", "tree-classification",
+        "tree-species", "tree-classification",
         "houseplant", "indoor plant", "decorative",
         "bonsai", "succulent",
         # generic classification (not detection)
-        "classification", "image-classification",
+        "image-classification",
     )
 
     def _card_suggests_bbox(self, ds_info):
