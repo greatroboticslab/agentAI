@@ -201,9 +201,14 @@ def detect_class_names(slug: str, lp: Path) -> tuple[list[str], str]:
         except Exception:
             pass
 
-    # 3) classification-style: try common bases
+    # 3) classification-style: try common bases.
+    # v3.0.43.22: added bare wrapper dirs 'dataset','data','Data','train_images'
+    # — kg_saroz014__plant-disease stores classes under {lp}/dataset/<class>,
+    # kg_nirmalsankalana__plant-diseases-training-dataset under {lp}/data/<class>.
+    # These were invisible because only '<wrapper>/train' was probed before.
     for base_rel in ("train", "training", "images/train", "train/images",
-                     "data/train", ""):
+                     "data/train", "dataset", "data", "Data",
+                     "dataset/train", "train_images", ""):
         base = lp / base_rel if base_rel else lp
         names = _detect_subdirs(base)
         if names:
