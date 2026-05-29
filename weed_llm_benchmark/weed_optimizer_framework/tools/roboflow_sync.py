@@ -132,6 +132,103 @@ def cmd_upload(args):
           f"in {time.time()-t0:.0f}s")
 
 
+def _primary_species(lbl: Path):
+    """Read a YOLO .txt and return the CWD12 name of its most-frequent class.
+    None if no valid boxes."""
+    try:
+        lines = lbl.read_text(errors="ignore").splitlines()
+    except Exception:
+        return None
+    from collections import Counter
+    c = Counter()
+    for ln in lines:
+        p = ln.split()
+        if p and p[0].lstrip("-").isdigit():
+            cid = int(p[0])
+            if 0 <= cid < len(CWD12):
+                c[cid] += 1
+    if not c:
+        return None
+    return CWD12[c.most_common(1)[0][0]]
+
+
+def cmd_bulk_upload(args):
+    """Upload images grouped BY SPECIES into per-species Roboflow batches
+    (user request: 'different classes in different places'), in parallel.
+
+    One project (cwd12-weeds), but batch_name = green-<species> so the
+    Annotate view groups/filters by species. Parallel workers measure
+    whether 57s/img was per-call overhead (parallel helps) or global
+    free-tier rate limiting (parallel won't help → wait for paid tier)."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    images = Path(args.images)
+    labels = Path(args.labels)
+    exts = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
+    all_imgs = sorted(p for p in images.iterdir() if p.suffix in exts)
+
+    # group by primary species; cap per species for testing via --per-species
+    by_sp: dict = {}
+    for img in all_imgs:
+        lbl = labels / (img.stem + ".txt")
+        sp = _primary_species(lbl) if lbl.is_file() else None
+        sp = sp or "Unlabeled"
+        by_sp.setdefault(sp, []).append((img, lbl if lbl.is_file() else None))
+    # build work list with per-species cap
+    work = []
+    for sp, items in sorted(by_sp.items()):
+        take = items[: args.per_species] if args.per_species else items
+        for img, lbl in take:
+            work.append((sp, img, lbl))
+    print(f"species present: { {k: len(v) for k, v in sorted(by_sp.items())} }")
+    print(f"uploading {len(work)} images across {len(by_sp)} species, "
+          f"workers={args.workers}")
+
+    ws = _workspace()
+    proj = ws.project(PROJECT_NAME)
+    lock = threading.Lock()
+    counters = {"ok": 0, "fail": 0}
+    labelmap = {i: n for i, n in enumerate(CWD12)}
+
+    def _one(task):
+        sp, img, lbl = task
+        t0 = time.time()
+        try:
+            kw = dict(image_path=str(img), split=args.split,
+                      batch_name=f"{args.batch}-{sp}",
+                      tag_names=[args.batch, sp], num_retry_uploads=1)
+            if lbl is not None:
+                kw["annotation_path"] = str(lbl)
+                kw["annotation_labelmap"] = labelmap
+            proj.single_upload(**kw)
+            with lock:
+                counters["ok"] += 1
+            return (sp, img.name, time.time() - t0, None)
+        except Exception as e:
+            with lock:
+                counters["fail"] += 1
+            return (sp, img.name, time.time() - t0, f"{type(e).__name__}: {e}")
+
+    t0 = time.time()
+    per_times = []
+    with ThreadPoolExecutor(max_workers=args.workers) as ex:
+        futs = [ex.submit(_one, t) for t in work]
+        for i, f in enumerate(as_completed(futs), 1):
+            sp, name, dt, err = f.result()
+            per_times.append(dt)
+            if err:
+                print(f"  FAIL [{sp}] {name}: {err}")
+            if i % 10 == 0:
+                print(f"  ... {i}/{len(work)} ok={counters['ok']} "
+                      f"fail={counters['fail']} ({time.time()-t0:.0f}s)")
+    wall = time.time() - t0
+    avg = sum(per_times) / len(per_times) if per_times else 0
+    print(f"DONE bulk: ok={counters['ok']} fail={counters['fail']} "
+          f"wall={wall:.0f}s  per-img(in-thread)avg={avg:.1f}s  "
+          f"effective={wall/max(1,len(work)):.1f}s/img")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -144,11 +241,20 @@ def main():
     up.add_argument("--batch", default="green",
                     help="provenance tag: green=human/gold, red=model-proposed")
     up.add_argument("--limit", type=int, default=0)
+    bu = sub.add_parser("bulk-upload")
+    bu.add_argument("--images", required=True)
+    bu.add_argument("--labels", required=True)
+    bu.add_argument("--split", default="train", choices=["train", "valid", "test"])
+    bu.add_argument("--batch", default="green")
+    bu.add_argument("--workers", type=int, default=8)
+    bu.add_argument("--per-species", type=int, default=0,
+                    help="cap images per species (0=all). For testing.")
     args = ap.parse_args()
 
     {"whoami": cmd_whoami,
      "create-project": cmd_create_project,
-     "upload": cmd_upload}[args.cmd](args)
+     "upload": cmd_upload,
+     "bulk-upload": cmd_bulk_upload}[args.cmd](args)
 
 
 if __name__ == "__main__":
