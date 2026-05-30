@@ -4115,3 +4115,135 @@ because expect timeout was 60s. Correct setting: ≥180s for trivial, ≥480s
 for multi-step, with `exp_continue` after the password prompt so the
 expect loop keeps polling. Captured in memory
 ([[cluster_ssh_is_slow_not_broken]]).
+
+## 2026-05-27 → 2026-05-30 — Roboflow integration + dashboard agent triggers + storage abstraction
+
+This is a single multi-day session: starts with the user's audit showing
+garbage data on /classes and ends with a complete Roboflow-integrated
+active-learning labeling pipeline plus the architectural decoupling needed
+to move the labeler off the (temporary) Bridges-2 cluster.
+
+### What shipped
+
+**Roboflow pipeline (per Prof Zhang's directive 2026-05-28).** Workspace
+`research-lhi4x` now hosts 13 object-detection projects:
+
+| Project | Imgs | Purpose |
+|---|---|---|
+| `cwd12-weeds` | 598 | combined multi-class gold seed (CottonWeedDet12 train, all 12 species) |
+| `cwd12-<species>` × 12 | 48-50 each | one per CWD12 species (single-class, cid=0); user's "different folders" requirement |
+
+Total: 1196 images, 1565 boxes, all gold-seeded from
+`downloads/cottonweeddet12/train`. valid/test never uploaded (eval
+contamination rule). Provenance tagged green (human/gold) for the seed;
+future red (model proposals) and yellow (in-review) tags follow.
+
+**12 live dashboard actions on `/control`** (extends the existing
+`/api/cluster_action/{action}` whitelist; new "subprocess" type for
+local-to-dashboard tools that don't need sbatch):
+
+- `restart_dashboard`, `brain_harvest`, `download_known_slugs`,
+  `topic_backfill`, `refresh_registry` *(pre-existing)*
+- `roboflow_sync_species` *(subprocess)* — per-species batch upload
+- `build_buckets` *(subprocess)* — A/B/C bucket audit + cwd12 coverage
+- `roboflow_state_audit` *(subprocess)* — read-only 13-project audit
+- `owl_preannotate_one` *(sbatch, 1×V100)* — OWLv2 image-guided red
+  proposals for active learning
+- `roboflow_generate_versions` *(subprocess)* — trigger Roboflow Version
+  generation (free-tier quota guard)
+- `roboflow_download_merge` *(subprocess)* — pull per-species labels,
+  remap cid → CWD12 index, merge into multi-class YOLO
+- `dinov2_route_classes` *(sbatch, 1×V100)* — DINOv2 nearest-neighbor
+  routing (weed-vs-not-weed gate + species classifier + near-dup dedup)
+
+**8 new/extended Python modules** (~2,314 LOC):
+
+- `tools/roboflow_sync.py` — single + bulk + per-species upload, parallel
+  workers, API key from `/jet/home/byler/.roboflow_key` (secret-file
+  pattern, never committed/logged)
+- `tools/bucketer.py` — A (detection-ready) / B (classification-only) /
+  C (unknown) audit; bounded `_find_label_dirs` (NEVER rglob image-filled
+  Lustre dirs — that was the 6h-prewarm catastrophe before v3.0.43.22)
+- `tools/merge_roboflow_projects.py` — `audit` / `generate-versions` /
+  `download-merge` subcommands; remaps each per-species project's cid=0
+  back to multi-class CWD12 index
+- `tools/owl_preannotate.py` — OWLv2 image-conditioned detection, writes
+  YOLO red proposals with provenance
+- `tools/dinov2_route.py` — DINOv2-base backbone, exemplar bank,
+  per-image cosine nearest-neighbor routing
+- `tools/active_learning_round.py` — orchestrator that chains OWL →
+  DINOv2 → Roboflow upload via `sbatch --dependency=afterok:JOBID`
+- `tools/storage.py` — `StorageBackend` Protocol with `LustreBackend`
+  (registry-aware: reads each slug's `local_path` from
+  `dataset_registry.json`, so canonical slugs under `downloads/` resolve
+  correctly) + `S3Backend` / `UniServerNASBackend` stubs. Decouples app
+  from hardcoded Lustre paths ahead of Uni-server migration.
+- `tools/methodology_log.py` — append-only JSONL recording per (round,
+  species): auto_label_precision, n_red_proposed, n_human_approved,
+  median_human_review_sec. Backbone of the paper-grade methodology
+  claim ("auto-label precision rose from X% to Y% across N rounds while
+  median human review time fell from A to B sec").
+
+**Documentation:**
+
+- `docs/roboflow_workspace.md` (95 lines) — the 13-project layout, gold
+  seed source + eval-contamination rule, provenance tagging, known
+  Roboflow quirks (stats-API minutes-long lag for new projects,
+  free-tier rate limits, no per-project folders).
+- `docs/mongodb_schema.md` (276 lines) — 6-collection design (slugs,
+  images, classes, exemplars, agent_tasks, audit_trail), indexes,
+  incremental migration plan from 52MB JSON registry, storage-abstraction
+  integration story.
+
+### Earlier in the session (before the autonomous loop, but same session)
+
+- /classes performance disaster diagnosed + fixed: prewarm went from
+  projected ~6 hours to 30 seconds. Root cause was Lustre filesystem
+  stat-storms in `_reg_pool_for_class` (full-tree rglob over slugs with
+  100K-434K images). Fixed by bounded `_find_label_dirs` + class-folder
+  thumb lookup (BFS auto-discovery, never iterates image-filled dirs).
+  See memory `project_classes_thumb_perf` for the full root-cause analysis.
+- 26 off-topic slugs purged from registry + disk (~46GB freed). 6 junk
+  pseudo-classes (`Color`, `Grayscale`, `Segmented`, …) filtered from
+  `/classes` (they were PlantVillage image-variant folders mis-extracted
+  as class names).
+- 12-species Roboflow upload — single-project bulk first (598 imgs,
+  parallel 8 workers, ~80s), then split into per-species projects per
+  user request for literal "different folders" UX.
+
+### Lessons captured (in memory for future sessions)
+
+- `feedback_no_blind_optimize`: user's directive that prompted full audit
+  rather than patch-on-patch on the /classes regression.
+- `project_classes_thumb_perf`: never rglob/full-iterdir image-filled
+  dirs on Lustre — the canonical perf trap.
+- Roboflow stats API has **minutes-long lag** on newly created projects;
+  uploads succeed but counts stay at 0 for a while. The "kill the
+  working process based on lagged signal" antipattern surfaced and was
+  recorded.
+- Bridges-2 login-node `nohup` gets policy-killed; long tasks need
+  foreground SSH (with `ServerAliveInterval=60`) or sbatch.
+
+### Pending items for user/professor (open decisions)
+
+- **MongoDB host**: cluster vs Uni server — design supports either; pick
+  when ready to migrate (E1 doc lists migration phases).
+- **Roboflow paid tier**: Prof Zhang offered to fund. Free tier hit ~10
+  Versions/project/month limit; paid would lift upload + Version caps.
+- **OWL exemplar configs**: each species needs a small human-drawn seed
+  set per round to drive OWLv2 image-conditioning. Active-learning loop
+  is ready to run as soon as those exist.
+- **Holdout audit**: registry includes `cottonweed_holdout` (eval data);
+  bucketer's per-species coverage currently includes it. A future
+  `--exclude-holdout` flag would compute training-eligible coverage
+  separately.
+
+### Files & commits
+
+- 26 commits (v3.0.43.20 → v3.0.57).
+- 8 new tool modules + 2 sbatch wrappers + 2 design docs.
+- 7 memory files added/updated for future-session continuity.
+- Master plan + live loop state in
+  `memory/project_autonomous_loop_2026_05_30.md` +
+  `memory/_loop_state_2026_05_30.md`.
+
