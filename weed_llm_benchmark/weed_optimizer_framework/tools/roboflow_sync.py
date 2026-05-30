@@ -229,11 +229,127 @@ def cmd_bulk_upload(args):
           f"effective={wall/max(1,len(work)):.1f}s/img")
 
 
+def cmd_create_species_projects(args):
+    """v3.0.44.2 — user feedback: Roboflow has NO folders within a project,
+    only filters. To literally separate species, create ONE project per
+    species (`cwd12-<species>`). Workspace home then shows 12 distinct
+    project tiles = the 'different folders' UX the user wants."""
+    ws = _workspace()
+    for sp in CWD12:
+        name = f"cwd12-{sp.lower()}"
+        try:
+            proj = ws.create_project(
+                project_name=name,
+                project_type="object-detection",
+                project_license="MIT",
+                annotation=name,
+            )
+            print(f"CREATED {name}")
+        except Exception as e:
+            print(f"  {name}: {type(e).__name__}: {e}")
+
+
+def cmd_species_upload(args):
+    """Upload to per-species projects: each image of species X goes to
+    project `cwd12-<x>` with its labels remapped to single-class (cid=0).
+    The annotation is filtered to keep ONLY this species' boxes (other
+    species in mixed-species images are dropped — single-class project
+    semantics)."""
+    import threading, tempfile
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    images = Path(args.images); labels = Path(args.labels)
+    exts = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
+    all_imgs = sorted(p for p in images.iterdir() if p.suffix in exts)
+
+    by_sp: dict = {}
+    for img in all_imgs:
+        lbl = labels / (img.stem + ".txt")
+        if not lbl.is_file():
+            continue
+        sp = _primary_species(lbl)
+        if sp is None:
+            continue
+        by_sp.setdefault(sp, []).append((img, lbl))
+    sp2id = {sp: i for i, sp in enumerate(CWD12)}
+    print(f"species available: { {k: len(v) for k, v in sorted(by_sp.items())} }")
+
+    ws = _workspace()
+    for sp in CWD12:
+        items = by_sp.get(sp, [])
+        if args.per_species:
+            items = items[: args.per_species]
+        if not items:
+            print(f"=== {sp}: 0 items, skip ===")
+            continue
+        proj_name = f"cwd12-{sp.lower()}"
+        try:
+            proj = ws.project(proj_name)
+        except Exception as e:
+            print(f"=== {sp}: project {proj_name} not found ({e}) — skip ===")
+            continue
+
+        cid = sp2id[sp]
+        labelmap = {0: sp}
+        lock = threading.Lock()
+        counters = {"ok": 0, "fail": 0, "no_box": 0}
+
+        def _one(item):
+            img, lbl = item
+            t0 = time.time()
+            try:
+                txt = lbl.read_text(errors="ignore")
+                kept = []
+                for ln in txt.splitlines():
+                    p = ln.split()
+                    if p and p[0].lstrip("-").isdigit() and int(p[0]) == cid:
+                        kept.append("0 " + " ".join(p[1:]))
+                if not kept:
+                    with lock:
+                        counters["no_box"] += 1
+                    return (img.name, time.time() - t0, "no_box_of_species")
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt",
+                                                  delete=False) as tf:
+                    tf.write("\n".join(kept))
+                    tmp = tf.name
+                try:
+                    proj.single_upload(
+                        image_path=str(img), annotation_path=tmp,
+                        annotation_labelmap=labelmap,
+                        split=args.split, batch_name=f"{args.batch}-{sp}",
+                        tag_names=[args.batch, sp], num_retry_uploads=1,
+                    )
+                    with lock:
+                        counters["ok"] += 1
+                    return (img.name, time.time() - t0, None)
+                finally:
+                    try: os.unlink(tmp)
+                    except Exception: pass
+            except Exception as e:
+                with lock:
+                    counters["fail"] += 1
+                return (img.name, time.time() - t0, f"{type(e).__name__}: {e}")
+
+        t0 = time.time()
+        print(f"=== {sp} → {proj_name}: uploading {len(items)} imgs"
+              f" (workers={args.workers}) ===")
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futs = [ex.submit(_one, x) for x in items]
+            for f in as_completed(futs):
+                _, _, err = f.result()
+                if err and err != "no_box_of_species":
+                    print(f"  FAIL: {err}")
+        wall = time.time() - t0
+        print(f"=== {sp}: ok={counters['ok']} fail={counters['fail']} "
+              f"no_box={counters['no_box']} wall={wall:.0f}s ===")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("whoami")
     sub.add_parser("create-project")
+    sub.add_parser("create-species-projects")
     up = sub.add_parser("upload")
     up.add_argument("--images", required=True)
     up.add_argument("--labels", default="")
@@ -249,12 +365,21 @@ def main():
     bu.add_argument("--workers", type=int, default=8)
     bu.add_argument("--per-species", type=int, default=0,
                     help="cap images per species (0=all). For testing.")
+    su = sub.add_parser("species-upload")
+    su.add_argument("--images", required=True)
+    su.add_argument("--labels", required=True)
+    su.add_argument("--split", default="train", choices=["train", "valid", "test"])
+    su.add_argument("--batch", default="green")
+    su.add_argument("--workers", type=int, default=8)
+    su.add_argument("--per-species", type=int, default=0)
     args = ap.parse_args()
 
     {"whoami": cmd_whoami,
      "create-project": cmd_create_project,
+     "create-species-projects": cmd_create_species_projects,
      "upload": cmd_upload,
-     "bulk-upload": cmd_bulk_upload}[args.cmd](args)
+     "bulk-upload": cmd_bulk_upload,
+     "species-upload": cmd_species_upload}[args.cmd](args)
 
 
 if __name__ == "__main__":
