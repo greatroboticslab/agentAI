@@ -2539,6 +2539,17 @@ _CLUSTER_ACTIONS = {
         ],
         "label": "Bucket audit: 每个下载的 slug → A/B/C 分桶 + cwd12 物种覆盖统计 (~30s)",
     },
+    # v3.0.47 (auto-loop iter 5 / Phase C3 skeleton): Roboflow workspace audit.
+    "roboflow_state_audit": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.merge_roboflow_projects",
+            "--out", "results/framework/roboflow_state.json",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "Roboflow 13-project 状态审计 (imgs/boxes/versions per cwd12-<sp>, ~10s)",
+    },
 }
 
 
