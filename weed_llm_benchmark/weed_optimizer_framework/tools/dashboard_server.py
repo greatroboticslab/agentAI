@@ -2530,6 +2530,15 @@ _CLUSTER_ACTIONS = {
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
         "label": "Roboflow per-species 上传 (12 cwd12-<sp> projects, 50/sp, ~13min)",
     },
+    # v3.0.46 (auto-loop iter 4 / Phase D1): bucket-audit CLI.
+    "build_buckets": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.bucketer",
+            "--out", "results/framework/buckets.json",
+        ],
+        "label": "Bucket audit: 每个下载的 slug → A/B/C 分桶 + cwd12 物种覆盖统计 (~30s)",
+    },
 }
 
 
