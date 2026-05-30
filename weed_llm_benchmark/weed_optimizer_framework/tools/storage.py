@@ -97,18 +97,66 @@ class StorageBackend(Protocol):
 
 class LustreBackend:
     """Bridges-2 /ocean Lustre filesystem. Matches current behavior of
-    dashboard_server.py / dataset_discovery.py."""
+    dashboard_server.py / dataset_discovery.py.
+
+    v3.0.56 (auto-loop iter 16): now registry-aware — `_slug_dir` reads
+    the slug's `local_path` from `dataset_registry.json` when available,
+    so canonical slugs (cottonweed_sp8 living under `downloads/`) resolve
+    correctly without the defensive find_image_in_slug fallback.
+    Lazy load of the registry; cached per backend instance + bound to
+    the registry file's mtime so updates pick up automatically."""
 
     name = "lustre"
 
     def __init__(self, repo_root: Optional[str] = None):
         self.repo_root = Path(repo_root or DEFAULT_LUSTRE_ROOT)
         self.datasets_root = self.repo_root / "datasets"
+        self._reg_cache: dict = {}  # slug → local_path str
+        self._reg_mtime: float = 0.0
+
+    def _registry_path(self) -> Path:
+        return self.repo_root / "results" / "framework" / "dataset_registry.json"
+
+    def _refresh_registry_if_stale(self) -> None:
+        import json as _json
+        rp = self._registry_path()
+        try:
+            mt = rp.stat().st_mtime
+        except Exception:
+            return
+        if mt == self._reg_mtime and self._reg_cache:
+            return
+        try:
+            with open(rp) as f:
+                reg = _json.load(f)
+        except Exception:
+            return
+        cache: dict = {}
+        for slug, info in (reg.get("datasets") or {}).items():
+            lp = info.get("local_path")
+            if lp:
+                cache[slug] = lp
+        self._reg_cache = cache
+        self._reg_mtime = mt
 
     def _slug_dir(self, slug: str) -> Path:
         # Sanity: refuse paths that escape datasets_root.
         if "/" in slug or "\\" in slug or slug in (".", ".."):
             raise ValueError(f"unsafe slug: {slug!r}")
+        # Prefer the registry's local_path (handles canonical slugs that
+        # live outside `datasets/`, e.g. cottonweed_sp8 under downloads/).
+        self._refresh_registry_if_stale()
+        lp = self._reg_cache.get(slug)
+        if lp:
+            p = Path(lp)
+            # Defense: only accept paths within the repo root
+            try:
+                p.resolve().relative_to(self.repo_root.resolve())
+            except Exception:
+                # registry says path outside repo — refuse (safety)
+                pass
+            else:
+                return p
         return self.datasets_root / slug
 
     def get_image_path(self, slug: str, image_key: str) -> Optional[str]:
