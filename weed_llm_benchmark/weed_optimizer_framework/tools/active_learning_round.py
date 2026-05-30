@@ -157,6 +157,22 @@ def sbatch_dinov2(target_dir: Path, dep_jobid: Optional[str],
     return job_id
 
 
+def _count_target_imgs(target_dir: Path) -> int:
+    """Cheap count of images in target_dir (bounded scandir, no rglob)."""
+    n = 0
+    exts = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
+    try:
+        with os.scandir(target_dir) as it:
+            for e in it:
+                if e.is_file() and Path(e.name).suffix in exts:
+                    n += 1
+                if n >= 100000:
+                    break
+    except Exception:
+        pass
+    return n
+
+
 def run_round_one_species(species: str, target_dir: Path, round_n: int,
                            dry_run: bool = False) -> dict:
     """One species, one round. Returns summary dict for the round log."""
@@ -176,6 +192,23 @@ def run_round_one_species(species: str, target_dir: Path, round_n: int,
     owl_jid = sbatch_owl(species, target_dir, cfg_path, owl_out, dry_run=dry_run)
     if not dry_run and not owl_jid:
         return {"species": species, "ok": False, "reason": "owl_sbatch_failed"}
+
+    # v3.0.57 (auto-loop iter 17): emit paper-grade methodology log entry.
+    # Captures the round inputs at scheduling time; the matching
+    # round_complete entry lands after the Roboflow approval poll.
+    try:
+        from weed_optimizer_framework.tools import methodology_log as _ml
+        _ml.record_round_start(
+            round_n=round_n, species=species,
+            model_id="google/owlv2-large-patch14-ensemble",
+            n_target_imgs=_count_target_imgs(target_dir),
+            n_exemplars_in=len(exemplars),
+            owl_job_id=owl_jid,
+            notes=("dry-run" if dry_run else ""),
+        )
+    except Exception as e:
+        # Best-effort; methodology logging shouldn't block the round.
+        print(f"  [methodology_log] skip: {type(e).__name__}: {e}")
 
     dinov2_jid = sbatch_dinov2(target_dir, dep_jobid=owl_jid, dry_run=dry_run)
 

@@ -748,21 +748,21 @@ def api_img(slug: str, filename: str):
         raise HTTPException(400, "bad slug")
     if not re.match(r"^[A-Za-z0-9_. -]+\.(jpg|jpeg|png|JPG|JPEG|PNG)$", filename):
         raise HTTPException(400, "bad filename")
+    # v3.0.57 (auto-loop iter 17): LustreBackend now reads registry's
+    # local_path (see storage.py v3.0.56), so it handles canonical slugs
+    # without the find_image_in_slug bare-fallback. We keep the fallback
+    # only for the catastrophic case of the storage module being
+    # unimportable — any backend-level miss now means "not found", not
+    # "try the legacy path".
     try:
         from weed_optimizer_framework.tools.storage import default_backend
-        backend = default_backend()
-        img_path = backend.get_image_path(slug, filename)
-    except Exception:
-        # Defensive fallback: storage module unimportable for any reason
-        img_path = None
-    if not img_path:
-        # Fall back to the original lookup so any structural difference
-        # between backend and existing find_image_in_slug doesn't cause
-        # a regression. Remove after E3 cluster verification (next iter).
+        img_path = default_backend().get_image_path(slug, filename)
+    except Exception as e:
+        log.warning(f"/api/img storage backend unavailable: {e!r} — fallback")
         found = find_image_in_slug(slug, filename)
-        if not found:
-            raise HTTPException(404)
-        img_path = str(found[0])
+        img_path = str(found[0]) if found else None
+    if not img_path:
+        raise HTTPException(404)
     return FileResponse(img_path, media_type="image/jpeg")
 
 
