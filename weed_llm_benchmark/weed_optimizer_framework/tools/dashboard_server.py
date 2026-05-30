@@ -2515,7 +2515,27 @@ _CLUSTER_ACTIONS = {
         "type": "refresh",
         "label": "wipe class-pool cache + reload registry index",
     },
+    # v3.0.45 (auto-loop iter 2): subprocess actions — local to dashboard
+    # node, no sbatch. Logs to shared FS so visible across login nodes.
+    "roboflow_sync_species": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "species-upload",
+            "--images", "downloads/cottonweeddet12/train/images",
+            "--labels", "downloads/cottonweeddet12/train/labels",
+            "--split", "train", "--batch", "green",
+            "--workers", "8", "--per-species", "50",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "Roboflow per-species 上传 (12 cwd12-<sp> projects, 50/sp, ~13min)",
+    },
 }
+
+
+# Shared FS for agent-task logs (login-node /tmp is session-local and
+# Bridges-2 kills login-node nohup processes — see [[project_classes_thumb_perf]]).
+_AGENT_LOG_DIR = REPO / "logs" / "agent_tasks"
 
 
 @app.get("/api/job_log/{jobid}")
@@ -2663,6 +2683,53 @@ def api_cluster_action(action: str):
                   "stderr": r["stderr"].strip(),
                   "msg": (r["stdout"].strip()
                           if r["ok"] else r["stderr"].strip())}
+        _log_action(action, result)
+        return result
+
+    if spec["type"] == "subprocess":
+        # v3.0.45 (auto-loop iter 2): spawn local subprocess from a fixed argv
+        # whitelist (no shell, no user-supplied args), with stdout/stderr to a
+        # shared-FS log so any login node + the dashboard can tail it.
+        import subprocess as _sp
+        argv = list(spec["argv"])
+        env = os.environ.copy()
+        # Load any required secrets from per-key files (key never crosses
+        # the wire / never gets logged / never gets committed).
+        for env_name, fp in (spec.get("env_secret_files") or {}).items():
+            try:
+                with open(fp) as f:
+                    env[env_name] = f.read().strip()
+            except Exception as e:
+                result = {"ok": False, "action": action,
+                          "msg": f"secret file {fp} not readable: {type(e).__name__}"}
+                _log_action(action, result)
+                return result
+        try:
+            _AGENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        log_path = _AGENT_LOG_DIR / f"{action}_{ts}.log"
+        try:
+            log_fp = open(log_path, "wb")
+        except Exception as e:
+            raise HTTPException(500, f"cannot open log: {e}")
+        try:
+            proc = _sp.Popen(
+                argv, cwd=str(REPO), env=env,
+                stdout=log_fp, stderr=_sp.STDOUT,
+                stdin=_sp.DEVNULL, start_new_session=True,
+            )
+        except Exception as e:
+            log_fp.close()
+            raise HTTPException(500, f"Popen failed: {e}")
+        # Don't close log_fp — Popen inherits it. Track pid so /api/task_status
+        # can later check liveness via os.kill(pid, 0).
+        result = {"ok": True, "action": action,
+                  "pid": proc.pid, "log_path": str(log_path),
+                  "log_name": log_path.name,
+                  "started_at": ts,
+                  "msg": f"started pid={proc.pid} → {log_path.name}"}
         _log_action(action, result)
         return result
 
