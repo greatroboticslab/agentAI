@@ -2558,6 +2558,29 @@ _CLUSTER_ACTIONS = {
         "script": "run_v3_0_50_owl_preannotate.sh",
         "label": "OWL 预标注 1 物种 — 给出 red bbox 提案 (~10-30min,需 exemplar JSON)",
     },
+    # v3.0.51 (auto-loop iter 9 / Phase D4): Roboflow Version generation + pull-back.
+    # Generate is RATE-LIMITED on free tier (~10/proj/month) — skips by default
+    # if Versions already exist. Use --force in manual sbatch to regenerate.
+    "roboflow_generate_versions": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.merge_roboflow_projects",
+            "generate-versions",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "Roboflow Version 生成 (all 12 species, skips if existing, ~30s)",
+    },
+    "roboflow_download_merge": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.merge_roboflow_projects",
+            "download-merge",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "Roboflow 下载+合并 → cwd12 多类训练集 (~5min,需先 generate-versions)",
+    },
 }
 
 
