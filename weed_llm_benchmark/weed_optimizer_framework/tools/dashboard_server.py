@@ -2550,6 +2550,14 @@ _CLUSTER_ACTIONS = {
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
         "label": "Roboflow 13-project 状态审计 (imgs/boxes/versions per cwd12-<sp>, ~10s)",
     },
+    # v3.0.50 (auto-loop iter 8 / Phase D3): OWL pre-annotate sbatch.
+    # Needs an exemplar-config JSON at the default path or env override —
+    # the script fails gracefully with usage hint if config missing.
+    "owl_preannotate_one": {
+        "type": "sbatch",
+        "script": "run_v3_0_50_owl_preannotate.sh",
+        "label": "OWL 预标注 1 物种 — 给出 red bbox 提案 (~10-30min,需 exemplar JSON)",
+    },
 }
 
 
