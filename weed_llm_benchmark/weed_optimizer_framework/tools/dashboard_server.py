@@ -2581,6 +2581,12 @@ _CLUSTER_ACTIONS = {
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
         "label": "Roboflow 下载+合并 → cwd12 多类训练集 (~5min,需先 generate-versions)",
     },
+    # v3.0.52 (auto-loop iter 11 / Phase D2 sbatch): DINOv2 routing job.
+    "dinov2_route_classes": {
+        "type": "sbatch",
+        "script": "run_v3_0_52_dinov2_route.sh",
+        "label": "DINOv2 路由 (weed-vs-not-weed + 物种归类,1×V100 ~30min)",
+    },
 }
 
 
