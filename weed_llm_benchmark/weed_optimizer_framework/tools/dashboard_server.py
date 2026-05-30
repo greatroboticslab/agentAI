@@ -736,15 +736,33 @@ def api_sample(slug: str, filename: str):
 
 @app.get("/api/img/{slug}/{filename}")
 def api_img(slug: str, filename: str):
-    """Original full-resolution image (no bbox overlay). For zoom-in."""
+    """Original full-resolution image (no bbox overlay). For zoom-in.
+
+    v3.0.54 (auto-loop iter 14 / Phase E3): refactored to use the
+    storage abstraction (`tools/storage.py`). LustreBackend mirrors the
+    previous find_image_in_slug behavior exactly, so this is behavior-
+    preserving — but path resolution is now in one place, ready for the
+    Uni-server migration (per Prof Zhang directive, see
+    `docs/mongodb_schema.md`)."""
     if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
         raise HTTPException(400, "bad slug")
     if not re.match(r"^[A-Za-z0-9_. -]+\.(jpg|jpeg|png|JPG|JPEG|PNG)$", filename):
         raise HTTPException(400, "bad filename")
-    found = find_image_in_slug(slug, filename)
-    if not found:
-        raise HTTPException(404)
-    img_path, _ = found
+    try:
+        from weed_optimizer_framework.tools.storage import default_backend
+        backend = default_backend()
+        img_path = backend.get_image_path(slug, filename)
+    except Exception:
+        # Defensive fallback: storage module unimportable for any reason
+        img_path = None
+    if not img_path:
+        # Fall back to the original lookup so any structural difference
+        # between backend and existing find_image_in_slug doesn't cause
+        # a regression. Remove after E3 cluster verification (next iter).
+        found = find_image_in_slug(slug, filename)
+        if not found:
+            raise HTTPException(404)
+        img_path = str(found[0])
     return FileResponse(img_path, media_type="image/jpeg")
 
 
