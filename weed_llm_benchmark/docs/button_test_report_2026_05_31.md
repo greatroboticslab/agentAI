@@ -60,13 +60,19 @@ Verified iter 14 — model ran 50/50 imgs in 263s, exit 0.
 
 ### Bug 4 — OWL emits out-of-bounds YOLO coords (v3.0.64)
 Found iter 15 by reading the produced .txt files: 262 of 29942 boxes
-(0.9%) had cx, cy, w, or h outside [0,1]. Sample: `cx=1.184993`.
+(0.87%) had cx, cy, w, or h outside [0,1]. Sample: `cx=1.184993`.
 **Fix:** clamp `x0/y0/x1/y1` to image bounds BEFORE normalizing; drop
 zero-area boxes after clamping; log drop counts.
-Status: fix on disk (v3.0.64). The 50 pre-fix .txt files at
-`results/framework/owl_red_proposals/Goosegrass/` still have the 0.9%
-malformed rows; need re-run to produce a clean batch (not done in loop
-to conserve GPU time).
+**Status: VERIFIED FIXED iter 19.** Re-ran OWL with v3.0.64 on disk:
+
+```
+old pre-fix run:  29942 boxes, 262 out-of-bounds (0.87%)
+new v3.0.64 run:  29683 boxes,   0 out-of-bounds (0.00%)
+```
+
+Drop log per image worked correctly (48/50 images logged drops,
+~259 boxes dropped total — matches the 262 invalid in the old run).
+Old .txt files preserved at `Goosegrass_pre_v3_0_64/` for comparison.
 
 ## Bug 5 — `brain_harvest` design issue (NOT fixed)
 
