@@ -1,5 +1,13 @@
 # Roboflow workspace — `research-lhi4x`
 
+> **2026-05-30 update**: workspace simplified from 13 projects to 1
+> (`cwd12-weeds`) after hitting Roboflow Public Plan's 10-project cap.
+> The 12 single-species projects were deleted via REST API DELETE
+> (all returned HTTP 200, `deleted: true`); their data was a duplicate
+> of cwd12-weeds' multi-class gold seed, so no information lost. The
+> per-species "different folders" UX now lives inside cwd12-weeds via
+> upload batches (`green-<species>`) + class-filter sidebar.
+
 Active labeling target for the agentAI weed-detection pipeline.
 See [`weed_optimizer_framework/tools/roboflow_sync.py`](../weed_optimizer_framework/tools/roboflow_sync.py)
 for the upload/sync code and `memory/project_roboflow_pipeline_plan.md`
