@@ -171,9 +171,19 @@ class LustreBackend:
         if direct.is_file():
             return str(direct)
         # Bare-filename fallback (matches dashboard_server.find_image_in_slug).
+        # v3.0.61 (button-test iter 3): added test/images and test/ to
+        # cover slugs like cottonweed_sp8 whose images live under test/.
+        # Previously LustreBackend returned None and /api/img 404'd while
+        # the file demonstrably existed (see _button_loop_state Bug 2).
         if "/" not in image_key:
-            for sub in (slug_dir / "images", slug_dir / "train" / "images",
-                        slug_dir / "valid" / "images", slug_dir):
+            for sub in (slug_dir / "images",
+                        slug_dir / "train" / "images",
+                        slug_dir / "valid" / "images",
+                        slug_dir / "test" / "images",
+                        slug_dir / "train",
+                        slug_dir / "valid",
+                        slug_dir / "test",
+                        slug_dir):
                 cand = sub / image_key
                 if cand.is_file():
                     return str(cand)
@@ -203,8 +213,10 @@ class LustreBackend:
             return
         exts = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
         n = 0
+        # v3.0.61: include test/images for slugs like cottonweed_sp8.
         for sub in (slug_dir / "images", slug_dir / "train" / "images",
-                    slug_dir / "valid" / "images", slug_dir):
+                    slug_dir / "valid" / "images",
+                    slug_dir / "test" / "images", slug_dir):
             if not sub.is_dir():
                 continue
             try:

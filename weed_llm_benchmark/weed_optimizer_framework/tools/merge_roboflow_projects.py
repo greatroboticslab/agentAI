@@ -183,24 +183,42 @@ def cmd_audit(args):
 
 
 def cmd_generate_versions(args):
-    """For each cwd12-<species> project (or just one via --species), call
-    Roboflow SDK to GENERATE a Version snapshot. Async on Roboflow side —
-    returns immediately. Tracks generated versions in a state file so we
-    don't burn the free-tier monthly quota (~10/project/month).
+    """Call Roboflow SDK to GENERATE a Version snapshot for one or more
+    projects. Free-tier quota guard: skip if Versions already exist
+    (unless --force).
 
-    Free-tier budget guard: skip if any project already has Versions and
-    --force isn't passed."""
+    Targets, in priority order:
+      1. --project NAME (explicit, single project) — added v3.0.61 after
+         button-test loop iter 2 found the legacy CWD12-species iteration
+         was hitting 12 dead per-species projects (deleted 2026-05-30).
+      2. --species SPECIES (single legacy per-species project).
+      3. Default: ['cwd12-multiclass-v1'] (the current master). Iterates
+         CWD12 per-species names ONLY if explicitly opted in via
+         --legacy-per-species.
+    """
     key = _key()
     from roboflow import Roboflow
     rf = Roboflow(api_key=key)
     ws = rf.workspace()
 
-    species_filter = (args.species,) if args.species else CWD12
+    if args.project:
+        targets = [args.project]
+    elif args.species:
+        targets = [f"cwd12-{args.species.lower()}"]
+    elif args.legacy_per_species:
+        targets = [f"cwd12-{sp.lower()}" for sp in CWD12]
+    else:
+        targets = ["cwd12-multiclass-v1"]
+    species_filter = targets  # naming kept for compat below
 
     state = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
              "requests": []}
-    for sp in species_filter:
-        proj_name = f"cwd12-{sp.lower()}"
+    for entry in species_filter:
+        # v3.0.61: entries now ARE the project names already (not species
+        # names that need cwd12-<sp> prefix). Old per-species path uses
+        # full project names from the legacy block above.
+        proj_name = entry
+        sp = entry  # reused for logging
         try:
             proj = ws.project(proj_name)
         except Exception as e:
@@ -374,9 +392,13 @@ def main():
     p_audit.add_argument("--out", default=str(DEFAULT_OUT))
 
     p_gen = sub.add_parser("generate-versions",
-                            help="trigger Roboflow Version generation per species")
+                            help="trigger Roboflow Version generation")
+    p_gen.add_argument("--project", default="",
+                        help="single project name (e.g. cwd12-multiclass-v1)")
     p_gen.add_argument("--species", default="",
-                        help="canonical species (e.g. Goosegrass); blank = all 12")
+                        help="legacy: a single CWD12 species → cwd12-<species>")
+    p_gen.add_argument("--legacy-per-species", action="store_true",
+                        help="legacy: iterate all 12 cwd12-<species> projects (deleted 2026-05-30)")
     p_gen.add_argument("--force", action="store_true",
                         help="re-generate even if Versions exist")
     p_gen.add_argument("--out",

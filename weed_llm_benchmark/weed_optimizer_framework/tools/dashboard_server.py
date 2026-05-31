@@ -2589,9 +2589,10 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.merge_roboflow_projects",
             "generate-versions",
+            "--project", "cwd12-multiclass-v1",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "Roboflow Version 生成 (all 12 species, skips if existing, ~30s)",
+        "label": "Roboflow Version 生成 → cwd12-multiclass-v1 (skips if existing, ~30s)",
     },
     "roboflow_download_merge": {
         "type": "subprocess",
