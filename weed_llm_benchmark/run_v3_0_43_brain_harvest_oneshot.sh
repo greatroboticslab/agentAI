@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=32G
-#SBATCH --time=01:30:00
+#SBATCH --time=04:00:00
 #SBATCH --output=results/framework/v3_0_43_brain_harvest_%j.out
 
 # v3.0.43.4 — single-round Brain harvest, triggerable from /control UI.
