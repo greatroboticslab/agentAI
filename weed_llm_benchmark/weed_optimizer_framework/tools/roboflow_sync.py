@@ -37,7 +37,16 @@ CWD12 = [
     "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
     "Sicklepod", "SpottedSpurge",
 ]
-PROJECT_NAME = "cwd12-weeds"
+# v3.0.58 (2026-05-30): project name configurable. Defaults to
+# 'cwd12-weeds' for backward compat with personal workspace
+# (research-lhi4x). Override via env ROBOFLOW_PROJECT or per-call
+# `--project <name>` flag — e.g., a-test-of-will/cwd12-multiclass-v1.
+PROJECT_NAME = os.environ.get("ROBOFLOW_PROJECT", "cwd12-weeds")
+
+
+def _resolve_project(args) -> str:
+    """Pick project: CLI --project > env ROBOFLOW_PROJECT > module default."""
+    return getattr(args, "project", None) or PROJECT_NAME
 
 
 def _key() -> str:
@@ -70,17 +79,18 @@ def cmd_whoami(args):
 
 def cmd_create_project(args):
     ws = _workspace()
+    name = _resolve_project(args)
     try:
         proj = ws.create_project(
-            project_name=PROJECT_NAME,
+            project_name=name,
             project_type="object-detection",
             project_license="MIT",
-            annotation=PROJECT_NAME,
+            annotation=name,
         )
-        print(f"CREATED project {PROJECT_NAME}: {proj}")
+        print(f"CREATED project {name}: {proj}")
     except Exception as e:
         # Already exists is fine — report and continue
-        print(f"create_project: {type(e).__name__}: {e}")
+        print(f"create_project({name}): {type(e).__name__}: {e}")
         print("(if it already exists, that's OK — proceed to upload)")
 
 
@@ -186,7 +196,9 @@ def cmd_bulk_upload(args):
           f"workers={args.workers}")
 
     ws = _workspace()
-    proj = ws.project(PROJECT_NAME)
+    proj_name = _resolve_project(args)
+    proj = ws.project(proj_name)
+    print(f"target project: {proj_name}")
     lock = threading.Lock()
     counters = {"ok": 0, "fail": 0}
     labelmap = {i: n for i, n in enumerate(CWD12)}
@@ -348,7 +360,9 @@ def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("whoami")
-    sub.add_parser("create-project")
+    cp = sub.add_parser("create-project")
+    cp.add_argument("--project", default=None,
+                    help="project name (overrides env ROBOFLOW_PROJECT)")
     sub.add_parser("create-species-projects")
     up = sub.add_parser("upload")
     up.add_argument("--images", required=True)
@@ -365,6 +379,8 @@ def main():
     bu.add_argument("--workers", type=int, default=8)
     bu.add_argument("--per-species", type=int, default=0,
                     help="cap images per species (0=all). For testing.")
+    bu.add_argument("--project", default=None,
+                    help="project name (overrides env ROBOFLOW_PROJECT)")
     su = sub.add_parser("species-upload")
     su.add_argument("--images", required=True)
     su.add_argument("--labels", required=True)
