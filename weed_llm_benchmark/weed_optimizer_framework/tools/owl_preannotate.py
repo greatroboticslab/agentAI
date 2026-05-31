@@ -95,36 +95,50 @@ def _load_owl(model_id: str = "google/owlv2-large-patch14-ensemble"):
 def _process_targets(target_imgs, exemplar_crops, species_name: str,
                      processor, model, device, conf_threshold: float):
     """For each target image, run OWLv2 image-conditioned detection with
-    exemplar crops as visual queries. Yield (image_path, [yolo_lines])."""
+    exemplar crops as visual queries. Yield (image_path, [yolo_lines]).
+
+    v3.0.63 (button-test iter 12): Bug 3 fix. When N query images are
+    batched, the model's logits have batch dim N — so target_sizes must
+    also be batch dim N (repeated). Previously we passed [1, 2] and
+    post_process raised 'target sizes != logits batch dim'.
+    """
     import torch
     from PIL import Image
+    n_queries = len(exemplar_crops)
     for tp in target_imgs:
         try:
             img = Image.open(tp).convert("RGB")
         except Exception as e:
             print(f"[owl] open fail {tp}: {e}", file=sys.stderr)
             continue
+        W, H = img.size
         with torch.no_grad():
             inputs = processor(
                 images=img, query_images=exemplar_crops, return_tensors="pt"
             ).to(device)
             outputs = model.image_guided_detection(**inputs)
-            target_sizes = torch.tensor([img.size[::-1]]).to(device)
-            results = processor.post_process_image_guided_detection(
+            # target_sizes batch dim must match logits batch (== n_queries).
+            target_sizes = torch.tensor(
+                [img.size[::-1]] * n_queries
+            ).to(device)
+            results_per_query = processor.post_process_image_guided_detection(
                 outputs=outputs, threshold=conf_threshold,
                 target_sizes=target_sizes,
-            )[0]
-        W, H = img.size
+            )
+        # results_per_query is a list of N dicts (one per query image).
+        # Merge proposals from all queries — they all describe the SAME
+        # target image (just matched against different exemplars).
         yolo_lines = []
-        for box, score in zip(results["boxes"], results["scores"]):
-            x0, y0, x1, y1 = [float(v) for v in box]
-            cx = ((x0 + x1) / 2) / W
-            cy = ((y0 + y1) / 2) / H
-            w = (x1 - x0) / W
-            h = (y1 - y0) / H
-            # single-class red proposal (matches per-species Roboflow proj)
-            yolo_lines.append(f"0 {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}  # "
-                              f"red conf={float(score):.3f} src=owlv2")
+        for r in results_per_query:
+            for box, score in zip(r["boxes"], r["scores"]):
+                x0, y0, x1, y1 = [float(v) for v in box]
+                cx = ((x0 + x1) / 2) / W
+                cy = ((y0 + y1) / 2) / H
+                w = (x1 - x0) / W
+                h = (y1 - y0) / H
+                # single-class red proposal (matches per-species Roboflow proj)
+                yolo_lines.append(f"0 {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}  # "
+                                  f"red conf={float(score):.3f} src=owlv2")
         yield tp, yolo_lines
 
 
