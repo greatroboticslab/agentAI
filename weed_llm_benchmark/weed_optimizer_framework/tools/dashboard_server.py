@@ -2580,6 +2580,18 @@ _CLUSTER_ACTIONS = {
         "script": "run_v3_0_50_owl_preannotate.sh",
         "label": "OWL 预标注 1 物种 — 给出 red bbox 提案 (~10-30min,需 exemplar JSON)",
     },
+    # v3.0.62 (button-test iter 9, Phase T3): export ✓/object_bank exemplars
+    # to JSON configs that owl_preannotate.py consumes. Without this, OWL
+    # button just FATALs on missing exemplar config.
+    "export_owl_exemplars": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.export_owl_exemplars",
+            "--source", "bank", "--per-species", "5",
+        ],
+        "label": "生成 OWL 所需的每物种 exemplar JSON(读 object_bank,~3s,12 文件)",
+    },
     # v3.0.51 (auto-loop iter 9 / Phase D4): Roboflow Version generation + pull-back.
     # Generate is RATE-LIMITED on free tier (~10/proj/month) — skips by default
     # if Versions already exist. Use --force in manual sbatch to regenerate.
