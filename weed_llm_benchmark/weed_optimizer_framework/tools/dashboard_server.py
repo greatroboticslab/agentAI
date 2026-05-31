@@ -2535,18 +2535,22 @@ _CLUSTER_ACTIONS = {
     },
     # v3.0.45 (auto-loop iter 2): subprocess actions — local to dashboard
     # node, no sbatch. Logs to shared FS so visible across login nodes.
-    "roboflow_sync_species": {
+    # v3.0.60 (2026-05-30): per-species projects deleted (Public Plan cap +
+    # user shifted to school workspace a-test-of-will). Replaced with a
+    # single multi-class upload to cwd12-multiclass-v1.
+    "roboflow_sync_cwd12_v1": {
         "type": "subprocess",
         "argv": [
             "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
-            "species-upload",
+            "bulk-upload",
             "--images", "downloads/cottonweeddet12/train/images",
             "--labels", "downloads/cottonweeddet12/train/labels",
             "--split", "train", "--batch", "green",
             "--workers", "8", "--per-species", "50",
+            "--project", "cwd12-multiclass-v1",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "Roboflow per-species 上传 (12 cwd12-<sp> projects, 50/sp, ~13min)",
+        "label": "Roboflow 多类上传 → cwd12-multiclass-v1 (598 imgs / 12 class, ~10min, dedup-safe)",
     },
     # v3.0.46 (auto-loop iter 4 / Phase D1): bucket-audit CLI.
     "build_buckets": {
@@ -3380,6 +3384,181 @@ _CLASSES_CSS = """
 """
 
 
+@app.get("/api/roboflow_status")
+def api_roboflow_status():
+    """v3.0.60 — read-only Roboflow workspace audit for the /roboflow page.
+
+    Reads the API key from /jet/home/byler/.roboflow_key (the active key,
+    currently school workspace a-test-of-will). Enumerates every project
+    in the workspace, queries each for class breakdown + image counts.
+    Returns JSON for the /roboflow HTML to render. No third-party SDK
+    needed — uses plain urllib.request.
+    """
+    import urllib.request
+    try:
+        with open("/jet/home/byler/.roboflow_key") as f:
+            key = f.read().strip()
+    except Exception as e:
+        return JSONResponse({"ok": False,
+                              "error": f"key file not readable: {type(e).__name__}"},
+                             status_code=500)
+    workspace = os.environ.get("ROBOFLOW_WORKSPACE", "a-test-of-will")
+    try:
+        with urllib.request.urlopen(
+            f"https://api.roboflow.com/{workspace}?api_key={key}",
+            timeout=20) as r:
+            ws_data = json.load(r)
+    except Exception as e:
+        return JSONResponse({"ok": False,
+                              "workspace": workspace,
+                              "error": f"workspace fetch failed: {type(e).__name__}: {e}"},
+                             status_code=502)
+    projs = (ws_data.get("workspace") or {}).get("projects", [])
+    # For each project, fetch detailed class breakdown.
+    detail = []
+    for p in projs:
+        slug_full = p.get("id", "")
+        slug = slug_full.split("/", 1)[1] if "/" in slug_full else slug_full
+        # Tag role
+        role = "other"
+        if slug.lower() in ("cwd12-weeds", "cwd12-multiclass-v1"):
+            role = "cwd12_master"
+        elif slug.lower().startswith("cwd12-"):
+            role = "cwd12_species"
+        try:
+            with urllib.request.urlopen(
+                f"https://api.roboflow.com/{workspace}/{slug}?api_key={key}",
+                timeout=20) as r:
+                d = json.load(r)
+            pdata = d.get("project") or {}
+            classes = pdata.get("classes") or {}
+            detail.append({
+                "slug": slug, "role": role,
+                "type": pdata.get("type"),
+                "images": pdata.get("images", 0),
+                "unannotated": pdata.get("unannotated", 0),
+                "n_classes": len(classes),
+                "boxes_total": sum(classes.values()) if isinstance(classes, dict) else 0,
+                "boxes_per_class": classes,
+                "versions": len(d.get("versions") or []),
+                "url": f"https://app.roboflow.com/{workspace}/{slug}",
+            })
+        except Exception as e:
+            detail.append({"slug": slug, "role": role,
+                            "error": f"{type(e).__name__}: {e}"})
+    # Sort: cwd12_master first, then cwd12_species, then other; within group by name
+    role_rank = {"cwd12_master": 0, "cwd12_species": 1, "other": 2}
+    detail.sort(key=lambda d: (role_rank.get(d.get("role", "other"), 9),
+                                d.get("slug", "")))
+    return JSONResponse({
+        "ok": True,
+        "workspace": workspace,
+        "workspace_url": f"https://app.roboflow.com/{workspace}",
+        "n_projects": len(detail),
+        "projects": detail,
+    })
+
+
+@app.get("/roboflow", response_class=HTMLResponse)
+def roboflow_page():
+    """v3.0.60 — user-facing Roboflow workspace status page.
+    User wanted '我们的网站会提示我们目前数据集里面含有多少分类
+    以及精标注的占据多少'. This page surfaces:
+      - workspace identity (link out to app.roboflow.com)
+      - per-project: images, # classes, boxes per class, unannotated, versions
+      - role chips (cwd12_master / cwd12_species / other) so non-ours are
+        visually distinct.
+    """
+    body = """
+<!doctype html><html><head><meta charset="utf-8">
+<title>Roboflow workspace status</title>
+<style>
+  body{font-family:-apple-system,"PingFang SC",sans-serif;margin:0;padding:18px;
+       background:#f2f3f7;color:#1a1a1d}
+  header{background:#fff;padding:16px 22px;border-radius:10px;margin-bottom:16px;
+         box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  header h1{margin:0 0 4px 0;font-size:20px}
+  header .sub{color:#666;font-size:13px}
+  header a{color:#06c;text-decoration:none}
+  .proj{background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:14px;
+        box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .proj h2{margin:0 0 6px 0;font-size:17px}
+  .role{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;
+        margin-left:8px;vertical-align:middle;font-weight:600}
+  .role.cwd12_master{background:#38a169;color:#fff}
+  .role.cwd12_species{background:#dbeafe;color:#1e40af}
+  .role.other{background:#f4f4f7;color:#666}
+  .stats{display:flex;gap:18px;margin:8px 0;font-size:13px;color:#444;flex-wrap:wrap}
+  .stats .v{font-weight:600;color:#000}
+  table.cls{font-size:12px;border-collapse:collapse;margin-top:8px;min-width:280px}
+  table.cls th,table.cls td{padding:3px 10px 3px 0;text-align:left}
+  table.cls th{color:#888;font-weight:500}
+  table.cls td.n{text-align:right;font-family:ui-monospace,monospace}
+  .err{color:#c00;font-size:12px}
+  .err{font-family:ui-monospace,monospace}
+  button{padding:6px 14px;border:1px solid #ddd;background:#fff;border-radius:6px;
+         cursor:pointer;font-size:13px}
+</style></head><body>
+<header>
+  <h1>📊 Roboflow workspace 状态</h1>
+  <div class="sub" id="ws-sub">loading...</div>
+  <div style="margin-top:8px">
+    <a href="/control">← /control</a> ·
+    <a href="/">dashboard</a> ·
+    <button onclick="loadStatus()">♻️ 刷新</button>
+  </div>
+</header>
+<div id="projects">loading projects…</div>
+<script>
+async function loadStatus(){
+  const el = document.getElementById('projects');
+  el.innerHTML = '<div style="padding:12px;color:#888">querying Roboflow…</div>';
+  let d;
+  try{
+    const r = await fetch('/api/roboflow_status');
+    d = await r.json();
+  }catch(e){
+    el.innerHTML = '<div class="err">fetch failed: '+e+'</div>'; return;
+  }
+  if(!d.ok){
+    el.innerHTML = '<div class="err">'+(d.error||'unknown error')+'</div>'; return;
+  }
+  document.getElementById('ws-sub').innerHTML =
+    'workspace: <a href="'+d.workspace_url+'" target="_blank">'+d.workspace+'</a> · '+
+    d.n_projects+' projects';
+  const html = d.projects.map(p=>{
+    if(p.error){
+      return '<div class="proj"><h2>'+p.slug+'<span class="role '+p.role+'">'+p.role+'</span></h2>'+
+             '<div class="err">'+p.error+'</div></div>';
+    }
+    const annotated = (p.images||0) - (p.unannotated||0);
+    const annPct = p.images ? Math.round(100*annotated/p.images) : 0;
+    const cls = p.boxes_per_class || {};
+    const clsRows = Object.entries(cls).sort((a,b)=>b[1]-a[1])
+      .map(([k,v])=>`<tr><td>${k}</td><td class="n">${v}</td></tr>`).join('');
+    return `<div class="proj">
+      <h2><a href="${p.url}" target="_blank">${p.slug}</a>
+          <span class="role ${p.role}">${p.role}</span></h2>
+      <div class="stats">
+        <span>📷 imgs <span class="v">${p.images}</span></span>
+        <span>📐 classes <span class="v">${p.n_classes}</span></span>
+        <span>📦 boxes <span class="v">${p.boxes_total}</span></span>
+        <span>🏷️ annotated <span class="v">${annotated}</span> / ${p.images} (${annPct}%)</span>
+        <span>🗂️ versions <span class="v">${p.versions}</span></span>
+        <span>type <span class="v">${p.type||'?'}</span></span>
+      </div>
+      ${clsRows ? '<table class="cls"><thead><tr><th>class</th><th>boxes</th></tr></thead><tbody>'+clsRows+'</tbody></table>' : '<div style="color:#888;font-size:12px">no classes yet</div>'}
+    </div>`;
+  }).join('');
+  el.innerHTML = html || '<div style="color:#888">no projects</div>';
+}
+loadStatus();
+</script>
+</body></html>
+"""
+    return HTMLResponse(body)
+
+
 @app.get("/morning_report", response_class=HTMLResponse)
 def morning_report():
     """One-page 'what happened overnight' summary. Read once with morning coffee."""
@@ -3667,6 +3846,7 @@ def control_page():
   <a href="/">🏠 hub</a>
   <a href="/classes">📋 classes</a>
   <a href="/slugs">📦 slugs</a>
+  <a href="/roboflow">📊 roboflow</a>
   <a href="/api/cluster_status">📥 JSON</a>
 </div>
 

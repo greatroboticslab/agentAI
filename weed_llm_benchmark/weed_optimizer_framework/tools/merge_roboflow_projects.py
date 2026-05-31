@@ -47,7 +47,9 @@ REPO = Path(os.environ.get(
 ))
 DEFAULT_OUT = REPO / "results" / "framework" / "roboflow_state.json"
 
-WORKSPACE = "research-lhi4x"
+# v3.0.59 (2026-05-30): workspace env-configurable. School account active
+# (a-test-of-will); personal (research-lhi4x) kept as snapshot.
+WORKSPACE = os.environ.get("ROBOFLOW_WORKSPACE", "a-test-of-will")
 CWD12 = (
     "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
     "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
@@ -76,43 +78,77 @@ def _query_project(project_slug: str, key: str) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
+def _list_workspace_projects(key: str) -> list:
+    """v3.0.59: enumerate projects in current workspace via REST. Replaces
+    the hardcoded 13-project list — works regardless of which workspace
+    the key points at (a-test-of-will, research-lhi4x, future ones)."""
+    import urllib.request
+    url = f"https://api.roboflow.com/{WORKSPACE}?api_key={key}"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            d = json.load(r)
+        return (d.get("workspace") or {}).get("projects", [])
+    except Exception as e:
+        print(f"[list_projects] {WORKSPACE}: {type(e).__name__}: {e}")
+        return []
+
+
 def audit_all_species(key: str) -> dict:
+    """v3.0.59: workspace-aware. Lists every project in the workspace
+    (not just our hardcoded list), then queries each for full details.
+    Tags each project with its inferred role:
+      - 'cwd12_master': our multi-class detection target
+      - 'cwd12_species': legacy per-species (now removed in a-test-of-will)
+      - 'other': pre-existing or unrelated projects in the workspace."""
     rows: list = []
     totals = {"images": 0, "boxes": 0, "missing": 0}
-    cwd12_full_too = {"slug": "cwd12-weeds", "purpose": "combined-multiclass"}
-    # include the unified project at the top for context
-    for slug in ["cwd12-weeds"] + [f"cwd12-{sp.lower()}" for sp in CWD12]:
-        species = (slug.split("-", 1)[1].title()
-                    if slug.startswith("cwd12-") and slug != "cwd12-weeds"
-                    else None)
-        # title() over a lowercase species: "carpetweeds" → "Carpetweeds"
-        # but PalmerAmaranth and SpottedSpurge are camelcase. Map explicitly:
-        if species:
-            for sp in CWD12:
-                if sp.lower() == slug.split("-", 1)[1]:
-                    species = sp
-                    break
+
+    projs = _list_workspace_projects(key)
+    if not projs:
+        return {"workspace": WORKSPACE, "rows": rows, "totals": totals,
+                "error": "could not list workspace projects"}
+
+    cwd12_species_lower = {sp.lower() for sp in CWD12}
+
+    for p in projs:
+        slug_full = p.get("id", "")
+        # API returns 'a-test-of-will/<slug>' — drop the workspace prefix
+        slug = slug_full.split("/", 1)[1] if "/" in slug_full else slug_full
+        # Classify role
+        if slug.lower() in ("cwd12-weeds", "cwd12-multiclass-v1"):
+            role = "cwd12_master"
+            species = None
+        elif slug.startswith("cwd12-") and slug.split("-", 1)[1] in cwd12_species_lower:
+            role = "cwd12_species"
+            sp_lower = slug.split("-", 1)[1]
+            species = next((sp for sp in CWD12 if sp.lower() == sp_lower), None)
+        else:
+            role = "other"
+            species = None
+
         r = _query_project(slug, key)
-        row = {"slug": slug, "species": species}
+        row = {"slug": slug, "slug_full": slug_full,
+               "role": role, "species": species}
         if not r["ok"]:
             row.update({"status": "error", "error": r["error"]})
             totals["missing"] += 1
         else:
-            p = (r["raw"].get("project") or {})
-            classes = p.get("classes") or {}
+            pdata = r["raw"].get("project") or {}
+            classes = pdata.get("classes") or {}
             n_boxes = sum(classes.values()) if isinstance(classes, dict) else 0
             row.update({
                 "status": "ok",
-                "images": p.get("images", 0),
-                "unannotated": p.get("unannotated", 0),
-                "type": p.get("type"),
+                "images": pdata.get("images", 0),
+                "unannotated": pdata.get("unannotated", 0),
+                "type": pdata.get("type"),
                 "n_classes": len(classes) if isinstance(classes, dict) else None,
                 "boxes_total": n_boxes,
                 "boxes_per_class": classes if isinstance(classes, dict) else None,
-                "versions": len((r["raw"].get("versions") or [])),
+                "versions": len(r["raw"].get("versions") or []),
             })
-            totals["images"] += row["images"]
-            totals["boxes"] += row["boxes_total"]
+            if role in ("cwd12_master", "cwd12_species"):
+                totals["images"] += row["images"]
+                totals["boxes"] += row["boxes_total"]
         rows.append(row)
     return {"workspace": WORKSPACE, "rows": rows, "totals": totals}
 
