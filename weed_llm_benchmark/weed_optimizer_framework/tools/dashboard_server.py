@@ -2672,7 +2672,26 @@ _CLUSTER_ACTIONS = {
             "--project", "cwd12-multiclass-v1",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "Roboflow 多类上传 → cwd12-multiclass-v1 (598 imgs / 12 class, ~10min, dedup-safe)",
+        "label": "Roboflow 多类上传 → cwd12-multiclass-v1 (frozen 598-img benchmark, ~10min)",
+    },
+    # v3.0.67 (2026-05-31): new agent-harvested target project per user
+    # directive — keep frozen cwd12 benchmark separate from autonomous
+    # harvest, route all brain-harvested goal-relevant data to
+    # weed-crop-agent-dataset (project lives in a-test-of-will workspace;
+    # user may drag into "weed_crop_agent_dataset" Project Folder in UI).
+    "roboflow_sync_agent_v1": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "bulk-upload",
+            "--images", "downloads/cottonweeddet12/train/images",
+            "--labels", "downloads/cottonweeddet12/train/labels",
+            "--split", "train", "--batch", "green",
+            "--workers", "8", "--per-species", "50",
+            "--project", "weed-crop-agent-dataset",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "Roboflow 上传 → weed-crop-agent-dataset (新 agent 收集池,~10min)",
     },
     # v3.0.46 (auto-loop iter 4 / Phase D1): bucket-audit CLI.
     "build_buckets": {
@@ -2723,10 +2742,10 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.merge_roboflow_projects",
             "generate-versions",
-            "--project", "cwd12-multiclass-v1",
+            "--project", "weed-crop-agent-dataset",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "Roboflow Version 生成 → cwd12-multiclass-v1 (skips if existing, ~30s)",
+        "label": "Roboflow Version 生成 → weed-crop-agent-dataset (skips if existing, ~30s)",
     },
     "roboflow_download_merge": {
         "type": "subprocess",
