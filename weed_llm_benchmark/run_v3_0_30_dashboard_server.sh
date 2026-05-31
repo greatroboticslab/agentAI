@@ -30,6 +30,20 @@ REPO=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark
 cd "$REPO"
 export PYTHONPATH=.:$PYTHONPATH
 
+# v3.0.66: prevent nested/outer dashboard_server.py drift.
+# Git tracks the nested copy at weed_llm_benchmark/weed_optimizer_framework/
+# but the outer weed_optimizer_framework/ package is what Python imports
+# because cwd is $REPO. Without this sync, a git pull updates code that
+# never actually runs. Mirror nested → outer at every job start so the
+# import always picks up the latest git HEAD.
+if [ -d "$REPO/weed_llm_benchmark/weed_optimizer_framework" ]; then
+    rsync -a --delete \
+        "$REPO/weed_llm_benchmark/weed_optimizer_framework/" \
+        "$REPO/weed_optimizer_framework/" \
+        && echo "[sync] nested → outer weed_optimizer_framework ok" \
+        || echo "[sync] WARN rsync failed (job continues with whatever code is on disk)"
+fi
+
 echo "=== v3.0.30 Job-S (dashboard server + public tunnel) ==="
 echo "SLURM_JOB_ID=$SLURM_JOB_ID"
 echo "Date: $(date)"
