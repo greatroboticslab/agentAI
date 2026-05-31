@@ -129,9 +129,19 @@ def _process_targets(target_imgs, exemplar_crops, species_name: str,
         # Merge proposals from all queries — they all describe the SAME
         # target image (just matched against different exemplars).
         yolo_lines = []
+        n_dropped = 0
         for r in results_per_query:
             for box, score in zip(r["boxes"], r["scores"]):
                 x0, y0, x1, y1 = [float(v) for v in box]
+                # v3.0.64 (Bug 4 fix): OWL post-process occasionally
+                # returns coords outside the image (saw cx=1.18 in iter 15
+                # output). Clamp to [0,W]/[0,H] FIRST, then YOLO-normalize.
+                # Drop the box if it has no area after clamping.
+                x0 = max(0.0, min(W, x0)); x1 = max(0.0, min(W, x1))
+                y0 = max(0.0, min(H, y0)); y1 = max(0.0, min(H, y1))
+                if x1 <= x0 or y1 <= y0:
+                    n_dropped += 1
+                    continue
                 cx = ((x0 + x1) / 2) / W
                 cy = ((y0 + y1) / 2) / H
                 w = (x1 - x0) / W
@@ -139,6 +149,8 @@ def _process_targets(target_imgs, exemplar_crops, species_name: str,
                 # single-class red proposal (matches per-species Roboflow proj)
                 yolo_lines.append(f"0 {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}  # "
                                   f"red conf={float(score):.3f} src=owlv2")
+        if n_dropped:
+            print(f"[owl] {tp.name}: dropped {n_dropped} out-of-bounds boxes")
         yield tp, yolo_lines
 
 
