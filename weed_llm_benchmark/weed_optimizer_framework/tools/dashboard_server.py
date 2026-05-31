@@ -458,16 +458,28 @@ def api_set_flag(slug: str, body: dict = Body(default=None)):
 
 @app.get("/", response_class=HTMLResponse)
 def root():
-    """Hub page — links to all dashboard tools, old + new.
-    v3.0.43.1: previously redirected to the old static index.html which had
-    no links to /classes or /slugs. Users (incl. the project owner) couldn't
-    discover them. This hub fixes discoverability."""
+    """v3.0.66 — unified single-page command center.
+
+    User feedback 2026-05-31: previously / was a hub of card-links to
+    other pages. User clicking those from github.io got 404 because
+    github.io has no routes for subpaths. Plus they wanted everything
+    'on ONE page'. Now / loads ALL pipeline state in panels with
+    auto-refresh:
+
+      - Top banner: live agent + registry + Roboflow + disk in one row
+      - Action grid: every cluster_action button inline (no /control hop)
+      - Live SLURM queue
+      - Recent agent task log (from logs/agent_tasks/ via /api/recent_jobs)
+      - Roboflow workspace state (from /api/roboflow_status)
+      - CWD12 per-species snapshot
+
+    Drill-down /classes /slugs /roboflow stay accessible from header nav."""
     return HTMLResponse('''<!DOCTYPE html><html lang="zh"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>autonomous weed detection — hub</title>
+<title>🌱 Weed-detection — Framework Controller</title>
 <style>
   body { font-family: -apple-system, "PingFang SC", sans-serif;
-         max-width: 900px; margin: 40px auto; padding: 1rem; color: #1a1a1d;
+         max-width: 1400px; margin: 16px auto; padding: 1rem; color: #1a1a1d;
          background: #f2f3f7; }
   h1 { margin: 0 0 6px 0; font-size: 22px; }
   .sub { color: #666; margin-bottom: 22px; font-size: 14px; }
@@ -498,11 +510,58 @@ def root():
   .live-banner.idle .pulse { animation: none; opacity: 0.5; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
   .live-banner a { color: #fff; text-decoration: underline; font-weight: 600; }
+  /* v3.0.66 unified-controller styles */
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+    gap:10px;margin-bottom:14px}
+  .stat{background:#fff;border-radius:8px;padding:10px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .stat .l{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px}
+  .stat .v{font-size:20px;font-weight:600;color:#000;margin-top:2px}
+  .stat .v.green{color:#2a7} .stat .v.red{color:#c44}
+  .panels{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:14px}
+  @media (max-width:1100px){.panels{grid-template-columns:1fr}}
+  .panel{background:#fff;border-radius:10px;padding:14px 16px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+  .panel h2{font-size:14px;margin:0 0 10px 0;color:#444;
+    display:flex;align-items:center;justify-content:space-between}
+  .panel h2 a{font-size:11px;color:#06c;text-decoration:none;font-weight:400}
+  .actions{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+  .act{background:#f7f7f9;border:1px solid #e0e0e6;padding:8px 10px;border-radius:6px;
+    cursor:pointer;font-size:12px;line-height:1.3;transition:all .12s;text-align:left;
+    font-family:inherit;color:#222}
+  .act:hover{background:#eef4ff;border-color:#06c}
+  .act .nm{font-weight:600;color:#06c;font-size:13px}
+  .act .ds{color:#666;margin-top:3px;font-size:11px}
+  .act.dangerous{background:#fff3f0}
+  .act.dangerous .nm{color:#c44}
+  .log{font-family:ui-monospace,monospace;font-size:11px;background:#fafafa;
+    border:1px solid #eee;border-radius:6px;padding:8px;max-height:160px;overflow:auto;
+    white-space:pre-wrap;word-break:break-all;color:#333}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:#888;font-weight:500;padding:4px 8px 4px 0;font-size:11px;text-transform:uppercase}
+  td{padding:5px 8px 5px 0;border-top:1px solid #f0f0f0}
+  td.r{text-align:right;font-variant-numeric:tabular-nums}
+  .state-R{color:#2a7;font-weight:600}.state-PD{color:#c70}.state-CD{color:#06c}
+  .nav{display:flex;gap:10px;font-size:13px;margin-bottom:12px;flex-wrap:wrap}
+  .nav a{color:#06c;text-decoration:none;padding:4px 10px;border-radius:5px;background:#fff}
+  .nav a:hover{background:#eef4ff}
+  .live-banner{background:linear-gradient(90deg,#2a7 0%,#28a 100%);color:#fff;
+    padding:10px 16px;border-radius:8px;margin-bottom:14px;font-size:13px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .live-banner.idle{background:linear-gradient(90deg,#888 0%,#aaa 100%)}
+  .live-banner .pulse{width:8px;height:8px;background:#fff;border-radius:50%;
+    animation:pulse 1.5s infinite}
+  .live-banner.idle .pulse{animation:none;opacity:.5}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 </style>
 </head><body>
-<h1>🌱 Autonomous Weed Detection — dashboard hub</h1>
-<div class="sub">
-  Track A (data harvest) + Track B (training) — pick a tool below.
+<h1>🌱 Weed-detection framework controller <span style="font-size:13px;color:#888;font-weight:400">v3.0.66 unified</span></h1>
+<div class="nav">
+  <a href="/">🏠 hub (this page)</a>
+  <a href="/classes">📋 /classes (295 cards)</a>
+  <a href="/slugs">📦 /slugs (60 slugs)</a>
+  <a href="/roboflow">📊 /roboflow</a>
+  <a href="/morning_report">☀️ /morning_report</a>
+  <a href="/api/cluster_status">📥 JSON</a>
 </div>
 
 <div class="live-banner idle" id="live-banner">
@@ -510,142 +569,205 @@ def root():
   <span id="live-banner-text">loading status…</span>
 </div>
 
+<!-- ───── STAT ROW ───── -->
+<div class="stat-row">
+  <div class="stat"><div class="l">📦 Registry slugs</div><div class="v" id="stat-slugs">…</div></div>
+  <div class="stat"><div class="l">⬇️ Downloaded</div><div class="v green" id="stat-downloaded">…</div></div>
+  <div class="stat"><div class="l">🖼️ Total images</div><div class="v" id="stat-imgs">…</div></div>
+  <div class="stat"><div class="l">🏷️ Topic overrides</div><div class="v" id="stat-topic">…</div></div>
+  <div class="stat"><div class="l">📡 Roboflow imgs</div><div class="v green" id="stat-rf-imgs">…</div></div>
+  <div class="stat"><div class="l">📐 Roboflow boxes</div><div class="v green" id="stat-rf-boxes">…</div></div>
+</div>
+
+<!-- ───── ACTIONS ───── -->
+<div class="panel" style="margin-bottom:14px">
+  <h2>🤖 Agent actions <span><a href="/control">/control 全功能 →</a></span></h2>
+  <div class="actions" id="actions">loading…</div>
+  <h2 style="margin-top:10px">📜 last action output</h2>
+  <div class="log" id="action-log">click an action above to fire it</div>
+</div>
+
+<!-- ───── PANELS: SLURM | Roboflow ───── -->
+<div class="panels">
+  <div class="panel">
+    <h2>📋 SLURM queue <span id="squeue-time">…</span></h2>
+    <table>
+      <thead><tr><th>jobid</th><th>name</th><th>st</th><th>time</th><th>reason</th></tr></thead>
+      <tbody id="squeue-body"><tr><td colspan="5" style="color:#888">loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <h2>📡 Roboflow workspace <span><a href="/roboflow">详情 →</a></span></h2>
+    <div id="rf-summary">loading…</div>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:14px">
+  <h2>🌿 CWD12 species snapshot (Roboflow boxes per class)</h2>
+  <div id="cwd12-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">loading…</div>
+</div>
+
+<div class="panel">
+  <h2>🐛 Recent agent task runs <span><a href="/api/recent_jobs">JSON →</a></span></h2>
+  <div id="recent-jobs">loading…</div>
+</div>
+
 <script>
-  // Refresh live banner with current cluster status
-  async function updateBanner() {
-    try {
-      const r = await fetch('/api/cluster_status');
-      const d = await r.json();
-      const jobs = d.jobs || [];
-      const reg = d.registry || {};
-      const agentRunning = jobs.find(j =>
-        ['dl_known','brain_hrv','topic_bf','smoke','lora_'].some(p => (j.name||'').startsWith(p))
-        && j.state === 'RUNNING');
-      const banner = document.getElementById('live-banner');
-      const txt = document.getElementById('live-banner-text');
-      if (agentRunning) {
-        banner.classList.remove('idle');
-        txt.innerHTML = `🤖 <strong>${agentRunning.name}</strong> RUNNING (${agentRunning.time}) — `
-          + `<a href="/control">monitor 📺</a> · `
-          + `registry ${reg.n_downloaded||'?'}/${reg.n_slugs||'?'} slugs, `
-          + `${(reg.total_imgs||0).toLocaleString()} imgs · `
-          + `${d.n_topic_overrides||0} topic overrides`;
-      } else {
-        banner.classList.add('idle');
-        txt.innerHTML = `💤 idle — no agent jobs · registry ${reg.n_downloaded||'?'}/${reg.n_slugs||'?'} slugs, `
-          + `${(reg.total_imgs||0).toLocaleString()} imgs · `
-          + `<a href="/control">trigger agent ▶️</a>`;
-      }
-    } catch(e) {
-      document.getElementById('live-banner-text').innerHTML =
-        'error fetching status: ' + e;
+function fmtN(n){return (n==null)?'?':n.toLocaleString()}
+
+async function loadStatus(){
+  try{
+    const d = await (await fetch('/api/cluster_status')).json();
+    const reg = d.registry || {};
+    document.getElementById('stat-slugs').textContent = fmtN(reg.n_slugs);
+    document.getElementById('stat-downloaded').textContent = fmtN(reg.n_downloaded);
+    document.getElementById('stat-imgs').textContent = fmtN(reg.total_imgs);
+    document.getElementById('stat-topic').textContent = fmtN(d.n_topic_overrides);
+    // live banner
+    const jobs = d.jobs || [];
+    const agentJob = jobs.find(j => j.state==='RUNNING' &&
+      !['v3030_dS'].includes(j.name||''));
+    const banner = document.getElementById('live-banner');
+    const txt = document.getElementById('live-banner-text');
+    if(agentJob){
+      banner.classList.remove('idle');
+      txt.innerHTML = `🤖 <strong>${agentJob.name}</strong> RUNNING (${agentJob.time}) on ${agentJob.nodelist||'?'}`;
+    }else{
+      banner.classList.add('idle');
+      txt.innerHTML = `💤 idle (no agent jobs) — registry ${reg.n_downloaded}/${reg.n_slugs} downloaded`;
     }
+    // squeue table
+    const tb = document.getElementById('squeue-body');
+    if(!jobs.length){
+      tb.innerHTML = '<tr><td colspan="5" style="color:#888">empty</td></tr>';
+    }else{
+      tb.innerHTML = jobs.map(j =>
+        `<tr><td>${j.jobid}</td><td>${j.name||'?'}</td>`
+        +`<td class="state-${j.state||'?'}">${j.state||'?'}</td>`
+        +`<td>${j.time||'?'}</td><td>${j.nodelist||'?'}</td></tr>`).join('');
+    }
+    document.getElementById('squeue-time').textContent =
+      new Date().toLocaleTimeString();
+  }catch(e){
+    document.getElementById('live-banner-text').innerHTML = 'cluster_status err: ' + e;
   }
-  updateBanner();
-  setInterval(updateBanner, 7000);
+}
+
+async function loadActions(){
+  try{
+    const acts = await (await fetch('/api/cluster_actions')).json();
+    const html = Object.entries(acts).map(([k,v]) => {
+      const danger = k.includes('restart') || k.includes('download_known') ? ' dangerous' : '';
+      const label = (v.label||'').slice(0,90);
+      return `<button class="act${danger}" onclick="trigger('${k}')">
+                <div class="nm">${k}</div><div class="ds">${label}</div></button>`;
+    }).join('');
+    document.getElementById('actions').innerHTML = html;
+  }catch(e){
+    document.getElementById('actions').innerHTML = 'actions err: ' + e;
+  }
+}
+
+async function trigger(name){
+  if(name === 'restart_dashboard' &&
+     !confirm('重启 dashboard? ~90 秒后此页面会重连(github.io 自动跳新 URL)。')) return;
+  const log = document.getElementById('action-log');
+  log.textContent = `→ triggering ${name} …`;
+  try{
+    const r = await fetch('/api/cluster_action/' + name, {method:'POST'});
+    const d = await r.json();
+    log.textContent = JSON.stringify(d, null, 2);
+    if(name !== 'restart_dashboard') loadStatus();
+  }catch(e){ log.textContent = 'error: ' + e }
+}
+
+async function loadRoboflow(){
+  try{
+    const d = await (await fetch('/api/roboflow_status')).json();
+    if(!d.ok){
+      document.getElementById('rf-summary').innerHTML =
+        '<span style="color:#c44">RF err: '+d.error+'</span>';
+      return;
+    }
+    const master = d.projects.find(p => p.role === 'cwd12_master');
+    if(master){
+      document.getElementById('stat-rf-imgs').textContent = fmtN(master.images);
+      document.getElementById('stat-rf-boxes').textContent = fmtN(master.boxes_total);
+    }
+    let html = `<div style="font-size:12px;color:#666;margin-bottom:8px">`
+      +`workspace <code>${d.workspace}</code> · ${d.n_projects} projects total</div>`;
+    if(master){
+      const ann = master.images - master.unannotated;
+      const annPct = master.images ? Math.round(100*ann/master.images) : 0;
+      html += `<div style="background:#f4faf4;border-left:3px solid #38a169;padding:8px 12px;border-radius:4px;font-size:13px">`
+        + `<strong>${master.slug}</strong> (主项目)<br>`
+        + `📷 ${master.images} imgs · 📐 ${master.n_classes} classes · 📦 ${master.boxes_total} boxes<br>`
+        + `🏷️ annotated ${ann}/${master.images} (${annPct}%) · 🗂️ ${master.versions} versions`
+        + `</div>`;
+    }
+    // CWD12 per-class breakdown
+    if(master && master.boxes_per_class){
+      const cwd12 = ["Carpetweeds","Crabgrass","Eclipta","Goosegrass","Morningglory","Nutsedge",
+        "PalmerAmaranth","PricklySida","Purslane","Ragweed","Sicklepod","SpottedSpurge"];
+      const cls = master.boxes_per_class || {};
+      const max = Math.max(...Object.values(cls).concat([1]));
+      const cwd12html = cwd12.map(sp => {
+        const n = cls[sp]||0; const pct = (100*n/max).toFixed(0);
+        return `<div style="background:#fff;border:1px solid #eee;border-radius:6px;padding:6px 10px;font-size:11px">
+                  <div style="font-weight:600">${sp}</div>
+                  <div style="color:#666">${n} boxes</div>
+                  <div style="background:#e0e0e6;height:4px;border-radius:2px;margin-top:4px">
+                    <div style="background:#38a169;width:${pct}%;height:100%;border-radius:2px"></div>
+                  </div>
+                </div>`;
+      }).join('');
+      document.getElementById('cwd12-row').innerHTML = cwd12html;
+    }
+    document.getElementById('rf-summary').innerHTML = html;
+  }catch(e){
+    document.getElementById('rf-summary').innerHTML = 'RF err: ' + e;
+  }
+}
+
+async function loadRecentJobs(){
+  try{
+    const d = await (await fetch('/api/recent_jobs?n=12')).json();
+    const jobs = d.jobs || [];
+    if(!jobs.length){
+      document.getElementById('recent-jobs').innerHTML =
+        '<div style="color:#888;font-size:12px">no jobs yet</div>';
+      return;
+    }
+    document.getElementById('recent-jobs').innerHTML =
+      '<table><thead><tr><th>jobid</th><th>name</th><th>finished</th><th class="r">size</th><th>log</th></tr></thead><tbody>'
+      + jobs.map(j =>
+        `<tr><td>${j.jobid}</td><td>${j.name}</td><td>${j.mtime_h}</td>`
+        +`<td class="r">${(j.size/1024).toFixed(1)} KB</td>`
+        +`<td><a href="/api/job_log/${j.jobid}?tail=200" target="_blank">📜</a></td></tr>`).join('')
+      + '</tbody></table>';
+  }catch(e){
+    document.getElementById('recent-jobs').innerHTML = 'recent-jobs err: ' + e;
+  }
+}
+
+// Initial load + poll
+loadStatus(); loadActions(); loadRoboflow(); loadRecentJobs();
+setInterval(loadStatus, 6000);
+setInterval(loadRecentJobs, 15000);
+setInterval(loadRoboflow, 60000);
 </script>
 
-<div class="section-h">🎛️ Cluster control (v3.0.43)</div>
-<div class="grid">
-  <a class="card new" href="/morning_report" style="border-left-color:#2a7;">
-    <div class="icon">☀️</div>
-    <div class="title">/morning_report — overnight 总结</div>
-    <div class="desc">一页看 overnight progress:新 slugs、action history、agent jobs 最新输出。
-    早上一杯咖啡时间看完。</div>
-  </a>
-  <a class="card new" href="/control" style="border-left-color:#c70;">
-    <div class="icon">🎛️</div>
-    <div class="title">/control — 控制台</div>
-    <div class="desc">实时 squeue / ollama / registry 状态 + 一键
-    重启 dashboard / Brain harvest / topic backfill /缓存清理。
-    <strong>你不再需要叫我做这些。</strong></div>
-  </a>
-</div>
-
-<div class="section-h">🆕 Human-in-the-loop verification (v3.0.42–43)</div>
-<div class="grid">
-  <a class="card new" href="/classes">
-    <div class="icon">📋</div>
-    <div class="title">/classes — 类级人工审计</div>
-    <div class="desc">每个类(CWD12 + 348 总类)逐张点 ✓ 榜样 / ✗ 错标 / 🔄 bbox 修。
-    7 个 filter tab + 搜索框。三源混排:bank/flux/真实 reg。</div>
-  </a>
-  <a class="card new" href="/slugs">
-    <div class="icon">📦</div>
-    <div class="title">/slugs — slug 级清理</div>
-    <div class="desc">80 个数据集 slug 列表,批量 ✓ keep / ✗ junk / 🤔 unsure。
-    ✗ 后自动从 /classes 隐藏 — 不用逐张点垃圾类。</div>
-  </a>
-  <a class="card new" href="/classes/Goosegrass">
-    <div class="icon">🌾</div>
-    <div class="title">直接进 Goosegrass</div>
-    <div class="desc">最难类 — 看 bank + flux + holdout 真图(红框 bbox 标本类)
-    混排,审定后写到 exemplar 集供训练。</div>
-  </a>
-</div>
-
-<div class="section-h">📊 旧版静态 dashboard</div>
-<div class="grid">
-  <a class="card old" href="/dashboard/index.html">
-    <div class="icon">🏠</div>
-    <div class="title">主页(stats)</div>
-    <div class="desc">总览:n_datasets / n_imgs / latest mAP. 由 dashboard_generator
-    定期 regenerate(可能滞后几天)。</div>
-  </a>
-  <a class="card old" href="/dashboard/datasets.html">
-    <div class="icon">📑</div>
-    <div class="title">Datasets 列表</div>
-    <div class="desc">所有 slug 的元数据列表(只读)。新功能 /slugs 是它的可写版。</div>
-  </a>
-  <a class="card old" href="/dashboard/categories.html">
-    <div class="icon">🏷️</div>
-    <div class="title">Categories</div>
-    <div class="desc">按 crop/topic 分桶统计。</div>
-  </a>
-  <a class="card old" href="/dashboard/progress.html">
-    <div class="icon">📈</div>
-    <div class="title">Progress</div>
-    <div class="desc">训练历史 / mAP 时序。</div>
-  </a>
-  <a class="card old" href="/audit">
-    <div class="icon">🔍</div>
-    <div class="title">/audit(旧)</div>
-    <div class="desc">v3.0.41 之前的 per-class 大图浏览,被 /classes 取代。</div>
-  </a>
-</div>
-
-<div class="section-h">🔌 API endpoints (JSON)</div>
-<div class="grid">
-  <a class="card api" href="/api/exemplars_export">
-    <div class="icon">📥</div>
-    <div class="title">/api/exemplars_export</div>
-    <div class="desc">所有 ✓ 榜样图导出 manifest。供 LoRA / training agent 读取。</div>
-  </a>
-  <a class="card api" href="/api/slug_verdicts">
-    <div class="icon">📥</div>
-    <div class="title">/api/slug_verdicts</div>
-    <div class="desc">所有 slug ✓/✗/🤔 判定 JSON。</div>
-  </a>
-  <a class="card api" href="/api/state">
-    <div class="icon">📊</div>
-    <div class="title">/api/state</div>
-    <div class="desc">整体 registry 状态(60s cache)。</div>
-  </a>
-  <a class="card api" href="/api/refresh_registry">
-    <div class="icon">♻️</div>
-    <div class="title">/api/refresh_registry</div>
-    <div class="desc">harvest 后强制清缓存。</div>
-  </a>
-  <a class="card api" href="/healthz">
-    <div class="icon">❤️</div>
-    <div class="title">/healthz</div>
-    <div class="desc">liveness probe.</div>
-  </a>
-</div>
-
-<div class="footer">
-  v3.0.43.1 hub · server pid自启 · for direct 路径:
-  /classes · /slugs · /classes/{species} · /dashboard/{page}.html
+<div style="color:#999;font-size:12px;margin-top:24px;text-align:center">
+  v3.0.66 unified · all panels auto-refresh · 旧版静态 dashboard:
+  <a href="/dashboard/index.html">stats</a> ·
+  <a href="/dashboard/datasets.html">datasets</a> ·
+  <a href="/dashboard/categories.html">categories</a> ·
+  <a href="/dashboard/progress.html">progress</a> ·
+  <a href="/audit">/audit (deprecated)</a>
+  <br>API: <a href="/api/state">/api/state</a> ·
+  <a href="/api/exemplars_export">/api/exemplars_export</a> ·
+  <a href="/api/slug_verdicts">/api/slug_verdicts</a> ·
+  <a href="/healthz">/healthz</a>
 </div>
 </body></html>''')
 
