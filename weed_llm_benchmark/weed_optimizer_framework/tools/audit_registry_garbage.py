@@ -43,27 +43,42 @@ CWD12_BASELINES = {
 
 
 def _slug_garbage_reason(slug: str, info: dict, labeled_min: int) -> str:
-    """Return a short reason string if slug is garbage, else empty string."""
+    """Return a short reason string if slug is garbage, else empty string.
+
+    v3.0.71.1 (2026-06-01): fixed false-positive. Earlier version dropped
+    on ANY non-numeric classes value ('?' or empty), which marked
+    francesco__grass_weeds (2479 labeled bboxes!) as garbage because brain
+    recorded its registry metadata as classes='?' despite the real schema.
+
+    Correct semantics: drop ONLY if there's evidence of no usable labels.
+    The disk check is authoritative — if there are >= labeled_min .txt
+    YOLO label files on disk, the slug is fine regardless of registry
+    metadata. This makes the audit safe even when brain's metadata is
+    fuzzy.
+    """
     if info.get("status") != "downloaded":
         return ""  # we only audit downloaded slugs
 
     labeled = info.get("labeled", info.get("local_labeled", 0)) or 0
     classes = info.get("classes")
-    if classes in (0, "0", None):
-        return f"classes=0"
-    if isinstance(classes, str) and not classes.isdigit() and classes != "multi":
-        # '?' or other non-numeric → assume bad metadata
-        return f"classes={classes!r}"
+    local_path = info.get("local_path", "")
 
-    if labeled < labeled_min:
-        # Some HF datasets report labeled=0 even though boxes exist; double-
-        # check by counting actual .txt YOLO files on disk if present.
-        local_path = info.get("local_path", "")
-        if local_path and os.path.isdir(local_path):
-            n_txt = sum(1 for _ in Path(local_path).rglob("*.txt"))
-            if n_txt >= labeled_min:
-                return ""  # disk has labels, registry metadata stale
-        return f"labeled={labeled} (< {labeled_min})"
+    # First, authoritative disk check — if labels exist, trust them.
+    n_txt = 0
+    if local_path and os.path.isdir(local_path):
+        n_txt = sum(1 for _ in Path(local_path).rglob("*.txt"))
+
+    # Effective label count: max(registry-claimed labeled, disk .txt count)
+    effective_labeled = max(int(labeled or 0), n_txt)
+
+    if effective_labeled < labeled_min:
+        # No usable labels anywhere → garbage.
+        return (f"effective_labeled={effective_labeled} "
+                f"(registry={labeled}, disk_txt={n_txt}) < {labeled_min}")
+
+    # Has labels on disk: only secondary check is total absence of class info.
+    if classes in (0, "0") and n_txt == 0:
+        return f"classes=0 + no disk labels"
 
     return ""
 
