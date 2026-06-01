@@ -32,7 +32,7 @@ from typing import Optional
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, HTTPException, Response, Body
+from fastapi import FastAPI, HTTPException, Response, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -659,6 +659,29 @@ async function loadActions(){
     const html = Object.entries(acts).map(([k,v]) => {
       const danger = k.includes('restart') || k.includes('download_known') ? ' dangerous' : '';
       const label = (v.label||'').slice(0,90);
+      // v3.0.68: brain_harvest gets an inline form (time / strict / max_new)
+      if(k === 'brain_harvest'){
+        return `<div class="act" style="background:#fff8e0;border-color:#c70;padding:10px">
+          <div class="nm" style="color:#c70">🧠 brain_harvest</div>
+          <div class="ds" style="margin-bottom:6px">${label}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:#444;align-items:center">
+            <label>时长:
+              <select id="bh-time" style="font-size:11px">
+                <option value="1">1h</option>
+                <option value="2">2h</option>
+                <option value="4" selected>4h</option>
+                <option value="6">6h</option>
+              </select>
+            </label>
+            <label>max_new:
+              <input id="bh-maxnew" type="number" value="5" min="1" max="50" style="width:48px;font-size:11px">
+            </label>
+            <label style="display:flex;align-items:center;gap:3px">
+              <input id="bh-strict" type="checkbox" checked> 严格 weed/crop
+            </label>
+            <button onclick="triggerBrain()" style="background:#c70;color:#fff;border:0;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">▶ run</button>
+          </div></div>`;
+      }
       return `<button class="act${danger}" onclick="trigger('${k}')">
                 <div class="nm">${k}</div><div class="ds">${label}</div></button>`;
     }).join('');
@@ -668,17 +691,32 @@ async function loadActions(){
   }
 }
 
-async function trigger(name){
+async function trigger(name, body){
   if(name === 'restart_dashboard' &&
      !confirm('重启 dashboard? ~90 秒后此页面会重连(github.io 自动跳新 URL)。')) return;
   const log = document.getElementById('action-log');
   log.textContent = `→ triggering ${name} …`;
   try{
-    const r = await fetch('/api/cluster_action/' + name, {method:'POST'});
+    const opts = {method:'POST'};
+    if(body){
+      opts.headers = {'Content-Type':'application/json'};
+      opts.body = JSON.stringify(body);
+    }
+    const r = await fetch('/api/cluster_action/' + name, opts);
     const d = await r.json();
     log.textContent = JSON.stringify(d, null, 2);
     if(name !== 'restart_dashboard') loadStatus();
   }catch(e){ log.textContent = 'error: ' + e }
+}
+
+// v3.0.68: brain_harvest form-driven trigger
+async function triggerBrain(){
+  const body = {
+    time_h: parseInt(document.getElementById('bh-time').value, 10),
+    max_new: parseInt(document.getElementById('bh-maxnew').value, 10),
+    strict: document.getElementById('bh-strict').checked,
+  };
+  return trigger('brain_harvest', body);
 }
 
 async function loadRoboflow(){
@@ -2880,16 +2918,34 @@ def api_cluster_actions_list():
 
 
 @app.post("/api/cluster_action/{action}")
-def api_cluster_action(action: str):
+async def api_cluster_action(action: str, request: Request):
     """Trigger one of the whitelisted actions. Returns the sbatch output
     (job id) or success marker.
 
-    SECURITY: actions are whitelisted by name. No arbitrary shell injection.
-    The dashboard URL is unguessable trycloudflare URL — acceptable risk
-    for a research dashboard."""
+    v3.0.68 (2026-05-31): optional JSON body with whitelisted env-var
+    overrides for sbatch actions. Currently honored for brain_harvest:
+      {"time_h": 1|2|4, "strict": true/false, "max_new": int, "max_imgs": int}
+    Translates to sbatch --time=HH:MM:00 and ENV vars BRAIN_STRICT/
+    BRAIN_MAX_NEW/BRAIN_MAX_IMGS.
+
+    SECURITY: actions are whitelisted by name. Body params are typed +
+    range-checked. No arbitrary shell injection. The dashboard URL is
+    an unguessable trycloudflare URL — acceptable risk for a research
+    dashboard."""
     if action not in _CLUSTER_ACTIONS:
         raise HTTPException(400, f"unknown action {action!r}")
     spec = _CLUSTER_ACTIONS[action]
+
+    # v3.0.68: parse optional JSON body for parameterized actions.
+    body = {}
+    try:
+        raw = await request.body()
+        if raw:
+            body = json.loads(raw.decode("utf-8") or "{}")
+            if not isinstance(body, dict):
+                body = {}
+    except Exception:
+        body = {}
 
     if spec["type"] == "refresh":
         # delegate to /api/refresh_registry logic
@@ -2910,12 +2966,45 @@ def api_cluster_action(action: str):
         script_path = REPO / spec["script"]
         if not script_path.is_file():
             raise HTTPException(500, f"script not found: {script_path}")
-        r = _shell(["sbatch", str(script_path)], timeout=15)
+
+        # v3.0.68: brain_harvest accepts {time_h, strict, max_new, max_imgs}
+        # body. Other actions ignore body (forward-compat safe).
+        sbatch_cli = ["sbatch"]
+        body_used = {}
+        if action == "brain_harvest" and body:
+            try:
+                t = int(body.get("time_h", 4))
+                if t in (1, 2, 4, 6, 8):
+                    sbatch_cli += [f"--time={t:02d}:00:00"]
+                    body_used["time_h"] = t
+            except (TypeError, ValueError):
+                pass
+            export_pairs = ["ALL"]
+            for k_body, k_env, lo, hi in [
+                ("strict",   "BRAIN_STRICT",   0, 1),
+                ("max_new",  "BRAIN_MAX_NEW",  1, 50),
+                ("max_imgs", "BRAIN_MAX_IMGS", 100, 50000),
+            ]:
+                if k_body in body:
+                    try:
+                        v = int(bool(body[k_body])) if k_body == "strict" \
+                            else int(body[k_body])
+                        if lo <= v <= hi:
+                            export_pairs.append(f"{k_env}={v}")
+                            body_used[k_body] = v
+                    except (TypeError, ValueError):
+                        pass
+            if len(export_pairs) > 1:
+                sbatch_cli += [f"--export={','.join(export_pairs)}"]
+        sbatch_cli += [str(script_path)]
+
+        r = _shell(sbatch_cli, timeout=15)
         result = {"ok": r["ok"], "action": action,
                   "stdout": r["stdout"].strip(),
                   "stderr": r["stderr"].strip(),
                   "msg": (r["stdout"].strip()
-                          if r["ok"] else r["stderr"].strip())}
+                          if r["ok"] else r["stderr"].strip()),
+                  "params": body_used}
         _log_action(action, result)
         return result
 

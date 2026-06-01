@@ -904,7 +904,7 @@ class DatasetDiscovery:
         return bool(entry) and entry.get("flag") == "garbage"
 
     def harvest_new_datasets(self, max_new=5, queries=None, confirm_schema=True,
-                              max_images_per_ds=30000):
+                              max_images_per_ds=30000, strict_topic=None):
         """Search HF for NEW datasets, fast-filter by card metadata, download up to max_new.
 
         Strategy:
@@ -913,8 +913,63 @@ class DatasetDiscovery:
         - For passing candidates, optionally confirm schema by loading first item
         - Download up to max_new — each one registered permanently
 
-        Returns: {attempted: n, downloaded: n, results: [{hf_id, local_images, labeled, kind}]}
+        v3.0.68 (2026-05-31): user feedback "ibm_research__cif_dataset got 5000
+        imgs with 0 labels — useless garbage". Adds strict_topic mode that:
+          - Post-download: reject if stats['labeled'] < 100 OR stats['classes']
+            in (0, '?') — deletes from registry + removes downloaded files
+          - Same for GitHub + Kaggle phases
+        Defaults: env BRAIN_STRICT=1 enables it; max_new from BRAIN_MAX_NEW.
+
+        Returns: {attempted: n, downloaded: n, rejected_strict: n,
+                  results: [{hf_id, local_images, labeled, kind}]}
         """
+        # v3.0.68: read overrides from env so the SBATCH/dashboard can configure
+        # without a code change.
+        if strict_topic is None:
+            strict_topic = bool(int(os.environ.get("BRAIN_STRICT", "0")))
+        env_max_new = os.environ.get("BRAIN_MAX_NEW")
+        if env_max_new:
+            try:
+                max_new = int(env_max_new)
+            except ValueError:
+                pass
+        logger.info(
+            f"[Harvest] config: max_new={max_new} strict_topic={strict_topic} "
+            f"max_images_per_ds={max_images_per_ds}"
+        )
+        n_rejected_strict = 0
+
+        def _strict_reject_if_garbage(slug, stats, src_tag):
+            """Strict-mode post-download check: drop low-label/no-class downloads.
+            Returns True if rejected (caller should NOT register/append)."""
+            if not strict_topic:
+                return False
+            labeled = stats.get("labeled", 0) or 0
+            classes = stats.get("classes", 0)
+            cls_n = 0 if classes in (0, "?", None, "0") else (
+                int(classes) if str(classes).isdigit() else 1)
+            if labeled < 100 or cls_n == 0:
+                logger.info(
+                    f"[Harvest][strict] REJECT {src_tag} {slug}: "
+                    f"labeled={labeled} classes={classes} (< 100 labels or 0 classes)"
+                )
+                # Remove from registry + delete the downloaded files
+                self.registry["datasets"].pop(slug, None)
+                local_path = os.path.join(self.data_dir, slug)
+                if os.path.isdir(local_path):
+                    import shutil
+                    try:
+                        shutil.rmtree(local_path)
+                        logger.info(
+                            f"[Harvest][strict] cleaned disk: {local_path}"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"[Harvest][strict] could not rmtree {local_path}: {e}"
+                        )
+                return True
+            return False
+
         try:
             from huggingface_hub import HfApi
         except ImportError:
@@ -1078,6 +1133,10 @@ class DatasetDiscovery:
                 }
 
             _, stats = self._download_hf(slug, d.id, local_path, max_images_per_ds)
+            # v3.0.68: strict-mode post-download quality gate
+            if _strict_reject_if_garbage(slug, stats, "HF"):
+                n_rejected_strict += 1
+                continue
             results.append({
                 "hf_id": d.id, "slug": slug,
                 "stats": stats, "reason": reason,
@@ -1095,9 +1154,14 @@ class DatasetDiscovery:
                     max_new=min(gh_quota, 3),
                 )
                 for entry in gh:
-                    self.registry["datasets"][entry["slug"]] = entry["info"]
+                    slug = entry["slug"]
+                    self.registry["datasets"][slug] = entry["info"]
+                    # v3.0.68: same strict gate for GitHub-sourced slugs
+                    if _strict_reject_if_garbage(slug, entry["stats"], "GitHub"):
+                        n_rejected_strict += 1
+                        continue
                     results.append({
-                        "hf_id": entry["hf_id"], "slug": entry["slug"],
+                        "hf_id": entry["hf_id"], "slug": slug,
                         "stats": entry["stats"], "reason": entry["reason"],
                     })
             except Exception as e:
@@ -1127,6 +1191,10 @@ class DatasetDiscovery:
                         logger.info(f"[Harvest] kaggle skip {slug} — failed weed/crop filter")
                         continue
                     self.registry["datasets"][slug] = entry["info"]
+                    # v3.0.68: strict gate on Kaggle too
+                    if _strict_reject_if_garbage(slug, entry["stats"], "Kaggle"):
+                        n_rejected_strict += 1
+                        continue
                     results.append({
                         "hf_id": entry["hf_id"], "slug": slug,
                         "stats": entry["stats"], "reason": entry["reason"],
@@ -1168,13 +1236,29 @@ class DatasetDiscovery:
             except Exception as e:
                 logger.warning(f"[Harvest] Roboflow phase failed: {e}")
 
+        # v3.0.68: also strict-gate any Roboflow phase entries that may have
+        # accumulated in registry. (The Roboflow loop above appends directly
+        # to results; we honor strict on those too.)
+        if strict_topic and results:
+            kept = []
+            for r in results:
+                slug = r.get("slug")
+                if slug and slug in self.registry["datasets"]:
+                    if _strict_reject_if_garbage(slug, r.get("stats", {}), "RF"):
+                        n_rejected_strict += 1
+                        continue
+                kept.append(r)
+            results = kept
+
         self._save_registry()
         return {
             "status": "ok",
+            "strict_topic": strict_topic,
             "queries_tried": len([q for q in queries]),
             "candidates_passed_filter": len(results),
             "downloaded": len([r for r in results
                                if r["stats"].get("status") == "downloaded"]),
+            "rejected_strict_garbage": n_rejected_strict,
             "results": results,
         }
 

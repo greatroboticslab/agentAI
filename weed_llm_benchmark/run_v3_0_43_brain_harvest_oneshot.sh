@@ -37,6 +37,14 @@ if ! curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1 ; then
     done
 fi
 
+# v3.0.68: read configurable knobs from env (set by dashboard POST body).
+# BRAIN_STRICT=1     → reject downloads with <100 labels or 0 classes
+# BRAIN_MAX_NEW=N    → cap new datasets per round (default 5)
+# BRAIN_MAX_IMGS=N   → cap images per dataset (default 5000)
+echo "[config] BRAIN_STRICT=${BRAIN_STRICT:-0}"
+echo "[config] BRAIN_MAX_NEW=${BRAIN_MAX_NEW:-5}"
+echo "[config] BRAIN_MAX_IMGS=${BRAIN_MAX_IMGS:-5000}"
+
 # Run a single harvest_new_datasets round
 python -u - <<'PYEOF' 2>&1 | tee -a $REPO/results/framework/v3_0_43_brain_harvest_oneshot.log
 import os, sys, time, json
@@ -48,10 +56,17 @@ d = DatasetDiscovery()
 before = len(d.registry["datasets"])
 print(f"[harvest] before: {before} slugs in registry")
 
+# v3.0.68: env-driven knobs (env var > kwarg default)
+max_new = int(os.environ.get("BRAIN_MAX_NEW", "5"))
+max_imgs = int(os.environ.get("BRAIN_MAX_IMGS", "5000"))
+strict = bool(int(os.environ.get("BRAIN_STRICT", "0")))
+print(f"[harvest] config max_new={max_new} max_imgs={max_imgs} strict={strict}")
+
 result = d.harvest_new_datasets(
-    max_new=5,
+    max_new=max_new,
     confirm_schema=True,
-    max_images_per_ds=5000,
+    max_images_per_ds=max_imgs,
+    strict_topic=strict,
 )
 
 d._load_registry()
