@@ -698,8 +698,9 @@ def root():
 <h1>🌱 Weed-detection framework controller <span style="font-size:13px;color:#888;font-weight:400">v3.0.66 unified</span></h1>
 <div class="nav">
   <a href="/">🏠 hub (this page)</a>
-  <a href="/classes">📋 /classes (295 cards)</a>
-  <a href="/slugs">📦 /slugs (60 slugs)</a>
+  <a href="/manual" style="background:#fff8e0;color:#c70;font-weight:600">📖 manual</a>
+  <a href="/classes">📋 /classes</a>
+  <a href="/slugs">📦 /slugs</a>
   <a href="/roboflow">📊 /roboflow</a>
   <a href="/morning_report">☀️ /morning_report</a>
   <a href="/api/cluster_status">📥 JSON</a>
@@ -5288,5 +5289,547 @@ document.addEventListener('keydown', e => {{
   else if (e.key === '0') setVerdict(hovered, 'clear');
 }});
 </script>
+</body></html>'''
+    return HTMLResponse(html)
+
+
+# ===========================================================================
+# v3.0.72 (2026-06-01) — /api/per_species_stats + /manual
+# ===========================================================================
+
+@app.get("/api/per_species_stats")
+def api_per_species_stats():
+    """v3.0.72 — Per CWD12 species: count of images in each pipeline stage.
+
+    Stages:
+      - gold: images in Roboflow cwd12-multiclass-v1 (frozen human-verified
+              benchmark). Source: /api/roboflow_status master.boxes_per_class.
+      - auto: images that came pre-labeled at harvest time (registry slug has
+              local YOLO .txt files matched to images on disk, primary species
+              parsed from first non-empty line).
+      - unlabeled: registry-known images with no labels on disk.
+      - owl: OWL red proposals (results/framework/owl_red_proposals/<species>/
+             *.txt count).
+      - exemplars: bank exemplar count per species (object_bank/<sp>/).
+
+    Returns per-species dict. Used by the dashboard's per-species stats panel
+    (Phase D of overnight loop)."""
+    out = {sp: {"gold": 0, "auto": 0, "unlabeled": 0,
+                "owl": 0, "exemplars": 0} for sp in _CWD12}
+
+    # gold: from Roboflow master
+    try:
+        from weed_optimizer_framework.tools.roboflow_status import (
+            get_roboflow_status,
+        )
+    except ImportError:
+        get_roboflow_status = None
+    try:
+        # reuse the same data /api/roboflow_status pulls
+        import urllib.request
+        key_path = "/jet/home/byler/.roboflow_key"
+        if os.path.isfile(key_path):
+            with open(key_path) as f:
+                rf_key = f.read().strip()
+            url = (f"https://api.roboflow.com/a-test-of-will/"
+                   f"cwd12-multiclass-v1?api_key={rf_key}")
+            with urllib.request.urlopen(url, timeout=15) as r:
+                d = json.load(r)
+            cls = (d.get("project", {}) or {}).get("classes", {}) or {}
+            for sp in _CWD12:
+                out[sp]["gold"] = int(cls.get(sp, 0))
+    except Exception as e:
+        log.warning(f"[per_species_stats] gold fetch failed: {e!r}")
+
+    # auto + unlabeled: walk registry slugs
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = json.load(f)
+        for slug, info in (reg.get("datasets") or {}).items():
+            if info.get("status") != "downloaded":
+                continue
+            lp = info.get("local_path", "")
+            if not lp or not os.path.isdir(lp):
+                continue
+            # Walk for image-label pairs (cap 5000 imgs per slug for speed)
+            n_imgs = 0
+            sp_counts = {sp: 0 for sp in _CWD12}
+            n_unlabeled = 0
+            img_exts = (".jpg", ".jpeg", ".png")
+            for img_p in Path(lp).rglob("*"):
+                if img_p.suffix.lower() not in img_exts:
+                    continue
+                n_imgs += 1
+                if n_imgs > 5000:
+                    break
+                # find matching .txt
+                txt_p = img_p.with_suffix(".txt")
+                # also check parallel labels/ dir
+                if not txt_p.is_file():
+                    parts = list(img_p.parts)
+                    if "images" in parts:
+                        idx = parts.index("images")
+                        parts[idx] = "labels"
+                        cand = Path(*parts).with_suffix(".txt")
+                        if cand.is_file():
+                            txt_p = cand
+                if txt_p.is_file() and txt_p.stat().st_size > 0:
+                    # Parse first line for primary class — see if any cwd12
+                    # class_name field on the slug maps the index
+                    class_names = info.get("class_names") or []
+                    try:
+                        first_line = txt_p.read_text().split("\n")[0]
+                        cid = int(first_line.split()[0])
+                        if 0 <= cid < len(class_names):
+                            cname = class_names[cid]
+                            if cname in sp_counts:
+                                sp_counts[cname] += 1
+                                continue
+                        # Unknown class index — count as auto-labeled to "other"
+                    except Exception:
+                        pass
+                    # Has txt but no recognized CWD12 species — skip
+                else:
+                    n_unlabeled += 1
+            for sp, c in sp_counts.items():
+                out[sp]["auto"] += c
+            # Unlabeled gets distributed pro-rata? Simpler: just add to
+            # "unlabeled" total per-slug; we'll surface aggregate separately.
+            # For now, attach to slug's primary species if class_names has
+            # exactly one entry; otherwise drop to "unlabeled" aggregate.
+            if n_unlabeled and info.get("class_names"):
+                cn = info.get("class_names", [])
+                if len(cn) == 1 and cn[0] in out:
+                    out[cn[0]]["unlabeled"] += n_unlabeled
+    except Exception as e:
+        log.warning(f"[per_species_stats] registry walk failed: {e!r}")
+
+    # OWL proposals: count .txt files in results/framework/owl_red_proposals/<sp>/
+    owl_root = REPO / "results" / "framework" / "owl_red_proposals"
+    if owl_root.is_dir():
+        for sp in _CWD12:
+            d = owl_root / sp
+            if d.is_dir():
+                out[sp]["owl"] = sum(1 for p in d.iterdir()
+                                     if p.suffix == ".txt"
+                                     and p.stat().st_size > 0)
+
+    # exemplars: object_bank/<sp>/* count
+    bank_root = REPO / "object_bank"
+    if bank_root.is_dir():
+        for sp in _CWD12:
+            d = bank_root / sp
+            if d.is_dir():
+                out[sp]["exemplars"] = sum(
+                    1 for p in d.rglob("*")
+                    if p.suffix.lower() in (".jpg", ".jpeg", ".png")
+                )
+
+    # Aggregate row
+    agg = {k: sum(out[sp][k] for sp in _CWD12)
+           for k in ("gold", "auto", "unlabeled", "owl", "exemplars")}
+    return JSONResponse({"per_species": out, "totals": agg,
+                          "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+
+
+@app.get("/manual", response_class=HTMLResponse)
+def manual_page():
+    """v3.0.72 — User manual: dual-agent architecture + button reference.
+
+    Single-page documentation explaining what the dashboard does, the full
+    data-collection pipeline, the role of each cluster_action button, and
+    the recommended daily workflow. Linked from the unified controller's
+    header nav. Audience: the user (Harry) + reviewers / professor."""
+    html = '''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>📖 Manual — Weed-detection framework</title>
+<style>
+  :root {
+    --bg: #0f172a; --bg-soft: #1e293b; --bg-card: #ffffff;
+    --accent: #0e7c66; --accent-grad: linear-gradient(135deg,#0e7c66 0%,#0a9b7a 100%);
+    --text: #1a1a1d; --text-soft: #555; --text-faint: #888;
+    --border: #e2e8f0; --highlight: #fff8e0;
+    --danger: #c53030; --warn: #c70; --ok: #2f855a;
+  }
+  body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",
+         sans-serif; color: var(--text);
+         background: linear-gradient(180deg,#f6f8fb 0%,#e9eef6 100%);
+         margin: 0; padding: 0; line-height: 1.55; }
+  .hero { background: var(--bg); color: #fff; padding: 3rem 2rem 2.5rem;
+          text-align: center; box-shadow: 0 4px 30px rgba(0,0,0,.15); }
+  .hero h1 { margin: 0 0 .5rem 0; font-size: 2.2rem; font-weight: 700; }
+  .hero .sub { color: #9aa5b8; margin-top: .3rem; font-size: 1.05rem; }
+  .nav { background: #fff; border-bottom: 1px solid var(--border);
+         padding: .7rem 1rem; display: flex; gap: 14px; font-size: 14px;
+         justify-content: center; flex-wrap: wrap; position: sticky; top: 0;
+         z-index: 10; }
+  .nav a { color: var(--accent); text-decoration: none; padding: 4px 10px;
+           border-radius: 6px; }
+  .nav a:hover { background: #eef4ff; }
+  .container { max-width: 980px; margin: 0 auto; padding: 2rem 1.2rem 4rem; }
+  h2 { color: var(--accent); margin-top: 2.5rem; font-size: 1.4rem;
+       border-bottom: 2px solid var(--accent); padding-bottom: .35rem;
+       display: inline-block; }
+  h3 { color: var(--text); font-size: 1.05rem; margin-top: 1.6rem;
+       margin-bottom: .4rem; }
+  p { color: var(--text-soft); }
+  .card { background: var(--bg-card); border-radius: 12px; padding: 1.5rem;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); margin: 1rem 0; }
+  .pipeline { display: grid; grid-template-columns: 1fr;
+              gap: 12px; margin: 1.5rem 0; }
+  .stage { background: var(--bg-card); border-radius: 10px;
+           padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+           border-left: 4px solid var(--accent); position: relative; }
+  .stage .num { position: absolute; right: 16px; top: 14px;
+                color: var(--text-faint); font-weight: 600; font-size: 13px; }
+  .stage h4 { margin: 0 0 .3rem 0; color: var(--accent); font-size: 1rem; }
+  .stage .who { display: inline-block; background: #eef4ff;
+                color: var(--accent); padding: 1px 8px; border-radius: 10px;
+                font-size: 11px; font-weight: 600; margin-right: 6px; }
+  .stage .who.bot { background: #fff8e0; color: var(--warn); }
+  .stage .who.h { background: #f0fff4; color: var(--ok); }
+  .stage .desc { color: var(--text-soft); font-size: 14px; }
+  .stage .btns { margin-top: .4rem; font-size: 12px; color: var(--text-faint); }
+  .stage .btns code { background: #f4f6fb; padding: .1rem .35rem;
+                       border-radius: 3px; color: var(--accent);
+                       font-family: ui-monospace,Menlo,monospace; font-size: 11px; }
+  .arrow { text-align: center; color: var(--text-faint); font-size: 22px;
+           margin: -4px 0; }
+  table.btn-table { width: 100%; border-collapse: collapse; font-size: 13px;
+                    margin: .5rem 0; }
+  table.btn-table th { text-align: left; background: #f4f6fb;
+                       padding: 8px 10px; font-weight: 600; color: var(--text); }
+  table.btn-table td { padding: 8px 10px; border-top: 1px solid var(--border);
+                       vertical-align: top; }
+  table.btn-table td.btn-name { font-family: ui-monospace,Menlo,monospace;
+                                 color: var(--accent); white-space: nowrap;
+                                 font-size: 12px; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 3px;
+           font-size: 10px; font-weight: 600; text-transform: uppercase;
+           letter-spacing: .3px; }
+  .badge.sb { background: #fce4ec; color: #d62a55; }
+  .badge.sub { background: #e7f5ff; color: #06c; }
+  .badge.refresh { background: #f0fff4; color: var(--ok); }
+  .badge.danger { background: #fff5f5; color: var(--danger); }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit,minmax(170px,1fr));
+              gap: 10px; margin: 1rem 0; }
+  .stat { background: var(--bg-card); border-radius: 8px; padding: 14px;
+          text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .stat .lbl { color: var(--text-faint); font-size: 12px;
+               text-transform: uppercase; letter-spacing: .4px; }
+  .stat .val { color: var(--accent); font-size: 26px; font-weight: 700;
+               margin-top: 4px; font-family: ui-monospace,Menlo,monospace; }
+  ol, ul { color: var(--text-soft); }
+  .warn-box { background: #fff8e0; border-left: 4px solid var(--warn);
+              padding: 12px 16px; border-radius: 6px; margin: 1rem 0;
+              color: #856404; font-size: 14px; }
+  .ok-box { background: #f0fff4; border-left: 4px solid var(--ok);
+            padding: 12px 16px; border-radius: 6px; margin: 1rem 0;
+            color: #2d6f4d; font-size: 14px; }
+</style></head><body>
+<div class="hero">
+  <h1>📖 Weed-detection — User Manual</h1>
+  <div class="sub">Dual-agent autonomous data collection + training pipeline · Bridges-2 cluster · v3.0.72</div>
+</div>
+<div class="nav">
+  <a href="/">🏠 Dashboard</a>
+  <a href="/manual">📖 Manual</a>
+  <a href="/classes">📋 Classes</a>
+  <a href="/slugs">📦 Slugs</a>
+  <a href="/roboflow">📊 Roboflow</a>
+  <a href="/morning_report">☀️ Morning</a>
+  <a href="#workflow">↓ Workflow</a>
+  <a href="#buttons">↓ Buttons</a>
+  <a href="#daily">↓ Daily</a>
+</div>
+<div class="container">
+
+<h2 id="overview">1. The big picture</h2>
+<div class="card">
+<p>This framework is an <b>autonomous data-collection-and-training agent system</b>
+targeting the <b>cottonweed-detection benchmark (cwd12)</b>.
+Two agents collaborate via a shared dataset registry + Roboflow workspace:</p>
+
+<div class="stat-row">
+  <div class="stat"><div class="lbl">🤖 Agent 1</div><div class="val" style="font-size:18px">Data Collector</div></div>
+  <div class="stat"><div class="lbl">🧠 Quality</div><div class="val" style="font-size:18px">DINOv2 Curator</div></div>
+  <div class="stat"><div class="lbl">🎯 Auto-label</div><div class="val" style="font-size:18px">OWLv2</div></div>
+  <div class="stat"><div class="lbl">🤖 Agent 2</div><div class="val" style="font-size:18px">Trainer (future)</div></div>
+</div>
+
+<p><b>North-star metric</b>: cwd12 mAP50-95 ≥ <b>0.90</b> (12-class object detection).</p>
+</div>
+
+<h2 id="workflow">2. The pipeline (8 stages)</h2>
+
+<div class="pipeline">
+  <div class="stage">
+    <span class="num">stage 1</span>
+    <h4>🌐 Discover</h4>
+    <p class="desc">
+      <span class="who bot">AGENT 1</span>
+      Brain searches HuggingFace, Kaggle, GitHub, Roboflow Universe for new
+      weed/crop datasets. Topic classifier filters out off-goal (disease,
+      pest, tree, etc.) BEFORE downloading.
+    </p>
+    <div class="btns">Buttons: <code>brain_harvest</code> (configurable duration + strict mode), <code>refresh_registry</code></div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="stage">
+    <span class="num">stage 2</span>
+    <h4>⬇️ Download</h4>
+    <p class="desc">
+      <span class="who bot">AGENT 1</span>
+      Selected slugs downloaded to <code>datasets/&lt;slug&gt;/</code> on the cluster.
+      Auto-classify topic + auto-detect any existing labels.
+    </p>
+    <div class="btns">Buttons: <code>download_known_slugs</code> (heavy)</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="stage">
+    <span class="num">stage 3</span>
+    <h4>🧹 Garbage audit</h4>
+    <p class="desc">
+      <span class="who bot">AGENT 1</span>
+      Drop slugs with <code>&lt;100 labels</code> OR <code>classes=0</code>. Disk-first
+      check (counts only .txt files with matching image stems + non-empty),
+      so brain's fuzzy metadata can't cause false positives.
+    </p>
+    <div class="btns">Buttons: <code>audit_registry_garbage</code> (dry-run), <code>audit_registry_garbage_APPLY</code> (deletes files)</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="stage">
+    <span class="num">stage 4</span>
+    <h4>🔍 Bucket + classify</h4>
+    <p class="desc">
+      <span class="who bot">AGENT 1</span>
+      Per-slug bucket assignment (A=detection-ready, B=class-only, C=unknown)
+      + DINOv2-based CWD12 species routing.
+    </p>
+    <div class="btns">Buttons: <code>build_buckets</code>, <code>dinov2_route_classes</code>, <code>topic_backfill</code></div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="stage">
+    <span class="num">stage 5</span>
+    <h4>🧠 DINOv2 quality filter</h4>
+    <p class="desc">
+      <span class="who bot">AGENT 1</span>
+      Reference pool built from trusted bbox slugs (cwd12 family +
+      weedsense + grass_weeds + ...). Score every new slug's mean cosine
+      similarity. Below threshold → reject.
+    </p>
+    <div class="btns">Buttons: <code>dinov2_curate_registry</code> (4h GPU)</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="stage">
+    <span class="num">stage 6</span>
+    <h4>🎯 OWL auto-label</h4>
+    <p class="desc">
+      <span class="who bot">AGENT 1</span>
+      Image-conditioned OWLv2 detection. Uses object_bank exemplars as
+      visual queries → proposes bboxes on unlabeled targets. All proposals
+      tagged <b>red</b> (= needs human approval).
+    </p>
+    <div class="btns">Buttons: <code>export_owl_exemplars</code>, <code>owl_preannotate_one</code> (sbatch GPU), <code>owl_upload_proposals</code></div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="stage">
+    <span class="num">stage 7</span>
+    <h4>📡 Sync to Roboflow</h4>
+    <p class="desc">
+      <span class="who bot">AGENT 1</span>
+      Upload (image + .txt YOLO labels) to <code>weed-crop-agent-dataset</code>
+      project inside <code>weed_crop_agent_dataset</code> folder. Auto-skips
+      garbage candidates. Folder placement is idempotent (PATCH /groups).
+    </p>
+    <div class="btns">Buttons: <code>sync_newest_slugs</code>, <code>roboflow_sync_cwd12_v1</code>, <code>roboflow_sync_agent_v1</code>, <code>roboflow_state_audit</code>, <code>roboflow_list_folders</code>, <code>roboflow_move_agent_to_folder</code>, <code>roboflow_generate_versions</code>, <code>roboflow_download_merge</code></div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="stage">
+    <span class="num">stage 8</span>
+    <h4>👤 Human refinement</h4>
+    <p class="desc">
+      <span class="who h">HUMAN</span>
+      Open Roboflow web UI. Red boxes → approve / correct. Approved boxes
+      flip from red to green (= gold). The dashboard <code>/classes</code> page
+      gives an alternative ✓/✗ approval flow with side-by-side originals.
+    </p>
+    <div class="btns">Dashboard pages: <code>/classes</code>, <code>/slugs</code></div>
+  </div>
+  <div class="arrow">↓ (FUTURE)</div>
+
+  <div class="stage" style="border-left-color:#888;opacity:.85">
+    <span class="num">stage 9</span>
+    <h4>🚀 Agent 2: Trainer (future)</h4>
+    <p class="desc">
+      <span class="who bot" style="background:#f4f6fb;color:#888">AGENT 2</span>
+      Pulls Roboflow Version of the curated agent project + cwd12
+      benchmark. Fine-tunes YOLO/RF-DETR. Reports mAP back to dashboard.
+      Targets ≥ 0.90 cwd12 mAP50-95.
+    </p>
+    <div class="btns">Not yet implemented. Planned: SBATCH script + new cluster_action.</div>
+  </div>
+</div>
+
+<h2 id="buttons">3. Every dashboard button explained</h2>
+<div class="card">
+<p>21 cluster actions, grouped by phase. Click <code>/</code> to see them inline
+with one-click triggers.</p>
+
+<h3>Discovery + collection</h3>
+<table class="btn-table">
+  <tr><th>Button</th><th>Type</th><th>What it does</th></tr>
+  <tr><td class="btn-name">brain_harvest</td><td><span class="badge sb">SBATCH 1-8h</span></td>
+      <td>One round of dataset hunting on HF + Kaggle + GitHub + Roboflow.
+          Form on dashboard: <b>time_h</b> (1/2/4/6h), <b>strict</b>
+          (post-download quality gate: reject if labeled&lt;100 OR
+          classes=0), <b>max_new</b> (cap per round).</td></tr>
+  <tr><td class="btn-name">download_known_slugs</td><td><span class="badge sb danger">SBATCH heavy</span></td>
+      <td>Bulk-download every <code>status=known</code> slug. Bandwidth-heavy.
+          Rarely needed; brain_harvest covers the common case.</td></tr>
+  <tr><td class="btn-name">refresh_registry</td><td><span class="badge refresh">refresh</span></td>
+      <td>Wipe class-pool cache + reload registry index. Click after manual
+          edits or to force re-fetch.</td></tr>
+</table>
+
+<h3>Quality + classification</h3>
+<table class="btn-table">
+  <tr><td class="btn-name">audit_registry_garbage</td><td><span class="badge sub">subprocess</span></td>
+      <td>Dry-run scan: list slugs with labeled&lt;100 OR classes=0.
+          Protects cwd12 baselines by default. Reports what would drop.</td></tr>
+  <tr><td class="btn-name">audit_registry_garbage_APPLY</td><td><span class="badge sub danger">subprocess</span></td>
+      <td>Actually drop the slugs the dry-run listed. Removes registry
+          entries AND <code>rmtree</code>'s the downloaded files on disk.</td></tr>
+  <tr><td class="btn-name">build_buckets</td><td><span class="badge sub">subprocess ~30s</span></td>
+      <td>Audit each slug → A (detection-ready) / B (class-only) / C
+          (unknown). Outputs <code>buckets.json</code>.</td></tr>
+  <tr><td class="btn-name">topic_backfill</td><td><span class="badge sb">SBATCH 15min</span></td>
+      <td>Ollama + topic classifier on slugs missing the topic_override
+          field. Lets the harvest filter pre-reject off-goal slugs.</td></tr>
+  <tr><td class="btn-name">dinov2_route_classes</td><td><span class="badge sb">SBATCH 1×V100 ~30min</span></td>
+      <td>DINOv2 routes unknown bucket images to a CWD12 species via
+          nearest-neighbor against the object_bank exemplars.</td></tr>
+  <tr><td class="btn-name">dinov2_curate_registry</td><td><span class="badge sb">SBATCH 1×V100 ~4h</span></td>
+      <td>Build DINOv2 reference pool from trusted bbox slugs, then score
+          every registry slug. Ranked report at
+          <code>results/framework/dinov2_curator/slug_scores.json</code>.</td></tr>
+</table>
+
+<h3>OWL auto-label</h3>
+<table class="btn-table">
+  <tr><td class="btn-name">export_owl_exemplars</td><td><span class="badge sub">subprocess ~3s</span></td>
+      <td>Read object_bank/&lt;sp&gt;/* → write per-species exemplar JSON to
+          <code>results/framework/owl_exemplars/&lt;sp&gt;.json</code>. Required
+          before owl_preannotate.</td></tr>
+  <tr><td class="btn-name">owl_preannotate_one</td><td><span class="badge sb">SBATCH 1×V100 ~10-30min</span></td>
+      <td>OWLv2-large image-conditioned detection. Reads exemplars +
+          target images, writes YOLO .txt labels marked
+          <code>red conf=… src=owlv2</code> in
+          <code>results/framework/owl_red_proposals/&lt;sp&gt;/</code>.</td></tr>
+  <tr><td class="btn-name">owl_upload_proposals</td><td><span class="badge sub">subprocess ~5min</span></td>
+      <td>Upload OWL-proposed (image, .txt) pairs to Roboflow tagged
+          <code>batch=red</code> for human review.</td></tr>
+</table>
+
+<h3>Roboflow sync</h3>
+<table class="btn-table">
+  <tr><td class="btn-name">sync_newest_slugs</td><td><span class="badge sub">subprocess</span></td>
+      <td>Iterate registry, upload any <code>status=downloaded</code> slug
+          not yet <code>roboflow_synced</code>. Skips cwd12 baselines (frozen)
+          + audit-garbage candidates + slug_verdicts.junk. After loop:
+          place target project into the agent folder (idempotent PATCH).</td></tr>
+  <tr><td class="btn-name">roboflow_sync_cwd12_v1</td><td><span class="badge sub">subprocess ~10min</span></td>
+      <td>Upload the cwd12 frozen benchmark (598 images, 822 boxes,
+          12 classes) to <code>cwd12-multiclass-v1</code>. Dedup-safe.</td></tr>
+  <tr><td class="btn-name">roboflow_sync_agent_v1</td><td><span class="badge sub">subprocess ~10min</span></td>
+      <td>Upload the same payload but to <code>weed-crop-agent-dataset</code>.
+          Mostly for early testing; in steady state <code>sync_newest_slugs</code>
+          replaces it.</td></tr>
+  <tr><td class="btn-name">roboflow_state_audit</td><td><span class="badge sub">subprocess ~3s</span></td>
+      <td>List every project in workspace + image / box / version counts.
+          Writes <code>roboflow_state.json</code>.</td></tr>
+  <tr><td class="btn-name">roboflow_generate_versions</td><td><span class="badge sub">subprocess ~30s</span></td>
+      <td>Generate a Roboflow Version for the agent project (Public-tier
+          generation can stall — paid tier is faster). Idempotent.</td></tr>
+  <tr><td class="btn-name">roboflow_download_merge</td><td><span class="badge sub">subprocess ~5min</span></td>
+      <td>Pull the latest Version back as YOLO zip, merge with cwd12 to
+          form a unified multi-class training set. Requires a generated
+          version.</td></tr>
+  <tr><td class="btn-name">roboflow_list_folders</td><td><span class="badge sub">subprocess</span></td>
+      <td>List all folders (groups) in workspace + their member projects.
+          Verifies <code>weed-crop-agent-dataset</code> is inside
+          <code>weed_crop_agent_dataset</code> folder.</td></tr>
+  <tr><td class="btn-name">roboflow_move_agent_to_folder</td><td><span class="badge sub">subprocess</span></td>
+      <td>PATCH the agent project into its folder. Idempotent — clicking
+          when already in folder is a no-op (HTTP 204).</td></tr>
+</table>
+
+<h3>System</h3>
+<table class="btn-table">
+  <tr><td class="btn-name">restart_dashboard</td><td><span class="badge sb danger">restart_self</span></td>
+      <td>Cancel + sbatch the dashboard server SLURM job. ~90s downtime,
+          new tunnel URL minted. github.io tunnel_url.json auto-updates.
+          Use sparingly — browser auth cache lost per restart.</td></tr>
+</table>
+</div>
+
+<h2 id="daily">4. Recommended daily workflow</h2>
+<div class="card">
+<ol>
+  <li><b>Morning</b>: Open <a href="/">🏠 dashboard</a> → check the live banner. If the agent is idle and there's no overnight progress, click <a href="/morning_report">☀️ /morning_report</a> for a summary.</li>
+  <li><b>Harvest</b>: Click <code>brain_harvest</code> with <b>strict ON</b>, <b>4h</b> duration. Walk away for a few hours.</li>
+  <li><b>Check results</b>: when SBATCH brain_harvest job completes, return. Look at the stat-row TOTAL IMAGES — should have grown.</li>
+  <li><b>Audit</b>: click <code>audit_registry_garbage</code> (dry-run first). Read the result. If happy → click <code>audit_registry_garbage_APPLY</code> to delete garbage.</li>
+  <li><b>Quality score</b>: click <code>dinov2_curate_registry</code> for a fresh quality ranking (4h GPU; can run overnight).</li>
+  <li><b>Sync to Roboflow</b>: click <code>sync_newest_slugs</code> → uploads survivors to the agent folder.</li>
+  <li><b>Refine</b>: open Roboflow → <code>weed-crop-agent-dataset</code> project → annotate red boxes. Approve good ones (they flip green).</li>
+  <li><b>Auto-label more</b>: for the next batch of unlabeled, click <code>export_owl_exemplars</code> then <code>owl_preannotate_one</code> then <code>owl_upload_proposals</code>.</li>
+  <li><b>Repeat</b> until you have enough labeled data per species for Agent 2 to train.</li>
+</ol>
+
+<div class="ok-box"><b>📊 Watch the dashboard stats</b> while the loop runs —
+the SLURM queue, Roboflow workspace panel, and CWD12 species snapshot all
+auto-refresh.</div>
+</div>
+
+<h2 id="trouble">5. Troubleshooting</h2>
+<div class="card">
+<h3>"Cluster unreachable: TypeError: Failed to fetch"</h3>
+<p>Fixed in v3.0.71.7 (CORS preflight). If you still see this, the
+dashboard SLURM job may have just restarted — wait 90s and refresh.</p>
+
+<h3>"Wrong password" after typing in github.io prompt</h3>
+<p>Most common cause: trailing whitespace on copy-paste. The v3.0.71.5 page
+strips whitespace automatically. If still rejected, verify the exact
+characters match what's in <code>/jet/home/byler/.dashpass</code>.</p>
+
+<h3>"5 wrong → IP locked 1h"</h3>
+<p>Per-IP rate limit. Wait 1 hour OR restart the dashboard
+(<code>restart_dashboard</code>) which clears the in-memory counter.</p>
+
+<h3>Tunnel URL changed</h3>
+<p>Quick cloudflared tunnels rotate per SLURM restart. The stable
+github.io URL <code>harry567566.github.io/weed-dashboard/</code> reads
+<code>tunnel_url.json</code> and redirects to the current URL. Always
+bookmark the github.io URL, never the raw trycloudflare one.</p>
+
+<h3>A button POSTs but the subprocess fails</h3>
+<p>Click into the dashboard's recent agent task runs (📜 icon) to read the
+log file for the action. Common issues: wrong path in argv (registry's
+local_path != the path I assumed), missing exemplars, Roboflow API rate
+limit.</p>
+</div>
+
+<div style="text-align:center;color:#999;font-size:12px;margin-top:3rem">
+  v3.0.72 · 2026-06-01 · <a href="/" style="color:var(--accent)">back to dashboard</a>
+</div>
+</div>
 </body></html>'''
     return HTMLResponse(html)
