@@ -223,6 +223,25 @@ def cmd_sync_newest_slugs(args):
         except Exception:
             pass
 
+    # v3.0.71.3: also skip audit-flagged garbage slugs. Last bug-test showed
+    # sync iterating dict-insertion order and hitting ibm_research__cif_dataset
+    # FIRST — that slug's .txt files are placeholders Roboflow rejects with
+    # 'AnnotationSaveError: Unrecognized annotation format'. Skipping garbage
+    # candidates means we never even try them.
+    garbage_slugs = set()
+    try:
+        from weed_optimizer_framework.tools.audit_registry_garbage import (
+            _slug_garbage_reason as _audit_reason,
+        )
+        for s, info in ds.items():
+            if _audit_reason(s, info, 100):
+                garbage_slugs.add(s)
+        if garbage_slugs:
+            print(f"  [audit] skipping {len(garbage_slugs)} garbage slugs: "
+                  f"{sorted(garbage_slugs)}")
+    except Exception as e:
+        print(f"  [audit] could not run garbage filter: {e}")
+
     pending = []
     for slug, info in ds.items():
         if info.get("status") != "downloaded":
@@ -230,6 +249,8 @@ def cmd_sync_newest_slugs(args):
         if slug in CWD12_BASELINES:
             continue
         if slug in junk_slugs:
+            continue
+        if slug in garbage_slugs:
             continue
         if info.get("roboflow_synced"):
             continue

@@ -2935,21 +2935,27 @@ _CLUSTER_ACTIONS = {
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
         "label": "把 registry 里所有未同步的 agent slug 上传到 weed-crop-agent-dataset + 归 folder (~10min/slug)",
     },
-    # v3.0.71: OWL red proposals → Roboflow upload (closes auto-label loop)
+    # v3.0.71.3: OWL red proposals → Roboflow upload.
+    # OWL only ran on Goosegrass against cottonweed_holdout/test/images; its
+    # output is 50 .txt files in results/framework/owl_red_proposals/Goosegrass/.
+    # We upload the source images + OWL-proposed labels via bulk-upload to
+    # weed-crop-agent-dataset, tagged batch=red so human reviewer sees them.
     "owl_upload_proposals": {
         "type": "subprocess",
         "argv": [
             "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
-            "species-upload",
+            "bulk-upload",
             "--images",
-            "results/framework/owl_red_proposals/Goosegrass",
+            "downloads/cottonweed_holdout/test/images",
             "--labels",
             "results/framework/owl_red_proposals/Goosegrass",
             "--split", "train", "--batch", "red",
             "--workers", "4",
+            "--per-species", "50",
+            "--project", "weed-crop-agent-dataset",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "上传 OWL Goosegrass red 提案到 Roboflow 等人审 (~5min)",
+        "label": "上传 OWL Goosegrass red 提案 → weed-crop-agent-dataset (~5min, 50 imgs)",
     },
     # v3.0.71: DINOv2 dataset-quality curator (full pipeline as one button)
     "dinov2_curate_registry": {
