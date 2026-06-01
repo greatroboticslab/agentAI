@@ -75,6 +75,135 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ============================================================================
+# v3.0.70 (2026-05-31) — HTTP Basic auth + IP rate-limit
+#
+# Threat model: tunnel URL is on a public github.io page (necessary for the
+# redirect to work). Without auth, anyone who finds the github profile can
+# trigger SLURM jobs / read all data. This middleware adds:
+#
+#   - HTTP Basic auth with password loaded from /jet/home/byler/.dashpass
+#     (read at startup; never logged; never returned in responses).
+#   - Per-IP failed-attempt counter: 5 failures → 1h lockout.
+#   - Exempt paths: /healthz (so cloudflared/uvicorn keep-alive works), and
+#     /tunnel_url.json (read by 404.html — not a secret).
+#
+# Username is fixed to "harry" (single-tenant research dashboard). Password
+# in plain-text file is acceptable for a research cluster — encrypted disk +
+# UNIX permissions (0600) are the access control.
+# ============================================================================
+import base64 as _base64
+import secrets as _secrets
+from collections import defaultdict as _defaultdict
+
+_DASHPASS_FILE = "/jet/home/byler/.dashpass"
+_AUTH_USER = "harry"
+_AUTH_PASS = None
+try:
+    with open(_DASHPASS_FILE, "r") as _f:
+        _AUTH_PASS = _f.read().strip() or None
+    if _AUTH_PASS:
+        log.info(f"[auth] HTTP Basic auth ENABLED (password from {_DASHPASS_FILE})")
+    else:
+        log.warning(f"[auth] {_DASHPASS_FILE} empty — auth DISABLED")
+except FileNotFoundError:
+    log.warning(f"[auth] {_DASHPASS_FILE} missing — auth DISABLED. "
+                f"Run: echo '<password>' > {_DASHPASS_FILE} && "
+                f"chmod 600 {_DASHPASS_FILE}")
+except Exception as _e:
+    log.error(f"[auth] could not read {_DASHPASS_FILE}: {_e}; auth DISABLED")
+
+# Per-IP attempt tracker. {ip: (failed_count, lockout_until_epoch)}
+# In-memory: forgets on uvicorn restart, which is fine — that means a
+# legitimate user who got locked just needs to wait for the next dashboard
+# refresh (≤48h auto-resubmit, or restart_dashboard button).
+_AUTH_FAIL = _defaultdict(lambda: (0, 0.0))
+_AUTH_LOCK_THRESHOLD = 5      # 5 failures
+_AUTH_LOCK_SECONDS = 3600     # locks for 1h
+
+# Public paths (no auth required)
+_AUTH_EXEMPT_PATHS = {
+    "/healthz",                      # cloudflared probe
+    "/tunnel_url.json",              # not a secret, github.io reads it
+}
+_AUTH_EXEMPT_PREFIXES = (
+    "/static/",                      # static assets if any
+)
+
+
+def _client_ip(request) -> str:
+    """Best-effort client IP — through cloudflared the real IP is in headers."""
+    hdr = request.headers
+    for k in ("cf-connecting-ip", "x-forwarded-for", "x-real-ip"):
+        v = hdr.get(k, "").split(",")[0].strip()
+        if v:
+            return v
+    return getattr(request.client, "host", "?") or "?"
+
+
+@app.middleware("http")
+async def _auth_and_rate_limit(request, call_next):
+    """Gate every non-exempt request behind HTTP Basic auth.
+
+    Rate limit: 5 failed attempts from an IP → 1h lockout (HTTP 429)."""
+    if _AUTH_PASS is None:
+        # Auth not configured; let everything through (logged at startup).
+        return await call_next(request)
+
+    path = request.url.path
+    if path in _AUTH_EXEMPT_PATHS or any(
+        path.startswith(p) for p in _AUTH_EXEMPT_PREFIXES
+    ):
+        return await call_next(request)
+
+    ip = _client_ip(request)
+    n_fail, locked_until = _AUTH_FAIL[ip]
+    now = time.time()
+    if locked_until > now:
+        remaining = int(locked_until - now)
+        return JSONResponse(
+            status_code=429,
+            content={"error": "rate-limited",
+                     "msg": f"too many failed auth attempts; locked for "
+                            f"{remaining // 60}m {remaining % 60}s"},
+            headers={"Retry-After": str(remaining)},
+        )
+
+    auth_hdr = request.headers.get("authorization", "")
+    ok = False
+    if auth_hdr.startswith("Basic "):
+        try:
+            decoded = _base64.b64decode(auth_hdr[6:]).decode("utf-8")
+            user, sep, passwd = decoded.partition(":")
+            ok = (sep == ":"
+                  and _secrets.compare_digest(user, _AUTH_USER)
+                  and _secrets.compare_digest(passwd, _AUTH_PASS))
+        except Exception:
+            ok = False
+
+    if not ok:
+        n_fail += 1
+        if n_fail >= _AUTH_LOCK_THRESHOLD:
+            _AUTH_FAIL[ip] = (n_fail, now + _AUTH_LOCK_SECONDS)
+            log.warning(
+                f"[auth] IP {ip} reached {n_fail} failed attempts → "
+                f"locked for {_AUTH_LOCK_SECONDS}s"
+            )
+        else:
+            _AUTH_FAIL[ip] = (n_fail, 0.0)
+            log.info(f"[auth] failed attempt from {ip} ({n_fail}/{_AUTH_LOCK_THRESHOLD})")
+        return Response(
+            status_code=401,
+            content=b'{"error":"unauthorized","msg":"Basic auth required"}',
+            headers={"WWW-Authenticate": 'Basic realm="weed-dashboard"',
+                     "Content-Type": "application/json"},
+        )
+
+    # Reset on success
+    if n_fail > 0:
+        _AUTH_FAIL[ip] = (0, 0.0)
+    return await call_next(request)
+
 
 # v3.0.43.8: pre-warm /classes thumbnail cache on startup in a background
 # thread, so the user's first hit lands on a hot cache (otherwise the
