@@ -175,6 +175,170 @@ def cmd_create_project(args):
                   f"{[f.get('name') for f in _list_folders()]}")
 
 
+def cmd_sync_newest_slugs(args):
+    """v3.0.71 — iterate registry; for each slug with status='downloaded'
+    AND not yet marked roboflow_synced=true, upload its images to a target
+    Roboflow project, then mark synced. Optionally place into a folder.
+
+    Skips:
+      - slugs not on disk (local_path missing)
+      - cwd12 baselines (cottonweed_*, cottonweeddet12) — those belong to
+        the frozen benchmark project, not the agent collection pool
+      - slugs the user has flagged junk in slug_verdicts.jsonl
+
+    This is what closes the brain_harvest → Roboflow visible loop.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    project = getattr(args, "project", None) or PROJECT_NAME
+    folder_ref = (getattr(args, "folder", None)
+                  or os.environ.get("ROBOFLOW_FOLDER", ""))
+    cap_per_slug = int(getattr(args, "cap_per_slug", 0) or 0)
+
+    reg_path = _Path(os.environ.get(
+        "REPO_ROOT",
+        "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark",
+    )) / "results" / "framework" / "dataset_registry.json"
+    if not reg_path.exists():
+        print(f"FATAL: registry missing {reg_path}", file=sys.stderr)
+        sys.exit(2)
+    reg = _json.load(open(reg_path))
+    ds = reg.get("datasets", {}) or {}
+
+    CWD12_BASELINES = {"cottonweed_holdout", "cottonweed_sp8",
+                       "cottonweeddet12"}
+
+    # slug_verdicts.jsonl: {slug: latest_verdict}
+    sv_path = reg_path.parent / "slug_verdicts.jsonl"
+    junk_slugs = set()
+    if sv_path.exists():
+        try:
+            for line in sv_path.read_text().splitlines():
+                if not line.strip():
+                    continue
+                e = _json.loads(line)
+                if e.get("verdict") == "junk":
+                    junk_slugs.add(e.get("slug"))
+        except Exception:
+            pass
+
+    pending = []
+    for slug, info in ds.items():
+        if info.get("status") != "downloaded":
+            continue
+        if slug in CWD12_BASELINES:
+            continue
+        if slug in junk_slugs:
+            continue
+        if info.get("roboflow_synced"):
+            continue
+        lp = info.get("local_path", "")
+        if not lp or not os.path.isdir(lp):
+            continue
+        pending.append((slug, info, lp))
+
+    print(f"=== sync-newest-slugs → {project} ===")
+    print(f"  registry: {len(ds)} slugs total")
+    print(f"  pending sync: {len(pending)}")
+
+    if not pending:
+        print("  nothing to do — all eligible slugs already synced.")
+        return
+
+    # Resolve folder once
+    fid = ""
+    if folder_ref:
+        fid = _resolve_folder_id(folder_ref)
+        if not fid:
+            print(f"  WARN folder {folder_ref!r} not found — skip folder step")
+
+    # For each slug: walk imgs + (optional) labels, upload, then mark
+    from roboflow import Roboflow as _RF
+    rf = _RF(api_key=_key())
+    ws = rf.workspace(_ws_name())
+    try:
+        proj = ws.project(project)
+    except Exception as e:
+        print(f"FATAL: cannot open project {project}: {e}", file=sys.stderr)
+        sys.exit(3)
+
+    n_uploaded_total = 0
+    n_synced_slugs = 0
+    EXTS = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
+    for slug, info, lp in pending:
+        print(f"\n--- {slug} ---")
+        # Look for images in common subpaths
+        cand_img_dirs = [_Path(lp) / s for s in
+                        ("images", "train/images", "valid/images",
+                         "test/images")]
+        cand_img_dirs.append(_Path(lp))
+        img_dir = next((d for d in cand_img_dirs if d.is_dir()
+                        and any(p.suffix in EXTS for p in d.iterdir())), None)
+        if img_dir is None:
+            print(f"  SKIP no image dir under {lp}")
+            continue
+        # Find labels in matching subpath
+        lbl_dir = None
+        for s in ("labels", "train/labels", "valid/labels", "test/labels"):
+            if (_Path(lp) / s).is_dir():
+                lbl_dir = _Path(lp) / s
+                break
+
+        imgs = sorted(p for p in img_dir.iterdir() if p.suffix in EXTS)
+        if cap_per_slug:
+            imgs = imgs[:cap_per_slug]
+        print(f"  imgs: {len(imgs)} from {img_dir}")
+        print(f"  labels: {lbl_dir or '(none)'}")
+
+        ok = 0
+        fail = 0
+        for img in imgs:
+            try:
+                kw = dict(
+                    image_path=str(img),
+                    split="train",
+                    batch_name=f"agent-{slug}",
+                    tag_names=["green", "brain-harvest", slug],
+                    num_retry_uploads=1,
+                )
+                if lbl_dir:
+                    lbl = lbl_dir / (img.stem + ".txt")
+                    if lbl.is_file():
+                        kw["annotation_path"] = str(lbl)
+                        # Generic labelmap (label-index → name); we don't
+                        # know the class_names for an arbitrary slug, so
+                        # leave it unmapped (Roboflow will keep indices).
+                proj.single_upload(**kw)
+                ok += 1
+            except Exception as e:
+                fail += 1
+                if fail < 3:
+                    print(f"    FAIL {img.name}: {type(e).__name__}: {str(e)[:80]}")
+        n_uploaded_total += ok
+        print(f"  uploaded {ok} ok, {fail} fail")
+
+        # Mark synced in registry
+        if ok > 0:
+            info["roboflow_synced"] = True
+            info["roboflow_synced_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            info["roboflow_synced_count"] = ok
+            n_synced_slugs += 1
+
+    # Save registry mid-flight so progress isn't lost
+    tmp = str(reg_path) + ".tmp"
+    with open(tmp, "w") as f:
+        _json.dump(reg, f, indent=2)
+    os.replace(tmp, reg_path)
+    print(f"\n=== TOTAL: synced {n_synced_slugs}/{len(pending)} slugs, "
+          f"uploaded {n_uploaded_total} imgs ===")
+
+    # Folder-place once at end
+    if fid:
+        ok = _add_project_to_folder(project, fid)
+        print(f"[folders] place {project} → {folder_ref}: {'ok' if ok else 'FAIL'}")
+
+
 def cmd_move_to_folder(args):
     """Standalone: move an existing project into a folder by name or id."""
     project = getattr(args, "project", None) or _resolve_project(args)
@@ -485,6 +649,14 @@ def main():
                     help="project name to move (overrides env)")
     mv.add_argument("--folder", default=None,
                     help="folder name or id (also reads env ROBOFLOW_FOLDER)")
+    # v3.0.71: sync newest unsynced slugs from registry
+    sn = sub.add_parser("sync-newest-slugs")
+    sn.add_argument("--project", default=None,
+                    help="destination project (default weed-crop-agent-dataset)")
+    sn.add_argument("--folder", default=None,
+                    help="folder name or id to place project (idempotent)")
+    sn.add_argument("--cap-per-slug", type=int, default=0,
+                    help="cap images per slug (0=all, for testing)")
     sub.add_parser("create-species-projects")
     up = sub.add_parser("upload")
     up.add_argument("--images", required=True)
@@ -516,6 +688,7 @@ def main():
      "create-project": cmd_create_project,
      "list-folders": cmd_list_folders,
      "move-to-folder": cmd_move_to_folder,
+     "sync-newest-slugs": cmd_sync_newest_slugs,
      "create-species-projects": cmd_create_species_projects,
      "upload": cmd_upload,
      "bulk-upload": cmd_bulk_upload,

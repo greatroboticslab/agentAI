@@ -2900,6 +2900,63 @@ _CLUSTER_ACTIONS = {
         ],
         "label": "生成 OWL 所需的每物种 exemplar JSON(读 object_bank,~3s,12 文件)",
     },
+    # v3.0.71 (2026-05-31): retroactive registry garbage audit.
+    # Applies v3.0.68 strict filter to pre-strict slugs (ibm CIF etc.).
+    # Two-button design: first DRY-RUN (default), then APPLY confirms.
+    "audit_registry_garbage": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.audit_registry_garbage",
+        ],
+        "label": "回溯审计 registry — 列出 labeled<100/classes=0 的 slug (dry-run, ~5s)",
+    },
+    "audit_registry_garbage_APPLY": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.audit_registry_garbage",
+            "--apply",
+        ],
+        "label": "⚠️ APPLY: 删除上面 dry-run 列出的所有 garbage slugs + 磁盘文件",
+    },
+    # v3.0.71: sync newest brain-harvested slugs → weed-crop-agent-dataset
+    # + auto-place into weed_crop_agent_dataset folder. THIS is the
+    # brain_harvest → Roboflow visible loop the user wants to see.
+    "sync_newest_slugs": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "sync-newest-slugs",
+            "--project", "weed-crop-agent-dataset",
+            "--folder", "weed_crop_agent_dataset",
+            "--cap-per-slug", "100",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "把 registry 里所有未同步的 agent slug 上传到 weed-crop-agent-dataset + 归 folder (~10min/slug)",
+    },
+    # v3.0.71: OWL red proposals → Roboflow upload (closes auto-label loop)
+    "owl_upload_proposals": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "species-upload",
+            "--images",
+            "results/framework/owl_red_proposals/Goosegrass",
+            "--labels",
+            "results/framework/owl_red_proposals/Goosegrass",
+            "--split", "train", "--batch", "red",
+            "--workers", "4",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "上传 OWL Goosegrass red 提案到 Roboflow 等人审 (~5min)",
+    },
+    # v3.0.71: DINOv2 dataset-quality curator (full pipeline as one button)
+    "dinov2_curate_registry": {
+        "type": "sbatch",
+        "script": "run_v3_0_36_dinov2_curator.sh",
+        "label": "DINOv2 reference-pool curator (~4h GPU): build ref + score 所有 slug + 排名报告",
+    },
     # v3.0.69 (2026-05-31): Roboflow Project Folder ops via /groups REST.
     # Earlier-session conclusion "no API support" was wrong — the path uses
     # internal name /groups while UI says Folders. Verified PATCH 204 OK on
