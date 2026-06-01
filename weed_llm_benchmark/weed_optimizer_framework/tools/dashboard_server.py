@@ -6333,28 +6333,37 @@ async function loadRounds(){
   document.getElementById('rounds-content').innerHTML = html || '<div class="round-card">no rounds yet — fire brain_harvest from the dashboard</div>';
 }
 
+// v3.0.75.1 (2026-06-01): real-test caught both AJAX calls were broken.
+//   - slug_verdict endpoint is POST /api/slug_verdict/{slug} (path param)
+//     with JSON body {verdict, note}. NOT query string ?slug=...&verdict=...
+//   - exemplar endpoint requires 'img' (not 'image') as the key.
+// Bugs found by curl-testing my own page and getting 404.
 async function markSlug(slug, verdict){
-  const reason = verdict==='junk' ? prompt('Reason (optional, why is this slug junk?)', '') : '';
-  if(verdict==='junk' && reason===null) return;  // cancelled
+  const note = verdict==='junk' ? (prompt('Reason (optional, why junk?)', '') || '') : '';
+  if(verdict==='junk' && note === null) return;
   try {
-    const r = await fetch('/api/slug_verdict?slug='+encodeURIComponent(slug)
-      + '&verdict='+encodeURIComponent(verdict)
-      + '&reason='+encodeURIComponent(reason||''),
-      {method:'POST', credentials:'include'});
-    if(r.ok){ toast('saved: '+slug+' → '+verdict); loadRounds(); }
-    else toast('err: HTTP '+r.status);
+    const r = await fetch('/api/slug_verdict/' + encodeURIComponent(slug), {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({verdict: verdict, note: note}),
+    });
+    if(r.ok){ toast('✓ saved: '+slug+' → '+verdict); loadRounds(); }
+    else { const t = await r.text(); toast('err HTTP '+r.status+': '+t.slice(0,80)); }
   } catch(e){ toast('err: '+e) }
 }
 
 async function markClass(slug, cls, verdict){
   try {
-    const r = await fetch('/api/exemplar/'+encodeURIComponent(cls), {
+    const r = await fetch('/api/exemplar/' + encodeURIComponent(cls), {
       method:'POST', credentials:'include',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({slug: slug, verdict: verdict, image: '(manual flag from /rounds)'})
+      // Server requires 'img' key (NOT 'image'), and 'verdict' in
+      // (exemplar|bad|rebox|clear). Img is a path/identifier; we use
+      // the slug as a stable identifier for round-level flags.
+      body: JSON.stringify({img: 'rounds:'+slug+':'+cls, verdict: verdict}),
     });
-    if(r.ok){ toast('saved: '+slug+'/'+cls+' → '+verdict); loadRounds(); }
-    else toast('err: HTTP '+r.status);
+    if(r.ok){ toast('✓ saved: '+slug+'/'+cls+' → '+verdict); loadRounds(); }
+    else { const t = await r.text(); toast('err HTTP '+r.status+': '+t.slice(0,80)); }
   } catch(e){ toast('err: '+e) }
 }
 
