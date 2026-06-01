@@ -67,12 +67,18 @@ from weed_optimizer_framework.tools.dashboard_generator import (  # noqa: E402
 )
 
 app = FastAPI(title="Autonomous Weed Detection Dashboard")
-# Allow GitHub Pages and any browser to call the API
+# Allow GitHub Pages and any browser to call the API.
+# v3.0.71.7 (2026-06-01): OPTIONS added so preflight succeeds for
+# cross-origin fetches with Authorization header (which github.io
+# password prompt sends). Without this, browser sees preflight 401,
+# returns TypeError: Failed to fetch, password page can't auth.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["WWW-Authenticate"],
+    max_age=3600,
 )
 
 # ============================================================================
@@ -148,6 +154,12 @@ async def _auth_and_rate_limit(request, call_next):
     Rate limit: 5 failed attempts from an IP → 1h lockout (HTTP 429)."""
     if _AUTH_PASS is None:
         # Auth not configured; let everything through (logged at startup).
+        return await call_next(request)
+
+    # v3.0.71.7: CORS preflight (OPTIONS) must pass without auth. Otherwise
+    # cross-origin browser fetches with Authorization header fail with
+    # 'TypeError: Failed to fetch' — user-reported bug 2026-06-01 ~03:30.
+    if request.method == "OPTIONS":
         return await call_next(request)
 
     path = request.url.path
