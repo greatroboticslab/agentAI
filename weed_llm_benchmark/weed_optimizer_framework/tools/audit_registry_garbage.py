@@ -63,12 +63,27 @@ def _slug_garbage_reason(slug: str, info: dict, labeled_min: int) -> str:
     classes = info.get("classes")
     local_path = info.get("local_path", "")
 
-    # First, authoritative disk check — if labels exist, trust them.
+    # First, authoritative disk check — count only .txt files that look like
+    # YOLO labels (i.e., there's a matching image with the same stem).
+    # v3.0.71.2: earlier version's rglob("*.txt") picked up README.txt and
+    # other docs, falsely inflating the label count for ibm-cif (which has
+    # 0 YOLO labels). Stem-match is the right discriminator.
     n_txt = 0
     if local_path and os.path.isdir(local_path):
-        n_txt = sum(1 for _ in Path(local_path).rglob("*.txt"))
+        img_exts = {".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"}
+        # Build set of image stems first (limit walk to avoid huge dirs)
+        img_stems = set()
+        for p in Path(local_path).rglob("*"):
+            if p.suffix in img_exts:
+                img_stems.add(p.stem)
+                if len(img_stems) > 50000:
+                    break
+        # Count .txt files whose stem matches an image stem AND non-empty
+        for p in Path(local_path).rglob("*.txt"):
+            if p.stem in img_stems and p.stat().st_size > 0:
+                n_txt += 1
 
-    # Effective label count: max(registry-claimed labeled, disk .txt count)
+    # Effective label count: max(registry-claimed labeled, disk yolo-label count)
     effective_labeled = max(int(labeled or 0), n_txt)
 
     if effective_labeled < labeled_min:
