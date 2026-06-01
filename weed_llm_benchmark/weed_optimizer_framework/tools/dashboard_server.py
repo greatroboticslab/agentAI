@@ -2946,7 +2946,7 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
             "bulk-upload",
             "--images",
-            "downloads/cottonweed_holdout/test/images",
+            "datasets/cottonweed_holdout/test/images",
             "--labels",
             "results/framework/owl_red_proposals/Goosegrass",
             "--split", "train", "--batch", "red",
