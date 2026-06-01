@@ -176,9 +176,15 @@ def cmd_create_project(args):
 
 
 def cmd_sync_newest_slugs(args):
-    """v3.0.71 — iterate registry; for each slug with status='downloaded'
+    """v3.0.71 / v3.0.76 — iterate registry; for each slug with status='downloaded'
     AND not yet marked roboflow_synced=true, upload its images to a target
     Roboflow project, then mark synced. Optionally place into a folder.
+
+    v3.0.76 (2026-06-01): the target project is now PER-ROUND. Each slug's
+    harvest_round determines the destination project name:
+      - round 1 → weed-crop-agent-dataset (legacy v1)
+      - round N → weed-crop-agent-v{N}
+    The --project arg now means 'default project if slug has no round info'.
 
     Skips:
       - slugs not on disk (local_path missing)
@@ -191,10 +197,17 @@ def cmd_sync_newest_slugs(args):
     import json as _json
     from pathlib import Path as _Path
 
-    project = getattr(args, "project", None) or PROJECT_NAME
+    default_project = getattr(args, "project", None) or PROJECT_NAME
     folder_ref = (getattr(args, "folder", None)
                   or os.environ.get("ROBOFLOW_FOLDER", ""))
     cap_per_slug = int(getattr(args, "cap_per_slug", 0) or 0)
+
+    # v3.0.76: helper to map round → project name
+    try:
+        from weed_optimizer_framework.tools.rounds import round_project_name
+    except Exception:
+        def round_project_name(n):
+            return "weed-crop-agent-dataset" if int(n) == 1 else f"weed-crop-agent-v{int(n)}"
 
     reg_path = _Path(os.environ.get(
         "REPO_ROOT",
@@ -284,18 +297,36 @@ def cmd_sync_newest_slugs(args):
 
     # For each slug: walk imgs + (optional) labels, upload, then mark
     from roboflow import Roboflow as _RF
+    # v3.0.76: per-round project resolution — derive target project from
+    # each slug's harvest_round. Open projects lazily and cache.
     rf = _RF(api_key=_key())
     ws = rf.workspace(_ws_name())
-    try:
-        proj = ws.project(project)
-    except Exception as e:
-        print(f"FATAL: cannot open project {project}: {e}", file=sys.stderr)
-        sys.exit(3)
 
     n_uploaded_total = 0
     n_synced_slugs = 0
     EXTS = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
+    proj_cache = {}  # name → SDK Project object
+    folders_visited = set()  # so we don't PATCH-into-folder per slug
+
     for slug, info, lp in pending:
+        # Resolve THIS slug's target project from its harvest_round
+        h_round = int(info.get("harvest_round", 0) or 0)
+        slug_proj_name = (round_project_name(h_round)
+                          if h_round > 0 else default_project)
+        if slug_proj_name not in proj_cache:
+            try:
+                proj_cache[slug_proj_name] = ws.project(slug_proj_name)
+                print(f"\n=== Project: {slug_proj_name} (round {h_round}) ===")
+            except Exception as e:
+                print(f"  SKIP {slug}: cannot open project "
+                      f"{slug_proj_name!r}: {type(e).__name__}: "
+                      f"{str(e)[:80]}. Run start_new_round to create it.",
+                      file=sys.stderr)
+                proj_cache[slug_proj_name] = None
+        proj = proj_cache[slug_proj_name]
+        if proj is None:
+            continue
+
         print(f"\n--- {slug} ---")
         # Look for images in common subpaths
         cand_img_dirs = [_Path(lp) / s for s in

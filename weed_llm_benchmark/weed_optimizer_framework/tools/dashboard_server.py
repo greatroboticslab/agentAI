@@ -6277,10 +6277,17 @@ async function loadRounds(){
     const slugs = d.rounds[rn] || [];
     const meta = (d.rounds_meta||{})[String(rn)] || {};
     const isCur = (rn === cur);
+    // v3.0.76: each round → its own RF project (round 1 legacy name)
+    const projName = (rn === 1) ? 'weed-crop-agent-dataset' : ('weed-crop-agent-v' + rn);
+    const projUrl = `https://app.roboflow.com/a-test-of-will/${projName}/browse`;
     html += `<div class="round-card${isCur?' current':''}">
       <div class="round-header">
-        <h2>Round v${rn}${isCur?' <span class="badge cur">CURRENT</span>':''}</h2>
-        <div class="round-meta">started: ${meta.started_at||'?'} · ${slugs.length} slugs</div>
+        <h2>Round v${rn}${isCur?' <span class="badge cur">CURRENT</span>':''}
+          <a href="${projUrl}" target="_blank" style="font-size:.7em;color:#0e7c66;text-decoration:none;margin-left:.6rem;font-weight:500">
+            📡 ${projName} ↗
+          </a>
+        </h2>
+        <div class="round-meta">started: ${meta.started_at||'?'} · ${slugs.length} slugs · RF project: <code style="background:#f4f6fb;padding:.05rem .3rem;border-radius:3px">${projName}</code></div>
       </div>`;
     if(slugs.length === 0){
       html += '<div style="color:#888;font-size:13px">no slugs in this round yet — fire brain_harvest from the dashboard</div>';
@@ -6290,12 +6297,11 @@ async function loadRounds(){
       for(const s of slugs){
         const cls_other = s.is_other ? ' other' : '';
         const cls_junk = (s.slug_verdict === 'junk') ? ' junk' : '';
-        // v3.0.75: redirect "inspect" to Roboflow (fast CDN) instead of
-        // local /classes (slow Lustre images). Roboflow URL = workspace/
-        // project/browse with optional ?batch= filter.
-        const rfBase = 'https://app.roboflow.com/a-test-of-will/weed-crop-agent-dataset';
+        // v3.0.76: each round = its own Roboflow project, NOT batch tags.
+        // Round 1 = legacy 'weed-crop-agent-dataset', round 2+ = 'weed-crop-agent-v{N}'.
+        const projName = (rn === 1) ? 'weed-crop-agent-dataset' : ('weed-crop-agent-v' + rn);
         const rfBatchUrl = s.roboflow_synced
-          ? `${rfBase}/browse?queryText=batch%3Aagent-v${rn}-${encodeURIComponent(s.slug)}`
+          ? `https://app.roboflow.com/a-test-of-will/${projName}/browse?queryText=tag%3A${encodeURIComponent(s.slug)}`
           : null;
         html += `<div class="slug-row${cls_other}${cls_junk}">
           <div>
