@@ -328,7 +328,12 @@ def cmd_sync_newest_slugs(args):
                       if h_round else f"agent-{slug}")
         ok = 0
         fail = 0
-        for img in imgs:
+        # v3.0.75.2: progress logging every 10 imgs so silent hangs are
+        # visible. The Roboflow SDK upload can stall on network hiccups
+        # and the previous code printed nothing for ~3 min stretches.
+        import time as _t
+        last_print = _t.time()
+        for i, img in enumerate(imgs, 1):
             try:
                 kw = dict(
                     image_path=str(img),
@@ -349,10 +354,18 @@ def cmd_sync_newest_slugs(args):
                 ok += 1
             except Exception as e:
                 fail += 1
-                if fail < 3:
-                    print(f"    FAIL {img.name}: {type(e).__name__}: {str(e)[:80]}")
+                if fail < 5:
+                    print(f"    [{i}/{len(imgs)}] FAIL {img.name}: "
+                          f"{type(e).__name__}: {str(e)[:120]}",
+                          flush=True)
+            # v3.0.75.2: heartbeat every 10 imgs OR every 30s — without
+            # this, a stuck upload looked exactly like "still running".
+            if i % 10 == 0 or _t.time() - last_print > 30:
+                print(f"    progress: {i}/{len(imgs)} ok={ok} fail={fail}",
+                      flush=True)
+                last_print = _t.time()
         n_uploaded_total += ok
-        print(f"  uploaded {ok} ok, {fail} fail")
+        print(f"  uploaded {ok} ok, {fail} fail", flush=True)
 
         # Mark synced in registry
         if ok > 0:

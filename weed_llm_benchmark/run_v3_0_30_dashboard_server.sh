@@ -55,6 +55,23 @@ else
     echo "[sync] WARN nested package not found at $NESTED_PKG"
 fi
 
+# v3.0.75.2: also mirror new run_*.sh scripts. v3.0.74 train_yolo placeholder
+# silently failed because run_v3_0_74_yolo_trainer_placeholder.sh was only at
+# the nested git-tracked path while subprocess actions look at outer ($REPO).
+# Symlinks would be cleaner but cp keeps behavior consistent with above.
+NESTED_SH_DIR="$REPO/weed_llm_benchmark"
+if [ -d "$NESTED_SH_DIR" ]; then
+    n_sh=0
+    for sh in "$NESTED_SH_DIR"/run_v3_0_*.sh; do
+        [ -f "$sh" ] || continue
+        bn=$(basename "$sh")
+        if [ ! -f "$REPO/$bn" ] || [ "$sh" -nt "$REPO/$bn" ]; then
+            cp -p "$sh" "$REPO/$bn" && chmod +x "$REPO/$bn" && n_sh=$((n_sh+1))
+        fi
+    done
+    echo "[sync] nested → outer run_v3_0_*.sh: $n_sh new/updated"
+fi
+
 echo "=== v3.0.30 Job-S (dashboard server + public tunnel) ==="
 echo "SLURM_JOB_ID=$SLURM_JOB_ID"
 echo "Date: $(date)"
