@@ -11,6 +11,7 @@ State persistence: dataset_registry.json tracks all known, downloaded, and used 
 
 import os
 import json
+import time
 import hashlib
 import logging
 from pathlib import Path
@@ -146,7 +147,12 @@ class DatasetDiscovery:
             except (json.JSONDecodeError, KeyError):
                 pass
 
-        registry = {"datasets": {}, "discovered": [], "total_downloaded": 0}
+        registry = {"datasets": {}, "discovered": [], "total_downloaded": 0,
+                    # v3.0.74: round-tracking. Bumped by start_new_round
+                    # cluster_action. Every new slug downloaded gets
+                    # tagged with this value.
+                    "current_round": 1,
+                    "rounds": {}}  # {round_n: {started_at, ended_at, dinov2_subversions: [...]}}
         for name, info in KNOWN_DATASETS.items():
             registry["datasets"][name] = {
                 **info,
@@ -1130,6 +1136,14 @@ class DatasetDiscovery:
                     "class_names": [], "downloaded_at": None,
                     "used_for_training": False, "training_runs": [],
                     "harvest_reason": reason,
+                    # v3.0.74 (2026-06-01): tag the slug with the current
+                    # round so per-round UI + Roboflow batch naming can
+                    # group correctly. current_round defaults to 1 if the
+                    # registry was created before the round-tracking
+                    # feature shipped.
+                    "harvest_round": int(
+                        self.registry.get("current_round", 1)),
+                    "harvest_round_ts": int(time.time()),
                 }
 
             _, stats = self._download_hf(slug, d.id, local_path, max_images_per_ds)

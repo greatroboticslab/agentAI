@@ -789,6 +789,7 @@ def root():
 <div class="nav">
   <a href="/">🏠 hub</a>
   <a href="/manual" style="background:linear-gradient(135deg,#fef3c7,#fde68a) !important;color:#c70 !important;border-color:#fbbf24 !important;font-weight:600 !important">📖 manual</a>
+  <a href="/rounds" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe) !important;color:#1d4ed8 !important;border-color:#60a5fa !important;font-weight:600 !important">🔄 rounds</a>
   <a href="/classes">📋 classes</a>
   <a href="/slugs">📦 slugs</a>
   <a href="/roboflow">📊 roboflow</a>
@@ -3082,6 +3083,47 @@ _CLUSTER_ACTIONS = {
             "--source", "bank", "--per-species", "5",
         ],
         "label": "生成 OWL 所需的每物种 exemplar JSON(读 object_bank,~3s,12 文件)",
+    },
+    # v3.0.74 (2026-06-01): round tracking — start a new harvest round.
+    # Subsequent brain_harvest calls tag downloaded slugs with the new round.
+    "start_new_round": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.rounds", "start-new",
+        ],
+        "label": "▶ Start NEW harvest round (v{N} → v{N+1}); next brain_harvest tags new slugs",
+    },
+    "backfill_round_1": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.rounds", "backfill",
+        ],
+        "label": "Backfill harvest_round=1 on pre-v3.0.74 slugs (idempotent, ~3s)",
+    },
+    # v3.0.74 Stage 4 — DINOv2 filters round N's un-verified slugs and
+    # uploads survivors as agent-v{N}-dinov2-v{X.Y}. Auto-bumps sub-version
+    # on re-run so you can iterate (v1.0 → v1.1 → v1.2 ...).
+    "dinov2_filter_round_1": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.dinov2_round_filter",
+            "--round", "1", "--threshold", "0.6",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "🧠 DINOv2 filter ROUND 1 → upload survivors as agent-v1-dinov2-v{X.Y} (re-clickable, ~10min)",
+    },
+    # v3.0.74 Stage 5 — placeholder send-to-training trigger
+    "train_yolo_round_1": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.train_yolo_on_verified",
+            "--round", "1",
+        ],
+        "label": "🚀 Send round 1 verified ✓ → YOLO trainer (PLACEHOLDER, queues 10min stub)",
     },
     # v3.0.71 (2026-05-31): retroactive registry garbage audit.
     # Applies v3.0.68 strict filter to pre-strict slugs (ibm CIF etc.).
@@ -6001,5 +6043,284 @@ limit.</p>
   v3.0.72 · 2026-06-01 · <a href="/" style="color:var(--accent)">back to dashboard</a>
 </div>
 </div>
+</body></html>'''
+    return HTMLResponse(html)
+
+
+# ===========================================================================
+# v3.0.74 (2026-06-01) — Round tracking + /rounds review UI
+# ===========================================================================
+
+@app.get("/api/rounds_state")
+def api_rounds_state():
+    """Return registry's round tracking: current_round + per-round slug list
+    + per-slug class info + Other-bucket detection. Used by /rounds UI."""
+    try:
+        from weed_optimizer_framework.tools.rounds import status
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
+    s = status()
+    # Enrich per_round_slugs with each slug's class_names + verdict state
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = json.load(f)
+    except Exception:
+        reg = {"datasets": {}}
+    ds = reg.get("datasets", {}) or {}
+
+    # Load existing slug + class verdicts
+    sv = _slug_verdict_state()  # {slug: latest_verdict}
+    # exemplar verdicts are per-image; we summarize per-class
+    cv = {}  # {slug: {class: count_verified}}
+    try:
+        ev_path = REPO / "results" / "framework" / "exemplar_verdicts.jsonl"
+        if ev_path.exists():
+            for line in ev_path.read_text().splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    e = json.loads(line)
+                    sl = e.get("slug") or e.get("source_slug")
+                    cl = e.get("class") or e.get("cls")
+                    v = e.get("verdict")
+                    if sl and cl and v == "exemplar":
+                        cv.setdefault(sl, {}).setdefault(cl, 0)
+                        cv[sl][cl] += 1
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    enriched = {}
+    for round_num, slugs in s["per_round_slugs"].items():
+        enriched[round_num] = []
+        for slug in slugs:
+            info = ds.get(slug, {})
+            cn = info.get("class_names") or []
+            # Detect "Other" bucket — numeric-only or empty class_names
+            is_other = (
+                len(cn) == 0
+                or all(str(x).isdigit() for x in cn if x is not None)
+            )
+            enriched[round_num].append({
+                "slug": slug,
+                "local_images": info.get("local_images", 0),
+                "source": info.get("source", "?"),
+                "class_names": cn,
+                "is_other": is_other,
+                "slug_verdict": sv.get(slug),
+                "class_verdicts": cv.get(slug, {}),
+                "roboflow_synced": info.get("roboflow_synced", False),
+            })
+    return JSONResponse({
+        "ok": True,
+        "current_round": s["current_round"],
+        "rounds_meta": s["rounds_meta"],
+        "per_round_counts": s["per_round_counts"],
+        "rounds": enriched,
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    })
+
+
+@app.get("/rounds", response_class=HTMLResponse)
+def rounds_page():
+    """v3.0.74 — per-round review hub.
+
+    User vision: each harvest round = a versioned snapshot. Show every slug
+    in the round grouped by:
+      • Has class names + bbox → 'Categorized'
+      • Has class names only (digits or empty) → 'Other' bucket
+      • Garbage slug (slug_verdict=junk) → already filtered out
+
+    For each class within a slug: ✓ / ✗ / 🔄 (manual relabel).
+    Click anywhere → AJAX POST verdict, panel updates immediately."""
+    html = '''<!DOCTYPE html><html lang="zh"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>🔄 Rounds — review per harvest version</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+       color:#1a1a1d;background:linear-gradient(180deg,#f6f8fb 0%,#e9eef6 100%);
+       margin:0;padding:0;min-height:100vh}
+  .hero{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);
+        color:#fff;padding:1.6rem 2rem 1.4rem;box-shadow:0 4px 30px rgba(0,0,0,.15)}
+  .hero h1{margin:0;font-size:1.55rem;font-weight:700}
+  .hero .sub{color:#9aa5b8;margin-top:.3rem;font-size:.9rem}
+  .nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:.7rem 1rem;
+       display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .nav a{color:#0e7c66;text-decoration:none;padding:4px 12px;
+         border-radius:18px;border:1px solid #e2e8f0;font-size:13px;
+         transition:all .15s;background:#fff}
+  .nav a:hover{background:#0e7c66;color:#fff;transform:translateY(-1px)}
+  .container{max-width:1200px;margin:0 auto;padding:1.5rem 1rem 4rem}
+  .round-card{background:#fff;border-radius:14px;padding:1.2rem 1.5rem;
+              margin:1rem 0;box-shadow:0 2px 8px rgba(15,23,42,.05),
+              0 1px 3px rgba(15,23,42,.04);border:1px solid #f0f4f8}
+  .round-card.current{border-left:4px solid #0e7c66;background:linear-gradient(180deg,#fff 0%,#f4faf8 100%)}
+  .round-header{display:flex;align-items:center;justify-content:space-between;
+                margin-bottom:1rem;border-bottom:1px solid #f0f4f8;padding-bottom:.6rem}
+  .round-header h2{margin:0;font-size:1.2rem;color:#0f172a}
+  .round-meta{font-size:.8rem;color:#888}
+  .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;
+         font-weight:600;background:#eef4ff;color:#0e7c66;margin-left:.4rem}
+  .badge.cur{background:#0e7c66;color:#fff}
+  .slug-row{background:#f7f9fc;border:1px solid #e8eef5;border-radius:8px;
+            padding:10px 14px;margin:.5rem 0;display:grid;
+            grid-template-columns:1fr auto auto;gap:10px;align-items:start}
+  .slug-row.other{background:linear-gradient(135deg,#fff8e0,#fef3c7);
+                  border-color:#fbbf24}
+  .slug-row.junk{opacity:.5;background:#fef2f2}
+  .slug-name{font-weight:600;color:#0f172a;font-size:14px}
+  .slug-name code{background:#fff;padding:.1rem .35rem;border-radius:3px;
+                  font-family:ui-monospace,Menlo,monospace;font-size:11px;
+                  color:#0e7c66}
+  .slug-meta{font-size:11px;color:#888;margin-top:3px}
+  .classes-list{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+  .cls-chip{background:#fff;border:1px solid #d8e2eb;border-radius:14px;
+            padding:3px 10px;font-size:11px;color:#444;
+            display:inline-flex;align-items:center;gap:4px;cursor:pointer;
+            transition:all .12s}
+  .cls-chip:hover{background:#eef4ff;border-color:#0e7c66}
+  .cls-chip.ok{background:linear-gradient(135deg,#f0fff4,#dcfce7);
+               border-color:#22c55e;color:#0e7c66;font-weight:600}
+  .cls-chip.ok::before{content:"✓ "}
+  .cls-chip.bad{background:linear-gradient(135deg,#fee,#fecaca);
+                border-color:#c44;color:#c44}
+  .cls-chip.bad::before{content:"✗ "}
+  .cls-chip.uncategorized{background:#fff8e0;border-color:#fbbf24;color:#c70}
+  .cls-chip.uncategorized::before{content:"🔶 "}
+  .actions{display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+  button.act{background:#fff;border:1px solid #d8e2eb;border-radius:6px;
+             padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit}
+  button.act.ok{background:#22c55e;color:#fff;border-color:#22c55e}
+  button.act.bad{background:#c44;color:#fff;border-color:#c44}
+  button.act:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.1)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+         gap:10px;margin:1rem 0}
+  .stat{background:#fff;border-radius:8px;padding:10px 14px;
+        box-shadow:0 1px 3px rgba(0,0,0,.05);text-align:center}
+  .stat .lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.4px}
+  .stat .val{font-size:22px;font-weight:700;color:#0f172a;
+             font-family:ui-monospace,Menlo,monospace}
+  .toast{position:fixed;bottom:20px;right:20px;background:#0e7c66;color:#fff;
+         padding:10px 16px;border-radius:8px;font-size:13px;display:none;
+         box-shadow:0 4px 12px rgba(14,124,102,.3);z-index:100}
+  .toast.show{display:block;animation:slidein .2s ease-out}
+  @keyframes slidein{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+</style></head><body>
+<div class="hero">
+  <h1>🔄 Harvest Rounds — version-by-version review</h1>
+  <div class="sub">Each round = a snapshot of what the agent collected. Click ✓/✗ on each class to flag for DINOv2.</div>
+</div>
+<div class="nav">
+  <a href="/">🏠 Dashboard</a>
+  <a href="/manual">📖 Manual</a>
+  <a href="/rounds" style="background:#0e7c66;color:#fff">🔄 Rounds</a>
+  <a href="/classes">📋 Classes</a>
+  <a href="/slugs">📦 Slugs</a>
+  <a href="/roboflow">📊 Roboflow</a>
+</div>
+<div class="container">
+  <div class="stats" id="stats">loading…</div>
+  <div id="rounds-content">loading…</div>
+</div>
+<div class="toast" id="toast">saved</div>
+<script>
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500)}
+
+async function loadRounds(){
+  const r = await fetch('/api/rounds_state', {credentials:'include'});
+  const d = await r.json();
+  if(!d.ok){document.getElementById('rounds-content').innerHTML = 'err: '+(d.error||'?');return}
+  const cur = d.current_round;
+  // Stats row
+  const totalSlugs = Object.values(d.per_round_counts||{}).reduce((a,b)=>a+b,0);
+  const totalRounds = Object.keys(d.rounds||{}).length;
+  let other = 0, categorized = 0;
+  for(const r of Object.values(d.rounds||{}))
+    for(const s of r){ if(s.is_other) other++; else categorized++; }
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="lbl">Current Round</div><div class="val">v${cur}</div></div>
+    <div class="stat"><div class="lbl">Total Rounds</div><div class="val">${totalRounds}</div></div>
+    <div class="stat"><div class="lbl">Total Slugs</div><div class="val">${totalSlugs}</div></div>
+    <div class="stat"><div class="lbl">Categorized</div><div class="val" style="color:#0e7c66">${categorized}</div></div>
+    <div class="stat"><div class="lbl">🔶 Other</div><div class="val" style="color:#c70">${other}</div></div>
+  `;
+  // Render rounds, newest first
+  const sorted = Object.keys(d.rounds||{}).map(Number).sort((a,b)=>b-a);
+  let html = '';
+  for(const rn of sorted){
+    const slugs = d.rounds[rn] || [];
+    const meta = (d.rounds_meta||{})[String(rn)] || {};
+    const isCur = (rn === cur);
+    html += `<div class="round-card${isCur?' current':''}">
+      <div class="round-header">
+        <h2>Round v${rn}${isCur?' <span class="badge cur">CURRENT</span>':''}</h2>
+        <div class="round-meta">started: ${meta.started_at||'?'} · ${slugs.length} slugs</div>
+      </div>`;
+    if(slugs.length === 0){
+      html += '<div style="color:#888;font-size:13px">no slugs in this round yet — fire brain_harvest from the dashboard</div>';
+    } else {
+      // Sort: categorized first, then 🔶 Other
+      slugs.sort((a,b)=> (a.is_other?1:0) - (b.is_other?1:0));
+      for(const s of slugs){
+        const cls_other = s.is_other ? ' other' : '';
+        const cls_junk = (s.slug_verdict === 'junk') ? ' junk' : '';
+        html += `<div class="slug-row${cls_other}${cls_junk}">
+          <div>
+            <div class="slug-name">${s.is_other?'🔶 ':''}<code>${s.slug}</code></div>
+            <div class="slug-meta">${s.local_images.toLocaleString()} imgs · ${s.source} · RF synced: ${s.roboflow_synced?'✓':'—'}</div>
+            <div class="classes-list">`;
+        if(s.class_names && s.class_names.length){
+          for(const cn of s.class_names){
+            const verified = (s.class_verdicts||{})[cn] || 0;
+            const cls = verified>0 ? 'ok' : '';
+            html += `<span class="cls-chip ${cls}" title="${verified} verified" onclick="markClass('${s.slug}','${cn}','exemplar')">${cn}${verified>0?' ('+verified+')':''}</span>`;
+          }
+        } else {
+          html += '<span class="cls-chip uncategorized">no class_names — needs manual labeling</span>';
+        }
+        html += `</div></div>
+          <div class="actions">
+            <button class="act ok" onclick="markSlug('${s.slug}','keep')">✓ keep slug</button>
+            <button class="act bad" onclick="markSlug('${s.slug}','junk')">✗ junk slug</button>
+            <button class="act" onclick="window.open('/classes/'+encodeURIComponent('${s.class_names[0]||''}'),'_blank')">🔍 inspect</button>
+          </div>
+          <div></div>
+        </div>`;
+      }
+    }
+    html += '</div>';
+  }
+  document.getElementById('rounds-content').innerHTML = html || '<div class="round-card">no rounds yet — fire brain_harvest from the dashboard</div>';
+}
+
+async function markSlug(slug, verdict){
+  const reason = verdict==='junk' ? prompt('Reason (optional, why is this slug junk?)', '') : '';
+  if(verdict==='junk' && reason===null) return;  // cancelled
+  try {
+    const r = await fetch('/api/slug_verdict?slug='+encodeURIComponent(slug)
+      + '&verdict='+encodeURIComponent(verdict)
+      + '&reason='+encodeURIComponent(reason||''),
+      {method:'POST', credentials:'include'});
+    if(r.ok){ toast('saved: '+slug+' → '+verdict); loadRounds(); }
+    else toast('err: HTTP '+r.status);
+  } catch(e){ toast('err: '+e) }
+}
+
+async function markClass(slug, cls, verdict){
+  try {
+    const r = await fetch('/api/exemplar/'+encodeURIComponent(cls), {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({slug: slug, verdict: verdict, image: '(manual flag from /rounds)'})
+    });
+    if(r.ok){ toast('saved: '+slug+'/'+cls+' → '+verdict); loadRounds(); }
+    else toast('err: HTTP '+r.status);
+  } catch(e){ toast('err: '+e) }
+}
+
+loadRounds();
+setInterval(loadRounds, 30000);  // 30s auto-refresh
+</script>
 </body></html>'''
     return HTMLResponse(html)

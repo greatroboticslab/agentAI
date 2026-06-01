@@ -312,6 +312,12 @@ def cmd_sync_newest_slugs(args):
         print(f"  imgs: {len(imgs)} from {img_dir}")
         print(f"  labels: {lbl_dir or '(none)'}")
 
+        # v3.0.74: round-aware batch_name. registry has current_round +
+        # each slug has harvest_round. Tag the upload so Roboflow UI can
+        # filter by round. Fall back to slug-only if metadata missing.
+        h_round = info.get("harvest_round")
+        batch_name = (f"agent-v{int(h_round)}-{slug}"
+                      if h_round else f"agent-{slug}")
         ok = 0
         fail = 0
         for img in imgs:
@@ -319,8 +325,9 @@ def cmd_sync_newest_slugs(args):
                 kw = dict(
                     image_path=str(img),
                     split="train",
-                    batch_name=f"agent-{slug}",
-                    tag_names=["green", "brain-harvest", slug],
+                    batch_name=batch_name,
+                    tag_names=["green", "brain-harvest", slug,
+                               f"round-{h_round}" if h_round else "round-?"],
                     num_retry_uploads=1,
                 )
                 if lbl_dir:
