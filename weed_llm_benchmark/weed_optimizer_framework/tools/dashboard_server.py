@@ -693,16 +693,106 @@ def root():
     animation:pulse 1.5s infinite}
   .live-banner.idle .pulse{animation:none;opacity:.5}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* ============================================================
+     v3.0.72 (2026-06-01) — Phase E polish, additive overrides.
+     Goal: 'super 好看且专业 + 酷炫' single-page controller. Keeps
+     the same selectors so existing JS works, just upgrades visuals.
+  ============================================================ */
+  body{background:linear-gradient(180deg,#f6f8fb 0%,#e9eef6 100%) !important;
+       min-height:100vh;max-width:none !important;margin:0 !important;padding:0 !important}
+  .body-inner{max-width:1400px;margin:0 auto;padding:1rem}
+  /* Hero banner replaces plain h1 */
+  .hero-bar{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);
+            color:#fff;padding:1.6rem 2rem 1.4rem;
+            box-shadow:0 4px 30px rgba(0,0,0,.15);margin-bottom:0;
+            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+  .hero-bar h1{margin:0;color:#fff;font-size:1.75rem;font-weight:700;letter-spacing:-.5px}
+  .hero-bar h1 span.v{color:#7dd3c0 !important;font-size:.85rem;font-weight:500;
+        background:rgba(125,211,192,.15);padding:.2rem .55rem;border-radius:4px;
+        margin-left:.5rem;letter-spacing:.5px}
+  .hero-bar .live-indicator{display:inline-flex;align-items:center;gap:.5rem;
+        background:rgba(255,255,255,.08);padding:.4rem .9rem;border-radius:20px;font-size:.85rem;color:#9aa5b8}
+  .hero-bar .live-indicator .dot{width:8px;height:8px;background:#0a9b7a;
+        border-radius:50%;box-shadow:0 0 8px rgba(10,155,122,.5);animation:pulse 1.8s infinite}
+  /* Pill nav style */
+  .nav{justify-content:center !important;padding:.6rem .8rem !important;
+       background:transparent !important;border:none !important;margin-top:.8rem !important}
+  .nav a{background:#fff !important;border:1px solid #e2e8f0 !important;
+         padding:.4rem .85rem !important;border-radius:18px !important;
+         color:#0e7c66 !important;font-weight:500 !important;font-size:13px !important;
+         transition:all .15s !important;text-decoration:none !important}
+  .nav a:hover{background:#0e7c66 !important;color:#fff !important;
+               border-color:#0e7c66 !important;transform:translateY(-1px);
+               box-shadow:0 4px 8px rgba(14,124,102,.2) !important}
+  /* Stat cards with accent gradient on hover */
+  .stat{transition:transform .12s,box-shadow .12s,border-color .12s;
+        border-left:3px solid transparent;background:#fff !important;
+        box-shadow:0 1px 4px rgba(0,0,0,.05) !important}
+  .stat:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08) !important;
+              border-left-color:#0e7c66}
+  .stat .v{font-family:ui-monospace,Menlo,monospace !important;font-size:24px !important;
+           color:#0f172a !important;font-weight:700 !important;letter-spacing:-.5px}
+  .stat .v.green{color:#0e7c66 !important}
+  /* Panels: deeper shadow + rounded edges */
+  .panel{background:#fff !important;border-radius:14px !important;
+         box-shadow:0 2px 8px rgba(15,23,42,.05),0 1px 3px rgba(15,23,42,.04) !important;
+         border:1px solid #f0f4f8}
+  .panel h2{font-size:15px !important;color:#0f172a !important;
+            font-weight:600 !important;border-bottom:1px solid #f0f4f8;
+            padding-bottom:.5rem !important;margin-bottom:.8rem !important}
+  .panel h2 a{color:#0e7c66 !important;font-weight:500 !important}
+  /* Action buttons: brighter on hover, gradient on dangerous */
+  .act{border-radius:8px !important;transition:all .15s !important;
+       border:1px solid #e2e8f0 !important;background:#f7f9fc !important}
+  .act:hover{background:#fff !important;border-color:#0e7c66 !important;
+             box-shadow:0 4px 12px rgba(14,124,102,.12) !important;
+             transform:translateY(-1px)}
+  .act .nm{color:#0e7c66 !important;font-weight:600 !important}
+  .act.dangerous{background:linear-gradient(135deg,#fff5f5 0%,#fee 100%) !important;
+                 border-color:#fecaca !important}
+  .act.dangerous .nm{color:#c53030 !important}
+  /* Live banner deeper gradient */
+  .live-banner{background:linear-gradient(135deg,#0e7c66 0%,#0a9b7a 100%) !important;
+               box-shadow:0 4px 12px rgba(14,124,102,.25) !important;
+               border-radius:10px !important}
+  .live-banner.idle{background:linear-gradient(135deg,#64748b 0%,#94a3b8 100%) !important;
+                    box-shadow:0 4px 12px rgba(100,116,139,.2) !important}
+  /* SLURM state badges */
+  .state-R{background:#f0fff4 !important;color:#0e7c66 !important;
+           padding:1px 7px !important;border-radius:4px !important;
+           font-size:11px !important;font-weight:600 !important}
+  .state-PD{background:#fff8e0 !important;color:#c70 !important;
+            padding:1px 7px !important;border-radius:4px !important;
+            font-size:11px !important;font-weight:600 !important}
+  /* Smooth fade-in for table updates */
+  table tbody tr{transition:background-color .2s}
+  /* Log block monospace polish */
+  .log{font-size:12px !important;border-radius:8px !important;
+       background:#0f172a !important;color:#7dd3c0 !important;
+       border:1px solid #1e293b !important;padding:12px !important}
+  /* Footer */
+  .footer{padding:1.5rem 1rem 2rem;text-align:center;font-size:12px;color:#94a3b8}
+  .footer a{color:#0e7c66 !important;text-decoration:none;margin:0 .35rem}
+  /* Hover ripple on stats and panels */
+  .panel,.stat{will-change:transform,box-shadow}
+  /* Count-up animation hook */
+  .stat .v.flash{animation:flash .4s ease-out}
+  @keyframes flash{0%{transform:scale(1)}50%{transform:scale(1.08);color:#0a9b7a !important}100%{transform:scale(1)}}
 </style>
 </head><body>
-<h1>🌱 Weed-detection framework controller <span style="font-size:13px;color:#888;font-weight:400">v3.0.66 unified</span></h1>
+<div class="hero-bar">
+  <h1>🌱 Weed-detection framework controller <span class="v">v3.0.72 unified</span></h1>
+  <div class="live-indicator"><span class="dot"></span> auto-refresh ON</div>
+</div>
+<div class="body-inner">
 <div class="nav">
-  <a href="/">🏠 hub (this page)</a>
-  <a href="/manual" style="background:#fff8e0;color:#c70;font-weight:600">📖 manual</a>
-  <a href="/classes">📋 /classes</a>
-  <a href="/slugs">📦 /slugs</a>
-  <a href="/roboflow">📊 /roboflow</a>
-  <a href="/morning_report">☀️ /morning_report</a>
+  <a href="/">🏠 hub</a>
+  <a href="/manual" style="background:linear-gradient(135deg,#fef3c7,#fde68a) !important;color:#c70 !important;border-color:#fbbf24 !important;font-weight:600 !important">📖 manual</a>
+  <a href="/classes">📋 classes</a>
+  <a href="/slugs">📦 slugs</a>
+  <a href="/roboflow">📊 roboflow</a>
+  <a href="/morning_report">☀️ morning</a>
   <a href="/api/cluster_status">📥 JSON</a>
 </div>
 
@@ -747,6 +837,16 @@ def root():
 <div class="panel" style="margin-bottom:14px">
   <h2>🌿 CWD12 species snapshot (Roboflow boxes per class)</h2>
   <div id="cwd12-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">loading…</div>
+</div>
+
+<!-- v3.0.72 Phase D — per-species pipeline stats panel -->
+<div class="panel" style="margin-bottom:14px">
+  <h2>📊 Per-species pipeline state <span><a href="/api/per_species_stats">JSON →</a></span></h2>
+  <div style="font-size:11px;color:#888;margin-bottom:6px">
+    每 30s 自动刷新 · gold = Roboflow cwd12 已审定 · auto = 下载自带 YOLO 标签 ·
+    unlabeled = 单类 slug 无标签图 · owl = OWL red 提案 · exemplars = object_bank 样本
+  </div>
+  <div id="per-species" style="overflow-x:auto">loading…</div>
 </div>
 
 <div class="panel">
@@ -930,24 +1030,94 @@ async function loadRecentJobs(){
   }
 }
 
+// v3.0.72 Phase D — per-species pipeline state
+async function loadPerSpecies(){
+  try {
+    const r = await fetch('/api/per_species_stats');
+    const d = await r.json();
+    const per = d.per_species || {};
+    const totals = d.totals || {};
+    const cwd12 = ["Carpetweeds","Crabgrass","Eclipta","Goosegrass","Morningglory","Nutsedge",
+                   "PalmerAmaranth","PricklySida","Purslane","Ragweed","Sicklepod","SpottedSpurge"];
+    // Find max for bar scaling
+    const allVals = [];
+    for(const sp of cwd12){
+      const r = per[sp] || {};
+      allVals.push(r.gold||0, r.auto||0, r.unlabeled||0, r.owl||0);
+    }
+    const maxVal = Math.max(...allVals, 1);
+    const bar = (v,color) => {
+      const pct = (100*v/maxVal).toFixed(1);
+      return `<div style="display:flex;align-items:center;gap:4px">
+        <span style="min-width:32px;font-variant-numeric:tabular-nums;font-size:11px;color:#333">${v}</span>
+        <div style="flex:1;background:#eef2f6;height:5px;border-radius:3px;min-width:24px">
+          <div style="background:${color};width:${pct}%;height:100%;border-radius:3px"></div>
+        </div></div>`;
+    };
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    html += '<thead><tr style="background:#f7f9fc;color:#555">'
+         + '<th style="text-align:left;padding:6px 10px;font-weight:600">Species</th>'
+         + '<th style="text-align:left;padding:6px 10px;font-weight:600">🟢 gold</th>'
+         + '<th style="text-align:left;padding:6px 10px;font-weight:600">⚙️ auto-on-download</th>'
+         + '<th style="text-align:left;padding:6px 10px;font-weight:600">⚪ unlabeled</th>'
+         + '<th style="text-align:left;padding:6px 10px;font-weight:600">🎯 OWL proposed</th>'
+         + '<th style="text-align:left;padding:6px 10px;font-weight:600">🧬 exemplars</th>'
+         + '</tr></thead><tbody>';
+    for(const sp of cwd12){
+      const r = per[sp] || {gold:0,auto:0,unlabeled:0,owl:0,exemplars:0};
+      html += `<tr style="border-top:1px solid #eee">
+        <td style="padding:5px 10px;font-weight:600;color:#333">${sp}</td>
+        <td style="padding:5px 10px">${bar(r.gold||0,'#38a169')}</td>
+        <td style="padding:5px 10px">${bar(r.auto||0,'#3b82f6')}</td>
+        <td style="padding:5px 10px">${bar(r.unlabeled||0,'#9ca3af')}</td>
+        <td style="padding:5px 10px">${bar(r.owl||0,'#ef4444')}</td>
+        <td style="padding:5px 10px">${bar(r.exemplars||0,'#a855f7')}</td>
+      </tr>`;
+    }
+    html += `<tr style="background:#f7f9fc;font-weight:700;border-top:2px solid #ddd">
+      <td style="padding:6px 10px">Total</td>
+      <td style="padding:6px 10px;color:#38a169">${totals.gold||0}</td>
+      <td style="padding:6px 10px;color:#3b82f6">${totals.auto||0}</td>
+      <td style="padding:6px 10px;color:#888">${totals.unlabeled||0}</td>
+      <td style="padding:6px 10px;color:#ef4444">${totals.owl||0}</td>
+      <td style="padding:6px 10px;color:#a855f7">${totals.exemplars||0}</td>
+    </tr>`;
+    html += '</tbody></table>';
+    document.getElementById('per-species').innerHTML = html;
+  } catch(e){
+    document.getElementById('per-species').innerHTML =
+      '<span style="color:#c44">per_species err: '+e+'</span>';
+  }
+}
+
 // Initial load + poll
-loadStatus(); loadActions(); loadRoboflow(); loadRecentJobs();
+loadStatus(); loadActions(); loadRoboflow(); loadRecentJobs(); loadPerSpecies();
 setInterval(loadStatus, 6000);
 setInterval(loadRecentJobs, 15000);
 setInterval(loadRoboflow, 60000);
+setInterval(loadPerSpecies, 30000);
 </script>
 
-<div style="color:#999;font-size:12px;margin-top:24px;text-align:center">
-  v3.0.66 unified · all panels auto-refresh · 旧版静态 dashboard:
-  <a href="/dashboard/index.html">stats</a> ·
-  <a href="/dashboard/datasets.html">datasets</a> ·
-  <a href="/dashboard/categories.html">categories</a> ·
-  <a href="/dashboard/progress.html">progress</a> ·
-  <a href="/audit">/audit (deprecated)</a>
-  <br>API: <a href="/api/state">/api/state</a> ·
-  <a href="/api/exemplars_export">/api/exemplars_export</a> ·
-  <a href="/api/slug_verdicts">/api/slug_verdicts</a> ·
-  <a href="/healthz">/healthz</a>
+</div><!-- /.body-inner -->
+<div class="footer">
+  <div style="margin-bottom:.4rem">
+    v3.0.72 · all panels auto-refresh · 📖 see
+    <a href="/manual">/manual</a> for the full pipeline guide
+  </div>
+  <div style="opacity:.7">
+    Legacy:
+    <a href="/dashboard/index.html">stats</a> ·
+    <a href="/dashboard/datasets.html">datasets</a> ·
+    <a href="/dashboard/categories.html">categories</a> ·
+    <a href="/dashboard/progress.html">progress</a> ·
+    <a href="/audit">/audit</a>
+    &nbsp;|&nbsp; API:
+    <a href="/api/state">state</a> ·
+    <a href="/api/per_species_stats">per_species_stats</a> ·
+    <a href="/api/exemplars_export">exemplars</a> ·
+    <a href="/api/slug_verdicts">verdicts</a> ·
+    <a href="/healthz">healthz</a>
+  </div>
 </div>
 </body></html>''')
 
