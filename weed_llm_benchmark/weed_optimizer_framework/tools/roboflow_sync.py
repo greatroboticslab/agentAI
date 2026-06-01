@@ -242,11 +242,19 @@ def cmd_sync_newest_slugs(args):
     except Exception as e:
         print(f"  [audit] could not run garbage filter: {e}")
 
+    # v3.0.75 (2026-06-01): user feedback — "我希望所有采集的数据集都会上传到
+    # roboflow上先 不然访问速度非常慢". cwd12 baselines (cottonweed_sp8/holdout)
+    # are part of "all collected data" too — review should happen in Roboflow's
+    # fast CDN, not Lustre-served dashboard. So we no longer skip them by
+    # default. To opt out, set --skip-baselines or env SYNC_SKIP_BASELINES=1.
+    skip_baselines = (getattr(args, "skip_baselines", False)
+                      or os.environ.get("SYNC_SKIP_BASELINES") == "1")
+
     pending = []
     for slug, info in ds.items():
         if info.get("status") != "downloaded":
             continue
-        if slug in CWD12_BASELINES:
+        if skip_baselines and slug in CWD12_BASELINES:
             continue
         if slug in junk_slugs:
             continue
@@ -685,6 +693,8 @@ def main():
                     help="folder name or id to place project (idempotent)")
     sn.add_argument("--cap-per-slug", type=int, default=0,
                     help="cap images per slug (0=all, for testing)")
+    sn.add_argument("--skip-baselines", action="store_true",
+                    help="skip cwd12_sp8/holdout/det12 baselines (default: include them)")
     sub.add_parser("create-species-projects")
     up = sub.add_parser("upload")
     up.add_argument("--images", required=True)

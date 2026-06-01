@@ -3156,9 +3156,25 @@ _CLUSTER_ACTIONS = {
             "--project", "weed-crop-agent-dataset",
             "--folder", "weed_crop_agent_dataset",
             "--cap-per-slug", "100",
+            "--skip-baselines",  # default: don't push cwd12 here (use sync_all_to_roboflow for that)
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "把 registry 里所有未同步的 agent slug 上传到 weed-crop-agent-dataset + 归 folder (~10min/slug)",
+        "label": "Roboflow 上传 — 跳过 cwd12 baseline (agent-harvested only, ~10min/slug)",
+    },
+    # v3.0.75 (2026-06-01): user wants ALL data in Roboflow for fast browsing.
+    # This variant uploads EVERYTHING including cwd12 baselines.
+    "sync_all_to_roboflow": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "sync-newest-slugs",
+            "--project", "weed-crop-agent-dataset",
+            "--folder", "weed_crop_agent_dataset",
+            "--cap-per-slug", "100",
+            # NO --skip-baselines: cwd12 baselines (sp8/holdout) included
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "🚀 Sync ALL (incl. cwd12 baselines) → Roboflow for fast review (~10min/slug)",
     },
     # v3.0.71.3: OWL red proposals → Roboflow upload.
     # OWL only ran on Goosegrass against cottonweed_holdout/test/images; its
@@ -6220,6 +6236,15 @@ def rounds_page():
   <a href="/roboflow">📊 Roboflow</a>
 </div>
 <div class="container">
+  <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-left:4px solid #1d4ed8;
+              padding:.9rem 1.2rem;border-radius:8px;margin-bottom:1rem;font-size:13px;color:#1e3a8a">
+    <strong>💡 Workflow:</strong> click "🚀 Sync ALL to Roboflow" on the
+    <a href="/" style="color:#1d4ed8;font-weight:600">main dashboard</a> first,
+    then come here to review each slug via the
+    <strong style="background:#fff;padding:.1rem .4rem;border-radius:3px;color:#0e7c66">📡 Review on Roboflow</strong>
+    button (Roboflow's CDN serves images way faster than our cluster's Lustre).
+    Use ✓/✗ here to flag the slug; the actual bbox review happens in Roboflow.
+  </div>
   <div class="stats" id="stats">loading…</div>
   <div id="rounds-content">loading…</div>
 </div>
@@ -6265,10 +6290,22 @@ async function loadRounds(){
       for(const s of slugs){
         const cls_other = s.is_other ? ' other' : '';
         const cls_junk = (s.slug_verdict === 'junk') ? ' junk' : '';
+        // v3.0.75: redirect "inspect" to Roboflow (fast CDN) instead of
+        // local /classes (slow Lustre images). Roboflow URL = workspace/
+        // project/browse with optional ?batch= filter.
+        const rfBase = 'https://app.roboflow.com/a-test-of-will/weed-crop-agent-dataset';
+        const rfBatchUrl = s.roboflow_synced
+          ? `${rfBase}/browse?queryText=batch%3Aagent-v${rn}-${encodeURIComponent(s.slug)}`
+          : null;
         html += `<div class="slug-row${cls_other}${cls_junk}">
           <div>
             <div class="slug-name">${s.is_other?'🔶 ':''}<code>${s.slug}</code></div>
-            <div class="slug-meta">${s.local_images.toLocaleString()} imgs · ${s.source} · RF synced: ${s.roboflow_synced?'✓':'—'}</div>
+            <div class="slug-meta">${s.local_images.toLocaleString()} imgs · ${s.source} ·
+              ${s.roboflow_synced
+                ? '<a href="'+rfBatchUrl+'" target="_blank" style="color:#0e7c66;font-weight:600">📡 on Roboflow ↗</a>'
+                : '<span style="color:#c70">⚠ NOT on Roboflow yet — click sync_all_to_roboflow on dashboard</span>'
+              }
+            </div>
             <div class="classes-list">`;
         if(s.class_names && s.class_names.length){
           for(const cn of s.class_names){
@@ -6277,13 +6314,15 @@ async function loadRounds(){
             html += `<span class="cls-chip ${cls}" title="${verified} verified" onclick="markClass('${s.slug}','${cn}','exemplar')">${cn}${verified>0?' ('+verified+')':''}</span>`;
           }
         } else {
-          html += '<span class="cls-chip uncategorized">no class_names — needs manual labeling</span>';
+          html += '<span class="cls-chip uncategorized">no class_names — needs manual labeling in Roboflow</span>';
         }
         html += `</div></div>
           <div class="actions">
             <button class="act ok" onclick="markSlug('${s.slug}','keep')">✓ keep slug</button>
             <button class="act bad" onclick="markSlug('${s.slug}','junk')">✗ junk slug</button>
-            <button class="act" onclick="window.open('/classes/'+encodeURIComponent('${s.class_names[0]||''}'),'_blank')">🔍 inspect</button>
+            ${s.roboflow_synced
+              ? `<button class="act" onclick="window.open('${rfBatchUrl}','_blank')" style="background:#0e7c66;color:#fff;border-color:#0e7c66">📡 Review on Roboflow</button>`
+              : `<button class="act" disabled title="Not synced yet" style="opacity:.5">⚠ Not synced</button>`}
           </div>
           <div></div>
         </div>`;
