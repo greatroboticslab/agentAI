@@ -2946,7 +2946,7 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
             "bulk-upload",
             "--images",
-            "datasets/cottonweed_holdout/test/images",
+            "results/leave4out/dataset_holdout/test/images",
             "--labels",
             "results/framework/owl_red_proposals/Goosegrass",
             "--split", "train", "--batch", "red",
@@ -2955,7 +2955,7 @@ _CLUSTER_ACTIONS = {
             "--project", "weed-crop-agent-dataset",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "上传 OWL Goosegrass red 提案 → weed-crop-agent-dataset (~5min, 50 imgs)",
+        "label": "上传 OWL Goosegrass red 提案 → weed-crop-agent-dataset (50 imgs, ~5min)",
     },
     # v3.0.71: DINOv2 dataset-quality curator (full pipeline as one button)
     "dinov2_curate_registry": {
