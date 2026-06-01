@@ -77,6 +77,70 @@ def cmd_whoami(args):
         print("projects(): ", type(e).__name__, e)
 
 
+def _ws_name() -> str:
+    """Resolve the workspace slug (a-test-of-will or override)."""
+    return os.environ.get("ROBOFLOW_WORKSPACE", "a-test-of-will")
+
+
+def _list_folders() -> list:
+    """v3.0.69 (2026-05-31): Roboflow Project Folders REST API.
+
+    Path uses internal name `/groups` (NOT /folders), which is why earlier
+    probes against /folders + /project_folders found nothing. Confirmed
+    working on free tier (school workspace a-test-of-will, returned 200
+    + folder data). Docs page incorrectly says "Enterprise only" — empirically
+    the basic CRUD works on free; only RBAC/SSO-restricted folders need Enterprise.
+
+    See memory/feedback_roboflow_folder_api.md for the full investigation."""
+    import urllib.request, json as _json
+    url = f"https://api.roboflow.com/{_ws_name()}/groups?api_key={_key()}"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            return _json.load(r).get("data", []) or []
+    except Exception as e:
+        print(f"[folders] list FAIL: {type(e).__name__}: {e}", file=sys.stderr)
+        return []
+
+
+def _resolve_folder_id(folder_ref: str) -> str:
+    """Accept either an explicit folder id OR a folder name; return the id.
+    Returns '' if not found."""
+    if not folder_ref:
+        return ""
+    # 20-char ids; names are arbitrary — try as id first
+    for f in _list_folders():
+        if folder_ref == f.get("id") or folder_ref == f.get("name"):
+            return f.get("id", "")
+    return ""
+
+
+def _add_project_to_folder(project_name: str, folder_id: str) -> bool:
+    """PATCH /:ws/groups/:folder_id/projects. Returns True on 200/204."""
+    import urllib.request, urllib.error, json as _json
+    if not folder_id:
+        return False
+    url = (f"https://api.roboflow.com/{_ws_name()}/groups/{folder_id}"
+           f"/projects?api_key={_key()}")
+    body = _json.dumps({"projects": [project_name]}).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=body, method="PATCH",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            code = r.status
+        ok = code in (200, 204)
+        print(f"[folders] PATCH {project_name} → folder {folder_id}: HTTP {code}")
+        return ok
+    except urllib.error.HTTPError as e:
+        print(f"[folders] PATCH FAIL HTTP {e.code}: {e.read()[:200]!r}",
+              file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"[folders] PATCH FAIL: {type(e).__name__}: {e}", file=sys.stderr)
+        return False
+
+
 def cmd_create_project(args):
     ws = _workspace()
     name = _resolve_project(args)
@@ -92,6 +156,54 @@ def cmd_create_project(args):
         # Already exists is fine — report and continue
         print(f"create_project({name}): {type(e).__name__}: {e}")
         print("(if it already exists, that's OK — proceed to upload)")
+
+    # v3.0.69: optionally place into a folder. ROBOFLOW_FOLDER (env) or
+    # --folder (CLI) can be either a folder-id OR a folder-name.
+    folder_ref = (getattr(args, "folder", None)
+                  or os.environ.get("ROBOFLOW_FOLDER", ""))
+    if folder_ref:
+        fid = _resolve_folder_id(folder_ref)
+        if fid:
+            ok = _add_project_to_folder(name, fid)
+            if ok:
+                print(f"[folders] placed {name} into folder {folder_ref} ({fid})")
+            else:
+                print(f"[folders] could not place {name} in {folder_ref}")
+        else:
+            print(f"[folders] folder ref {folder_ref!r} not found in workspace; "
+                  f"project lives at root level. List: "
+                  f"{[f.get('name') for f in _list_folders()]}")
+
+
+def cmd_move_to_folder(args):
+    """Standalone: move an existing project into a folder by name or id."""
+    project = getattr(args, "project", None) or _resolve_project(args)
+    folder_ref = getattr(args, "folder", None) or os.environ.get(
+        "ROBOFLOW_FOLDER", "")
+    if not project or not folder_ref:
+        print("FATAL: --project and --folder required (or set ROBOFLOW_FOLDER)",
+              file=sys.stderr)
+        sys.exit(2)
+    fid = _resolve_folder_id(folder_ref)
+    if not fid:
+        print(f"FATAL: folder {folder_ref!r} not found. Available: "
+              f"{[(f.get('name'), f.get('id')) for f in _list_folders()]}",
+              file=sys.stderr)
+        sys.exit(3)
+    ok = _add_project_to_folder(project, fid)
+    sys.exit(0 if ok else 4)
+
+
+def cmd_list_folders(args):
+    """Pretty-print all folders in the workspace + their members."""
+    folders = _list_folders()
+    print(f"workspace {_ws_name()}: {len(folders)} folder(s)")
+    for f in folders:
+        ps = f.get("projects") or []
+        print(f"  - {f.get('name','?')!r}  id={f.get('id','?')}  "
+              f"({len(ps)} projects)")
+        for p in ps:
+            print(f"      ↳ {p}")
 
 
 def cmd_upload(args):
@@ -363,6 +475,16 @@ def main():
     cp = sub.add_parser("create-project")
     cp.add_argument("--project", default=None,
                     help="project name (overrides env ROBOFLOW_PROJECT)")
+    cp.add_argument("--folder", default=None,
+                    help="v3.0.69: after create, place project into this "
+                         "folder (name OR id). Also reads env ROBOFLOW_FOLDER.")
+    # v3.0.69: standalone folder ops
+    lf = sub.add_parser("list-folders")
+    mv = sub.add_parser("move-to-folder")
+    mv.add_argument("--project", default=None,
+                    help="project name to move (overrides env)")
+    mv.add_argument("--folder", default=None,
+                    help="folder name or id (also reads env ROBOFLOW_FOLDER)")
     sub.add_parser("create-species-projects")
     up = sub.add_parser("upload")
     up.add_argument("--images", required=True)
@@ -392,6 +514,8 @@ def main():
 
     {"whoami": cmd_whoami,
      "create-project": cmd_create_project,
+     "list-folders": cmd_list_folders,
+     "move-to-folder": cmd_move_to_folder,
      "create-species-projects": cmd_create_species_projects,
      "upload": cmd_upload,
      "bulk-upload": cmd_bulk_upload,

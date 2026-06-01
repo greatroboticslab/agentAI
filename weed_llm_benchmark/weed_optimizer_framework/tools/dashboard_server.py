@@ -2771,6 +2771,30 @@ _CLUSTER_ACTIONS = {
         ],
         "label": "生成 OWL 所需的每物种 exemplar JSON(读 object_bank,~3s,12 文件)",
     },
+    # v3.0.69 (2026-05-31): Roboflow Project Folder ops via /groups REST.
+    # Earlier-session conclusion "no API support" was wrong — the path uses
+    # internal name /groups while UI says Folders. Verified PATCH 204 OK on
+    # free-tier school workspace. See memory/feedback_roboflow_folder_api.md.
+    "roboflow_list_folders": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "list-folders",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "Roboflow folders 列表 (workspace 内所有 folder + 成员项目, ~3s)",
+    },
+    "roboflow_move_agent_to_folder": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "move-to-folder",
+            "--project", "weed-crop-agent-dataset",
+            "--folder", "weed_crop_agent_dataset",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "把 weed-crop-agent-dataset 项目移进 weed_crop_agent_dataset folder (idempotent, ~3s)",
+    },
     # v3.0.51 (auto-loop iter 9 / Phase D4): Roboflow Version generation + pull-back.
     # Generate is RATE-LIMITED on free tier (~10/proj/month) — skips by default
     # if Versions already exist. Use --force in manual sbatch to regenerate.
