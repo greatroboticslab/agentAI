@@ -6107,8 +6107,16 @@ def api_rounds_state():
     except Exception:
         pass
 
+    # v3.0.76.1: include EMPTY rounds too. The /rounds JS iterates `rounds`
+    # and didn't show round 2/3 when they were just-created with 0 slugs —
+    # user couldn't tell start_new_round had worked. Union of rounds_meta
+    # keys and per_round_slugs ensures every round announced via
+    # start_new_round shows up immediately.
+    all_round_keys = set(s["per_round_slugs"].keys()) | set(
+        str(k) for k in (s.get("rounds_meta") or {}).keys())
     enriched = {}
-    for round_num, slugs in s["per_round_slugs"].items():
+    for round_num in all_round_keys:
+        slugs = s["per_round_slugs"].get(round_num, [])
         enriched[round_num] = []
         for slug in slugs:
             info = ds.get(slug, {})
@@ -6184,7 +6192,11 @@ def rounds_page():
             grid-template-columns:1fr auto auto;gap:10px;align-items:start}
   .slug-row.other{background:linear-gradient(135deg,#fff8e0,#fef3c7);
                   border-color:#fbbf24}
-  .slug-row.junk{opacity:.5;background:#fef2f2}
+  .slug-row.junk{opacity:.5;background:#fef2f2;text-decoration:line-through}
+  /* v3.0.76.1: visual feedback for kept slugs */
+  .slug-row.kept{background:linear-gradient(135deg,#f0fff4,#dcfce7);
+                 border-color:#22c55e;border-left:4px solid #0e7c66}
+  .slug-row.kept .slug-name::before{content:"✓ ";color:#0e7c66;font-weight:700}
   .slug-name{font-weight:600;color:#0f172a;font-size:14px}
   .slug-name code{background:#fff;padding:.1rem .35rem;border-radius:3px;
                   font-family:ui-monospace,Menlo,monospace;font-size:11px;
@@ -6297,13 +6309,15 @@ async function loadRounds(){
       for(const s of slugs){
         const cls_other = s.is_other ? ' other' : '';
         const cls_junk = (s.slug_verdict === 'junk') ? ' junk' : '';
+        // v3.0.76.1: add visual kept styling so user sees ✓ flag immediately
+        const cls_kept = (s.slug_verdict === 'keep') ? ' kept' : '';
         // v3.0.76: each round = its own Roboflow project, NOT batch tags.
         // Round 1 = legacy 'weed-crop-agent-dataset', round 2+ = 'weed-crop-agent-v{N}'.
         const projName = (rn === 1) ? 'weed-crop-agent-dataset' : ('weed-crop-agent-v' + rn);
         const rfBatchUrl = s.roboflow_synced
           ? `https://app.roboflow.com/a-test-of-will/${projName}/browse?queryText=tag%3A${encodeURIComponent(s.slug)}`
           : null;
-        html += `<div class="slug-row${cls_other}${cls_junk}">
+        html += `<div class="slug-row${cls_other}${cls_junk}${cls_kept}">
           <div>
             <div class="slug-name">${s.is_other?'🔶 ':''}<code>${s.slug}</code></div>
             <div class="slug-meta">${s.local_images.toLocaleString()} imgs · ${s.source} ·
