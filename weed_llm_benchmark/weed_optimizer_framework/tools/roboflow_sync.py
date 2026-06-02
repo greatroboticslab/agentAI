@@ -280,7 +280,10 @@ def cmd_sync_newest_slugs(args):
             continue
         pending.append((slug, info, lp))
 
-    print(f"=== sync-newest-slugs → {project} ===")
+    # v3.0.77.2: was `{project}` (NameError after v3.0.76 rename to
+    # default_project). Caught by clicking sync from /rounds after
+    # round 2 backfill — sync silently died with NameError.
+    print(f"=== sync-newest-slugs → default project {default_project} (per-round routing applies) ===")
     print(f"  registry: {len(ds)} slugs total")
     print(f"  pending sync: {len(pending)}")
 
