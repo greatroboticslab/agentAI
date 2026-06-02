@@ -332,12 +332,32 @@ def cmd_sync_newest_slugs(args):
 
         print(f"\n--- {slug} ---")
         # Look for images in common subpaths
+        # v3.0.77.3: GitHub/Kaggle slugs have varied layouts:
+        #   - HF:        <lp>/images/*.jpg
+        #   - YOLO:      <lp>/train/images/*.jpg
+        #   - this one:  <lp>/data/images/*.jpg (yolov9-beehive)
+        #   - kaggle:    <lp>/agri_data/data/*.jpeg (ravirajsinh45)
+        # Add common 2-level patterns + fall back to scanning any dir
+        # with enough imgs.
         cand_img_dirs = [_Path(lp) / s for s in
                         ("images", "train/images", "valid/images",
-                         "test/images")]
+                         "test/images", "data/images", "data",
+                         "agri_data/data", "raw_data", "train",
+                         "valid", "test")]
         cand_img_dirs.append(_Path(lp))
         img_dir = next((d for d in cand_img_dirs if d.is_dir()
                         and any(p.suffix in EXTS for p in d.iterdir())), None)
+        if img_dir is None:
+            # Fallback: recursive scan, pick dir with most images
+            counts = {}
+            for p in _Path(lp).rglob("*"):
+                if p.suffix in EXTS and p.is_file():
+                    counts[p.parent] = counts.get(p.parent, 0) + 1
+                    if sum(counts.values()) > 5000:
+                        break
+            if counts:
+                img_dir = max(counts.items(), key=lambda kv: kv[1])[0]
+                print(f"  (rglob fallback) → {img_dir}  ({counts[img_dir]} imgs)")
         if img_dir is None:
             print(f"  SKIP no image dir under {lp}")
             continue
@@ -416,10 +436,15 @@ def cmd_sync_newest_slugs(args):
     print(f"\n=== TOTAL: synced {n_synced_slugs}/{len(pending)} slugs, "
           f"uploaded {n_uploaded_total} imgs ===")
 
-    # Folder-place once at end
-    if fid:
-        ok = _add_project_to_folder(project, fid)
-        print(f"[folders] place {project} → {folder_ref}: {'ok' if ok else 'FAIL'}")
+    # v3.0.77.3: was `project` (NameError, second instance from same
+    # v3.0.76 rename). PATCH all projects we touched into folder.
+    if fid and proj_cache:
+        for proj_name in proj_cache:
+            if proj_cache[proj_name] is None:
+                continue
+            ok = _add_project_to_folder(proj_name, fid)
+            print(f"[folders] place {proj_name} → {folder_ref}: "
+                  f"{'ok' if ok else 'FAIL'}")
 
 
 def cmd_move_to_folder(args):
