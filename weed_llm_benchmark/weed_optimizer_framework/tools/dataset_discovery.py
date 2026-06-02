@@ -1290,6 +1290,23 @@ class DatasetDiscovery:
                 kept.append(r)
             results = kept
 
+        # v3.0.77.1 (2026-06-02): stamp harvest_round on EVERY slug
+        # downloaded in this run. Earlier code only set it in the HF
+        # phase; GitHub/Kaggle/RoboflowUniverse paths registered slugs
+        # via entry["info"] which didn't include harvest_round. As a
+        # result the 2 new slugs (gh_minhvuongvu + kg_ravirajsinh45)
+        # from run 41106922 came back tagged round=0 instead of
+        # current_round=2. Fix: post-hoc stamp every slug in `results`.
+        cur_round = int(self.registry.get("current_round", 1))
+        for r in results:
+            slug = r.get("slug")
+            if not slug or slug not in self.registry["datasets"]:
+                continue
+            info = self.registry["datasets"][slug]
+            if not info.get("harvest_round"):
+                info["harvest_round"] = cur_round
+                info["harvest_round_ts"] = int(time.time())
+
         self._save_registry()
         return {
             "status": "ok",
