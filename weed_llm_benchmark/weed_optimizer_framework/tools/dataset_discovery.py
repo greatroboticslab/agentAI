@@ -777,6 +777,25 @@ class DatasetDiscovery:
         "grass weed", "weed species",
         # Real-bbox-hinting keywords
         "yolo agriculture", "coco agriculture", "bounding box field",
+        # v3.0.77 (2026-06-01): expanded to find more datasets after
+        # earlier rounds exhausted basic terms. Round 2/3 needs fresh
+        # candidates. These are species-specific + technique-specific.
+        "amaranth", "ragweed", "morningglory dataset", "carpetweed",
+        "crabgrass", "purslane plant", "sicklepod", "goosegrass",
+        "palmer amaranth", "spurge weed", "nutsedge plant",
+        # Generic detection-relevant for plants
+        "plant detection yolo", "leaf detection bbox", "field scene yolo",
+        "agriculture object detection", "crop health detection",
+        "early stage plant", "vegetation segmentation", "leaf segmentation",
+        # New: bigger-scale general
+        "yolov8 weed", "yolov5 crop", "weed control vision",
+        "smart farming dataset", "precision agriculture dataset",
+        "robot crop weeding", "crop row dataset",
+        # Common synonyms / species + variants
+        "horseweed", "pigweed", "lambsquarters", "thistle plant",
+        "dandelion detection", "clover weed", "chickweed",
+        "annual weed", "perennial weed", "broad leaf weeds",
+        "grassy weed", "sedge weed",
     ]
 
     # Positive matches: a slug name / description containing any of these is
@@ -954,10 +973,17 @@ class DatasetDiscovery:
             classes = stats.get("classes", 0)
             cls_n = 0 if classes in (0, "?", None, "0") else (
                 int(classes) if str(classes).isdigit() else 1)
-            if labeled < 100 or cls_n == 0:
+            # v3.0.77 (2026-06-01): loosened — brain was rejecting fine
+            # datasets just because their card metadata says labeled=0
+            # but disk actually has labels. Now: only reject if NEITHER
+            # labeled>=50 NOR class info is present.
+            # Honor env BRAIN_STRICT_MIN_LABELS override (default 50).
+            strict_min = int(os.environ.get("BRAIN_STRICT_MIN_LABELS", "50") or 50)
+            if labeled < strict_min and cls_n == 0:
                 logger.info(
                     f"[Harvest][strict] REJECT {src_tag} {slug}: "
-                    f"labeled={labeled} classes={classes} (< 100 labels or 0 classes)"
+                    f"labeled={labeled} classes={classes} "
+                    f"(< {strict_min} labels AND 0 classes)"
                 )
                 # Remove from registry + delete the downloaded files
                 self.registry["datasets"].pop(slug, None)

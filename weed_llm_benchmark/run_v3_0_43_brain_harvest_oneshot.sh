@@ -24,6 +24,18 @@ export CLASS_TOPIC_OVERRIDES_FILE="$REPO/results/framework/class_topic_overrides
 
 echo "=== v3.0.43.4 Brain harvest (1 round, triggered from /control) ==="
 echo "SLURM_JOB_ID=$SLURM_JOB_ID  Date: $(date)"
+echo "[config] ROUND_BUMP=${ROUND_BUMP:-0}  AUTO_SYNC=${AUTO_SYNC:-0}  BRAIN_STRICT_MIN_LABELS=${BRAIN_STRICT_MIN_LABELS:-50}"
+
+# v3.0.77: optional pre-step — bump round + create RF project. Used by
+# the harvest_full_round_e2e button so user gets one-click new round.
+if [ "${ROUND_BUMP:-0}" = "1" ]; then
+    echo "[round-bump] starting new harvest round + creating new RF project..."
+    if [ -f /jet/home/byler/.roboflow_key ]; then
+        export ROBOFLOW_API_KEY=$(cat /jet/home/byler/.roboflow_key)
+    fi
+    python -m weed_optimizer_framework.tools.rounds start-new 2>&1 | tail -10
+    echo "[round-bump] done. brain_harvest will tag new slugs with the bumped round."
+fi
 
 # Start ollama if not already up (needed for topic classify on new classes)
 if ! curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1 ; then
@@ -77,3 +89,19 @@ print(f"[harvest] done {time.strftime('%H:%M:%S')}")
 PYEOF
 
 echo "=== Brain harvest oneshot done $(date) ==="
+
+# v3.0.77: optional post-step — auto-sync newly downloaded slugs to RF.
+# Used by harvest_full_round_e2e button so user gets data into v{N}
+# project without another click.
+if [ "${AUTO_SYNC:-0}" = "1" ]; then
+    echo
+    echo "=== [auto-sync] uploading new slugs to per-round Roboflow project ==="
+    if [ -f /jet/home/byler/.roboflow_key ]; then
+        export ROBOFLOW_API_KEY=$(cat /jet/home/byler/.roboflow_key)
+    fi
+    python -m weed_optimizer_framework.tools.roboflow_sync sync-newest-slugs \
+        --project weed-crop-agent-dataset \
+        --folder weed_crop_agent_dataset \
+        --cap-per-slug 100 2>&1 | tail -40
+    echo "=== [auto-sync] done $(date) ==="
+fi

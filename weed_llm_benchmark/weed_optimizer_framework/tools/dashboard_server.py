@@ -3092,7 +3092,23 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.rounds", "start-new",
         ],
-        "label": "▶ Start NEW harvest round (v{N} → v{N+1}); next brain_harvest tags new slugs",
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "▶ Start NEW harvest round (v{N} → v{N+1}); creates RF project but no data yet",
+    },
+    # v3.0.77 (2026-06-01): ONE-CLICK new harvest round end-to-end.
+    # Triggers brain_harvest SBATCH with env vars that:
+    #   1. ROUND_BUMP=1 → start_new_round at job-start (new RF project)
+    #   2. brain_harvest collects new datasets (4h, loosened strict)
+    #   3. AUTO_SYNC=1 → upload survivors to the new round's RF project
+    # User clicks ONCE, walks away, comes back to populated v{N+1}.
+    "harvest_full_round_e2e": {
+        "type": "sbatch",
+        "script": "run_v3_0_43_brain_harvest_oneshot.sh",
+        "sbatch_extra_args": [
+            "--time=04:00:00",
+            "--export=ALL,ROUND_BUMP=1,AUTO_SYNC=1,BRAIN_STRICT=1,BRAIN_STRICT_MIN_LABELS=50,BRAIN_MAX_NEW=8,BRAIN_MAX_IMGS=2000",
+        ],
+        "label": "🚀 ONE-CLICK new round: bump round → harvest 4h → auto-sync to weed-crop-agent-v{N+1}",
     },
     "backfill_round_1": {
         "type": "subprocess",
@@ -3424,9 +3440,12 @@ async def api_cluster_action(action: str, request: Request):
         if not script_path.is_file():
             raise HTTPException(500, f"script not found: {script_path}")
 
-        # v3.0.68: brain_harvest accepts {time_h, strict, max_new, max_imgs}
-        # body. Other actions ignore body (forward-compat safe).
+        # v3.0.77: actions can declare 'sbatch_extra_args' — list of CLI
+        # flags ALWAYS appended (e.g. --time=04:00:00 + --export=ALL,…).
+        # Used by harvest_full_round_e2e to fire one-click new-round.
         sbatch_cli = ["sbatch"]
+        if isinstance(spec.get("sbatch_extra_args"), list):
+            sbatch_cli += [str(a) for a in spec["sbatch_extra_args"]]
         body_used = {}
         if action == "brain_harvest" and body:
             try:
