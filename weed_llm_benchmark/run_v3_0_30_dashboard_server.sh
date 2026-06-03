@@ -69,6 +69,11 @@ if [ -d "$NESTED_SH_DIR" ]; then
             cp -p "$sh" "$REPO/$bn" && chmod +x "$REPO/$bn" && n_sh=$((n_sh+1))
         fi
     done
+    # v3.0.78: also mirror run_mongo_node.sh (no v3_0 prefix → not caught above).
+    if [ -f "$NESTED_SH_DIR/run_mongo_node.sh" ]; then
+        cp -p "$NESTED_SH_DIR/run_mongo_node.sh" "$REPO/run_mongo_node.sh" \
+            && chmod +x "$REPO/run_mongo_node.sh"
+    fi
     echo "[sync] nested → outer run_v3_0_*.sh: $n_sh new/updated"
 fi
 
