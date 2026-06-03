@@ -9,3 +9,4 @@ numpy
 requests
 qwen-vl-utils
 ultralytics
+pymongo>=4.6

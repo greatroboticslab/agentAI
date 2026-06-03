@@ -79,6 +79,12 @@ Evaluated on **CottonWeedDet12** test set (848 images, 12 weed species, 1,464 gr
 > DINOv2 curator + cut-paste synthetic anchor (v3.0.38). See CHANGELOG.md
 > for the authoritative, up-to-date log — the sections below describe the
 > earlier v3.0.23-era pipeline.
+>
+> **Infra (v3.0.78, 2026-06):** MongoDB migration Phase 1 — `tools/db.py`
+> (Mongo-first / JSON-fallback read layer) + `run_mongo_node.sh` (no-root
+> single-instance mongod, co-located on the dashboard node). Decouples the
+> labeler from hardcoded Lustre paths ahead of the move off the cluster.
+> See `docs/mongodb_schema.md`.
 
 Starting v3.0, the framework's primary mode is an autonomous research agent that
 accumulates real-bbox datasets across runs and trains the latest YOLO (yolo26x,

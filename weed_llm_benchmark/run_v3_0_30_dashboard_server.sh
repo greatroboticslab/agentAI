@@ -82,6 +82,24 @@ if [ -f "$REPO/.stop_dashserver" ]; then
     exit 0
 fi
 
+# --- 0. stand up co-located MongoDB (Phase 1) ---
+# Bring up a single-instance user-space mongod on THIS node (binds 127.0.0.1),
+# co-located with uvicorn so dashboard_server / tools.db connect via localhost.
+# Fully guarded: if the binary isn't downloaded yet or the node has no internet,
+# this fails softly and the app keeps running in JSON-fallback (tools.db handles
+# the missing connection transparently). Pre-download once on a login node:
+#   bash run_mongo_node.sh download
+if [ -f "$REPO/.stop_mongo" ]; then
+    echo "[mongo] .stop_mongo present — skipping Mongo startup (JSON-fallback)"
+elif [ -f "$REPO/run_mongo_node.sh" ]; then
+    echo "[mongo] attempting co-located mongod startup"
+    REPO_ROOT="$REPO" bash "$REPO/run_mongo_node.sh" up \
+        && echo "[mongo] up — db.py will use Mongo" \
+        || echo "[mongo] WARN startup failed — app continues in JSON-fallback"
+else
+    echo "[mongo] run_mongo_node.sh not found — JSON-fallback"
+fi
+
 # --- 1. start uvicorn ---
 mkdir -p "$REPO/logs"
 LOG_UVICORN="$REPO/logs/uvicorn_$SLURM_JOB_ID.log"

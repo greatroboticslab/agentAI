@@ -4247,3 +4247,53 @@ local-to-dashboard tools that don't need sbatch):
   `memory/project_autonomous_loop_2026_05_30.md` +
   `memory/_loop_state_2026_05_30.md`.
 
+
+---
+
+## 2026-06-03 — v3.0.78 MongoDB migration Phase 1 (db.py + co-located mongod)
+
+Per Prof Zhang's directive ("use MongoDB for the labeler") and the schema
+designed in `docs/mongodb_schema.md`, this lands **Phase 1** of the
+incremental, reversible JSON→Mongo migration: a single read-path seam plus
+a no-root mongod launcher. Zero risk to the running dashboard — every read
+falls back to the existing JSON files when Mongo is absent.
+
+### New / changed
+
+- **`weed_optimizer_framework/tools/db.py`** (new) — Mongo-first /
+  JSON-fallback read layer. Migration step 2 ("read from Mongo first, fall
+  back to the JSON registry"). API: `available()`, `get_registry()` (returns
+  the exact `dataset_registry.json` shape so callers swap with no downstream
+  change), `get_slug`, `list_slugs(topic/status/bucket)`,
+  `get_class_topic_overrides`, `list_classes`, `ping`. Connection string from
+  env `AGENTAI_MONGO_URL` → `~/.mongo_url` secret file → none. 800ms probe
+  timeout (cached) so a dead Mongo never stalls a request. WRITE PATH is
+  intentionally deferred to Phase 3.
+- **`run_mongo_node.sh`** (new) — stands up a single-instance user-space
+  mongod without root. `download|start|up|status|stop`. dbpath on /ocean
+  (`mongo_data`, persists across job restarts), binds 127.0.0.1:27017, writes
+  `~/.mongo_url`, idempotent. Default binary MongoDB 7.0.14 rhel80 (Bridges-2
+  = RHEL8), overridable via `MONGO_TARBALL_URL`.
+- **`run_v3_0_30_dashboard_server.sh`** — Phase-0 block brings mongod up
+  co-located on the dashboard SLURM node before uvicorn. Guarded/soft-fail:
+  no binary or no node egress → app keeps serving in JSON-fallback.
+  `touch $REPO/.stop_mongo` skips Mongo startup.
+- **`requirements.txt`** += `pymongo>=4.6`.
+
+### Verification (local, Mac)
+
+- JSON-fallback path: reads the real 8-slug `dataset_registry.json`.
+- Mongo branch (mongomock): registry reconstruction, topic/bucket filters,
+  class_names, topic overrides, canonical classes all correct.
+- Dead-Mongo path: falls back in ~1.4s (800ms timeout honored, not the 20s
+  pymongo default) — requests never block.
+- `bash -n run_mongo_node.sh` clean.
+
+### Next (not in this change)
+
+- Phase 3: write path — slug upsert + `audit_trail` + dual-write (Mongo AND
+  JSON, both authoritative).
+- Phase 4: idempotent backfill — `dataset_registry.json` +
+  `class_topic_overrides.json` + `_CWD12`/`_CWD12_ZH` → `slugs`/`classes`.
+- Phase 5: flip db.py Mongo-authoritative; JSON becomes export snapshot.
+- Phase 6: move to Uni server (storage.py abstraction handles path swap).
