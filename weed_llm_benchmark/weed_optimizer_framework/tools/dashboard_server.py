@@ -541,6 +541,23 @@ def healthz():
     return {"ok": True, "repo": str(REPO), "ts": time.time()}
 
 
+@app.get("/api/db_status")
+def api_db_status():
+    """MongoDB migration Phase 1 probe. Reports whether tools.db has a live
+    Mongo connection or is serving from the JSON fallback. Never raises."""
+    try:
+        from . import db as _db
+        info = _db.ping()
+        info["backend"] = "mongo" if info.get("available") else "json-fallback"
+        # Cross-check: does get_registry actually return data via the live path?
+        reg = _db.get_registry()
+        info["registry_datasets"] = len(reg.get("datasets", {}))
+        return info
+    except Exception as e:
+        return {"available": False, "backend": "json-fallback",
+                "error": f"db module error: {e}"}
+
+
 # ---------- flag API: user-driven REQ-3 feedback loop ----------
 
 def _load_flags() -> dict:
