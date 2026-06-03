@@ -35,13 +35,18 @@ set -uo pipefail
 
 REPO_ROOT="${REPO_ROOT:-/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark}"
 MONGO_PORT="${MONGO_PORT:-27017}"
-MONGO_VER="${MONGO_VER:-7.0.14}"
-# rhel80 build matches Bridges-2 (RHEL 8 / glibc 2.28). Override if the node is
-# a different distro — the script prints a clear error if the binary won't run.
-MONGO_TARBALL_URL="${MONGO_TARBALL_URL:-https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel80-${MONGO_VER}.tgz}"
+# rhel80 build matches Bridges-2 (RHEL 8 / glibc 2.28). NOTE: MongoDB renamed
+# the target from "rhel80" to "rhel8" at 7.0.13+, so pin 7.0.12 (rhel80, verified
+# downloadable). Override MONGO_TARGET=rhel8 + MONGO_VER for a newer build, or
+# MONGO_TARBALL_URL for a fully custom one. Binary either runs or the version
+# check below reports the glibc error clearly.
+MONGO_VER="${MONGO_VER:-7.0.12}"
+MONGO_TARGET="${MONGO_TARGET:-rhel80}"
+MONGO_DISTRO="mongodb-linux-x86_64-${MONGO_TARGET}-${MONGO_VER}"
+MONGO_TARBALL_URL="${MONGO_TARBALL_URL:-https://fastdl.mongodb.org/linux/${MONGO_DISTRO}.tgz}"
 
 MONGO_HOME="$REPO_ROOT/.mongodb"
-MONGO_BIN="$MONGO_HOME/mongodb-linux-x86_64-rhel80-${MONGO_VER}/bin/mongod"
+MONGO_BIN="$MONGO_HOME/${MONGO_DISTRO}/bin/mongod"
 DBPATH="$REPO_ROOT/mongo_data"
 LOGPATH="$REPO_ROOT/results/framework/mongod.log"
 PIDFILE="$REPO_ROOT/results/framework/mongod.pid"
