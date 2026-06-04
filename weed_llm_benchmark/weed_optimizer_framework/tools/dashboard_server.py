@@ -799,7 +799,7 @@ def root():
 </style>
 </head><body>
 <div class="hero-bar">
-  <h1>🌱 Weed-detection framework controller <span class="v">v3.0.72 unified</span></h1>
+  <h1>🌱 Weed-detection framework controller <span class="v">v3.0.79 · Mongo Phase 1</span></h1>
   <div class="live-indicator"><span class="dot"></span> auto-refresh ON</div>
 </div>
 <div class="body-inner">
@@ -827,6 +827,11 @@ def root():
   <div class="stat"><div class="l">🏷️ Topic overrides</div><div class="v" id="stat-topic">…</div></div>
   <div class="stat"><div class="l">📡 Roboflow imgs</div><div class="v green" id="stat-rf-imgs">…</div></div>
   <div class="stat"><div class="l">📐 Roboflow boxes</div><div class="v green" id="stat-rf-boxes">…</div></div>
+  <div class="stat" title="MongoDB migration Phase 1 — is tools.db serving from Mongo or the JSON fallback?">
+    <div class="l">🗄️ Storage backend</div>
+    <div class="v" id="stat-db-backend">…</div>
+    <div class="l" id="stat-db-detail" style="margin-top:2px;font-size:.7rem">…</div>
+  </div>
 </div>
 
 <!-- ───── ACTIONS ───── -->
@@ -1108,12 +1113,37 @@ async function loadPerSpecies(){
   }
 }
 
+// v3.0.79 — MongoDB Phase 1 storage-backend card
+async function loadDbStatus(){
+  const elB = document.getElementById('stat-db-backend');
+  const elD = document.getElementById('stat-db-detail');
+  if(!elB) return;
+  try {
+    const r = await fetch('/api/db_status');
+    const d = await r.json();
+    if(d.available){
+      elB.innerHTML = '<span style="color:#16a34a">🟢 Mongo</span>';
+      const c = d.counts || {};
+      elD.textContent = `${d.registry_datasets??c.slugs??0} slugs · ${c.classes??0} classes`;
+      elD.title = d.url || '';
+    } else {
+      elB.innerHTML = '<span style="color:#d97706">🟡 JSON</span>';
+      elD.textContent = `${d.registry_datasets??0} slugs (fallback)`;
+      elD.title = d.error || 'mongo unavailable';
+    }
+  } catch(e){
+    elB.innerHTML = '<span style="color:#c44">err</span>';
+    elD.textContent = String(e).slice(0,40);
+  }
+}
+
 // Initial load + poll
-loadStatus(); loadActions(); loadRoboflow(); loadRecentJobs(); loadPerSpecies();
+loadStatus(); loadActions(); loadRoboflow(); loadRecentJobs(); loadPerSpecies(); loadDbStatus();
 setInterval(loadStatus, 6000);
 setInterval(loadRecentJobs, 15000);
 setInterval(loadRoboflow, 60000);
 setInterval(loadPerSpecies, 30000);
+setInterval(loadDbStatus, 20000);
 </script>
 
 </div><!-- /.body-inner -->

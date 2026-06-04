@@ -228,6 +228,13 @@ class DatasetDiscovery:
         with open(tmp, "w") as f:
             json.dump(registry, f, indent=2, default=str)
         os.replace(tmp, REGISTRY_PATH)
+        # Phase 3 dual-write: mirror to Mongo so new harvest lands there too.
+        # Best-effort — never blocks/raises if Mongo is down (db handles it).
+        try:
+            from . import db as _db
+            _db.mirror_registry_to_mongo(registry)
+        except Exception:
+            pass
 
     # =========================================================
     # STATUS TRACKING — mark datasets as used

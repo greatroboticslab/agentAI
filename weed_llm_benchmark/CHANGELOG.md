@@ -4297,3 +4297,45 @@ falls back to the existing JSON files when Mongo is absent.
   `class_topic_overrides.json` + `_CWD12`/`_CWD12_ZH` → `slugs`/`classes`.
 - Phase 5: flip db.py Mongo-authoritative; JSON becomes export snapshot.
 - Phase 6: move to Uni server (storage.py abstraction handles path swap).
+
+---
+
+## 2026-06-04 — v3.0.79 MongoDB Phase 3 (dual-write) + Phase 4 (backfill) + UI card
+
+Builds on v3.0.78 (Phase 1). Mongo is now LIVE co-located on the dashboard
+node (job 41146758, `/api/db_status` → backend=mongo) and loaded with real data.
+
+### Phase 4 — backfill (DONE + verified on cluster)
+
+- **`tools/backfill_mongo.py`** (new) — idempotent registry→Mongo loader +
+  read-only audit. `--audit` prints weed-bbox total / distinct species / gap to
+  50K (touches no DB); `--apply` upserts slugs + classes + registry_meta +
+  audit_trail. Field-faithful (each slug copied verbatim + `_id`).
+- Ran on the compute node via `srun --jobid=… --overlap` (mongod binds the
+  compute node's localhost, unreachable from login node). Result:
+  **8 slugs, 381 classes** loaded. `/api/db_status` now reports
+  `registry_datasets: 8` (was 0).
+- **Audit finding (real registry):** weed-bbox = **5,928** imgs (cottonweed_sp8
+  3,442 + francesco grass_weeds 2,486), holdout 2,206 excluded, 10 distinct
+  species, **gap to 50K = 44,072**. 485 class-topic overrides. The 420K disease
+  mass from the 2026-05-28 audit is no longer in this registry.
+
+### Phase 3 — dual-write (Mongo AND JSON, both authoritative)
+
+- **`tools/db.py`** += `upsert_slug`, `set_class_topic`, `mirror_registry_to_mongo`,
+  `log_audit`. Each write hits Mongo (best-effort) AND the JSON file; Mongo
+  failures never block the JSON path. audit_trail event per write.
+- **`tools/dataset_discovery.py`** — `_save_registry()` now calls
+  `db.mirror_registry_to_mongo()` after the atomic JSON write, so new harvest
+  lands in Mongo automatically. Verified locally (mongomock + temp JSON):
+  upsert_slug/set_class_topic write both backends, audit_trail records events.
+
+### UI
+
+- **Storage-backend stat card** (`/api/db_status`): 🟢 Mongo / 🟡 JSON + slug &
+  class counts, polled every 20s. Hero version → `v3.0.79 · Mongo Phase 1`.
+
+### Still ahead
+
+- Phase 5: flip db.py Mongo-authoritative; switch read endpoints off direct JSON.
+- Harvest bias to close the 44K weed-bbox gap (separate from DB work).

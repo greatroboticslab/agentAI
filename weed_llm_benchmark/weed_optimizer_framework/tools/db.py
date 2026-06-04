@@ -371,6 +371,153 @@ def list_classes() -> list:
 
 
 # --------------------------------------------------------------------------- #
+# Write API — Phase 3 dual-write (Mongo AND JSON, both authoritative)
+# --------------------------------------------------------------------------- #
+#
+# Migration step 3 ("dual-write"): when a slug is added/updated, write to BOTH
+# Mongo and the JSON registry so neither is stale during the cutover. Mongo is
+# best-effort: if it's down, the JSON write still happens and the next backfill
+# reconciles. JSON write uses registry_lock.atomic_write_json (crash-safe on
+# Lustre). These are what the harvester calls so "new harvest goes straight
+# into Mongo" without abandoning the JSON path yet.
+
+def _now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc)
+
+
+def upsert_slug(slug: str, fields: dict, actor: str = "system") -> dict:
+    """Add/update one slug in BOTH Mongo `slugs` and the JSON registry.
+
+    `fields` is merged onto any existing entry (partial update). Returns
+    {"mongo": bool, "json": bool} indicating which backends were written.
+    Records a Mongo audit_trail event when Mongo is available.
+    """
+    if not slug or "/" in slug or slug in (".", ".."):
+        raise ValueError(f"unsafe slug: {slug!r}")
+    fields = dict(fields or {})
+    fields.pop("_id", None)
+    wrote = {"mongo": False, "json": False}
+
+    # --- Mongo (best effort) ---
+    dbh = _get_db()
+    if dbh is not None:
+        try:
+            before = dbh[COLL_SLUGS].find_one({"_id": slug})
+            doc = dict(fields)
+            doc["updated_at"] = _now()
+            dbh[COLL_SLUGS].update_one({"_id": slug}, {"$set": doc}, upsert=True)
+            wrote["mongo"] = True
+            try:
+                dbh[COLL_AUDIT].insert_one({
+                    "ts": _now(), "actor": actor, "event": "slug.upsert",
+                    "target": {"kind": "slug", "id": slug},
+                    "before": {k: before.get(k) for k in fields} if before else None,
+                    "after": fields, "reason": "dual_write",
+                })
+            except Exception:
+                pass
+        except Exception as e:
+            _state["error"] = f"upsert_slug mongo write failed: {e}"
+
+    # --- JSON registry (authoritative until cutover) ---
+    try:
+        from .registry_lock import atomic_write_json
+        reg = _registry_from_json()
+        cur = reg["datasets"].get(slug, {})
+        cur.update(fields)
+        reg["datasets"][slug] = cur
+        reg["total_downloaded"] = sum(
+            1 for v in reg["datasets"].values() if v.get("status") == "downloaded")
+        atomic_write_json(REGISTRY_PATH, reg)
+        wrote["json"] = True
+    except Exception as e:
+        _state["error"] = f"upsert_slug json write failed: {e}"
+
+    return wrote
+
+
+def set_class_topic(cls: str, topic: str, actor: str = "user") -> dict:
+    """Set a class→topic in BOTH Mongo `classes` and class_topic_overrides.json.
+    `topic='_clear_'` removes the override. Returns {"mongo":bool,"json":bool}."""
+    wrote = {"mongo": False, "json": False}
+
+    dbh = _get_db()
+    if dbh is not None:
+        try:
+            if topic == "_clear_":
+                dbh[COLL_CLASSES].update_one({"_id": cls}, {"$unset": {"topic": ""}})
+            else:
+                dbh[COLL_CLASSES].update_one(
+                    {"_id": cls}, {"$set": {"topic": topic}}, upsert=True)
+            wrote["mongo"] = True
+            try:
+                dbh[COLL_AUDIT].insert_one({
+                    "ts": _now(), "actor": actor, "event": "class.topic_set",
+                    "target": {"kind": "class", "id": cls},
+                    "after": {"topic": topic}, "reason": "dual_write",
+                })
+            except Exception:
+                pass
+        except Exception as e:
+            _state["error"] = f"set_class_topic mongo write failed: {e}"
+
+    try:
+        from .class_topic_store import save_override
+        wrote["json"] = bool(save_override(cls, topic))
+    except Exception as e:
+        _state["error"] = f"set_class_topic json write failed: {e}"
+
+    return wrote
+
+
+def mirror_registry_to_mongo(registry: dict) -> dict:
+    """Mongo-ONLY mirror of a full registry dict (the harvester already wrote
+    JSON; this just keeps Mongo in sync at the same chokepoint). Best-effort:
+    never raises, returns {"ok":bool, "slugs":n}. Upserts every slug + the
+    registry_meta singleton. Safe to call on every _save_registry."""
+    dbh = _get_db()
+    if dbh is None:
+        return {"ok": False, "slugs": 0, "reason": "mongo unavailable"}
+    try:
+        ds = (registry or {}).get("datasets", {}) or {}
+        n = 0
+        now = _now()
+        for slug, info in ds.items():
+            doc = dict(info)
+            doc.pop("_id", None)
+            doc["updated_at"] = now
+            dbh[COLL_SLUGS].update_one({"_id": slug}, {"$set": doc}, upsert=True)
+            n += 1
+        dbh["registry_meta"].update_one(
+            {"_id": "singleton"},
+            {"$set": {"discovered": registry.get("discovered", []),
+                      "total_downloaded": registry.get("total_downloaded", 0),
+                      "updated_at": now}}, upsert=True)
+        return {"ok": True, "slugs": n}
+    except Exception as e:
+        _state["error"] = f"mirror_registry_to_mongo failed: {e}"
+        return {"ok": False, "slugs": 0, "reason": str(e)}
+
+
+def log_audit(event: str, target: dict, after: dict = None,
+              before: dict = None, reason: str = "", actor: str = "system") -> bool:
+    """Append one event to the Mongo audit_trail. No-op (returns False) if Mongo
+    is down — audit_trail is Mongo-only (no JSON equivalent)."""
+    dbh = _get_db()
+    if dbh is None:
+        return False
+    try:
+        dbh[COLL_AUDIT].insert_one({
+            "ts": _now(), "actor": actor, "event": event,
+            "target": target, "before": before, "after": after, "reason": reason,
+        })
+        return True
+    except Exception:
+        return False
+
+
+# --------------------------------------------------------------------------- #
 # Self-test
 # --------------------------------------------------------------------------- #
 
