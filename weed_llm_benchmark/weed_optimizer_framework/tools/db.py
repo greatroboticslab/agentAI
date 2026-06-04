@@ -105,7 +105,10 @@ COLL_AGENT_TASKS = "agent_tasks"
 COLL_AUDIT = "audit_trail"
 
 # Short timeout so a dead Mongo never stalls a request for more than this.
-_CONNECT_TIMEOUT_MS = int(os.environ.get("AGENTAI_MONGO_TIMEOUT_MS", "800"))
+# v3.0.80: 1500ms (was 800) — Mongo may now be cross-node (harvest/trainer jobs
+# reach the dashboard node's mongod over the cluster net), slightly slower than
+# localhost. Still bounded so a dead Mongo never hangs a request.
+_CONNECT_TIMEOUT_MS = int(os.environ.get("AGENTAI_MONGO_TIMEOUT_MS", "1500"))
 
 
 # --------------------------------------------------------------------------- #

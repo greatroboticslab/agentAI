@@ -51,7 +51,14 @@ DBPATH="$REPO_ROOT/mongo_data"
 LOGPATH="$REPO_ROOT/results/framework/mongod.log"
 PIDFILE="$REPO_ROOT/results/framework/mongod.pid"
 SECRET_FILE="$HOME/.mongo_url"
-MONGO_URL="mongodb://127.0.0.1:${MONGO_PORT}/agentai"
+# v3.0.80: bind on the node's hostname (not just 127.0.0.1) so OTHER jobs
+# (brain_harvest, trainer) on different compute nodes can reach this Mongo —
+# required for the multi-agent pipeline to share one DB. The secret file thus
+# carries the actual hostname; co-located processes (dashboard) still reach it
+# fine since --bind_ip_all also listens on 127.0.0.1.
+# ⚠️ unauthenticated DB on a shared node — internal cluster net only; auth TODO.
+MONGO_HOST="${MONGO_HOST:-$(hostname -f 2>/dev/null || hostname)}"
+MONGO_URL="mongodb://${MONGO_HOST}:${MONGO_PORT}/agentai"
 
 log() { echo "[mongo] $*"; }
 
@@ -119,10 +126,10 @@ do_start() {
         do_download || { log "ERROR cannot start without binary"; return 1; }
     fi
     mkdir -p "$DBPATH" "$(dirname "$LOGPATH")"
-    log "starting mongod  dbpath=$DBPATH  port=$MONGO_PORT  (bind 127.0.0.1 only)"
+    log "starting mongod  dbpath=$DBPATH  port=$MONGO_PORT  (bind_ip_all → host $MONGO_HOST + 127.0.0.1)"
     "$MONGO_BIN" \
         --dbpath "$DBPATH" \
-        --bind_ip 127.0.0.1 \
+        --bind_ip_all \
         --port "$MONGO_PORT" \
         --logpath "$LOGPATH" \
         --pidfilepath "$PIDFILE" \
