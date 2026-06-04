@@ -4339,3 +4339,25 @@ node (job 41146758, `/api/db_status` → backend=mongo) and loaded with real dat
 
 - Phase 5: flip db.py Mongo-authoritative; switch read endpoints off direct JSON.
 - Harvest bias to close the 44K weed-bbox gap (separate from DB work).
+
+---
+
+## 2026-06-04 — v3.0.81 MongoDB authentication (SCRAM)
+
+Closes the "unauthenticated DB on a shared compute node" TODO from v3.0.80.
+
+- **`run_mongo_node.sh`** — mongod now starts with `--auth`. Password lives in
+  `~/.mongo_pass` (auto-generated `openssl rand -hex 24`, chmod 600, NEVER in
+  git — same secret-file pattern as the Roboflow key / GH PAT). First start on
+  an existing no-auth dbpath bootstraps the root user `agentai_admin` via the
+  MongoDB **localhost exception**, then `~/.mongo_url` is rewritten with the
+  credentialed URL `mongodb://agentai_admin:***@<host>:27017/agentai?authSource=admin`.
+  Idempotent: re-runs detect the working user and skip creation. `MONGO_AUTH=0`
+  opts out (throwaway local tests). New helpers: `ensure_password`, `build_url`,
+  `port_listening` (no-cred liveness), `auth_works` (cred listCollections),
+  `create_user_if_needed`. `status` reports auth state.
+- **`db.py`** — no change needed: pymongo parses creds from the URL; `_redact`
+  already masks them so `/api/db_status` shows `mongodb://***@host…` (verified).
+- Deploy = one dashboard restart so the Phase-0 `run_mongo_node.sh up` restarts
+  mongod with `--auth` (data on /ocean dbpath preserved). Harvest/trainer jobs
+  read the credentialed `~/.mongo_url` and authenticate automatically.
