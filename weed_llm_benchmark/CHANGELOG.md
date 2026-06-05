@@ -4384,3 +4384,24 @@ migration. Done now while the DB is tiny (9 slugs) → near-zero migration cost.
 - Verified locally (mongomock): per-domain filtering of registry/slugs/classes.
 - Schema doc updated (docs/mongodb_schema.md). Also: v3.0.81 Mongo SCRAM auth
   verified live (authed read OK, unauth `listCollections requires authentication`).
+
+---
+
+## 2026-06-05 — v3.0.83 Phase 5: /classes + /slugs read from Mongo
+
+Switched the two browse endpoints off direct dataset_registry.json parsing onto
+`db.get_registry(domain='weed')` — Mongo is now the authoritative read source
+for them (db.py keeps its transparent JSON fallback, so a Mongo outage degrades
+gracefully instead of breaking).
+
+- **/slugs**: reads `db.get_registry(domain="weed")` instead of `open(REGISTRY_PATH)`.
+- **/classes**: `_load_registry_index()` and `_get_cached_registry()` now source
+  from `db.get_registry(domain="weed")`. Cache key changed file-mtime → short
+  TTL (15s, `REG_INDEX_TTL_SEC`/`REG_PARSE_TTL_SEC`) since there's no file mtime
+  when Mongo is the source; within one render every call still hits the cache
+  (preserves the 355×-reparse perf fix). `_reg_pool_for_class` unchanged (its
+  disk cache keys on the JSON file, which dual-write still updates).
+- Refresh-registry handlers reset the TTL caches (ts→0 + parse data cleared).
+- Domain-scoped: /classes and /slugs now show only the WEED domain — future
+  domains get their own scoped views.
+- db.py JSON fallback means no behavior change when Mongo is down.

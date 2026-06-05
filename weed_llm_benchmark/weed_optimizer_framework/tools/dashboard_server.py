@@ -1716,25 +1716,32 @@ def _is_junk_class(canon: str) -> bool:
     return _re_canon.sub(r'[^A-Za-z0-9]', '', canon).lower() in _JUNK_CLASS_ALNUM
 
 
-_registry_index_cache: dict = {"mtime": 0.0, "index": {}, "empty_slugs": []}
+_registry_index_cache: dict = {"ts": 0.0, "index": {}, "empty_slugs": []}
+_REG_INDEX_TTL = float(os.environ.get("REG_INDEX_TTL_SEC", "15"))
 
 def _load_registry_index() -> dict:
     """Returns {canon_class_name: [(slug, class_id, raw_name), ...]}.
     Side-effect populates _registry_index_cache['empty_slugs'] for slugs
-    with local data but missing class_names — surfaces metadata-gap."""
-    if not REGISTRY_PATH.exists():
-        return {}
-    try:
-        mtime = REGISTRY_PATH.stat().st_mtime
-    except Exception:
-        mtime = 0.0
-    if _registry_index_cache["mtime"] == mtime:
+    with local data but missing class_names — surfaces metadata-gap.
+
+    v3.0.83 Phase 5: source is `db.get_registry(domain='weed')` (Mongo
+    authoritative, JSON fallback inside db). Cached with a short TTL instead of
+    the file mtime — within one /classes render every call hits the cache, so
+    we never re-query/re-parse 355× (the original perf bug this guards)."""
+    now = time.time()
+    if (now - _registry_index_cache["ts"]) < _REG_INDEX_TTL and _registry_index_cache["index"]:
         return _registry_index_cache["index"]
     try:
-        with open(REGISTRY_PATH) as f:
-            reg = json.load(f)
+        from . import db as _db
+        reg = _db.get_registry(domain="weed")
     except Exception:
-        return {}
+        # last-resort direct file read (should rarely happen — db has its own
+        # JSON fallback already)
+        try:
+            with open(REGISTRY_PATH) as f:
+                reg = json.load(f)
+        except Exception:
+            return _registry_index_cache.get("index", {})
     idx: dict = {}
     empty: list = []
     for slug, info in (reg.get("datasets") or {}).items():
@@ -1754,7 +1761,7 @@ def _load_registry_index() -> dict:
             if _is_junk_class(canon):   # v3.0.43.23: hide non-species pseudo-classes
                 continue
             idx.setdefault(canon, []).append((slug, cid, raw))
-    _registry_index_cache.update({"mtime": mtime, "index": idx, "empty_slugs": empty})
+    _registry_index_cache.update({"ts": now, "index": idx, "empty_slugs": empty})
     return idx
 
 
@@ -3495,8 +3502,10 @@ async def api_cluster_action(action: str, request: Request):
 
     if spec["type"] == "refresh":
         # delegate to /api/refresh_registry logic
-        _registry_index_cache["mtime"] = 0.0
+        _registry_index_cache["ts"] = 0.0
         _registry_index_cache["index"] = {}
+        _registry_parse_cache["ts"] = 0.0
+        _registry_parse_cache["data"] = None
         n = 0
         try:
             for p in _pool_cache_dir.glob("*.json"):
@@ -3633,10 +3642,12 @@ async def api_cluster_action(action: str, request: Request):
 def api_refresh_registry():
     """Wipe registry-index + class-pool disk caches so /classes re-scans on
     next load. Use after Brain harvest_new_datasets() adds new slugs."""
-    # 1) in-memory registry index — force reload by zeroing mtime cache
-    _registry_index_cache["mtime"] = 0.0
+    # 1) in-memory registry caches — force reload by zeroing TTL
+    _registry_index_cache["ts"] = 0.0
     _registry_index_cache["index"] = {}
     _registry_index_cache["empty_slugs"] = []
+    _registry_parse_cache["ts"] = 0.0
+    _registry_parse_cache["data"] = None
     # 2) disk class_pool cache — delete files (next access rebuilds)
     n_removed = 0
     try:
@@ -3797,29 +3808,34 @@ def _class_topic(cls: str) -> str:
     return "other"
 
 
-_registry_parse_cache = {"mtime": 0.0, "data": None}
+_registry_parse_cache = {"ts": 0.0, "data": None}
+_REG_PARSE_TTL = float(os.environ.get("REG_PARSE_TTL_SEC", "15"))
 
 
 def _get_cached_registry() -> dict:
-    """Module-level cached parse of dataset_registry.json (52MB).
-    mtime-invalidated. Use instead of opening + json.load every call —
-    355× per /classes render was timing out the cloudflare tunnel."""
-    if not REGISTRY_PATH.exists():
-        return {}
-    try:
-        mt = REGISTRY_PATH.stat().st_mtime
-    except Exception:
-        return _registry_parse_cache["data"] or {}
-    if _registry_parse_cache["mtime"] == mt and _registry_parse_cache["data"]:
+    """Cached registry for /classes rendering. v3.0.83 Phase 5: source is
+    `db.get_registry(domain='weed')` (Mongo authoritative, JSON fallback in db).
+    Short TTL cache so the 355×-per-render path never re-queries (the original
+    52MB-reparse bug that timed out the tunnel)."""
+    now = time.time()
+    if (now - _registry_parse_cache["ts"]) < _REG_PARSE_TTL and _registry_parse_cache["data"]:
         return _registry_parse_cache["data"]
     try:
-        with open(REGISTRY_PATH) as f:
-            data = _json.load(f)
-        _registry_parse_cache["mtime"] = mt
+        from . import db as _db
+        data = _db.get_registry(domain="weed")
+        _registry_parse_cache["ts"] = now
         _registry_parse_cache["data"] = data
         return data
     except Exception:
-        return _registry_parse_cache["data"] or {}
+        # last-resort direct read (db already has its own JSON fallback)
+        try:
+            with open(REGISTRY_PATH) as f:
+                data = _json.load(f)
+            _registry_parse_cache["ts"] = now
+            _registry_parse_cache["data"] = data
+            return data
+        except Exception:
+            return _registry_parse_cache["data"] or {}
 
 
 def _inline_thumb_data_uri(src_path: Path, w: int = 200) -> str:
@@ -5023,12 +5039,13 @@ def slugs_landing():
     """Slug-level cleanup: ✓ keep / ✗ junk / 🤔 unsure on whole slugs.
     Faster than per-image audit when a slug is obviously garbage (plant
     disease imported by accident, etc.)."""
-    # Load registry once
-    if not REGISTRY_PATH.exists():
-        return HTMLResponse("<h1>no registry</h1>", status_code=404)
-    with open(REGISTRY_PATH) as f:
-        reg = json.load(f)
+    # v3.0.83 Phase 5: read via Mongo (domain=weed); db.get_registry falls back
+    # to dataset_registry.json automatically when Mongo is down.
+    from . import db as _db
+    reg = _db.get_registry(domain="weed")
     datasets = reg.get("datasets", {})
+    if not datasets and not REGISTRY_PATH.exists():
+        return HTMLResponse("<h1>no registry</h1>", status_code=404)
     verdicts = _slug_verdict_state()
 
     # Build rows. Sort: junk last, then unsure, then keep, then unverified.
