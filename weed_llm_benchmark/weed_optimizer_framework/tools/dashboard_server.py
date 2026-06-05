@@ -2835,9 +2835,87 @@ def _log_action(action: str, result: dict):
         log.warning(f"action log fail: {e}")
 
 
+# v3.0.84 (P0 — honesty instrumentation): resolve the REAL outcome of an action,
+# not just "launched ok". sbatch → sacct/squeue; subprocess → pid liveness + log
+# failure markers; refresh/restart → the immediate ok flag.
+_action_status_cache: dict = {}   # jobid → terminal status (never changes once terminal)
+_SACCT_TERMINAL = {
+    "COMPLETED": "succeeded", "FAILED": "failed", "TIMEOUT": "failed",
+    "CANCELLED": "failed", "OUT_OF_MEMORY": "failed", "NODE_FAIL": "failed",
+    "DEADLINE": "failed", "PREEMPTED": "failed", "BOOT_FAIL": "failed",
+}
+_SACCT_ACTIVE = {"RUNNING", "PENDING", "REQUEUED", "RESIZING", "SUSPENDED", "COMPLETING"}
+_LOG_FAIL_MARKERS = ("Traceback (most recent", "No module named", "command not found",
+                     "FATAL", "FAILED", " Error:", "Killed", "OOM",
+                     "raise ", "Exception:", "Errno")
+
+
+def _sacct_state(jobid: str) -> str:
+    """Main job-step State from sacct (e.g. COMPLETED/FAILED/TIMEOUT). '' if unknown."""
+    r = _shell(["sacct", "-j", jobid, "--format=State", "--noheader", "-P"], timeout=10)
+    if not r["ok"]:
+        return ""
+    for ln in r["stdout"].splitlines():
+        tok = ln.strip().split()
+        if tok:
+            return tok[0].upper()   # "CANCELLED by 123" → CANCELLED
+    return ""
+
+
+def _resolve_action_real_status(result: dict) -> str:
+    """One of: launched | running | succeeded | failed | unknown. Real, not just ok."""
+    if not isinstance(result, dict):
+        return "unknown"
+    # --- subprocess: pid + log_path ---
+    pid = result.get("pid")
+    log_path = result.get("log_path")
+    if pid and log_path:
+        tail = ""
+        try:
+            p = Path(log_path)
+            if p.is_file():
+                sz = p.stat().st_size
+                with open(p, "rb") as f:
+                    f.seek(max(0, sz - 8192))
+                    tail = f.read().decode("utf-8", "replace")
+        except Exception:
+            pass
+        if any(m in tail for m in _LOG_FAIL_MARKERS):
+            return "failed"          # log shows an error → failed (authoritative)
+        try:
+            os.kill(int(pid), 0)
+            return "running"          # alive, no error yet
+        except (ProcessLookupError, ValueError, TypeError):
+            return "succeeded"        # gone + no error marker → done ok
+        except PermissionError:
+            return "running"
+    # --- sbatch: parse "Submitted batch job N" ---
+    text = f"{result.get('stdout','')} {result.get('msg','')}"
+    m = re.search(r"Submitted batch job (\d+)", text)
+    if m:
+        jid = m.group(1)
+        if jid in _action_status_cache:
+            return _action_status_cache[jid]
+        st = _sacct_state(jid)
+        if st in _SACCT_TERMINAL:
+            _action_status_cache[jid] = _SACCT_TERMINAL[st]
+            return _action_status_cache[jid]
+        if st in _SACCT_ACTIVE:
+            return "running"
+        sq = _shell(["squeue", "-j", jid, "-h", "-o", "%T"], timeout=6)
+        if sq["ok"] and sq["stdout"].strip():
+            return "running"
+        return "launched"             # submitted but unresolvable (purged/too new)
+    # --- refresh / restart_self / immediate ---
+    if "ok" in result:
+        return "succeeded" if result.get("ok") else "failed"
+    return "unknown"
+
+
 @app.get("/api/action_history")
-def api_action_history(n: int = 50):
-    """Last N action invocations (from cluster_actions.jsonl)."""
+def api_action_history(n: int = 50, resolve: int = 1):
+    """Last N action invocations (from cluster_actions.jsonl). v3.0.84: each row
+    gets a real `status` (launched/running/succeeded/failed) unless resolve=0."""
     if not 1 <= n <= 500:
         n = 50
     if not _ACTIONS_LOG.is_file():
@@ -2848,6 +2926,13 @@ def api_action_history(n: int = 50):
         for ln in lines[-n:]:
             try: events.append(_json.loads(ln))
             except Exception: pass
+        if resolve:
+            # resolve only the most recent ~30 to bound sacct/squeue calls
+            for ev in events[-30:]:
+                try:
+                    ev["status"] = _resolve_action_real_status(ev.get("result") or {})
+                except Exception:
+                    ev["status"] = "unknown"
         return JSONResponse({"history": events})
     except Exception as e:
         return JSONResponse({"error": str(e)})
@@ -4878,11 +4963,20 @@ async function loadActionHistory() {
         '<div style="color:#999">no actions yet</div>';
       return;
     }
+    const stColor = {succeeded:'#16a34a', running:'#2563eb', failed:'#dc2626',
+                     launched:'#d97706', unknown:'#9ca3af'};
+    const stIcon = {succeeded:'✅', running:'⏳', failed:'❌',
+                    launched:'🚀', unknown:'❔'};
     document.getElementById('action-history').innerHTML = events.map(e => {
       const msg = (e.result && (e.result.msg || JSON.stringify(e.result))) || '';
       const t = e.ts_h ? e.ts_h.replace('UTC','') : '?';
+      const st = e.status || 'unknown';
+      const badge = `<span class="hstatus" title="real outcome (sacct/log), not just launched-ok" `
+        + `style="color:${stColor[st]||'#9ca3af'};font-weight:600;min-width:90px;display:inline-block">`
+        + `${stIcon[st]||'❔'} ${st}</span>`;
       return `<div class="history-item">
         <span class="ts">${t}</span>
+        ${badge}
         <span class="act">${e.action}</span>
         <span class="msg">${msg.toString().replace(/[<>]/g, c => ({'<':'&lt;','>':'&gt;'}[c]))}</span>
       </div>`;

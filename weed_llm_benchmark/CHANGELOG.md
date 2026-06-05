@@ -4405,3 +4405,19 @@ gracefully instead of breaking).
 - Domain-scoped: /classes and /slugs now show only the WEED domain — future
   domains get their own scoped views.
 - db.py JSON fallback means no behavior change when Mongo is down.
+
+---
+
+## 2026-06-05 — v3.0.84 P0: honest per-action status (dataset master-plan)
+
+First phase of the dataset master plan (memory/project_dataset_master_plan.md).
+Buttons now report REAL outcome, not just launched-ok.
+
+- **_resolve_action_real_status()**: sbatch → sacct State (COMPLETED→succeeded,
+  FAILED/TIMEOUT/CANCELLED/OOM→failed, RUNNING/PENDING→running; squeue fallback);
+  subprocess → log failure-markers (authoritative) + pid liveness; refresh/
+  restart → ok flag. Terminal sbatch states cached by jobid.
+- **/api/action_history** adds a real `status` field per recent row
+  (launched/running/succeeded/failed/unknown), resolve=0 to skip.
+- **/control** action-history rows show a colored status badge (✅/⏳/❌/🚀).
+- Acceptance: status reflects sacct/log truth on ≥3 action types (verified).
