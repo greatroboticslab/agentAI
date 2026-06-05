@@ -274,3 +274,42 @@ config change, not a rewrite.
    Roboflow key and GH PAT.
 
 — autonomous-loop iter 12, 2026-05-30
+
+---
+
+## v3.0.82 — Multi-domain extensibility (Prof directive 2026-06-05)
+
+"Consider future flexibility when we collect different datasets." The weed
+agent is ONE of many future dataset-collection agents (pest, crop-disease, …).
+The schema must let a new agent be additive config, not a migration.
+
+### `domains` collection — one doc per dataset-collection agent
+
+```js
+{
+  _id: "weed",                                  // domain key
+  display_name: "Weed detection",
+  taxonomy: "cwd12",                            // canonical class taxonomy
+  target_metric: { dataset: "cwd12_holdout", metric: "mAP50-95", goal: 0.90 },
+  harvest_queries: ["weed detection", "cotton weed", ...],
+  status: "active",                             // active | planned | paused
+}
+// future: { _id:"pest", taxonomy:"ip102", ... } — inserted, no schema change
+```
+
+### Changes to existing collections
+
+- `slugs` gain **`domain`** (e.g. "weed"). Backfilled/legacy data defaults to
+  "weed". All queries/UI can filter by domain → one Mongo holds every agent's
+  data side by side. `db.get_registry(domain=…)`, `db.list_slugs(domain=…)`.
+- `classes` gain **`domain`** + **`taxonomies: [{taxonomy, index}]`** (a class
+  may live in several taxonomies). `cwd12_index`/`is_cwd12` kept for back-compat
+  until readers migrate. `db.list_classes(domain=…)`.
+
+### API
+
+- `db.get_domains()` / `db.get_domain(id)`; `GET /api/domains` (per-domain slug
+  counts + target metric).
+
+Adding a new collection agent = insert a `domains` doc + its taxonomy + tag its
+harvested slugs with `domain`. No migration of existing data.

@@ -51,6 +51,28 @@ OVERRIDES_PATH = Path(os.environ.get(
 
 NORTH_STAR_WEED_BBOX = 50_000  # feedback_polaris_scale / feedback_framework_invariants
 
+# v3.0.82 (Prof directive — multi-domain extensibility): every slug/class is
+# scoped to a DOMAIN = one dataset-collection agent. "weed" is the first; future
+# agents (pest, crop_disease, …) just insert another `domains` doc + taxonomy,
+# NO schema change. Backfilled (pre-domain) data defaults to "weed".
+DEFAULT_DOMAIN = "weed"
+DOMAINS_SEED = {
+    "weed": {
+        "_id": "weed",
+        "display_name": "Weed detection",
+        "description": "Field weed species detection for the laser-weeding robot.",
+        "taxonomy": "cwd12",                 # canonical class taxonomy for this domain
+        "target_metric": {"dataset": "cwd12_holdout",
+                          "metric": "mAP50-95", "goal": 0.90},
+        "harvest_queries": ["weed detection", "cotton weed", "crop and weed",
+                            "grass weed", "weed dataset bounding box"],
+        "status": "active",
+    },
+    # Future example (insert at will, no migration):
+    # "pest": {"_id":"pest","display_name":"Pest detection","taxonomy":"ip102",
+    #          "target_metric":{...},"harvest_queries":[...],"status":"planned"},
+}
+
 # --- canonical CWD12 (mirror of dashboard_server._CWD12 / _CWD12_ZH) --------
 # After this backfill the Mongo `classes` collection becomes the single source
 # of truth; this literal exists only to seed it. Keep in sync until then.
@@ -219,22 +241,35 @@ def apply() -> dict:
         doc = dict(info)
         doc.pop("_id", None)
         doc["updated_at"] = now
+        doc.setdefault("domain", DEFAULT_DOMAIN)   # v3.0.82 multi-domain scope
         if _is_holdout(slug, info):
             doc["cwd12_eval_holdout"] = True  # enforce NEVER-TRAIN at query time
         dbh[_db.COLL_SLUGS].update_one({"_id": slug}, {"$set": doc}, upsert=True)
         n_slugs += 1
 
+    # --- domains: one doc per dataset-collection agent (multi-domain seed) ---
+    n_domains = 0
+    for dom_id, dom_doc in DOMAINS_SEED.items():
+        dbh[_db.COLL_DOMAINS].update_one({"_id": dom_id}, {"$set": dom_doc},
+                                         upsert=True)
+        n_domains += 1
+
     # --- classes: CWD12 canon + every species seen in slugs + overrides ---
+    # v3.0.82: generalize taxonomy. `taxonomies` is the extensible form (a class
+    # can belong to several taxonomies across domains); cwd12_index/is_cwd12 are
+    # kept for back-compat with existing readers.
     classes: dict = {}
     for i, c in enumerate(_CWD12):
         classes[c] = {"_id": c, "topic": "cwd12", "is_cwd12": True,
-                      "cwd12_index": i, "cn_zh": _CWD12_ZH.get(c, "")}
+                      "cwd12_index": i, "cn_zh": _CWD12_ZH.get(c, ""),
+                      "domain": "weed",
+                      "taxonomies": [{"taxonomy": "cwd12", "index": i}]}
     for info in ds.values():
         for cn in (info.get("class_names") or []):
             canon = _canon(cn)
             if not canon or canon in classes:
                 continue
-            classes[canon] = {"_id": canon, "is_cwd12": False}
+            classes[canon] = {"_id": canon, "is_cwd12": False, "domain": "weed"}
     # apply topic overrides on top
     for cls, topic in overrides.items():
         canon = _canon(cls) or cls
@@ -257,16 +292,19 @@ def apply() -> dict:
     dbh[_db.COLL_AUDIT].insert_one({
         "ts": now, "actor": "system", "event": "mongo.backfill",
         "target": {"kind": "registry", "id": str(REGISTRY_PATH)},
-        "after": {"slugs": n_slugs, "classes": n_classes},
+        "after": {"slugs": n_slugs, "classes": n_classes, "domains": n_domains},
         "reason": "phase4_backfill",
     })
 
     res = {"slugs_upserted": n_slugs, "classes_upserted": n_classes,
+           "domains_upserted": n_domains,
            "slugs_in_mongo": dbh[_db.COLL_SLUGS].estimated_document_count(),
-           "classes_in_mongo": dbh[_db.COLL_CLASSES].estimated_document_count()}
-    print(f"[apply] upserted {n_slugs} slugs, {n_classes} classes")
+           "classes_in_mongo": dbh[_db.COLL_CLASSES].estimated_document_count(),
+           "domains_in_mongo": dbh[_db.COLL_DOMAINS].estimated_document_count()}
+    print(f"[apply] upserted {n_slugs} slugs, {n_classes} classes, "
+          f"{n_domains} domains")
     print(f"[apply] mongo now: slugs={res['slugs_in_mongo']} "
-          f"classes={res['classes_in_mongo']}")
+          f"classes={res['classes_in_mongo']} domains={res['domains_in_mongo']}")
     return res
 
 

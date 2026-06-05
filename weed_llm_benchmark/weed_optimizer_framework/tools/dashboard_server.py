@@ -558,6 +558,32 @@ def api_db_status():
                 "error": f"db module error: {e}"}
 
 
+@app.get("/api/domains")
+def api_domains():
+    """v3.0.82 multi-domain: list dataset-collection-agent domains + per-domain
+    slug counts. Each domain is one collection agent (weed is the first; future
+    pest/crop-disease agents appear here with no schema change). Never raises."""
+    try:
+        from . import db as _db
+        domains = _db.get_domains()
+        out = []
+        for d in domains:
+            dom_id = d.get("_id")
+            out.append({
+                "domain": dom_id,
+                "display_name": d.get("display_name", dom_id),
+                "taxonomy": d.get("taxonomy"),
+                "status": d.get("status"),
+                "target_metric": d.get("target_metric"),
+                "n_slugs": len(_db.list_slugs(domain=dom_id)),
+            })
+        return {"available": _db.available(), "n_domains": len(out),
+                "domains": out}
+    except Exception as e:
+        return {"available": False, "n_domains": 0, "domains": [],
+                "error": f"db module error: {e}"}
+
+
 # ---------- flag API: user-driven REQ-3 feedback loop ----------
 
 def _load_flags() -> dict:

@@ -103,6 +103,13 @@ COLL_IMAGES = "images"
 COLL_EXEMPLARS = "exemplars"
 COLL_AGENT_TASKS = "agent_tasks"
 COLL_AUDIT = "audit_trail"
+COLL_DOMAINS = "domains"          # v3.0.82: one doc per dataset-collection agent
+
+# v3.0.82 (Prof directive — multi-domain extensibility): every slug/class is
+# scoped to a DOMAIN (= a dataset-collection agent's target). "weed" is just
+# the first; future agents (pest, crop_disease, …) insert a `domains` doc +
+# their taxonomy with NO schema change. Default for un-tagged/backfilled data.
+DEFAULT_DOMAIN = os.environ.get("AGENTAI_DEFAULT_DOMAIN", "weed")
 
 # Short timeout so a dead Mongo never stalls a request for more than this.
 # v3.0.80: 1500ms (was 800) — Mongo may now be cross-node (harvest/trainer jobs
@@ -258,20 +265,30 @@ def _registry_from_json() -> dict:
     return data
 
 
-def get_registry() -> dict:
+def get_registry(domain: Optional[str] = None) -> dict:
     """Return the full registry in dataset_registry.json shape.
 
     Mongo path: reconstruct `datasets` from the `slugs` collection (each doc's
     `_id` is the slug). JSON path: read the file. On any Mongo error, fall
     back to JSON so the caller always gets a usable dict.
+
+    `domain` (v3.0.82): if given, return only slugs for that collection-agent
+    domain (e.g. "weed"). JSON fallback filters in Python (treats a missing
+    `domain` field as DEFAULT_DOMAIN for back-compat).
     """
     db = _get_db()
     if db is None:
-        return _registry_from_json()
+        reg = _registry_from_json()
+        if domain:
+            reg["datasets"] = {
+                s: i for s, i in reg["datasets"].items()
+                if (i.get("domain") or DEFAULT_DOMAIN) == domain}
+        return reg
     try:
         datasets: dict = {}
         total_downloaded = 0
-        for doc in db[COLL_SLUGS].find({}):
+        q = {"domain": domain} if domain else {}
+        for doc in db[COLL_SLUGS].find(q):
             slug = doc.pop("_id")
             # Drop Mongo-only bookkeeping that isn't part of the JSON contract.
             doc.pop("updated_at", None)
@@ -305,9 +322,10 @@ def get_slug(slug: str) -> Optional[dict]:
 
 def list_slugs(topic: Optional[str] = None,
                status: Optional[str] = None,
-               bucket: Optional[str] = None) -> list:
+               bucket: Optional[str] = None,
+               domain: Optional[str] = None) -> list:
     """Return slug docs (with `slug` key) optionally filtered. JSON fallback
-    filters the same fields in Python."""
+    filters the same fields in Python. `domain` scopes to one collection agent."""
     db = _get_db()
     if db is not None:
         try:
@@ -318,6 +336,8 @@ def list_slugs(topic: Optional[str] = None,
                 q["status"] = status
             if bucket:
                 q["bucket"] = bucket
+            if domain:
+                q["domain"] = domain
             out = []
             for doc in db[COLL_SLUGS].find(q):
                 doc["slug"] = doc.pop("_id")
@@ -328,6 +348,8 @@ def list_slugs(topic: Optional[str] = None,
     out = []
     for slug, info in _registry_from_json()["datasets"].items():
         if topic and info.get("topic") != topic:
+            continue
+        if domain and (info.get("domain") or DEFAULT_DOMAIN) != domain:
             continue
         if status and info.get("status") != status:
             continue
@@ -359,18 +381,43 @@ def get_class_topic_overrides() -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def list_classes() -> list:
+def list_classes(domain: Optional[str] = None) -> list:
     """Return canonical class docs from the `classes` collection. JSON has no
     equivalent canonical store yet, so the fallback derives a minimal list
-    from the topic-overrides keys (best effort)."""
+    from the topic-overrides keys (best effort). `domain` scopes to one agent."""
     db = _get_db()
     if db is not None:
         try:
-            return list(db[COLL_CLASSES].find({}))
+            q = {"domain": domain} if domain else {}
+            return list(db[COLL_CLASSES].find(q))
         except Exception:
             pass
     return [{"_id": cls, "topic": topic}
             for cls, topic in get_class_topic_overrides().items()]
+
+
+def get_domains() -> list:
+    """Return all dataset-collection-agent domain docs (v3.0.82). Each doc:
+    {_id, display_name, taxonomy, target_metric, harvest_queries, status, ...}.
+    Returns [] when Mongo is down (JSON has no domains store)."""
+    db = _get_db()
+    if db is None:
+        return []
+    try:
+        return list(db[COLL_DOMAINS].find({}))
+    except Exception:
+        return []
+
+
+def get_domain(domain_id: str) -> Optional[dict]:
+    """Return one domain doc, or None."""
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        return db[COLL_DOMAINS].find_one({"_id": domain_id})
+    except Exception:
+        return None
 
 
 # --------------------------------------------------------------------------- #
@@ -490,6 +537,7 @@ def mirror_registry_to_mongo(registry: dict) -> dict:
             doc = dict(info)
             doc.pop("_id", None)
             doc["updated_at"] = now
+            doc.setdefault("domain", DEFAULT_DOMAIN)  # v3.0.82 multi-domain
             dbh[COLL_SLUGS].update_one({"_id": slug}, {"$set": doc}, upsert=True)
             n += 1
         dbh["registry_meta"].update_one(

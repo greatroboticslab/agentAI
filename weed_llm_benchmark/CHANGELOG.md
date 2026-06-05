@@ -4361,3 +4361,26 @@ Closes the "unauthenticated DB on a shared compute node" TODO from v3.0.80.
 - Deploy = one dashboard restart so the Phase-0 `run_mongo_node.sh up` restarts
   mongod with `--auth` (data on /ocean dbpath preserved). Harvest/trainer jobs
   read the credentialed `~/.mongo_url` and authenticate automatically.
+
+---
+
+## 2026-06-05 — v3.0.82 multi-domain extensibility (Prof directive)
+
+Prof: "consider future flexibility when we collect different datasets — important
+for DB design." The weed agent is just ONE of many future dataset-collection
+agents. Made the schema domain-scoped so a new agent is additive config, not a
+migration. Done now while the DB is tiny (9 slugs) → near-zero migration cost.
+
+- **`domains` collection** — one doc per collection agent (`weed` seeded:
+  taxonomy cwd12, target_metric mAP50-95≥0.90, harvest_queries, status). Future
+  pest/crop-disease agents just insert a doc.
+- **`slugs.domain`** + **`classes.domain` / `classes.taxonomies[{taxonomy,index}]`**
+  (cwd12_index/is_cwd12 kept for back-compat). Legacy data defaults to "weed".
+- **db.py**: `get_domains`/`get_domain`; `domain=` filter on `get_registry`,
+  `list_slugs`, `list_classes`; `mirror_registry_to_mongo` stamps `domain`.
+- **backfill_mongo.py**: seeds `domains`, stamps `domain` on slugs, writes
+  `taxonomies` on CWD12 classes.
+- **`GET /api/domains`** — per-domain slug counts + target metric.
+- Verified locally (mongomock): per-domain filtering of registry/slugs/classes.
+- Schema doc updated (docs/mongodb_schema.md). Also: v3.0.81 Mongo SCRAM auth
+  verified live (authed read OK, unauth `listCollections requires authentication`).
