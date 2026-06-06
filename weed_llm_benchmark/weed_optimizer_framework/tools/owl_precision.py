@@ -110,13 +110,14 @@ def main() -> None:
     ap.add_argument("--prop-dir", default=None,
                     help="default results/framework/owl_red_proposals/<species>")
     ap.add_argument("--gt-dir", default=None,
-                    help="default results/leave4out/dataset_holdout/test/labels")
+                    help="default downloads/cottonweeddet12/valid/labels "
+                         "(matches owl_preannotate default target valid/images)")
     ap.add_argument("--iou", type=float, default=0.5)
     args = ap.parse_args()
     prop_dir = Path(args.prop_dir) if args.prop_dir else \
         REPO / "results" / "framework" / "owl_red_proposals" / args.species
     gt_dir = Path(args.gt_dir) if args.gt_dir else \
-        REPO / "results" / "leave4out" / "dataset_holdout" / "test" / "labels"
+        REPO / "downloads" / "cottonweeddet12" / "valid" / "labels"
     print(f"[owl-precision] species={args.species}")
     print(f"  prop_dir: {prop_dir}  exists={prop_dir.is_dir()}")
     print(f"  gt_dir  : {gt_dir}  exists={gt_dir.is_dir()}")
