@@ -4421,3 +4421,12 @@ Buttons now report REAL outcome, not just launched-ok.
   (launched/running/succeeded/failed/unknown), resolve=0 to skip.
 - **/control** action-history rows show a colored status badge (✅/⏳/❌/🚀).
 - Acceptance: status reflects sacct/log truth on ≥3 action types (verified).
+
+---
+
+## 2026-06-05 — v3.0.86 P2: fix per_species_stats exemplars path (always 0 bug)
+
+OWL chain diagnosis: chain intact (object_bank 75-400/species all 12, exemplar
+JSONs exist, Goosegrass red proposals exist+uploaded). "exemplars=0" was a STAT
+bug: per_species_stats read REPO/"object_bank" (nonexistent) → now uses _BANK_DIR
+(results/framework/synth_cutpaste/object_bank). OWL precision logged next.

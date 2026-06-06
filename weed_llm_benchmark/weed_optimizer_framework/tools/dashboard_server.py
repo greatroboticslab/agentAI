@@ -5846,7 +5846,9 @@ def api_per_species_stats():
                                      and p.stat().st_size > 0)
 
     # exemplars: object_bank/<sp>/* count
-    bank_root = REPO / "object_bank"
+    # v3.0.86 (P2) fix: was REPO/"object_bank" (wrong path → always 0). The real
+    # bank is results/framework/synth_cutpaste/object_bank (= _BANK_DIR).
+    bank_root = _BANK_DIR
     if bank_root.is_dir():
         for sp in _CWD12:
             d = bank_root / sp
