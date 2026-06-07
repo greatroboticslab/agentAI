@@ -727,9 +727,16 @@ def root():
   .state-R{color:#2a7;font-weight:600}.state-PD{color:#c70}.state-CD{color:#06c}
   .nav{display:flex;gap:10px;font-size:13px;margin-bottom:12px;flex-wrap:wrap}
   .nav a{color:#06c;text-decoration:none;padding:4px 10px;border-radius:5px;background:#fff}
-  .navhelp{color:#16a34a;font-size:11px;font-weight:700;cursor:help;
+  .navhelp{color:#16a34a;font-size:11px;font-weight:700;cursor:help;position:relative;
            border:1px solid #bbf7d0;border-radius:50%;padding:0 4px;margin-left:2px;
            background:#f0fdf4}
+  .navhelp:hover::after{content:attr(data-tip);position:absolute;left:0;top:150%;
+           width:320px;max-width:80vw;white-space:normal;text-align:left;
+           background:#0f172a;color:#fff;font-size:12px;font-weight:400;line-height:1.55;
+           padding:9px 11px;border-radius:7px;box-shadow:0 6px 20px rgba(0,0,0,.3);
+           z-index:1000;pointer-events:none}
+  .navhelp:hover::before{content:"";position:absolute;left:8px;top:135%;
+           border:6px solid transparent;border-bottom-color:#0f172a;z-index:1000}
   .nav a:hover{background:#eef4ff}
   .live-banner{background:linear-gradient(90deg,#2a7 0%,#28a 100%);color:#fff;
     padding:10px 16px;border-radius:8px;margin-bottom:14px;font-size:13px;
@@ -833,13 +840,13 @@ def root():
 </div>
 <div class="body-inner">
 <div class="nav">
-  <a href="/">🏠 hub <span class="navhelp" title="首页总控制台。集中显示:统计卡(slug/图/Roboflow/存储后端)+ 27 个 agent 操作按钮 + SLURM 队列实时表 + Roboflow 面板 + 每物种流水线统计,各面板自动刷新。这是所有操作的入口页。">ⓘ</span></a>
-  <a href="/manual" style="background:linear-gradient(135deg,#fef3c7,#fde68a) !important;color:#c70 !important;border-color:#fbbf24 !important;font-weight:600 !important">📖 manual <span class="navhelp" title="说明书页。双 agent 架构图 + 完整 8 段数据流水线 + 每个按钮的用途 + 当前真实进度 + 诚实的数据现状(如 8/12 物种缺训练数据)。给新使用者和教授看的文档。">ⓘ</span></a>
-  <a href="/rounds" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe) !important;color:#1d4ed8 !important;border-color:#60a5fa !important;font-weight:600 !important">🔄 rounds <span class="navhelp" title="按采集轮次(round)审核。每一轮 harvest = 一个带版本号的数据快照;把该轮每个数据集按 类名/bbox 状态分组,逐个点 ✓保留 / ✗删 / 🔄重标。人工把好数据审定成 gold。">ⓘ</span></a>
-  <a href="/classes">📋 classes <span class="navhelp" title="杂草类别浏览页。每个类名一张卡片 + 真实图片缩略图,可按 topic(weed/disease/pest/crop)过滤和搜索;点卡片进详情看该类全部图,可改 topic、给图标 exemplar。全站唯一能看图审核的页。">ⓘ</span></a>
-  <a href="/slugs">📦 slugs <span class="navhelp" title="数据集级清理页。每个数据集(slug)一行,显示类名/图数/状态;点 ✓保留 / ✗垃圾 / 🤔存疑 做整包粗筛。✗ 的会从 /classes 隐藏、且不进训练。比逐图审快。">ⓘ</span></a>
-  <a href="/roboflow">📊 roboflow <span class="navhelp" title="我们的 Roboflow 项目状态(只显示我们的 4 个:cwd12 金标 + agent v1/v2/v3,无关老项目已过滤)。每个项目的图/框/类数 + 跳转 Roboflow 网页去人工画框精标。">ⓘ</span></a>
-  <a href="/api/cluster_status">📥 JSON <span class="navhelp" title="原始状态接口(机器可读 JSON),是 dashboard 各面板自己轮询的数据源:作业队列、registry 统计、ollama、verdict 计数等。开发者排查/核对用,普通使用不必点。">ⓘ</span></a>
+  <a href="/">🏠 hub <span class="navhelp" data-tip="首页总控制台。集中显示:统计卡(slug/图/Roboflow/存储后端)+ 27 个 agent 操作按钮 + SLURM 队列实时表 + Roboflow 面板 + 每物种流水线统计,各面板自动刷新。这是所有操作的入口页。">ⓘ</span></a>
+  <a href="/manual" style="background:linear-gradient(135deg,#fef3c7,#fde68a) !important;color:#c70 !important;border-color:#fbbf24 !important;font-weight:600 !important">📖 manual <span class="navhelp" data-tip="说明书页。双 agent 架构图 + 完整 8 段数据流水线 + 每个按钮的用途 + 当前真实进度 + 诚实的数据现状(如 8/12 物种缺训练数据)。给新使用者和教授看的文档。">ⓘ</span></a>
+  <a href="/rounds" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe) !important;color:#1d4ed8 !important;border-color:#60a5fa !important;font-weight:600 !important">🔄 rounds <span class="navhelp" data-tip="按采集轮次(round)审核。每一轮 harvest = 一个带版本号的数据快照;把该轮每个数据集按 类名/bbox 状态分组,逐个点 ✓保留 / ✗删 / 🔄重标。人工把好数据审定成 gold。">ⓘ</span></a>
+  <a href="/classes">📋 classes <span class="navhelp" data-tip="杂草类别浏览页。每个类名一张卡片 + 真实图片缩略图,可按 topic(weed/disease/pest/crop)过滤和搜索;点卡片进详情看该类全部图,可改 topic、给图标 exemplar。全站唯一能看图审核的页。">ⓘ</span></a>
+  <a href="/slugs">📦 slugs <span class="navhelp" data-tip="数据集级清理页。每个数据集(slug)一行,显示类名/图数/状态;点 ✓保留 / ✗垃圾 / 🤔存疑 做整包粗筛。✗ 的会从 /classes 隐藏、且不进训练。比逐图审快。">ⓘ</span></a>
+  <a href="/roboflow">📊 roboflow <span class="navhelp" data-tip="我们的 Roboflow 项目状态(只显示我们的 4 个:cwd12 金标 + agent v1/v2/v3,无关老项目已过滤)。每个项目的图/框/类数 + 跳转 Roboflow 网页去人工画框精标。">ⓘ</span></a>
+  <a href="/api/cluster_status">📥 JSON <span class="navhelp" data-tip="原始状态接口(机器可读 JSON),是 dashboard 各面板自己轮询的数据源:作业队列、registry 统计、ollama、verdict 计数等。开发者排查/核对用,普通使用不必点。">ⓘ</span></a>
 </div>
 
 <div class="live-banner idle" id="live-banner">
