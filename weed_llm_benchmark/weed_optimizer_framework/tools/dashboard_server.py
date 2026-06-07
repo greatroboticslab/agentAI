@@ -716,8 +716,9 @@ def root():
   .act .nm{font-weight:600;color:#06c;font-size:13px}
   .act .ds{color:#666;margin-top:3px;font-size:11px}
   .ord{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;
-       background:#0e7c66;color:#fff;border-radius:50%;font-size:10px;font-weight:700;
-       margin-right:4px;padding:0 1px}
+       background:#0e7c66;color:#fff;border-radius:9px;font-size:10px;font-weight:700;
+       margin-right:4px;padding:0 4px}
+  .ord.alt{background:#fff;color:#94a3b8;border:1px solid #cbd5e1}
   .act-status{margin-right:3px;font-size:11px}
   .act.dangerous{background:#fff3f0}
   .act.dangerous .nm{color:#c44}
@@ -876,6 +877,12 @@ def root():
 <!-- ───── ACTIONS ───── -->
 <div class="panel" style="margin-bottom:14px">
   <h2>🤖 Agent actions <span><a href="/control">/control 全功能 →</a></span></h2>
+  <div style="font-size:11px;color:#666;margin:-4px 0 8px;line-height:1.7">
+    <span class="ord">1</span> 绿=<b>主推荐顺序</b>(按数字依次点) ·
+    <span class="ord alt">1</span> 灰=备选/变体 ·
+    <b>无号</b>=工具 · <b>④</b>=人工(去 Roboflow 画框) ·
+    状态 ⏳运行中 ✅成功 ❌失败
+  </div>
   <div class="actions" id="actions">loading…</div>
   <h2 style="margin-top:10px">📜 last action output</h2>
   <div class="log" id="action-log">click an action above to fire it</div>
@@ -957,19 +964,37 @@ async function loadStatus(){
   }
 }
 
-// v3.0.95: canonical pipeline order (only pipeline steps numbered; utilities blank).
-// Step ④ is human (Roboflow labeling) — no button. See /manual.
+// v3.0.96: canonical pipeline. Each action → {n: step label, k: 'p'(primary,
+// green = the recommended one button for that step) | 'a'(alt/variant, gray)}.
+// Sub-steps use letters (5a→5b→5c, 7a→7b). Utilities have no entry. Step ④ is
+// human (Roboflow labeling) — no button. See /manual.
 const ACTION_ORDER = {
-  brain_harvest:'1', harvest_full_round_e2e:'1', start_new_round:'1',
-  audit_registry_garbage:'2', audit_registry_garbage_APPLY:'2', build_buckets:'2',
-  sync_newest_slugs:'3', sync_all_to_roboflow:'3', roboflow_sync_agent_v1:'3',
-  roboflow_sync_cwd12_v1:'3', roboflow_move_agent_to_folder:'3',
-  export_owl_exemplars:'5', owl_preannotate_one:'5', owl_upload_proposals:'5',
-  dinov2_curate_registry:'6', dinov2_filter_round_1:'6', dinov2_route_classes:'6',
-  roboflow_generate_versions:'7', roboflow_download_merge:'7',
-  train_yolo_round_1:'8',
+  brain_harvest:{n:'1',k:'p'},            // ① collect (primary)
+  start_new_round:{n:'1',k:'a'},          //   variant: just create round/RF project
+  harvest_full_round_e2e:{n:'1·3',k:'a'}, //   variant: one-click collect+sync
+  audit_registry_garbage:{n:'2',k:'p'},   // ② clean (dry-run primary)
+  audit_registry_garbage_APPLY:{n:'2',k:'a'}, //   variant: actually delete
+  build_buckets:{n:'2',k:'a'},            //   variant: bucket audit
+  sync_newest_slugs:{n:'3',k:'p'},        // ③ upload to Roboflow (primary)
+  sync_all_to_roboflow:{n:'3',k:'a'},
+  roboflow_sync_cwd12_v1:{n:'3',k:'a'},
+  roboflow_sync_agent_v1:{n:'3',k:'a'},
+  roboflow_move_agent_to_folder:{n:'3',k:'a'},
+  export_owl_exemplars:{n:'5a',k:'p'},    // ⑤ OWL auto-label (3 sub-steps)
+  owl_preannotate_one:{n:'5b',k:'p'},
+  owl_upload_proposals:{n:'5c',k:'p'},
+  dinov2_curate_registry:{n:'6',k:'p'},   // ⑥ DINOv2 quality (primary)
+  dinov2_filter_round_1:{n:'6',k:'a'},
+  dinov2_route_classes:{n:'6',k:'a'},
+  roboflow_generate_versions:{n:'7a',k:'p'}, // ⑦ pull back (2 sub-steps)
+  roboflow_download_merge:{n:'7b',k:'p'},
+  train_yolo_round_1:{n:'8',k:'p'},       // ⑧ train
 };
-function ordBadge(k){ return ACTION_ORDER[k] ? `<span class="ord">${ACTION_ORDER[k]}</span>` : ''; }
+function ordBadge(k){
+  const e = ACTION_ORDER[k];
+  if(!e) return '';
+  return `<span class="ord${e.k==='a'?' alt':''}">${e.n}</span>`;
+}
 function stSpan(k){ return `<span class="act-status" data-st-for="${k}"></span>`; }
 
 async function loadActions(){
