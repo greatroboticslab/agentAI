@@ -22,6 +22,19 @@ export PYTHONPATH=.:$PYTHONPATH
 export REPO_ROOT="$REPO"
 export CLASS_TOPIC_OVERRIDES_FILE="$REPO/results/framework/class_topic_overrides.json"
 
+# v3.0.92: ensure the harvest runs the LATEST code (filter fixes etc.). The
+# harvest imports the OUTER weed_optimizer_framework, which only gets synced at
+# dashboard-job start — so a fresh harvest could run stale filter logic. Pull +
+# mirror nested→outer here so off-topic/junk filtering is always current.
+# See feedback_nested_outer_package_drift.
+git fetch origin main >/dev/null 2>&1 && git reset --hard origin/main >/dev/null 2>&1 \
+    && echo "[sync] git reset to $(git rev-parse --short HEAD)"
+if [ -d "$REPO/weed_llm_benchmark/weed_optimizer_framework" ]; then
+    rm -rf "$REPO/weed_optimizer_framework" 2>/dev/null
+    cp -ar "$REPO/weed_llm_benchmark/weed_optimizer_framework" "$REPO/weed_optimizer_framework" \
+        && echo "[sync] nested → outer weed_optimizer_framework ok"
+fi
+
 echo "=== v3.0.43.4 Brain harvest (1 round, triggered from /control) ==="
 echo "SLURM_JOB_ID=$SLURM_JOB_ID  Date: $(date)"
 echo "[config] ROUND_BUMP=${ROUND_BUMP:-0}  AUTO_SYNC=${AUTO_SYNC:-0}  BRAIN_STRICT_MIN_LABELS=${BRAIN_STRICT_MIN_LABELS:-50}"
