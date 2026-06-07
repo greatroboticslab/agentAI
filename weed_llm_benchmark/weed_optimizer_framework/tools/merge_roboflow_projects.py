@@ -56,6 +56,36 @@ CWD12 = (
     "Sicklepod", "SpottedSpurge",
 )
 
+# v3.0.91: OUR-projects ALLOW-LIST. The workspace contains many unrelated
+# projects (drone/hardhat/demo/…). The dashboard must show ONLY our pipeline's
+# projects. Source of truth = Mongo/DB; Roboflow is just a labeling surface, so
+# we do NOT scope by Roboflow folders — we keep an explicit allow-list here.
+# Resolution: env AGENTAI_RF_PROJECTS (comma-sep) → config json → default.
+# See memory/feedback_roboflow_folder_scope.md.
+_RF_PROJECTS_CONFIG = REPO / "results" / "framework" / "roboflow_projects.json"
+_DEFAULT_RF_PROJECTS = [
+    "cwd12-multiclass-v1",        # 598-img human-labeled train gold
+    "weed-crop-agent-dataset",    # agent harvest pool (v1)
+    "weed-crop-agent-v2",
+    "weed-crop-agent-v3",
+]
+
+
+def our_projects() -> set:
+    env = os.environ.get("AGENTAI_RF_PROJECTS", "").strip()
+    if env:
+        return {s.strip() for s in env.split(",") if s.strip()}
+    try:
+        if _RF_PROJECTS_CONFIG.is_file():
+            d = json.load(open(_RF_PROJECTS_CONFIG))
+            if isinstance(d, list) and d:
+                return set(d)
+            if isinstance(d, dict) and d.get("projects"):
+                return set(d["projects"])
+    except Exception:
+        pass
+    return set(_DEFAULT_RF_PROJECTS)
+
 
 def _key() -> str:
     k = os.environ.get("ROBOFLOW_API_KEY", "").strip()
@@ -108,15 +138,23 @@ def audit_all_species(key: str) -> dict:
         return {"workspace": WORKSPACE, "rows": rows, "totals": totals,
                 "error": "could not list workspace projects"}
 
+    # v3.0.91: keep ONLY our pipeline's projects (allow-list). Unrelated
+    # workspace projects (drone/hardhat/demo/…) are dropped before querying.
+    allow = our_projects()
     cwd12_species_lower = {sp.lower() for sp in CWD12}
 
     for p in projs:
         slug_full = p.get("id", "")
         # API returns 'a-test-of-will/<slug>' — drop the workspace prefix
         slug = slug_full.split("/", 1)[1] if "/" in slug_full else slug_full
+        if slug not in allow:
+            continue  # not ours → never show / never query
         # Classify role
         if slug.lower() in ("cwd12-weeds", "cwd12-multiclass-v1"):
             role = "cwd12_master"
+            species = None
+        elif slug.startswith("weed-crop-agent"):
+            role = "agent"
             species = None
         elif slug.startswith("cwd12-") and slug.split("-", 1)[1] in cwd12_species_lower:
             role = "cwd12_species"
@@ -146,11 +184,12 @@ def audit_all_species(key: str) -> dict:
                 "boxes_per_class": classes if isinstance(classes, dict) else None,
                 "versions": len(r["raw"].get("versions") or []),
             })
-            if role in ("cwd12_master", "cwd12_species"):
-                totals["images"] += row["images"]
-                totals["boxes"] += row["boxes_total"]
+            # v3.0.91: all kept rows are ours (allow-listed) → count all.
+            totals["images"] += row["images"]
+            totals["boxes"] += row["boxes_total"]
         rows.append(row)
-    return {"workspace": WORKSPACE, "rows": rows, "totals": totals}
+    return {"workspace": WORKSPACE, "rows": rows, "totals": totals,
+            "allow_list": sorted(allow), "n_our_projects": len(rows)}
 
 
 def cmd_audit(args):

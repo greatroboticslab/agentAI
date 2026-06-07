@@ -1024,7 +1024,7 @@ async function loadRoboflow(){
       document.getElementById('stat-rf-boxes').textContent = fmtN(master.boxes_total);
     }
     let html = `<div style="font-size:12px;color:#666;margin-bottom:8px">`
-      +`workspace <code>${d.workspace}</code> · ${d.n_projects} projects total</div>`;
+      +`workspace <code>${d.workspace}</code> · ${d.n_projects} 个本项目(weed_crop_agent_dataset)</div>`;
     if(master){
       const ann = master.images - master.unannotated;
       const annPct = master.images ? Math.round(100*ann/master.images) : 0;
@@ -1034,6 +1034,17 @@ async function loadRoboflow(){
         + `🏷️ annotated ${ann}/${master.images} (${annPct}%) · 🗂️ ${master.versions} versions`
         + `</div>`;
     }
+    // v3.0.91: list ALL our projects (incl. agent v1/v2/v3) so the folder's
+    // contents are visible — unrelated workspace projects are already filtered.
+    const roleLbl = {cwd12_master:'🥇 gold', agent:'🤖 agent', cwd12_species:'species', other:''};
+    html += `<div style="margin-top:8px;font-size:12px">`
+      + d.projects.map(p => `<div style="display:flex;justify-content:space-between;`
+        + `padding:4px 8px;border-bottom:1px solid #f0f0f0">`
+        + `<span>${p.error?'⚠️ ':''}<strong>${p.slug}</strong> `
+        + `<span style="color:#999">${roleLbl[p.role]||''}</span></span>`
+        + `<span style="color:#666">${p.error?p.error:('📷 '+(p.images||0)+' · 📦 '+(p.boxes_total||0)+' boxes')}</span>`
+        + `</div>`).join('')
+      + `</div>`;
     // CWD12 per-class breakdown
     if(master && master.boxes_per_class){
       const cwd12 = ["Carpetweeds","Crabgrass","Eclipta","Goosegrass","Morningglory","Nutsedge",
@@ -4307,15 +4318,29 @@ def api_roboflow_status():
                               "error": f"workspace fetch failed: {type(e).__name__}: {e}"},
                              status_code=502)
     projs = (ws_data.get("workspace") or {}).get("projects", [])
+    # v3.0.91: scope to OUR projects only (allow-list) — the workspace has many
+    # unrelated projects (drone/hardhat/demo/…). Source of truth is the DB;
+    # Roboflow is just a labeling surface, so we filter by an explicit allow-list
+    # (NOT by Roboflow folders). See memory/feedback_roboflow_folder_scope.md.
+    try:
+        from .merge_roboflow_projects import our_projects as _our_rf
+        allow = _our_rf()
+    except Exception:
+        allow = {"cwd12-multiclass-v1", "weed-crop-agent-dataset",
+                 "weed-crop-agent-v2", "weed-crop-agent-v3"}
     # For each project, fetch detailed class breakdown.
     detail = []
     for p in projs:
         slug_full = p.get("id", "")
         slug = slug_full.split("/", 1)[1] if "/" in slug_full else slug_full
+        if slug not in allow:
+            continue  # not ours → never show / never query
         # Tag role
         role = "other"
         if slug.lower() in ("cwd12-weeds", "cwd12-multiclass-v1"):
             role = "cwd12_master"
+        elif slug.lower().startswith("weed-crop-agent"):
+            role = "agent"
         elif slug.lower().startswith("cwd12-"):
             role = "cwd12_species"
         try:
@@ -4340,7 +4365,7 @@ def api_roboflow_status():
             detail.append({"slug": slug, "role": role,
                             "error": f"{type(e).__name__}: {e}"})
     # Sort: cwd12_master first, then cwd12_species, then other; within group by name
-    role_rank = {"cwd12_master": 0, "cwd12_species": 1, "other": 2}
+    role_rank = {"cwd12_master": 0, "agent": 1, "cwd12_species": 2, "other": 3}
     detail.sort(key=lambda d: (role_rank.get(d.get("role", "other"), 9),
                                 d.get("slug", "")))
     return JSONResponse({

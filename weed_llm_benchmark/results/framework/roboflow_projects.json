@@ -1,0 +1,4 @@
+{
+  "projects": ["cwd12-multiclass-v1", "weed-crop-agent-dataset", "weed-crop-agent-v2", "weed-crop-agent-v3"],
+  "note": "OUR Roboflow projects allow-list. Dashboard shows ONLY these (DB is source of truth, Roboflow = labeling surface). Edit here or set AGENTAI_RF_PROJECTS env."
+}
