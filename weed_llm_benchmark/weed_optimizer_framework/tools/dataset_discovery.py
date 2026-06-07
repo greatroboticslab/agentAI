@@ -826,6 +826,12 @@ class DatasetDiscovery:
         "pest", "insect", "bug-detect", "fly", "mosquito", "beetle",
         "weevil", "caterpillar", "earthworm", "grasshopper",
         "bee", "beehive", "honeybee", "spider", "ant-detect",
+        "apiary", "honey", "pollinator",
+        # v3.0.92: animals + specific off-target crops/categories that leaked in
+        # (gh_minhvuongvu beehive, gh_vuyyurusairamreddy coconut-disease,
+        #  project_agml cowpea). Block at source so they can't be re-harvested.
+        "coconut", "cowpea", "poultry", "livestock", "cattle", "fish-detect",
+        "fruit-detect", "flower-detect", "face-detect", "vehicle-detect",
         # ** v3.0.43.20 NEW: non-plant categories that slipped through **
         "price_tag", "price-tag",        # d_shatnev__price_tag_detection
         "commonform",                    # jbarrow/kurianmelvin/wewocram commonforms (forms!)
@@ -915,25 +921,47 @@ class DatasetDiscovery:
         return False
 
     def _is_already_flagged_garbage(self, candidate_slug: str) -> bool:
-        """Check if user (or prior Brain run) has marked this slug as garbage
-        via the dashboard. Stops Brain from re-suggesting the same junk.
+        """Check if user (or prior Brain run) has marked this slug as garbage.
+        Stops Brain from re-harvesting the same junk.
 
-        Reads results/framework/dataset_flags.json. Returns True if flagged."""
+        v3.0.92: checks BOTH sources (they were divergent — a real leak):
+          1. results/framework/dataset_flags.json  (flag == 'garbage')
+          2. results/framework/slug_verdicts.jsonl  (latest verdict == 'junk')
+             ← this is where the dashboard /slugs ✗ button writes. Previously the
+             harvest guard ignored it, so user-junked off-topic slugs (bee,
+             coconut-disease) could be re-harvested. Now they stick."""
         import os, json
-        flags_path = os.path.join(
-            os.path.dirname(__file__), "..", "..",
-            "results", "framework", "dataset_flags.json",
-        )
-        flags_path = os.path.abspath(flags_path)
-        if not os.path.isfile(flags_path):
-            return False
-        try:
-            with open(flags_path) as f:
-                flags = json.load(f)
-        except Exception:
-            return False
-        entry = flags.get(candidate_slug)
-        return bool(entry) and entry.get("flag") == "garbage"
+        base = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "..", "results", "framework"))
+        # 1) dataset_flags.json
+        flags_path = os.path.join(base, "dataset_flags.json")
+        if os.path.isfile(flags_path):
+            try:
+                with open(flags_path) as f:
+                    flags = json.load(f)
+                entry = flags.get(candidate_slug)
+                if bool(entry) and entry.get("flag") == "garbage":
+                    return True
+            except Exception:
+                pass
+        # 2) slug_verdicts.jsonl — replay to latest verdict per slug
+        vpath = os.path.join(base, "slug_verdicts.jsonl")
+        if os.path.isfile(vpath):
+            try:
+                latest = None
+                with open(vpath) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        ev = json.loads(line)
+                        if ev.get("slug") == candidate_slug:
+                            latest = ev.get("verdict")
+                if latest == "junk":
+                    return True
+            except Exception:
+                pass
+        return False
 
     def harvest_new_datasets(self, max_new=5, queries=None, confirm_schema=True,
                               max_images_per_ds=30000, strict_topic=None):
