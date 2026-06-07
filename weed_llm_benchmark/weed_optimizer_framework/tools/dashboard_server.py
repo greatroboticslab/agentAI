@@ -715,6 +715,10 @@ def root():
   .act:hover{background:#eef4ff;border-color:#06c}
   .act .nm{font-weight:600;color:#06c;font-size:13px}
   .act .ds{color:#666;margin-top:3px;font-size:11px}
+  .ord{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;
+       background:#0e7c66;color:#fff;border-radius:50%;font-size:10px;font-weight:700;
+       margin-right:4px;padding:0 1px}
+  .act-status{margin-right:3px;font-size:11px}
   .act.dangerous{background:#fff3f0}
   .act.dangerous .nm{color:#c44}
   .log{font-family:ui-monospace,monospace;font-size:11px;background:#fafafa;
@@ -953,6 +957,21 @@ async function loadStatus(){
   }
 }
 
+// v3.0.95: canonical pipeline order (only pipeline steps numbered; utilities blank).
+// Step ④ is human (Roboflow labeling) — no button. See /manual.
+const ACTION_ORDER = {
+  brain_harvest:'1', harvest_full_round_e2e:'1', start_new_round:'1',
+  audit_registry_garbage:'2', audit_registry_garbage_APPLY:'2', build_buckets:'2',
+  sync_newest_slugs:'3', sync_all_to_roboflow:'3', roboflow_sync_agent_v1:'3',
+  roboflow_sync_cwd12_v1:'3', roboflow_move_agent_to_folder:'3',
+  export_owl_exemplars:'5', owl_preannotate_one:'5', owl_upload_proposals:'5',
+  dinov2_curate_registry:'6', dinov2_filter_round_1:'6', dinov2_route_classes:'6',
+  roboflow_generate_versions:'7', roboflow_download_merge:'7',
+  train_yolo_round_1:'8',
+};
+function ordBadge(k){ return ACTION_ORDER[k] ? `<span class="ord">${ACTION_ORDER[k]}</span>` : ''; }
+function stSpan(k){ return `<span class="act-status" data-st-for="${k}"></span>`; }
+
 async function loadActions(){
   try{
     const acts = await (await fetch('/api/cluster_actions')).json();
@@ -961,8 +980,8 @@ async function loadActions(){
       const label = (v.label||'').slice(0,90);
       // v3.0.68: brain_harvest gets an inline form (time / strict / max_new)
       if(k === 'brain_harvest'){
-        return `<div class="act" style="background:#fff8e0;border-color:#c70;padding:10px">
-          <div class="nm" style="color:#c70">🧠 brain_harvest</div>
+        return `<div class="act" data-action="brain_harvest" style="background:#fff8e0;border-color:#c70;padding:10px">
+          <div class="nm" style="color:#c70">${ordBadge('brain_harvest')}${stSpan('brain_harvest')}🧠 brain_harvest</div>
           <div class="ds" style="margin-bottom:6px">${label}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:#444;align-items:center">
             <label>时长:
@@ -982,10 +1001,11 @@ async function loadActions(){
             <button onclick="triggerBrain()" style="background:#c70;color:#fff;border:0;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">▶ run</button>
           </div></div>`;
       }
-      return `<button class="act${danger}" onclick="trigger('${k}')">
-                <div class="nm">${k}</div><div class="ds">${label}</div></button>`;
+      return `<button class="act${danger}" data-action="${k}" onclick="trigger('${k}')">
+                <div class="nm">${ordBadge(k)}${stSpan(k)}${k}</div><div class="ds">${label}</div></button>`;
     }).join('');
     document.getElementById('actions').innerHTML = html;
+    loadActionStatus();  // paint real per-button status right after render
   }catch(e){
     document.getElementById('actions').innerHTML = 'actions err: ' + e;
   }
@@ -1183,6 +1203,22 @@ async function loadDbStatus(){
   }
 }
 
+// v3.0.95: paint each action button with its REAL last-run status (from P0
+// /api/action_history): ⏳ running / ✅ succeeded / ❌ failed / 🚀 launched.
+async function loadActionStatus(){
+  try{
+    const d = await (await fetch('/api/action_history?n=80')).json();
+    const latest = {};
+    for(const ev of (d.history||[])){ if(ev.action) latest[ev.action] = ev.status || 'unknown'; }
+    const icon = {succeeded:'✅', running:'⏳', failed:'❌', launched:'🚀', unknown:''};
+    document.querySelectorAll('.act-status').forEach(el=>{
+      const a = el.dataset.stFor; const st = latest[a];
+      el.textContent = st ? (icon[st]||'') : '';
+      el.title = st ? ('上次运行: '+st) : '从未运行';
+    });
+  }catch(e){}
+}
+
 // Initial load + poll
 loadStatus(); loadActions(); loadRoboflow(); loadRecentJobs(); loadPerSpecies(); loadDbStatus();
 setInterval(loadStatus, 6000);
@@ -1190,6 +1226,7 @@ setInterval(loadRecentJobs, 15000);
 setInterval(loadRoboflow, 60000);
 setInterval(loadPerSpecies, 30000);
 setInterval(loadDbStatus, 20000);
+setInterval(loadActionStatus, 12000);
 </script>
 
 </div><!-- /.body-inner -->
