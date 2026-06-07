@@ -5962,7 +5962,7 @@ def manual_page():
 </style></head><body>
 <div class="hero">
   <h1>📖 Weed-detection — User Manual</h1>
-  <div class="sub">Dual-agent autonomous data collection + training pipeline · Bridges-2 cluster · v3.0.72</div>
+  <div class="sub">Dual-agent autonomous data collection + training pipeline · Bridges-2 cluster · MongoDB-backed · v3.0.89 (2026-06)</div>
 </div>
 <div class="nav">
   <a href="/">🏠 Dashboard</a>
@@ -5971,6 +5971,7 @@ def manual_page():
   <a href="/slugs">📦 Slugs</a>
   <a href="/roboflow">📊 Roboflow</a>
   <a href="/morning_report">☀️ Morning</a>
+  <a href="#status">↓ Status</a>
   <a href="#workflow">↓ Workflow</a>
   <a href="#buttons">↓ Buttons</a>
   <a href="#daily">↓ Daily</a>
@@ -5987,10 +5988,45 @@ Two agents collaborate via a shared dataset registry + Roboflow workspace:</p>
   <div class="stat"><div class="lbl">🤖 Agent 1</div><div class="val" style="font-size:18px">Data Collector</div></div>
   <div class="stat"><div class="lbl">🧠 Quality</div><div class="val" style="font-size:18px">DINOv2 Curator</div></div>
   <div class="stat"><div class="lbl">🎯 Auto-label</div><div class="val" style="font-size:18px">OWLv2</div></div>
-  <div class="stat"><div class="lbl">🤖 Agent 2</div><div class="val" style="font-size:18px">Trainer (future)</div></div>
+  <div class="stat"><div class="lbl">🤖 Agent 2</div><div class="val" style="font-size:18px">Trainer (v1 coded)</div></div>
 </div>
 
-<p><b>North-star metric</b>: cwd12 mAP50-95 ≥ <b>0.90</b> (12-class object detection).</p>
+<p><b>Metric — two levels:</b> <i>interim baseline</i> = cwd12 holdout mAP50-95 ≥ <b>0.90</b>
+(fixed 12-class benchmark, comparable to SOTA). <i>True target</i> = mAP50-95 ≥ 0.90 on the
+<b>overall, all-species/all-domain, hand-verified, never-train test set</b> that grows as
+collection matures. The dataset is the lever that lifts the overall number.</p>
+</div>
+
+<h2 id="status">1b. Current status (2026-06, honest)</h2>
+<div class="card">
+<p><b>✅ Built &amp; verified:</b></p>
+<ul>
+  <li><b>MongoDB backend</b> — cross-node, authenticated (SCRAM), live on the dashboard node.
+      9 dataset slugs / 381 classes / 1 domain loaded. Dashboard <code>/classes</code> +
+      <code>/slugs</code> read from Mongo; new harvest dual-writes to Mongo automatically.</li>
+  <li><b>Multi-domain extensibility</b> (per Prof's "future flexibility") — every slug/class is
+      scoped to a <code>domain</code>; "weed" is domain #1, a new agent (pest, crop-disease…) is an
+      additive config entry, <b>no schema migration</b>. See <code>/api/domains</code>.</li>
+  <li><b>Roboflow integration</b> — upload / folder mgmt / version gen / download-merge (pull
+      labeled ground truth) all wired &amp; run.</li>
+  <li><b>Roboflow→training closed loop is coded end-to-end</b> (<code>train_from_roboflow.py</code> +
+      <code>run_v3_0_89_roboflow_loop.sh</code>): pull labeled data → train a real YOLO
+      (class-remapped to canonical order) → eval on the cwd12 holdout (with stem-level leak
+      guard) → report mAP. First real mAP run is pending cluster access.</li>
+  <li><b>Honest per-action status</b> — buttons show real succeeded/running/failed (from sacct +
+      logs), not just "launched". Holdout leak-protection verified (1,977 cwd12 stems).</li>
+</ul>
+<p><b>⚠️ Known gaps (being worked):</b></p>
+<ul>
+  <li><b>Only 8 of 12 weed species have training data</b> — Eclipta, Goosegrass, Morningglory,
+      Nutsedge currently exist only in the eval holdout (zero train data). Closing this is the
+      data priority.</li>
+  <li><b>~5,928 real weed-bbox vs a 50K target</b> (gap ~44K) — needs more harvesting biased to weeds.</li>
+  <li><b>OWL auto-label</b> was over-proposing (~600 boxes/img, precision ≈0); fixed with NMS +
+      per-image top-k (re-verification pending).</li>
+  <li><b>First end-to-end training mAP</b> not yet produced (closed-loop coded, awaiting a clean
+      cluster run).</li>
+</ul>
 </div>
 
 <h2 id="workflow">2. The pipeline (8 stages)</h2>
@@ -6211,6 +6247,34 @@ with one-click triggers.</p>
           new tunnel URL minted. github.io tunnel_url.json auto-updates.
           Use sparingly — browser auth cache lost per restart.</td></tr>
 </table>
+
+<h3>Added since v3.0.72 (rounds, full-loop, training, all-sync)</h3>
+<table class="btn-table">
+  <tr><td class="btn-name">start_new_round</td><td><span class="badge sub">subprocess</span></td>
+      <td>Begin a new harvest round v{N}→v{N+1} (creates the RF project; no data yet).</td></tr>
+  <tr><td class="btn-name">harvest_full_round_e2e</td><td><span class="badge sb">sbatch 4h</span></td>
+      <td>One-click round: bump round → harvest 4h → auto-sync survivors to the round's RF project.</td></tr>
+  <tr><td class="btn-name">backfill_round_1</td><td><span class="badge sub">subprocess</span></td>
+      <td>Stamp harvest_round=1 on pre-v3.0.74 slugs (idempotent).</td></tr>
+  <tr><td class="btn-name">dinov2_filter_round_1</td><td><span class="badge sub">subprocess</span></td>
+      <td>DINOv2-filter a round's unverified slugs → upload survivors as agent-v1-dinov2-v{X.Y}.</td></tr>
+  <tr><td class="btn-name">sync_all_to_roboflow</td><td><span class="badge sub">subprocess</span></td>
+      <td>Upload ALL slugs (incl. cwd12 baselines) to Roboflow for fast review.</td></tr>
+  <tr><td class="btn-name">train_yolo_round_1</td><td><span class="badge sub">subprocess</span></td>
+      <td>Send round-1 verified ✓ set to the trainer. NOTE: this button is still the
+          v3.0.74 <b>placeholder stub</b>; the REAL training is the closed-loop
+          <code>run_v3_0_89_roboflow_loop.sh</code> / <code>train_from_roboflow.py</code>
+          (pull labeled RF data → train YOLO → eval cwd12 holdout → mAP).</td></tr>
+</table>
+<p style="color:#555"><b>Roboflow closed loop (top priority, professor-facing):</b> the real
+training path is <code>train_from_roboflow.py</code> — pull human-labeled Roboflow ground truth →
+train a real YOLO (classes remapped to canonical order) → eval on the cwd12 holdout with a
+stem-level leak guard → report mAP50-95 + gap to 0.90. Run via
+<code>run_v3_0_89_roboflow_loop.sh</code> (RF_DOWNLOAD=1).</p>
+
+<p style="color:#555"><b>Storage:</b> the whole registry + classes + per-image metadata live in
+<b>MongoDB</b> (cross-node, authenticated). The dashboard's 🗄️ card shows whether it's serving
+from Mongo (🟢) or the JSON fallback. <code>/api/domains</code> lists collection-agent domains.</p>
 </div>
 
 <h2 id="daily">4. Recommended daily workflow</h2>
