@@ -235,37 +235,35 @@ def download_roboflow_project(api_key, workspace, project, version, dest_dir):
     if version_obj is None:
         return None, {"status": "no_versions", "tried": tried[:5]}
 
-    # v3.0.99.10: download to a UNIQUE ABSOLUTE location — no os.chdir (that caused
-    # the 'weed-detection-1/roboflow.zip No such file' relative-path failure when
-    # pulling several in a row). Mirrors merge_roboflow_projects' download pattern.
+    # v3.0.99.13: REVERT to the proven os.chdir download (location= gave
+    # no_yolo_structure for every pull — the export landed where rglob didn't look).
+    # The original used a SHARED scratch "_rf_tmp" which collided across consecutive
+    # pulls (adamaseri 'roboflow.zip No such file'); fix = UNIQUE scratch per slug +
+    # robust cwd restore. download() with no location writes <scratch>/<name>-<v>/…
+    # which _find_yolo_dataset_root then locates via rglob (this is how zig-zag worked).
     slug = f"rf_{workspace.replace('/', '_')}__{project}".lower()
     loc = os.path.join(dest_dir, "_rf_dl", slug)
     shutil.rmtree(loc, ignore_errors=True)
     os.makedirs(loc, exist_ok=True)
+    prev_cwd = os.getcwd()
     try:
-        dl = version_obj.download("yolov8", location=loc)
+        os.chdir(loc)
+        version_obj.download("yolov8")
     except Exception as e:
+        os.chdir(prev_cwd)
         shutil.rmtree(loc, ignore_errors=True)
         logger.warning(f"[Roboflow] download {workspace}/{project} failed: {e}")
         return None, {"status": "download_failed", "error": str(e)[:200]}
-
-    # v3.0.99.12: the SDK may write to its OWN chosen path, not exactly `loc` — use
-    # the returned dl.location (this is why bulk got no_yolo_structure for ALL: we
-    # searched `loc` which was empty). Search both, plus dest_dir as a last resort.
-    actual = getattr(dl, "location", None)
-    root = None
-    for sr in [actual, loc]:   # ONLY these two (never dest_dir — would grab other slugs)
+    finally:
         try:
-            if sr and os.path.isdir(sr):
-                root = _find_yolo_dataset_root(sr)
-                if root:
-                    break
+            os.chdir(prev_cwd)
         except Exception:
-            continue
+            pass
+
+    root = _find_yolo_dataset_root(loc)
     if root is None:
         shutil.rmtree(loc, ignore_errors=True)
-        return None, {"status": "no_yolo_structure",
-                      "dl_location": str(actual)[:200]}
+        return None, {"status": "no_yolo_structure"}
 
     final = os.path.join(dest_dir, slug)
     if os.path.exists(final):
