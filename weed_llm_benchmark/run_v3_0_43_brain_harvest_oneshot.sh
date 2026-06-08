@@ -51,12 +51,15 @@ if [ "${HARVEST_GH_PROXY:-1}" = "1" ]; then
         if timeout 25 git ls-remote --exit-code \
                 https://github.com/octocat/Hello-World.git HEAD >/dev/null 2>&1; then
             echo "[net] github SOCKS proxy via $GH_LOGIN:$GH_PORT — VERIFIED reachable ✓"
+            export HARVEST_SKIP_GITHUB=0
         else
-            echo "[net] github SOCKS proxy set ($GH_LOGIN:$GH_PORT) but ls-remote failed — clones may still time out"
+            echo "[net] github SOCKS proxy set ($GH_LOGIN:$GH_PORT) but ls-remote failed — SKIPPING github source"
+            export HARVEST_SKIP_GITHUB=1
         fi
     else
-        echo "[net] WARN: SOCKS proxy via $GH_LOGIN failed — github clones will fast-fail; Kaggle/HF still grow data"
+        echo "[net] WARN: SOCKS proxy via $GH_LOGIN failed (compute→login SSH disabled) — SKIPPING github, using Kaggle/HF only"
         git config --global --unset "http.https://github.com/.proxy" 2>/dev/null
+        export HARVEST_SKIP_GITHUB=1
     fi
 fi
 

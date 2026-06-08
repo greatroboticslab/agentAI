@@ -172,6 +172,15 @@ def harvest_github_datasets(data_dir, queries, already_known_cb, max_new=3):
 
     already_known_cb(slug_or_full_name) -> bool: True if already in registry.
     """
+    # v3.0.99.7: on Bridges-2 COMPUTE nodes github is unreachable (every clone
+    # times out) and the SOCKS-via-login proxy can't be set up (compute→login
+    # passwordless SSH is disabled). run_v3_0_43 exports HARVEST_SKIP_GITHUB=1 when
+    # the proxy probe fails, so we skip github entirely and spend the time on the
+    # sources that DO work from compute (Kaggle / HuggingFace) instead of burning
+    # 60s per dead clone. Set HARVEST_SKIP_GITHUB=0 to force-try anyway.
+    if os.environ.get("HARVEST_SKIP_GITHUB") == "1":
+        logger.info("[GitHub] HARVEST_SKIP_GITHUB=1 (no github route from this node) — skipping github source")
+        return []
     if shutil.which("git") is None:
         logger.info("[GitHub] git not available, skipping GitHub source")
         return []
