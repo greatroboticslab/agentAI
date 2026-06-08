@@ -472,7 +472,7 @@ def cmd_download_merge(args):
                 except Exception:
                     continue
                 with open(lbl_dir / (new_stem + ".txt"), "w") as f:
-                    f.write("\n".join(lines_out))
+                    f.write("\n".join(lines_out) + "\n")  # trailing NL: clean cat/tools
                 n_imgs += 1; n_boxes += len(lines_out)
 
         print(f"  [{proj_name}] images={n_imgs} boxes={n_boxes} "
