@@ -27,6 +27,18 @@ cd "$REPO"
 export PYTHONPATH=.:$PYTHONPATH
 export REPO_ROOT="$REPO"
 
+# v3.0.99.4: self-sync git + nested→outer so `python -m weed_optimizer_framework…`
+# always resolves the latest code. The OWL job hit ModuleNotFoundError when the
+# outer package wasn't synced (dashboard syncs only at its own job start).
+# See feedback_nested_outer_package_drift.
+git fetch origin main >/dev/null 2>&1 && git reset --hard origin/main >/dev/null 2>&1 \
+    && echo "[sync] git reset to $(git rev-parse --short HEAD)"
+if [ -d "$REPO/weed_llm_benchmark/weed_optimizer_framework" ]; then
+    rm -rf "$REPO/weed_optimizer_framework" 2>/dev/null
+    cp -ar "$REPO/weed_llm_benchmark/weed_optimizer_framework" "$REPO/weed_optimizer_framework" \
+        && echo "[sync] nested → outer weed_optimizer_framework ok"
+fi
+
 # --- Defaults (override via env) ---
 OWL_SPECIES="${OWL_SPECIES:-Goosegrass}"
 OWL_TARGET_DIR="${OWL_TARGET_DIR:-$REPO/downloads/cottonweeddet12/valid/images}"
