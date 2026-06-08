@@ -56,6 +56,48 @@ CWD12 = (
     "Sicklepod", "SpottedSpurge",
 )
 
+
+def _norm_cls(name: str) -> str:
+    """Normalize a class name for matching: lowercase, alphanumerics only."""
+    return "".join(ch for ch in str(name).lower() if ch.isalnum())
+
+
+# normalized class name → CWD12 canonical index (+ a few common aliases).
+_CWD12_NORM = {_norm_cls(sp): i for i, sp in enumerate(CWD12)}
+for _alias, _canon in {
+    "carpetweed": "Carpetweeds", "morning glory": "Morningglory",
+    "palmer amaranth": "PalmerAmaranth", "prickly sida": "PricklySida",
+    "spotted spurge": "SpottedSpurge", "spurge": "SpottedSpurge",
+}.items():
+    _CWD12_NORM.setdefault(_norm_cls(_alias), CWD12.index(_canon))
+
+
+def _build_multiclass_remap(loc: Path):
+    """Read a downloaded Roboflow yolov8 data.yaml `names` and map each project
+    class-id → CWD12 canonical index by normalized name. Returns
+    (remap {src_cid:cwd12_idx}, names list, unmapped names list)."""
+    names = []
+    dy = loc / "data.yaml"
+    if dy.is_file():
+        try:
+            import yaml  # ultralytics env ships pyyaml
+            d = yaml.safe_load(dy.read_text(errors="ignore")) or {}
+            nm = d.get("names")
+            if isinstance(nm, dict):
+                names = [nm[k] for k in sorted(nm, key=lambda x: int(x))]
+            elif isinstance(nm, list):
+                names = nm
+        except Exception:
+            pass
+    remap, unknown = {}, []
+    for cid, nm in enumerate(names):
+        idx = _CWD12_NORM.get(_norm_cls(nm))
+        if idx is None:
+            unknown.append(nm)
+        else:
+            remap[cid] = idx
+    return remap, names, unknown
+
 # v3.0.91: OUR-projects ALLOW-LIST. The workspace contains many unrelated
 # projects (drone/hardhat/demo/…). The dashboard must show ONLY our pipeline's
 # projects. Source of truth = Mongo/DB; Roboflow is just a labeling surface, so
@@ -301,74 +343,102 @@ def cmd_generate_versions(args):
     print(f"\nWROTE: {out_path}")
 
 
+def _resolve_dl_targets(args):
+    """Decide which Roboflow projects to pull and how to remap each.
+    Returns list of (project_name, ('multiclass', None) | ('species', sp)).
+    Default = allow-list MULTI-CLASS projects (our_projects); the legacy
+    per-species `cwd12-<sp>` projects were deleted 2026-05-30."""
+    if getattr(args, "species", ""):
+        sp = args.species
+        return [(f"cwd12-{sp.lower()}", ("species", sp))]
+    if getattr(args, "legacy_per_species", False):
+        return [(f"cwd12-{sp.lower()}", ("species", sp)) for sp in CWD12]
+    if getattr(args, "project", ""):
+        return [(args.project, ("multiclass", None))]
+    return [(p, ("multiclass", None)) for p in sorted(our_projects())]
+
+
 def cmd_download_merge(args):
-    """For each cwd12-<species> project with a Version: download YOLO zip,
-    remap labels (cid 0 → CWD12.index(species)), and merge into a single
-    multi-class YOLO dataset suitable for cluster training.
+    """Download labeled YOLO data from our Roboflow projects and merge into a
+    single multi-class CWD12 YOLO dataset for cluster training.
+
+    v3.0.98 FIX: default now pulls the allow-list MULTI-CLASS projects
+    (cwd12-multiclass-v1, weed-crop-agent-*) and remaps each box's class via
+    the downloaded data.yaml names → CWD12 index. The old code iterated 12
+    per-species `cwd12-<species>` projects that were DELETED 2026-05-30, so
+    every download 404'd and the merged set was empty. Legacy single-class
+    behavior is still available via --species / --legacy-per-species.
 
     Output layout:
-      results/framework/datasets/cwd12_active_learning/
-        train/images/<species>_<orig_name>.jpg
-        train/labels/<species>_<orig_name>.txt
-        data.yaml
-
-    Splits: we put everything from Roboflow into TRAIN. The training-time
-    eval uses cottonweeddet12/valid + test (untouched holdout). This
-    ensures the active-learning loop never contaminates evaluation.
+      <out-dir>/train/images/<project>_<orig>.jpg
+      <out-dir>/train/labels/<project>_<orig>.txt
+      <out-dir>/data.yaml
+    Everything goes to TRAIN; eval uses untouched cottonweeddet12/valid+test
+    holdout so the active-learning loop never contaminates evaluation.
     """
     key = _key()
     from roboflow import Roboflow
     rf = Roboflow(api_key=key)
     ws = rf.workspace()
 
-    species_filter = (args.species,) if args.species else CWD12
     out_root = Path(args.out_dir)
     img_dir = out_root / "train" / "images"
     lbl_dir = out_root / "train" / "labels"
     img_dir.mkdir(parents=True, exist_ok=True)
     lbl_dir.mkdir(parents=True, exist_ok=True)
 
-    import zipfile, shutil
+    import shutil
     cwd12_index = {sp: i for i, sp in enumerate(CWD12)}
+    targets = _resolve_dl_targets(args)
+    print(f"[download-merge] {len(targets)} target project(s): "
+          f"{[t[0] for t in targets]}")
 
     summary = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-               "per_species": []}
-    for sp in species_filter:
-        proj_name = f"cwd12-{sp.lower()}"
+               "targets": [t[0] for t in targets], "per_project": []}
+    tot_imgs = tot_lbls = tot_boxes = 0
+
+    for proj_name, mode in targets:
         try:
             proj = ws.project(proj_name)
             vs = proj.versions()
         except Exception as e:
             print(f"[skip] {proj_name}: {type(e).__name__}: {e}")
-            summary["per_species"].append({"species": sp, "ok": False,
-                                            "error": str(e)})
+            summary["per_project"].append({"project": proj_name, "ok": False,
+                                           "error": str(e)})
             continue
         if not vs:
             print(f"[skip] {proj_name}: no versions yet — run generate-versions first")
-            summary["per_species"].append({"species": sp, "ok": False,
-                                            "reason": "no_versions"})
+            summary["per_project"].append({"project": proj_name, "ok": False,
+                                           "reason": "no_versions"})
             continue
 
         v = vs[-1]  # latest
         print(f"[download] {proj_name} version {v.version} ...")
         try:
-            dl = v.download("yolov8", location=str(out_root / "_dl" / sp))
+            dl = v.download("yolov8", location=str(out_root / "_dl" / proj_name))
         except Exception as e:
             print(f"[FAIL download] {proj_name}: {type(e).__name__}: {e}")
-            summary["per_species"].append({"species": sp, "ok": False,
-                                            "error": f"download: {e}"})
+            summary["per_project"].append({"project": proj_name, "ok": False,
+                                           "error": f"download: {e}"})
             continue
 
-        loc = Path(getattr(dl, "location", "") or out_root / "_dl" / sp)
+        loc = Path(getattr(dl, "location", "") or out_root / "_dl" / proj_name)
         if not loc.is_dir():
             print(f"[FAIL] download location not found: {loc}")
-            summary["per_species"].append({"species": sp, "ok": False,
-                                            "error": "no_location"})
+            summary["per_project"].append({"project": proj_name, "ok": False,
+                                           "error": "no_location"})
             continue
 
-        cid_target = cwd12_index[sp]
-        n_imgs = 0; n_lbls = 0
-        # Roboflow yolov8 layout: train/images, train/labels, valid/, test/, data.yaml
+        # Per-project cid → CWD12-index remap.
+        if mode[0] == "species":
+            remap, unknown = {0: cwd12_index[mode[1]]}, []
+        else:
+            remap, _names, unknown = _build_multiclass_remap(loc)
+            if not remap:
+                print(f"  [WARN] {proj_name}: no class names matched CWD12 "
+                      f"(names={_names}) — 0 boxes will be kept")
+
+        n_imgs = 0; n_boxes = 0; n_dropped = 0
         for split in ("train", "valid", "test"):
             si = loc / split / "images"
             sl = loc / split / "labels"
@@ -378,33 +448,41 @@ def cmd_download_merge(args):
                 if img.suffix.lower() not in (".jpg", ".jpeg", ".png"):
                     continue
                 lbl = sl / (img.stem + ".txt")
-                new_stem = f"{sp}_{img.stem}"
-                new_img = img_dir / (new_stem + img.suffix)
-                new_lbl = lbl_dir / (new_stem + ".txt")
-                try:
-                    shutil.copy2(img, new_img)
-                except Exception:
-                    continue
-                n_imgs += 1
-                # Remap label cid 0 → cid_target
                 lines_out = []
                 if lbl.is_file():
                     try:
                         for line in lbl.read_text(errors="ignore").splitlines():
                             p = line.split()
-                            if p and p[0].lstrip("-").isdigit():
-                                p[0] = str(cid_target)
-                                lines_out.append(" ".join(p))
+                            if not p or not p[0].lstrip("-").isdigit():
+                                continue
+                            src = int(p[0])
+                            if src not in remap:
+                                n_dropped += 1
+                                continue
+                            p[0] = str(remap[src])
+                            lines_out.append(" ".join(p))
                     except Exception:
                         pass
-                with open(new_lbl, "w") as f:
+                # keep only images with ≥1 in-vocab CWD12 box
+                if not lines_out:
+                    continue
+                new_stem = f"{proj_name}_{img.stem}"
+                try:
+                    shutil.copy2(img, img_dir / (new_stem + img.suffix))
+                except Exception:
+                    continue
+                with open(lbl_dir / (new_stem + ".txt"), "w") as f:
                     f.write("\n".join(lines_out))
-                n_lbls += 1
+                n_imgs += 1; n_boxes += len(lines_out)
 
-        print(f"  [{sp}] images={n_imgs} labels={n_lbls}")
-        summary["per_species"].append({"species": sp, "ok": True,
-                                        "images": n_imgs, "labels": n_lbls,
-                                        "cid_target": cid_target})
+        print(f"  [{proj_name}] images={n_imgs} boxes={n_boxes} "
+              f"dropped_oov_boxes={n_dropped}")
+        tot_imgs += n_imgs; tot_lbls += n_imgs; tot_boxes += n_boxes
+        rec = {"project": proj_name, "ok": True, "mode": mode[0],
+               "images": n_imgs, "boxes": n_boxes, "dropped_oov_boxes": n_dropped}
+        if mode[0] == "multiclass" and unknown:
+            rec["unmapped_class_names"] = unknown
+        summary["per_project"].append(rec)
 
     # Write data.yaml
     data_yaml = out_root / "data.yaml"
@@ -415,12 +493,15 @@ def cmd_download_merge(args):
         f.write("train: train/images\n")
         f.write("val: train/images   # placeholder — real eval uses cottonweeddet12/valid\n")
 
+    summary["totals"] = {"images": tot_imgs, "labels": tot_lbls, "boxes": tot_boxes}
     out_state = out_root / "_merge_summary.json"
     with open(out_state, "w") as f:
         json.dump(summary, f, indent=2, default=str)
     print(f"\nWROTE: {out_state}")
-    print(f"      dataset: {out_root}")
+    print(f"      dataset: {out_root}  (images={tot_imgs}, boxes={tot_boxes})")
     print(f"      data.yaml: {data_yaml}")
+    if tot_imgs == 0:
+        print("WARNING: 0 images merged — check project names/versions/perms above.")
 
 
 def main():
@@ -445,7 +526,12 @@ def main():
 
     p_dl = sub.add_parser("download-merge",
                            help="download labeled YOLO data and merge to multi-class")
-    p_dl.add_argument("--species", default="")
+    p_dl.add_argument("--project", default="",
+                       help="single project to pull (default: allow-list multi-class projects)")
+    p_dl.add_argument("--species", default="",
+                       help="legacy: single CWD12 species → cwd12-<species> (single-class)")
+    p_dl.add_argument("--legacy-per-species", action="store_true",
+                       help="legacy: iterate 12 cwd12-<species> projects (deleted 2026-05-30)")
     p_dl.add_argument("--out-dir",
                        default=str(REPO / "results" / "framework" / "datasets" / "cwd12_active_learning"))
 
