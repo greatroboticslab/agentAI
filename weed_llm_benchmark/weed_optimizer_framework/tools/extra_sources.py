@@ -119,8 +119,14 @@ def _count_labels(root):
     return sum(1 for _ in Path(root).rglob("*.txt"))
 
 
-def clone_github_repo(clone_url, dest_dir, depth=1, timeout=180):
-    """Clone a GitHub repo with depth=1 + 3-min timeout.
+def clone_github_repo(clone_url, dest_dir, depth=1, timeout=60):
+    """Clone a GitHub repo with depth=1 + a 60s timeout.
+
+    v3.0.99.6: timeout 180→60s. On compute nodes without a working github route
+    every clone hung the full 180s, burning hours. With the SOCKS-via-login proxy
+    (set in run_v3_0_43 as git http.https://github.com/.proxy) clones succeed fast;
+    without it they fail fast so the harvest spends its time on Kaggle/HF instead.
+    git uses libcurl, which honors the git http.<url>.proxy config automatically.
 
     v3.0.43.18: PAT auth + tighter timeout.
     v3.0.43.19 SECURITY FIX: never let the PAT-embedded URL appear in

@@ -790,6 +790,11 @@ class DatasetDiscovery:
         "amaranth", "ragweed", "morningglory dataset", "carpetweed",
         "crabgrass", "purslane plant", "sicklepod", "goosegrass",
         "palmer amaranth", "spurge weed", "nutsedge plant",
+        # v3.0.99.6 (2026-06-08): bias to the 4 CWD12 species still missing data
+        # (Eclipta/Goosegrass/Morningglory/Nutsedge). Eclipta had NO query before.
+        "eclipta", "eclipta prostrata", "eclipta weed", "false daisy weed",
+        "goosegrass detection", "eleusine indica", "nutsedge detection",
+        "cyperus weed", "morning glory weed detection", "ipomoea weed",
         # Generic detection-relevant for plants
         "plant detection yolo", "leaf detection bbox", "field scene yolo",
         "agriculture object detection", "crop health detection",
@@ -850,11 +855,18 @@ class DatasetDiscovery:
         # plantdoc kept in reject (plant doc is generic doc, NOT weed-focused)
         # weeds vs leafdoc decision: still reject classification-only sets unless
         # they're clearly weed-labeled
-        # diseases / classification — KEPT in reject for HARVEST (Brain shouldn't
-        # ACTIVELY seek these). Existing plant-disease in registry is KEPT
-        # because they may contribute leaf visual prior after OWLv2 autolabel.
+        # v3.0.99.6 (2026-06-08): TIGHTEN against plant-DISEASE. Earlier we kept
+        # disease sets as a "leaf visual prior for OWLv2 autolabel", but OWLv2
+        # image-conditioned autolabel proved too imprecise (2026-06-07 finding),
+        # so that rationale is gone. A tomato-leaf-DISEASE set leaked through as
+        # "crop detection" (tomato ∈ ACCEPT) — reject disease vocab now (reject is
+        # checked fail-fast BEFORE accept, so it overrides the 'tomato' match).
+        "disease", "diseased", "leaf-disease", "leaf_disease", "leaf disease",
+        "plant-disease", "plant disease", "plantdisease", "plantvillage",
+        "leaf-spot", "leaf_spot", "leafspot", "leaf-blight", "anthracnose",
+        "scab", "powdery", "downy", "necrosis", "necrotic", "pathogen",
         "blight", "rust-detect", "rot-detect", "infection",
-        "virus", "fungus", "mildew", "lesion",
+        "virus", "fungus", "fungal", "mildew", "lesion", "bacterial-spot",
         # tree/non-plant retained
         "warp", "recycling", "waste",
         "tree-species", "tree-classification",

@@ -35,6 +35,31 @@ if [ -d "$REPO/weed_llm_benchmark/weed_optimizer_framework" ]; then
         && echo "[sync] nested → outer weed_optimizer_framework ok"
 fi
 
+# v3.0.99.6: GitHub is unreachable from compute nodes (every clone timed out in the
+# 2026-06-07 round) but login nodes have internet. Start a SOCKS proxy THROUGH a login
+# node (compute can ssh to login intra-cluster) and route ONLY github traffic through
+# it (Kaggle/HF stay on their working direct path). git/libcurl honors the per-URL
+# http proxy config. Fully guarded: if ssh/proxy fails, github clones just fast-fail
+# (60s each now) and the Brain still grows via Kaggle/HF. Disable with HARVEST_GH_PROXY=0.
+if [ "${HARVEST_GH_PROXY:-1}" = "1" ]; then
+    GH_LOGIN="${HARVEST_LOGIN_NODE:-bridges2-login011}"
+    GH_PORT="${HARVEST_SOCKS_PORT:-18080}"
+    if timeout 15 ssh -fN -o BatchMode=yes -o StrictHostKeyChecking=no \
+            -o ExitOnForwardFailure=yes -o ConnectTimeout=10 \
+            -D "$GH_PORT" "$GH_LOGIN" 2>/dev/null; then
+        git config --global "http.https://github.com/.proxy" "socks5h://127.0.0.1:$GH_PORT"
+        if timeout 25 git ls-remote --exit-code \
+                https://github.com/octocat/Hello-World.git HEAD >/dev/null 2>&1; then
+            echo "[net] github SOCKS proxy via $GH_LOGIN:$GH_PORT — VERIFIED reachable ✓"
+        else
+            echo "[net] github SOCKS proxy set ($GH_LOGIN:$GH_PORT) but ls-remote failed — clones may still time out"
+        fi
+    else
+        echo "[net] WARN: SOCKS proxy via $GH_LOGIN failed — github clones will fast-fail; Kaggle/HF still grow data"
+        git config --global --unset "http.https://github.com/.proxy" 2>/dev/null
+    fi
+fi
+
 echo "=== v3.0.43.4 Brain harvest (1 round, triggered from /control) ==="
 echo "SLURM_JOB_ID=$SLURM_JOB_ID  Date: $(date)"
 echo "[config] ROUND_BUMP=${ROUND_BUMP:-0}  AUTO_SYNC=${AUTO_SYNC:-0}  BRAIN_STRICT_MIN_LABELS=${BRAIN_STRICT_MIN_LABELS:-50}"
