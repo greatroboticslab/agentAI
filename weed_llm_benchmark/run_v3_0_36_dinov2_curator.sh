@@ -4,8 +4,10 @@
 #SBATCH --gres=gpu:v100-32:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
-#SBATCH --mem=24G
+#SBATCH --mem=64G
 #SBATCH --time=04:00:00
+# v3.0.99: 24G→64G — job was oom-killed at exit (ExitCode 0:125) on the 2026-06-07
+# run; products written but sacct=OUT_OF_MEMORY mislabeled it failed.
 #SBATCH --output=results/framework/v3_0_36_dinov2_curator_%j.out
 
 # v3.0.36 — DINOv2 similarity curator: implements Hongbo's collection-phase

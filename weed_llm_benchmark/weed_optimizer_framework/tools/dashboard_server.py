@@ -2944,6 +2944,29 @@ def _sacct_state(jobid: str) -> str:
     return ""
 
 
+def _pid_alive_nonzombie(pid) -> bool:
+    """True only if pid exists AND is not a zombie. On Linux read /proc/<pid>/stat
+    (state field after the ')'); 'Z' = zombie (exited, un-reaped) → treat as done.
+    Falls back to os.kill(pid,0) where /proc is unavailable."""
+    try:
+        pid = int(pid)
+    except (ValueError, TypeError):
+        return False
+    try:
+        st = Path(f"/proc/{pid}/stat").read_text()
+        state = st.rsplit(") ", 1)[1].split(" ", 1)[0]
+        return state != "Z"
+    except Exception:
+        pass
+    try:
+        os.kill(pid, 0)
+        return True
+    except (ProcessLookupError, ValueError, TypeError):
+        return False
+    except PermissionError:
+        return True
+
+
 def _resolve_action_real_status(result: dict) -> str:
     """One of: launched | running | succeeded | failed | unknown. Real, not just ok."""
     if not isinstance(result, dict):
@@ -2962,15 +2985,18 @@ def _resolve_action_real_status(result: dict) -> str:
                     tail = f.read().decode("utf-8", "replace")
         except Exception:
             pass
-        if any(m in tail for m in _LOG_FAIL_MARKERS):
-            return "failed"          # log shows an error → failed (authoritative)
-        try:
-            os.kill(int(pid), 0)
-            return "running"          # alive, no error yet
-        except (ProcessLookupError, ValueError, TypeError):
-            return "succeeded"        # gone + no error marker → done ok
-        except PermissionError:
+        # v3.0.99: authoritative exit-code marker appended by the bash wrapper.
+        mrc = re.search(r"__ACTION_RC__=(-?\d+)", tail)
+        if mrc:
+            return "succeeded" if mrc.group(1) == "0" else "failed"
+        # No marker yet → still going IF the pid is alive AND not a zombie.
+        # (Un-reaped children show as zombies; os.kill(zombie,0) lies "alive".)
+        if _pid_alive_nonzombie(pid):
             return "running"
+        # pid gone, no RC marker (killed / pre-v3.0.99 launch) → fall back to markers
+        if any(m in tail for m in _LOG_FAIL_MARKERS):
+            return "failed"
+        return "succeeded"
     # --- sbatch: parse "Submitted batch job N" ---
     text = f"{result.get('stdout','')} {result.get('msg','')}"
     m = re.search(r"Submitted batch job (\d+)", text)
@@ -3447,19 +3473,14 @@ _CLUSTER_ACTIONS = {
     "owl_upload_proposals": {
         "type": "subprocess",
         "argv": [
-            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
-            "bulk-upload",
-            "--images",
-            "results/leave4out/dataset_holdout/test/images",
-            "--labels",
-            "results/framework/owl_red_proposals/Goosegrass",
-            "--split", "train", "--batch", "red",
-            "--workers", "4",
-            "--per-species", "50",
+            "python", "-u", "-m",
+            "weed_optimizer_framework.tools.owl_upload_proposals",
+            "--species", "Goosegrass",
             "--project", "weed-crop-agent-dataset",
+            "--per-species", "50",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "上传 OWL Goosegrass red 提案 → weed-crop-agent-dataset (50 imgs, ~5min)",
+        "label": "上传 OWL red 提案 → weed-crop-agent-dataset (精度门槛保护;低于阈值拒绝上传,OWL_UPLOAD_FORCE=1 强制)",
     },
     # v3.0.71: DINOv2 dataset-quality curator (full pipeline as one button)
     "dinov2_curate_registry": {
@@ -3761,9 +3782,16 @@ async def api_cluster_action(action: str, request: Request):
             log_fp = open(log_path, "wb")
         except Exception as e:
             raise HTTPException(500, f"cannot open log: {e}")
+        # v3.0.99: wrap in `bash -c "<cmd>; echo __ACTION_RC__=$?"` so the log
+        # gets an authoritative exit-code marker when the process finishes. Fixes
+        # the "running forever" bug: subprocesses were never wait()ed, becoming
+        # ZOMBIES, and os.kill(zombie_pid,0) returns success → status stuck running.
+        import shlex as _shlex
+        _inner = " ".join(_shlex.quote(a) for a in argv)
+        _wrapped = f'{_inner}; rc=$?; echo "__ACTION_RC__=$rc"; exit $rc'
         try:
             proc = _sp.Popen(
-                argv, cwd=str(REPO), env=env,
+                ["bash", "-c", _wrapped], cwd=str(REPO), env=env,
                 stdout=log_fp, stderr=_sp.STDOUT,
                 stdin=_sp.DEVNULL, start_new_session=True,
             )

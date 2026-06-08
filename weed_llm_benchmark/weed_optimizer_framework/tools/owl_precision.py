@@ -69,6 +69,10 @@ def evaluate(species: str, prop_dir: Path, gt_dir: Path, iou_thr: float = 0.5) -
     n_prop = n_prop_matched = n_gt = n_gt_matched = 0
     files_with_props = files_with_gt = 0
     n_files = 0
+    # "on-GT" view: proposals only on images that actually contain the species.
+    # Decouples the metric from the dataset mismatch where most sampled images
+    # don't contain the target (which floors global precision artificially).
+    n_prop_on_gt = n_prop_matched_on_gt = 0
     for pf in sorted(prop_dir.glob("*.txt")):
         n_files += 1
         props = _read_yolo(pf, only_cid=None)   # OWL writes cid=0 single-species
@@ -77,6 +81,7 @@ def evaluate(species: str, prop_dir: Path, gt_dir: Path, iou_thr: float = 0.5) -
             files_with_props += 1
         if gt:
             files_with_gt += 1
+            n_prop_on_gt += len(props)
         n_prop += len(props)
         n_gt += len(gt)
         gt_used = [False] * len(gt)
@@ -91,9 +96,12 @@ def evaluate(species: str, prop_dir: Path, gt_dir: Path, iou_thr: float = 0.5) -
             if best >= iou_thr and bj >= 0:
                 gt_used[bj] = True
                 n_prop_matched += 1
+                if gt:
+                    n_prop_matched_on_gt += 1
         n_gt_matched += sum(gt_used)
     precision = n_prop_matched / n_prop if n_prop else 0.0
     recall = n_gt_matched / n_gt if n_gt else 0.0
+    precision_on_gt = n_prop_matched_on_gt / n_prop_on_gt if n_prop_on_gt else 0.0
     return {
         "species": species, "gt_cid": gt_cid, "iou_thr": iou_thr,
         "n_proposal_files": n_files,
@@ -101,6 +109,8 @@ def evaluate(species: str, prop_dir: Path, gt_dir: Path, iou_thr: float = 0.5) -
         "n_proposal_boxes": n_prop, "n_gt_boxes": n_gt,
         "n_proposal_matched": n_prop_matched, "n_gt_matched": n_gt_matched,
         "precision": round(precision, 4), "recall": round(recall, 4),
+        "n_proposal_boxes_on_gt_images": n_prop_on_gt,
+        "precision_on_gt_images": round(precision_on_gt, 4),
     }
 
 

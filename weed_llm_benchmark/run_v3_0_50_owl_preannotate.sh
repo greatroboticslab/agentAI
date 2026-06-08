@@ -32,7 +32,11 @@ OWL_SPECIES="${OWL_SPECIES:-Goosegrass}"
 OWL_TARGET_DIR="${OWL_TARGET_DIR:-$REPO/downloads/cottonweeddet12/valid/images}"
 OWL_EXEMPLAR_CONFIG="${OWL_EXEMPLAR_CONFIG:-$REPO/results/framework/owl_exemplars/${OWL_SPECIES}.json}"
 OWL_OUT_DIR="${OWL_OUT_DIR:-$REPO/results/framework/owl_red_proposals/${OWL_SPECIES}}"
-OWL_CONF="${OWL_CONF:-0.30}"
+# v3.0.99: retune for PRECISION. The 0.30/top30 config over-proposed (~30 boxes/img,
+# precision 0.002). Tighten: high conf + tiny top_k so OWL only fires when confident.
+OWL_CONF="${OWL_CONF:-0.50}"
+OWL_TOP_K="${OWL_TOP_K:-3}"
+OWL_NMS_IOU="${OWL_NMS_IOU:-0.5}"
 OWL_MAX="${OWL_MAX:-50}"
 OWL_DRY_RUN="${OWL_DRY_RUN:-0}"
 
@@ -43,6 +47,8 @@ echo "  target:     $OWL_TARGET_DIR"
 echo "  exemplars:  $OWL_EXEMPLAR_CONFIG"
 echo "  out:        $OWL_OUT_DIR"
 echo "  conf:       $OWL_CONF"
+echo "  top-k:      $OWL_TOP_K"
+echo "  nms-iou:    $OWL_NMS_IOU"
 echo "  max-images: $OWL_MAX"
 
 # Sanity: exemplar config must exist (gate against accidental runs)
@@ -62,6 +68,8 @@ python -u -m weed_optimizer_framework.tools.owl_preannotate \
     --exemplar-config "$OWL_EXEMPLAR_CONFIG" \
     --out-dir "$OWL_OUT_DIR" \
     --conf-threshold "$OWL_CONF" \
+    --top-k "$OWL_TOP_K" \
+    --nms-iou "$OWL_NMS_IOU" \
     --max-images "$OWL_MAX" \
     $DRY_FLAG 2>&1 | tee -a $REPO/results/framework/v3_0_50_owl_preannotate_${SLURM_JOB_ID}.log
 
