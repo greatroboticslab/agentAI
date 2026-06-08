@@ -460,19 +460,33 @@ _BULK_QUERIES = [
 ]
 
 
-def cmd_bulk(target_images=20000, max_pulls=40, min_images=100, queries=None):
+def cmd_bulk(target_images=35000, max_pulls=40, min_images=150, queries=None):
     """Search Universe broadly + pull fresh weed datasets toward an image target.
-    Human-driven bulk grow (user 2026-06-08: 批量拉更多 Universe 杂草集冲 50K)."""
+    Human-driven bulk grow (user 2026-06-08: 批量拉更多 Universe 杂草集冲 50K).
+
+    v3.0.99.14: each pull runs as a SUBPROCESS with a hard timeout, and candidates
+    over RF_MAXPER images are skipped. Reason: one 10k-img Universe export was a
+    1.5M-FILE pathological dump that extracted at ~50 files/s on Lustre (~8h) and
+    blocked the whole batch. The timeout kills any such mega/slow extraction and
+    moves on; capping image size avoids most of them. Mid-size clean datasets
+    (150–RF_MAXPER imgs) finish fast — pull many of those to reach 50K."""
+    import subprocess
+    import sys as _sys
     from weed_optimizer_framework.tools.dataset_discovery import DatasetDiscovery
     key = load_api_key()
     if not key:
         print("FATAL: no Roboflow API key"); return 2
+    max_per = int(os.environ.get("RF_MAXPER", "3000"))
+    per_timeout = int(os.environ.get("RF_TIMEOUT", "360"))
     d = DatasetDiscovery()
     queries = queries or _BULK_QUERIES
     seen, cands = set(), []
     for q in queries:
         for r in search_roboflow_universe(q, max_results=60, min_images=min_images):
             if r.get("version") is None:          # no downloadable version snapshot
+                continue
+            imgs = r.get("images") or 0
+            if imgs > max_per:                    # skip mega (1.5M-file pathological)
                 continue
             k = (r["workspace"], r["project"])
             if k in seen:
@@ -483,42 +497,38 @@ def cmd_bulk(target_images=20000, max_pulls=40, min_images=100, queries=None):
                 continue
             cands.append(r)
     cands.sort(key=lambda r: -(r.get("images") or 0))
-    print(f"[bulk] {len(cands)} fresh candidates (over {len(queries)} queries); "
-          f"target +{target_images} imgs / max {max_pulls} pulls")
+    base = sum((v.get("local_images", 0) or 0) for v in d.registry["datasets"].values())
+    print(f"[bulk] {len(cands)} fresh candidates ({min_images}-{max_per} imgs); "
+          f"target +{target_images} imgs / max {max_pulls} pulls / {per_timeout}s each "
+          f"(registry base {base} imgs)", flush=True)
     added = added_imgs = 0
     for r in cands:
         if added >= max_pulls or added_imgs >= target_images:
             break
         ws, proj = r["workspace"], r["project"]
-        print(f"[bulk] pull {ws}/{proj} (~{r.get('images')} imgs, classes={r.get('classes')})")
-        local, stats = download_roboflow_project(key, ws, proj, r.get("version") or "latest", d.data_dir)
-        if stats.get("status") != "downloaded":
-            print(f"  skip: {stats.get('status')}")
+        ver = str(r.get("version") or "latest")
+        print(f"[bulk] pull {ws}/{proj} (~{r.get('images')} imgs)", flush=True)
+        try:
+            cp = subprocess.run(
+                [_sys.executable, "-u", "-m",
+                 "weed_optimizer_framework.tools.roboflow_source", "pull", ws, proj, ver],
+                timeout=per_timeout, capture_output=True, text=True)
+        except subprocess.TimeoutExpired:
+            print(f"  TIMEOUT >{per_timeout}s (mega/slow export) — skipped", flush=True)
             continue
-        if stats.get("images", 0) < min_images or stats.get("labeled", 0) == 0:
-            print(f"  skip: too small/no labels ({stats.get('images')}/{stats.get('labeled')})")
-            shutil.rmtree(local, ignore_errors=True)
-            continue
-        classes = _read_yaml_classes(local)
-        slug = f"rf_{ws}__{proj}".replace("/", "_").lower()
-        d.registry["datasets"][slug] = {
-            "source": "roboflow_universe", "hf_id": None,
-            "roboflow_workspace": ws, "roboflow_project": proj,
-            "roboflow_version": r.get("version") or "latest",
-            "images": stats["images"], "classes": len(classes) or "?",
-            "class_names": classes, "annotation": "yolo", "format": "yolo",
-            "description": f"Roboflow Universe (bulk): {ws}/{proj}",
-            "status": "downloaded", "local_path": local,
-            "local_images": stats["images"],
-            "harvest_round": int(d.registry.get("current_round", 1)),
-            "harvest_reason": "bulk:roboflow_universe",
-            "used_for_training": False, "training_runs": [],
-        }
-        d._save_registry()
-        added += 1; added_imgs += stats["images"]
-        print(f"  ✓ {slug}: {stats['images']} imgs, {stats['labeled']} labels "
-              f"(running total +{added_imgs} imgs / {added} datasets)")
-    print(f"[bulk] DONE: added {added} datasets, +{added_imgs} images")
+        out = (cp.stdout or "") + (cp.stderr or "")
+        reg = [l for l in out.splitlines() if "✓ registered" in l]
+        if cp.returncode == 0 and reg:
+            print("  " + reg[-1].strip()[:150], flush=True)
+            added += 1
+        else:
+            bad = [l for l in out.splitlines() if "FAILED" in l or "already in" in l]
+            print(f"  skip (rc={cp.returncode}): {(bad[-1] if bad else '?')[:120]}", flush=True)
+        d._load_registry()
+        added_imgs = sum((v.get("local_images", 0) or 0)
+                         for v in d.registry["datasets"].values()) - base
+    print(f"[bulk] DONE: +{added} datasets, +{added_imgs} images "
+          f"(registry total ~{base + added_imgs})", flush=True)
     return 0
 
 
