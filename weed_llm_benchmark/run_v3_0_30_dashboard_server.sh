@@ -1,7 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=v3030_dS
-#SBATCH --partition=GPU-shared
-#SBATCH --gres=gpu:v100-32:1
+# v3.0.99.2: dashboard is PURE CPU (mongod + uvicorn/FastAPI + cloudflared + git).
+# It used NO GPU — requesting a V100 only made it queue behind GPU jobs (PENDING →
+# dashboard offline + tunnel-URL churn on requeue). Moved to the CPU partition so it
+# starts immediately and stays up. GPU work (Brain harvest, OWL, DINOv2) is separate sbatch.
+#SBATCH --partition=RM-shared
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=16G
