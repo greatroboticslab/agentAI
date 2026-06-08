@@ -243,16 +243,29 @@ def download_roboflow_project(api_key, workspace, project, version, dest_dir):
     shutil.rmtree(loc, ignore_errors=True)
     os.makedirs(loc, exist_ok=True)
     try:
-        version_obj.download("yolov8", location=loc)
+        dl = version_obj.download("yolov8", location=loc)
     except Exception as e:
         shutil.rmtree(loc, ignore_errors=True)
         logger.warning(f"[Roboflow] download {workspace}/{project} failed: {e}")
         return None, {"status": "download_failed", "error": str(e)[:200]}
 
-    root = _find_yolo_dataset_root(loc)
+    # v3.0.99.12: the SDK may write to its OWN chosen path, not exactly `loc` — use
+    # the returned dl.location (this is why bulk got no_yolo_structure for ALL: we
+    # searched `loc` which was empty). Search both, plus dest_dir as a last resort.
+    actual = getattr(dl, "location", None)
+    root = None
+    for sr in [actual, loc]:   # ONLY these two (never dest_dir — would grab other slugs)
+        try:
+            if sr and os.path.isdir(sr):
+                root = _find_yolo_dataset_root(sr)
+                if root:
+                    break
+        except Exception:
+            continue
     if root is None:
         shutil.rmtree(loc, ignore_errors=True)
-        return None, {"status": "no_yolo_structure"}
+        return None, {"status": "no_yolo_structure",
+                      "dl_location": str(actual)[:200]}
 
     final = os.path.join(dest_dir, slug)
     if os.path.exists(final):
