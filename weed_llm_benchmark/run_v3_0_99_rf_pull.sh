@@ -1,9 +1,14 @@
 #!/bin/bash
 #SBATCH --job-name=rf_pull
-#SBATCH --partition=RM-shared
-#SBATCH --time=01:00:00
+# v3.0.99.11: byler's allocation cis240145p is a GPU allocation (qos=gpu); RM-shared
+# returned "Invalid qos". This pull is CPU work (download+extract) but GPU-shared is
+# the only partition the account can use, so run there (1 GPU idle is acceptable for a
+# one-off bulk grow). mem 16G is fine on GPU-shared (per-core limit is higher there).
+#SBATCH --partition=GPU-shared
+#SBATCH --gres=gpu:v100-32:1
+#SBATCH --time=02:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=5
 #SBATCH --mem=16G
 #SBATCH --output=results/framework/rf_pull_%j.out
 
@@ -36,16 +41,22 @@ fi
 export ROBOFLOW_KEY=$(cat /jet/home/byler/.roboflow_key 2>/dev/null)
 export ROBOFLOW_API_KEY="$ROBOFLOW_KEY"
 
-RF_PULLS="${RF_PULLS:-}"
-if [ -z "$RF_PULLS" ]; then
-    echo "FATAL: set RF_PULLS='ws1:proj1 ws2:proj2 ...'"; exit 2
+# Two modes:
+#   RF_BULK=1 [RF_TARGET=35000] [RF_MAXPULLS=30] → auto-discover + pull toward target
+#   RF_PULLS='ws1:proj1 ws2:proj2 …'             → explicit list
+echo "=== v3.0.99.11 Roboflow Universe batch pull ($(date)) ==="
+if [ "${RF_BULK:-0}" = "1" ]; then
+    echo "[bulk] target=${RF_TARGET:-35000} max_pulls=${RF_MAXPULLS:-30}"
+    python -u -m weed_optimizer_framework.tools.roboflow_source bulk \
+        "${RF_TARGET:-35000}" "${RF_MAXPULLS:-30}"
+elif [ -n "${RF_PULLS:-}" ]; then
+    echo "RF_PULLS=$RF_PULLS"
+    for pair in $RF_PULLS; do
+        ws="${pair%%:*}"; proj="${pair#*:}"
+        echo "==PULL $ws/$proj=="
+        python -u -m weed_optimizer_framework.tools.roboflow_source pull "$ws" "$proj" latest
+    done
+else
+    echo "FATAL: set RF_BULK=1 or RF_PULLS='ws1:proj1 …'"; exit 2
 fi
-
-echo "=== v3.0.99.9 Roboflow Universe batch pull ==="
-echo "RF_PULLS=$RF_PULLS  Date: $(date)"
-for pair in $RF_PULLS; do
-    ws="${pair%%:*}"; proj="${pair#*:}"
-    echo "==PULL $ws/$proj=="
-    python -u -m weed_optimizer_framework.tools.roboflow_source pull "$ws" "$proj" latest
-done
 echo "ALLPULLS_DONE $(date)"
