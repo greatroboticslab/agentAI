@@ -31,6 +31,17 @@ REPO=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark
 cd "$REPO"
 export PYTHONPATH=.:$PYTHONPATH
 
+# v3.0.99.5: self-sync git + nested→outer (same drift guard as run_v3_0_43/50) so
+# `python -m weed_optimizer_framework…` always resolves the latest code regardless
+# of when the dashboard last synced. See feedback_nested_outer_package_drift.
+git fetch origin main >/dev/null 2>&1 && git reset --hard origin/main >/dev/null 2>&1 \
+    && echo "[sync] git reset to $(git rev-parse --short HEAD)"
+if [ -d "$REPO/weed_llm_benchmark/weed_optimizer_framework" ]; then
+    rm -rf "$REPO/weed_optimizer_framework" 2>/dev/null
+    cp -ar "$REPO/weed_llm_benchmark/weed_optimizer_framework" "$REPO/weed_optimizer_framework" \
+        && echo "[sync] nested → outer weed_optimizer_framework ok"
+fi
+
 echo "=== v3.0.36 DINOv2 curator (stage 1+2+3) ==="
 echo "SLURM_JOB_ID=$SLURM_JOB_ID"
 echo "Date: $(date)"
