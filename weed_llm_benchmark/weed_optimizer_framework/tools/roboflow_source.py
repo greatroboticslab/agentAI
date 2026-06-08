@@ -22,6 +22,7 @@ import shutil
 import logging
 import urllib.request
 import urllib.parse
+import urllib.error
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -100,20 +101,43 @@ def search_roboflow_universe(query, max_results=30, od_only=True, min_images=50)
     if not key:
         logger.info("[Roboflow] no API key — cannot search Universe")
         return []
-    try:
-        q = urllib.parse.quote(query)
-        url = f"https://api.roboflow.com/universe/search?q={q}&api_key={key}"
-        req = urllib.request.Request(url, headers={
-            "User-Agent": "weed-llm-benchmark", "Accept": "application/json",
-        })
-        with urllib.request.urlopen(req, timeout=20) as r:
-            data = json.load(r)
-    except Exception as e:
-        logger.warning(f"[Roboflow] Universe search '{query}' failed: {e}")
-        return []
+    # v3.0.99.10: paginate (API returns ~12/page) until max_results or a short page.
+    # The Universe search API rate-limits (HTTP 429) — back off + retry, and pace
+    # pages so a bulk multi-query sweep doesn't get cut off.
+    import time as _t
+    items = []
+    q = urllib.parse.quote(query)
+    for page in range(1, 11):
+        data = None
+        for attempt in range(3):
+            try:
+                url = (f"https://api.roboflow.com/universe/search?q={q}"
+                       f"&api_key={key}&page={page}")
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "weed-llm-benchmark", "Accept": "application/json",
+                })
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    data = json.load(r)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 429:
+                    _t.sleep(4 * (attempt + 1))
+                    continue
+                logger.warning(f"[Roboflow] search '{query}' p{page}: {e}")
+                break
+            except Exception as e:
+                logger.warning(f"[Roboflow] search '{query}' p{page}: {e}")
+                break
+        if data is None:
+            break
+        batch = data.get("results") or []
+        items.extend(batch)
+        if len(items) >= max_results or len(batch) < int(data.get("page_size", 12) or 12):
+            break
+        _t.sleep(0.6)   # pace pages to avoid 429
 
     results = []
-    for item in (data.get("results") or [])[:max_results]:
+    for item in items[:max_results]:
         if od_only and item.get("type") != "object-detection":
             continue
         ws, proj = _ws_proj_from_result(item)
@@ -144,10 +168,19 @@ def search_roboflow_universe(query, max_results=30, od_only=True, min_images=50)
 def _find_yolo_dataset_root(root):
     """Find the directory containing train/valid YOLO data under root."""
     root = Path(root)
-    # Roboflow export usually has: {export_name}/data.yaml + train/ + valid/
+    # v3.0.99.10: LENIENT — a Roboflow yolov8 export may have only valid/ or test/
+    # (not train/), or images directly. tuuf/goosegrass failed 'no_yolo_structure'
+    # because we required train/. Accept data.yaml beside ANY split dir; then any
+    # dir with an images/ subdir; last resort any data.yaml parent.
     for yaml in root.rglob("data.yaml"):
-        if (yaml.parent / "train").is_dir():
-            return yaml.parent
+        p = yaml.parent
+        if any((p / s).is_dir() for s in ("train", "valid", "test", "images")):
+            return p
+    for imgs in root.rglob("images"):
+        if imgs.is_dir():
+            return imgs.parent
+    for yaml in root.rglob("data.yaml"):
+        return yaml.parent
     return None
 
 
@@ -178,55 +211,60 @@ def download_roboflow_project(api_key, workspace, project, version, dest_dir):
         logger.warning(f"[Roboflow] cannot access {workspace}/{project}: {e}")
         return None, {"status": "not_found", "error": str(e)[:200]}
 
+    # v3.0.99.10: resolve a downloadable Version robustly. Order: explicit int →
+    # versions()[-1] → try v1/v2/v3. A Universe project with NO generated version
+    # genuinely can't be downloaded (Roboflow needs a version snapshot) → no_versions.
+    version_obj = None
+    tried = []
+    explicit = []
+    if isinstance(version, int) or (isinstance(version, str) and version.isdigit()):
+        explicit = [int(version)]
     try:
-        if version == "latest":
-            versions = project_obj.versions()
-            if not versions:
-                return None, {"status": "no_versions"}
-            version_obj = versions[-1]
-        else:
-            version_obj = project_obj.version(int(version))
+        vs = project_obj.versions()
+        if vs:
+            version_obj = vs[-1]
     except Exception as e:
-        logger.warning(f"[Roboflow] version fetch {workspace}/{project} failed: {e}")
-        return None, {"status": "version_fetch_failed", "error": str(e)[:200]}
+        tried.append(f"versions():{str(e)[:50]}")
+    if version_obj is None:
+        for vn in (explicit or [1, 2, 3]):
+            try:
+                version_obj = project_obj.version(int(vn))
+                break
+            except Exception as e:
+                tried.append(f"v{vn}:{str(e)[:40]}")
+    if version_obj is None:
+        return None, {"status": "no_versions", "tried": tried[:5]}
 
-    # Download into a scratch subdir inside dest_dir
-    scratch = os.path.join(dest_dir, "_rf_tmp")
-    os.makedirs(scratch, exist_ok=True)
-    prev_cwd = os.getcwd()
+    # v3.0.99.10: download to a UNIQUE ABSOLUTE location — no os.chdir (that caused
+    # the 'weed-detection-1/roboflow.zip No such file' relative-path failure when
+    # pulling several in a row). Mirrors merge_roboflow_projects' download pattern.
+    slug = f"rf_{workspace.replace('/', '_')}__{project}".lower()
+    loc = os.path.join(dest_dir, "_rf_dl", slug)
+    shutil.rmtree(loc, ignore_errors=True)
+    os.makedirs(loc, exist_ok=True)
     try:
-        os.chdir(scratch)
-        version_obj.download("yolov8")
+        version_obj.download("yolov8", location=loc)
     except Exception as e:
-        os.chdir(prev_cwd)
-        shutil.rmtree(scratch, ignore_errors=True)
+        shutil.rmtree(loc, ignore_errors=True)
         logger.warning(f"[Roboflow] download {workspace}/{project} failed: {e}")
         return None, {"status": "download_failed", "error": str(e)[:200]}
-    finally:
-        os.chdir(prev_cwd)
 
-    # Find the actual export dir
-    root = _find_yolo_dataset_root(scratch)
+    root = _find_yolo_dataset_root(loc)
     if root is None:
-        shutil.rmtree(scratch, ignore_errors=True)
+        shutil.rmtree(loc, ignore_errors=True)
         return None, {"status": "no_yolo_structure"}
 
-    # Move out of scratch to dest
-    slug = f"rf_{workspace.replace('/', '_')}__{project}".lower()
     final = os.path.join(dest_dir, slug)
     if os.path.exists(final):
         shutil.rmtree(final, ignore_errors=True)
     shutil.move(str(root), final)
-    shutil.rmtree(scratch, ignore_errors=True)
+    shutil.rmtree(loc, ignore_errors=True)
 
-    img_count = _count_images(final)
-    lbl_count = _count_labels(final)
     return final, {
         "status": "downloaded",
-        "images": img_count,
-        "labeled": lbl_count,
-        "workspace": workspace,
-        "project": project,
+        "images": _count_images(final),
+        "labeled": _count_labels(final),
+        "workspace": workspace, "project": project,
     }
 
 
@@ -402,12 +440,84 @@ def cmd_pull(workspace, project, version="latest"):
     return 0
 
 
+_BULK_QUERIES = [
+    "weed detection", "weed", "crop weed detection", "weed segmentation",
+    "agriculture weed", "field weed detection", "weed yolo", "broadleaf weed",
+    "grass weed detection", "crop and weed", "weeds in field", "robot weeding",
+    "cotton weed", "soybean weed", "corn weed", "rice weed", "sugar beet weed",
+    "lettuce weed", "carrot weed", "weed species detection", "smart farming weed",
+]
+
+
+def cmd_bulk(target_images=20000, max_pulls=40, min_images=100, queries=None):
+    """Search Universe broadly + pull fresh weed datasets toward an image target.
+    Human-driven bulk grow (user 2026-06-08: 批量拉更多 Universe 杂草集冲 50K)."""
+    from weed_optimizer_framework.tools.dataset_discovery import DatasetDiscovery
+    key = load_api_key()
+    if not key:
+        print("FATAL: no Roboflow API key"); return 2
+    d = DatasetDiscovery()
+    queries = queries or _BULK_QUERIES
+    seen, cands = set(), []
+    for q in queries:
+        for r in search_roboflow_universe(q, max_results=60, min_images=min_images):
+            if r.get("version") is None:          # no downloadable version snapshot
+                continue
+            k = (r["workspace"], r["project"])
+            if k in seen:
+                continue
+            seen.add(k)
+            slug = f"rf_{r['workspace']}__{r['project']}".replace("/", "_").lower()
+            if slug in d.registry["datasets"]:    # already have it
+                continue
+            cands.append(r)
+    cands.sort(key=lambda r: -(r.get("images") or 0))
+    print(f"[bulk] {len(cands)} fresh candidates (over {len(queries)} queries); "
+          f"target +{target_images} imgs / max {max_pulls} pulls")
+    added = added_imgs = 0
+    for r in cands:
+        if added >= max_pulls or added_imgs >= target_images:
+            break
+        ws, proj = r["workspace"], r["project"]
+        print(f"[bulk] pull {ws}/{proj} (~{r.get('images')} imgs, classes={r.get('classes')})")
+        local, stats = download_roboflow_project(key, ws, proj, r.get("version") or "latest", d.data_dir)
+        if stats.get("status") != "downloaded":
+            print(f"  skip: {stats.get('status')}")
+            continue
+        if stats.get("images", 0) < min_images or stats.get("labeled", 0) == 0:
+            print(f"  skip: too small/no labels ({stats.get('images')}/{stats.get('labeled')})")
+            shutil.rmtree(local, ignore_errors=True)
+            continue
+        classes = _read_yaml_classes(local)
+        slug = f"rf_{ws}__{proj}".replace("/", "_").lower()
+        d.registry["datasets"][slug] = {
+            "source": "roboflow_universe", "hf_id": None,
+            "roboflow_workspace": ws, "roboflow_project": proj,
+            "roboflow_version": r.get("version") or "latest",
+            "images": stats["images"], "classes": len(classes) or "?",
+            "class_names": classes, "annotation": "yolo", "format": "yolo",
+            "description": f"Roboflow Universe (bulk): {ws}/{proj}",
+            "status": "downloaded", "local_path": local,
+            "local_images": stats["images"],
+            "harvest_round": int(d.registry.get("current_round", 1)),
+            "harvest_reason": "bulk:roboflow_universe",
+            "used_for_training": False, "training_runs": [],
+        }
+        d._save_registry()
+        added += 1; added_imgs += stats["images"]
+        print(f"  ✓ {slug}: {stats['images']} imgs, {stats['labeled']} labels "
+              f"(running total +{added_imgs} imgs / {added} datasets)")
+    print(f"[bulk] DONE: added {added} datasets, +{added_imgs} images")
+    return 0
+
+
 def main():
     import sys
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = sys.argv[1:]
     if not args:
-        print("usage: roboflow_source.py search '<q>' ['<q2>' …]  |  pull <ws> <proj> [version]")
+        print("usage: roboflow_source.py search '<q>' …  |  pull <ws> <proj> [version]  "
+              "|  bulk [target_images] [max_pulls]")
         return 2
     cmd = args[0]
     if cmd == "search":
@@ -418,6 +528,10 @@ def main():
             print("usage: pull <workspace> <project> [version]")
             return 2
         return cmd_pull(args[1], args[2], args[3] if len(args) > 3 else "latest")
+    if cmd == "bulk":
+        tgt = int(args[1]) if len(args) > 1 else 20000
+        mx = int(args[2]) if len(args) > 2 else 40
+        return cmd_bulk(target_images=tgt, max_pulls=mx)
     print(f"unknown command: {cmd}")
     return 2
 
