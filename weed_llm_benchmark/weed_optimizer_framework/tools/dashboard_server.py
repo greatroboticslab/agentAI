@@ -6624,6 +6624,13 @@ def rounds_page():
   .stat .lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.4px}
   .stat .val{font-size:22px;font-weight:700;color:#0f172a;
              font-family:ui-monospace,Menlo,monospace}
+  .rev-thumbs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+  .rev-thumbs img{width:84px;height:64px;object-fit:cover;border-radius:5px;
+        border:1px solid #d7dde6;background:#eef1f5;cursor:zoom-in;transition:transform .12s}
+  .rev-thumbs img:hover{transform:scale(1.04);border-color:#0e7c66}
+  .rev-thumbs .th-load,.rev-thumbs .th-empty{font-size:11px;color:#94a3b8}
+  .act.view{background:#0e7c66;color:#fff;border-color:#0e7c66;text-decoration:none;
+        display:inline-block}
   .toast{position:fixed;bottom:20px;right:20px;background:#0e7c66;color:#fff;
          padding:10px 16px;border-radius:8px;font-size:13px;display:none;
          box-shadow:0 4px 12px rgba(14,124,102,.3);z-index:100}
@@ -6645,12 +6652,11 @@ def rounds_page():
 <div class="container">
   <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-left:4px solid #1d4ed8;
               padding:.9rem 1.2rem;border-radius:8px;margin-bottom:1rem;font-size:13px;color:#1e3a8a">
-    <strong>💡 Workflow:</strong> click "🚀 Sync ALL to Roboflow" on the
-    <a href="/" style="color:#1d4ed8;font-weight:600">main dashboard</a> first,
-    then come here to review each slug via the
-    <strong style="background:#fff;padding:.1rem .4rem;border-radius:3px;color:#0e7c66">📡 Review on Roboflow</strong>
-    button (Roboflow's CDN serves images way faster than our cluster's Lustre).
-    Use ✓/✗ here to flag the slug; the actual bbox review happens in Roboflow.
+    <strong>💡 Workflow:</strong> harvest → sync to Roboflow → <b>review HERE</b>.
+    Each slug now shows an inline <b>boxed preview</b> (YOLO boxes drawn server-side);
+    click a thumb or <strong style="background:#fff;padding:.1rem .4rem;border-radius:3px;color:#0e7c66">🖼️ 看全部图+框</strong>
+    for the full boxed gallery, judge quality, then <b>✓ keep / ✗ junk</b> right here — no need to
+    leave for Roboflow. (📡 Roboflow ↗ still available for the web labeler / faster CDN.)
   </div>
   <div class="stats" id="stats">loading…</div>
   <div id="rounds-content">loading…</div>
@@ -6731,12 +6737,15 @@ async function loadRounds(){
         } else {
           html += '<span class="cls-chip uncategorized">no class_names — needs manual labeling in Roboflow</span>';
         }
-        html += `</div></div>
+        html += `</div>
+            <div class="rev-thumbs" id="th_${s.slug}" data-slug="${s.slug}"><span class="th-load">🖼️ 载入带框预览…</span></div>
+          </div>
           <div class="actions">
+            <a class="act view" href="/gallery/${encodeURIComponent(s.slug)}" target="_blank">🖼️ 看全部图+框</a>
             <button class="act ok" onclick="markSlug('${s.slug}','keep')">✓ keep slug</button>
             <button class="act bad" onclick="markSlug('${s.slug}','junk')">✗ junk slug</button>
             ${s.roboflow_synced
-              ? `<button class="act" onclick="window.open('${rfBatchUrl}','_blank')" style="background:#0e7c66;color:#fff;border-color:#0e7c66">📡 Review on Roboflow</button>`
+              ? `<button class="act" onclick="window.open('${rfBatchUrl}','_blank')" style="background:#0e7c66;color:#fff;border-color:#0e7c66">📡 Roboflow ↗</button>`
               : `<button class="act" disabled title="Not synced yet" style="opacity:.5">⚠ Not synced</button>`}
           </div>
           <div></div>
@@ -6746,6 +6755,33 @@ async function loadRounds(){
     html += '</div>';
   }
   document.getElementById('rounds-content').innerHTML = html || '<div class="round-card">no rounds yet — fire brain_harvest from the dashboard</div>';
+  loadThumbs();
+}
+
+// v3.0.99: inline boxed-thumbnail preview per slug, so the human can VISUALLY
+// review each round's images (with bboxes) WITHOUT leaving for Roboflow. Thumbs
+// come from /api/sample (server renders YOLO boxes); cached so the 30s refresh
+// doesn't refetch. Click a thumb → full boxed gallery /gallery/{slug}.
+const thumbCache = {};
+async function loadThumbs(){
+  const boxes = document.querySelectorAll('.rev-thumbs[data-slug]');
+  for(const box of boxes){
+    const slug = box.dataset.slug;
+    try{
+      let files = thumbCache[slug];
+      if(files === undefined){
+        const r = await fetch('/api/slug/'+encodeURIComponent(slug)+'/samples?n=4', {credentials:'include'});
+        const d = await r.json();
+        files = d.samples || [];
+        thumbCache[slug] = files;
+      }
+      if(!files.length){ box.innerHTML = '<span class="th-empty">— no local images —</span>'; continue; }
+      box.innerHTML = files.map(f =>
+        '<a href="/gallery/'+encodeURIComponent(slug)+'" target="_blank" title="'+f+' — click for full boxed gallery">'+
+        '<img loading="lazy" src="/api/sample/'+encodeURIComponent(slug)+'/'+encodeURIComponent(f)+'"/></a>'
+      ).join('');
+    }catch(e){ box.innerHTML = '<span class="th-empty">preview failed</span>'; }
+  }
 }
 
 // v3.0.75.1 (2026-06-01): real-test caught both AJAX calls were broken.
