@@ -110,6 +110,14 @@ _DEFAULT_RF_PROJECTS = [
     "weed-crop-agent-dataset",    # agent harvest pool (v1)
     "weed-crop-agent-v2",
     "weed-crop-agent-v3",
+    # v3.0.99.17: round-N projects must be in the allow-list or the dashboard's
+    # /api/roboflow_status undercounts (v4 held the bulk Universe upload — 2175+
+    # imgs — but was invisible because it wasn't listed). Cover future rounds too.
+    "weed-crop-agent-v4",
+    "weed-crop-agent-v5",
+    "weed-crop-agent-v6",
+    "weed-crop-agent-v7",
+    "weed-crop-agent-v8",
 ]
 
 
