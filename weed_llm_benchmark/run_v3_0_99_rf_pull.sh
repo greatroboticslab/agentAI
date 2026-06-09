@@ -44,8 +44,10 @@ export ROBOFLOW_API_KEY="$ROBOFLOW_KEY"
 # Two modes:
 #   RF_BULK=1 [RF_TARGET=35000] [RF_MAXPULLS=30] → auto-discover + pull toward target
 #   RF_PULLS='ws1:proj1 ws2:proj2 …'             → explicit list
-echo "=== v3.0.99.11 Roboflow Universe batch pull ($(date)) ==="
-if [ "${RF_BULK:-0}" = "1" ]; then
+echo "=== v3.0.99.15 Roboflow Universe batch pull ($(date)) ==="
+if [ "${RF_SYNC_ONLY:-0}" = "1" ]; then
+    echo "[sync-only] skipping pulls — uploading existing registry backlog to Roboflow"
+elif [ "${RF_BULK:-0}" = "1" ]; then
     echo "[bulk] target=${RF_TARGET:-35000} max_pulls=${RF_MAXPULLS:-30}"
     python -u -m weed_optimizer_framework.tools.roboflow_source bulk \
         "${RF_TARGET:-35000}" "${RF_MAXPULLS:-30}"
@@ -60,3 +62,14 @@ else
     echo "FATAL: set RF_BULK=1 or RF_PULLS='ws1:proj1 …'"; exit 2
 fi
 echo "ALLPULLS_DONE $(date)"
+
+# v3.0.99.15: prof directive — ALL collected data must land in Roboflow so humans
+# review there. Auto-sync every newly-pulled slug to the Roboflow folder right after
+# pulling (resumable: sync-newest-slugs skips already-synced). Disable with RF_AUTOSYNC=0.
+if [ "${RF_AUTOSYNC:-1}" = "1" ]; then
+    echo "=== [auto-sync] uploading new slugs to Roboflow folder weed_crop_agent_dataset ($(date)) ==="
+    ROBOFLOW_FOLDER=weed_crop_agent_dataset \
+    python -u -m weed_optimizer_framework.tools.roboflow_sync sync-newest-slugs \
+        --folder weed_crop_agent_dataset --cap-per-slug "${RF_SYNC_CAP:-0}" 2>&1 | tail -60
+    echo "=== [auto-sync] done $(date) ==="
+fi
