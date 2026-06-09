@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=v3030_dS
-# v3.0.99.2: dashboard is PURE CPU (mongod + uvicorn/FastAPI + cloudflared + git).
-# It used NO GPU — requesting a V100 only made it queue behind GPU jobs (PENDING →
-# dashboard offline + tunnel-URL churn on requeue). Moved to the CPU partition so it
-# starts immediately and stays up. GPU work (Brain harvest, OWL, DINOv2) is separate sbatch.
-#SBATCH --partition=RM-shared
+# v3.0.99.19: REVERT to GPU-shared. The v3.0.99.2 "move to RM-shared" was wrong for
+# THIS allocation: account cis240145p is GPU-only (RM-shared → "mem-per-core higher
+# than 2000M/core" + Invalid qos), so RM submit FAILS and the dashboard can't start.
+# The dashboard is CPU work but GPU-shared is the only partition this account can use.
+#SBATCH --partition=GPU-shared
+#SBATCH --gres=gpu:v100-32:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=16G
