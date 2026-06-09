@@ -777,6 +777,91 @@ def cmd_species_upload(args):
               f"no_box={counters['no_box']} wall={wall:.0f}s ===")
 
 
+# ---------------------------------------------------------------------------
+# v3.0.99.21 — delete junk images from Roboflow (user: 垃圾删除 + 优质保留 +
+# 标注导出回集群). Storage on Roboflow is a recurring per-month cost, so after
+# human review we DELETE the junk-verdict datasets' images (keep only clean).
+#   search:  POST /{ws}/{proj}/search  body {tag, offset, limit}  → results[].id
+#   delete:  DELETE /{ws}/{proj}/images  body {images:[ids]}      → 204
+# Ground-truth labels are exported to the cluster separately (download-merge),
+# so deleting from Roboflow never loses data.
+# ---------------------------------------------------------------------------
+def _rf_api(method, path, body=None, timeout=30):
+    import urllib.request, urllib.error, json as _j
+    url = f"https://api.roboflow.com/{_ws_name()}/{path}?api_key={_key()}"
+    data = _j.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        txt = r.read().decode("utf-8", "replace")
+        return r.status, (_j.loads(txt) if txt.strip() else {})
+
+
+def cmd_delete_junk(args):
+    """Delete junk-verdict datasets' images from ALL our Roboflow projects.
+    Latest verdict per slug wins; dry-run unless --apply."""
+    import json as _j
+    from pathlib import Path as _P
+    reg_path = _P(os.environ.get(
+        "REPO_ROOT", "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark")
+    ) / "results" / "framework" / "dataset_registry.json"
+    sv = reg_path.parent / "slug_verdicts.jsonl"
+    latest = {}
+    if sv.exists():
+        for line in sv.read_text().splitlines():
+            if line.strip():
+                try:
+                    e = _j.loads(line)
+                    if e.get("slug"):
+                        latest[e["slug"]] = e.get("verdict")
+                except Exception:
+                    pass
+    junk = sorted(s for s, v in latest.items() if v == "junk")
+    if not junk:
+        print("no junk-verdict slugs — nothing to delete")
+        return 0
+    apply = getattr(args, "apply", False)
+    print(f"=== delete-junk ({'APPLY' if apply else 'DRY-RUN'}) ===")
+    print(f"junk slugs ({len(junk)}): {junk}")
+    try:
+        from .merge_roboflow_projects import our_projects
+        projects = sorted(our_projects())
+    except Exception:
+        projects = ["weed-crop-agent-dataset", "weed-crop-agent-clean"]
+    total = 0
+    for proj in projects:
+        for slug in junk:
+            ids, offset = [], 0
+            while True:
+                try:
+                    st, res = _rf_api("POST", f"{proj}/search",
+                                      {"tag": slug, "offset": offset, "limit": 250})
+                except Exception:
+                    break
+                batch = [x.get("id") for x in (res.get("results") or []) if x.get("id")]
+                ids += batch
+                if len(batch) < 250:
+                    break
+                offset += 250
+            if not ids:
+                continue
+            print(f"  {proj}/{slug}: {len(ids)} junk images"
+                  + ("" if apply else " (dry-run, not deleted)"))
+            if not apply:
+                total += len(ids)
+                continue
+            for i in range(0, len(ids), 250):
+                chunk = ids[i:i + 250]
+                try:
+                    st, _ = _rf_api("DELETE", f"{proj}/images", {"images": chunk})
+                    total += len(chunk)
+                    print(f"    deleted {len(chunk)} (HTTP {st})")
+                except Exception as e:
+                    print(f"    delete FAILED: {type(e).__name__}: {str(e)[:100]}")
+    print(f"DONE: {'deleted' if apply else 'would delete'} {total} junk images")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -826,6 +911,9 @@ def main():
                     help="cap images per species (0=all). For testing.")
     bu.add_argument("--project", default=None,
                     help="project name (overrides env ROBOFLOW_PROJECT)")
+    dj = sub.add_parser("delete-junk")
+    dj.add_argument("--apply", action="store_true",
+                    help="actually delete (default: dry-run = just count)")
     su = sub.add_parser("species-upload")
     su.add_argument("--images", required=True)
     su.add_argument("--labels", required=True)
@@ -843,6 +931,7 @@ def main():
      "create-species-projects": cmd_create_species_projects,
      "upload": cmd_upload,
      "bulk-upload": cmd_bulk_upload,
+     "delete-junk": cmd_delete_junk,
      "species-upload": cmd_species_upload}[args.cmd](args)
 
 

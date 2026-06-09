@@ -3535,7 +3535,28 @@ _CLUSTER_ACTIONS = {
             "download-merge",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
-        "label": "Roboflow 下载+合并 → cwd12 多类训练集 (~5min,需先 generate-versions)",
+        "label": "⬇️ 导出标注回集群:Roboflow 标注好的数据 → cwd12 多类训练集(优质保留+ground-truth落盘)",
+    },
+    # v3.0.99.21: delete junk-verdict datasets' images from Roboflow (storage is a
+    # recurring monthly cost → after review, delete junk, keep only the clean library).
+    # Dry-run first (counts), then APPLY. Ground truth is already exported to cluster.
+    "roboflow_delete_junk_dryrun": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "delete-junk",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "🗑️ 垃圾删除(预演):统计 junk 数据集在 Roboflow 上有多少图会被删(不实删)",
+    },
+    "roboflow_delete_junk_apply": {
+        "type": "subprocess",
+        "argv": [
+            "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
+            "delete-junk", "--apply",
+        ],
+        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "label": "🗑️ 垃圾删除(执行):把 verdict=junk 的数据集从 Roboflow 删除,省每月存储(真值已在集群)",
     },
     # v3.0.52 (auto-loop iter 11 / Phase D2 sbatch): DINOv2 routing job.
     "dinov2_route_classes": {
