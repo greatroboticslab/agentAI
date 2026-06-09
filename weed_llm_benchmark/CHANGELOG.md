@@ -4430,3 +4430,46 @@ OWL chain diagnosis: chain intact (object_bank 75-400/species all 12, exemplar
 JSONs exist, Goosegrass red proposals exist+uploaded). "exemplars=0" was a STAT
 bug: per_species_stats read REPO/"object_bank" (nonexistent) → now uses _BANK_DIR
 (results/framework/synth_cutpaste/object_bank). OWL precision logged next.
+
+---
+
+## 2026-06-08 - Data-Collection Block: review-visualization, bug fixes, Roboflow Universe at scale (v3.0.96 → v3.0.99.14)
+
+Focus this session = the DATA-COLLECTION block (collection → human review → visualization
+→ filter), NOT training/mAP. Architecture reminder: **cluster registry (Lustre) + MongoDB =
+source of truth** holding ALL collected datasets; **our Roboflow workspace = labeling surface
+for CURATED SUBSETS only** (free tier cannot hold the full corpus). Universe datasets pulled in
+this session live in the registry/Mongo, NOT in our Roboflow workspace — by design.
+
+### Dashboard / review-visualization
+- v3.0.99.1 `/rounds`: inline boxed-thumbnail preview per slug (server renders YOLO boxes via
+  /api/sample) + "看全部图+框" → /gallery; human keep/junk review now closes INSIDE the dashboard
+  (no longer punted to Roboflow web). Verified end-to-end (boxed jpeg + verdict round-trip).
+- v3.0.99.2 dashboard intended → RM-shared; NOTE the account cis240145p is GPU-only so it stays
+  GPU-shared in practice (RM-shared = Invalid qos).
+
+### Collection-loop bug fixes (found by button-by-button test)
+- v3.0.98/.1 download-merge: pull allow-list multi-class projects (12 per-species projects were
+  deleted → empty merge); name→CWD12 remap; trailing newline. Produces 598img/822box/12cls set.
+- v3.0.99 subprocess actions: exit-code marker + zombie-aware status (no more stuck "running");
+  precision-GATED owl_upload (refuses low-quality); DINOv2 mem fix; OWL retune + precision_on_gt.
+- OWL auto-label HONEST result: image-conditioned owlv2 precision ~0.02 (over-fires on every
+  image even at conf 0.97) — NOT usable to skip human review; gate keeps the noise out. Future:
+  trained-detector active-learning instead.
+- Harvest: github unreachable from Bridges-2 COMPUTE nodes (clone timeouts; compute→login SSH
+  disabled, no http proxy) → SKIP github, use Kaggle/HF. Topic filter tightened to REJECT
+  plant-disease (a tomato-leaf-disease set had leaked via "crop detection").
+
+### Roboflow Universe re-enabled + scaled (the working source for volume + missing species)
+- v3.0.99.8 fixed the Universe search API (api.roboflow.com/universe/search?q=&api_key=) +
+  rich-result parsing + class-vocab off-topic filter; added manual search/pull/bulk CLI in
+  roboflow_source.py (human-driven; Brain stays seed-free).
+- v3.0.99.10–.14 hardened download_roboflow_project (proven os.chdir download + unique per-slug
+  scratch; version fallback; lenient yolo-structure detection) and made `bulk` run each pull as a
+  SUBPROCESS with a 360s timeout + skip mega datasets (one 10k-img export was a 1.5M-FILE dump
+  that extracted ~8h on Lustre and blocked the batch).
+- run_v3_0_99_rf_pull.sh: GPU-shared batch puller (RF_BULK / RF_PULLS / RF_MAXPER / RF_TIMEOUT).
+- RESULT: missing CWD12 species (Eclipta/Goosegrass/Morningglory/Nutsedge) filled (zig-zag set);
+  registry grew 16,898 → **110,404 images / 45 datasets** (raw collection pool, >2× the 50K goal).
+  This is the COLLECTION pool — still needs DINOv2 quality-filter + dedup + CWD12 mapping to
+  produce the clean training-ready subset.
