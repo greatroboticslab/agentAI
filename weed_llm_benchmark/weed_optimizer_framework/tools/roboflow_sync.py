@@ -37,6 +37,20 @@ CWD12 = [
     "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
     "Sicklepod", "SpottedSpurge",
 ]
+# v3.0.99.20: normalized CWD12 names + aliases, for --require-cwd12 filtering
+# (sync only the clean datasets whose class names actually map to CWD12 species).
+_CWD12_NORM = {"".join(c for c in s.lower() if c.isalnum()) for s in CWD12}
+for _a in ("morningglory", "carpetweed", "palmeramaranth", "spottedspurge",
+           "spurge", "pricklysida", "eleusineindica", "cyperus", "ipomoea"):
+    _CWD12_NORM.add(_a)
+
+
+def _slug_has_cwd12(class_names):
+    """True if ≥1 of the slug's class names maps to a CWD12 species."""
+    for c in (class_names or []):
+        if "".join(ch for ch in str(c).lower() if ch.isalnum()) in _CWD12_NORM:
+            return True
+    return False
 # v3.0.58 (2026-05-30): project name configurable. Defaults to
 # 'cwd12-weeds' for backward compat with personal workspace
 # (research-lhi4x). Override via env ROBOFLOW_PROJECT or per-call
@@ -201,6 +215,14 @@ def cmd_sync_newest_slugs(args):
     folder_ref = (getattr(args, "folder", None)
                   or os.environ.get("ROBOFLOW_FOLDER", ""))
     cap_per_slug = int(getattr(args, "cap_per_slug", 0) or 0)
+    # v3.0.99.20: clean-only sync. --require-cwd12 → upload only datasets whose class
+    # names map to ≥1 CWD12 species (skip generic 'weed'/'crop', numeric, off-topic).
+    # --force-project → route ALL to one project (override per-round) so the clean set
+    # lands in a single pristine project, not mixed with the numeric v4.
+    require_cwd12 = (getattr(args, "require_cwd12", False)
+                     or os.environ.get("SYNC_REQUIRE_CWD12") == "1")
+    force_project = (getattr(args, "force_project", None)
+                     or os.environ.get("SYNC_FORCE_PROJECT", "") or "")
 
     # v3.0.76: helper to map round → project name
     try:
@@ -275,6 +297,8 @@ def cmd_sync_newest_slugs(args):
             continue
         if info.get("roboflow_synced"):
             continue
+        if require_cwd12 and not _slug_has_cwd12(info.get("class_names")):
+            continue
         lp = info.get("local_path", "")
         if not lp or not os.path.isdir(lp):
             continue
@@ -313,9 +337,10 @@ def cmd_sync_newest_slugs(args):
 
     for slug, info, lp in pending:
         # Resolve THIS slug's target project from its harvest_round
+        # (v3.0.99.20: --force-project overrides per-round routing).
         h_round = int(info.get("harvest_round", 0) or 0)
-        slug_proj_name = (round_project_name(h_round)
-                          if h_round > 0 else default_project)
+        slug_proj_name = force_project or (round_project_name(h_round)
+                                           if h_round > 0 else default_project)
         if slug_proj_name not in proj_cache:
             try:
                 proj_cache[slug_proj_name] = ws.project(slug_proj_name)
@@ -779,6 +804,10 @@ def main():
                     help="cap images per slug (0=all, for testing)")
     sn.add_argument("--skip-baselines", action="store_true",
                     help="skip cwd12_sp8/holdout/det12 baselines (default: include them)")
+    sn.add_argument("--require-cwd12", action="store_true",
+                    help="only sync datasets whose class names map to a CWD12 species (clean subset)")
+    sn.add_argument("--force-project", default=None,
+                    help="route ALL synced slugs to this one project (override per-round routing)")
     sub.add_parser("create-species-projects")
     up = sub.add_parser("upload")
     up.add_argument("--images", required=True)
