@@ -851,6 +851,7 @@ def root():
   <a href="/classes">📋 classes <span class="navhelp" data-tip="杂草类别浏览页。每个类名一张卡片 + 真实图片缩略图,可按 topic(weed/disease/pest/crop)过滤和搜索;点卡片进详情看该类全部图,可改 topic、给图标 exemplar。全站唯一能看图审核的页。">ⓘ</span></a>
   <a href="/slugs">📦 slugs <span class="navhelp" data-tip="数据集级清理页。每个数据集(slug)一行,显示类名/图数/状态;点 ✓保留 / ✗垃圾 / 🤔存疑 做整包粗筛。✗ 的会从 /classes 隐藏、且不进训练。比逐图审快。">ⓘ</span></a>
   <a href="/roboflow">📊 roboflow <span class="navhelp" data-tip="我们的 Roboflow 项目状态(只显示我们的 4 个:cwd12 金标 + agent v1/v2/v3,无关老项目已过滤)。每个项目的图/框/类数 + 跳转 Roboflow 网页去人工画框精标。">ⓘ</span></a>
+  <a href="/annotate">🏷️ annotate <span class="navhelp" data-tip="标注指引面板:每个采集到的数据集 → 它的类是真名/数字占位/泛称/CWD12,以及人工精标该怎么做(直接核实 / 重传带名 / 逐框判物种 / 逐图标)。回答『这堆乱数据我该怎么标、v2/v3/v4 里都是什么』。">ⓘ</span></a>
   <a href="/api/cluster_status">📥 JSON <span class="navhelp" data-tip="原始状态接口(机器可读 JSON),是 dashboard 各面板自己轮询的数据源:作业队列、registry 统计、ollama、verdict 计数等。开发者排查/核对用,普通使用不必点。">ⓘ</span></a>
 </div>
 
@@ -4385,6 +4386,160 @@ _CLASSES_CSS = """
   .help { background: #fffbe6; border-left: 3px solid #f59e0b; padding: 8px 12px;
           border-radius: 5px; font-size: 13px; margin: 10px 0; }
 """
+
+
+# ====================================================================
+# v3.0.99.18 — ANNOTATION GUIDANCE PANEL (user 2026-06-09): for each
+# collected dataset, tell the human operator EXACTLY what to do when
+# fine-annotating in Roboflow — is the class schema real names / numeric
+# placeholders / generic / CWD12-mappable / unlabeled, and the recommended
+# action. Answers "how do I label this messy data, and what's in v2/v3/v4".
+# ====================================================================
+_CWD12_NORM = {"".join(c for c in s.lower() if c.isalnum()): s for s in _CWD12}
+for _a, _c in {"morningglory": "Morningglory", "morning glory": "Morningglory",
+               "carpetweed": "Carpetweeds", "palmeramaranth": "PalmerAmaranth",
+               "palmer amaranth": "PalmerAmaranth", "spottedspurge": "SpottedSpurge",
+               "spurge": "SpottedSpurge", "pricklysida": "PricklySida",
+               "eleusineindica": "Goosegrass", "cyperus": "Nutsedge",
+               "cyperusrotundus": "Nutsedge", "ipomoea": "Morningglory"}.items():
+    _CWD12_NORM.setdefault("".join(c for c in _a.lower() if c.isalnum()), _c)
+
+
+def _norm_cls_name(s):
+    return "".join(c for c in str(s).lower() if c.isalnum())
+
+
+def _classify_dataset_classes(class_names):
+    """Return {type, cwd12, action} for an annotation-guidance row."""
+    cn = [str(c) for c in (class_names or []) if str(c).strip()]
+    if not cn:
+        return {"type": "unlabeled", "cwd12": [],
+                "action": "无标注 → 需在 Roboflow 里逐图人工标注(画框+定物种)"}
+    numeric = [c for c in cn if c.strip().lstrip("-").isdigit()]
+    named = [c for c in cn if not c.strip().lstrip("-").isdigit()]
+    cwd12 = sorted({_CWD12_NORM[_norm_cls_name(c)] for c in named
+                    if _norm_cls_name(c) in _CWD12_NORM})
+    if not named:
+        return {"type": "numeric", "cwd12": [],
+                "action": "纯数字占位(0/1/2…)→ 上传器已修会带真名;重传即可,然后核实"}
+    if cwd12 and len(cwd12) == len(set(named)):
+        return {"type": "cwd12", "cwd12": cwd12,
+                "action": "真名且全是 CWD12 物种 → 在 Roboflow 直接人工核实框是否准"}
+    if cwd12:
+        return {"type": "mixed", "cwd12": cwd12,
+                "action": "部分 CWD12 + 部分泛称/数字 → 核实 CWD12,其余逐框判物种或丢弃"}
+    return {"type": "generic", "cwd12": [],
+            "action": "真名但泛称(weed/crop/grass)→ 需逐框判具体物种、映射到 CWD12"}
+
+
+@app.get("/api/annotation_status")
+def api_annotation_status():
+    """Per-dataset annotation guidance for the human labeler."""
+    try:
+        reg = json.load(open(REGISTRY_PATH))
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    ds = reg.get("datasets", {}) or {}
+    try:
+        sv = _slug_verdict_state()
+    except Exception:
+        sv = {}
+    rows = []
+    summary = {"cwd12": 0, "mixed": 0, "generic": 0, "numeric": 0, "unlabeled": 0}
+    for slug, info in ds.items():
+        if info.get("status") != "downloaded":
+            continue
+        cn = info.get("class_names") or []
+        c = _classify_dataset_classes(cn)
+        summary[c["type"]] = summary.get(c["type"], 0) + 1
+        rows.append({
+            "slug": slug,
+            "source": info.get("source", "?"),
+            "images": info.get("local_images", 0),
+            "class_names": [str(x) for x in cn][:20],
+            "n_classes": len(cn),
+            "type": c["type"],
+            "cwd12": c["cwd12"],
+            "action": c["action"],
+            "roboflow_synced": bool(info.get("roboflow_synced")),
+            "verdict": sv.get(slug),
+            "harvest_round": info.get("harvest_round"),
+        })
+    # named/cwd12 first, then mixed/generic, numeric, unlabeled
+    order = {"cwd12": 0, "mixed": 1, "generic": 2, "numeric": 3, "unlabeled": 4}
+    rows.sort(key=lambda r: (order.get(r["type"], 9), -(r["images"] or 0)))
+    return JSONResponse({"ok": True, "n_datasets": len(rows),
+                         "summary": summary, "rows": rows,
+                         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+
+
+@app.get("/annotate", response_class=HTMLResponse)
+def annotate_page():
+    html = '''<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🏷️ 标注指引</title><style>
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
+ .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.4rem 2rem}
+ .hero h1{margin:0 0 .3rem}.hero .sub{opacity:.85;font-size:13px}
+ .nav{background:#fff;padding:.6rem 2rem;border-bottom:1px solid #e5e7eb}
+ .nav a{margin-right:1rem;color:#0e7c66;text-decoration:none;font-size:14px}
+ .wrap{padding:1.2rem 2rem}
+ .legend{display:flex;gap:10px;flex-wrap:wrap;margin:.6rem 0 1rem}
+ .lg{background:#fff;border-radius:8px;padding:.5rem .8rem;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+ table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+ th,td{padding:.55rem .7rem;text-align:left;font-size:13px;border-bottom:1px solid #f0f2f5;vertical-align:top}
+ th{background:#0f172a;color:#fff;font-size:12px}
+ .badge{padding:.12rem .5rem;border-radius:20px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap}
+ .cwd12{background:#0e7c66}.mixed{background:#0ea5e9}.generic{background:#d97706}.numeric{background:#dc2626}.unlabeled{background:#6b7280}
+ .cls{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#444}
+ .stat{display:inline-block;background:#fff;border-radius:8px;padding:.5rem .9rem;margin-right:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+ .stat b{font-size:20px;font-family:ui-monospace,monospace}
+ a.rev{color:#0e7c66;font-weight:600;text-decoration:none}
+</style></head><body>
+<div class="hero"><h1>🏷️ 标注指引面板</h1>
+<div class="sub">每个采集到的数据集 → 它的类是什么(真名/数字/泛称/CWD12)+ 人工该怎么标。配合 Roboflow 做精标注。</div></div>
+<div class="nav"><a href="/">🏠 hub</a><a href="/rounds">🔄 rounds</a><a href="/classes">📋 classes</a><a href="/slugs">📦 slugs</a><a href="/roboflow">📊 roboflow</a><a href="/annotate" style="font-weight:700">🏷️ annotate</a></div>
+<div class="wrap">
+ <div id="stats">loading…</div>
+ <div class="legend">
+  <span class="lg"><span class="badge cwd12">CWD12</span> 真名+全是12物种 → 直接核实</span>
+  <span class="lg"><span class="badge mixed">MIXED</span> 部分CWD12+其他 → 核实+判其余</span>
+  <span class="lg"><span class="badge generic">GENERIC</span> 泛称(weed/crop)→ 逐框判物种</span>
+  <span class="lg"><span class="badge numeric">NUMERIC</span> 纯数字占位 → 重传带真名后核实</span>
+  <span class="lg"><span class="badge unlabeled">UNLABELED</span> 无标注 → 逐图标</span>
+ </div>
+ <table id="tbl"><thead><tr><th>数据集 slug</th><th>来源</th><th>图数</th><th>类型</th><th>类名(真实)</th><th>CWD12命中</th><th>Roboflow</th><th>人工该做什么</th></tr></thead><tbody></tbody></table>
+</div>
+<script>
+async function load(){
+ const d=await (await fetch('/api/annotation_status',{credentials:'include'})).json();
+ if(!d.ok){document.getElementById('stats').innerHTML='err: '+(d.error||'?');return}
+ const s=d.summary||{};
+ document.getElementById('stats').innerHTML=
+   `<span class="stat"><b>${d.n_datasets}</b> 数据集</span>`+
+   `<span class="stat" style="color:#0e7c66"><b>${s.cwd12||0}</b> CWD12真名</span>`+
+   `<span class="stat" style="color:#0ea5e9"><b>${s.mixed||0}</b> mixed</span>`+
+   `<span class="stat" style="color:#d97706"><b>${s.generic||0}</b> generic</span>`+
+   `<span class="stat" style="color:#dc2626"><b>${s.numeric||0}</b> numeric</span>`+
+   `<span class="stat" style="color:#6b7280"><b>${s.unlabeled||0}</b> unlabeled</span>`;
+ const tb=document.querySelector('#tbl tbody');tb.innerHTML='';
+ for(const r of (d.rows||[])){
+   const tr=document.createElement('tr');
+   const rfp=(r.harvest_round&&r.harvest_round!==1)?('weed-crop-agent-v'+r.harvest_round):'weed-crop-agent-dataset';
+   const rfurl='https://app.roboflow.com/a-test-of-will/'+rfp+'/browse?queryText=tag%3A'+encodeURIComponent(r.slug);
+   tr.innerHTML=`<td><a class="rev" href="/gallery/${encodeURIComponent(r.slug)}" target="_blank">${r.slug}</a></td>`+
+     `<td>${r.source}</td><td>${(r.images||0).toLocaleString()}</td>`+
+     `<td><span class="badge ${r.type}">${r.type.toUpperCase()}</span></td>`+
+     `<td class="cls">${(r.class_names||[]).join(', ')||'—'}</td>`+
+     `<td class="cls">${(r.cwd12||[]).join(', ')||'—'}</td>`+
+     `<td>${r.roboflow_synced?('<a class="rev" href="'+rfurl+'" target="_blank">📡 看</a>'):'⏳ 待传'}</td>`+
+     `<td>${r.action}</td>`;
+   tb.appendChild(tr);
+ }
+}
+load();setInterval(load,60000);
+</script></body></html>'''
+    return HTMLResponse(html)
 
 
 @app.get("/api/roboflow_status")

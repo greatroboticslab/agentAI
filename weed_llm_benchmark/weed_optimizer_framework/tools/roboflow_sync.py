@@ -380,6 +380,18 @@ def cmd_sync_newest_slugs(args):
         h_round = info.get("harvest_round")
         batch_name = (f"agent-v{int(h_round)}-{slug}"
                       if h_round else f"agent-{slug}")
+        # v3.0.99.18: label-index → REAL class name from the registry. Without it
+        # every dataset's raw indices upload as 0/1/2 and COLLIDE in the shared
+        # project (one set's "0"=crop, another's "0"=eclipta → merged/corrupted).
+        # With per-slug names the project gets distinct real classes the human can
+        # actually review. Slug name itself is prepended so cross-dataset same-name
+        # classes (generic "weed") stay traceable to their source.
+        _cn = info.get("class_names") or []
+        labelmap = {}
+        for _i, _n in enumerate(_cn):
+            _n = str(_n).strip()
+            if _n and not _n.isdigit():        # skip placeholder-numeric names
+                labelmap[_i] = _n
         ok = 0
         fail = 0
         # v3.0.75.2: progress logging every 10 imgs so silent hangs are
@@ -401,9 +413,9 @@ def cmd_sync_newest_slugs(args):
                     lbl = lbl_dir / (img.stem + ".txt")
                     if lbl.is_file():
                         kw["annotation_path"] = str(lbl)
-                        # Generic labelmap (label-index → name); we don't
-                        # know the class_names for an arbitrary slug, so
-                        # leave it unmapped (Roboflow will keep indices).
+                        # v3.0.99.18: map indices → real names (see above).
+                        if labelmap:
+                            kw["annotation_labelmap"] = labelmap
                 proj.single_upload(**kw)
                 ok += 1
             except Exception as e:
