@@ -68,8 +68,10 @@ echo "ALLPULLS_DONE $(date)"
 # pulling (resumable: sync-newest-slugs skips already-synced). Disable with RF_AUTOSYNC=0.
 if [ "${RF_AUTOSYNC:-1}" = "1" ]; then
     echo "=== [auto-sync] uploading new slugs to Roboflow folder weed_crop_agent_dataset ($(date)) ==="
+    # NOTE: stream to the .out directly (NOT `| tail`, which buffers until EOF and
+    # hides hours of live progress). v3.0.99.16.
     ROBOFLOW_FOLDER=weed_crop_agent_dataset \
     python -u -m weed_optimizer_framework.tools.roboflow_sync sync-newest-slugs \
-        --folder weed_crop_agent_dataset --cap-per-slug "${RF_SYNC_CAP:-0}" 2>&1 | tail -60
+        --folder weed_crop_agent_dataset --cap-per-slug "${RF_SYNC_CAP:-0}" 2>&1
     echo "=== [auto-sync] done $(date) ==="
 fi
