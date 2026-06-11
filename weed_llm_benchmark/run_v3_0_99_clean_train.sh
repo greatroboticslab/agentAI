@@ -47,9 +47,13 @@ cd "$REPO"
 export PYTHONPATH=.:$PYTHONPATH
 export HF_HOME=/ocean/projects/cis240145p/byler/hf_cache
 
-# --- sync latest code: git pull + mirror nested → outer package (drift guard) ---
-echo "[sync] git pull..."
-git pull --ff-only 2>&1 | tail -3 || echo "[sync] WARN git pull failed (using on-disk code)"
+# --- sync latest code: fetch+reset --hard origin/main + mirror nested → outer ---
+# reset --hard (not pull) so local cluster changes never block the sync; the
+# min_dino_score gate (v3.0.99.28) MUST be present or the experiment is wrong.
+echo "[sync] git fetch + reset --hard origin/main ..."
+git fetch origin 2>&1 | tail -2
+git reset --hard origin/main 2>&1 | tail -2
+echo "[sync] HEAD now: $(git log --oneline -1 2>/dev/null)"
 NESTED_PKG="$REPO/weed_llm_benchmark/weed_optimizer_framework"
 OUTER_PKG="$REPO/weed_optimizer_framework"
 if [ -d "$NESTED_PKG" ]; then

@@ -34,6 +34,18 @@ REPO=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark
 cd "$REPO"
 export PYTHONPATH=.:$PYTHONPATH
 
+# v3.0.99.29: SELF-SYNC code to origin/main on every (re)start. Without this, the
+# restart_dashboard HTTP button (restart_self → sbatch this script) silently ran
+# whatever was checked out on the cluster, so "edit locally → push → restart" kept
+# running STALE code (bit us 2026-06-11 deploying the DINO column under SSH login-
+# throttle). fetch+reset --hard guarantees the nested git tree == latest pushed
+# code before the nested→outer mirror below. reset --hard only touches tracked
+# files; results/ + downloads/ (gitignored) are preserved.
+echo "[sync] git fetch + reset --hard origin/main ..."
+git fetch origin 2>&1 | tail -2
+git reset --hard origin/main 2>&1 | tail -2
+echo "[sync] HEAD now: $(git log --oneline -1 2>/dev/null)"
+
 # v3.0.66 / v3.0.67: prevent nested/outer dashboard_server.py drift.
 # Git tracks the nested copy at weed_llm_benchmark/weed_optimizer_framework/
 # but the outer weed_optimizer_framework/ package is what Python imports
