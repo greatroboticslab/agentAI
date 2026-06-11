@@ -852,6 +852,7 @@ def root():
   <a href="/slugs">📦 slugs <span class="navhelp" data-tip="数据集级清理页。每个数据集(slug)一行,显示类名/图数/状态;点 ✓保留 / ✗垃圾 / 🤔存疑 做整包粗筛。✗ 的会从 /classes 隐藏、且不进训练。比逐图审快。">ⓘ</span></a>
   <a href="/roboflow">📊 roboflow <span class="navhelp" data-tip="我们的 Roboflow 项目状态(只显示我们的 4 个:cwd12 金标 + agent v1/v2/v3,无关老项目已过滤)。每个项目的图/框/类数 + 跳转 Roboflow 网页去人工画框精标。">ⓘ</span></a>
   <a href="/annotate">🏷️ annotate <span class="navhelp" data-tip="标注指引面板:每个采集到的数据集 → 它的类是真名/数字占位/泛称/CWD12,以及人工精标该怎么做(直接核实 / 重传带名 / 逐框判物种 / 逐图标)。回答『这堆乱数据我该怎么标、v2/v3/v4 里都是什么』。">ⓘ</span></a>
+  <a href="/labeling">🎯 labeling <span class="navhelp" data-tip="标注控制台(教授设计的人在环闭环):每个数据集你决定推几张到 Roboflow 人工标(agent 采样推荐)→ 标 → 导出回集群 → 删除省额度 → 再推。Mongo 记账:采集/agent标/人标/人核实计数 + 历史。">ⓘ</span></a>
   <a href="/api/cluster_status">📥 JSON <span class="navhelp" data-tip="原始状态接口(机器可读 JSON),是 dashboard 各面板自己轮询的数据源:作业队列、registry 统计、ollama、verdict 计数等。开发者排查/核对用,普通使用不必点。">ⓘ</span></a>
 </div>
 
@@ -4559,6 +4560,186 @@ async function load(){
  }
 }
 load();setInterval(load,60000);
+</script></body></html>'''
+    return HTMLResponse(html)
+
+
+# ====================================================================
+# v3.0.99.24 (A5 + B) — LABELING CONTROL + HISTORY panel. Implements the
+# professor's design: per dataset, the human decides how many images to push
+# to Roboflow (agent recommends a diverse/uncertain sample), labels in Roboflow,
+# then deletes to free quota. MongoDB (labeling_tracker) records the full
+# lifecycle: collected / pushed / in-roboflow / human-labeled / verified.
+# ====================================================================
+def _spawn_rf_sync(tail_args, action):
+    """Spawn `python -m roboflow_sync <tail_args>` with the RF key, logged + RC-marked."""
+    import subprocess as _sp, shlex as _shlex
+    env = os.environ.copy()
+    try:
+        with open("/jet/home/byler/.roboflow_key") as f:
+            k = f.read().strip()
+        env["ROBOFLOW_API_KEY"] = k
+        env["ROBOFLOW_KEY"] = k
+    except Exception as e:
+        return {"ok": False, "action": action, "msg": f"RF key unreadable: {e}"}
+    argv = ["python", "-u", "-m",
+            "weed_optimizer_framework.tools.roboflow_sync"] + list(tail_args)
+    inner = " ".join(_shlex.quote(a) for a in argv)
+    wrapped = f'{inner}; rc=$?; echo "__ACTION_RC__=$rc"; exit $rc'
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    try:
+        _AGENT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    log = _AGENT_LOG_DIR / f"{action}_{ts}.log"
+    try:
+        fp = open(log, "wb")
+        proc = _sp.Popen(["bash", "-c", wrapped], cwd=str(REPO), env=env,
+                         stdout=fp, stderr=_sp.STDOUT, stdin=_sp.DEVNULL,
+                         start_new_session=True)
+    except Exception as e:
+        return {"ok": False, "action": action, "msg": f"spawn failed: {e}"}
+    res = {"ok": True, "action": action, "pid": proc.pid,
+           "log_path": str(log), "log_name": log.name, "started_at": ts,
+           "msg": f"started pid={proc.pid} → {log.name}"}
+    _log_action(action, res)
+    return res
+
+
+@app.post("/api/labeling/push")
+async def api_labeling_push(payload: dict = Body(...)):
+    slug = str(payload.get("slug", ""))
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
+        raise HTTPException(400, "bad slug")
+    try:
+        n = int(payload.get("n", 20))
+    except (TypeError, ValueError):
+        n = 20
+    n = max(1, min(n, 2000))
+    proj = payload.get("project") or "weed-crop-agent-clean"
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', proj):
+        raise HTTPException(400, "bad project")
+    return JSONResponse(_spawn_rf_sync(
+        ["push-slug", "--slug", slug, "--n", str(n), "--project", proj],
+        "labeling_push"))
+
+
+@app.post("/api/labeling/delete")
+async def api_labeling_delete(payload: dict = Body(...)):
+    slug = str(payload.get("slug", ""))
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
+        raise HTTPException(400, "bad slug")
+    proj = payload.get("project") or "weed-crop-agent-clean"
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', proj):
+        raise HTTPException(400, "bad project")
+    return JSONResponse(_spawn_rf_sync(
+        ["delete-slug", "--slug", slug, "--project", proj, "--apply"],
+        "labeling_delete"))
+
+
+@app.get("/api/labeling_status")
+def api_labeling_status():
+    try:
+        from weed_optimizer_framework.tools import labeling_tracker as LT
+        ov = LT.overall()
+    except Exception as e:
+        ov = {"total": {}, "per_slug": {}, "error": str(e)}
+    try:
+        reg = json.load(open(REGISTRY_PATH))
+        ds = reg.get("datasets", {}) or {}
+    except Exception:
+        ds = {}
+    per = ov.get("per_slug", {})
+    rows = []
+    for slug, info in ds.items():
+        if info.get("status") != "downloaded":
+            continue
+        c = per.get(slug, {})
+        rows.append({
+            "slug": slug,
+            "total_images": info.get("local_images", 0),
+            "pushed": c.get("pushed", 0),
+            "in_roboflow": c.get("in_roboflow", 0),
+            "agent_labeled": c.get("agent_labeled", 0),
+            "human_labeled": c.get("human_labeled", 0),
+            "human_verified": c.get("human_verified", 0),
+            "class_names": [str(x) for x in (info.get("class_names") or [])][:8],
+        })
+    rows.sort(key=lambda r: -(r["total_images"] or 0))
+    return JSONResponse({"ok": True, "total": ov.get("total", {}),
+                         "n_datasets": len(rows), "rows": rows})
+
+
+@app.get("/labeling", response_class=HTMLResponse)
+def labeling_page():
+    html = '''<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>🏷️ 标注控制台</title><style>
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
+ .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.3rem 2rem}
+ .hero h1{margin:0 0 .3rem}.hero .sub{opacity:.85;font-size:13px}
+ .nav{background:#fff;padding:.6rem 2rem;border-bottom:1px solid #e5e7eb}
+ .nav a{margin-right:1rem;color:#0e7c66;text-decoration:none;font-size:14px}
+ .wrap{padding:1.1rem 2rem}
+ .stats{margin:.3rem 0 1rem}.stat{display:inline-block;background:#fff;border-radius:8px;padding:.5rem .9rem;margin-right:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+ .stat b{font-size:20px;font-family:ui-monospace,monospace}
+ table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+ th,td{padding:.5rem .6rem;text-align:left;font-size:13px;border-bottom:1px solid #f0f2f5}
+ th{background:#0f172a;color:#fff;font-size:12px}
+ input.n{width:64px;padding:.25rem;border:1px solid #ccd;border-radius:5px}
+ button{padding:.3rem .6rem;border-radius:6px;border:1px solid #0e7c66;background:#0e7c66;color:#fff;cursor:pointer;font-size:12px}
+ button.del{background:#dc2626;border-color:#dc2626}
+ button.exp{background:#0ea5e9;border-color:#0ea5e9}
+ .cls{font-family:ui-monospace,monospace;font-size:11px;color:#555}
+ .toast{position:fixed;bottom:20px;right:20px;background:#0e7c66;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none}
+ .toast.show{display:block}
+</style></head><body>
+<div class="hero"><h1>🏷️ 标注控制台 (human-in-the-loop)</h1>
+<div class="sub">教授设计:每个数据集只推<b>几张</b>(你定数量)→ Roboflow 人工标 → 导出回集群 → 删除省额度 → 再推下一批。Mongo 全程记账。</div></div>
+<div class="nav"><a href="/">🏠 hub</a><a href="/rounds">🔄 rounds</a><a href="/annotate">🏷️ annotate</a><a href="/labeling" style="font-weight:700">🎯 labeling</a><a href="/roboflow">📊 roboflow</a></div>
+<div class="wrap">
+ <div class="stats" id="stats">loading…</div>
+ <table id="tbl"><thead><tr><th>数据集</th><th>总图</th><th>已推</th><th>在RF</th><th>agent标</th><th>人标</th><th>人核实</th><th>类名</th><th>操作</th></tr></thead><tbody></tbody></table>
+ <p style="font-size:12px;color:#888;margin-top:1rem">说明:<b>推 N 张</b>=采样 N 张(均匀分布、代表性)推到 Roboflow(weed-crop-agent-clean,带真名)供人工标;
+ <b>📡审/标</b>=去 Roboflow 网页画框;<b>⬇️导出</b>=把标注好的下载回集群(用首页 download-merge 按钮);<b>🗑删</b>=标完从 RF 删除省额度。</p>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+async function load(){
+ const d=await (await fetch('/api/labeling_status',{credentials:'include'})).json();
+ const t=d.total||{};
+ document.getElementById('stats').innerHTML=
+  `<span class="stat"><b>${d.n_datasets||0}</b> 数据集</span>`+
+  `<span class="stat" style="color:#0e7c66"><b>${t.in_roboflow||0}</b> 在RF待标</span>`+
+  `<span class="stat" style="color:#16a34a"><b>${t.human_labeled||0}</b> 人标</span>`+
+  `<span class="stat" style="color:#0ea5e9"><b>${t.human_verified||0}</b> 人核实</span>`+
+  `<span class="stat"><b>${t.pushed||0}</b> 累计推送</span>`;
+ const tb=document.querySelector('#tbl tbody');tb.innerHTML='';
+ for(const r of (d.rows||[])){
+  const tr=document.createElement('tr');
+  const rfurl='https://app.roboflow.com/a-test-of-will/weed-crop-agent-clean/browse?queryText=tag%3A'+encodeURIComponent(r.slug);
+  tr.innerHTML=`<td><a href="/gallery/${encodeURIComponent(r.slug)}" target="_blank" style="color:#0e7c66">${r.slug}</a></td>`+
+   `<td>${(r.total_images||0).toLocaleString()}</td><td>${r.pushed}</td><td>${r.in_roboflow}</td>`+
+   `<td>${r.agent_labeled}</td><td>${r.human_labeled}</td><td>${r.human_verified}</td>`+
+   `<td class="cls">${(r.class_names||[]).join(', ')}</td>`+
+   `<td><input class="n" id="n_${r.slug}" type="number" value="20" min="1"> `+
+   `<button onclick="push('${r.slug}')">推N张</button> `+
+   `<button class="exp" onclick="window.open('${rfurl}','_blank')">📡标</button> `+
+   `<button class="del" onclick="del('${r.slug}')">🗑删</button></td>`;
+  tb.appendChild(tr);
+ }
+}
+async function push(slug){
+ const n=document.getElementById('n_'+slug).value||20;
+ const r=await fetch('/api/labeling/push',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,n:parseInt(n)})});
+ const d=await r.json();toast(d.ok?('推送中: '+slug+' '+n+'张 (pid '+d.pid+')'):('失败: '+(d.msg||'')));setTimeout(load,3000);
+}
+async function del(slug){
+ if(!confirm('从 Roboflow 删除 '+slug+' 的图?(标注好的应先导出回集群)'))return;
+ const r=await fetch('/api/labeling/delete',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})});
+ const d=await r.json();toast(d.ok?('删除中: '+slug+' (pid '+d.pid+')'):('失败: '+(d.msg||'')));setTimeout(load,3000);
+}
+load();setInterval(load,15000);
 </script></body></html>'''
     return HTMLResponse(html)
 
