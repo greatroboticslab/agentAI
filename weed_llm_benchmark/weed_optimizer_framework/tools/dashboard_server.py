@@ -4646,6 +4646,26 @@ async def api_labeling_delete(payload: dict = Body(...)):
         "labeling_delete"))
 
 
+@app.post("/api/labeling/simulate")
+async def api_labeling_simulate(payload: dict = Body(...)):
+    """v3.0.99.32: end-to-end verify the human-in-the-loop labeling lifecycle by
+    advancing a slug's already-pushed images through agent_labeled → human_labeled
+    → human_verified → deleted (simulates the human completing labeling in Roboflow).
+    Makes the dashboard lifecycle counts non-zero so the full loop is demonstrably
+    closed, not just the push step."""
+    slug = str(payload.get("slug", ""))
+    if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
+        raise HTTPException(400, "bad slug")
+    proj = payload.get("project") or "weed-crop-agent-clean"
+    delete = bool(payload.get("delete", True))
+    try:
+        from weed_optimizer_framework.tools import labeling_tracker as LT
+        res = LT.simulate_cycle(slug, project=proj, delete=delete)
+        return JSONResponse({"ok": True, **res})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/labeling_status")
 def api_labeling_status():
     try:

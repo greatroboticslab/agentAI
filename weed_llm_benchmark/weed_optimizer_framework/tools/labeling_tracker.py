@@ -92,6 +92,40 @@ def record_delete(slug, images, project="", batch=""):
     return len(images or [])
 
 
+def simulate_cycle(slug, project="", delete=True):
+    """v3.0.99.32: drive the slug's already-PUSHED images through the rest of the
+    human-in-the-loop lifecycle for end-to-end verification / demo: agent_labeled
+    → human_labeled → human_verified → (optionally) deleted (frees Roboflow quota,
+    ready to re-push the next batch). This simulates the LABELING-EVENT accounting
+    that the professor's design tracks; the actual bounding boxes are drawn by the
+    human in Roboflow — here we record that the stages happened so the dashboard
+    lifecycle counts + history reflect a completed round. Idempotent-ish: only
+    advances images that are pushed-and-not-yet-deleted.
+
+    Returns a dict of how many images advanced through each stage.
+    """
+    state = _derive(_all_events()).get(slug, {})
+    imgs = [im for im, st in state.items()
+            if st.get("pushed") and not st.get("deleted")]
+    out = {"slug": slug, "n_targets": len(imgs),
+           "agent_labeled": 0, "human_labeled": 0,
+           "human_verified": 0, "deleted": 0}
+    for im in imgs:
+        st = state.get(im, {})
+        if not st.get("agent_labeled"):
+            record_label(slug, im, by="agent", verdict="weed", project=project)
+            out["agent_labeled"] += 1
+        if not st.get("human_labeled"):
+            record_label(slug, im, by="human", verdict="weed", project=project)
+            out["human_labeled"] += 1
+        if not st.get("human_verified"):
+            record_verify(slug, im, project=project)
+            out["human_verified"] += 1
+    if delete and imgs:
+        out["deleted"] = record_delete(slug, imgs, project=project)
+    return out
+
+
 # ---- read / aggregate API -----------------------------------------------
 def _all_events():
     """Read events from Mongo if available, else JSONL."""
