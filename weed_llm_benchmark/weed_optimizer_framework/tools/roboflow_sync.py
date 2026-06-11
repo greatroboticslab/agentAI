@@ -937,11 +937,19 @@ def cmd_push_slug(args):
     if slug not in ds:
         print(f"FATAL: {slug} not in registry"); return 2
     info = ds[slug]
-    dmin = float(os.environ.get("SYNC_DINO_MIN", "0.45"))
+    # v3.0.99.27 (C): hard-refuse threshold lowered 0.45→0.20 on EVIDENCE from the
+    # 45-slug DINOv2 ranking (job 41290114): off-topic garbage separates cleanly at
+    # the very bottom (generic-agriculture 0.084, coconut-disease 0.122, beehive
+    # 0.124 — all <0.15), while legitimate-but-visually-different weed datasets
+    # (drone/other-crop) cluster ~0.30. The trusted pool is cotton-field-only, so
+    # the score is "similarity to cotton fields", NOT "weed vs not-weed". A 0.45
+    # hard-block nuked 29/45 incl. real weed data; 0.20 blocks only gross off-topic.
+    # The red<0.45 / orange<0.6 COLOR in the panel stays as the advisory quality cue.
+    dmin = float(os.environ.get("SYNC_DINO_MIN", "0.20"))
     dscore = _dino_score(slug)
     if (dscore is not None and dscore < dmin and not getattr(args, "force", False)):
-        print(f"REFUSED: {slug} DINO score {dscore:.3f} < {dmin} — likely garbage "
-              f"(step-C filter). Use --force to push anyway.")
+        print(f"REFUSED: {slug} DINO score {dscore:.3f} < {dmin} — off-topic garbage "
+              f"(step-C filter; pool=cotton-field). Use --force to push anyway.")
         return 2
     lp = info.get("local_path", "")
     img_dir = _find_slug_image_dir(lp) if lp and os.path.isdir(lp) else None
