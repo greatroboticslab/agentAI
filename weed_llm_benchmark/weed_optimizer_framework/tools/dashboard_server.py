@@ -4649,6 +4649,16 @@ def api_labeling_status():
         ds = reg.get("datasets", {}) or {}
     except Exception:
         ds = {}
+    # v3.0.99.26 (C): DINOv2 trusted-pool similarity score per slug (garbage filter)
+    dino = {}
+    try:
+        dp = REPO / "results" / "framework" / "dinov2_curator" / "slug_scores.json"
+        if dp.is_file():
+            for s, rec in (json.load(open(dp)) or {}).items():
+                if isinstance(rec, dict) and rec.get("score") is not None:
+                    dino[s] = round(float(rec["score"]), 3)
+    except Exception:
+        pass
     per = ov.get("per_slug", {})
     rows = []
     for slug, info in ds.items():
@@ -4663,6 +4673,7 @@ def api_labeling_status():
             "agent_labeled": c.get("agent_labeled", 0),
             "human_labeled": c.get("human_labeled", 0),
             "human_verified": c.get("human_verified", 0),
+            "dino_score": dino.get(slug),
             "class_names": [str(x) for x in (info.get("class_names") or [])][:8],
         })
     rows.sort(key=lambda r: -(r["total_images"] or 0))
@@ -4698,7 +4709,7 @@ def labeling_page():
 <div class="nav"><a href="/">🏠 hub</a><a href="/rounds">🔄 rounds</a><a href="/annotate">🏷️ annotate</a><a href="/labeling" style="font-weight:700">🎯 labeling</a><a href="/roboflow">📊 roboflow</a></div>
 <div class="wrap">
  <div class="stats" id="stats">loading…</div>
- <table id="tbl"><thead><tr><th>数据集</th><th>总图</th><th>已推</th><th>在RF</th><th>agent标</th><th>人标</th><th>人核实</th><th>类名</th><th>操作</th></tr></thead><tbody></tbody></table>
+ <table id="tbl"><thead><tr><th>数据集</th><th>总图</th><th>DINO</th><th>已推</th><th>在RF</th><th>agent标</th><th>人标</th><th>人核实</th><th>类名</th><th>操作</th></tr></thead><tbody></tbody></table>
  <p style="font-size:12px;color:#888;margin-top:1rem">说明:<b>推 N 张</b>=采样 N 张(均匀分布、代表性)推到 Roboflow(weed-crop-agent-clean,带真名)供人工标;
  <b>📡审/标</b>=去 Roboflow 网页画框;<b>⬇️导出</b>=把标注好的下载回集群(用首页 download-merge 按钮);<b>🗑删</b>=标完从 RF 删除省额度。</p>
 </div>
@@ -4718,8 +4729,12 @@ async function load(){
  for(const r of (d.rows||[])){
   const tr=document.createElement('tr');
   const rfurl='https://app.roboflow.com/a-test-of-will/weed-crop-agent-clean/browse?queryText=tag%3A'+encodeURIComponent(r.slug);
+  const ds=r.dino_score;
+  const dcol = ds==null?'#bbb':(ds<0.45?'#dc2626':(ds<0.6?'#d97706':'#0e7c66'));
   tr.innerHTML=`<td><a href="/gallery/${encodeURIComponent(r.slug)}" target="_blank" style="color:#0e7c66">${r.slug}</a></td>`+
-   `<td>${(r.total_images||0).toLocaleString()}</td><td>${r.pushed}</td><td>${r.in_roboflow}</td>`+
+   `<td>${(r.total_images||0).toLocaleString()}</td>`+
+   `<td style="font-family:ui-monospace;font-weight:700;color:${dcol}">${ds==null?'—':ds}</td>`+
+   `<td>${r.pushed}</td><td>${r.in_roboflow}</td>`+
    `<td>${r.agent_labeled}</td><td>${r.human_labeled}</td><td>${r.human_verified}</td>`+
    `<td class="cls">${(r.class_names||[]).join(', ')}</td>`+
    `<td><input class="n" id="n_${r.slug}" type="number" value="20" min="1"> `+
