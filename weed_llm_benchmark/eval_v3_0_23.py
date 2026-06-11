@@ -21,7 +21,8 @@ import yaml
 from ultralytics import YOLO
 
 REPO = "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"
-BEST_PT = f"{REPO}/results/framework/mega_iter6/train8/weights/best.pt"
+BEST_PT = os.environ.get(
+    "BEST_PT", f"{REPO}/results/framework/mega_iter6/train8/weights/best.pt")
 OUT = f"{REPO}/results/v3_0_23_eval"
 os.makedirs(OUT, exist_ok=True)
 

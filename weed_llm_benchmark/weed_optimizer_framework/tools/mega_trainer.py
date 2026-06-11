@@ -248,7 +248,7 @@ def _build_canonical_class_map(slug, info):
 
 
 def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
-                    val_dataset_root=None):
+                    val_dataset_root=None, min_dino_score=None):
     """Merge all downloaded datasets (with labels) into one YOLO-format dataset.
 
     v3.0.25 changes:
@@ -282,6 +282,7 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
              "skipped_duplicates": 0, "unique_hashes": 0,
              "skipped_autolabel": 0, "skipped_never_train": 0,
              "skipped_holdout_stem": 0, "skipped_user_flag": 0,
+             "skipped_low_dino": 0,
              "weed_class_instances": {n: 0 for n in CANONICAL_12_NAMES}}
     seen_hashes = {}
 
@@ -311,6 +312,35 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
         except Exception as e:
             logger.warning(f"[Merge] could not load user flags from {flags_path}: {e}")
 
+    # v3.0.99.28 (D): DINOv2 quality gate for the "clean subset" experiment.
+    # When strategy sets min_dino_score, slugs whose trusted-pool similarity score
+    # (results/framework/dinov2_curator/slug_scores.json, written by dinov2_curator)
+    # is below the threshold are dropped from training. This lets us build a
+    # quality-core training set (e.g. min_dino_score=0.45 keeps only cotton-like
+    # high-similarity weed data) to test the "quality > quantity" hypothesis
+    # against the 175K-noisy baseline. Off-topic garbage (coconut/beehive ~0.12)
+    # is excluded automatically. None = no gate (default, back-compat).
+    dino_scores = {}
+    if min_dino_score is not None:
+        dino_path = os.path.join(os.path.dirname(__file__), "..", "..",
+                                 "results", "framework", "dinov2_curator",
+                                 "slug_scores.json")
+        dino_path = os.path.abspath(dino_path)
+        try:
+            import json as _json2
+            with open(dino_path) as f:
+                raw = _json2.load(f) or {}
+            for s, rec in raw.items():
+                if isinstance(rec, dict) and rec.get("score") is not None:
+                    dino_scores[s] = float(rec["score"])
+            logger.info(f"[Merge] DINO gate active: min_dino_score={min_dino_score}; "
+                        f"{len(dino_scores)} slugs scored; "
+                        f"{sum(1 for v in dino_scores.values() if v < min_dino_score)} "
+                        f"below threshold will be skipped")
+        except Exception as e:
+            logger.warning(f"[Merge] min_dino_score set but could not load "
+                           f"{dino_path}: {e} — DINO gate DISABLED this run")
+
     valid_annotations = {"bbox", "bbox+segmentation", "yolo"}
     if include_autolabel:
         valid_annotations.add("yolo_autolabel")
@@ -329,6 +359,16 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
             stats["skipped_user_flag"] += 1
             logger.info(f"[Merge] {ds_name} user-flagged GARBAGE — skipped. "
                         f"reason: {(user_flags[ds_name] or {}).get('reason','')[:80]}")
+            continue
+
+        # v3.0.99.28 (D): DINOv2 quality gate — drop low-similarity slugs when the
+        # clean-subset experiment sets min_dino_score. A slug with NO score is kept
+        # (don't penalize unscored data); only an explicit below-threshold score skips.
+        if min_dino_score is not None and ds_name in dino_scores \
+                and dino_scores[ds_name] < min_dino_score:
+            stats["skipped_low_dino"] += 1
+            logger.info(f"[Merge] {ds_name} DINO score {dino_scores[ds_name]:.3f} "
+                        f"< {min_dino_score} — skipped (clean-subset gate)")
             continue
 
         local_path = info.get("local_path")
@@ -681,6 +721,9 @@ def train_yolo_mega(strategy, iteration):
       val_dataset_root (default None) — path to cottonweeddet12 holdout root.
         If provided, val is overridden to the hand-labeled holdout and
         mAP50-95 reported by ultralytics is the honest paper-grade signal.
+      min_dino_score (default None) — v3.0.99.28 (D) clean-subset gate. When set,
+        slugs with DINOv2 trusted-pool score below it are dropped from training
+        (quality-core experiment). Unscored slugs are kept.
 
     Returns: (best_pt_path, result_summary)
     """
@@ -689,10 +732,11 @@ def train_yolo_mega(strategy, iteration):
 
     include_autolabel = bool(strategy.get("include_autolabel", False))
     val_dataset_root = strategy.get("val_dataset_root")
+    min_dino_score = strategy.get("min_dino_score")  # v3.0.99.28 (D) clean-subset gate
     merged_dir = os.path.join(Config.FRAMEWORK_DIR, f"merged_iter{iteration}")
     _, data_yaml, stats, used_datasets, names_list = _merge_datasets(
         merged_dir, include_autolabel=include_autolabel,
-        val_dataset_root=val_dataset_root,
+        val_dataset_root=val_dataset_root, min_dino_score=min_dino_score,
     )
 
     if stats["images"] < 100:
