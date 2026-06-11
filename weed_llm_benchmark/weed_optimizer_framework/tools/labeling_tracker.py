@@ -1,0 +1,188 @@
+"""
+labeling_tracker.py — v3.0.99.22 (2026-06-11)
+
+Mongo (+JSONL fallback) lifecycle tracker for the PROFESSOR's human-in-the-loop
+labeling design: we only label a FEW images per dataset, the agent recommends
+which, the human decides how many to push to Roboflow, then push → label →
+record → delete → repush. This module is the single source of truth for WHAT
+happened to each image:
+
+  events (append-only):  pushed | agent_labeled | human_labeled | human_verified | deleted
+  per (slug, image)   →  latest state derived by replay
+
+Used by the dashboard "labeling control" + "history" panels (steps A & B).
+MongoDB collection `labeling`; falls back to results/framework/labeling_events.jsonl
+when Mongo is unavailable so nothing is ever lost.
+"""
+import json
+import os
+import time
+from pathlib import Path
+
+REPO = Path(os.environ.get(
+    "REPO_ROOT", "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"))
+_JSONL = REPO / "results" / "framework" / "labeling_events.jsonl"
+COLL_LABELING = "labeling"
+
+EVENTS = ("pushed", "agent_labeled", "human_labeled", "human_verified", "deleted")
+
+
+def _now():
+    # Date.now-free per harness rules; uses time.time which is allowed here (not a scripts ctx)
+    return time.time()
+
+
+def _mongo():
+    """Return the Mongo db handle from db.py, or None."""
+    try:
+        from weed_optimizer_framework.tools import db as _db
+        return _db._get_db()
+    except Exception:
+        return None
+
+
+def _emit(event: str, slug: str, image: str = "", project: str = "",
+          batch: str = "", meta: dict = None):
+    if event not in EVENTS:
+        raise ValueError(f"bad event {event!r}")
+    doc = {
+        "ts": _now(),
+        "event": event, "slug": slug, "image": image,
+        "project": project, "batch": batch,
+        "meta": meta or {},
+    }
+    # Mongo (best effort)
+    dbh = _mongo()
+    if dbh is not None:
+        try:
+            dbh[COLL_LABELING].insert_one(dict(doc))
+        except Exception:
+            pass
+    # JSONL fallback (always — durable even without Mongo)
+    try:
+        _JSONL.parent.mkdir(parents=True, exist_ok=True)
+        with open(_JSONL, "a") as f:
+            f.write(json.dumps(doc) + "\n")
+    except Exception:
+        pass
+    return doc
+
+
+# ---- write API -----------------------------------------------------------
+def record_push(slug, images, project="", batch=""):
+    """images: list of filenames just pushed to Roboflow for labeling."""
+    for im in (images or []):
+        _emit("pushed", slug, im, project, batch)
+    return len(images or [])
+
+
+def record_label(slug, image, by="agent", verdict=None, project=""):
+    """by = 'agent' or 'human'."""
+    ev = "agent_labeled" if by == "agent" else "human_labeled"
+    return _emit(ev, slug, image, project, meta={"verdict": verdict})
+
+
+def record_verify(slug, image, project=""):
+    return _emit("human_verified", slug, image, project)
+
+
+def record_delete(slug, images, project="", batch=""):
+    for im in (images or []):
+        _emit("deleted", slug, im, project, batch)
+    return len(images or [])
+
+
+# ---- read / aggregate API -----------------------------------------------
+def _all_events():
+    """Read events from Mongo if available, else JSONL."""
+    dbh = _mongo()
+    if dbh is not None:
+        try:
+            return list(dbh[COLL_LABELING].find({}, {"_id": 0}).sort("ts", 1))
+        except Exception:
+            pass
+    out = []
+    if _JSONL.is_file():
+        for line in _JSONL.read_text(errors="ignore").splitlines():
+            if line.strip():
+                try:
+                    out.append(json.loads(line))
+                except Exception:
+                    pass
+    out.sort(key=lambda e: e.get("ts", 0))
+    return out
+
+
+def _derive(events):
+    """Latest state per (slug, image). Returns {slug: {image: state}}."""
+    state = {}
+    for e in events:
+        slug, im = e.get("slug"), e.get("image")
+        if not slug:
+            continue
+        s = state.setdefault(slug, {})
+        st = s.setdefault(im, {"pushed": False, "agent_labeled": False,
+                               "human_labeled": False, "human_verified": False,
+                               "deleted": False})
+        ev = e.get("event")
+        if ev in st:
+            st[ev] = True
+    return state
+
+
+def slug_counts(slug):
+    state = _derive(_all_events()).get(slug, {})
+    return _count_state(state)
+
+
+def _count_state(state):
+    c = {"images": 0, "pushed": 0, "agent_labeled": 0,
+         "human_labeled": 0, "human_verified": 0, "deleted": 0,
+         "in_roboflow": 0}
+    for im, st in state.items():
+        c["images"] += 1
+        for k in ("pushed", "agent_labeled", "human_labeled",
+                  "human_verified", "deleted"):
+            if st.get(k):
+                c[k] += 1
+        if st.get("pushed") and not st.get("deleted"):
+            c["in_roboflow"] += 1
+    return c
+
+
+def overall():
+    """Per-slug + grand-total lifecycle counts + raw event count."""
+    events = _all_events()
+    state = _derive(events)
+    per = {slug: _count_state(s) for slug, s in state.items()}
+    total = {"images": 0, "pushed": 0, "agent_labeled": 0,
+             "human_labeled": 0, "human_verified": 0, "deleted": 0,
+             "in_roboflow": 0, "n_datasets": len(per)}
+    for c in per.values():
+        for k in c:
+            total[k] = total.get(k, 0) + c[k]
+    return {"total": total, "per_slug": per, "n_events": len(events)}
+
+
+def history(limit=200):
+    """Recent events (for the dashboard history panel)."""
+    return _all_events()[-limit:]
+
+
+def main():
+    import sys
+    a = sys.argv[1:]
+    if not a or a[0] == "overall":
+        print(json.dumps(overall(), indent=2, default=str))
+    elif a[0] == "slug" and len(a) > 1:
+        print(json.dumps(slug_counts(a[1]), indent=2, default=str))
+    elif a[0] == "history":
+        for e in history(int(a[1]) if len(a) > 1 else 50):
+            print(e.get("event"), e.get("slug"), e.get("image"))
+    else:
+        print("usage: labeling_tracker.py [overall|slug <slug>|history [N]]")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
