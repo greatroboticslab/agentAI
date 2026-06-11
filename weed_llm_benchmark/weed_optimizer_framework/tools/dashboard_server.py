@@ -3347,6 +3347,15 @@ _CLUSTER_ACTIONS = {
         "script": "run_v3_0_50_owl_preannotate.sh",
         "label": "OWL 预标注 1 物种 — 给出 red bbox 提案 (~10-30min,需 exemplar JSON)",
     },
+    # v3.0.99.30 (D): clean-subset training — quality>quantity probe. Trains on
+    # high-DINO clean data only (min_dino_score gate, no 175K loose auto-labels)
+    # with cwd12 gold val, then auto-evals mAP50-95 vs the 0.67 noisy baseline.
+    # HTTP-triggerable so D can launch without SSH (login-throttle workaround).
+    "clean_train_d": {
+        "type": "sbatch",
+        "script": "run_v3_0_99_clean_train.sh",
+        "label": "D 干净子集训练(质量>数量探针:DINO门+cwd12 gold val+自动eval,GPU)",
+    },
     # v3.0.62 (button-test iter 9, Phase T3): export ✓/object_bank exemplars
     # to JSON configs that owl_preannotate.py consumes. Without this, OWL
     # button just FATALs on missing exemplar config.
