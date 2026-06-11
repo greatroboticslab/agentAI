@@ -862,6 +862,146 @@ def cmd_delete_junk(args):
     return 0
 
 
+# ---------------------------------------------------------------------------
+# v3.0.99.23 (A2/A3) — PER-DATASET push of a FEW sampled images (prof: only a few
+# images per dataset, human decides how many). push-slug uploads N diverse images
+# of ONE slug to a project (real names via labelmap) + records to labeling_tracker;
+# delete-slug removes that slug's images from the project (free Roboflow quota).
+# ---------------------------------------------------------------------------
+_PUSH_EXTS = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
+
+
+def _find_slug_image_dir(lp):
+    from pathlib import Path as _P
+    cands = [_P(lp) / s for s in
+             ("images", "train/images", "valid/images", "test/images",
+              "data/images", "data", "agri_data/data", "raw_data",
+              "train", "valid", "test")]
+    cands.append(_P(lp))
+    for d in cands:
+        if d.is_dir() and any(p.suffix in _PUSH_EXTS for p in d.iterdir()):
+            return d
+    counts = {}
+    for p in _P(lp).rglob("*"):
+        if p.suffix in _PUSH_EXTS and p.is_file():
+            counts[p.parent] = counts.get(p.parent, 0) + 1
+            if sum(counts.values()) > 5000:
+                break
+    return max(counts.items(), key=lambda kv: kv[1])[0] if counts else None
+
+
+def _labelmap_for(info):
+    lm = {}
+    for i, n in enumerate(info.get("class_names") or []):
+        n = str(n).strip()
+        if n and not n.isdigit():
+            lm[i] = n
+    return lm
+
+
+def _registry():
+    import json as _j
+    from pathlib import Path as _P
+    rp = _P(os.environ.get(
+        "REPO_ROOT", "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark")
+    ) / "results" / "framework" / "dataset_registry.json"
+    return _j.load(open(rp))["datasets"]
+
+
+def cmd_push_slug(args):
+    """Push N sampled (diverse, evenly-spaced) images of ONE slug to a project for
+    human labeling. Records 'pushed' events to labeling_tracker."""
+    from pathlib import Path as _P
+    from weed_optimizer_framework.tools import labeling_tracker as LT
+    slug = args.slug
+    n = int(args.n)
+    project = getattr(args, "project", None) or "weed-crop-agent-clean"
+    ds = _registry()
+    if slug not in ds:
+        print(f"FATAL: {slug} not in registry"); return 2
+    info = ds[slug]
+    lp = info.get("local_path", "")
+    img_dir = _find_slug_image_dir(lp) if lp and os.path.isdir(lp) else None
+    if not img_dir:
+        print(f"FATAL: no image dir for {slug}"); return 2
+    lbl_dir = None
+    for s in ("labels", "train/labels", "valid/labels", "test/labels"):
+        if (_P(lp) / s).is_dir():
+            lbl_dir = _P(lp) / s; break
+    imgs = sorted(p for p in img_dir.iterdir() if p.suffix in _PUSH_EXTS)
+    if not imgs:
+        print(f"FATAL: 0 images under {img_dir}"); return 2
+    # diverse sample: evenly spaced across the dataset (v1 recommendation heuristic)
+    if n < len(imgs):
+        step = len(imgs) / n
+        picked = [imgs[int(i * step)] for i in range(n)]
+    else:
+        picked = imgs
+    labelmap = _labelmap_for(info)
+    ws = _workspace()
+    try:
+        proj = ws.project(project)
+    except Exception as e:
+        print(f"FATAL: cannot open project {project}: {e}"); return 2
+    batch = f"label-{slug}"
+    ok = []
+    print(f"[push-slug] {slug}: pushing {len(picked)}/{len(imgs)} sampled imgs → {project}")
+    for i, img in enumerate(picked, 1):
+        kw = dict(image_path=str(img), split="train", batch_name=batch,
+                  tag_names=["needs-label", slug], num_retry_uploads=1)
+        if lbl_dir and (lbl_dir / (img.stem + ".txt")).is_file():
+            kw["annotation_path"] = str(lbl_dir / (img.stem + ".txt"))
+            if labelmap:
+                kw["annotation_labelmap"] = labelmap
+        try:
+            proj.single_upload(**kw)
+            ok.append(img.name)
+        except Exception as e:
+            if len(ok) < 3:
+                print(f"  fail {img.name}: {str(e)[:80]}")
+        if i % 10 == 0:
+            print(f"  {i}/{len(picked)} ok={len(ok)}", flush=True)
+    LT.record_push(slug, ok, project=project, batch=batch)
+    print(f"[push-slug] done: pushed {len(ok)} imgs, recorded to labeling_tracker")
+    return 0
+
+
+def cmd_delete_slug(args):
+    """Delete ONE slug's images from a Roboflow project (frees quota after labeling).
+    Records 'deleted' events."""
+    from weed_optimizer_framework.tools import labeling_tracker as LT
+    slug = args.slug
+    project = getattr(args, "project", None) or "weed-crop-agent-clean"
+    ids, offset = [], 0
+    while True:
+        try:
+            st, res = _rf_api("POST", f"{project}/search",
+                              {"tag": slug, "offset": offset, "limit": 250})
+        except Exception as e:
+            print(f"search failed: {e}"); break
+        batch = [x.get("id") for x in (res.get("results") or []) if x.get("id")]
+        ids += batch
+        if len(batch) < 250:
+            break
+        offset += 250
+    if not ids:
+        print(f"[delete-slug] {slug}: 0 images in {project}"); return 0
+    if not getattr(args, "apply", False):
+        print(f"[delete-slug] DRY-RUN: would delete {len(ids)} imgs of {slug} from {project}")
+        return 0
+    deleted = 0
+    for i in range(0, len(ids), 250):
+        chunk = ids[i:i + 250]
+        try:
+            _rf_api("DELETE", f"{project}/images", {"images": chunk})
+            deleted += len(chunk)
+        except Exception as e:
+            print(f"  delete fail: {str(e)[:80]}")
+    LT.record_delete(slug, [f"id:{x}" for x in ids[:deleted]], project=project)
+    print(f"[delete-slug] {slug}: deleted {deleted} imgs from {project}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -914,6 +1054,14 @@ def main():
     dj = sub.add_parser("delete-junk")
     dj.add_argument("--apply", action="store_true",
                     help="actually delete (default: dry-run = just count)")
+    ps = sub.add_parser("push-slug")
+    ps.add_argument("--slug", required=True)
+    ps.add_argument("--n", type=int, default=20, help="how many sampled images to push")
+    ps.add_argument("--project", default=None, help="target project (default weed-crop-agent-clean)")
+    ds_ = sub.add_parser("delete-slug")
+    ds_.add_argument("--slug", required=True)
+    ds_.add_argument("--project", default=None)
+    ds_.add_argument("--apply", action="store_true")
     su = sub.add_parser("species-upload")
     su.add_argument("--images", required=True)
     su.add_argument("--labels", required=True)
@@ -932,6 +1080,8 @@ def main():
      "upload": cmd_upload,
      "bulk-upload": cmd_bulk_upload,
      "delete-junk": cmd_delete_junk,
+     "push-slug": cmd_push_slug,
+     "delete-slug": cmd_delete_slug,
      "species-upload": cmd_species_upload}[args.cmd](args)
 
 
