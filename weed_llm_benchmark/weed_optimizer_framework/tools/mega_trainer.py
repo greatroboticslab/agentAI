@@ -473,6 +473,15 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
             # bookkeeping but the *real* val gets overridden in data.yaml below.
             bucket = "valid" if (ds_img_count % int(1 / val_fraction)) == 0 else "train"
             dst_stem = f"{ds_name}_{img.stem}"
+            # v3.0.99.31: cap the per-file name to stay under NAME_MAX (255 bytes).
+            # Roboflow slugs + augmented filenames (e.g. *_jpg.rf.<long-hash>) can
+            # concatenate past 255 → OSError(36) ENAMETOOLONG crashed the whole
+            # v3.0.99 clean-train merge. Truncate + append a stable hash so names
+            # stay unique. Keep the matching label name in sync via dst_stem.
+            if len(dst_stem.encode("utf-8")) > 180:
+                import hashlib as _hl
+                _h = _hl.md5(dst_stem.encode("utf-8")).hexdigest()[:12]
+                dst_stem = dst_stem[:160] + "_" + _h
             dst_img = os.path.join(out_dir, bucket, "images", dst_stem + img.suffix)
             # v3.0.22: SYMLINK instead of copy. 244K file copies on /ocean took
             # 3h in v3.0.20 merge. Symlinks are nearly instant and ultralytics
