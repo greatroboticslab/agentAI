@@ -908,9 +908,26 @@ def _registry():
     return _j.load(open(rp))["datasets"]
 
 
+def _dino_score(slug):
+    """Read this slug's DINOv2 trusted-pool similarity score (step C), or None."""
+    import json as _j
+    from pathlib import Path as _P
+    p = _P(os.environ.get(
+        "REPO_ROOT", "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark")
+    ) / "results" / "framework" / "dinov2_curator" / "slug_scores.json"
+    try:
+        d = _j.load(open(p))
+        rec = d.get(slug)
+        return rec.get("score") if isinstance(rec, dict) else None
+    except Exception:
+        return None
+
+
 def cmd_push_slug(args):
     """Push N sampled (diverse, evenly-spaced) images of ONE slug to a project for
-    human labeling. Records 'pushed' events to labeling_tracker."""
+    human labeling. Records 'pushed' events to labeling_tracker.
+    v3.0.99.25: refuse DINO-garbage slugs (score < SYNC_DINO_MIN) unless --force —
+    don't waste human labeling effort / Roboflow quota on garbage datasets (step C)."""
     from pathlib import Path as _P
     from weed_optimizer_framework.tools import labeling_tracker as LT
     slug = args.slug
@@ -920,6 +937,12 @@ def cmd_push_slug(args):
     if slug not in ds:
         print(f"FATAL: {slug} not in registry"); return 2
     info = ds[slug]
+    dmin = float(os.environ.get("SYNC_DINO_MIN", "0.45"))
+    dscore = _dino_score(slug)
+    if (dscore is not None and dscore < dmin and not getattr(args, "force", False)):
+        print(f"REFUSED: {slug} DINO score {dscore:.3f} < {dmin} — likely garbage "
+              f"(step-C filter). Use --force to push anyway.")
+        return 2
     lp = info.get("local_path", "")
     img_dir = _find_slug_image_dir(lp) if lp and os.path.isdir(lp) else None
     if not img_dir:
@@ -1058,6 +1081,7 @@ def main():
     ps.add_argument("--slug", required=True)
     ps.add_argument("--n", type=int, default=20, help="how many sampled images to push")
     ps.add_argument("--project", default=None, help="target project (default weed-crop-agent-clean)")
+    ps.add_argument("--force", action="store_true", help="push even if DINO score is low")
     ds_ = sub.add_parser("delete-slug")
     ds_.add_argument("--slug", required=True)
     ds_.add_argument("--project", default=None)
