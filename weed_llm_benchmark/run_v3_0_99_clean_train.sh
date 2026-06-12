@@ -5,8 +5,12 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=48G
-#SBATCH --time=12:00:00
+#SBATCH --time=48:00:00
 #SBATCH --output=results/framework/v3_0_99_clean_train_%j.out
+# v3.0.99.33: --time 12h→48h. The first run (job 41292498) hit the 12h wall-time
+# at ~epoch 14 (mAP50-95 0.602, still rising) before converging — 34K imgs ×
+# imgsz 1024 × ~50min/epoch needs more than 12h. 48h lets patience(25) decide the
+# stop on the real plateau so the quality-vs-quantity verdict is conclusive.
 
 # v3.0.99.28 (D) — CLEAN-SUBSET training: test the "quality > quantity" hypothesis.
 #
