@@ -102,7 +102,11 @@ import base64 as _base64
 import secrets as _secrets
 from collections import defaultdict as _defaultdict
 
-_DASHPASS_FILE = "/jet/home/byler/.dashpass"
+# v3.0.99.35: portable secret paths. os.path.expanduser("~") = /jet/home/byler on
+# the cluster (unchanged) and /home/lab on the lab server → works in BOTH places.
+# Env override DASHPASS_FILE / ROBOFLOW_KEY_FILE for non-standard locations.
+_DASHPASS_FILE = os.environ.get("DASHPASS_FILE", os.path.expanduser("~/.dashpass"))
+_ROBOFLOW_KEY_FILE = os.environ.get("ROBOFLOW_KEY_FILE", os.path.expanduser("~/.roboflow_key"))
 _AUTH_USER = "harry"
 _AUTH_PASS = None
 try:
@@ -3297,7 +3301,7 @@ _CLUSTER_ACTIONS = {
             "--workers", "8", "--per-species", "50",
             "--project", "cwd12-multiclass-v1",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "Roboflow 多类上传 → cwd12-multiclass-v1 (frozen 598-img benchmark, ~10min)",
     },
     # v3.0.67 (2026-05-31): new agent-harvested target project per user
@@ -3316,7 +3320,7 @@ _CLUSTER_ACTIONS = {
             "--workers", "8", "--per-species", "50",
             "--project", "weed-crop-agent-dataset",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "Roboflow 上传 → weed-crop-agent-dataset (新 agent 收集池,~10min)",
     },
     # v3.0.46 (auto-loop iter 4 / Phase D1): bucket-audit CLI.
@@ -3336,7 +3340,7 @@ _CLUSTER_ACTIONS = {
             "weed_optimizer_framework.tools.merge_roboflow_projects",
             "--out", "results/framework/roboflow_state.json",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "Roboflow 13-project 状态审计 (imgs/boxes/versions per cwd12-<sp>, ~10s)",
     },
     # v3.0.50 (auto-loop iter 8 / Phase D3): OWL pre-annotate sbatch.
@@ -3376,7 +3380,7 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.rounds", "start-new",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "▶ Start NEW harvest round (v{N} → v{N+1}); creates RF project but no data yet",
     },
     # v3.0.77 (2026-06-01): ONE-CLICK new harvest round end-to-end.
@@ -3412,7 +3416,7 @@ _CLUSTER_ACTIONS = {
             "weed_optimizer_framework.tools.dinov2_round_filter",
             "--round", "1", "--threshold", "0.6",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "🧠 DINOv2 filter ROUND 1 → upload survivors as agent-v1-dinov2-v{X.Y} (re-clickable, ~10min)",
     },
     # v3.0.74 Stage 5 — placeholder send-to-training trigger
@@ -3458,7 +3462,7 @@ _CLUSTER_ACTIONS = {
             "--cap-per-slug", "100",
             "--skip-baselines",  # default: don't push cwd12 here (use sync_all_to_roboflow for that)
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "Roboflow 上传 — 跳过 cwd12 baseline (agent-harvested only, ~10min/slug)",
     },
     # v3.0.75 (2026-06-01): user wants ALL data in Roboflow for fast browsing.
@@ -3473,7 +3477,7 @@ _CLUSTER_ACTIONS = {
             "--cap-per-slug", "100",
             # NO --skip-baselines: cwd12 baselines (sp8/holdout) included
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "🚀 Sync ALL (incl. cwd12 baselines) → Roboflow for fast review (~10min/slug)",
     },
     # v3.0.71.3: OWL red proposals → Roboflow upload.
@@ -3490,7 +3494,7 @@ _CLUSTER_ACTIONS = {
             "--project", "weed-crop-agent-dataset",
             "--per-species", "50",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "上传 OWL red 提案 → weed-crop-agent-dataset (精度门槛保护;低于阈值拒绝上传,OWL_UPLOAD_FORCE=1 强制)",
     },
     # v3.0.71: DINOv2 dataset-quality curator (full pipeline as one button)
@@ -3509,7 +3513,7 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
             "list-folders",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "Roboflow folders 列表 (workspace 内所有 folder + 成员项目, ~3s)",
     },
     "roboflow_move_agent_to_folder": {
@@ -3520,7 +3524,7 @@ _CLUSTER_ACTIONS = {
             "--project", "weed-crop-agent-dataset",
             "--folder", "weed_crop_agent_dataset",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "把 weed-crop-agent-dataset 项目移进 weed_crop_agent_dataset folder (idempotent, ~3s)",
     },
     # v3.0.51 (auto-loop iter 9 / Phase D4): Roboflow Version generation + pull-back.
@@ -3534,7 +3538,7 @@ _CLUSTER_ACTIONS = {
             "generate-versions",
             "--project", "weed-crop-agent-dataset",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "Roboflow Version 生成 → weed-crop-agent-dataset (skips if existing, ~30s)",
     },
     "roboflow_download_merge": {
@@ -3544,7 +3548,7 @@ _CLUSTER_ACTIONS = {
             "weed_optimizer_framework.tools.merge_roboflow_projects",
             "download-merge",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "⬇️ 导出标注回集群:Roboflow 标注好的数据 → cwd12 多类训练集(优质保留+ground-truth落盘)",
     },
     # v3.0.99.21: delete junk-verdict datasets' images from Roboflow (storage is a
@@ -3556,7 +3560,7 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
             "delete-junk",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "🗑️ 垃圾删除(预演):统计 junk 数据集在 Roboflow 上有多少图会被删(不实删)",
     },
     "roboflow_delete_junk_apply": {
@@ -3565,7 +3569,7 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m", "weed_optimizer_framework.tools.roboflow_sync",
             "delete-junk", "--apply",
         ],
-        "env_secret_files": {"ROBOFLOW_API_KEY": "/jet/home/byler/.roboflow_key"},
+        "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
         "label": "🗑️ 垃圾删除(执行):把 verdict=junk 的数据集从 Roboflow 删除,省每月存储(真值已在集群)",
     },
     # v3.0.52 (auto-loop iter 11 / Phase D2 sbatch): DINOv2 routing job.
@@ -4585,7 +4589,7 @@ def _spawn_rf_sync(tail_args, action):
     import subprocess as _sp, shlex as _shlex
     env = os.environ.copy()
     try:
-        with open("/jet/home/byler/.roboflow_key") as f:
+        with open(_ROBOFLOW_KEY_FILE) as f:
             k = f.read().strip()
         env["ROBOFLOW_API_KEY"] = k
         env["ROBOFLOW_KEY"] = k
@@ -4800,7 +4804,7 @@ def api_roboflow_status():
     """
     import urllib.request
     try:
-        with open("/jet/home/byler/.roboflow_key") as f:
+        with open(_ROBOFLOW_KEY_FILE) as f:
             key = f.read().strip()
     except Exception as e:
         return JSONResponse({"ok": False,
@@ -6286,7 +6290,7 @@ def api_per_species_stats():
     try:
         # reuse the same data /api/roboflow_status pulls
         import urllib.request
-        key_path = "/jet/home/byler/.roboflow_key"
+        key_path = _ROBOFLOW_KEY_FILE
         if os.path.isfile(key_path):
             with open(key_path) as f:
                 rf_key = f.read().strip()
