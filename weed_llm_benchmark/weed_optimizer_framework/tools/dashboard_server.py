@@ -2894,9 +2894,15 @@ _CLUSTER_KEY = os.environ.get(
 
 
 def _ssh_cluster_prefix() -> list:
-    return ["ssh", "-i", _CLUSTER_KEY, "-o", "IdentitiesOnly=yes",
-            "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20",
-            "-o", "BatchMode=yes", _CLUSTER_SSH]
+    # v3.0.99.41: Bridges-2 does NOT honor user-added authorized_keys (resets them)
+    # → use PASSWORD auth via SSH_ASKPASS (env set in the service) + ControlMaster
+    # multiplexing: the FIRST connection authenticates (password), all subsequent
+    # commands reuse the persistent socket → no repeated auth → no login throttle
+    # + fast. No -i/IdentitiesOnly/BatchMode (those would block password fallback).
+    cm = os.path.expanduser("~/.ssh/cm-%r@%h:%p")
+    return ["ssh", "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "ConnectTimeout=25", "-o", "ControlMaster=auto",
+            "-o", f"ControlPath={cm}", "-o", "ControlPersist=12h", _CLUSTER_SSH]
 
 
 def _slurm(cmd: list, timeout: int = 15) -> dict:
