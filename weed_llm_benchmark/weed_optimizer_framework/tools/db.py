@@ -521,6 +521,24 @@ def set_class_topic(cls: str, topic: str, actor: str = "user") -> dict:
     return wrote
 
 
+_BSON_INT64_MAX = 2 ** 63 - 1
+
+
+def _bson_safe(v):
+    """Recursively make a value BSON-safe. MongoDB ints must fit in int64; some
+    registry fields (e.g. unsigned dHash values) exceed it → 'can only handle up
+    to 8-byte ints'. Convert oversized ints to str so the mirror never crashes."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, int):
+        return str(v) if abs(v) > _BSON_INT64_MAX else v
+    if isinstance(v, dict):
+        return {k: _bson_safe(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_bson_safe(x) for x in v]
+    return v
+
+
 def mirror_registry_to_mongo(registry: dict) -> dict:
     """Mongo-ONLY mirror of a full registry dict (the harvester already wrote
     JSON; this just keeps Mongo in sync at the same chokepoint). Best-effort:
@@ -536,6 +554,10 @@ def mirror_registry_to_mongo(registry: dict) -> dict:
         for slug, info in ds.items():
             doc = dict(info)
             doc.pop("_id", None)
+            # dhash_cache = large per-image hash cache (not source-of-truth, and
+            # its unsigned-64bit values overflow BSON int64) → never mirror it.
+            doc.pop("dhash_cache", None)
+            doc = _bson_safe(doc)
             doc["updated_at"] = now
             doc.setdefault("domain", DEFAULT_DOMAIN)  # v3.0.82 multi-domain
             dbh[COLL_SLUGS].update_one({"_id": slug}, {"$set": doc}, upsert=True)
