@@ -1,0 +1,7 @@
+[Unit]
+Description=Sync new harvested data cluster->lab + refresh Mongo
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/weed_llm_benchmark/deploy/sync_from_cluster.sh
