@@ -1,0 +1,12 @@
+[Unit]
+Description=cloudflared quick tunnel for weed-dashboard (public testing URL)
+After=network-online.target weed-dashboard.service
+Wants=network-online.target
+
+[Service]
+ExecStart=%h/bin/cloudflared tunnel --url http://localhost:8000 --logfile %h/cflare.log --loglevel info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
