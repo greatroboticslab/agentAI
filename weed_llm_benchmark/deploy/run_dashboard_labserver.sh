@@ -4,5 +4,10 @@ cd "$HOME/weed_llm_benchmark"
 source .venv/bin/activate
 export REPO_ROOT="$HOME/weed_llm_benchmark"
 export DASH_PORT="${DASH_PORT:-8000}"
+# v3.0.99.40: lab-control mode — SLURM (sbatch/squeue/job_log) runs ON the cluster
+# over an SSH key (lab = website + control + storage; cluster = compute only).
+export CLUSTER_SSH="${CLUSTER_SSH:-byler@bridges2.psc.edu}"
+export CLUSTER_REPO="${CLUSTER_REPO:-/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark}"
+export CLUSTER_SSH_KEY="${CLUSTER_SSH_KEY:-$HOME/.ssh/id_lab2cluster}"
 exec .venv/bin/uvicorn weed_optimizer_framework.tools.dashboard_server:app \
   --host 0.0.0.0 --port "$DASH_PORT" --workers 1

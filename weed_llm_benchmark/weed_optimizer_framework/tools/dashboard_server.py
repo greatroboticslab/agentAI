@@ -2881,6 +2881,35 @@ def _shell(cmd: list, timeout: int = 15) -> dict:
                 "returncode": -2}
 
 
+# v3.0.99.40: lab-server CONTROL mode. When the dashboard runs on the lab server
+# (no SLURM), set CLUSTER_SSH so SLURM/cluster commands (sbatch/squeue/sacct/
+# scancel) + sbatch scripts + job .out reads run ON the cluster over an SSH key.
+# When unset (dashboard hosted on the cluster itself), everything runs locally.
+import shlex as _shlex
+_CLUSTER_SSH = os.environ.get("CLUSTER_SSH", "")  # e.g. byler@bridges2.psc.edu
+_CLUSTER_REPO = os.environ.get(
+    "CLUSTER_REPO", "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark")
+_CLUSTER_KEY = os.environ.get(
+    "CLUSTER_SSH_KEY", os.path.expanduser("~/.ssh/id_lab2cluster"))
+
+
+def _ssh_cluster_prefix() -> list:
+    return ["ssh", "-i", _CLUSTER_KEY, "-o", "IdentitiesOnly=yes",
+            "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20",
+            "-o", "BatchMode=yes", _CLUSTER_SSH]
+
+
+def _slurm(cmd: list, timeout: int = 15) -> dict:
+    """Run a SLURM/cluster command locally, or ON the cluster via SSH key when
+    CLUSTER_SSH is set (lab-server control mode). cmd is an argv list."""
+    if not _CLUSTER_SSH:
+        return _shell(cmd, timeout)
+    remote = "cd %s 2>/dev/null; %s" % (
+        _shlex.quote(_CLUSTER_REPO),
+        " ".join(_shlex.quote(a) for a in cmd))
+    return _shell(_ssh_cluster_prefix() + [remote], timeout=max(timeout + 20, 35))
+
+
 @app.post("/api/cancel_job/{jobid}")
 def api_cancel_job(jobid: str):
     """Cancel a SLURM job by ID. Only allow cancelling job names we recognize
@@ -2888,7 +2917,7 @@ def api_cancel_job(jobid: str):
     if not _re_cls.match(r'^[0-9]+$', jobid):
         raise HTTPException(400, "bad jobid")
     # Check job name to prevent self-killing
-    sq = _shell(["squeue", "-j", jobid, "-h", "-o", "%j"], timeout=8)
+    sq = _slurm(["squeue", "-j", jobid, "-h", "-o", "%j"], timeout=8)
     name = (sq["stdout"] or "").strip()
     if not name:
         return JSONResponse({"ok": False, "msg": f"job {jobid} not in queue"})
@@ -2898,7 +2927,7 @@ def api_cancel_job(jobid: str):
     if not any(name.startswith(p) for p in SAFE_PREFIXES):
         return JSONResponse({"ok": False, "msg":
             f"refuse to cancel {name!r} — only agent jobs cancellable from UI"})
-    r = _shell(["scancel", jobid], timeout=8)
+    r = _slurm(["scancel", jobid], timeout=8)
     return JSONResponse({"ok": r["ok"], "jobid": jobid, "name": name,
                           "msg": r["stdout"] or r["stderr"] or "cancelled"})
 
@@ -2940,7 +2969,7 @@ _LOG_FAIL_MARKERS = ("Traceback (most recent", "No module named", "command not f
 
 def _sacct_state(jobid: str) -> str:
     """Main job-step State from sacct (e.g. COMPLETED/FAILED/TIMEOUT). '' if unknown."""
-    r = _shell(["sacct", "-j", jobid, "--format=State", "--noheader", "-P"], timeout=10)
+    r = _slurm(["sacct", "-j", jobid, "--format=State", "--noheader", "-P"], timeout=10)
     if not r["ok"]:
         return ""
     for ln in r["stdout"].splitlines():
@@ -3016,7 +3045,7 @@ def _resolve_action_real_status(result: dict) -> str:
             return _action_status_cache[jid]
         if st in _SACCT_ACTIVE:
             return "running"
-        sq = _shell(["squeue", "-j", jid, "-h", "-o", "%T"], timeout=6)
+        sq = _slurm(["squeue", "-j", jid, "-h", "-o", "%T"], timeout=6)
         if sq["ok"] and sq["stdout"].strip():
             return "running"
         return "launched"             # submitted but unresolvable (purged/too new)
@@ -3112,7 +3141,7 @@ def api_agent_progress():
 
     # Try job state
     state = ""
-    sq = _shell(["squeue", "-j", jobid, "-h", "-o", "%T"], timeout=6)
+    sq = _slurm(["squeue", "-j", jobid, "-h", "-o", "%T"], timeout=6)
     if sq["ok"] and sq["stdout"].strip():
         state = sq["stdout"].strip()
 
@@ -3150,7 +3179,7 @@ def api_cluster_status():
     out: dict = {"generated_at": time.time()}
 
     # SLURM job queue for our user
-    sq = _shell(["squeue", "-u", "byler",
+    sq = _slurm(["squeue", "-u", "byler",
                  "-o", "%i\t%j\t%T\t%M\t%R\t%C\t%m"], timeout=10)
     jobs = []
     if sq["ok"]:
@@ -3597,6 +3626,27 @@ def api_job_log(jobid: str, tail: int = 200):
     if not 1 <= tail <= 2000:
         tail = 200
 
+    # v3.0.99.40: lab-control mode → the .out lives on the cluster; find newest
+    # matching file there + tail it over SSH.
+    if _CLUSTER_SSH:
+        script = (f"f=$(ls -t results/framework/*_{jobid}.out "
+                  f"results/*_{jobid}.out logs/*{jobid}*.out 2>/dev/null | head -1); "
+                  f'if [ -z "$f" ]; then echo __NOFILE__; '
+                  f'else echo "__FILE__:$f"; tail -n {tail} "$f"; fi')
+        r = _slurm(["bash", "-lc", script], timeout=45)
+        out = r.get("stdout", "")
+        if (not r["ok"]) or "__NOFILE__" in out:
+            return JSONResponse({"ok": False, "jobid": jobid, "remote": True,
+                "msg": f"no output file for {jobid} on cluster"}, status_code=404)
+        lines = out.splitlines()
+        fpath = ""
+        if lines and lines[0].startswith("__FILE__:"):
+            fpath = lines[0][len("__FILE__:"):]
+            lines = lines[1:]
+        return JSONResponse({"ok": True, "jobid": jobid, "remote": True,
+            "file": fpath, "lines_returned": len(lines),
+            "content": "\n".join(lines)})
+
     # Search standard locations
     candidates = []
     search_dirs = [
@@ -3778,9 +3828,11 @@ async def api_cluster_action(action: str, request: Request):
                         pass
             if len(export_pairs) > 1:
                 sbatch_cli += [f"--export={','.join(export_pairs)}"]
-        sbatch_cli += [str(script_path)]
+        # v3.0.99.40: in lab-control mode, sbatch runs ON the cluster (via _slurm,
+        # which cd's to _CLUSTER_REPO) → use the REPO-relative script path there.
+        sbatch_cli += [spec["script"] if _CLUSTER_SSH else str(script_path)]
 
-        r = _shell(sbatch_cli, timeout=15)
+        r = _slurm(sbatch_cli, timeout=15)
         result = {"ok": r["ok"], "action": action,
                   "stdout": r["stdout"].strip(),
                   "stderr": r["stderr"].strip(),
@@ -3845,6 +3897,18 @@ async def api_cluster_action(action: str, request: Request):
         return result
 
     if spec["type"] == "restart_self":
+        # v3.0.99.40: on the lab server (control mode) the dashboard is a
+        # systemd --user service → restart that, NOT sbatch on the cluster.
+        if _CLUSTER_SSH:
+            import subprocess as _sp
+            _sp.Popen(["bash", "-c",
+                       "sleep 1 && systemctl --user restart weed-dashboard"],
+                      stdout=_sp.DEVNULL, stderr=_sp.DEVNULL, start_new_session=True)
+            result = {"ok": True, "action": action,
+                      "msg": "restarting weed-dashboard.service (lab server)",
+                      "note": "service restarts in ~1s; refresh shortly"}
+            _log_action(action, result)
+            return result
         script_path = REPO / "run_v3_0_30_dashboard_server.sh"
         sbatch_r = _shell(["sbatch", str(script_path)], timeout=15)
         if not sbatch_r["ok"]:
