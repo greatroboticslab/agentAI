@@ -1,0 +1,12 @@
+[Unit]
+Description=Weed dataset dashboard (FastAPI)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/weed_llm_benchmark
+ExecStart=%h/weed_llm_benchmark/deploy/run_dashboard_labserver.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
