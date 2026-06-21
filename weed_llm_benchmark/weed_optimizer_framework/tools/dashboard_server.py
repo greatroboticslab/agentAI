@@ -3029,6 +3029,34 @@ def _sacct_state(jobid: str) -> str:
     return ""
 
 
+def _batch_sacct(jobids: list) -> dict:
+    """v3.0.99.46: ONE sacct call for MANY jobids → {jobid: status}. Replaces the
+    per-action SSH loop that made /api/action_history take ~19s in lab-control mode
+    (30 actions × per-job SSH). status ∈ {succeeded, failed, running}; jobs not in
+    sacct output are omitted (caller treats as 'launched')."""
+    ids = sorted({str(j) for j in jobids if j})
+    if not ids:
+        return {}
+    r = _slurm(["sacct", "-j", ",".join(ids),
+                "--format=JobID,State", "--noheader", "-P"], timeout=20)
+    if not r["ok"]:
+        return {}
+    out: dict = {}
+    for ln in r["stdout"].splitlines():
+        parts = ln.split("|")
+        if len(parts) < 2:
+            continue
+        jid = parts[0].split(".")[0].strip()   # main step (drop .batch/.extern)
+        if jid in out:
+            continue
+        state = parts[1].strip().upper().split()[0] if parts[1].strip() else ""
+        if state in _SACCT_TERMINAL:
+            out[jid] = _SACCT_TERMINAL[state]
+        elif state in _SACCT_ACTIVE:
+            out[jid] = "running"
+    return out
+
+
 def _pid_alive_nonzombie(pid) -> bool:
     """True only if pid exists AND is not a zombie. On Linux read /proc/<pid>/stat
     (state field after the ')'); 'Z' = zombie (exited, un-reaped) → treat as done.
@@ -3052,8 +3080,10 @@ def _pid_alive_nonzombie(pid) -> bool:
         return True
 
 
-def _resolve_action_real_status(result: dict) -> str:
-    """One of: launched | running | succeeded | failed | unknown. Real, not just ok."""
+def _resolve_action_real_status(result: dict, state_map: dict = None) -> str:
+    """One of: launched | running | succeeded | failed | unknown. Real, not just ok.
+    state_map (v3.0.99.46): optional {jobid: status} from a batched sacct so the
+    sbatch branch needs ZERO per-call SSH (avoids the 19s action_history hang)."""
     if not isinstance(result, dict):
         return "unknown"
     # --- subprocess: pid + log_path ---
@@ -3089,6 +3119,15 @@ def _resolve_action_real_status(result: dict) -> str:
         jid = m.group(1)
         if jid in _action_status_cache:
             return _action_status_cache[jid]
+        # v3.0.99.46: use the batched sacct map first → no per-action SSH.
+        if state_map is not None and jid in state_map:
+            s = state_map[jid]
+            if s in ("succeeded", "failed"):
+                _action_status_cache[jid] = s
+            return s
+        if state_map is not None:
+            # batched but this jobid wasn't in sacct (purged/too new) → don't SSH again
+            return "launched"
         st = _sacct_state(jid)
         if st in _SACCT_TERMINAL:
             _action_status_cache[jid] = _SACCT_TERMINAL[st]
@@ -3120,10 +3159,21 @@ def api_action_history(n: int = 50, resolve: int = 1):
             try: events.append(_json.loads(ln))
             except Exception: pass
         if resolve:
-            # resolve only the most recent ~30 to bound sacct/squeue calls
-            for ev in events[-30:]:
+            recent = events[-30:]
+            # v3.0.99.46: ONE batched sacct for all sbatch jobids (was 1 SSH/action
+            # → ~19s in lab-control mode). Subprocess actions resolve from local logs.
+            jids = []
+            for ev in recent:
+                res = ev.get("result") or {}
+                txt = f"{res.get('stdout','')} {res.get('msg','')}"
+                mm = re.search(r"Submitted batch job (\d+)", txt)
+                if mm and mm.group(1) not in _action_status_cache:
+                    jids.append(mm.group(1))
+            state_map = _batch_sacct(jids) if jids else {}
+            for ev in recent:
                 try:
-                    ev["status"] = _resolve_action_real_status(ev.get("result") or {})
+                    ev["status"] = _resolve_action_real_status(
+                        ev.get("result") or {}, state_map)
                 except Exception:
                     ev["status"] = "unknown"
         return JSONResponse({"history": events})
