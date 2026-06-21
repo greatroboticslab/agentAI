@@ -221,6 +221,50 @@ async def _auth_and_rate_limit(request, call_next):
     return await call_next(request)
 
 
+# v3.0.99.45: global RESPONSIVE CSS — inject once into every HTML page so the
+# dashboard renders well on BOTH phone and desktop (pages already have viewport +
+# auto-fill grids; this adds: fluid images, mobile-scrollable tables, and a
+# <=768px breakpoint that shrinks padding/fonts). Conservative — doesn't override
+# existing layouts. Marker id="_rwd" prevents double-injection.
+_RESPONSIVE_CSS = (
+    '<style id="_rwd">'
+    'img,svg,canvas,video{max-width:100%;height:auto}'
+    'table{max-width:100%}'
+    '@media (max-width:768px){'
+    'html{-webkit-text-size-adjust:100%}'
+    'body{font-size:14px}'
+    'table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}'
+    '.hero,.nav,header,section,main,.wrap,.container{padding-left:.6rem!important;padding-right:.6rem!important}'
+    'h1{font-size:1.3rem}h2{font-size:1.1rem}'
+    '}'
+    '</style>'
+)
+
+
+@app.middleware("http")
+async def _inject_responsive_css(request: Request, call_next):
+    resp = await call_next(request)
+    ctype = (resp.headers.get("content-type", "") or "").lower()
+    if "text/html" not in ctype:
+        return resp
+    body = b""
+    async for chunk in resp.body_iterator:
+        body += chunk
+    try:
+        text = body.decode("utf-8", "replace")
+        if "_rwd" not in text:
+            if "</head>" in text:
+                text = text.replace("</head>", _RESPONSIVE_CSS + "</head>", 1)
+            else:
+                text = _RESPONSIVE_CSS + text
+        body = text.encode("utf-8")
+    except Exception:
+        pass
+    headers = dict(resp.headers)
+    headers.pop("content-length", None)
+    return Response(content=body, status_code=resp.status_code, headers=headers)
+
+
 # v3.0.43.8: pre-warm /classes thumbnail cache on startup in a background
 # thread, so the user's first hit lands on a hot cache (otherwise the
 # 350-class first-load times out the cloudflare tunnel at ~30s).
