@@ -4360,6 +4360,26 @@ async def api_cluster_action(action: str, request: Request):
             if _dom and _dom != "weed":
                 export_pairs.append(f"BRAIN_DOMAIN={_dom}")
                 body_used["domain"] = _dom
+                # v3.0.110: the cluster compute node can't reach the lab Mongo,
+                # so stage this domain's config (queries/taxonomy) to the cluster
+                # shared FS before sbatch. dataset_discovery reads it as fallback.
+                # Untracked path → survives the job's `git reset --hard`.
+                try:
+                    from . import db as _db_dom
+                    _dd = _db_dom.get_domain(_dom) or {}
+                    import base64 as _b64
+                    _cfgj = json.dumps({
+                        "display_name": _dd.get("display_name", _dom),
+                        "harvest_queries": _dd.get("harvest_queries", []),
+                        "taxonomy": _dd.get("taxonomy", []),
+                    })
+                    _b = _b64.b64encode(_cfgj.encode()).decode()
+                    _stage = ("mkdir -p results/framework/_domains && echo "
+                              f"{_b} | base64 -d > results/framework/_domains/{_dom}.json")
+                    _sr = _slurm(["bash", "-lc", _stage], timeout=25)
+                    body_used["domain_cfg_staged"] = bool(_sr.get("ok"))
+                except Exception as _e:
+                    body_used["domain_cfg_staged"] = f"fail:{type(_e).__name__}"
             if len(export_pairs) > 1:
                 sbatch_cli += [f"--export={','.join(export_pairs)}"]
         # v3.0.99.40: in lab-control mode, sbatch runs ON the cluster (via _slurm,

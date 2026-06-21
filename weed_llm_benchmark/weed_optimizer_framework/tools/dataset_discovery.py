@@ -970,6 +970,23 @@ class DatasetDiscovery:
             d = _db.get_domain(domain) or {}
         except Exception:
             d = {}
+        # v3.0.110: the cluster compute node can't reach the lab Mongo, so the
+        # dashboard stages the domain config to the shared FS before sbatch.
+        # Read it when Mongo gave us no queries.
+        if not d.get("harvest_queries"):
+            try:
+                import json as _json
+                _p = os.path.join(os.path.dirname(__file__), "..", "..",
+                                  "results", "framework", "_domains",
+                                  f"{domain}.json")
+                if os.path.isfile(_p):
+                    with open(_p) as _f:
+                        _fd = _json.load(_f)
+                    for _k, _v in (_fd or {}).items():
+                        if not d.get(_k):
+                            d[_k] = _v
+            except Exception:
+                pass
         queries = list(d.get("harvest_queries") or [])
         words = set()
         for s in list(d.get("taxonomy") or []) + queries + [
