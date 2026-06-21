@@ -118,6 +118,12 @@ class DatasetDiscovery:
         self.data_dir = os.path.join(Config.BASE_DIR, "datasets")
         os.makedirs(self.data_dir, exist_ok=True)
         self.registry = self._load_registry()
+        # v3.0.108 (domain-aware harvest): per-harvest scope. Defaults to the
+        # weed domain so all existing behavior is byte-identical. harvest_new_
+        # datasets(domain=...) overrides these for a different collection agent.
+        self._harvest_domain = "weed"
+        self._accept_vocab = self.AG_VOCAB_ACCEPT
+        self._reject_vocab = self.AG_VOCAB_REJECT
 
     # =========================================================
     # REGISTRY — persistent tracking of all datasets
@@ -692,6 +698,8 @@ class DatasetDiscovery:
                 "annotation": annotation_kind,
                 "downloaded_at": datetime.now().isoformat(),
                 "configs_iterated": len(configs),
+                # v3.0.108: tag with the harvest's domain (defaults to "weed")
+                "domain": getattr(self, "_harvest_domain", "weed"),
             }
             # Only WRITE class_names if we extracted any — never clobber a
             # previously curated set with [].
@@ -876,6 +884,17 @@ class DatasetDiscovery:
         "image-classification",
     )
 
+    # v3.0.108: domain-AGNOSTIC junk — rejected for ANY collection agent (forms,
+    # codes, vehicles, faces, warehouse, generic COCO). The weed agent rejects
+    # MORE (disease/pest/bee via AG_VOCAB_REJECT); a NEW domain uses only this so
+    # its own topic (e.g. disease) is never blocked.
+    GENERIC_REJECT = (
+        "price_tag", "price-tag", "commonform", "yonder", "d-kap", "dkap",
+        "uvh_coco", "cheque", "bofa", "qr-code", "qr_code", "qr-detect",
+        "kapr", "kapp", "warehouse", "robotics-arm", "recycling", "waste",
+        "face-detect", "vehicle-detect", "scenes", "warp",
+    )
+
     def _card_suggests_bbox(self, ds_info):
         """Fast heuristic from HF dataset_info (no actual data load):
         - task_categories contains 'object-detection'
@@ -922,15 +941,45 @@ class DatasetDiscovery:
         Both vocab lists are class attributes (AG_VOCAB_ACCEPT, AG_VOCAB_REJECT).
         """
         blob = (slug_or_id + " " + (description or "")).lower()
+        # v3.0.108: use per-harvest vocab (defaults to the weed class attrs, so
+        # weed behavior is unchanged; a non-weed domain swaps these in).
+        reject_vocab = getattr(self, "_reject_vocab", self.AG_VOCAB_REJECT)
+        accept_vocab = getattr(self, "_accept_vocab", self.AG_VOCAB_ACCEPT)
         # First check reject — fail-fast on obvious off-domain
-        for r in self.AG_VOCAB_REJECT:
+        for r in reject_vocab:
             if r in blob:
                 return False
         # Then require at least one positive match
-        for a in self.AG_VOCAB_ACCEPT:
+        for a in accept_vocab:
             if a in blob:
                 return True
         return False
+
+    def _resolve_domain_config(self, domain: str) -> dict:
+        """v3.0.108: build a harvest config for a NON-weed domain from its
+        domain doc (db COLL_DOMAINS): accept-vocab is derived from the domain's
+        taxonomy + harvest_query words; reject-vocab is GENERIC_REJECT only (so
+        the domain's own topic is never blocked); queries are its harvest_queries.
+        Returns {accept, reject, queries}."""
+        import re as _re
+        _STOP = {"detection", "dataset", "datasets", "image", "images", "the",
+                 "and", "for", "with", "from", "object", "objects", "data",
+                 "yolo", "bbox", "annotated", "annotation", "set", "sets"}
+        try:
+            from . import db as _db
+            d = _db.get_domain(domain) or {}
+        except Exception:
+            d = {}
+        queries = list(d.get("harvest_queries") or [])
+        words = set()
+        for s in list(d.get("taxonomy") or []) + queries + [
+                str(d.get("display_name") or ""), domain]:
+            for w in _re.findall(r"[a-z0-9]{3,}", str(s).lower()):
+                if w not in _STOP:
+                    words.add(w)
+        accept = tuple(sorted(words)) or (domain,)
+        return {"accept": accept, "reject": self.GENERIC_REJECT,
+                "queries": queries}
 
     def _is_already_flagged_garbage(self, candidate_slug: str) -> bool:
         """Check if user (or prior Brain run) has marked this slug as garbage.
@@ -976,7 +1025,8 @@ class DatasetDiscovery:
         return False
 
     def harvest_new_datasets(self, max_new=5, queries=None, confirm_schema=True,
-                              max_images_per_ds=30000, strict_topic=None):
+                              max_images_per_ds=30000, strict_topic=None,
+                              domain=None):
         """Search HF for NEW datasets, fast-filter by card metadata, download up to max_new.
 
         Strategy:
@@ -1055,6 +1105,25 @@ class DatasetDiscovery:
             return {"status": "error", "error": "huggingface_hub not installed"}
 
         api = HfApi()
+        # v3.0.108: domain-aware harvest. Default = "weed" → byte-identical to
+        # prior behavior (weed queries + weed accept/reject vocab). A non-weed
+        # domain pulls queries + accept-vocab from its domain doc and uses only
+        # GENERIC_REJECT, then every harvested slug is tagged with that domain.
+        domain = domain or os.environ.get("BRAIN_DOMAIN") or "weed"
+        if domain == "weed":
+            self._harvest_domain = "weed"
+            self._accept_vocab = self.AG_VOCAB_ACCEPT
+            self._reject_vocab = self.AG_VOCAB_REJECT
+        else:
+            cfg = self._resolve_domain_config(domain)
+            self._harvest_domain = domain
+            self._accept_vocab = cfg["accept"]
+            self._reject_vocab = cfg["reject"]
+            if not queries:
+                queries = cfg["queries"]
+            logger.info(f"[Harvest] domain={domain} "
+                        f"queries={len(queries or [])} "
+                        f"accept_kw={len(cfg['accept'])}")
         queries = queries or self.DEFAULT_HARVEST_QUERIES
         results = []
         seen_ids = set()

@@ -1002,7 +1002,18 @@ def agent_generic(domain_id: str):
     st = _h.escape(str(d.get("status") or "created"))
     qs = d.get("harvest_queries") or []
     qline = _h.escape(", ".join(qs)) if qs else "&mdash; none set &mdash;"
-    return HTMLResponse(f'''<!DOCTYPE html><html lang="en"><head>
+    if qs:
+        _hbtn = ('<button class="btn" id="hbtn" onclick="startHarvest()" '
+                 'style="border:0;cursor:pointer">&#9654; Start harvest</button>'
+                 '<span id="htoast" style="display:none;margin-left:12px;font-size:13px"></span>')
+        _note = ("Harvest is wired (v3.0.108): it uses this domain's seed queries "
+                 "+ topic vocabulary and tags every collected dataset with "
+                 f"<code>{_h.escape(domain_id)}</code>.")
+    else:
+        _hbtn = ''
+        _note = ("Add seed search queries (re-create the agent with queries) to "
+                 "enable harvesting for this domain.")
+    page = (f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{nm} &mdash; Mission Control</title>
 <style>
@@ -1023,15 +1034,23 @@ def agent_generic(domain_id: str):
    <div class="row" style="margin-top:16px"><b>This agent was just created.</b> It has no collected data yet.</div>
    <div class="row">Seed search queries: <b>{qline}</b></div>
    <div class="row">Sub-agents: <b>{int(d.get("n_subagents") or 2)}</b> &middot; Target metric: <b>{_h.escape(str(d.get("target_metric") or "mAP50-95"))}</b></div>
-   <div class="row" style="margin-top:18px">To make this agent functional (next backend step):</div>
-   <ol class="steps">
-     <li>Wire the brain harvester to use this domain's <code>harvest_queries</code>.</li>
-     <li>Scope the data / review / training views to <code>domain={_h.escape(domain_id)}</code>.</li>
-     <li>Run the collector to populate it &mdash; then it gets a full mission control like the Weed agent.</li>
-   </ol>
-   <a class="btn" href="/">&larr; Back to agents</a>
+   <div class="row" style="margin-top:18px">{_note}</div>
+   <div style="margin-top:16px">{_hbtn}</div>
+   <div class="row" style="margin-top:10px;color:#64748b;font-size:12.5px">Note: the data / review / training views are not yet scoped per-domain (they currently show the Weed agent). Domain-scoped views are the next UI step.</div>
+   <a class="btn" href="/" style="margin-top:16px">&larr; Back to agents</a>
  </div></div>
-</body></html>''')
+''' + '''<script>
+function startHarvest(){
+ if(!confirm('Launch a harvest on the cluster for this domain (uses its seed queries)? This starts a GPU job.'))return;
+ var t=document.getElementById('htoast'),b=document.getElementById('hbtn');
+ t.style.display='inline';t.textContent='\\u23f3 Submitting\\u2026';b.disabled=true;
+ fetch('/api/cluster_action/brain_harvest',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})
+  .then(function(r){return r.json();}).then(function(d){t.textContent=(d&&d.ok?'\\u2705 Harvest submitted to cluster.':'\\u274c '+((d&&(d.msg||d.stderr))||'failed'));})
+  .catch(function(e){t.textContent='\\u274c '+e;}).finally(function(){b.disabled=false;});
+}
+</script></body></html>''')
+    page = page.replace("__DOM__", domain_id)
+    return HTMLResponse(page)
 
 
 @app.get("/console", response_class=HTMLResponse)
@@ -4330,6 +4349,13 @@ async def api_cluster_action(action: str, request: Request):
                             body_used[k_body] = v
                     except (TypeError, ValueError):
                         pass
+            # v3.0.108: domain-aware harvest — a non-weed agent injects
+            # BRAIN_DOMAIN so dataset_discovery uses that domain's queries +
+            # accept-vocab and tags harvested slugs with the domain.
+            _dom = re.sub(r"[^a-z0-9_]+", "", str(body.get("domain") or "").strip().lower())[:40]
+            if _dom and _dom != "weed":
+                export_pairs.append(f"BRAIN_DOMAIN={_dom}")
+                body_used["domain"] = _dom
             if len(export_pairs) > 1:
                 sbatch_cli += [f"--export={','.join(export_pairs)}"]
         # v3.0.99.40: in lab-control mode, sbatch runs ON the cluster (via _slurm,
