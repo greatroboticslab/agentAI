@@ -1036,8 +1036,12 @@ def agent_generic(domain_id: str):
    <div class="row">Sub-agents: <b>{int(d.get("n_subagents") or 2)}</b> &middot; Target metric: <b>{_h.escape(str(d.get("target_metric") or "mAP50-95"))}</b></div>
    <div class="row" style="margin-top:18px">{_note}</div>
    <div style="margin-top:16px">{_hbtn}</div>
-   <div class="row" style="margin-top:10px;color:#64748b;font-size:12.5px">Note: the data / review / training views are not yet scoped per-domain (they currently show the Weed agent). Domain-scoped views are the next UI step.</div>
-   <a class="btn" href="/" style="margin-top:16px">&larr; Back to agents</a>
+   <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
+   <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+     <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
+     <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/slugs?domain=__DOM__">Datasets</a>
+   </div>
+   <a class="btn" href="/" style="margin-top:20px">&larr; Back to agents</a>
  </div></div>
 ''' + '''<script>
 function startHarvest(){
@@ -2245,24 +2249,25 @@ def _is_junk_class(canon: str) -> bool:
     return _re_canon.sub(r'[^A-Za-z0-9]', '', canon).lower() in _JUNK_CLASS_ALNUM
 
 
-_registry_index_cache: dict = {"ts": 0.0, "index": {}, "empty_slugs": []}
+_registry_index_cache: dict = {}   # v3.0.109: per-domain {domain: {ts, index, empty_slugs}}
 _REG_INDEX_TTL = float(os.environ.get("REG_INDEX_TTL_SEC", "15"))
 
-def _load_registry_index() -> dict:
-    """Returns {canon_class_name: [(slug, class_id, raw_name), ...]}.
-    Side-effect populates _registry_index_cache['empty_slugs'] for slugs
-    with local data but missing class_names — surfaces metadata-gap.
+def _load_registry_index(domain: str = "weed") -> dict:
+    """Returns {canon_class_name: [(slug, class_id, raw_name), ...]} for `domain`.
+    Side-effect populates the per-domain cache's 'empty_slugs' (slugs with local
+    data but missing class_names) — surfaces metadata-gap.
 
-    v3.0.83 Phase 5: source is `db.get_registry(domain='weed')` (Mongo
-    authoritative, JSON fallback inside db). Cached with a short TTL instead of
-    the file mtime — within one /classes render every call hits the cache, so
-    we never re-query/re-parse 355× (the original perf bug this guards)."""
+    v3.0.109: domain-scoped + per-domain cache (default "weed" = unchanged).
+    Source is `db.get_registry(domain=...)` (Mongo authoritative, JSON fallback
+    treats untagged slugs as the weed default). Short-TTL cached per domain so a
+    single /classes render never re-queries 355×."""
     now = time.time()
-    if (now - _registry_index_cache["ts"]) < _REG_INDEX_TTL and _registry_index_cache["index"]:
-        return _registry_index_cache["index"]
+    ce = _registry_index_cache.get(domain)
+    if ce and (now - ce["ts"]) < _REG_INDEX_TTL and ce["index"]:
+        return ce["index"]
     try:
         from . import db as _db
-        reg = _db.get_registry(domain="weed")
+        reg = _db.get_registry(domain=domain)
     except Exception:
         # last-resort direct file read (should rarely happen — db has its own
         # JSON fallback already)
@@ -2270,7 +2275,7 @@ def _load_registry_index() -> dict:
             with open(REGISTRY_PATH) as f:
                 reg = json.load(f)
         except Exception:
-            return _registry_index_cache.get("index", {})
+            return (ce or {}).get("index", {})
     idx: dict = {}
     empty: list = []
     for slug, info in (reg.get("datasets") or {}).items():
@@ -2290,13 +2295,13 @@ def _load_registry_index() -> dict:
             if _is_junk_class(canon):   # v3.0.43.23: hide non-species pseudo-classes
                 continue
             idx.setdefault(canon, []).append((slug, cid, raw))
-    _registry_index_cache.update({"ts": now, "index": idx, "empty_slugs": empty})
+    _registry_index_cache[domain] = {"ts": now, "index": idx, "empty_slugs": empty}
     return idx
 
 
-def _registry_empty_slugs() -> list:
-    _load_registry_index()
-    return list(_registry_index_cache.get("empty_slugs", []))
+def _registry_empty_slugs(domain: str = "weed") -> list:
+    _load_registry_index(domain)
+    return list((_registry_index_cache.get(domain) or {}).get("empty_slugs", []))
 
 
 _pool_cache_dir = REPO / "results" / "framework" / "cache" / "class_pool"
@@ -4299,8 +4304,7 @@ async def api_cluster_action(action: str, request: Request):
 
     if spec["type"] == "refresh":
         # delegate to /api/refresh_registry logic
-        _registry_index_cache["ts"] = 0.0
-        _registry_index_cache["index"] = {}
+        _registry_index_cache.clear()   # v3.0.109: per-domain cache
         _registry_parse_cache["ts"] = 0.0
         _registry_parse_cache["data"] = None
         n = 0
@@ -4487,10 +4491,8 @@ async def api_cluster_action(action: str, request: Request):
 def api_refresh_registry():
     """Wipe registry-index + class-pool disk caches so /classes re-scans on
     next load. Use after Brain harvest_new_datasets() adds new slugs."""
-    # 1) in-memory registry caches — force reload by zeroing TTL
-    _registry_index_cache["ts"] = 0.0
-    _registry_index_cache["index"] = {}
-    _registry_index_cache["empty_slugs"] = []
+    # 1) in-memory registry caches — force reload by clearing per-domain cache
+    _registry_index_cache.clear()   # v3.0.109: per-domain cache
     _registry_parse_cache["ts"] = 0.0
     _registry_parse_cache["data"] = None
     # 2) disk class_pool cache — delete files (next access rebuilds)
@@ -4517,17 +4519,20 @@ def api_refresh_registry():
 
 
 # ---------------------------------------------------------------- /classes
-def _all_known_classes() -> _List_cls[str]:
-    """Union of CANONICAL_12 + bank folders + registry slugs' class_names.
-    Auto-grows: when a slug with new class_names is registered, that class
-    appears here automatically (next /classes load picks up registry mtime change)."""
-    out: set = set(_CWD12)
-    bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
-    if bd.is_dir():
-        for d in bd.iterdir():
-            if d.is_dir():
-                out.add(d.name)
-    for c in _load_registry_index().keys():
+def _all_known_classes(domain: str = "weed") -> _List_cls[str]:
+    """Class names for `domain`. For weed (default): CANONICAL_12 + bank folders
+    + weed registry class_names (unchanged). For another domain: ONLY that
+    domain's registered class_names (CWD12 + object_bank are weed-specific).
+    v3.0.109: domain-scoped."""
+    out: set = set()
+    if domain == "weed":
+        out |= set(_CWD12)
+        bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
+        if bd.is_dir():
+            for d in bd.iterdir():
+                if d.is_dir():
+                    out.add(d.name)
+    for c in _load_registry_index(domain).keys():
         out.add(c)
     return sorted(out)
 
@@ -4702,9 +4707,10 @@ def _inline_thumb_data_uri(src_path: Path, w: int = 200) -> str:
         return ""
 
 
-def _class_summary_landing(cls: str) -> dict:
+def _class_summary_landing(cls: str, domain: str = "weed") -> dict:
     """Lightweight per-class summary for /classes landing — does NOT walk
     registry labels. Cheap enough that listing 50+ classes is sub-second.
+    v3.0.109: `domain` scopes the slug lookup to one collection agent.
     Returns {n_bank, n_flux, n_reg_est, n_reg_slugs, first_thumb, first_thumb_data}.
 
     v3.0.43.2: first_thumb_data is a base64 data URI inlined into the HTML
@@ -4750,7 +4756,7 @@ def _class_summary_landing(cls: str) -> dict:
                 if ffp.is_file():
                     first_src = ffp
     # reg — DO NOT walk labels. Use cap × #slugs as estimate.
-    slugs = _load_registry_index().get(cls, [])
+    slugs = _load_registry_index(domain).get(cls, [])
     out["n_reg_slugs"] = len(slugs)
     out["n_reg_est"] = 200 * len(slugs)  # upper-bound (cap is 200/slug)
 
@@ -6297,14 +6303,16 @@ setInterval(pollAgentProgress, 8000);
 
 
 @app.get("/slugs", response_class=HTMLResponse)
-def slugs_landing():
+def slugs_landing(domain: str = "weed"):
     """Slug-level cleanup: ✓ keep / ✗ junk / 🤔 unsure on whole slugs.
     Faster than per-image audit when a slug is obviously garbage (plant
-    disease imported by accident, etc.)."""
-    # v3.0.83 Phase 5: read via Mongo (domain=weed); db.get_registry falls back
-    # to dataset_registry.json automatically when Mongo is down.
+    disease imported by accident, etc.). v3.0.109: ?domain= scopes to one agent."""
+    if not re.match(r"^[a-z0-9_]{1,40}$", domain or ""):
+        domain = "weed"
+    # v3.0.83 Phase 5: read via Mongo; db.get_registry falls back to
+    # dataset_registry.json automatically when Mongo is down.
     from . import db as _db
-    reg = _db.get_registry(domain="weed")
+    reg = _db.get_registry(domain=domain)
     datasets = reg.get("datasets", {})
     if not datasets and not REGISTRY_PATH.exists():
         return HTMLResponse("<h1>no registry</h1>", status_code=404)
@@ -6503,12 +6511,15 @@ document.querySelectorAll('.filter-bar button').forEach(b => {{
 
 
 @app.get("/classes", response_class=HTMLResponse)
-def classes_landing():
+def classes_landing(domain: str = "weed"):
+    # v3.0.109: ?domain= scopes /classes to one collection agent (default weed).
+    if not re.match(r"^[a-z0-9_]{1,40}$", domain or ""):
+        domain = "weed"
     rows = []
     topic_counts: dict = {"all": 0, "cwd12": 0, "weed": 0, "disease": 0,
                           "pest": 0, "crop": 0, "other": 0}
-    for cls in _all_known_classes():
-        summary = _class_summary_landing(cls)
+    for cls in _all_known_classes(domain):
+        summary = _class_summary_landing(cls, domain)
         state = _exemplar_state(cls)
         n_bank = summary["n_bank"]
         n_flux = summary["n_flux"]
@@ -6575,7 +6586,7 @@ def classes_landing():
     )
 
     # ----- metadata-gap surface: slugs with local data but no class_names -----
-    empty_slugs = _registry_empty_slugs()
+    empty_slugs = _registry_empty_slugs(domain)
     banner = ""
     if empty_slugs:
         sample = ", ".join(empty_slugs[:6])
