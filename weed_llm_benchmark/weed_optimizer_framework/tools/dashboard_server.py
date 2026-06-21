@@ -828,9 +828,12 @@ def agent_weed():
  .agent .stat{font-size:13px;color:#475569;margin:10px 0 4px}
  .agent .stat b{color:#0f172a}
  .acts{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
- .acts a{flex:1;text-align:center;text-decoration:none;font-size:13px;font-weight:600;padding:9px 12px;
-   border-radius:8px;background:#2563eb;color:#fff;white-space:nowrap}
- .acts a.sec{background:#eef2ff;color:#2563eb}
+ .acts a,.acts button{flex:1;text-align:center;text-decoration:none;font-size:13px;font-weight:600;padding:9px 12px;
+   border-radius:8px;background:#2563eb;color:#fff;white-space:nowrap;border:0;cursor:pointer;font-family:inherit}
+ .acts a.sec{flex:0 0 auto;background:#eef2ff;color:#2563eb}
+ .acts button:disabled{opacity:.55;cursor:default}
+ #toast{display:none;margin:18px 0 0;padding:12px 15px;border-radius:9px;background:#0f172a;color:#e7eaf0;
+   font-size:13px;line-height:1.5;word-break:break-word}
  .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:13px}
  .quick a{background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:16px;text-decoration:none;
    color:inherit;transition:.12s}
@@ -859,14 +862,16 @@ def agent_weed():
      <div class="agent">
        <div class="hd"><span class="ic">&#129302;</span><span class="t">Agent 1 &middot; Collector<small>Brain harvester &mdash; finds &amp; pulls datasets</small></span></div>
        <div class="stat">Runs autonomous search + harvest on the cluster, then syncs results to this server.</div>
-       <div class="acts"><a href="/console">Run / configure &rarr;</a><a class="sec" href="/slugs">View datasets</a></div>
+       <div class="acts"><button onclick="runAction(this,'harvest_full_round_e2e','Harvest','This launches a ~4h GPU harvest round on the cluster (find + pull new datasets, then auto-sync to this server). Continue?')">&#9654; Start harvest</button><a class="sec" href="/slugs">Datasets</a><a class="sec" href="/console">Configure</a></div>
      </div>
      <div class="agent">
        <div class="hd"><span class="ic">&#128640;</span><span class="t">Agent 2 &middot; Trainer<small>Trains detection on reviewed data</small></span></div>
        <div class="stat">Trains YOLO on human-verified data and evaluates against the held-out gold set.</div>
-       <div class="acts"><a href="/console">Run / configure &rarr;</a><a class="sec" href="/rounds">View results</a></div>
+       <div class="acts"><button onclick="runAction(this,'clean_train_d','Training','This launches a GPU training job on the cluster (clean-subset training, evaluated on the held-out gold set). Continue?')">&#128640; Train</button><a class="sec" href="/rounds">Results</a><a class="sec" href="/console">Configure</a></div>
      </div>
    </div>
+
+   <div id="toast"></div>
 
    <div class="sec-h">Workspace</div>
    <div class="quick">
@@ -885,6 +890,21 @@ def agent_weed():
     if(jobs&&jobs>0){dot.className='c run';txt.textContent='cluster: '+jobs+' job'+(jobs>1?'s':'')+' running';}
     else{dot.className='c';txt.textContent='cluster: idle';}
   }).catch(function(){document.getElementById('ctxt').textContent='cluster: status unavailable';});
+
+  function runAction(btn,name,label,confirmMsg){
+    if(!confirm(confirmMsg))return;
+    var t=document.getElementById('toast');
+    t.style.display='block';t.textContent='\\u23f3 Submitting '+label+'\\u2026';
+    btn.disabled=true;
+    fetch('/api/cluster_action/'+name,{method:'POST',credentials:'include'})
+     .then(function(r){return r.json();})
+     .then(function(d){
+        if(d&&d.ok){t.textContent='\\u2705 '+label+' submitted to cluster. '+(d.msg||d.stdout||'');}
+        else{t.textContent='\\u274c '+label+' failed: '+((d&&(d.msg||d.stderr))||'unknown error');}
+     })
+     .catch(function(e){t.textContent='\\u274c '+label+' error: '+e;})
+     .finally(function(){btn.disabled=false;});
+  }
  </script>
 </body></html>''')
 
@@ -1008,7 +1028,7 @@ def console_page():
 
   /* ============================================================
      v3.0.72 (2026-06-01) — Phase E polish, additive overrides.
-     Goal: 'super 好看且专业 + 酷炫' single-page controller. Keeps
+     Goal: 'super clean, professional + slick' single-page controller. Keeps
      the same selectors so existing JS works, just upgrades visuals.
   ============================================================ */
   body{background:linear-gradient(180deg,#f6f8fb 0%,#e9eef6 100%) !important;
@@ -1099,15 +1119,15 @@ def console_page():
 </div>
 <div class="body-inner">
 <div class="nav">
-  <a href="/">🏠 hub <span class="navhelp" data-tip="首页总控制台。集中显示:统计卡(slug/图/Roboflow/存储后端)+ 27 个 agent 操作按钮 + SLURM 队列实时表 + Roboflow 面板 + 每物种流水线统计,各面板自动刷新。这是所有操作的入口页。">ⓘ</span></a>
-  <a href="/manual" style="background:linear-gradient(135deg,#fef3c7,#fde68a) !important;color:#c70 !important;border-color:#fbbf24 !important;font-weight:600 !important">📖 manual <span class="navhelp" data-tip="说明书页。双 agent 架构图 + 完整 8 段数据流水线 + 每个按钮的用途 + 当前真实进度 + 诚实的数据现状(如 8/12 物种缺训练数据)。给新使用者和教授看的文档。">ⓘ</span></a>
-  <a href="/rounds" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe) !important;color:#1d4ed8 !important;border-color:#60a5fa !important;font-weight:600 !important">🔄 rounds <span class="navhelp" data-tip="按采集轮次(round)审核。每一轮 harvest = 一个带版本号的数据快照;把该轮每个数据集按 类名/bbox 状态分组,逐个点 ✓保留 / ✗删 / 🔄重标。人工把好数据审定成 gold。">ⓘ</span></a>
-  <a href="/classes">📋 classes <span class="navhelp" data-tip="杂草类别浏览页。每个类名一张卡片 + 真实图片缩略图,可按 topic(weed/disease/pest/crop)过滤和搜索;点卡片进详情看该类全部图,可改 topic、给图标 exemplar。全站唯一能看图审核的页。">ⓘ</span></a>
-  <a href="/slugs">📦 slugs <span class="navhelp" data-tip="数据集级清理页。每个数据集(slug)一行,显示类名/图数/状态;点 ✓保留 / ✗垃圾 / 🤔存疑 做整包粗筛。✗ 的会从 /classes 隐藏、且不进训练。比逐图审快。">ⓘ</span></a>
-  <a href="/roboflow">📊 roboflow <span class="navhelp" data-tip="我们的 Roboflow 项目状态(只显示我们的 4 个:cwd12 金标 + agent v1/v2/v3,无关老项目已过滤)。每个项目的图/框/类数 + 跳转 Roboflow 网页去人工画框精标。">ⓘ</span></a>
-  <a href="/annotate">🏷️ annotate <span class="navhelp" data-tip="标注指引面板:每个采集到的数据集 → 它的类是真名/数字占位/泛称/CWD12,以及人工精标该怎么做(直接核实 / 重传带名 / 逐框判物种 / 逐图标)。回答『这堆乱数据我该怎么标、v2/v3/v4 里都是什么』。">ⓘ</span></a>
-  <a href="/labeling">🎯 labeling <span class="navhelp" data-tip="标注控制台(教授设计的人在环闭环):每个数据集你决定推几张到 Roboflow 人工标(agent 采样推荐)→ 标 → 导出回集群 → 删除省额度 → 再推。Mongo 记账:采集/agent标/人标/人核实计数 + 历史。">ⓘ</span></a>
-  <a href="/api/cluster_status">📥 JSON <span class="navhelp" data-tip="原始状态接口(机器可读 JSON),是 dashboard 各面板自己轮询的数据源:作业队列、registry 统计、ollama、verdict 计数等。开发者排查/核对用,普通使用不必点。">ⓘ</span></a>
+  <a href="/">🏠 hub <span class="navhelp" data-tip="Home command center. Stat cards (slugs/images/Roboflow/storage backend) + 27 agent action buttons + live SLURM queue + Roboflow panel + per-species pipeline stats, all auto-refreshing. The entry page for every operation.">ⓘ</span></a>
+  <a href="/manual" style="background:linear-gradient(135deg,#fef3c7,#fde68a) !important;color:#c70 !important;border-color:#fbbf24 !important;font-weight:600 !important">📖 manual <span class="navhelp" data-tip="Manual page. Dual-agent architecture diagram + the full 8-stage data pipeline + what each button does + current real progress + an honest data status (e.g. 8/12 species missing training data). Docs for new users and the professor.">ⓘ</span></a>
+  <a href="/rounds" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe) !important;color:#1d4ed8 !important;border-color:#60a5fa !important;font-weight:600 !important">🔄 rounds <span class="navhelp" data-tip="Review by harvest round. Each harvest round = a versioned data snapshot; the round's datasets are grouped by class name / bbox status, and you triage each one with ✓ keep / ✗ delete / 🔄 relabel. Humans promote good data to gold.">ⓘ</span></a>
+  <a href="/classes">📋 classes <span class="navhelp" data-tip="Weed class browser. One card per class name + real image thumbnails; filter & search by topic (weed/disease/pest/crop); click a card for detail to see all images of the class, change its topic, or mark images as exemplars. The only page where you review images.">ⓘ</span></a>
+  <a href="/slugs">📦 slugs <span class="navhelp" data-tip="Dataset-level cleanup. One row per dataset (slug) showing class names / image count / status; mark ✓ keep / ✗ junk / 🤔 unsure for whole-dataset triage. ✗ datasets are hidden from /classes and excluded from training. Faster than per-image review.">ⓘ</span></a>
+  <a href="/roboflow">📊 roboflow <span class="navhelp" data-tip="Our Roboflow project status (shows only our 4: cwd12 gold + agent v1/v2/v3; unrelated old projects filtered out). Images/boxes/classes per project + a link to Roboflow to draw boxes for precise labeling.">ⓘ</span></a>
+  <a href="/annotate">🏷️ annotate <span class="navhelp" data-tip="Labeling guide: for each collected dataset → whether its classes are real names / numeric placeholders / generic / CWD12, and how to label it (just verify / re-upload with names / judge species per box / label each image). Answers 'how do I label this messy data, and what's in v2/v3/v4'.">ⓘ</span></a>
+  <a href="/labeling">🎯 labeling <span class="navhelp" data-tip="Labeling console (the professor's human-in-the-loop): for each dataset you decide how many images to push to Roboflow for human labeling (agent recommends a sample) → label → export back to the cluster → delete to save quota → push more. Mongo tracks counts (collected / agent-labeled / human-labeled / human-verified) + history.">ⓘ</span></a>
+  <a href="/api/cluster_status">📥 JSON <span class="navhelp" data-tip="Raw status API (machine-readable JSON) that the dashboard panels poll: job queue, registry stats, ollama, verdict counts, etc. For developer debugging; not needed in normal use.">ⓘ</span></a>
 </div>
 
 <div class="live-banner idle" id="live-banner">
@@ -1132,12 +1152,12 @@ def console_page():
 
 <!-- ───── ACTIONS ───── -->
 <div class="panel" style="margin-bottom:14px">
-  <h2>🤖 Agent actions <span><a href="/control">/control 全功能 →</a></span></h2>
+  <h2>🤖 Agent actions <span><a href="/control">/control full controls →</a></span></h2>
   <div style="font-size:11px;color:#666;margin:-4px 0 8px;line-height:1.7">
-    <span class="ord">1</span> 绿=<b>主推荐顺序</b>(按数字依次点) ·
-    <span class="ord alt">1</span> 灰=备选/变体 ·
-    <b>无号</b>=工具 · <b>④</b>=人工(去 Roboflow 画框) ·
-    状态 ⏳运行中 ✅成功 ❌失败
+    <span class="ord">1</span> green = <b>recommended order</b> (click by number) ·
+    <span class="ord alt">1</span> gray = alternatives/variants ·
+    <b>no number</b> = tools · <b>④</b> = human (draw boxes in Roboflow) ·
+    status ⏳ running ✅ success ❌ failed
   </div>
   <div class="actions" id="actions">loading…</div>
   <h2 style="margin-top:10px">📜 last action output</h2>
@@ -1154,7 +1174,7 @@ def console_page():
     </table>
   </div>
   <div class="panel">
-    <h2>📡 Roboflow workspace <span><a href="/roboflow">详情 →</a></span></h2>
+    <h2>📡 Roboflow workspace <span><a href="/roboflow">details →</a></span></h2>
     <div id="rf-summary">loading…</div>
   </div>
 </div>
@@ -1168,8 +1188,8 @@ def console_page():
 <div class="panel" style="margin-bottom:14px">
   <h2>📊 Per-species pipeline state <span><a href="/api/per_species_stats">JSON →</a></span></h2>
   <div style="font-size:11px;color:#888;margin-bottom:6px">
-    每 30s 自动刷新 · gold = Roboflow cwd12 已审定 · auto = 下载自带 YOLO 标签 ·
-    unlabeled = 单类 slug 无标签图 · owl = OWL red 提案 · exemplars = object_bank 样本
+    auto-refresh every 30s · gold = Roboflow cwd12 verified · auto = downloaded with YOLO labels ·
+    unlabeled = single-class slug with no label files · owl = OWL red proposals · exemplars = object_bank samples
   </div>
   <div id="per-species" style="overflow-x:auto">loading…</div>
 </div>
@@ -1265,7 +1285,7 @@ async function loadActions(){
           <div class="nm" style="color:#c70">${ordBadge('brain_harvest')}${stSpan('brain_harvest')}🧠 brain_harvest</div>
           <div class="ds" style="margin-bottom:6px">${label}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:#444;align-items:center">
-            <label>时长:
+            <label>Duration:
               <select id="bh-time" style="font-size:11px">
                 <option value="1">1h</option>
                 <option value="2">2h</option>
@@ -1277,7 +1297,7 @@ async function loadActions(){
               <input id="bh-maxnew" type="number" value="5" min="1" max="50" style="width:48px;font-size:11px">
             </label>
             <label style="display:flex;align-items:center;gap:3px">
-              <input id="bh-strict" type="checkbox" checked> 严格 weed/crop
+              <input id="bh-strict" type="checkbox" checked> strict weed/crop
             </label>
             <button onclick="triggerBrain()" style="background:#c70;color:#fff;border:0;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">▶ run</button>
           </div></div>`;
@@ -1294,14 +1314,14 @@ async function loadActions(){
 
 async function trigger(name, body){
   if(name === 'restart_dashboard' &&
-     !confirm('重启 dashboard? ~90 秒后此页面会重连(github.io 自动跳新 URL)。')) return;
+     !confirm('Restart dashboard? This page will reconnect in ~90s (github.io auto-redirects to the new URL).')) return;
   const log = document.getElementById('action-log');
   // v3.0.99.47: per-button feedback so SSH-backed actions (2-5s) never feel "hung".
   const btn = document.querySelector('[data-action="'+name+'"]');
   let orig = null;
   if(btn && !btn.dataset.busy){
     orig = btn.textContent; btn.dataset.busy='1';
-    btn.disabled = true; btn.style.opacity='0.6'; btn.textContent='⏳ 运行中…';
+    btn.disabled = true; btn.style.opacity='0.6'; btn.textContent='⏳ Running…';
   }
   log.textContent = `→ triggering ${name} …`;
   try{ log.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(e){}
@@ -1346,12 +1366,12 @@ async function loadRoboflow(){
       document.getElementById('stat-rf-boxes').textContent = fmtN(master.boxes_total);
     }
     let html = `<div style="font-size:12px;color:#666;margin-bottom:8px">`
-      +`workspace <code>${d.workspace}</code> · ${d.n_projects} 个本项目(weed_crop_agent_dataset)</div>`;
+      +`workspace <code>${d.workspace}</code> · ${d.n_projects} projects (weed_crop_agent_dataset)</div>`;
     if(master){
       const ann = master.images - master.unannotated;
       const annPct = master.images ? Math.round(100*ann/master.images) : 0;
       html += `<div style="background:#f4faf4;border-left:3px solid #38a169;padding:8px 12px;border-radius:4px;font-size:13px">`
-        + `<strong>${master.slug}</strong> (主项目)<br>`
+        + `<strong>${master.slug}</strong> (main project)<br>`
         + `📷 ${master.images} imgs · 📐 ${master.n_classes} classes · 📦 ${master.boxes_total} boxes<br>`
         + `🏷️ annotated ${ann}/${master.images} (${annPct}%) · 🗂️ ${master.versions} versions`
         + `</div>`;
@@ -1507,7 +1527,7 @@ async function loadActionStatus(){
     document.querySelectorAll('.act-status').forEach(el=>{
       const a = el.dataset.stFor; const st = latest[a];
       el.textContent = st ? (icon[st]||'') : '';
-      el.title = st ? ('上次运行: '+st) : '从未运行';
+      el.title = st ? ('Last run: '+st) : 'never run';
     });
   }catch(e){}
 }
