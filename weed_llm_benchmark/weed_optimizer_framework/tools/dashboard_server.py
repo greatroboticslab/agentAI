@@ -4455,7 +4455,17 @@ def _class_summary_landing(cls: str) -> dict:
                 if cstat.st_mtime >= reg_mtime:
                     txt = thumb_cache_p.read_text().strip()
                     if not txt:
-                        cache_hit_empty = True  # we already searched; no thumb
+                        # v3.0.99.48: empty cache = "searched, no image found".
+                        # BUT images can arrive AFTER we cached empty, via an
+                        # incremental rsync that fills a previously-empty slug
+                        # dir WITHOUT bumping registry mtime (lab_pull_datasets
+                        # doesn't re-mirror). Without a TTL the class stays
+                        # no-image forever until a full re-mirror. Re-search if
+                        # the empty cache is stale so newly-harvested/synced
+                        # images auto-surface (serves the growing-dataset goal).
+                        if (time.time() - cstat.st_mtime) < 1800:
+                            cache_hit_empty = True  # recent miss; trust it
+                        # else: fall through to re-search (cache_hit_empty False)
                     else:
                         cp = Path(txt)
                         if cp.is_file():
