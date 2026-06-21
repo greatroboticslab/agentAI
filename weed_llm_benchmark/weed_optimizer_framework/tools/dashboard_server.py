@@ -715,8 +715,31 @@ def root():
 
     Big "Weed Detection" agent card + a "+" to create new domain agents.
     Pure presentation; links to /agent/weed (mission control) and /console
-    (classic advanced view). NO backend logic touched. English-only UI."""
-    return HTMLResponse('''<!DOCTYPE html><html lang="en"><head>
+    (classic advanced view). NO backend logic touched. English-only UI.
+
+    v3.0.107: data-driven — built-in Weed card + any domains created via the
+    "+" (db.create_domain → COLL_DOMAINS) render automatically."""
+    _extra = ""
+    try:
+        import html as _htmlmod
+        _esc = _htmlmod.escape
+        from . import db as _db
+        for _d in (_db.get_domains() or []):
+            _did = str(_d.get("_id") or "")
+            if not _did or _did == "weed":
+                continue
+            _nm = _esc(str(_d.get("display_name") or _did))
+            _st = _esc(str(_d.get("status") or "created"))
+            _extra += (
+                f'<a class="agent" href="/agent/{_esc(_did)}">'
+                f'<div class="ic">&#129516;</div><div class="nm">{_nm}</div>'
+                f'<div class="ds">New collection agent. Status: {_st}. '
+                f'Harvest pipeline not wired yet.</div>'
+                f'<div class="badge" style="background:#2a2a16;color:#d9c95f;'
+                f'border-color:#544a1d">&#9679; {_st}</div></a>')
+    except Exception:
+        _extra = ""
+    html = '''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agent Launcher</title>
 <style>
@@ -767,6 +790,7 @@ def root():
        models toward field-ready accuracy.</div>
      <div class="badge">&#9679; Active</div>
    </a>
+   __EXTRA_AGENTS__
    <div class="agent add" onclick="var p=document.getElementById('createPanel');p.style.display='block';p.scrollIntoView({behavior:'smooth'})">
      <div class="plus">+</div>
      <div class="nm">New Agent</div>
@@ -782,13 +806,35 @@ def root():
      <div><label>Task type</label>
        <select id="agType"><option>detection</option><option>classification</option><option>segmentation</option></select></div>
      <div><label>Sub-agents</label>
-       <select id="agN"><option>2 &mdash; collector + trainer</option><option>1 &mdash; collector only</option><option>3 &mdash; collector + filter + trainer</option></select></div>
+       <select id="agN"><option value="2">2 &mdash; collector + trainer</option><option value="1">1 &mdash; collector only</option><option value="3">3 &mdash; collector + filter + trainer</option></select></div>
    </div>
-   <button class="btn" onclick="alert('Framework placeholder \\u2014 backend provisioning for new domains is the next step. The database + dashboard are already multi-domain ready (domain field).')">Create agent</button>
-   <div class="note">The database and dashboard are already multi-domain ready; the provisioning backend is the next build step.</div>
+   <label>Seed search queries (comma-separated, optional)</label>
+   <input id="agQ" placeholder="e.g. tomato leaf blight, potato early blight">
+   <button class="btn" id="createBtn" onclick="createAgent()">Create agent</button>
+   <div class="note" id="createNote">Registers a new domain in the database and adds it here. Wiring its harvest pipeline (the collector using these queries) is the next backend step.</div>
  </div>
  <div class="foot">Lab server &middot; MongoDB &middot; cluster GPU compute &nbsp;|&nbsp; <a href="/console">Advanced console &rarr;</a></div>
-</body></html>''')
+ <script>
+  function createAgent(){
+    var name=(document.getElementById('agName').value||'').trim();
+    var note=document.getElementById('createNote'), btn=document.getElementById('createBtn');
+    if(!name){note.textContent='Please enter an agent name.';return;}
+    btn.disabled=true;note.textContent='\\u23f3 Creating\\u2026';
+    fetch('/api/agent/create',{method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:name,type:document.getElementById('agType').value,
+        n_subagents:parseInt(document.getElementById('agN').value||'2'),
+        queries:document.getElementById('agQ').value||''})})
+     .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+     .then(function(res){
+        if(res.ok&&res.j.ok){note.textContent='\\u2705 Created \"'+res.j.display_name+'\". Reloading\\u2026';setTimeout(function(){location.reload();},900);}
+        else{note.textContent='\\u274c '+((res.j&&res.j.detail)||'Create failed');btn.disabled=false;}
+     })
+     .catch(function(e){note.textContent='\\u274c Error: '+e;btn.disabled=false;});
+  }
+ </script>
+</body></html>'''
+    return HTMLResponse(html.replace("__EXTRA_AGENTS__", _extra))
 
 
 @app.get("/agent/weed", response_class=HTMLResponse)
@@ -906,6 +952,85 @@ def agent_weed():
      .finally(function(){btn.disabled=false;});
   }
  </script>
+</body></html>''')
+
+
+@app.post("/api/agent/create")
+async def api_agent_create(request: Request):
+    """v3.0.107: register a new collection-agent domain (Prof multi-domain
+    design). Persists to COLL_DOMAINS via db.create_domain. Additive — does NOT
+    touch the weed agent and does NOT yet wire the new domain's harvest pipeline."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    name = (str(body.get("name") or "")).strip()
+    if not name:
+        raise HTTPException(400, "name required")
+    domain_id = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")[:40]
+    if not domain_id:
+        raise HTTPException(400, "name must contain letters or digits")
+    try:
+        queries = [q.strip() for q in str(body.get("queries") or "").split(",") if q.strip()]
+        n = int(body.get("n_subagents") or 2)
+    except Exception:
+        queries, n = [], 2
+    from . import db as _db
+    res = _db.create_domain(domain_id, name, harvest_queries=queries, n_subagents=n)
+    if res == "exists":
+        raise HTTPException(409, f"agent '{domain_id}' already exists")
+    if res is None:
+        raise HTTPException(503, "database unavailable (Mongo down) — cannot create agent")
+    return {"ok": True, "domain": domain_id, "display_name": name}
+
+
+@app.get("/agent/{domain_id}", response_class=HTMLResponse)
+def agent_generic(domain_id: str):
+    """v3.0.107: mission control for a created (non-weed) domain agent. Honest:
+    a fresh domain has no data and its harvest pipeline isn't wired yet. The
+    specific /agent/weed route above takes precedence for the weed agent."""
+    if domain_id == "weed":
+        return agent_weed()
+    if not re.match(r"^[a-z0-9_]{1,40}$", domain_id):
+        raise HTTPException(400, "bad agent id")
+    from . import db as _db
+    d = _db.get_domain(domain_id)
+    if not d:
+        raise HTTPException(404, f"no agent '{domain_id}'")
+    import html as _h
+    nm = _h.escape(str(d.get("display_name") or domain_id))
+    st = _h.escape(str(d.get("status") or "created"))
+    qs = d.get("harvest_queries") or []
+    qline = _h.escape(", ".join(qs)) if qs else "&mdash; none set &mdash;"
+    return HTMLResponse(f'''<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{nm} &mdash; Mission Control</title>
+<style>
+ *{{box-sizing:border-box}}
+ body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;background:#f2f4f8;color:#1a1a1d}}
+ .top{{background:#fff;border-bottom:1px solid #e3e7ef;padding:14px 22px;display:flex;align-items:center;gap:14px}}
+ .top a.bc{{color:#64748b;text-decoration:none;font-size:13px}} .top h1{{font-size:18px;margin:0}}
+ .wrap{{max-width:760px;margin:34px auto;padding:0 18px}}
+ .card{{background:#fff;border:1px solid #e3e7ef;border-radius:14px;padding:24px}}
+ .badge{{display:inline-block;font-size:12px;padding:3px 11px;border-radius:20px;background:#fef9e7;color:#946c00;border:1px solid #f3e1a0}}
+ .row{{margin:14px 0;font-size:14px;color:#334}} .row b{{color:#0f172a}}
+ .steps{{margin:14px 0 0;padding-left:20px;color:#475569;font-size:13.5px;line-height:1.7}}
+ a.btn{{display:inline-block;margin-top:18px;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:10px 16px;border-radius:9px}}
+</style></head><body>
+ <div class="top"><a class="bc" href="/">&larr; Agents</a><h1>&#129516; {nm}</h1></div>
+ <div class="wrap"><div class="card">
+   <span class="badge">&#9679; {st}</span>
+   <div class="row" style="margin-top:16px"><b>This agent was just created.</b> It has no collected data yet.</div>
+   <div class="row">Seed search queries: <b>{qline}</b></div>
+   <div class="row">Sub-agents: <b>{int(d.get("n_subagents") or 2)}</b> &middot; Target metric: <b>{_h.escape(str(d.get("target_metric") or "mAP50-95"))}</b></div>
+   <div class="row" style="margin-top:18px">To make this agent functional (next backend step):</div>
+   <ol class="steps">
+     <li>Wire the brain harvester to use this domain's <code>harvest_queries</code>.</li>
+     <li>Scope the data / review / training views to <code>domain={_h.escape(domain_id)}</code>.</li>
+     <li>Run the collector to populate it &mdash; then it gets a full mission control like the Weed agent.</li>
+   </ol>
+   <a class="btn" href="/">&larr; Back to agents</a>
+ </div></div>
 </body></html>''')
 
 

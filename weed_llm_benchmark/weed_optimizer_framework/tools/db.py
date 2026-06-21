@@ -420,6 +420,35 @@ def get_domain(domain_id: str) -> Optional[dict]:
         return None
 
 
+def create_domain(domain_id: str, display_name: str, taxonomy=None,
+                  target_metric: str = "mAP50-95", harvest_queries=None,
+                  n_subagents: int = 2, status: str = "created") -> Optional[dict]:
+    """v3.0.107: insert a new dataset-collection-agent domain doc. Additive —
+    a domain is just config (Prof's multi-domain design). Returns the created
+    doc, the string "exists" if the id is taken, or None if Mongo is down.
+    NOTE: this only registers the domain; wiring its harvest pipeline (the
+    brain using `harvest_queries`) + domain-scoped data views is a later step."""
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        if db[COLL_DOMAINS].find_one({"_id": domain_id}):
+            return "exists"
+        doc = {
+            "_id": domain_id,
+            "display_name": display_name,
+            "taxonomy": list(taxonomy or []),
+            "target_metric": target_metric,
+            "harvest_queries": list(harvest_queries or []),
+            "n_subagents": int(n_subagents),
+            "status": status,
+        }
+        db[COLL_DOMAINS].insert_one(doc)
+        return doc
+    except Exception:
+        return None
+
+
 # --------------------------------------------------------------------------- #
 # Write API — Phase 3 dual-write (Mongo AND JSON, both authoritative)
 # --------------------------------------------------------------------------- #
