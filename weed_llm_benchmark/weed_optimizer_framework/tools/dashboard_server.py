@@ -6381,7 +6381,6 @@ def classes_landing():
             {(f'<span class="badge exemplar">✓ {n_ex}</span>' if n_ex else '')}
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
-          <div class="zh">{zh}</div>
           <div class="counts">bank {n_bank} · flux {n_flux} · real ≤{n_reg_est} ({n_reg_slugs} slugs)</div>
           <div class="counts">reviewed {n_ex+n_bad}</div>
         </a>'''
@@ -6626,7 +6625,7 @@ def classes_detail(cls: str):
 <style>{_CLASSES_CSS}</style>
 </head><body>
 <header>
-  <h1>📋 Class audit · {cls} <span style="color:#888;font-weight:normal;">/ {zh}</span></h1>
+  <h1>📋 Class audit · {cls}</h1>
   <div class="sub">
     <strong>{len(pool)}</strong> candidates ({src_summary}) ·
     <span class="badge exemplar">✓ exemplar {n_ex}</span>
