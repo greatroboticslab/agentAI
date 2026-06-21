@@ -1830,6 +1830,22 @@ def synth_montage(kind: str):
 import re as _re_audit
 from typing import List as _List_audit, Tuple as _Tuple_audit
 
+# v3.0.99.52: class names legitimately contain spaces / dashes / dots / parens
+# ("Carpet weed", "Crab Grass", "grass weeds - v2 release"). The old
+# ^[A-Za-z0-9_]+$ guard 400'd every such class → the WHOLE view+review workflow
+# (detail page /classes/{cls}, /thumb_reg, exemplar POST, exemplars_export) was
+# unreachable for multi-word weed classes the agent actually collected — they
+# showed on the landing but clicking them returned 400. Relax to an allowlist
+# that still bars the only dangerous chars: path separators (/ \) and HTML/quote
+# chars (< > "). cls is used ONLY as a single path component (dir/{cls}.jsonl),
+# so with no separator no traversal is possible; a bare '..' is a harmless stem.
+_RE_CLS_OK = _re_audit.compile(r"^[\w .()\-'&,+]{1,128}$")
+
+
+def _cls_ok(cls: str) -> bool:
+    """Validate a class-name path param (allows spaces; bars separators/HTML)."""
+    return bool(cls) and _RE_CLS_OK.match(cls) is not None
+
 _CWD12 = [
     "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
     "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
@@ -2215,7 +2231,7 @@ def _flux_files_for_class(cls: str) -> _List_audit[_Tuple_audit[str, list]]:
 # ---------------------------------------------------------------- raw serving
 @app.get("/audit/raw/bank/{cls}/{filename}")
 def audit_raw_bank(cls: str, filename: str):
-    if not _re_audit.match(r"^[A-Za-z0-9_]+$", cls):
+    if not _cls_ok(cls):
         raise HTTPException(400, "bad class name")
     if not _re_audit.match(r"^[A-Za-z0-9_.-]+\.(png|jpg|jpeg|PNG|JPG|JPEG)$", filename):
         raise HTTPException(400, "bad filename")
@@ -2584,7 +2600,7 @@ def thumb_serve(kind: str, cls: str, filename: str, w: int = 256):
     /ocean. Cache key includes mtime so source changes invalidate."""
     if kind not in ("bank", "flux"):
         raise HTTPException(400)
-    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+    if not _cls_ok(cls):
         raise HTTPException(400)
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+\.(png|jpg|jpeg|PNG|JPG|JPEG)$', filename):
         raise HTTPException(400)
@@ -2653,7 +2669,7 @@ def thumb_reg_serve(slug: str, cls: str, filename: str, w: int = 256):
     """Cached thumb of a registry-slug image with target-class bbox in red."""
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
         raise HTTPException(400, "bad slug")
-    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+    if not _cls_ok(cls):
         raise HTTPException(400, "bad cls")
     if "/" in filename or ".." in filename or filename.startswith("."):
         raise HTTPException(400, "bad fname")
@@ -2686,7 +2702,7 @@ def raw_reg_serve(slug: str, cls: str, filename: str):
     """Full-res image with target-class bbox highlighted (cached on disk)."""
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
         raise HTTPException(400)
-    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+    if not _cls_ok(cls):
         raise HTTPException(400)
     if "/" in filename or ".." in filename or filename.startswith("."):
         raise HTTPException(400)
@@ -2741,14 +2757,14 @@ def _exemplar_state(cls: str) -> _Dict_cls[str, str]:
 
 @app.get("/api/exemplar/{cls}")
 def api_exemplar_get(cls: str):
-    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+    if not _cls_ok(cls):
         raise HTTPException(400)
     return JSONResponse(_exemplar_state(cls))
 
 
 @app.post("/api/exemplar/{cls}")
 async def api_exemplar_post(cls: str, payload: dict = Body(...)):
-    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+    if not _cls_ok(cls):
         raise HTTPException(400)
     img = payload.get("img", "")
     verdict = payload.get("verdict", "")
@@ -2823,7 +2839,7 @@ def _exemplar_export_entry(cls: str, img_key: str) -> dict:
 @app.get("/api/exemplars_export/{cls}")
 def api_exemplars_export_class(cls: str):
     """Return all ✓ exemplar entries for a class as a usable manifest."""
-    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+    if not _cls_ok(cls):
         raise HTTPException(400)
     state = _exemplar_state(cls)
     entries = [
@@ -2920,7 +2936,7 @@ async def api_class_topic_set(cls: str, payload: dict = Body(...)):
 
     Future autonomous agent: after Brain LLM classifies a new species, it
     POSTs here to persist. User can override too via /classes UI."""
-    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+    if not _cls_ok(cls):
         raise HTTPException(400, "bad class name chars")
     topic = payload.get("topic", "")
     if topic not in ("cwd12", "weed", "disease", "pest", "crop", "other", "_clear_"):
@@ -6360,7 +6376,7 @@ if (initParams.get('q')) {{
 
 @app.get("/classes/{cls}", response_class=HTMLResponse)
 def classes_detail(cls: str):
-    if not _re_cls.match(r'^[A-Za-z0-9_]+$', cls):
+    if not _cls_ok(cls):
         raise HTTPException(400)
     pool = _class_image_pool(cls)
     if not pool and cls not in _CWD12:
