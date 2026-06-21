@@ -1553,8 +1553,7 @@ setInterval(loadActionStatus, 12000);
     <a href="/dashboard/index.html">stats</a> ·
     <a href="/dashboard/datasets.html">datasets</a> ·
     <a href="/dashboard/categories.html">categories</a> ·
-    <a href="/dashboard/progress.html">progress</a> ·
-    <a href="/audit">/audit</a>
+    <a href="/dashboard/progress.html">progress</a>
     &nbsp;|&nbsp; API:
     <a href="/api/state">state</a> ·
     <a href="/api/per_species_stats">per_species_stats</a> ·
@@ -6490,7 +6489,6 @@ def classes_landing():
   <div class="sub">
     Click any class to review image-by-image: ✓ exemplar / ✗ mislabeled.
     Approved images join that class's "exemplar set" as a trusted source for LoRA / curator / training.
-    · <a href="/audit">← legacy /audit view</a>
     · <a href="/">dashboard home</a>
     · <a href="/api/exemplars_export">📥 Export exemplars</a>
     · <a href="/slugs">📦 slug-level cleanup</a>
@@ -6653,7 +6651,6 @@ def classes_detail(cls: str):
     <span class="badge rebox">🔄 bbox to fix {n_rb}</span>
     · unreviewed {n_un}
     · <a href="/classes">← all classes</a>
-    · <a href="/audit/class/{cls}">legacy view</a>
   </div>
 </header>
 <div class="help">
