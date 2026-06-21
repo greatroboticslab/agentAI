@@ -711,7 +711,192 @@ def api_set_flag(slug: str, body: dict = Body(default=None)):
 
 @app.get("/", response_class=HTMLResponse)
 def root():
+    """v3.0.100 — Agent Launcher (clean entry page).
+
+    Big "Weed Detection" agent card + a "+" to create new domain agents.
+    Pure presentation; links to /agent/weed (mission control) and /console
+    (classic advanced view). NO backend logic touched. English-only UI."""
+    return HTMLResponse('''<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Launcher</title>
+<style>
+ *{box-sizing:border-box}
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;
+   min-height:100vh;background:linear-gradient(160deg,#1b2433 0%,#0f1218 100%);color:#e7eaf0;
+   display:flex;flex-direction:column;align-items:center;padding:52px 20px}
+ .brand{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:#7b8aa5;margin-bottom:8px}
+ h1{font-size:30px;margin:0 0 8px;font-weight:700;text-align:center}
+ .tag{color:#9aa7bd;font-size:15px;margin-bottom:42px;text-align:center;max-width:580px;line-height:1.55}
+ .agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,300px));gap:22px;
+   justify-content:center;width:100%;max-width:960px}
+ .agent{background:linear-gradient(160deg,#243049,#1a2230);border:1px solid #2c3a52;border-radius:16px;
+   padding:26px;text-decoration:none;color:inherit;transition:.15s;display:block}
+ .agent:hover{transform:translateY(-3px);border-color:#3b82f6;box-shadow:0 14px 34px rgba(0,0,0,.45)}
+ .agent .ic{font-size:42px;margin-bottom:14px}
+ .agent .nm{font-size:20px;font-weight:700;margin-bottom:7px}
+ .agent .ds{font-size:13.5px;color:#9aa7bd;line-height:1.5}
+ .agent .badge{display:inline-block;margin-top:15px;font-size:11px;padding:3px 11px;border-radius:20px;
+   background:#16351f;color:#5fd98a;border:1px solid #1f5132}
+ .agent.add{border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;
+   text-align:center;color:#8b9bb5;cursor:pointer;background:transparent;min-height:210px}
+ .agent.add .plus{font-size:50px;line-height:1;margin-bottom:10px;color:#5b6c8a}
+ .agent.add:hover{color:#cdd6e6;border-color:#3b82f6}
+ #createPanel{display:none;margin-top:28px;background:#1a2230;border:1px solid #2c3a52;border-radius:14px;
+   padding:24px;width:100%;max-width:470px}
+ #createPanel h3{margin:0 0 6px;font-size:17px}
+ #createPanel p.h{margin:0 0 14px;font-size:12.5px;color:#7b8aa5}
+ #createPanel label{display:block;font-size:12px;color:#9aa7bd;margin:13px 0 5px}
+ #createPanel input,#createPanel select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2c3a52;
+   background:#11161f;color:#e7eaf0;font-size:14px}
+ .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+ .btn{margin-top:18px;width:100%;padding:12px;border:0;border-radius:9px;background:#2563eb;color:#fff;
+   font-size:14px;font-weight:600;cursor:pointer}
+ .note{font-size:12px;color:#7b8aa5;margin-top:11px;text-align:center;line-height:1.5}
+ .foot{margin-top:48px;color:#5b6c8a;font-size:12px;text-align:center}
+ .foot a{color:#93a3bd}
+</style></head><body>
+ <div class="brand">Greater Robotics Lab</div>
+ <h1>Autonomous Dataset Agents</h1>
+ <div class="tag">Self-driving agents that collect, human-review, filter and train on real-world
+   datasets &mdash; compounding over weeks and months.</div>
+ <div class="agents">
+   <a class="agent" href="/agent/weed">
+     <div class="ic">&#127806;</div>
+     <div class="nm">Weed Detection</div>
+     <div class="ds">Harvests weed &amp; crop imagery, human-reviews labels, and trains detection
+       models toward field-ready accuracy.</div>
+     <div class="badge">&#9679; Active</div>
+   </a>
+   <div class="agent add" onclick="var p=document.getElementById('createPanel');p.style.display='block';p.scrollIntoView({behavior:'smooth'})">
+     <div class="plus">+</div>
+     <div class="nm">New Agent</div>
+     <div class="ds">Spin up a collection agent for a new domain.</div>
+   </div>
+ </div>
+ <div id="createPanel">
+   <h3>Create a new agent</h3>
+   <p class="h">Each agent owns one domain and runs the same collect &rarr; review &rarr; train pipeline.</p>
+   <label>Agent name</label>
+   <input id="agName" placeholder="e.g. Crop Disease, Pest, Aerial Crops">
+   <div class="row2">
+     <div><label>Task type</label>
+       <select id="agType"><option>detection</option><option>classification</option><option>segmentation</option></select></div>
+     <div><label>Sub-agents</label>
+       <select id="agN"><option>2 &mdash; collector + trainer</option><option>1 &mdash; collector only</option><option>3 &mdash; collector + filter + trainer</option></select></div>
+   </div>
+   <button class="btn" onclick="alert('Framework placeholder \\u2014 backend provisioning for new domains is the next step. The database + dashboard are already multi-domain ready (domain field).')">Create agent</button>
+   <div class="note">The database and dashboard are already multi-domain ready; the provisioning backend is the next build step.</div>
+ </div>
+ <div class="foot">Lab server &middot; MongoDB &middot; cluster GPU compute &nbsp;|&nbsp; <a href="/console">Advanced console &rarr;</a></div>
+</body></html>''')
+
+
+@app.get("/agent/weed", response_class=HTMLResponse)
+def agent_weed():
+    """v3.0.100 — Mission Control for the Weed Detection agent.
+
+    Clean overview: pipeline strip + the two agents (Collector / Trainer) +
+    quick links to existing data / review / results pages + advanced console.
+    Pure presentation linking to existing routes; NO backend logic touched.
+    Live cluster status pulled from the existing /api/cluster_status. English."""
+    return HTMLResponse('''<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weed Detection &mdash; Mission Control</title>
+<style>
+ *{box-sizing:border-box}
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;
+   background:#f2f4f8;color:#1a1a1d;padding:0 0 48px}
+ .top{background:#fff;border-bottom:1px solid #e3e7ef;padding:14px 22px;display:flex;align-items:center;
+   gap:14px;flex-wrap:wrap}
+ .top a.bc{color:#64748b;text-decoration:none;font-size:13px}
+ .top a.bc:hover{color:#2563eb}
+ .top h1{font-size:18px;margin:0;font-weight:700}
+ .dot{margin-left:auto;font-size:12.5px;color:#475569;display:flex;align-items:center;gap:7px}
+ .dot .c{width:9px;height:9px;border-radius:50%;background:#94a3b8}
+ .dot .c.run{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18)}
+ .wrap{max-width:1080px;margin:22px auto;padding:0 18px}
+ .pipe{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
+ .pipe .st{flex:1;min-width:120px;background:#fff;border:1px solid #e3e7ef;border-radius:10px;padding:12px 14px;
+   text-align:center;font-size:13px;color:#475569;position:relative}
+ .pipe .st b{display:block;font-size:14px;color:#0f172a;margin-top:3px}
+ .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:22px}
+ .agent{background:#fff;border:1px solid #e3e7ef;border-radius:14px;padding:20px 22px}
+ .agent .hd{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+ .agent .hd .ic{font-size:28px}
+ .agent .hd .t{font-size:16px;font-weight:700}
+ .agent .hd .t small{display:block;font-weight:500;color:#64748b;font-size:12px}
+ .agent .stat{font-size:13px;color:#475569;margin:10px 0 4px}
+ .agent .stat b{color:#0f172a}
+ .acts{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+ .acts a{flex:1;text-align:center;text-decoration:none;font-size:13px;font-weight:600;padding:9px 12px;
+   border-radius:8px;background:#2563eb;color:#fff;white-space:nowrap}
+ .acts a.sec{background:#eef2ff;color:#2563eb}
+ .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:13px}
+ .quick a{background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:16px;text-decoration:none;
+   color:inherit;transition:.12s}
+ .quick a:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.07);border-color:#c7d2fe}
+ .quick .ic{font-size:24px}
+ .quick .nm{font-weight:600;margin:8px 0 3px;font-size:14.5px}
+ .quick .ds{font-size:12.5px;color:#64748b;line-height:1.45}
+ .sec-h{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;margin:4px 0 11px}
+</style></head><body>
+ <div class="top">
+   <a class="bc" href="/">&larr; Agents</a>
+   <h1>&#127806; Weed Detection</h1>
+   <div class="dot"><span class="c" id="cdot"></span><span id="ctxt">cluster: checking&hellip;</span></div>
+ </div>
+ <div class="wrap">
+   <div class="pipe">
+     <div class="st">1<b>Collect</b></div>
+     <div class="st">2<b>Review &amp; Label</b></div>
+     <div class="st">3<b>Filter</b></div>
+     <div class="st">4<b>Train</b></div>
+     <div class="st">5<b>Results</b></div>
+   </div>
+
+   <div class="sec-h">Agents</div>
+   <div class="grid2">
+     <div class="agent">
+       <div class="hd"><span class="ic">&#129302;</span><span class="t">Agent 1 &middot; Collector<small>Brain harvester &mdash; finds &amp; pulls datasets</small></span></div>
+       <div class="stat">Runs autonomous search + harvest on the cluster, then syncs results to this server.</div>
+       <div class="acts"><a href="/console">Run / configure &rarr;</a><a class="sec" href="/slugs">View datasets</a></div>
+     </div>
+     <div class="agent">
+       <div class="hd"><span class="ic">&#128640;</span><span class="t">Agent 2 &middot; Trainer<small>Trains detection on reviewed data</small></span></div>
+       <div class="stat">Trains YOLO on human-verified data and evaluates against the held-out gold set.</div>
+       <div class="acts"><a href="/console">Run / configure &rarr;</a><a class="sec" href="/rounds">View results</a></div>
+     </div>
+   </div>
+
+   <div class="sec-h">Workspace</div>
+   <div class="quick">
+     <a href="/classes"><div class="ic">&#127793;</div><div class="nm">Browse Data</div><div class="ds">All collected species &amp; classes, with thumbnails.</div></a>
+     <a href="/slugs"><div class="ic">&#128451;</div><div class="nm">Datasets</div><div class="ds">Every harvested dataset, sample previews.</div></a>
+     <a href="/labeling"><div class="ic">&#9989;</div><div class="nm">Review &amp; Label</div><div class="ds">Human-in-the-loop labeling queue.</div></a>
+     <a href="/rounds"><div class="ic">&#128200;</div><div class="nm">Rounds &amp; Results</div><div class="ds">Harvest rounds and training metrics.</div></a>
+     <a href="/manual"><div class="ic">&#128214;</div><div class="nm">Manual</div><div class="ds">Architecture &amp; full pipeline docs.</div></a>
+     <a href="/console"><div class="ic">&#9881;</div><div class="nm">Advanced Console</div><div class="ds">All raw controls &amp; cluster ops.</div></a>
+   </div>
+ </div>
+ <script>
+  fetch('/api/cluster_status').then(r=>r.json()).then(d=>{
+    var jobs=(d&&(d.running!=null?d.running:(d.n_running!=null?d.n_running:(Array.isArray(d.jobs)?d.jobs.length:null))));
+    var dot=document.getElementById('cdot'),txt=document.getElementById('ctxt');
+    if(jobs&&jobs>0){dot.className='c run';txt.textContent='cluster: '+jobs+' job'+(jobs>1?'s':'')+' running';}
+    else{dot.className='c';txt.textContent='cluster: idle';}
+  }).catch(function(){document.getElementById('ctxt').textContent='cluster: status unavailable';});
+ </script>
+</body></html>''')
+
+
+@app.get("/console", response_class=HTMLResponse)
+def console_page():
     """v3.0.66 — unified single-page command center.
+
+    v3.0.100: moved from "/" to "/console". "/" is now the Agent Launcher
+    (clean entry) and /agent/weed is the per-agent Mission Control. This page
+    is preserved BYTE-FOR-BYTE as the advanced/classic console — all existing
+    action buttons + logic intact (user: do NOT change functionality).
 
     User feedback 2026-05-31: previously / was a hub of card-links to
     other pages. User clicking those from github.io got 404 because
