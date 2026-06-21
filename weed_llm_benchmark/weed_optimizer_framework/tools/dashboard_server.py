@@ -7524,7 +7524,7 @@ def rounds_page():
               padding:.9rem 1.2rem;border-radius:8px;margin-bottom:1rem;font-size:13px;color:#1e3a8a">
     <strong>💡 Workflow:</strong> harvest → sync to Roboflow → <b>review HERE</b>.
     Each slug now shows an inline <b>boxed preview</b> (YOLO boxes drawn server-side);
-    click a thumb or <strong style="background:#fff;padding:.1rem .4rem;border-radius:3px;color:#0e7c66">🖼️ 看全部图+框</strong>
+    click a thumb or <strong style="background:#fff;padding:.1rem .4rem;border-radius:3px;color:#0e7c66">🖼️ View all images + boxes</strong>
     for the full boxed gallery, judge quality, then <b>✓ keep / ✗ junk</b> right here — no need to
     leave for Roboflow. (📡 Roboflow ↗ still available for the web labeler / faster CDN.)
   </div>
@@ -7608,10 +7608,10 @@ async function loadRounds(){
           html += '<span class="cls-chip uncategorized">no class_names — needs manual labeling in Roboflow</span>';
         }
         html += `</div>
-            <div class="rev-thumbs" id="th_${s.slug}" data-slug="${s.slug}"><span class="th-load">🖼️ 载入带框预览…</span></div>
+            <div class="rev-thumbs" id="th_${s.slug}" data-slug="${s.slug}"><span class="th-load">🖼️ Loading boxed previews…</span></div>
           </div>
           <div class="actions">
-            <a class="act view" href="/gallery/${encodeURIComponent(s.slug)}" target="_blank">🖼️ 看全部图+框</a>
+            <a class="act view" href="/gallery/${encodeURIComponent(s.slug)}" target="_blank">🖼️ View all images + boxes</a>
             <button class="act ok" onclick="markSlug('${s.slug}','keep')">✓ keep slug</button>
             <button class="act bad" onclick="markSlug('${s.slug}','junk')">✗ junk slug</button>
             ${s.roboflow_synced
