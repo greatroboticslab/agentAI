@@ -241,6 +241,27 @@ _RESPONSIVE_CSS = (
 )
 
 
+@app.on_event("startup")
+def _warm_cluster_master():
+    """v3.0.99.46: in lab-control mode, eagerly open + keep alive the SSH
+    ControlMaster to the cluster so user actions hit a WARM connection (~1-2s)
+    instead of a cold password handshake (~15s → felt like 'buttons hang')."""
+    if not _CLUSTER_SSH:
+        return
+    import threading, time as _t
+
+    def warmer():
+        while True:
+            try:
+                _shell(_ssh_cluster_prefix() + ["true"], timeout=45)
+            except Exception:
+                pass
+            _t.sleep(240)   # ControlPersist=12h; refresh well within it
+    threading.Thread(target=warmer, daemon=True,
+                     name="cluster_master_warmer").start()
+    log.info("[cluster] ControlMaster warmer started")
+
+
 @app.middleware("http")
 async def _inject_responsive_css(request: Request, call_next):
     resp = await call_next(request)
@@ -3274,13 +3295,24 @@ def api_agent_progress():
 
 
 @app.get("/api/cluster_status")
+_squeue_cache: dict = {"ts": 0.0, "sq": None}   # v3.0.99.46: TTL cache for /control auto-refresh
+
+
 def api_cluster_status():
     """Return a structured snapshot of cluster state — what /control polls."""
     out: dict = {"generated_at": time.time()}
 
-    # SLURM job queue for our user
-    sq = _slurm(["squeue", "-u", "byler",
-                 "-o", "%i\t%j\t%T\t%M\t%R\t%C\t%m"], timeout=10)
+    # SLURM job queue for our user. v3.0.99.46: 12s TTL cache so the /control
+    # auto-refresh (every ~5-30s) doesn't SSH the cluster on every hit.
+    _now = time.time()
+    if _squeue_cache["sq"] is not None and _now - _squeue_cache["ts"] < 12:
+        sq = _squeue_cache["sq"]
+    else:
+        sq = _slurm(["squeue", "-u", "byler",
+                     "-o", "%i\t%j\t%T\t%M\t%R\t%C\t%m"], timeout=10)
+        if sq["ok"]:
+            _squeue_cache["sq"] = sq
+            _squeue_cache["ts"] = _now
     jobs = []
     if sq["ok"]:
         for line in sq["stdout"].strip().split("\n")[1:]:  # skip header
