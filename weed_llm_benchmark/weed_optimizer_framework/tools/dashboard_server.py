@@ -3294,10 +3294,10 @@ def api_agent_progress():
     })
 
 
-@app.get("/api/cluster_status")
 _squeue_cache: dict = {"ts": 0.0, "sq": None}   # v3.0.99.46: TTL cache for /control auto-refresh
 
 
+@app.get("/api/cluster_status")
 def api_cluster_status():
     """Return a structured snapshot of cluster state — what /control polls."""
     out: dict = {"generated_at": time.time()}
