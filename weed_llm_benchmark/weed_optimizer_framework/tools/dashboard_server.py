@@ -3538,6 +3538,7 @@ _CLUSTER_ACTIONS = {
     # button just FATALs on missing exemplar config.
     "export_owl_exemplars": {
         "type": "subprocess",
+        "needs_cluster": True,  # v3.0.99.49: reads object_bank (cluster-only, not migrated)
         "argv": [
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.export_owl_exemplars",
@@ -3584,6 +3585,7 @@ _CLUSTER_ACTIONS = {
     # on re-run so you can iterate (v1.0 → v1.1 → v1.2 ...).
     "dinov2_filter_round_1": {
         "type": "subprocess",
+        "needs_cluster": True,  # v3.0.99.49: torch/DINOv2 GPU — runs on cluster
         "argv": [
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.dinov2_round_filter",
@@ -3595,6 +3597,7 @@ _CLUSTER_ACTIONS = {
     # v3.0.74 Stage 5 — placeholder send-to-training trigger
     "train_yolo_round_1": {
         "type": "subprocess",
+        "needs_cluster": True,  # v3.0.99.49: YOLO training GPU — runs on cluster
         "argv": [
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.train_yolo_on_verified",
@@ -3660,6 +3663,7 @@ _CLUSTER_ACTIONS = {
     # weed-crop-agent-dataset, tagged batch=red so human reviewer sees them.
     "owl_upload_proposals": {
         "type": "subprocess",
+        "needs_cluster": True,  # v3.0.99.49: reads OWL proposals produced on cluster
         "argv": [
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.owl_upload_proposals",
@@ -3992,6 +3996,25 @@ async def api_cluster_action(action: str, request: Request):
         # shared-FS log so any login node + the dashboard can tail it.
         import subprocess as _sp
         argv = list(spec["argv"])
+        # v3.0.99.49: in lab-control mode (dashboard on lab, compute on cluster)
+        # some subprocess actions CANNOT run locally — they need GPU/torch
+        # (dinov2_filter, train_yolo) or cluster-only artifacts (object_bank,
+        # OWL proposals). Running them locally would Popen → fail confusingly
+        # (silent error in a log the user won't open → "button does nothing").
+        # Return a CLEAR, honest result instead. Full auto-sbatch routing of
+        # these is deferred until the training phase (needs dedicated wrapper
+        # scripts + burns SU) — surface the exact cluster command meanwhile.
+        if _CLUSTER_SSH and spec.get("needs_cluster"):
+            _cmd = " ".join(argv)
+            result = {
+                "ok": False, "action": action, "needs_cluster": True,
+                "msg": ("⚠️ 计算动作:需在 cluster 上运行(GPU/torch 或 OWL/"
+                        "object_bank 产物仅在 cluster)。lab 控制台暂不自动提交"
+                        "此类作业(训练阶段再接 sbatch 路由)。请在 cluster 运行:"
+                        f" cd $REPO && {_cmd}"),
+            }
+            _log_action(action, result)
+            return result
         env = os.environ.copy()
         # Load any required secrets from per-key files (key never crosses
         # the wire / never gets logged / never gets committed).
