@@ -3638,17 +3638,17 @@ def api_cluster_status():
 _CLUSTER_ACTIONS = {
     "restart_dashboard": {
         "type": "restart_self",
-        "label": "重启 dashboard server (cancels current job + sbatch new)",
+        "label": "Restart dashboard server (cancels current job + sbatch new)",
     },
     "brain_harvest": {
         "type": "sbatch",
         "script": "run_v3_0_43_brain_harvest_oneshot.sh",
-        "label": "Brain 一轮 harvest_new_datasets — 找 + 抓 NEW 数据集 (~30 min)",
+        "label": "Brain one round: harvest_new_datasets — find + pull NEW datasets (~30 min)",
     },
     "download_known_slugs": {
         "type": "sbatch",
         "script": "run_v3_0_43_download_known_slugs.sh",
-        "label": "下载所有 status=known 的 HF slug 到 /ocean cluster (~30min-2hr)",
+        "label": "Download all status=known HF slugs to the /ocean cluster (~30min-2hr)",
     },
     "topic_backfill": {
         "type": "sbatch",
@@ -3676,7 +3676,7 @@ _CLUSTER_ACTIONS = {
             "--project", "cwd12-multiclass-v1",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "Roboflow 多类上传 → cwd12-multiclass-v1 (frozen 598-img benchmark, ~10min)",
+        "label": "Roboflow multi-class upload → cwd12-multiclass-v1 (frozen 598-img benchmark, ~10min)",
     },
     # v3.0.67 (2026-05-31): new agent-harvested target project per user
     # directive — keep frozen cwd12 benchmark separate from autonomous
@@ -3695,7 +3695,7 @@ _CLUSTER_ACTIONS = {
             "--project", "weed-crop-agent-dataset",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "Roboflow 上传 → weed-crop-agent-dataset (新 agent 收集池,~10min)",
+        "label": "Roboflow upload → weed-crop-agent-dataset (new agent collection pool, ~10min)",
     },
     # v3.0.46 (auto-loop iter 4 / Phase D1): bucket-audit CLI.
     "build_buckets": {
@@ -3704,7 +3704,7 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m", "weed_optimizer_framework.tools.bucketer",
             "--out", "results/framework/buckets.json",
         ],
-        "label": "Bucket audit: 每个下载的 slug → A/B/C 分桶 + cwd12 物种覆盖统计 (~30s)",
+        "label": "Bucket audit: each downloaded slug → A/B/C buckets + cwd12 species coverage (~30s)",
     },
     # v3.0.47 (auto-loop iter 5 / Phase C3 skeleton): Roboflow workspace audit.
     "roboflow_state_audit": {
@@ -3715,7 +3715,7 @@ _CLUSTER_ACTIONS = {
             "--out", "results/framework/roboflow_state.json",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "Roboflow 13-project 状态审计 (imgs/boxes/versions per cwd12-<sp>, ~10s)",
+        "label": "Roboflow 13-project status audit (imgs/boxes/versions per cwd12-<sp>, ~10s)",
     },
     # v3.0.50 (auto-loop iter 8 / Phase D3): OWL pre-annotate sbatch.
     # Needs an exemplar-config JSON at the default path or env override —
@@ -3723,7 +3723,7 @@ _CLUSTER_ACTIONS = {
     "owl_preannotate_one": {
         "type": "sbatch",
         "script": "run_v3_0_50_owl_preannotate.sh",
-        "label": "OWL 预标注 1 物种 — 给出 red bbox 提案 (~10-30min,需 exemplar JSON)",
+        "label": "OWL pre-annotate 1 species — produces red bbox proposals (~10-30min, needs exemplar JSON)",
     },
     # v3.0.99.30 (D): clean-subset training — quality>quantity probe. Trains on
     # high-DINO clean data only (min_dino_score gate, no 175K loose auto-labels)
@@ -3732,7 +3732,7 @@ _CLUSTER_ACTIONS = {
     "clean_train_d": {
         "type": "sbatch",
         "script": "run_v3_0_99_clean_train.sh",
-        "label": "D 干净子集训练(质量>数量探针:DINO门+cwd12 gold val+自动eval,GPU)",
+        "label": "D clean-subset training (quality>quantity probe: DINO gate + cwd12 gold val + auto-eval, GPU)",
     },
     # v3.0.62 (button-test iter 9, Phase T3): export ✓/object_bank exemplars
     # to JSON configs that owl_preannotate.py consumes. Without this, OWL
@@ -3745,7 +3745,7 @@ _CLUSTER_ACTIONS = {
             "weed_optimizer_framework.tools.export_owl_exemplars",
             "--source", "bank", "--per-species", "5",
         ],
-        "label": "生成 OWL 所需的每物种 exemplar JSON(读 object_bank,~3s,12 文件)",
+        "label": "Generate per-species exemplar JSON for OWL (reads object_bank, ~3s, 12 files)",
     },
     # v3.0.74 (2026-06-01): round tracking — start a new harvest round.
     # Subsequent brain_harvest calls tag downloaded slugs with the new round.
@@ -3821,7 +3821,7 @@ _CLUSTER_ACTIONS = {
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.audit_registry_garbage",
         ],
-        "label": "回溯审计 registry — 列出 labeled<100/classes=0 的 slug (dry-run, ~5s)",
+        "label": "Retroactive registry audit — list slugs with labeled<100/classes=0 (dry-run, ~5s)",
     },
     "audit_registry_garbage_APPLY": {
         "type": "subprocess",
@@ -3835,7 +3835,7 @@ _CLUSTER_ACTIONS = {
             "weed_optimizer_framework.tools.audit_registry_garbage",
             "--apply",
         ],
-        "label": "⚠️ APPLY: 删除上面 dry-run 列出的所有 garbage slugs + 磁盘文件",
+        "label": "⚠️ APPLY: delete all garbage slugs listed by the dry-run above + their disk files",
     },
     # v3.0.71: sync newest brain-harvested slugs → weed-crop-agent-dataset
     # + auto-place into weed_crop_agent_dataset folder. THIS is the
@@ -3851,7 +3851,7 @@ _CLUSTER_ACTIONS = {
             "--skip-baselines",  # default: don't push cwd12 here (use sync_all_to_roboflow for that)
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "Roboflow 上传 — 跳过 cwd12 baseline (agent-harvested only, ~10min/slug)",
+        "label": "Roboflow upload — skip cwd12 baseline (agent-harvested only, ~10min/slug)",
     },
     # v3.0.75 (2026-06-01): user wants ALL data in Roboflow for fast browsing.
     # This variant uploads EVERYTHING including cwd12 baselines.
@@ -3884,13 +3884,13 @@ _CLUSTER_ACTIONS = {
             "--per-species", "50",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "上传 OWL red 提案 → weed-crop-agent-dataset (精度门槛保护;低于阈值拒绝上传,OWL_UPLOAD_FORCE=1 强制)",
+        "label": "Upload OWL red proposals → weed-crop-agent-dataset (precision-gated; rejects upload below threshold, OWL_UPLOAD_FORCE=1 to force)",
     },
     # v3.0.71: DINOv2 dataset-quality curator (full pipeline as one button)
     "dinov2_curate_registry": {
         "type": "sbatch",
         "script": "run_v3_0_36_dinov2_curator.sh",
-        "label": "DINOv2 reference-pool curator (~4h GPU): build ref + score 所有 slug + 排名报告",
+        "label": "DINOv2 reference-pool curator (~4h GPU): build ref + score all slugs + ranking report",
     },
     # v3.0.69 (2026-05-31): Roboflow Project Folder ops via /groups REST.
     # Earlier-session conclusion "no API support" was wrong — the path uses
@@ -3903,7 +3903,7 @@ _CLUSTER_ACTIONS = {
             "list-folders",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "Roboflow folders 列表 (workspace 内所有 folder + 成员项目, ~3s)",
+        "label": "Roboflow folders list (all folders in workspace + member projects, ~3s)",
     },
     "roboflow_move_agent_to_folder": {
         "type": "subprocess",
@@ -3914,7 +3914,7 @@ _CLUSTER_ACTIONS = {
             "--folder", "weed_crop_agent_dataset",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "把 weed-crop-agent-dataset 项目移进 weed_crop_agent_dataset folder (idempotent, ~3s)",
+        "label": "Move the weed-crop-agent-dataset project into the weed_crop_agent_dataset folder (idempotent, ~3s)",
     },
     # v3.0.51 (auto-loop iter 9 / Phase D4): Roboflow Version generation + pull-back.
     # Generate is RATE-LIMITED on free tier (~10/proj/month) — skips by default
@@ -3928,7 +3928,7 @@ _CLUSTER_ACTIONS = {
             "--project", "weed-crop-agent-dataset",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "Roboflow Version 生成 → weed-crop-agent-dataset (skips if existing, ~30s)",
+        "label": "Roboflow version generate → weed-crop-agent-dataset (skips if existing, ~30s)",
     },
     "roboflow_download_merge": {
         "type": "subprocess",
@@ -3938,7 +3938,7 @@ _CLUSTER_ACTIONS = {
             "download-merge",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "⬇️ 导出标注回集群:Roboflow 标注好的数据 → cwd12 多类训练集(优质保留+ground-truth落盘)",
+        "label": "⬇️ Export labels back to cluster: Roboflow-labeled data → cwd12 multi-class training set (quality-kept + ground-truth written to disk)",
     },
     # v3.0.99.21: delete junk-verdict datasets' images from Roboflow (storage is a
     # recurring monthly cost → after review, delete junk, keep only the clean library).
@@ -3950,7 +3950,7 @@ _CLUSTER_ACTIONS = {
             "delete-junk",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "🗑️ 垃圾删除(预演):统计 junk 数据集在 Roboflow 上有多少图会被删(不实删)",
+        "label": "🗑️ Junk delete (dry-run): count how many images of junk datasets would be removed on Roboflow (no real delete)",
     },
     "roboflow_delete_junk_apply": {
         "type": "subprocess",
@@ -3959,13 +3959,13 @@ _CLUSTER_ACTIONS = {
             "delete-junk", "--apply",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "🗑️ 垃圾删除(执行):把 verdict=junk 的数据集从 Roboflow 删除,省每月存储(真值已在集群)",
+        "label": "🗑️ Junk delete (apply): remove verdict=junk datasets from Roboflow to save monthly storage (ground-truth already on cluster)",
     },
     # v3.0.52 (auto-loop iter 11 / Phase D2 sbatch): DINOv2 routing job.
     "dinov2_route_classes": {
         "type": "sbatch",
         "script": "run_v3_0_52_dinov2_route.sh",
-        "label": "DINOv2 路由 (weed-vs-not-weed + 物种归类,1×V100 ~30min)",
+        "label": "DINOv2 routing (weed-vs-not-weed + species classification, 1×V100 ~30min)",
     },
 }
 
@@ -4220,10 +4220,11 @@ async def api_cluster_action(action: str, request: Request):
             _cmd = " ".join(argv)
             result = {
                 "ok": False, "action": action, "needs_cluster": True,
-                "msg": ("⚠️ 计算动作:需在 cluster 上运行(GPU/torch 或 OWL/"
-                        "object_bank 产物仅在 cluster)。lab 控制台暂不自动提交"
-                        "此类作业(训练阶段再接 sbatch 路由)。请在 cluster 运行:"
-                        f" cd $REPO && {_cmd}"),
+                "msg": ("\u26a0\ufe0f Compute action: must run on the cluster (needs GPU/torch, "
+                        "or OWL/object_bank artifacts that live only on the cluster). "
+                        "The lab console does not auto-submit these yet (sbatch routing "
+                        "comes with the training phase). Run on the cluster: "
+                        f"cd $REPO && {_cmd}"),
             }
             _log_action(action, result)
             return result
