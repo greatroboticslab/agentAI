@@ -1111,7 +1111,18 @@ async function trigger(name, body){
   if(name === 'restart_dashboard' &&
      !confirm('重启 dashboard? ~90 秒后此页面会重连(github.io 自动跳新 URL)。')) return;
   const log = document.getElementById('action-log');
+  // v3.0.99.47: per-button feedback so SSH-backed actions (2-5s) never feel "hung".
+  const btn = document.querySelector('[data-action="'+name+'"]');
+  let orig = null;
+  if(btn && !btn.dataset.busy){
+    orig = btn.textContent; btn.dataset.busy='1';
+    btn.disabled = true; btn.style.opacity='0.6'; btn.textContent='⏳ 运行中…';
+  }
   log.textContent = `→ triggering ${name} …`;
+  try{ log.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(e){}
+  const restore = (mark)=>{ if(btn && orig!==null){ btn.textContent=mark+orig;
+    setTimeout(()=>{ btn.textContent=orig; btn.disabled=false; btn.style.opacity='';
+      delete btn.dataset.busy; }, 2500); } };
   try{
     const opts = {method:'POST'};
     if(body){
@@ -1121,8 +1132,9 @@ async function trigger(name, body){
     const r = await fetch('/api/cluster_action/' + name, opts);
     const d = await r.json();
     log.textContent = JSON.stringify(d, null, 2);
+    restore(d && d.ok===false ? '❌ ' : '✅ ');
     if(name !== 'restart_dashboard') loadStatus();
-  }catch(e){ log.textContent = 'error: ' + e }
+  }catch(e){ log.textContent = 'error: ' + e; restore('❌ '); }
 }
 
 // v3.0.68: brain_harvest form-driven trigger
