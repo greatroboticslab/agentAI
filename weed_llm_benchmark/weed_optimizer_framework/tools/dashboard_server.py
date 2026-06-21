@@ -4978,7 +4978,7 @@ def api_annotation_status():
 def annotate_page():
     html = '''<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>🏷️ 标注指引</title><style>
+<title>🏷️ Labeling Guide</title><style>
  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
  .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.4rem 2rem}
  .hero h1{margin:0 0 .3rem}.hero .sub{opacity:.85;font-size:13px}
@@ -4997,19 +4997,19 @@ def annotate_page():
  .stat b{font-size:20px;font-family:ui-monospace,monospace}
  a.rev{color:#0e7c66;font-weight:600;text-decoration:none}
 </style></head><body>
-<div class="hero"><h1>🏷️ 标注指引面板</h1>
-<div class="sub">每个采集到的数据集 → 它的类是什么(真名/数字/泛称/CWD12)+ 人工该怎么标。配合 Roboflow 做精标注。</div></div>
+<div class="hero"><h1>🏷️ Labeling Guide</h1>
+<div class="sub">For each collected dataset → what its classes are (real name / numeric / generic / CWD12) + how a human should label it. Use with Roboflow for precise labeling.</div></div>
 <div class="nav"><a href="/">🏠 hub</a><a href="/rounds">🔄 rounds</a><a href="/classes">📋 classes</a><a href="/slugs">📦 slugs</a><a href="/roboflow">📊 roboflow</a><a href="/annotate" style="font-weight:700">🏷️ annotate</a></div>
 <div class="wrap">
  <div id="stats">loading…</div>
  <div class="legend">
-  <span class="lg"><span class="badge cwd12">CWD12</span> 真名+全是12物种 → 直接核实</span>
-  <span class="lg"><span class="badge mixed">MIXED</span> 部分CWD12+其他 → 核实+判其余</span>
-  <span class="lg"><span class="badge generic">GENERIC</span> 泛称(weed/crop)→ 逐框判物种</span>
-  <span class="lg"><span class="badge numeric">NUMERIC</span> 纯数字占位 → 重传带真名后核实</span>
-  <span class="lg"><span class="badge unlabeled">UNLABELED</span> 无标注 → 逐图标</span>
+  <span class="lg"><span class="badge cwd12">CWD12</span> real names + all 12 species → just verify</span>
+  <span class="lg"><span class="badge mixed">MIXED</span> some CWD12 + others → verify + judge the rest</span>
+  <span class="lg"><span class="badge generic">GENERIC</span> generic (weed/crop) → judge species per box</span>
+  <span class="lg"><span class="badge numeric">NUMERIC</span> numeric placeholders → re-upload with real names, then verify</span>
+  <span class="lg"><span class="badge unlabeled">UNLABELED</span> no labels → label each image</span>
  </div>
- <table id="tbl"><thead><tr><th>数据集 slug</th><th>来源</th><th>图数</th><th>类型</th><th>类名(真实)</th><th>CWD12命中</th><th>Roboflow</th><th>人工该做什么</th></tr></thead><tbody></tbody></table>
+ <table id="tbl"><thead><tr><th>Dataset slug</th><th>Source</th><th>Images</th><th>Type</th><th>Class names (real)</th><th>CWD12 hits</th><th>Roboflow</th><th>What to do</th></tr></thead><tbody></tbody></table>
 </div>
 <script>
 async function load(){
@@ -5017,8 +5017,8 @@ async function load(){
  if(!d.ok){document.getElementById('stats').innerHTML='err: '+(d.error||'?');return}
  const s=d.summary||{};
  document.getElementById('stats').innerHTML=
-   `<span class="stat"><b>${d.n_datasets}</b> 数据集</span>`+
-   `<span class="stat" style="color:#0e7c66"><b>${s.cwd12||0}</b> CWD12真名</span>`+
+   `<span class="stat"><b>${d.n_datasets}</b> datasets</span>`+
+   `<span class="stat" style="color:#0e7c66"><b>${s.cwd12||0}</b> CWD12 real-name</span>`+
    `<span class="stat" style="color:#0ea5e9"><b>${s.mixed||0}</b> mixed</span>`+
    `<span class="stat" style="color:#d97706"><b>${s.generic||0}</b> generic</span>`+
    `<span class="stat" style="color:#dc2626"><b>${s.numeric||0}</b> numeric</span>`+
@@ -5033,7 +5033,7 @@ async function load(){
      `<td><span class="badge ${r.type}">${r.type.toUpperCase()}</span></td>`+
      `<td class="cls">${(r.class_names||[]).join(', ')||'—'}</td>`+
      `<td class="cls">${(r.cwd12||[]).join(', ')||'—'}</td>`+
-     `<td>${r.roboflow_synced?('<a class="rev" href="'+rfurl+'" target="_blank">📡 看</a>'):'⏳ 待传'}</td>`+
+     `<td>${r.roboflow_synced?('<a class="rev" href="'+rfurl+'" target="_blank">📡 view</a>'):'⏳ pending'}</td>`+
      `<td>${r.action}</td>`;
    tb.appendChild(tr);
  }
@@ -5183,7 +5183,7 @@ def api_labeling_status():
 @app.get("/labeling", response_class=HTMLResponse)
 def labeling_page():
     html = '''<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>🏷️ 标注控制台</title><style>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>🏷️ Labeling Console</title><style>
  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
  .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.3rem 2rem}
  .hero h1{margin:0 0 .3rem}.hero .sub{opacity:.85;font-size:13px}
@@ -5203,14 +5203,14 @@ def labeling_page():
  .toast{position:fixed;bottom:20px;right:20px;background:#0e7c66;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none}
  .toast.show{display:block}
 </style></head><body>
-<div class="hero"><h1>🏷️ 标注控制台 (human-in-the-loop)</h1>
-<div class="sub">教授设计:每个数据集只推<b>几张</b>(你定数量)→ Roboflow 人工标 → 导出回集群 → 删除省额度 → 再推下一批。Mongo 全程记账。</div></div>
+<div class="hero"><h1>🏷️ Labeling Console (human-in-the-loop)</h1>
+<div class="sub">Design: push only <b>a few</b> images per dataset (you choose how many) → label in Roboflow → export back to the cluster → delete to save quota → push the next batch. Mongo tracks everything.</div></div>
 <div class="nav"><a href="/">🏠 hub</a><a href="/rounds">🔄 rounds</a><a href="/annotate">🏷️ annotate</a><a href="/labeling" style="font-weight:700">🎯 labeling</a><a href="/roboflow">📊 roboflow</a></div>
 <div class="wrap">
  <div class="stats" id="stats">loading…</div>
- <table id="tbl"><thead><tr><th>数据集</th><th>总图</th><th>DINO</th><th>已推</th><th>在RF</th><th>agent标</th><th>人标</th><th>人核实</th><th>类名</th><th>操作</th></tr></thead><tbody></tbody></table>
- <p style="font-size:12px;color:#888;margin-top:1rem">说明:<b>推 N 张</b>=采样 N 张(均匀分布、代表性)推到 Roboflow(weed-crop-agent-clean,带真名)供人工标;
- <b>📡审/标</b>=去 Roboflow 网页画框;<b>⬇️导出</b>=把标注好的下载回集群(用首页 download-merge 按钮);<b>🗑删</b>=标完从 RF 删除省额度。</p>
+ <table id="tbl"><thead><tr><th>Dataset</th><th>Total</th><th>DINO</th><th>Pushed</th><th>In RF</th><th>agent-labeled</th><th>human-labeled</th><th>human-verified</th><th>Class names</th><th>Actions</th></tr></thead><tbody></tbody></table>
+ <p style="font-size:12px;color:#888;margin-top:1rem">How it works: <b>Push N</b> = sample N images (evenly, representative) to Roboflow (weed-crop-agent-clean, with real names) for human labeling;
+ <b>📡 review/label</b> = draw boxes on the Roboflow site; <b>⬇️ export</b> = download labeled data back to the cluster (use the download-merge button on the console); <b>🗑 delete</b> = remove from RF after labeling to save quota.</p>
 </div>
 <div class="toast" id="toast"></div>
 <script>
@@ -5219,11 +5219,11 @@ async function load(){
  const d=await (await fetch('/api/labeling_status',{credentials:'include'})).json();
  const t=d.total||{};
  document.getElementById('stats').innerHTML=
-  `<span class="stat"><b>${d.n_datasets||0}</b> 数据集</span>`+
-  `<span class="stat" style="color:#0e7c66"><b>${t.in_roboflow||0}</b> 在RF待标</span>`+
-  `<span class="stat" style="color:#16a34a"><b>${t.human_labeled||0}</b> 人标</span>`+
-  `<span class="stat" style="color:#0ea5e9"><b>${t.human_verified||0}</b> 人核实</span>`+
-  `<span class="stat"><b>${t.pushed||0}</b> 累计推送</span>`;
+  `<span class="stat"><b>${d.n_datasets||0}</b> datasets</span>`+
+  `<span class="stat" style="color:#0e7c66"><b>${t.in_roboflow||0}</b> in RF to label</span>`+
+  `<span class="stat" style="color:#16a34a"><b>${t.human_labeled||0}</b> human-labeled</span>`+
+  `<span class="stat" style="color:#0ea5e9"><b>${t.human_verified||0}</b> human-verified</span>`+
+  `<span class="stat"><b>${t.pushed||0}</b> total pushed</span>`;
  const tb=document.querySelector('#tbl tbody');tb.innerHTML='';
  for(const r of (d.rows||[])){
   const tr=document.createElement('tr');
@@ -5237,21 +5237,21 @@ async function load(){
    `<td>${r.agent_labeled}</td><td>${r.human_labeled}</td><td>${r.human_verified}</td>`+
    `<td class="cls">${(r.class_names||[]).join(', ')}</td>`+
    `<td><input class="n" id="n_${r.slug}" type="number" value="20" min="1"> `+
-   `<button onclick="push('${r.slug}')">推N张</button> `+
-   `<button class="exp" onclick="window.open('${rfurl}','_blank')">📡标</button> `+
-   `<button class="del" onclick="del('${r.slug}')">🗑删</button></td>`;
+   `<button onclick="push('${r.slug}')">Push N</button> `+
+   `<button class="exp" onclick="window.open('${rfurl}','_blank')">📡 Label</button> `+
+   `<button class="del" onclick="del('${r.slug}')">🗑 Delete</button></td>`;
   tb.appendChild(tr);
  }
 }
 async function push(slug){
  const n=document.getElementById('n_'+slug).value||20;
  const r=await fetch('/api/labeling/push',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,n:parseInt(n)})});
- const d=await r.json();toast(d.ok?('推送中: '+slug+' '+n+'张 (pid '+d.pid+')'):('失败: '+(d.msg||'')));setTimeout(load,3000);
+ const d=await r.json();toast(d.ok?('Pushing: '+slug+' '+n+' imgs (pid '+d.pid+')'):('Failed: '+(d.msg||'')));setTimeout(load,3000);
 }
 async function del(slug){
- if(!confirm('从 Roboflow 删除 '+slug+' 的图?(标注好的应先导出回集群)'))return;
+ if(!confirm('Delete '+slug+' images from Roboflow? (export labeled data back to the cluster first)'))return;
  const r=await fetch('/api/labeling/delete',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})});
- const d=await r.json();toast(d.ok?('删除中: '+slug+' (pid '+d.pid+')'):('失败: '+(d.msg||'')));setTimeout(load,3000);
+ const d=await r.json();toast(d.ok?('Deleting: '+slug+' (pid '+d.pid+')'):('Failed: '+(d.msg||'')));setTimeout(load,3000);
 }
 load();setInterval(load,15000);
 </script></body></html>'''
@@ -5350,8 +5350,8 @@ def api_roboflow_status():
 @app.get("/roboflow", response_class=HTMLResponse)
 def roboflow_page():
     """v3.0.60 — user-facing Roboflow workspace status page.
-    User wanted '我们的网站会提示我们目前数据集里面含有多少分类
-    以及精标注的占据多少'. This page surfaces:
+    User wanted "the website to show how many classes our dataset currently
+    has and how much of it is precisely labeled". This page surfaces:
       - workspace identity (link out to app.roboflow.com)
       - per-project: images, # classes, boxes per class, unannotated, versions
       - role chips (cwd12_master / cwd12_species / other) so non-ours are
@@ -5388,12 +5388,12 @@ def roboflow_page():
          cursor:pointer;font-size:13px}
 </style></head><body>
 <header>
-  <h1>📊 Roboflow workspace 状态</h1>
+  <h1>📊 Roboflow workspace status</h1>
   <div class="sub" id="ws-sub">loading...</div>
   <div style="margin-top:8px">
     <a href="/control">← /control</a> ·
     <a href="/">dashboard</a> ·
-    <button onclick="loadStatus()">♻️ 刷新</button>
+    <button onclick="loadStatus()">♻️ Refresh</button>
   </div>
 </header>
 <div id="projects">loading projects…</div>
@@ -5732,7 +5732,7 @@ def control_page():
 </style>
 </head><body>
 <h1>🎛️ Cluster Control Panel</h1>
-<div class="sub">实时监控 + 一键操作 — 你不需要叫我做这些</div>
+<div class="sub">Live monitoring + one-click actions</div>
 <div class="nav">
   <a href="/">🏠 hub</a>
   <a href="/classes">📋 classes</a>
@@ -5744,14 +5744,14 @@ def control_page():
 <div class="grid-stats" id="stats"></div>
 
 <div class="section" id="agent-section">
-  <h3>🤖 agent 当前活动(latest dl_known / brain_harvest / topic_backfill)</h3>
+  <h3>🤖 Current agent activity (latest dl_known / brain_harvest / topic_backfill)</h3>
   <div id="agent-progress">
     <span style="color:#999">loading…</span>
   </div>
 </div>
 
 <div class="section">
-  <h3>🔘 actions — 点击触发(后端 sbatch / 缓存清理)</h3>
+  <h3>🔘 Actions — click to trigger (backend sbatch / cache clear)</h3>
   <div class="actions" id="actions"></div>
   <div class="refresh-info" id="last-action"></div>
 </div>
@@ -5894,7 +5894,7 @@ function renderStats(d) {
       sub: 'with class_names: ' + (reg.n_with_classnames||0) },
     { l: 'total images',  v: (reg.total_imgs||0).toLocaleString() },
     { l: 'topic overrides', v: d.n_topic_overrides || 0,
-      sub: 'Brain + 人工已分类' },
+      sub: 'Brain + human classified' },
     { l: '✓ exemplars (all classes)',  v: ex.n_keep || 0,
       cls: (ex.n_keep||0) > 0 ? 'ok' : '' },
     { l: '✗ bad (all classes)',  v: ex.n_bad || 0,
@@ -6095,7 +6095,7 @@ async function loadActions() {
 
 async function trigger(action) {
   if (action === 'restart_dashboard') {
-    if (!confirm('重启 dashboard? 当前页面 ~90 秒后会重连(刷新 github.io 看新 URL)')) return;
+    if (!confirm('Restart dashboard? This page will reconnect in ~90s (refresh github.io for the new URL)')) return;
   }
   const log = document.getElementById('action-log');
   const li = document.getElementById('last-action');
@@ -6173,9 +6173,9 @@ def slugs_landing():
             f'<button class="vbtn {k}{"" if r["verdict"]!=k else " on"}" '
             f'data-v="{k}" title="{lbl}">{sym}</button>'
             for k, sym, lbl in [
-                ("keep", "✓", "保留 (good slug)"),
-                ("junk", "✗", "删除 (garbage slug)"),
-                ("unsure", "🤔", "存疑"),
+                ("keep", "✓", "Keep (good slug)"),
+                ("junk", "✗", "Delete (garbage slug)"),
+                ("unsure", "🤔", "Unsure"),
             ]
         )
         tr_html.append(f'''
@@ -6242,34 +6242,34 @@ def slugs_landing():
 </style>
 </head><body>
 <header>
-  <h1>📦 Slugs — registry-level 清理</h1>
+  <h1>📦 Slugs — registry-level cleanup</h1>
   <div class="sub">
-    每行一个 slug — ✓ 保留 / ✗ 删除(垃圾) / 🤔 存疑。
-    标 ✗ 的 slug 默认从 /classes 隐藏。
-    · <a href="/classes">/classes 类级审计</a>
-    · <a href="/">dashboard 首页</a>
+    One slug per row — ✓ Keep / ✗ Delete (garbage) / 🤔 Unsure.
+    Slugs marked ✗ are hidden from /classes by default.
+    · <a href="/classes">/classes class-level audit</a>
+    · <a href="/">dashboard home</a>
     · <a href="/api/slug_verdicts">📥 JSON</a>
   </div>
 </header>
 <div class="summary">
-  <div>📊 总 <strong>{len(datasets)}</strong> 个 slugs</div>
+  <div>📊 Total <strong>{len(datasets)}</strong> slugs</div>
   <div>✓ keep: <strong>{n_keep}</strong></div>
   <div>🤔 unsure: <strong>{n_unsure}</strong></div>
   <div>✗ junk: <strong>{n_junk}</strong></div>
-  <div>未审: <strong>{n_unverified}</strong></div>
+  <div>Unreviewed: <strong>{n_unverified}</strong></div>
 </div>
 <div class="filter-bar" id="filter-bar">
-  <button class="on" data-f="all">全部 {len(datasets)}</button>
-  <button data-f="unverified">未审 {n_unverified}</button>
+  <button class="on" data-f="all">All {len(datasets)}</button>
+  <button data-f="unverified">Unreviewed {n_unverified}</button>
   <button data-f="keep">✓ keep {n_keep}</button>
   <button data-f="unsure">🤔 unsure {n_unsure}</button>
   <button data-f="junk">✗ junk {n_junk}</button>
-  <button data-f="has_classnames">有 class_names</button>
-  <button data-f="empty_classnames">无 class_names</button>
+  <button data-f="has_classnames">has class_names</button>
+  <button data-f="empty_classnames">no class_names</button>
 </div>
 <table>
 <thead>
-<tr><th>Slug</th><th>状态</th><th class="num"># 图</th><th class="num"># 类</th><th>class_names 预览</th><th>verdict</th></tr>
+<tr><th>Slug</th><th>Status</th><th class="num"># imgs</th><th class="num"># classes</th><th>class_names preview</th><th>verdict</th></tr>
 </thead>
 <tbody id="slugs-tbody">
 {''.join(tr_html)}
@@ -6377,13 +6377,13 @@ def classes_landing():
             else f'<div class="no-thumb">no image</div>')}
           <div class="name">{cls}
             {('<span class="new-badge">🆕 NEW</span>' if is_new_today else '')}
-            <span class="topic-tag tag-{topic}" title="{'手动覆盖' if is_override else '关键词启发式'}">{topic}{'★' if is_override else ''}</span>
+            <span class="topic-tag tag-{topic}" title="{'manual override' if is_override else 'keyword heuristic'}">{topic}{'★' if is_override else ''}</span>
             {(f'<span class="badge exemplar">✓ {n_ex}</span>' if n_ex else '')}
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
           <div class="zh">{zh}</div>
           <div class="counts">bank {n_bank} · flux {n_flux} · real ≤{n_reg_est} ({n_reg_slugs} slugs)</div>
-          <div class="counts">已审 {n_ex+n_bad}</div>
+          <div class="counts">reviewed {n_ex+n_bad}</div>
         </a>'''
         for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb, topic, is_override, is_new_today in rows
     )
@@ -6410,12 +6410,12 @@ def classes_landing():
     banner = ""
     if empty_slugs:
         sample = ", ".join(empty_slugs[:6])
-        more = f" (+{len(empty_slugs)-6} 更多)" if len(empty_slugs) > 6 else ""
+        more = f" (+{len(empty_slugs)-6} more)" if len(empty_slugs) > 6 else ""
         banner = f'''
   <div class="help" style="background:#fee;border-left-color:#c00;">
-    ⚠️ <strong>Registry metadata gap</strong>:{len(empty_slugs)} 个已下载的 slugs <strong>class_names 为空</strong>,
-    其图片<strong>不会</strong>出现在下面任何类里。需要先跑 backfill 工具补元数据。<br>
-    举例:<code>{sample}</code>{more}
+    ⚠️ <strong>Registry metadata gap</strong>: {len(empty_slugs)} downloaded slugs have <strong>empty class_names</strong>,
+    their images will <strong>not</strong> appear in any class below. Run the backfill tool first to fill metadata.<br>
+    e.g. <code>{sample}</code>{more}
   </div>'''
 
     html = f'''<!DOCTYPE html><html lang="zh"><head>
@@ -6467,26 +6467,26 @@ def classes_landing():
 </style>
 </head><body>
 <header>
-  <h1>📋 Classes — human-in-the-loop 类级数据审计</h1>
+  <h1>📋 Classes — human-in-the-loop class-level data audit</h1>
   <div class="sub">
-    点任一类进入,逐张人眼判定 ✓ 榜样 / ✗ 标错。
-    通过的图自动加入该类"榜样集",作为 LoRA / curator / 训练的可信源。
-    · <a href="/audit">← 旧 /audit 视图</a>
-    · <a href="/">dashboard 首页</a>
-    · <a href="/api/exemplars_export">📥 导出榜样集</a>
-    · <a href="/slugs">📦 slug 级清理</a>
-    · <a href="javascript:void(0)" onclick="refreshRegistry()">♻️ 刷新 registry</a>
+    Click any class to review image-by-image: ✓ exemplar / ✗ mislabeled.
+    Approved images join that class's "exemplar set" as a trusted source for LoRA / curator / training.
+    · <a href="/audit">← legacy /audit view</a>
+    · <a href="/">dashboard home</a>
+    · <a href="/api/exemplars_export">📥 Export exemplars</a>
+    · <a href="/slugs">📦 slug-level cleanup</a>
+    · <a href="javascript:void(0)" onclick="refreshRegistry()">♻️ Refresh registry</a>
   </div>
 </header>
 {banner}
 <div class="filter-bar" id="filter-bar">
   {tab_html}
   <input class="filter-search" id="filter-search" type="search"
-         placeholder="🔎 类名搜索 (e.g. Goose, weed, tomato)" autocomplete="off"/>
+         placeholder="🔎 Search class name (e.g. Goose, weed, tomato)" autocomplete="off"/>
 </div>
 <section>
   <div class="grid-classes" id="grid-classes">{cards}</div>
-  <div class="filter-empty-note" id="filter-empty">没有匹配的类。</div>
+  <div class="filter-empty-note" id="filter-empty">No matching classes.</div>
 </section>
 <script>
 async function refreshRegistry() {{
@@ -6611,11 +6611,11 @@ def classes_detail(cls: str):
           <div class="meta-row">{fn}</div>
           <div class="verdict-row">
             <button class="ok{(' on' if verdict=='exemplar' else '')}"
-              title="榜样 (1)" data-v="exemplar">✓</button>
+              title="Exemplar (1)" data-v="exemplar">✓</button>
             <button class="ng{(' on' if verdict=='bad' else '')}"
-              title="错标 (2)" data-v="bad">✗</button>
+              title="Mislabeled (2)" data-v="bad">✗</button>
             <button class="rb{(' on' if verdict=='rebox' else '')}"
-              title="bbox 不准 (3)" data-v="rebox">🔄</button>
+              title="bbox off (3)" data-v="rebox">🔄</button>
           </div>
         </div>''')
     src_summary = " · ".join(f"{k} {v}" for k, v in sorted(src_breakdown.items()))
@@ -6626,30 +6626,30 @@ def classes_detail(cls: str):
 <style>{_CLASSES_CSS}</style>
 </head><body>
 <header>
-  <h1>📋 类审计 · {cls} <span style="color:#888;font-weight:normal;">/ {zh}</span></h1>
+  <h1>📋 Class audit · {cls} <span style="color:#888;font-weight:normal;">/ {zh}</span></h1>
   <div class="sub">
-    共 <strong>{len(pool)}</strong> 张候选 ({src_summary}) ·
-    <span class="badge exemplar">✓ 榜样 {n_ex}</span>
-    <span class="badge bad">✗ 错标 {n_bad}</span>
-    <span class="badge rebox">🔄 bbox 待修 {n_rb}</span>
-    · 未审 {n_un}
-    · <a href="/classes">← 所有类</a>
-    · <a href="/audit/class/{cls}">旧视图</a>
+    <strong>{len(pool)}</strong> candidates ({src_summary}) ·
+    <span class="badge exemplar">✓ exemplar {n_ex}</span>
+    <span class="badge bad">✗ mislabeled {n_bad}</span>
+    <span class="badge rebox">🔄 bbox to fix {n_rb}</span>
+    · unreviewed {n_un}
+    · <a href="/classes">← all classes</a>
+    · <a href="/audit/class/{cls}">legacy view</a>
   </div>
 </header>
 <div class="help">
-  快捷键:鼠标悬停在缩略图上,按 <kbd>1</kbd>=榜样 ✓,<kbd>2</kbd>=错标 ✗,<kbd>3</kbd>=bbox 待修 🔄,<kbd>0</kbd>=清除。
-  点击缩略图弹出原图新窗口。下方过滤器按状态筛选。
+  Shortcuts: hover a thumbnail and press <kbd>1</kbd>=exemplar ✓, <kbd>2</kbd>=mislabeled ✗, <kbd>3</kbd>=bbox to fix 🔄, <kbd>0</kbd>=clear.
+  Click a thumbnail to open the full image in a new window. Filter by status below.
 </div>
 <div class="layout">
   <aside class="sidebar">{sidebar}</aside>
   <main>
     <div class="filters">
-      <button class="on" data-f="all">全部 {len(pool)}</button>
-      <button data-f="unverified">未审 {n_un}</button>
-      <button data-f="exemplar">榜样 ✓ {n_ex}</button>
-      <button data-f="bad">错标 ✗ {n_bad}</button>
-      <button data-f="rebox">bbox 修 🔄 {n_rb}</button>
+      <button class="on" data-f="all">All {len(pool)}</button>
+      <button data-f="unverified">Unreviewed {n_un}</button>
+      <button data-f="exemplar">Exemplar ✓ {n_ex}</button>
+      <button data-f="bad">Mislabeled ✗ {n_bad}</button>
+      <button data-f="rebox">bbox fix 🔄 {n_rb}</button>
     </div>
     <div class="grid" id="grid">{''.join(cards)}</div>
   </main>
