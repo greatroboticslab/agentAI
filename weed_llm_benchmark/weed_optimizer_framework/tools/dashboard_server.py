@@ -4497,7 +4497,7 @@ def _class_summary_landing(cls: str) -> dict:
                         # no-image forever until a full re-mirror. Re-search if
                         # the empty cache is stale so newly-harvested/synced
                         # images auto-surface (serves the growing-dataset goal).
-                        if (time.time() - cstat.st_mtime) < 1800:
+                        if (time.time() - cstat.st_mtime) < 600:  # v3.0.99.51: 10min (was 30) — surface new data faster
                             cache_hit_empty = True  # recent miss; trust it
                         # else: fall through to re-search (cache_hit_empty False)
                     else:
@@ -4572,9 +4572,21 @@ def _class_summary_landing(cls: str) -> dict:
                                     break
                             if first_src:
                                 break
-                # Persist whatever we found (or empty if nothing)
+                # Persist whatever we found.
+                # v3.0.99.51 BUGFIX: the empty marker must be written ONCE and
+                # then left alone. Previously every /classes render that still
+                # found nothing REWROTE the empty file → refreshed its mtime →
+                # the 30min TTL clock reset on every render → images that
+                # arrived later NEVER auto-surfaced (the loop renders /classes
+                # far more often than every 30min). Now: cache a real hit
+                # always, but only write the empty marker if none exists yet,
+                # so the TTL ages from FIRST empty-discovery and re-search fires
+                # on schedule once data lands.
                 try:
-                    thumb_cache_p.write_text(str(first_src) if first_src else "")
+                    if first_src:
+                        thumb_cache_p.write_text(str(first_src))
+                    elif not thumb_cache_p.exists():
+                        thumb_cache_p.write_text("")
                 except Exception:
                     pass
             except Exception as e:
