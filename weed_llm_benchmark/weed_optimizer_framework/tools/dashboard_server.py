@@ -107,7 +107,7 @@ from collections import defaultdict as _defaultdict
 # Env override DASHPASS_FILE / ROBOFLOW_KEY_FILE for non-standard locations.
 _DASHPASS_FILE = os.environ.get("DASHPASS_FILE", os.path.expanduser("~/.dashpass"))
 _ROBOFLOW_KEY_FILE = os.environ.get("ROBOFLOW_KEY_FILE", os.path.expanduser("~/.roboflow_key"))
-_AUTH_USER = "harry"
+_AUTH_USER = os.environ.get("DASH_USER", "harry")  # env-configurable for testing
 _AUTH_PASS = None
 try:
     with open(_DASHPASS_FILE, "r") as _f:

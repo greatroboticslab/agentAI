@@ -4,6 +4,8 @@ cd "$HOME/weed_llm_benchmark"
 source .venv/bin/activate
 export REPO_ROOT="$HOME/weed_llm_benchmark"
 export DASH_PORT="${DASH_PORT:-8000}"
+# TESTING creds (user=1, pass=~/.dashpass=1). ⚠️ CHANGE before real deployment.
+export DASH_USER="${DASH_USER:-1}"
 # v3.0.99.40: lab-control mode — SLURM (sbatch/squeue/job_log) runs ON the cluster
 # over an SSH key (lab = website + control + storage; cluster = compute only).
 export CLUSTER_SSH="${CLUSTER_SSH:-byler@bridges2.psc.edu}"
