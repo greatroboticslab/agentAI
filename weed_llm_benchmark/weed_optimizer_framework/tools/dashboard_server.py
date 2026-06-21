@@ -3550,6 +3550,11 @@ _CLUSTER_ACTIONS = {
     # Subsequent brain_harvest calls tag downloaded slugs with the new round.
     "start_new_round": {
         "type": "subprocess",
+        # v3.0.99.50: mutates the AUTHORITATIVE registry (current_round). On
+        # lab that write is clobbered by the next cluster→lab sync (harvest
+        # runs on cluster → cluster registry is current_round's source of
+        # truth) → silently reverted + misleads. Route to cluster.
+        "needs_cluster": True,
         "argv": [
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.rounds", "start-new",
@@ -3574,6 +3579,7 @@ _CLUSTER_ACTIONS = {
     },
     "backfill_round_1": {
         "type": "subprocess",
+        "needs_cluster": True,  # v3.0.99.50: mutates authoritative registry (round tags) — cluster is truth
         "argv": [
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.rounds", "backfill",
@@ -3618,6 +3624,11 @@ _CLUSTER_ACTIONS = {
     },
     "audit_registry_garbage_APPLY": {
         "type": "subprocess",
+        # v3.0.99.50: --apply pops slugs from the authoritative registry + deletes
+        # disk files. On lab both are futile: registry write clobbered by sync,
+        # and deleted disk files re-appear on next rsync from cluster. Route to
+        # cluster (the dry-run variant above stays lab-local — it's read-only).
+        "needs_cluster": True,
         "argv": [
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.audit_registry_garbage",
