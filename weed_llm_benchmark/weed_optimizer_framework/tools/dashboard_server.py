@@ -7890,6 +7890,16 @@ async function loadRounds(){
           </a>
         </h2>
         <div class="round-meta">started: ${meta.started_at||'?'} · ${slugs.length} slugs · RF project: <code style="background:#f4f6fb;padding:.05rem .3rem;border-radius:3px">${projName}</code></div>
+        ${(function(){
+          const tr = meta.train_results || {};
+          const m = tr.map50_95 || tr['mAP50-95'] || meta.map50_95;
+          const subv = meta.dinov2_subversions || [];
+          const trainTxt = meta.trained
+            ? ('<span style="color:#0e7c66;font-weight:600">✅ trained</span>' + (m!=null?(' · mAP50-95 <b>'+m+'</b>'):' · mAP pending'))
+            : '<span style="color:#94a3b8">⚪ not trained yet</span>';
+          const dinoTxt = subv.length ? (' · DINOv2: '+subv.join(', ')) : '';
+          return '<div class="round-meta">Results: '+trainTxt+dinoTxt+'</div>';
+        })()}
       </div>`;
     if(slugs.length === 0){
       html += '<div style="color:#888;font-size:13px">no slugs in this round yet — fire brain_harvest from the dashboard</div>';
