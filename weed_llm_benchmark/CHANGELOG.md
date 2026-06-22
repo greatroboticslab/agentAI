@@ -4473,3 +4473,31 @@ this session live in the registry/Mongo, NOT in our Roboflow workspace — by de
   registry grew 16,898 → **110,404 images / 45 datasets** (raw collection pool, >2× the 50K goal).
   This is the COLLECTION pool — still needs DINOv2 quality-filter + dedup + CWD12 mapping to
   produce the clean training-ready subset.
+
+---
+
+### v3.0.100–118 — Dashboard frontend epic: Agent Launcher + Mission Control + Browse-Data polish
+
+Lab-server dashboard (FastAPI) redesigned around the professor's "weed is ONE of many
+collection agents" direction, plus a per-page polish pass. **Product is now English-only**
+(permanent hard rule: UI / agent names / shipped prompts / surfaced code text all English;
+Chinese only in chat). Backend logic untouched per user constraint — UI reorganized, not rewired.
+
+- **Agent Launcher** (`/`): homepage is now a data-driven launcher (dark theme) — a "Weed
+  Detection" agent card + a "+ New Agent" create panel (name → domain_id → `db.create_domain`).
+  Old command center moved to `/console`.
+- **Mission Control** (`/agent/weed`): pipeline strip + Agent-1 Collector (▶ harvest) and
+  Agent-2 Trainer (🚀 train), with confirm + cluster-status dot. Generic `/agent/{domain}` page
+  for created domains.
+- **Domain-aware harvest**: dataset_discovery resolves per-domain accept/reject vocab; dashboard
+  stages the domain config to the cluster as base64 (compute nodes can't read lab Mongo) so a
+  new domain harvests with ITS queries, not the 83 weed ones.
+- **Browse Data** (`/classes`): back buttons on every page; species-synonym merge + numeric-junk
+  hiding; per-class progress bar; off-goal/junk slugs hidden; bulk-mark.
+- **v3.0.118 (this entry's fixes):** (a) progress denominator for REVIEWED classes now uses the
+  ACTUAL pool size, not the 200×slugs over-estimate — "463/600" → "463/463 reviewed" (100%);
+  (b) new `POST /api/exemplar_markall/{cls}` marks the WHOLE class server-side (no dependence on
+  rendered cards); detail page gains a "Mark ALL N in class" button; (c) detail page now renders
+  at most 180 cards (unreviewed first) with a cap note — fixes the lag on 400–600-image classes.
+- Roboflow push path fixed (SDK installed in lab venv; e2e push verified); slug-verdict writes
+  mirror to the cluster (base64 over a single ssh command) so human verdicts survive sync-down.
