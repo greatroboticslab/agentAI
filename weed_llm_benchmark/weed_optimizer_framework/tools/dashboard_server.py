@@ -1080,7 +1080,7 @@ def console_page():
       - CWD12 per-species snapshot
 
     Drill-down /classes /slugs /roboflow stay accessible from header nav."""
-    return HTMLResponse('''<!DOCTYPE html><html lang="zh"><head>
+    return HTMLResponse('''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🌱 Weed-detection — Framework Controller</title>
 <style>
@@ -2704,7 +2704,7 @@ def audit_landing():
           <div class="counts">bank {len(bank)}  ·  flux {len(flux)}</div>
         </a>''')
 
-    html = f'''<!DOCTYPE html><html lang="zh"><head>
+    html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Audit — cwd12 数据 + FLUX 输出</title>
 <style>{_AUDIT_CSS}</style>
@@ -2738,7 +2738,7 @@ def audit_method():
                     f"<td><code>{prompt}</code></td></tr>")
     table = "<table>" + "".join(rows) + "</table>"
 
-    html = f'''<!DOCTYPE html><html lang="zh"><head>
+    html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FLUX 方法论 / Methodology</title>
 <style>{_AUDIT_CSS}
@@ -2842,7 +2842,7 @@ def audit_class(cls: str):
         f'<div class="meta">{fn} · {len(boxes)} bbox(es) of {cls}</div></div>'
         for fn, boxes in flux)
 
-    html = f'''<!DOCTYPE html><html lang="zh"><head>
+    html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{cls} — audit</title>
 <style>{_AUDIT_CSS}</style>
@@ -5507,7 +5507,7 @@ def api_labeling_status():
 
 @app.get("/labeling", response_class=HTMLResponse)
 def labeling_page():
-    html = '''<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
+    html = '''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>🏷️ Labeling Console</title><style>
  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
  .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.3rem 2rem}
@@ -5684,7 +5684,7 @@ def roboflow_page():
         visually distinct.
     """
     body = """
-<!doctype html><html><head><meta charset="utf-8">
+<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Roboflow workspace status</title>
 <style>
   body{font-family:-apple-system,"PingFang SC",sans-serif;margin:0;padding:18px;
@@ -5882,7 +5882,7 @@ def morning_report():
     if not jobs_html:
         jobs_html = "<div style='color:#888'>no agent jobs found</div>"
 
-    return HTMLResponse(f'''<!DOCTYPE html><html lang="zh"><head>
+    return HTMLResponse(f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>☀️ Morning Report</title>
 <style>
@@ -5963,7 +5963,7 @@ def morning_report():
 def control_page():
     """Operator-facing control panel. Lives at /control. Polls /api/cluster_status
     every 5 s; action buttons POST /api/cluster_action/{name}."""
-    return HTMLResponse('''<!DOCTYPE html><html lang="zh"><head>
+    return HTMLResponse('''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎛️ Cluster Control Panel</title>
 <style>
@@ -6526,7 +6526,7 @@ def slugs_landing(domain: str = "weed"):
     n_unsure = sum(1 for v in verdicts.values() if v == "unsure")
     n_unverified = len(datasets) - n_keep - n_junk - n_unsure
 
-    html = f'''<!DOCTYPE html><html lang="zh"><head>
+    html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Slugs — registry cleanup</title>
 <style>
@@ -6765,7 +6765,7 @@ def classes_landing(domain: str = "weed"):
     e.g. <code>{sample}</code>{more}
   </div>'''
 
-    html = f'''<!DOCTYPE html><html lang="zh"><head>
+    html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Classes — human verification</title>
 <style>{_AUDIT_CSS}
@@ -7299,7 +7299,7 @@ def manual_page():
     data-collection pipeline, the role of each cluster_action button, and
     the recommended daily workflow. Linked from the unified controller's
     header nav. Audience: the user (Harry) + reviewers / professor."""
-    html = '''<!DOCTYPE html><html lang="zh"><head>
+    html = '''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>📖 Manual — Weed-detection framework</title>
 <style>
@@ -7852,7 +7852,7 @@ def rounds_page():
 
     For each class within a slug: ✓ / ✗ / 🔄 (manual relabel).
     Click anywhere → AJAX POST verdict, panel updates immediately."""
-    html = '''<!DOCTYPE html><html lang="zh"><head>
+    html = '''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>🔄 Rounds — review per harvest version</title>
 <style>
