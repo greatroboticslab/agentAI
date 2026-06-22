@@ -3319,6 +3319,22 @@ async def api_slug_verdict_post(slug: str, payload: dict = Body(...)):
     }
     with open(_SLUG_VERDICT_FILE, "a") as f:
         f.write(_json.dumps(ev) + "\n")
+    # v3.0.116: lab-side writes get clobbered by the cluster→lab sync (which
+    # pulls the cluster's slug_verdicts.jsonl). Mirror the verdict to the
+    # cluster — where the harvest guard reads it (so junk isn't re-harvested)
+    # AND where the sync pulls from — so it persists. Fire-and-forget so the
+    # verdict button stays instant (don't block on the SSH).
+    if _CLUSTER_SSH:
+        try:
+            import base64 as _b64, subprocess as _sp2
+            _b = _b64.b64encode((_json.dumps(ev) + "\n").encode()).decode()
+            _cmd = ("cd %s && echo %s | base64 -d >> results/framework/slug_verdicts.jsonl"
+                    % (_shlex.quote(_CLUSTER_REPO), _b))
+            _sp2.Popen(_ssh_cluster_prefix() + ["bash", "-lc", _cmd],
+                       stdout=_sp2.DEVNULL, stderr=_sp2.DEVNULL,
+                       stdin=_sp2.DEVNULL, start_new_session=True)
+        except Exception:
+            pass
     # Verdict changed → invalidate per-class pool caches so junk slugs vanish
     # from /classes on next load.
     try:
