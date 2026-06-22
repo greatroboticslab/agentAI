@@ -2214,6 +2214,18 @@ _CWD12_ZH = {
 # ----------------- registry class index (canonical -> [(slug, cid, raw)]) ----
 import re as _re_canon
 
+# v3.0.113: explicit same-species synonyms (alnum-lowercased key → canonical
+# class). Consolidates near-duplicates the harvester created from differently
+# worded source labels, e.g. "Carpet weed" vs CWD12 "Carpetweeds". Keep this
+# list HIGH-CONFIDENCE only (true same species), not fuzzy guesses.
+_CLASS_SYNONYMS = {
+    "carpetweed": "Carpetweeds",          # → CWD12 canonical
+    "weeds": "Weed",                       # generic plural → generic singular
+    "grassweedsv2release": "GrassWeeds",   # Roboflow version-suffix leaked into name
+    "partheniumhysterophorous": "Parthenium",
+}
+
+
 def _canon_class(raw: str) -> str:
     """Normalize species name from registry to canonical form.
     Matches CWD12 case+punctuation-insensitive; else PascalCase the input."""
@@ -2222,6 +2234,8 @@ def _canon_class(raw: str) -> str:
     alnum = _re_canon.sub(r'[^A-Za-z0-9]', '', raw).lower()
     if not alnum:
         return ""
+    if alnum in _CLASS_SYNONYMS:           # v3.0.113 same-species merge
+        return _CLASS_SYNONYMS[alnum]
     for c12 in _CWD12:
         if _re_canon.sub(r'[^A-Za-z0-9]', '', c12).lower() == alnum:
             return c12
@@ -2246,6 +2260,11 @@ def _is_junk_class(canon: str) -> bool:
     """True if `canon` is a known non-species pseudo-class to hide."""
     if not canon:
         return False
+    # v3.0.113: pure-numeric / single-char names are leftover YOLO class indices
+    # (e.g. "0","1","2","3") — never a real species. Hide them from /classes.
+    s = canon.strip()
+    if s.isdigit() or len(s) <= 1:
+        return True
     return _re_canon.sub(r'[^A-Za-z0-9]', '', canon).lower() in _JUNK_CLASS_ALNUM
 
 
