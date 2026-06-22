@@ -1989,13 +1989,14 @@ def gallery(slug: str, page: int = 1, per_page: int = 24):
 </style>
 </head>
 <body>
+<div style="margin:0 0 12px"><a href="/slugs" style="display:inline-block;text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Back to Datasets</a></div>
 <header>
   <h1>📂 {slug}</h1>
   <div class="meta">
     {total} unique images · page {page}/{n_pages} ({per_page}/page)
     · annotation: <code>{annot}</code>
     · source: <code>{src}</code>
-    · <a href="/dashboard/datasets.html">← back to all datasets</a>
+    · <a href="/slugs">← back to all datasets</a>
   </div>
 </header>
 
@@ -6441,7 +6442,8 @@ def slugs_landing(domain: str = "weed"):
         tr_html.append(f'''
         <tr class="srow{v_class}" data-slug="{r["slug"]}" data-verdict="{r["verdict"]}">
           <td class="slug-col">
-            <a href="/classes#q={r["slug"][:10]}" title="filter /classes by this slug">{r["slug"]}</a>
+            <a href="/gallery/{r["slug"]}" target="_blank" title="View this dataset's images (to judge keep / junk)">{r["slug"]}</a>
+            <a href="/gallery/{r["slug"]}" target="_blank" title="View images" style="text-decoration:none;margin-left:6px">🖼</a>
             {used_badge} {local_badge}
           </td>
           <td>{r["status"]}</td>
