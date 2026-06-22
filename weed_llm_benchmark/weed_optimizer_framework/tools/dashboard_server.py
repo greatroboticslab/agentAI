@@ -5222,22 +5222,22 @@ def _classify_dataset_classes(class_names):
     cn = [str(c) for c in (class_names or []) if str(c).strip()]
     if not cn:
         return {"type": "unlabeled", "cwd12": [],
-                "action": "无标注 → 需在 Roboflow 里逐图人工标注(画框+定物种)"}
+                "action": "No labels → annotate every image in Roboflow (draw boxes + assign species)"}
     numeric = [c for c in cn if c.strip().lstrip("-").isdigit()]
     named = [c for c in cn if not c.strip().lstrip("-").isdigit()]
     cwd12 = sorted({_CWD12_NORM[_norm_cls_name(c)] for c in named
                     if _norm_cls_name(c) in _CWD12_NORM})
     if not named:
         return {"type": "numeric", "cwd12": [],
-                "action": "纯数字占位(0/1/2…)→ 上传器已修会带真名;重传即可,然后核实"}
+                "action": "Numeric placeholders (0/1/2…) → re-upload with real names (uploader is fixed), then verify"}
     if cwd12 and len(cwd12) == len(set(named)):
         return {"type": "cwd12", "cwd12": cwd12,
-                "action": "真名且全是 CWD12 物种 → 在 Roboflow 直接人工核实框是否准"}
+                "action": "Real names, all CWD12 species → just verify the boxes are accurate in Roboflow"}
     if cwd12:
         return {"type": "mixed", "cwd12": cwd12,
-                "action": "部分 CWD12 + 部分泛称/数字 → 核实 CWD12,其余逐框判物种或丢弃"}
+                "action": "Some CWD12 + some generic/numeric → verify the CWD12 ones; judge or drop the rest per box"}
     return {"type": "generic", "cwd12": [],
-            "action": "真名但泛称(weed/crop/grass)→ 需逐框判具体物种、映射到 CWD12"}
+            "action": "Real but generic names (weed/crop/grass) → judge the actual species per box, map to CWD12"}
 
 
 @app.get("/api/annotation_status")
@@ -5283,32 +5283,37 @@ def api_annotation_status():
 
 @app.get("/annotate", response_class=HTMLResponse)
 def annotate_page():
-    html = '''<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
+    html = '''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>🏷️ Labeling Guide</title><style>
  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
  .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.4rem 2rem}
- .hero h1{margin:0 0 .3rem}.hero .sub{opacity:.85;font-size:13px}
+ .hero h1{margin:0 0 .3rem}.hero .sub{opacity:.85;font-size:13px;line-height:1.5}
  .nav{background:#fff;padding:.6rem 2rem;border-bottom:1px solid #e5e7eb}
  .nav a{margin-right:1rem;color:#0e7c66;text-decoration:none;font-size:14px}
  .wrap{padding:1.2rem 2rem}
+ .pipe{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.7rem 1rem;font-size:13px;margin:0 0 1rem;color:#1e3a8a}
+ .pipe a{color:#2563eb;font-weight:700;text-decoration:none}
  .legend{display:flex;gap:10px;flex-wrap:wrap;margin:.6rem 0 1rem}
  .lg{background:#fff;border-radius:8px;padding:.5rem .8rem;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
- table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+ .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px}
+ table{width:100%;min-width:820px;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
  th,td{padding:.55rem .7rem;text-align:left;font-size:13px;border-bottom:1px solid #f0f2f5;vertical-align:top}
- th{background:#0f172a;color:#fff;font-size:12px}
+ th{background:#0f172a;color:#fff;font-size:12px;position:sticky;top:0}
  .badge{padding:.12rem .5rem;border-radius:20px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap}
  .cwd12{background:#0e7c66}.mixed{background:#0ea5e9}.generic{background:#d97706}.numeric{background:#dc2626}.unlabeled{background:#6b7280}
  .cls{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#444}
- .stat{display:inline-block;background:#fff;border-radius:8px;padding:.5rem .9rem;margin-right:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+ .stat{display:inline-block;background:#fff;border-radius:8px;padding:.5rem .9rem;margin-right:.5rem;margin-bottom:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
  .stat b{font-size:20px;font-family:ui-monospace,monospace}
  a.rev{color:#0e7c66;font-weight:600;text-decoration:none}
+ @media(max-width:640px){.hero,.nav,.wrap{padding-left:1rem;padding-right:1rem}}
 </style></head><body>
 <div style="padding:10px 16px;background:#0b1220"><a href="/agent/weed" style="display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Mission Control</a></div>
 <div class="hero"><h1>🏷️ Labeling Guide</h1>
-<div class="sub">For each collected dataset → what its classes are (real name / numeric / generic / CWD12) + how a human should label it. Use with Roboflow for precise labeling.</div></div>
-<div class="nav"><a href="/">🏠 hub</a><a href="/rounds">🔄 rounds</a><a href="/classes">📋 classes</a><a href="/slugs">📦 slugs</a><a href="/roboflow">📊 roboflow</a><a href="/annotate" style="font-weight:700">🏷️ annotate</a></div>
+<div class="sub">A read-only reference: for each collected dataset, what its class names are (real / numeric / generic / CWD12) and exactly how a human should label it. This page tells you <em>what to do</em> — do the actual push &amp; label work in the Labeling Console.</div></div>
+<div class="nav"><a href="/agent/weed">🛰️ Mission Control</a><a href="/classes">📋 Browse Data</a><a href="/slugs">📦 Datasets</a><a href="/labeling">🎯 Labeling Console</a><a href="/roboflow">📊 Roboflow</a><a href="/annotate" style="font-weight:700">🏷️ Guide</a></div>
 <div class="wrap">
+ <div class="pipe">Pipeline: <strong>Browse Data → Datasets → Labeling Guide (you are here) → Labeling Console</strong>. Read the recommended action per dataset below, then push &amp; label in the <a href="/labeling">🎯 Labeling Console</a>.</div>
  <div id="stats">loading…</div>
  <div class="legend">
   <span class="lg"><span class="badge cwd12">CWD12</span> real names + all 12 species → just verify</span>
@@ -5317,32 +5322,44 @@ def annotate_page():
   <span class="lg"><span class="badge numeric">NUMERIC</span> numeric placeholders → re-upload with real names, then verify</span>
   <span class="lg"><span class="badge unlabeled">UNLABELED</span> no labels → label each image</span>
  </div>
- <table id="tbl"><thead><tr><th>Dataset slug</th><th>Source</th><th>Images</th><th>Type</th><th>Class names (real)</th><th>CWD12 hits</th><th>Roboflow</th><th>What to do</th></tr></thead><tbody></tbody></table>
+ <div class="tblwrap"><table id="tbl"><thead><tr><th>Dataset slug</th><th>Source</th><th>Images</th><th>Type</th><th>Class names (real)</th><th>CWD12 hits</th><th>Roboflow</th><th>What to do</th></tr></thead><tbody></tbody></table></div>
 </div>
 <script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 async function load(){
- const d=await (await fetch('/api/annotation_status',{credentials:'include'})).json();
- if(!d.ok){document.getElementById('stats').innerHTML='err: '+(d.error||'?');return}
+ const stats=document.getElementById('stats');
+ let d;
+ try{
+   const resp=await fetch('/api/annotation_status',{credentials:'include'});
+   if(!resp.ok){stats.innerHTML='⚠️ HTTP '+resp.status;return}
+   d=await resp.json();
+ }catch(e){stats.innerHTML='⚠️ could not load: '+esc(e);return}
+ if(!d.ok){stats.innerHTML='⚠️ '+esc(d.error||'unknown error');return}
  const s=d.summary||{};
- document.getElementById('stats').innerHTML=
+ const when=d.generated_at?(' · updated '+esc(d.generated_at.replace('T',' '))):'';
+ stats.innerHTML=
    `<span class="stat"><b>${d.n_datasets}</b> datasets</span>`+
    `<span class="stat" style="color:#0e7c66"><b>${s.cwd12||0}</b> CWD12 real-name</span>`+
    `<span class="stat" style="color:#0ea5e9"><b>${s.mixed||0}</b> mixed</span>`+
    `<span class="stat" style="color:#d97706"><b>${s.generic||0}</b> generic</span>`+
    `<span class="stat" style="color:#dc2626"><b>${s.numeric||0}</b> numeric</span>`+
-   `<span class="stat" style="color:#6b7280"><b>${s.unlabeled||0}</b> unlabeled</span>`;
+   `<span class="stat" style="color:#6b7280"><b>${s.unlabeled||0}</b> unlabeled</span>`+
+   `<span style="font-size:12px;color:#94a3b8">${when}</span>`;
  const tb=document.querySelector('#tbl tbody');tb.innerHTML='';
- for(const r of (d.rows||[])){
+ const rows=d.rows||[];
+ if(!rows.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:1.5rem">No downloaded datasets yet.</td></tr>';return}
+ for(const r of rows){
    const tr=document.createElement('tr');
    const rfp=(r.harvest_round&&r.harvest_round!==1)?('weed-crop-agent-v'+r.harvest_round):'weed-crop-agent-dataset';
    const rfurl='https://app.roboflow.com/a-test-of-will/'+rfp+'/browse?queryText=tag%3A'+encodeURIComponent(r.slug);
-   tr.innerHTML=`<td><a class="rev" href="/gallery/${encodeURIComponent(r.slug)}" target="_blank">${r.slug}</a></td>`+
-     `<td>${r.source}</td><td>${(r.images||0).toLocaleString()}</td>`+
-     `<td><span class="badge ${r.type}">${r.type.toUpperCase()}</span></td>`+
-     `<td class="cls">${(r.class_names||[]).join(', ')||'—'}</td>`+
-     `<td class="cls">${(r.cwd12||[]).join(', ')||'—'}</td>`+
+   const typ=esc(r.type||'unlabeled');
+   tr.innerHTML=`<td><a class="rev" href="/gallery/${encodeURIComponent(r.slug)}" target="_blank">${esc(r.slug)}</a></td>`+
+     `<td>${esc(r.source)}</td><td>${(r.images||0).toLocaleString()}</td>`+
+     `<td><span class="badge ${typ}">${typ.toUpperCase()}</span></td>`+
+     `<td class="cls">${esc((r.class_names||[]).join(', '))||'—'}</td>`+
+     `<td class="cls">${esc((r.cwd12||[]).join(', '))||'—'}</td>`+
      `<td>${r.roboflow_synced?('<a class="rev" href="'+rfurl+'" target="_blank">📡 view</a>'):'⏳ pending'}</td>`+
-     `<td>${r.action}</td>`;
+     `<td>${esc(r.action)}</td>`;
    tb.appendChild(tr);
  }
 }
