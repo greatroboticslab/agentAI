@@ -18,6 +18,14 @@ for f in results/framework/dataset_registry.json results/framework/labeling_even
   setsid -w rsync -az -e "$RSH" "$HOST:$CL/$f" "$LAB/$f" && echo "  pulled $f" || echo "  skip $f"
 done
 
+# 1.5) v3.0.110 FIX: rewrite local_path (cluster /ocean -> lab) + re-mirror Mongo
+# IMMEDIATELY after pulling the registry, BEFORE the slow dataset rsync below.
+# Previously fix ran only at the end (step 3), so during the long rsync the
+# dashboard saw cluster paths -> 0 images on /classes. Run it here too (it is
+# idempotent) to keep the broken window near-zero.
+cd "$LAB"; source .venv/bin/activate 2>/dev/null
+REPO_ROOT="$LAB" CLUSTER_REPO="$CL" PYTHONPATH="$LAB" python deploy/fix_local_paths.py | tail -2
+
 # 2) ALL dataset dirs the registry references (incremental: only new/changed).
 #    Registry slugs live in datasets/ + results/leave4out/ + downloads/ — sync all 3.
 for d in downloads datasets results/leave4out; do
