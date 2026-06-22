@@ -5225,6 +5225,7 @@ def annotate_page():
  .stat b{font-size:20px;font-family:ui-monospace,monospace}
  a.rev{color:#0e7c66;font-weight:600;text-decoration:none}
 </style></head><body>
+<div style="padding:10px 16px;background:#0b1220"><a href="/agent/weed" style="display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Mission Control</a></div>
 <div class="hero"><h1>🏷️ Labeling Guide</h1>
 <div class="sub">For each collected dataset → what its classes are (real name / numeric / generic / CWD12) + how a human should label it. Use with Roboflow for precise labeling.</div></div>
 <div class="nav"><a href="/">🏠 hub</a><a href="/rounds">🔄 rounds</a><a href="/classes">📋 classes</a><a href="/slugs">📦 slugs</a><a href="/roboflow">📊 roboflow</a><a href="/annotate" style="font-weight:700">🏷️ annotate</a></div>
@@ -5431,6 +5432,7 @@ def labeling_page():
  .toast{position:fixed;bottom:20px;right:20px;background:#0e7c66;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none}
  .toast.show{display:block}
 </style></head><body>
+<div style="padding:10px 16px;background:#0b1220"><a href="/agent/weed" style="display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Mission Control</a></div>
 <div class="hero"><h1>🏷️ Labeling Console (human-in-the-loop)</h1>
 <div class="sub">Design: push only <b>a few</b> images per dataset (you choose how many) → label in Roboflow → export back to the cluster → delete to save quota → push the next batch. Mongo tracks everything.</div></div>
 <div class="nav"><a href="/">🏠 hub</a><a href="/rounds">🔄 rounds</a><a href="/annotate">🏷️ annotate</a><a href="/labeling" style="font-weight:700">🎯 labeling</a><a href="/roboflow">📊 roboflow</a></div>
@@ -5615,6 +5617,7 @@ def roboflow_page():
   button{padding:6px 14px;border:1px solid #ddd;background:#fff;border-radius:6px;
          cursor:pointer;font-size:13px}
 </style></head><body>
+<div style="margin-bottom:10px"><a href="/agent/weed" style="display:inline-block;text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Mission Control</a></div>
 <header>
   <h1>📊 Roboflow workspace status</h1>
   <div class="sub" id="ws-sub">loading...</div>
@@ -6471,6 +6474,7 @@ def slugs_landing(domain: str = "weed"):
   .badge-no-local {{ background: #fee2e2; color: #991b1b; }}
 </style>
 </head><body>
+<div style="margin:0 0 12px"><a href="/agent/{domain}" style="display:inline-block;text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Mission Control</a></div>
 <header>
   <h1>📦 Slugs — registry-level cleanup</h1>
   <div class="sub">
@@ -6615,7 +6619,10 @@ def classes_landing(domain: str = "weed"):
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
           <div class="counts">bank {n_bank} · flux {n_flux} · real ≤{n_reg_est} ({n_reg_slugs} slugs)</div>
-          <div class="counts">reviewed {n_ex+n_bad}</div>
+          <div style="height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin:5px 0">
+            <div style="height:100%;width:{min(100, round(100*(n_ex+n_bad)/max(1,n_total_est)))}%;background:{'#16a34a' if (n_ex+n_bad) else '#cbd5e1'}"></div>
+          </div>
+          <div class="counts">{n_ex+n_bad} / {n_total_est} reviewed{(' ✓' if n_total_est and (n_ex+n_bad)>=n_total_est else '')}</div>
         </a>'''
         for cls, zh, n_total_est, n_bank, n_flux, n_reg_slugs, n_reg_est, n_ex, n_bad, thumb, topic, is_override, is_new_today in rows
     )
@@ -6698,6 +6705,7 @@ def classes_landing(domain: str = "weed"):
                 font-weight: 700; margin-left: 4px; }}
 </style>
 </head><body>
+<div style="margin:0 0 12px"><a href="/agent/{domain}" style="display:inline-block;text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Mission Control</a></div>
 <header>
   <h1>📋 Classes — human-in-the-loop class-level data audit</h1>
   <div class="sub">
@@ -7770,6 +7778,7 @@ def rounds_page():
   .toast.show{display:block;animation:slidein .2s ease-out}
   @keyframes slidein{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
 </style></head><body>
+<div style="padding:10px 16px;background:#0b1220"><a href="/agent/weed" style="display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Mission Control</a></div>
 <div class="hero">
   <h1>🔄 Harvest Rounds — version-by-version review</h1>
   <div class="sub">Each round = a snapshot of what the agent collected. Click ✓/✗ on each class to flag for DINOv2.</div>
