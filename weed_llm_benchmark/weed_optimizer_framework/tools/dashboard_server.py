@@ -3328,9 +3328,11 @@ async def api_slug_verdict_post(slug: str, payload: dict = Body(...)):
         try:
             import base64 as _b64, subprocess as _sp2
             _b = _b64.b64encode((_json.dumps(ev) + "\n").encode()).decode()
-            _cmd = ("cd %s && echo %s | base64 -d >> results/framework/slug_verdicts.jsonl"
+            # ONE remote command string (ssh joins extra argv with spaces, which
+            # would break `bash -lc <cmd>`); mirror how _slurm passes it.
+            _cmd = ("cd %s 2>/dev/null; echo %s | base64 -d >> results/framework/slug_verdicts.jsonl"
                     % (_shlex.quote(_CLUSTER_REPO), _b))
-            _sp2.Popen(_ssh_cluster_prefix() + ["bash", "-lc", _cmd],
+            _sp2.Popen(_ssh_cluster_prefix() + [_cmd],
                        stdout=_sp2.DEVNULL, stderr=_sp2.DEVNULL,
                        stdin=_sp2.DEVNULL, start_new_session=True)
         except Exception:
