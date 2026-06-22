@@ -4493,6 +4493,27 @@ async def api_cluster_action(action: str, request: Request):
                     body_used["domain_cfg_staged"] = f"fail:{type(_e).__name__}"
             if len(export_pairs) > 1:
                 sbatch_cli += [f"--export={','.join(export_pairs)}"]
+        # v3.0.123: clean_train_d accepts optional overrides so a SHORT real
+        # training run can verify the train→round write-back end-to-end without
+        # waiting for the full 80-epoch job. {epochs:int, dino_min:float}.
+        if action == "clean_train_d" and body:
+            export_pairs = ["ALL"]
+            try:
+                ep = int(body.get("epochs", 0))
+                if 1 <= ep <= 300:
+                    export_pairs.append(f"CLEAN_EPOCHS={ep}")
+                    body_used["epochs"] = ep
+            except (TypeError, ValueError):
+                pass
+            try:
+                dm = float(body.get("dino_min", -1))
+                if 0.0 <= dm <= 1.0:
+                    export_pairs.append(f"CLEAN_DINO_MIN={dm}")
+                    body_used["dino_min"] = dm
+            except (TypeError, ValueError):
+                pass
+            if len(export_pairs) > 1:
+                sbatch_cli += [f"--export={','.join(export_pairs)}"]
         # v3.0.99.40: in lab-control mode, sbatch runs ON the cluster (via _slurm,
         # which cd's to _CLUSTER_REPO) → use the REPO-relative script path there.
         sbatch_cli += [spec["script"] if _CLUSTER_SSH else str(script_path)]
