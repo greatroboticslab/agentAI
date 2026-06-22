@@ -8061,11 +8061,27 @@ async function loadRounds(){
         <div class="round-meta">started: ${meta.started_at||'?'} · ${slugs.length} slugs · RF project: <code style="background:#f4f6fb;padding:.05rem .3rem;border-radius:3px">${projName}</code></div>
         ${(function(){
           const tr = meta.train_results || {};
-          const m = tr.map50_95 || tr['mAP50-95'] || meta.map50_95;
+          const m = (tr.map50_95!=null?tr.map50_95:(tr['mAP50-95']!=null?tr['mAP50-95']:meta.map50_95));
           const subv = meta.dinov2_subversions || [];
-          const trainTxt = meta.trained
-            ? ('<span style="color:#0e7c66;font-weight:600">✅ trained</span>' + (m!=null?(' · mAP50-95 <b>'+m+'</b>'):' · mAP pending'))
-            : '<span style="color:#94a3b8">⚪ not trained yet</span>';
+          let trainTxt;
+          if(meta.trained){
+            trainTxt = '<span style="color:#0e7c66;font-weight:600">✅ trained</span>';
+            if(m!=null){
+              trainTxt += ' · cwd12 mAP50-95 <b>'+m+'</b>';
+              // research goal is locked at >= 0.90 — always show the gap
+              const gap = (tr.gap_to_0_90!=null)?tr.gap_to_0_90:Math.round((0.90-m)*1e4)/1e4;
+              if(gap>0) trainTxt += ' <span style="color:#dc2626">(gap to 0.90: '+gap.toFixed(4)+')</span>';
+              else trainTxt += ' <span style="color:#16a34a">(✓ goal met)</span>';
+              const parts=[];
+              if(tr.cwd12_test_map50_95!=null) parts.push('test '+tr.cwd12_test_map50_95);
+              if(tr.cwd12_valid_map50_95!=null) parts.push('valid '+tr.cwd12_valid_map50_95);
+              if(parts.length) trainTxt += ' <span style="color:#64748b;font-size:.9em">['+parts.join(' · ')+']</span>';
+              if(tr.model_label) trainTxt += ' <span style="color:#94a3b8;font-size:.9em">'+tr.model_label+'</span>';
+            } else { trainTxt += ' · mAP pending'; }
+            if(meta.trained_at) trainTxt += ' <span style="color:#94a3b8;font-size:.85em">@ '+meta.trained_at+'</span>';
+          } else {
+            trainTxt = '<span style="color:#94a3b8">⚪ not trained yet</span>';
+          }
           const dinoTxt = subv.length ? (' · DINOv2: '+subv.join(', ')) : '';
           return '<div class="round-meta">Results: '+trainTxt+dinoTxt+'</div>';
         })()}

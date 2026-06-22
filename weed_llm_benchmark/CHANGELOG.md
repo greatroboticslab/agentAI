@@ -4521,3 +4521,24 @@ Deep-polish pass found a real data bug and several gaps:
 - Consistent top nav (Mission Control / Browse Data / Datasets / Labeling Console / Guide /
   Roboflow), removed stale `/control` link, English font stack, mobile padding, HTML-escaped
   all rendered fields, hardened fetch (HTTP-error + credentials).
+
+
+---
+
+### v3.0.122 — Close the train→round loop (mAP write-back)
+
+The /rounds page already READ `meta.train_results.map50_95` + `meta.trained`, but nothing ever
+WROTE them — so every round showed "⚪ not trained yet" / "mAP pending" even after a training job.
+Wired the missing link:
+- **rounds.record_train_result(eval_json, round_n=None)** + CLI `record-train --eval <path> [--round N]`:
+  reads eval_v3_0_23.py's output (cwd12 test+valid mAP50-95) and stamps the round meta in the
+  registry: `trained=True`, `trained_at`, and `train_results` {map50_95 (paper-grade holdout test,
+  fallback valid/mean), test/valid breakdown, gap_to_0_90, model_label}. Idempotent; preserves
+  existing round fields. Defaults to current_round (training uses the cumulative clean snapshot).
+- **run_v3_0_99_clean_train.sh**: after the cwd12 gold eval, calls `rounds record-train` so the
+  result lands in the CLUSTER registry (source of truth) and the next cluster→lab sync mirrors it
+  to the dashboard — durable (a lab-side write would be clobbered by sync).
+- **/rounds render**: shows real mAP + gap-to-0.90 (research goal locked at ≥0.90), test/valid
+  split, model label, recorded-at. Verified the write-back on a throwaway registry (stamps
+  correctly, idempotent, explicit-round) and all four render cases (gap / goal-met / not-trained /
+  mAP-pending). First REAL mAP will populate automatically on the next clean_train_d run.

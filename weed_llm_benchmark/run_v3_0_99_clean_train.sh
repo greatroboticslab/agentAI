@@ -107,6 +107,20 @@ if [ $EXIT_CODE -eq 0 ]; then
     if [ -n "$BEST" ]; then
         BEST_PT="$BEST" python eval_v3_0_23.py 2>&1 | tail -40 \
           || echo "[eval] eval_v3_0_23.py failed — inspect manually"
+        # v3.0.122: close the train->round loop. eval_v3_0_23.py writes the
+        # cwd12 holdout mAP to results/v3_0_23_eval/v3_0_23_eval.json; stamp it
+        # into the current round's meta in the registry (the source of truth).
+        # The next cluster->lab sync mirrors it so /rounds shows a real mAP
+        # instead of "mAP pending". Non-fatal if anything is missing.
+        EVAL_JSON="results/v3_0_23_eval/v3_0_23_eval.json"
+        if [ -f "$EVAL_JSON" ]; then
+            python -m weed_optimizer_framework.tools.rounds record-train \
+                --eval "$EVAL_JSON" --model-label "yolo-clean" \
+              && echo "[round] train result recorded into registry (round meta)" \
+              || echo "[round] record-train failed (non-fatal)"
+        else
+            echo "[round] no eval JSON at $EVAL_JSON — skipping round write-back"
+        fi
     fi
 fi
 echo "=== ALL DONE $(date) ==="

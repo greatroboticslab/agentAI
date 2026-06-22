@@ -236,9 +236,93 @@ def backfill_missing(default_round: int = 1) -> dict:
     }
 
 
+def record_train_result(eval_json, round_n: int | None = None,
+                        model_label: str = "yolo-clean") -> dict:
+    """v3.0.122 — write a training/eval result back into a round's meta.
+
+    This closes the train→round loop: after a clean-subset training job evals
+    on the cwd12 gold holdout (eval_v3_0_23.py → results/v3_0_23_eval/
+    v3_0_23_eval.json), stamp the round so the /rounds page shows a real mAP
+    instead of "mAP pending".
+
+    Runs on the CLUSTER at end-of-training, writing into the cluster registry
+    (the source of truth). The next cluster→lab sync mirrors it to the
+    dashboard — so the result is durable (a lab-side write would be clobbered).
+
+    `eval_json` is a path to, or an already-parsed dict of, the eval JSON shape
+    {"cwd12_test": {"mAP50_95", "mAP50", "n_classes_with_data", ...},
+     "cwd12_valid": {...}}. `round_n` defaults to the registry's current_round
+    (training uses the cumulative clean set = the latest snapshot). Idempotent:
+    re-recording overwrites the round's train_results (latest wins)."""
+    reg = _load()
+    if round_n is None:
+        round_n = int(reg.get("current_round", 1))
+    round_n = int(round_n)
+
+    if isinstance(eval_json, str):
+        with open(eval_json) as f:
+            ev = json.load(f)
+        eval_src = eval_json
+    else:
+        ev = dict(eval_json or {})
+        eval_src = "inline"
+
+    def _m(d, k):
+        try:
+            return round(float(d.get(k)), 4)
+        except (TypeError, ValueError, AttributeError):
+            return None
+
+    test = ev.get("cwd12_test") or {}
+    valid = ev.get("cwd12_valid") or {}
+    m_test = _m(test, "mAP50_95")
+    m_valid = _m(valid, "mAP50_95")
+    cands = [x for x in (m_test, m_valid) if x is not None]
+    # headline = paper-grade holdout test mAP50-95; fall back to valid, then mean
+    if m_test is not None:
+        headline = m_test
+    elif cands:
+        headline = round(sum(cands) / len(cands), 4)
+    else:
+        headline = None
+
+    train_results = {
+        "map50_95": headline,
+        "mAP50_95": headline,  # alias (the /rounds JS also checks this key)
+        "map50": _m(test, "mAP50") if test else _m(valid, "mAP50"),
+        "cwd12_test_map50_95": m_test,
+        "cwd12_valid_map50_95": m_valid,
+        "n_classes_with_data": (test.get("n_classes_with_data")
+                                if test else valid.get("n_classes_with_data")),
+        "model_label": model_label,
+        # research goal is locked at cwd12 mAP50-95 >= 0.90 — surface the gap
+        "gap_to_0_90": (round(0.90 - headline, 4) if headline is not None else None),
+        "eval_source": eval_src,
+        "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+
+    rounds_meta = reg.setdefault("rounds", {})
+    meta = rounds_meta.setdefault(str(round_n), {
+        "started_at": "unknown (predates record_train_result)",
+        "started_at_ts": int(time.time()),
+        "dinov2_subversions": [],
+    })
+    meta["trained"] = True
+    meta["trained_at"] = train_results["recorded_at"]
+    meta["train_results"] = train_results
+    _save(reg)
+    return {"ok": True, "round": round_n, "train_results": train_results}
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("command", choices=["status", "start-new", "backfill"])
+    ap.add_argument("command",
+                    choices=["status", "start-new", "backfill", "record-train"])
+    ap.add_argument("--eval", help="path to eval JSON (record-train)")
+    ap.add_argument("--round", type=int, default=None,
+                    help="round number (record-train; default current_round)")
+    ap.add_argument("--model-label", default="yolo-clean",
+                    help="model label stored with the result (record-train)")
     args = ap.parse_args()
     if args.command == "status":
         print(json.dumps(status(), indent=2))
@@ -246,6 +330,13 @@ def main():
         print(json.dumps(start_new_round(), indent=2))
     elif args.command == "backfill":
         print(json.dumps(backfill_missing(default_round=1), indent=2))
+    elif args.command == "record-train":
+        if not args.eval:
+            print("record-train requires --eval <path>", file=sys.stderr)
+            sys.exit(2)
+        print(json.dumps(record_train_result(
+            args.eval, round_n=args.round, model_label=args.model_label),
+            indent=2))
 
 
 if __name__ == "__main__":
