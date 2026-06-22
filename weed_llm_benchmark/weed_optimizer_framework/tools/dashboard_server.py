@@ -3139,6 +3139,38 @@ async def api_exemplar_post(cls: str, payload: dict = Body(...)):
     return JSONResponse({"ok": True, **ev})
 
 
+@app.post("/api/exemplar_bulk/{cls}")
+async def api_exemplar_bulk(cls: str, payload: dict = Body(...)):
+    """v3.0.111: apply one verdict to MANY images at once (one-click select-all
+    for a clean class). Body: {verdict, imgs:[key,...]}. Appends one event per
+    img to the same jsonl the per-image endpoint uses (latest-wins replay)."""
+    if not _cls_ok(cls):
+        raise HTTPException(400)
+    verdict = payload.get("verdict", "")
+    imgs = payload.get("imgs", [])
+    if verdict not in ("exemplar", "bad", "rebox", "clear"):
+        raise HTTPException(400, "verdict must be exemplar|bad|rebox|clear")
+    if not isinstance(imgs, list) or not imgs:
+        raise HTTPException(400, "imgs must be a non-empty list")
+    if len(imgs) > 20000:
+        raise HTTPException(400, "too many imgs")
+    ts = _time_cls.time()
+    tsh = _time_cls.strftime("%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())
+    fp = _exemplar_file(cls)
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    n = 0
+    with open(fp, "a") as f:
+        for img in imgs:
+            if not isinstance(img, str) or not img:
+                continue
+            if "/" in img and not _re_cls.match(r'^[A-Za-z0-9_./-]+$', img):
+                continue
+            f.write(_json.dumps({"img": img, "verdict": verdict,
+                                 "ts": ts, "ts_h": tsh}) + "\n")
+            n += 1
+    return JSONResponse({"ok": True, "verdict": verdict, "count": n})
+
+
 # ---- exemplar EXPORT: closes the human-in-loop circle ----
 # Human ✓ marks → exportable manifest → downstream LoRA / curator training.
 
@@ -6767,26 +6799,8 @@ def classes_detail(cls: str):
     if not pool and cls not in _CWD12:
         raise HTTPException(404, f"unknown class {cls!r}")
     state = _exemplar_state(cls)
-    zh = _CWD12_ZH.get(cls, "")
-
-    # sidebar of all classes — uses cheap estimate (don't walk labels per class)
-    sidebar_rows = []
-    for c in _all_known_classes():
-        st = _exemplar_state(c) if c != cls else state
-        if c == cls:
-            n_total = len(pool)
-        else:
-            sm = _class_summary_landing(c)
-            n_total = sm["n_bank"] + sm["n_flux"] + sm["n_reg_est"]
-        n_ex = sum(1 for v in st.values() if v == "exemplar")
-        cls_attr = ' class="active"' if c == cls else ""
-        sidebar_rows.append(
-            f'<a href="/classes/{c}"{cls_attr}>'
-            f'<div>{c}</div>'
-            f'<div class="row-counts">{n_total} · ✓{n_ex}</div>'
-            f'</a>')
-    sidebar = "".join(sidebar_rows)
-
+    # v3.0.111: removed the all-classes sidebar (cluttered + it ran
+    # _class_summary_landing for every class on every detail load = slow).
     cards = []
     n_ex = n_bad = n_rb = n_un = 0
     src_breakdown: dict = {}
@@ -6819,12 +6833,22 @@ def classes_detail(cls: str):
         </div>''')
     src_summary = " · ".join(f"{k} {v}" for k, v in sorted(src_breakdown.items()))
 
-    html = f'''<!DOCTYPE html><html lang="zh"><head>
+    html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{cls} — verify</title>
-<style>{_CLASSES_CSS}</style>
+<style>{_CLASSES_CSS}
+ .backbar{{margin:0 0 10px}}
+ .backbtn{{display:inline-block;text-decoration:none;background:#eef2ff;color:#2563eb;
+   font-weight:600;font-size:13px;padding:8px 14px;border-radius:8px}}
+ .bulk{{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:0 0 12px}}
+ .bulk button{{font-size:13px;font-weight:600;padding:8px 13px;border:0;border-radius:8px;cursor:pointer}}
+ .bulk .bulk-ex{{background:#16a34a;color:#fff}} .bulk .bulk-bad{{background:#dc2626;color:#fff}}
+ .bulk .bulk-clear{{background:#e5e7eb;color:#374151}}
+ .bulk .bulk-msg{{font-size:13px;color:#475569}}
+</style>
 </head><body>
 <header>
+  <div class="backbar"><a class="backbtn" href="/classes">&larr; Back to Browse Data</a></div>
   <h1>📋 Class audit · {cls}</h1>
   <div class="sub">
     <strong>{len(pool)}</strong> candidates ({src_summary}) ·
@@ -6832,16 +6856,19 @@ def classes_detail(cls: str):
     <span class="badge bad">✗ mislabeled {n_bad}</span>
     <span class="badge rebox">🔄 bbox to fix {n_rb}</span>
     · unreviewed {n_un}
-    · <a href="/classes">← all classes</a>
   </div>
 </header>
 <div class="help">
   Shortcuts: hover a thumbnail and press <kbd>1</kbd>=exemplar ✓, <kbd>2</kbd>=mislabeled ✗, <kbd>3</kbd>=bbox to fix 🔄, <kbd>0</kbd>=clear.
   Click a thumbnail to open the full image in a new window. Filter by status below.
 </div>
-<div class="layout">
-  <aside class="sidebar">{sidebar}</aside>
-  <main>
+<main>
+    <div class="bulk">
+      <button class="bulk-ex" id="bulk-ex">✓ Mark all shown as exemplar</button>
+      <button class="bulk-bad" id="bulk-bad">✗ Mark all shown mislabeled</button>
+      <button class="bulk-clear" id="bulk-clear">Clear all shown</button>
+      <span class="bulk-msg" id="bulk-msg"></span>
+    </div>
     <div class="filters">
       <button class="on" data-f="all">All {len(pool)}</button>
       <button data-f="unverified">Unreviewed {n_un}</button>
@@ -6850,8 +6877,7 @@ def classes_detail(cls: str):
       <button data-f="rebox">bbox fix 🔄 {n_rb}</button>
     </div>
     <div class="grid" id="grid">{''.join(cards)}</div>
-  </main>
-</div>
+</main>
 <script>
 const CLS = {_json.dumps(cls)};
 
@@ -6901,6 +6927,44 @@ document.querySelectorAll('.filters button').forEach(btn => {{
     }});
   }});
 }});
+
+// v3.0.111: bulk select-all → one verdict for every SHOWN card (respects the
+// active filter, e.g. filter to Unreviewed then mark all as exemplar).
+function visibleCards() {{
+  return Array.from(document.querySelectorAll('#grid .card'))
+    .filter(c => c.style.display !== 'none');
+}}
+async function bulkMark(verdict) {{
+  const cards = visibleCards();
+  if (!cards.length) return;
+  const label = verdict==='exemplar'?'exemplar':(verdict==='bad'?'mislabeled':'cleared');
+  if (!confirm('Mark ' + cards.length + ' shown image(s) as ' + label + '?')) return;
+  const msg = document.getElementById('bulk-msg');
+  msg.textContent = '⏳ Saving ' + cards.length + '…';
+  const imgs = cards.map(c => c.dataset.img);
+  try {{
+    const r = await fetch(`/api/exemplar_bulk/${{CLS}}`, {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{verdict, imgs}}),
+    }});
+    const d = await r.json();
+    if (d.ok) {{
+      cards.forEach(card => {{
+        for (const k of ['exemplar','bad','rebox','unverified']) card.classList.remove(k);
+        card.classList.add(verdict==='clear'?'unverified':verdict);
+        card.querySelectorAll('.verdict-row button').forEach(b=>b.classList.remove('on'));
+        if (verdict!=='clear') {{
+          const t = card.querySelector(`.verdict-row button[data-v="${{verdict}}"]`);
+          if (t) t.classList.add('on');
+        }}
+      }});
+      msg.textContent = '✅ ' + d.count + ' marked ' + label + ' — refresh to update counts';
+    }} else {{ msg.textContent = '❌ ' + (d.detail || 'failed'); }}
+  }} catch(e) {{ msg.textContent = '❌ ' + e; }}
+}}
+document.getElementById('bulk-ex').addEventListener('click', () => bulkMark('exemplar'));
+document.getElementById('bulk-bad').addEventListener('click', () => bulkMark('bad'));
+document.getElementById('bulk-clear').addEventListener('click', () => bulkMark('clear'));
 
 // keyboard shortcuts when hovering a card
 let hovered = null;
