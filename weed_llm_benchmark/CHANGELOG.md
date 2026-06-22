@@ -4501,3 +4501,23 @@ Chinese only in chat). Backend logic untouched per user constraint — UI reorga
   at most 180 cards (unreviewed first) with a cap note — fixes the lag on 400–600-image classes.
 - Roboflow push path fixed (SDK installed in lab venv; e2e push verified); slug-verdict writes
   mirror to the cluster (base64 over a single ssh command) so human verdicts survive sync-down.
+
+
+---
+
+### v3.0.121 — /roboflow deep polish + annotated-count bug fix
+
+The Roboflow status page is the answer to "how much of our data is precisely labeled".
+Deep-polish pass found a real data bug and several gaps:
+- **BUG**: the page computed `annotated = images - unannotated`, but in Roboflow's data model
+  `images` = images already annotated (Dataset tab) and `unannotated` = a SEPARATE backlog in
+  the Annotate queue — two distinct pools. When the backlog exceeded the labeled set the result
+  went NEGATIVE (e.g. cwd12-multiclass-v1 showed annotated -1 / 599). Fixed in the API as the
+  single source of truth: annotated = images, pending = unannotated, total = images + unannotated,
+  annotated_pct = annotated/total. Same bug on the hub's RF summary card fixed too.
+- API now returns a workspace `totals` roll-up (annotated / pending / total / pct / boxes) +
+  `generated_at`; the page shows a summary strip with a labeled-progress bar.
+- Per-project rows now show annotated/total (%), a pending count, and a progress bar.
+- Consistent top nav (Mission Control / Browse Data / Datasets / Labeling Console / Guide /
+  Roboflow), removed stale `/control` link, English font stack, mobile padding, HTML-escaped
+  all rendered fields, hardened fetch (HTTP-error + credentials).

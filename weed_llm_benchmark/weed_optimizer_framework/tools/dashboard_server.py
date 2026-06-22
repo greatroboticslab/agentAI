@@ -1516,12 +1516,12 @@ async function loadRoboflow(){
     let html = `<div style="font-size:12px;color:#666;margin-bottom:8px">`
       +`workspace <code>${d.workspace}</code> · ${d.n_projects} projects (weed_crop_agent_dataset)</div>`;
     if(master){
-      const ann = master.images - master.unannotated;
-      const annPct = master.images ? Math.round(100*ann/master.images) : 0;
+      const ann = master.annotated||0, tot = master.total||0;
+      const annPct = Math.max(0,Math.min(100,master.annotated_pct||0));
       html += `<div style="background:#f4faf4;border-left:3px solid #38a169;padding:8px 12px;border-radius:4px;font-size:13px">`
         + `<strong>${master.slug}</strong> (main project)<br>`
-        + `📷 ${master.images} imgs · 📐 ${master.n_classes} classes · 📦 ${master.boxes_total} boxes<br>`
-        + `🏷️ annotated ${ann}/${master.images} (${annPct}%) · 🗂️ ${master.versions} versions`
+        + `📐 ${master.n_classes} classes · 📦 ${master.boxes_total} boxes<br>`
+        + `🏷️ annotated ${ann}/${tot} (${annPct}%) · ⏳ ${master.pending||0} pending · 🗂️ ${master.versions} versions`
         + `</div>`;
     }
     // v3.0.91: list ALL our projects (incl. agent v1/v2/v3) so the folder's
@@ -5646,11 +5646,24 @@ def api_roboflow_status():
                 d = json.load(r)
             pdata = d.get("project") or {}
             classes = pdata.get("classes") or {}
+            # Roboflow data model: `images` = images that ARE annotated (in the
+            # Dataset tab); `unannotated` = a SEPARATE backlog still waiting in the
+            # Annotate queue. They are two distinct pools, so annotated = images,
+            # pending = unannotated, total = images + unannotated. (The old page
+            # did images - unannotated, which went NEGATIVE when the backlog was
+            # larger than the labeled set.)
+            annotated = int(pdata.get("images", 0) or 0)
+            pending = int(pdata.get("unannotated", 0) or 0)
+            total = annotated + pending
             detail.append({
                 "slug": slug, "role": role,
                 "type": pdata.get("type"),
-                "images": pdata.get("images", 0),
-                "unannotated": pdata.get("unannotated", 0),
+                "images": annotated,          # kept for back-compat (= annotated)
+                "unannotated": pending,
+                "annotated": annotated,
+                "pending": pending,
+                "total": total,
+                "annotated_pct": (round(100 * annotated / total) if total else 0),
                 "n_classes": len(classes),
                 "boxes_total": sum(classes.values()) if isinstance(classes, dict) else 0,
                 "boxes_per_class": classes,
@@ -5664,12 +5677,27 @@ def api_roboflow_status():
     role_rank = {"cwd12_master": 0, "agent": 1, "cwd12_species": 2, "other": 3}
     detail.sort(key=lambda d: (role_rank.get(d.get("role", "other"), 9),
                                 d.get("slug", "")))
+    # Workspace roll-up across OUR projects — directly answers the user's ask:
+    # "how much of our data is precisely labeled".
+    ok_projs = [p for p in detail if not p.get("error")]
+    t_ann = sum(p.get("annotated", 0) for p in ok_projs)
+    t_pend = sum(p.get("pending", 0) for p in ok_projs)
+    t_tot = t_ann + t_pend
+    totals = {
+        "annotated": t_ann,
+        "pending": t_pend,
+        "total": t_tot,
+        "annotated_pct": (round(100 * t_ann / t_tot) if t_tot else 0),
+        "boxes_total": sum(p.get("boxes_total", 0) for p in ok_projs),
+    }
     return JSONResponse({
         "ok": True,
         "workspace": workspace,
         "workspace_url": f"https://app.roboflow.com/{workspace}",
         "n_projects": len(detail),
+        "totals": totals,
         "projects": detail,
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
     })
 
 
@@ -5687,13 +5715,22 @@ def roboflow_page():
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Roboflow workspace status</title>
 <style>
-  body{font-family:-apple-system,"PingFang SC",sans-serif;margin:0;padding:18px;
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:18px;
        background:#f2f3f7;color:#1a1a1d}
+  .nav{margin:0 0 14px;display:flex;gap:.9rem;flex-wrap:wrap}
+  .nav a{color:#0e7c66;text-decoration:none;font-size:14px}
+  .nav a.here{font-weight:700}
   header{background:#fff;padding:16px 22px;border-radius:10px;margin-bottom:16px;
          box-shadow:0 1px 3px rgba(0,0,0,.06)}
   header h1{margin:0 0 4px 0;font-size:20px}
   header .sub{color:#666;font-size:13px}
   header a{color:#06c;text-decoration:none}
+  .summary{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0}
+  .card{background:#fff;border-radius:10px;padding:.7rem 1.1rem;box-shadow:0 1px 3px rgba(0,0,0,.06);min-width:120px}
+  .card .k{font-size:12px;color:#64748b}
+  .card .v{font-size:22px;font-weight:700;font-family:ui-monospace,monospace}
+  .bar{height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-top:6px}
+  .bar>div{height:100%;background:#16a34a}
   .proj{background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:14px;
         box-shadow:0 1px 3px rgba(0,0,0,.06)}
   .proj h2{margin:0 0 6px 0;font-size:17px}
@@ -5701,67 +5738,88 @@ def roboflow_page():
         margin-left:8px;vertical-align:middle;font-weight:600}
   .role.cwd12_master{background:#38a169;color:#fff}
   .role.cwd12_species{background:#dbeafe;color:#1e40af}
+  .role.agent{background:#fef3c7;color:#92400e}
   .role.other{background:#f4f4f7;color:#666}
   .stats{display:flex;gap:18px;margin:8px 0;font-size:13px;color:#444;flex-wrap:wrap}
   .stats .v{font-weight:600;color:#000}
+  .pbar{height:6px;background:#e5e7eb;border-radius:5px;overflow:hidden;margin:6px 0 2px;max-width:420px}
+  .pbar>div{height:100%;background:#16a34a}
   table.cls{font-size:12px;border-collapse:collapse;margin-top:8px;min-width:280px}
   table.cls th,table.cls td{padding:3px 10px 3px 0;text-align:left}
   table.cls th{color:#888;font-weight:500}
   table.cls td.n{text-align:right;font-family:ui-monospace,monospace}
-  .err{color:#c00;font-size:12px}
-  .err{font-family:ui-monospace,monospace}
+  .err{color:#c00;font-size:12px;font-family:ui-monospace,monospace}
   button{padding:6px 14px;border:1px solid #ddd;background:#fff;border-radius:6px;
          cursor:pointer;font-size:13px}
+  @media(max-width:640px){body{padding:12px}}
 </style></head><body>
 <div style="margin-bottom:10px"><a href="/agent/weed" style="display:inline-block;text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px">&larr; Mission Control</a></div>
+<div class="nav"><a href="/agent/weed">🛰️ Mission Control</a><a href="/classes">📋 Browse Data</a><a href="/slugs">📦 Datasets</a><a href="/labeling">🎯 Labeling Console</a><a href="/annotate">🏷️ Guide</a><a href="/roboflow" class="here">📊 Roboflow</a></div>
 <header>
   <h1>📊 Roboflow workspace status</h1>
-  <div class="sub" id="ws-sub">loading...</div>
+  <div class="sub" id="ws-sub">loading…</div>
   <div style="margin-top:8px">
-    <a href="/control">← /control</a> ·
-    <a href="/">dashboard</a> ·
     <button onclick="loadStatus()">♻️ Refresh</button>
+    <span id="updated" style="font-size:12px;color:#94a3b8;margin-left:8px"></span>
   </div>
 </header>
+<div class="summary" id="summary"></div>
 <div id="projects">loading projects…</div>
 <script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 async function loadStatus(){
   const el = document.getElementById('projects');
+  const sum = document.getElementById('summary');
   el.innerHTML = '<div style="padding:12px;color:#888">querying Roboflow…</div>';
+  sum.innerHTML = '';
   let d;
   try{
-    const r = await fetch('/api/roboflow_status');
+    const r = await fetch('/api/roboflow_status',{credentials:'include'});
+    if(!r.ok){el.innerHTML='<div class="err">HTTP '+r.status+'</div>';return;}
     d = await r.json();
   }catch(e){
-    el.innerHTML = '<div class="err">fetch failed: '+e+'</div>'; return;
+    el.innerHTML = '<div class="err">fetch failed: '+esc(e)+'</div>'; return;
   }
   if(!d.ok){
-    el.innerHTML = '<div class="err">'+(d.error||'unknown error')+'</div>'; return;
+    el.innerHTML = '<div class="err">'+esc(d.error||'unknown error')+'</div>'; return;
   }
   document.getElementById('ws-sub').innerHTML =
-    'workspace: <a href="'+d.workspace_url+'" target="_blank">'+d.workspace+'</a> · '+
-    d.n_projects+' projects';
-  const html = d.projects.map(p=>{
+    'workspace: <a href="'+esc(d.workspace_url)+'" target="_blank">'+esc(d.workspace)+'</a> · '+
+    d.n_projects+' project(s) · Roboflow is our central labeling library';
+  if(d.generated_at) document.getElementById('updated').textContent =
+    'updated '+esc(d.generated_at.replace('T',' '));
+  // Workspace roll-up — "how much of our data is precisely labeled".
+  const t = d.totals || {};
+  sum.innerHTML =
+    `<div class="card"><div class="k">Annotated images</div><div class="v" style="color:#16a34a">${(t.annotated||0).toLocaleString()}</div></div>`+
+    `<div class="card"><div class="k">Pending in queue</div><div class="v" style="color:#d97706">${(t.pending||0).toLocaleString()}</div></div>`+
+    `<div class="card"><div class="k">Total uploaded</div><div class="v">${(t.total||0).toLocaleString()}</div></div>`+
+    `<div class="card"><div class="k">Bounding boxes</div><div class="v">${(t.boxes_total||0).toLocaleString()}</div></div>`+
+    `<div class="card" style="min-width:200px"><div class="k">Labeled ${t.annotated_pct||0}%</div>`+
+      `<div class="v" style="font-size:16px">${(t.annotated||0).toLocaleString()} / ${(t.total||0).toLocaleString()}</div>`+
+      `<div class="bar"><div style="width:${Math.max(0,Math.min(100,t.annotated_pct||0))}%"></div></div></div>`;
+  const html = (d.projects||[]).map(p=>{
     if(p.error){
-      return '<div class="proj"><h2>'+p.slug+'<span class="role '+p.role+'">'+p.role+'</span></h2>'+
-             '<div class="err">'+p.error+'</div></div>';
+      return '<div class="proj"><h2>'+esc(p.slug)+'<span class="role '+esc(p.role)+'">'+esc(p.role)+'</span></h2>'+
+             '<div class="err">'+esc(p.error)+'</div></div>';
     }
-    const annotated = (p.images||0) - (p.unannotated||0);
-    const annPct = p.images ? Math.round(100*annotated/p.images) : 0;
+    const ann = p.annotated||0, tot = p.total||0, pend = p.pending||0;
+    const pct = Math.max(0,Math.min(100,p.annotated_pct||0));
     const cls = p.boxes_per_class || {};
     const clsRows = Object.entries(cls).sort((a,b)=>b[1]-a[1])
-      .map(([k,v])=>`<tr><td>${k}</td><td class="n">${v}</td></tr>`).join('');
+      .map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${v}</td></tr>`).join('');
     return `<div class="proj">
-      <h2><a href="${p.url}" target="_blank">${p.slug}</a>
-          <span class="role ${p.role}">${p.role}</span></h2>
+      <h2><a href="${esc(p.url)}" target="_blank">${esc(p.slug)}</a>
+          <span class="role ${esc(p.role)}">${esc(p.role)}</span></h2>
       <div class="stats">
-        <span>📷 imgs <span class="v">${p.images}</span></span>
+        <span>🏷️ annotated <span class="v">${ann.toLocaleString()}</span> / ${tot.toLocaleString()} (${pct}%)</span>
+        <span>⏳ pending <span class="v">${pend.toLocaleString()}</span></span>
         <span>📐 classes <span class="v">${p.n_classes}</span></span>
-        <span>📦 boxes <span class="v">${p.boxes_total}</span></span>
-        <span>🏷️ annotated <span class="v">${annotated}</span> / ${p.images} (${annPct}%)</span>
+        <span>📦 boxes <span class="v">${(p.boxes_total||0).toLocaleString()}</span></span>
         <span>🗂️ versions <span class="v">${p.versions}</span></span>
-        <span>type <span class="v">${p.type||'?'}</span></span>
+        <span>type <span class="v">${esc(p.type||'?')}</span></span>
       </div>
+      <div class="pbar"><div style="width:${pct}%"></div></div>
       ${clsRows ? '<table class="cls"><thead><tr><th>class</th><th>boxes</th></tr></thead><tbody>'+clsRows+'</tbody></table>' : '<div style="color:#888;font-size:12px">no classes yet</div>'}
     </div>`;
   }).join('');
