@@ -3199,6 +3199,39 @@ async def api_exemplar_bulk(cls: str, payload: dict = Body(...)):
     return JSONResponse({"ok": True, "verdict": verdict, "count": n})
 
 
+@app.post("/api/exemplar_markall/{cls}")
+async def api_exemplar_markall(cls: str, payload: dict = Body(...)):
+    """v3.0.118: mark the ENTIRE class pool with one verdict, server-side.
+    Unlike /api/exemplar_bulk (which the client builds from rendered cards),
+    this enumerates the full _class_image_pool on the server, so the detail
+    page never has to render hundreds of cards just to "select all" — fixes the
+    lag the user saw on big classes and guarantees the progress bar reaches
+    100%. Body: {verdict}. Returns count actually written."""
+    if not _cls_ok(cls):
+        raise HTTPException(400)
+    verdict = payload.get("verdict", "")
+    if verdict not in ("exemplar", "bad", "clear"):
+        raise HTTPException(400, "verdict must be exemplar|bad|clear")
+    pool = _class_image_pool(cls)
+    ts = _time_cls.time()
+    tsh = _time_cls.strftime("%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())
+    fp = _exemplar_file(cls)
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    n = 0
+    with open(fp, "a") as f:
+        for entry in pool:
+            try:
+                key = _pool_entry_urls(entry, cls)[0]
+            except Exception:
+                key = None
+            if not key or not isinstance(key, str):
+                continue
+            f.write(_json.dumps({"img": key, "verdict": verdict,
+                                 "ts": ts, "ts_h": tsh}) + "\n")
+            n += 1
+    return JSONResponse({"ok": True, "verdict": verdict, "count": n})
+
+
 # ---- exemplar EXPORT: closes the human-in-loop circle ----
 # Human ✓ marks → exportable manifest → downstream LoRA / curator training.
 
@@ -6631,6 +6664,17 @@ def classes_landing(domain: str = "weed"):
         n_total_est = n_bank + n_flux + n_reg_est
         n_ex = sum(1 for v in state.values() if v == "exemplar")
         n_bad = sum(1 for v in state.values() if v == "bad")
+        # v3.0.118: n_reg_est above is a cap-based OVER-estimate (200×slugs), so
+        # "463/600 reviewed" looked incomplete even after marking everything. For
+        # REVIEWED classes (few), use the ACTUAL pool size as the denominator so
+        # the fraction is truthful; unreviewed classes keep the cheap estimate.
+        if (n_ex + n_bad) > 0:
+            try:
+                actual = len(_class_image_pool(cls))
+                if actual >= (n_ex + n_bad):
+                    n_total_est = actual
+            except Exception:
+                pass
         zh = _CWD12_ZH.get(cls, "")
         # v3.0.43.2: prefer inline data URI (works even with network blocking
         # subrequests); fall back to /thumb/ URL.
@@ -6859,7 +6903,14 @@ def classes_detail(cls: str):
     cards = []
     n_ex = n_bad = n_rb = n_un = 0
     src_breakdown: dict = {}
-    for entry in pool:
+    # v3.0.118: cap how many cards we RENDER (big classes had 400-600 thumbnails
+    # → laggy page). Counts/badges below still reflect the FULL pool; the
+    # "Mark ALL in class" button labels everything server-side without needing
+    # every card in the DOM. Unreviewed cards render first so review is useful.
+    RENDER_CAP = 180
+    pool_sorted = sorted(pool, key=lambda e: 0 if not state.get(
+        _pool_entry_urls(e, cls)[0], "") else 1)
+    for entry in pool_sorted:
         key, thumb_url, full_url, src_tag = _pool_entry_urls(entry, cls)
         kind = entry["kind"]
         fn = entry["fname"]
@@ -6869,6 +6920,8 @@ def classes_detail(cls: str):
         elif verdict == "bad":     n_bad += 1
         elif verdict == "rebox":   n_rb += 1
         else:                      n_un += 1
+        if len(cards) >= RENDER_CAP:
+            continue
         klass = " " + verdict if verdict else " unverified"
         cards.append(f'''
         <div class="card{klass}" data-img="{key}" data-kind="{kind}" data-src="{src_tag}">
@@ -6887,6 +6940,13 @@ def classes_detail(cls: str):
           </div>
         </div>''')
     src_summary = " · ".join(f"{k} {v}" for k, v in sorted(src_breakdown.items()))
+    n_shown = len(cards)
+    cap_note = ("" if n_shown >= len(pool) else
+                f'<div class="help" style="background:#fef9c3;border-color:#fde047">'
+                f'Showing the first <strong>{n_shown}</strong> of {len(pool)} candidates '
+                f'(unreviewed first) to keep the page fast. Use '
+                f'<strong>“Mark ALL {len(pool)} in class”</strong> above to label every '
+                f'image at once — it works on the whole class, not just what is shown.</div>')
 
     html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -6918,11 +6978,17 @@ def classes_detail(cls: str):
   Click a thumbnail to open the full image in a new window. Filter by status below.
 </div>
 <main>
+    {cap_note}
     <div class="bulk">
-      <button class="bulk-ex" id="bulk-ex">✓ Mark all shown as exemplar</button>
-      <button class="bulk-bad" id="bulk-bad">✗ Mark all shown mislabeled</button>
-      <button class="bulk-clear" id="bulk-clear">Clear all shown</button>
+      <button class="bulk-ex" id="markall-ex" style="font-size:14px">✓ Mark ALL {len(pool)} in class as exemplar</button>
+      <button class="bulk-bad" id="markall-bad" style="font-size:14px">✗ Mark ALL {len(pool)} mislabeled</button>
       <span class="bulk-msg" id="bulk-msg"></span>
+    </div>
+    <div class="bulk" style="margin-top:-4px">
+      <span class="bulk-msg">Or only the cards matching the active filter:</span>
+      <button class="bulk-ex" id="bulk-ex">✓ shown → exemplar</button>
+      <button class="bulk-bad" id="bulk-bad">✗ shown → mislabeled</button>
+      <button class="bulk-clear" id="bulk-clear">Clear shown</button>
     </div>
     <div class="filters">
       <button class="on" data-f="all">All {len(pool)}</button>
@@ -7020,6 +7086,34 @@ async function bulkMark(verdict) {{
 document.getElementById('bulk-ex').addEventListener('click', () => bulkMark('exemplar'));
 document.getElementById('bulk-bad').addEventListener('click', () => bulkMark('bad'));
 document.getElementById('bulk-clear').addEventListener('click', () => bulkMark('clear'));
+
+// v3.0.118: mark the ENTIRE class server-side (no dependence on rendered cards)
+// — this is the fast path for a clean class and always reaches 100%.
+async function markAll(verdict) {{
+  const label = verdict==='exemplar'?'exemplar':'mislabeled';
+  if (!confirm('Mark the ENTIRE class ({len(pool)} images) as ' + label + '? This labels every candidate, not just what is shown.')) return;
+  const msg = document.getElementById('bulk-msg');
+  msg.textContent = '⏳ Marking the whole class…';
+  try {{
+    const r = await fetch(`/api/exemplar_markall/${{CLS}}`, {{
+      method:'POST', headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{verdict}}),
+    }});
+    const d = await r.json();
+    if (d.ok) {{
+      document.querySelectorAll('#grid .card').forEach(card => {{
+        for (const k of ['exemplar','bad','rebox','unverified']) card.classList.remove(k);
+        card.classList.add(verdict);
+        card.querySelectorAll('.verdict-row button').forEach(b=>b.classList.remove('on'));
+        const t = card.querySelector(`.verdict-row button[data-v="${{verdict}}"]`);
+        if (t) t.classList.add('on');
+      }});
+      msg.textContent = '✅ Entire class (' + d.count + ') marked ' + label + ' — refresh to update counts';
+    }} else {{ msg.textContent = '❌ ' + (d.detail || 'failed'); }}
+  }} catch(e) {{ msg.textContent = '❌ ' + e; }}
+}}
+document.getElementById('markall-ex').addEventListener('click', () => markAll('exemplar'));
+document.getElementById('markall-bad').addEventListener('click', () => markAll('bad'));
 
 // keyboard shortcuts when hovering a card
 let hovered = null;
