@@ -2297,7 +2297,15 @@ def _load_registry_index(domain: str = "weed") -> dict:
             return (ce or {}).get("index", {})
     idx: dict = {}
     empty: list = []
+    # v3.0.114: don't nag about junk-verdicted slugs in the metadata-gap banner
+    # (a slug the user marked ✗ junk shouldn't demand a backfill).
+    try:
+        _vd = _slug_verdict_state()
+    except Exception:
+        _vd = {}
     for slug, info in (reg.get("datasets") or {}).items():
+        if _vd.get(slug) == "junk":
+            continue
         cn = info.get("class_names") or []
         lp = info.get("local_path") or ""
         has_local = bool(lp and os.path.isdir(lp))
