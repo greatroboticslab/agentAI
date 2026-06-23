@@ -51,9 +51,15 @@ from typing import IO, Iterator, Optional, Protocol, runtime_checkable
 
 # ---- Defaults (resolved from env, but importable for tests) ----------------
 
-DEFAULT_LUSTRE_ROOT = os.environ.get(
-    "AGENTAI_LUSTRE_ROOT",
-    "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark",
+# v3.0.126: fall back to REPO_ROOT before the cluster /ocean default. On the lab
+# server REPO_ROOT=/home/lab/weed_llm_benchmark, so without this the backend's
+# repo-root safety check rejected every lab local_path and /api/img 404'd for
+# ALL slugs (storage thought the repo was on /ocean). AGENTAI_LUSTRE_ROOT still
+# wins if explicitly set.
+DEFAULT_LUSTRE_ROOT = (
+    os.environ.get("AGENTAI_LUSTRE_ROOT")
+    or os.environ.get("REPO_ROOT")
+    or "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"
 )
 
 

@@ -2009,6 +2009,13 @@ def api_sample(slug: str, filename: str):
     ok = render_with_bbox(img_path, label_path, cache_p, slug,
                           max_width=600, class_names=class_names)
     if not ok:
+        # v3.0.126: degrade gracefully instead of 500. Community/manual uploads
+        # may carry unusual formats/sizes that the bbox renderer can't process;
+        # show the raw image (no overlay) rather than a broken thumbnail.
+        if os.path.isfile(img_path):
+            ext = os.path.splitext(img_path)[1].lower()
+            mt = "image/png" if ext == ".png" else "image/jpeg"
+            return FileResponse(img_path, media_type=mt)
         raise HTTPException(500, "render failed")
     return FileResponse(cache_p, media_type="image/jpeg")
 
