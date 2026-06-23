@@ -4542,3 +4542,22 @@ Wired the missing link:
   split, model label, recorded-at. Verified the write-back on a throwaway registry (stamps
   correctly, idempotent, explicit-round) and all four render cases (gap / goal-met / not-trained /
   mAP-pending). First REAL mAP will populate automatically on the next clean_train_d run.
+
+
+---
+
+### v3.0.125 — Manual dataset upload (Prof Zhang platform expansion, Z1)
+
+Every domain now has a manual ZIP-upload interface (future: auto-upload + open community).
+- **POST /api/dataset/upload?domain=&name=** — the .zip is the raw request body (no python-multipart
+  dep). Safe-extracts images (+ optional YOLO labels/ + data.yaml) to uploads/<slug>/ with
+  path-traversal / size (2GB) / file-count (60k) / image-only guards. Registers via db.upsert_slug
+  (status=downloaded, source=manual_upload, domain, uploaded_by attribution, local_path,
+  local_images, class_names from data.yaml, harvest_round). Returns slug + gallery_url.
+- **Durability across sync**: lab dataset_registry.json is a sync-DOWN mirror (cluster overwrites
+  it ≤30min). Uploads are also recorded in results/framework/manual_uploads.json (lab-local, never
+  synced); deploy/fix_local_paths.py now re-injects them into the registry after every cluster pull
+  so user uploads survive.
+- **UI**: an "Upload a dataset (.zip)" panel on /agent/<domain> (name field + file picker + live
+  result with a gallery link). English-only.
+- Foundation for the mobile-robot domain (manual upload now) and community contributions.

@@ -984,6 +984,197 @@ async def api_agent_create(request: Request):
     return {"ok": True, "domain": domain_id, "display_name": name}
 
 
+# ===========================================================================
+# v3.0.125 (Prof Zhang platform expansion, Z1) — MANUAL DATASET UPLOAD.
+# Every domain/dataset gets a manual ZIP-upload interface (future: auto-upload
+# + open to the community). The .zip is POSTed as the raw request body (no
+# python-multipart dependency); query params carry domain + name.
+#
+# Durability note: the lab dataset_registry.json is a sync-DOWN mirror of the
+# cluster (overwritten ≤30min). So a manual upload is recorded in BOTH the live
+# registry (immediate visibility) AND results/framework/manual_uploads.json
+# (lab-local, never synced); deploy/fix_local_paths.py re-injects the latter
+# into the registry after every cluster pull so uploads survive.
+# ===========================================================================
+_UPLOAD_DIR = REPO / "uploads"
+_MANUAL_UPLOADS_FILE = REPO / "results" / "framework" / "manual_uploads.json"
+_MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024   # 2 GB
+_MAX_UPLOAD_FILES = 60000
+_UPLOAD_IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+
+def _actor_from_request(request) -> str:
+    """Best-effort uploader identity. Z3 (Google login) will set a session user;
+    until then fall back to an X-User header, the Basic-auth user, or 'admin'."""
+    try:
+        xu = (request.headers.get("x-user") or "").strip()
+        if xu:
+            return xu[:80]
+        h = request.headers.get("authorization", "")
+        if h.startswith("Basic "):
+            u = _base64.b64decode(h[6:]).decode("utf-8").partition(":")[0]
+            # the shared admin Basic login (user '1') maps to 'admin'
+            if u and u != _AUTH_USER:
+                return ("user:" + u)[:80]
+    except Exception:
+        pass
+    return "admin"
+
+
+def _read_manual_uploads() -> dict:
+    try:
+        if _MANUAL_UPLOADS_FILE.is_file():
+            return json.load(open(_MANUAL_UPLOADS_FILE)) or {}
+    except Exception:
+        pass
+    return {}
+
+
+def _append_manual_upload(slug: str, fields: dict) -> None:
+    data = _read_manual_uploads()
+    data[slug] = fields
+    _MANUAL_UPLOADS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = str(_MANUAL_UPLOADS_FILE) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2, default=str)
+    os.replace(tmp, _MANUAL_UPLOADS_FILE)
+
+
+def _registry_current_round() -> int:
+    try:
+        with open(REGISTRY_PATH) as f:
+            return int(json.load(f).get("current_round", 1) or 1)
+    except Exception:
+        return 1
+
+
+@app.post("/api/dataset/upload")
+async def api_dataset_upload(request: Request):
+    """Manual dataset upload. POST the .zip as the raw request body with
+    ?domain=<id>&name=<dataset name>. Images (+ optional YOLO labels / data.yaml)
+    are extracted to uploads/<slug>/ and the dataset is registered (status
+    downloaded, source manual_upload, attributed to the uploader)."""
+    import zipfile
+    import shutil
+    qp = request.query_params
+    domain = re.sub(r"[^a-z0-9_]+", "", (qp.get("domain") or "weed").lower())[:40] or "weed"
+    name = (qp.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "missing dataset name (?name=)")
+    base = re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_")[:60] or "dataset"
+
+    raw = await request.body()
+    if not raw:
+        raise HTTPException(400, "empty body — POST the .zip file as the request body")
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"zip too large (> {_MAX_UPLOAD_BYTES // (1024*1024)} MB)")
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(raw))
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "not a valid .zip file")
+    members = [m for m in zf.infolist() if not m.is_dir()]
+    if not members:
+        raise HTTPException(400, "zip is empty")
+    if len(members) > _MAX_UPLOAD_FILES:
+        raise HTTPException(413, f"too many files in zip (> {_MAX_UPLOAD_FILES})")
+
+    actor = _actor_from_request(request)
+    short = hashlib.sha1(raw).hexdigest()[:8]
+    slug = f"ul_{base}_{short}"
+    dest = _UPLOAD_DIR / slug
+    if dest.exists():
+        shutil.rmtree(dest, ignore_errors=True)
+    img_dir = dest / "images"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    label_dir = dest / "labels"
+
+    n_img = n_lbl = n_skipped = 0
+    data_yaml_bytes = None
+    for m in members:
+        nm = m.filename
+        parts = Path(nm).parts
+        # path-traversal / absolute-path guard
+        if nm.startswith("/") or ".." in parts:
+            n_skipped += 1
+            continue
+        safe_name = Path(nm).name
+        if not safe_name:
+            continue
+        ext = Path(safe_name).suffix.lower()
+        if ext in _UPLOAD_IMG_EXT:
+            try:
+                with zf.open(m) as src, open(img_dir / safe_name, "wb") as out:
+                    shutil.copyfileobj(src, out, length=1024 * 1024)
+                n_img += 1
+            except Exception:
+                n_skipped += 1
+        elif ext == ".txt" and "label" in nm.lower():
+            label_dir.mkdir(exist_ok=True)
+            try:
+                with zf.open(m) as src, open(label_dir / safe_name, "wb") as out:
+                    shutil.copyfileobj(src, out)
+                n_lbl += 1
+            except Exception:
+                n_skipped += 1
+        elif safe_name.lower() in ("data.yaml", "data.yml", "classes.txt"):
+            try:
+                data_yaml_bytes = zf.read(m)
+            except Exception:
+                pass
+
+    if n_img == 0:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise HTTPException(400, "no images found in zip "
+                                 "(supported: .jpg .jpeg .png .bmp .webp)")
+
+    class_names = []
+    if data_yaml_bytes:
+        try:
+            import yaml as _yaml
+            y = _yaml.safe_load(data_yaml_bytes) or {}
+            names = y.get("names") if isinstance(y, dict) else None
+            if isinstance(names, dict):
+                class_names = [str(names[k]) for k in sorted(names)]
+            elif isinstance(names, list):
+                class_names = [str(x) for x in names]
+        except Exception:
+            class_names = []
+
+    uploaded_at = time.strftime("%Y-%m-%dT%H:%M:%S")
+    fields = {
+        "status": "downloaded",
+        "source": "manual_upload",
+        "domain": domain,
+        "uploaded_by": actor,
+        "uploaded_at": uploaded_at,
+        "downloaded_at": uploaded_at,
+        "local_path": str(img_dir),
+        "local_images": n_img,
+        "n_local_labels": n_lbl,
+        "class_names": class_names,
+        "harvest_round": _registry_current_round(),
+        "display_name": name,
+    }
+    # durable record first (survives cluster→lab sync), then live registry+Mongo
+    try:
+        _append_manual_upload(slug, fields)
+    except Exception as e:
+        log.warning(f"[upload] manual_uploads.json write failed: {e}")
+    wrote = {"mongo": False, "json": False}
+    try:
+        from . import db as _db
+        wrote = _db.upsert_slug(slug, fields, actor=actor)
+    except Exception as e:
+        log.warning(f"[upload] registry upsert failed: {e}")
+    log.info(f"[upload] {slug} domain={domain} imgs={n_img} labels={n_lbl} by={actor}")
+    return JSONResponse({
+        "ok": True, "slug": slug, "domain": domain, "images": n_img,
+        "labels": n_lbl, "skipped": n_skipped, "class_names": class_names,
+        "uploaded_by": actor, "registered": wrote,
+        "gallery_url": f"/gallery/{slug}",
+    })
+
+
 @app.get("/agent/{domain_id}", response_class=HTMLResponse)
 def agent_generic(domain_id: str):
     """v3.0.107: mission control for a created (non-weed) domain agent. Honest:
@@ -1036,6 +1227,14 @@ def agent_generic(domain_id: str):
    <div class="row">Sub-agents: <b>{int(d.get("n_subagents") or 2)}</b> &middot; Target metric: <b>{_h.escape(str(d.get("target_metric") or "mAP50-95"))}</b></div>
    <div class="row" style="margin-top:18px">{_note}</div>
    <div style="margin-top:16px">{_hbtn}</div>
+   <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Upload a dataset (.zip)</div>
+   <div style="margin-top:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px">
+     <div style="font-size:13px;color:#475569;margin-bottom:10px">Drop a <b>.zip</b> of images (optionally with YOLO <code>labels/</code> + <code>data.yaml</code>). It registers as a dataset for this agent and appears under Datasets. Future: automatic upload + open community contributions.</div>
+     <input id="ds-name" type="text" placeholder="Dataset name (e.g. lab-run-2026-06)" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px">
+     <input id="ds-file" type="file" accept=".zip,application/zip" style="font-size:13px;margin-bottom:10px;display:block">
+     <button id="ds-up" onclick="uploadDataset()" class="btn" style="margin-top:0;border:0;cursor:pointer">&#11014; Upload dataset</button>
+     <span id="ds-toast" style="margin-left:12px;font-size:13px"></span>
+   </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
@@ -1051,6 +1250,23 @@ function startHarvest(){
  fetch('/api/cluster_action/brain_harvest',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})
   .then(function(r){return r.json();}).then(function(d){t.textContent=(d&&d.ok?'\\u2705 Harvest submitted to cluster.':'\\u274c '+((d&&(d.msg||d.stderr))||'failed'));})
   .catch(function(e){t.textContent='\\u274c '+e;}).finally(function(){b.disabled=false;});
+}
+async function uploadDataset(){
+ var nameEl=document.getElementById('ds-name'),fileEl=document.getElementById('ds-file'),
+     t=document.getElementById('ds-toast'),btn=document.getElementById('ds-up');
+ var name=(nameEl.value||'').trim();
+ if(!name){t.textContent='\\u26a0 enter a dataset name';return;}
+ if(!fileEl.files||!fileEl.files[0]){t.textContent='\\u26a0 choose a .zip file';return;}
+ var f=fileEl.files[0];
+ if(!/\\.zip$/i.test(f.name)){t.textContent='\\u26a0 must be a .zip file';return;}
+ btn.disabled=true;t.textContent='\\u23f3 uploading '+(f.size/1048576).toFixed(1)+' MB\\u2026';
+ try{
+  var url='/api/dataset/upload?domain=__DOM__&name='+encodeURIComponent(name);
+  var r=await fetch(url,{method:'POST',credentials:'include',headers:{'Content-Type':'application/zip'},body:f});
+  var d=await r.json();
+  if(r.ok&&d&&d.ok){t.innerHTML='\\u2705 '+d.images+' images registered as <b>'+d.slug+'</b> \\u00b7 <a href="'+d.gallery_url+'" target="_blank">view</a>';}
+  else{t.textContent='\\u274c '+((d&&(d.detail||d.msg))||('HTTP '+r.status));}
+ }catch(e){t.textContent='\\u274c '+e;}finally{btn.disabled=false;}
 }
 </script></body></html>''')
     page = page.replace("__DOM__", domain_id)
