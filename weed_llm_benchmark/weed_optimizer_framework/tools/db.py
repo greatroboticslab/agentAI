@@ -104,6 +104,7 @@ COLL_EXEMPLARS = "exemplars"
 COLL_AGENT_TASKS = "agent_tasks"
 COLL_AUDIT = "audit_trail"
 COLL_DOMAINS = "domains"          # v3.0.82: one doc per dataset-collection agent
+COLL_USERS = "users"              # v3.0.129: one doc per user (Prof: per-student login + attribution)
 
 # v3.0.82 (Prof directive — multi-domain extensibility): every slug/class is
 # scoped to a DOMAIN (= a dataset-collection agent's target). "weed" is just
@@ -617,6 +618,97 @@ def log_audit(event: str, target: dict, after: dict = None,
         return True
     except Exception:
         return False
+
+
+# --------------------------------------------------------------------------- #
+# Users (v3.0.129) — Prof Zhang: students log in with their own account; we save
+# users + track who uploaded what. Mongo-backed (best-effort, like domains).
+# A user doc: {_id: user_id, email, name, role, auth_provider, created_at, last_seen}.
+# --------------------------------------------------------------------------- #
+
+def list_users() -> list:
+    db = _get_db()
+    if db is None:
+        return []
+    try:
+        return list(db[COLL_USERS].find({}).sort("last_seen", -1))
+    except Exception:
+        return []
+
+
+def get_user(user_id: str) -> Optional[dict]:
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        return db[COLL_USERS].find_one({"_id": user_id})
+    except Exception:
+        return None
+
+
+def upsert_user(user_id: str, email: str = "", name: str = "",
+                role: str = "member", auth_provider: str = "basic") -> Optional[dict]:
+    """Create the user if new (stamping created_at + role/email/name), and always
+    bump last_seen. Idempotent — safe to call on every authenticated action.
+    Returns the user doc, or None if Mongo is down."""
+    if not user_id:
+        return None
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        now = _now()
+        existing = db[COLL_USERS].find_one({"_id": user_id})
+        if existing is None:
+            doc = {
+                "_id": user_id, "email": email, "name": name or user_id,
+                "role": role, "auth_provider": auth_provider,
+                "created_at": now, "last_seen": now,
+            }
+            db[COLL_USERS].insert_one(doc)
+            return doc
+        # update last_seen + fill any newly-provided identity fields
+        sets = {"last_seen": now}
+        if email and not existing.get("email"):
+            sets["email"] = email
+        if name and (not existing.get("name") or existing.get("name") == user_id):
+            sets["name"] = name
+        if auth_provider and existing.get("auth_provider") in (None, "basic"):
+            sets["auth_provider"] = auth_provider
+        db[COLL_USERS].update_one({"_id": user_id}, {"$set": sets})
+        existing.update(sets)
+        return existing
+    except Exception:
+        return None
+
+
+def create_user(user_id: str, email: str = "", name: str = "",
+                role: str = "member", auth_provider: str = "basic") -> Optional[dict]:
+    """Insert a user; returns the doc, "exists" if taken, or None if Mongo down."""
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        if db[COLL_USERS].find_one({"_id": user_id}):
+            return "exists"
+        now = _now()
+        doc = {"_id": user_id, "email": email, "name": name or user_id,
+               "role": role, "auth_provider": auth_provider,
+               "created_at": now, "last_seen": now}
+        db[COLL_USERS].insert_one(doc)
+        return doc
+    except Exception:
+        return None
+
+
+def ensure_default_admin() -> None:
+    """Make sure an 'admin' user exists (maps to the shared Basic-auth login)."""
+    try:
+        if get_user("admin") is None:
+            create_user("admin", name="Administrator", role="admin",
+                        auth_provider="basic")
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------------------- #

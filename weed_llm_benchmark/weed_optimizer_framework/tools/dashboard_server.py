@@ -950,6 +950,7 @@ def agent_weed():
      <a href="/slugs"><div class="ic">&#128451;</div><div class="nm">Datasets</div><div class="ds">Every harvested dataset, sample previews.</div></a>
      <a href="/labeling"><div class="ic">&#9989;</div><div class="nm">Review &amp; Label</div><div class="ds">Human-in-the-loop labeling queue.</div></a>
      <a href="/rounds"><div class="ic">&#128200;</div><div class="nm">Rounds &amp; Results</div><div class="ds">Harvest rounds and training metrics.</div></a>
+     <a href="/users"><div class="ic">&#128100;</div><div class="nm">Users</div><div class="ds">Who signed in &amp; uploaded what.</div></a>
      <a href="/manual"><div class="ic">&#128214;</div><div class="nm">Manual</div><div class="ds">Architecture &amp; full pipeline docs.</div></a>
      <a href="/console"><div class="ic">&#9881;</div><div class="nm">Advanced Console</div><div class="ds">All raw controls &amp; cluster ops.</div></a>
    </div>
@@ -1158,6 +1159,11 @@ async def api_dataset_upload(request: Request):
         raise HTTPException(413, f"too many files in zip (> {_MAX_UPLOAD_FILES})")
 
     actor = _actor_from_request(request)
+    try:
+        from . import db as _dbu
+        _dbu.upsert_user(actor, auth_provider="basic")
+    except Exception:
+        pass
     short = hashlib.sha1(raw).hexdigest()[:8]
     slug = f"ul_{base}_{short}"
     dest = _UPLOAD_DIR / slug
@@ -1410,9 +1416,121 @@ async def api_set_push_cap_ep(request: Request):
     except (TypeError, ValueError):
         raise HTTPException(400, "cap must be an integer")
     newcap = _set_push_cap(domain, cap)
+    try:
+        from . import db as _dbu
+        _dbu.upsert_user(_actor_from_request(request), auth_provider="basic")
+    except Exception:
+        pass
     log.info(f"[push_cap] {_norm_domain(domain)} -> {newcap} by {_actor_from_request(request)}")
     return JSONResponse({"ok": True, "domain": _norm_domain(domain), "cap": newcap,
                          "max": _MAX_PUSH_CAP})
+
+
+# ===========================================================================
+# v3.0.129 (Z2) — users + upload attribution. Prof Zhang: students log in with
+# their own account; track who uploaded what. Users live in Mongo COLL_USERS;
+# uploads already carry uploaded_by. This page joins the two.
+# ===========================================================================
+@app.get("/api/users")
+def api_users():
+    """List users + how many datasets / images each has uploaded."""
+    try:
+        from . import db as _dbu
+        _dbu.ensure_default_admin()
+        users = _dbu.list_users()
+    except Exception:
+        users = []
+    # aggregate manual uploads by uploader
+    agg: dict = {}
+    for slug, info in _read_manual_uploads().items():
+        who = info.get("uploaded_by") or "admin"
+        a = agg.setdefault(who, {"datasets": 0, "images": 0, "slugs": []})
+        a["datasets"] += 1
+        a["images"] += int(info.get("local_images", 0) or 0)
+        a["slugs"].append(slug)
+    rows = []
+    seen = set()
+    for u in users:
+        uid = u.get("_id")
+        seen.add(uid)
+        a = agg.get(uid, {"datasets": 0, "images": 0})
+        rows.append({
+            "user_id": uid, "name": u.get("name") or uid,
+            "email": u.get("email") or "", "role": u.get("role") or "member",
+            "auth_provider": u.get("auth_provider") or "basic",
+            "created_at": _iso(u.get("created_at")), "last_seen": _iso(u.get("last_seen")),
+            "uploads": a["datasets"], "images": a["images"],
+        })
+    # uploaders that aren't in the users table yet (e.g. Mongo was down on upload)
+    for who, a in agg.items():
+        if who not in seen:
+            rows.append({"user_id": who, "name": who, "email": "", "role": "member",
+                         "auth_provider": "unknown", "created_at": "", "last_seen": "",
+                         "uploads": a["datasets"], "images": a["images"]})
+    rows.sort(key=lambda r: (-(r["uploads"]), r["user_id"]))
+    return JSONResponse({"ok": True, "n": len(rows), "users": rows,
+                         "mongo": (len(users) > 0)})
+
+
+def _iso(v):
+    try:
+        return v.strftime("%Y-%m-%d %H:%M") if hasattr(v, "strftime") else (str(v)[:16] if v else "")
+    except Exception:
+        return ""
+
+
+@app.get("/users", response_class=HTMLResponse)
+def users_page():
+    """v3.0.129 — admin view of users + per-user upload attribution (English)."""
+    html = '''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Users</title><style>
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
+ .top{background:#0b1220;padding:10px 16px}
+ .top a{display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px}
+ .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.3rem 2rem}
+ .hero h1{margin:0 0 .3rem}.hero .sub{opacity:.85;font-size:13px}
+ .wrap{padding:1.2rem 2rem;max-width:1000px;margin:0 auto}
+ .note{background:#fff;border:1px solid #e3e7ef;border-radius:10px;padding:.7rem 1rem;font-size:13px;color:#475569;margin-bottom:14px}
+ .tblwrap{overflow-x:auto;border-radius:10px}
+ table{width:100%;min-width:640px;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+ th,td{padding:.6rem .8rem;text-align:left;font-size:13px;border-bottom:1px solid #f0f2f5}
+ th{background:#0f172a;color:#fff;font-size:12px}
+ .role{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+ .role.admin{background:#fee2e2;color:#991b1b}.role.member{background:#e0f2fe;color:#075985}
+ .num{font-family:ui-monospace,monospace;text-align:right}
+</style></head><body>
+<div class="top"><a href="/">&larr; Agents</a></div>
+<div class="hero"><h1>&#128100; Users</h1><div class="sub">Everyone who has signed in or uploaded data, and how much they contributed. Per-student attribution (Prof Zhang).</div></div>
+<div class="wrap">
+ <div class="note" id="note">loading…</div>
+ <div class="tblwrap"><table id="tbl"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Auth</th><th>Uploads</th><th>Images</th><th>Last seen</th></tr></thead><tbody></tbody></table></div>
+</div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+async function load(){
+ var note=document.getElementById('note');
+ let d;
+ try{const r=await fetch('/api/users',{credentials:'include'});if(!r.ok){note.textContent='HTTP '+r.status;return;}d=await r.json();}
+ catch(e){note.textContent='could not load: '+esc(e);return;}
+ if(!d.ok){note.textContent=esc(d.error||'error');return;}
+ note.innerHTML='<b>'+d.n+'</b> user(s)'+(d.mongo?'':' · <span style="color:#d97706">Mongo offline — showing uploaders only</span>');
+ var tb=document.querySelector('#tbl tbody');tb.innerHTML='';
+ if(!d.users.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.4rem">No users yet.</td></tr>';return;}
+ d.users.forEach(function(u){
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><b>'+esc(u.name)+'</b><br><span style="color:#94a3b8;font-size:11px">'+esc(u.user_id)+'</span></td>'
+   +'<td>'+esc(u.email||'\\u2014')+'</td>'
+   +'<td><span class="role '+(u.role==='admin'?'admin':'member')+'">'+esc(u.role)+'</span></td>'
+   +'<td>'+esc(u.auth_provider)+'</td>'
+   +'<td class="num">'+u.uploads+'</td><td class="num">'+(u.images||0).toLocaleString()+'</td>'
+   +'<td>'+esc(u.last_seen||'\\u2014')+'</td>';
+  tb.appendChild(tr);
+ });
+}
+load();
+</script></body></html>'''
+    return HTMLResponse(html)
 
 
 @app.get("/agent/{domain_id}", response_class=HTMLResponse)

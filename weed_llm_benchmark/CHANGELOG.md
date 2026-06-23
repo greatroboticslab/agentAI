@@ -4591,3 +4591,19 @@ the agent uploads); already-labeled images push with their annotations; user can
 - Already-labeled push already worked: cmd_push_slug uploads annotation_path alongside images.
 - **UI**: a "Roboflow push" panel on /agent/weed + /agent/<domain> — view/edit/save the cap, plus
   "Open Labeling Console" and "Adjust labels in Roboflow ↗" links. English-only.
+
+
+---
+
+### v3.0.129 — Users in DB + upload attribution (Z2)
+
+Prof Zhang: students log in with their own account; track who uploaded what.
+- **db.py**: COLL_USERS + list_users / get_user / upsert_user (idempotent: creates on first sight,
+  bumps last_seen every call) / create_user / ensure_default_admin (admin = the shared Basic login).
+  User doc: {_id, email, name, role, auth_provider, created_at, last_seen}.
+- **Attribution**: uploads + push-cap saves now upsert the acting user (last_seen); uploads already
+  carry uploaded_by.
+- **/users admin page** + GET /api/users: lists every user joined with their upload counts
+  (datasets + images), aggregated from manual_uploads.json by uploaded_by. Handles Mongo-offline
+  (shows uploaders only). English-only, mobile-responsive table.
+- "Users" entry added to the weed Mission Control workspace.
