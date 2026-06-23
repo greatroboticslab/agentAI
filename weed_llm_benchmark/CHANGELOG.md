@@ -4607,3 +4607,25 @@ Prof Zhang: students log in with their own account; track who uploaded what.
   (datasets + images), aggregated from manual_uploads.json by uploaded_by. Handles Mongo-offline
   (shows uploaders only). English-only, mobile-responsive table.
 - "Users" entry added to the weed Mission Control workspace.
+
+
+---
+
+### v3.0.130 — Google login scaffold (Z3, configurable + Basic fallback)
+
+Prof Zhang: students sign in with their own Google account; save users. Implemented as an OPTIONAL
+layer that does NOT disturb the existing Basic auth (the dashboard controls the cluster, so login
+stays mandatory).
+- **Stdlib only** (no new deps): HMAC-SHA256-signed session cookie (agentai_session), 7-day TTL,
+  key persisted at ~/.dash_session_key (or SESSION_SECRET env).
+- **Enabled only when** GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + OAUTH_REDIRECT_BASE are all set;
+  otherwise Google login is gracefully disabled and Basic auth (1/1) is unchanged.
+- Routes (all auth-exempt): /login (page; shows "Sign in with Google" when enabled, else admin
+  setup steps), /auth/google/start (→ Google), /auth/google/callback (code→token→userinfo→
+  db.upsert_user(auth_provider=google,email,name)→signed cookie→/), /logout.
+- Middleware: a valid session cookie authenticates first; else Basic as before. When Google is
+  enabled, a browser GET with no credentials is redirected to /login instead of a Basic popup;
+  curl -u and API calls are unaffected. _actor_from_request now prefers the session user, so uploads
+  are attributed to the Google account.
+- **Operator setup** to enable Google login is documented in /login and in code: create an OAuth Web
+  client, set redirect URI <dashboard>/auth/google/callback, export the 3 env vars, restart.

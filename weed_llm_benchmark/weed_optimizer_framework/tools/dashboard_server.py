@@ -131,10 +131,104 @@ _AUTH_FAIL = _defaultdict(lambda: (0, 0.0))
 _AUTH_LOCK_THRESHOLD = 5      # 5 failures
 _AUTH_LOCK_SECONDS = 3600     # locks for 1h
 
+# --------------------------------------------------------------------------- #
+# v3.0.130 (Z3) — OPTIONAL Google OAuth login (Prof Zhang: students sign in with
+# their own account; we save users + attribute uploads). Enabled ONLY when the
+# OAuth env vars are all set; otherwise the dashboard stays exactly on Basic auth
+# (1/1). A signed (HMAC, stdlib — no new deps) session cookie carries the logged
+# in user. Basic auth always remains valid (curl -u, the cluster-control path).
+#
+# To ENABLE Google login the operator must (one-time):
+#   1. Google Cloud Console → APIs & Services → Credentials → Create OAuth client
+#      ID (type: Web application).
+#   2. Authorized redirect URI = <public dashboard URL>/auth/google/callback
+#      (e.g. https://lab-b660m-c.tailfa6424.ts.net/auth/google/callback).
+#   3. Put the values in the dashboard service env (deploy/run_dashboard_labserver.sh):
+#        export GOOGLE_CLIENT_ID=...    export GOOGLE_CLIENT_SECRET=...
+#        export OAUTH_REDIRECT_BASE=https://lab-b660m-c.tailfa6424.ts.net
+#      then restart weed-dashboard. /login then shows "Sign in with Google".
+# --------------------------------------------------------------------------- #
+import hmac as _hmac
+_GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+_GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+_OAUTH_REDIRECT_BASE = os.environ.get("OAUTH_REDIRECT_BASE", "").rstrip("/")
+_GOOGLE_ENABLED = bool(_GOOGLE_CLIENT_ID and _GOOGLE_CLIENT_SECRET and _OAUTH_REDIRECT_BASE)
+_SESSION_COOKIE = "agentai_session"
+_SESSION_TTL = 7 * 24 * 3600
+
+
+def _load_session_secret() -> bytes:
+    k = os.environ.get("SESSION_SECRET", "").strip()
+    if k:
+        return k.encode()
+    p = os.path.expanduser("~/.dash_session_key")
+    try:
+        if os.path.isfile(p):
+            return open(p, "rb").read()
+        kb = _secrets.token_bytes(32)
+        with open(p, "wb") as f:
+            f.write(kb)
+        try:
+            os.chmod(p, 0o600)
+        except Exception:
+            pass
+        return kb
+    except Exception:
+        return (_AUTH_PASS or "agentai-session-fallback").encode()
+
+
+_SESSION_SECRET = _load_session_secret()
+
+
+def _b64u(b: bytes) -> str:
+    return _base64.urlsafe_b64encode(b).decode().rstrip("=")
+
+
+def _b64u_dec(s: str) -> bytes:
+    return _base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def _sign_session(payload: dict) -> str:
+    body = _b64u(json.dumps(payload, separators=(",", ":")).encode())
+    sig = _b64u(_hmac.new(_SESSION_SECRET, body.encode(), hashlib.sha256).digest())
+    return body + "." + sig
+
+
+def _verify_session(cookie: str):
+    try:
+        body, _, sig = (cookie or "").partition(".")
+        if not body or not sig:
+            return None
+        exp_sig = _b64u(_hmac.new(_SESSION_SECRET, body.encode(),
+                                  hashlib.sha256).digest())
+        if not _hmac.compare_digest(sig, exp_sig):
+            return None
+        data = json.loads(_b64u_dec(body))
+        if float(data.get("exp", 0)) < time.time():
+            return None
+        return data
+    except Exception:
+        return None
+
+
+def _session_user(request):
+    try:
+        c = request.cookies.get(_SESSION_COOKIE)
+    except Exception:
+        c = None
+    if not c:
+        return None
+    return _verify_session(c)
+
+
 # Public paths (no auth required)
 _AUTH_EXEMPT_PATHS = {
     "/healthz",                      # cloudflared probe
     "/tunnel_url.json",              # not a secret, github.io reads it
+    "/login",                        # v3.0.130: login page
+    "/logout",                       # clear session
+    "/auth/google/start",            # OAuth redirect to Google
+    "/auth/google/callback",         # OAuth return
 }
 _AUTH_EXEMPT_PREFIXES = (
     "/static/",                      # static assets if any
@@ -185,6 +279,12 @@ async def _auth_and_rate_limit(request, call_next):
             headers={"Retry-After": str(remaining)},
         )
 
+    # v3.0.130: a valid signed session cookie (Google login) authenticates first.
+    if _session_user(request) is not None:
+        if n_fail > 0:
+            _AUTH_FAIL[ip] = (0, 0.0)
+        return await call_next(request)
+
     auth_hdr = request.headers.get("authorization", "")
     ok = False
     if auth_hdr.startswith("Basic "):
@@ -198,6 +298,13 @@ async def _auth_and_rate_limit(request, call_next):
             ok = False
 
     if not ok:
+        # v3.0.130: when Google login is enabled and a browser navigates here
+        # with NO credentials at all, send them to /login instead of a Basic
+        # popup. Requests that DO present a (wrong) Basic header still count as
+        # failed attempts; curl -u and API calls are unaffected.
+        if (_GOOGLE_ENABLED and not auth_hdr and request.method == "GET"
+                and "text/html" in request.headers.get("accept", "")):
+            return RedirectResponse(url="/login", status_code=302)
         n_fail += 1
         if n_fail >= _AUTH_LOCK_THRESHOLD:
             _AUTH_FAIL[ip] = (n_fail, now + _AUTH_LOCK_SECONDS)
@@ -1084,8 +1191,14 @@ _UPLOAD_IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
 def _actor_from_request(request) -> str:
-    """Best-effort uploader identity. Z3 (Google login) will set a session user;
-    until then fall back to an X-User header, the Basic-auth user, or 'admin'."""
+    """Best-effort uploader identity: the signed Google session user if present,
+    else an X-User header, the Basic-auth user, or 'admin'."""
+    try:
+        su = _session_user(request)
+        if su and su.get("uid"):
+            return str(su["uid"])[:80]
+    except Exception:
+        pass
     try:
         xu = (request.headers.get("x-user") or "").strip()
         if xu:
@@ -1531,6 +1644,136 @@ async function load(){
 load();
 </script></body></html>'''
     return HTMLResponse(html)
+
+
+# ---- v3.0.130 (Z3) — login / Google OAuth routes (all auth-exempt) ----
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    if _GOOGLE_ENABLED:
+        body = ('<a class="gbtn" href="/auth/google/start">'
+                '<span style="font-weight:700">G</span>&nbsp; Sign in with Google</a>'
+                '<p class="muted">Sign in with your institutional Google account. '
+                'Your uploads and labeling actions are recorded under your name.</p>')
+    else:
+        body = ('<p class="muted">Google sign-in is not configured on this server yet. '
+                'Use the shared access credentials in the browser prompt, or ask the '
+                'administrator to enable Google login.</p>'
+                '<details style="margin-top:14px;text-align:left">'
+                '<summary style="cursor:pointer;color:#2563eb;font-weight:600">Enable Google login (administrator)</summary>'
+                '<ol style="color:#475569;font-size:13px;line-height:1.7;margin-top:8px">'
+                '<li>Google Cloud Console &rarr; APIs &amp; Services &rarr; Credentials &rarr; '
+                'Create <b>OAuth client ID</b> (type: Web application).</li>'
+                '<li>Add an Authorized redirect URI: '
+                '<code>&lt;dashboard URL&gt;/auth/google/callback</code>.</li>'
+                '<li>In <code>deploy/run_dashboard_labserver.sh</code> set '
+                '<code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code>, and '
+                '<code>OAUTH_REDIRECT_BASE</code> (the dashboard&rsquo;s public URL), then restart.</li>'
+                '</ol></details>')
+    html = f'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in — AgentAI dataset platform</title><style>
+ body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;
+   min-height:100vh;display:flex;align-items:center;justify-content:center;
+   background:linear-gradient(135deg,#0f172a,#1e293b);color:#1a1a1d}}
+ .card{{background:#fff;border-radius:16px;padding:36px 30px;max-width:380px;width:92%;
+   text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)}}
+ h1{{margin:0 0 4px;font-size:20px}} .sub{{color:#64748b;font-size:13px;margin-bottom:22px}}
+ .muted{{color:#64748b;font-size:13px;line-height:1.6;margin-top:16px}}
+ .gbtn{{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+   text-decoration:none;background:#fff;color:#3c4043;border:1px solid #dadce0;
+   font-weight:600;font-size:14px;padding:11px 18px;border-radius:9px;width:100%}}
+ .gbtn:hover{{background:#f8fafc}}
+ code{{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:12px}}
+</style></head><body>
+ <div class="card">
+   <h1>&#129302; AgentAI Dataset Platform</h1>
+   <div class="sub">Autonomous data-collection agents</div>
+   {body}
+ </div>
+</body></html>'''
+    return HTMLResponse(html)
+
+
+@app.get("/auth/google/start")
+def google_start():
+    if not _GOOGLE_ENABLED:
+        return RedirectResponse(url="/login", status_code=302)
+    import urllib.parse as _up
+    state = _secrets.token_urlsafe(24)
+    params = {
+        "client_id": _GOOGLE_CLIENT_ID,
+        "redirect_uri": _OAUTH_REDIRECT_BASE + "/auth/google/callback",
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + _up.urlencode(params)
+    resp = RedirectResponse(url=url, status_code=302)
+    resp.set_cookie("oauth_state", state, max_age=600, httponly=True, samesite="lax")
+    return resp
+
+
+@app.get("/auth/google/callback")
+def google_callback(request: Request, code: str = "", state: str = ""):
+    if not _GOOGLE_ENABLED:
+        return RedirectResponse(url="/login", status_code=302)
+    saved = None
+    try:
+        saved = request.cookies.get("oauth_state")
+    except Exception:
+        saved = None
+    if not code or not state or not saved or not _secrets.compare_digest(state, saved):
+        return HTMLResponse("<h3>Login failed: invalid state.</h3>"
+                            "<a href='/login'>Try again</a>", status_code=400)
+    import urllib.request as _ur
+    import urllib.parse as _up
+    try:
+        data = _up.urlencode({
+            "code": code,
+            "client_id": _GOOGLE_CLIENT_ID,
+            "client_secret": _GOOGLE_CLIENT_SECRET,
+            "redirect_uri": _OAUTH_REDIRECT_BASE + "/auth/google/callback",
+            "grant_type": "authorization_code",
+        }).encode()
+        with _ur.urlopen(_ur.Request("https://oauth2.googleapis.com/token", data=data),
+                         timeout=20) as r:
+            tok = json.load(r)
+        access = tok.get("access_token")
+        if not access:
+            raise RuntimeError("no access_token")
+        with _ur.urlopen(_ur.Request("https://www.googleapis.com/oauth2/v2/userinfo",
+                                     headers={"Authorization": "Bearer " + access}),
+                         timeout=20) as r:
+            ui = json.load(r)
+    except Exception as e:
+        return HTMLResponse(f"<h3>Login failed: {type(e).__name__}</h3>"
+                            "<a href='/login'>Try again</a>", status_code=502)
+    email = (ui.get("email") or "").strip()
+    name = (ui.get("name") or email or "user").strip()
+    uid = email or ui.get("id") or ("g_" + _secrets.token_hex(6))
+    try:
+        from . import db as _dbu
+        _dbu.upsert_user(uid, email=email, name=name,
+                         auth_provider="google", role="member")
+    except Exception:
+        pass
+    payload = {"uid": uid, "email": email, "name": name,
+               "exp": time.time() + _SESSION_TTL}
+    resp = RedirectResponse(url="/", status_code=302)
+    resp.set_cookie(_SESSION_COOKIE, _sign_session(payload),
+                    max_age=_SESSION_TTL, httponly=True, samesite="lax")
+    resp.delete_cookie("oauth_state")
+    log.info(f"[auth] google login: {uid}")
+    return resp
+
+
+@app.get("/logout")
+def logout():
+    resp = RedirectResponse(url="/login", status_code=302)
+    resp.delete_cookie(_SESSION_COOKIE)
+    return resp
 
 
 @app.get("/agent/{domain_id}", response_class=HTMLResponse)
