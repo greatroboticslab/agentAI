@@ -140,9 +140,11 @@ if [ "${AUTO_SYNC:-0}" = "1" ]; then
     if [ -f /jet/home/byler/.roboflow_key ]; then
         export ROBOFLOW_API_KEY=$(cat /jet/home/byler/.roboflow_key)
     fi
+    # v3.0.128 (Z4): cap-per-slug is the USER-SET agent push limit, injected by
+    # the dashboard as PUSH_CAP (per-domain push_caps.json). Default 100.
     python -m weed_optimizer_framework.tools.roboflow_sync sync-newest-slugs \
         --project weed-crop-agent-dataset \
         --folder weed_crop_agent_dataset \
-        --cap-per-slug 100 2>&1 | tail -40
+        --cap-per-slug "${PUSH_CAP:-100}" 2>&1 | tail -40
     echo "=== [auto-sync] done $(date) ==="
 fi

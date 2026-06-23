@@ -929,6 +929,21 @@ def agent_weed():
    </div>
    <div id="wul-wrap" style="margin-top:14px"></div>
 
+   <div class="sec-h">Roboflow push</div>
+   <div style="background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:16px">
+     <div style="font-size:13px;color:#475569;margin-bottom:10px">The agent uploads collected datasets to Roboflow for human labeling. Set the <b>upper limit</b> — the most images the agent pushes per dataset (already-labeled images are pushed with their annotations too).</div>
+     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+       <label style="font-size:13px;color:#334">Agent push cap (images / dataset):</label>
+       <input id="wcap" type="number" min="1" max="2000" style="width:100px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+       <button id="wcap-save" onclick="saveWeedCap()" style="border:0;cursor:pointer;background:#0e7c66;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Save</button>
+       <span id="wcap-msg" style="font-size:13px;color:#475569"></span>
+     </div>
+     <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+       <a href="/labeling" style="text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Open Labeling Console</a>
+       <a href="https://app.roboflow.com/a-test-of-will" target="_blank" style="text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Adjust labels in Roboflow &#8599;</a>
+     </div>
+   </div>
+
    <div class="sec-h">Workspace</div>
    <div class="quick">
      <a href="/classes"><div class="ic">&#127793;</div><div class="nm">Browse Data</div><div class="ds">All collected species &amp; classes, with thumbnails.</div></a>
@@ -1002,6 +1017,19 @@ def agent_weed():
    }catch(e){btn.disabled=false;btn.textContent='Delete';alert(''+e);}
   }
   loadWeedUploads();
+  async function loadWeedCap(){
+   try{var d=await (await fetch('/api/domain/push_cap?domain=weed',{credentials:'include'})).json();
+    if(d&&d.ok){document.getElementById('wcap').value=d.cap;}}catch(e){}
+  }
+  async function saveWeedCap(){
+   var el=document.getElementById('wcap'),m=document.getElementById('wcap-msg'),b=document.getElementById('wcap-save');
+   var cap=parseInt(el.value,10);if(!cap||cap<1){m.textContent='\\u26a0 enter a number';return;}
+   b.disabled=true;m.textContent='\\u23f3 saving\\u2026';
+   try{var d=await (await fetch('/api/domain/push_cap',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'weed',cap:cap})})).json();
+    if(d&&d.ok){el.value=d.cap;m.textContent='\\u2705 saved (cap '+d.cap+')';}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}
+   }catch(e){m.textContent='\\u274c '+e;}finally{b.disabled=false;}
+  }
+  loadWeedCap();
  </script>
 </body></html>''')
 
@@ -1317,6 +1345,76 @@ def api_dataset_uploads(domain: str = ""):
     return JSONResponse({"ok": True, "n": len(rows), "uploads": rows})
 
 
+# ===========================================================================
+# v3.0.128 (Z4) — user-controlled Roboflow push CAP. Prof Zhang: the agent may
+# push to Roboflow, but the USER sets the upper limit (max images per dataset
+# the agent uploads). Stored per-domain in a lab-local push_caps.json (durable,
+# never synced/clobbered). Enforced on BOTH the manual push (/api/labeling/push
+# clamps to the cap) and the autonomous harvest auto-sync (PUSH_CAP env →
+# run_v3_0_43_brain_harvest_oneshot.sh --cap-per-slug).
+# ===========================================================================
+_PUSH_CAPS_FILE = REPO / "results" / "framework" / "push_caps.json"
+_DEFAULT_PUSH_CAP = 100
+_MAX_PUSH_CAP = 2000
+
+
+def _norm_domain(domain: str) -> str:
+    return re.sub(r"[^a-z0-9_]+", "", (domain or "weed").lower())[:40] or "weed"
+
+
+def _read_push_caps() -> dict:
+    try:
+        if _PUSH_CAPS_FILE.is_file():
+            return json.load(open(_PUSH_CAPS_FILE)) or {}
+    except Exception:
+        pass
+    return {}
+
+
+def _get_push_cap(domain: str) -> int:
+    try:
+        return int(_read_push_caps().get(_norm_domain(domain), _DEFAULT_PUSH_CAP))
+    except Exception:
+        return _DEFAULT_PUSH_CAP
+
+
+def _set_push_cap(domain: str, cap: int) -> int:
+    d = _norm_domain(domain)
+    cap = max(1, min(int(cap), _MAX_PUSH_CAP))
+    caps = _read_push_caps()
+    caps[d] = cap
+    _PUSH_CAPS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = str(_PUSH_CAPS_FILE) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(caps, f, indent=2)
+    os.replace(tmp, _PUSH_CAPS_FILE)
+    return cap
+
+
+@app.get("/api/domain/push_cap")
+def api_get_push_cap(domain: str = "weed"):
+    return JSONResponse({"ok": True, "domain": _norm_domain(domain),
+                         "cap": _get_push_cap(domain),
+                         "default": _DEFAULT_PUSH_CAP, "max": _MAX_PUSH_CAP})
+
+
+@app.post("/api/domain/push_cap")
+async def api_set_push_cap_ep(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    domain = str((body.get("domain") if isinstance(body, dict) else "") or "weed")
+    try:
+        cap = int(body.get("cap"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "cap must be an integer")
+    newcap = _set_push_cap(domain, cap)
+    log.info(f"[push_cap] {_norm_domain(domain)} -> {newcap} by {_actor_from_request(request)}")
+    return JSONResponse({"ok": True, "domain": _norm_domain(domain), "cap": newcap,
+                         "max": _MAX_PUSH_CAP})
+
+
 @app.get("/agent/{domain_id}", response_class=HTMLResponse)
 def agent_generic(domain_id: str):
     """v3.0.107: mission control for a created (non-weed) domain agent. Honest:
@@ -1378,6 +1476,17 @@ def agent_generic(domain_id: str):
      <span id="ds-toast" style="margin-left:12px;font-size:13px"></span>
    </div>
    <div id="ul-wrap" style="margin-top:14px"></div>
+   <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Roboflow push</div>
+   <div style="margin-top:10px;background:#f8fafc;border:1px solid #e3e7ef;border-radius:10px;padding:14px">
+     <div style="font-size:13px;color:#475569;margin-bottom:10px">Set the <b>upper limit</b> — the most images the agent pushes per dataset to Roboflow for labeling.</div>
+     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+       <label style="font-size:13px;color:#334">Agent push cap:</label>
+       <input id="cap" type="number" min="1" max="2000" style="width:100px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+       <button id="cap-save" onclick="saveCap()" style="border:0;cursor:pointer;background:#0e7c66;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Save</button>
+       <span id="cap-msg" style="font-size:13px;color:#475569"></span>
+     </div>
+     <div style="margin-top:12px"><a href="https://app.roboflow.com/a-test-of-will" target="_blank" style="text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Adjust labels in Roboflow &#8599;</a></div>
+   </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
@@ -1438,6 +1547,19 @@ async function deleteUpload(slug,btn){
  }catch(e){btn.disabled=false;btn.textContent='Delete';alert(''+e);}
 }
 loadUploads();
+async function loadCap(){
+ try{var d=await (await fetch('/api/domain/push_cap?domain=__DOM__',{credentials:'include'})).json();
+  if(d&&d.ok){document.getElementById('cap').value=d.cap;}}catch(e){}
+}
+async function saveCap(){
+ var el=document.getElementById('cap'),m=document.getElementById('cap-msg'),b=document.getElementById('cap-save');
+ var cap=parseInt(el.value,10);if(!cap||cap<1){m.textContent='\\u26a0 enter a number';return;}
+ b.disabled=true;m.textContent='\\u23f3 saving\\u2026';
+ try{var d=await (await fetch('/api/domain/push_cap',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',cap:cap})})).json();
+  if(d&&d.ok){el.value=d.cap;m.textContent='\\u2705 saved (cap '+d.cap+')';}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}
+ }catch(e){m.textContent='\\u274c '+e;}finally{b.disabled=false;}
+}
+loadCap();
 </script></body></html>''')
     page = page.replace("__DOM__", domain_id)
     return HTMLResponse(page)
@@ -4907,6 +5029,23 @@ async def api_cluster_action(action: str, request: Request):
                 pass
             if len(export_pairs) > 1:
                 sbatch_cli += [f"--export={','.join(export_pairs)}"]
+        # v3.0.128 (Z4): inject the domain's user-set Roboflow push cap into the
+        # harvest auto-sync (run script reads PUSH_CAP → --cap-per-slug). Merge
+        # into the existing --export if present (brain_harvest dynamic /
+        # harvest_full_round_e2e fixed), else add one.
+        if action in ("brain_harvest", "harvest_full_round_e2e"):
+            _dom_for_cap = (body_used.get("domain", "weed")
+                            if action == "brain_harvest" else "weed")
+            _cap = _get_push_cap(_dom_for_cap)
+            _injected = False
+            for _i, _a in enumerate(sbatch_cli):
+                if isinstance(_a, str) and _a.startswith("--export="):
+                    if "PUSH_CAP=" not in _a:
+                        sbatch_cli[_i] = _a + f",PUSH_CAP={_cap}"
+                    _injected = True
+                    break
+            if not _injected:
+                sbatch_cli += [f"--export=ALL,PUSH_CAP={_cap}"]
         # v3.0.99.40: in lab-control mode, sbatch runs ON the cluster (via _slurm,
         # which cd's to _CLUSTER_REPO) → use the REPO-relative script path there.
         sbatch_cli += [spec["script"] if _CLUSTER_SSH else str(script_path)]
@@ -5829,17 +5968,25 @@ async def api_labeling_push(payload: dict = Body(...)):
     slug = str(payload.get("slug", ""))
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
         raise HTTPException(400, "bad slug")
+    # v3.0.128 (Z4): enforce the user-set per-domain push cap as the UPPER limit.
+    # If n is omitted, default to the cap; otherwise clamp n down to the cap.
+    domain = str(payload.get("domain") or "weed")
+    cap = _get_push_cap(domain)
     try:
-        n = int(payload.get("n", 20))
+        n = int(payload.get("n", cap))
     except (TypeError, ValueError):
-        n = 20
-    n = max(1, min(n, 2000))
+        n = cap
+    n = max(1, min(n, cap))
     proj = payload.get("project") or "weed-crop-agent-clean"
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', proj):
         raise HTTPException(400, "bad project")
-    return JSONResponse(_spawn_rf_sync(
+    res = _spawn_rf_sync(
         ["push-slug", "--slug", slug, "--n", str(n), "--project", proj],
-        "labeling_push"))
+        "labeling_push")
+    if isinstance(res, dict):
+        res["n_capped"] = n
+        res["push_cap"] = cap
+    return JSONResponse(res)
 
 
 @app.post("/api/labeling/delete")

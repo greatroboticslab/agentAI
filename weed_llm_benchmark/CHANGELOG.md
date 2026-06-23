@@ -4574,3 +4574,20 @@ Every domain now has a manual ZIP-upload interface (future: auto-upload + open c
 - **UI**: the weed Mission Control (/agent/weed) now has the same "Upload a dataset (.zip)" panel as
   the generic agent pages (Prof: every dataset/domain leaves an upload interface). Both pages show a
   "Your uploads" list with per-dataset Delete buttons; the list refreshes after upload/delete.
+
+
+---
+
+### v3.0.128 — User-controlled Roboflow push cap (Z4)
+
+Prof Zhang: the agent pushes to Roboflow, but the USER sets the upper limit (max images per dataset
+the agent uploads); already-labeled images push with their annotations; user can adjust labels.
+- **Per-domain push cap** stored in lab-local results/framework/push_caps.json (durable, default 100,
+  max 2000). GET/POST /api/domain/push_cap.
+- **Enforced on both paths**: (1) manual /api/labeling/push now clamps n to the domain cap (n omitted
+  → uses the cap); (2) autonomous harvest auto-sync — dashboard injects PUSH_CAP into the harvest
+  sbatch --export, and run_v3_0_43_brain_harvest_oneshot.sh passes it to sync-newest-slugs
+  --cap-per-slug (was hardcoded 100).
+- Already-labeled push already worked: cmd_push_slug uploads annotation_path alongside images.
+- **UI**: a "Roboflow push" panel on /agent/weed + /agent/<domain> — view/edit/save the cap, plus
+  "Open Labeling Console" and "Adjust labels in Roboflow ↗" links. English-only.
