@@ -4629,3 +4629,15 @@ stays mandatory).
   are attributed to the Google account.
 - **Operator setup** to enable Google login is documented in /login and in code: create an OAuth Web
   client, set redirect URI <dashboard>/auth/google/callback, export the 3 env vars, restart.
+
+
+---
+
+### v3.0.131 — Mobile/desktop polish sweep (Z6)
+
+Audited all 11 pages on phone + desktop (viewport meta, horizontal overflow, fixed widths, Chinese,
+back links). Result: every page is responsive (tables wrapped in horizontal-scroll containers, grids
+auto-fit, new upload/push-cap/uploads/users/login panels use flex-wrap + full-width inputs), zero
+Chinese, back/nav present. One concrete fix:
+- **/roboflow was missing the viewport meta** → added; the page now scales correctly on phones
+  (was rendering at desktop width on mobile).

@@ -6635,6 +6635,7 @@ def roboflow_page():
     """
     body = """
 <!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Roboflow workspace status</title>
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:18px;
