@@ -919,6 +919,16 @@ def agent_weed():
 
    <div id="toast"></div>
 
+   <div class="sec-h">Upload a dataset (.zip)</div>
+   <div style="background:#fff;border:1px dashed #cbd5e1;border-radius:12px;padding:16px">
+     <div style="font-size:13px;color:#475569;margin-bottom:10px">Add data manually: a <b>.zip</b> of images (optionally with YOLO <code>labels/</code> + <code>data.yaml</code>) registers as a dataset for this agent and appears under Datasets. Future: automatic upload + open community contributions.</div>
+     <input id="wds-name" type="text" placeholder="Dataset name (e.g. field-photos-2026-06)" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px">
+     <input id="wds-file" type="file" accept=".zip,application/zip" style="font-size:13px;margin-bottom:10px;display:block">
+     <button id="wds-up" onclick="uploadWeedDataset()" style="border:0;cursor:pointer;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:10px 16px;border-radius:9px">&#11014; Upload dataset</button>
+     <span id="wds-toast" style="margin-left:12px;font-size:13px"></span>
+   </div>
+   <div id="wul-wrap" style="margin-top:14px"></div>
+
    <div class="sec-h">Workspace</div>
    <div class="quick">
      <a href="/classes"><div class="ic">&#127793;</div><div class="nm">Browse Data</div><div class="ds">All collected species &amp; classes, with thumbnails.</div></a>
@@ -951,6 +961,47 @@ def agent_weed():
      .catch(function(e){t.textContent='\\u274c '+label+' error: '+e;})
      .finally(function(){btn.disabled=false;});
   }
+  async function uploadWeedDataset(){
+   var nameEl=document.getElementById('wds-name'),fileEl=document.getElementById('wds-file'),
+       t=document.getElementById('wds-toast'),btn=document.getElementById('wds-up');
+   var name=(nameEl.value||'').trim();
+   if(!name){t.textContent='\\u26a0 enter a dataset name';return;}
+   if(!fileEl.files||!fileEl.files[0]){t.textContent='\\u26a0 choose a .zip file';return;}
+   var f=fileEl.files[0];
+   if(!/\\.zip$/i.test(f.name)){t.textContent='\\u26a0 must be a .zip file';return;}
+   btn.disabled=true;t.textContent='\\u23f3 uploading '+(f.size/1048576).toFixed(1)+' MB\\u2026';
+   try{
+    var url='/api/dataset/upload?domain=weed&name='+encodeURIComponent(name);
+    var r=await fetch(url,{method:'POST',credentials:'include',headers:{'Content-Type':'application/zip'},body:f});
+    var d=await r.json();
+    if(r.ok&&d&&d.ok){t.innerHTML='\\u2705 '+d.images+' images registered as <b>'+d.slug+'</b> \\u00b7 <a href="'+d.gallery_url+'" target="_blank">view</a>';nameEl.value='';fileEl.value='';loadWeedUploads();}
+    else{t.textContent='\\u274c '+((d&&(d.detail||d.msg))||('HTTP '+r.status));}
+   }catch(e){t.textContent='\\u274c '+e;}finally{btn.disabled=false;}
+  }
+  async function loadWeedUploads(){
+   var w=document.getElementById('wul-wrap');if(!w)return;
+   try{
+    var d=await (await fetch('/api/dataset/uploads?domain=weed',{credentials:'include'})).json();
+    var rows=(d&&d.uploads)||[];
+    if(!rows.length){w.innerHTML='';return;}
+    var h='<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Your uploads ('+rows.length+')</div><div style="border:1px solid #e3e7ef;border-radius:10px;overflow:hidden;background:#fff">';
+    rows.forEach(function(u,i){
+     h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
+       +'<span><a href="/gallery/'+encodeURIComponent(u.slug)+'" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600">'+(u.name||u.slug)+'</a> <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+'</span></span>'
+       +'<button onclick="deleteWeedUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button></div>';
+    });
+    h+='</div>';w.innerHTML=h;
+   }catch(e){w.innerHTML='';}
+  }
+  async function deleteWeedUpload(slug,btn){
+   if(!confirm('Delete uploaded dataset '+slug+'? This removes its images and registration.'))return;
+   btn.disabled=true;btn.textContent='\\u2026';
+   try{
+    var d=await (await fetch('/api/dataset/delete',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:slug})})).json();
+    if(d&&d.ok){loadWeedUploads();}else{btn.disabled=false;btn.textContent='Delete';alert((d&&(d.detail||d.msg))||'delete failed');}
+   }catch(e){btn.disabled=false;btn.textContent='Delete';alert(''+e);}
+  }
+  loadWeedUploads();
  </script>
 </body></html>''')
 
@@ -1175,6 +1226,97 @@ async def api_dataset_upload(request: Request):
     })
 
 
+@app.post("/api/dataset/delete")
+async def api_dataset_delete(request: Request):
+    """Delete a MANUALLY-uploaded dataset. Safety: only slugs whose
+    source=manual_upload (recorded in manual_uploads.json or the registry) can
+    be removed here — harvested/cluster datasets are never deletable from the UI.
+    Removes it from manual_uploads.json, the registry, Mongo, and deletes
+    uploads/<slug> on disk."""
+    import shutil
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    slug = str((body.get("slug") if isinstance(body, dict) else "")
+               or request.query_params.get("slug") or "").strip()
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug) or slug in (".", ".."):
+        raise HTTPException(400, "bad slug")
+
+    manual = _read_manual_uploads()
+    is_manual = slug in manual
+    if not is_manual:
+        try:
+            with open(REGISTRY_PATH) as f:
+                info = json.load(f)["datasets"].get(slug, {})
+            is_manual = info.get("source") == "manual_upload"
+        except Exception:
+            is_manual = False
+    if not is_manual:
+        raise HTTPException(403, "only manually-uploaded datasets can be deleted here")
+
+    actor = _actor_from_request(request)
+    # 1) durable manual_uploads.json
+    if slug in manual:
+        manual.pop(slug, None)
+        try:
+            _MANUAL_UPLOADS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            tmp = str(_MANUAL_UPLOADS_FILE) + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(manual, f, indent=2, default=str)
+            os.replace(tmp, _MANUAL_UPLOADS_FILE)
+        except Exception as e:
+            log.warning(f"[upload] delete manual_uploads.json write failed: {e}")
+    # 2) registry
+    removed_reg = False
+    try:
+        from .registry_lock import atomic_write_json
+        with open(REGISTRY_PATH) as f:
+            reg = json.load(f)
+        if slug in reg.get("datasets", {}):
+            reg["datasets"].pop(slug, None)
+            reg["total_downloaded"] = sum(
+                1 for v in reg["datasets"].values() if v.get("status") == "downloaded")
+            atomic_write_json(REGISTRY_PATH, reg)
+            removed_reg = True
+    except Exception as e:
+        log.warning(f"[upload] delete registry write failed: {e}")
+    # 3) Mongo
+    try:
+        from . import db as _db
+        dbh = _db._get_db()
+        if dbh is not None:
+            dbh[_db.COLL_SLUGS].delete_one({"_id": slug})
+    except Exception:
+        pass
+    # 4) files
+    shutil.rmtree(_UPLOAD_DIR / slug, ignore_errors=True)
+    log.info(f"[upload] deleted {slug} by {actor}")
+    return JSONResponse({"ok": True, "slug": slug, "removed_registry": removed_reg})
+
+
+@app.get("/api/dataset/uploads")
+def api_dataset_uploads(domain: str = ""):
+    """List manually-uploaded datasets (optionally filtered by domain) so the UI
+    can show + manage them."""
+    dom = re.sub(r"[^a-z0-9_]+", "", (domain or "").lower())[:40]
+    manual = _read_manual_uploads()
+    rows = []
+    for slug, info in manual.items():
+        if dom and (info.get("domain") or "weed") != dom:
+            continue
+        rows.append({
+            "slug": slug,
+            "name": info.get("display_name") or slug,
+            "images": info.get("local_images", 0),
+            "uploaded_by": info.get("uploaded_by"),
+            "uploaded_at": info.get("uploaded_at"),
+            "domain": info.get("domain") or "weed",
+        })
+    rows.sort(key=lambda r: (r.get("uploaded_at") or ""), reverse=True)
+    return JSONResponse({"ok": True, "n": len(rows), "uploads": rows})
+
+
 @app.get("/agent/{domain_id}", response_class=HTMLResponse)
 def agent_generic(domain_id: str):
     """v3.0.107: mission control for a created (non-weed) domain agent. Honest:
@@ -1235,6 +1377,7 @@ def agent_generic(domain_id: str):
      <button id="ds-up" onclick="uploadDataset()" class="btn" style="margin-top:0;border:0;cursor:pointer">&#11014; Upload dataset</button>
      <span id="ds-toast" style="margin-left:12px;font-size:13px"></span>
    </div>
+   <div id="ul-wrap" style="margin-top:14px"></div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
@@ -1264,10 +1407,37 @@ async function uploadDataset(){
   var url='/api/dataset/upload?domain=__DOM__&name='+encodeURIComponent(name);
   var r=await fetch(url,{method:'POST',credentials:'include',headers:{'Content-Type':'application/zip'},body:f});
   var d=await r.json();
-  if(r.ok&&d&&d.ok){t.innerHTML='\\u2705 '+d.images+' images registered as <b>'+d.slug+'</b> \\u00b7 <a href="'+d.gallery_url+'" target="_blank">view</a>';}
+  if(r.ok&&d&&d.ok){t.innerHTML='\\u2705 '+d.images+' images registered as <b>'+d.slug+'</b> \\u00b7 <a href="'+d.gallery_url+'" target="_blank">view</a>';nameEl.value='';fileEl.value='';loadUploads();}
   else{t.textContent='\\u274c '+((d&&(d.detail||d.msg))||('HTTP '+r.status));}
  }catch(e){t.textContent='\\u274c '+e;}finally{btn.disabled=false;}
 }
+async function loadUploads(){
+ var w=document.getElementById('ul-wrap');if(!w)return;
+ try{
+  var d=await (await fetch('/api/dataset/uploads?domain=__DOM__',{credentials:'include'})).json();
+  var rows=(d&&d.uploads)||[];
+  if(!rows.length){w.innerHTML='';return;}
+  var h='<div style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:6px">Your uploads ('+rows.length+')</div>';
+  h+='<div style="border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">';
+  rows.forEach(function(u,i){
+   h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
+     +'<span><a href="/gallery/'+encodeURIComponent(u.slug)+'" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600">'+(u.name||u.slug)+'</a>'
+     +' <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+'</span></span>'
+     +'<button onclick="deleteUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button>'
+     +'</div>';
+  });
+  h+='</div>';w.innerHTML=h;
+ }catch(e){w.innerHTML='';}
+}
+async function deleteUpload(slug,btn){
+ if(!confirm('Delete uploaded dataset '+slug+'? This removes its images and registration.'))return;
+ btn.disabled=true;btn.textContent='\\u2026';
+ try{
+  var d=await (await fetch('/api/dataset/delete',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:slug})})).json();
+  if(d&&d.ok){loadUploads();}else{btn.disabled=false;btn.textContent='Delete';alert((d&&(d.detail||d.msg))||'delete failed');}
+ }catch(e){btn.disabled=false;btn.textContent='Delete';alert(''+e);}
+}
+loadUploads();
 </script></body></html>''')
     page = page.replace("__DOM__", domain_id)
     return HTMLResponse(page)

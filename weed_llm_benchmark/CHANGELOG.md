@@ -4561,3 +4561,16 @@ Every domain now has a manual ZIP-upload interface (future: auto-upload + open c
 - **UI**: an "Upload a dataset (.zip)" panel on /agent/<domain> (name field + file picker + live
   result with a gallery link). English-only.
 - Foundation for the mobile-robot domain (manual upload now) and community contributions.
+
+
+---
+
+### v3.0.127 — Upload management (Z1b): delete endpoint + uploads list + weed panel
+
+- **POST /api/dataset/delete** — removes a MANUALLY-uploaded dataset (safety: only source=manual_upload
+  slugs; harvested datasets never deletable from UI) from manual_uploads.json + registry + Mongo +
+  deletes uploads/<slug> on disk.
+- **GET /api/dataset/uploads?domain=** — lists manual uploads (per domain) for management.
+- **UI**: the weed Mission Control (/agent/weed) now has the same "Upload a dataset (.zip)" panel as
+  the generic agent pages (Prof: every dataset/domain leaves an upload interface). Both pages show a
+  "Your uploads" list with per-dataset Delete buttons; the list refreshes after upload/delete.
