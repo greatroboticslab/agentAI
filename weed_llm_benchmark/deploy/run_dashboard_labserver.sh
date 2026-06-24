@@ -15,5 +15,11 @@ export CLUSTER_SSH_KEY="${CLUSTER_SSH_KEY:-$HOME/.ssh/id_lab2cluster}"
 export SSH_ASKPASS="$HOME/.cluster_askpass.sh"
 export SSH_ASKPASS_REQUIRE=force
 export DISPLAY=:0
+# v3.0.132: optional Google OAuth login. Secrets live in ~/.google_oauth (chmod
+# 600, NOT in git): GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OAUTH_REDIRECT_BASE.
+# When absent the dashboard stays on Basic auth. set -a so sourced vars export.
+if [ -f "$HOME/.google_oauth" ]; then
+  set -a; . "$HOME/.google_oauth"; set +a
+fi
 exec .venv/bin/uvicorn weed_optimizer_framework.tools.dashboard_server:app \
   --host 0.0.0.0 --port "$DASH_PORT" --workers 1
