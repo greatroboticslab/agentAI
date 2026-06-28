@@ -1353,6 +1353,11 @@ async def api_cluster_request(request: Request):
     if _can_use_cluster(actor):
         return JSONResponse({"ok": True, "already": True,
                              "msg": "You already have cluster access."})
+    try:   # ensure the requester is in the users table so admins see them in /users
+        from . import db as _dbu
+        _dbu.upsert_user(actor, auth_provider="basic")
+    except Exception:
+        pass
     reqs = _read_cluster_requests()
     reqs[actor] = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
     try:
@@ -1739,7 +1744,15 @@ def api_users():
                          "uploads": a["datasets"], "images": a["images"],
                          "can_use_cluster": eff_admin, "is_seed_admin": eff_admin,
                          "requested_cluster": who in creq})
-    rows.sort(key=lambda r: (-(r["uploads"]), r["user_id"]))
+    # requesters not otherwise present (so admins can always act on a request)
+    for who in creq:
+        if who not in seen and who not in agg:
+            rows.append({"user_id": who, "name": who, "email": "", "role": "member",
+                         "auth_provider": "unknown", "created_at": "", "last_seen": "",
+                         "uploads": 0, "images": 0, "can_use_cluster": False,
+                         "is_seed_admin": False, "requested_cluster": True})
+    rows.sort(key=lambda r: (-(1 if r.get("requested_cluster") else 0),
+                             -(r["uploads"]), r["user_id"]))
     return JSONResponse({"ok": True, "n": len(rows), "users": rows,
                          "mongo": (len(users) > 0)})
 
