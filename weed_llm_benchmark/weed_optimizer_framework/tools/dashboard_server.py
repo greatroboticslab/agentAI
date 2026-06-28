@@ -1070,6 +1070,23 @@ def agent_weed():
     else{dot.className='c';txt.textContent='cluster: idle';}
   }).catch(function(){document.getElementById('ctxt').textContent='cluster: status unavailable';});
 
+  // v3.0.133 (RBAC): cluster (GPU) jobs are admin/granted-only. For members,
+  // disable the Harvest/Train buttons and explain — they can still upload/browse.
+  fetch('/api/me',{credentials:'include'}).then(r=>r.json()).then(function(me){
+    if(me&&me.ok&&!me.can_use_cluster){
+      document.querySelectorAll('button').forEach(function(b){
+        var oc=b.getAttribute('onclick')||'';
+        if(oc.indexOf('runAction')>=0){
+          b.disabled=true;b.title='Cluster jobs are limited to administrators';
+          b.style.opacity='0.5';b.style.cursor='not-allowed';
+        }
+      });
+      var t=document.getElementById('toast');
+      if(t){t.style.display='block';t.style.background='#fef9c3';t.style.color='#854d0e';
+        t.textContent='\\u2139 Harvest \\u0026 Train run on the shared GPU cluster and are limited to administrators. You can still upload datasets, browse, and review. Ask an admin for cluster access if needed.';}
+    }
+  }).catch(function(){});
+
   function runAction(btn,name,label,confirmMsg){
     if(!confirm(confirmMsg))return;
     var t=document.getElementById('toast');
@@ -1212,6 +1229,70 @@ def _actor_from_request(request) -> str:
     except Exception:
         pass
     return "admin"
+
+
+# ---- v3.0.133 (RBAC) — admin / cluster-access checks ----------------------- #
+# Admins: the Basic-auth operator ("admin"), any email seeded in ~/.dash_admins
+# (bootstrap, can't be locked out), or any user whose DB role is "admin".
+# Cluster (GPU) jobs require admin OR a per-user can_use_cluster grant.
+_ADMIN_FILE = os.path.expanduser("~/.dash_admins")
+_admin_cache = {"mtime": -1.0, "set": set()}
+
+
+def _admin_emails() -> set:
+    try:
+        mt = os.path.getmtime(_ADMIN_FILE)
+    except Exception:
+        return _admin_cache["set"]
+    if mt == _admin_cache["mtime"]:
+        return _admin_cache["set"]
+    s = set()
+    try:
+        for line in open(_ADMIN_FILE):
+            e = line.strip().lower()
+            if e and not e.startswith("#"):
+                s.add(e)
+    except Exception:
+        pass
+    _admin_cache["set"] = s
+    _admin_cache["mtime"] = mt
+    return s
+
+
+def _is_admin(actor: str) -> bool:
+    if not actor:
+        return False
+    if actor == "admin":          # shared Basic-auth operator
+        return True
+    if actor.lower() in _admin_emails():
+        return True
+    try:
+        from . import db as _dbu
+        u = _dbu.get_user(actor)
+        if u and u.get("role") == "admin":
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _can_use_cluster(actor: str) -> bool:
+    if _is_admin(actor):
+        return True
+    try:
+        from . import db as _dbu
+        u = _dbu.get_user(actor)
+        return bool(u and u.get("can_use_cluster"))
+    except Exception:
+        return False
+
+
+@app.get("/api/me")
+def api_me(request: Request):
+    actor = _actor_from_request(request)
+    return JSONResponse({"ok": True, "user": actor,
+                         "is_admin": _is_admin(actor),
+                         "can_use_cluster": _can_use_cluster(actor)})
 
 
 def _read_manual_uploads() -> dict:
@@ -1561,28 +1642,77 @@ def api_users():
         a["datasets"] += 1
         a["images"] += int(info.get("local_images", 0) or 0)
         a["slugs"].append(slug)
+    seeds = _admin_emails()
     rows = []
     seen = set()
     for u in users:
         uid = u.get("_id")
         seen.add(uid)
         a = agg.get(uid, {"datasets": 0, "images": 0})
+        eff_admin = (u.get("role") == "admin") or (str(uid).lower() in seeds)
         rows.append({
             "user_id": uid, "name": u.get("name") or uid,
-            "email": u.get("email") or "", "role": u.get("role") or "member",
+            "email": u.get("email") or "", "role": "admin" if eff_admin else "member",
             "auth_provider": u.get("auth_provider") or "basic",
             "created_at": _iso(u.get("created_at")), "last_seen": _iso(u.get("last_seen")),
             "uploads": a["datasets"], "images": a["images"],
+            "can_use_cluster": bool(eff_admin or u.get("can_use_cluster")),
+            "is_seed_admin": str(uid).lower() in seeds,
         })
     # uploaders that aren't in the users table yet (e.g. Mongo was down on upload)
     for who, a in agg.items():
         if who not in seen:
-            rows.append({"user_id": who, "name": who, "email": "", "role": "member",
+            eff_admin = str(who).lower() in seeds
+            rows.append({"user_id": who, "name": who, "email": "",
+                         "role": "admin" if eff_admin else "member",
                          "auth_provider": "unknown", "created_at": "", "last_seen": "",
-                         "uploads": a["datasets"], "images": a["images"]})
+                         "uploads": a["datasets"], "images": a["images"],
+                         "can_use_cluster": eff_admin, "is_seed_admin": eff_admin})
     rows.sort(key=lambda r: (-(r["uploads"]), r["user_id"]))
     return JSONResponse({"ok": True, "n": len(rows), "users": rows,
                          "mongo": (len(users) > 0)})
+
+
+@app.post("/api/users/role")
+async def api_set_user_role(request: Request):
+    """Admin-only: promote/demote a user (admin|member)."""
+    if not _is_admin(_actor_from_request(request)):
+        raise HTTPException(403, "Administrators only.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    uid = str((body.get("user_id") if isinstance(body, dict) else "") or "").strip()
+    role = str(body.get("role") or "")
+    if not uid:
+        raise HTTPException(400, "user_id required")
+    if role not in ("admin", "member"):
+        raise HTTPException(400, "role must be admin or member")
+    from . import db as _dbu
+    ok = _dbu.set_user_role(uid, role, actor=_actor_from_request(request))
+    if not ok:
+        raise HTTPException(503, "database unavailable")
+    return JSONResponse({"ok": True, "user_id": uid, "role": role})
+
+
+@app.post("/api/users/cluster_access")
+async def api_set_user_cluster_access(request: Request):
+    """Admin-only: grant/revoke a member's permission to launch cluster GPU jobs."""
+    if not _is_admin(_actor_from_request(request)):
+        raise HTTPException(403, "Administrators only.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    uid = str((body.get("user_id") if isinstance(body, dict) else "") or "").strip()
+    allow = bool(body.get("allow"))
+    if not uid:
+        raise HTTPException(400, "user_id required")
+    from . import db as _dbu
+    ok = _dbu.set_user_cluster_access(uid, allow, actor=_actor_from_request(request))
+    if not ok:
+        raise HTTPException(503, "database unavailable")
+    return JSONResponse({"ok": True, "user_id": uid, "can_use_cluster": allow})
 
 
 def _iso(v):
@@ -1611,35 +1741,66 @@ def users_page():
  th{background:#0f172a;color:#fff;font-size:12px}
  .role{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
  .role.admin{background:#fee2e2;color:#991b1b}.role.member{background:#e0f2fe;color:#075985}
+ .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+ .pill.yes{background:#dcfce7;color:#166534}.pill.no{background:#f1f5f9;color:#64748b}
  .num{font-family:ui-monospace,monospace;text-align:right}
+ .act{border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:4px 9px;font-size:12px;cursor:pointer;margin:2px 2px 0 0}
+ .act.warn{border-color:#fecaca;color:#dc2626}
 </style></head><body>
 <div class="top"><a href="/">&larr; Agents</a></div>
-<div class="hero"><h1>&#128100; Users</h1><div class="sub">Everyone who has signed in or uploaded data, and how much they contributed. Per-student attribution (Prof Zhang).</div></div>
+<div class="hero"><h1>&#128100; Users &amp; access</h1><div class="sub">Everyone who has signed in or uploaded data. Per-user attribution + role-based access (admins can grant cluster use).</div></div>
 <div class="wrap">
  <div class="note" id="note">loading…</div>
- <div class="tblwrap"><table id="tbl"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Auth</th><th>Uploads</th><th>Images</th><th>Last seen</th></tr></thead><tbody></tbody></table></div>
+ <div class="tblwrap"><table id="tbl"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Cluster</th><th>Uploads</th><th>Images</th><th>Last seen</th><th id="acth" style="display:none">Manage</th></tr></thead><tbody></tbody></table></div>
 </div>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+var ME={is_admin:false};
 async function load(){
  var note=document.getElementById('note');
+ try{ME=await (await fetch('/api/me',{credentials:'include'})).json();}catch(e){}
  let d;
  try{const r=await fetch('/api/users',{credentials:'include'});if(!r.ok){note.textContent='HTTP '+r.status;return;}d=await r.json();}
  catch(e){note.textContent='could not load: '+esc(e);return;}
  if(!d.ok){note.textContent=esc(d.error||'error');return;}
- note.innerHTML='<b>'+d.n+'</b> user(s)'+(d.mongo?'':' · <span style="color:#d97706">Mongo offline — showing uploaders only</span>');
+ var adminNote=ME.is_admin?' · you are an <b>admin</b> — you can change roles &amp; cluster access':' · you are a <b>member</b>';
+ note.innerHTML='<b>'+d.n+'</b> user(s)'+adminNote+(d.mongo?'':' · <span style="color:#d97706">Mongo offline</span>');
+ if(ME.is_admin) document.getElementById('acth').style.display='';
  var tb=document.querySelector('#tbl tbody');tb.innerHTML='';
- if(!d.users.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:1.4rem">No users yet.</td></tr>';return;}
+ if(!d.users.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:1.4rem">No users yet.</td></tr>';return;}
  d.users.forEach(function(u){
   var tr=document.createElement('tr');
-  tr.innerHTML='<td><b>'+esc(u.name)+'</b><br><span style="color:#94a3b8;font-size:11px">'+esc(u.user_id)+'</span></td>'
+  var cluster=u.can_use_cluster?'<span class="pill yes">allowed</span>':'<span class="pill no">no</span>';
+  var html='<td><b>'+esc(u.name)+'</b><br><span style="color:#94a3b8;font-size:11px">'+esc(u.user_id)+'</span></td>'
    +'<td>'+esc(u.email||'\\u2014')+'</td>'
    +'<td><span class="role '+(u.role==='admin'?'admin':'member')+'">'+esc(u.role)+'</span></td>'
-   +'<td>'+esc(u.auth_provider)+'</td>'
+   +'<td>'+cluster+'</td>'
    +'<td class="num">'+u.uploads+'</td><td class="num">'+(u.images||0).toLocaleString()+'</td>'
    +'<td>'+esc(u.last_seen||'\\u2014')+'</td>';
+  if(ME.is_admin){
+   var btns='';
+   if(u.is_seed_admin){btns='<span style="color:#94a3b8;font-size:11px">seed admin</span>';}
+   else{
+    if(u.role==='admin') btns+='<button class="act" onclick="setRole(\\''+esc(u.user_id)+'\\',\\'member\\')">Make member</button>';
+    else btns+='<button class="act" onclick="setRole(\\''+esc(u.user_id)+'\\',\\'admin\\')">Make admin</button>';
+    if(u.can_use_cluster) btns+='<button class="act warn" onclick="setCluster(\\''+esc(u.user_id)+'\\',false)">Revoke cluster</button>';
+    else btns+='<button class="act" onclick="setCluster(\\''+esc(u.user_id)+'\\',true)">Grant cluster</button>';
+   }
+   html+='<td>'+btns+'</td>';
+  }
+  tr.innerHTML=html;
   tb.appendChild(tr);
  });
+}
+async function setRole(uid,role){
+ if(!confirm('Set '+uid+' role to '+role+'?'))return;
+ try{var d=await (await fetch('/api/users/role',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,role:role})})).json();
+  if(d&&d.ok){load();}else{alert((d&&(d.detail||d.msg))||'failed');}}catch(e){alert(''+e);}
+}
+async function setCluster(uid,allow){
+ if(!confirm((allow?'Grant':'Revoke')+' cluster (GPU) access for '+uid+'?'))return;
+ try{var d=await (await fetch('/api/users/cluster_access',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,allow:allow})})).json();
+  if(d&&d.ok){load();}else{alert((d&&(d.detail||d.msg))||'failed');}}catch(e){alert(''+e);}
 }
 load();
 </script></body></html>'''
@@ -5277,6 +5438,18 @@ async def api_cluster_action(action: str, request: Request):
     if action not in _CLUSTER_ACTIONS:
         raise HTTPException(400, f"unknown action {action!r}")
     spec = _CLUSTER_ACTIONS[action]
+
+    # v3.0.133 (RBAC): cluster jobs cost our shared GPU allocation. GPU/agent
+    # actions (sbatch + subprocess) require admin OR a per-user cluster grant;
+    # restarting the server is admin-only; harmless cache refresh is open to any
+    # signed-in user. Members can still upload/browse — just not burn the cluster.
+    _actor = _actor_from_request(request)
+    _atype = spec.get("type")
+    if _atype in ("sbatch", "subprocess") and not _can_use_cluster(_actor):
+        raise HTTPException(403, "Cluster (GPU) jobs are restricted. Ask an "
+                                 "administrator to grant you cluster access.")
+    if _atype == "restart_self" and not _is_admin(_actor):
+        raise HTTPException(403, "Administrators only.")
 
     # v3.0.68: parse optional JSON body for parameterized actions.
     body = {}

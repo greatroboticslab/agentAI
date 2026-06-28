@@ -4641,3 +4641,23 @@ auto-fit, new upload/push-cap/uploads/users/login panels use flex-wrap + full-wi
 Chinese, back/nav present. One concrete fix:
 - **/roboflow was missing the viewport meta** → added; the page now scales correctly on phones
   (was rendering at desktop width on mobile).
+
+
+---
+
+### v3.0.133 — Role-based access control (RBAC) + per-user cluster permission
+
+Prof Zhang: anyone with Google can sign in and upload; Google login's purpose is to track who did
+what; admins (Harry + lab account) control who may use the cluster.
+- **Roles**: admin vs member. Admins = the Basic-auth operator, any email seeded in ~/.dash_admins
+  (bootstrap, can't be locked out), or any user whose DB role is admin. Everyone else = member.
+- **Cluster (GPU) jobs are protected**: /api/cluster_action/* (sbatch + subprocess) now require
+  admin OR a per-user can_use_cluster grant; restart_self is admin-only; harmless cache refresh is
+  open. Members can still upload / browse / review / delete their own uploads — they just can't burn
+  the shared GPU allocation. (The whitelisted-modes + SLURM-queue design already prevented arbitrary
+  code; this closes the resource-abuse gap once login is open to everyone.)
+- **Admins manage access in /users**: per-user "Make admin / Make member" and "Grant / Revoke
+  cluster" buttons (db.set_user_role / set_user_cluster_access). /api/me powers UI gating.
+- weed Mission Control disables Harvest/Train for members with an explanatory note.
+- db: set_user_role, set_user_cluster_access (upsert so an admin can pre-authorize a user who hasn't
+  logged in yet); /api/users now returns role (seed-aware) + can_use_cluster.

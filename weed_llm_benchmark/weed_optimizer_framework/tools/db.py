@@ -711,6 +711,55 @@ def ensure_default_admin() -> None:
         pass
 
 
+def set_user_role(user_id: str, role: str, actor: str = "admin") -> bool:
+    """v3.0.133 (RBAC): set a user's role (admin|member). Upserts so an admin can
+    promote a user who hasn't logged in yet. Returns True on success."""
+    if role not in ("admin", "member"):
+        return False
+    db = _get_db()
+    if db is None:
+        return False
+    try:
+        db[COLL_USERS].update_one(
+            {"_id": user_id},
+            {"$set": {"role": role}, "$setOnInsert": {"created_at": _now(),
+             "name": user_id, "auth_provider": "unknown", "last_seen": _now()}},
+            upsert=True)
+        try:
+            db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
+                "event": "user.set_role", "target": {"kind": "user", "id": user_id},
+                "after": {"role": role}})
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
+def set_user_cluster_access(user_id: str, allow: bool, actor: str = "admin") -> bool:
+    """v3.0.133 (RBAC): grant/revoke a member's permission to launch cluster
+    (GPU) jobs. Admins always have access regardless of this flag."""
+    db = _get_db()
+    if db is None:
+        return False
+    try:
+        db[COLL_USERS].update_one(
+            {"_id": user_id},
+            {"$set": {"can_use_cluster": bool(allow)},
+             "$setOnInsert": {"created_at": _now(), "name": user_id,
+             "role": "member", "auth_provider": "unknown", "last_seen": _now()}},
+            upsert=True)
+        try:
+            db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
+                "event": "user.cluster_access", "target": {"kind": "user", "id": user_id},
+                "after": {"can_use_cluster": bool(allow)}})
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
 # --------------------------------------------------------------------------- #
 # Self-test
 # --------------------------------------------------------------------------- #
