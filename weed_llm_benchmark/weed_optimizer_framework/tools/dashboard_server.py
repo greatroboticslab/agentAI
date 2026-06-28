@@ -1581,6 +1581,88 @@ async def api_test_model(request: Request):
     return JSONResponse(res)
 
 
+# ===========================================================================
+# v3.0.142 (roadmap #3) — generic TRAINING submission. Stage an uploaded dataset
+# lab→cluster, then submit the whitelisted generic Ultralytics template. On-demand
+# (the job runs only while queued), same pattern as harvest. Cluster-gated.
+# ===========================================================================
+def _stage_dataset_to_cluster(slug: str) -> dict:
+    """rsync an uploaded dataset (lab uploads/<slug>) to the cluster shared FS so a
+    GPU job can read it. Returns {ok, dest, error}."""
+    import subprocess as _sp
+    local = _UPLOAD_DIR / slug
+    if not local.is_dir():
+        return {"ok": False, "error": f"no local dataset at uploads/{slug}"}
+    if not _CLUSTER_SSH:
+        return {"ok": False, "error": "cluster not configured"}
+    rel = f"uploads/{slug}"
+    _slurm(["mkdir", "-p", rel], timeout=30)   # login node, shared FS
+    data_host = os.environ.get("CLUSTER_DATA_SSH", "byler@data.bridges2.psc.edu")
+    rsh = "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30"
+    dest = f"{data_host}:{_CLUSTER_REPO}/{rel}/"
+    try:
+        r = _sp.run(["rsync", "-az", "-e", rsh, str(local) + "/", dest],
+                    env=os.environ.copy(), capture_output=True, text=True, timeout=900)
+        if r.returncode != 0:
+            return {"ok": False, "error": "rsync: " + (r.stderr or "")[-200:]}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+    return {"ok": True, "dest": f"{_CLUSTER_REPO}/{rel}"}
+
+
+@app.post("/api/train/submit")
+async def api_train_submit(request: Request):
+    actor = _actor_from_request(request)
+    if not _can_use_cluster(actor):
+        raise HTTPException(403, "Cluster (GPU) jobs are restricted to admins / granted users.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    domain = _norm_domain(body.get("domain") or "weed")
+    slug = str(body.get("slug") or "").strip()
+    if not re.match(r'^[A-Za-z0-9_.-]+$', slug):
+        raise HTTPException(400, "bad/missing dataset slug")
+    from . import db as _db
+    dd = _db.get_domain(domain) or {}
+    task = str(body.get("task") or dd.get("task") or "detection")
+    ultra = {"detection": "detect", "segmentation": "segment",
+             "classification": "classify"}.get(task, task)
+    if ultra not in ("detect", "segment", "classify"):
+        raise HTTPException(400, "task must be detection / classification / segmentation")
+    model = str(body.get("model") or dd.get("model") or "auto")
+    if not model.endswith(".pt"):
+        model = "auto"   # let the template pick the right yolo11n-* per task
+    try:
+        epochs = max(1, min(int(body.get("epochs") or 20), 300))
+    except (TypeError, ValueError):
+        epochs = 20
+    # 1) stage the dataset to the cluster
+    st = _stage_dataset_to_cluster(slug)
+    if not st.get("ok"):
+        raise HTTPException(502, "data staging to cluster failed: " + st.get("error", ""))
+    base = st["dest"]
+    data_path = base + "/images" if ultra == "classify" else base + "/data.yaml"
+    # 2) make sure the whitelisted template is on the cluster outer root
+    _slurm(["bash", "-lc",
+            "git fetch origin >/dev/null 2>&1; "
+            "git checkout origin/main -- weed_llm_benchmark/run_train_generic.sh 2>/dev/null; "
+            "cp -f weed_llm_benchmark/run_train_generic.sh run_train_generic.sh 2>/dev/null; true"],
+           timeout=60)
+    # 3) submit
+    jobtag = "j" + time.strftime("%m%d%H%M%S")
+    export = ",".join(["ALL", f"TRAIN_TASK={ultra}", f"TRAIN_MODEL={model}",
+                       f"TRAIN_EPOCHS={epochs}", f"TRAIN_DATA={data_path}",
+                       f"TRAIN_DOMAIN={domain}", f"TRAIN_JOBTAG={jobtag}"])
+    r = _slurm(["sbatch", f"--export={export}", "run_train_generic.sh"], timeout=25)
+    ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
+    result = {"ok": ok, "domain": domain, "task": ultra, "model": model,
+              "epochs": epochs, "data": data_path, "jobtag": jobtag,
+              "msg": (r.get("stdout") or r.get("stderr") or "").strip()}
+    _log_action("train_generic", result)
+    return JSONResponse(result)
+
+
 @app.get("/models", response_class=HTMLResponse)
 def models_page():
     """v3.0.138 — choose the model/provider per agent role (admins edit, all view)."""
@@ -1859,7 +1941,13 @@ async def api_dataset_upload(request: Request):
         ext = Path(safe_name).suffix.lower()
         if ext in _UPLOAD_IMG_EXT and modality == "image":
             try:
-                with zf.open(m) as src, open(img_dir / safe_name, "wb") as out:
+                # v3.0.142: preserve the zip's directory structure (train/<class>/
+                # img.jpg) — needed for classification ImageFolder + det/seg splits.
+                # The gallery still finds images (it rglobs local_path).
+                rel = "/".join(p for p in parts if p not in ("..", ""))[:200] or safe_name
+                outp = img_dir / rel
+                outp.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(m) as src, open(outp, "wb") as out:
                     shutil.copyfileobj(src, out, length=1024 * 1024)
                 n_img += 1
             except Exception:
@@ -2649,6 +2737,16 @@ def agent_generic(domain_id: str):
      </div>
      <div style="margin-top:12px"><a href="https://app.roboflow.com/a-test-of-will" target="_blank" style="text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Adjust labels in Roboflow &#8599;</a></div>
    </div>
+   <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Train a model</div>
+   <div style="margin-top:10px;background:#f8fafc;border:1px solid #e3e7ef;border-radius:10px;padding:14px">
+     <div style="font-size:13px;color:#475569;margin-bottom:10px">Train this agent&rsquo;s <b>{_task}</b> task on one of its uploaded datasets. Runs on the cluster GPU on-demand (queued); the result mAP/accuracy is written back here.</div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+       <select id="tr-ds" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;min-width:200px"><option value="">&mdash; choose an uploaded dataset &mdash;</option></select>
+       <label style="font-size:13px;color:#334">epochs <input id="tr-ep" type="number" value="20" min="1" max="300" style="width:70px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
+       <button id="tr-go" onclick="submitTrain()" style="border:0;cursor:pointer;background:#7c3aed;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#128640; Train</button>
+       <span id="tr-msg" style="font-size:13px;color:#475569"></span>
+     </div>
+   </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
@@ -2709,9 +2807,28 @@ async function deleteUpload(slug,btn){
  }catch(e){btn.disabled=false;btn.textContent='Delete';alert(''+e);}
 }
 loadUploads();
+loadTrainDatasets();
 async function loadCap(){
  try{var d=await (await fetch('/api/domain/push_cap?domain=__DOM__',{credentials:'include'})).json();
   if(d&&d.ok){document.getElementById('cap').value=d.cap;}}catch(e){}
+}
+async function loadTrainDatasets(){
+ try{
+  var me=await (await fetch('/api/me',{credentials:'include'})).json();
+  var sel=document.getElementById('tr-ds'),msg=document.getElementById('tr-msg'),go=document.getElementById('tr-go');
+  if(me&&me.ok&&!me.can_use_cluster){go.disabled=true;sel.disabled=true;msg.textContent='\\u2139 training is admin/granted-only';return;}
+  var d=await (await fetch('/api/dataset/uploads?domain=__DOM__',{credentials:'include'})).json();
+  (d.uploads||[]).forEach(function(u){var o=document.createElement('option');o.value=u.slug;o.textContent=u.name+' ('+u.images+' imgs)';sel.appendChild(o);});
+ }catch(e){}
+}
+async function submitTrain(){
+ var sel=document.getElementById('tr-ds'),ep=document.getElementById('tr-ep'),msg=document.getElementById('tr-msg'),go=document.getElementById('tr-go');
+ var slug=sel.value;if(!slug){msg.textContent='\\u26a0 choose a dataset';return;}
+ if(!confirm('Stage "'+slug+'" to the cluster and submit a GPU training job?'))return;
+ go.disabled=true;msg.textContent='\\u23f3 staging + submitting\\u2026';
+ try{var d=await (await fetch('/api/train/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,epochs:parseInt(ep.value||'20')})})).json();
+  msg.textContent=(d&&d.ok)?('\\u2705 submitted ('+d.task+', '+d.epochs+'ep) \\u2014 '+(d.msg||'')):'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
+ catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
 }
 async function saveCap(){
  var el=document.getElementById('cap'),m=document.getElementById('cap-msg'),b=document.getElementById('cap-save');
