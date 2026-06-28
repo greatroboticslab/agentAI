@@ -1300,15 +1300,89 @@ async def api_agent_create(request: Request):
         mod_in = [m.strip() for m in mod_in.split(",") if m.strip()]
     modality = [str(m).strip().lower() for m in (mod_in or ["image"])]
     from . import db as _db
+    actor = _actor_from_request(request)
     res = _db.create_domain(domain_id, name, harvest_queries=queries, n_subagents=n,
-                            task=task, modality=modality, model=model)
+                            task=task, modality=modality, model=model, owner=actor)
     if res == "exists":
         raise HTTPException(409, f"agent '{domain_id}' already exists")
     if res is None:
         raise HTTPException(503, "database unavailable (Mongo down) — cannot create agent")
+    try:
+        _db.upsert_user(actor, auth_provider="basic")
+    except Exception:
+        pass
     return {"ok": True, "domain": domain_id, "display_name": name,
             "task": res.get("task"), "modality": res.get("modality"),
             "model": res.get("model")}
+
+
+def _can_manage_agent(actor: str, dom: dict) -> bool:
+    """Owner of the agent, or any admin, may edit/delete it. The flagship 'weed'
+    agent is admin-only (never owner-deletable)."""
+    if _is_admin(actor):
+        return True
+    if not dom or dom.get("_id") == "weed":
+        return False
+    return bool(dom.get("owner") and dom.get("owner") == actor)
+
+
+@app.post("/api/agent/delete")
+async def api_agent_delete(request: Request):
+    """Delete an agent (domain). Owner or admin only; 'weed' is protected."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    domain_id = re.sub(r"[^a-z0-9_]+", "", str(body.get("domain") or "").lower())[:40]
+    if not domain_id:
+        raise HTTPException(400, "domain required")
+    if domain_id == "weed":
+        raise HTTPException(403, "the weed agent cannot be deleted")
+    from . import db as _db
+    dom = _db.get_domain(domain_id)
+    if not dom:
+        raise HTTPException(404, f"no agent '{domain_id}'")
+    actor = _actor_from_request(request)
+    if not _can_manage_agent(actor, dom):
+        raise HTTPException(403, "only the agent's owner or an admin can delete it")
+    ok = _db.delete_domain(domain_id, actor=actor)
+    log.info(f"[agent] deleted {domain_id} by {actor}")
+    return JSONResponse({"ok": bool(ok), "domain": domain_id})
+
+
+@app.post("/api/agent/update")
+async def api_agent_update(request: Request):
+    """Edit an agent's config (display_name / task / modality / model / queries).
+    Owner or admin only."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    domain_id = re.sub(r"[^a-z0-9_]+", "", str(body.get("domain") or "").lower())[:40]
+    if not domain_id:
+        raise HTTPException(400, "domain required")
+    from . import db as _db
+    dom = _db.get_domain(domain_id)
+    if not dom:
+        raise HTTPException(404, f"no agent '{domain_id}'")
+    actor = _actor_from_request(request)
+    if not _can_manage_agent(actor, dom):
+        raise HTTPException(403, "only the agent's owner or an admin can edit it")
+    fields = {}
+    if "display_name" in body:
+        fields["display_name"] = str(body["display_name"]).strip()[:80]
+    if "task" in body:
+        fields["task"] = str(body["task"]).strip().lower()
+    if "model" in body:
+        fields["model"] = str(body["model"]).strip()[:40]
+    if "queries" in body:
+        fields["harvest_queries"] = [q.strip() for q in str(body["queries"]).split(",") if q.strip()]
+    if "modality" in body and isinstance(body["modality"], list):
+        fields["modality"] = [str(m).strip().lower() for m in body["modality"]]
+    updated = _db.update_domain(domain_id, fields, actor=actor)
+    if updated is None:
+        raise HTTPException(503, "database unavailable")
+    return JSONResponse({"ok": True, "domain": domain_id})
 
 
 # ===========================================================================
@@ -2761,6 +2835,7 @@ def agent_generic(domain_id: str):
     _modline = _h.escape(", ".join(str(m) for m in _mods))
     _model = _h.escape(str(d.get("model") or "auto"))
     _metric = _h.escape(str(d.get("target_metric") or "mAP50-95"))
+    _owner = _h.escape(str(d.get("owner") or ""))
     if qs:
         _hbtn = ('<button class="btn" id="hbtn" onclick="startHarvest()" '
                  'style="border:0;cursor:pointer">&#9654; Start harvest</button>'
@@ -2793,6 +2868,12 @@ def agent_generic(domain_id: str):
    <span class="badge" style="background:#eef2ff;color:#1d4ed8;border-color:#bfdbfe">task: {_task}</span>
    <span class="badge" style="background:#ecfdf5;color:#047857;border-color:#a7f3d0">modality: {_modline}</span>
    <span class="badge" style="background:#fdf4ff;color:#a21caf;border-color:#f5d0fe">model: {_model}</span>
+   <div id="manage" data-owner="{_owner}" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid #eef1f6">
+     <button onclick="renameAgent()" style="border:1px solid #cbd5e1;background:#fff;color:#334;font-size:12px;padding:6px 11px;border-radius:7px;cursor:pointer">&#9998; Rename</button>
+     <button onclick="editQueries()" style="border:1px solid #cbd5e1;background:#fff;color:#334;font-size:12px;padding:6px 11px;border-radius:7px;cursor:pointer">&#9998; Edit seed queries</button>
+     <button onclick="deleteAgent()" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:6px 11px;border-radius:7px;cursor:pointer">&#128465; Delete agent</button>
+     <span id="mng-msg" style="font-size:12px;color:#475569;margin-left:6px"></span>
+   </div>
    <div class="row" style="margin-top:16px"><b>This agent was just created.</b> It has no collected data yet.</div>
    <div class="row">Seed search queries: <b>{qline}</b></div>
    <div class="row">Sub-agents: <b>{int(d.get("n_subagents") or 2)}</b> &middot; Target metric: <b>{_metric}</b></div>
@@ -2889,6 +2970,30 @@ async function deleteUpload(slug,btn){
 }
 loadUploads();
 loadTrainDatasets();
+(async function(){try{
+  var me=await (await fetch('/api/me',{credentials:'include'})).json();
+  var mng=document.getElementById('manage');if(!mng)return;
+  var owner=mng.getAttribute('data-owner')||'';
+  if(me&&me.ok&&(me.is_admin||(owner&&owner===me.user))){mng.style.display='block';}
+}catch(e){}})();
+async function renameAgent(){
+ var nm=prompt('New display name for this agent:');if(!nm||!nm.trim())return;
+ var m=document.getElementById('mng-msg');m.textContent='\\u23f3';
+ try{var d=await (await fetch('/api/agent/update',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',display_name:nm.trim()})})).json();
+  if(d&&d.ok){m.textContent='\\u2705 renamed';setTimeout(function(){location.reload();},700);}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){m.textContent='\\u274c '+e;}
+}
+async function editQueries(){
+ var q=prompt('Seed search queries (comma-separated):');if(q===null)return;
+ var m=document.getElementById('mng-msg');m.textContent='\\u23f3';
+ try{var d=await (await fetch('/api/agent/update',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',queries:q})})).json();
+  if(d&&d.ok){m.textContent='\\u2705 saved';setTimeout(function(){location.reload();},700);}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){m.textContent='\\u274c '+e;}
+}
+async function deleteAgent(){
+ if(!confirm('Delete this agent? Its uploaded datasets are not auto-removed, but the agent disappears from the launcher. This cannot be undone.'))return;
+ var m=document.getElementById('mng-msg');m.textContent='\\u23f3 deleting\\u2026';
+ try{var d=await (await fetch('/api/agent/delete',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
+  if(d&&d.ok){m.textContent='\\u2705 deleted';setTimeout(function(){location.href='/';},700);}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){m.textContent='\\u274c '+e;}
+}
 async function loadCap(){
  try{var d=await (await fetch('/api/domain/push_cap?domain=__DOM__',{credentials:'include'})).json();
   if(d&&d.ok){document.getElementById('cap').value=d.cap;}}catch(e){}

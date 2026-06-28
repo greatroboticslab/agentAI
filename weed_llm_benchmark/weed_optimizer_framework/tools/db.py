@@ -436,11 +436,55 @@ _TASK_DEFAULT_METRIC = {
 }
 
 
+def delete_domain(domain_id: str, actor: str = "user") -> bool:
+    """v3.0.144: remove an agent (domain) doc. Returns True if deleted."""
+    db = _get_db()
+    if db is None:
+        return False
+    try:
+        r = db[COLL_DOMAINS].delete_one({"_id": domain_id})
+        if r.deleted_count:
+            try:
+                db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
+                    "event": "domain.delete", "target": {"kind": "domain", "id": domain_id}})
+            except Exception:
+                pass
+        return bool(r.deleted_count)
+    except Exception:
+        return False
+
+
+def update_domain(domain_id: str, fields: dict, actor: str = "user") -> Optional[dict]:
+    """v3.0.144: update an agent's editable config (display_name, task, modality,
+    model, harvest_queries, n_subagents). Returns the updated doc or None."""
+    db = _get_db()
+    if db is None:
+        return None
+    allowed = {"display_name", "task", "modality", "model", "harvest_queries",
+               "n_subagents", "target_metric", "status"}
+    sets = {k: v for k, v in (fields or {}).items() if k in allowed}
+    if not sets:
+        return get_domain(domain_id)
+    try:
+        r = db[COLL_DOMAINS].update_one({"_id": domain_id}, {"$set": sets})
+        if r.matched_count == 0:
+            return None
+        try:
+            db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
+                "event": "domain.update", "target": {"kind": "domain", "id": domain_id},
+                "after": sets})
+        except Exception:
+            pass
+        return get_domain(domain_id)
+    except Exception:
+        return None
+
+
 def create_domain(domain_id: str, display_name: str, taxonomy=None,
                   target_metric: str = None, harvest_queries=None,
                   n_subagents: int = 2, status: str = "created",
                   task: str = "detection", modality=None,
-                  model: str = "auto") -> Optional[dict]:
+                  model: str = "auto", owner: str = "") -> Optional[dict]:
     """v3.0.107/137: insert a new agent (domain) doc. Additive config — a domain
     declares task / modality / model so the platform generalizes beyond weed.
     Returns the created doc, "exists" if taken, or None if Mongo is down."""
@@ -465,6 +509,8 @@ def create_domain(domain_id: str, display_name: str, taxonomy=None,
             "task": task,
             "modality": mods,
             "model": model or "auto",
+            "owner": owner or "",
+            "created_at": _now(),
         }
         db[COLL_DOMAINS].insert_one(doc)
         return doc

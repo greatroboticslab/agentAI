@@ -4774,3 +4774,16 @@ cluster, on-demand, brokered by the always-on lab server.
 - **GET /api/llm/infer/result?jobtag=**: poll the result file (queued/running → pending; done/failed).
 - **/models**: an "On-demand cluster inference" box submits + polls a prompt. So an external machine
   with our API key can call the server and get an answer from our cluster-hosted model — no paid key.
+
+
+---
+
+### v3.0.144 — Agent lifecycle: delete / rename / edit (UX loop P1)
+
+New-project main line was functional but unmanageable (no way to remove/edit an agent → launcher
+rotted; agents had to be hand-deleted from Mongo). Fixed:
+- db.delete_domain / update_domain; create_domain now stores `owner` (the creator) + created_at.
+- POST /api/agent/delete and /api/agent/update — owner-or-admin only; the flagship "weed" agent is
+  protected (never deletable). Creator is recorded as owner.
+- Agent page shows a Manage bar (Rename / Edit seed queries / Delete) to the owner or an admin,
+  gated via /api/me. Deleting returns to the launcher.
