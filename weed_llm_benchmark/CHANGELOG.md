@@ -4724,3 +4724,21 @@ SU budget). So the right design is a provider abstraction, not a hosted 671B mod
   Members view; admins edit. "Models" card added to the weed workspace.
 - Foundation so agents use the best model per task and switch local↔API any time. (Wiring the harvest
   brain to read this registry is the next step.)
+
+
+---
+
+### v3.0.139 — Ingestion upgrades (roadmap #2) + model-serving realignment
+
+- **Streaming upload**: the request body now streams to a temp file (sha1 + size cap computed
+  incrementally) instead of loading the whole zip in RAM — large robot/video datasets no longer
+  blow up memory.
+- **COCO / Pascal-VOC import**: when there's no data.yaml, class names + format are auto-detected
+  from COCO `categories` or VOC `<object><name>` so non-YOLO datasets aren't blind.
+- **Video frame extraction**: uploads to a video-modality agent get a few preview frames pulled
+  per clip (cv2) so the gallery shows thumbnails; clips kept under <slug>/files/.
+- **Model serving realigned** to the actual architecture (per Harry): no paid keys required — we
+  deploy our OWN models on the cluster ON-DEMAND (batch job, same as the harvest/Gemma agent; the
+  cluster is never always-on). The always-on lab server is the broker (holds our own api key, other
+  machines call it, it submits a queued cluster job). /models note + provider ids updated; paid APIs
+  remain optional.

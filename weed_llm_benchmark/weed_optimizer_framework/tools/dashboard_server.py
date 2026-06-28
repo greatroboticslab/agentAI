@@ -1557,7 +1557,7 @@ def models_page():
  <div class="card"><h3>Test a model</h3><div class="d">Send a tiny prompt to verify a model id works (admin).</div>
    <input id="tm" placeholder="e.g. deepseek:deepseek-chat or ollama:gemma2"> <button onclick="testModel()">Test</button>
    <div class="msg" id="tmsg"></div></div>
- <div class="card" style="background:#fffbeb;border-color:#fde68a"><h3>Note on big models on the cluster</h3><div class="d" style="color:#92400e">Bridges-2 has H100-80GB nodes that can host DeepSeek-V3/V4 &amp; GLM-4.6 &mdash; but only as time-limited batch jobs (shared queue, no always-on server). For the agents&rsquo; sporadic reasoning, APIs are cheaper &amp; instant; for bulk work over a whole dataset, run a cluster batch job that exposes a <code>vllm@&lt;url&gt;:&lt;model&gt;</code> endpoint and point a role at it.</div></div>
+ <div class="card" style="background:#fffbeb;border-color:#fde68a"><h3>How we serve models (self-hosted, no paid keys)</h3><div class="d" style="color:#92400e">Our plan: don&rsquo;t buy external API keys. We deploy our OWN models on the cluster <b>on-demand</b> (a batch job, same pattern as the harvest/Gemma agent &mdash; the cluster is never always-on). This server (Unie) is the always-on broker: it holds our OWN api key, other machines call the server, and the server submits a queued cluster job to run the model and returns the result. In this page that maps to a <code>cluster:&lt;model&gt;</code> / <code>vllm@&lt;url&gt;:&lt;model&gt;</code> id. Bridges-2 has H100-80GB nodes that can host DeepSeek-V3/V4 &amp; GLM-4.6 for such jobs. Paid APIs (DeepSeek/GLM/OpenAI/Anthropic) remain available as an option but are not required.</div></div>
 </div>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -1625,6 +1625,85 @@ def _registry_current_round() -> int:
         return 1
 
 
+def _extract_anno_classes(root: Path):
+    """v3.0.139 (roadmap #2): scan an extracted dataset for COCO or Pascal-VOC
+    annotations and return (sorted class names, format). YOLO has no class names
+    in the labels themselves (needs data.yaml), so this covers the other two
+    common formats. Bounded: scans up to a few files, caps json size."""
+    names = set()
+    fmt = ""
+    try:
+        # COCO: a *.json with a top-level "categories":[{name},...]
+        for p in list(root.rglob("*.json"))[:40]:
+            try:
+                if p.stat().st_size > 80 * 1024 * 1024:
+                    continue
+                d = json.load(open(p))
+            except Exception:
+                continue
+            cats = d.get("categories") if isinstance(d, dict) else None
+            if isinstance(cats, list) and cats:
+                for c in cats:
+                    if isinstance(c, dict) and c.get("name"):
+                        names.add(str(c["name"]))
+                if names:
+                    fmt = "coco"
+                    break
+        # Pascal VOC: *.xml with <object><name>...</name>
+        if not names:
+            import xml.etree.ElementTree as _ET
+            for p in list(root.rglob("*.xml"))[:200]:
+                try:
+                    r = _ET.parse(p).getroot()
+                except Exception:
+                    continue
+                for obj in r.findall(".//object/name"):
+                    if obj.text:
+                        names.add(obj.text.strip())
+                if names:
+                    fmt = "voc"
+    except Exception:
+        pass
+    return sorted(n for n in names if n), fmt
+
+
+def _extract_video_frames(files_dir: Path, img_dir: Path, max_frames: int = 8) -> int:
+    """v3.0.139 (roadmap #2): grab a few evenly-spaced preview frames from each
+    uploaded video (cv2) so video datasets show thumbnails in the gallery."""
+    try:
+        import cv2  # available on lab venv
+    except Exception:
+        return 0
+    if not files_dir.is_dir():
+        return 0
+    vexts = _MODALITY_EXT["video"]
+    n = 0
+    for vp in sorted(files_dir.rglob("*")):
+        if vp.suffix.lower() not in vexts:
+            continue
+        try:
+            cap = cv2.VideoCapture(str(vp))
+            tot = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+            if tot <= 0:
+                cap.release(); continue
+            step = max(1, tot // max_frames)
+            grabbed = 0
+            for i in range(0, tot, step):
+                if grabbed >= max_frames:
+                    break
+                cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+                ok, frame = cap.read()
+                if not ok:
+                    continue
+                out = img_dir / f"{vp.stem}_f{i:06d}.jpg"
+                if cv2.imwrite(str(out), frame):
+                    grabbed += 1; n += 1
+            cap.release()
+        except Exception:
+            continue
+    return n
+
+
 @app.post("/api/dataset/upload")
 async def api_dataset_upload(request: Request):
     """Manual dataset upload. POST the .zip as the raw request body with
@@ -1633,6 +1712,7 @@ async def api_dataset_upload(request: Request):
     downloaded, source manual_upload, attributed to the uploader)."""
     import zipfile
     import shutil
+    import tempfile
     qp = request.query_params
     domain = re.sub(r"[^a-z0-9_]+", "", (qp.get("domain") or "weed").lower())[:40] or "weed"
     name = (qp.get("name") or "").strip()
@@ -1640,19 +1720,46 @@ async def api_dataset_upload(request: Request):
         raise HTTPException(400, "missing dataset name (?name=)")
     base = re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_")[:60] or "dataset"
 
-    raw = await request.body()
-    if not raw:
-        raise HTTPException(400, "empty body — POST the .zip file as the request body")
-    if len(raw) > _MAX_UPLOAD_BYTES:
-        raise HTTPException(413, f"zip too large (> {_MAX_UPLOAD_BYTES // (1024*1024)} MB)")
+    # v3.0.139 (roadmap #2): STREAM the body to a temp file instead of loading the
+    # whole zip in memory — large robot/video datasets no longer blow up RAM.
+    # Size cap enforced incrementally; sha1 (for the slug) computed on the fly.
+    _h = hashlib.sha1()
+    total = 0
+    tmpf = tempfile.NamedTemporaryFile(prefix="upload_", suffix=".zip", delete=False)
     try:
-        zf = zipfile.ZipFile(io.BytesIO(raw))
+        async for chunk in request.stream():
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > _MAX_UPLOAD_BYTES:
+                tmpf.close(); os.unlink(tmpf.name)
+                raise HTTPException(413, f"zip too large (> {_MAX_UPLOAD_BYTES // (1024*1024)} MB)")
+            _h.update(chunk)
+            tmpf.write(chunk)
+        tmpf.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        try:
+            tmpf.close(); os.unlink(tmpf.name)
+        except Exception:
+            pass
+        raise HTTPException(400, f"upload read failed: {type(e).__name__}")
+    if total == 0:
+        os.unlink(tmpf.name)
+        raise HTTPException(400, "empty body — POST the .zip file as the request body")
+    zip_path = tmpf.name
+    try:
+        zf = zipfile.ZipFile(zip_path)
     except zipfile.BadZipFile:
+        os.unlink(zip_path)
         raise HTTPException(400, "not a valid .zip file")
     members = [m for m in zf.infolist() if not m.is_dir()]
     if not members:
+        zf.close(); os.unlink(zip_path)
         raise HTTPException(400, "zip is empty")
     if len(members) > _MAX_UPLOAD_FILES:
+        zf.close(); os.unlink(zip_path)
         raise HTTPException(413, f"too many files in zip (> {_MAX_UPLOAD_FILES})")
 
     actor = _actor_from_request(request)
@@ -1661,7 +1768,7 @@ async def api_dataset_upload(request: Request):
         _dbu.upsert_user(actor, auth_provider="basic")
     except Exception:
         pass
-    short = hashlib.sha1(raw).hexdigest()[:8]
+    short = _h.hexdigest()[:8]
     slug = f"ul_{base}_{short}"
     dest = _UPLOAD_DIR / slug
     if dest.exists():
@@ -1732,6 +1839,15 @@ async def api_dataset_upload(request: Request):
         else:
             n_skipped += 1
 
+    try:
+        zf.close()
+    except Exception:
+        pass
+    try:
+        os.unlink(zip_path)   # temp upload zip no longer needed
+    except Exception:
+        pass
+
     if n_img == 0 and n_file == 0:
         shutil.rmtree(dest, ignore_errors=True)
         _hint = ", ".join(sorted(accept_ext))
@@ -1739,6 +1855,7 @@ async def api_dataset_upload(request: Request):
                                  f"(accepted: {_hint})")
 
     class_names = []
+    detected_fmt = ""
     if data_yaml_bytes:
         try:
             import yaml as _yaml
@@ -1748,12 +1865,31 @@ async def api_dataset_upload(request: Request):
                 class_names = [str(names[k]) for k in sorted(names)]
             elif isinstance(names, list):
                 class_names = [str(x) for x in names]
+            if class_names:
+                detected_fmt = "yolo"
         except Exception:
             class_names = []
+    # v3.0.139 (roadmap #2): COCO/VOC import — pull class names + format from
+    # annotation files when there's no data.yaml (so non-YOLO datasets aren't blind).
+    if not class_names:
+        cn2, fmt2 = _extract_anno_classes(dest)
+        if cn2:
+            class_names, detected_fmt = cn2, fmt2
+    # v3.0.139: video → extract a few preview frames (cv2) so the gallery shows it.
+    if modality == "video":
+        try:
+            n_frames = _extract_video_frames(files_dir, img_dir, max_frames=8)
+            n_img += n_frames
+        except Exception as e:
+            log.warning(f"[upload] video frame extract failed: {e}")
 
-    # coarse format tag: image+labels → yolo; else the modality
-    fmt = ("yolo" if (modality == "image" and n_lbl > 0)
-           else ("images" if modality == "image" else modality))
+    # coarse format tag
+    if detected_fmt:
+        fmt = detected_fmt
+    elif modality == "image":
+        fmt = "yolo" if n_lbl > 0 else "images"
+    else:
+        fmt = modality
     uploaded_at = time.strftime("%Y-%m-%dT%H:%M:%S")
     fields = {
         "status": "downloaded",
