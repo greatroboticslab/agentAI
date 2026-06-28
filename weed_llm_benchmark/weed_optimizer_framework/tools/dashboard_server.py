@@ -976,33 +976,11 @@ def root():
  <div id="createPanel">
    <h3>Create a new project</h3>
    <p class="h">A project is a research workspace (any field, any data type). Upload datasets and add agents (collect / filter / label / train) any time &mdash; or none at all.</p>
-   <label>Agent name</label>
-   <input id="agName" placeholder="e.g. Crop Disease, Warehouse Robot, Drone Survey">
-   <div class="row2">
-     <div><label>Task</label>
-       <select id="agType">
-         <option value="detection">detection (boxes)</option>
-         <option value="classification">classification</option>
-         <option value="segmentation">segmentation (masks)</option>
-         <option value="pose">pose / keypoints</option>
-         <option value="tracking">tracking</option>
-         <option value="rl_policy">RL / policy (control)</option>
-         <option value="ssl_pretrain">self-supervised pretrain</option>
-       </select></div>
-     <div><label>Model</label>
-       <select id="agModel">
-         <option value="auto">auto (recommended for task)</option>
-         <option value="yolo">YOLO</option>
-         <option value="rf-detr">RF-DETR</option>
-         <option value="resnet">ResNet (classifier)</option>
-         <option value="vit">ViT (classifier)</option>
-         <option value="unet">U-Net (segment)</option>
-         <option value="sam">SAM (segment)</option>
-         <option value="rl-ppo">PPO (RL)</option>
-         <option value="custom">custom</option>
-       </select></div>
-   </div>
-   <label>Data modality (what this agent collects)</label>
+   <label>Project name</label>
+   <input id="agName" placeholder="e.g. Crop Disease, Warehouse Robot, Coral Reef Survey">
+   <label>Research field <span style="color:#94a3b8;font-weight:400">(free text, any domain)</span></label>
+   <input id="agField" placeholder="e.g. agriculture, robotics, marine biology, materials science">
+   <label>Data types this project will hold</label>
    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 12px;font-size:13px">
      <label style="font-weight:400"><input type="checkbox" class="agMod" value="image" checked> Image</label>
      <label style="font-weight:400"><input type="checkbox" class="agMod" value="video"> Video</label>
@@ -1011,33 +989,25 @@ def root():
      <label style="font-weight:400"><input type="checkbox" class="agMod" value="audio"> Audio</label>
      <label style="font-weight:400"><input type="checkbox" class="agMod" value="text"> Text</label>
    </div>
-   <div class="row2">
-     <div><label>Sub-agents</label>
-       <select id="agN"><option value="2">2 &mdash; collector + trainer</option><option value="1">1 &mdash; collector only</option><option value="3">3 &mdash; collector + filter + trainer</option></select></div>
-     <div><label>Seed search queries (optional)</label>
-       <input id="agQ" placeholder="comma-separated"></div>
-   </div>
-   <button class="btn" id="createBtn" onclick="createAgent()">Create agent</button>
-   <div class="note" id="createNote">Registers a new agent (domain) with its task, model, and data modality. Members can upload data to it immediately; harvest/training wiring follows per modality.</div>
+   <button class="btn" id="createBtn" onclick="createAgent()">Create project</button>
+   <div class="note" id="createNote">Creates an empty research workspace. Upload datasets right away, and add agents (collect / filter / label / train) whenever you want &mdash; any number, any mix, or none.</div>
  </div>
  <div class="foot">Lab server &middot; MongoDB &middot; cluster GPU compute &nbsp;|&nbsp; <a href="/console">Advanced console &rarr;</a></div>
  <script>
   function createAgent(){
     var name=(document.getElementById('agName').value||'').trim();
     var note=document.getElementById('createNote'), btn=document.getElementById('createBtn');
-    if(!name){note.textContent='Please enter an agent name.';return;}
+    if(!name){note.textContent='Please enter a project name.';return;}
     var mods=Array.prototype.slice.call(document.querySelectorAll('.agMod:checked')).map(function(c){return c.value;});
-    if(!mods.length){note.textContent='Pick at least one data modality.';return;}
+    if(!mods.length){note.textContent='Pick at least one data type.';return;}
     btn.disabled=true;note.textContent='\\u23f3 Creating\\u2026';
     fetch('/api/agent/create',{method:'POST',credentials:'include',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:name,task:document.getElementById('agType').value,
-        model:document.getElementById('agModel').value,modality:mods,
-        n_subagents:parseInt(document.getElementById('agN').value||'2'),
-        queries:document.getElementById('agQ').value||''})})
+      body:JSON.stringify({name:name,modality:mods,
+        research_field:(document.getElementById('agField').value||'').trim()})})
      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
      .then(function(res){
-        if(res.ok&&res.j.ok){note.textContent='\\u2705 Created \"'+res.j.display_name+'\". Reloading\\u2026';setTimeout(function(){location.reload();},900);}
+        if(res.ok&&res.j.ok){note.textContent='\\u2705 Created \"'+res.j.display_name+'\". Opening\\u2026';setTimeout(function(){location.href='/agent/'+res.j.domain;},800);}
         else{note.textContent='\\u274c '+((res.j&&res.j.detail)||'Create failed');btn.disabled=false;}
      })
      .catch(function(e){note.textContent='\\u274c Error: '+e;btn.disabled=false;});
@@ -1299,10 +1269,12 @@ async def api_agent_create(request: Request):
     if isinstance(mod_in, str):
         mod_in = [m.strip() for m in mod_in.split(",") if m.strip()]
     modality = [str(m).strip().lower() for m in (mod_in or ["image"])]
+    research_field = str(body.get("research_field") or "").strip()[:80]
     from . import db as _db
     actor = _actor_from_request(request)
     res = _db.create_domain(domain_id, name, harvest_queries=queries, n_subagents=n,
-                            task=task, modality=modality, model=model, owner=actor)
+                            task=task, modality=modality, model=model, owner=actor,
+                            research_field=research_field)
     if res == "exists":
         raise HTTPException(409, f"agent '{domain_id}' already exists")
     if res is None:
@@ -2983,6 +2955,7 @@ def agent_generic(domain_id: str):
    <span class="badge" style="background:#eef2ff;color:#1d4ed8;border-color:#bfdbfe">task: {_task}</span>
    <span class="badge" style="background:#ecfdf5;color:#047857;border-color:#a7f3d0">modality: {_modline}</span>
    <span class="badge" style="background:#fdf4ff;color:#a21caf;border-color:#f5d0fe">model: {_model}</span>
+   {('<span class="badge" style="background:#f0fdfa;color:#0f766e;border-color:#99f6e4">field: ' + _h.escape(str(d.get("research_field"))) + '</span>') if d.get("research_field") else ''}
    <div id="manage" data-owner="{_owner}" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid #eef1f6">
      <button onclick="renameAgent()" style="border:1px solid #cbd5e1;background:#fff;color:#334;font-size:12px;padding:6px 11px;border-radius:7px;cursor:pointer">&#9998; Rename</button>
      <button onclick="editQueries()" style="border:1px solid #cbd5e1;background:#fff;color:#334;font-size:12px;padding:6px 11px;border-radius:7px;cursor:pointer">&#9998; Edit seed queries</button>

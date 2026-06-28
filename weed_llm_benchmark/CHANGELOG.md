@@ -4820,3 +4820,14 @@ the existing domain doc IS the project; routes unchanged.
   "This agent was just created / re-create the agent" copy → project-framed text.
 - Terminology Agent→Project across the launcher ("Research Projects", "New Project", "Create a new
   project") + page titles + back links.
+
+
+---
+
+### v3.0.147 — Simplify "Create project" form + research field (UX loop R3a/R4)
+
+The create form pushed task/model/sub-agents/seed-queries up front — contradicting the new model
+(a project is a workspace; those belong to agents added later). Simplified to: Project name +
+Research field (free text, any domain) + data types. Drops the YOLO/detection framing.
+- create_domain stores research_field + agents:[]; /api/agent/create parses research_field.
+- Project page shows a "field: …" badge. After create, opens the new project directly.

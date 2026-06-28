@@ -522,7 +522,8 @@ def create_domain(domain_id: str, display_name: str, taxonomy=None,
                   target_metric: str = None, harvest_queries=None,
                   n_subagents: int = 2, status: str = "created",
                   task: str = "detection", modality=None,
-                  model: str = "auto", owner: str = "") -> Optional[dict]:
+                  model: str = "auto", owner: str = "",
+                  research_field: str = "") -> Optional[dict]:
     """v3.0.107/137: insert a new agent (domain) doc. Additive config — a domain
     declares task / modality / model so the platform generalizes beyond weed.
     Returns the created doc, "exists" if taken, or None if Mongo is down."""
@@ -548,6 +549,8 @@ def create_domain(domain_id: str, display_name: str, taxonomy=None,
             "modality": mods,
             "model": model or "auto",
             "owner": owner or "",
+            "research_field": research_field or "",
+            "agents": [],
             "created_at": _now(),
         }
         db[COLL_DOMAINS].insert_one(doc)
