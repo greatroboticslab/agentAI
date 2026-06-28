@@ -4742,3 +4742,19 @@ SU budget). So the right design is a provider abstraction, not a hosted 671B mod
   cluster is never always-on). The always-on lab server is the broker (holds our own api key, other
   machines call it, it submits a queued cluster job). /models note + provider ids updated; paid APIs
   remain optional.
+
+
+---
+
+### v3.0.141 — Our-own API keys (gateway auth) + generic training template (roadmap #3/gateway)
+
+- **run_train_generic.sh**: one whitelisted Ultralytics template for detection/classification/
+  segmentation (env-driven: TRAIN_TASK/MODEL/EPOCHS/DATA/DOMAIN), writes a per-domain result JSON.
+  The compute core for the training-job abstraction (submission + lab→cluster data staging is the
+  next piece).
+- **Our-own API keys** (the gateway auth Harry described — no paid/Google key for machines): admins
+  generate `ak_...` keys in /users; scripts/robots/other computers authenticate with
+  `X-API-Key: ak_...`. Server stores only the sha256 hash (~/.dash_api_keys.json, 600). Member-level
+  (upload/read); does NOT grant cluster GPU. Middleware accepts it (after session, before Basic);
+  uploads attribute to `key:<label>`. /api/keys [GET list / POST create (secret shown once) / revoke].
+  Lets the humanoid laptop client drop shared Basic 1/1 for a proper key.

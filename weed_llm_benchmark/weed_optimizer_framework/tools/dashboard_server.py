@@ -221,6 +221,47 @@ def _session_user(request):
     return _verify_session(c)
 
 
+# v3.0.140 — OUR-OWN API keys (no paid/Google needed): scripts/robots/other
+# machines authenticate by sending  X-API-Key: ak_...  The server stores only the
+# sha256 hash. A key authenticates as a member-level identity (upload/read); it
+# does NOT grant cluster GPU access (that stays admin/granted). Keys live in
+# ~/.dash_api_keys.json {hash: {label, created, owner}} (chmod 600, not in git).
+_API_KEYS_FILE = os.path.expanduser("~/.dash_api_keys.json")
+
+
+def _read_api_keys() -> dict:
+    try:
+        if os.path.isfile(_API_KEYS_FILE):
+            return json.load(open(_API_KEYS_FILE)) or {}
+    except Exception:
+        pass
+    return {}
+
+
+def _write_api_keys(d: dict) -> None:
+    tmp = _API_KEYS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(d, f, indent=2)
+    os.replace(tmp, _API_KEYS_FILE)
+    try:
+        os.chmod(_API_KEYS_FILE, 0o600)
+    except Exception:
+        pass
+
+
+def _check_api_key(request):
+    """Return the key record {label,...} if a valid X-API-Key is present, else None."""
+    try:
+        k = (request.headers.get("x-api-key") or "").strip()
+    except Exception:
+        k = ""
+    if not k:
+        return None
+    h = hashlib.sha256(k.encode()).hexdigest()
+    rec = _read_api_keys().get(h)
+    return rec if rec else None
+
+
 # Public paths (no auth required)
 _AUTH_EXEMPT_PATHS = {
     "/healthz",                      # cloudflared probe
@@ -281,6 +322,12 @@ async def _auth_and_rate_limit(request, call_next):
 
     # v3.0.130: a valid signed session cookie (Google login) authenticates first.
     if _session_user(request) is not None:
+        if n_fail > 0:
+            _AUTH_FAIL[ip] = (0, 0.0)
+        return await call_next(request)
+
+    # v3.0.140: our-own API key (X-API-Key) — for scripts / robots / other machines.
+    if _check_api_key(request) is not None:
         if n_fail > 0:
             _AUTH_FAIL[ip] = (0, 0.0)
         return await call_next(request)
@@ -1306,6 +1353,12 @@ def _actor_from_request(request) -> str:
     except Exception:
         pass
     try:
+        ak = _check_api_key(request)
+        if ak:
+            return ("key:" + str(ak.get("label") or "api"))[:80]
+    except Exception:
+        pass
+    try:
         xu = (request.headers.get("x-user") or "").strip()
         if xu:
             return xu[:80]
@@ -2184,6 +2237,61 @@ async def api_set_user_role(request: Request):
     return JSONResponse({"ok": True, "user_id": uid, "role": role})
 
 
+@app.get("/api/keys")
+def api_list_keys(request: Request):
+    """Admin: list API keys (labels + metadata, never the secret)."""
+    if not _is_admin(_actor_from_request(request)):
+        raise HTTPException(403, "Administrators only.")
+    out = []
+    for h, rec in _read_api_keys().items():
+        out.append({"label": rec.get("label"), "created": rec.get("created"),
+                    "owner": rec.get("owner"), "hash_prefix": h[:10]})
+    out.sort(key=lambda r: r.get("created") or "", reverse=True)
+    return JSONResponse({"ok": True, "keys": out})
+
+
+@app.post("/api/keys")
+async def api_create_key(request: Request):
+    """Admin: generate a new API key. The plaintext is returned ONCE."""
+    if not _is_admin(_actor_from_request(request)):
+        raise HTTPException(403, "Administrators only.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    label = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(body.get("label") or "").strip())[:40]
+    if not label:
+        raise HTTPException(400, "label required")
+    secret = "ak_" + _secrets.token_urlsafe(30)
+    h = hashlib.sha256(secret.encode()).hexdigest()
+    keys = _read_api_keys()
+    keys[h] = {"label": label, "created": time.strftime("%Y-%m-%dT%H:%M:%S"),
+               "owner": _actor_from_request(request)}
+    _write_api_keys(keys)
+    log.info(f"[apikey] created '{label}' by {_actor_from_request(request)}")
+    # returned once — not retrievable later
+    return JSONResponse({"ok": True, "label": label, "api_key": secret,
+                         "note": "Save this now — it is shown only once."})
+
+
+@app.post("/api/keys/revoke")
+async def api_revoke_key(request: Request):
+    if not _is_admin(_actor_from_request(request)):
+        raise HTTPException(403, "Administrators only.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    label = str(body.get("label") or "")
+    keys = _read_api_keys()
+    removed = [h for h, r in keys.items() if r.get("label") == label]
+    for h in removed:
+        keys.pop(h, None)
+    if removed:
+        _write_api_keys(keys)
+    return JSONResponse({"ok": True, "revoked": len(removed), "label": label})
+
+
 @app.post("/api/users/cluster_access")
 async def api_set_user_cluster_access(request: Request):
     """Admin-only: grant/revoke a member's permission to launch cluster GPU jobs."""
@@ -2249,6 +2357,14 @@ def users_page():
 <div class="wrap">
  <div class="note" id="note">loading…</div>
  <div class="tblwrap"><table id="tbl"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Cluster</th><th>Uploads</th><th>Images</th><th>Last seen</th><th id="acth" style="display:none">Manage</th></tr></thead><tbody></tbody></table></div>
+ <div id="keys-card" style="display:none;background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:16px;margin-top:16px">
+   <h3 style="margin:0 0 2px;font-size:15px">&#128273; API keys (our own &mdash; for scripts &amp; robots)</h3>
+   <div style="color:#64748b;font-size:12px;margin-bottom:10px">Other machines authenticate by sending <code>X-API-Key: ak_...</code> &mdash; no Google/paid key needed. Member-level (upload/read); does not grant cluster GPU.</div>
+   <input id="kl" placeholder="key label (e.g. humanoid-laptop)" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+   <button onclick="createKey()" style="border:0;cursor:pointer;background:#0e7c66;color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:8px">Generate key</button>
+   <div id="knew" style="font-size:12px;margin-top:8px"></div>
+   <div id="klist" style="font-size:13px;margin-top:10px"></div>
+ </div>
 </div>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -2262,7 +2378,7 @@ async function load(){
  if(!d.ok){note.textContent=esc(d.error||'error');return;}
  var adminNote=ME.is_admin?' · you are an <b>admin</b> — you can change roles &amp; cluster access':' · you are a <b>member</b>';
  note.innerHTML='<b>'+d.n+'</b> user(s)'+adminNote+(d.mongo?'':' · <span style="color:#d97706">Mongo offline</span>');
- if(ME.is_admin) document.getElementById('acth').style.display='';
+ if(ME.is_admin){document.getElementById('acth').style.display='';document.getElementById('keys-card').style.display='block';loadKeys();}
  var tb=document.querySelector('#tbl tbody');tb.innerHTML='';
  if(!d.users.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:1.4rem">No users yet.</td></tr>';return;}
  d.users.forEach(function(u){
@@ -2298,6 +2414,24 @@ async function setCluster(uid,allow){
  if(!confirm((allow?'Grant':'Revoke')+' cluster (GPU) access for '+uid+'?'))return;
  try{var d=await (await fetch('/api/users/cluster_access',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,allow:allow})})).json();
   if(d&&d.ok){load();}else{alert((d&&(d.detail||d.msg))||'failed');}}catch(e){alert(''+e);}
+}
+async function loadKeys(){
+ try{var d=await (await fetch('/api/keys',{credentials:'include'})).json();var el=document.getElementById('klist');
+  if(!d||!d.ok){el.textContent='';return;}
+  if(!d.keys.length){el.innerHTML='<span style="color:#94a3b8">no keys yet</span>';return;}
+  el.innerHTML=d.keys.map(function(k){return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #eef1f6"><span><b>'+esc(k.label)+'</b> <span style="color:#94a3b8">'+esc(k.created||'')+' \\u00b7 '+esc(k.hash_prefix)+'\\u2026</span></span><button onclick="revokeKey(\\''+esc(k.label)+'\\')" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:4px 9px;border-radius:7px;cursor:pointer">Revoke</button></div>';}).join('');
+ }catch(e){}
+}
+async function createKey(){
+ var lbl=(document.getElementById('kl').value||'').trim(),nw=document.getElementById('knew');
+ if(!lbl){nw.textContent='enter a label';return;}nw.textContent='\\u23f3';
+ try{var d=await (await fetch('/api/keys',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:lbl})})).json();
+  if(d&&d.ok){nw.innerHTML='\\u2705 <b>Save now (shown once):</b> <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px">'+esc(d.api_key)+'</code>';document.getElementById('kl').value='';loadKeys();}
+  else{nw.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){nw.textContent='\\u274c '+e;}
+}
+async function revokeKey(label){
+ if(!confirm('Revoke API key "'+label+'"? Machines using it will stop working.'))return;
+ try{await fetch('/api/keys/revoke',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:label})});loadKeys();}catch(e){}
 }
 load();
 </script></body></html>'''
