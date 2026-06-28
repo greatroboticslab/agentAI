@@ -347,6 +347,21 @@ _RESPONSIVE_CSS = (
     '</style>'
 )
 
+# v3.0.134: global "signed in as X · Logout" badge, injected before </body> on
+# every HTML page (one place). Fills itself from /api/me. Skipped on /login.
+_LOGIN_BADGE = (
+    '<div id="_authbadge" style="position:fixed;top:8px;right:10px;z-index:99999;'
+    'font:12px -apple-system,BlinkMacSystemFont,sans-serif"></div>'
+    '<script>(function(){fetch("/api/me",{credentials:"include"})'
+    '.then(function(r){return r.json();}).then(function(m){'
+    'if(!m||!m.ok)return;var el=document.getElementById("_authbadge");if(!el)return;'
+    'var who=m.user||"?";var star=m.is_admin?"\\u2605 ":"";'
+    'el.innerHTML="<span style=\\"background:#0f172a;color:#fff;padding:4px 10px;'
+    'border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,.25);opacity:.93\\">"+star+who'
+    '+" \\u00b7 <a href=\\"/logout\\" style=\\"color:#93c5fd;text-decoration:none\\">Logout</a></span>";'
+    '}).catch(function(){});})();</script>'
+)
+
 
 @app.on_event("startup")
 def _warm_cluster_master():
@@ -385,6 +400,10 @@ async def _inject_responsive_css(request: Request, call_next):
                 text = text.replace("</head>", _RESPONSIVE_CSS + "</head>", 1)
             else:
                 text = _RESPONSIVE_CSS + text
+        # v3.0.134: login badge on every page except the login page itself.
+        if ("_authbadge" not in text and request.url.path != "/login"
+                and "</body>" in text):
+            text = text.replace("</body>", _LOGIN_BADGE + "</body>", 1)
         body = text.encode("utf-8")
     except Exception:
         pass
@@ -1083,7 +1102,16 @@ def agent_weed():
       });
       var t=document.getElementById('toast');
       if(t){t.style.display='block';t.style.background='#fef9c3';t.style.color='#854d0e';
-        t.textContent='\\u2139 Harvest \\u0026 Train run on the shared GPU cluster and are limited to administrators. You can still upload datasets, browse, and review. Ask an admin for cluster access if needed.';}
+        var reqd=me.cluster_requested;
+        t.innerHTML='\\u2139 Harvest \\u0026 Train run on the shared GPU cluster and are limited to administrators. You can still upload datasets, browse, and review. '
+          +(reqd?'<b>Cluster access requested \\u2014 waiting for an admin.</b>'
+                :'<button id="reqcl" style="border:0;cursor:pointer;background:#0e7c66;color:#fff;font-weight:600;font-size:12px;padding:6px 12px;border-radius:7px;margin-left:6px">Request cluster access</button>');
+        var rb=document.getElementById('reqcl');
+        if(rb)rb.onclick=function(){rb.disabled=true;rb.textContent='\\u2026';
+          fetch('/api/cluster/request',{method:'POST',credentials:'include'}).then(function(r){return r.json();})
+           .then(function(d){rb.outerHTML=(d&&d.ok)?'<b>'+(d.already?'You already have access.':'Request sent to admins.')+'</b>':'\\u274c failed';})
+           .catch(function(e){rb.disabled=false;rb.textContent='Request cluster access';});};
+      }
     }
   }).catch(function(){});
 
@@ -1287,12 +1315,52 @@ def _can_use_cluster(actor: str) -> bool:
         return False
 
 
+# ---- v3.0.134 — members can request cluster access; admins see + grant ------ #
+_CLUSTER_REQ_FILE = REPO / "results" / "framework" / "cluster_requests.json"
+
+
+def _read_cluster_requests() -> dict:
+    try:
+        if _CLUSTER_REQ_FILE.is_file():
+            return json.load(open(_CLUSTER_REQ_FILE)) or {}
+    except Exception:
+        pass
+    return {}
+
+
+def _write_cluster_requests(d: dict) -> None:
+    _CLUSTER_REQ_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = str(_CLUSTER_REQ_FILE) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(d, f, indent=2)
+    os.replace(tmp, _CLUSTER_REQ_FILE)
+
+
 @app.get("/api/me")
 def api_me(request: Request):
     actor = _actor_from_request(request)
+    reqs = _read_cluster_requests()
     return JSONResponse({"ok": True, "user": actor,
                          "is_admin": _is_admin(actor),
-                         "can_use_cluster": _can_use_cluster(actor)})
+                         "can_use_cluster": _can_use_cluster(actor),
+                         "cluster_requested": actor in reqs})
+
+
+@app.post("/api/cluster/request")
+async def api_cluster_request(request: Request):
+    """A signed-in member asks an admin for cluster (GPU) access."""
+    actor = _actor_from_request(request)
+    if _can_use_cluster(actor):
+        return JSONResponse({"ok": True, "already": True,
+                             "msg": "You already have cluster access."})
+    reqs = _read_cluster_requests()
+    reqs[actor] = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    try:
+        _write_cluster_requests(reqs)
+    except Exception as e:
+        raise HTTPException(500, f"could not record request: {e}")
+    log.info(f"[cluster] access requested by {actor}")
+    return JSONResponse({"ok": True, "msg": "Request sent to administrators."})
 
 
 def _read_manual_uploads() -> dict:
@@ -1643,6 +1711,7 @@ def api_users():
         a["images"] += int(info.get("local_images", 0) or 0)
         a["slugs"].append(slug)
     seeds = _admin_emails()
+    creq = _read_cluster_requests()
     rows = []
     seen = set()
     for u in users:
@@ -1658,6 +1727,7 @@ def api_users():
             "uploads": a["datasets"], "images": a["images"],
             "can_use_cluster": bool(eff_admin or u.get("can_use_cluster")),
             "is_seed_admin": str(uid).lower() in seeds,
+            "requested_cluster": uid in creq,
         })
     # uploaders that aren't in the users table yet (e.g. Mongo was down on upload)
     for who, a in agg.items():
@@ -1667,7 +1737,8 @@ def api_users():
                          "role": "admin" if eff_admin else "member",
                          "auth_provider": "unknown", "created_at": "", "last_seen": "",
                          "uploads": a["datasets"], "images": a["images"],
-                         "can_use_cluster": eff_admin, "is_seed_admin": eff_admin})
+                         "can_use_cluster": eff_admin, "is_seed_admin": eff_admin,
+                         "requested_cluster": who in creq})
     rows.sort(key=lambda r: (-(r["uploads"]), r["user_id"]))
     return JSONResponse({"ok": True, "n": len(rows), "users": rows,
                          "mongo": (len(users) > 0)})
@@ -1712,6 +1783,14 @@ async def api_set_user_cluster_access(request: Request):
     ok = _dbu.set_user_cluster_access(uid, allow, actor=_actor_from_request(request))
     if not ok:
         raise HTTPException(503, "database unavailable")
+    # clear any pending access request once handled
+    try:
+        reqs = _read_cluster_requests()
+        if uid in reqs:
+            reqs.pop(uid, None)
+            _write_cluster_requests(reqs)
+    except Exception:
+        pass
     return JSONResponse({"ok": True, "user_id": uid, "can_use_cluster": allow})
 
 
@@ -1770,7 +1849,7 @@ async function load(){
  if(!d.users.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:1.4rem">No users yet.</td></tr>';return;}
  d.users.forEach(function(u){
   var tr=document.createElement('tr');
-  var cluster=u.can_use_cluster?'<span class="pill yes">allowed</span>':'<span class="pill no">no</span>';
+  var cluster=u.can_use_cluster?'<span class="pill yes">allowed</span>':(u.requested_cluster?'<span class="pill" style="background:#fef3c7;color:#92400e">\\u23f3 requested</span>':'<span class="pill no">no</span>');
   var html='<td><b>'+esc(u.name)+'</b><br><span style="color:#94a3b8;font-size:11px">'+esc(u.user_id)+'</span></td>'
    +'<td>'+esc(u.email||'\\u2014')+'</td>'
    +'<td><span class="role '+(u.role==='admin'?'admin':'member')+'">'+esc(u.role)+'</span></td>'

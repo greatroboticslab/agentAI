@@ -4661,3 +4661,16 @@ what; admins (Harry + lab account) control who may use the cluster.
 - weed Mission Control disables Harvest/Train for members with an explanatory note.
 - db: set_user_role, set_user_cluster_access (upsert so an admin can pre-authorize a user who hasn't
   logged in yet); /api/users now returns role (seed-aware) + can_use_cluster.
+
+
+---
+
+### v3.0.134 — Login badge + member cluster-access requests
+
+- **Global login badge**: every page (except /login) now shows a fixed top-right "★ <user> · Logout"
+  badge, injected by the responsive-CSS middleware and filled from /api/me. Users can finally see who
+  they're signed in as and log out from anywhere.
+- **Request cluster access**: members hitting the GPU buttons on weed Mission Control now get a
+  "Request cluster access" button → POST /api/cluster/request records it; admins see a "⏳ requested"
+  badge in /users and grant with one click; granting clears the request. /api/me reports
+  cluster_requested.
