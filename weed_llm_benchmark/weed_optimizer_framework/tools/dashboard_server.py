@@ -1114,6 +1114,7 @@ def agent_weed():
      <a href="/labeling"><div class="ic">&#9989;</div><div class="nm">Review &amp; Label</div><div class="ds">Human-in-the-loop labeling queue.</div></a>
      <a href="/rounds"><div class="ic">&#128200;</div><div class="nm">Rounds &amp; Results</div><div class="ds">Harvest rounds and training metrics.</div></a>
      <a href="/users"><div class="ic">&#128100;</div><div class="nm">Users</div><div class="ds">Who signed in &amp; uploaded what.</div></a>
+     <a href="/models"><div class="ic">&#129504;</div><div class="nm">Models</div><div class="ds">Pick the LLM/VLM per agent role.</div></a>
      <a href="/manual"><div class="ic">&#128214;</div><div class="nm">Manual</div><div class="ds">Architecture &amp; full pipeline docs.</div></a>
      <a href="/console"><div class="ic">&#9881;</div><div class="nm">Advanced Console</div><div class="ds">All raw controls &amp; cluster ops.</div></a>
    </div>
@@ -1429,6 +1430,172 @@ async def api_cluster_request(request: Request):
         raise HTTPException(500, f"could not record request: {e}")
     log.info(f"[cluster] access requested by {actor}")
     return JSONResponse({"ok": True, "msg": "Request sent to administrators."})
+
+
+# ===========================================================================
+# v3.0.138 — Model registry: pick which LLM/VLM each agent role uses (local
+# Ollama or DeepSeek/GLM/OpenAI/Anthropic API or a cluster vLLM endpoint).
+# Flexible switching done right (see llm_providers.py + docs/PLATFORM_ROADMAP).
+# ===========================================================================
+_MODEL_CONFIG_FILE = REPO / "results" / "framework" / "model_config.json"
+_MODEL_ROLES = {
+    "brain": "Agent reasoning / harvest decisions",
+    "curation": "Dataset quality judging",
+    "labeling_vlm": "VLM captioning / label assist",
+}
+_DEFAULT_MODELS = {"brain": "ollama:gemma2", "curation": "ollama:gemma2",
+                   "labeling_vlm": "ollama:llava"}
+_SUGGESTED_MODELS = [
+    "ollama:gemma2:9b", "ollama:qwen2.5:7b", "ollama:llava",
+    "deepseek:deepseek-chat", "deepseek:deepseek-reasoner",
+    "glm:glm-4-flash", "glm:glm-4.6",
+    "openai:gpt-4o-mini", "anthropic:claude-3-5-sonnet-20241022",
+    "vllm@http://NODE:8000/v1:deepseek-ai/DeepSeek-V3",
+]
+
+
+def _read_model_config() -> dict:
+    cfg = {"roles": dict(_DEFAULT_MODELS)}
+    try:
+        if _MODEL_CONFIG_FILE.is_file():
+            saved = json.load(open(_MODEL_CONFIG_FILE)) or {}
+            cfg["roles"].update(saved.get("roles") or {})
+    except Exception:
+        pass
+    return cfg
+
+
+def _write_model_config(cfg: dict) -> None:
+    _MODEL_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = str(_MODEL_CONFIG_FILE) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cfg, f, indent=2)
+    os.replace(tmp, _MODEL_CONFIG_FILE)
+
+
+@app.get("/api/models")
+def api_models():
+    try:
+        from . import llm_providers as _llm
+        providers = _llm.provider_status()
+    except Exception as e:
+        providers = {"error": str(e)}
+    cfg = _read_model_config()
+    roles = {r: {"model": cfg["roles"].get(r, _DEFAULT_MODELS.get(r, "")),
+                 "desc": _MODEL_ROLES[r]} for r in _MODEL_ROLES}
+    return JSONResponse({"ok": True, "roles": roles, "providers": providers,
+                         "suggested": _SUGGESTED_MODELS})
+
+
+@app.post("/api/models/role")
+async def api_set_model_role(request: Request):
+    if not _is_admin(_actor_from_request(request)):
+        raise HTTPException(403, "Administrators only.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    role = str(body.get("role") or "")
+    model = str(body.get("model") or "").strip()
+    if role not in _MODEL_ROLES:
+        raise HTTPException(400, f"role must be one of {list(_MODEL_ROLES)}")
+    if not model or ":" not in model:
+        raise HTTPException(400, "model must look like provider:name")
+    cfg = _read_model_config()
+    cfg["roles"][role] = model
+    _write_model_config(cfg)
+    log.info(f"[models] {role} -> {model} by {_actor_from_request(request)}")
+    return JSONResponse({"ok": True, "role": role, "model": model})
+
+
+@app.post("/api/models/test")
+async def api_test_model(request: Request):
+    if not _is_admin(_actor_from_request(request)):
+        raise HTTPException(403, "Administrators only.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    model = str(body.get("model") or "").strip()
+    prompt = str(body.get("prompt") or "Reply with exactly: OK")
+    if not model or ":" not in model:
+        raise HTTPException(400, "model must look like provider:name")
+    try:
+        from . import llm_providers as _llm
+        res = _llm.chat(model, prompt, max_tokens=64, timeout=45)
+    except Exception as e:
+        res = {"ok": False, "error": str(e), "model": model}
+    return JSONResponse(res)
+
+
+@app.get("/models", response_class=HTMLResponse)
+def models_page():
+    """v3.0.138 — choose the model/provider per agent role (admins edit, all view)."""
+    html = '''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Models</title><style>
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
+ .top{background:#0b1220;padding:10px 16px}.top a{display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px}
+ .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.3rem 2rem}.hero h1{margin:0 0 .3rem}.hero .sub{opacity:.85;font-size:13px;line-height:1.5}
+ .wrap{padding:1.2rem 2rem;max-width:920px;margin:0 auto}
+ .card{background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:16px 18px;margin-bottom:14px}
+ .card h3{margin:0 0 2px;font-size:15px}.card .d{color:#64748b;font-size:12px;margin-bottom:10px}
+ input,select{padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px}
+ input{width:340px;max-width:100%}
+ button{border:0;cursor:pointer;background:#0e7c66;color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:8px}
+ button.sec{background:#eef2ff;color:#2563eb}
+ .prov{display:flex;gap:8px;flex-wrap:wrap;margin:.4rem 0}
+ .pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+ .pill.on{background:#dcfce7;color:#166534}.pill.off{background:#f1f5f9;color:#64748b}
+ .msg{font-size:12px;color:#475569;margin-left:8px}
+ code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:12px}
+</style></head><body>
+<div class="top"><a href="/">&larr; Agents</a></div>
+<div class="hero"><h1>&#129504; Models</h1><div class="sub">Which model each agent role uses. Mix local (Ollama) and APIs (DeepSeek / GLM / OpenAI / Anthropic) or a cluster vLLM endpoint &mdash; switch any time. Model id = <code>provider:name</code>.</div></div>
+<div class="wrap">
+ <div class="card"><h3>Providers</h3><div class="d">Green = ready to use now. API keys live in <code>~/.llm_keys</code> on the server (DEEPSEEK_API_KEY, ZHIPU_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY). Ollama = a local model server.</div><div class="prov" id="prov">loading…</div></div>
+ <div id="roles"></div>
+ <div class="card"><h3>Test a model</h3><div class="d">Send a tiny prompt to verify a model id works (admin).</div>
+   <input id="tm" placeholder="e.g. deepseek:deepseek-chat or ollama:gemma2"> <button onclick="testModel()">Test</button>
+   <div class="msg" id="tmsg"></div></div>
+ <div class="card" style="background:#fffbeb;border-color:#fde68a"><h3>Note on big models on the cluster</h3><div class="d" style="color:#92400e">Bridges-2 has H100-80GB nodes that can host DeepSeek-V3/V4 &amp; GLM-4.6 &mdash; but only as time-limited batch jobs (shared queue, no always-on server). For the agents&rsquo; sporadic reasoning, APIs are cheaper &amp; instant; for bulk work over a whole dataset, run a cluster batch job that exposes a <code>vllm@&lt;url&gt;:&lt;model&gt;</code> endpoint and point a role at it.</div></div>
+</div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+var ME={is_admin:false},DATA={};
+async function load(){
+ try{ME=await (await fetch('/api/me',{credentials:'include'})).json();}catch(e){}
+ DATA=await (await fetch('/api/models',{credentials:'include'})).json();
+ var pv=document.getElementById('prov');pv.innerHTML='';
+ var P=DATA.providers||{};
+ Object.keys(P).forEach(function(k){var p=P[k];if(p&&typeof p==='object'){
+   pv.innerHTML+='<span class="pill '+(p.configured?'on':'off')+'">'+esc(k)+(p.configured?' \\u2713':' \\u2014 '+esc(p.needs||''))+'</span>';}});
+ var rs=document.getElementById('roles');rs.innerHTML='';
+ var sug=(DATA.suggested||[]).map(function(s){return '<option value="'+esc(s)+'">'+esc(s)+'</option>';}).join('');
+ Object.keys(DATA.roles||{}).forEach(function(role){
+  var r=DATA.roles[role];
+  var ctl=ME.is_admin
+    ? '<input id="in_'+role+'" value="'+esc(r.model)+'" list="sug"> <button onclick="saveRole(\\''+role+'\\')">Save</button> <button class="sec" onclick="testRole(\\''+role+'\\')">Test</button> <span class="msg" id="m_'+role+'"></span>'
+    : '<code>'+esc(r.model)+'</code>';
+  rs.innerHTML+='<div class="card"><h3>'+esc(role)+'</h3><div class="d">'+esc(r.desc)+'</div>'+ctl+'</div>';
+ });
+ rs.innerHTML+='<datalist id="sug">'+sug+'</datalist>';
+}
+async function saveRole(role){
+ var m=document.getElementById('in_'+role).value.trim(),el=document.getElementById('m_'+role);
+ el.textContent='\\u23f3';
+ try{var d=await (await fetch('/api/models/role',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:role,model:m})})).json();
+  el.textContent=d&&d.ok?'\\u2705 saved':'\\u274c '+((d&&(d.detail||d.msg))||'failed');}catch(e){el.textContent='\\u274c '+e;}
+}
+async function testRole(role){var m=document.getElementById('in_'+role).value.trim();_test(m,document.getElementById('m_'+role));}
+async function testModel(){_test(document.getElementById('tm').value.trim(),document.getElementById('tmsg'));}
+async function _test(model,el){
+ if(!model){el.textContent='enter a model id';return;}el.textContent='\\u23f3 testing\\u2026';
+ try{var d=await (await fetch('/api/models/test',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:model})})).json();
+  el.textContent=d&&d.ok?('\\u2705 '+esc((d.text||'').slice(0,80))):'\\u274c '+esc(d&&(d.error||d.detail||'failed'));}catch(e){el.textContent='\\u274c '+e;}
+}
+load();
+</script></body></html>'''
+    return HTMLResponse(html)
 
 
 def _read_manual_uploads() -> dict:

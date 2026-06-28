@@ -4706,3 +4706,21 @@ any pre-existing domain (incl. weed) defaults to image / detection / yolo.
   format + n_local_files. "Nothing gets rejected" for declared modalities.
 - Foundation for per-task training templates, per-domain eval, and the physical-AI sensor/RL tracks
   (see docs/PLATFORM_ROADMAP.md).
+
+
+---
+
+### v3.0.138 — Model/provider abstraction (flexible LLM switching, done right)
+
+Answer to "deploy DeepSeek-V4 / GLM on the cluster?": Bridges-2 DOES have H100-80GB nodes that can
+host them — but only as time-limited batch jobs on a shared queue (no persistent always-on server,
+SU budget). So the right design is a provider abstraction, not a hosted 671B model for sporadic calls.
+- **weed_optimizer_framework/tools/llm_providers.py** (stdlib only): unified chat() routing by model
+  id `provider:name` — `ollama:` (local), `deepseek:` / `glm:` / `openai:` (OpenAI-compatible APIs),
+  `anthropic:`, and `vllm@<url>:<model>` (a cluster batch job serving a big model). Keys in
+  ~/.llm_keys or env. provider_status() reports what's ready.
+- **/models admin page** + /api/models, /api/models/role, /api/models/test: pick the model per agent
+  role (brain / curation / labeling_vlm), see which providers are configured, and test any model id.
+  Members view; admins edit. "Models" card added to the weed workspace.
+- Foundation so agents use the best model per task and switch local↔API any time. (Wiring the harvest
+  brain to read this registry is the next step.)
