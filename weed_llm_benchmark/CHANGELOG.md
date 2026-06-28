@@ -4878,3 +4878,14 @@ upload→other pages). All smooth; one straggler fixed: the project/weed page ba
 "← Agents" (the class="bc" variant was missed by the earlier rename) → now "← Projects". Journey is
 consistent: login redirect, onboarding, nav, 0 Chinese, agents section, upload, empty-state CTA, no
 dead ends. Extended smoke 47/47.
+
+
+---
+
+### v3.0.152 — Model selection (agent-builder loop V1)
+
+"模型自由选" is now real where it matters:
+- Train panel: a model dropdown (auto / YOLO11 n,s,m,l) → /api/train/submit maps model_size to the
+  concrete task weight (yolo11{size}{-cls/-seg}.pt); auto keeps the per-task default.
+- Add-agent form: a per-agent model dropdown (auto / YOLO11 sizes / RF-DETR / Gemma4-cluster / custom)
+  stored in the agent's config.model and shown on each agent row.

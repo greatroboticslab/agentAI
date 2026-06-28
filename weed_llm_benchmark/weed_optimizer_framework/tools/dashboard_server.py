@@ -1435,6 +1435,7 @@ async def api_project_agent_add(request: Request):
     domain_id = re.sub(r"[^a-z0-9_]+", "", str(body.get("project") or body.get("domain") or "").lower())[:40]
     atype = str(body.get("type") or "").strip().lower()
     name = str(body.get("name") or "").strip()[:60]
+    model = re.sub(r"[^A-Za-z0-9_.:@/-]", "", str(body.get("model") or "auto"))[:60] or "auto"
     if not domain_id:
         raise HTTPException(400, "project required")
     if atype not in _AGENT_TYPES:
@@ -1446,7 +1447,7 @@ async def api_project_agent_add(request: Request):
     actor = _actor_from_request(request)
     if not _can_manage_agent(actor, dom):
         raise HTTPException(403, "only the project's owner or an admin can add agents")
-    a = _db.add_project_agent(domain_id, atype, name or atype, actor=actor)
+    a = _db.add_project_agent(domain_id, atype, name or atype, actor=actor, model=model)
     if a is None:
         raise HTTPException(503, "database unavailable")
     return JSONResponse({"ok": True, "agent": a})
@@ -1795,6 +1796,11 @@ async def api_train_submit(request: Request):
     model = str(body.get("model") or dd.get("model") or "auto")
     if not model.endswith(".pt"):
         model = "auto"   # let the template pick the right yolo11n-* per task
+    # v3.0.152: model SIZE picker (n/s/m/l) → a concrete YOLO11 weight for the task.
+    msize = str(body.get("model_size") or "auto").strip().lower()
+    if msize in ("n", "s", "m", "l"):
+        _suf = {"classify": "-cls", "segment": "-seg"}.get(ultra, "")
+        model = f"yolo11{msize}{_suf}.pt"
     # v3.0.148: learning paradigm. Only supervised is wired today; the others are
     # honestly rejected (scaffolded) rather than silently running supervised.
     paradigm = str(body.get("paradigm") or "supervised").strip().lower()
@@ -2964,6 +2970,7 @@ def agent_generic(domain_id: str):
              + '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;'
                'background:#eef2ff;color:#1d4ed8">' + _h.escape(str(a.get("type", ""))) + '</span>'
              + '<b>' + _h.escape(str(a.get("name") or a.get("type", ""))) + '</b>'
+             + '<span style="color:#94a3b8;font-size:12px">' + _h.escape(str((a.get("config") or {}).get("model") or "auto")) + '</span>'
              + '<span style="color:#94a3b8;margin-left:auto">' + _h.escape(str(a.get("status", "idle"))) + '</span>'
              + '<button data-type="' + _h.escape(str(a.get("type", ""))) + '" '
                'style="border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;'
@@ -3031,6 +3038,15 @@ def agent_generic(domain_id: str):
        <option value="custom">Custom</option>
      </select>
      <input id="ag-name" placeholder="name (optional)" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+     <select id="ag-model" title="model for this agent" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+       <option value="auto">model: auto</option>
+       <option value="yolo11n.pt">YOLO11-n</option>
+       <option value="yolo11s.pt">YOLO11-s</option>
+       <option value="yolo11m.pt">YOLO11-m</option>
+       <option value="rf-detr">RF-DETR</option>
+       <option value="ollama:gemma4">Gemma4 (LLM, cluster)</option>
+       <option value="custom">custom</option>
+     </select>
      <button onclick="addAgent()" style="border:0;cursor:pointer;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#43; Add agent</button>
      <span id="ag-msg" style="font-size:12px;color:#475569"></span>
    </div>
@@ -3065,6 +3081,13 @@ def agent_generic(domain_id: str):
          <option value="self_supervised">self-supervised (coming)</option>
          <option value="rl">reinforcement (coming)</option>
          <option value="multi_strategy">multi-strategy (coming)</option>
+       </select>
+       <select id="tr-model" title="model" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+         <option value="auto">model: auto</option>
+         <option value="n">YOLO11-n (fast)</option>
+         <option value="s">YOLO11-s</option>
+         <option value="m">YOLO11-m</option>
+         <option value="l">YOLO11-l (accurate)</option>
        </select>
        <label style="font-size:13px;color:#334">epochs <input id="tr-ep" type="number" value="20" min="1" max="300" style="width:70px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
        <button id="tr-go" onclick="submitTrain()" style="border:0;cursor:pointer;background:#7c3aed;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#128640; Train</button>
@@ -3144,8 +3167,9 @@ loadTrainDatasets();
 }catch(e){}})();
 async function addAgent(){
  var t=document.getElementById('ag-type').value,nm=document.getElementById('ag-name').value.trim(),m=document.getElementById('ag-msg');
+ var mdl=(document.getElementById('ag-model')||{}).value||'auto';
  m.textContent='\\u23f3';
- try{var d=await (await fetch('/api/project/agent/add',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:'__DOM__',type:t,name:nm})})).json();
+ try{var d=await (await fetch('/api/project/agent/add',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:'__DOM__',type:t,name:nm,model:mdl})})).json();
   if(d&&d.ok){m.textContent='\\u2705 added';setTimeout(function(){location.reload();},600);}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){m.textContent='\\u274c '+e;}
 }
 async function removeAgent(aid){
@@ -3206,9 +3230,10 @@ async function submitTrain(){
  var sel=document.getElementById('tr-ds'),ep=document.getElementById('tr-ep'),msg=document.getElementById('tr-msg'),go=document.getElementById('tr-go');
  var slug=sel.value;if(!slug){msg.textContent='\\u26a0 choose a dataset';return;}
  var para=(document.getElementById('tr-para')||{}).value||'supervised';
- if(!confirm('Stage "'+slug+'" to the cluster and submit a '+para+' GPU training job?'))return;
+ var msz=(document.getElementById('tr-model')||{}).value||'auto';
+ if(!confirm('Stage "'+slug+'" to the cluster and submit a '+para+' GPU training job (model: '+msz+')?'))return;
  go.disabled=true;msg.textContent='\\u23f3 staging + submitting\\u2026';
- try{var d=await (await fetch('/api/train/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,epochs:parseInt(ep.value||'20'),paradigm:para})})).json();
+ try{var d=await (await fetch('/api/train/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,epochs:parseInt(ep.value||'20'),paradigm:para,model_size:msz})})).json();
   msg.textContent=(d&&d.ok)?('\\u2705 submitted ('+d.task+', '+d.epochs+'ep) \\u2014 '+(d.msg||'')):'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
  catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
 }

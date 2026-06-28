@@ -481,7 +481,7 @@ def update_domain(domain_id: str, fields: dict, actor: str = "user") -> Optional
 
 
 def add_project_agent(domain_id: str, atype: str, name: str = "",
-                      actor: str = "user") -> Optional[dict]:
+                      actor: str = "user", model: str = "auto") -> Optional[dict]:
     """v3.0.146: add an AGENT component to a PROJECT (domain). A project holds
     0..N agents, freely composed (collector/filter/labeler/trainer/evaluator/
     custom). Returns the new agent dict, or None."""
@@ -490,7 +490,8 @@ def add_project_agent(domain_id: str, atype: str, name: str = "",
     if db is None:
         return None
     agent = {"id": _s.token_hex(4), "type": atype, "name": name or atype,
-             "created_at": _now().isoformat(), "status": "idle", "config": {}}
+             "created_at": _now().isoformat(), "status": "idle",
+             "config": {"model": model or "auto"}}
     try:
         r = db[COLL_DOMAINS].update_one({"_id": domain_id}, {"$push": {"agents": agent}})
         if r.matched_count == 0:
