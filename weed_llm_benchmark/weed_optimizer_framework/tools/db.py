@@ -490,7 +490,7 @@ def add_project_agent(domain_id: str, atype: str, name: str = "",
     if db is None:
         return None
     agent = {"id": _s.token_hex(4), "type": atype, "name": name or atype,
-             "created_at": _now(), "status": "idle", "config": {}}
+             "created_at": _now().isoformat(), "status": "idle", "config": {}}
     try:
         r = db[COLL_DOMAINS].update_one({"_id": domain_id}, {"$push": {"agents": agent}})
         if r.matched_count == 0:
@@ -551,7 +551,7 @@ def create_domain(domain_id: str, display_name: str, taxonomy=None,
             "owner": owner or "",
             "research_field": research_field or "",
             "agents": [],
-            "created_at": _now(),
+            "created_at": _now().isoformat(),
         }
         db[COLL_DOMAINS].insert_one(doc)
         return doc
