@@ -1414,6 +1414,17 @@ def api_agent_types():
     return JSONResponse({"ok": True, "types": _AGENT_TYPES})
 
 
+@app.get("/api/project/agents")
+def api_project_agents(project: str = ""):
+    """List a project's agent components."""
+    domain_id = re.sub(r"[^a-z0-9_]+", "", (project or "").lower())[:40]
+    from . import db as _db
+    d = _db.get_domain(domain_id)
+    if not d:
+        raise HTTPException(404, f"no project '{domain_id}'")
+    return JSONResponse({"ok": True, "project": domain_id, "agents": d.get("agents") or []})
+
+
 @app.post("/api/project/agent/add")
 async def api_project_agent_add(request: Request):
     """Add an agent component to a project (owner or admin)."""

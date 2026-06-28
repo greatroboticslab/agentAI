@@ -75,12 +75,33 @@ print(body+'.'+b(hmac.new(key,body.encode(),hashlib.sha256).digest()))
 PY
 }
   M=$(mkc smoke_member@example.com)
+  M2=$(mkc smoke_other@example.com)
   ck "member train -> 403"        403  "$(HC -H "Cookie: agentai_session=$M" -X POST "$BASE/api/cluster_action/clean_train_d")"
   ck "member set_role -> 403"     403  "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"user_id":"x","role":"admin"}' "$BASE/api/users/role")"
   ck "member cluster_access ->403" 403 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"user_id":"x","allow":true}' "$BASE/api/users/cluster_access")"
   ck "member can_use_cluster=false" false "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/me" | python3 -c "import json,sys;print(str(json.load(sys.stdin)['can_use_cluster']).lower())" 2>/dev/null)"
+
+  echo "== PROJECT / AGENT lifecycle (member) =="
+  HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj"}' "$BASE/api/agent/delete" >/dev/null  # clean stale
+  ck "member create project" 200 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"name":"smoke proj","research_field":"testing","modality":["image"]}' "$BASE/api/agent/create")"
+  ck "add agent (collector)" 200 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"project":"smoke_proj","type":"collector"}' "$BASE/api/project/agent/add")"
+  ck "agents list = 1" 1 "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/project/agents?project=smoke_proj" | python3 -c "import json,sys;print(len(json.load(sys.stdin)['agents']))" 2>/dev/null)"
+  AID=$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/project/agents?project=smoke_proj" | python3 -c "import json,sys;a=json.load(sys.stdin)['agents'];print(a[0]['id'] if a else '')" 2>/dev/null)
+  ck "non-owner add agent -> 403" 403 "$(HC -H "Cookie: agentai_session=$M2" -X POST -H 'Content-Type: application/json' -d '{"project":"smoke_proj","type":"filter"}' "$BASE/api/project/agent/add")"
+  ck "owner remove agent" 200 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d "{\"project\":\"smoke_proj\",\"agent_id\":\"$AID\"}" "$BASE/api/project/agent/remove")"
+  ck "agents list = 0" 0 "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/project/agents?project=smoke_proj" | python3 -c "import json,sys;print(len(json.load(sys.stdin)['agents']))" 2>/dev/null)"
+  # upload a dataset to the project, then delete project should cascade it away
+  TMP2=$(mktemp -d); mkdir -p "$TMP2/images"
+  python3 -c "import base64;from pathlib import Path;Path('$TMP2/images/a.png').write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/1eqAAAAAElFTkSuQmCC'))"
+  ( cd "$TMP2" && zip -qr d.zip images )
+  PSLUG=$(curl -s -H "Cookie: agentai_session=$M" --max-time 40 -X POST -H 'Content-Type: application/zip' --data-binary @"$TMP2/d.zip" "$BASE/api/dataset/upload?domain=smoke_proj&name=smokeds" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+  ck "project upload listed" yes "$(curl -s -H "Cookie: agentai_session=$M" --max-time 20 "$BASE/api/dataset/uploads?domain=smoke_proj" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['uploads'] else 'no')" 2>/dev/null)"
+  ck "non-owner delete project -> 403" 403 "$(HC -H "Cookie: agentai_session=$M2" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj"}' "$BASE/api/agent/delete")"
+  ck "owner delete project (cascade)" 200 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj"}' "$BASE/api/agent/delete")"
+  ck "project datasets gone after delete" 0 "$(curl -s -H "Cookie: agentai_session=$M" --max-time 20 "$BASE/api/dataset/uploads?domain=smoke_proj" | python3 -c "import json,sys;print(len(json.load(sys.stdin)['uploads']))" 2>/dev/null)"
+  rm -rf "$TMP2"
 else
-  skip=$((skip+4)); echo "  SKIP  RBAC cookie checks (no ~/.dash_session_key on this host)"
+  skip=$((skip+12)); echo "  SKIP  RBAC + project/agent cookie checks (no ~/.dash_session_key on this host)"
 fi
 
 echo ""

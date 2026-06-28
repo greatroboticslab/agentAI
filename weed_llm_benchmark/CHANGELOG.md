@@ -4857,3 +4857,13 @@ Polished the entry experience for a new member:
   by owner (with a friendly empty hint when you own none).
 - Empty-state CTA on a project with no datasets ("No datasets yet — drop a .zip above or add a
   Collector agent") instead of a blank wall.
+
+
+---
+
+### v3.0.150 — Test suite covers project/agent lifecycle (UX loop R6)
+
+- New GET /api/project/agents?project= (list a project's agent components).
+- tests/smoke_test.sh now exercises the full member journey as a regression net: create project →
+  add agent → list → non-owner add 403 → owner remove → upload dataset → non-owner delete 403 →
+  owner delete (cascade) → datasets gone. ~12 new checks.
