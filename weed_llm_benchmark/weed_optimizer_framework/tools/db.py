@@ -421,20 +421,39 @@ def get_domain(domain_id: str) -> Optional[dict]:
         return None
 
 
+# v3.0.137: generalized agent schema. An agent (domain) is no longer implicitly
+# image+YOLO+detection — it declares its MODALITY (what kind of data), TASK (what
+# it learns), and MODEL. Defaults keep every pre-v3.0.137 domain (incl. weed)
+# behaving exactly as before (image / detection / yolo).
+TASKS = ["detection", "classification", "segmentation", "pose", "tracking",
+         "rl_policy", "ssl_pretrain"]
+MODALITIES = ["image", "video", "sensor", "pointcloud", "audio", "text"]
+# sensible default headline metric per task
+_TASK_DEFAULT_METRIC = {
+    "detection": "mAP50-95", "classification": "top1_accuracy",
+    "segmentation": "mIoU", "pose": "PCK", "tracking": "MOTA",
+    "rl_policy": "success_rate", "ssl_pretrain": "linear_probe_acc",
+}
+
+
 def create_domain(domain_id: str, display_name: str, taxonomy=None,
-                  target_metric: str = "mAP50-95", harvest_queries=None,
-                  n_subagents: int = 2, status: str = "created") -> Optional[dict]:
-    """v3.0.107: insert a new dataset-collection-agent domain doc. Additive —
-    a domain is just config (Prof's multi-domain design). Returns the created
-    doc, the string "exists" if the id is taken, or None if Mongo is down.
-    NOTE: this only registers the domain; wiring its harvest pipeline (the
-    brain using `harvest_queries`) + domain-scoped data views is a later step."""
+                  target_metric: str = None, harvest_queries=None,
+                  n_subagents: int = 2, status: str = "created",
+                  task: str = "detection", modality=None,
+                  model: str = "auto") -> Optional[dict]:
+    """v3.0.107/137: insert a new agent (domain) doc. Additive config — a domain
+    declares task / modality / model so the platform generalizes beyond weed.
+    Returns the created doc, "exists" if taken, or None if Mongo is down."""
     db = _get_db()
     if db is None:
         return None
     try:
         if db[COLL_DOMAINS].find_one({"_id": domain_id}):
             return "exists"
+        task = task if task in TASKS else "detection"
+        mods = [m for m in (modality or ["image"]) if m in MODALITIES] or ["image"]
+        if not target_metric:
+            target_metric = _TASK_DEFAULT_METRIC.get(task, "mAP50-95")
         doc = {
             "_id": domain_id,
             "display_name": display_name,
@@ -443,6 +462,9 @@ def create_domain(domain_id: str, display_name: str, taxonomy=None,
             "harvest_queries": list(harvest_queries or []),
             "n_subagents": int(n_subagents),
             "status": status,
+            "task": task,
+            "modality": mods,
+            "model": model or "auto",
         }
         db[COLL_DOMAINS].insert_one(doc)
         return doc

@@ -930,17 +930,48 @@ def root():
    <h3>Create a new agent</h3>
    <p class="h">Each agent owns one domain and runs the same collect &rarr; review &rarr; train pipeline.</p>
    <label>Agent name</label>
-   <input id="agName" placeholder="e.g. Crop Disease, Pest, Aerial Crops">
+   <input id="agName" placeholder="e.g. Crop Disease, Warehouse Robot, Drone Survey">
    <div class="row2">
-     <div><label>Task type</label>
-       <select id="agType"><option>detection</option><option>classification</option><option>segmentation</option></select></div>
+     <div><label>Task</label>
+       <select id="agType">
+         <option value="detection">detection (boxes)</option>
+         <option value="classification">classification</option>
+         <option value="segmentation">segmentation (masks)</option>
+         <option value="pose">pose / keypoints</option>
+         <option value="tracking">tracking</option>
+         <option value="rl_policy">RL / policy (control)</option>
+         <option value="ssl_pretrain">self-supervised pretrain</option>
+       </select></div>
+     <div><label>Model</label>
+       <select id="agModel">
+         <option value="auto">auto (recommended for task)</option>
+         <option value="yolo">YOLO</option>
+         <option value="rf-detr">RF-DETR</option>
+         <option value="resnet">ResNet (classifier)</option>
+         <option value="vit">ViT (classifier)</option>
+         <option value="unet">U-Net (segment)</option>
+         <option value="sam">SAM (segment)</option>
+         <option value="rl-ppo">PPO (RL)</option>
+         <option value="custom">custom</option>
+       </select></div>
+   </div>
+   <label>Data modality (what this agent collects)</label>
+   <div style="display:flex;gap:14px;flex-wrap:wrap;margin:4px 0 12px;font-size:13px">
+     <label style="font-weight:400"><input type="checkbox" class="agMod" value="image" checked> Image</label>
+     <label style="font-weight:400"><input type="checkbox" class="agMod" value="video"> Video</label>
+     <label style="font-weight:400"><input type="checkbox" class="agMod" value="sensor"> Sensor (GPS/IMU/LiDAR)</label>
+     <label style="font-weight:400"><input type="checkbox" class="agMod" value="pointcloud"> Point cloud</label>
+     <label style="font-weight:400"><input type="checkbox" class="agMod" value="audio"> Audio</label>
+     <label style="font-weight:400"><input type="checkbox" class="agMod" value="text"> Text</label>
+   </div>
+   <div class="row2">
      <div><label>Sub-agents</label>
        <select id="agN"><option value="2">2 &mdash; collector + trainer</option><option value="1">1 &mdash; collector only</option><option value="3">3 &mdash; collector + filter + trainer</option></select></div>
+     <div><label>Seed search queries (optional)</label>
+       <input id="agQ" placeholder="comma-separated"></div>
    </div>
-   <label>Seed search queries (comma-separated, optional)</label>
-   <input id="agQ" placeholder="e.g. tomato leaf blight, potato early blight">
    <button class="btn" id="createBtn" onclick="createAgent()">Create agent</button>
-   <div class="note" id="createNote">Registers a new domain in the database and adds it here. Wiring its harvest pipeline (the collector using these queries) is the next backend step.</div>
+   <div class="note" id="createNote">Registers a new agent (domain) with its task, model, and data modality. Members can upload data to it immediately; harvest/training wiring follows per modality.</div>
  </div>
  <div class="foot">Lab server &middot; MongoDB &middot; cluster GPU compute &nbsp;|&nbsp; <a href="/console">Advanced console &rarr;</a></div>
  <script>
@@ -948,10 +979,13 @@ def root():
     var name=(document.getElementById('agName').value||'').trim();
     var note=document.getElementById('createNote'), btn=document.getElementById('createBtn');
     if(!name){note.textContent='Please enter an agent name.';return;}
+    var mods=Array.prototype.slice.call(document.querySelectorAll('.agMod:checked')).map(function(c){return c.value;});
+    if(!mods.length){note.textContent='Pick at least one data modality.';return;}
     btn.disabled=true;note.textContent='\\u23f3 Creating\\u2026';
     fetch('/api/agent/create',{method:'POST',credentials:'include',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:name,type:document.getElementById('agType').value,
+      body:JSON.stringify({name:name,task:document.getElementById('agType').value,
+        model:document.getElementById('agModel').value,modality:mods,
         n_subagents:parseInt(document.getElementById('agN').value||'2'),
         queries:document.getElementById('agQ').value||''})})
      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
@@ -1210,13 +1244,23 @@ async def api_agent_create(request: Request):
         n = int(body.get("n_subagents") or 2)
     except Exception:
         queries, n = [], 2
+    # v3.0.137: generalized agent fields (task / modality / model)
+    task = str(body.get("task") or body.get("type") or "detection").strip().lower()
+    model = str(body.get("model") or "auto").strip()
+    mod_in = body.get("modality")
+    if isinstance(mod_in, str):
+        mod_in = [m.strip() for m in mod_in.split(",") if m.strip()]
+    modality = [str(m).strip().lower() for m in (mod_in or ["image"])]
     from . import db as _db
-    res = _db.create_domain(domain_id, name, harvest_queries=queries, n_subagents=n)
+    res = _db.create_domain(domain_id, name, harvest_queries=queries, n_subagents=n,
+                            task=task, modality=modality, model=model)
     if res == "exists":
         raise HTTPException(409, f"agent '{domain_id}' already exists")
     if res is None:
         raise HTTPException(503, "database unavailable (Mongo down) — cannot create agent")
-    return {"ok": True, "domain": domain_id, "display_name": name}
+    return {"ok": True, "domain": domain_id, "display_name": name,
+            "task": res.get("task"), "modality": res.get("modality"),
+            "model": res.get("model")}
 
 
 # ===========================================================================
@@ -1236,6 +1280,19 @@ _MANUAL_UPLOADS_FILE = REPO / "results" / "framework" / "manual_uploads.json"
 _MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024   # 2 GB
 _MAX_UPLOAD_FILES = 60000
 _UPLOAD_IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+# v3.0.137: per-modality accepted file extensions so non-image agents (video /
+# robot sensor / point cloud) can upload too — "nothing gets rejected".
+_MODALITY_EXT = {
+    "image": _UPLOAD_IMG_EXT,
+    "video": {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"},
+    "sensor": {".csv", ".tsv", ".json", ".jsonl", ".parquet", ".npy", ".npz",
+               ".bag", ".mcap", ".txt", ".log", ".gpx", ".nmea"},
+    "pointcloud": {".pcd", ".ply", ".las", ".laz", ".bin", ".npy"},
+    "audio": {".wav", ".flac", ".mp3", ".ogg", ".m4a"},
+    "text": {".txt", ".json", ".jsonl", ".csv", ".md"},
+}
+# sidecars always allowed alongside any modality (labels / metadata / config)
+_UPLOAD_SIDECAR_EXT = {".txt", ".json", ".xml", ".yaml", ".yml", ".csv"}
 
 
 def _actor_from_request(request) -> str:
@@ -1445,21 +1502,35 @@ async def api_dataset_upload(request: Request):
     img_dir = dest / "images"
     img_dir.mkdir(parents=True, exist_ok=True)
     label_dir = dest / "labels"
+    files_dir = dest / "files"   # non-image payloads land here
 
-    n_img = n_lbl = n_skipped = 0
+    # v3.0.137: modality — explicit ?modality= wins, else the agent's configured
+    # modality, else image. Determines which file types we accept (so video /
+    # sensor / point-cloud agents can upload too).
+    modality = re.sub(r"[^a-z]", "", (qp.get("modality") or "").lower())
+    if modality not in _MODALITY_EXT:
+        try:
+            from . import db as _dbm
+            _dd = _dbm.get_domain(domain) or {}
+            _mlist = _dd.get("modality") or ["image"]
+            modality = _mlist[0] if _mlist and _mlist[0] in _MODALITY_EXT else "image"
+        except Exception:
+            modality = "image"
+    accept_ext = _MODALITY_EXT.get(modality, _UPLOAD_IMG_EXT)
+
+    n_img = n_lbl = n_file = n_skipped = 0
     data_yaml_bytes = None
     for m in members:
         nm = m.filename
         parts = Path(nm).parts
-        # path-traversal / absolute-path guard
-        if nm.startswith("/") or ".." in parts:
+        if nm.startswith("/") or ".." in parts:    # path-traversal guard
             n_skipped += 1
             continue
         safe_name = Path(nm).name
         if not safe_name:
             continue
         ext = Path(safe_name).suffix.lower()
-        if ext in _UPLOAD_IMG_EXT:
+        if ext in _UPLOAD_IMG_EXT and modality == "image":
             try:
                 with zf.open(m) as src, open(img_dir / safe_name, "wb") as out:
                     shutil.copyfileobj(src, out, length=1024 * 1024)
@@ -1479,11 +1550,26 @@ async def api_dataset_upload(request: Request):
                 data_yaml_bytes = zf.read(m)
             except Exception:
                 pass
+        elif ext in accept_ext or ext in _UPLOAD_SIDECAR_EXT:
+            # non-image modality payload (or sidecar): keep folder structure
+            files_dir.mkdir(exist_ok=True)
+            try:
+                rel = "/".join(p for p in parts if p not in ("..", ""))[:180] or safe_name
+                outp = files_dir / rel
+                outp.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(m) as src, open(outp, "wb") as out:
+                    shutil.copyfileobj(src, out, length=1024 * 1024)
+                n_file += 1
+            except Exception:
+                n_skipped += 1
+        else:
+            n_skipped += 1
 
-    if n_img == 0:
+    if n_img == 0 and n_file == 0:
         shutil.rmtree(dest, ignore_errors=True)
-        raise HTTPException(400, "no images found in zip "
-                                 "(supported: .jpg .jpeg .png .bmp .webp)")
+        _hint = ", ".join(sorted(accept_ext))
+        raise HTTPException(400, f"no recognized {modality} files in zip "
+                                 f"(accepted: {_hint})")
 
     class_names = []
     if data_yaml_bytes:
@@ -1498,16 +1584,24 @@ async def api_dataset_upload(request: Request):
         except Exception:
             class_names = []
 
+    # coarse format tag: image+labels → yolo; else the modality
+    fmt = ("yolo" if (modality == "image" and n_lbl > 0)
+           else ("images" if modality == "image" else modality))
     uploaded_at = time.strftime("%Y-%m-%dT%H:%M:%S")
     fields = {
         "status": "downloaded",
         "source": "manual_upload",
         "domain": domain,
+        "modality": modality,
+        "format": fmt,
         "uploaded_by": actor,
         "uploaded_at": uploaded_at,
         "downloaded_at": uploaded_at,
-        "local_path": str(img_dir),
+        # image datasets point local_path at images/ (gallery walks it); non-image
+        # datasets point at the dataset root so files/ is browsable later.
+        "local_path": str(img_dir if modality == "image" else dest),
         "local_images": n_img,
+        "n_local_files": n_file,
         "n_local_labels": n_lbl,
         "class_names": class_names,
         "harvest_round": _registry_current_round(),
@@ -1524,9 +1618,11 @@ async def api_dataset_upload(request: Request):
         wrote = _db.upsert_slug(slug, fields, actor=actor)
     except Exception as e:
         log.warning(f"[upload] registry upsert failed: {e}")
-    log.info(f"[upload] {slug} domain={domain} imgs={n_img} labels={n_lbl} by={actor}")
+    log.info(f"[upload] {slug} domain={domain} modality={modality} imgs={n_img} "
+             f"files={n_file} labels={n_lbl} by={actor}")
     return JSONResponse({
-        "ok": True, "slug": slug, "domain": domain, "images": n_img,
+        "ok": True, "slug": slug, "domain": domain, "modality": modality,
+        "format": fmt, "images": n_img, "files": n_file,
         "labels": n_lbl, "skipped": n_skipped, "class_names": class_names,
         "uploaded_by": actor, "registered": wrote,
         "gallery_url": f"/gallery/{slug}",
@@ -2053,6 +2149,12 @@ def agent_generic(domain_id: str):
     st = _h.escape(str(d.get("status") or "created"))
     qs = d.get("harvest_queries") or []
     qline = _h.escape(", ".join(qs)) if qs else "&mdash; none set &mdash;"
+    # v3.0.137: generalized agent attributes (default to image/detection/yolo)
+    _task = _h.escape(str(d.get("task") or "detection"))
+    _mods = d.get("modality") or ["image"]
+    _modline = _h.escape(", ".join(str(m) for m in _mods))
+    _model = _h.escape(str(d.get("model") or "auto"))
+    _metric = _h.escape(str(d.get("target_metric") or "mAP50-95"))
     if qs:
         _hbtn = ('<button class="btn" id="hbtn" onclick="startHarvest()" '
                  'style="border:0;cursor:pointer">&#9654; Start harvest</button>'
@@ -2082,9 +2184,12 @@ def agent_generic(domain_id: str):
  <div class="top"><a class="bc" href="/">&larr; Agents</a><h1>&#129516; {nm}</h1></div>
  <div class="wrap"><div class="card">
    <span class="badge">&#9679; {st}</span>
+   <span class="badge" style="background:#eef2ff;color:#1d4ed8;border-color:#bfdbfe">task: {_task}</span>
+   <span class="badge" style="background:#ecfdf5;color:#047857;border-color:#a7f3d0">modality: {_modline}</span>
+   <span class="badge" style="background:#fdf4ff;color:#a21caf;border-color:#f5d0fe">model: {_model}</span>
    <div class="row" style="margin-top:16px"><b>This agent was just created.</b> It has no collected data yet.</div>
    <div class="row">Seed search queries: <b>{qline}</b></div>
-   <div class="row">Sub-agents: <b>{int(d.get("n_subagents") or 2)}</b> &middot; Target metric: <b>{_h.escape(str(d.get("target_metric") or "mAP50-95"))}</b></div>
+   <div class="row">Sub-agents: <b>{int(d.get("n_subagents") or 2)}</b> &middot; Target metric: <b>{_metric}</b></div>
    <div class="row" style="margin-top:18px">{_note}</div>
    <div style="margin-top:16px">{_hbtn}</div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Upload a dataset (.zip)</div>

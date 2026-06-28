@@ -4687,3 +4687,22 @@ what; admins (Harry + lab account) control who may use the cluster.
   delete + push-cap + RBAC via minted session cookies). Prints PASS/FAIL, exits non-zero on failure
   (CI-friendly). Run after every deploy: `bash tests/smoke_test.sh` (or BASE=<url> ...). Replaces
   ad-hoc curl checks with a professional, version-controlled test method.
+
+
+---
+
+### v3.0.137 — Generalize the agent + dataset schema (keystone, beyond weed/image/YOLO)
+
+The platform's foundation no longer assumes weed / image / YOLO-detection. Backwards-compatible:
+any pre-existing domain (incl. weed) defaults to image / detection / yolo.
+- **Agent schema**: db.create_domain now stores task (detection|classification|segmentation|pose|
+  tracking|rl_policy|ssl_pretrain), modality (image|video|sensor|pointcloud|audio|text, multi),
+  and model; target_metric defaults per task. /api/agent/create accepts them.
+- **New-Agent wizard**: task + model selects + modality checkboxes (Image/Video/Sensor/Point cloud/
+  Audio/Text). The agent page shows task/modality/model badges.
+- **Modality-aware upload**: /api/dataset/upload picks accepted file types from ?modality= or the
+  agent's configured modality (video/sensor/pointcloud/audio/text now accepted, not just images);
+  non-image payloads land under <slug>/files/ keeping folder structure; dataset records modality +
+  format + n_local_files. "Nothing gets rejected" for declared modalities.
+- Foundation for per-task training templates, per-domain eval, and the physical-AI sensor/RL tracks
+  (see docs/PLATFORM_ROADMAP.md).
