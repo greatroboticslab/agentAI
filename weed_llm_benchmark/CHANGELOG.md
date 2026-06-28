@@ -4787,3 +4787,19 @@ rotted; agents had to be hand-deleted from Mongo). Fixed:
   protected (never deletable). Creator is recorded as owner.
 - Agent page shows a Manage bar (Rename / Edit seed queries / Delete) to the owner or an admin,
   gated via /api/me. Deleting returns to the launcher.
+
+
+---
+
+### v3.0.145 — Comprehensive project deletion (cascade datasets + files) — UX loop P1c
+
+Deleting an agent now properly manages its data, not just the domain record (per Harry: "涉及复杂的
+文件/数据集管理,要做全面").
+- Extracted `_purge_dataset(slug)` — the single source of truth removing a dataset from
+  manual_uploads.json + registry + Mongo + uploads/<slug> files. /api/dataset/delete now uses it.
+- `_datasets_for_domain(domain)` scopes datasets by the `domain` tag; the shared weed harvest pool
+  (no domain tag) is never matched, so deleting a robot/student agent only removes ITS own data.
+- /api/agent/delete now CASCADES: purges all the agent's datasets (files + records), then deletes
+  the domain; returns datasets_removed. Admin can delete any project (weed protected); owner can
+  delete their own. The delete confirm shows how many datasets will go.
+- create_domain records owner + created_at (v3.0.144).

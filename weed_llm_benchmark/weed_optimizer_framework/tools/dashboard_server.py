@@ -1345,9 +1345,16 @@ async def api_agent_delete(request: Request):
     actor = _actor_from_request(request)
     if not _can_manage_agent(actor, dom):
         raise HTTPException(403, "only the agent's owner or an admin can delete it")
+    # v3.0.145: COMPREHENSIVE delete — cascade the agent's own datasets (files +
+    # registry + Mongo + manual_uploads). The shared weed pool (no domain tag) is
+    # never matched, so this only removes THIS agent's data.
+    purged = []
+    for ds in _datasets_for_domain(domain_id):
+        purged.append(_purge_dataset(ds, actor=actor))
     ok = _db.delete_domain(domain_id, actor=actor)
-    log.info(f"[agent] deleted {domain_id} by {actor}")
-    return JSONResponse({"ok": bool(ok), "domain": domain_id})
+    log.info(f"[agent] deleted {domain_id} (+{len(purged)} datasets) by {actor}")
+    return JSONResponse({"ok": bool(ok), "domain": domain_id,
+                         "datasets_removed": len(purged)})
 
 
 @app.post("/api/agent/update")
@@ -2228,37 +2235,14 @@ async def api_dataset_upload(request: Request):
     })
 
 
-@app.post("/api/dataset/delete")
-async def api_dataset_delete(request: Request):
-    """Delete a MANUALLY-uploaded dataset. Safety: only slugs whose
-    source=manual_upload (recorded in manual_uploads.json or the registry) can
-    be removed here — harvested/cluster datasets are never deletable from the UI.
-    Removes it from manual_uploads.json, the registry, Mongo, and deletes
-    uploads/<slug> on disk."""
+# ---- v3.0.145 — shared dataset purge + domain scoping (comprehensive deletion)
+def _purge_dataset(slug: str, actor: str = "system") -> dict:
+    """Fully remove ONE dataset everywhere: manual_uploads.json, the registry,
+    the Mongo slug doc, and uploads/<slug> files on disk. Returns what was removed.
+    The single source of truth for dataset deletion (per-dataset + agent cascade)."""
     import shutil
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    slug = str((body.get("slug") if isinstance(body, dict) else "")
-               or request.query_params.get("slug") or "").strip()
-    if not re.match(r"^[A-Za-z0-9_.-]+$", slug) or slug in (".", ".."):
-        raise HTTPException(400, "bad slug")
-
+    res = {"slug": slug, "manual": False, "registry": False, "files": False}
     manual = _read_manual_uploads()
-    is_manual = slug in manual
-    if not is_manual:
-        try:
-            with open(REGISTRY_PATH) as f:
-                info = json.load(f)["datasets"].get(slug, {})
-            is_manual = info.get("source") == "manual_upload"
-        except Exception:
-            is_manual = False
-    if not is_manual:
-        raise HTTPException(403, "only manually-uploaded datasets can be deleted here")
-
-    actor = _actor_from_request(request)
-    # 1) durable manual_uploads.json
     if slug in manual:
         manual.pop(slug, None)
         try:
@@ -2267,10 +2251,9 @@ async def api_dataset_delete(request: Request):
             with open(tmp, "w") as f:
                 json.dump(manual, f, indent=2, default=str)
             os.replace(tmp, _MANUAL_UPLOADS_FILE)
+            res["manual"] = True
         except Exception as e:
-            log.warning(f"[upload] delete manual_uploads.json write failed: {e}")
-    # 2) registry
-    removed_reg = False
+            log.warning(f"[purge] manual_uploads write: {e}")
     try:
         from .registry_lock import atomic_write_json
         with open(REGISTRY_PATH) as f:
@@ -2280,10 +2263,9 @@ async def api_dataset_delete(request: Request):
             reg["total_downloaded"] = sum(
                 1 for v in reg["datasets"].values() if v.get("status") == "downloaded")
             atomic_write_json(REGISTRY_PATH, reg)
-            removed_reg = True
+            res["registry"] = True
     except Exception as e:
-        log.warning(f"[upload] delete registry write failed: {e}")
-    # 3) Mongo
+        log.warning(f"[purge] registry write: {e}")
     try:
         from . import db as _db
         dbh = _db._get_db()
@@ -2291,10 +2273,60 @@ async def api_dataset_delete(request: Request):
             dbh[_db.COLL_SLUGS].delete_one({"_id": slug})
     except Exception:
         pass
-    # 4) files
-    shutil.rmtree(_UPLOAD_DIR / slug, ignore_errors=True)
-    log.info(f"[upload] deleted {slug} by {actor}")
-    return JSONResponse({"ok": True, "slug": slug, "removed_registry": removed_reg})
+    d = _UPLOAD_DIR / slug
+    if d.exists():
+        shutil.rmtree(d, ignore_errors=True)
+        res["files"] = True
+    log.info(f"[purge] {slug} by {actor}: {res}")
+    return res
+
+
+def _is_manual_dataset(slug: str) -> bool:
+    if slug in _read_manual_uploads():
+        return True
+    try:
+        with open(REGISTRY_PATH) as f:
+            return json.load(f)["datasets"].get(slug, {}).get("source") == "manual_upload"
+    except Exception:
+        return False
+
+
+def _datasets_for_domain(domain: str) -> list:
+    """All dataset slugs scoped to a domain (manual_uploads + registry domain tag).
+    The shared weed harvest pool has no domain tag, so it is never matched by a
+    non-weed agent — deleting a robot/student agent only touches ITS own data."""
+    out = set()
+    for s, v in _read_manual_uploads().items():
+        if (v.get("domain") or "weed") == domain:
+            out.add(s)
+    try:
+        with open(REGISTRY_PATH) as f:
+            reg = json.load(f)
+        for s, v in reg.get("datasets", {}).items():
+            if v.get("domain") == domain:
+                out.add(s)
+    except Exception:
+        pass
+    return sorted(out)
+
+
+@app.post("/api/dataset/delete")
+async def api_dataset_delete(request: Request):
+    """Delete a MANUALLY-uploaded dataset (manual_uploads + registry + Mongo +
+    files). Safety: only source=manual_upload slugs are deletable here — the
+    harvested/cluster weed pool is never removable from the UI."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    slug = str((body.get("slug") if isinstance(body, dict) else "")
+               or request.query_params.get("slug") or "").strip()
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug) or slug in (".", ".."):
+        raise HTTPException(400, "bad slug")
+    if not _is_manual_dataset(slug):
+        raise HTTPException(403, "only manually-uploaded datasets can be deleted here")
+    res = _purge_dataset(slug, actor=_actor_from_request(request))
+    return JSONResponse({"ok": True, "slug": slug, "removed": res})
 
 
 @app.get("/api/dataset/uploads")
@@ -2989,10 +3021,13 @@ async function editQueries(){
   if(d&&d.ok){m.textContent='\\u2705 saved';setTimeout(function(){location.reload();},700);}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){m.textContent='\\u274c '+e;}
 }
 async function deleteAgent(){
- if(!confirm('Delete this agent? Its uploaded datasets are not auto-removed, but the agent disappears from the launcher. This cannot be undone.'))return;
- var m=document.getElementById('mng-msg');m.textContent='\\u23f3 deleting\\u2026';
+ var n=0;try{var u=await (await fetch('/api/dataset/uploads?domain=__DOM__',{credentials:'include'})).json();n=(u.uploads||[]).length;}catch(e){}
+ var warn='Delete this agent? This permanently removes the agent';
+ warn += n>0 ? (' AND its '+n+' uploaded dataset(s) — files, registry, and database records. This cannot be undone.') : '. This cannot be undone.';
+ if(!confirm(warn))return;
+ var m=document.getElementById('mng-msg');m.textContent='\\u23f3 deleting agent + data\\u2026';
  try{var d=await (await fetch('/api/agent/delete',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
-  if(d&&d.ok){m.textContent='\\u2705 deleted';setTimeout(function(){location.href='/';},700);}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){m.textContent='\\u274c '+e;}
+  if(d&&d.ok){m.textContent='\\u2705 deleted ('+(d.datasets_removed||0)+' datasets removed)';setTimeout(function(){location.href='/';},900);}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){m.textContent='\\u274c '+e;}
 }
 async function loadCap(){
  try{var d=await (await fetch('/api/domain/push_cap?domain=__DOM__',{credentials:'include'})).json();
