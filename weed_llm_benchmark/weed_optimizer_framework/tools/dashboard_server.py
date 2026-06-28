@@ -905,14 +905,18 @@ def root():
             if not _did or _did == "weed":
                 continue
             _nm = _esc(str(_d.get("display_name") or _did))
-            _st = _esc(str(_d.get("status") or "created"))
+            _own = _esc(str(_d.get("owner") or ""))
+            _fld = _esc(str(_d.get("research_field") or ""))
+            _nag = len(_d.get("agents") or [])
+            _desc = (f'{_fld} &middot; ' if _fld else '') + (
+                f'{_nag} agent' + ('s' if _nag != 1 else '') if _nag
+                else 'dataset workspace (no agents yet)')
+            _badge = (f'<div class="badge" style="background:#1e293b;color:#93c5fd;'
+                      f'border-color:#334155">owner: {_own}</div>' if _own else '')
             _extra += (
-                f'<a class="agent" href="/agent/{_esc(_did)}">'
-                f'<div class="ic">&#129516;</div><div class="nm">{_nm}</div>'
-                f'<div class="ds">New collection agent. Status: {_st}. '
-                f'Harvest pipeline not wired yet.</div>'
-                f'<div class="badge" style="background:#2a2a16;color:#d9c95f;'
-                f'border-color:#544a1d">&#9679; {_st}</div></a>')
+                f'<a class="agent" data-owner="{_own}" href="/agent/{_esc(_did)}">'
+                f'<div class="ic">&#128193;</div><div class="nm">{_nm}</div>'
+                f'<div class="ds">{_desc}</div>{_badge}</a>')
     except Exception:
         _extra = ""
     html = '''<!DOCTYPE html><html lang="en"><head>
@@ -953,13 +957,28 @@ def root():
  .note{font-size:12px;color:#7b8aa5;margin-top:11px;text-align:center;line-height:1.5}
  .foot{margin-top:48px;color:#5b6c8a;font-size:12px;text-align:center}
  .foot a{color:#93a3bd}
+ .toolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;width:100%;max-width:960px;margin:0 0 20px}
+ .toolbar a{color:#9aa7bd;text-decoration:none;font-size:13px}
+ .toolbar a:hover{color:#cdd6e6}
+ .toolbar .spacer{flex:1}
+ .ftab{background:#1a2230;border:1px solid #2c3a52;color:#9aa7bd;font-size:12px;font-weight:600;
+   padding:6px 12px;border-radius:8px;cursor:pointer}
+ .ftab.on{background:#2563eb;border-color:#2563eb;color:#fff}
 </style></head><body>
  <div class="brand">Greater Robotics Lab</div>
  <h1>Research Projects</h1>
- <div class="tag">Self-driving agents that collect, human-review, filter and train on real-world
-   datasets &mdash; compounding over weeks and months.</div>
+ <div class="tag">A platform for any research field: create a <b>project</b>, upload datasets of any
+   kind (images, video, sensor, &hellip;), and add <b>agents</b> to collect, filter, label, or train
+   &mdash; any number, any mix, or none. Pick a project to open it, or start a new one.</div>
+ <div class="toolbar">
+   <a href="/users">&#128100; Users</a><a href="/models">&#129504; Models</a>
+   <a href="/console">&#9881; Console</a><a href="/manual">&#128214; Docs</a>
+   <span class="spacer"></span>
+   <button id="f-all" class="ftab on" onclick="filterProj('all')">All projects</button>
+   <button id="f-mine" class="ftab" onclick="filterProj('mine')">My projects</button>
+ </div>
  <div class="agents">
-   <a class="agent" href="/agent/weed">
+   <a class="agent" data-owner="" href="/agent/weed">
      <div class="ic">&#127806;</div>
      <div class="nm">Weed Detection</div>
      <div class="ds">Harvests weed &amp; crop imagery, human-reviews labels, and trains detection
@@ -973,6 +992,7 @@ def root():
      <div class="ds">Create a project for any research domain &mdash; upload data, add agents later.</div>
    </div>
  </div>
+ <div id="mine-empty" style="display:none;color:#9aa7bd;font-size:13px;margin-top:16px;text-align:center">You don&rsquo;t own any projects yet &mdash; click <b>New Project</b> to start one.</div>
  <div id="createPanel">
    <h3>Create a new project</h3>
    <p class="h">A project is a research workspace (any field, any data type). Upload datasets and add agents (collect / filter / label / train) any time &mdash; or none at all.</p>
@@ -994,6 +1014,20 @@ def root():
  </div>
  <div class="foot">Lab server &middot; MongoDB &middot; cluster GPU compute &nbsp;|&nbsp; <a href="/console">Advanced console &rarr;</a></div>
  <script>
+  async function filterProj(mode){
+    document.getElementById('f-all').className='ftab'+(mode==='all'?' on':'');
+    document.getElementById('f-mine').className='ftab'+(mode==='mine'?' on':'');
+    var me={};try{me=await (await fetch('/api/me',{credentials:'include'})).json();}catch(e){}
+    var any=false;
+    document.querySelectorAll('.agent').forEach(function(c){
+      if(c.classList.contains('add'))return;
+      if(mode==='all'){c.style.display='block';return;}
+      var o=c.getAttribute('data-owner')||'';
+      var mine=(o&&me&&o===me.user);c.style.display=mine?'block':'none';if(mine)any=true;
+    });
+    var e=document.getElementById('mine-empty');
+    if(e)e.style.display=(mode==='mine'&&!any)?'block':'none';
+  }
   function createAgent(){
     var name=(document.getElementById('agName').value||'').trim();
     var note=document.getElementById('createNote'), btn=document.getElementById('createBtn');
@@ -3064,7 +3098,7 @@ async function loadUploads(){
  try{
   var d=await (await fetch('/api/dataset/uploads?domain=__DOM__',{credentials:'include'})).json();
   var rows=(d&&d.uploads)||[];
-  if(!rows.length){w.innerHTML='';return;}
+  if(!rows.length){w.innerHTML='<div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px;font-size:13px;color:#475569">&#128228; <b>No datasets yet.</b> Get started: drop a .zip in the upload box above, or add a Collector agent to gather data automatically.</div>';return;}
   var h='<div style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:6px">Your uploads ('+rows.length+')</div>';
   h+='<div style="border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">';
   rows.forEach(function(u,i){

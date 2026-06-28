@@ -4843,3 +4843,17 @@ Research field (free text, any domain) + data types. Drops the YOLO/detection fr
 - Train panel gains a learning-paradigm select: supervised (live) / self-supervised / reinforcement /
   multi-strategy (coming). /api/train/submit accepts `paradigm` and rejects non-supervised with a
   clear 501 ("scaffolded, not yet runnable") rather than silently running supervised.
+
+
+---
+
+### v3.0.149 — Launcher onboarding + My Projects + global nav + empty states (UX loop R5)
+
+Polished the entry experience for a new member:
+- Onboarding one-liner reframes the launcher as a general research platform (create a project, upload
+  any data, add agents — any mix or none).
+- Global nav on the launcher: Users / Models / Console / Docs.
+- Project cards now show research field + agent count + owner; an "All / My projects" toggle filters
+  by owner (with a friendly empty hint when you own none).
+- Empty-state CTA on a project with no datasets ("No datasets yet — drop a .zip above or add a
+  Collector agent") instead of a blank wall.
