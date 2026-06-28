@@ -1979,7 +1979,7 @@ def api_llm_infer_result(jobtag: str):
 # ===========================================================================
 @app.post("/api/models/deploy")
 async def api_models_deploy(request: Request):
-    if not _is_admin(request):
+    if not _is_admin(_actor_from_request(request)):
         raise HTTPException(403, "admin only — deploying a model uses cluster GPU")
     try:
         body = await request.json()
