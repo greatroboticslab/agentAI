@@ -4867,3 +4867,14 @@ Polished the entry experience for a new member:
 - tests/smoke_test.sh now exercises the full member journey as a regression net: create project →
   add agent → list → non-owner add 403 → owner remove → upload dataset → non-owner delete 403 →
   owner delete (cascade) → datasets gone. ~12 new checks.
+
+
+---
+
+### v3.0.151 — New-member re-walk: consistency fix (UX loop R6 close)
+
+Full new-member journey re-walked (unauth→login→launcher→create project→project page→add agent→
+upload→other pages). All smooth; one straggler fixed: the project/weed page back link still said
+"← Agents" (the class="bc" variant was missed by the earlier rename) → now "← Projects". Journey is
+consistent: login redirect, onboarding, nav, 0 Chinese, agents section, upload, empty-state CTA, no
+dead ends. Extended smoke 47/47.
