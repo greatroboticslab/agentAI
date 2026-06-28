@@ -1750,6 +1750,12 @@ async def api_train_submit(request: Request):
     model = str(body.get("model") or dd.get("model") or "auto")
     if not model.endswith(".pt"):
         model = "auto"   # let the template pick the right yolo11n-* per task
+    # v3.0.148: learning paradigm. Only supervised is wired today; the others are
+    # honestly rejected (scaffolded) rather than silently running supervised.
+    paradigm = str(body.get("paradigm") or "supervised").strip().lower()
+    if paradigm not in ("supervised", ""):
+        raise HTTPException(501, f"{paradigm} training is scaffolded, not yet runnable — "
+                                 f"only supervised training is live right now.")
     try:
         epochs = max(1, min(int(body.get("epochs") or 20), 300))
     except (TypeError, ValueError):
@@ -2914,6 +2920,10 @@ def agent_generic(domain_id: str):
                'background:#eef2ff;color:#1d4ed8">' + _h.escape(str(a.get("type", ""))) + '</span>'
              + '<b>' + _h.escape(str(a.get("name") or a.get("type", ""))) + '</b>'
              + '<span style="color:#94a3b8;margin-left:auto">' + _h.escape(str(a.get("status", "idle"))) + '</span>'
+             + '<button data-type="' + _h.escape(str(a.get("type", ""))) + '" '
+               'style="border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;'
+               'font-size:12px;padding:4px 11px;border-radius:7px;cursor:pointer" '
+               'onclick="runAgent(this.getAttribute(\'data-type\'))">&#9654; Run</button>'
              + '<button class="agdel" data-id="' + _h.escape(str(a.get("id", ""))) + '" '
                'style="display:none;border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;'
                'padding:4px 9px;border-radius:7px;cursor:pointer" '
@@ -3005,6 +3015,12 @@ def agent_generic(domain_id: str):
      <div style="font-size:13px;color:#475569;margin-bottom:10px">Train this agent&rsquo;s <b>{_task}</b> task on one of its uploaded datasets. Runs on the cluster GPU on-demand (queued); the result mAP/accuracy is written back here.</div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
        <select id="tr-ds" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;min-width:200px"><option value="">&mdash; choose an uploaded dataset &mdash;</option></select>
+       <select id="tr-para" title="learning paradigm" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+         <option value="supervised">supervised (live)</option>
+         <option value="self_supervised">self-supervised (coming)</option>
+         <option value="rl">reinforcement (coming)</option>
+         <option value="multi_strategy">multi-strategy (coming)</option>
+       </select>
        <label style="font-size:13px;color:#334">epochs <input id="tr-ep" type="number" value="20" min="1" max="300" style="width:70px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
        <button id="tr-go" onclick="submitTrain()" style="border:0;cursor:pointer;background:#7c3aed;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#128640; Train</button>
        <span id="tr-msg" style="font-size:13px;color:#475569"></span>
@@ -3092,6 +3108,21 @@ async function removeAgent(aid){
  try{var d=await (await fetch('/api/project/agent/remove',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:'__DOM__',agent_id:aid})})).json();
   if(d&&d.ok){location.reload();}else{alert((d&&(d.detail||d.msg))||'failed');}}catch(e){alert(''+e);}
 }
+async function runAgent(type){
+ if(type==='collector'){
+   if(!confirm('Run the Collector: launch an autonomous data-harvest job on the cluster for this project?'))return;
+   try{var d=await (await fetch('/api/cluster_action/brain_harvest',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
+    alert(d&&d.ok?('\\u2705 Collector submitted to cluster. '+(d.msg||d.stdout||'')):'\\u274c '+((d&&(d.detail||d.msg||d.stderr))||'failed (need cluster access?)'));}catch(e){alert('\\u274c '+e);}
+   return;
+ }
+ if(type==='trainer'){
+   var t=document.getElementById('tr-go');
+   if(t){t.scrollIntoView({behavior:'smooth',block:'center'});var m=document.getElementById('tr-msg');if(m)m.textContent='\\u2193 pick a dataset + epochs below, then Train';}
+   else{alert('Open the "Train a model" panel below to run training.');}
+   return;
+ }
+ alert('The "'+type+'" agent is scaffolded — its per-project automation is not wired yet. Honest status: not runnable today. Collector and Trainer are live; filter/labeler/evaluator are coming.');
+}
 async function renameAgent(){
  var nm=prompt('New display name for this agent:');if(!nm||!nm.trim())return;
  var m=document.getElementById('mng-msg');m.textContent='\\u23f3';
@@ -3129,9 +3160,10 @@ async function loadTrainDatasets(){
 async function submitTrain(){
  var sel=document.getElementById('tr-ds'),ep=document.getElementById('tr-ep'),msg=document.getElementById('tr-msg'),go=document.getElementById('tr-go');
  var slug=sel.value;if(!slug){msg.textContent='\\u26a0 choose a dataset';return;}
- if(!confirm('Stage "'+slug+'" to the cluster and submit a GPU training job?'))return;
+ var para=(document.getElementById('tr-para')||{}).value||'supervised';
+ if(!confirm('Stage "'+slug+'" to the cluster and submit a '+para+' GPU training job?'))return;
  go.disabled=true;msg.textContent='\\u23f3 staging + submitting\\u2026';
- try{var d=await (await fetch('/api/train/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,epochs:parseInt(ep.value||'20')})})).json();
+ try{var d=await (await fetch('/api/train/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,epochs:parseInt(ep.value||'20'),paradigm:para})})).json();
   msg.textContent=(d&&d.ok)?('\\u2705 submitted ('+d.task+', '+d.epochs+'ep) \\u2014 '+(d.msg||'')):'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
  catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
 }

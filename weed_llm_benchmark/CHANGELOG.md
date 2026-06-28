@@ -4831,3 +4831,15 @@ The create form pushed task/model/sub-agents/seed-queries up front — contradic
 Research field (free text, any domain) + data types. Drops the YOLO/detection framing.
 - create_domain stores research_field + agents:[]; /api/agent/create parses research_field.
 - Project page shows a "field: …" badge. After create, opens the new project directly.
+
+
+---
+
+### v3.0.148 — Per-agent Run controls + training-paradigm choice (UX loop R3/R4)
+
+- Each agent row in a project now has a Run control, dispatched by type: collector → launches the
+  domain-aware harvest job (live, cluster-gated); trainer → scrolls to the Train panel (live). filter
+  / labeler / evaluator / custom → an HONEST scaffold notice ("not runnable today"), not fake wiring.
+- Train panel gains a learning-paradigm select: supervised (live) / self-supervised / reinforcement /
+  multi-strategy (coming). /api/train/submit accepts `paradigm` and rejects non-supervised with a
+  clear 501 ("scaffolded, not yet runnable") rather than silently running supervised.
