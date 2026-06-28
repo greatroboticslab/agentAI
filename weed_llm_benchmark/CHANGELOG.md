@@ -4674,3 +4674,16 @@ what; admins (Harry + lab account) control who may use the cluster.
   "Request cluster access" button → POST /api/cluster/request records it; admins see a "⏳ requested"
   badge in /users and grant with one click; granting clears the request. /api/me reports
   cluster_requested.
+
+
+---
+
+### v3.0.136 — Admin notification (red dot) + committed smoke-test suite
+
+- **Admin notification**: /api/me now returns pending_requests (count of cluster-access requests) for
+  admins; the global login badge shows a red "N ⚑" pill linking to /users when requests are pending —
+  admins see new requests from any page. (Email notify needs SMTP creds — can be added on request.)
+- **tests/smoke_test.sh**: a repeatable, self-cleaning smoke test (pages + APIs + auth + upload/list/
+  delete + push-cap + RBAC via minted session cookies). Prints PASS/FAIL, exits non-zero on failure
+  (CI-friendly). Run after every deploy: `bash tests/smoke_test.sh` (or BASE=<url> ...). Replaces
+  ad-hoc curl checks with a professional, version-controlled test method.

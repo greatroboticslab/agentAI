@@ -355,8 +355,11 @@ _LOGIN_BADGE = (
     '<script>(function(){fetch("/api/me",{credentials:"include"})'
     '.then(function(r){return r.json();}).then(function(m){'
     'if(!m||!m.ok)return;var el=document.getElementById("_authbadge");if(!el)return;'
-    'var who=m.user||"?";var star=m.is_admin?"\\u2605 ":"";'
-    'el.innerHTML="<span style=\\"background:#0f172a;color:#fff;padding:4px 10px;'
+    'var who=m.user||"?";var star=m.is_admin?"\\u2605 ":"";var dot="";'
+    'if(m.is_admin&&m.pending_requests>0){dot="<a href=\\"/users\\" title=\\"pending cluster-access requests\\" '
+    'style=\\"background:#dc2626;color:#fff;padding:3px 8px;border-radius:20px;text-decoration:none;'
+    'font-weight:700;margin-right:6px\\">"+m.pending_requests+" \\u2691</a>";}'
+    'el.innerHTML=dot+"<span style=\\"background:#0f172a;color:#fff;padding:4px 10px;'
     'border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,.25);opacity:.93\\">"+star+who'
     '+" \\u00b7 <a href=\\"/logout\\" style=\\"color:#93c5fd;text-decoration:none\\">Logout</a></span>";'
     '}).catch(function(){});})();</script>'
@@ -1340,10 +1343,13 @@ def _write_cluster_requests(d: dict) -> None:
 def api_me(request: Request):
     actor = _actor_from_request(request)
     reqs = _read_cluster_requests()
+    is_admin = _is_admin(actor)
     return JSONResponse({"ok": True, "user": actor,
-                         "is_admin": _is_admin(actor),
+                         "is_admin": is_admin,
                          "can_use_cluster": _can_use_cluster(actor),
-                         "cluster_requested": actor in reqs})
+                         "cluster_requested": actor in reqs,
+                         # admins see how many access requests are pending (red dot)
+                         "pending_requests": (len(reqs) if is_admin else 0)})
 
 
 @app.post("/api/cluster/request")
