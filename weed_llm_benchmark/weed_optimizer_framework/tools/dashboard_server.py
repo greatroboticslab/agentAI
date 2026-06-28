@@ -1663,6 +1663,64 @@ async def api_train_submit(request: Request):
     return JSONResponse(result)
 
 
+# ===========================================================================
+# v3.0.143 — self-hosted model GATEWAY (on-demand). An authenticated caller (our
+# own API key / session) submits a prompt; the lab server queues a cluster job
+# that runs OUR model and writes the answer to a file the server polls. No paid
+# API, no persistent server — the user's exact architecture.
+# ===========================================================================
+@app.post("/api/llm/infer")
+async def api_llm_infer(request: Request):
+    """Submit an on-demand inference job. Returns a jobtag to poll."""
+    actor = _actor_from_request(request)   # any authenticated identity (incl. api key)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    prompt = str(body.get("prompt") or "").strip()
+    if not prompt:
+        raise HTTPException(400, "prompt required")
+    if len(prompt) > 8000:
+        raise HTTPException(400, "prompt too long (max 8000 chars)")
+    model = re.sub(r"[^A-Za-z0-9_.:-]", "", str(body.get("model") or "gemma4"))[:60] or "gemma4"
+    import base64 as _b64
+    pb64 = _b64.b64encode(prompt.encode()).decode()
+    jobtag = "i" + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
+    # write the prompt to the cluster + ensure the job script is present
+    stage = ("mkdir -p results/framework/llm_infer; "
+             f"echo {pb64} | base64 -d > results/framework/llm_infer/{jobtag}.prompt; "
+             "git fetch origin >/dev/null 2>&1; "
+             "git checkout origin/main -- weed_llm_benchmark/run_llm_infer.sh 2>/dev/null; "
+             "cp -f weed_llm_benchmark/run_llm_infer.sh run_llm_infer.sh 2>/dev/null; true")
+    _slurm(["bash", "-lc", stage], timeout=60)
+    export = ",".join(["ALL", f"LLM_MODEL={model}", f"LLM_JOBTAG={jobtag}"])
+    r = _slurm(["sbatch", f"--export={export}", "run_llm_infer.sh"], timeout=25)
+    ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
+    jobid = (r.get("stdout") or "").split()[-1] if ok else None
+    log.info(f"[llm_infer] {jobtag} model={model} by {actor} ok={ok}")
+    return JSONResponse({"ok": ok, "jobtag": jobtag, "job_id": jobid, "model": model,
+                         "msg": (r.get("stdout") or r.get("stderr") or "").strip(),
+                         "poll": f"/api/llm/infer/result?jobtag={jobtag}"})
+
+
+@app.get("/api/llm/infer/result")
+def api_llm_infer_result(jobtag: str):
+    if not re.match(r"^[A-Za-z0-9]+$", jobtag):
+        raise HTTPException(400, "bad jobtag")
+    r = _slurm(["bash", "-lc",
+                f"cat results/framework/llm_infer/{jobtag}.json 2>/dev/null"], timeout=20)
+    txt = (r.get("stdout") or "").strip()
+    if txt:
+        try:
+            d = json.loads(txt)
+            return JSONResponse({"status": "done" if d.get("ok") else "failed",
+                                 "text": d.get("text"), "error": d.get("error"),
+                                 "model": d.get("model")})
+        except Exception:
+            pass
+    return JSONResponse({"status": "pending"})
+
+
 @app.get("/models", response_class=HTMLResponse)
 def models_page():
     """v3.0.138 — choose the model/provider per agent role (admins edit, all view)."""
@@ -1692,6 +1750,9 @@ def models_page():
  <div class="card"><h3>Test a model</h3><div class="d">Send a tiny prompt to verify a model id works (admin).</div>
    <input id="tm" placeholder="e.g. deepseek:deepseek-chat or ollama:gemma2"> <button onclick="testModel()">Test</button>
    <div class="msg" id="tmsg"></div></div>
+ <div class="card"><h3>On-demand cluster inference (our model, no paid key)</h3><div class="d">Submit a prompt &rarr; the server queues a cluster GPU job that runs our own model (ollama, default <code>gemma4</code>) &rarr; answer comes back. This is the self-hosted gateway; first response waits for the GPU queue + model load.</div>
+   <input id="ip" placeholder="prompt, e.g. Say hello in one word" style="width:340px;max-width:100%"> <button onclick="clusterInfer()">Run on cluster</button>
+   <div class="msg" id="imsg"></div></div>
  <div class="card" style="background:#fffbeb;border-color:#fde68a"><h3>How we serve models (self-hosted, no paid keys)</h3><div class="d" style="color:#92400e">Our plan: don&rsquo;t buy external API keys. We deploy our OWN models on the cluster <b>on-demand</b> (a batch job, same pattern as the harvest/Gemma agent &mdash; the cluster is never always-on). This server (Unie) is the always-on broker: it holds our OWN api key, other machines call the server, and the server submits a queued cluster job to run the model and returns the result. In this page that maps to a <code>cluster:&lt;model&gt;</code> / <code>vllm@&lt;url&gt;:&lt;model&gt;</code> id. Bridges-2 has H100-80GB nodes that can host DeepSeek-V3/V4 &amp; GLM-4.6 for such jobs. Paid APIs (DeepSeek/GLM/OpenAI/Anthropic) remain available as an option but are not required.</div></div>
 </div>
 <script>
@@ -1723,6 +1784,26 @@ async function saveRole(role){
 }
 async function testRole(role){var m=document.getElementById('in_'+role).value.trim();_test(m,document.getElementById('m_'+role));}
 async function testModel(){_test(document.getElementById('tm').value.trim(),document.getElementById('tmsg'));}
+async function clusterInfer(){
+ var p=document.getElementById('ip').value.trim(),el=document.getElementById('imsg');
+ if(!p){el.textContent='enter a prompt';return;}
+ el.textContent='\\u23f3 submitting cluster job\\u2026';
+ try{
+  var d=await (await fetch('/api/llm/infer',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p})})).json();
+  if(!d||!d.ok){el.textContent='\\u274c '+((d&&(d.detail||d.msg))||'submit failed');return;}
+  el.textContent='\\u23f3 queued (job '+(d.job_id||'?')+') \\u2014 waiting for GPU + model load\\u2026';
+  var tag=d.jobtag,tries=0;
+  var iv=setInterval(async function(){
+   tries++;
+   try{var rr=await (await fetch('/api/llm/infer/result?jobtag='+encodeURIComponent(tag),{credentials:'include'})).json();
+    if(rr.status==='done'){clearInterval(iv);el.innerHTML='\\u2705 '+esc((rr.text||'').slice(0,400));}
+    else if(rr.status==='failed'){clearInterval(iv);el.textContent='\\u274c '+esc(rr.error||'failed');}
+    else{el.textContent='\\u23f3 running\\u2026 ('+tries+')';}
+   }catch(e){}
+   if(tries>120){clearInterval(iv);el.textContent='\\u23f3 still running \\u2014 check back (poll /api/llm/infer/result?jobtag='+tag+')';}
+  },10000);
+ }catch(e){el.textContent='\\u274c '+e;}
+}
 async function _test(model,el){
  if(!model){el.textContent='enter a model id';return;}el.textContent='\\u23f3 testing\\u2026';
  try{var d=await (await fetch('/api/models/test',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:model})})).json();

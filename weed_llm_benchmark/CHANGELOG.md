@@ -4758,3 +4758,19 @@ SU budget). So the right design is a provider abstraction, not a hosted 671B mod
   (upload/read); does NOT grant cluster GPU. Middleware accepts it (after session, before Basic);
   uploads attribute to `key:<label>`. /api/keys [GET list / POST create (secret shown once) / revoke].
   Lets the humanoid laptop client drop shared Basic 1/1 for a proper key.
+
+
+---
+
+### v3.0.143 — Self-hosted model gateway (on-demand cluster inference)
+
+Completes the model gateway in the user's architecture: no paid API keys — our OWN model on the
+cluster, on-demand, brokered by the always-on lab server.
+- **run_llm_infer.sh**: an on-demand sbatch that spins up our ollama model (default gemma4, cached),
+  answers ONE prompt from results/framework/llm_infer/<jobtag>.prompt, writes the answer JSON, exits.
+  Same on-demand pattern as the harvest/Gemma agent (cluster never persistent).
+- **POST /api/llm/infer**: any authenticated caller (session OR our own X-API-Key) submits a prompt →
+  server stages it to the cluster + submits the job → returns a jobtag.
+- **GET /api/llm/infer/result?jobtag=**: poll the result file (queued/running → pending; done/failed).
+- **/models**: an "On-demand cluster inference" box submits + polls a prompt. So an external machine
+  with our API key can call the server and get an answer from our cluster-hosted model — no paid key.
