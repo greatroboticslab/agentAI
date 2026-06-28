@@ -1689,6 +1689,78 @@ def _write_model_config(cfg: dict) -> None:
     os.replace(tmp, _MODEL_CONFIG_FILE)
 
 
+# ===========================================================================
+# v3.0.153 — MODEL CATALOG. The agent/training model dropdowns are populated
+# ONLY from models that have actually run / been deployed on our cluster (per
+# Harry). Big LLMs (DeepSeek-V4, GLM-4.x) appear ONLY after a deploy job pulls +
+# verifies them on the cluster (see /api/models/deploy + run_deploy_model.sh).
+# Seeded with what we've genuinely run: the YOLO11 family (training) + gemma4
+# (ollama, used by the harvest brain + on-demand gateway).
+# ===========================================================================
+_MODEL_CATALOG_FILE = REPO / "results" / "framework" / "model_catalog.json"
+_SEED_CATALOG = {
+    "yolo11n": {"label": "YOLO11-n (fast)", "kind": "vision", "backend": "ultralytics",
+                "note": "runs on cluster GPU (verified in training)"},
+    "yolo11s": {"label": "YOLO11-s", "kind": "vision", "backend": "ultralytics",
+                "note": "runs on cluster GPU"},
+    "yolo11m": {"label": "YOLO11-m", "kind": "vision", "backend": "ultralytics",
+                "note": "runs on cluster GPU"},
+    "yolo11l": {"label": "YOLO11-l (accurate)", "kind": "vision", "backend": "ultralytics",
+                "note": "runs on cluster GPU"},
+    "ollama:gemma4": {"label": "Gemma4 (LLM)", "kind": "llm", "backend": "ollama",
+                      "note": "deployed on cluster (harvest brain + on-demand gateway)"},
+}
+
+
+def _read_catalog() -> dict:
+    cat = {}
+    try:
+        if _MODEL_CATALOG_FILE.is_file():
+            cat = json.load(open(_MODEL_CATALOG_FILE)) or {}
+    except Exception:
+        cat = {}
+    if not cat:   # first run → seed with genuinely-deployed models
+        cat = {k: dict(v, status="available", verified_at="seed")
+               for k, v in _SEED_CATALOG.items()}
+        try:
+            _write_catalog(cat)
+        except Exception:
+            pass
+    return cat
+
+
+def _write_catalog(cat: dict) -> None:
+    _MODEL_CATALOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = str(_MODEL_CATALOG_FILE) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cat, f, indent=2)
+    os.replace(tmp, _MODEL_CATALOG_FILE)
+
+
+def _catalog_add(model_id: str, fields: dict) -> None:
+    cat = _read_catalog()
+    cat[model_id] = {**cat.get(model_id, {}), **fields,
+                     "status": "available",
+                     "verified_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    _write_catalog(cat)
+
+
+@app.get("/api/models/catalog")
+def api_models_catalog(kind: str = ""):
+    """Models actually deployed/run on our cluster — the source for every model
+    dropdown. kind= 'vision' | 'llm' filters."""
+    cat = _read_catalog()
+    items = []
+    for mid, m in cat.items():
+        if kind and m.get("kind") != kind:
+            continue
+        items.append({"id": mid, "label": m.get("label") or mid,
+                      "kind": m.get("kind"), "backend": m.get("backend"),
+                      "note": m.get("note", ""), "verified_at": m.get("verified_at")})
+    items.sort(key=lambda x: (x["kind"] or "", x["id"]))
+    return JSONResponse({"ok": True, "models": items})
+
+
 @app.get("/api/models")
 def api_models():
     try:
@@ -1796,11 +1868,14 @@ async def api_train_submit(request: Request):
     model = str(body.get("model") or dd.get("model") or "auto")
     if not model.endswith(".pt"):
         model = "auto"   # let the template pick the right yolo11n-* per task
-    # v3.0.152: model SIZE picker (n/s/m/l) → a concrete YOLO11 weight for the task.
-    msize = str(body.get("model_size") or "auto").strip().lower()
-    if msize in ("n", "s", "m", "l"):
+    # v3.0.153: model picker now comes from the cluster catalog. The dropdown
+    # value is a catalog id ("yolo11s") or a bare size ("s"); both → a concrete
+    # YOLO11 weight for the task. Only vision/ultralytics ids are trainable here.
+    msize = str(body.get("model_size") or body.get("model") or "auto").strip().lower()
+    _m = re.match(r'^(?:yolo11)?([nslmx])(?:\.pt)?$', msize)
+    if _m:
         _suf = {"classify": "-cls", "segment": "-seg"}.get(ultra, "")
-        model = f"yolo11{msize}{_suf}.pt"
+        model = f"yolo11{_m.group(1)}{_suf}.pt"
     # v3.0.148: learning paradigm. Only supervised is wired today; the others are
     # honestly rejected (scaffolded) rather than silently running supervised.
     paradigm = str(body.get("paradigm") or "supervised").strip().lower()
@@ -1895,6 +1970,84 @@ def api_llm_infer_result(jobtag: str):
     return JSONResponse({"status": "pending"})
 
 
+# ===========================================================================
+# v3.0.153 — DEPLOY a new model onto the cluster so it enters the catalog.
+# Admin-only. Submits run_deploy_model.sh (ollama pull + verify-generate). The
+# model is parked in the catalog as status="deploying" (hidden from dropdowns)
+# and only flips to "available" once the result poll sees a successful generate.
+# This is the gate: DeepSeek-V4 / latest GLM appear ONLY after a real cluster run.
+# ===========================================================================
+@app.post("/api/models/deploy")
+async def api_models_deploy(request: Request):
+    if not _is_admin(request):
+        raise HTTPException(403, "admin only — deploying a model uses cluster GPU")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    model = re.sub(r"[^A-Za-z0-9_.:-]", "", str(body.get("model") or "")).strip()[:60]
+    if not model:
+        raise HTTPException(400, "model tag required (an ollama-library tag, e.g. deepseek-v4, glm4)")
+    label = str(body.get("label") or model)[:60]
+    kind = str(body.get("kind") or "llm").strip().lower()
+    if kind not in ("llm", "vision"):
+        kind = "llm"
+    jobtag = "d" + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
+    stage = ("mkdir -p results/framework/model_deploy; "
+             "git fetch origin >/dev/null 2>&1; "
+             "git checkout origin/main -- weed_llm_benchmark/run_deploy_model.sh 2>/dev/null; "
+             "cp -f weed_llm_benchmark/run_deploy_model.sh run_deploy_model.sh 2>/dev/null; true")
+    _slurm(["bash", "-lc", stage], timeout=60)
+    export = ",".join(["ALL", f"DEPLOY_MODEL={model}", f"DEPLOY_JOBTAG={jobtag}"])
+    r = _slurm(["sbatch", f"--export={export}", "run_deploy_model.sh"], timeout=25)
+    ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
+    jobid = (r.get("stdout") or "").split()[-1] if ok else None
+    if ok:
+        # park in catalog as deploying (hidden from dropdowns until verified)
+        cat = _read_catalog()
+        cat[model] = {**cat.get(model, {}), "label": label, "kind": kind,
+                      "backend": "ollama", "status": "deploying",
+                      "jobtag": jobtag, "job_id": jobid,
+                      "note": "deploying on cluster — pulling + verifying"}
+        _write_catalog(cat)
+    log.info(f"[deploy_model] {jobtag} model={model} ok={ok} by {_actor_from_request(request)}")
+    return JSONResponse({"ok": ok, "jobtag": jobtag, "job_id": jobid, "model": model,
+                         "msg": (r.get("stdout") or r.get("stderr") or "").strip(),
+                         "poll": f"/api/models/deploy/result?jobtag={jobtag}&model={model}"})
+
+
+@app.get("/api/models/deploy/result")
+def api_models_deploy_result(jobtag: str, model: str = ""):
+    if not re.match(r"^[A-Za-z0-9]+$", jobtag):
+        raise HTTPException(400, "bad jobtag")
+    r = _slurm(["bash", "-lc",
+                f"cat results/framework/model_deploy/{jobtag}.json 2>/dev/null"], timeout=20)
+    txt = (r.get("stdout") or "").strip()
+    if not txt:
+        return JSONResponse({"status": "pending"})
+    try:
+        d = json.loads(txt)
+    except Exception:
+        return JSONResponse({"status": "pending"})
+    mid = model or d.get("model")
+    if d.get("ok"):
+        # verified → make it selectable
+        if mid:
+            _catalog_add(mid, {"label": _read_catalog().get(mid, {}).get("label") or mid,
+                               "kind": _read_catalog().get(mid, {}).get("kind") or "llm",
+                               "backend": "ollama",
+                               "note": "deployed + verified on cluster"})
+        return JSONResponse({"status": "done", "model": mid, "sample": d.get("sample")})
+    # failed → mark failed (stays out of dropdowns)
+    if mid:
+        cat = _read_catalog()
+        if mid in cat:
+            cat[mid]["status"] = "failed"
+            cat[mid]["note"] = (d.get("error") or "verify-generate failed")[:160]
+            _write_catalog(cat)
+    return JSONResponse({"status": "failed", "model": mid, "error": d.get("error")})
+
+
 @app.get("/models", response_class=HTMLResponse)
 def models_page():
     """v3.0.138 — choose the model/provider per agent role (admins edit, all view)."""
@@ -1927,6 +2080,14 @@ def models_page():
  <div class="card"><h3>On-demand cluster inference (our model, no paid key)</h3><div class="d">Submit a prompt &rarr; the server queues a cluster GPU job that runs our own model (ollama, default <code>gemma4</code>) &rarr; answer comes back. This is the self-hosted gateway; first response waits for the GPU queue + model load.</div>
    <input id="ip" placeholder="prompt, e.g. Say hello in one word" style="width:340px;max-width:100%"> <button onclick="clusterInfer()">Run on cluster</button>
    <div class="msg" id="imsg"></div></div>
+ <div class="card"><h3>Cluster model catalog</h3><div class="d">These are the models that have actually run / been deployed on our cluster. <b>This is the exact list students pick from</b> when building an agent or training a model &mdash; nothing shows here until it really runs on our GPUs.</div>
+   <div id="catlist">loading&hellip;</div>
+   <div id="deploybox" style="display:none;margin-top:12px;border-top:1px solid #eef2f7;padding-top:12px">
+     <div class="d" style="margin-bottom:6px"><b>Deploy a new model</b> (admin). Pulls an Ollama-library tag onto a cluster GPU and verifies it generates. On success it joins the catalog &mdash; this is how <code>deepseek-v4</code> / latest <code>glm</code> become selectable. Big models need the GPU queue; the job can take a while.</div>
+     <input id="dm" placeholder="ollama tag, e.g. deepseek-v4 or glm4" style="width:260px"> <input id="dl" placeholder="display label (optional)" style="width:200px"> <button onclick="deployModel()">Deploy</button>
+     <div class="msg" id="dmsg"></div>
+   </div>
+ </div>
  <div class="card" style="background:#fffbeb;border-color:#fde68a"><h3>How we serve models (self-hosted, no paid keys)</h3><div class="d" style="color:#92400e">Our plan: don&rsquo;t buy external API keys. We deploy our OWN models on the cluster <b>on-demand</b> (a batch job, same pattern as the harvest/Gemma agent &mdash; the cluster is never always-on). This server (Unie) is the always-on broker: it holds our OWN api key, other machines call the server, and the server submits a queued cluster job to run the model and returns the result. In this page that maps to a <code>cluster:&lt;model&gt;</code> / <code>vllm@&lt;url&gt;:&lt;model&gt;</code> id. Bridges-2 has H100-80GB nodes that can host DeepSeek-V3/V4 &amp; GLM-4.6 for such jobs. Paid APIs (DeepSeek/GLM/OpenAI/Anthropic) remain available as an option but are not required.</div></div>
 </div>
 <script>
@@ -1949,6 +2110,38 @@ async function load(){
   rs.innerHTML+='<div class="card"><h3>'+esc(role)+'</h3><div class="d">'+esc(r.desc)+'</div>'+ctl+'</div>';
  });
  rs.innerHTML+='<datalist id="sug">'+sug+'</datalist>';
+ loadCatalog();
+ if(ME.is_admin){var db=document.getElementById('deploybox');if(db)db.style.display='block';}
+}
+async function loadCatalog(){
+ var el=document.getElementById('catlist');if(!el)return;
+ try{var cat=(await (await fetch('/api/models/catalog',{credentials:'include'})).json()).models||[];
+  if(!cat.length){el.innerHTML='<span class="d">none yet</span>';return;}
+  el.innerHTML='<div class="prov">'+cat.map(function(m){
+    return '<span class="pill on" title="'+esc(m.note||'')+'">'+esc(m.label)+' \\u00b7 '+esc(m.kind||'')+'</span>';
+  }).join('')+'</div>';
+ }catch(e){el.textContent='\\u274c '+e;}
+}
+async function deployModel(){
+ var m=document.getElementById('dm').value.trim(),lab=document.getElementById('dl').value.trim(),el=document.getElementById('dmsg');
+ if(!m){el.textContent='enter an ollama tag';return;}
+ if(!confirm('Deploy "'+m+'" on a cluster GPU? This submits a batch job (pull + verify) and may take a while.'))return;
+ el.textContent='\\u23f3 submitting deploy job\\u2026';
+ try{
+  var d=await (await fetch('/api/models/deploy',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:m,label:lab})})).json();
+  if(!d||!d.ok){el.textContent='\\u274c '+((d&&(d.detail||d.msg))||'submit failed');return;}
+  el.textContent='\\u23f3 queued (job '+(d.job_id||'?')+') \\u2014 pulling + verifying on GPU\\u2026';
+  var tag=d.jobtag,mid=d.model,tries=0;
+  var iv=setInterval(async function(){
+   tries++;
+   try{var rr=await (await fetch('/api/models/deploy/result?jobtag='+encodeURIComponent(tag)+'&model='+encodeURIComponent(mid),{credentials:'include'})).json();
+    if(rr.status==='done'){clearInterval(iv);el.innerHTML='\\u2705 deployed + verified \\u2014 now selectable. sample: '+esc((rr.sample||'').slice(0,80));loadCatalog();}
+    else if(rr.status==='failed'){clearInterval(iv);el.textContent='\\u274c failed: '+esc(rr.error||'verify failed');}
+    else{el.textContent='\\u23f3 deploying\\u2026 ('+tries+') \\u2014 big models take time in the GPU queue';}
+   }catch(e){}
+   if(tries>180){clearInterval(iv);el.textContent='\\u23f3 still deploying \\u2014 check back later (poll /api/models/deploy/result?jobtag='+tag+')';}
+  },10000);
+ }catch(e){el.textContent='\\u274c '+e;}
 }
 async function saveRole(role){
  var m=document.getElementById('in_'+role).value.trim(),el=document.getElementById('m_'+role);
@@ -3038,14 +3231,8 @@ def agent_generic(domain_id: str):
        <option value="custom">Custom</option>
      </select>
      <input id="ag-name" placeholder="name (optional)" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
-     <select id="ag-model" title="model for this agent" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+     <select id="ag-model" title="model for this agent (deployed on cluster)" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
        <option value="auto">model: auto</option>
-       <option value="yolo11n.pt">YOLO11-n</option>
-       <option value="yolo11s.pt">YOLO11-s</option>
-       <option value="yolo11m.pt">YOLO11-m</option>
-       <option value="rf-detr">RF-DETR</option>
-       <option value="ollama:gemma4">Gemma4 (LLM, cluster)</option>
-       <option value="custom">custom</option>
      </select>
      <button onclick="addAgent()" style="border:0;cursor:pointer;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#43; Add agent</button>
      <span id="ag-msg" style="font-size:12px;color:#475569"></span>
@@ -3082,12 +3269,8 @@ def agent_generic(domain_id: str):
          <option value="rl">reinforcement (coming)</option>
          <option value="multi_strategy">multi-strategy (coming)</option>
        </select>
-       <select id="tr-model" title="model" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+       <select id="tr-model" title="model (deployed on cluster)" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
          <option value="auto">model: auto</option>
-         <option value="n">YOLO11-n (fast)</option>
-         <option value="s">YOLO11-s</option>
-         <option value="m">YOLO11-m</option>
-         <option value="l">YOLO11-l (accurate)</option>
        </select>
        <label style="font-size:13px;color:#334">epochs <input id="tr-ep" type="number" value="20" min="1" max="300" style="width:70px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
        <button id="tr-go" onclick="submitTrain()" style="border:0;cursor:pointer;background:#7c3aed;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#128640; Train</button>
@@ -3155,6 +3338,16 @@ async function deleteUpload(slug,btn){
 }
 loadUploads();
 loadTrainDatasets();
+// v3.0.153: populate model dropdowns from the cluster catalog (deployed-only).
+async function loadModelCatalog(){try{
+  var all=(await (await fetch('/api/models/catalog',{credentials:'include'})).json()).models||[];
+  var ag=document.getElementById('ag-model');
+  if(ag){all.forEach(function(m){var o=document.createElement('option');o.value=m.id;o.textContent=m.label+(m.kind==='llm'?' \\u00b7 LLM':'');o.title=m.note||'';ag.appendChild(o);});
+    var oc=document.createElement('option');oc.value='custom';oc.textContent='custom\\u2026';ag.appendChild(oc);}
+  var tr=document.getElementById('tr-model');
+  if(tr){all.filter(function(m){return m.kind==='vision';}).forEach(function(m){var o=document.createElement('option');o.value=m.id;o.textContent=m.label;o.title=m.note||'';tr.appendChild(o);});}
+}catch(e){}}
+loadModelCatalog();
 (async function(){try{
   var me=await (await fetch('/api/me',{credentials:'include'})).json();
   var mng=document.getElementById('manage');if(!mng)return;

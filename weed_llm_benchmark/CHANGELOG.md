@@ -4889,3 +4889,17 @@ dead ends. Extended smoke 47/47.
   concrete task weight (yolo11{size}{-cls/-seg}.pt); auto keeps the per-task default.
 - Add-agent form: a per-agent model dropdown (auto / YOLO11 sizes / RF-DETR / Gemma4-cluster / custom)
   stored in the agent's config.model and shown on each agent row.
+
+### v3.0.153 — Model dropdowns = DYNAMIC cluster catalog (deployed-only) + deploy flow
+
+Per Harry: the model choices must be exactly the models that have actually run / been deployed on our
+cluster — not a hardcoded list. DeepSeek-V4 / latest GLM appear ONLY after a real cluster deployment.
+- New model catalog (`results/framework/model_catalog.json`), seeded with genuinely-run models only:
+  YOLO11 n/s/m/l (vision, ultralytics) + ollama:gemma4 (LLM). NOT DeepSeek/GLM (not deployed yet).
+- `GET /api/models/catalog?kind=` serves the catalog (available-status only). Both the Train-panel model
+  dropdown and the Add-agent model dropdown are now populated dynamically from it (hardcoded options
+  removed). /api/train/submit accepts a catalog id (yolo11s) or bare size (s) → concrete task weight.
+- Deploy flow: `POST /api/models/deploy` (admin) submits `run_deploy_model.sh` (cluster ollama pull +
+  verify-generate on GPU). The model is parked as status="deploying" (hidden from dropdowns) and only
+  flips to "available" once `GET /api/models/deploy/result` sees a successful generate. Failed → marked
+  failed, stays out of the dropdowns. /models page shows the live catalog + an admin Deploy box.
