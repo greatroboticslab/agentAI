@@ -955,7 +955,7 @@ def root():
  .foot a{color:#93a3bd}
 </style></head><body>
  <div class="brand">Greater Robotics Lab</div>
- <h1>Autonomous Dataset Agents</h1>
+ <h1>Research Projects</h1>
  <div class="tag">Self-driving agents that collect, human-review, filter and train on real-world
    datasets &mdash; compounding over weeks and months.</div>
  <div class="agents">
@@ -969,13 +969,13 @@ def root():
    __EXTRA_AGENTS__
    <div class="agent add" onclick="var p=document.getElementById('createPanel');p.style.display='block';p.scrollIntoView({behavior:'smooth'})">
      <div class="plus">+</div>
-     <div class="nm">New Agent</div>
-     <div class="ds">Spin up a collection agent for a new domain.</div>
+     <div class="nm">New Project</div>
+     <div class="ds">Create a project for any research domain &mdash; upload data, add agents later.</div>
    </div>
  </div>
  <div id="createPanel">
-   <h3>Create a new agent</h3>
-   <p class="h">Each agent owns one domain and runs the same collect &rarr; review &rarr; train pipeline.</p>
+   <h3>Create a new project</h3>
+   <p class="h">A project is a research workspace (any field, any data type). Upload datasets and add agents (collect / filter / label / train) any time &mdash; or none at all.</p>
    <label>Agent name</label>
    <input id="agName" placeholder="e.g. Crop Disease, Warehouse Robot, Drone Survey">
    <div class="row2">
@@ -1390,6 +1390,70 @@ async def api_agent_update(request: Request):
     if updated is None:
         raise HTTPException(503, "database unavailable")
     return JSONResponse({"ok": True, "domain": domain_id})
+
+
+# v3.0.146 — agents are COMPONENTS inside a project (freely composed, 0..N).
+_AGENT_TYPES = {
+    "collector": "Collector — autonomously finds & pulls datasets",
+    "filter": "Filter / QC — quality-scores & prunes data",
+    "labeler": "Labeler — auto / assisted annotation",
+    "trainer": "Trainer — trains models (supervised / self-sup / RL / hybrid)",
+    "evaluator": "Evaluator — benchmarks & reports metrics",
+    "custom": "Custom — a component you define later",
+}
+
+
+@app.get("/api/agent_types")
+def api_agent_types():
+    return JSONResponse({"ok": True, "types": _AGENT_TYPES})
+
+
+@app.post("/api/project/agent/add")
+async def api_project_agent_add(request: Request):
+    """Add an agent component to a project (owner or admin)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    domain_id = re.sub(r"[^a-z0-9_]+", "", str(body.get("project") or body.get("domain") or "").lower())[:40]
+    atype = str(body.get("type") or "").strip().lower()
+    name = str(body.get("name") or "").strip()[:60]
+    if not domain_id:
+        raise HTTPException(400, "project required")
+    if atype not in _AGENT_TYPES:
+        raise HTTPException(400, f"type must be one of {list(_AGENT_TYPES)}")
+    from . import db as _db
+    dom = _db.get_domain(domain_id)
+    if not dom:
+        raise HTTPException(404, f"no project '{domain_id}'")
+    actor = _actor_from_request(request)
+    if not _can_manage_agent(actor, dom):
+        raise HTTPException(403, "only the project's owner or an admin can add agents")
+    a = _db.add_project_agent(domain_id, atype, name or atype, actor=actor)
+    if a is None:
+        raise HTTPException(503, "database unavailable")
+    return JSONResponse({"ok": True, "agent": a})
+
+
+@app.post("/api/project/agent/remove")
+async def api_project_agent_remove(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    domain_id = re.sub(r"[^a-z0-9_]+", "", str(body.get("project") or body.get("domain") or "").lower())[:40]
+    agent_id = re.sub(r"[^a-f0-9]+", "", str(body.get("agent_id") or ""))[:16]
+    if not domain_id or not agent_id:
+        raise HTTPException(400, "project + agent_id required")
+    from . import db as _db
+    dom = _db.get_domain(domain_id)
+    if not dom:
+        raise HTTPException(404, f"no project '{domain_id}'")
+    actor = _actor_from_request(request)
+    if not _can_manage_agent(actor, dom):
+        raise HTTPException(403, "only the project's owner or an admin can remove agents")
+    ok = _db.remove_project_agent(domain_id, agent_id, actor=actor)
+    return JSONResponse({"ok": bool(ok), "agent_id": agent_id})
 
 
 # ===========================================================================
@@ -1823,7 +1887,7 @@ def models_page():
  .msg{font-size:12px;color:#475569;margin-left:8px}
  code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:12px}
 </style></head><body>
-<div class="top"><a href="/">&larr; Agents</a></div>
+<div class="top"><a href="/">&larr; Projects</a></div>
 <div class="hero"><h1>&#129504; Models</h1><div class="sub">Which model each agent role uses. Mix local (Ollama) and APIs (DeepSeek / GLM / OpenAI / Anthropic) or a cluster vLLM endpoint &mdash; switch any time. Model id = <code>provider:name</code>.</div></div>
 <div class="wrap">
  <div class="card"><h3>Providers</h3><div class="d">Green = ready to use now. API keys live in <code>~/.llm_keys</code> on the server (DEEPSEEK_API_KEY, ZHIPU_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY). Ollama = a local model server.</div><div class="prov" id="prov">loading…</div></div>
@@ -2627,7 +2691,7 @@ def users_page():
  .act{border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:4px 9px;font-size:12px;cursor:pointer;margin:2px 2px 0 0}
  .act.warn{border-color:#fecaca;color:#dc2626}
 </style></head><body>
-<div class="top"><a href="/">&larr; Agents</a></div>
+<div class="top"><a href="/">&larr; Projects</a></div>
 <div class="hero"><h1>&#128100; Users &amp; access</h1><div class="sub">Everyone who has signed in or uploaded data. Per-user attribution + role-based access (admins can grant cluster use).</div></div>
 <div class="wrap">
  <div class="note" id="note">loading…</div>
@@ -2868,6 +2932,25 @@ def agent_generic(domain_id: str):
     _model = _h.escape(str(d.get("model") or "auto"))
     _metric = _h.escape(str(d.get("target_metric") or "mAP50-95"))
     _owner = _h.escape(str(d.get("owner") or ""))
+    # v3.0.146: agents are components inside this PROJECT (0..N, freely composed)
+    _agents = d.get("agents") or []
+    if _agents:
+        _arows = "".join(
+            ('<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;'
+             + ('border-top:1px solid #eef1f6;' if i else '') + 'font-size:13px">'
+             + '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;'
+               'background:#eef2ff;color:#1d4ed8">' + _h.escape(str(a.get("type", ""))) + '</span>'
+             + '<b>' + _h.escape(str(a.get("name") or a.get("type", ""))) + '</b>'
+             + '<span style="color:#94a3b8;margin-left:auto">' + _h.escape(str(a.get("status", "idle"))) + '</span>'
+             + '<button class="agdel" data-id="' + _h.escape(str(a.get("id", ""))) + '" '
+               'style="display:none;border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;'
+               'padding:4px 9px;border-radius:7px;cursor:pointer" '
+               'onclick="removeAgent(this.getAttribute(\'data-id\'))">remove</button></div>')
+            for i, a in enumerate(_agents))
+    else:
+        _arows = ('<div style="color:#64748b;font-size:13px;padding:4px 0">No agents yet &mdash; '
+                  'this project is a pure dataset workspace. Add an agent when you want automation '
+                  '(collect / filter / label / train / &hellip;).</div>')
     if qs:
         _hbtn = ('<button class="btn" id="hbtn" onclick="startHarvest()" '
                  'style="border:0;cursor:pointer">&#9654; Start harvest</button>'
@@ -2881,7 +2964,7 @@ def agent_generic(domain_id: str):
                  "enable harvesting for this domain.")
     page = (f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{nm} &mdash; Mission Control</title>
+<title>{nm} &mdash; Project</title>
 <style>
  *{{box-sizing:border-box}}
  body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;background:#f2f4f8;color:#1a1a1d}}
@@ -2906,11 +2989,24 @@ def agent_generic(domain_id: str):
      <button onclick="deleteAgent()" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:6px 11px;border-radius:7px;cursor:pointer">&#128465; Delete agent</button>
      <span id="mng-msg" style="font-size:12px;color:#475569;margin-left:6px"></span>
    </div>
-   <div class="row" style="margin-top:16px"><b>This agent was just created.</b> It has no collected data yet.</div>
-   <div class="row">Seed search queries: <b>{qline}</b></div>
-   <div class="row">Sub-agents: <b>{int(d.get("n_subagents") or 2)}</b> &middot; Target metric: <b>{_metric}</b></div>
-   <div class="row" style="margin-top:18px">{_note}</div>
-   <div style="margin-top:16px">{_hbtn}</div>
+   <div class="row" style="margin-top:16px">A <b>project</b> is your research workspace. Upload datasets (any kind) below, and add <b>agents</b> to automate collection, filtering, labeling, or training &mdash; any number, any mix. Target metric: <b>{_metric}</b>.</div>
+
+   <div style="margin-top:20px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Agents in this project</div>
+   <div style="margin-top:10px;border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">{_arows}</div>
+   <div id="agent-add" style="display:none;margin-top:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center">
+     <select id="ag-type" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+       <option value="collector">Collector (auto-collect datasets)</option>
+       <option value="filter">Filter / QC</option>
+       <option value="labeler">Labeler</option>
+       <option value="trainer">Trainer</option>
+       <option value="evaluator">Evaluator</option>
+       <option value="custom">Custom</option>
+     </select>
+     <input id="ag-name" placeholder="name (optional)" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
+     <button onclick="addAgent()" style="border:0;cursor:pointer;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#43; Add agent</button>
+     <span id="ag-msg" style="font-size:12px;color:#475569"></span>
+   </div>
+   <div style="margin-top:14px">{_hbtn}</div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Upload a dataset (.zip)</div>
    <div style="margin-top:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px">
      <div style="font-size:13px;color:#475569;margin-bottom:10px">Drop a <b>.zip</b> of images (optionally with YOLO <code>labels/</code> + <code>data.yaml</code>). It registers as a dataset for this agent and appears under Datasets. Future: automatic upload + open community contributions.</div>
@@ -3006,8 +3102,23 @@ loadTrainDatasets();
   var me=await (await fetch('/api/me',{credentials:'include'})).json();
   var mng=document.getElementById('manage');if(!mng)return;
   var owner=mng.getAttribute('data-owner')||'';
-  if(me&&me.ok&&(me.is_admin||(owner&&owner===me.user))){mng.style.display='block';}
+  if(me&&me.ok&&(me.is_admin||(owner&&owner===me.user))){
+    mng.style.display='block';
+    var aa=document.getElementById('agent-add');if(aa)aa.style.display='flex';
+    Array.prototype.forEach.call(document.querySelectorAll('.agdel'),function(b){b.style.display='inline-block';});
+  }
 }catch(e){}})();
+async function addAgent(){
+ var t=document.getElementById('ag-type').value,nm=document.getElementById('ag-name').value.trim(),m=document.getElementById('ag-msg');
+ m.textContent='\\u23f3';
+ try{var d=await (await fetch('/api/project/agent/add',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:'__DOM__',type:t,name:nm})})).json();
+  if(d&&d.ok){m.textContent='\\u2705 added';setTimeout(function(){location.reload();},600);}else{m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}catch(e){m.textContent='\\u274c '+e;}
+}
+async function removeAgent(aid){
+ if(!confirm('Remove this agent from the project?'))return;
+ try{var d=await (await fetch('/api/project/agent/remove',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:'__DOM__',agent_id:aid})})).json();
+  if(d&&d.ok){location.reload();}else{alert((d&&(d.detail||d.msg))||'failed');}}catch(e){alert(''+e);}
+}
 async function renameAgent(){
  var nm=prompt('New display name for this agent:');if(!nm||!nm.trim())return;
  var m=document.getElementById('mng-msg');m.textContent='\\u23f3';

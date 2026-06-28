@@ -4803,3 +4803,20 @@ Deleting an agent now properly manages its data, not just the domain record (per
   the domain; returns datasets_removed. Admin can delete any project (weed protected); owner can
   delete their own. The delete confirm shows how many datasets will go.
 - create_domain records owner + created_at (v3.0.144).
+
+
+---
+
+### v3.0.146 — Reframe to PROJECT containing AGENTS (the super-platform model) — UX loop R1/R2
+
+Per Harry's vision: top-level is a PROJECT (any research field, any data type), which CONTAINS
+datasets + 0..N freely-composed agents (not limited to collect/filter/train). Backward-compatible:
+the existing domain doc IS the project; routes unchanged.
+- db.add_project_agent / remove_project_agent — agents stored on the project doc (project.agents:
+  [{id,type,name,status,config}]). Types: collector / filter / labeler / trainer / evaluator / custom.
+- /api/project/agent/add + /remove (owner-or-admin); /api/agent_types.
+- Project page now shows an "Agents in this project" section (list + Add type picker + remove for
+  owner/admin); a project with 0 agents is a valid pure-dataset workspace. Killed the bad
+  "This agent was just created / re-create the agent" copy → project-framed text.
+- Terminology Agent→Project across the launcher ("Research Projects", "New Project", "Create a new
+  project") + page titles + back links.

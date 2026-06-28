@@ -480,6 +480,44 @@ def update_domain(domain_id: str, fields: dict, actor: str = "user") -> Optional
         return None
 
 
+def add_project_agent(domain_id: str, atype: str, name: str = "",
+                      actor: str = "user") -> Optional[dict]:
+    """v3.0.146: add an AGENT component to a PROJECT (domain). A project holds
+    0..N agents, freely composed (collector/filter/labeler/trainer/evaluator/
+    custom). Returns the new agent dict, or None."""
+    import secrets as _s
+    db = _get_db()
+    if db is None:
+        return None
+    agent = {"id": _s.token_hex(4), "type": atype, "name": name or atype,
+             "created_at": _now(), "status": "idle", "config": {}}
+    try:
+        r = db[COLL_DOMAINS].update_one({"_id": domain_id}, {"$push": {"agents": agent}})
+        if r.matched_count == 0:
+            return None
+        try:
+            db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
+                "event": "project.agent_add", "target": {"kind": "domain", "id": domain_id},
+                "after": {"agent": agent["type"]}})
+        except Exception:
+            pass
+        return agent
+    except Exception:
+        return None
+
+
+def remove_project_agent(domain_id: str, agent_id: str, actor: str = "user") -> bool:
+    db = _get_db()
+    if db is None:
+        return False
+    try:
+        r = db[COLL_DOMAINS].update_one({"_id": domain_id},
+                                        {"$pull": {"agents": {"id": agent_id}}})
+        return bool(r.modified_count)
+    except Exception:
+        return False
+
+
 def create_domain(domain_id: str, display_name: str, taxonomy=None,
                   target_metric: str = None, harvest_queries=None,
                   n_subagents: int = 2, status: str = "created",
