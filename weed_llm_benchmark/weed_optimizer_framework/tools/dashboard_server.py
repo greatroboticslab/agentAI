@@ -3192,6 +3192,21 @@ def _iso(v):
         return ""
 
 
+@app.get("/api/audit")
+def api_audit(request: Request, limit: int = 100, actor: str = ""):
+    """v3.0.159 — admin-only activity log: who did what, when. Reads the Mongo
+    audit_trail that's been recorded all along (create/delete project, add/remove
+    agent, role + cluster-access changes, dataset upsert/purge)."""
+    if not _is_admin(_actor_from_request(request)):
+        raise HTTPException(403, "admin only")
+    try:
+        from . import db as _dbu
+        events = _dbu.list_audit(limit=limit, actor=actor)
+    except Exception:
+        events = []
+    return JSONResponse({"ok": True, "count": len(events), "events": events})
+
+
 @app.get("/users", response_class=HTMLResponse)
 def users_page():
     """v3.0.129 — admin view of users + per-user upload attribution (English)."""
@@ -3230,6 +3245,11 @@ def users_page():
    <div id="knew" style="font-size:12px;margin-top:8px"></div>
    <div id="klist" style="font-size:13px;margin-top:10px"></div>
  </div>
+ <div id="audit-card" style="display:none;background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:16px;margin-top:16px">
+   <h3 style="margin:0 0 2px;font-size:15px">&#128220; Activity log (who did what)</h3>
+   <div style="color:#64748b;font-size:12px;margin-bottom:10px">Every key action is recorded with the user who did it &mdash; create/delete project, add/remove agent, role &amp; cluster-access changes, dataset upload/delete. Newest first. <button onclick="loadAudit()" style="border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:3px 9px;font-size:12px;cursor:pointer">&#8635; refresh</button></div>
+   <div class="tblwrap"><table id="audit"><thead><tr><th>When (UTC)</th><th>Who</th><th>Action</th><th>Target</th><th>Details</th></tr></thead><tbody></tbody></table></div>
+ </div>
 </div>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -3243,7 +3263,7 @@ async function load(){
  if(!d.ok){note.textContent=esc(d.error||'error');return;}
  var adminNote=ME.is_admin?' · you are an <b>admin</b> — you can change roles &amp; cluster access':' · you are a <b>member</b>';
  note.innerHTML='<b>'+d.n+'</b> user(s)'+adminNote+(d.mongo?'':' · <span style="color:#d97706">Mongo offline</span>');
- if(ME.is_admin){document.getElementById('acth').style.display='';document.getElementById('keys-card').style.display='block';loadKeys();}
+ if(ME.is_admin){document.getElementById('acth').style.display='';document.getElementById('keys-card').style.display='block';loadKeys();document.getElementById('audit-card').style.display='block';loadAudit();}
  var tb=document.querySelector('#tbl tbody');tb.innerHTML='';
  if(!d.users.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:1.4rem">No users yet.</td></tr>';return;}
  d.users.forEach(function(u){
@@ -3279,6 +3299,23 @@ async function setCluster(uid,allow){
  if(!confirm((allow?'Grant':'Revoke')+' cluster (GPU) access for '+uid+'?'))return;
  try{var d=await (await fetch('/api/users/cluster_access',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,allow:allow})})).json();
   if(d&&d.ok){load();}else{alert((d&&(d.detail||d.msg))||'failed');}}catch(e){alert(''+e);}
+}
+async function loadAudit(){
+ var tb=document.querySelector('#audit tbody');if(!tb)return;
+ tb.innerHTML='<tr><td colspan="5" style="color:#94a3b8;padding:.8rem">loading\\u2026</td></tr>';
+ try{var d=await (await fetch('/api/audit?limit=200',{credentials:'include'})).json();
+  if(!d||!d.ok){tb.innerHTML='<tr><td colspan="5" style="color:#dc2626;padding:.8rem">'+esc((d&&d.detail)||'error')+'</td></tr>';return;}
+  if(!d.events.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:1.2rem">No activity recorded yet.</td></tr>';return;}
+  tb.innerHTML=d.events.map(function(e){
+    var tgt=e.target?((e.target.kind||'')+' '+(e.target.id||'')):'';
+    var det=e.after?JSON.stringify(e.after):(e.reason||'');
+    return '<tr><td style="white-space:nowrap;font-family:ui-monospace,monospace;font-size:12px">'+esc((e.ts||'').replace('T',' ').slice(0,19))+'</td>'
+      +'<td>'+esc(e.actor||'')+'</td>'
+      +'<td><span class="pill" style="background:#eef2ff;color:#1d4ed8">'+esc(e.event||'')+'</span></td>'
+      +'<td>'+esc(tgt)+'</td>'
+      +'<td style="color:#64748b;font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis">'+esc(det)+'</td></tr>';
+  }).join('');
+ }catch(e){tb.innerHTML='<tr><td colspan="5" style="color:#dc2626;padding:.8rem">'+esc(e)+'</td></tr>';}
 }
 async function loadKeys(){
  try{var d=await (await fetch('/api/keys',{credentials:'include'})).json();var el=document.getElementById('klist');

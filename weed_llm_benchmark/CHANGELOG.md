@@ -4964,3 +4964,12 @@ project page (upload datasets, compose agents with real Run controls, train pane
 renderer seeds a "weed" domain doc on first view if missing (display_name "Weed Detection", field
 "agriculture / precision weeding", detection/image). The old mission-control template is kept dormant after
 an early return (no behaviour split). Advanced weed views (/classes, /slugs, /rounds) remain in the nav.
+
+### v3.0.159 — Admin activity log (who did what, when)
+
+The audit trail has been recorded in Mongo all along (actor + event + target on create/delete project,
+add/remove agent, role + cluster-access changes, dataset upsert/purge) but was never viewable. Now:
+- db.list_audit(limit, actor) reads audit_trail newest-first (ts → ISO string).
+- GET /api/audit (admin-only) returns recent events.
+- /users page gets an admin-only "Activity log" card: a table of When / Who / Action / Target / Details
+  with a refresh button. Answers Harry's question — admins can now see what each account did on the site.

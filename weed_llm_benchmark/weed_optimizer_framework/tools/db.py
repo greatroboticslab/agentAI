@@ -730,6 +730,31 @@ def log_audit(event: str, target: dict, after: dict = None,
         return False
 
 
+def list_audit(limit: int = 100, actor: str = "") -> list:
+    """Recent audit-trail events, newest first. Each: {ts(iso), actor, event,
+    target, after, before, reason}. Mongo-only; [] if Mongo is down."""
+    db = _get_db()
+    if db is None:
+        return []
+    q = {}
+    if actor:
+        q["actor"] = actor
+    try:
+        rows = list(db[COLL_AUDIT].find(q).sort("ts", -1).limit(max(1, min(int(limit), 500))))
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        r.pop("_id", None)
+        ts = r.get("ts")
+        try:
+            r["ts"] = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
+        except Exception:
+            r["ts"] = str(ts)
+        out.append(r)
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Users (v3.0.129) — Prof Zhang: students log in with their own account; we save
 # users + track who uploaded what. Mongo-backed (best-effort, like domains).
