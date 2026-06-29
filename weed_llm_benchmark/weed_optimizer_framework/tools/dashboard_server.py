@@ -1542,7 +1542,9 @@ async def api_agent_plan(request: Request):
         if answers:
             usr += "\nClarifications: " + json.dumps(answers)[:1000]
         from . import llm_providers as _llm
-        r = _llm.chat(planner, usr, system=sys_p, max_tokens=512, timeout=25)
+        # 60s: tolerates a cold GPU model load (first call after idle) + the
+        # plan generation on the lab's small local model.
+        r = _llm.chat(planner, usr, system=sys_p, max_tokens=512, timeout=60)
         if r.get("ok") and (r.get("text") or "").strip():
             m = re.search(r"\{.*\}", r["text"], re.S)
             if m:
