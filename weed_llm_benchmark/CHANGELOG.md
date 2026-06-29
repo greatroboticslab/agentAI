@@ -4973,3 +4973,14 @@ add/remove agent, role + cluster-access changes, dataset upsert/purge) but was n
 - GET /api/audit (admin-only) returns recent events.
 - /users page gets an admin-only "Activity log" card: a table of When / Who / Action / Target / Details
   with a refresh button. Answers Harry's question — admins can now see what each account did on the site.
+
+### v3.0.160 — Local AI-planning model on the lab server + README sync
+
+- Installed ollama (user-space, systemd --user, no sudo) on the always-on lab server (RTX 3060) and
+  pulled a small model **qwen2.5:3b** for fast AI planning. It loads into the GPU only when called and
+  unloads when idle (OLLAMA_KEEP_ALIVE=5m), so it doesn't burden the dashboard.
+- /api/agent/plan now defaults its planner to the lab's local **ollama:qwen2.5:3b** (override via
+  PLANNER_MODEL env or a "planner" model-config role) instead of the cluster brain (gemma4), which isn't
+  reachable synchronously from the lab. So intent→plan now uses a real LLM instead of the heuristic fallback.
+- README rewritten: it described only the old weed benchmark; now leads with the current platform
+  (architecture, what works, honest limits) and keeps the original benchmark below.

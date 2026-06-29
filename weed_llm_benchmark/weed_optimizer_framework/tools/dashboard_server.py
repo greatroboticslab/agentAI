@@ -1523,7 +1523,13 @@ async def api_agent_plan(request: Request):
     llm_error = None
     try:
         cfg = _read_model_config()
-        planner = (cfg.get("roles") or {}).get("brain") or "ollama:gemma4"
+        # v3.0.160: the planner uses the lab's LOCAL small model (ollama qwen2.5:3b,
+        # served on the always-on server) so planning is fast + actually works —
+        # the cluster brain (gemma4) isn't reachable synchronously from the lab.
+        # Override via PLANNER_MODEL env or a "planner" model-config role.
+        planner = (os.environ.get("PLANNER_MODEL")
+                   or (cfg.get("roles") or {}).get("planner")
+                   or "ollama:qwen2.5:3b")
         sys_p = ("You are a research-platform planner. Given a user's intent, propose ONE project "
                  "and the agents to build inside it. Agent types MUST be from: "
                  + ", ".join(_AGENT_TYPES) + ". "

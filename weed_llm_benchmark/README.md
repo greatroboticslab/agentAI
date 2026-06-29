@@ -1,4 +1,44 @@
-# Weed Detection LLM Benchmark
+# agentAI — Research Data-Collection & Training Platform
+
+> Started as a weed-detection LLM benchmark (below); it has grown into a general,
+> multi-domain platform for autonomous research data collection, human-in-the-loop
+> labeling, and model training. See `CHANGELOG.md` for the full history.
+
+## Platform (current state)
+
+A web platform (FastAPI dashboard + MongoDB) where a researcher creates a **Project**
+(any field, any data type) and freely composes **datasets + agents** inside it.
+
+**Architecture**
+- **Lab server (always-on, Ubuntu/RTX 3060)** — hosts the dashboard, MongoDB, the
+  dataset image library, and a small **local LLM (ollama `qwen2.5:3b`) for fast AI planning**.
+  Reached over Tailscale at a fixed URL.
+- **Bridges-2 cluster (on-demand GPU only)** — harvest + training + large-model inference,
+  submitted as batch jobs from the lab; the cluster is never always-on.
+
+**What works today (verified, smoke 58/58):**
+- **Auth & RBAC** — Google login (no user cap once the OAuth app is published), our own
+  API keys (`X-API-Key`), Basic fallback; admin vs member; cluster GPU actions gated.
+- **Projects & agents** — create a project, freely add/remove agents (collector / filter /
+  labeler / trainer / evaluator / custom), upload datasets (zip, multi-modal), cascade delete.
+- **Intent → plan → one-click build** — describe a project in words (or **voice**, Web Speech);
+  the planner proposes a project + agents to build in one click. Uses the lab's local model;
+  degrades to a labelled keyword heuristic if no LLM is reachable.
+- **Model catalog & deploy** — dropdowns list only models actually deployed on our cluster
+  (qwen2.5/qwen3/gemma4/deepseek-r1 + VLMs + YOLO11; plus **glm-4.7-flash** and
+  **deepseek-v3:671b** deployed via the in-app deploy flow on an 8×H100 node). Ollama *cloud*
+  models (deepseek-v4-pro, glm-5.2) are rejected — we self-host only.
+- **Agent Run controls** — each agent's Run fires a real cluster job with inline status.
+- **Activity log** — admin view of who did what (audit trail).
+- **Training** — generic Ultralytics trainer (detect/classify/segment) on any uploaded dataset.
+
+**Honest limits (work in progress):** the collector/filter/labeler pipeline is currently
+specialised for the weed/CWD12 domain — per-field specialisation for arbitrary research areas
+is the next backend step. Self-supervised / RL / multi-strategy training are scaffolded (501).
+
+---
+
+## Original benchmark
 
 A benchmark framework for evaluating how well open-source vision LLMs can detect and identify weeds in agricultural images. Tests multiple models on the same dataset and compares their detection capabilities.
 
