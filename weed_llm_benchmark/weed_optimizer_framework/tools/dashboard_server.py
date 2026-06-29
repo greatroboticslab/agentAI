@@ -996,6 +996,16 @@ def root():
  <div id="createPanel">
    <h3>Create a new project</h3>
    <p class="h">A project is a research workspace (any field, any data type). Upload datasets and add agents (collect / filter / label / train) any time &mdash; or none at all.</p>
+
+   <div style="background:#f0f7ff;border:1px solid #cfe2ff;border-radius:12px;padding:14px;margin-bottom:16px">
+     <label style="font-weight:600">&#10024; Describe what you want &mdash; we&rsquo;ll propose a setup</label>
+     <p class="h" style="margin:.25rem 0 .5rem">Plain language, e.g. &ldquo;collect drone images of coral reefs and train a model to spot bleaching&rdquo;. We suggest a project + agents you can build in one click or edit first.</p>
+     <textarea id="intent" rows="3" placeholder="Describe your research data + goal in a sentence or two&hellip;" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
+     <button class="btn" id="planBtn" onclick="suggestPlan()" style="margin-top:8px">&#10024; Suggest a setup</button>
+     <span class="h" id="planMsg" style="margin-left:8px"></span>
+     <div id="planOut" style="display:none;margin-top:12px;border-top:1px solid #dbeafe;padding-top:12px"></div>
+   </div>
+
    <label>Project name</label>
    <input id="agName" placeholder="e.g. Crop Disease, Warehouse Robot, Coral Reef Survey">
    <label>Research field <span style="color:#94a3b8;font-weight:400">(free text, any domain)</span></label>
@@ -1027,6 +1037,64 @@ def root():
     });
     var e=document.getElementById('mine-empty');
     if(e)e.style.display=(mode==='mine'&&!any)?'block':'none';
+  }
+  function _esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  var LASTPLAN=null;
+  async function suggestPlan(){
+    var desc=(document.getElementById('intent').value||'').trim();
+    var msg=document.getElementById('planMsg'), out=document.getElementById('planOut'), btn=document.getElementById('planBtn');
+    if(!desc){msg.textContent='Type a sentence describing what you want.';return;}
+    btn.disabled=true;msg.textContent='\\u23f3 thinking\\u2026';
+    try{
+      var d=await (await fetch('/api/agent/plan',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:desc})})).json();
+      btn.disabled=false;
+      if(!d||!d.ok){msg.textContent='\\u274c '+((d&&(d.detail||d.note))||'could not plan');return;}
+      LASTPLAN=d.plan;
+      msg.innerHTML=(d.source==='ai')?('\\u2705 proposed by '+_esc(d.model||'AI')):'\\u2728 suggested from keywords (no AI configured)';
+      var p=d.plan;
+      var qhtml=(d.questions||[]).map(function(q){return '<li>'+_esc(q)+'</li>';}).join('');
+      var ahtml=(p.agents||[]).map(function(a){return '<span style="display:inline-block;background:#e0ecff;color:#1e40af;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;margin:2px 2px 0 0">'+_esc(a.name||a.type)+'</span>';}).join(' ')||'none';
+      out.style.display='block';
+      out.innerHTML=
+        (d.source!=='ai'?'<div class="h" style="color:#92740a;margin-bottom:8px">'+_esc(d.note||'')+'</div>':'')+
+        '<div style="font-size:13px;line-height:1.7">'+
+          '<b>Proposed project:</b> '+_esc(p.name)+'<br>'+
+          '<b>Field:</b> '+(_esc(p.research_field)||'<span class="h">(you fill in)</span>')+'<br>'+
+          '<b>Data types:</b> '+_esc((p.modality||[]).join(', '))+'<br>'+
+          '<b>Agents:</b> '+ahtml+
+        '</div>'+
+        (qhtml?('<div style="margin-top:10px"><div class="h">A few things to refine (optional):</div><ul style="margin:.3rem 0 0;padding-left:1.1rem;font-size:12px;color:#475569">'+qhtml+'</ul></div>'):'')+
+        '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
+          '<button class="btn" style="width:auto;margin-top:0" onclick="buildFromPlan()">&#9889; Build it now</button>'+
+          '<button class="btn" style="width:auto;margin-top:0;background:#eef2ff;color:#2563eb" onclick="prefillForm()">Edit in the form below</button>'+
+        '</div>'+
+        '<div class="note" id="buildNote"></div>';
+    }catch(e){btn.disabled=false;msg.textContent='\\u274c '+e;}
+  }
+  function prefillForm(){
+    if(!LASTPLAN)return;
+    document.getElementById('agName').value=LASTPLAN.name||'';
+    document.getElementById('agField').value=LASTPLAN.research_field||'';
+    var mods=LASTPLAN.modality||['image'];
+    document.querySelectorAll('.agMod').forEach(function(c){c.checked=mods.indexOf(c.value)>=0;});
+    document.getElementById('agName').scrollIntoView({behavior:'smooth',block:'center'});
+    document.getElementById('createNote').textContent='Pre-filled from your description \\u2014 tweak and click Create. (Add the suggested agents from the project page after.)';
+  }
+  async function buildFromPlan(){
+    if(!LASTPLAN)return;
+    var bn=document.getElementById('buildNote');
+    bn.textContent='\\u23f3 creating project\\u2026';
+    try{
+      var cr=await (await fetch('/api/agent/create',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:LASTPLAN.name,modality:LASTPLAN.modality,research_field:LASTPLAN.research_field})})).json();
+      if(!cr||!cr.ok){bn.textContent='\\u274c '+((cr&&cr.detail)||'create failed');return;}
+      var dom=cr.domain, agents=LASTPLAN.agents||[], made=0;
+      for(var i=0;i<agents.length;i++){
+        bn.textContent='\\u23f3 adding agent '+(i+1)+'/'+agents.length+'\\u2026';
+        try{var ar=await (await fetch('/api/project/agent/add',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:dom,type:agents[i].type,name:agents[i].name,model:agents[i].model||'auto'})})).json();if(ar&&ar.ok)made++;}catch(e){}
+      }
+      bn.textContent='\\u2705 built project + '+made+' agent(s). Opening\\u2026';
+      setTimeout(function(){location.href='/agent/'+dom;},900);
+    }catch(e){bn.textContent='\\u274c '+e;}
   }
   function createAgent(){
     var name=(document.getElementById('agName').value||'').trim();
@@ -1320,6 +1388,146 @@ async def api_agent_create(request: Request):
     return {"ok": True, "domain": domain_id, "display_name": name,
             "task": res.get("task"), "modality": res.get("modality"),
             "model": res.get("model")}
+
+
+# ===========================================================================
+# v3.0.154 — INTENT → PLAN (agent-builder V2). Describe what you want in plain
+# language; we propose a project + a set of agents you can one-click build (or
+# edit / drop into the manual form). We try our model gateway for a smart plan;
+# if no LLM is reachable (the lab's normal state — no local ollama, no paid keys)
+# we fall back to a transparent keyword heuristic, clearly LABELLED as such so we
+# never pretend an AI was involved when it wasn't.
+# ===========================================================================
+_PLAN_MODALITY_KW = {
+    "image": ["image", "photo", "picture", "camera", "vision", "rgb", "jpg", "png", "frame", "visual"],
+    "video": ["video", "footage", "clip", "movie", "mp4", "stream"],
+    "pointcloud": ["point cloud", "pointcloud", "lidar", "3d scan", "depth map"],
+    "sensor": ["sensor", "gps", "imu", "telemetry", "accelerometer", "signal", "spectro"],
+    "audio": ["audio", "sound", "speech", "voice", "acoustic", "wav"],
+    "text": ["text", "document", "nlp", "language", "corpus", "article", "report"],
+}
+_PLAN_AGENT_KW = {
+    "collector": ["collect", "gather", "scrape", "harvest", "find data", "download", "crawl", "acquire", "search for"],
+    "labeler": ["label", "annotat", "tag", "ground truth", "mark up", "bounding box"],
+    "filter": ["filter", "clean", "quality", "dedup", "prune", "curate", "remove bad"],
+    "trainer": ["train", "model", "detect", "classif", "segment", "predict", "fine-tune", "yolo", "recogni"],
+    "evaluator": ["evaluat", "benchmark", "metric", "test set", "accuracy", "validate", "report results"],
+}
+_PLAN_FIELDS = ["agriculture", "robotics", "marine", "medical", "material", "ecology",
+                "astronomy", "manufacturing", "traffic", "wildlife", "geology",
+                "chemistry", "biology", "physics", "remote sensing", "security"]
+
+
+def _heuristic_plan(desc: str, answers: dict) -> dict:
+    d = (str(desc) + " " + " ".join(str(v) for v in (answers or {}).values())).lower()
+    mods = [m for m, kws in _PLAN_MODALITY_KW.items() if any(k in d for k in kws)] or ["image"]
+    agents = [a for a, kws in _PLAN_AGENT_KW.items() if any(k in d for k in kws)]
+    if not agents:
+        agents = ["collector", "trainer"]   # sensible starter pipeline
+    # keep a natural pipeline order
+    order = ["collector", "filter", "labeler", "trainer", "evaluator", "custom"]
+    agents = [a for a in order if a in agents]
+    field = ""
+    for f in _PLAN_FIELDS:
+        if f.split()[0][:6] in d:
+            field = f
+            break
+    words = re.findall(r"[A-Za-z0-9]+", str(desc))[:5]
+    name = " ".join(words).title() if words else "New Project"
+    plan_agents = [{"type": a, "model": "auto",
+                    "name": _AGENT_TYPES[a].split("—")[0].strip()} for a in agents]
+    return {"name": name[:60], "research_field": field, "modality": mods, "agents": plan_agents}
+
+
+def _plan_questions() -> list:
+    return [
+        "What's the primary data type? (image / video / sensor / point cloud / audio / text)",
+        "Will an agent collect the data automatically, or will you upload it yourself?",
+        "What's the end goal? (e.g. object detection, classification, monitoring — or just a data library)",
+    ]
+
+
+def _sanitize_plan(p: dict) -> dict:
+    """Coerce any plan (AI or heuristic) into a safe, buildable shape."""
+    if not isinstance(p, dict):
+        p = {}
+    name = str(p.get("name") or "New Project").strip()[:60] or "New Project"
+    field = str(p.get("research_field") or "").strip()[:80]
+    mods = p.get("modality") or ["image"]
+    if isinstance(mods, str):
+        mods = [mods]
+    mods = [str(m).strip().lower() for m in mods
+            if str(m).strip().lower() in _MODALITY_EXT] or ["image"]
+    out_agents = []
+    for a in (p.get("agents") or []):
+        if isinstance(a, str):
+            a = {"type": a}
+        t = str(a.get("type") or "").strip().lower()
+        if t not in _AGENT_TYPES:
+            continue
+        out_agents.append({"type": t,
+                           "model": str(a.get("model") or "auto").strip()[:60] or "auto",
+                           "name": str(a.get("name") or _AGENT_TYPES[t].split("—")[0].strip())[:60]})
+    return {"name": name, "research_field": field, "modality": mods, "agents": out_agents}
+
+
+@app.post("/api/agent/plan")
+async def api_agent_plan(request: Request):
+    """Turn a free-text intent into a proposed project + agents. Tries the model
+    gateway; degrades to a labelled keyword heuristic when no LLM is reachable."""
+    _ = _actor_from_request(request)   # any authenticated identity
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    desc = str(body.get("description") or "").strip()
+    if not desc:
+        raise HTTPException(400, "describe what you want to build (a sentence is enough)")
+    if len(desc) > 4000:
+        desc = desc[:4000]
+    answers = body.get("answers") if isinstance(body.get("answers"), dict) else {}
+
+    heur = _sanitize_plan(_heuristic_plan(desc, answers))
+    questions = _plan_questions()
+
+    # Try the gateway for a smarter plan (graceful — never blocks the response long).
+    llm_error = None
+    try:
+        cfg = _read_model_config()
+        planner = (cfg.get("roles") or {}).get("brain") or "ollama:gemma4"
+        sys_p = ("You are a research-platform planner. Given a user's intent, propose ONE project "
+                 "and the agents to build inside it. Agent types MUST be from: "
+                 + ", ".join(_AGENT_TYPES) + ". "
+                 "Respond with STRICT JSON only, no prose, shape: "
+                 '{"questions":[up to 3 short clarifying questions],'
+                 '"plan":{"name":str,"research_field":str,'
+                 '"modality":[image|video|sensor|pointcloud|audio|text],'
+                 '"agents":[{"type":one of the allowed,"model":"auto","name":str}]}}')
+        usr = "Intent: " + desc
+        if answers:
+            usr += "\nClarifications: " + json.dumps(answers)[:1000]
+        from . import llm_providers as _llm
+        r = _llm.chat(planner, usr, system=sys_p, max_tokens=512, timeout=25)
+        if r.get("ok") and (r.get("text") or "").strip():
+            m = re.search(r"\{.*\}", r["text"], re.S)
+            if m:
+                obj = json.loads(m.group(0))
+                ai_plan = _sanitize_plan(obj.get("plan") or obj)
+                if ai_plan.get("agents"):   # only trust the AI plan if it yielded agents
+                    qs = [str(q)[:200] for q in (obj.get("questions") or [])][:3] or questions
+                    return JSONResponse({"ok": True, "source": "ai", "model": planner,
+                                         "questions": qs, "plan": ai_plan})
+            llm_error = "model reply was not usable JSON"
+        else:
+            llm_error = r.get("error") or "no LLM configured/reachable"
+    except Exception as e:
+        llm_error = f"{type(e).__name__}: {str(e)[:160]}"
+
+    return JSONResponse({"ok": True, "source": "heuristic", "questions": questions,
+                         "plan": heur,
+                         "note": "Suggested from keywords (no AI planner reachable). "
+                                 "Edit anything before building.",
+                         "llm_error": llm_error})
 
 
 def _can_manage_agent(actor: str, dom: dict) -> bool:

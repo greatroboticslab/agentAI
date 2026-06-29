@@ -4903,3 +4903,18 @@ cluster — not a hardcoded list. DeepSeek-V4 / latest GLM appear ONLY after a r
   verify-generate on GPU). The model is parked as status="deploying" (hidden from dropdowns) and only
   flips to "available" once `GET /api/models/deploy/result` sees a successful generate. Failed → marked
   failed, stays out of the dropdowns. /models page shows the live catalog + an admin Deploy box.
+
+### v3.0.154 — Intent → plan → one-click build (agent-builder loop V2)
+
+Describe a project in plain language and get a buildable setup:
+- New `POST /api/agent/plan {description, answers?}` → proposes `{name, research_field, modality, agents:[{type,
+  model, name}]}` + up to 3 clarifying questions. Tries the model gateway (brain-role model, default
+  ollama:gemma4) for a smart plan; if no LLM is reachable (the lab's normal state — no local ollama, no
+  paid keys) it falls back to a TRANSPARENT keyword heuristic, clearly labelled "suggested from keywords
+  (no AI configured)" so we never imply an AI ran when it didn't. All plans pass `_sanitize_plan` (agent
+  types validated against the real catalog, modality against accepted types) before reaching the UI.
+- New-Project launcher: a "✨ Describe what you want" textarea + "Suggest a setup" → shows the proposed
+  project, field, data types, agent chips, and refine-questions. Two paths: "⚡ Build it now" (auto-creates
+  the project via /api/agent/create then adds each agent via /api/project/agent/add) or "Edit in the form
+  below" (pre-fills the manual fields). Honest: the planner proposes a CONFIG; whether the agents then run
+  well is the separate science.
