@@ -1001,8 +1001,11 @@ def root():
      <label style="font-weight:600">&#10024; Describe what you want &mdash; we&rsquo;ll propose a setup</label>
      <p class="h" style="margin:.25rem 0 .5rem">Plain language, e.g. &ldquo;collect drone images of coral reefs and train a model to spot bleaching&rdquo;. We suggest a project + agents you can build in one click or edit first.</p>
      <textarea id="intent" rows="3" placeholder="Describe your research data + goal in a sentence or two&hellip;" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
-     <button class="btn" id="planBtn" onclick="suggestPlan()" style="margin-top:8px">&#10024; Suggest a setup</button>
-     <span class="h" id="planMsg" style="margin-left:8px"></span>
+     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+       <button class="btn" id="planBtn" onclick="suggestPlan()" style="width:auto;margin-top:0">&#10024; Suggest a setup</button>
+       <button class="btn" id="micBtn" onclick="toggleVoice()" style="width:auto;margin-top:0;display:none;background:#eef2ff;color:#2563eb" title="Speak your description (English)">&#127908; Speak</button>
+       <span class="h" id="planMsg"></span>
+     </div>
      <div id="planOut" style="display:none;margin-top:12px;border-top:1px solid #dbeafe;padding-top:12px"></div>
    </div>
 
@@ -1040,6 +1043,27 @@ def root():
   }
   function _esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   var LASTPLAN=null;
+  // V3: voice input via the browser Web Speech API (English, on-device). Feature-
+  // detected — the mic button only appears where the browser supports it.
+  var _SR=window.SpeechRecognition||window.webkitSpeechRecognition, _rec=null, _listening=false;
+  (function(){ if(_SR){var b=document.getElementById('micBtn'); if(b)b.style.display='inline-block';} })();
+  function _say(t){ try{ if(window.speechSynthesis){var u=new SpeechSynthesisUtterance(t);u.lang='en-US';window.speechSynthesis.speak(u);} }catch(e){} }
+  function toggleVoice(){
+    if(!_SR){return;}
+    var btn=document.getElementById('micBtn'), msg=document.getElementById('planMsg'), ta=document.getElementById('intent');
+    if(_listening&&_rec){ _rec.stop(); return; }
+    _rec=new _SR(); _rec.lang='en-US'; _rec.interimResults=true; _rec.continuous=false;
+    var base=ta.value?ta.value.trim()+' ':'', finalT='';
+    _rec.onstart=function(){_listening=true;btn.innerHTML='\\u23f9 Stop';btn.style.background='#fee2e2';btn.style.color='#b91c1c';msg.textContent='\\ud83c\\udf99 listening\\u2026 speak your description';};
+    _rec.onerror=function(e){msg.textContent='\\u274c mic: '+(e.error||'error')+(e.error==='not-allowed'?' (allow microphone access)':'');};
+    _rec.onresult=function(ev){var interim='';for(var i=ev.resultIndex;i<ev.results.length;i++){var r=ev.results[i];if(r.isFinal)finalT+=r[0].transcript;else interim+=r[0].transcript;}ta.value=base+finalT+interim;};
+    _rec.onend=function(){_listening=false;btn.innerHTML='\\ud83c\\udf99 Speak';btn.style.background='#eef2ff';btn.style.color='#2563eb';
+      var said=(finalT||ta.value||'').trim();
+      if(said){msg.innerHTML='\\u2705 heard \\u2014 review the text, then Suggest a setup';_say('I heard: '+said+'. Please review, then click suggest a setup.');}
+      else{msg.textContent='didn\\u2019t catch that \\u2014 try again';}
+    };
+    try{_rec.start();}catch(e){msg.textContent='\\u274c '+e;}
+  }
   async function suggestPlan(){
     var desc=(document.getElementById('intent').value||'').trim();
     var msg=document.getElementById('planMsg'), out=document.getElementById('planOut'), btn=document.getElementById('planBtn');

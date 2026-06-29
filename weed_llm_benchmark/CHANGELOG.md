@@ -4918,3 +4918,12 @@ Describe a project in plain language and get a buildable setup:
   the project via /api/agent/create then adds each agent via /api/project/agent/add) or "Edit in the form
   below" (pre-fills the manual fields). Honest: the planner proposes a CONFIG; whether the agents then run
   well is the separate science.
+
+### v3.0.155 — Voice intent input (agent-builder loop V3)
+
+- The New-Project intent box gets a 🎙 "Speak" button using the browser Web Speech API (English,
+  on-device — no server, no audio upload). Feature-detected: the button only appears where the browser
+  supports SpeechRecognition (Chrome/Edge). Live interim transcription fills the textarea; Stop to end.
+- Readback confirm: on finish it speaks back "I heard: …, please review then click suggest a setup"
+  (speechSynthesis) and shows the same text, so you verify before planning. Mic-permission / no-speech
+  errors are surfaced inline. Degrades silently where unsupported (button stays hidden; typing works).
