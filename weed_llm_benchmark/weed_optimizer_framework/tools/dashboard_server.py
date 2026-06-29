@@ -1922,15 +1922,20 @@ def _write_model_config(cfg: dict) -> None:
 
 
 # ===========================================================================
-# v3.0.153 — MODEL CATALOG. The agent/training model dropdowns are populated
-# ONLY from models that have actually run / been deployed on our cluster (per
-# Harry). Big LLMs (DeepSeek-V4, GLM-4.x) appear ONLY after a deploy job pulls +
-# verifies them on the cluster (see /api/models/deploy + run_deploy_model.sh).
-# Seeded with what we've genuinely run: the YOLO11 family (training) + gemma4
-# (ollama, used by the harvest brain + on-demand gateway).
+# v3.0.156 — MODEL CATALOG. The agent/training model dropdowns are populated
+# ONLY from models actually deployed on our cluster (per Harry). New big LLMs
+# appear ONLY after a deploy job pulls + verifies them (see /api/models/deploy +
+# run_deploy_model.sh). Seed = GROUND TRUTH from the cluster ollama store
+# (/ocean/.../byler/ollama/models, verified 2026-06-28): the qwen brains we ran
+# first, gemma4 (current brain), deepseek-r1, and the vision-language models —
+# plus the YOLO11 training family. Stored as ollama:<tag> so the gateway routes.
+# NOTE: deepseek-v4-pro / glm-5.2 etc. are Ollama *cloud* models (cannot be
+# self-hosted on our GPUs); the realistic self-hostable "latest strong" picks are
+# glm-4.7-flash (30B) and deepseek-v3:671b (huge) — deploy them via /api/models/deploy.
 # ===========================================================================
 _MODEL_CATALOG_FILE = REPO / "results" / "framework" / "model_catalog.json"
 _SEED_CATALOG = {
+    # --- training (Ultralytics, run on cluster GPU) ---
     "yolo11n": {"label": "YOLO11-n (fast)", "kind": "vision", "backend": "ultralytics",
                 "note": "runs on cluster GPU (verified in training)"},
     "yolo11s": {"label": "YOLO11-s", "kind": "vision", "backend": "ultralytics",
@@ -1939,8 +1944,24 @@ _SEED_CATALOG = {
                 "note": "runs on cluster GPU"},
     "yolo11l": {"label": "YOLO11-l (accurate)", "kind": "vision", "backend": "ultralytics",
                 "note": "runs on cluster GPU"},
-    "ollama:gemma4": {"label": "Gemma4 (LLM)", "kind": "llm", "backend": "ollama",
-                      "note": "deployed on cluster (harvest brain + on-demand gateway)"},
+    # --- text LLM brains (ollama, deployed on cluster) ---
+    "ollama:gemma4": {"label": "Gemma4 (current brain)", "kind": "llm", "backend": "ollama",
+                      "note": "deployed on cluster — harvest brain + on-demand gateway"},
+    "ollama:gemma4:e2b": {"label": "Gemma4 e2b", "kind": "llm", "backend": "ollama",
+                          "note": "deployed on cluster"},
+    "ollama:qwen3:14b": {"label": "Qwen3 14B", "kind": "llm", "backend": "ollama",
+                         "note": "deployed on cluster (earlier brain)"},
+    "ollama:qwen2.5:7b": {"label": "Qwen2.5 7B", "kind": "llm", "backend": "ollama",
+                          "note": "deployed on cluster (first brain family)"},
+    "ollama:deepseek-r1:7b": {"label": "DeepSeek-R1 7B (reasoning)", "kind": "llm",
+                              "backend": "ollama", "note": "deployed on cluster"},
+    # --- vision-language models (ollama, deployed on cluster) ---
+    "ollama:llama3.2-vision:11b": {"label": "Llama3.2-Vision 11B (VLM)", "kind": "vlm",
+                                   "backend": "ollama", "note": "deployed on cluster"},
+    "ollama:minicpm-v": {"label": "MiniCPM-V (VLM)", "kind": "vlm", "backend": "ollama",
+                         "note": "deployed on cluster"},
+    "ollama:moondream": {"label": "Moondream (small VLM)", "kind": "vlm", "backend": "ollama",
+                         "note": "deployed on cluster"},
 }
 
 
@@ -1951,9 +1972,15 @@ def _read_catalog() -> dict:
             cat = json.load(open(_MODEL_CATALOG_FILE)) or {}
     except Exception:
         cat = {}
-    if not cat:   # first run → seed with genuinely-deployed models
-        cat = {k: dict(v, status="available", verified_at="seed")
-               for k, v in _SEED_CATALOG.items()}
+    # Always ensure every genuinely-deployed seed model is present (merge missing
+    # keys). This both seeds first-run AND migrates older catalogs that predate a
+    # seed expansion — without clobbering models added via /api/models/deploy.
+    changed = False
+    for k, v in _SEED_CATALOG.items():
+        if k not in cat:
+            cat[k] = dict(v, status="available", verified_at="seed")
+            changed = True
+    if changed:
         try:
             _write_catalog(cat)
         except Exception:
@@ -2219,11 +2246,28 @@ async def api_models_deploy(request: Request):
         body = {}
     model = re.sub(r"[^A-Za-z0-9_.:-]", "", str(body.get("model") or "")).strip()[:60]
     if not model:
-        raise HTTPException(400, "model tag required (an ollama-library tag, e.g. deepseek-v4, glm4)")
+        raise HTTPException(400, "model tag required (a LOCAL ollama tag, e.g. glm-4.7-flash, "
+                                 "deepseek-v3:671b). NOTE: *:cloud tags (deepseek-v4-pro, glm-5.2) "
+                                 "are Ollama-cloud only and cannot be self-hosted here.")
+    if model.endswith(":cloud") or model in ("deepseek-v4-pro", "deepseek-v4-flash", "glm-5.2", "glm-5"):
+        raise HTTPException(400, f"'{model}' is an Ollama *cloud* model (served by Ollama's cloud, not "
+                                 "downloadable). We self-host only. Pick a local tag, e.g. "
+                                 "glm-4.7-flash (30B) or deepseek-v3:671b.")
     label = str(body.get("label") or model)[:60]
     kind = str(body.get("kind") or "llm").strip().lower()
-    if kind not in ("llm", "vision"):
+    if kind not in ("llm", "vlm", "vision"):
         kind = "llm"
+    cat_id = f"ollama:{model}"
+    # v3.0.156: hardware selection so big models can request H100 / multi-GPU.
+    gres = str(body.get("gres") or "").strip()
+    if gres and not re.match(r"^gpu:(h100-80|v100-32|v100-16|l40s-48):[1-8]$", gres):
+        raise HTTPException(400, "bad gres — use e.g. gpu:h100-80:1, gpu:l40s-48:1, gpu:v100-32:1")
+    mem = str(body.get("mem") or "").strip()
+    if mem and not re.match(r"^[0-9]{1,4}G$", mem):
+        raise HTTPException(400, "bad mem — use e.g. 64G")
+    tlim = str(body.get("time") or "").strip()
+    if tlim and not re.match(r"^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$", tlim):
+        raise HTTPException(400, "bad time — use HH:MM:SS, e.g. 03:00:00")
     jobtag = "d" + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
     stage = ("mkdir -p results/framework/model_deploy; "
              "git fetch origin >/dev/null 2>&1; "
@@ -2231,21 +2275,30 @@ async def api_models_deploy(request: Request):
              "cp -f weed_llm_benchmark/run_deploy_model.sh run_deploy_model.sh 2>/dev/null; true")
     _slurm(["bash", "-lc", stage], timeout=60)
     export = ",".join(["ALL", f"DEPLOY_MODEL={model}", f"DEPLOY_JOBTAG={jobtag}"])
-    r = _slurm(["sbatch", f"--export={export}", "run_deploy_model.sh"], timeout=25)
+    sbatch_cli = ["sbatch", f"--export={export}"]
+    if gres:
+        sbatch_cli.append(f"--gres={gres}")
+    if mem:
+        sbatch_cli.append(f"--mem={mem}")
+    if tlim:
+        sbatch_cli.append(f"--time={tlim}")
+    sbatch_cli.append("run_deploy_model.sh")
+    r = _slurm(sbatch_cli, timeout=25)
     ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
     jobid = (r.get("stdout") or "").split()[-1] if ok else None
     if ok:
         # park in catalog as deploying (hidden from dropdowns until verified)
         cat = _read_catalog()
-        cat[model] = {**cat.get(model, {}), "label": label, "kind": kind,
-                      "backend": "ollama", "status": "deploying",
-                      "jobtag": jobtag, "job_id": jobid,
-                      "note": "deploying on cluster — pulling + verifying"}
+        cat[cat_id] = {**cat.get(cat_id, {}), "label": label, "kind": kind,
+                       "backend": "ollama", "status": "deploying",
+                       "jobtag": jobtag, "job_id": jobid, "gres": gres or "default",
+                       "note": "deploying on cluster — pulling + verifying"}
         _write_catalog(cat)
-    log.info(f"[deploy_model] {jobtag} model={model} ok={ok} by {_actor_from_request(request)}")
-    return JSONResponse({"ok": ok, "jobtag": jobtag, "job_id": jobid, "model": model,
+    log.info(f"[deploy_model] {jobtag} model={model} gres={gres or 'default'} ok={ok} "
+             f"by {_actor_from_request(request)}")
+    return JSONResponse({"ok": ok, "jobtag": jobtag, "job_id": jobid, "model": cat_id,
                          "msg": (r.get("stdout") or r.get("stderr") or "").strip(),
-                         "poll": f"/api/models/deploy/result?jobtag={jobtag}&model={model}"})
+                         "poll": f"/api/models/deploy/result?jobtag={jobtag}&model={cat_id}"})
 
 
 @app.get("/api/models/deploy/result")

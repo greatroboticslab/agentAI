@@ -4927,3 +4927,19 @@ Describe a project in plain language and get a buildable setup:
 - Readback confirm: on finish it speaks back "I heard: …, please review then click suggest a setup"
   (speechSynthesis) and shows the same text, so you verify before planning. Mic-permission / no-speech
   errors are surfaced inline. Degrades silently where unsupported (button stays hidden; typing works).
+
+### v3.0.156 — Catalog reflects REAL cluster models + deploy hardware selection + cloud-model guard
+
+Ground-truthed against the cluster ollama store (/ocean/.../byler/ollama/models, 47GB, verified 2026-06-28).
+v3.0.153 was wrong — it seeded only gemma4 and hid models that were ALREADY deployed.
+- Catalog seed now lists every deployed model: gemma4 (current brain) + gemma4:e2b, qwen3:14b + qwen2.5:7b
+  (the original brains), deepseek-r1:7b, and the VLMs llama3.2-vision:11b / minicpm-v / moondream — plus the
+  YOLO11 training family. `_read_catalog()` now MERGES missing seed entries into an existing catalog file
+  (migrates old catalogs without clobbering deploy-added models). Stored as `ollama:<tag>` so the gateway routes.
+- Deploy hardware selection: `/api/models/deploy` accepts gres / mem / time (validated allow-list:
+  gpu:{h100-80,v100-32,v100-16,l40s-48}:N) and passes them on the sbatch CLI, so big models can request an
+  H100 or a full 8×H100 node. run_deploy_model.sh #SBATCH lines are now documented defaults.
+- Cloud-model guard: deploy REJECTS `*:cloud` tags and the known Ollama-cloud giants (deepseek-v4-pro [1.6T],
+  deepseek-v4-flash, glm-5.2, glm-5 [744B]) with a clear message — they are served by Ollama's cloud, not
+  self-hostable on our GPUs. Realistic self-hostable "latest strong" picks: glm-4.7-flash (30B, 19GB) and
+  deepseek-v3:671b (Q4 ~400GB on a full H100 node).

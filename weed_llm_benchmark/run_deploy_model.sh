@@ -4,9 +4,12 @@
 #SBATCH --gres=gpu:v100-32:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
-#SBATCH --mem=48G
-#SBATCH --time=01:30:00
+#SBATCH --mem=64G
+#SBATCH --time=02:30:00
 #SBATCH --output=results/framework/model_deploy_%j.out
+# NOTE: --gres / --mem / --time above are DEFAULTS; /api/models/deploy overrides
+# them on the sbatch CLI for big models (e.g. --gres=gpu:h100-80:1 for 30B+,
+# or a full --gres=gpu:h100-80:8 node for deepseek-v3:671b at Q4 ~400GB).
 #
 # v3.0.153 — DEPLOY a model onto our cluster so it becomes selectable in the
 # agent/training model dropdowns. This is the gate the user requested: big LLMs
