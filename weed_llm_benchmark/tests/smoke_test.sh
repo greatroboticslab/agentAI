@@ -104,7 +104,9 @@ PY
   echo "== MODEL CATALOG (deployed-only) =="
   ck "catalog 200" 200 "$(HC $BA "$BASE/api/models/catalog")"
   ck "catalog has yolo11s" yes "$(curl -s $BA --max-time 15 "$BASE/api/models/catalog" | python3 -c "import json,sys;print('yes' if any(m['id']=='yolo11s' for m in json.load(sys.stdin)['models']) else 'no')" 2>/dev/null)"
-  ck "catalog excludes undeployed deepseek/glm" yes "$(curl -s $BA --max-time 15 "$BASE/api/models/catalog" | python3 -c "import json,sys;ids=[m['id'] for m in json.load(sys.stdin)['models']];print('yes' if not any('deepseek' in i or 'glm' in i for i in ids) else 'no')" 2>/dev/null)"
+  ck "catalog has deployed gemma4 brain" yes "$(curl -s $BA --max-time 15 "$BASE/api/models/catalog" | python3 -c "import json,sys;print('yes' if any(m['id']=='ollama:gemma4' for m in json.load(sys.stdin)['models']) else 'no')" 2>/dev/null)"
+  ck "catalog excludes cloud giants" yes "$(curl -s $BA --max-time 15 "$BASE/api/models/catalog" | python3 -c "import json,sys;ids=[m['id'] for m in json.load(sys.stdin)['models']];print('yes' if not any(':cloud' in i or 'v4-pro' in i or 'glm-5' in i for i in ids) else 'no')" 2>/dev/null)"
+  ck "deploy rejects cloud model" 400 "$(HC $BA -X POST -H 'Content-Type: application/json' -d '{"model":"deepseek-v4-pro"}' "$BASE/api/models/deploy")"
   ck "member deploy -> 403" 403 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"model":"deepseek-v4"}' "$BASE/api/models/deploy")"
 
   echo "== INTENT -> PLAN (agent-builder V2) =="
@@ -115,7 +117,7 @@ PY
   ck "plan proposes >=1 agent" yes "$(echo "$PLAN" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['plan']['agents'] else 'no')" 2>/dev/null)"
   ck "plan agent types valid" yes "$(echo "$PLAN" | python3 -c "import json,sys;V={'collector','filter','labeler','trainer','evaluator','custom'};a=json.load(sys.stdin)['plan']['agents'];print('yes' if all(x['type'] in V for x in a) else 'no')" 2>/dev/null)"
 else
-  skip=$((skip+21)); echo "  SKIP  RBAC + project/agent + catalog + plan cookie checks (no ~/.dash_session_key on this host)"
+  skip=$((skip+23)); echo "  SKIP  RBAC + project/agent + catalog + plan cookie checks (no ~/.dash_session_key on this host)"
 fi
 
 echo ""
