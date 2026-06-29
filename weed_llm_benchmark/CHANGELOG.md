@@ -4955,3 +4955,12 @@ Every agent type's ▶ Run now does something real on the generic project page:
   Collector/Filter/Labeler run the shared harvest→quality→label pipeline which is currently specialised
   for the weed/CWD12 domain (per-field specialisation is the next backend step). We don't pretend a new
   research field's harvest is domain-aware yet.
+
+### v3.0.158 — Unify /agent/weed into the generic project page
+
+The flagship weed agent used a separate bespoke "Mission Control" template while every other project used
+the generic /agent/{id} page — an inconsistency Harry flagged. Now /agent/weed renders the SAME generic
+project page (upload datasets, compose agents with real Run controls, train panel, harvest). The generic
+renderer seeds a "weed" domain doc on first view if missing (display_name "Weed Detection", field
+"agriculture / precision weeding", detection/image). The old mission-control template is kept dormant after
+an early return (no behaviour split). Advanced weed views (/classes, /slugs, /rounds) remain in the nav.

@@ -1150,7 +1150,12 @@ def agent_weed():
     Clean overview: pipeline strip + the two agents (Collector / Trainer) +
     quick links to existing data / review / results pages + advanced console.
     Pure presentation linking to existing routes; NO backend logic touched.
-    Live cluster status pulled from the existing /api/cluster_status. English."""
+    Live cluster status pulled from the existing /api/cluster_status. English.
+
+    v3.0.158 — UNIFIED: weed now renders the SAME generic project page as every
+    other project (Harry: drop the /agent/weed vs /agent/{id} split). The bespoke
+    mission-control template below is superseded and kept dormant after the return."""
+    return agent_generic("weed")
     return HTMLResponse('''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Weed Detection &mdash; Mission Control</title>
@@ -3433,12 +3438,21 @@ def agent_generic(domain_id: str):
     """v3.0.107: mission control for a created (non-weed) domain agent. Honest:
     a fresh domain has no data and its harvest pipeline isn't wired yet. The
     specific /agent/weed route above takes precedence for the weed agent."""
-    if domain_id == "weed":
-        return agent_weed()
     if not re.match(r"^[a-z0-9_]{1,40}$", domain_id):
         raise HTTPException(400, "bad agent id")
     from . import db as _db
     d = _db.get_domain(domain_id)
+    if not d and domain_id == "weed":
+        # v3.0.158: the flagship weed agent now renders like any other project.
+        # Seed its domain doc on first view so the generic page has data.
+        try:
+            _db.create_domain("weed", "Weed Detection", harvest_queries=[],
+                              n_subagents=2, task="detection", modality=["image"],
+                              model="auto", owner="system",
+                              research_field="agriculture / precision weeding")
+            d = _db.get_domain("weed")
+        except Exception:
+            d = None
     if not d:
         raise HTTPException(404, f"no agent '{domain_id}'")
     import html as _h
