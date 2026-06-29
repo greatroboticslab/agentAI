@@ -2268,6 +2268,9 @@ async def api_models_deploy(request: Request):
     tlim = str(body.get("time") or "").strip()
     if tlim and not re.match(r"^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$", tlim):
         raise HTTPException(400, "bad time — use HH:MM:SS, e.g. 03:00:00")
+    partition = str(body.get("partition") or "").strip()
+    if partition and partition not in ("GPU", "GPU-shared"):
+        raise HTTPException(400, "bad partition — use GPU (full node) or GPU-shared")
     jobtag = "d" + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
     stage = ("mkdir -p results/framework/model_deploy; "
              "git fetch origin >/dev/null 2>&1; "
@@ -2282,6 +2285,8 @@ async def api_models_deploy(request: Request):
         sbatch_cli.append(f"--mem={mem}")
     if tlim:
         sbatch_cli.append(f"--time={tlim}")
+    if partition:
+        sbatch_cli.append(f"--partition={partition}")
     sbatch_cli.append("run_deploy_model.sh")
     r = _slurm(sbatch_cli, timeout=25)
     ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
