@@ -58,9 +58,15 @@ import os, json, time, urllib.request
 res = {"jobtag": os.environ["JOBTAG"], "model": os.environ["DEPLOY_MODEL"],
        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "pull_log": os.environ.get("PULL_LOG","")}
 try:
+    # num_ctx small on purpose: a deploy verify is one tiny prompt. Huge models
+    # (e.g. deepseek-v3:671b) default to a 160K context whose KV cache alone is
+    # ~760GB → OOM. A small context keeps the KV cache tiny so the weights fit
+    # across the GPUs. (DEPLOY_NUM_CTX env overrides; default 4096.)
+    _nctx = int(os.environ.get("DEPLOY_NUM_CTX", "4096"))
     data = json.dumps({"model": os.environ["DEPLOY_MODEL"],
                        "prompt": "Reply with exactly: DEPLOY_OK",
-                       "stream": False}).encode()
+                       "stream": False,
+                       "options": {"num_ctx": _nctx}}).encode()
     req = urllib.request.Request("http://127.0.0.1:11434/api/generate", data=data,
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=1800) as r:
