@@ -3520,6 +3520,8 @@ def agent_generic(domain_id: str):
 
    <div style="margin-top:20px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Agents in this project</div>
    <div style="margin-top:10px;border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">{_arows}</div>
+   <div id="run-msg" style="margin-top:10px;font-size:13px;display:none;padding:10px 12px;border-radius:8px;background:#f1f5f9"></div>
+   <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">&#9654; Run fires a real cluster job (needs cluster access). Trainer trains on <b>your uploaded dataset</b> and is fully general. Collector / Filter / Labeler run our shared harvest&rarr;quality&rarr;label pipeline, which today is specialised for the weed/CWD12 domain &mdash; per-field specialisation is the next backend step.</div>
    <div id="agent-add" style="display:none;margin-top:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center">
      <select id="ag-type" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
        <option value="collector">Collector (auto-collect datasets)</option>
@@ -3669,20 +3671,38 @@ async function removeAgent(aid){
  try{var d=await (await fetch('/api/project/agent/remove',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:'__DOM__',agent_id:aid})})).json();
   if(d&&d.ok){location.reload();}else{alert((d&&(d.detail||d.msg))||'failed');}}catch(e){alert(''+e);}
 }
+// v3.0.157: every agent type now fires a REAL action (no dead "scaffolded" alerts).
+// Maps the agent role → an existing whitelisted cluster action / page.
+var _AGENT_ACTION={
+  collector:{action:'brain_harvest', label:'Collector \\u2014 data harvest'},
+  filter:{action:'dinov2_curate_registry', label:'Filter \\u2014 DINOv2 quality curation'},
+  labeler:{action:'sync_all_to_roboflow', label:'Labeler \\u2014 push to Roboflow for human labeling'}
+};
+function _runMsg(html,bg){var el=document.getElementById('run-msg');if(!el)return;el.style.display='block';el.style.background=bg||'#f1f5f9';el.innerHTML=html;}
 async function runAgent(type){
- if(type==='collector'){
-   if(!confirm('Run the Collector: launch an autonomous data-harvest job on the cluster for this project?'))return;
-   try{var d=await (await fetch('/api/cluster_action/brain_harvest',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
-    alert(d&&d.ok?('\\u2705 Collector submitted to cluster. '+(d.msg||d.stdout||'')):'\\u274c '+((d&&(d.detail||d.msg||d.stderr))||'failed (need cluster access?)'));}catch(e){alert('\\u274c '+e);}
-   return;
- }
  if(type==='trainer'){
    var t=document.getElementById('tr-go');
    if(t){t.scrollIntoView({behavior:'smooth',block:'center'});var m=document.getElementById('tr-msg');if(m)m.textContent='\\u2193 pick a dataset + epochs below, then Train';}
-   else{alert('Open the "Train a model" panel below to run training.');}
+   else{_runMsg('Open the "Train a model" panel below to run training.');}
    return;
  }
- alert('The "'+type+'" agent is scaffolded — its per-project automation is not wired yet. Honest status: not runnable today. Collector and Trainer are live; filter/labeler/evaluator are coming.');
+ if(type==='evaluator'){
+   _runMsg('\\ud83d\\udcca Evaluation runs as part of training (held-out metrics). View results &amp; per-round metrics on the <a href="/rounds">Rounds page \\u2192</a>');
+   return;
+ }
+ var spec=_AGENT_ACTION[type];
+ if(!spec){_runMsg('The "'+type+'" agent is a custom component \\u2014 no built-in run action. Configure it via the console.');return;}
+ if(!confirm('Run '+spec.label+'? This launches a real job on the cluster (needs cluster access).'))return;
+ _runMsg('\\u23f3 submitting '+spec.label+'\\u2026');
+ try{
+   var d=await (await fetch('/api/cluster_action/'+spec.action,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
+   if(d&&(d.ok||d.job_id||/Submitted batch job/.test(d.stdout||d.msg||''))){
+     var jid=(d.job_id||((d.stdout||d.msg||'').match(/Submitted batch job (\\d+)/)||[])[1]||'');
+     _runMsg('\\u2705 '+spec.label+' submitted'+(jid?(' \\u2014 job '+jid):'')+'. Track it on the <a href="/console">console \\u2192</a>','#ecfdf5');
+   }else{
+     _runMsg('\\u274c '+((d&&(d.detail||d.msg||d.stderr))||'failed \\u2014 need cluster access?'),'#fef2f2');
+   }
+ }catch(e){_runMsg('\\u274c '+e,'#fef2f2');}
 }
 async function renameAgent(){
  var nm=prompt('New display name for this agent:');if(!nm||!nm.trim())return;

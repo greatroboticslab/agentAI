@@ -4943,3 +4943,15 @@ v3.0.153 was wrong — it seeded only gemma4 and hid models that were ALREADY de
   deepseek-v4-flash, glm-5.2, glm-5 [744B]) with a clear message — they are served by Ollama's cloud, not
   self-hostable on our GPUs. Realistic self-hostable "latest strong" picks: glm-4.7-flash (30B, 19GB) and
   deepseek-v3:671b (Q4 ~400GB on a full H100 node).
+
+### v3.0.157 — Agent Run controls fire REAL actions (no dead "scaffolded" alerts)
+
+Every agent type's ▶ Run now does something real on the generic project page:
+- collector → /api/cluster_action/brain_harvest, filter → dinov2_curate_registry, labeler →
+  sync_all_to_roboflow (push to Roboflow for human labeling), trainer → the (general) Train panel,
+  evaluator → Rounds metrics page. Inline status shows the submitted SLURM job id + a track link
+  (no more fleeting alert / "not runnable today").
+- Honest note under the agents table: Trainer trains on YOUR uploaded dataset and is fully general;
+  Collector/Filter/Labeler run the shared harvest→quality→label pipeline which is currently specialised
+  for the weed/CWD12 domain (per-field specialisation is the next backend step). We don't pretend a new
+  research field's harvest is domain-aware yet.
