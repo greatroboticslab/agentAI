@@ -2005,17 +2005,23 @@ def _catalog_add(model_id: str, fields: dict) -> None:
 
 
 @app.get("/api/models/catalog")
-def api_models_catalog(kind: str = ""):
+def api_models_catalog(kind: str = "", include: str = ""):
     """Models actually deployed/run on our cluster — the source for every model
-    dropdown. kind= 'vision' | 'llm' filters."""
+    dropdown. Only status=available models are returned (deploying/failed are
+    hidden) unless include=all (admin view on /models). kind= 'vision'|'llm'|'vlm'."""
     cat = _read_catalog()
+    show_all = include == "all"
     items = []
     for mid, m in cat.items():
+        status = m.get("status", "available")
+        if not show_all and status != "available":
+            continue   # hide deploying/failed from the selectable dropdowns
         if kind and m.get("kind") != kind:
             continue
         items.append({"id": mid, "label": m.get("label") or mid,
                       "kind": m.get("kind"), "backend": m.get("backend"),
-                      "note": m.get("note", ""), "verified_at": m.get("verified_at")})
+                      "status": status, "note": m.get("note", ""),
+                      "verified_at": m.get("verified_at")})
     items.sort(key=lambda x: (x["kind"] or "", x["id"]))
     return JSONResponse({"ok": True, "models": items})
 
@@ -2405,10 +2411,13 @@ async function load(){
 }
 async function loadCatalog(){
  var el=document.getElementById('catlist');if(!el)return;
- try{var cat=(await (await fetch('/api/models/catalog',{credentials:'include'})).json()).models||[];
+ try{var cat=(await (await fetch('/api/models/catalog?include=all',{credentials:'include'})).json()).models||[];
   if(!cat.length){el.innerHTML='<span class="d">none yet</span>';return;}
   el.innerHTML='<div class="prov">'+cat.map(function(m){
-    return '<span class="pill on" title="'+esc(m.note||'')+'">'+esc(m.label)+' \\u00b7 '+esc(m.kind||'')+'</span>';
+    var st=m.status||'available';
+    var cls=(st==='available')?'on':'off';
+    var tag=(st==='deploying')?' \\u23f3 deploying':(st==='failed')?' \\u274c failed':'';
+    return '<span class="pill '+cls+'" title="'+esc(m.note||'')+'">'+esc(m.label)+' \\u00b7 '+esc(m.kind||'')+tag+'</span>';
   }).join('')+'</div>';
  }catch(e){el.textContent='\\u274c '+e;}
 }
