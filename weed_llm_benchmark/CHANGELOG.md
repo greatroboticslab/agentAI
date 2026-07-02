@@ -4984,3 +4984,17 @@ add/remove agent, role + cluster-access changes, dataset upsert/purge) but was n
   reachable synchronously from the lab. So intent→plan now uses a real LLM instead of the heuristic fallback.
 - README rewritten: it described only the old weed benchmark; now leads with the current platform
   (architecture, what works, honest limits) and keeps the original benchmark below.
+
+### v3.0.161 — Deep dataset analysis / visualization (EDA), read-only, no GPU
+
+Answers "上传数据集的可视化分析". For ANY uploaded/registry dataset:
+- `_analyze_dataset(slug)` + `GET /api/dataset/analyze?slug=&refresh=` compute (lab-local, cached):
+  modality mix, train/val/test split, class distribution (YOLO box counts w/ data.yaml names, OR
+  classification folder counts, OR COCO/VOC class names), labeled-image count, image dimension /
+  aspect / filesize stats + resolution & aspect histograms (bounded 500-image sample), near-duplicate
+  count (dHash), and a per-class sample grid.
+- `GET /dataset/{slug}` renders it with dependency-free CSS bar charts + a sample thumbnail grid
+  (reuses /api/sample + /api/img); "Recompute" re-runs it. An "Analyze" button now sits next to each
+  dataset in a project's uploads list (and links back to the image gallery).
+- Honest scope: non-image modalities are counted but not yet visualized (only images get dim stats +
+  grid); annotations show "none" cleanly when a dataset is unlabeled.

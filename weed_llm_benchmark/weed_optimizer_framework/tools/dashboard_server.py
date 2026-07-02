@@ -2950,6 +2950,258 @@ def api_dataset_uploads(domain: str = ""):
 
 
 # ===========================================================================
+# v3.0.161 — DATASET ANALYSIS (deep EDA, read-only, lab-local, no GPU). For ANY
+# uploaded/registry dataset: modality mix, splits, class distribution, image
+# dimension/aspect/filesize stats + histograms, near-duplicate detection, and a
+# per-class sample grid. Answers Harry's "上传数据集的可视化分析". Cached per slug.
+# ===========================================================================
+_DATASET_ANALYSIS_DIR = REPO / "results" / "framework" / "dataset_analysis"
+_ANALYSIS_SAMPLE_CAP = 500          # images opened for dim/dHash stats (counts are full)
+_SPLIT_NAMES = ("train", "val", "valid", "test", "training", "validation")
+
+
+def _resolve_slug_dir(slug: str):
+    """Best-effort local directory for a slug: registry local_path → manual
+    upload local_path → uploads/<slug>[/images]. Returns a Path or None."""
+    try:
+        reg = json.load(open(REGISTRY_PATH))
+        lp = (reg.get("datasets") or {}).get(slug, {}).get("local_path")
+        if lp and os.path.isdir(lp):
+            return Path(lp)
+    except Exception:
+        pass
+    try:
+        lp = _read_manual_uploads().get(slug, {}).get("local_path")
+        if lp and os.path.isdir(lp):
+            return Path(lp)
+    except Exception:
+        pass
+    for cand in (REPO / "uploads" / slug / "images", REPO / "uploads" / slug):
+        if cand.is_dir():
+            return cand
+    return None
+
+
+def _dhash64(pil_img) -> int:
+    """64-bit difference hash for near-duplicate detection."""
+    g = pil_img.convert("L").resize((9, 8))
+    px = list(g.getdata())
+    bits = 0
+    i = 0
+    for r in range(8):
+        row = r * 9
+        for c in range(8):
+            if px[row + c] > px[row + c + 1]:
+                bits |= (1 << i)
+            i += 1
+    return bits
+
+
+def _analyze_dataset(slug: str, refresh: bool = False) -> dict:
+    from collections import Counter
+    cache = _DATASET_ANALYSIS_DIR / f"{slug}.json"
+    if not refresh and cache.is_file():
+        try:
+            return json.load(open(cache))
+        except Exception:
+            pass
+    root = _resolve_slug_dir(slug)
+    if root is None:
+        return {"ok": False, "slug": slug, "error": "dataset files not found on this host"}
+
+    img_exts = {e.lower() for e in _UPLOAD_IMG_EXT}
+    ext_counts, modality_counts = Counter(), Counter()
+    img_paths, label_txts = [], []
+    total_bytes = 0
+    has_data_yaml = False
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        e = p.suffix.lower()
+        ext_counts[e] += 1
+        try:
+            total_bytes += p.stat().st_size
+        except Exception:
+            pass
+        cat = "other"
+        for m, exts in _MODALITY_EXT.items():
+            if e in exts:
+                cat = m
+                break
+        if e in img_exts:
+            cat = "image"
+            if len(img_paths) < 200000:
+                img_paths.append(p)
+        modality_counts[cat] += 1
+        if e == ".txt" and p.parent.name.lower() == "labels":
+            label_txts.append(p)
+        if p.name.lower() in ("data.yaml", "data.yml"):
+            has_data_yaml = True
+
+    n_images = len(img_paths)
+    norm = lambda p: str(p).replace("\\", "/").lower()
+
+    # splits
+    splits = {}
+    for sp in ("train", "val", "valid", "test"):
+        c = sum(1 for p in img_paths if f"/{sp}/" in norm(p))
+        if c:
+            splits[sp] = c
+
+    # ---- classes / labels ----
+    ann = {"type": "none", "classes": [], "per_class": {}, "labeled_images": 0, "count_kind": ""}
+    # YOLO: labels/*.txt with class ids; map names via data.yaml if present
+    if label_txts:
+        names = None
+        try:
+            for yp in list(root.rglob("data.yaml")) + list(root.rglob("data.yml")):
+                txt = open(yp, encoding="utf-8", errors="replace").read()
+                m = re.search(r"names\s*:\s*\[([^\]]*)\]", txt)
+                if m:
+                    names = [x.strip().strip("'\"") for x in m.group(1).split(",") if x.strip()]
+                if names:
+                    break
+        except Exception:
+            names = None
+        inst = Counter()
+        labeled = 0
+        for lp in label_txts[:20000]:
+            got = False
+            try:
+                for line in open(lp, encoding="utf-8", errors="replace"):
+                    line = line.split()
+                    if line:
+                        inst[line[0]] += 1
+                        got = True
+            except Exception:
+                pass
+            if got:
+                labeled += 1
+        def cname(cid):
+            try:
+                return names[int(cid)] if names and int(cid) < len(names) else f"class {cid}"
+            except Exception:
+                return f"class {cid}"
+        ann = {"type": "yolo",
+               "classes": [cname(k) for k, _ in inst.most_common()],
+               "per_class": {cname(k): v for k, v in inst.most_common()},
+               "labeled_images": labeled, "count_kind": "boxes"}
+    else:
+        # classification by folder: images under <split>/<class>/ or <class>/
+        cls = Counter()
+        for p in img_paths:
+            parts = [x for x in p.parts]
+            parent = p.parent.name
+            if parent.lower() in _SPLIT_NAMES or parent.lower() in ("images", "img"):
+                continue
+            # require the grandparent to look like a split or the root (real class layout)
+            gp = p.parent.parent.name.lower() if p.parent.parent else ""
+            if gp in _SPLIT_NAMES or gp in ("images", "img") or p.parent.parent == root:
+                cls[parent] += 1
+        if len(cls) >= 2:
+            ann = {"type": "classification",
+                   "classes": [k for k, _ in cls.most_common()],
+                   "per_class": {k: v for k, v in cls.most_common()},
+                   "labeled_images": sum(cls.values()), "count_kind": "images"}
+        else:
+            names, fmt = _extract_anno_classes(root)
+            if names:
+                ann = {"type": fmt, "classes": names, "per_class": {},
+                       "labeled_images": 0, "count_kind": ""}
+
+    # ---- image dimension / aspect / filesize stats on a bounded sample ----
+    dims = {"ok": False}
+    dup_pairs = 0
+    samples_for_grid = []
+    if n_images:
+        step = max(1, n_images // _ANALYSIS_SAMPLE_CAP)
+        sampled = img_paths[::step][:_ANALYSIS_SAMPLE_CAP]
+        try:
+            from PIL import Image as _PILImage
+        except Exception:
+            _PILImage = None
+        ws, hs, ars, szs = [], [], [], []
+        hashes = {}
+        res_buckets = Counter()   # by max side
+        ar_buckets = Counter()
+        if _PILImage is not None:
+            for p in sampled:
+                try:
+                    with _PILImage.open(p) as im:
+                        w, h = im.size
+                        dh = _dhash64(im)
+                    ws.append(w); hs.append(h)
+                    ar = round(w / h, 3) if h else 0
+                    ars.append(ar)
+                    try:
+                        szs.append(p.stat().st_size)
+                    except Exception:
+                        pass
+                    mx = max(w, h)
+                    res_buckets["≤256" if mx <= 256 else "257–512" if mx <= 512 else
+                                "513–1024" if mx <= 1024 else "1025–2048" if mx <= 2048 else ">2048"] += 1
+                    ar_buckets["tall <0.8" if ar and ar < 0.8 else "square 0.8–1.25" if ar <= 1.25
+                               else "wide >1.25"] += 1
+                    hashes[dh] = hashes.get(dh, 0) + 1
+                except Exception:
+                    continue
+            dup_pairs = sum(v - 1 for v in hashes.values() if v > 1)
+        def _st(v):
+            if not v:
+                return None
+            s = sorted(v)
+            return {"min": s[0], "max": s[-1], "mean": round(sum(s) / len(s), 1),
+                    "median": s[len(s) // 2]}
+        if ws:
+            dims = {"ok": True, "sampled": len(ws),
+                    "width": _st(ws), "height": _st(hs), "aspect": _st(ars),
+                    "filesize_kb": _st([round(x / 1024, 1) for x in szs]) if szs else None,
+                    "resolution_hist": dict(res_buckets), "aspect_hist": dict(ar_buckets)}
+        # sample grid: a few per class (classification) else spread across the set
+        img_ok = {".jpg", ".jpeg", ".png"}
+        if ann["type"] == "classification" and ann["classes"]:
+            per = max(1, 12 // max(1, len(ann["classes"][:6])))
+            for cname_ in ann["classes"][:6]:
+                picks = [p for p in img_paths if p.parent.name == cname_ and p.suffix.lower() in img_ok][:per]
+                for p in picks:
+                    samples_for_grid.append({"cls": cname_, "file": p.name})
+        else:
+            spread = img_paths[::max(1, n_images // 12)][:12]
+            samples_for_grid = [{"cls": "", "file": p.name} for p in spread if p.suffix.lower() in img_ok]
+
+    result = {
+        "ok": True, "slug": slug,
+        "root_exists": True,
+        "total_files": sum(ext_counts.values()),
+        "total_size_mb": round(total_bytes / (1024 * 1024), 1),
+        "n_images": n_images,
+        "modality": dict(modality_counts.most_common()),
+        "ext_top": dict(Counter(ext_counts).most_common(12)),
+        "splits": splits,
+        "has_data_yaml": has_data_yaml,
+        "annotations": ann,
+        "images": dims,
+        "near_duplicates": dup_pairs,
+        "sample_grid": samples_for_grid,
+        "computed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    try:
+        _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+        json.dump(result, open(cache, "w"), indent=2)
+    except Exception:
+        pass
+    return result
+
+
+@app.get("/api/dataset/analyze")
+def api_dataset_analyze(request: Request, slug: str, refresh: int = 0):
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)   # any authenticated identity
+    return JSONResponse(_analyze_dataset(slug, refresh=bool(refresh)))
+
+
+# ===========================================================================
 # v3.0.128 (Z4) — user-controlled Roboflow push CAP. Prof Zhang: the agent may
 # push to Roboflow, but the USER sets the upper limit (max images per dataset
 # the agent uploads). Stored per-domain in a lab-local push_caps.json (durable,
@@ -3682,8 +3934,10 @@ async function loadUploads(){
    h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
      +'<span><a href="/gallery/'+encodeURIComponent(u.slug)+'" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600">'+(u.name||u.slug)+'</a>'
      +' <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+'</span></span>'
+     +'<span style="display:flex;gap:6px">'
+     +'<a href="/dataset/'+encodeURIComponent(u.slug)+'" target="_blank" style="border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;font-size:12px;padding:5px 10px;border-radius:7px;text-decoration:none">\\ud83d\\udcca Analyze</a>'
      +'<button onclick="deleteUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button>'
-     +'</div>';
+     +'</span></div>';
   });
   h+='</div>';w.innerHTML=h;
  }catch(e){w.innerHTML='';}
@@ -4658,6 +4912,97 @@ def api_slug_count(slug: str):
         if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp"):
             seen.add(p.name)
     return {"slug": slug, "total_unique": len(seen)}
+
+
+@app.get("/dataset/{slug}", response_class=HTMLResponse)
+def dataset_analysis_page(slug: str):
+    """v3.0.161 — deep visual analysis of one dataset (EDA). Charts are
+    dependency-free CSS bars; data comes from /api/dataset/analyze."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    s = slug   # regex-validated above: no HTML-special chars
+    html = '''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Dataset analysis</title><style>
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d}
+ .top{background:#0b1220;padding:10px 16px}.top a{display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px;margin-right:8px}
+ .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.2rem 2rem}.hero h1{margin:0 0 .3rem;font-size:20px}.hero .sub{opacity:.85;font-size:13px}
+ .wrap{padding:1.2rem 2rem;max-width:1040px;margin:0 auto}
+ .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+ .kpi{background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:12px 16px;min-width:120px;flex:1}
+ .kpi .v{font-size:22px;font-weight:700}.kpi .l{font-size:12px;color:#64748b;margin-top:2px}
+ .card{background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:16px 18px;margin-bottom:14px}
+ .card h3{margin:0 0 10px;font-size:14px}
+ .bar{display:flex;align-items:center;gap:10px;margin:5px 0;font-size:12.5px}
+ .bar .lab{width:150px;text-align:right;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .bar .track{flex:1;background:#eef2f7;border-radius:6px;overflow:hidden;height:16px}
+ .bar .fill{height:100%;background:#2563eb;border-radius:6px}
+ .bar .n{width:70px;color:#64748b}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+ .grid figure{margin:0;text-align:center}
+ .grid img{width:100%;height:88px;object-fit:cover;border-radius:8px;border:1px solid #e3e7ef;background:#f1f5f9}
+ .grid figcaption{font-size:10px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .muted{color:#64748b;font-size:13px}.warn{color:#b45309}
+ table.mini{border-collapse:collapse;font-size:12.5px}.mini td{padding:2px 10px 2px 0}
+</style></head><body>
+<div class="top"><a href="/">&larr; Projects</a><a href="/gallery/__SLUG__">&#128444; Image gallery</a><a href="#" onclick="load(1);return false">&#8635; Recompute</a></div>
+<div class="hero"><h1>&#128202; Dataset analysis</h1><div class="sub"><code>__SLUG__</code> &middot; read-only EDA (no GPU) &middot; <span id="ts"></span></div></div>
+<div class="wrap"><div id="body"><div class="muted">analyzing&hellip; (first run on a big dataset can take a moment)</div></div></div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+var SLUG="__SLUG__";
+function bars(obj,color){
+ var keys=Object.keys(obj||{});if(!keys.length)return '<div class="muted">none</div>';
+ var max=Math.max.apply(null,keys.map(k=>obj[k]))||1;
+ return keys.map(function(k){var w=Math.round(obj[k]/max*100);
+  return '<div class="bar"><div class="lab">'+esc(k)+'</div><div class="track"><div class="fill" style="width:'+w+'%;background:'+(color||'#2563eb')+'"></div></div><div class="n">'+obj[k]+'</div></div>';}).join('');
+}
+function stat(s){return s?('min '+s.min+' · med '+s.median+' · mean '+s.mean+' · max '+s.max):'—';}
+async function load(refresh){
+ var b=document.getElementById('body');b.innerHTML='<div class="muted">analyzing&hellip;</div>';
+ try{
+  var d=await (await fetch('/api/dataset/analyze?slug='+encodeURIComponent(SLUG)+(refresh?'&refresh=1':''),{credentials:'include'})).json();
+  if(!d.ok){b.innerHTML='<div class="card warn">'+esc(d.error||d.detail||'analysis failed')+'</div>';return;}
+  document.getElementById('ts').textContent='computed '+esc(d.computed_at||'');
+  var a=d.annotations||{};
+  var kpis=[['n_images',d.n_images],['total files',d.total_files],['size (MB)',d.total_size_mb],
+            ['annotation',a.type],['classes',(a.classes||[]).length],['near-dupes',d.near_duplicates]];
+  var html='<div class="cards">'+kpis.map(function(k){return '<div class="kpi"><div class="v">'+esc(k[1])+'</div><div class="l">'+esc(k[0])+'</div></div>';}).join('')+'</div>';
+  // modality + splits
+  html+='<div class="card"><h3>Modality mix</h3>'+bars(d.modality,'#0e7c66')+'</div>';
+  if(d.splits&&Object.keys(d.splits).length)html+='<div class="card"><h3>Train / val / test split (images)</h3>'+bars(d.splits,'#7c3aed')+'</div>';
+  // class distribution
+  if(a.per_class&&Object.keys(a.per_class).length){
+    html+='<div class="card"><h3>Class distribution <span class="muted">('+esc(a.count_kind||'')+', '+esc(a.type)+')</span></h3>'+bars(a.per_class,'#2563eb')
+      +'<div class="muted" style="margin-top:6px">labeled images: '+esc(a.labeled_images)+'</div></div>';
+  }else if((a.classes||[]).length){
+    html+='<div class="card"><h3>Classes ('+esc(a.type)+')</h3><div class="muted">'+a.classes.map(esc).join(', ')+'</div></div>';
+  }else{
+    html+='<div class="card"><h3>Annotations</h3><div class="muted">none detected — this dataset has no labels yet (upload YOLO labels/ + data.yaml, COCO/VOC, or class subfolders to see class distribution).</div></div>';
+  }
+  // image stats
+  var im=d.images||{};
+  if(im.ok){
+   html+='<div class="card"><h3>Image dimensions <span class="muted">(sampled '+esc(im.sampled)+')</span></h3>'
+     +'<table class="mini"><tr><td><b>width</b></td><td>'+stat(im.width)+'</td></tr>'
+     +'<tr><td><b>height</b></td><td>'+stat(im.height)+'</td></tr>'
+     +'<tr><td><b>aspect (w/h)</b></td><td>'+stat(im.aspect)+'</td></tr>'
+     +(im.filesize_kb?'<tr><td><b>file KB</b></td><td>'+stat(im.filesize_kb)+'</td></tr>':'')+'</table>'
+     +'<div style="margin-top:10px"><b style="font-size:12px">Resolution (max side)</b>'+bars(im.resolution_hist,'#0891b2')+'</div>'
+     +'<div style="margin-top:8px"><b style="font-size:12px">Aspect ratio</b>'+bars(im.aspect_hist,'#ca8a04')+'</div></div>';
+  }
+  // sample grid
+  if((d.sample_grid||[]).length){
+   html+='<div class="card"><h3>Samples</h3><div class="grid">'+d.sample_grid.map(function(s){
+     var u='/api/sample/'+encodeURIComponent(SLUG)+'/'+encodeURIComponent(s.file);
+     return '<figure><a href="/api/img/'+encodeURIComponent(SLUG)+'/'+encodeURIComponent(s.file)+'" target="_blank"><img loading="lazy" src="'+u+'"></a><figcaption>'+esc(s.cls||s.file)+'</figcaption></figure>';
+   }).join('')+'</div></div>';
+  }
+  b.innerHTML=html;
+ }catch(e){b.innerHTML='<div class="card warn">'+esc(e)+'</div>';}
+}
+load(0);
+</script></body></html>'''
+    return HTMLResponse(html.replace("__SLUG__", s))
 
 
 @app.get("/gallery/{slug}", response_class=HTMLResponse)
