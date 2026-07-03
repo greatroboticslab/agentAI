@@ -47,6 +47,18 @@ JOBTAG="${TRAIN_JOBTAG:-job${SLURM_JOB_ID:-0}}"
 echo "=== generic train: task=$TASK model=$MODEL epochs=$EPOCHS data=$DATA domain=$DOMAIN ==="
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null)"
 
+# v3.0.163: robust classification data root. Ultralytics classify needs the dir
+# that DIRECTLY contains train/ (+ val/). Uploaded zips that carry a wrapper
+# folder (e.g. images/train/...) get extracted one level too deep, so DATA=.../images
+# ends up holding another dir instead of train/. Descend to find the real root.
+if [ "$TASK" = "classify" ] && [ ! -d "$DATA/train" ]; then
+  found=$(find "$DATA" -maxdepth 4 -type d -name train 2>/dev/null | head -1)
+  if [ -n "$found" ]; then
+    DATA="$(dirname "$found")"
+    echo "classify: resolved data root -> $DATA"
+  fi
+fi
+
 # default model per task if 'auto'
 if [ "$MODEL" = "auto" ] || [ -z "$MODEL" ]; then
   case "$TASK" in
