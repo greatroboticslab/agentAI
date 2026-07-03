@@ -61,6 +61,15 @@ ck "upload returns slug" yes "$([ -n "$USLUG" ] && echo yes || echo no)"
 ck "upload listed" yes "$(curl -s $BA --max-time 25 "$BASE/api/dataset/uploads?domain=mobile_robot" | python3 -c "import json,sys;print('yes' if any(u['slug']=='$USLUG' for u in json.load(sys.stdin)['uploads']) else 'no')" 2>/dev/null)"
 ck "delete own upload -> 200" 200 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$USLUG\"}" "$BASE/api/dataset/delete")"
 ck "delete harvested -> 403" 403 "$(HC $BA -X POST -H 'Content-Type: application/json' -d '{"slug":"cottonweed_sp8"}' "$BASE/api/dataset/delete")"
+# v3.0.164: upload beyond zip — tar.gz (with a wrapper dir) + single image
+python3 -c "import tarfile,os; os.makedirs('$TMP/w/images',exist_ok=True); open('$TMP/w/images/a.png','wb').write(open('$TMP/images/a.png','rb').read()); t=tarfile.open('$TMP/d.tgz','w:gz'); t.add('$TMP/w',arcname='.'); t.close()"
+TSLUG=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/octet-stream' --data-binary @"$TMP/d.tgz" "$BASE/api/dataset/upload?domain=mobile_robot&name=smoketgz" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+ck "tar.gz upload -> slug" yes "$([ -n "$TSLUG" ] && echo yes || echo no)"
+ISLUG=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/octet-stream' --data-binary @"$TMP/images/a.png" "$BASE/api/dataset/upload?domain=mobile_robot&name=smokeimg" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+ck "single image upload -> slug" yes "$([ -n "$ISLUG" ] && echo yes || echo no)"
+ck "bad upload (text) -> 400" 400 "$(printf 'not an archive or image' | HC $BA -X POST -H 'Content-Type: application/octet-stream' --data-binary @- "$BASE/api/dataset/upload?domain=mobile_robot&name=smokebad")"
+[ -n "$TSLUG" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$TSLUG\"}" "$BASE/api/dataset/delete" >/dev/null
+[ -n "$ISLUG" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$ISLUG\"}" "$BASE/api/dataset/delete" >/dev/null
 rm -rf "$TMP"
 
 echo "== PUSH CAP =="
