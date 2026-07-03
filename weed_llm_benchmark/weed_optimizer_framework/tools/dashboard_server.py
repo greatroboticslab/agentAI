@@ -1055,6 +1055,9 @@ def root():
   var _imr=null,_imrChunks=[],_imrOn=false;
   async function toggleVoice(){
     var btn=document.getElementById('micBtn'), msg=document.getElementById('planMsg'), ta=document.getElementById('intent');
+    // v3.0.171: prefer LIVE Web Speech (shows words as you speak, like Claude);
+    // fall back to record->server-Whisper only where live recognition is unavailable.
+    if(_SR){ return toggleVoiceWS(); }
     if(!_canRec){ return toggleVoiceWS(); }
     if(_imrOn&&_imr){ _imr.stop(); return; }
     try{
@@ -1363,7 +1366,7 @@ def agent_weed():
     if(!rows.length){w.innerHTML='';return;}
     var h='<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Your uploads ('+rows.length+')</div><div style="border:1px solid #e3e7ef;border-radius:10px;overflow:hidden;background:#fff">';
     rows.forEach(function(u,i){
-     h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
+     h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
        +'<span><a href="/gallery/'+encodeURIComponent(u.slug)+'" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600">'+(u.name||u.slug)+'</a> <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+'</span></span>'
        +'<button onclick="deleteWeedUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button></div>';
     });
@@ -4343,7 +4346,7 @@ def agent_generic(domain_id: str):
     _agents = d.get("agents") or []
     if _agents:
         _arows = "".join(
-            ('<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;'
+            ('<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;'
              + ('border-top:1px solid #eef1f6;' if i else '') + 'font-size:13px">'
              + '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;'
                'background:#eef2ff;color:#1d4ed8">' + _h.escape(str(a.get("type", ""))) + '</span>'
@@ -4508,11 +4511,13 @@ function dsSetFiles(list){
  var _canVoice=(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)||_SR;
  if(_canVoice){var mb=document.getElementById('ds-goal-mic');if(mb)mb.style.display='inline-block';}
 })();
-// v3.0.168: prefer self-hosted Whisper (record → server transcribe, more accurate);
-// fall back to the browser's live Web Speech where MediaRecorder isn't available.
+// v3.0.171: prefer LIVE Web Speech (words appear as you speak, like Claude); fall
+// back to record->server-Whisper only where live recognition isn't available.
 var _mr=null,_mrChunks=[],_mrOn=false;
 async function goalVoice(){
  var ta=document.getElementById('ds-goal'),mb=document.getElementById('ds-goal-mic');
+ var _SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(_SR)return goalVoiceWS();
  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder))return goalVoiceWS();
  if(_mrOn&&_mr){_mr.stop();return;}
  try{
@@ -4575,7 +4580,7 @@ async function loadUploads(){
   var h='<div style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:6px">Your uploads ('+rows.length+')</div>';
   h+='<div style="border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">';
   rows.forEach(function(u,i){
-   h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
+   h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
      +'<span><a href="/gallery/'+encodeURIComponent(u.slug)+'" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600">'+(u.name||u.slug)+'</a>'
      +' <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+'</span></span>'
      +'<span style="display:flex;gap:6px">'
