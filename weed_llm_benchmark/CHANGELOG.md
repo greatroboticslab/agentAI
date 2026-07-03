@@ -5039,3 +5039,12 @@ facts to the lab-local model (ollama:qwen2.5:3b) for a plain-English summary + r
 degrades to a rules-only report when no LLM is reachable (clearly labelled). The /dataset/{slug} page
 gets a "🤖 AI review & training readiness" card with an on-demand "Analyze with AI" button (ready/not-ready
 badge, severity-colored issues, recommendations). English only; cached to <slug>.ai.json.
+
+### v3.0.166 — Multi-file & folder upload (dataset pipeline loop, P1b)
+
+Students no longer have to zip. /api/dataset/upload now also accepts **multipart/form-data**: multiple
+loose files OR a whole folder (webkitdirectory, whose relative paths are preserved) — placed through the
+same image/label/data.yaml/sidecar logic + wrapper-strip + traversal guard as archives. The raw-body
+archive/single-image path still works (frontend sends 1 file raw, many files as multipart). Frontend
+upload box rebuilt: **drag & drop**, "Choose files" (multiple), and "Choose folder", with a live selection
+summary; success links straight to Analyze + gallery. Installed python-multipart on the lab venv. English.

@@ -2618,64 +2618,107 @@ async def api_dataset_upload(request: Request):
         raise HTTPException(400, "missing dataset name (?name=)")
     base = re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_")[:60] or "dataset"
 
-    # v3.0.139 (roadmap #2): STREAM the body to a temp file instead of loading the
-    # whole zip in memory — large robot/video datasets no longer blow up RAM.
-    # Size cap enforced incrementally; sha1 (for the slug) computed on the fly.
-    _h = hashlib.sha1()
-    total = 0
-    tmpf = tempfile.NamedTemporaryFile(prefix="upload_", suffix=".zip", delete=False)
-    try:
-        async for chunk in request.stream():
-            if not chunk:
-                continue
-            total += len(chunk)
-            if total > _MAX_UPLOAD_BYTES:
-                tmpf.close(); os.unlink(tmpf.name)
-                raise HTTPException(413, f"zip too large (> {_MAX_UPLOAD_BYTES // (1024*1024)} MB)")
-            _h.update(chunk)
-            tmpf.write(chunk)
-        tmpf.close()
-    except HTTPException:
-        raise
-    except Exception as e:
-        try:
-            tmpf.close(); os.unlink(tmpf.name)
-        except Exception:
-            pass
-        raise HTTPException(400, f"upload read failed: {type(e).__name__}")
-    if total == 0:
-        os.unlink(tmpf.name)
-        raise HTTPException(400, "empty body — POST the .zip file as the request body")
-    zip_path = tmpf.name
-    # v3.0.164: accept ZIP, TAR/TAR.GZ/TGZ, or a single raw image — detected by
-    # magic bytes (not just the .zip the frontend used to force).
     import tarfile
-    with open(zip_path, "rb") as _mf:
-        magic = _mf.read(264)
+    _h = hashlib.sha1()
+    zip_path = None
+    staging_dir = None
     zf = tf = None
     single_name = None
     kind = None
-    try:
-        if magic[:4] in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"):
-            zf = zipfile.ZipFile(zip_path); kind = "zip"
-        elif magic[:2] == b"\x1f\x8b" or tarfile.is_tarfile(zip_path):
-            tf = tarfile.open(zip_path, "r:*"); kind = "tar"
-        elif (magic[:3] == b"\xff\xd8\xff" or magic[:8] == b"\x89PNG\r\n\x1a\n"
-              or magic[:2] == b"BM" or (magic[:4] == b"RIFF" and magic[8:12] == b"WEBP")):
-            kind = "image"
-            base_nm = re.sub(r"[^A-Za-z0-9_.-]", "_", Path(name).name) or "image"
-            _defext = {0xFF: ".jpg", 0x89: ".png", ord("B"): ".bmp", ord("R"): ".webp"}
-            single_name = base_nm if Path(base_nm).suffix.lower() in _UPLOAD_IMG_EXT \
-                else base_nm + _defext.get(magic[0] if magic else 0, ".jpg")
-    except Exception:
-        kind = None
-    if kind is None:
-        os.unlink(zip_path)
-        raise HTTPException(400, "unsupported upload — send a .zip / .tar / .tar.gz / .tgz "
-                                 "archive, or a single image (jpg/png/bmp/webp)")
+    _ctype = (request.headers.get("content-type") or "").lower()
+
+    if "multipart/form-data" in _ctype:
+        # v3.0.166: multi-file / folder upload. Each form part is one file; a folder
+        # upload (webkitdirectory) sends files whose filename carries the relative
+        # path. Save them to a staging dir, then treat like an extracted archive.
+        form = await request.form()
+        ups = [v for _k, v in form.multi_items()
+               if hasattr(v, "filename") and getattr(v, "filename", None)]
+        if not ups:
+            raise HTTPException(400, "no files in the upload")
+        if len(ups) > _MAX_UPLOAD_FILES:
+            raise HTTPException(413, f"too many files (> {_MAX_UPLOAD_FILES})")
+        staging_dir = tempfile.mkdtemp(prefix="mpu_")
+        total = 0
+        for uf in ups:
+            rel = "/".join(p for p in Path(uf.filename).parts if p not in ("..", "")) \
+                or Path(uf.filename).name
+            if not rel:
+                continue
+            outp = Path(staging_dir) / rel
+            outp.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with open(outp, "wb") as out:
+                    while True:
+                        chunk = await uf.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        total += len(chunk)
+                        if total > _MAX_UPLOAD_BYTES:
+                            shutil.rmtree(staging_dir, ignore_errors=True)
+                            raise HTTPException(413, f"upload too large (> {_MAX_UPLOAD_BYTES // (1024*1024)} MB)")
+                        _h.update(rel.encode()); _h.update(chunk)
+                        out.write(chunk)
+            finally:
+                try:
+                    await uf.close()
+                except Exception:
+                    pass
+        kind = "multipart"
+    else:
+        # STREAM the raw body to a temp file (no whole-file-in-RAM). Accept ZIP,
+        # TAR/TAR.GZ/TGZ, or a single raw image — detected by magic bytes.
+        total = 0
+        tmpf = tempfile.NamedTemporaryFile(prefix="upload_", suffix=".zip", delete=False)
+        try:
+            async for chunk in request.stream():
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > _MAX_UPLOAD_BYTES:
+                    tmpf.close(); os.unlink(tmpf.name)
+                    raise HTTPException(413, f"upload too large (> {_MAX_UPLOAD_BYTES // (1024*1024)} MB)")
+                _h.update(chunk)
+                tmpf.write(chunk)
+            tmpf.close()
+        except HTTPException:
+            raise
+        except Exception as e:
+            try:
+                tmpf.close(); os.unlink(tmpf.name)
+            except Exception:
+                pass
+            raise HTTPException(400, f"upload read failed: {type(e).__name__}")
+        if total == 0:
+            os.unlink(tmpf.name)
+            raise HTTPException(400, "empty upload — send an archive, image, or files")
+        zip_path = tmpf.name
+        with open(zip_path, "rb") as _mf:
+            magic = _mf.read(264)
+    if kind != "multipart":
+        try:
+            if magic[:4] in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"):
+                zf = zipfile.ZipFile(zip_path); kind = "zip"
+            elif magic[:2] == b"\x1f\x8b" or tarfile.is_tarfile(zip_path):
+                tf = tarfile.open(zip_path, "r:*"); kind = "tar"
+            elif (magic[:3] == b"\xff\xd8\xff" or magic[:8] == b"\x89PNG\r\n\x1a\n"
+                  or magic[:2] == b"BM" or (magic[:4] == b"RIFF" and magic[8:12] == b"WEBP")):
+                kind = "image"
+                base_nm = re.sub(r"[^A-Za-z0-9_.-]", "_", Path(name).name) or "image"
+                _defext = {0xFF: ".jpg", 0x89: ".png", ord("B"): ".bmp", ord("R"): ".webp"}
+                single_name = base_nm if Path(base_nm).suffix.lower() in _UPLOAD_IMG_EXT \
+                    else base_nm + _defext.get(magic[0] if magic else 0, ".jpg")
+        except Exception:
+            kind = None
+        if kind is None:
+            os.unlink(zip_path)
+            raise HTTPException(400, "unsupported upload — send a .zip / .tar / .tar.gz / .tgz "
+                                     "archive, or a single image (jpg/png/bmp/webp)")
 
     # member NAMES (for wrapper-strip + count)
-    if kind == "zip":
+    if kind == "multipart":
+        names = [str(p.relative_to(staging_dir)) for p in Path(staging_dir).rglob("*") if p.is_file()]
+    elif kind == "zip":
         names = [m.filename for m in zf.infolist() if not m.is_dir()]
     elif kind == "tar":
         names = [m.name for m in tf.getmembers() if m.isfile()]
@@ -2689,7 +2732,13 @@ async def api_dataset_upload(request: Request):
             except Exception:
                 pass
         try:
-            os.unlink(zip_path)
+            if zip_path:
+                os.unlink(zip_path)
+        except Exception:
+            pass
+        try:
+            if staging_dir:
+                shutil.rmtree(staging_dir, ignore_errors=True)
         except Exception:
             pass
 
@@ -2715,7 +2764,12 @@ async def api_dataset_upload(request: Request):
         return "/".join(p)[:200]
 
     def _members():
-        if kind == "zip":
+        if kind == "multipart":
+            for p in sorted(Path(staging_dir).rglob("*")):
+                if p.is_file():
+                    with open(p, "rb") as s:
+                        yield str(p.relative_to(staging_dir)), s
+        elif kind == "zip":
             for m in zf.infolist():
                 if m.is_dir():
                     continue
@@ -4249,9 +4303,16 @@ def agent_generic(domain_id: str):
    <div style="margin-top:14px">{_hbtn}</div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Upload a dataset</div>
    <div style="margin-top:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px">
-     <div style="font-size:13px;color:#475569;margin-bottom:10px">Upload a <b>.zip / .tar / .tar.gz / .tgz</b> archive, or a single image. Images can include YOLO <code>labels/</code> + <code>data.yaml</code>, COCO/VOC annotations, or class subfolders (<code>train/&lt;class&gt;/</code>) for classification. It registers as a dataset and appears under Datasets below.</div>
+     <div style="font-size:13px;color:#475569;margin-bottom:10px">Upload a <b>.zip / .tar / .tar.gz / .tgz</b> archive, a <b>folder</b>, <b>multiple files</b>, or a single image &mdash; no need to zip. Images can include YOLO <code>labels/</code> + <code>data.yaml</code>, COCO/VOC annotations, or class subfolders (<code>train/&lt;class&gt;/</code>) for classification. It registers as a dataset and appears under Datasets below.</div>
      <input id="ds-name" type="text" placeholder="Dataset name (e.g. lab-run-2026-06)" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px">
-     <input id="ds-file" type="file" accept=".zip,.tar,.gz,.tgz,.tar.gz,application/zip,application/x-tar,application/gzip,image/*" style="font-size:13px;margin-bottom:10px;display:block">
+     <div id="ds-drop" style="border:2px dashed #cbd5e1;border-radius:10px;padding:16px;text-align:center;color:#64748b;font-size:13px;background:#fff;cursor:pointer;margin-bottom:8px">
+       <b>Drag &amp; drop</b> files here, or pick:<br>
+       <input id="ds-file" type="file" multiple accept=".zip,.tar,.gz,.tgz,.tar.gz,application/zip,application/x-tar,application/gzip,image/*" style="display:none">
+       <input id="ds-folder" type="file" webkitdirectory directory multiple style="display:none">
+       <button type="button" onclick="document.getElementById('ds-file').click()" style="margin-top:8px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer">&#128193; Choose files</button>
+       <button type="button" onclick="document.getElementById('ds-folder').click()" style="margin-top:8px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer">&#128194; Choose folder</button>
+       <div id="ds-sel" style="margin-top:8px;font-size:12px;color:#2563eb"></div>
+     </div>
      <button id="ds-up" onclick="uploadDataset()" class="btn" style="margin-top:0;border:0;cursor:pointer">&#11014; Upload dataset</button>
      <span id="ds-toast" style="margin-left:12px;font-size:13px"></span>
    </div>
@@ -4302,20 +4363,41 @@ function startHarvest(){
   .then(function(r){return r.json();}).then(function(d){t.textContent=(d&&d.ok?'\\u2705 Harvest submitted to cluster.':'\\u274c '+((d&&(d.msg||d.stderr))||'failed'));})
   .catch(function(e){t.textContent='\\u274c '+e;}).finally(function(){b.disabled=false;});
 }
+var DS_FILES=[];   // the chosen file list (from picker, folder, or drag-drop)
+function dsSetFiles(list){
+ DS_FILES=Array.prototype.slice.call(list||[]);
+ var sel=document.getElementById('ds-sel');
+ if(sel)sel.textContent=DS_FILES.length?(DS_FILES.length+' file(s) selected \\u00b7 '+(DS_FILES.reduce(function(a,f){return a+f.size;},0)/1048576).toFixed(1)+' MB'):'';
+}
+(function dsInit(){
+ var fe=document.getElementById('ds-file'),fo=document.getElementById('ds-folder'),dz=document.getElementById('ds-drop');
+ if(fe)fe.addEventListener('change',function(){dsSetFiles(fe.files);});
+ if(fo)fo.addEventListener('change',function(){dsSetFiles(fo.files);});
+ if(dz){['dragenter','dragover'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='#2563eb';dz.style.background='#eff6ff';});});
+  ['dragleave','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='#cbd5e1';dz.style.background='#fff';});});
+  dz.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length)dsSetFiles(e.dataTransfer.files);});}
+})();
 async function uploadDataset(){
- var nameEl=document.getElementById('ds-name'),fileEl=document.getElementById('ds-file'),
-     t=document.getElementById('ds-toast'),btn=document.getElementById('ds-up');
+ var nameEl=document.getElementById('ds-name'),t=document.getElementById('ds-toast'),btn=document.getElementById('ds-up');
  var name=(nameEl.value||'').trim();
  if(!name){t.textContent='\\u26a0 enter a dataset name';return;}
- if(!fileEl.files||!fileEl.files[0]){t.textContent='\\u26a0 choose a .zip file';return;}
- var f=fileEl.files[0];
- if(!/\\.zip$/i.test(f.name)){t.textContent='\\u26a0 must be a .zip file';return;}
- btn.disabled=true;t.textContent='\\u23f3 uploading '+(f.size/1048576).toFixed(1)+' MB\\u2026';
+ if(!DS_FILES.length){t.textContent='\\u26a0 choose files, a folder, or an archive';return;}
+ var totalMB=(DS_FILES.reduce(function(a,f){return a+f.size;},0)/1048576).toFixed(1);
+ btn.disabled=true;t.textContent='\\u23f3 uploading '+DS_FILES.length+' file(s), '+totalMB+' MB\\u2026';
  try{
   var url='/api/dataset/upload?domain=__DOM__&name='+encodeURIComponent(name);
-  var r=await fetch(url,{method:'POST',credentials:'include',headers:{'Content-Type':'application/zip'},body:f});
+  var r;
+  if(DS_FILES.length===1){
+    // single archive or image → raw body (server detects by magic bytes)
+    r=await fetch(url,{method:'POST',credentials:'include',headers:{'Content-Type':'application/octet-stream'},body:DS_FILES[0]});
+  }else{
+    // many files / a folder → multipart, preserving relative paths (webkitRelativePath)
+    var fd=new FormData();
+    DS_FILES.forEach(function(f){fd.append('files',f,f.webkitRelativePath||f.name);});
+    r=await fetch(url,{method:'POST',credentials:'include',body:fd});
+  }
   var d=await r.json();
-  if(r.ok&&d&&d.ok){t.innerHTML='\\u2705 '+d.images+' images registered as <b>'+d.slug+'</b> \\u00b7 <a href="'+d.gallery_url+'" target="_blank">view</a>';nameEl.value='';fileEl.value='';loadUploads();}
+  if(r.ok&&d&&d.ok){t.innerHTML='\\u2705 '+d.images+' image(s) registered as <b>'+d.slug+'</b> \\u00b7 <a href="/dataset/'+d.slug+'" target="_blank">analyze</a> \\u00b7 <a href="'+(d.gallery_url||('/gallery/'+d.slug))+'" target="_blank">view</a>';nameEl.value='';dsSetFiles([]);document.getElementById('ds-file').value='';loadUploads();}
   else{t.textContent='\\u274c '+((d&&(d.detail||d.msg))||('HTTP '+r.status));}
  }catch(e){t.textContent='\\u274c '+e;}finally{btn.disabled=false;}
 }
