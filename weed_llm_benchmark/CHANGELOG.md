@@ -5084,3 +5084,12 @@ Smarter, more accurate voice than the browser's live recognition — fully self-
   title) instead of letting the model replace them — so "No labels", imbalance, etc. can never be dropped.
 - The launcher intent-box mic now also records → self-hosted Whisper (Web Speech fallback).
 - README refreshed for the dataset pipeline; new `docs/DATASET_PIPELINE_STATUS.md` (honest what-works audit).
+
+### v3.0.170 — Optional cluster deep-analysis (dataset pipeline loop, P5 bonus)
+
+The dataset AI card gets a "🔬 Deep analysis on cluster (glm-4.7-flash)" button. It reuses the existing
+on-demand inference path (`/api/llm/infer` + poll) to run the already-deployed 30B glm-4.7-flash on the
+dataset facts for a richer review (overall assessment → key problems → concrete collect/clean/label plan →
+suggested training setup). Clearly labelled as optional (queues on the GPU, slower). Frontend-only — no
+new backend; resource-sensible (uses the 30B model, not the 671b). The instant local qwen2.5:3b review
+remains the default.

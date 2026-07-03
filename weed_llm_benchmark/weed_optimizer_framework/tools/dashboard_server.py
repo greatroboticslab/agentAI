@@ -5689,8 +5689,42 @@ async function loadAI(refresh){
   } else { h+='<div class="muted">No significant issues detected.</div>'; }
   var rec=d.recommendations||[];
   if(rec.length){ h+='<div style="font-weight:600;font-size:13px;margin:10px 0 4px">Recommendations</div><ul style="margin:.2rem 0;padding-left:1.1rem;font-size:12.5px;color:#334155">'+rec.map(function(r){return '<li>'+esc(r)+'</li>';}).join('')+'</ul>'; }
+  AIREV=d;
+  h+='<div style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:10px">'
+    +'<button onclick="deepAnalyze()" id="deepbtn" style="border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;font-size:12.5px;padding:6px 12px;border-radius:8px;cursor:pointer">&#128300; Deep analysis on cluster (glm-4.7-flash)</button>'
+    +'<span class="muted" style="margin-left:8px;font-size:11.5px">optional &middot; runs a bigger model on the GPU (queues, slower)</span>'
+    +'<div id="deepout" style="margin-top:10px"></div></div>';
   out.innerHTML=h;
  }catch(e){ if(btn)btn.disabled=false; out.innerHTML='<span class="warn">'+esc(e)+'</span>'; }
+}
+var AIREV=null,EDAD=null;
+async function deepAnalyze(){
+ var out=document.getElementById('deepout'),btn=document.getElementById('deepbtn');
+ var a=EDAD||{},r=AIREV||{},ann=(a.annotations||{});
+ var facts='Dataset facts: images='+(a.n_images||'?')+', annotation='+(ann.type||'none')
+   +', classes='+JSON.stringify((ann.classes||[]).slice(0,20))+', per_class='+JSON.stringify(ann.per_class||{})
+   +', splits='+JSON.stringify(a.splits||{})+', near_duplicates='+(a.near_duplicates||0)
+   +', image_size='+JSON.stringify((a.images||{}).width||{})+(r.goal?(', stated_goal="'+r.goal+'"'):'')
+   +', rule_issues='+JSON.stringify((r.issues||[]).map(function(i){return i.title;}));
+ var prompt='You are a senior machine-learning data reviewer. Given these dataset facts, write a thorough, '
+   +'practical review: (1) overall assessment, (2) the most important problems and why they matter, '
+   +'(3) a concrete step-by-step data-collection / cleaning / labeling plan to make it training-ready, '
+   +'(4) a suggested training setup. Be specific and honest.\\n\\n'+facts;
+ btn.disabled=true;out.innerHTML='<span class="muted">\\u23f3 submitting a GPU job (glm-4.7-flash)\\u2026 this queues, first response can take a few minutes.</span>';
+ try{
+  var s=await (await fetch('/api/llm/infer',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,model:'glm-4.7-flash'})})).json();
+  if(!s||!s.ok){out.innerHTML='<span class="warn">'+esc((s&&(s.detail||s.msg))||'could not submit')+'</span>';btn.disabled=false;return;}
+  var tag=s.jobtag,tries=0;
+  out.innerHTML='<span class="muted">\\u23f3 queued (job '+(s.job_id||'?')+') \\u2014 waiting for the GPU\\u2026</span>';
+  var iv=setInterval(async function(){tries++;
+   try{var rr=await (await fetch('/api/llm/infer/result?jobtag='+encodeURIComponent(tag),{credentials:'include'})).json();
+    if(rr.status==='done'){clearInterval(iv);btn.disabled=false;out.innerHTML='<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.6;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:12px">'+esc(rr.text||'')+'</div>';}
+    else if(rr.status==='failed'){clearInterval(iv);btn.disabled=false;out.innerHTML='<span class="warn">\\u274c '+esc(rr.error||'failed')+'</span>';}
+    else{out.innerHTML='<span class="muted">\\u23f3 running on the GPU\\u2026 ('+tries+')</span>';}
+   }catch(e){}
+   if(tries>90){clearInterval(iv);btn.disabled=false;out.innerHTML='<span class="muted">\\u23f3 still running \\u2014 check back later.</span>';}
+  },8000);
+ }catch(e){out.innerHTML='<span class="warn">'+esc(e)+'</span>';btn.disabled=false;}
 }
 function modalityDetail(md){
  var keys=Object.keys(md||{});if(!keys.length)return '';
@@ -5718,6 +5752,7 @@ async function load(refresh){
  try{
   var d=await (await fetch('/api/dataset/analyze?slug='+encodeURIComponent(SLUG)+(refresh?'&refresh=1':''),{credentials:'include'})).json();
   if(!d.ok){b.innerHTML='<div class="card warn">'+esc(d.error||d.detail||'analysis failed')+'</div>';return;}
+  EDAD=d;
   document.getElementById('ts').textContent='computed '+esc(d.computed_at||'');
   var a=d.annotations||{};
   var kpis=[['n_images',d.n_images],['total files',d.total_files],['size (MB)',d.total_size_mb],
