@@ -5060,3 +5060,15 @@ summary; success links straight to Analyze + gallery. Installed python-multipart
 - **Onboarding**: new `/guide` page — a friendly 2-minute English walkthrough (big picture, accepted
   upload formats + layouts, describing the goal, what analysis gives you, what each agent does). Linked
   from the launcher toolbar ("👋 New here? Guide") and the project empty-state.
+
+### v3.0.168 — Self-hosted Whisper voice (dataset pipeline loop, P4)
+
+Smarter, more accurate voice than the browser's live recognition — fully self-hosted (no cloud):
+- Installed faster-whisper (1.2.1) in the lab venv; verified it loads on the RTX 3060 (cuda/float16, ~14s
+  first load, cached) and transcribes.
+- Backend: `POST /api/voice/transcribe` (multipart 'audio' or raw body) → Whisper → {ok, text, language,
+  device}. Model loaded lazily once + cached under a lock; honest 503 if the lib/model is unavailable.
+  Model size via WHISPER_MODEL env (default 'base').
+- Frontend: the dataset **goal mic** now records via MediaRecorder and transcribes on the server (more
+  accurate), with the browser Web Speech API kept as the instant fallback where MediaRecorder isn't
+  available. English by default (Whisper is multilingual if needed).

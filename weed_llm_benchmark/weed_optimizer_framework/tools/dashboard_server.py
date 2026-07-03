@@ -3668,6 +3668,83 @@ def api_dataset_analyze_ai(request: Request, slug: str, refresh: int = 0):
 
 
 # ===========================================================================
+# v3.0.168 — server-side speech-to-text (P4). faster-whisper on the lab GPU:
+# more accurate + multilingual than the browser Web Speech API, and fully
+# self-hosted (no cloud). Model is loaded lazily once + cached. Browser Web
+# Speech stays as the instant fallback.
+# ===========================================================================
+import threading as _threading
+_WHISPER = {"model": None, "device": None, "err": None}
+_WHISPER_LOCK = _threading.Lock()
+_WHISPER_SIZE = os.environ.get("WHISPER_MODEL", "base")
+
+
+def _get_whisper():
+    if _WHISPER["model"] is not None or _WHISPER["err"]:
+        return _WHISPER["model"]
+    with _WHISPER_LOCK:
+        if _WHISPER["model"] is not None or _WHISPER["err"]:
+            return _WHISPER["model"]
+        try:
+            from faster_whisper import WhisperModel
+        except Exception as e:
+            _WHISPER["err"] = f"faster-whisper not installed: {e}"
+            return None
+        for dev, ct in (("cuda", "float16"), ("cpu", "int8")):
+            try:
+                _WHISPER["model"] = WhisperModel(_WHISPER_SIZE, device=dev, compute_type=ct)
+                _WHISPER["device"] = f"{dev}/{ct}"
+                log.info(f"[whisper] loaded {_WHISPER_SIZE} on {dev}/{ct}")
+                return _WHISPER["model"]
+            except Exception as e:
+                _WHISPER["err"] = f"{type(e).__name__}: {str(e)[:160]}"
+        return None
+
+
+@app.post("/api/voice/transcribe")
+async def api_voice_transcribe(request: Request):
+    """Transcribe an uploaded audio clip (multipart 'audio' file, or raw body) to
+    text with self-hosted Whisper. Returns {ok, text, device}. English by default."""
+    _ = _actor_from_request(request)
+    import tempfile as _tf
+    lang = (request.query_params.get("lang") or "en").strip()[:8] or "en"
+    data = b""
+    ctype = (request.headers.get("content-type") or "").lower()
+    try:
+        if "multipart/form-data" in ctype:
+            form = await request.form()
+            uf = next((v for _k, v in form.multi_items()
+                       if hasattr(v, "filename") and getattr(v, "filename", None)), None)
+            if uf is not None:
+                data = await uf.read()
+        if not data:
+            data = await request.body()
+    except Exception as e:
+        raise HTTPException(400, f"could not read audio: {type(e).__name__}")
+    if not data:
+        raise HTTPException(400, "no audio uploaded")
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(413, "audio too large (> 25 MB)")
+    model = _get_whisper()
+    if model is None:
+        raise HTTPException(503, "speech-to-text unavailable: " + (_WHISPER["err"] or "model not loaded"))
+    tmp = _tf.NamedTemporaryFile(prefix="voice_", suffix=".webm", delete=False)
+    try:
+        tmp.write(data); tmp.close()
+        segs, info = model.transcribe(tmp.name, language=(lang or None), beam_size=1)
+        text = "".join(s.text for s in segs).strip()
+        return JSONResponse({"ok": True, "text": text, "language": info.language,
+                             "device": _WHISPER["device"]})
+    except Exception as e:
+        raise HTTPException(500, f"transcription failed: {type(e).__name__}: {str(e)[:160]}")
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except Exception:
+            pass
+
+
+# ===========================================================================
 # v3.0.128 (Z4) — user-controlled Roboflow push CAP. Prof Zhang: the agent may
 # push to Roboflow, but the USER sets the upper limit (max images per dataset
 # the agent uploads). Stored per-domain in a lab-local push_caps.json (durable,
@@ -4396,10 +4473,31 @@ function dsSetFiles(list){
   ['dragleave','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='#cbd5e1';dz.style.background='#fff';});});
   dz.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length)dsSetFiles(e.dataTransfer.files);});}
  var _SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(_SR){var mb=document.getElementById('ds-goal-mic');if(mb)mb.style.display='inline-block';}
+ var _canVoice=(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)||_SR;
+ if(_canVoice){var mb=document.getElementById('ds-goal-mic');if(mb)mb.style.display='inline-block';}
 })();
+// v3.0.168: prefer self-hosted Whisper (record → server transcribe, more accurate);
+// fall back to the browser's live Web Speech where MediaRecorder isn't available.
+var _mr=null,_mrChunks=[],_mrOn=false;
+async function goalVoice(){
+ var ta=document.getElementById('ds-goal'),mb=document.getElementById('ds-goal-mic');
+ if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder))return goalVoiceWS();
+ if(_mrOn&&_mr){_mr.stop();return;}
+ try{
+  var stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  _mr=new MediaRecorder(stream);_mrChunks=[];
+  _mr.ondataavailable=function(e){if(e.data&&e.data.size)_mrChunks.push(e.data);};
+  _mr.onstart=function(){_mrOn=true;mb.style.background='#fee2e2';mb.textContent='\\u23f9';};
+  _mr.onstop=async function(){_mrOn=false;mb.style.background='#eef2ff';mb.innerHTML='\\u23f3';
+    try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
+    try{var d=await (await fetch('/api/voice/transcribe',{method:'POST',credentials:'include',headers:{'Content-Type':'application/octet-stream'},body:new Blob(_mrChunks,{type:'audio/webm'})})).json();
+      if(d&&d.ok&&d.text)ta.value=(ta.value?ta.value.trim()+' ':'')+d.text;}catch(e){}
+    mb.innerHTML='\\ud83c\\udf99';};
+  _mr.start();
+ }catch(e){goalVoiceWS();}
+}
 var _goalRec=null,_goalOn=false;
-function goalVoice(){
+function goalVoiceWS(){
  var _SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!_SR)return;
  var ta=document.getElementById('ds-goal'),mb=document.getElementById('ds-goal-mic');
  if(_goalOn&&_goalRec){_goalRec.stop();return;}
