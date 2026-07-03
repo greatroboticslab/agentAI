@@ -30,7 +30,7 @@ SLUG=$(curl -s $BA --max-time 25 "$BASE/api/annotation_status" | python3 -c "imp
 echo "(class=$CLS slug=$SLUG)"
 
 echo "== PAGES =="
-for pg in / /agent/weed /agent/mobile_robot /agent/humanoid_robot /classes "/classes/$CLS" /slugs "/gallery/$SLUG" /labeling /annotate /roboflow /rounds /users /login /console; do
+for pg in / /agent/weed /agent/mobile_robot /agent/humanoid_robot /classes "/classes/$CLS" /slugs "/gallery/$SLUG" /labeling /annotate /roboflow /rounds /users /login /console /guide; do
   ck "GET $pg" 200 "$(HC $BA "$BASE$pg")"
 done
 
@@ -63,6 +63,10 @@ UP=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/zip' --data
 USLUG=$(echo "$UP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
 ck "upload returns slug" yes "$([ -n "$USLUG" ] && echo yes || echo no)"
 ck "upload listed" yes "$(curl -s $BA --max-time 25 "$BASE/api/dataset/uploads?domain=mobile_robot" | python3 -c "import json,sys;print('yes' if any(u['slug']=='$USLUG' for u in json.load(sys.stdin)['uploads']) else 'no')" 2>/dev/null)"
+# v3.0.167: goal capture persists
+GSLUG=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/octet-stream' --data-binary @"$TMP/d.zip" "$BASE/api/dataset/upload?domain=mobile_robot&name=smokegoal&goal=detect%20widgets%20on%20a%20line" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+ck "goal persisted + returned" yes "$(curl -s $BA --max-time 25 "$BASE/api/dataset/uploads?domain=mobile_robot" | python3 -c "import json,sys;print('yes' if any(u['slug']=='$GSLUG' and 'widgets' in (u.get('goal') or '') for u in json.load(sys.stdin)['uploads']) else 'no')" 2>/dev/null)"
+[ -n "$GSLUG" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$GSLUG\"}" "$BASE/api/dataset/delete" >/dev/null
 ck "delete own upload -> 200" 200 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$USLUG\"}" "$BASE/api/dataset/delete")"
 ck "delete harvested -> 403" 403 "$(HC $BA -X POST -H 'Content-Type: application/json' -d '{"slug":"cottonweed_sp8"}' "$BASE/api/dataset/delete")"
 # v3.0.164: upload beyond zip — tar.gz (with a wrapper dir) + single image
