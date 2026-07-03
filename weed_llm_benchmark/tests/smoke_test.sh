@@ -50,6 +50,13 @@ ck "ai review ok" True "$(echo "$AI" | python3 -c "import json,sys;print(json.lo
 ckin "ai review source" "ai,rules" "$(echo "$AI" | python3 -c "import json,sys;print(json.load(sys.stdin)['source'])" 2>/dev/null)"
 ck "ai review has readiness verdict" yes "$(echo "$AI" | python3 -c "import json,sys;print('yes' if 'suggested_task' in json.load(sys.stdin).get('training_readiness',{}) else 'no')" 2>/dev/null)"
 
+echo "== VOICE (self-hosted whisper) =="
+python3 -c "import wave,struct,math;w=wave.open('/tmp/sv.wav','w');w.setnchannels(1);w.setsampwidth(2);w.setframerate(16000);w.writeframes(b''.join(struct.pack('<h',int(1000*math.sin(2*math.pi*250*t/16000))) for t in range(8000)));w.close()" 2>/dev/null
+VOICE=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/octet-stream' --data-binary @/tmp/sv.wav "$BASE/api/voice/transcribe")
+ck "voice transcribe ok" True "$(echo "$VOICE" | python3 -c "import json,sys;print(json.load(sys.stdin)['ok'])" 2>/dev/null)"
+ck "voice returns text field" yes "$(echo "$VOICE" | python3 -c "import json,sys;print('yes' if 'text' in json.load(sys.stdin) else 'no')" 2>/dev/null)"
+rm -f /tmp/sv.wav
+
 echo "== AUTH =="
 ck   "basic creds -> 200"        200       "$(HC $BA "$BASE/agent/weed")"
 ckin "no-cred -> login/401"      "302,401" "$(HC -H 'Accept: text/html' "$BASE/")"
