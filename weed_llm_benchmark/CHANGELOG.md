@@ -5028,3 +5028,14 @@ wrapper directory is stripped on extract, which ALSO fixes the double-nesting bu
 archive of `images/train/<class>/` now lands as `uploads/<slug>/images/train/<class>/`, not
 `.../images/images/...`). Unified zip+tar member iterator; path-traversal guarded. Frontend accept +
 helper text updated. (Multi-file / folder upload is P1b, next.)
+
+### v3.0.165 — Intelligent dataset analysis (dataset pipeline loop, P2)
+
+Turns the raw EDA into an actionable review. `_detect_dataset_issues()` flags grounded data-quality
+problems in code (very-small dataset, no labels, class imbalance ratio, too-few-per-class, >10% near-
+duplicates, tiny/huge images, no validation split, partially-unlabeled) and `_rules_readiness()` gives a
+training-readiness verdict + suggested task. `GET /api/dataset/analyze/ai?slug=&refresh=` feeds those
+facts to the lab-local model (ollama:qwen2.5:3b) for a plain-English summary + recommendations, and
+degrades to a rules-only report when no LLM is reachable (clearly labelled). The /dataset/{slug} page
+gets a "🤖 AI review & training readiness" card with an on-demand "Analyze with AI" button (ready/not-ready
+badge, severity-colored issues, recommendations). English only; cached to <slug>.ai.json.

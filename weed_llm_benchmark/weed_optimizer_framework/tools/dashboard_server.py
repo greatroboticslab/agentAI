@@ -3431,6 +3431,172 @@ def api_dataset_analyze(request: Request, slug: str, refresh: int = 0):
 
 
 # ===========================================================================
+# v3.0.165 — INTELLIGENT dataset analysis (P2). Detect concrete data issues in
+# CODE first (grounded), then have the lab-local LLM turn the EDA + issues into a
+# readable report + training-readiness verdict. Degrades to a rules-only report
+# when no LLM is reachable. English only.
+# ===========================================================================
+def _detect_dataset_issues(a: dict) -> list:
+    """Rule-based, grounded data-quality issues. Each: {severity, title, detail}."""
+    issues = []
+    if not a or not a.get("ok"):
+        return issues
+    n = a.get("n_images") or 0
+    ann = a.get("annotations") or {}
+    per = ann.get("per_class") or {}
+    im = a.get("images") or {}
+
+    if 0 < n < 20:
+        issues.append({"severity": "high", "title": "Very small dataset",
+                       "detail": f"Only {n} images — too few to train a reliable model. Aim for at least a few hundred."})
+    elif 20 <= n < 100:
+        issues.append({"severity": "medium", "title": "Small dataset",
+                       "detail": f"{n} images is enough to smoke-test the pipeline but likely too few for good accuracy."})
+
+    if ann.get("type") == "none" and a.get("modality", {}).get("image"):
+        issues.append({"severity": "high", "title": "No labels detected",
+                       "detail": "Supervised training needs labels — add YOLO labels/ + data.yaml, COCO/VOC "
+                                 "annotations, or class subfolders (train/<class>/) for classification."})
+
+    if per and len(per) >= 2:
+        vals = list(per.values())
+        ratio = (max(vals) / min(vals)) if min(vals) else 0
+        if ratio >= 10:
+            issues.append({"severity": "high", "title": "Severe class imbalance",
+                           "detail": f"Largest class has {ratio:.0f}× the samples of the smallest — the model will "
+                                     f"be biased. Collect more of the rare classes or rebalance."})
+        elif ratio >= 3:
+            issues.append({"severity": "medium", "title": "Class imbalance",
+                           "detail": f"Class sizes differ by {ratio:.0f}× — consider balancing."})
+        few = [k for k, v in per.items() if v < 10]
+        if few:
+            issues.append({"severity": "medium", "title": "Classes with too few samples",
+                           "detail": "Under 10 samples: " + ", ".join(sorted(few)[:8]) + "."})
+
+    sampled = im.get("sampled") or 0
+    dup = a.get("near_duplicates") or 0
+    if sampled and dup / sampled > 0.10:
+        issues.append({"severity": "medium", "title": "Many near-duplicate images",
+                       "detail": f"~{dup}/{sampled} sampled images look near-identical — duplicates inflate size "
+                                 f"without adding information and can leak between train/val."})
+
+    w = (im.get("width") or {}); h = (im.get("height") or {})
+    if w.get("median") and h.get("median") and min(w["median"], h["median"]) < 64:
+        issues.append({"severity": "medium", "title": "Tiny images",
+                       "detail": f"Median size ~{w['median']}×{h['median']}px — very small images limit achievable accuracy."})
+    if w.get("max") and w["max"] > 5000:
+        issues.append({"severity": "low", "title": "Very large images",
+                       "detail": f"Up to {w['max']}px wide — training will down-scale them (imgsz); fine but slower to load."})
+
+    splits = a.get("splits") or {}
+    if per and not any(k in splits for k in ("val", "valid", "test")):
+        issues.append({"severity": "medium", "title": "No validation split",
+                       "detail": "No val/ or test/ split found — without a held-out set you can't measure real accuracy."})
+
+    if ann.get("type") == "yolo":
+        lbl = ann.get("labeled_images") or 0
+        if n and lbl < n:
+            issues.append({"severity": "medium", "title": "Some images unlabeled",
+                           "detail": f"{n - lbl} of {n} images have no YOLO label file."})
+    return issues
+
+
+def _rules_readiness(a: dict, issues: list) -> dict:
+    ann = (a.get("annotations") or {})
+    typ = ann.get("type")
+    n = a.get("n_images") or 0
+    task = ("classification" if typ == "classification"
+            else "detection" if typ in ("yolo", "coco", "voc") else None)
+    blocking = [i for i in issues if i["severity"] == "high"]
+    ready = bool(task) and n >= 20 and not blocking
+    if not task:
+        reason = "No usable labels/classes yet — add annotations or class subfolders before training."
+    elif blocking:
+        reason = "Fix the high-severity issues first: " + "; ".join(i["title"] for i in blocking) + "."
+    else:
+        reason = f"Has {n} images and {task} labels; good enough to start a training run."
+    return {"ready": ready, "reason": reason, "suggested_task": task or "labeling"}
+
+
+def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
+    cache = _DATASET_ANALYSIS_DIR / f"{slug}.ai.json"
+    if not refresh and cache.is_file():
+        try:
+            return json.load(open(cache))
+        except Exception:
+            pass
+    a = _analyze_dataset(slug)
+    if not a.get("ok"):
+        return {"ok": False, "slug": slug, "error": a.get("error", "analysis unavailable")}
+    issues = _detect_dataset_issues(a)
+    readiness = _rules_readiness(a, issues)
+    # compact facts for the model
+    ann = a.get("annotations") or {}
+    facts = {
+        "n_images": a.get("n_images"), "modality": a.get("modality"),
+        "splits": a.get("splits"), "annotation_type": ann.get("type"),
+        "classes": (ann.get("classes") or [])[:20], "per_class": ann.get("per_class") or {},
+        "labeled_images": ann.get("labeled_images"),
+        "image_size": {k: (a.get("images") or {}).get(k) for k in ("width", "height")},
+        "near_duplicates": a.get("near_duplicates"),
+        "detected_issues": issues,
+    }
+    result = {"ok": True, "slug": slug, "source": "rules", "issues": issues,
+              "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    try:
+        cfg = _read_model_config()
+        model = (os.environ.get("PLANNER_MODEL")
+                 or (cfg.get("roles") or {}).get("planner") or "ollama:qwen2.5:3b")
+        sys_p = ("You are a data-quality assistant for a research dataset platform. Given dataset FACTS "
+                 "(already-computed stats + rule-detected issues), write a concise, practical review for a "
+                 "student. Respond with STRICT JSON only, no prose, shape: "
+                 '{"summary": "2-3 sentence plain-English overview", '
+                 '"issues": [{"severity":"high|medium|low","title":str,"detail":str}], '
+                 '"recommendations": ["actionable next step", ...], '
+                 '"training_readiness": {"ready": bool, "reason": str, "suggested_task": str}}. '
+                 "Keep the given detected_issues and add any you infer. Be honest and specific.")
+        from . import llm_providers as _llm
+        r = _llm.chat(model, "Dataset FACTS:\n" + json.dumps(facts)[:3500],
+                      system=sys_p, max_tokens=700, timeout=60)
+        if r.get("ok") and (r.get("text") or "").strip():
+            m = re.search(r"\{.*\}", r["text"], re.S)
+            if m:
+                obj = json.loads(m.group(0))
+                if isinstance(obj, dict) and obj.get("summary"):
+                    result.update({
+                        "source": "ai", "model": model,
+                        "summary": str(obj.get("summary"))[:800],
+                        "issues": obj.get("issues") if isinstance(obj.get("issues"), list) else issues,
+                        "recommendations": [str(x)[:300] for x in (obj.get("recommendations") or [])][:8],
+                        "training_readiness": obj.get("training_readiness") or readiness,
+                    })
+        if result["source"] != "ai":
+            result["llm_error"] = r.get("error") or "model reply not usable"
+    except Exception as e:
+        result["llm_error"] = f"{type(e).__name__}: {str(e)[:160]}"
+    if result["source"] != "ai":
+        result["summary"] = ("Rules-only review (no AI model reachable). "
+                             f"{a.get('n_images')} images, "
+                             f"{ann.get('type')} labels, {len(issues)} issue(s) flagged.")
+        result.setdefault("recommendations",
+                          [i["detail"] for i in issues] or ["Dataset looks basically fine — try a training run."])
+    try:
+        _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+        json.dump(result, open(cache, "w"), indent=2)
+    except Exception:
+        pass
+    return result
+
+
+@app.get("/api/dataset/analyze/ai")
+def api_dataset_analyze_ai(request: Request, slug: str, refresh: int = 0):
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)
+    return JSONResponse(_analyze_dataset_ai(slug, refresh=bool(refresh)))
+
+
+# ===========================================================================
 # v3.0.128 (Z4) — user-controlled Roboflow push CAP. Prof Zhang: the agent may
 # push to Roboflow, but the USER sets the upper limit (max images per dataset
 # the agent uploads). Stored per-domain in a lab-local push_caps.json (durable,
@@ -5186,6 +5352,33 @@ function bars(obj,color){
   return '<div class="bar"><div class="lab">'+esc(k)+'</div><div class="track"><div class="fill" style="width:'+w+'%;background:'+(color||'#2563eb')+'"></div></div><div class="n">'+obj[k]+'</div></div>';}).join('');
 }
 function stat(s){return s?('min '+s.min+' · med '+s.median+' · mean '+s.mean+' · max '+s.max):'—';}
+var SEVCOL={high:'#dc2626',medium:'#d97706',low:'#64748b'};
+async function loadAI(refresh){
+ var out=document.getElementById('aiout'),btn=document.getElementById('aibtn'),hint=document.getElementById('aihint');
+ if(!out)return; if(btn)btn.disabled=true; if(hint)hint.style.display='none';
+ out.innerHTML='<span class="muted">\\u23f3 the AI is reviewing the dataset\\u2026 (first run loads the model, ~10-20s)</span>';
+ try{
+  var d=await (await fetch('/api/dataset/analyze/ai?slug='+encodeURIComponent(SLUG)+(refresh?'&refresh=1':''),{credentials:'include'})).json();
+  if(btn)btn.disabled=false;
+  if(!d.ok){out.innerHTML='<span class="warn">'+esc(d.error||d.detail||'AI review failed')+'</span>';return;}
+  var tr=d.training_readiness||{};
+  var badge=tr.ready?'<span style="background:#dcfce7;color:#166534;font-weight:700;font-size:12px;padding:3px 10px;border-radius:20px">\\u2705 Ready to train</span>'
+                    :'<span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:12px;padding:3px 10px;border-radius:20px">\\u26a0 Not ready yet</span>';
+  var srcTag=(d.source==='ai')?('<span class="muted"> \\u00b7 by '+esc(d.model||'AI')+'</span>')
+                              :'<span class="muted"> \\u00b7 rules-only (no AI model reachable)</span>';
+  var h='<div style="margin-bottom:10px">'+badge+srcTag+'</div>';
+  h+='<div style="font-size:13.5px;line-height:1.6;margin-bottom:10px">'+esc(d.summary||'')+'</div>';
+  h+='<div class="muted" style="margin-bottom:10px"><b>Training readiness:</b> '+esc(tr.reason||'')+(tr.suggested_task?(' <span style="color:#475569">(suggested task: '+esc(tr.suggested_task)+')</span>'):'')+'</div>';
+  var iss=d.issues||[];
+  if(iss.length){ h+='<div style="font-weight:600;font-size:13px;margin:6px 0 4px">Issues</div>';
+   h+=iss.map(function(i){var c=SEVCOL[i.severity]||'#64748b';
+     return '<div style="border-left:3px solid '+c+';padding:4px 0 4px 10px;margin:5px 0;font-size:12.5px"><b style="color:'+c+'">['+esc(i.severity||'')+']</b> '+esc(i.title||'')+' \\u2014 <span class="muted">'+esc(i.detail||'')+'</span></div>';}).join('');
+  } else { h+='<div class="muted">No significant issues detected.</div>'; }
+  var rec=d.recommendations||[];
+  if(rec.length){ h+='<div style="font-weight:600;font-size:13px;margin:10px 0 4px">Recommendations</div><ul style="margin:.2rem 0;padding-left:1.1rem;font-size:12.5px;color:#334155">'+rec.map(function(r){return '<li>'+esc(r)+'</li>';}).join('')+'</ul>'; }
+  out.innerHTML=h;
+ }catch(e){ if(btn)btn.disabled=false; out.innerHTML='<span class="warn">'+esc(e)+'</span>'; }
+}
 function modalityDetail(md){
  var keys=Object.keys(md||{});if(!keys.length)return '';
  var h='';
@@ -5217,6 +5410,11 @@ async function load(refresh){
   var kpis=[['n_images',d.n_images],['total files',d.total_files],['size (MB)',d.total_size_mb],
             ['annotation',a.type],['classes',(a.classes||[]).length],['near-dupes',d.near_duplicates]];
   var html='<div class="cards">'+kpis.map(function(k){return '<div class="kpi"><div class="v">'+esc(k[1])+'</div><div class="l">'+esc(k[0])+'</div></div>';}).join('')+'</div>';
+  // AI review card (on-demand — the smart summary + readiness verdict)
+  html+='<div class="card" style="border-color:#c7d2fe;background:#f5f8ff"><h3>&#129302; AI review &amp; training readiness</h3>'
+    +'<div class="muted" id="aihint">A local AI model reviews this dataset: plain-English summary, data issues, recommendations, and whether it&rsquo;s ready to train.</div>'
+    +'<button onclick="loadAI(1)" id="aibtn" style="margin-top:8px;border:0;cursor:pointer;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:8px">Analyze with AI</button>'
+    +'<div id="aiout" style="margin-top:12px"></div></div>';
   // modality + splits
   html+='<div class="card"><h3>Modality mix</h3>'+bars(d.modality,'#0e7c66')+'</div>';
   if(d.splits&&Object.keys(d.splits).length)html+='<div class="card"><h3>Train / val / test split (images)</h3>'+bars(d.splits,'#7c3aed')+'</div>';
