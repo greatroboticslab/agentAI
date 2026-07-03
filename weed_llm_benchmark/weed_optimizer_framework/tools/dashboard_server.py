@@ -2601,10 +2601,13 @@ def _extract_video_frames(files_dir: Path, img_dir: Path, max_frames: int = 8) -
 
 @app.post("/api/dataset/upload")
 async def api_dataset_upload(request: Request):
-    """Manual dataset upload. POST the .zip as the raw request body with
-    ?domain=<id>&name=<dataset name>. Images (+ optional YOLO labels / data.yaml)
-    are extracted to uploads/<slug>/ and the dataset is registered (status
-    downloaded, source manual_upload, attributed to the uploader)."""
+    """Manual dataset upload. POST an archive (.zip / .tar / .tar.gz / .tgz) OR a
+    single image as the raw request body with ?domain=<id>&name=<dataset name>.
+    Format is detected by magic bytes (not the extension). A single redundant
+    top-level wrapper directory is stripped so nested layouts (images/train/<class>/)
+    land correctly. Images (+ optional YOLO labels / data.yaml / COCO / VOC) are
+    extracted to uploads/<slug>/ and the dataset is registered (status downloaded,
+    source manual_upload, attributed to the uploader)."""
     import zipfile
     import shutil
     import tempfile
@@ -2644,18 +2647,90 @@ async def api_dataset_upload(request: Request):
         os.unlink(tmpf.name)
         raise HTTPException(400, "empty body — POST the .zip file as the request body")
     zip_path = tmpf.name
+    # v3.0.164: accept ZIP, TAR/TAR.GZ/TGZ, or a single raw image — detected by
+    # magic bytes (not just the .zip the frontend used to force).
+    import tarfile
+    with open(zip_path, "rb") as _mf:
+        magic = _mf.read(264)
+    zf = tf = None
+    single_name = None
+    kind = None
     try:
-        zf = zipfile.ZipFile(zip_path)
-    except zipfile.BadZipFile:
+        if magic[:4] in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"):
+            zf = zipfile.ZipFile(zip_path); kind = "zip"
+        elif magic[:2] == b"\x1f\x8b" or tarfile.is_tarfile(zip_path):
+            tf = tarfile.open(zip_path, "r:*"); kind = "tar"
+        elif (magic[:3] == b"\xff\xd8\xff" or magic[:8] == b"\x89PNG\r\n\x1a\n"
+              or magic[:2] == b"BM" or (magic[:4] == b"RIFF" and magic[8:12] == b"WEBP")):
+            kind = "image"
+            base_nm = re.sub(r"[^A-Za-z0-9_.-]", "_", Path(name).name) or "image"
+            _defext = {0xFF: ".jpg", 0x89: ".png", ord("B"): ".bmp", ord("R"): ".webp"}
+            single_name = base_nm if Path(base_nm).suffix.lower() in _UPLOAD_IMG_EXT \
+                else base_nm + _defext.get(magic[0] if magic else 0, ".jpg")
+    except Exception:
+        kind = None
+    if kind is None:
         os.unlink(zip_path)
-        raise HTTPException(400, "not a valid .zip file")
-    members = [m for m in zf.infolist() if not m.is_dir()]
-    if not members:
-        zf.close(); os.unlink(zip_path)
-        raise HTTPException(400, "zip is empty")
-    if len(members) > _MAX_UPLOAD_FILES:
-        zf.close(); os.unlink(zip_path)
-        raise HTTPException(413, f"too many files in zip (> {_MAX_UPLOAD_FILES})")
+        raise HTTPException(400, "unsupported upload — send a .zip / .tar / .tar.gz / .tgz "
+                                 "archive, or a single image (jpg/png/bmp/webp)")
+
+    # member NAMES (for wrapper-strip + count)
+    if kind == "zip":
+        names = [m.filename for m in zf.infolist() if not m.is_dir()]
+    elif kind == "tar":
+        names = [m.name for m in tf.getmembers() if m.isfile()]
+    else:
+        names = [single_name]
+
+    def _cleanup_archive():
+        for h in (zf, tf):
+            try:
+                h and h.close()
+            except Exception:
+                pass
+        try:
+            os.unlink(zip_path)
+        except Exception:
+            pass
+
+    if not names:
+        _cleanup_archive()
+        raise HTTPException(400, "archive is empty")
+    if len(names) > _MAX_UPLOAD_FILES:
+        _cleanup_archive()
+        raise HTTPException(413, f"too many files (> {_MAX_UPLOAD_FILES})")
+
+    # v3.0.164: strip a single redundant top-level wrapper dir so an archive that
+    # wraps everything in e.g. images/  (→ images/train/<class>/) is NOT nested one
+    # level too deep on extract (this was the "no training images found" bug).
+    _wrapper = ""
+    _fp = [Path(n).parts[0] for n in names if Path(n).parts and not n.startswith("/")]
+    if _fp and len(set(_fp)) == 1 and all(len(Path(n).parts) > 1 for n in names):
+        _wrapper = _fp[0]
+
+    def _rel_of(nm):
+        p = [x for x in Path(nm).parts if x not in ("..", "")]
+        if _wrapper and p and p[0] == _wrapper:
+            p = p[1:]
+        return "/".join(p)[:200]
+
+    def _members():
+        if kind == "zip":
+            for m in zf.infolist():
+                if m.is_dir():
+                    continue
+                with zf.open(m) as s:
+                    yield m.filename, s
+        elif kind == "tar":
+            for m in tf.getmembers():
+                if not m.isfile():
+                    continue
+                s = tf.extractfile(m)
+                if s is not None:
+                    yield m.name, s
+        else:
+            with open(zip_path, "rb") as s:
+                yield single_name, s
 
     actor = _actor_from_request(request)
     try:
@@ -2689,25 +2764,22 @@ async def api_dataset_upload(request: Request):
 
     n_img = n_lbl = n_file = n_skipped = 0
     data_yaml_bytes = None
-    for m in members:
-        nm = m.filename
-        parts = Path(nm).parts
-        if nm.startswith("/") or ".." in parts:    # path-traversal guard
+    for nm, src in _members():
+        if nm.startswith("/") or ".." in Path(nm).parts:    # path-traversal guard
             n_skipped += 1
             continue
         safe_name = Path(nm).name
         if not safe_name:
             continue
+        rel = _rel_of(nm) or safe_name          # wrapper-stripped relative path
         ext = Path(safe_name).suffix.lower()
         if ext in _UPLOAD_IMG_EXT and modality == "image":
             try:
-                # v3.0.142: preserve the zip's directory structure (train/<class>/
-                # img.jpg) — needed for classification ImageFolder + det/seg splits.
-                # The gallery still finds images (it rglobs local_path).
-                rel = "/".join(p for p in parts if p not in ("..", ""))[:200] or safe_name
+                # preserve structure (train/<class>/img.jpg) for classification +
+                # det/seg splits; the gallery rglobs local_path so it still finds them.
                 outp = img_dir / rel
                 outp.parent.mkdir(parents=True, exist_ok=True)
-                with zf.open(m) as src, open(outp, "wb") as out:
+                with open(outp, "wb") as out:
                     shutil.copyfileobj(src, out, length=1024 * 1024)
                 n_img += 1
             except Exception:
@@ -2715,24 +2787,23 @@ async def api_dataset_upload(request: Request):
         elif ext == ".txt" and "label" in nm.lower():
             label_dir.mkdir(exist_ok=True)
             try:
-                with zf.open(m) as src, open(label_dir / safe_name, "wb") as out:
+                with open(label_dir / safe_name, "wb") as out:
                     shutil.copyfileobj(src, out)
                 n_lbl += 1
             except Exception:
                 n_skipped += 1
         elif safe_name.lower() in ("data.yaml", "data.yml", "classes.txt"):
             try:
-                data_yaml_bytes = zf.read(m)
+                data_yaml_bytes = src.read()
             except Exception:
                 pass
         elif ext in accept_ext or ext in _UPLOAD_SIDECAR_EXT:
             # non-image modality payload (or sidecar): keep folder structure
             files_dir.mkdir(exist_ok=True)
             try:
-                rel = "/".join(p for p in parts if p not in ("..", ""))[:180] or safe_name
                 outp = files_dir / rel
                 outp.parent.mkdir(parents=True, exist_ok=True)
-                with zf.open(m) as src, open(outp, "wb") as out:
+                with open(outp, "wb") as out:
                     shutil.copyfileobj(src, out, length=1024 * 1024)
                 n_file += 1
             except Exception:
@@ -2740,19 +2811,12 @@ async def api_dataset_upload(request: Request):
         else:
             n_skipped += 1
 
-    try:
-        zf.close()
-    except Exception:
-        pass
-    try:
-        os.unlink(zip_path)   # temp upload zip no longer needed
-    except Exception:
-        pass
+    _cleanup_archive()
 
     if n_img == 0 and n_file == 0:
         shutil.rmtree(dest, ignore_errors=True)
         _hint = ", ".join(sorted(accept_ext))
-        raise HTTPException(400, f"no recognized {modality} files in zip "
+        raise HTTPException(400, f"no recognized {modality} files in the upload "
                                  f"(accepted: {_hint})")
 
     class_names = []
@@ -4015,11 +4079,11 @@ def agent_generic(domain_id: str):
      <span id="ag-msg" style="font-size:12px;color:#475569"></span>
    </div>
    <div style="margin-top:14px">{_hbtn}</div>
-   <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Upload a dataset (.zip)</div>
+   <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Upload a dataset</div>
    <div style="margin-top:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px">
-     <div style="font-size:13px;color:#475569;margin-bottom:10px">Drop a <b>.zip</b> of images (optionally with YOLO <code>labels/</code> + <code>data.yaml</code>). It registers as a dataset for this agent and appears under Datasets. Future: automatic upload + open community contributions.</div>
+     <div style="font-size:13px;color:#475569;margin-bottom:10px">Upload a <b>.zip / .tar / .tar.gz / .tgz</b> archive, or a single image. Images can include YOLO <code>labels/</code> + <code>data.yaml</code>, COCO/VOC annotations, or class subfolders (<code>train/&lt;class&gt;/</code>) for classification. It registers as a dataset and appears under Datasets below.</div>
      <input id="ds-name" type="text" placeholder="Dataset name (e.g. lab-run-2026-06)" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px">
-     <input id="ds-file" type="file" accept=".zip,application/zip" style="font-size:13px;margin-bottom:10px;display:block">
+     <input id="ds-file" type="file" accept=".zip,.tar,.gz,.tgz,.tar.gz,application/zip,application/x-tar,application/gzip,image/*" style="font-size:13px;margin-bottom:10px;display:block">
      <button id="ds-up" onclick="uploadDataset()" class="btn" style="margin-top:0;border:0;cursor:pointer">&#11014; Upload dataset</button>
      <span id="ds-toast" style="margin-left:12px;font-size:13px"></span>
    </div>

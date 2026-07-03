@@ -5012,3 +5012,19 @@ Extends the EDA to the other modalities (venv has cv2/numpy/wave/csv):
   (.txt/.npy/.csv/.json) are single-assigned and never double-count. Annotation sidecars (labels/,
   data.yaml) are excluded. Rendered as extra cards on /dataset/{slug}. Verified on a built multi-modal
   test set (2 video, 2 wav, 1 csv/500-rows, 2 point clouds, 4 text) — all read real metadata; smoke 62/62.
+
+### v3.0.163 — Trainer: auto-locate classification data root
+
+The student closed-loop test caught a real bug: uploaded zips carrying a wrapper folder (images/train/...)
+extract one level too deep, so Ultralytics classify at `<data>` couldn't find `train/` ("no training
+images found"). run_train_generic.sh now descends (`find -maxdepth 4 -type d -name train`) to the real
+classification root. Verified: student training then completed (accuracy_top1 written back).
+
+### v3.0.164 — Upload beyond ZIP (dataset pipeline loop, P1a)
+
+Uploads now accept **.zip / .tar / .tar.gz / .tgz** archives OR a **single raw image** — detected by
+MAGIC BYTES (not the extension), so the frontend no longer forces .zip. A single redundant top-level
+wrapper directory is stripped on extract, which ALSO fixes the double-nesting bug at the source (an
+archive of `images/train/<class>/` now lands as `uploads/<slug>/images/train/<class>/`, not
+`.../images/images/...`). Unified zip+tar member iterator; path-traversal guarded. Frontend accept +
+helper text updated. (Multi-file / folder upload is P1b, next.)
