@@ -1053,23 +1053,27 @@ def root():
   // v3.0.169: prefer self-hosted Whisper (record -> server transcribe, accurate);
   // fall back to the browser's live Web Speech.
   var _imr=null,_imrChunks=[],_imrOn=false;
+  var _imrSR=null,_imrBase='';
   async function toggleVoice(){
     var btn=document.getElementById('micBtn'), msg=document.getElementById('planMsg'), ta=document.getElementById('intent');
-    // v3.0.171: prefer LIVE Web Speech (shows words as you speak, like Claude);
-    // fall back to record->server-Whisper only where live recognition is unavailable.
-    if(_SR){ return toggleVoiceWS(); }
+    // v3.0.172: HYBRID — live browser preview while recording, then Whisper (accurate)
+    // replaces it on stop. Falls back to pure live Web Speech if no recorder.
     if(!_canRec){ return toggleVoiceWS(); }
     if(_imrOn&&_imr){ _imr.stop(); return; }
     try{
       var stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      _imr=new MediaRecorder(stream); _imrChunks=[];
+      _imr=new MediaRecorder(stream); _imrChunks=[]; _imrBase=ta.value?ta.value.trim()+' ':'';
       _imr.ondataavailable=function(e){if(e.data&&e.data.size)_imrChunks.push(e.data);};
-      _imr.onstart=function(){_imrOn=true;btn.innerHTML='\\u23f9 Stop';btn.style.background='#fee2e2';btn.style.color='#b91c1c';msg.textContent='\\ud83c\\udf99 recording\\u2026 click Stop when done';};
-      _imr.onstop=async function(){_imrOn=false;btn.innerHTML='\\ud83c\\udf99 Speak';btn.style.background='#eef2ff';btn.style.color='#2563eb';msg.textContent='\\u23f3 transcribing\\u2026';
-        try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
+      var live='';
+      if(_SR){ _imrSR=new _SR();_imrSR.lang='en-US';_imrSR.interimResults=true;_imrSR.continuous=true;
+        _imrSR.onresult=function(ev){var t='';for(var i=0;i<ev.results.length;i++)t+=ev.results[i][0].transcript;live=t;ta.value=_imrBase+t;};
+        try{_imrSR.start();}catch(e){} }
+      _imr.onstart=function(){_imrOn=true;btn.innerHTML='\\u23f9 Stop';btn.style.background='#fee2e2';btn.style.color='#b91c1c';msg.textContent='\\ud83c\\udf99 recording\\u2026 speak, then click Stop';};
+      _imr.onstop=async function(){_imrOn=false;btn.innerHTML='\\ud83c\\udf99 Speak';btn.style.background='#eef2ff';btn.style.color='#2563eb';msg.textContent='\\u23f3 transcribing with Whisper (accurate)\\u2026';
+        try{if(_imrSR)_imrSR.stop();}catch(e){} try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
         try{var d=await (await fetch('/api/voice/transcribe',{method:'POST',credentials:'include',headers:{'Content-Type':'application/octet-stream'},body:new Blob(_imrChunks,{type:'audio/webm'})})).json();
-          if(d&&d.ok&&d.text){ta.value=(ta.value?ta.value.trim()+' ':'')+d.text;msg.innerHTML='\\u2705 heard \\u2014 review, then Suggest a setup';}
-          else{msg.textContent='didn\\u2019t catch that \\u2014 try again';}}catch(e){msg.textContent='\\u274c '+e;}
+          if(d&&d.ok&&(d.text||'').trim()){ta.value=_imrBase+d.text.trim();msg.innerHTML='\\u2705 transcribed \\u2014 review, then Suggest a setup';}
+          else{msg.textContent=(live?'\\u2705 heard (preview)':'didn\\u2019t catch that \\u2014 try again');}}catch(e){msg.textContent='\\u274c '+e;}
       };
       _imr.start();
     }catch(e){ toggleVoiceWS(); }
@@ -4511,24 +4515,30 @@ function dsSetFiles(list){
  var _canVoice=(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)||_SR;
  if(_canVoice){var mb=document.getElementById('ds-goal-mic');if(mb)mb.style.display='inline-block';}
 })();
-// v3.0.171: prefer LIVE Web Speech (words appear as you speak, like Claude); fall
-// back to record->server-Whisper only where live recognition isn't available.
-var _mr=null,_mrChunks=[],_mrOn=false;
+// v3.0.172: HYBRID voice — live browser preview (words appear as you speak, like
+// Claude) DURING recording, then self-hosted Whisper transcribes the recording on
+// stop and REPLACES the preview with its accurate text. Best of both: instant
+// feedback + Whisper accuracy. Falls back to pure live Web Speech if no recorder.
+var _mr=null,_mrChunks=[],_mrOn=false,_mrSR=null,_mrBase='';
 async function goalVoice(){
- var ta=document.getElementById('ds-goal'),mb=document.getElementById('ds-goal-mic');
- var _SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(_SR)return goalVoiceWS();
+ var ta=document.getElementById('ds-goal'),mb=document.getElementById('ds-goal-mic'),tt=document.getElementById('ds-toast');
  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder))return goalVoiceWS();
  if(_mrOn&&_mr){_mr.stop();return;}
  try{
   var stream=await navigator.mediaDevices.getUserMedia({audio:true});
-  _mr=new MediaRecorder(stream);_mrChunks=[];
+  _mr=new MediaRecorder(stream);_mrChunks=[];_mrBase=ta.value?ta.value.trim()+' ':'';
   _mr.ondataavailable=function(e){if(e.data&&e.data.size)_mrChunks.push(e.data);};
-  _mr.onstart=function(){_mrOn=true;mb.style.background='#fee2e2';mb.textContent='\\u23f9';};
-  _mr.onstop=async function(){_mrOn=false;mb.style.background='#eef2ff';mb.innerHTML='\\u23f3';
-    try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition, live='';
+  if(SR){ _mrSR=new SR();_mrSR.lang='en-US';_mrSR.interimResults=true;_mrSR.continuous=true;
+    _mrSR.onresult=function(ev){var t='';for(var i=0;i<ev.results.length;i++)t+=ev.results[i][0].transcript;live=t;ta.value=_mrBase+t;};
+    try{_mrSR.start();}catch(e){} }
+  _mr.onstart=function(){_mrOn=true;mb.style.background='#fee2e2';mb.textContent='\\u23f9';if(tt)tt.textContent='\\ud83c\\udf99 recording\\u2026 speak, then click \\u23f9 to finish';};
+  _mr.onstop=async function(){_mrOn=false;mb.style.background='#eef2ff';mb.innerHTML='\\u23f3';if(tt)tt.textContent='\\u23f3 transcribing with Whisper (accurate)\\u2026';
+    try{if(_mrSR)_mrSR.stop();}catch(e){} try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
     try{var d=await (await fetch('/api/voice/transcribe',{method:'POST',credentials:'include',headers:{'Content-Type':'application/octet-stream'},body:new Blob(_mrChunks,{type:'audio/webm'})})).json();
-      if(d&&d.ok&&d.text)ta.value=(ta.value?ta.value.trim()+' ':'')+d.text;}catch(e){}
+      if(d&&d.ok&&(d.text||'').trim()){ta.value=_mrBase+d.text.trim();if(tt)tt.textContent='\\u2705 transcribed (Whisper)';}
+      else if(tt)tt.textContent=(live?'\\u2705 heard (live preview)':'didn\\u2019t catch that \\u2014 try again');}
+    catch(e){if(tt)tt.textContent='\\u274c '+e;}
     mb.innerHTML='\\ud83c\\udf99';};
   _mr.start();
  }catch(e){goalVoiceWS();}
