@@ -971,6 +971,7 @@ def root():
    kind (images, video, sensor, &hellip;), and add <b>agents</b> to collect, filter, label, or train
    &mdash; any number, any mix, or none. Pick a project to open it, or start a new one.</div>
  <div class="toolbar">
+   <a href="/guide" style="background:#1d4ed8;color:#fff">&#128075; New here? Guide</a>
    <a href="/users">&#128100; Users</a><a href="/models">&#129504; Models</a>
    <a href="/console">&#9881; Console</a><a href="/manual">&#128214; Docs</a>
    <span class="spacer"></span>
@@ -2617,6 +2618,7 @@ async def api_dataset_upload(request: Request):
     if not name:
         raise HTTPException(400, "missing dataset name (?name=)")
     base = re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_")[:60] or "dataset"
+    goal = (qp.get("goal") or "").strip()[:1000]   # v3.0.167: dataset purpose/goal
 
     import tarfile
     _h = hashlib.sha1()
@@ -2928,6 +2930,7 @@ async def api_dataset_upload(request: Request):
         "class_names": class_names,
         "harvest_round": _registry_current_round(),
         "display_name": name,
+        "goal": goal,
     }
     # durable record first (survives cluster→lab sync), then live registry+Mongo
     try:
@@ -2946,7 +2949,7 @@ async def api_dataset_upload(request: Request):
         "ok": True, "slug": slug, "domain": domain, "modality": modality,
         "format": fmt, "images": n_img, "files": n_file,
         "labels": n_lbl, "skipped": n_skipped, "class_names": class_names,
-        "uploaded_by": actor, "registered": wrote,
+        "uploaded_by": actor, "registered": wrote, "goal": goal,
         "gallery_url": f"/gallery/{slug}",
     })
 
@@ -3062,6 +3065,7 @@ def api_dataset_uploads(domain: str = ""):
             "uploaded_by": info.get("uploaded_by"),
             "uploaded_at": info.get("uploaded_at"),
             "domain": info.get("domain") or "weed",
+            "goal": info.get("goal") or "",
         })
     rows.sort(key=lambda r: (r.get("uploaded_at") or ""), reverse=True)
     return JSONResponse({"ok": True, "n": len(rows), "uploads": rows})
@@ -3584,9 +3588,15 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
         return {"ok": False, "slug": slug, "error": a.get("error", "analysis unavailable")}
     issues = _detect_dataset_issues(a)
     readiness = _rules_readiness(a, issues)
+    # v3.0.167: the dataset's stated goal/purpose → fitness-for-purpose judgment.
+    try:
+        goal = (_read_manual_uploads().get(slug, {}).get("goal") or "").strip()
+    except Exception:
+        goal = ""
     # compact facts for the model
     ann = a.get("annotations") or {}
     facts = {
+        "stated_goal": goal or None,
         "n_images": a.get("n_images"), "modality": a.get("modality"),
         "splits": a.get("splits"), "annotation_type": ann.get("type"),
         "classes": (ann.get("classes") or [])[:20], "per_class": ann.get("per_class") or {},
@@ -3595,19 +3605,21 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
         "near_duplicates": a.get("near_duplicates"),
         "detected_issues": issues,
     }
-    result = {"ok": True, "slug": slug, "source": "rules", "issues": issues,
+    result = {"ok": True, "slug": slug, "source": "rules", "issues": issues, "goal": goal,
               "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
     try:
         cfg = _read_model_config()
         model = (os.environ.get("PLANNER_MODEL")
                  or (cfg.get("roles") or {}).get("planner") or "ollama:qwen2.5:3b")
+        _fit = ('"fitness": {"matches_goal": bool, "note": "does this dataset fit its stated_goal? what is '
+                'missing to achieve that goal?"}, ' if goal else "")
         sys_p = ("You are a data-quality assistant for a research dataset platform. Given dataset FACTS "
-                 "(already-computed stats + rule-detected issues), write a concise, practical review for a "
-                 "student. Respond with STRICT JSON only, no prose, shape: "
-                 '{"summary": "2-3 sentence plain-English overview", '
+                 "(already-computed stats + rule-detected issues" + (" + a stated_goal" if goal else "") +
+                 "), write a concise, practical review for a student. Respond with STRICT JSON only, no "
+                 'prose, shape: {"summary": "2-3 sentence plain-English overview", '
+                 + _fit +
                  '"issues": [{"severity":"high|medium|low","title":str,"detail":str}], '
-                 '"recommendations": ["actionable next step", ...], '
-                 '"training_readiness": {"ready": bool, "reason": str, "suggested_task": str}}. '
+                 '"recommendations": ["actionable next step", ...]}. '
                  "Keep the given detected_issues and add any you infer. Be honest and specific.")
         from . import llm_providers as _llm
         r = _llm.chat(model, "Dataset FACTS:\n" + json.dumps(facts)[:3500],
@@ -3626,6 +3638,9 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
                         "issues": obj.get("issues") if isinstance(obj.get("issues"), list) and obj.get("issues") else issues,
                         "recommendations": [str(x)[:300] for x in (obj.get("recommendations") or [])][:8],
                     })
+                    if goal and isinstance(obj.get("fitness"), dict):
+                        result["fitness"] = {"matches_goal": bool(obj["fitness"].get("matches_goal")),
+                                             "note": str(obj["fitness"].get("note", ""))[:500]}
         if result["source"] != "ai":
             result["llm_error"] = r.get("error") or "model reply not usable"
     except Exception as e:
@@ -4305,6 +4320,10 @@ def agent_generic(domain_id: str):
    <div style="margin-top:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px">
      <div style="font-size:13px;color:#475569;margin-bottom:10px">Upload a <b>.zip / .tar / .tar.gz / .tgz</b> archive, a <b>folder</b>, <b>multiple files</b>, or a single image &mdash; no need to zip. Images can include YOLO <code>labels/</code> + <code>data.yaml</code>, COCO/VOC annotations, or class subfolders (<code>train/&lt;class&gt;/</code>) for classification. It registers as a dataset and appears under Datasets below.</div>
      <input id="ds-name" type="text" placeholder="Dataset name (e.g. lab-run-2026-06)" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px">
+     <div style="display:flex;gap:6px;margin-bottom:8px">
+       <textarea id="ds-goal" rows="2" placeholder="Goal / purpose (optional but recommended): what should this dataset be used for? e.g. 'detect 3 weed species in cotton fields for a laser weeder'" style="flex:1;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
+       <button type="button" id="ds-goal-mic" onclick="goalVoice()" title="Speak the goal (English)" style="display:none;border:1px solid #cbd5e1;background:#eef2ff;color:#2563eb;border-radius:8px;padding:0 10px;font-size:16px;cursor:pointer">&#127908;</button>
+     </div>
      <div id="ds-drop" style="border:2px dashed #cbd5e1;border-radius:10px;padding:16px;text-align:center;color:#64748b;font-size:13px;background:#fff;cursor:pointer;margin-bottom:8px">
        <b>Drag &amp; drop</b> files here, or pick:<br>
        <input id="ds-file" type="file" multiple accept=".zip,.tar,.gz,.tgz,.tar.gz,application/zip,application/x-tar,application/gzip,image/*" style="display:none">
@@ -4376,7 +4395,22 @@ function dsSetFiles(list){
  if(dz){['dragenter','dragover'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='#2563eb';dz.style.background='#eff6ff';});});
   ['dragleave','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.style.borderColor='#cbd5e1';dz.style.background='#fff';});});
   dz.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length)dsSetFiles(e.dataTransfer.files);});}
+ var _SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(_SR){var mb=document.getElementById('ds-goal-mic');if(mb)mb.style.display='inline-block';}
 })();
+var _goalRec=null,_goalOn=false;
+function goalVoice(){
+ var _SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!_SR)return;
+ var ta=document.getElementById('ds-goal'),mb=document.getElementById('ds-goal-mic');
+ if(_goalOn&&_goalRec){_goalRec.stop();return;}
+ _goalRec=new _SR();_goalRec.lang='en-US';_goalRec.interimResults=true;_goalRec.continuous=false;
+ var base=ta.value?ta.value.trim()+' ':'',fin='';
+ _goalRec.onstart=function(){_goalOn=true;mb.style.background='#fee2e2';mb.textContent='\\u23f9';};
+ _goalRec.onresult=function(ev){var it='';for(var i=ev.resultIndex;i<ev.results.length;i++){var r=ev.results[i];if(r.isFinal)fin+=r[0].transcript;else it+=r[0].transcript;}ta.value=base+fin+it;};
+ _goalRec.onend=function(){_goalOn=false;mb.style.background='#eef2ff';mb.innerHTML='\\ud83c\\udf99';};
+ _goalRec.onerror=function(e){_goalOn=false;mb.style.background='#eef2ff';mb.innerHTML='\\ud83c\\udf99';};
+ try{_goalRec.start();}catch(e){}
+}
 async function uploadDataset(){
  var nameEl=document.getElementById('ds-name'),t=document.getElementById('ds-toast'),btn=document.getElementById('ds-up');
  var name=(nameEl.value||'').trim();
@@ -4385,7 +4419,8 @@ async function uploadDataset(){
  var totalMB=(DS_FILES.reduce(function(a,f){return a+f.size;},0)/1048576).toFixed(1);
  btn.disabled=true;t.textContent='\\u23f3 uploading '+DS_FILES.length+' file(s), '+totalMB+' MB\\u2026';
  try{
-  var url='/api/dataset/upload?domain=__DOM__&name='+encodeURIComponent(name);
+  var goal=(document.getElementById('ds-goal')||{}).value||'';
+  var url='/api/dataset/upload?domain=__DOM__&name='+encodeURIComponent(name)+(goal.trim()?('&goal='+encodeURIComponent(goal.trim())):'');
   var r;
   if(DS_FILES.length===1){
     // single archive or image → raw body (server detects by magic bytes)
@@ -4406,7 +4441,7 @@ async function loadUploads(){
  try{
   var d=await (await fetch('/api/dataset/uploads?domain=__DOM__',{credentials:'include'})).json();
   var rows=(d&&d.uploads)||[];
-  if(!rows.length){w.innerHTML='<div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px;font-size:13px;color:#475569">&#128228; <b>No datasets yet.</b> Get started: drop a .zip in the upload box above, or add a Collector agent to gather data automatically.</div>';return;}
+  if(!rows.length){w.innerHTML='<div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px;font-size:13px;color:#475569">&#128228; <b>No datasets yet.</b> Drag &amp; drop files (or a folder) in the box above, or add a Collector agent to gather data automatically. New here? <a href="/guide">Read the 2-min guide &rarr;</a></div>';return;}
   var h='<div style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:6px">Your uploads ('+rows.length+')</div>';
   h+='<div style="border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">';
   rows.forEach(function(u,i){
@@ -5393,6 +5428,67 @@ def api_slug_count(slug: str):
     return {"slug": slug, "total_unique": len(seen)}
 
 
+@app.get("/guide", response_class=HTMLResponse)
+def guide_page():
+    """v3.0.167 — friendly onboarding guide for new students (English)."""
+    return HTMLResponse('''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Getting started</title><style>
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:#1a1a1d;line-height:1.6}
+ .top{background:#0b1220;padding:10px 16px}.top a{display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px}
+ .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.6rem 2rem}.hero h1{margin:0 0 .3rem}.hero .sub{opacity:.88;font-size:14px}
+ .wrap{padding:1.2rem 2rem;max-width:900px;margin:0 auto}
+ .card{background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:18px 20px;margin-bottom:16px}
+ .card h2{margin:0 0 8px;font-size:17px}.card h3{margin:14px 0 4px;font-size:14px;color:#0f172a}
+ .step{display:flex;gap:12px;margin:10px 0}.step .n{flex:none;width:26px;height:26px;border-radius:50%;background:#2563eb;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px}
+ code{background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:12.5px}
+ .pill{display:inline-block;background:#eef2ff;color:#1d4ed8;font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px;margin:2px}
+ .cta{display:inline-block;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;font-size:14px;padding:10px 18px;border-radius:9px;margin-top:6px}
+ ul{margin:.3rem 0;padding-left:1.2rem}
+</style></head><body>
+<div class="top"><a href="/">&larr; Projects</a></div>
+<div class="hero"><h1>&#128075; Getting started</h1><div class="sub">A 2-minute guide to collecting, analyzing, and training on datasets here.</div></div>
+<div class="wrap">
+ <div class="card"><h2>The big picture</h2>
+   <div class="step"><div class="n">1</div><div><b>Create a project</b> for any research field (any data type). It&rsquo;s your workspace.</div></div>
+   <div class="step"><div class="n">2</div><div><b>Add datasets</b> &mdash; upload your own, or add a Collector agent to gather data automatically.</div></div>
+   <div class="step"><div class="n">3</div><div><b>Analyze</b> each dataset &mdash; get an instant EDA + an AI review that tells you what&rsquo;s wrong and whether it&rsquo;s ready to train.</div></div>
+   <div class="step"><div class="n">4</div><div><b>Train</b> a model on your data (needs cluster access &mdash; an admin grants it, then jobs queue on the GPU).</div></div>
+ </div>
+ <div class="card"><h2>Uploading a dataset</h2>
+   <p>No need to zip anything &mdash; you can <b>drag &amp; drop</b> files, <b>Choose files</b> (many at once), or <b>Choose folder</b>. You can also upload an archive or a single image.</p>
+   <h3>Accepted formats</h3>
+   <div><span class="pill">.zip</span><span class="pill">.tar / .tar.gz / .tgz</span><span class="pill">a folder</span><span class="pill">multiple images</span><span class="pill">single image</span></div>
+   <h3>Layouts we understand</h3>
+   <ul>
+     <li><b>Classification</b>: put images in class subfolders &mdash; <code>train/&lt;class&gt;/*.jpg</code> and <code>val/&lt;class&gt;/*.jpg</code>.</li>
+     <li><b>Detection (YOLO)</b>: images + a <code>labels/</code> folder of <code>.txt</code> files + a <code>data.yaml</code> with class names.</li>
+     <li><b>Detection (COCO / Pascal VOC)</b>: include the <code>.json</code> / <code>.xml</code> annotations &mdash; we read the class names automatically.</li>
+     <li><b>Just images</b> (no labels yet): totally fine &mdash; upload them and add labels later.</li>
+   </ul>
+   <h3>Tip: describe the goal</h3>
+   <p>When you upload, add a one-line <b>goal</b> (you can type or speak it), e.g. <i>&ldquo;detect 3 weed species in cotton fields for a laser weeder&rdquo;</i>. The AI review then checks whether the dataset actually <b>fits that goal</b> and what&rsquo;s missing.</p>
+ </div>
+ <div class="card"><h2>What the analysis gives you</h2>
+   <ul>
+     <li><b>Overview</b>: image count, modality mix, train/val split, size on disk.</li>
+     <li><b>Class distribution</b> + image dimension / aspect / file-size histograms + near-duplicate detection.</li>
+     <li><b>&#129302; AI review</b>: a plain-English summary, a list of issues (class imbalance, missing labels, tiny images, no validation split&hellip;), recommendations, a <b>fitness-for-goal</b> check, and a <b>ready / not-ready to train</b> verdict.</li>
+   </ul>
+ </div>
+ <div class="card"><h2>Agents you can add</h2>
+   <ul>
+     <li><b>Collector</b> &mdash; autonomously finds &amp; pulls datasets.</li>
+     <li><b>Filter / QC</b> &mdash; quality-scores &amp; prunes data.</li>
+     <li><b>Labeler</b> &mdash; assisted / human-in-the-loop annotation.</li>
+     <li><b>Trainer</b> &mdash; trains a model on your dataset.</li>
+     <li><b>Evaluator</b> &mdash; benchmarks &amp; reports metrics.</li>
+   </ul>
+   <p style="color:#64748b;font-size:13px">A project can have any mix of agents &mdash; or none, if you just want a dataset workspace.</p>
+ </div>
+ <a class="cta" href="/">Create your first project &rarr;</a>
+</div></body></html>''')
+
+
 @app.get("/dataset/{slug}", response_class=HTMLResponse)
 def dataset_analysis_page(slug: str):
     """v3.0.161 — deep visual analysis of one dataset (EDA). Charts are
@@ -5452,6 +5548,9 @@ async function loadAI(refresh){
                               :'<span class="muted"> \\u00b7 rules-only (no AI model reachable)</span>';
   var h='<div style="margin-bottom:10px">'+badge+srcTag+'</div>';
   h+='<div style="font-size:13.5px;line-height:1.6;margin-bottom:10px">'+esc(d.summary||'')+'</div>';
+  if(d.goal){ h+='<div class="muted" style="margin-bottom:8px"><b>Stated goal:</b> '+esc(d.goal)+'</div>'; }
+  if(d.fitness){ var fc=d.fitness.matches_goal?'#166534':'#b45309';
+   h+='<div style="margin-bottom:10px;font-size:13px"><b style="color:'+fc+'">Fitness for goal: '+(d.fitness.matches_goal?'\\u2705 matches':'\\u26a0 gaps')+'</b> <span class="muted">'+esc(d.fitness.note||'')+'</span></div>'; }
   h+='<div class="muted" style="margin-bottom:10px"><b>Training readiness:</b> '+esc(tr.reason||'')+(tr.suggested_task?(' <span style="color:#475569">(suggested task: '+esc(tr.suggested_task)+')</span>'):'')+'</div>';
   var iss=d.issues||[];
   if(iss.length){ h+='<div style="font-weight:600;font-size:13px;margin:6px 0 4px">Issues</div>';

@@ -5048,3 +5048,15 @@ same image/label/data.yaml/sidecar logic + wrapper-strip + traversal guard as ar
 archive/single-image path still works (frontend sends 1 file raw, many files as multipart). Frontend
 upload box rebuilt: **drag & drop**, "Choose files" (multiple), and "Choose folder", with a live selection
 summary; success links straight to Analyze + gallery. Installed python-multipart on the lab venv. English.
+
+### v3.0.167 — Dataset goal capture + fitness-for-purpose + onboarding guide (P3)
+
+- **Goal capture**: the upload widget gets an optional "Goal / purpose" field (with a 🎙 voice button,
+  Web Speech). /api/dataset/upload persists `?goal=` into the manual_uploads record + registry; it's
+  returned by /api/dataset/uploads.
+- **Fitness-for-purpose**: /api/dataset/analyze/ai now feeds the stated goal to the local model and adds a
+  `fitness` field (matches_goal + note: does the data fit the goal, what's missing) — shown on the AI card
+  alongside the goal.
+- **Onboarding**: new `/guide` page — a friendly 2-minute English walkthrough (big picture, accepted
+  upload formats + layouts, describing the goal, what analysis gives you, what each agent does). Linked
+  from the launcher toolbar ("👋 New here? Guide") and the project empty-state.
