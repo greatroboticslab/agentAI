@@ -5072,3 +5072,15 @@ Smarter, more accurate voice than the browser's live recognition — fully self-
 - Frontend: the dataset **goal mic** now records via MediaRecorder and transcribes on the server (more
   accurate), with the browser Web Speech API kept as the instant fallback where MediaRecorder isn't
   available. English by default (Whisper is multilingual if needed).
+
+### v3.0.169 — E2E test + AI issue-merge fix + intent-mic voice (dataset pipeline loop, P6)
+
+- New `tests/e2e_dataset.sh` — a committed END-TO-END test of the full student journey (create project →
+  upload via zip / tar.gz / single image / multiple files / folder + goal → verify structure/splits/classes
+  → EDA → AI review incl. readiness + fitness → voice transcribe → member-train-403 → admin grant → real
+  training submit → cleanup) + edge cases (unlabeled → not-ready + no-labels issue, imbalanced → imbalance
+  issue, non-image sensor analysis, bad/empty upload 400). **24/24.**
+- Fix it surfaced: the AI review now MERGES the grounded rule-detected issues with the model's (dedup by
+  title) instead of letting the model replace them — so "No labels", imbalance, etc. can never be dropped.
+- The launcher intent-box mic now also records → self-hosted Whisper (Web Speech fallback).
+- README refreshed for the dataset pipeline; new `docs/DATASET_PIPELINE_STATUS.md` (honest what-works audit).

@@ -16,12 +16,23 @@ A web platform (FastAPI dashboard + MongoDB) where a researcher creates a **Proj
 - **Bridges-2 cluster (on-demand GPU only)** — harvest + training + large-model inference,
   submitted as batch jobs from the lab; the cluster is never always-on.
 
-**What works today (verified, smoke 58/58):**
+**What works today (verified — `tests/smoke_test.sh` 74/74 + `tests/e2e_dataset.sh` 24/24):**
 - **Auth & RBAC** — Google login (no user cap once the OAuth app is published), our own
   API keys (`X-API-Key`), Basic fallback; admin vs member; cluster GPU actions gated.
 - **Projects & agents** — create a project, freely add/remove agents (collector / filter /
-  labeler / trainer / evaluator / custom), upload datasets (zip, multi-modal), cascade delete.
-- **Intent → plan → one-click build** — describe a project in words (or **voice**, Web Speech);
+  labeler / trainer / evaluator / custom), cascade delete.
+- **Dataset upload — no zipping required** — drag & drop, "Choose files" (many), or "Choose folder";
+  accepts `.zip` / `.tar` / `.tar.gz` / `.tgz`, a folder, multiple files, or a single image (magic-byte
+  detected; folder layouts preserved). Understands classification subfolders, YOLO + `data.yaml`,
+  COCO/VOC. Capture an optional **goal** (typed or spoken).
+- **Dataset analysis** — instant EDA (counts, modality mix, splits, class distribution, dimension/
+  aspect/filesize histograms, near-duplicate detection, sample grid; non-image modalities too) + a
+  **🤖 AI review** (grounded issues + recommendations + **training-readiness** verdict + **fitness-for-goal**
+  check) via a self-hosted local model, degrading to a rules-only report if no LLM. See `/dataset/<slug>`.
+- **Self-hosted voice** — `/api/voice/transcribe` (Whisper on the lab GPU) for the goal/intent boxes,
+  browser Web Speech as fallback.
+- **Onboarding** — a friendly `/guide` page for new students.
+- **Intent → plan → one-click build** — describe a project in words (or **voice**);
   the planner proposes a project + agents to build in one click. Uses the lab's local model;
   degrades to a labelled keyword heuristic if no LLM is reachable.
 - **Model catalog & deploy** — dropdowns list only models actually deployed on our cluster
