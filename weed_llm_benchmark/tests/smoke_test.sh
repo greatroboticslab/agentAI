@@ -45,6 +45,10 @@ AN=$(curl -s $BA --max-time 90 "$BASE/api/dataset/analyze?slug=$SLUG")
 ck "analyze ok" True "$(echo "$AN" | python3 -c "import json,sys;print(json.load(sys.stdin)['ok'])" 2>/dev/null)"
 ck "analyze has class distribution" yes "$(echo "$AN" | python3 -c "import json,sys;a=json.load(sys.stdin)['annotations'];print('yes' if a['classes'] else 'no')" 2>/dev/null)"
 ck "analyze has image dim stats" yes "$(echo "$AN" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['images'].get('ok') else 'no')" 2>/dev/null)"
+AI=$(curl -s $BA --max-time 90 "$BASE/api/dataset/analyze/ai?slug=$SLUG")
+ck "ai review ok" True "$(echo "$AI" | python3 -c "import json,sys;print(json.load(sys.stdin)['ok'])" 2>/dev/null)"
+ckin "ai review source" "ai,rules" "$(echo "$AI" | python3 -c "import json,sys;print(json.load(sys.stdin)['source'])" 2>/dev/null)"
+ck "ai review has readiness verdict" yes "$(echo "$AI" | python3 -c "import json,sys;print('yes' if 'suggested_task' in json.load(sys.stdin).get('training_readiness',{}) else 'no')" 2>/dev/null)"
 
 echo "== AUTH =="
 ck   "basic creds -> 200"        200       "$(HC $BA "$BASE/agent/weed")"
