@@ -72,6 +72,12 @@ ck "tar.gz upload -> slug" yes "$([ -n "$TSLUG" ] && echo yes || echo no)"
 ISLUG=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/octet-stream' --data-binary @"$TMP/images/a.png" "$BASE/api/dataset/upload?domain=mobile_robot&name=smokeimg" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
 ck "single image upload -> slug" yes "$([ -n "$ISLUG" ] && echo yes || echo no)"
 ck "bad upload (text) -> 400" 400 "$(printf 'not an archive or image' | HC $BA -X POST -H 'Content-Type: application/octet-stream' --data-binary @- "$BASE/api/dataset/upload?domain=mobile_robot&name=smokebad")"
+# v3.0.166: multipart multi-file + folder-relative-path upload
+cp "$TMP/images/a.png" "$TMP/b.png"
+MSLUG=$(curl -s $BA --max-time 60 -F "files=@$TMP/images/a.png;filename=d/train/x/a.png" -F "files=@$TMP/b.png;filename=d/val/x/b.png" "$BASE/api/dataset/upload?domain=mobile_robot&name=smokemp" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+ck "multipart folder upload -> slug" yes "$([ -n "$MSLUG" ] && echo yes || echo no)"
+ck "multipart preserved split" yes "$([ -n "$MSLUG" ] && curl -s $BA --max-time 30 "$BASE/api/dataset/analyze?slug=$MSLUG&refresh=1" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin).get('splits',{}).get('train') else 'no')" 2>/dev/null || echo no)"
+[ -n "$MSLUG" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$MSLUG\"}" "$BASE/api/dataset/delete" >/dev/null
 [ -n "$TSLUG" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$TSLUG\"}" "$BASE/api/dataset/delete" >/dev/null
 [ -n "$ISLUG" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$ISLUG\"}" "$BASE/api/dataset/delete" >/dev/null
 rm -rf "$TMP"
