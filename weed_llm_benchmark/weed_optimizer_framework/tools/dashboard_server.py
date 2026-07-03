@@ -3563,12 +3563,14 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
             if m:
                 obj = json.loads(m.group(0))
                 if isinstance(obj, dict) and obj.get("summary"):
+                    # Keep training_readiness from RULES (deterministic + reliable);
+                    # the small model is unreliable on that structured field. Use the
+                    # model only for the human-facing summary / issues / recommendations.
                     result.update({
                         "source": "ai", "model": model,
                         "summary": str(obj.get("summary"))[:800],
-                        "issues": obj.get("issues") if isinstance(obj.get("issues"), list) else issues,
+                        "issues": obj.get("issues") if isinstance(obj.get("issues"), list) and obj.get("issues") else issues,
                         "recommendations": [str(x)[:300] for x in (obj.get("recommendations") or [])][:8],
-                        "training_readiness": obj.get("training_readiness") or readiness,
                     })
         if result["source"] != "ai":
             result["llm_error"] = r.get("error") or "model reply not usable"
