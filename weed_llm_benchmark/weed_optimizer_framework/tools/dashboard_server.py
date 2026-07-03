@@ -1047,9 +1047,31 @@ def root():
   // V3: voice input via the browser Web Speech API (English, on-device). Feature-
   // detected — the mic button only appears where the browser supports it.
   var _SR=window.SpeechRecognition||window.webkitSpeechRecognition, _rec=null, _listening=false;
-  (function(){ if(_SR){var b=document.getElementById('micBtn'); if(b)b.style.display='inline-block';} })();
+  var _canRec=(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+  (function(){ if(_SR||_canRec){var b=document.getElementById('micBtn'); if(b)b.style.display='inline-block';} })();
   function _say(t){ try{ if(window.speechSynthesis){var u=new SpeechSynthesisUtterance(t);u.lang='en-US';window.speechSynthesis.speak(u);} }catch(e){} }
-  function toggleVoice(){
+  // v3.0.169: prefer self-hosted Whisper (record -> server transcribe, accurate);
+  // fall back to the browser's live Web Speech.
+  var _imr=null,_imrChunks=[],_imrOn=false;
+  async function toggleVoice(){
+    var btn=document.getElementById('micBtn'), msg=document.getElementById('planMsg'), ta=document.getElementById('intent');
+    if(!_canRec){ return toggleVoiceWS(); }
+    if(_imrOn&&_imr){ _imr.stop(); return; }
+    try{
+      var stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      _imr=new MediaRecorder(stream); _imrChunks=[];
+      _imr.ondataavailable=function(e){if(e.data&&e.data.size)_imrChunks.push(e.data);};
+      _imr.onstart=function(){_imrOn=true;btn.innerHTML='\\u23f9 Stop';btn.style.background='#fee2e2';btn.style.color='#b91c1c';msg.textContent='\\ud83c\\udf99 recording\\u2026 click Stop when done';};
+      _imr.onstop=async function(){_imrOn=false;btn.innerHTML='\\ud83c\\udf99 Speak';btn.style.background='#eef2ff';btn.style.color='#2563eb';msg.textContent='\\u23f3 transcribing\\u2026';
+        try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
+        try{var d=await (await fetch('/api/voice/transcribe',{method:'POST',credentials:'include',headers:{'Content-Type':'application/octet-stream'},body:new Blob(_imrChunks,{type:'audio/webm'})})).json();
+          if(d&&d.ok&&d.text){ta.value=(ta.value?ta.value.trim()+' ':'')+d.text;msg.innerHTML='\\u2705 heard \\u2014 review, then Suggest a setup';}
+          else{msg.textContent='didn\\u2019t catch that \\u2014 try again';}}catch(e){msg.textContent='\\u274c '+e;}
+      };
+      _imr.start();
+    }catch(e){ toggleVoiceWS(); }
+  }
+  function toggleVoiceWS(){
     if(!_SR){return;}
     var btn=document.getElementById('micBtn'), msg=document.getElementById('planMsg'), ta=document.getElementById('intent');
     if(_listening&&_rec){ _rec.stop(); return; }
@@ -3632,10 +3654,20 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
                     # Keep training_readiness from RULES (deterministic + reliable);
                     # the small model is unreliable on that structured field. Use the
                     # model only for the human-facing summary / issues / recommendations.
+                    # MERGE: rule-detected issues are grounded + must never be lost;
+                    # append any NEW issues the model inferred (dedup by title).
+                    merged = list(issues)
+                    seen = {str(i.get("title", "")).lower() for i in issues}
+                    for mi in (obj.get("issues") or []):
+                        if isinstance(mi, dict) and mi.get("title") and str(mi["title"]).lower() not in seen:
+                            merged.append({"severity": mi.get("severity", "low"),
+                                           "title": str(mi["title"])[:120],
+                                           "detail": str(mi.get("detail", ""))[:300]})
+                            seen.add(str(mi["title"]).lower())
                     result.update({
                         "source": "ai", "model": model,
                         "summary": str(obj.get("summary"))[:800],
-                        "issues": obj.get("issues") if isinstance(obj.get("issues"), list) and obj.get("issues") else issues,
+                        "issues": merged[:10],
                         "recommendations": [str(x)[:300] for x in (obj.get("recommendations") or [])][:8],
                     })
                     if goal and isinstance(obj.get("fitness"), dict):
