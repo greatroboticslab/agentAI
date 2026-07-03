@@ -2997,6 +2997,170 @@ def _dhash64(pil_img) -> int:
     return bits
 
 
+def _analyze_nonimage(root) -> dict:
+    """v3.0.162 — best-effort per-modality analysis for NON-image data (video /
+    audio / sensor / pointcloud / text). Bounded samples; every branch degrades
+    to a plain count on error. Excludes annotation sidecars (labels/, data.yaml)."""
+    out = {}
+    SIDECAR_NAMES = {"data.yaml", "data.yml", "classes.txt", "notes.json"}
+    # Analysis-specific DISJOINT extension map (each ext → exactly one modality) so
+    # shared extensions never double-count. Distinct from _MODALITY_EXT (which is
+    # about upload acceptance and deliberately overlaps).
+    BUCKET_EXT = (
+        ("video", {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}),
+        ("audio", {".wav", ".flac", ".mp3", ".ogg", ".m4a"}),
+        ("pointcloud", {".pcd", ".ply", ".las", ".laz", ".npy", ".npz"}),
+        ("sensor", {".csv", ".tsv", ".parquet", ".bag", ".mcap", ".gpx", ".nmea", ".log"}),
+        ("text", {".txt", ".md", ".json", ".jsonl"}),
+    )
+    _ext2mod = {e: m for m, exts in BUCKET_EXT for e in exts}
+    buckets = {m: [] for m, _ in BUCKET_EXT}
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        parts = {x.lower() for x in p.parts}
+        if "labels" in parts or p.name.lower() in SIDECAR_NAMES:
+            continue                            # skip annotation sidecars
+        m = _ext2mod.get(p.suffix.lower())
+        if m:
+            buckets[m].append(p)
+
+    # ---- VIDEO (cv2) ----
+    vids = buckets["video"]
+    if vids:
+        info = {"n": len(vids), "per": [], "total_duration_s": 0.0, "sampled": 0}
+        try:
+            import cv2
+            for p in vids[:6]:
+                try:
+                    cap = cv2.VideoCapture(str(p))
+                    fps = cap.get(cv2.CAP_PROP_FPS) or 0
+                    frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+                    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+                    hh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+                    cap.release()
+                    dur = round(frames / fps, 1) if fps else 0
+                    info["per"].append({"file": p.name, "dur_s": dur, "fps": round(fps, 1),
+                                        "frames": int(frames), "w": w, "h": hh})
+                    info["total_duration_s"] += dur
+                except Exception:
+                    continue
+            info["sampled"] = len(info["per"])
+            info["total_duration_s"] = round(info["total_duration_s"], 1)
+        except Exception:
+            info["note"] = "cv2 unavailable"
+        out["video"] = info
+
+    # ---- AUDIO (.wav via stdlib; others counted) ----
+    auds = buckets["audio"]
+    if auds:
+        info = {"n": len(auds), "sampled": 0, "wav_dur_s": 0.0}
+        import wave as _wave
+        got = 0
+        for p in auds[:8]:
+            if p.suffix.lower() != ".wav":
+                continue
+            try:
+                with _wave.open(str(p)) as wf:
+                    fr = wf.getframerate()
+                    info["wav_dur_s"] += round(wf.getnframes() / fr, 1) if fr else 0
+                    info["rate"] = fr
+                    info["channels"] = wf.getnchannels()
+                    got += 1
+            except Exception:
+                pass
+        info["sampled"] = got
+        info["wav_dur_s"] = round(info["wav_dur_s"], 1)
+        if got == 0:
+            info["note"] = "duration needs a codec lib (only .wav is read natively)"
+        out["audio"] = info
+
+    # ---- SENSOR (csv/tsv columns + numeric stats; json/jsonl counted) ----
+    sens = buckets["sensor"]
+    if sens:
+        info = {"n": len(sens), "tables": []}
+        import csv as _csv
+        tabular = [x for x in sens if x.suffix.lower() in (".csv", ".tsv")]
+        for p in tabular[:3]:
+            try:
+                delim = "\t" if p.suffix.lower() == ".tsv" else ","
+                with open(p, newline="", encoding="utf-8", errors="replace") as f:
+                    rd = _csv.reader(f, delimiter=delim)
+                    header = next(rd, [])
+                    nrow = 0
+                    numcols = {}
+                    for row in rd:
+                        nrow += 1
+                        if nrow <= 5000:
+                            for i, val in enumerate(row):
+                                try:
+                                    numcols.setdefault(i, []).append(float(val))
+                                except (ValueError, TypeError):
+                                    pass
+                        if nrow >= 500000:
+                            break
+                    stats = {}
+                    for i, vals in numcols.items():
+                        if vals and i < len(header):
+                            s = sorted(vals)
+                            stats[header[i] or f"col{i}"] = {
+                                "min": round(s[0], 3), "max": round(s[-1], 3),
+                                "mean": round(sum(s) / len(s), 3)}
+                    info["tables"].append({"file": p.name, "rows": nrow,
+                                           "cols": header[:24], "numeric": stats})
+            except Exception:
+                continue
+        out["sensor"] = info
+
+    # ---- POINTCLOUD (npy shape / ply,pcd header point count) ----
+    pcs = buckets["pointcloud"]
+    if pcs:
+        info = {"n": len(pcs), "files": []}
+        for p in pcs[:6]:
+            pts = None
+            try:
+                e = p.suffix.lower()
+                if e == ".npy":
+                    import numpy as _np
+                    pts = int(_np.load(str(p), mmap_mode="r").shape[0])
+                elif e in (".ply", ".pcd"):
+                    with open(p, "rb") as f:
+                        for _ in range(80):
+                            line = f.readline().decode("latin-1", "replace").strip().lower()
+                            if not line:
+                                break
+                            if e == ".ply" and line.startswith("element vertex"):
+                                pts = int(line.split()[-1]); break
+                            if e == ".pcd" and line.startswith("points"):
+                                pts = int(line.split()[-1]); break
+                            if line in ("end_header",):
+                                break
+            except Exception:
+                pass
+            info["files"].append({"file": p.name, "points": pts})
+        out["pointcloud"] = info
+
+    # ---- TEXT (doc count + avg length) ----
+    txts = buckets["text"]
+    if txts:
+        info = {"n": len(txts), "sampled": 0, "total_kb": 0.0, "avg_chars": 0}
+        chars = got = 0
+        for p in txts[:60]:
+            try:
+                info["total_kb"] += p.stat().st_size / 1024
+                if got < 25:
+                    chars += len(open(p, encoding="utf-8", errors="replace").read(200000))
+                    got += 1
+            except Exception:
+                pass
+        info["sampled"] = got
+        info["total_kb"] = round(info["total_kb"], 1)
+        info["avg_chars"] = int(chars / got) if got else 0
+        out["text"] = info
+
+    return out
+
+
 def _analyze_dataset(slug: str, refresh: bool = False) -> dict:
     from collections import Counter
     cache = _DATASET_ANALYSIS_DIR / f"{slug}.json"
@@ -3183,6 +3347,7 @@ def _analyze_dataset(slug: str, refresh: bool = False) -> dict:
         "images": dims,
         "near_duplicates": dup_pairs,
         "sample_grid": samples_for_grid,
+        "modality_detail": _analyze_nonimage(root),
         "computed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     try:
@@ -4957,6 +5122,27 @@ function bars(obj,color){
   return '<div class="bar"><div class="lab">'+esc(k)+'</div><div class="track"><div class="fill" style="width:'+w+'%;background:'+(color||'#2563eb')+'"></div></div><div class="n">'+obj[k]+'</div></div>';}).join('');
 }
 function stat(s){return s?('min '+s.min+' · med '+s.median+' · mean '+s.mean+' · max '+s.max):'—';}
+function modalityDetail(md){
+ var keys=Object.keys(md||{});if(!keys.length)return '';
+ var h='';
+ if(md.video){var v=md.video;var rows=(v.per||[]).map(function(x){return '<tr><td>'+esc(x.file)+'</td><td>'+x.dur_s+'s</td><td>'+x.fps+'fps</td><td>'+x.frames+'f</td><td>'+x.w+'×'+x.h+'</td></tr>';}).join('');
+  h+='<div class="card"><h3>&#127909; Video ('+v.n+' files, sampled '+(v.sampled||0)+')</h3><div class="muted">total sampled duration: '+(v.total_duration_s||0)+'s</div>'
+    +(rows?'<table class="mini" style="margin-top:6px"><tr><td><b>file</b></td><td><b>dur</b></td><td><b>fps</b></td><td><b>frames</b></td><td><b>res</b></td></tr>'+rows+'</table>':'')+'</div>';}
+ if(md.audio){var a=md.audio;
+  h+='<div class="card"><h3>&#127925; Audio ('+a.n+' files)</h3><div class="muted">'
+    +(a.sampled?('.wav sampled '+a.sampled+' · total '+a.wav_dur_s+'s · '+(a.rate||'?')+'Hz · '+(a.channels||'?')+'ch'):esc(a.note||''))+'</div></div>';}
+ if(md.sensor){var s=md.sensor;var t=(s.tables||[]).map(function(tb){
+    var nums=Object.keys(tb.numeric||{}).map(function(c){var st=tb.numeric[c];return '<tr><td>'+esc(c)+'</td><td>'+st.min+'</td><td>'+st.mean+'</td><td>'+st.max+'</td></tr>';}).join('');
+    return '<div style="margin-top:8px"><b>'+esc(tb.file)+'</b> <span class="muted">· '+tb.rows+' rows · '+ (tb.cols||[]).length +' cols</span>'
+      +'<div class="muted" style="font-size:11px">cols: '+(tb.cols||[]).map(esc).join(', ')+'</div>'
+      +(nums?'<table class="mini" style="margin-top:4px"><tr><td><b>numeric col</b></td><td><b>min</b></td><td><b>mean</b></td><td><b>max</b></td></tr>'+nums+'</table>':'')+'</div>';}).join('');
+  h+='<div class="card"><h3>&#128225; Sensor / tabular ('+s.n+' files)</h3>'+(t||'<div class="muted">non-tabular sensor files (counted only)</div>')+'</div>';}
+ if(md.pointcloud){var pc=md.pointcloud;var rows=(pc.files||[]).map(function(x){return '<tr><td>'+esc(x.file)+'</td><td>'+(x.points!=null?x.points+' pts':'—')+'</td></tr>';}).join('');
+  h+='<div class="card"><h3>&#127756; Point cloud ('+pc.n+' files)</h3><table class="mini">'+rows+'</table></div>';}
+ if(md.text){var tx=md.text;
+  h+='<div class="card"><h3>&#128196; Text ('+tx.n+' docs)</h3><div class="muted">total '+tx.total_kb+' KB · avg '+tx.avg_chars+' chars/doc (sampled '+tx.sampled+')</div></div>';}
+ return h;
+}
 async function load(refresh){
  var b=document.getElementById('body');b.innerHTML='<div class="muted">analyzing&hellip;</div>';
  try{
@@ -4990,6 +5176,8 @@ async function load(refresh){
      +'<div style="margin-top:10px"><b style="font-size:12px">Resolution (max side)</b>'+bars(im.resolution_hist,'#0891b2')+'</div>'
      +'<div style="margin-top:8px"><b style="font-size:12px">Aspect ratio</b>'+bars(im.aspect_hist,'#ca8a04')+'</div></div>';
   }
+  // non-image modality details (video / audio / sensor / pointcloud / text)
+  html+=modalityDetail(d.modality_detail||{});
   // sample grid
   if((d.sample_grid||[]).length){
    html+='<div class="card"><h3>Samples</h3><div class="grid">'+d.sample_grid.map(function(s){
