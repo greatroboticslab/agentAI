@@ -4998,3 +4998,17 @@ Answers "上传数据集的可视化分析". For ANY uploaded/registry dataset:
   dataset in a project's uploads list (and links back to the image gallery).
 - Honest scope: non-image modalities are counted but not yet visualized (only images get dim stats +
   grid); annotations show "none" cleanly when a dataset is unlabeled.
+
+### v3.0.162 — Dataset analysis: non-image modality visualization
+
+Extends the EDA to the other modalities (venv has cv2/numpy/wave/csv):
+- **Video** (cv2): per-file duration / fps / frame count / resolution + total sampled duration.
+- **Audio**: .wav duration / sample-rate / channels via stdlib `wave`; other codecs counted (noted — no
+  codec lib).
+- **Sensor / tabular** (CSV/TSV): row count, column names, and per-numeric-column min/mean/max.
+- **Point cloud**: point counts (.npy shape, .ply/.pcd header parse).
+- **Text**: document count, total size, avg chars/doc.
+- Files are bucketed with a DISJOINT extension→modality map (analysis-specific), so shared extensions
+  (.txt/.npy/.csv/.json) are single-assigned and never double-count. Annotation sidecars (labels/,
+  data.yaml) are excluded. Rendered as extra cards on /dataset/{slug}. Verified on a built multi-modal
+  test set (2 video, 2 wav, 1 csv/500-rows, 2 point clouds, 4 text) — all read real metadata; smoke 62/62.
