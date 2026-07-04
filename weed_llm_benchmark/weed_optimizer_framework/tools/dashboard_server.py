@@ -4617,6 +4617,24 @@ def agent_generic(domain_id: str):
      </div>
      <div style="margin-top:12px"><a href="https://app.roboflow.com/a-test-of-will" target="_blank" style="text-decoration:none;background:#eef2ff;color:#2563eb;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Adjust labels in Roboflow &#8599;</a></div>
    </div>
+   <div id="proj-config" style="display:none">
+     <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Project config <span style="text-transform:none;letter-spacing:0;color:#cbd5e1">&middot; owner/admin only</span></div>
+     <div style="margin-top:10px;background:#f8fafc;border:1px solid #e3e7ef;border-radius:10px;padding:14px">
+       <div style="font-size:13px;color:#475569;margin-bottom:12px">These settings drive this project&rsquo;s agents &mdash; quality thresholds, the Roboflow project it labels into, and the harvest vocabulary. A new research field is set up by filling this in, not by changing code.</div>
+       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+         <label style="font-size:12px;color:#334">Filter similarity threshold<br><span style="color:#94a3b8;font-size:11px">DINOv2 flag cutoff, 0&ndash;1</span><br><input id="cfg-dino" type="number" min="0" max="1" step="0.01" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
+         <label style="font-size:12px;color:#334">Min images / class<br><span style="color:#94a3b8;font-size:11px">warn below this</span><br><input id="cfg-minpc" type="number" min="1" max="10000" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
+         <label style="font-size:12px;color:#334">Small-dataset warn<br><span style="color:#94a3b8;font-size:11px">total images</span><br><input id="cfg-small" type="number" min="1" max="1000000" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
+         <label style="font-size:12px;color:#334">Roboflow project<br><span style="color:#94a3b8;font-size:11px">blank = &lt;project&gt;-dataset</span><br><input id="cfg-rf" type="text" placeholder="auto" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
+       </div>
+       <label style="display:block;margin-top:12px;font-size:12px;color:#334">Harvest queries <span style="color:#94a3b8">(one per line &mdash; what the collector searches for)</span>
+         <textarea id="cfg-queries" rows="3" placeholder="coral reef bleaching detection dataset&#10;staghorn coral annotated images" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea></label>
+       <label style="display:block;margin-top:12px;font-size:12px;color:#334">Accept vocabulary <span style="color:#94a3b8">(comma-separated topic words a dataset must match; blank = auto-derive from queries)</span>
+         <input id="cfg-accept" type="text" placeholder="coral, reef, polyp" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
+       <div style="margin-top:12px"><button id="cfg-save" onclick="saveDomainConfig()" style="border:0;cursor:pointer;background:#0e7c66;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Save config</button>
+       <span id="cfg-msg" style="font-size:13px;color:#475569;margin-left:10px"></span></div>
+     </div>
+   </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Train a model</div>
    <div style="margin-top:10px;background:#f8fafc;border:1px solid #e3e7ef;border-radius:10px;padding:14px">
      <div style="font-size:13px;color:#475569;margin-bottom:10px">Train this agent&rsquo;s <b>{_task}</b> task on one of its uploaded datasets. Runs on the cluster GPU on-demand (queued); the result mAP/accuracy is written back here.</div>
@@ -4784,8 +4802,35 @@ loadModelCatalog();
     mng.style.display='block';
     var aa=document.getElementById('agent-add');if(aa)aa.style.display='flex';
     Array.prototype.forEach.call(document.querySelectorAll('.agdel'),function(b){b.style.display='inline-block';});
+    var pc=document.getElementById('proj-config');if(pc){pc.style.display='block';loadDomainConfig();}
   }
 }catch(e){}})();
+async function loadDomainConfig(){
+ try{
+  var d=await (await fetch('/api/domain/config?domain=__DOM__',{credentials:'include'})).json();
+  if(!d||!d.ok||!d.config)return;
+  var c=d.config,t=c.thresholds||{};
+  var set=function(id,v){var el=document.getElementById(id);if(el&&v!==undefined&&v!==null)el.value=v;};
+  set('cfg-dino',t.dino_threshold);set('cfg-minpc',t.min_per_class);set('cfg-small',t.small_dataset);
+  set('cfg-rf',c.roboflow_project||'');
+  var q=document.getElementById('cfg-queries');if(q)q.value=(c.harvest_queries||[]).join('\\n');
+  var a=document.getElementById('cfg-accept');if(a)a.value=(c.accept_vocab||[]).join(', ');
+ }catch(e){}
+}
+async function saveDomainConfig(){
+ var m=document.getElementById('cfg-msg'),b=document.getElementById('cfg-save');
+ var num=function(id){var v=(document.getElementById(id)||{}).value;return v===''||v===undefined?null:parseFloat(v);};
+ var th={};var dn=num('cfg-dino');if(dn!==null)th.dino_threshold=dn;
+ var mp=num('cfg-minpc');if(mp!==null)th.min_per_class=Math.round(mp);
+ var sm=num('cfg-small');if(sm!==null)th.small_dataset=Math.round(sm);
+ var qraw=((document.getElementById('cfg-queries')||{}).value||'').split('\\n').map(function(s){return s.trim();}).filter(Boolean);
+ var araw=((document.getElementById('cfg-accept')||{}).value||'').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean);
+ var cfg={thresholds:th,roboflow_project:((document.getElementById('cfg-rf')||{}).value||'').trim(),harvest_queries:qraw,accept_vocab:araw};
+ m.textContent='\\u23f3 saving\\u2026';b.disabled=true;
+ try{var d=await (await fetch('/api/domain/config',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',config:cfg})})).json();
+  m.textContent=(d&&d.ok)?'\\u2705 saved':'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
+ catch(e){m.textContent='\\u274c '+e;}finally{b.disabled=false;}
+}
 async function addAgent(){
  var t=document.getElementById('ag-type').value,nm=document.getElementById('ag-name').value.trim(),m=document.getElementById('ag-msg');
  var mdl=(document.getElementById('ag-model')||{}).value||'auto';

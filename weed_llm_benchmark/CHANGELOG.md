@@ -5199,3 +5199,14 @@ Fed the three per-domain agents from the config layer instead of ad-hoc/hardcode
 New `tests/test_domain_config.py` (16 pure-logic asserts: DEFAULT_DOMAIN_CONFIG shape, `_deep_merge`,
 accept_vocab-wins vs derive) — verified without burning cluster/Roboflow/Mongo. weed unchanged (weed skips
 all three branches). smoke stays 80.
+
+### v3.0.181 — Phase 1 part 3: Project config editor UI (owner/admin) + Phase 1 complete
+
+Added a "Project config" card to every project page (`/agent/{id}`), shown only to the project owner/admin
+(revealed by the same /api/me check that reveals the manage controls). It loads GET /api/domain/config and
+lets the owner edit, in plain English: the filter similarity threshold, min-images/class, small-dataset warn,
+the Roboflow project to label into, the harvest queries (one per line), and the accept vocabulary
+(comma-separated) — then POSTs to /api/domain/config. Non-owners never see it (403 on the write path anyway).
+Mobile-friendly (auto-fit grid). This closes the loop opened in v3.0.179/.180: a new research field is now
+set up by filling this form, and the collector/filter/labeler/analysis read those values — no code change.
+⇒ Phase 1 (de-weed domain-config layer) COMPLETE. smoke 81 (added: project page ships the config editor).

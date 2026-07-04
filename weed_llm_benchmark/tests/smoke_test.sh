@@ -39,6 +39,7 @@ for api in /api/me /api/users /api/annotation_status /api/rounds_state "/api/dom
   ck "GET $api" 200 "$(HC $BA "$BASE$api")"
 done
 ck "domain config has thresholds" yes "$(curl -s $BA --max-time 15 "$BASE/api/domain/config?domain=weed" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['config']['thresholds'].get('dino_threshold') else 'no')" 2>/dev/null)"
+ck "project page ships config editor" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'saveDomainConfig' && echo yes || echo no)"
 
 echo "== DATASET ANALYSIS (EDA) =="
 ck "GET /dataset/$SLUG" 200 "$(HC $BA "$BASE/dataset/$SLUG")"
