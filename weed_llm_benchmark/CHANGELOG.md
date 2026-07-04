@@ -5351,3 +5351,14 @@ are returned by the upload response + `/api/dataset/uploads`, and the uploads li
 `v2` badge on re-uploads. Pure lab-local (no cluster/SU). smoke +3 (default license, re-upload license
 captured, version bump). Next Phase 5: per-domain agent-run/job observability + SU surfacing, then careful
 monolith modularization.
+
+### v3.0.192 — Phase 5 part 2: per-domain observability (activity log + on-demand job status)
+
+Reuses what already exists instead of rebuilding. New `GET /api/domain/activity?domain=` reads the recent
+agent runs straight from the action log (results/framework/cluster_actions.jsonl) — no cluster SSH — returning
+each run's time, action, mapped pipeline step (collect/filter/label/train/eval), submitted-ok, and job id. New
+`GET /api/job/status?jobid=` resolves ONE job's real sacct State + Elapsed (SU proxy) + AllocTRES, ON-DEMAND
+only (user clicks a job id), so there's no polling SSH churn. Project page gains a "Recent activity" section
+(under the round timeline) listing runs with a ✓/✗ + step icon; each job id is a link that resolves its live
+cluster status inline. smoke +3 (activity ok, job-status bad-id 400, activity view ships — all validation-only,
+no live-cluster assertions).

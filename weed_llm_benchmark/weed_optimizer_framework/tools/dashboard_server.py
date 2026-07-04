@@ -4355,6 +4355,70 @@ def api_domain_rounds(domain: str = "weed"):
                          "steps_order": _dbr.ROUND_STEPS})
 
 
+@app.get("/api/domain/activity")
+def api_domain_activity(domain: str = "weed", limit: int = 30):
+    """v3.0.192 (P5 observability): recent agent runs for a project, read straight
+    from the action log (results/framework/cluster_actions.jsonl) — no cluster SSH.
+    Each entry: when, action, which pipeline step, submitted-ok, job id, message."""
+    dom = _norm_domain(domain)
+    limit = max(1, min(int(limit), 100))
+    out = []
+    try:
+        if _ACTIONS_LOG.is_file():
+            lines = _ACTIONS_LOG.read_text(errors="replace").splitlines()[-2000:]
+            for ln in reversed(lines):
+                if not ln.strip():
+                    continue
+                try:
+                    ev = _json.loads(ln)
+                except Exception:
+                    continue
+                r = ev.get("result") or {}
+                edom = _norm_domain(r.get("domain") or (r.get("params") or {}).get("domain") or "weed")
+                if edom != dom:
+                    continue
+                msg = str(r.get("msg") or r.get("stdout") or r.get("stderr") or "")
+                mm = re.search(r"Submitted batch job (\d+)", msg)
+                out.append({
+                    "ts": ev.get("ts_h"), "action": ev.get("action"),
+                    "step": _ROUND_STEP_FOR_ACTION.get(ev.get("action")),
+                    "ok": bool(r.get("ok")),
+                    "job_id": r.get("job_id") or (mm.group(1) if mm else None),
+                    "msg": msg[:200],
+                })
+                if len(out) >= limit:
+                    break
+    except Exception as e:
+        return JSONResponse({"ok": False, "domain": dom, "error": str(e), "activity": []})
+    return JSONResponse({"ok": True, "domain": dom, "activity": out})
+
+
+@app.get("/api/job/status")
+def api_job_status(request: Request, jobid: str):
+    """v3.0.192 (P5 observability): resolve ONE cluster job's real status + elapsed
+    (SU proxy) via sacct — ON-DEMAND only (user clicks), so no polling SSH churn."""
+    _ = _actor_from_request(request)
+    if not re.match(r"^\d+$", jobid):
+        raise HTTPException(400, "jobid must be numeric")
+    state = _sacct_state(jobid) or "UNKNOWN"
+    elapsed = ""
+    alloc = ""
+    try:
+        r = _slurm(["sacct", "-j", jobid, "--format=Elapsed,AllocTRES%60",
+                    "--noheader", "-P"], timeout=12)
+        if r.get("ok"):
+            for ln in (r.get("stdout") or "").splitlines():
+                parts = ln.strip().split("|")
+                if parts and parts[0].strip():
+                    elapsed = parts[0].strip()
+                    alloc = parts[1].strip() if len(parts) > 1 else ""
+                    break
+    except Exception:
+        pass
+    return JSONResponse({"ok": True, "jobid": jobid, "state": state,
+                         "elapsed": elapsed, "alloc": alloc})
+
+
 @app.post("/api/domain/round/start")
 def api_domain_round_start(request: Request, payload: dict = Body(default={})):
     """Open the next round for a project (owner/admin)."""
@@ -5009,6 +5073,11 @@ def agent_generic(domain_id: str):
    </div>
    <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">Each round is one pass of the loop &mdash; collect &rarr; filter &rarr; label &rarr; train &rarr; evaluate &mdash; and its steps are recorded here with who ran them and when. Evaluation metrics feed back to inform the next round&rsquo;s collection.</div>
    <div id="rounds-tl" style="margin-top:10px;font-size:13px;color:#64748b">loading rounds&hellip;</div>
+   <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
+     <span style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Recent activity</span>
+     <button onclick="loadActivity()" style="border:1px solid #cbd5e1;background:#fff;color:#334;font-size:11px;padding:3px 9px;border-radius:6px;cursor:pointer">&#8635; refresh</button>
+   </div>
+   <div id="activity" style="margin-top:8px;font-size:12.5px;color:#64748b">&mdash;</div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Upload a dataset</div>
    <div style="margin-top:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px">
      <div style="font-size:13px;color:#475569;margin-bottom:10px">Upload a <b>.zip / .tar / .tar.gz / .tgz</b> archive, a <b>folder</b>, <b>multiple files</b>, or a single image &mdash; no need to zip. Images can include YOLO <code>labels/</code> + <code>data.yaml</code>, COCO/VOC annotations, or class subfolders (<code>train/&lt;class&gt;/</code>) for classification. It registers as a dataset and appears under Datasets below.</div>
@@ -5259,6 +5328,32 @@ async function loadRounds(){
  }catch(e){el.innerHTML='<span style="color:#dc2626">could not load rounds</span>';}
 }
 loadRounds();
+// v3.0.192 (P5 observability): per-project recent activity from the action log
+// (no cluster SSH); each job id can resolve its real sacct status on demand.
+var _STEP_TAG={collect:'\\ud83d\\udd0d',filter:'\\ud83e\\uddf9',label:'\\ud83c\\udff7\\ufe0f',train:'\\ud83d\\ude80',eval:'\\ud83d\\udcca'};
+async function loadActivity(){
+ var el=document.getElementById('activity');if(!el)return;el.textContent='\\u23f3';
+ try{
+  var d=await (await fetch('/api/domain/activity?domain=__DOM__&limit=25',{credentials:'include'})).json();
+  var a=(d&&d.activity)||[];
+  if(!a.length){el.innerHTML='<span style="color:#94a3b8">No agent runs recorded yet.</span>';return;}
+  el.innerHTML=a.map(function(r){
+    var icon=r.step?(_STEP_TAG[r.step]||''):'';
+    var stat=r.ok?'<span style="color:#16a34a">\\u2713</span>':'<span style="color:#dc2626">\\u2717</span>';
+    var jb=r.job_id?(' <a href="#" onclick="jobStatus(\\''+r.job_id+'\\',this);return false;" style="color:#2563eb;text-decoration:none">job '+r.job_id+' &#8635;</a><span class="jst"></span>'):'';
+    return '<div style="padding:5px 0;border-top:1px solid #f1f5f9;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline">'
+      +'<span style="color:#94a3b8;font-size:11px;min-width:135px">'+(r.ts||'')+'</span>'
+      +stat+' '+icon+' <b style="font-size:12px">'+(r.action||'')+'</b>'+(r.step?(' <span style="color:#94a3b8">('+r.step+')</span>'):'')+jb+'</div>';
+  }).join('');
+ }catch(e){el.innerHTML='<span style="color:#dc2626">could not load activity</span>';}
+}
+async function jobStatus(jobid,link){
+ var span=link.parentNode.querySelector('.jst');if(span)span.textContent=' \\u23f3';
+ try{var d=await (await fetch('/api/job/status?jobid='+encodeURIComponent(jobid),{credentials:'include'})).json();
+  if(span)span.textContent=' \\u2014 '+(d.state||'?')+(d.elapsed?(' \\u00b7 '+d.elapsed):'')+(d.alloc?(' \\u00b7 '+d.alloc):'');}
+ catch(e){if(span)span.textContent=' \\u2014 status unavailable';}
+}
+loadActivity();
 async function startRound(){
  var m=document.getElementById('round-msg');if(m)m.textContent='\\u23f3';
  try{var d=await (await fetch('/api/domain/round/start',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
