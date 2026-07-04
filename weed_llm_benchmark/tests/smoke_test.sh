@@ -49,6 +49,8 @@ ck "video project created" yes "$([ -n "$VID" ] && echo yes || echo no)"
 ck "train on video -> 501" 501 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\",\"slug\":\"dummy\"}" "$BASE/api/train/submit")"
 ck "eval on video -> 501" 501 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\",\"slug\":\"dummy\"}" "$BASE/api/eval/submit")"
 ck "video page shows not-yet note" yes "$(curl -s $BA --max-time 20 "$BASE/agent/$VID" | grep -q 'modality is' && echo yes || echo no)"
+ck "filter on video -> 501" 501 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\"}" "$BASE/api/cluster_action/dinov2_curate_registry")"
+ck "labeler on video -> 501" 501 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\"}" "$BASE/api/cluster_action/sync_all_to_roboflow")"
 [ -n "$VID" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\"}" "$BASE/api/agent/delete" >/dev/null
 
 echo "== DATASET ANALYSIS (EDA) =="

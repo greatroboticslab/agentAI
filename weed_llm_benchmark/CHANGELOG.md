@@ -5251,3 +5251,12 @@ mirrors this: for a non-image project the Train/Evaluate panel is replaced by an
 yet for <modality>" note (no dead button). `_TRAINABLE_MODALITIES = {"image"}` is the single place to widen
 as real trainers land. Upload + analysis were already modality-aware (v3.0.137), so non-vision data still
 flows through collection/EDA. smoke +4 (video project → train 501, eval 501, page shows the note).
+
+### v3.0.185 — Phase 3 part 2: modality gate on filter + labeler actions
+
+Extended the honest gate to the two other vision-only agent actions: `dinov2_curate_registry` (DINOv2 image
+embeddings) and `sync_all_to_roboflow` (Roboflow image annotation) now return a clear 501 for a non-image
+project ("DINOv2 filtering / Roboflow labeling works on image data only — this project's modality is 'video'
+… collection and upload still work") instead of firing a cluster job that can't work. Collector/harvest is
+left modality-general (it can discover datasets of any kind). The project-page Run buttons surface the 501's
+detail message via runAgent, so the failure is explained, not silent. smoke +2 (filter/labeler on video → 501).

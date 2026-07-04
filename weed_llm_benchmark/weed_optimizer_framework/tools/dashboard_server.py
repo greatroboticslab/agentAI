@@ -8633,6 +8633,25 @@ def api_cluster_action(action: str, request: Request, payload: dict = Body(defau
     # the event loop. Body injected instead of `await request.body()`.
     body = payload if isinstance(payload, dict) else {}
 
+    # v3.0.185 (P3): honest modality gate for vision-only agent actions. The FILTER
+    # (DINOv2 image embeddings) and LABELER (Roboflow image annotation) only make
+    # sense for image projects; refuse them clearly for other modalities rather than
+    # firing a cluster job that can't work. Collector/harvest is modality-general.
+    if action in ("dinov2_curate_registry", "sync_all_to_roboflow"):
+        _gdom = re.sub(r"[^a-z0-9_]+", "", str(body.get("domain") or "").strip().lower())[:40]
+        if _gdom and _gdom != "weed":
+            try:
+                from . import db as _dbg
+                _gm = _domain_modality(_dbg.get_domain(_gdom) or {})
+            except Exception:
+                _gm = "image"
+            if _gm not in _TRAINABLE_MODALITIES:
+                _label = "DINOv2 filtering" if action == "dinov2_curate_registry" else "Roboflow labeling"
+                raise HTTPException(501,
+                    f"{_label} works on image data only — this project's modality is "
+                    f"'{_gm}', so this agent isn't wired for it yet. Collection and upload "
+                    f"still work for {_gm} data.")
+
     if spec["type"] == "refresh":
         # delegate to /api/refresh_registry logic
         _registry_index_cache.clear()   # v3.0.109: per-domain cache
