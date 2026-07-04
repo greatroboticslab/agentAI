@@ -5158,3 +5158,14 @@ then did the SLOW part (rsync-stage the dataset lab→cluster + sbatch, ~40-150s
 button. Now they return a `submit_id` immediately and run the stage+sbatch in a background thread
 (asyncio.to_thread) via a small in-process job registry; the UI polls GET /api/submit/status?id= (new) and
 shows the real job when it lands. Frontend submitTrain/submitEval poll via pollSubmit(). e2e updated to poll.
+
+### v3.0.178 — Phase 0.3: all remaining handlers non-blocking (site stays responsive)
+
+Audited every `async def` endpoint that did blocking work inline (would stall the single-worker event loop):
+api_test_model (_llm.chat), api_llm_infer / api_models_deploy / api_cluster_action (_slurm/SSH),
+api_slug_verdict_post (subprocess). Converted them to sync `def` (+ `payload: dict = Body()` instead of
+`await request.json()/body()`) so FastAPI thread-pools them → the blocking cluster SSH / model call no
+longer freezes the site for other users. Kept workers=1 on purpose: the in-process submit registry
+(_BG_JOBS), the lazily-loaded Whisper model, and the auth-lockout state are per-process — 2 workers would
+split them (submit on one, poll on another → broken). Single worker + fully non-blocking handlers is the
+correct architecture here. Phase 0 (foundations) complete.

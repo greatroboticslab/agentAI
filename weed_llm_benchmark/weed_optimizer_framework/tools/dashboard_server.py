@@ -2108,13 +2108,12 @@ async def api_set_model_role(request: Request):
 
 
 @app.post("/api/models/test")
-async def api_test_model(request: Request):
+def api_test_model(request: Request, payload: dict = Body(default={})):
+    # v3.0.178: sync def → FastAPI thread-pools it, so the blocking _llm.chat
+    # (lab GPU) doesn't stall the event loop / hang the site for others.
     if not _is_admin(_actor_from_request(request)):
         raise HTTPException(403, "Administrators only.")
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    body = payload if isinstance(payload, dict) else {}
     model = str(body.get("model") or "").strip()
     prompt = str(body.get("prompt") or "Reply with exactly: OK")
     if not model or ":" not in model:
@@ -2299,13 +2298,11 @@ def api_submit_status(request: Request, id: str):
 # API, no persistent server — the user's exact architecture.
 # ===========================================================================
 @app.post("/api/llm/infer")
-async def api_llm_infer(request: Request):
-    """Submit an on-demand inference job. Returns a jobtag to poll."""
+def api_llm_infer(request: Request, payload: dict = Body(default={})):
+    """Submit an on-demand inference job. Returns a jobtag to poll. v3.0.178: sync
+    def (thread-pooled) so the blocking _slurm/SSH doesn't stall the event loop."""
     actor = _actor_from_request(request)   # any authenticated identity (incl. api key)
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    body = payload if isinstance(payload, dict) else {}
     prompt = str(body.get("prompt") or "").strip()
     if not prompt:
         raise HTTPException(400, "prompt required")
@@ -2358,13 +2355,11 @@ def api_llm_infer_result(jobtag: str):
 # This is the gate: DeepSeek-V4 / latest GLM appear ONLY after a real cluster run.
 # ===========================================================================
 @app.post("/api/models/deploy")
-async def api_models_deploy(request: Request):
+def api_models_deploy(request: Request, payload: dict = Body(default={})):
+    # v3.0.178: sync def (thread-pooled) → blocking _slurm doesn't stall the loop.
     if not _is_admin(_actor_from_request(request)):
         raise HTTPException(403, "admin only — deploying a model uses cluster GPU")
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    body = payload if isinstance(payload, dict) else {}
     model = re.sub(r"[^A-Za-z0-9_.:-]", "", str(body.get("model") or "")).strip()[:60]
     if not model:
         raise HTTPException(400, "model tag required (a LOCAL ollama tag, e.g. glm-4.7-flash, "
@@ -7402,7 +7397,7 @@ def api_slug_verdicts_all():
 
 
 @app.post("/api/slug_verdict/{slug}")
-async def api_slug_verdict_post(slug: str, payload: dict = Body(...)):
+def api_slug_verdict_post(slug: str, payload: dict = Body(...)):
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
         raise HTTPException(400, "bad slug chars")
     verdict = payload.get("verdict", "")
@@ -8451,7 +8446,7 @@ def api_cluster_actions_list():
 
 
 @app.post("/api/cluster_action/{action}")
-async def api_cluster_action(action: str, request: Request):
+def api_cluster_action(action: str, request: Request, payload: dict = Body(default={})):
     """Trigger one of the whitelisted actions. Returns the sbatch output
     (job id) or success marker.
 
@@ -8482,15 +8477,9 @@ async def api_cluster_action(action: str, request: Request):
         raise HTTPException(403, "Administrators only.")
 
     # v3.0.68: parse optional JSON body for parameterized actions.
-    body = {}
-    try:
-        raw = await request.body()
-        if raw:
-            body = json.loads(raw.decode("utf-8") or "{}")
-            if not isinstance(body, dict):
-                body = {}
-    except Exception:
-        body = {}
+    # v3.0.178: sync def (thread-pooled) so blocking _slurm/subprocess don't stall
+    # the event loop. Body injected instead of `await request.body()`.
+    body = payload if isinstance(payload, dict) else {}
 
     if spec["type"] == "refresh":
         # delegate to /api/refresh_registry logic
