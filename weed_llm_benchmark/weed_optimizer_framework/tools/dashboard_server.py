@@ -1966,12 +1966,18 @@ _MODEL_ROLES = {
     "brain": "Agent reasoning / harvest decisions",
     "curation": "Dataset quality judging",
     "labeling_vlm": "VLM captioning / label assist",
+    # v3.0.189: the big OPEN model on the cluster for the async dataset AI-review
+    # ("Re-review with a big model"). Prof direction: smartest open model, cluster,
+    # async. Read by _analysis_cluster_model (bare ollama name).
+    "analysis_cluster": "Dataset AI-review (big model, cluster, async)",
 }
 # v3.0.182: align with models actually deployed on the cluster (gemma4 brain,
 # qwen2.5:7b, minicpm-v VLM) — the old gemma2/llava were never deployed, so the
 # router would display models that can't answer. See reference_cluster_deployed_models.
+# v3.0.189: analysis_cluster default = glm-4.7-flash (30B, deployed+verified on cluster).
 _DEFAULT_MODELS = {"brain": "ollama:gemma4", "curation": "ollama:qwen2.5:7b",
-                   "labeling_vlm": "ollama:minicpm-v"}
+                   "labeling_vlm": "ollama:minicpm-v",
+                   "analysis_cluster": "ollama:glm-4.7-flash"}
 _SUGGESTED_MODELS = [
     "ollama:gemma2:9b", "ollama:qwen2.5:7b", "ollama:llava",
     "deepseek:deepseek-chat", "deepseek:deepseek-reasoner",
@@ -3989,8 +3995,8 @@ def _analysis_cluster_model(domain: str, override: str = "") -> str:
             m = ""
     if not m:
         m = str((_read_model_config().get("roles") or {}).get("analysis_cluster") or "")
-    m = m or "gemma4"
-    return re.sub(r"[^A-Za-z0-9_.:-]", "", m.split(":", 1)[1] if m.startswith("ollama:") else m)[:60] or "gemma4"
+    m = m or "glm-4.7-flash"   # v3.0.189: default big analysis brain (deployed on cluster)
+    return re.sub(r"[^A-Za-z0-9_.:-]", "", m.split(":", 1)[1] if m.startswith("ollama:") else m)[:60] or "glm-4.7-flash"
 
 
 @app.post("/api/dataset/analyze/ai/submit")
