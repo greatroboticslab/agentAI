@@ -1941,8 +1941,11 @@ _MODEL_ROLES = {
     "curation": "Dataset quality judging",
     "labeling_vlm": "VLM captioning / label assist",
 }
-_DEFAULT_MODELS = {"brain": "ollama:gemma2", "curation": "ollama:gemma2",
-                   "labeling_vlm": "ollama:llava"}
+# v3.0.182: align with models actually deployed on the cluster (gemma4 brain,
+# qwen2.5:7b, minicpm-v VLM) — the old gemma2/llava were never deployed, so the
+# router would display models that can't answer. See reference_cluster_deployed_models.
+_DEFAULT_MODELS = {"brain": "ollama:gemma4", "curation": "ollama:qwen2.5:7b",
+                   "labeling_vlm": "ollama:minicpm-v"}
 _SUGGESTED_MODELS = [
     "ollama:gemma2:9b", "ollama:qwen2.5:7b", "ollama:llava",
     "deepseek:deepseek-chat", "deepseek:deepseek-reasoner",
