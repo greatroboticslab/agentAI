@@ -117,6 +117,15 @@ UP=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/zip' --data
 USLUG=$(echo "$UP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
 ck "upload returns slug" yes "$([ -n "$USLUG" ] && echo yes || echo no)"
 ck "upload listed" yes "$(curl -s $BA --max-time 25 "$BASE/api/dataset/uploads?domain=mobile_robot" | python3 -c "import json,sys;print('yes' if any(u['slug']=='$USLUG' for u in json.load(sys.stdin)['uploads']) else 'no')" 2>/dev/null)"
+# v3.0.191 (P5 governance): provenance — default license + version + re-upload bump
+ck "upload default license" unspecified "$(echo "$UP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('license'))" 2>/dev/null)"
+V1=$(echo "$UP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',0))" 2>/dev/null)
+UP2=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/zip' --data-binary @"$TMP/d.zip" "$BASE/api/dataset/upload?domain=mobile_robot&name=smoke&license=CC-BY-4.0")
+U2SLUG=$(echo "$UP2" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+ck "re-upload license captured" CC-BY-4.0 "$(echo "$UP2" | python3 -c "import json,sys;print(json.load(sys.stdin).get('license'))" 2>/dev/null)"
+V2=$(echo "$UP2" | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',0))" 2>/dev/null)
+ck "re-upload version bumps" yes "$(python3 -c "print('yes' if $V2==$V1+1 else 'no')" 2>/dev/null)"
+[ -n "$U2SLUG" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$U2SLUG\"}" "$BASE/api/dataset/delete" >/dev/null
 # v3.0.167: goal capture persists
 GSLUG=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/octet-stream' --data-binary @"$TMP/d.zip" "$BASE/api/dataset/upload?domain=mobile_robot&name=smokegoal&goal=detect%20widgets%20on%20a%20line" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
 ck "goal persisted + returned" yes "$(curl -s $BA --max-time 25 "$BASE/api/dataset/uploads?domain=mobile_robot" | python3 -c "import json,sys;print('yes' if any(u['slug']=='$GSLUG' and 'widgets' in (u.get('goal') or '') for u in json.load(sys.stdin)['uploads']) else 'no')" 2>/dev/null)"

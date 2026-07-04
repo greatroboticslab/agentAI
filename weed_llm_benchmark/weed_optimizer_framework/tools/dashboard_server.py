@@ -2811,6 +2811,16 @@ async def api_dataset_upload(request: Request):
         raise HTTPException(400, "missing dataset name (?name=)")
     base = re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_")[:60] or "dataset"
     goal = (qp.get("goal") or "").strip()[:1000]   # v3.0.167: dataset purpose/goal
+    # v3.0.191 (P5 governance): data provenance — license + auto version. Version
+    # bumps when re-uploading the same logical dataset (same name in this domain).
+    license_ = (qp.get("license") or "").strip()[:60] or "unspecified"
+    try:
+        _prior = [v for v in _read_manual_uploads().values()
+                  if v.get("domain") == domain
+                  and str(v.get("display_name") or "").strip().lower() == name.lower()]
+        version = len(_prior) + 1
+    except Exception:
+        version = 1
 
     import tarfile
     _h = hashlib.sha1()
@@ -3123,6 +3133,13 @@ async def api_dataset_upload(request: Request):
         "harvest_round": _registry_current_round(),
         "display_name": name,
         "goal": goal,
+        # v3.0.191 (P5 governance): provenance + license + version, so a research
+        # dataset is traceable + reproducible (who/when/source/license/version).
+        "license": license_,
+        "version": version,
+        "provenance": {"source": "manual_upload", "uploaded_by": actor,
+                       "uploaded_at": uploaded_at, "license": license_,
+                       "version": version},
     }
     # durable record first (survives cluster→lab sync), then live registry+Mongo
     try:
@@ -3142,6 +3159,7 @@ async def api_dataset_upload(request: Request):
         "format": fmt, "images": n_img, "files": n_file,
         "labels": n_lbl, "skipped": n_skipped, "class_names": class_names,
         "uploaded_by": actor, "registered": wrote, "goal": goal,
+        "license": license_, "version": version,
         "gallery_url": f"/gallery/{slug}",
     })
 
@@ -3258,6 +3276,10 @@ def api_dataset_uploads(domain: str = ""):
             "uploaded_at": info.get("uploaded_at"),
             "domain": info.get("domain") or "weed",
             "goal": info.get("goal") or "",
+            # v3.0.191 (P5 governance): surface provenance for the UI
+            "license": info.get("license") or "unspecified",
+            "version": info.get("version") or 1,
+            "source": (info.get("provenance") or {}).get("source") or info.get("source") or "manual_upload",
         })
     rows.sort(key=lambda r: (r.get("uploaded_at") or ""), reverse=True)
     return JSONResponse({"ok": True, "n": len(rows), "uploads": rows})
@@ -4991,6 +5013,8 @@ def agent_generic(domain_id: str):
    <div style="margin-top:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px">
      <div style="font-size:13px;color:#475569;margin-bottom:10px">Upload a <b>.zip / .tar / .tar.gz / .tgz</b> archive, a <b>folder</b>, <b>multiple files</b>, or a single image &mdash; no need to zip. Images can include YOLO <code>labels/</code> + <code>data.yaml</code>, COCO/VOC annotations, or class subfolders (<code>train/&lt;class&gt;/</code>) for classification. It registers as a dataset and appears under Datasets below.</div>
      <input id="ds-name" type="text" placeholder="Dataset name (e.g. lab-run-2026-06)" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px">
+     <input id="ds-license" type="text" list="license-list" placeholder="License (optional, e.g. CC-BY-4.0, MIT, internal) — for provenance" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:8px">
+     <datalist id="license-list"><option value="CC-BY-4.0"><option value="CC-BY-SA-4.0"><option value="CC0-1.0"><option value="MIT"><option value="Apache-2.0"><option value="internal / proprietary"><option value="unknown"></datalist>
      <div style="display:flex;gap:6px;margin-bottom:8px">
        <textarea id="ds-goal" rows="2" placeholder="Goal / purpose (optional but recommended): what should this dataset be used for? e.g. 'detect 3 weed species in cotton fields for a laser weeder'" style="flex:1;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
        <button type="button" id="ds-goal-mic" onclick="goalVoice()" title="Speak the goal (English)" style="display:none;border:1px solid #cbd5e1;background:#eef2ff;color:#2563eb;border-radius:8px;padding:0 10px;font-size:16px;cursor:pointer">&#127908;</button>
@@ -5141,7 +5165,8 @@ async function uploadDataset(){
  btn.disabled=true;t.textContent='\\u23f3 uploading '+DS_FILES.length+' file(s), '+totalMB+' MB\\u2026';
  try{
   var goal=(document.getElementById('ds-goal')||{}).value||'';
-  var url='/api/dataset/upload?domain=__DOM__&name='+encodeURIComponent(name)+(goal.trim()?('&goal='+encodeURIComponent(goal.trim())):'');
+  var lic=((document.getElementById('ds-license')||{}).value||'').trim();
+  var url='/api/dataset/upload?domain=__DOM__&name='+encodeURIComponent(name)+(goal.trim()?('&goal='+encodeURIComponent(goal.trim())):'')+(lic?('&license='+encodeURIComponent(lic)):'');
   var r;
   if(DS_FILES.length===1){
     // single archive or image → raw body (server detects by magic bytes)
@@ -5168,7 +5193,8 @@ async function loadUploads(){
   rows.forEach(function(u,i){
    h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
      +'<span><a href="/gallery/'+encodeURIComponent(u.slug)+'" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600">'+(u.name||u.slug)+'</a>'
-     +' <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+'</span></span>'
+     +(u.version&&u.version>1?(' <span style="font-size:10px;font-weight:700;color:#4f46e5;background:#eef2ff;padding:1px 6px;border-radius:10px">v'+u.version+'</span>'):'')
+     +' <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+' \\u00b7 '+(u.license||'unspecified')+'</span></span>'
      +'<span style="display:flex;gap:6px">'
      +'<a href="/dataset/'+encodeURIComponent(u.slug)+'" target="_blank" style="border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;font-size:12px;padding:5px 10px;border-radius:7px;text-decoration:none">\\ud83d\\udcca Analyze</a>'
      +'<button onclick="deleteUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button>'

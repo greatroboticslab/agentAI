@@ -5340,3 +5340,14 @@ one click. Honest by design: the later steps are async cluster jobs + a human la
 round + collect and you advance filter → label → train → evaluate as each finishes — every step is recorded
 on the round and shown in the timeline (with eval metrics via the writeback). This turns the stitched manual
 buttons into a guided compounding round. ⇒ Phase 4 (closed compounding loop) COMPLETE. smoke +1 (button ships).
+
+### v3.0.191 — Phase 5 (start): dataset provenance, license + versioning
+
+Governance groundwork so a research dataset is traceable + reproducible. Every upload now records a
+`license` (from an optional `?license=` / a new form field with common-license suggestions; default
+"unspecified"), an auto `version` (bumps when re-uploading the same logical dataset — same name in the same
+project), and a structured `provenance` block (source / uploaded_by / uploaded_at / license / version). These
+are returned by the upload response + `/api/dataset/uploads`, and the uploads list now shows the license and a
+`v2` badge on re-uploads. Pure lab-local (no cluster/SU). smoke +3 (default license, re-upload license
+captured, version bump). Next Phase 5: per-domain agent-run/job observability + SU surfacing, then careful
+monolith modularization.
