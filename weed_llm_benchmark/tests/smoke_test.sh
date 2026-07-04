@@ -114,6 +114,7 @@ PY
   M=$(mkc smoke_member@example.com)
   M2=$(mkc smoke_other@example.com)
   ck "member train -> 403"        403  "$(HC -H "Cookie: agentai_session=$M" -X POST "$BASE/api/cluster_action/clean_train_d")"
+  ck "member eval submit -> 403"  403  "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"domain":"weed","slug":"x"}' "$BASE/api/eval/submit")"
   ck "member set_role -> 403"     403  "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"user_id":"x","role":"admin"}' "$BASE/api/users/role")"
   ck "member cluster_access ->403" 403 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"user_id":"x","allow":true}' "$BASE/api/users/cluster_access")"
   ck "member can_use_cluster=false" false "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/me" | python3 -c "import json,sys;print(str(json.load(sys.stdin)['can_use_cluster']).lower())" 2>/dev/null)"
@@ -154,7 +155,7 @@ PY
   ck "plan proposes >=1 agent" yes "$(echo "$PLAN" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['plan']['agents'] else 'no')" 2>/dev/null)"
   ck "plan agent types valid" yes "$(echo "$PLAN" | python3 -c "import json,sys;V={'collector','filter','labeler','trainer','evaluator','custom'};a=json.load(sys.stdin)['plan']['agents'];print('yes' if all(x['type'] in V for x in a) else 'no')" 2>/dev/null)"
 else
-  skip=$((skip+23)); echo "  SKIP  RBAC + project/agent + catalog + plan cookie checks (no ~/.dash_session_key on this host)"
+  skip=$((skip+24)); echo "  SKIP  RBAC + project/agent + catalog + plan cookie checks (no ~/.dash_session_key on this host)"
 fi
 
 echo ""

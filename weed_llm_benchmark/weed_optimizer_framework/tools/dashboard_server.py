@@ -2220,6 +2220,63 @@ async def api_train_submit(request: Request):
     return JSONResponse(result)
 
 
+@app.post("/api/eval/submit")
+async def api_eval_submit(request: Request):
+    """v3.0.175 — the EVALUATOR agent: run Ultralytics model.val() of a model on a
+    dataset's val/test split and report metrics. Model 'auto' = this domain's most
+    recent trained best.pt, else a base weight (baseline). Cluster-gated + general."""
+    actor = _actor_from_request(request)
+    if not _can_use_cluster(actor):
+        raise HTTPException(403, "Cluster (GPU) jobs are restricted to admins / granted users.")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    domain = _norm_domain(body.get("domain") or "weed")
+    slug = str(body.get("slug") or "").strip()
+    if not re.match(r'^[A-Za-z0-9_.-]+$', slug):
+        raise HTTPException(400, "bad/missing dataset slug")
+    from . import db as _db
+    dd = _db.get_domain(domain) or {}
+    task = str(body.get("task") or dd.get("task") or "detection")
+    ultra = {"detection": "detect", "segmentation": "segment",
+             "classification": "classify"}.get(task, task)
+    if ultra not in ("detect", "segment", "classify"):
+        raise HTTPException(400, "task must be detection / classification / segmentation")
+    model = str(body.get("model") or "auto")
+    msize = str(body.get("model_size") or body.get("model") or "").strip().lower()
+    _m = re.match(r'^(?:yolo11)?([nslmx])(?:\.pt)?$', msize)
+    if _m:
+        _suf = {"classify": "-cls", "segment": "-seg"}.get(ultra, "")
+        model = f"yolo11{_m.group(1)}{_suf}.pt"
+    elif not model.endswith(".pt"):
+        model = "auto"
+    # 1) stage dataset to cluster
+    st = _stage_dataset_to_cluster(slug)
+    if not st.get("ok"):
+        raise HTTPException(502, "data staging to cluster failed: " + st.get("error", ""))
+    base = st["dest"]
+    data_path = base + "/images" if ultra == "classify" else base + "/data.yaml"
+    # 2) ensure the eval template is on the cluster outer root
+    _slurm(["bash", "-lc",
+            "git fetch origin >/dev/null 2>&1; "
+            "git checkout origin/main -- weed_llm_benchmark/run_eval_generic.sh 2>/dev/null; "
+            "cp -f weed_llm_benchmark/run_eval_generic.sh run_eval_generic.sh 2>/dev/null; true"],
+           timeout=60)
+    # 3) submit
+    jobtag = "e" + time.strftime("%m%d%H%M%S")
+    export = ",".join(["ALL", f"EVAL_TASK={ultra}", f"EVAL_MODEL={model}",
+                       f"EVAL_DATA={data_path}", f"EVAL_DOMAIN={domain}",
+                       f"EVAL_JOBTAG={jobtag}"])
+    r = _slurm(["sbatch", f"--export={export}", "run_eval_generic.sh"], timeout=25)
+    ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
+    result = {"ok": ok, "domain": domain, "task": ultra, "model": model,
+              "data": data_path, "jobtag": jobtag,
+              "msg": (r.get("stdout") or r.get("stderr") or "").strip()}
+    _log_action("eval_generic", result)
+    return JSONResponse(result)
+
+
 # ===========================================================================
 # v3.0.143 — self-hosted model GATEWAY (on-demand). An authenticated caller (our
 # own API key / session) submits a prompt; the lab server queues a cluster job
@@ -4414,7 +4471,7 @@ def agent_generic(domain_id: str):
    <div style="margin-top:20px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Agents in this project</div>
    <div style="margin-top:10px;border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">{_arows}</div>
    <div id="run-msg" style="margin-top:10px;font-size:13px;display:none;padding:10px 12px;border-radius:8px;background:#f1f5f9"></div>
-   <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">&#9654; Run fires a real cluster job (needs cluster access). <b>Collector</b> (harvest by this project&rsquo;s queries), <b>Filter</b> (DINOv2 quality-scores this project&rsquo;s datasets), <b>Labeler</b> (pushes this project&rsquo;s datasets to its own Roboflow project for human labeling), and <b>Trainer</b> (trains on your uploaded dataset) all honor this project&rsquo;s domain. <b>Evaluator</b> is still a stub (coming next).</div>
+   <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">&#9654; Run fires a real cluster job (needs cluster access). <b>Collector</b> (harvest by this project&rsquo;s queries), <b>Filter</b> (DINOv2 quality-scores this project&rsquo;s datasets), <b>Labeler</b> (pushes this project&rsquo;s datasets to its own Roboflow project for human labeling), <b>Trainer</b> (trains on your uploaded dataset), and <b>Evaluator</b> (runs model.val on a dataset&rsquo;s val split &mdash; auto-uses this project&rsquo;s latest trained model) all honor this project&rsquo;s domain.</div>
    <div id="agent-add" style="display:none;margin-top:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center">
      <select id="ag-type" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
        <option value="collector">Collector (auto-collect datasets)</option>
@@ -4479,6 +4536,7 @@ def agent_generic(domain_id: str):
        </select>
        <label style="font-size:13px;color:#334">epochs <input id="tr-ep" type="number" value="20" min="1" max="300" style="width:70px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
        <button id="tr-go" onclick="submitTrain()" style="border:0;cursor:pointer;background:#7c3aed;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#128640; Train</button>
+       <button id="ev-go" onclick="submitEval()" title="Evaluate a model on this dataset's val split" style="border:1px solid #c4b5fd;cursor:pointer;background:#f5f3ff;color:#7c3aed;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#128202; Evaluate</button>
        <span id="tr-msg" style="font-size:13px;color:#475569"></span>
      </div>
    </div>
@@ -4659,7 +4717,9 @@ async function runAgent(type){
    return;
  }
  if(type==='evaluator'){
-   _runMsg('\\ud83d\\udcca Evaluation runs as part of training (held-out metrics). View results &amp; per-round metrics on the <a href="/rounds">Rounds page \\u2192</a>');
+   var e=document.getElementById('ev-go');
+   if(e){e.scrollIntoView({behavior:'smooth',block:'center'});var m=document.getElementById('tr-msg');if(m)m.textContent='\\u2193 pick a dataset below, then Evaluate (runs model.val on its val split)';}
+   else{_runMsg('Open the "Train a model" panel below and click Evaluate.');}
    return;
  }
  var spec=_AGENT_ACTION[type];
@@ -4719,6 +4779,16 @@ async function submitTrain(){
  go.disabled=true;msg.textContent='\\u23f3 staging + submitting\\u2026';
  try{var d=await (await fetch('/api/train/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,epochs:parseInt(ep.value||'20'),paradigm:para,model_size:msz})})).json();
   msg.textContent=(d&&d.ok)?('\\u2705 submitted ('+d.task+', '+d.epochs+'ep) \\u2014 '+(d.msg||'')):'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
+ catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
+}
+async function submitEval(){
+ var sel=document.getElementById('tr-ds'),msg=document.getElementById('tr-msg'),go=document.getElementById('ev-go');
+ var slug=sel.value;if(!slug){msg.textContent='\\u26a0 choose a dataset to evaluate';return;}
+ var msz=(document.getElementById('tr-model')||{}).value||'auto';
+ if(!confirm('Evaluate on "'+slug+'" (runs model.val on its val split; model: '+msz+' \\u2014 auto uses this project\\u2019s latest trained model, else a baseline)?'))return;
+ go.disabled=true;msg.textContent='\\u23f3 staging + submitting eval\\u2026';
+ try{var d=await (await fetch('/api/eval/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,model_size:msz})})).json();
+  msg.textContent=(d&&d.ok)?('\\u2705 eval submitted ('+d.task+') \\u2014 '+(d.msg||'')+' \\u00b7 results write to eval_results/'):'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
  catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
 }
 async function saveCap(){

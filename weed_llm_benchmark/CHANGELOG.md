@@ -5129,3 +5129,16 @@ own datasets to the project's own Roboflow project:
 - Verified: argv transform (weed project dropped, domain project + --domain + --force-project added) and
   the new --domain CLI arg. The actual Roboflow push was NOT run (would spend the free Roboflow key +
   create a real project). Evaluator is the last per-domain piece.
+
+### v3.0.175 — Evaluator agent is now REAL (per-domain agents, 3/3)
+
+The evaluator was a dead alert. Now it runs a real evaluation:
+- New `run_eval_generic.sh` (val-only mirror of the trainer): `YOLO(model).val(task, data)` on a dataset's
+  val/test split → writes metrics to `results/framework/eval_results/<domain>_<jobtag>.json`. `EVAL_MODEL=auto`
+  picks THIS domain's most-recent trained best.pt, else a base weight (labelled baseline).
+- New `POST /api/eval/submit {domain, slug, task, model}` — stages the dataset + submits the eval job
+  (cluster-gated, general, mirrors /api/train/submit).
+- Project page: an "📊 Evaluate" button in the Train panel (reuses the dataset + model dropdowns) → submitEval;
+  the Evaluator agent's Run scrolls there. Note updated: Collector / Filter / Labeler / Trainer / Evaluator
+  now ALL honor the project's domain. Verified compile + wiring + permission gate; the GPU eval job runs on
+  the same proven staging+sbatch path as training.
