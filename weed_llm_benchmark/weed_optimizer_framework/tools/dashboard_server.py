@@ -2264,6 +2264,13 @@ async def api_train_submit(request: Request):
                   "epochs": epochs, "data": data_path, "jobtag": jobtag,
                   "msg": (r.get("stdout") or r.get("stderr") or "").strip()}
         _log_action("train_generic", result)
+        try:  # v3.0.186 (P4): record the train step on the domain's current round
+            from . import db as _dbr
+            _dbr.record_round_step(domain, "train", "running" if ok else "failed",
+                                   detail={"model": model, "epochs": epochs, "slug": slug},
+                                   job=jobtag, actor=actor)
+        except Exception:
+            pass
         return result
     sid = await _start_bg_submit("train", _do)
     return JSONResponse({"ok": True, "pending": True, "submit_id": sid,
@@ -2323,6 +2330,13 @@ async def api_eval_submit(request: Request):
                   "data": data_path, "jobtag": jobtag,
                   "msg": (r.get("stdout") or r.get("stderr") or "").strip()}
         _log_action("eval_generic", result)
+        try:  # v3.0.186 (P4): record the eval step on the domain's current round
+            from . import db as _dbr
+            _dbr.record_round_step(domain, "eval", "running" if ok else "failed",
+                                   detail={"model": model, "slug": slug}, job=jobtag,
+                                   actor=actor)
+        except Exception:
+            pass
         return result
     sid = await _start_bg_submit("eval", _do)
     return JSONResponse({"ok": True, "pending": True, "submit_id": sid,
@@ -4038,6 +4052,59 @@ async def api_set_domain_config(request: Request):
     return JSONResponse({"ok": True, "domain": dom, "config": new_cfg})
 
 
+@app.get("/api/domain/rounds")
+def api_domain_rounds(domain: str = "weed"):
+    """v3.0.186 (P4): the per-domain compounding-loop rounds — each round's
+    collect/filter/label/train/eval step provenance + eval metrics. Any signed-in
+    user can read. `steps_order` is the canonical step sequence for the UI."""
+    from . import db as _dbr
+    dom = _norm_domain(domain)
+    rounds = _dbr.get_rounds(dom)
+    for r in rounds:
+        r.pop("_id", None)  # internal key; round_num is the public id
+    return JSONResponse({"ok": True, "domain": dom, "rounds": rounds,
+                         "steps_order": _dbr.ROUND_STEPS})
+
+
+@app.post("/api/domain/round/start")
+def api_domain_round_start(request: Request, payload: dict = Body(default={})):
+    """Open the next round for a project (owner/admin)."""
+    actor = _actor_from_request(request)
+    body = payload if isinstance(payload, dict) else {}
+    dom = _norm_domain(body.get("domain") or "weed")
+    from . import db as _dbr
+    if not _can_manage_agent(actor, _dbr.get_domain(dom) or {"_id": dom}):
+        raise HTTPException(403, "only the project owner or an admin can start a round")
+    doc = _dbr.start_round(dom, actor=actor)
+    if doc is None:
+        raise HTTPException(503, "could not open round (Mongo down)")
+    doc.pop("_id", None)
+    return JSONResponse({"ok": True, "domain": dom, "round": doc})
+
+
+@app.post("/api/domain/round/step")
+def api_domain_round_step(request: Request, payload: dict = Body(default={})):
+    """Record a step's provenance on the current round (owner/admin). Used to log
+    the human-label step, or let orchestration mark a step done + attach metrics."""
+    actor = _actor_from_request(request)
+    body = payload if isinstance(payload, dict) else {}
+    dom = _norm_domain(body.get("domain") or "weed")
+    from . import db as _dbr
+    if not _can_manage_agent(actor, _dbr.get_domain(dom) or {"_id": dom}):
+        raise HTTPException(403, "only the project owner or an admin can record a round step")
+    step = str(body.get("step") or "").strip().lower()
+    if step not in _dbr.ROUND_STEPS:
+        raise HTTPException(400, f"step must be one of {_dbr.ROUND_STEPS}")
+    status = str(body.get("status") or "done").strip().lower()
+    metrics = body.get("metrics") if isinstance(body.get("metrics"), dict) else None
+    doc = _dbr.record_round_step(dom, step, status, detail=body.get("detail"),
+                                 job=body.get("job"), actor=actor, metrics=metrics)
+    if doc is None:
+        raise HTTPException(503, "could not record step (Mongo down)")
+    doc.pop("_id", None)
+    return JSONResponse({"ok": True, "domain": dom, "round": doc})
+
+
 @app.get("/api/domain/push_cap")
 def api_get_push_cap(domain: str = "weed"):
     return JSONResponse({"ok": True, "domain": _norm_domain(domain),
@@ -4645,6 +4712,13 @@ def agent_generic(domain_id: str):
      <span id="ag-msg" style="font-size:12px;color:#475569"></span>
    </div>
    <div style="margin-top:14px">{_hbtn}</div>
+   <div style="margin-top:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+     <span style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Compounding rounds</span>
+     <button id="round-new" onclick="startRound()" style="display:none;border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;font-size:12px;padding:5px 11px;border-radius:7px;cursor:pointer">&#43; Start new round</button>
+     <span id="round-msg" style="font-size:12px;color:#475569"></span>
+   </div>
+   <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">Each round is one pass of the loop &mdash; collect &rarr; filter &rarr; label &rarr; train &rarr; evaluate &mdash; and its steps are recorded here with who ran them and when. Evaluation metrics feed back to inform the next round&rsquo;s collection.</div>
+   <div id="rounds-tl" style="margin-top:10px;font-size:13px;color:#64748b">loading rounds&hellip;</div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Upload a dataset</div>
    <div style="margin-top:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px">
      <div style="font-size:13px;color:#475569;margin-bottom:10px">Upload a <b>.zip / .tar / .tar.gz / .tgz</b> archive, a <b>folder</b>, <b>multiple files</b>, or a single image &mdash; no need to zip. Images can include YOLO <code>labels/</code> + <code>data.yaml</code>, COCO/VOC annotations, or class subfolders (<code>train/&lt;class&gt;/</code>) for classification. It registers as a dataset and appears under Datasets below.</div>
@@ -4862,8 +4936,38 @@ loadModelCatalog();
     var aa=document.getElementById('agent-add');if(aa)aa.style.display='flex';
     Array.prototype.forEach.call(document.querySelectorAll('.agdel'),function(b){b.style.display='inline-block';});
     var pc=document.getElementById('proj-config');if(pc){pc.style.display='block';loadDomainConfig();}
+    var rn=document.getElementById('round-new');if(rn)rn.style.display='inline-block';
   }
 }catch(e){}})();
+var _STEP_ICON={collect:'\\ud83d\\udd0d',filter:'\\ud83e\\uddf9',label:'\\ud83c\\udff7\\ufe0f',train:'\\ud83d\\ude80',eval:'\\ud83d\\udcca'};
+var _STEP_BG={done:'#ecfdf5',running:'#fefce8',failed:'#fef2f2',skipped:'#f1f5f9',pending:'#f8fafc'};
+async function loadRounds(){
+ var el=document.getElementById('rounds-tl');if(!el)return;
+ try{
+  var d=await (await fetch('/api/domain/rounds?domain=__DOM__',{credentials:'include'})).json();
+  var order=(d&&d.steps_order)||['collect','filter','label','train','eval'];
+  var rounds=(d&&d.rounds)||[];
+  if(!rounds.length){el.innerHTML='<span style="color:#94a3b8">No rounds yet. Start a round to track the collect &rarr; filter &rarr; label &rarr; train &rarr; eval loop with provenance.</span>';return;}
+  el.innerHTML=rounds.map(function(r){
+    var steps=r.steps||{};
+    var chips=order.map(function(s){
+      var e=steps[s],st=(e&&e.status)||'pending',bg=_STEP_BG[st]||'#f8fafc';
+      var who=e&&e.actor?(' \\u00b7 '+e.actor):'';
+      var ttl=s+': '+st+who+(e&&e.at?(' \\u00b7 '+e.at):'');
+      return '<span title="'+ttl+'" style="display:inline-block;padding:4px 9px;margin:2px;border-radius:16px;background:'+bg+';border:1px solid #e3e7ef;font-size:12px">'+(_STEP_ICON[s]||'')+' '+s+(st!=='pending'?(' \\u00b7 '+st):'')+'</span>';
+    }).join('');
+    var mtxt='';if(r.metrics&&Object.keys(r.metrics).length){mtxt=' &mdash; '+Object.keys(r.metrics).map(function(k){return k+': '+r.metrics[k];}).join(', ');}
+    return '<div style="border:1px solid #e3e7ef;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff"><div style="font-weight:600;font-size:13px;color:#0f172a;margin-bottom:4px">Round '+r.round_num+' <span style="font-weight:400;color:#94a3b8">'+(r.created_at||'')+mtxt+'</span></div><div>'+chips+'</div></div>';
+  }).join('');
+ }catch(e){el.innerHTML='<span style="color:#dc2626">could not load rounds</span>';}
+}
+loadRounds();
+async function startRound(){
+ var m=document.getElementById('round-msg');if(m)m.textContent='\\u23f3';
+ try{var d=await (await fetch('/api/domain/round/start',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
+  if(d&&d.ok){if(m)m.textContent='\\u2705 round '+d.round.round_num+' opened';loadRounds();}else{if(m)m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}
+ catch(e){if(m)m.textContent='\\u274c '+e;}
+}
 async function loadDomainConfig(){
  try{
   var d=await (await fetch('/api/domain/config?domain=__DOM__',{credentials:'include'})).json();

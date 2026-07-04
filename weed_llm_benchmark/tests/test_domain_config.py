@@ -117,6 +117,24 @@ ck("vllm not reachable on lab", mr._reachable("vllm:glm-4.7-flash", "lab", OLLAM
 ck("role_table lists all roles", len(mr.role_table()) == len(mr.ROLES))
 
 
+# ---- round provenance pure helpers (Phase 4) -----------------------------
+ck("ROUND_STEPS is the 5-step loop",
+   db.ROUND_STEPS == ["collect", "filter", "label", "train", "eval"])
+ck("_round_id formats domain#n", db._round_id("coral", 3) == "coral#3")
+
+e = db._round_step_entry("running", detail={"x": 1}, job="j123", actor="alice", now="T")
+ck("step entry keeps valid status", e["status"] == "running")
+ck("step entry records actor+at+job", e["actor"] == "alice" and e["at"] == "T" and e["job"] == "j123")
+ck("step entry keeps detail", e["detail"] == {"x": 1})
+
+e2 = db._round_step_entry("bogus", now="T")
+ck("invalid status coerced to pending", e2["status"] == "pending")
+ck("step entry omits job when none", "job" not in e2)
+
+# record_round_step rejects an unknown step (before any Mongo call)
+ck("record_round_step rejects bad step", db.record_round_step("coral", "notastep", "done") is None)
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)

@@ -105,6 +105,7 @@ COLL_AGENT_TASKS = "agent_tasks"
 COLL_AUDIT = "audit_trail"
 COLL_DOMAINS = "domains"          # v3.0.82: one doc per dataset-collection agent
 COLL_USERS = "users"              # v3.0.129: one doc per user (Prof: per-student login + attribution)
+COLL_ROUNDS = "domain_rounds"     # v3.0.186 (P4): per-domain compounding-loop round provenance
 
 # v3.0.82 (Prof directive — multi-domain extensibility): every slug/class is
 # scoped to a DOMAIN (= a dataset-collection agent's target). "weed" is just
@@ -491,6 +492,124 @@ def set_domain_config(domain_id: str, patch: dict, actor: str = "user") -> Optio
         except Exception:
             pass
         return get_domain_config(domain_id)
+    except Exception:
+        return None
+
+
+# ===========================================================================
+# v3.0.186 (P4) — per-domain "round" provenance for the closed compounding loop.
+# A round is one pass of collect -> filter -> label -> train -> eval; each step
+# records WHAT ran, WHEN, by WHOM, with what result. eval metrics land on the
+# round so the next collect can be biased by them (the compounding feedback).
+# This is a GENERAL, per-domain layer (any modality/field) — separate from the
+# weed-registry harvest_round tags (which track which datasets, not which steps).
+# ===========================================================================
+ROUND_STEPS = ["collect", "filter", "label", "train", "eval"]
+_ROUND_STATUSES = {"pending", "running", "done", "failed", "skipped"}
+
+
+def _round_id(domain_id: str, n: int) -> str:
+    return f"{domain_id}#{int(n)}"
+
+
+def _round_step_entry(status: str, detail=None, job=None, actor: str = "user",
+                      now: str = "") -> dict:
+    """Pure builder for one step's provenance entry (unit-testable, no Mongo)."""
+    st = status if status in _ROUND_STATUSES else "pending"
+    e = {"status": st, "actor": actor, "at": now}
+    if job:
+        e["job"] = str(job)[:120]
+    if detail is not None:
+        e["detail"] = detail
+    return e
+
+
+def start_round(domain_id: str, actor: str = "user") -> Optional[dict]:
+    """Open the next round for a domain (max existing round_num + 1, else 1).
+    Returns the new round doc, or None if Mongo is down."""
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        last = db[COLL_ROUNDS].find_one({"domain": domain_id},
+                                        sort=[("round_num", -1)])
+        n = int((last or {}).get("round_num", 0)) + 1
+        now = _now()
+        doc = {"_id": _round_id(domain_id, n), "domain": domain_id,
+               "round_num": n, "created_at": now, "updated_at": now,
+               "actor": actor, "status": "open", "steps": {}, "metrics": {}}
+        db[COLL_ROUNDS].insert_one(doc)
+        try:
+            db[COLL_AUDIT].insert_one({"ts": now, "actor": actor,
+                "event": "round.start", "target": {"kind": "domain", "id": domain_id},
+                "after": {"round_num": n}})
+        except Exception:
+            pass
+        return doc
+    except Exception:
+        return None
+
+
+def record_round_step(domain_id: str, step: str, status: str, detail=None,
+                      job=None, actor: str = "user", round_num=None,
+                      metrics=None) -> Optional[dict]:
+    """Record a pipeline step's provenance on a round (the current open one unless
+    round_num is given; auto-opens round 1 if none exists). `metrics` (from eval)
+    merge onto round.metrics — the compounding feedback the next collect can read.
+    Returns the updated round doc, or None if Mongo down / bad step."""
+    if step not in ROUND_STEPS:
+        return None
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        if round_num is None:
+            cur = db[COLL_ROUNDS].find_one({"domain": domain_id},
+                                           sort=[("round_num", -1)])
+            if not cur:
+                cur = start_round(domain_id, actor=actor)
+                if not cur:
+                    return None
+            round_num = cur["round_num"]
+        now = _now()
+        sets = {f"steps.{step}": _round_step_entry(status, detail, job, actor, now),
+                "updated_at": now}
+        if isinstance(metrics, dict) and metrics:
+            for k, v in metrics.items():
+                sets[f"metrics.{k}"] = v
+        db[COLL_ROUNDS].update_one({"_id": _round_id(domain_id, round_num)},
+                                   {"$set": sets}, upsert=True)
+        try:
+            db[COLL_AUDIT].insert_one({"ts": now, "actor": actor,
+                "event": "round.step", "target": {"kind": "domain", "id": domain_id},
+                "after": {"round_num": round_num, "step": step, "status": status}})
+        except Exception:
+            pass
+        return db[COLL_ROUNDS].find_one({"_id": _round_id(domain_id, round_num)})
+    except Exception:
+        return None
+
+
+def get_rounds(domain_id: str, limit: int = 25) -> list:
+    """All rounds for a domain, newest first. [] if Mongo down / none."""
+    db = _get_db()
+    if db is None:
+        return []
+    try:
+        return list(db[COLL_ROUNDS].find({"domain": domain_id},
+                                         sort=[("round_num", -1)]).limit(int(limit)))
+    except Exception:
+        return []
+
+
+def get_current_round(domain_id: str) -> Optional[dict]:
+    """The highest-numbered round doc for a domain, or None."""
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        return db[COLL_ROUNDS].find_one({"domain": domain_id},
+                                        sort=[("round_num", -1)])
     except Exception:
         return None
 

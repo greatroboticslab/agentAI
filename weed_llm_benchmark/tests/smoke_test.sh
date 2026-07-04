@@ -35,12 +35,14 @@ for pg in / /agent/weed /agent/mobile_robot /agent/humanoid_robot /classes "/cla
 done
 
 echo "== APIs =="
-for api in /api/me /api/users /api/annotation_status /api/rounds_state "/api/domain/push_cap?domain=weed" "/api/domain/config?domain=weed" "/api/dataset/uploads?domain=weed" /api/cluster_status /api/roboflow_status /healthz; do
+for api in /api/me /api/users /api/annotation_status /api/rounds_state "/api/domain/push_cap?domain=weed" "/api/domain/config?domain=weed" "/api/domain/rounds?domain=weed" "/api/dataset/uploads?domain=weed" /api/cluster_status /api/roboflow_status /healthz; do
   ck "GET $api" 200 "$(HC $BA "$BASE$api")"
 done
 ck "domain config has thresholds" yes "$(curl -s $BA --max-time 15 "$BASE/api/domain/config?domain=weed" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['config']['thresholds'].get('dino_threshold') else 'no')" 2>/dev/null)"
 ck "project page ships config editor" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'saveDomainConfig' && echo yes || echo no)"
 ck "model router exposed + resolves" yes "$(curl -s $BA --max-time 15 "$BASE/api/models" | python3 -c "import json,sys;d=json.load(sys.stdin).get('router',{});r=d.get('analysis_summary',{});print('yes' if r.get('resolved') and r.get('place')=='lab' else 'no')" 2>/dev/null)"
+ck "rounds api exposes step order" collect "$(curl -s $BA --max-time 15 "$BASE/api/domain/rounds?domain=weed" | python3 -c "import json,sys;print(json.load(sys.stdin)['steps_order'][0])" 2>/dev/null)"
+ck "project page ships round timeline" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'loadRounds' && echo yes || echo no)"
 
 echo "== MODALITY GATE (P3: train/eval vision-only, honest) =="
 HC $BA -X POST -H 'Content-Type: application/json' -d '{"domain":"smokevid"}' "$BASE/api/agent/delete" >/dev/null  # clean stale
@@ -141,6 +143,12 @@ PY
   ck "owner set domain config" 200 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj","config":{"thresholds":{"imbalance_med":2},"roboflow_project":"smoke-rf"}}' "$BASE/api/domain/config")"
   ck "config persisted (imbalance_med=2)" 2 "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/domain/config?domain=smoke_proj" | python3 -c "import json,sys;print(json.load(sys.stdin)['config']['thresholds']['imbalance_med'])" 2>/dev/null)"
   ck "non-owner set config -> 403" 403 "$(HC -H "Cookie: agentai_session=$M2" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj","config":{"modality":"video"}}' "$BASE/api/domain/config")"
+  # v3.0.186 (P4): per-domain round provenance
+  ck "owner start round" 200 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj"}' "$BASE/api/domain/round/start")"
+  ck "owner record label step" 200 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj","step":"label","status":"done","detail":"human labeled 12"}' "$BASE/api/domain/round/step")"
+  ck "round records step" done "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/domain/rounds?domain=smoke_proj" | python3 -c "import json,sys;r=json.load(sys.stdin)['rounds'];print((r[0]['steps'].get('label') or {}).get('status') if r else 'none')" 2>/dev/null)"
+  ck "rounds expose step order" collect "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/domain/rounds?domain=smoke_proj" | python3 -c "import json,sys;print(json.load(sys.stdin)['steps_order'][0])" 2>/dev/null)"
+  ck "non-owner start round -> 403" 403 "$(HC -H "Cookie: agentai_session=$M2" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj"}' "$BASE/api/domain/round/start")"
   ck "agents list = 1" 1 "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/project/agents?project=smoke_proj" | python3 -c "import json,sys;print(len(json.load(sys.stdin)['agents']))" 2>/dev/null)"
   AID=$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/project/agents?project=smoke_proj" | python3 -c "import json,sys;a=json.load(sys.stdin)['agents'];print(a[0]['id'] if a else '')" 2>/dev/null)
   ck "non-owner add agent -> 403" 403 "$(HC -H "Cookie: agentai_session=$M2" -X POST -H 'Content-Type: application/json' -d '{"project":"smoke_proj","type":"filter"}' "$BASE/api/project/agent/add")"
@@ -173,7 +181,7 @@ PY
   ck "plan proposes >=1 agent" yes "$(echo "$PLAN" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['plan']['agents'] else 'no')" 2>/dev/null)"
   ck "plan agent types valid" yes "$(echo "$PLAN" | python3 -c "import json,sys;V={'collector','filter','labeler','trainer','evaluator','custom'};a=json.load(sys.stdin)['plan']['agents'];print('yes' if all(x['type'] in V for x in a) else 'no')" 2>/dev/null)"
 else
-  skip=$((skip+27)); echo "  SKIP  RBAC + project/agent + catalog + plan cookie checks (no ~/.dash_session_key on this host)"
+  skip=$((skip+32)); echo "  SKIP  RBAC + project/agent + catalog + plan cookie checks (no ~/.dash_session_key on this host)"
 fi
 
 echo ""

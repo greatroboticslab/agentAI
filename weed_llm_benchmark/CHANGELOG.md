@@ -5260,3 +5260,17 @@ project ("DINOv2 filtering / Roboflow labeling works on image data only — this
 … collection and upload still work") instead of firing a cluster job that can't work. Collector/harvest is
 left modality-general (it can discover datasets of any kind). The project-page Run buttons surface the 501's
 detail message via runAgent, so the failure is explained, not silent. smoke +2 (filter/labeler on video → 501).
+
+### v3.0.186 — Phase 4 (start): per-domain round provenance + timeline
+
+The closed compounding loop needs a first-class "round" — one pass of collect → filter → label → train → eval,
+recorded so it compounds. New general (any-domain) provenance layer in db.py (COLL_ROUNDS, ROUND_STEPS,
+start_round / record_round_step / get_rounds / get_current_round): each round records every step's status +
+who ran it + when + the job tag, and eval metrics land on the round so the next collect can read them (the
+feedback that makes it compound). Separate from the weed-registry harvest_round tags (which track which
+datasets, not which steps). Endpoints: GET /api/domain/rounds (any signed-in), POST /api/domain/round/start +
+/api/domain/round/step (owner/admin). Train + eval submits now record their step ("running" with the real job
+tag, or "failed") on the current round — honest: we log that a job was queued, not that it finished (no fake
+"done"; a job-completion writeback is future work). Project page shows a "Compounding rounds" timeline (step
+chips with status/owner tooltips + eval metrics) + a "Start new round" button for owners. Unit tests +8 (pure
+round helpers, offline). smoke +7 (rounds api + timeline UI + start/record/read + non-owner 403).
