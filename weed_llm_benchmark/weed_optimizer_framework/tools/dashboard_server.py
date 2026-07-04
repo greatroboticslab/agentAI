@@ -4414,7 +4414,7 @@ def agent_generic(domain_id: str):
    <div style="margin-top:20px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Agents in this project</div>
    <div style="margin-top:10px;border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">{_arows}</div>
    <div id="run-msg" style="margin-top:10px;font-size:13px;display:none;padding:10px 12px;border-radius:8px;background:#f1f5f9"></div>
-   <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">&#9654; Run fires a real cluster job (needs cluster access). Trainer trains on <b>your uploaded dataset</b> and is fully general. Collector / Filter / Labeler run our shared harvest&rarr;quality&rarr;label pipeline, which today is specialised for the weed/CWD12 domain &mdash; per-field specialisation is the next backend step.</div>
+   <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">&#9654; Run fires a real cluster job (needs cluster access). <b>Collector</b> (harvest by this project&rsquo;s queries), <b>Filter</b> (DINOv2 quality-scores this project&rsquo;s datasets), and <b>Trainer</b> (trains on your uploaded dataset) all honor this project&rsquo;s domain. <b>Labeler</b> still targets the shared weed labeling pipeline &mdash; per-domain labeling is the next backend step.</div>
    <div id="agent-add" style="display:none;margin-top:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center">
      <select id="ag-type" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
        <option value="collector">Collector (auto-collect datasets)</option>
@@ -8456,6 +8456,13 @@ async def api_cluster_action(action: str, request: Request):
                 pass
             if len(export_pairs) > 1:
                 sbatch_cli += [f"--export={','.join(export_pairs)}"]
+        # v3.0.173: domain-aware FILTER — the DINOv2 curator scopes its reference
+        # pool + scoring to this project's domain when DINO_DOMAIN is injected.
+        if action == "dinov2_curate_registry":
+            _fdom = re.sub(r"[^a-z0-9_]+", "", str(body.get("domain") or "").strip().lower())[:40]
+            if _fdom and _fdom != "weed":
+                sbatch_cli += [f"--export=ALL,DINO_DOMAIN={_fdom}"]
+                body_used["domain"] = _fdom
         # v3.0.128 (Z4): inject the domain's user-set Roboflow push cap into the
         # harvest auto-sync (run script reads PUSH_CAP → --cap-per-slug). Merge
         # into the existing --export if present (brain_harvest dynamic /

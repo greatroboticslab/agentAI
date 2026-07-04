@@ -5093,3 +5093,26 @@ dataset facts for a richer review (overall assessment → key problems → concr
 suggested training setup). Clearly labelled as optional (queues on the GPU, slower). Frontend-only — no
 new backend; resource-sensible (uses the 30B model, not the 671b). The instant local qwen2.5:3b review
 remains the default.
+
+### v3.0.171/172 — Voice UX (live) + mobile fixes
+
+- Voice: HYBRID mic — the browser's live recognition shows words AS YOU SPEAK (like Claude) during
+  recording, then self-hosted Whisper transcribes the recording on Stop and REPLACES the preview with its
+  accurate text. Best of live feedback + Whisper accuracy. Both goal + intent mics. Falls back to pure live
+  Web Speech if no MediaRecorder.
+- Mobile: agent rows + dataset upload rows now flex-wrap so the Run / remove / Analyze / Delete buttons are
+  no longer cut off on narrow screens.
+
+### v3.0.173 — Filter agent is now DOMAIN-AWARE (per-domain agents, 1/3)
+
+The DINOv2 quality-filter used a hardcoded weed/CWD12 reference pool + scored the whole registry, ignoring
+the project. Now it honors the project's domain:
+- dinov2_curator.py reads `DINO_DOMAIN` (env): builds the reference pool from THAT domain's best-available
+  data (manual uploads / kept / labeled slugs; falls back to all the domain's slugs), and scores ONLY that
+  domain's slugs. Weed/default behaviour unchanged.
+- The dashboard threads `DINO_DOMAIN=<project>` into the `dinov2_curate_registry` sbatch (like the
+  collector's BRAIN_DOMAIN). Project-page note corrected: Collector + Filter + Trainer honor the domain;
+  Labeler is still weed-specific (next).
+- Verified the domain slug-selection logic by unit test (coral domain → scores only coral slugs, reference
+  = its uploaded/labeled slugs). The full 4h GPU curation job was NOT run (resource-sensible); the
+  threading + filtering code is verified. Labeler + evaluator are the remaining per-domain work.

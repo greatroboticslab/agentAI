@@ -83,6 +83,38 @@ TRUSTED_SLUGS = [
     "francesco__weed_crop_aerial",  # aerial holdout
 ]
 
+# v3.0.173 — DOMAIN-AWARE curation. When DINO_DOMAIN is set (injected by the
+# dashboard's filter agent for a non-weed project), the reference pool is built
+# from THAT domain's best-available data (human uploads / kept / labeled slugs)
+# and only that domain's slugs are scored — instead of the hardcoded weed pool.
+DINO_DOMAIN = os.environ.get("DINO_DOMAIN", "").strip().lower()
+
+
+def _slug_domain(info):
+    return (info.get("domain") or "weed") if isinstance(info, dict) else "weed"
+
+
+def _domain_candidate_slugs(ds):
+    """Slugs to SCORE: all of a domain's slugs (or the whole registry for weed)."""
+    if not DINO_DOMAIN or DINO_DOMAIN == "weed":
+        return list(ds.keys())
+    return [s for s, i in ds.items() if _slug_domain(i) == DINO_DOMAIN]
+
+
+def _reference_slugs(ds):
+    """Slugs that seed the REFERENCE pool. Weed → the hardcoded trusted list.
+    A domain → its human-provided / kept / labeled data (best available), else
+    all of the domain's slugs as a fallback."""
+    if not DINO_DOMAIN or DINO_DOMAIN == "weed":
+        return list(TRUSTED_SLUGS)
+    dom = [(s, i) for s, i in ds.items() if _slug_domain(i) == DINO_DOMAIN]
+    trusted = [s for s, i in dom
+               if (i.get("source") == "manual_upload"
+                   or i.get("verdict") == "keep"
+                   or (i.get("n_local_labels") or 0) > 0)]
+    return trusted or [s for s, _ in dom]
+
+
 # How many images per trusted slug to put in the reference pool
 SAMPLES_PER_TRUSTED_SLUG = 500
 
@@ -241,15 +273,21 @@ def _normalize(x: np.ndarray) -> np.ndarray:
 
 def build_reference_pool():
     """Stage 1: build the reference pool of trusted-slug embeddings."""
-    log.info(f"=== Building reference pool from {len(TRUSTED_SLUGS)} trusted slugs ===")
     reg = _load_registry()
     ds = reg.get("datasets", {})
+    ref_slugs = _reference_slugs(ds)
+    _scope = f"domain '{DINO_DOMAIN}'" if (DINO_DOMAIN and DINO_DOMAIN != "weed") else "weed (default)"
+    log.info(f"=== Building reference pool from {len(ref_slugs)} slugs [{_scope}] ===")
+    if not ref_slugs:
+        log.warning(f"No reference slugs for {_scope} — nothing to curate. "
+                    f"Upload or keep some data for this domain first.")
 
     model, proc = _load_dinov2()
     all_emb = []
-    meta = {"slugs": {}, "samples_per_slug": SAMPLES_PER_TRUSTED_SLUG}
+    meta = {"slugs": {}, "samples_per_slug": SAMPLES_PER_TRUSTED_SLUG,
+            "domain": DINO_DOMAIN or "weed", "reference_slugs": ref_slugs}
 
-    for slug in TRUSTED_SLUGS:
+    for slug in ref_slugs:
         info = ds.get(slug, {})
         slug_dir = _resolve_slug_local_path(slug, info)
         if slug_dir is None:
@@ -321,8 +359,10 @@ def score_all_slugs():
 
     model, proc = _load_dinov2()
     scores = {}
-    slugs = list(ds.keys())
-    log.info(f"Scoring {len(slugs)} slugs (N_sample={SAMPLES_PER_CANDIDATE_SLUG} per slug)...")
+    slugs = _domain_candidate_slugs(ds)
+    ref_slugs = set(_reference_slugs(ds))
+    _scope = f"domain '{DINO_DOMAIN}'" if (DINO_DOMAIN and DINO_DOMAIN != "weed") else "whole registry"
+    log.info(f"Scoring {len(slugs)} slugs [{_scope}] (N_sample={SAMPLES_PER_CANDIDATE_SLUG} per slug)...")
     t_total = time.time()
     for i, slug in enumerate(slugs):
         info = ds[slug]
@@ -333,7 +373,7 @@ def score_all_slugs():
             log.warning(f"  [{slug}] FAIL: {e}")
             res = {"slug": slug, "status": "error", "score": None, "error": str(e)}
         dt = time.time() - t0
-        is_trusted = slug in TRUSTED_SLUGS
+        is_trusted = slug in ref_slugs
         res["is_trusted"] = is_trusted
         scores[slug] = res
         sc = res.get("score")
