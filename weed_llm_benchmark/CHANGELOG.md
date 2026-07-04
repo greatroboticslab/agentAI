@@ -5308,3 +5308,13 @@ Added a per-project "Analysis brain" dropdown to the Project-config card (popula
 catalog, LLMs only). Honest: if the cluster job can't be submitted / times out, it falls back to the rules
 review and says so; the big model is whatever is actually deployed (gemma4 today; deploy Qwen3/GLM-4.7 to go
 bigger). smoke +4 (brain-select shipped, async submit bad-slug 400 + member 403).
+
+### v3.0.189 — GLM-4.7-flash is the default analysis brain
+
+Set the async dataset AI-review to run on GLM-4.7-flash (30B, already deployed + verified on the cluster's
+persistent ollama store) instead of gemma4. Added `analysis_cluster` as a first-class model role (so it's
+selectable in /console + per-project via the config card), defaulting to `ollama:glm-4.7-flash`;
+`_analysis_cluster_model` + the hardcoded fallback now resolve to glm-4.7-flash. The gateway job
+(run_llm_infer.sh) requests a 32GB V100 which fits the 30B model in Q4, and the model files are cached on
+/ocean so no re-pull/SU-heavy deploy was needed. Verified: submitting a review now reports
+`model: glm-4.7-flash, where: cluster` and the job runs on the GPU. smoke 104/104.
