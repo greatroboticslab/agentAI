@@ -135,6 +135,21 @@ ck("step entry omits job when none", "job" not in e2)
 ck("record_round_step rejects bad step", db.record_round_step("coral", "notastep", "done") is None)
 
 
+# ---- dataset_eda.analyze_nonimage (Phase 5 extraction, pure) -------------
+import tempfile as _tf  # noqa: E402
+import os as _os  # noqa: E402
+from pathlib import Path as _P  # noqa: E402
+from weed_optimizer_framework.tools.dataset_eda import analyze_nonimage  # noqa: E402
+
+_d = _tf.mkdtemp()
+with open(_os.path.join(_d, "s.csv"), "w") as _f:
+    _f.write("t,ax,label\n0,0.1,walk\n1,0.2,walk\n2,0.05,idle\n")
+_r = analyze_nonimage(_P(_d))
+ck("analyze_nonimage finds sensor bucket", "sensor" in _r)
+ck("analyze_nonimage detects label column", (_r.get("sensor") or {}).get("label_column") == "label")
+ck("analyze_nonimage counts 2 classes", (_r.get("sensor") or {}).get("n_classes") == 2)
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)

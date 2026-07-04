@@ -5370,3 +5370,13 @@ run_train_generic.sh writes (results/framework/train_results/<domain>_<jobtag>.j
 `train` step DONE + metrics. Frontend `submitTrain` now `pollTrainResult`s after the job lands, shows the
 metric, and refreshes the round timeline. So both train and eval now fill their round step with real metrics.
 smoke +1 (train-result bad-jobtag 400, validation-only).
+
+### v3.0.193 — Phase 5 part 3: begin monolith modularization (first safe extraction)
+
+Started de-monolithing the ~13.3k-line dashboard_server.py, smallest-safest-first. Extracted the pure
+non-image EDA helper `_analyze_nonimage` (215 lines, filesystem-only, zero FastAPI/app-state coupling) into a
+new module `weed_optimizer_framework/tools/dataset_eda.py` as `analyze_nonimage`, imported back into
+dashboard_server as `_analyze_nonimage` — behaviour byte-identical (the sensor/video/audio/pointcloud/text
+analysis is unchanged). dashboard_server.py: 13,176 → 12,963 lines. Verified: the extracted function works
+standalone (unit test +3, offline — sensor bucket / label column / class count) and the live sensor-analysis
+smoke path still passes. One small extraction per tick, never a big-bang. smoke stays 113.
