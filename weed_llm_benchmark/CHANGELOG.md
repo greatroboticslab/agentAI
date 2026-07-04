@@ -5318,3 +5318,17 @@ selectable in /console + per-project via the config card), defaulting to `ollama
 (run_llm_infer.sh) requests a 32GB V100 which fits the 30B model in Q4, and the model files are cached on
 /ocean so no re-pull/SU-heavy deploy was needed. Verified: submitting a review now reports
 `model: glm-4.7-flash, where: cluster` and the job runs on the GPU. smoke 104/104.
+
+### v3.0.190 — Phase 4 part 2: collect/filter/label recorded + eval metric writeback
+
+Closes more of the compounding loop. (1) Running collect (brain_harvest / harvest_full_round_e2e), filter
+(dinov2_curate_registry), or label (sync_all_to_roboflow) from the dashboard now records that step on the
+project's current round ("running" + the real job tag, or "failed") — same honest semantics as train/eval
+(v3.0.186), via `_ROUND_STEP_FOR_ACTION` + `_record_round_step_for_action` hooked into the cluster-action
+result. (2) NEW `GET /api/eval/result?domain=&jobtag=` reads the metrics run_eval_generic.sh writes to the
+cluster (results/framework/eval_results/<domain>_<jobtag>.json) and, when present, records the round's `eval`
+step as DONE + its metrics (mAP/accuracy) — the compounding feedback the next collect can read. Previously the
+eval metric was written on the cluster but nothing polled it back. Frontend: `pollSubmit` now returns the
+landed job + refreshes the round timeline; `submitEval` then `pollEvalResult`s until the metric lands and
+shows it. So a round now visibly fills in collect→filter→label→train→eval with eval metrics. smoke +2
+(eval-result pending for unknown job + bad-jobtag 400).

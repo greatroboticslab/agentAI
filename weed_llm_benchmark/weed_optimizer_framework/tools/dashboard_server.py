@@ -2349,6 +2349,35 @@ async def api_eval_submit(request: Request):
                          "poll": f"/api/submit/status?id={sid}"})
 
 
+@app.get("/api/eval/result")
+def api_eval_result(request: Request, domain: str, jobtag: str):
+    """v3.0.190 (P4 part 2): poll a finished eval job's metrics (written by
+    run_eval_generic.sh to results/framework/eval_results/<domain>_<jobtag>.json)
+    and, when present, record the round's `eval` step as DONE + its metrics — the
+    compounding feedback the next collect can read. status ∈ pending | done."""
+    actor = _actor_from_request(request)
+    dom = _norm_domain(domain)
+    if not re.match(r"^[A-Za-z0-9_.-]+$", jobtag):
+        raise HTTPException(400, "bad jobtag")
+    r = _slurm(["bash", "-lc",
+                f"cat results/framework/eval_results/{dom}_{jobtag}.json 2>/dev/null"], timeout=20)
+    txt = (r.get("stdout") or "").strip()
+    if not txt:
+        return JSONResponse({"status": "pending"})
+    try:
+        d = json.loads(txt)
+    except Exception:
+        return JSONResponse({"status": "pending"})
+    metrics = d.get("metrics") or {}
+    try:
+        from . import db as _dbr
+        _dbr.record_round_step(dom, "eval", "done", metrics=metrics, job=jobtag,
+                               detail={"model": d.get("model")}, actor=actor)
+    except Exception:
+        pass
+    return JSONResponse({"status": "done", "metrics": metrics, "model": d.get("model")})
+
+
 @app.get("/api/submit/status")
 def api_submit_status(request: Request, id: str):
     """Poll an async train/eval submit. status ∈ pending | done | failed."""
@@ -5342,11 +5371,25 @@ async function pollSubmit(sid,msg,label){
  for(var i=0;i<80;i++){
   await new Promise(function(r){setTimeout(r,2500);});
   var s;try{s=await (await fetch('/api/submit/status?id='+encodeURIComponent(sid),{credentials:'include'})).json();}catch(e){continue;}
-  if(s.status==='done'){var r=s.result||{};msg.textContent=r.ok?('\\u2705 '+label+' job submitted \\u2014 '+(r.msg||'')+(r.task?(' ('+r.task+')'):'')):('\\u274c '+(r.error||r.msg||'failed'));return;}
-  if(s.status==='failed'){msg.textContent='\\u274c '+(s.error||'failed');return;}
+  if(s.status==='done'){var r=s.result||{};msg.textContent=r.ok?('\\u2705 '+label+' job submitted \\u2014 '+(r.msg||'')+(r.task?(' ('+r.task+')'):'')):('\\u274c '+(r.error||r.msg||'failed'));if(typeof loadRounds==='function')loadRounds();return r;}
+  if(s.status==='failed'){msg.textContent='\\u274c '+(s.error||'failed');return null;}
   msg.textContent='\\u23f3 staging data to the cluster + submitting\\u2026 ('+(i+1)+')';
  }
  msg.textContent='\\u23f3 still submitting \\u2014 check the console for the job.';
+ return null;
+}
+// v3.0.190 (P4 part 2): after an eval job lands, poll its metrics and record them
+// on the round (server-side writeback) — the compounding feedback loop closes here.
+async function pollEvalResult(domain,jobtag,msg){
+ for(var i=0;i<120;i++){
+  await new Promise(function(r){setTimeout(r,10000);});
+  var s;try{s=await (await fetch('/api/eval/result?domain='+encodeURIComponent(domain)+'&jobtag='+encodeURIComponent(jobtag),{credentials:'include'})).json();}catch(e){continue;}
+  if(s&&s.status==='done'){var m=s.metrics||{};var ks=Object.keys(m);
+    msg.textContent='\\u2705 eval done \\u2014 '+(ks.length?ks.map(function(k){return k+': '+m[k];}).join(', '):'no metrics')+(s.model?(' ('+s.model+')'):'');
+    if(typeof loadRounds==='function')loadRounds(); return;}
+  msg.textContent='\\u23f3 eval running on the cluster\\u2026 metrics pending ('+(i+1)+')';
+ }
+ msg.textContent='\\u23f3 eval still running \\u2014 metrics will appear on the round when done.';
 }
 async function submitEval(){
  var sel=document.getElementById('tr-ds'),msg=document.getElementById('tr-msg'),go=document.getElementById('ev-go');
@@ -5355,7 +5398,8 @@ async function submitEval(){
  if(!confirm('Evaluate on "'+slug+'" (runs model.val on its val split; model: '+msz+' \\u2014 auto uses this project\\u2019s latest trained model, else a baseline)?'))return;
  go.disabled=true;msg.textContent='\\u23f3 submitting eval\\u2026';
  try{var d=await (await fetch('/api/eval/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,model_size:msz})})).json();
-  if(d&&d.pending&&d.submit_id){await pollSubmit(d.submit_id,msg,'eval');}
+  if(d&&d.pending&&d.submit_id){var r=await pollSubmit(d.submit_id,msg,'eval');
+    if(r&&r.ok&&r.jobtag){pollEvalResult('__DOM__',r.jobtag,msg);}}
   else{msg.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}
  catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
 }
@@ -8962,6 +9006,31 @@ def api_cluster_actions_list():
                           for k, v in _CLUSTER_ACTIONS.items()})
 
 
+# v3.0.190 (P4 part 2): map an agent action → the compounding-round step it is,
+# so running collect/filter/label from the dashboard is recorded on the project's
+# current round (same honest "running + jobtag" semantics as train/eval in v3.0.186).
+_ROUND_STEP_FOR_ACTION = {
+    "brain_harvest": "collect", "harvest_full_round_e2e": "collect",
+    "dinov2_curate_registry": "filter", "sync_all_to_roboflow": "label",
+}
+
+
+def _record_round_step_for_action(action: str, domain, ok: bool, msg, actor: str) -> None:
+    step = _ROUND_STEP_FOR_ACTION.get(action)
+    if not step:
+        return
+    dom = _norm_domain(domain or "weed")
+    job = None
+    mm = re.search(r"Submitted batch job (\d+)", str(msg or ""))
+    if mm:
+        job = "j" + mm.group(1)
+    try:
+        from . import db as _dbr
+        _dbr.record_round_step(dom, step, "running" if ok else "failed", job=job, actor=actor)
+    except Exception:
+        pass
+
+
 @app.post("/api/cluster_action/{action}")
 def api_cluster_action(action: str, request: Request, payload: dict = Body(default={})):
     """Trigger one of the whitelisted actions. Returns the sbatch output
@@ -9182,6 +9251,8 @@ def api_cluster_action(action: str, request: Request, payload: dict = Body(defau
                           if r["ok"] else r["stderr"].strip()),
                   "params": body_used}
         _log_action(action, result)
+        _record_round_step_for_action(action, body.get("domain"), result["ok"],
+                                      result.get("stdout") or result.get("msg"), _actor)
         return result
 
     if spec["type"] == "subprocess":
@@ -9280,6 +9351,8 @@ def api_cluster_action(action: str, request: Request, payload: dict = Body(defau
                   "started_at": ts,
                   "msg": f"started pid={proc.pid} → {log_path.name}"}
         _log_action(action, result)
+        _record_round_step_for_action(action, body.get("domain"), True,
+                                      f"pid={proc.pid}", _actor)
         return result
 
     if spec["type"] == "restart_self":
