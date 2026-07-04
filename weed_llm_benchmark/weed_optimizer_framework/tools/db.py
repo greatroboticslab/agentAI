@@ -508,6 +508,13 @@ ROUND_STEPS = ["collect", "filter", "label", "train", "eval"]
 _ROUND_STATUSES = {"pending", "running", "done", "failed", "skipped"}
 
 
+def _now_iso() -> str:
+    """ISO-8601 UTC string — round docs are returned raw via JSONResponse, so their
+    timestamps must be JSON-serializable (unlike _now()'s datetime)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _round_id(domain_id: str, n: int) -> str:
     return f"{domain_id}#{int(n)}"
 
@@ -534,13 +541,13 @@ def start_round(domain_id: str, actor: str = "user") -> Optional[dict]:
         last = db[COLL_ROUNDS].find_one({"domain": domain_id},
                                         sort=[("round_num", -1)])
         n = int((last or {}).get("round_num", 0)) + 1
-        now = _now()
+        now = _now_iso()
         doc = {"_id": _round_id(domain_id, n), "domain": domain_id,
                "round_num": n, "created_at": now, "updated_at": now,
                "actor": actor, "status": "open", "steps": {}, "metrics": {}}
         db[COLL_ROUNDS].insert_one(doc)
         try:
-            db[COLL_AUDIT].insert_one({"ts": now, "actor": actor,
+            db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
                 "event": "round.start", "target": {"kind": "domain", "id": domain_id},
                 "after": {"round_num": n}})
         except Exception:
@@ -571,7 +578,7 @@ def record_round_step(domain_id: str, step: str, status: str, detail=None,
                 if not cur:
                     return None
             round_num = cur["round_num"]
-        now = _now()
+        now = _now_iso()
         sets = {f"steps.{step}": _round_step_entry(status, detail, job, actor, now),
                 "updated_at": now}
         if isinstance(metrics, dict) and metrics:
@@ -580,7 +587,7 @@ def record_round_step(domain_id: str, step: str, status: str, detail=None,
         db[COLL_ROUNDS].update_one({"_id": _round_id(domain_id, round_num)},
                                    {"$set": sets}, upsert=True)
         try:
-            db[COLL_AUDIT].insert_one({"ts": now, "actor": actor,
+            db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
                 "event": "round.step", "target": {"kind": "domain", "id": domain_id},
                 "after": {"round_num": round_num, "step": step, "status": status}})
         except Exception:
