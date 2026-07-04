@@ -5239,3 +5239,15 @@ might not have. Same injection pattern as the (proven) `DINO_THRESHOLD` filter r
 compile + router-resolve level (the domain-override resolve is covered by the unit suite); not fired as a live
 SU-costing job. Deep on-demand tiers (deep_review glm-4.7-flash / hard_reasoning deepseek-v3) remain declared
 in the router but are not yet wired to a live action — deferred honestly until there's a reachable endpoint.
+
+### v3.0.184 — Phase 3 (start): honest per-modality gate on train / eval
+
+The trainer/evaluator are Ultralytics-YOLO (vision) only, but nothing stopped a non-image project (video /
+sensor / pointcloud / audio / text) from firing a train job that would silently fail as YOLO. Now
+`/api/train/submit` and `/api/eval/submit` check the project's `modality` (via `_require_trainable_modality`)
+and return a clear **501** — "Training for 'video' data is not wired yet — only image (vision/YOLO) training
+is live … you can still collect, upload, and analyze" — instead of a confusing YOLO failure. The project page
+mirrors this: for a non-image project the Train/Evaluate panel is replaced by an honest amber "not runnable
+yet for <modality>" note (no dead button). `_TRAINABLE_MODALITIES = {"image"}` is the single place to widen
+as real trainers land. Upload + analysis were already modality-aware (v3.0.137), so non-vision data still
+flows through collection/EDA. smoke +4 (video project → train 501, eval 501, page shows the note).

@@ -42,6 +42,15 @@ ck "domain config has thresholds" yes "$(curl -s $BA --max-time 15 "$BASE/api/do
 ck "project page ships config editor" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'saveDomainConfig' && echo yes || echo no)"
 ck "model router exposed + resolves" yes "$(curl -s $BA --max-time 15 "$BASE/api/models" | python3 -c "import json,sys;d=json.load(sys.stdin).get('router',{});r=d.get('analysis_summary',{});print('yes' if r.get('resolved') and r.get('place')=='lab' else 'no')" 2>/dev/null)"
 
+echo "== MODALITY GATE (P3: train/eval vision-only, honest) =="
+HC $BA -X POST -H 'Content-Type: application/json' -d '{"domain":"smokevid"}' "$BASE/api/agent/delete" >/dev/null  # clean stale
+VID=$(curl -s $BA --max-time 20 -X POST -H 'Content-Type: application/json' -d '{"name":"smokevid","research_field":"testing","modality":["video"]}' "$BASE/api/agent/create" | python3 -c "import json,sys;print(json.load(sys.stdin).get('domain',''))" 2>/dev/null)
+ck "video project created" yes "$([ -n "$VID" ] && echo yes || echo no)"
+ck "train on video -> 501" 501 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\",\"slug\":\"dummy\"}" "$BASE/api/train/submit")"
+ck "eval on video -> 501" 501 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\",\"slug\":\"dummy\"}" "$BASE/api/eval/submit")"
+ck "video page shows not-yet note" yes "$(curl -s $BA --max-time 20 "$BASE/agent/$VID" | grep -q 'modality is' && echo yes || echo no)"
+[ -n "$VID" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\"}" "$BASE/api/agent/delete" >/dev/null
+
 echo "== DATASET ANALYSIS (EDA) =="
 ck "GET /dataset/$SLUG" 200 "$(HC $BA "$BASE/dataset/$SLUG")"
 AN=$(curl -s $BA --max-time 90 "$BASE/api/dataset/analyze?slug=$SLUG")

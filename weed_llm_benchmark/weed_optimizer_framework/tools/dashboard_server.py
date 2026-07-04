@@ -1787,6 +1787,32 @@ _MODALITY_EXT = {
 # sidecars always allowed alongside any modality (labels / metadata / config)
 _UPLOAD_SIDECAR_EXT = {".txt", ".json", ".xml", ".yaml", ".yml", ".csv"}
 
+# v3.0.184 (P3): which modalities the train/eval pipeline can ACTUALLY run today.
+# Only image (Ultralytics YOLO vision) is wired. Everything else can be collected /
+# uploaded / analyzed, but training is not yet implemented — we reject it HONESTLY
+# with a 501 (rather than silently attempting YOLO on audio/sensor/pointcloud and
+# failing confusingly). Add a modality here only when its trainer is real.
+_TRAINABLE_MODALITIES = {"image"}
+
+
+def _domain_modality(dd: dict) -> str:
+    """First declared modality of a project (domain doc), defaulting to 'image'."""
+    mods = (dd or {}).get("modality") or ["image"]
+    m = str(mods[0]).strip().lower() if mods else "image"
+    return m or "image"
+
+
+def _require_trainable_modality(dd: dict, verb: str = "Training") -> str:
+    """Return the project modality, or raise a clear 501 when its train/eval path
+    is not implemented yet. Keeps non-vision projects honest instead of pretending."""
+    m = _domain_modality(dd)
+    if m not in _TRAINABLE_MODALITIES:
+        raise HTTPException(501,
+            f"{verb} for '{m}' data is not wired yet — only image (vision / YOLO) "
+            f"{verb.lower()} is live today. This project's modality is '{m}'. You can "
+            f"still collect, upload, and analyze {m} datasets.")
+    return m
+
 
 def _actor_from_request(request) -> str:
     """Best-effort uploader identity: the signed Google session user if present,
@@ -2189,6 +2215,7 @@ async def api_train_submit(request: Request):
         raise HTTPException(400, "bad/missing dataset slug")
     from . import db as _db
     dd = _db.get_domain(domain) or {}
+    _require_trainable_modality(dd, "Training")   # v3.0.184 (P3): honest non-vision gate
     task = str(body.get("task") or dd.get("task") or "detection")
     ultra = {"detection": "detect", "segmentation": "segment",
              "classification": "classify"}.get(task, task)
@@ -2261,6 +2288,7 @@ async def api_eval_submit(request: Request):
         raise HTTPException(400, "bad/missing dataset slug")
     from . import db as _db
     dd = _db.get_domain(domain) or {}
+    _require_trainable_modality(dd, "Evaluation")   # v3.0.184 (P3): honest non-vision gate
     task = str(body.get("task") or dd.get("task") or "detection")
     ultra = {"detection": "detect", "segmentation": "segment",
              "classification": "classify"}.get(task, task)
@@ -4524,6 +4552,10 @@ def agent_generic(domain_id: str):
     _task = _h.escape(str(d.get("task") or "detection"))
     _mods = d.get("modality") or ["image"]
     _modline = _h.escape(", ".join(str(m) for m in _mods))
+    # v3.0.184 (P3): training/eval is vision-only today — reflect that honestly in
+    # the UI instead of showing a Train button that will 501 for non-image data.
+    _mod0 = str(_mods[0]).strip().lower() if _mods else "image"
+    _is_vision = _mod0 in _TRAINABLE_MODALITIES
     _model = _h.escape(str(d.get("model") or "auto"))
     _metric = _h.escape(str(d.get("target_metric") or "mAP50-95"))
     _owner = _h.escape(str(d.get("owner") or ""))
@@ -4663,8 +4695,8 @@ def agent_generic(domain_id: str):
      </div>
    </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Train a model</div>
-   <div style="margin-top:10px;background:#f8fafc;border:1px solid #e3e7ef;border-radius:10px;padding:14px">
-     <div style="font-size:13px;color:#475569;margin-bottom:10px">Train this agent&rsquo;s <b>{_task}</b> task on one of its uploaded datasets. Runs on the cluster GPU on-demand (queued); the result mAP/accuracy is written back here.</div>
+   {('''<div style="margin-top:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;font-size:13px;color:#92400e">Training &amp; evaluation are wired for <b>image</b> (vision / YOLO) projects today. This project&rsquo;s modality is <b>''' + _modline + '''</b>, so training isn&rsquo;t runnable yet &mdash; you can still collect, upload, and analyze datasets. A trainer for this modality is on the roadmap.</div>''') if not _is_vision else ('''<div style="margin-top:10px;background:#f8fafc;border:1px solid #e3e7ef;border-radius:10px;padding:14px">
+     <div style="font-size:13px;color:#475569;margin-bottom:10px">Train this agent&rsquo;s <b>''' + _task + '''</b> task on one of its uploaded datasets. Runs on the cluster GPU on-demand (queued); the result mAP/accuracy is written back here.</div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
        <select id="tr-ds" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;min-width:200px"><option value="">&mdash; choose an uploaded dataset &mdash;</option></select>
        <select id="tr-para" title="learning paradigm" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
@@ -4681,7 +4713,7 @@ def agent_generic(domain_id: str):
        <button id="ev-go" onclick="submitEval()" title="Evaluate a model on this dataset's val split" style="border:1px solid #c4b5fd;cursor:pointer;background:#f5f3ff;color:#7c3aed;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">&#128202; Evaluate</button>
        <span id="tr-msg" style="font-size:13px;color:#475569"></span>
      </div>
-   </div>
+   </div>''')}
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
