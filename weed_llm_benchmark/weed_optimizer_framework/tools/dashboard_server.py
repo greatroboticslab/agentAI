@@ -4414,7 +4414,7 @@ def agent_generic(domain_id: str):
    <div style="margin-top:20px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Agents in this project</div>
    <div style="margin-top:10px;border:1px solid #e3e7ef;border-radius:10px;overflow:hidden">{_arows}</div>
    <div id="run-msg" style="margin-top:10px;font-size:13px;display:none;padding:10px 12px;border-radius:8px;background:#f1f5f9"></div>
-   <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">&#9654; Run fires a real cluster job (needs cluster access). <b>Collector</b> (harvest by this project&rsquo;s queries), <b>Filter</b> (DINOv2 quality-scores this project&rsquo;s datasets), and <b>Trainer</b> (trains on your uploaded dataset) all honor this project&rsquo;s domain. <b>Labeler</b> still targets the shared weed labeling pipeline &mdash; per-domain labeling is the next backend step.</div>
+   <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">&#9654; Run fires a real cluster job (needs cluster access). <b>Collector</b> (harvest by this project&rsquo;s queries), <b>Filter</b> (DINOv2 quality-scores this project&rsquo;s datasets), <b>Labeler</b> (pushes this project&rsquo;s datasets to its own Roboflow project for human labeling), and <b>Trainer</b> (trains on your uploaded dataset) all honor this project&rsquo;s domain. <b>Evaluator</b> is still a stub (coming next).</div>
    <div id="agent-add" style="display:none;margin-top:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center">
      <select id="ag-type" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">
        <option value="collector">Collector (auto-collect datasets)</option>
@@ -8500,6 +8500,26 @@ async def api_cluster_action(action: str, request: Request):
         # shared-FS log so any login node + the dashboard can tail it.
         import subprocess as _sp
         argv = list(spec["argv"])
+        # v3.0.174: domain-aware LABELER — push ONLY this project's datasets to the
+        # project's own Roboflow project (auto-created), not the shared weed one.
+        if action == "sync_all_to_roboflow":
+            _ldom = re.sub(r"[^a-z0-9_]+", "", str(body.get("domain") or "").strip().lower())[:40]
+            if _ldom and _ldom != "weed":
+                _lproj = f"{_ldom}-dataset".replace("_", "-")
+                # replace the hardcoded weed --project/--folder with the domain's,
+                # add --domain (filter slugs) + --force-project (route all to it).
+                _clean = []
+                _skip = 0
+                for _a in argv:
+                    if _skip:
+                        _skip = 0
+                        continue
+                    if _a in ("--project", "--folder"):
+                        _skip = 1
+                        continue
+                    _clean.append(_a)
+                argv = _clean + ["--domain", _ldom, "--project", _lproj,
+                                 "--force-project", _lproj, "--folder", _ldom.replace("_", "-")]
         # v3.0.99.49: in lab-control mode (dashboard on lab, compute on cluster)
         # some subprocess actions CANNOT run locally — they need GPU/torch
         # (dinov2_filter, train_yolo) or cluster-only artifacts (object_bank,

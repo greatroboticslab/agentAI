@@ -223,6 +223,11 @@ def cmd_sync_newest_slugs(args):
                      or os.environ.get("SYNC_REQUIRE_CWD12") == "1")
     force_project = (getattr(args, "force_project", None)
                      or os.environ.get("SYNC_FORCE_PROJECT", "") or "")
+    # v3.0.174: per-domain labeling. --domain <dom> pushes ONLY that domain's
+    # slugs, and (with --force-project) routes them all to that domain's Roboflow
+    # project (auto-created if missing). weed/unset → unchanged global behaviour.
+    _sync_domain = (getattr(args, "domain", None) or "").strip().lower()
+    _auto_create = bool(_sync_domain)
 
     # v3.0.76: helper to map round → project name
     try:
@@ -299,6 +304,8 @@ def cmd_sync_newest_slugs(args):
             continue
         if require_cwd12 and not _slug_has_cwd12(info.get("class_names")):
             continue
+        if _sync_domain and (info.get("domain") or "weed").strip().lower() != _sync_domain:
+            continue                     # v3.0.174: only this domain's slugs
         lp = info.get("local_path", "")
         if not lp or not os.path.isdir(lp):
             continue
@@ -346,11 +353,27 @@ def cmd_sync_newest_slugs(args):
                 proj_cache[slug_proj_name] = ws.project(slug_proj_name)
                 print(f"\n=== Project: {slug_proj_name} (round {h_round}) ===")
             except Exception as e:
-                print(f"  SKIP {slug}: cannot open project "
-                      f"{slug_proj_name!r}: {type(e).__name__}: "
-                      f"{str(e)[:80]}. Run start_new_round to create it.",
-                      file=sys.stderr)
-                proj_cache[slug_proj_name] = None
+                # v3.0.174: in per-domain mode, auto-create the domain's project
+                # instead of skipping (honest error if the plan blocks creation).
+                if _auto_create:
+                    try:
+                        ws.create_project(project_name=slug_proj_name,
+                                          project_type="object-detection",
+                                          project_license="MIT",
+                                          annotation=slug_proj_name)
+                        proj_cache[slug_proj_name] = ws.project(slug_proj_name)
+                        print(f"\n=== Project (created): {slug_proj_name} ===")
+                    except Exception as ce:
+                        print(f"  SKIP {slug}: could not create/open domain project "
+                              f"{slug_proj_name!r}: {type(ce).__name__}: {str(ce)[:100]} "
+                              f"(Roboflow free plan may cap projects).", file=sys.stderr)
+                        proj_cache[slug_proj_name] = None
+                else:
+                    print(f"  SKIP {slug}: cannot open project "
+                          f"{slug_proj_name!r}: {type(e).__name__}: "
+                          f"{str(e)[:80]}. Run start_new_round to create it.",
+                          file=sys.stderr)
+                    proj_cache[slug_proj_name] = None
         proj = proj_cache[slug_proj_name]
         if proj is None:
             continue
@@ -1052,6 +1075,8 @@ def main():
                     help="folder name or id (also reads env ROBOFLOW_FOLDER)")
     # v3.0.71: sync newest unsynced slugs from registry
     sn = sub.add_parser("sync-newest-slugs")
+    sn.add_argument("--domain", default=None,
+                    help="v3.0.174: push ONLY this domain's slugs to its own project (auto-created)")
     sn.add_argument("--project", default=None,
                     help="destination project (default weed-crop-agent-dataset)")
     sn.add_argument("--folder", default=None,

@@ -5116,3 +5116,16 @@ the project. Now it honors the project's domain:
 - Verified the domain slug-selection logic by unit test (coral domain → scores only coral slugs, reference
   = its uploaded/labeled slugs). The full 4h GPU curation job was NOT run (resource-sensible); the
   threading + filtering code is verified. Labeler + evaluator are the remaining per-domain work.
+
+### v3.0.174 — Labeler agent is now DOMAIN-AWARE (per-domain agents, 2/3)
+
+The labeler pushed the newest slugs to a hardcoded weed Roboflow project. Now it pushes each project's
+own datasets to the project's own Roboflow project:
+- roboflow_sync `sync-newest-slugs --domain <dom>`: filters to ONLY that domain's slugs and (with
+  --force-project) routes them all to the domain's project, AUTO-CREATING it via the Roboflow API if
+  missing (honest error printed if the free plan caps project creation).
+- The dashboard rewrites the labeler subprocess argv for a non-weed project: drops the weed --project/
+  --folder and adds --domain <dom> --project <dom>-dataset --force-project <dom>-dataset --folder <dom>.
+- Verified: argv transform (weed project dropped, domain project + --domain + --force-project added) and
+  the new --domain CLI arg. The actual Roboflow push was NOT run (would spend the free Roboflow key +
+  create a real project). Evaluator is the last per-domain piece.
