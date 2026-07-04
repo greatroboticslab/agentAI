@@ -5228,3 +5228,14 @@ reachable (cluster job / API key). Wired the two lab-synchronous LLM sites throu
 `config.model_routing` for per-domain override + returns `model_role`/`model_source`). `/api/models` now
 returns the resolved `router` table for observability. Unit tests +14 (tests/test_domain_config.py, 30 total,
 no network). smoke 82.
+
+### v3.0.183 — Phase 2 part 2: harvest brain model routed per-project
+
+The collector's brain model can now be chosen per project: the `brain_harvest` sbatch resolves the
+`harvest_brain` role through the router with the project's `config.model_routing`, and injects
+`BRAIN_MODEL=<bare name>` into the job env ONLY on a deliberate per-project override (source=domain) — the
+default path leaves the run script's tested `gemma4:26b` untouched, so we never swap in a model the cluster
+might not have. Same injection pattern as the (proven) `DINO_THRESHOLD` filter route. Verified at
+compile + router-resolve level (the domain-override resolve is covered by the unit suite); not fired as a live
+SU-costing job. Deep on-demand tiers (deep_review glm-4.7-flash / hard_reasoning deepseek-v3) remain declared
+in the router but are not yet wired to a live action — deferred honestly until there's a reachable endpoint.

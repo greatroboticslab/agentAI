@@ -8684,6 +8684,23 @@ def api_cluster_action(action: str, request: Request, payload: dict = Body(defau
                     body_used["domain_cfg_staged"] = bool(_sr.get("ok"))
                 except Exception as _e:
                     body_used["domain_cfg_staged"] = f"fail:{type(_e).__name__}"
+            # v3.0.183 (P2): route the harvest BRAIN model through the model router,
+            # so a project can pick its own brain via config.model_routing.harvest_brain.
+            # Inject ONLY on a DELIBERATE per-project override (source=domain) — the
+            # global/default path leaves the run script's tested default (gemma4:26b via
+            # setdefault) untouched, so we never swap in a model the cluster may not have.
+            # Strip the `ollama:` transport prefix → the bare name the cluster Ollama wants.
+            try:
+                if _dom and _dom != "weed":
+                    from . import model_router as _mrh, db as _dbh
+                    _hpick = _mrh.resolve("harvest_brain",
+                                          domain_config=_dbh.get_domain_config(_dom))
+                    if _hpick.get("source") == "domain":
+                        _bm = _hpick["model"].split(":", 1)[1] if ":" in _hpick["model"] else _hpick["model"]
+                        export_pairs.append(f"BRAIN_MODEL={_bm}")
+                        body_used["brain_model"] = _bm
+            except Exception as _e:
+                body_used["brain_model"] = f"skip:{type(_e).__name__}"
             if len(export_pairs) > 1:
                 sbatch_cli += [f"--export={','.join(export_pairs)}"]
         # v3.0.123: clean_train_d accepts optional overrides so a SHORT real
