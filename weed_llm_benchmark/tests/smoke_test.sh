@@ -44,6 +44,7 @@ ck "model router exposed + resolves" yes "$(curl -s $BA --max-time 15 "$BASE/api
 ck "rounds api exposes step order" collect "$(curl -s $BA --max-time 15 "$BASE/api/domain/rounds?domain=weed" | python3 -c "import json,sys;print(json.load(sys.stdin)['steps_order'][0])" 2>/dev/null)"
 ck "project page ships round timeline" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'loadRounds' && echo yes || echo no)"
 ck "project page ships brain-select" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'cfg-brain' && echo yes || echo no)"
+ck "project page ships one-click round" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'runFullRound' && echo yes || echo no)"
 ck "async big-review rejects bad slug" 400 "$(HC $BA -X POST -H 'Content-Type: application/json' -d '{"slug":"bad slug!"}' "$BASE/api/dataset/analyze/ai/submit")"
 ck "eval result pending for unknown job" pending "$(curl -s $BA --max-time 25 "$BASE/api/eval/result?domain=weed&jobtag=nope123" | python3 -c "import json,sys;print(json.load(sys.stdin).get('status'))" 2>/dev/null)"
 ck "eval result rejects bad jobtag" 400 "$(HC $BA "$BASE/api/eval/result?domain=weed&jobtag=bad%21tag")"

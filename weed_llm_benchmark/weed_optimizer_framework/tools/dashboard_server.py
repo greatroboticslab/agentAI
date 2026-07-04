@@ -4982,6 +4982,7 @@ def agent_generic(domain_id: str):
    <div style="margin-top:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
      <span style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Compounding rounds</span>
      <button id="round-new" onclick="startRound()" style="display:none;border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;font-size:12px;padding:5px 11px;border-radius:7px;cursor:pointer">&#43; Start new round</button>
+     <button id="round-run" onclick="runFullRound()" style="display:none;border:0;background:#4f46e5;color:#fff;font-weight:600;font-size:12px;padding:5px 11px;border-radius:7px;cursor:pointer">&#9654; Run a round (collect &rarr; &hellip;)</button>
      <span id="round-msg" style="font-size:12px;color:#475569"></span>
    </div>
    <div style="margin-top:8px;font-size:11.5px;color:#94a3b8;line-height:1.5">Each round is one pass of the loop &mdash; collect &rarr; filter &rarr; label &rarr; train &rarr; evaluate &mdash; and its steps are recorded here with who ran them and when. Evaluation metrics feed back to inform the next round&rsquo;s collection.</div>
@@ -5206,6 +5207,7 @@ loadModelCatalog();
     Array.prototype.forEach.call(document.querySelectorAll('.agdel'),function(b){b.style.display='inline-block';});
     var pc=document.getElementById('proj-config');if(pc){pc.style.display='block';loadDomainConfig();}
     var rn=document.getElementById('round-new');if(rn)rn.style.display='inline-block';
+    var rr=document.getElementById('round-run');if(rr)rr.style.display='inline-block';
   }
 }catch(e){}})();
 var _STEP_ICON={collect:'\\ud83d\\udd0d',filter:'\\ud83e\\uddf9',label:'\\ud83c\\udff7\\ufe0f',train:'\\ud83d\\ude80',eval:'\\ud83d\\udcca'};
@@ -5236,6 +5238,24 @@ async function startRound(){
  try{var d=await (await fetch('/api/domain/round/start',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
   if(d&&d.ok){if(m)m.textContent='\\u2705 round '+d.round.round_num+' opened';loadRounds();}else{if(m)m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}
  catch(e){if(m)m.textContent='\\u274c '+e;}
+}
+// v3.0.190 (P4 part 2): one-click round — opens a fresh round + kicks off COLLECT.
+// Honest: the later steps are async cluster jobs + a human label step, so this
+// starts the round and the collect; you advance filter/label/train/eval as each
+// completes (each is recorded on the round + shown in the timeline).
+async function runFullRound(){
+ var m=document.getElementById('round-msg');
+ if(!confirm('Run a round: open a new round and start COLLECT (a harvest job on the cluster). Filter, human-label, train and evaluate are then advanced step by step as each finishes. Continue?'))return;
+ if(m)m.textContent='\\u23f3 opening round\\u2026';
+ try{
+  var d=await (await fetch('/api/domain/round/start',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
+  if(!d||!d.ok){if(m)m.textContent='\\u274c '+((d&&(d.detail||d.msg))||'could not open round');return;}
+  if(m)m.textContent='\\u2705 round '+d.round.round_num+' opened \\u2014 starting collect\\u2026';
+  var c=await (await fetch('/api/cluster_action/brain_harvest',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__'})})).json();
+  if(c&&(c.ok||/Submitted batch job/.test(c.msg||c.stdout||''))){if(m)m.textContent='\\u2705 round '+d.round.round_num+': collect submitted. Advance filter \\u2192 label \\u2192 train \\u2192 evaluate as each finishes.';}
+  else{if(m)m.textContent='\\u26a0 round opened, but collect did not start: '+((c&&(c.detail||c.msg))||'need cluster access?');}
+  loadRounds();
+ }catch(e){if(m)m.textContent='\\u274c '+e;}
 }
 async function loadDomainConfig(){
  try{

@@ -5332,3 +5332,11 @@ eval metric was written on the cluster but nothing polled it back. Frontend: `po
 landed job + refreshes the round timeline; `submitEval` then `pollEvalResult`s until the metric lands and
 shows it. So a round now visibly fills in collect→filter→label→train→eval with eval metrics. smoke +2
 (eval-result pending for unknown job + bad-jobtag 400).
+
+### v3.0.190.1 — Phase 4 part 2: one-click "Run a round" ⇒ Phase 4 COMPLETE
+
+Added a "▶ Run a round" button (owner) that opens a fresh round and kicks off the COLLECT step (harvest) in
+one click. Honest by design: the later steps are async cluster jobs + a human label step, so it starts the
+round + collect and you advance filter → label → train → evaluate as each finishes — every step is recorded
+on the round and shown in the timeline (with eval metrics via the writeback). This turns the stitched manual
+buttons into a guided compounding round. ⇒ Phase 4 (closed compounding loop) COMPLETE. smoke +1 (button ships).
