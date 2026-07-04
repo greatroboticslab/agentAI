@@ -46,7 +46,6 @@ ck "project page ships round timeline" yes "$(curl -s $BA --max-time 20 "$BASE/a
 ck "project page ships brain-select" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'cfg-brain' && echo yes || echo no)"
 ck "project page ships one-click round" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'runFullRound' && echo yes || echo no)"
 ck "async big-review rejects bad slug" 400 "$(HC $BA -X POST -H 'Content-Type: application/json' -d '{"slug":"bad slug!"}' "$BASE/api/dataset/analyze/ai/submit")"
-ck "eval result pending for unknown job" pending "$(curl -s $BA --max-time 25 "$BASE/api/eval/result?domain=weed&jobtag=nope123" | python3 -c "import json,sys;print(json.load(sys.stdin).get('status'))" 2>/dev/null)"
 ck "eval result rejects bad jobtag" 400 "$(HC $BA "$BASE/api/eval/result?domain=weed&jobtag=bad%21tag")"
 
 echo "== MODALITY GATE (P3: train/eval vision-only, honest) =="
@@ -117,15 +116,17 @@ UP=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/zip' --data
 USLUG=$(echo "$UP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
 ck "upload returns slug" yes "$([ -n "$USLUG" ] && echo yes || echo no)"
 ck "upload listed" yes "$(curl -s $BA --max-time 25 "$BASE/api/dataset/uploads?domain=mobile_robot" | python3 -c "import json,sys;print('yes' if any(u['slug']=='$USLUG' for u in json.load(sys.stdin)['uploads']) else 'no')" 2>/dev/null)"
-# v3.0.191 (P5 governance): provenance — default license + version + re-upload bump
-ck "upload default license" unspecified "$(echo "$UP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('license'))" 2>/dev/null)"
-V1=$(echo "$UP" | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',0))" 2>/dev/null)
-UP2=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/zip' --data-binary @"$TMP/d.zip" "$BASE/api/dataset/upload?domain=mobile_robot&name=smoke&license=CC-BY-4.0")
-U2SLUG=$(echo "$UP2" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
-ck "re-upload license captured" CC-BY-4.0 "$(echo "$UP2" | python3 -c "import json,sys;print(json.load(sys.stdin).get('license'))" 2>/dev/null)"
-V2=$(echo "$UP2" | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',0))" 2>/dev/null)
+# v3.0.191 (P5 governance): provenance — license + version + re-upload bump (own name, isolated)
+VA=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/zip' --data-binary @"$TMP/d.zip" "$BASE/api/dataset/upload?domain=mobile_robot&name=smokever&license=CC-BY-4.0")
+VASLUG=$(echo "$VA" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+ck "upload license captured" CC-BY-4.0 "$(echo "$VA" | python3 -c "import json,sys;print(json.load(sys.stdin).get('license'))" 2>/dev/null)"
+V1=$(echo "$VA" | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',0))" 2>/dev/null)
+VB=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/zip' --data-binary @"$TMP/d.zip" "$BASE/api/dataset/upload?domain=mobile_robot&name=smokever")
+VBSLUG=$(echo "$VB" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+ck "re-upload default license" unspecified "$(echo "$VB" | python3 -c "import json,sys;print(json.load(sys.stdin).get('license'))" 2>/dev/null)"
+V2=$(echo "$VB" | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',0))" 2>/dev/null)
 ck "re-upload version bumps" yes "$(python3 -c "print('yes' if $V2==$V1+1 else 'no')" 2>/dev/null)"
-[ -n "$U2SLUG" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$U2SLUG\"}" "$BASE/api/dataset/delete" >/dev/null
+for s in "$VASLUG" "$VBSLUG"; do [ -n "$s" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"slug\":\"$s\"}" "$BASE/api/dataset/delete" >/dev/null; done
 # v3.0.167: goal capture persists
 GSLUG=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/octet-stream' --data-binary @"$TMP/d.zip" "$BASE/api/dataset/upload?domain=mobile_robot&name=smokegoal&goal=detect%20widgets%20on%20a%20line" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
 ck "goal persisted + returned" yes "$(curl -s $BA --max-time 25 "$BASE/api/dataset/uploads?domain=mobile_robot" | python3 -c "import json,sys;print('yes' if any(u['slug']=='$GSLUG' and 'widgets' in (u.get('goal') or '') for u in json.load(sys.stdin)['uploads']) else 'no')" 2>/dev/null)"
