@@ -1572,9 +1572,12 @@ async def api_agent_plan(request: Request):
         if answers:
             usr += "\nClarifications: " + json.dumps(answers)[:1000]
         from . import llm_providers as _llm
-        # 60s: tolerates a cold GPU model load (first call after idle) + the
-        # plan generation on the lab's small local model.
-        r = _llm.chat(planner, usr, system=sys_p, max_tokens=512, timeout=60)
+        # 60s: tolerates a cold GPU model load (first call after idle) + the plan
+        # generation on the lab's small local model. v3.0.176: run OFF the event
+        # loop (to_thread) behind the single-flight lock so the site stays responsive.
+        async with _LAB_INFER_SEM:
+            r = await _asyncio.to_thread(_llm.chat, planner, usr, system=sys_p,
+                                         max_tokens=512, timeout=60)
         if r.get("ok") and (r.get("text") or "").strip():
             m = re.search(r"\{.*\}", r["text"], re.S)
             if m:
@@ -3772,6 +3775,12 @@ def api_dataset_analyze_ai(request: Request, slug: str, refresh: int = 0):
 import threading as _threading
 _WHISPER = {"model": None, "device": None, "err": None}
 _WHISPER_LOCK = _threading.Lock()
+# v3.0.176 (Phase 0): single-flight semaphore for lab-GPU inference — the 12GB 3060
+# can't run two models at once. Combined with asyncio.to_thread on the blocking
+# call, this keeps the single-worker web event loop FREE (pages/uploads stay
+# responsive) while one plan/voice/analysis inference runs.
+import asyncio as _asyncio
+_LAB_INFER_SEM = _asyncio.Semaphore(1)
 _WHISPER_SIZE = os.environ.get("WHISPER_MODEL", "base")
 
 
@@ -3827,9 +3836,14 @@ async def api_voice_transcribe(request: Request):
     tmp = _tf.NamedTemporaryFile(prefix="voice_", suffix=".webm", delete=False)
     try:
         tmp.write(data); tmp.close()
-        segs, info = model.transcribe(tmp.name, language=(lang or None), beam_size=1)
-        text = "".join(s.text for s in segs).strip()
-        return JSONResponse({"ok": True, "text": text, "language": info.language,
+        # v3.0.176: transcription is CPU/GPU-bound + blocking — run it OFF the event
+        # loop behind the single-flight lock so the website doesn't hang for others.
+        def _do_transcribe():
+            segs, info = model.transcribe(tmp.name, language=(lang or None), beam_size=1)
+            return "".join(s.text for s in segs).strip(), info.language
+        async with _LAB_INFER_SEM:
+            text, langd = await _asyncio.to_thread(_do_transcribe)
+        return JSONResponse({"ok": True, "text": text, "language": langd,
                              "device": _WHISPER["device"]})
     except Exception as e:
         raise HTTPException(500, f"transcription failed: {type(e).__name__}: {str(e)[:160]}")

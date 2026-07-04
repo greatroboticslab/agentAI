@@ -5142,3 +5142,11 @@ The evaluator was a dead alert. Now it runs a real evaluation:
   the Evaluator agent's Run scrolls there. Note updated: Collector / Filter / Labeler / Trainer / Evaluator
   now ALL honor the project's domain. Verified compile + wiring + permission gate; the GPU eval job runs on
   the same proven staging+sbatch path as training.
+### v3.0.176 — Phase 0: non-blocking website (models don't hang the site)
+
+The site is single-worker uvicorn, and api_agent_plan / api_voice_transcribe were async handlers that called
+the SYNC blocking _llm.chat() / whisper.transcribe() — stalling the event loop so the WHOLE site hung for
+every user during a 10-60s inference. Fixed: both now run the blocking call via asyncio.to_thread behind a
+single-flight semaphore (_LAB_INFER_SEM — the 12GB 3060 can't run two models at once). The event loop stays
+free → pages/uploads stay responsive while a plan/voice call runs. First step of the platform-optimization
+plan (docs/PLATFORM_OPTIMIZATION_PLAN.md).
