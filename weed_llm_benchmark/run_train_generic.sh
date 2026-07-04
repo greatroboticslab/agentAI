@@ -95,7 +95,12 @@ try:
     res["metric"] = metric
     res["metrics"] = {k: (round(float(v), 4) if isinstance(v, (int, float)) else v)
                       for k, v in rd.items()}
-    best = sorted(glob.glob(os.environ["OUTDIR"] + "/run*/weights/best.pt"))
+    # Ultralytics may nest classification runs under runs/<task>/<OUTDIR>/ — search
+    # recursively for this run's best.pt wherever it landed.
+    _tag = os.path.basename(os.environ["OUTDIR"])
+    best = sorted(glob.glob(f"**/{_tag}/run*/weights/best.pt", recursive=True)
+                  + glob.glob(os.environ["OUTDIR"] + "/run*/weights/best.pt"),
+                  key=lambda p: os.path.getmtime(p))
     res["best_pt"] = best[-1] if best else None
     res["ok"] = True
     print("RESULT metric:", metric)

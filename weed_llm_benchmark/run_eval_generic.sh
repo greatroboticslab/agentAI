@@ -50,9 +50,11 @@ if [ "$TASK" = "classify" ] && [ ! -d "$DATA/val" ] && [ ! -d "$DATA/train" ]; t
   [ -n "$found" ] && DATA="$(dirname "$found")" && echo "classify: resolved data root -> $DATA"
 fi
 
-# auto model: this domain's most-recent trained best.pt, else the base weight
+# auto model: this domain's most-recent trained best.pt, else the base weight.
+# Search broadly: Ultralytics saves classification runs under runs/classify/<project>/,
+# so the best.pt can live under runs/*/ too — find it wherever it is for this domain.
 if [ "$MODEL" = "auto" ] || [ -z "$MODEL" ]; then
-  BEST=$(ls -t results/framework/train_generic/${DOMAIN}_*/run*/weights/best.pt 2>/dev/null | head -1)
+  BEST=$(find . -path "*/${DOMAIN}_*/run*/weights/best.pt" 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1)
   if [ -n "$BEST" ]; then
     MODEL="$BEST"; echo "auto model -> latest trained best.pt: $MODEL"
   else
