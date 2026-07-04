@@ -5290,3 +5290,21 @@ sensor trainer isn't wired yet), not sent to "labeling". RESULT on the same smal
 wrong to genuinely useful ("labeled IMU, 3 classes walk/turn/idle, 100 Hz, matches_goal: TRUE"). Residual
 small-model slips (miscount, a hallucinated issue) are exactly what the planned async big-cluster-model
 analysis will fix. smoke +4 (sensor label/classes/Hz detected + readiness=analyze).
+
+### v3.0.188 — async big-model analysis on the cluster (prof direction) + per-project brain-select
+
+Per the professor: the analysis brain should be the smartest OPEN model on the CLUSTER, async + live
+progress (realtime not required); the small lab model stays only for the instant fallback. Refactored the AI
+review into shared `_ai_review_prepare` (modality-aware facts + prompt + routed model) and `_ai_review_merge`
+(model answer → structured review), so the sync (lab) and async (cluster) paths are identical except WHERE
+the model runs. New `POST /api/dataset/analyze/ai/submit` (cluster-gated) runs the review on a big cluster
+model via the proven `run_llm_infer.sh` gateway (submit → the job writes JSON → server polls over the reused
+ControlMaster SSH) and reports live `progress` on `/api/submit/status`. The old client-side `deepAnalyze` (which
+built its OWN image-centric facts — the same sensor bug — and returned raw text) is replaced: the
+"Re-review with a big model on the cluster" button now calls the async endpoint, shows a progress bar, and
+re-renders the SAME structured review from the cluster model. Model choice: explicit → project
+`config.model_routing.analysis_cluster` → global `analysis_cluster` role → `gemma4` (the deployed default).
+Added a per-project "Analysis brain" dropdown to the Project-config card (populated from the cluster model
+catalog, LLMs only). Honest: if the cluster job can't be submitted / times out, it falls back to the rules
+review and says so; the big model is whatever is actually deployed (gemma4 today; deploy Qwen3/GLM-4.7 to go
+bigger). smoke +4 (brain-select shipped, async submit bad-slug 400 + member 403).

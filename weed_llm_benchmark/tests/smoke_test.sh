@@ -43,6 +43,8 @@ ck "project page ships config editor" yes "$(curl -s $BA --max-time 20 "$BASE/ag
 ck "model router exposed + resolves" yes "$(curl -s $BA --max-time 15 "$BASE/api/models" | python3 -c "import json,sys;d=json.load(sys.stdin).get('router',{});r=d.get('analysis_summary',{});print('yes' if r.get('resolved') and r.get('place')=='lab' else 'no')" 2>/dev/null)"
 ck "rounds api exposes step order" collect "$(curl -s $BA --max-time 15 "$BASE/api/domain/rounds?domain=weed" | python3 -c "import json,sys;print(json.load(sys.stdin)['steps_order'][0])" 2>/dev/null)"
 ck "project page ships round timeline" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'loadRounds' && echo yes || echo no)"
+ck "project page ships brain-select" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'cfg-brain' && echo yes || echo no)"
+ck "async big-review rejects bad slug" 400 "$(HC $BA -X POST -H 'Content-Type: application/json' -d '{"slug":"bad slug!"}' "$BASE/api/dataset/analyze/ai/submit")"
 
 echo "== MODALITY GATE (P3: train/eval vision-only, honest) =="
 HC $BA -X POST -H 'Content-Type: application/json' -d '{"domain":"smokevid"}' "$BASE/api/agent/delete" >/dev/null  # clean stale
@@ -175,6 +177,8 @@ PY
   ck "round records step" done "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/domain/rounds?domain=smoke_proj" | python3 -c "import json,sys;r=json.load(sys.stdin)['rounds'];print((r[0]['steps'].get('label') or {}).get('status') if r else 'none')" 2>/dev/null)"
   ck "rounds expose step order" collect "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/domain/rounds?domain=smoke_proj" | python3 -c "import json,sys;print(json.load(sys.stdin)['steps_order'][0])" 2>/dev/null)"
   ck "non-owner start round -> 403" 403 "$(HC -H "Cookie: agentai_session=$M2" -X POST -H 'Content-Type: application/json' -d '{"domain":"smoke_proj"}' "$BASE/api/domain/round/start")"
+  # v3.0.188: big-model cluster review is cluster-gated (member has no cluster access)
+  ck "member big cluster review -> 403" 403 "$(HC -H "Cookie: agentai_session=$M" -X POST -H 'Content-Type: application/json' -d '{"slug":"cottonweed_sp8"}' "$BASE/api/dataset/analyze/ai/submit")"
   ck "agents list = 1" 1 "$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/project/agents?project=smoke_proj" | python3 -c "import json,sys;print(len(json.load(sys.stdin)['agents']))" 2>/dev/null)"
   AID=$(curl -s -H "Cookie: agentai_session=$M" --max-time 15 "$BASE/api/project/agents?project=smoke_proj" | python3 -c "import json,sys;a=json.load(sys.stdin)['agents'];print(a[0]['id'] if a else '')" 2>/dev/null)
   ck "non-owner add agent -> 403" 403 "$(HC -H "Cookie: agentai_session=$M2" -X POST -H 'Content-Type: application/json' -d '{"project":"smoke_proj","type":"filter"}' "$BASE/api/project/agent/add")"
@@ -207,7 +211,7 @@ PY
   ck "plan proposes >=1 agent" yes "$(echo "$PLAN" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['plan']['agents'] else 'no')" 2>/dev/null)"
   ck "plan agent types valid" yes "$(echo "$PLAN" | python3 -c "import json,sys;V={'collector','filter','labeler','trainer','evaluator','custom'};a=json.load(sys.stdin)['plan']['agents'];print('yes' if all(x['type'] in V for x in a) else 'no')" 2>/dev/null)"
 else
-  skip=$((skip+32)); echo "  SKIP  RBAC + project/agent + catalog + plan cookie checks (no ~/.dash_session_key on this host)"
+  skip=$((skip+33)); echo "  SKIP  RBAC + project/agent + catalog + plan cookie checks (no ~/.dash_session_key on this host)"
 fi
 
 echo ""

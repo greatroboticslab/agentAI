@@ -3810,16 +3810,20 @@ def _rules_readiness(a: dict, issues: list) -> dict:
     return {"ready": ready, "reason": reason, "suggested_task": task or "labeling"}
 
 
-def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
+def _ai_review_prepare(slug: str, refresh: bool = False) -> dict:
+    """Compute the rules review + the model prompt for a dataset — the shared input
+    for BOTH the sync (lab small model) and async (big cluster model) review paths.
+    Returns {cached: <final result>} on cache-hit / error, else {cached: None, base,
+    a, issues, goal, facts, usr, sys_p, model, model_source, place}."""
     cache = _DATASET_ANALYSIS_DIR / f"{slug}.ai.json"
     if not refresh and cache.is_file():
         try:
-            return json.load(open(cache))
+            return {"cached": json.load(open(cache))}
         except Exception:
             pass
     a = _analyze_dataset(slug)
     if not a.get("ok"):
-        return {"ok": False, "slug": slug, "error": a.get("error", "analysis unavailable")}
+        return {"cached": {"ok": False, "slug": slug, "error": a.get("error", "analysis unavailable")}}
     # v3.0.179: thresholds from THIS dataset's project/domain config.
     _thr = None
     _domcfg = None
@@ -3834,15 +3838,11 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
         _thr = None
     issues = _detect_dataset_issues(a, thr=_thr)
     readiness = _rules_readiness(a, issues)
-    # v3.0.167: the dataset's stated goal/purpose → fitness-for-purpose judgment.
     try:
         goal = (_read_manual_uploads().get(slug, {}).get("goal") or "").strip()
     except Exception:
         goal = ""
-    # compact facts for the model
     ann = a.get("annotations") or {}
-    # v3.0.187: modality of THIS dataset (first non-image bucket wins, else image),
-    # so the facts + prompt describe the right kind of data instead of assuming images.
     _mdet = a.get("modality_detail") or {}
     _prim_mod = "image"
     for _mk in ("sensor", "video", "audio", "pointcloud", "text"):
@@ -3860,85 +3860,85 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
         "near_duplicates": a.get("near_duplicates"),
         "detected_issues": issues,
     }
-    # For non-image data, the image fields are meaningless — send the modality
-    # detail (columns / label column / class balance / sampling rate / …) instead,
-    # so the model reviews the ACTUAL data, not "missing images".
     if _prim_mod != "image":
         for _k in ("n_images", "image_size", "labeled_images"):
             facts.pop(_k, None)
         facts["data_detail"] = _mdet.get(_prim_mod)
-    result = {"ok": True, "slug": slug, "source": "rules", "issues": issues, "goal": goal,
-              "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    base = {"ok": True, "slug": slug, "source": "rules", "issues": issues, "goal": goal,
+            "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    # v3.0.182 (P2): route the model through the role-based router.
+    from . import model_router as _mr, llm_providers as _llmp
+    _cfg = _read_model_config()
+    _pick = _mr.resolve("analysis_summary", domain_config=_domcfg,
+                        global_roles=(_cfg.get("roles") or {}),
+                        provider_status=_llmp.provider_status())
+    model = os.environ.get("PLANNER_MODEL") or _pick["model"]
+    _fit = ('"fitness": {"matches_goal": bool, "note": "does this dataset fit its stated_goal? what is '
+            'missing to achieve that goal?"}, ' if goal else "")
+    if _prim_mod == "image":
+        _mod_guide = ("This is an IMAGE dataset — assess class distribution, "
+                      "annotation coverage, image sizes, duplicates.")
+    else:
+        _mod_guide = (
+            f"This is a {_prim_mod.upper()} dataset (NOT images) — do NOT ask for "
+            "images or image annotations. Review `data_detail`: the columns/signals, "
+            "the `label_column` + `class_balance` (if present the data is ALREADY "
+            "labeled — judge class balance, not 'missing labels'), the sampling rate, "
+            "signal ranges, number of files/rows, and whether it fits the stated_goal.")
+    sys_p = ("You are a data-quality assistant for a research dataset platform. Given dataset FACTS "
+             "(already-computed stats + rule-detected issues" + (" + a stated_goal" if goal else "") +
+             "), write a concise, practical review for a student. " + _mod_guide + " "
+             "Respond with STRICT JSON only, no "
+             'prose, shape: {"summary": "2-3 sentence plain-English overview", '
+             + _fit +
+             '"issues": [{"severity":"high|medium|low","title":str,"detail":str}], '
+             '"recommendations": ["actionable next step", ...]}. '
+             "Keep the given detected_issues and add any you infer. Be honest and specific.")
+    usr = "Dataset FACTS:\n" + json.dumps(facts)[:3500]
+    return {"cached": None, "base": base, "a": a, "issues": issues, "goal": goal,
+            "facts": facts, "usr": usr, "sys_p": sys_p, "model": model,
+            "model_source": _pick.get("source"), "place": _pick.get("place")}
+
+
+def _ai_review_merge(prep: dict, model_text: str, model: str = None,
+                     model_source: str = None, model_place: str = None,
+                     llm_error: str = None) -> dict:
+    """Merge a model's raw answer into the rules base; cache + return the final
+    review. Shared by the sync + async paths so both produce identical structure."""
+    result = dict(prep["base"])
+    issues = prep["issues"]; goal = prep["goal"]; a = prep["a"]
+    ann = a.get("annotations") or {}
+    model = model or prep["model"]
+    model_source = model_source or prep.get("model_source")
     try:
-        # v3.0.182 (P2): route the model through the role-based router — per-domain
-        # override → global config → small lab default, graceful-degrade if unreachable.
-        from . import model_router as _mr, llm_providers as _llmp
-        _cfg = _read_model_config()
-        _pick = _mr.resolve("analysis_summary", domain_config=_domcfg,
-                            global_roles=(_cfg.get("roles") or {}),
-                            provider_status=_llmp.provider_status())
-        model = os.environ.get("PLANNER_MODEL") or _pick["model"]
-        _fit = ('"fitness": {"matches_goal": bool, "note": "does this dataset fit its stated_goal? what is '
-                'missing to achieve that goal?"}, ' if goal else "")
-        # v3.0.187: tell the model what KIND of data it's reviewing so it doesn't
-        # apply image assumptions to sensor/tabular/audio data. For non-image data,
-        # `data_detail` holds the real structure (columns, label column, class
-        # balance, sampling rate) — a `label_column` means it is ALREADY labeled.
-        if _prim_mod == "image":
-            _mod_guide = ("This is an IMAGE dataset — assess class distribution, "
-                          "annotation coverage, image sizes, duplicates.")
-        else:
-            _mod_guide = (
-                f"This is a {_prim_mod.upper()} dataset (NOT images) — do NOT ask for "
-                "images or image annotations. Review `data_detail`: the columns/signals, "
-                "the `label_column` + `class_balance` (if present the data is ALREADY "
-                "labeled — judge class balance, not 'missing labels'), the sampling rate, "
-                "signal ranges, number of files/rows, and whether it fits the stated_goal.")
-        sys_p = ("You are a data-quality assistant for a research dataset platform. Given dataset FACTS "
-                 "(already-computed stats + rule-detected issues" + (" + a stated_goal" if goal else "") +
-                 "), write a concise, practical review for a student. " + _mod_guide + " "
-                 "Respond with STRICT JSON only, no "
-                 'prose, shape: {"summary": "2-3 sentence plain-English overview", '
-                 + _fit +
-                 '"issues": [{"severity":"high|medium|low","title":str,"detail":str}], '
-                 '"recommendations": ["actionable next step", ...]}. '
-                 "Keep the given detected_issues and add any you infer. Be honest and specific.")
-        from . import llm_providers as _llm
-        r = _llm.chat(model, "Dataset FACTS:\n" + json.dumps(facts)[:3500],
-                      system=sys_p, max_tokens=700, timeout=60)
-        if r.get("ok") and (r.get("text") or "").strip():
-            m = re.search(r"\{.*\}", r["text"], re.S)
-            if m:
-                obj = json.loads(m.group(0))
-                if isinstance(obj, dict) and obj.get("summary"):
-                    # Keep training_readiness from RULES (deterministic + reliable);
-                    # the small model is unreliable on that structured field. Use the
-                    # model only for the human-facing summary / issues / recommendations.
-                    # MERGE: rule-detected issues are grounded + must never be lost;
-                    # append any NEW issues the model inferred (dedup by title).
-                    merged = list(issues)
-                    seen = {str(i.get("title", "")).lower() for i in issues}
-                    for mi in (obj.get("issues") or []):
-                        if isinstance(mi, dict) and mi.get("title") and str(mi["title"]).lower() not in seen:
-                            merged.append({"severity": mi.get("severity", "low"),
-                                           "title": str(mi["title"])[:120],
-                                           "detail": str(mi.get("detail", ""))[:300]})
-                            seen.add(str(mi["title"]).lower())
-                    result.update({
-                        "source": "ai", "model": model, "model_role": "analysis_summary",
-                        "model_source": _pick.get("source"),
-                        "summary": str(obj.get("summary"))[:800],
-                        "issues": merged[:10],
-                        "recommendations": [str(x)[:300] for x in (obj.get("recommendations") or [])][:8],
-                    })
-                    if goal and isinstance(obj.get("fitness"), dict):
-                        result["fitness"] = {"matches_goal": bool(obj["fitness"].get("matches_goal")),
-                                             "note": str(obj["fitness"].get("note", ""))[:500]}
-        if result["source"] != "ai":
-            result["llm_error"] = r.get("error") or "model reply not usable"
+        m = re.search(r"\{.*\}", model_text or "", re.S)
+        if m:
+            obj = json.loads(m.group(0))
+            if isinstance(obj, dict) and obj.get("summary"):
+                merged = list(issues)
+                seen = {str(i.get("title", "")).lower() for i in issues}
+                for mi in (obj.get("issues") or []):
+                    if isinstance(mi, dict) and mi.get("title") and str(mi["title"]).lower() not in seen:
+                        merged.append({"severity": mi.get("severity", "low"),
+                                       "title": str(mi["title"])[:120],
+                                       "detail": str(mi.get("detail", ""))[:300]})
+                        seen.add(str(mi["title"]).lower())
+                result.update({
+                    "source": "ai", "model": model, "model_role": "analysis_summary",
+                    "model_source": model_source, "model_place": model_place or prep.get("place"),
+                    "summary": str(obj.get("summary"))[:800],
+                    "issues": merged[:10],
+                    "recommendations": [str(x)[:300] for x in (obj.get("recommendations") or [])][:8],
+                })
+                if goal and isinstance(obj.get("fitness"), dict):
+                    result["fitness"] = {"matches_goal": bool(obj["fitness"].get("matches_goal")),
+                                         "note": str(obj["fitness"].get("note", ""))[:500]}
     except Exception as e:
         result["llm_error"] = f"{type(e).__name__}: {str(e)[:160]}"
     if result["source"] != "ai":
+        if llm_error:
+            result["llm_error"] = llm_error
+        result.setdefault("llm_error", "model reply not usable")
         result["summary"] = ("Rules-only review (no AI model reachable). "
                              f"{a.get('n_images')} images, "
                              f"{ann.get('type')} labels, {len(issues)} issue(s) flagged.")
@@ -3946,10 +3946,26 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
                           [i["detail"] for i in issues] or ["Dataset looks basically fine — try a training run."])
     try:
         _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
-        json.dump(result, open(cache, "w"), indent=2)
+        json.dump(result, open(_DATASET_ANALYSIS_DIR / f"{prep['base']['slug']}.ai.json", "w"), indent=2)
     except Exception:
         pass
     return result
+
+
+def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
+    """Sync review: uses the reachable (lab) model, graceful rules fallback."""
+    prep = _ai_review_prepare(slug, refresh)
+    if prep.get("cached") is not None:
+        return prep["cached"]
+    try:
+        from . import llm_providers as _llm
+        r = _llm.chat(prep["model"], prep["usr"], system=prep["sys_p"],
+                      max_tokens=700, timeout=60)
+        if r.get("ok") and (r.get("text") or "").strip():
+            return _ai_review_merge(prep, r["text"])
+        return _ai_review_merge(prep, "", llm_error=(r.get("error") or "model reply not usable"))
+    except Exception as e:
+        return _ai_review_merge(prep, "", llm_error=f"{type(e).__name__}: {str(e)[:160]}")
 
 
 @app.get("/api/dataset/analyze/ai")
@@ -3958,6 +3974,112 @@ def api_dataset_analyze_ai(request: Request, slug: str, refresh: int = 0):
         raise HTTPException(400, "bad slug")
     _ = _actor_from_request(request)
     return JSONResponse(_analyze_dataset_ai(slug, refresh=bool(refresh)))
+
+
+def _analysis_cluster_model(domain: str, override: str = "") -> str:
+    """Bare cluster ollama model name for the big-model review: explicit override
+    → project config.model_routing.analysis_cluster → global 'analysis_cluster'
+    role → gemma4 (the proven llm_infer default). Strips any 'ollama:' prefix."""
+    m = str(override or "").strip()
+    if not m:
+        try:
+            from . import db as _dbm
+            m = str((_dbm.get_domain_config(domain).get("model_routing") or {}).get("analysis_cluster") or "")
+        except Exception:
+            m = ""
+    if not m:
+        m = str((_read_model_config().get("roles") or {}).get("analysis_cluster") or "")
+    m = m or "gemma4"
+    return re.sub(r"[^A-Za-z0-9_.:-]", "", m.split(":", 1)[1] if m.startswith("ollama:") else m)[:60] or "gemma4"
+
+
+@app.post("/api/dataset/analyze/ai/submit")
+def api_dataset_analyze_ai_submit(request: Request, payload: dict = Body(default={})):
+    """v3.0.188 (prof direction): run the dataset AI review on a BIG OPEN model on
+    the CLUSTER, async — submit → poll /api/submit/status (live progress) → merged
+    review. Reuses the proven llm_infer cluster-job gateway. The instant rules /
+    small-lab review (GET .../analyze/ai) stays as the immediate fallback."""
+    actor = _actor_from_request(request)
+    if not _can_use_cluster(actor):
+        raise HTTPException(403, "A big-model review runs on the cluster GPU — restricted "
+                                 "to admins / cluster-granted users. The instant rules review is open to all.")
+    body = payload if isinstance(payload, dict) else {}
+    slug = str(body.get("slug") or "").strip()
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad/missing slug")
+    try:
+        _dom = (_read_manual_uploads().get(slug, {}).get("domain")
+                or (json.load(open(REGISTRY_PATH)).get("datasets", {}).get(slug, {}) or {}).get("domain")
+                or "weed")
+    except Exception:
+        _dom = "weed"
+    model = _analysis_cluster_model(_dom, str(body.get("model") or ""))
+    sid = "a" + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
+    _bg_set(sid, status="running", kind="analyze_ai", model=model, where="cluster",
+            progress={"stage": "preparing dataset facts", "pct": 8})
+
+    def _runner():
+        try:
+            prep = _ai_review_prepare(slug, refresh=True)
+            if prep.get("cached") is not None:
+                _bg_set(sid, status="done", result=prep["cached"], progress={"stage": "done", "pct": 100})
+                return
+            _bg_set(sid, progress={"stage": "queuing cluster job", "pct": 20})
+            prompt = prep["sys_p"] + "\n\nDataset FACTS:\n" + json.dumps(prep["facts"])[:3500]
+            import base64 as _b64
+            pb64 = _b64.b64encode(prompt.encode()).decode()
+            jobtag = "i" + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
+            stage = ("mkdir -p results/framework/llm_infer; "
+                     f"echo {pb64} | base64 -d > results/framework/llm_infer/{jobtag}.prompt; "
+                     "git fetch origin >/dev/null 2>&1; "
+                     "git checkout origin/main -- weed_llm_benchmark/run_llm_infer.sh 2>/dev/null; "
+                     "cp -f weed_llm_benchmark/run_llm_infer.sh run_llm_infer.sh 2>/dev/null; true")
+            _slurm(["bash", "-lc", stage], timeout=60)
+            export = ",".join(["ALL", f"LLM_MODEL={model}", f"LLM_JOBTAG={jobtag}"])
+            r = _slurm(["sbatch", f"--export={export}", "run_llm_infer.sh"], timeout=25)
+            if not (r.get("ok") and "Submitted batch job" in (r.get("stdout") or "")):
+                res = _ai_review_merge(prep, "", llm_error="cluster job submit failed: "
+                                       + (r.get("stderr") or r.get("stdout") or "")[:160])
+                _bg_set(sid, status="done", result=res, progress={"stage": "submit failed", "pct": 100})
+                return
+            _bg_set(sid, progress={"stage": f"{model} running on cluster GPU (queued)", "pct": 40})
+            # poll the result file the job writes (ControlMaster SSH reused → cheap).
+            text = None
+            import time as _t
+            for i in range(80):            # ~ up to 20 min (job queue + cold load + gen)
+                _t.sleep(15)
+                pr = _slurm(["bash", "-lc",
+                             f"cat results/framework/llm_infer/{jobtag}.json 2>/dev/null"], timeout=20)
+                out = (pr.get("stdout") or "").strip()
+                if out:
+                    try:
+                        d = json.loads(out)
+                        text = d.get("text") if d.get("ok") else ""
+                        if not d.get("ok"):
+                            res = _ai_review_merge(prep, "", llm_error="cluster model error: "
+                                                   + str(d.get("error"))[:160])
+                            _bg_set(sid, status="done", result=res, progress={"stage": "model error", "pct": 100})
+                            return
+                        break
+                    except Exception:
+                        pass
+                _bg_set(sid, progress={"stage": f"{model} running on cluster GPU",
+                                       "pct": min(40 + i * 2, 90)})
+            if not text:
+                res = _ai_review_merge(prep, "", llm_error="cluster job timed out (still running or queue busy)")
+                _bg_set(sid, status="done", result=res, progress={"stage": "timed out", "pct": 100})
+                return
+            _bg_set(sid, progress={"stage": "parsing review", "pct": 95})
+            res = _ai_review_merge(prep, text, model="ollama:" + model,
+                                   model_source="cluster", model_place="cluster")
+            _bg_set(sid, status="done", result=res, progress={"stage": "done", "pct": 100})
+        except Exception as e:
+            _bg_set(sid, status="failed", error=f"{type(e).__name__}: {str(e)[:200]}",
+                    progress={"stage": "failed", "pct": 100})
+
+    _threading.Thread(target=_runner, daemon=True).start()
+    return JSONResponse({"ok": True, "submit_id": sid, "model": model, "where": "cluster",
+                         "poll": f"/api/submit/status?id={sid}"})
 
 
 # ===========================================================================
@@ -3981,6 +4103,14 @@ _LAB_INFER_SEM = _asyncio.Semaphore(1)
 # Train/Evaluate button never hangs.
 _BG_JOBS = {}
 _BG_JOBS_LOCK = _threading.Lock()
+
+
+def _bg_set(sid: str, **kw) -> None:
+    """Merge fields into a background job's status (progress-bar friendly)."""
+    with _BG_JOBS_LOCK:
+        cur = dict(_BG_JOBS.get(sid) or {})
+        cur.update(kw)
+        _BG_JOBS[sid] = cur
 
 
 async def _start_bg_submit(kind: str, fn) -> str:
@@ -4866,6 +4996,8 @@ def agent_generic(domain_id: str):
          <textarea id="cfg-queries" rows="3" placeholder="coral reef bleaching detection dataset&#10;staghorn coral annotated images" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea></label>
        <label style="display:block;margin-top:12px;font-size:12px;color:#334">Accept vocabulary <span style="color:#94a3b8">(comma-separated topic words a dataset must match; blank = auto-derive from queries)</span>
          <input id="cfg-accept" type="text" placeholder="coral, reef, polyp" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></label>
+       <label style="display:block;margin-top:12px;font-size:12px;color:#334">Analysis brain <span style="color:#94a3b8">(the big OPEN model on the cluster used for &ldquo;Re-review with a big model&rdquo;; blank = gemma4 default)</span>
+         <select id="cfg-brain" style="width:100%;margin-top:4px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"><option value="">gemma4 (default)</option></select></label>
        <div style="margin-top:12px"><button id="cfg-save" onclick="saveDomainConfig()" style="border:0;cursor:pointer;background:#0e7c66;color:#fff;font-weight:600;font-size:13px;padding:9px 14px;border-radius:8px">Save config</button>
        <span id="cfg-msg" style="font-size:13px;color:#475569;margin-left:10px"></span></div>
      </div>
@@ -5080,6 +5212,15 @@ async function loadDomainConfig(){
   set('cfg-rf',c.roboflow_project||'');
   var q=document.getElementById('cfg-queries');if(q)q.value=(c.harvest_queries||[]).join('\\n');
   var a=document.getElementById('cfg-accept');if(a)a.value=(c.accept_vocab||[]).join(', ');
+  // populate the analysis-brain dropdown from the CLUSTER model catalog (LLMs only)
+  var sel=document.getElementById('cfg-brain');
+  if(sel){ try{
+    var cat=await (await fetch('/api/models/catalog?include=all',{credentials:'include'})).json();
+    var want=((c.model_routing||{}).analysis_cluster||'');
+    (cat.models||[]).filter(function(m){return m.backend==='ollama'&&(m.kind==='llm')&&m.status==='available';})
+      .forEach(function(m){var bare=String(m.id).replace(/^ollama:/,'');var o=document.createElement('option');o.value=bare;o.textContent=(m.label||bare);sel.appendChild(o);});
+    sel.value=want.replace(/^ollama:/,'');
+  }catch(e){} }
  }catch(e){}
 }
 async function saveDomainConfig(){
@@ -5090,7 +5231,8 @@ async function saveDomainConfig(){
  var sm=num('cfg-small');if(sm!==null)th.small_dataset=Math.round(sm);
  var qraw=((document.getElementById('cfg-queries')||{}).value||'').split('\\n').map(function(s){return s.trim();}).filter(Boolean);
  var araw=((document.getElementById('cfg-accept')||{}).value||'').split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean);
- var cfg={thresholds:th,roboflow_project:((document.getElementById('cfg-rf')||{}).value||'').trim(),harvest_queries:qraw,accept_vocab:araw};
+ var brain=((document.getElementById('cfg-brain')||{}).value||'').trim();
+ var cfg={thresholds:th,roboflow_project:((document.getElementById('cfg-rf')||{}).value||'').trim(),harvest_queries:qraw,accept_vocab:araw,model_routing:{analysis_cluster:brain}};
  m.textContent='\\u23f3 saving\\u2026';b.disabled=true;
  try{var d=await (await fetch('/api/domain/config',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',config:cfg})})).json();
   m.textContent=(d&&d.ok)?'\\u2705 saved':'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
@@ -6176,10 +6318,16 @@ async function loadAI(refresh){
   var d=await (await fetch('/api/dataset/analyze/ai?slug='+encodeURIComponent(SLUG)+(refresh?'&refresh=1':''),{credentials:'include'})).json();
   if(btn)btn.disabled=false;
   if(!d.ok){out.innerHTML='<span class="warn">'+esc(d.error||d.detail||'AI review failed')+'</span>';return;}
+  AIREV=d;
+  out.innerHTML=renderReview(d);
+ }catch(e){ if(btn)btn.disabled=false; out.innerHTML='<span class="warn">'+esc(e)+'</span>'; }
+}
+function renderReview(d){
   var tr=d.training_readiness||{};
   var badge=tr.ready?'<span style="background:#dcfce7;color:#166534;font-weight:700;font-size:12px;padding:3px 10px;border-radius:20px">\\u2705 Ready to train</span>'
                     :'<span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:12px;padding:3px 10px;border-radius:20px">\\u26a0 Not ready yet</span>';
-  var srcTag=(d.source==='ai')?('<span class="muted"> \\u00b7 by '+esc(d.model||'AI')+'</span>')
+  var where=(d.model_place==='cluster')?' on cluster':'';
+  var srcTag=(d.source==='ai')?('<span class="muted"> \\u00b7 by '+esc(d.model||'AI')+where+'</span>')
                               :'<span class="muted"> \\u00b7 rules-only (no AI model reachable)</span>';
   var h='<div style="margin-bottom:10px">'+badge+srcTag+'</div>';
   h+='<div style="font-size:13.5px;line-height:1.6;margin-bottom:10px">'+esc(d.summary||'')+'</div>';
@@ -6194,42 +6342,47 @@ async function loadAI(refresh){
   } else { h+='<div class="muted">No significant issues detected.</div>'; }
   var rec=d.recommendations||[];
   if(rec.length){ h+='<div style="font-weight:600;font-size:13px;margin:10px 0 4px">Recommendations</div><ul style="margin:.2rem 0;padding-left:1.1rem;font-size:12.5px;color:#334155">'+rec.map(function(r){return '<li>'+esc(r)+'</li>';}).join('')+'</ul>'; }
-  AIREV=d;
   h+='<div style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:10px">'
-    +'<button onclick="deepAnalyze()" id="deepbtn" style="border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;font-size:12.5px;padding:6px 12px;border-radius:8px;cursor:pointer">&#128300; Deep analysis on cluster (glm-4.7-flash)</button>'
-    +'<span class="muted" style="margin-left:8px;font-size:11.5px">optional &middot; runs a bigger model on the GPU (queues, slower)</span>'
-    +'<div id="deepout" style="margin-top:10px"></div></div>';
-  out.innerHTML=h;
- }catch(e){ if(btn)btn.disabled=false; out.innerHTML='<span class="warn">'+esc(e)+'</span>'; }
+    +'<button onclick="deepAnalyze()" id="deepbtn" style="border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;font-size:12.5px;padding:6px 12px;border-radius:8px;cursor:pointer">&#129504; Re-review with a big model on the cluster</button>'
+    +'<span class="muted" style="margin-left:8px;font-size:11.5px">smarter open model on the GPU (async, queues \\u2014 not realtime)</span>'
+    +'<div id="deepbar" style="display:none;margin-top:10px;height:8px;background:#eef2ff;border-radius:6px;overflow:hidden"><div id="deepfill" style="height:100%;width:0;background:#6366f1;transition:width .4s"></div></div>'
+    +'<div id="deepout" style="margin-top:8px"></div></div>';
+  return h;
 }
 var AIREV=null,EDAD=null;
+// v3.0.188 (prof direction): re-review the dataset with a BIG OPEN model on the
+// CLUSTER, async, with a live progress bar. Uses the server-side modality-aware
+// facts (same as the instant review) + returns the SAME structured review, so a
+// sensor dataset is reviewed as sensor data, not "missing images".
 async function deepAnalyze(){
  var out=document.getElementById('deepout'),btn=document.getElementById('deepbtn');
- var a=EDAD||{},r=AIREV||{},ann=(a.annotations||{});
- var facts='Dataset facts: images='+(a.n_images||'?')+', annotation='+(ann.type||'none')
-   +', classes='+JSON.stringify((ann.classes||[]).slice(0,20))+', per_class='+JSON.stringify(ann.per_class||{})
-   +', splits='+JSON.stringify(a.splits||{})+', near_duplicates='+(a.near_duplicates||0)
-   +', image_size='+JSON.stringify((a.images||{}).width||{})+(r.goal?(', stated_goal="'+r.goal+'"'):'')
-   +', rule_issues='+JSON.stringify((r.issues||[]).map(function(i){return i.title;}));
- var prompt='You are a senior machine-learning data reviewer. Given these dataset facts, write a thorough, '
-   +'practical review: (1) overall assessment, (2) the most important problems and why they matter, '
-   +'(3) a concrete step-by-step data-collection / cleaning / labeling plan to make it training-ready, '
-   +'(4) a suggested training setup. Be specific and honest.\\n\\n'+facts;
- btn.disabled=true;out.innerHTML='<span class="muted">\\u23f3 submitting a GPU job (glm-4.7-flash)\\u2026 this queues, first response can take a few minutes.</span>';
+ var bar=document.getElementById('deepbar'),fill=document.getElementById('deepfill');
+ btn.disabled=true; if(bar)bar.style.display='block';
+ var setBar=function(pct,stage){ if(fill)fill.style.width=(pct||0)+'%';
+   out.innerHTML='<span class="muted">\\u23f3 '+esc(stage||'submitting\\u2026')+'</span>'; };
+ setBar(5,'submitting a cluster GPU job\\u2026');
  try{
-  var s=await (await fetch('/api/llm/infer',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,model:'glm-4.7-flash'})})).json();
-  if(!s||!s.ok){out.innerHTML='<span class="warn">'+esc((s&&(s.detail||s.msg))||'could not submit')+'</span>';btn.disabled=false;return;}
-  var tag=s.jobtag,tries=0;
-  out.innerHTML='<span class="muted">\\u23f3 queued (job '+(s.job_id||'?')+') \\u2014 waiting for the GPU\\u2026</span>';
+  var s=await (await fetch('/api/dataset/analyze/ai/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:SLUG})})).json();
+  if(!s||!s.ok){ if(bar)bar.style.display='none'; out.innerHTML='<span class="warn">'+esc((s&&(s.detail||s.msg))||'could not submit')+'</span>';btn.disabled=false;return;}
+  setBar(15,'queued on the cluster ('+esc(s.model||'model')+')\\u2026');
+  var sid=s.submit_id,tries=0;
   var iv=setInterval(async function(){tries++;
-   try{var rr=await (await fetch('/api/llm/infer/result?jobtag='+encodeURIComponent(tag),{credentials:'include'})).json();
-    if(rr.status==='done'){clearInterval(iv);btn.disabled=false;out.innerHTML='<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.6;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:12px">'+esc(rr.text||'')+'</div>';}
-    else if(rr.status==='failed'){clearInterval(iv);btn.disabled=false;out.innerHTML='<span class="warn">\\u274c '+esc(rr.error||'failed')+'</span>';}
-    else{out.innerHTML='<span class="muted">\\u23f3 running on the GPU\\u2026 ('+tries+')</span>';}
+   try{var rr=await (await fetch('/api/submit/status?id='+encodeURIComponent(sid),{credentials:'include'})).json();
+    var pg=rr.progress||{};
+    if(rr.status==='done'){clearInterval(iv);btn.disabled=false; if(fill)fill.style.width='100%';
+      var res=rr.result||{};
+      if(bar)setTimeout(function(){bar.style.display='none';},500);
+      if(res.source==='ai'){ AIREV=res; var aout=document.getElementById('aiout'); if(aout)aout.innerHTML=renderReview(res);
+        // scroll the fresh cluster review into view
+        var nb=document.getElementById('deepbar'); }
+      else { out.innerHTML='<span class="warn">\\u26a0 '+esc(res.llm_error||'the cluster model did not return a usable review')+' \\u2014 showing the instant review above.</span>'; }
+    }
+    else if(rr.status==='failed'){clearInterval(iv);btn.disabled=false; if(bar)bar.style.display='none'; out.innerHTML='<span class="warn">\\u274c '+esc(rr.error||'failed')+'</span>';}
+    else{ setBar(pg.pct||20, pg.stage||('running on the GPU\\u2026 ('+tries+')')); }
    }catch(e){}
-   if(tries>90){clearInterval(iv);btn.disabled=false;out.innerHTML='<span class="muted">\\u23f3 still running \\u2014 check back later.</span>';}
-  },8000);
- }catch(e){out.innerHTML='<span class="warn">'+esc(e)+'</span>';btn.disabled=false;}
+   if(tries>100){clearInterval(iv);btn.disabled=false; out.innerHTML='<span class="muted">\\u23f3 still running on the cluster \\u2014 check back later.</span>';}
+  },6000);
+ }catch(e){ if(bar)bar.style.display='none'; out.innerHTML='<span class="warn">'+esc(e)+'</span>';btn.disabled=false;}
 }
 function modalityDetail(md){
  var keys=Object.keys(md||{});if(!keys.length)return '';
