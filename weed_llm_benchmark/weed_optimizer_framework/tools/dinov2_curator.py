@@ -500,8 +500,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("command", choices=["build-reference", "score-all",
                                           "report", "flag"])
-    ap.add_argument("--threshold", type=float, default=0.45,
-                    help="for `flag` command")
+    ap.add_argument("--threshold", type=float,
+                    default=float(os.environ.get("DINO_THRESHOLD", 0.45)),
+                    help="for `flag` command; defaults to $DINO_THRESHOLD "
+                         "(injected per-project by the dashboard) or 0.45")
     ap.add_argument("--no-dry-run", action="store_true",
                     help="for `flag` — actually write flags")
     args = ap.parse_args()

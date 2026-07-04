@@ -8594,11 +8594,16 @@ def api_cluster_action(action: str, request: Request, payload: dict = Body(defau
                 try:
                     from . import db as _db_dom
                     _dd = _db_dom.get_domain(_dom) or {}
+                    # v3.0.180 (P1): stage the MERGED domain config (defaults +
+                    # saved config), so harvest_queries AND accept_vocab flow from
+                    # the config layer, not just legacy top-level fields.
+                    _dcfg = _db_dom.get_domain_config(_dom)
                     import base64 as _b64
                     _cfgj = json.dumps({
                         "display_name": _dd.get("display_name", _dom),
-                        "harvest_queries": _dd.get("harvest_queries", []),
-                        "taxonomy": _dd.get("taxonomy", []),
+                        "harvest_queries": _dcfg.get("harvest_queries") or _dd.get("harvest_queries", []),
+                        "accept_vocab": _dcfg.get("accept_vocab") or [],
+                        "taxonomy": _dcfg.get("taxonomy") or _dd.get("taxonomy", []),
                     })
                     _b = _b64.b64encode(_cfgj.encode()).decode()
                     _stage = ("mkdir -p results/framework/_domains && echo "
@@ -8635,8 +8640,14 @@ def api_cluster_action(action: str, request: Request, payload: dict = Body(defau
         if action == "dinov2_curate_registry":
             _fdom = re.sub(r"[^a-z0-9_]+", "", str(body.get("domain") or "").strip().lower())[:40]
             if _fdom and _fdom != "weed":
-                sbatch_cli += [f"--export=ALL,DINO_DOMAIN={_fdom}"]
+                # v3.0.180 (P1): also inject this project's DINO similarity
+                # threshold from its config so the flag step uses the project's
+                # own quality bar (not the hardcoded 0.45).
+                from . import db as _db_fdom
+                _fthr = _db_fdom.get_domain_config(_fdom).get("thresholds", {}).get("dino_threshold", 0.45)
+                sbatch_cli += [f"--export=ALL,DINO_DOMAIN={_fdom},DINO_THRESHOLD={_fthr}"]
                 body_used["domain"] = _fdom
+                body_used["dino_threshold"] = _fthr
         # v3.0.128 (Z4): inject the domain's user-set Roboflow push cap into the
         # harvest auto-sync (run script reads PUSH_CAP → --cap-per-slug). Merge
         # into the existing --export if present (brain_harvest dynamic /
@@ -8679,7 +8690,11 @@ def api_cluster_action(action: str, request: Request, payload: dict = Body(defau
         if action == "sync_all_to_roboflow":
             _ldom = re.sub(r"[^a-z0-9_]+", "", str(body.get("domain") or "").strip().lower())[:40]
             if _ldom and _ldom != "weed":
-                _lproj = f"{_ldom}-dataset".replace("_", "-")
+                # v3.0.180 (P1): use the project's configured Roboflow project when
+                # set (config.roboflow_project), else fall back to the derived name.
+                from . import db as _db_ldom
+                _cfg_proj = str(_db_ldom.get_domain_config(_ldom).get("roboflow_project") or "").strip()
+                _lproj = _cfg_proj or f"{_ldom}-dataset".replace("_", "-")
                 # replace the hardcoded weed --project/--folder with the domain's,
                 # add --domain (filter slugs) + --force-project (route all to it).
                 _clean = []

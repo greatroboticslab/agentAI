@@ -5184,3 +5184,18 @@ New endpoints: GET /api/domain/config (any signed-in user) + POST /api/domain/co
 otherwise). weed = the default config, behaviour unchanged. smoke +5 (config GET, thresholds present, owner
 set, persisted value, non-owner 403). Next: route filter DINO threshold + labeler roboflow_project +
 harvest_queries through the config, then a small project config editor UI.
+
+### v3.0.180 — Phase 1 part 2: route filter / labeler / harvest through the config
+
+Fed the three per-domain agents from the config layer instead of ad-hoc/hardcoded values:
+- **Filter** (dinov2_curate_registry): the sbatch now injects `DINO_THRESHOLD` from the project's
+  `config.thresholds.dino_threshold` (was hardcoded 0.45); dinov2_curator's `flag --threshold` default now
+  reads `$DINO_THRESHOLD` — so each project flags garbage at its own similarity bar.
+- **Labeler** (sync_all_to_roboflow): the target Roboflow project is now `config.roboflow_project` when set,
+  falling back to the derived `<domain>-dataset` name — a project can point at an existing RF project.
+- **Harvest** (brain_harvest): the config staged to the cluster now uses `get_domain_config()` and includes
+  `accept_vocab`; `dataset_discovery._resolve_domain_config()` uses an EXPLICIT `accept_vocab` verbatim when
+  present (config wins), else derives from taxonomy/queries as before.
+New `tests/test_domain_config.py` (16 pure-logic asserts: DEFAULT_DOMAIN_CONFIG shape, `_deep_merge`,
+accept_vocab-wins vs derive) — verified without burning cluster/Roboflow/Mongo. weed unchanged (weed skips
+all three branches). smoke stays 80.

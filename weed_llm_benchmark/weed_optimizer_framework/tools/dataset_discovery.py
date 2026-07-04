@@ -988,13 +988,20 @@ class DatasetDiscovery:
             except Exception:
                 pass
         queries = list(d.get("harvest_queries") or [])
-        words = set()
-        for s in list(d.get("taxonomy") or []) + queries + [
-                str(d.get("display_name") or ""), domain]:
-            for w in _re.findall(r"[a-z0-9]{3,}", str(s).lower()):
-                if w not in _STOP:
-                    words.add(w)
-        accept = tuple(sorted(words)) or (domain,)
+        # v3.0.180 (P1): an EXPLICIT accept_vocab in the domain config wins over
+        # the derived one — lets a project curate exactly which topic words pass,
+        # instead of only inferring from taxonomy/queries.
+        explicit_accept = [str(w).lower().strip() for w in (d.get("accept_vocab") or []) if str(w).strip()]
+        if explicit_accept:
+            accept = tuple(sorted(set(explicit_accept)))
+        else:
+            words = set()
+            for s in list(d.get("taxonomy") or []) + queries + [
+                    str(d.get("display_name") or ""), domain]:
+                for w in _re.findall(r"[a-z0-9]{3,}", str(s).lower()):
+                    if w not in _STOP:
+                        words.add(w)
+            accept = tuple(sorted(words)) or (domain,)
         return {"accept": accept, "reject": self.GENERIC_REJECT,
                 "queries": queries}
 
