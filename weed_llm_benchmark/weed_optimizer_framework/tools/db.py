@@ -644,6 +644,10 @@ def delete_domain(domain_id: str, actor: str = "user") -> bool:
     try:
         r = db[COLL_DOMAINS].delete_one({"_id": domain_id})
         if r.deleted_count:
+            try:  # v3.0.186.2: cascade the project's round provenance
+                db[COLL_ROUNDS].delete_many({"domain": domain_id})
+            except Exception:
+                pass
             try:
                 db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
                     "event": "domain.delete", "target": {"kind": "domain", "id": domain_id}})
