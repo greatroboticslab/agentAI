@@ -5169,3 +5169,18 @@ longer freezes the site for other users. Kept workers=1 on purpose: the in-proce
 (_BG_JOBS), the lazily-loaded Whisper model, and the auth-lockout state are per-process — 2 workers would
 split them (submit on one, poll on another → broken). Single worker + fully non-blocking handlers is the
 correct architecture here. Phase 0 (foundations) complete.
+
+### v3.0.179 — Phase 1: per-domain config layer (de-weed, part 1)
+
+Start of Phase 1 (turn 802 weed/cwd12 hardcodes into per-project config; "new field = fill a config, not
+change code"). db.py: `DEFAULT_DOMAIN_CONFIG` (taxonomy / harvest_queries / accept_vocab / thresholds
+{dino_threshold, imbalance_high/med, dup_frac, tiny_px, min_per_class, small_dataset} / reference_pool_policy
+/ roboflow_project / modality / target_metric / model_routing) + `get_domain_config()` (deep-merges a
+project's saved `config` over the defaults, backfills legacy taxonomy/queries/modality) + `set_domain_config()`
+(owner/admin deep-merge patch, audited). dashboard_server.py: `_detect_dataset_issues()` now pulls every
+quality threshold (imbalance/dup/tiny/min-per-class/small-dataset) from the domain config instead of
+hardcoded 100/10/3/0.10/64 — so a non-weed project can define its own "what makes a dataset unbalanced".
+New endpoints: GET /api/domain/config (any signed-in user) + POST /api/domain/config (owner/admin only, 403
+otherwise). weed = the default config, behaviour unchanged. smoke +5 (config GET, thresholds present, owner
+set, persisted value, non-owner 403). Next: route filter DINO threshold + labeler roboflow_project +
+harvest_queries through the config, then a small project config editor UI.

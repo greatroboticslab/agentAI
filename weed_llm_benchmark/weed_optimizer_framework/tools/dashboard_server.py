@@ -3590,8 +3590,14 @@ def api_dataset_analyze(request: Request, slug: str, refresh: int = 0):
 # readable report + training-readiness verdict. Degrades to a rules-only report
 # when no LLM is reachable. English only.
 # ===========================================================================
-def _detect_dataset_issues(a: dict) -> list:
-    """Rule-based, grounded data-quality issues. Each: {severity, title, detail}."""
+def _detect_dataset_issues(a: dict, thr: dict = None) -> list:
+    """Rule-based, grounded data-quality issues. Each: {severity, title, detail}.
+    v3.0.179: thresholds come from the project's domain config (thr) so a new field
+    can tune them; defaults = today's constants (no regression)."""
+    from . import db as _dbthr
+    T = dict(_dbthr.DEFAULT_DOMAIN_CONFIG["thresholds"])
+    if thr:
+        T.update({k: v for k, v in thr.items() if v is not None})
     issues = []
     if not a or not a.get("ok"):
         return issues
@@ -3603,7 +3609,7 @@ def _detect_dataset_issues(a: dict) -> list:
     if 0 < n < 20:
         issues.append({"severity": "high", "title": "Very small dataset",
                        "detail": f"Only {n} images — too few to train a reliable model. Aim for at least a few hundred."})
-    elif 20 <= n < 100:
+    elif 20 <= n < T["small_dataset"]:
         issues.append({"severity": "medium", "title": "Small dataset",
                        "detail": f"{n} images is enough to smoke-test the pipeline but likely too few for good accuracy."})
 
@@ -3615,27 +3621,27 @@ def _detect_dataset_issues(a: dict) -> list:
     if per and len(per) >= 2:
         vals = list(per.values())
         ratio = (max(vals) / min(vals)) if min(vals) else 0
-        if ratio >= 10:
+        if ratio >= T["imbalance_high"]:
             issues.append({"severity": "high", "title": "Severe class imbalance",
                            "detail": f"Largest class has {ratio:.0f}× the samples of the smallest — the model will "
                                      f"be biased. Collect more of the rare classes or rebalance."})
-        elif ratio >= 3:
+        elif ratio >= T["imbalance_med"]:
             issues.append({"severity": "medium", "title": "Class imbalance",
                            "detail": f"Class sizes differ by {ratio:.0f}× — consider balancing."})
-        few = [k for k, v in per.items() if v < 10]
+        few = [k for k, v in per.items() if v < T["min_per_class"]]
         if few:
             issues.append({"severity": "medium", "title": "Classes with too few samples",
-                           "detail": "Under 10 samples: " + ", ".join(sorted(few)[:8]) + "."})
+                           "detail": f"Under {T['min_per_class']} samples: " + ", ".join(sorted(few)[:8]) + "."})
 
     sampled = im.get("sampled") or 0
     dup = a.get("near_duplicates") or 0
-    if sampled and dup / sampled > 0.10:
+    if sampled and dup / sampled > T["dup_frac"]:
         issues.append({"severity": "medium", "title": "Many near-duplicate images",
                        "detail": f"~{dup}/{sampled} sampled images look near-identical — duplicates inflate size "
                                  f"without adding information and can leak between train/val."})
 
     w = (im.get("width") or {}); h = (im.get("height") or {})
-    if w.get("median") and h.get("median") and min(w["median"], h["median"]) < 64:
+    if w.get("median") and h.get("median") and min(w["median"], h["median"]) < T["tiny_px"]:
         issues.append({"severity": "medium", "title": "Tiny images",
                        "detail": f"Median size ~{w['median']}×{h['median']}px — very small images limit achievable accuracy."})
     if w.get("max") and w["max"] > 5000:
@@ -3682,7 +3688,17 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
     a = _analyze_dataset(slug)
     if not a.get("ok"):
         return {"ok": False, "slug": slug, "error": a.get("error", "analysis unavailable")}
-    issues = _detect_dataset_issues(a)
+    # v3.0.179: thresholds from THIS dataset's project/domain config.
+    _thr = None
+    try:
+        from . import db as _dbc2
+        _dom = (_read_manual_uploads().get(slug, {}).get("domain")
+                or (json.load(open(REGISTRY_PATH)).get("datasets", {}).get(slug, {}) or {}).get("domain")
+                or "weed")
+        _thr = _dbc2.get_domain_config(_dom).get("thresholds")
+    except Exception:
+        _thr = None
+    issues = _detect_dataset_issues(a, thr=_thr)
     readiness = _rules_readiness(a, issues)
     # v3.0.167: the dataset's stated goal/purpose → fitness-for-purpose judgment.
     try:
@@ -3933,6 +3949,38 @@ def _set_push_cap(domain: str, cap: int) -> int:
         json.dump(caps, f, indent=2)
     os.replace(tmp, _PUSH_CAPS_FILE)
     return cap
+
+
+@app.get("/api/domain/config")
+def api_get_domain_config(domain: str = "weed"):
+    """v3.0.179: the per-project config that drives taxonomy / queries / quality
+    thresholds / roboflow project / model routing. Any signed-in user can read."""
+    from . import db as _dbc
+    dom = _norm_domain(domain)
+    return JSONResponse({"ok": True, "domain": dom,
+                         "config": _dbc.get_domain_config(dom),
+                         "defaults": _dbc.DEFAULT_DOMAIN_CONFIG})
+
+
+@app.post("/api/domain/config")
+async def api_set_domain_config(request: Request):
+    """Patch a project's config (owner/admin). Deep-merges into domain.config."""
+    actor = _actor_from_request(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    dom = _norm_domain(body.get("domain") or "weed")
+    from . import db as _dbc
+    if not _can_manage_agent(actor, _dbc.get_domain(dom) or {"_id": dom}):
+        raise HTTPException(403, "only the project owner or an admin can edit its config")
+    patch = body.get("config")
+    if not isinstance(patch, dict):
+        raise HTTPException(400, "config must be an object")
+    new_cfg = _dbc.set_domain_config(dom, patch, actor=actor)
+    if new_cfg is None:
+        raise HTTPException(503, "could not save (Mongo down or unknown project)")
+    return JSONResponse({"ok": True, "domain": dom, "config": new_cfg})
 
 
 @app.get("/api/domain/push_cap")

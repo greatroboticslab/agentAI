@@ -421,6 +421,80 @@ def get_domain(domain_id: str) -> Optional[dict]:
         return None
 
 
+# v3.0.179 (Phase 1) — PER-DOMAIN CONFIG. The platform is domain-general: every
+# tunable that used to be a weed/CWD12 hardcode now lives in a per-project config,
+# with these DEFAULTS reproducing today's behaviour EXACTLY (so nothing regresses).
+# A new research field = a new config, not a code change.
+DEFAULT_DOMAIN_CONFIG = {
+    "taxonomy": [],            # class / species / label names for this field
+    "harvest_queries": [],     # collector search terms
+    "accept_vocab": [],        # words that make a harvested dataset relevant
+    "thresholds": {            # dataset-quality knobs (today's hardcoded values)
+        "dino_threshold": 0.45,
+        "imbalance_high": 10, "imbalance_med": 3,
+        "dup_frac": 0.10, "tiny_px": 64,
+        "min_per_class": 10, "small_dataset": 100,
+    },
+    "reference_pool_policy": "uploaded_or_labeled",   # filter reference pool
+    "roboflow_project": "",    # labeler target ("" → derived per domain)
+    "modality": "image",
+    "target_metric": "",       # "" → per-task default
+    "model_routing": {},       # role -> model id overrides
+}
+
+
+def _deep_merge(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for k, v in (over or {}).items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def get_domain_config(domain_id: str) -> dict:
+    """Effective config for a domain: DEFAULTS <- domain.config, back-filling
+    harvest_queries / taxonomy / modality from the legacy domain fields so existing
+    domains (incl. weed) work with zero migration."""
+    import copy as _copy
+    cfg = _copy.deepcopy(DEFAULT_DOMAIN_CONFIG)
+    d = get_domain(domain_id) or {}
+    cfg = _deep_merge(cfg, d.get("config") or {})
+    # back-fill from legacy top-level fields when config didn't set them
+    if not cfg["harvest_queries"] and d.get("harvest_queries"):
+        cfg["harvest_queries"] = list(d["harvest_queries"])
+    if not cfg["taxonomy"] and d.get("taxonomy"):
+        cfg["taxonomy"] = list(d["taxonomy"])
+    _mods = d.get("modality")
+    if _mods:
+        cfg["modality"] = _mods[0] if isinstance(_mods, list) and _mods else _mods
+    return cfg
+
+
+def set_domain_config(domain_id: str, patch: dict, actor: str = "user") -> Optional[dict]:
+    """Deep-merge patch into a domain's config, persist, audit. Returns the new
+    effective config, or None if Mongo down / domain missing."""
+    db = _get_db()
+    if db is None:
+        return None
+    try:
+        d = db[COLL_DOMAINS].find_one({"_id": domain_id})
+        if not d:
+            return None
+        new_cfg = _deep_merge(d.get("config") or {}, patch or {})
+        db[COLL_DOMAINS].update_one({"_id": domain_id}, {"$set": {"config": new_cfg}})
+        try:
+            db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
+                "event": "domain.config", "target": {"kind": "domain", "id": domain_id},
+                "after": patch})
+        except Exception:
+            pass
+        return get_domain_config(domain_id)
+    except Exception:
+        return None
+
+
 # v3.0.137: generalized agent schema. An agent (domain) is no longer implicitly
 # image+YOLO+detection — it declares its MODALITY (what kind of data), TASK (what
 # it learns), and MODEL. Defaults keep every pre-v3.0.137 domain (incl. weed)
