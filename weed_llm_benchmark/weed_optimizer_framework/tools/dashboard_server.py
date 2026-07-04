@@ -3360,24 +3360,46 @@ def _analyze_nonimage(root) -> dict:
         info = {"n": len(sens), "tables": []}
         import csv as _csv
         tabular = [x for x in sens if x.suffix.lower() in (".csv", ".tsv")]
-        for p in tabular[:3]:
+        # v3.0.187: understand tabular/time-series sensor data like sensor data —
+        # detect a LABEL column (categorical) + class balance, and estimate the
+        # sampling rate from a time column — so downstream analysis knows this data
+        # is (often) already labeled and time-sampled, not "unlabeled images".
+        _label_names = ("label", "class", "activity", "target", "y", "annotation", "state")
+        _time_names = ("t", "time", "timestamp", "ts", "sec", "seconds", "millis", "ms")
+        label_counts_all = {}       # {value: count} across sampled files
+        label_col_name = None
+        rates = []                  # estimated Hz per file
+        total_rows = 0
+        _SAMPLE_N = 24
+        for p in tabular[:_SAMPLE_N]:
             try:
                 delim = "\t" if p.suffix.lower() == ".tsv" else ","
                 with open(p, newline="", encoding="utf-8", errors="replace") as f:
                     rd = _csv.reader(f, delimiter=delim)
                     header = next(rd, [])
+                    low = [str(h).strip().lower() for h in header]
                     nrow = 0
                     numcols = {}
+                    catcols = {}           # {col_idx: {value: count}} for non-numeric
+                    tcol = next((i for i, h in enumerate(low) if h in _time_names), None)
+                    tmin = tmax = None
                     for row in rd:
                         nrow += 1
-                        if nrow <= 5000:
+                        if nrow <= 20000:
                             for i, val in enumerate(row):
                                 try:
-                                    numcols.setdefault(i, []).append(float(val))
+                                    fv = float(val)
+                                    numcols.setdefault(i, []).append(fv)
+                                    if i == tcol:
+                                        tmin = fv if tmin is None else min(tmin, fv)
+                                        tmax = fv if tmax is None else max(tmax, fv)
                                 except (ValueError, TypeError):
-                                    pass
+                                    if val != "" and i < len(header):
+                                        c = catcols.setdefault(i, {})
+                                        c[val] = c.get(val, 0) + 1
                         if nrow >= 500000:
                             break
+                    total_rows += nrow
                     stats = {}
                     for i, vals in numcols.items():
                         if vals and i < len(header):
@@ -3385,10 +3407,39 @@ def _analyze_nonimage(root) -> dict:
                             stats[header[i] or f"col{i}"] = {
                                 "min": round(s[0], 3), "max": round(s[-1], 3),
                                 "mean": round(sum(s) / len(s), 3)}
-                    info["tables"].append({"file": p.name, "rows": nrow,
-                                           "cols": header[:24], "numeric": stats})
+                    # pick the label column: a named categorical col, else any categorical
+                    lc_idx = next((i for i, h in enumerate(low)
+                                   if h in _label_names and i in catcols), None)
+                    if lc_idx is None and catcols:
+                        lc_idx = max(catcols, key=lambda i: len(catcols[i]))
+                    tbl = {"file": p.name, "rows": nrow, "cols": header[:24], "numeric": stats}
+                    if lc_idx is not None:
+                        label_col_name = header[lc_idx] if lc_idx < len(header) else f"col{lc_idx}"
+                        tbl["label_col"] = label_col_name
+                        tbl["label_values"] = catcols[lc_idx]
+                        for v, c in catcols[lc_idx].items():
+                            label_counts_all[v] = label_counts_all.get(v, 0) + c
+                    if tcol is not None and tmin is not None and tmax is not None and tmax > tmin:
+                        hz = round((nrow - 1) / (tmax - tmin), 1)
+                        tbl["sampling_hz"] = hz
+                        rates.append(hz)
+                    info["tables"].append(tbl)
             except Exception:
                 continue
+        # dataset-level rollup the analysis + model can reason over
+        info["n_files"] = len(sens)
+        info["sampled_files"] = min(len(tabular), _SAMPLE_N)
+        info["total_rows"] = total_rows   # over sampled files
+        if label_col_name:
+            info["label_column"] = label_col_name
+            info["class_balance"] = dict(sorted(label_counts_all.items(),
+                                                key=lambda kv: -kv[1]))
+            info["n_classes"] = len(label_counts_all)
+            if info["sampled_files"] < len(sens):
+                info["class_balance_note"] = (
+                    f"counts over {info['sampled_files']} of {len(sens)} files (sampled)")
+        if rates:
+            info["sampling_hz_est"] = round(sum(rates) / len(rates), 1)
         out["sensor"] = info
 
     # ---- POINTCLOUD (npy shape / ply,pcd header point count) ----
@@ -3726,6 +3777,26 @@ def _rules_readiness(a: dict, issues: list) -> dict:
     ann = (a.get("annotations") or {})
     typ = ann.get("type")
     n = a.get("n_images") or 0
+    # v3.0.187: non-image data has its own readiness story. A sensor/tabular
+    # dataset with a detected label column is ALREADY labeled — don't send it to
+    # "labeling". But the model trainer is vision-only today, so be honest: it's
+    # analysis-ready, and a trainer for this modality is "not yet".
+    _mdet = a.get("modality_detail") or {}
+    for _mk in ("sensor", "video", "audio", "pointcloud", "text"):
+        det = _mdet.get(_mk)
+        if det:
+            rows = det.get("total_rows") or 0
+            nfiles = det.get("n_files") or det.get("n") or 0
+            if det.get("label_column") and (det.get("n_classes") or 0) >= 2:
+                return {"ready": False, "suggested_task": "analyze",
+                        "reason": (f"This {_mk} data is already labeled by "
+                                   f"'{det['label_column']}' ({det.get('n_classes')} classes, "
+                                   f"~{rows} rows across {nfiles} files). It's ready to analyze; "
+                                   f"a {_mk} model trainer isn't wired yet (vision-only today).")}
+            return {"ready": False, "suggested_task": "analyze",
+                    "reason": (f"{_mk} dataset ({nfiles} files, ~{rows} rows). No label column "
+                               f"detected — add one (e.g. a 'label' column) to make it trainable "
+                               f"once a {_mk} trainer lands; you can analyze it now.")}
     task = ("classification" if typ == "classification"
             else "detection" if typ in ("yolo", "coco", "voc") else None)
     blocking = [i for i in issues if i["severity"] == "high"]
@@ -3770,8 +3841,17 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
         goal = ""
     # compact facts for the model
     ann = a.get("annotations") or {}
+    # v3.0.187: modality of THIS dataset (first non-image bucket wins, else image),
+    # so the facts + prompt describe the right kind of data instead of assuming images.
+    _mdet = a.get("modality_detail") or {}
+    _prim_mod = "image"
+    for _mk in ("sensor", "video", "audio", "pointcloud", "text"):
+        if _mdet.get(_mk):
+            _prim_mod = _mk
+            break
     facts = {
         "stated_goal": goal or None,
+        "primary_modality": _prim_mod,
         "n_images": a.get("n_images"), "modality": a.get("modality"),
         "splits": a.get("splits"), "annotation_type": ann.get("type"),
         "classes": (ann.get("classes") or [])[:20], "per_class": ann.get("per_class") or {},
@@ -3780,6 +3860,13 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
         "near_duplicates": a.get("near_duplicates"),
         "detected_issues": issues,
     }
+    # For non-image data, the image fields are meaningless — send the modality
+    # detail (columns / label column / class balance / sampling rate / …) instead,
+    # so the model reviews the ACTUAL data, not "missing images".
+    if _prim_mod != "image":
+        for _k in ("n_images", "image_size", "labeled_images"):
+            facts.pop(_k, None)
+        facts["data_detail"] = _mdet.get(_prim_mod)
     result = {"ok": True, "slug": slug, "source": "rules", "issues": issues, "goal": goal,
               "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
     try:
@@ -3793,9 +3880,24 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
         model = os.environ.get("PLANNER_MODEL") or _pick["model"]
         _fit = ('"fitness": {"matches_goal": bool, "note": "does this dataset fit its stated_goal? what is '
                 'missing to achieve that goal?"}, ' if goal else "")
+        # v3.0.187: tell the model what KIND of data it's reviewing so it doesn't
+        # apply image assumptions to sensor/tabular/audio data. For non-image data,
+        # `data_detail` holds the real structure (columns, label column, class
+        # balance, sampling rate) — a `label_column` means it is ALREADY labeled.
+        if _prim_mod == "image":
+            _mod_guide = ("This is an IMAGE dataset — assess class distribution, "
+                          "annotation coverage, image sizes, duplicates.")
+        else:
+            _mod_guide = (
+                f"This is a {_prim_mod.upper()} dataset (NOT images) — do NOT ask for "
+                "images or image annotations. Review `data_detail`: the columns/signals, "
+                "the `label_column` + `class_balance` (if present the data is ALREADY "
+                "labeled — judge class balance, not 'missing labels'), the sampling rate, "
+                "signal ranges, number of files/rows, and whether it fits the stated_goal.")
         sys_p = ("You are a data-quality assistant for a research dataset platform. Given dataset FACTS "
                  "(already-computed stats + rule-detected issues" + (" + a stated_goal" if goal else "") +
-                 "), write a concise, practical review for a student. Respond with STRICT JSON only, no "
+                 "), write a concise, practical review for a student. " + _mod_guide + " "
+                 "Respond with STRICT JSON only, no "
                  'prose, shape: {"summary": "2-3 sentence plain-English overview", '
                  + _fit +
                  '"issues": [{"severity":"high|medium|low","title":str,"detail":str}], '

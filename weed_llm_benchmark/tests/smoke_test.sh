@@ -55,6 +55,32 @@ ck "filter on video -> 501" 501 "$(HC $BA -X POST -H 'Content-Type: application/
 ck "labeler on video -> 501" 501 "$(HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\"}" "$BASE/api/cluster_action/sync_all_to_roboflow")"
 [ -n "$VID" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$VID\"}" "$BASE/api/agent/delete" >/dev/null
 
+echo "== SENSOR ANALYSIS (P3+: modality-aware EDA, non-image) =="
+STMP=$(mktemp -d); mkdir -p "$STMP/imu"
+python3 -c "
+import csv,random,math
+random.seed(1)
+for act in ('walk','idle'):
+  with open('$STMP/imu/%s.csv'%act,'w',newline='') as f:
+    w=csv.writer(f); w.writerow(['t','ax','ay','az','gx','gy','gz','label'])
+    for i in range(120):
+      t=i*0.01; a=0.8 if act=='walk' else 0.05
+      w.writerow([round(t,3),round(a*math.sin(t),4),round(a*math.cos(t),4),9.81,0,0,0,act])
+"
+( cd "$STMP" && zip -qr imu.zip imu )
+HC $BA -X POST -H 'Content-Type: application/json' -d '{"domain":"smokeimu"}' "$BASE/api/agent/delete" >/dev/null  # clean stale
+IDOM=$(curl -s $BA --max-time 20 -X POST -H 'Content-Type: application/json' -d '{"name":"smokeimu","research_field":"robotics","modality":["sensor"]}' "$BASE/api/agent/create" | python3 -c "import json,sys;print(json.load(sys.stdin).get('domain',''))" 2>/dev/null)
+ISLUG=$(curl -s $BA --max-time 60 -X POST -H 'Content-Type: application/zip' --data-binary @"$STMP/imu.zip" "$BASE/api/dataset/upload?domain=$IDOM&name=imu&goal=classify%20walk/idle" | python3 -c "import json,sys;print(json.load(sys.stdin).get('slug',''))" 2>/dev/null)
+ck "sensor upload -> slug" yes "$([ -n "$ISLUG" ] && echo yes || echo no)"
+SAN=$(curl -s $BA --max-time 60 "$BASE/api/dataset/analyze?slug=$ISLUG&refresh=1")
+ck "sensor detects label column" label "$(echo "$SAN" | python3 -c "import json,sys;print(json.load(sys.stdin)['modality_detail']['sensor'].get('label_column'))" 2>/dev/null)"
+ck "sensor counts classes" 2 "$(echo "$SAN" | python3 -c "import json,sys;print(json.load(sys.stdin)['modality_detail']['sensor'].get('n_classes'))" 2>/dev/null)"
+ck "sensor estimates sampling rate" yes "$(echo "$SAN" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['modality_detail']['sensor'].get('sampling_hz_est') else 'no')" 2>/dev/null)"
+SAI=$(curl -s $BA --max-time 120 "$BASE/api/dataset/analyze/ai?slug=$ISLUG&refresh=1")
+ck "sensor readiness = analyze (not labeling)" analyze "$(echo "$SAI" | python3 -c "import json,sys;print(json.load(sys.stdin)['training_readiness']['suggested_task'])" 2>/dev/null)"
+rm -rf "$STMP"
+[ -n "$IDOM" ] && HC $BA -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"$IDOM\"}" "$BASE/api/agent/delete" >/dev/null
+
 echo "== DATASET ANALYSIS (EDA) =="
 ck "GET /dataset/$SLUG" 200 "$(HC $BA "$BASE/dataset/$SLUG")"
 AN=$(curl -s $BA --max-time 90 "$BASE/api/dataset/analyze?slug=$SLUG")

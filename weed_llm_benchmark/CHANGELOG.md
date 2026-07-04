@@ -5274,3 +5274,19 @@ tag, or "failed") on the current round — honest: we log that a job was queued,
 "done"; a job-completion writeback is future work). Project page shows a "Compounding rounds" timeline (step
 chips with status/owner tooltips + eval metrics) + a "Start new round" button for owners. Unit tests +8 (pure
 round helpers, offline). smoke +7 (rounds api + timeline UI + start/record/read + non-owner 403).
+
+### v3.0.187 — modality-aware analysis: sensor/tabular data understood, not image-brained
+
+Triggered by a real IMU test (upload 9 CSV sessions of simulated robot accel/gyro): the analysis was WRONG —
+it said "no annotated images, add class subfolders, matches_goal: false", because the AI facts were 100%
+image-centric (n_images / image_size / labeled_images) and the rich sensor detail was never sent to the model.
+Fixes: (1) the sensor analyzer now DETECTS a label column (label/class/activity/…), computes class balance +
+n_classes, and estimates the sampling rate from a time column (with a sampled-files note for honesty); (2) the
+AI-review facts carry `primary_modality` + `data_detail` (the real columns/label/balance/Hz) and DROP the
+image fields for non-image data; (3) the system prompt is modality-aware — for non-image data it tells the
+model "this is SENSOR data, a label_column means it's already labeled, judge balance/sampling/fit, do NOT ask
+for images"; (4) `_rules_readiness` is modality-aware — labeled sensor data is "ready to analyze" (honest: a
+sensor trainer isn't wired yet), not sent to "labeling". RESULT on the same small model: analysis flipped from
+wrong to genuinely useful ("labeled IMU, 3 classes walk/turn/idle, 100 Hz, matches_goal: TRUE"). Residual
+small-model slips (miscount, a hallucinated issue) are exactly what the planned async big-cluster-model
+analysis will fix. smoke +4 (sensor label/classes/Hz detected + readiness=analyze).
