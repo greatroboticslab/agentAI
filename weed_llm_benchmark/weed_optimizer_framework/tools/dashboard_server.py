@@ -1556,10 +1556,14 @@ async def api_agent_plan(request: Request):
         # v3.0.160: the planner uses the lab's LOCAL small model (ollama qwen2.5:3b,
         # served on the always-on server) so planning is fast + actually works —
         # the cluster brain (gemma4) isn't reachable synchronously from the lab.
-        # Override via PLANNER_MODEL env or a "planner" model-config role.
+        # v3.0.182 (P2): resolved via the role router (interactive_plan, lab place),
+        # graceful-degrade if unreachable. Override still honored via PLANNER_MODEL.
+        from . import model_router as _mr, llm_providers as _llmp
+        _pplan = _mr.resolve("interactive_plan", global_roles=(cfg.get("roles") or {}),
+                             provider_status=_llmp.provider_status())
         planner = (os.environ.get("PLANNER_MODEL")
                    or (cfg.get("roles") or {}).get("planner")
-                   or "ollama:qwen2.5:3b")
+                   or _pplan["model"])
         sys_p = ("You are a research-platform planner. Given a user's intent, propose ONE project "
                  "and the agents to build inside it. Agent types MUST be from: "
                  + ", ".join(_AGENT_TYPES) + ". "
@@ -2082,8 +2086,20 @@ def api_models():
     cfg = _read_model_config()
     roles = {r: {"model": cfg["roles"].get(r, _DEFAULT_MODELS.get(r, "")),
                  "desc": _MODEL_ROLES[r]} for r in _MODEL_ROLES}
+    # v3.0.182 (P2): the role router — role -> (model, where), resolved with the
+    # live provider status so the UI can show what would ACTUALLY answer + why.
+    router = {}
+    try:
+        from . import model_router as _mr
+        for _row in _mr.role_table():
+            _res = _mr.resolve(_row["role"], global_roles=(cfg.get("roles") or {}),
+                               provider_status=providers)
+            router[_row["role"]] = {**_row, "resolved": _res["model"],
+                                    "source": _res["source"], "reachable": _res["reachable"]}
+    except Exception as e:
+        router = {"error": str(e)}
     return JSONResponse({"ok": True, "roles": roles, "providers": providers,
-                         "suggested": _SUGGESTED_MODELS})
+                         "suggested": _SUGGESTED_MODELS, "router": router})
 
 
 @app.post("/api/models/role")
@@ -3690,12 +3706,14 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
         return {"ok": False, "slug": slug, "error": a.get("error", "analysis unavailable")}
     # v3.0.179: thresholds from THIS dataset's project/domain config.
     _thr = None
+    _domcfg = None
     try:
         from . import db as _dbc2
         _dom = (_read_manual_uploads().get(slug, {}).get("domain")
                 or (json.load(open(REGISTRY_PATH)).get("datasets", {}).get(slug, {}) or {}).get("domain")
                 or "weed")
-        _thr = _dbc2.get_domain_config(_dom).get("thresholds")
+        _domcfg = _dbc2.get_domain_config(_dom)
+        _thr = _domcfg.get("thresholds")
     except Exception:
         _thr = None
     issues = _detect_dataset_issues(a, thr=_thr)
@@ -3720,9 +3738,14 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
     result = {"ok": True, "slug": slug, "source": "rules", "issues": issues, "goal": goal,
               "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
     try:
-        cfg = _read_model_config()
-        model = (os.environ.get("PLANNER_MODEL")
-                 or (cfg.get("roles") or {}).get("planner") or "ollama:qwen2.5:3b")
+        # v3.0.182 (P2): route the model through the role-based router — per-domain
+        # override → global config → small lab default, graceful-degrade if unreachable.
+        from . import model_router as _mr, llm_providers as _llmp
+        _cfg = _read_model_config()
+        _pick = _mr.resolve("analysis_summary", domain_config=_domcfg,
+                            global_roles=(_cfg.get("roles") or {}),
+                            provider_status=_llmp.provider_status())
+        model = os.environ.get("PLANNER_MODEL") or _pick["model"]
         _fit = ('"fitness": {"matches_goal": bool, "note": "does this dataset fit its stated_goal? what is '
                 'missing to achieve that goal?"}, ' if goal else "")
         sys_p = ("You are a data-quality assistant for a research dataset platform. Given dataset FACTS "
@@ -3755,7 +3778,8 @@ def _analyze_dataset_ai(slug: str, refresh: bool = False) -> dict:
                                            "detail": str(mi.get("detail", ""))[:300]})
                             seen.add(str(mi["title"]).lower())
                     result.update({
-                        "source": "ai", "model": model,
+                        "source": "ai", "model": model, "model_role": "analysis_summary",
+                        "model_source": _pick.get("source"),
                         "summary": str(obj.get("summary"))[:800],
                         "issues": merged[:10],
                         "recommendations": [str(x)[:300] for x in (obj.get("recommendations") or [])][:8],

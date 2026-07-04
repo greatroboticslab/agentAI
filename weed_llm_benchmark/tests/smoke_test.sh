@@ -40,6 +40,7 @@ for api in /api/me /api/users /api/annotation_status /api/rounds_state "/api/dom
 done
 ck "domain config has thresholds" yes "$(curl -s $BA --max-time 15 "$BASE/api/domain/config?domain=weed" | python3 -c "import json,sys;print('yes' if json.load(sys.stdin)['config']['thresholds'].get('dino_threshold') else 'no')" 2>/dev/null)"
 ck "project page ships config editor" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'saveDomainConfig' && echo yes || echo no)"
+ck "model router exposed + resolves" yes "$(curl -s $BA --max-time 15 "$BASE/api/models" | python3 -c "import json,sys;d=json.load(sys.stdin).get('router',{});r=d.get('analysis_summary',{});print('yes' if r.get('resolved') and r.get('place')=='lab' else 'no')" 2>/dev/null)"
 
 echo "== DATASET ANALYSIS (EDA) =="
 ck "GET /dataset/$SLUG" 200 "$(HC $BA "$BASE/dataset/$SLUG")"

@@ -5210,3 +5210,21 @@ the Roboflow project to label into, the harvest queries (one per line), and the 
 Mobile-friendly (auto-fit grid). This closes the loop opened in v3.0.179/.180: a new research field is now
 set up by filling this form, and the collector/filter/labeler/analysis read those values — no code change.
 ⇒ Phase 1 (de-weed domain-config layer) COMPLETE. smoke 81 (added: project page ships the config editor).
+
+### v3.0.182 — Phase 2 (start): role-based model router (role → model, where)
+
+New `weed_optimizer_framework/tools/model_router.py` — the one place that answers "for THIS job, which model,
+running WHERE?" instead of each call site hardcoding a model id. `ROLES` table: interactive_plan +
+analysis_summary (place=lab, small local model, blocks a request → must stay fast), harvest_brain / curation /
+labeling_vlm (place=cluster, consumed inside jobs), deep_review (glm-4.7-flash) + hard_reasoning
+(deepseek-v3:671b) as async cluster on-demand tiers. `resolve(role, domain_config, global_roles,
+provider_status)` is PURE (inject provider status → unit-testable, no network): precedence per-domain override
+→ global model_config → deep tier (lab, if reachable) → default → fallbacks, picking the first REACHABLE one
+and honestly reporting `source` + `reachable`. Honesty grounded in reality: the lab 3060 only has
+`qwen2.5:3b` pulled and no cloud keys, so lab-sync roles degrade to the small model and SAY SO rather than
+pretend a big model answered; the big models are wired as cluster/deep tiers that light up when actually
+reachable (cluster job / API key). Wired the two lab-synchronous LLM sites through it: the New-Project planner
+(interactive_plan) and the dataset AI review (analysis_summary, now also passes the project's
+`config.model_routing` for per-domain override + returns `model_role`/`model_source`). `/api/models` now
+returns the resolved `router` table for observability. Unit tests +14 (tests/test_domain_config.py, 30 total,
+no network). smoke 82.

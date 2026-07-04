@@ -70,6 +70,53 @@ finally:
     db.get_domain = _orig_get_domain
 
 
+# ---- model_router.resolve (Phase 2) --------------------------------------
+from weed_optimizer_framework.tools import model_router as mr  # noqa: E402
+
+OLLAMA_UP = {"ollama": {"configured": True}}
+OLLAMA_DOWN = {"ollama": {"configured": False}}
+
+# lab role, ollama reachable → the small default answers
+r = mr.resolve("analysis_summary", provider_status=OLLAMA_UP)
+ck("lab role resolves to small default", r["model"] == mr.LAB_SMALL and r["place"] == "lab")
+ck("lab role source=default", r["source"] == "default")
+ck("lab role reachable when ollama up", r["reachable"] is True)
+
+# lab role, ollama DOWN → still returns a model but honestly flags unreachable
+r = mr.resolve("analysis_summary", provider_status=OLLAMA_DOWN)
+ck("lab role unreachable flagged", r["reachable"] is False and r["source"] == "unreachable_default")
+
+# per-domain override wins
+r = mr.resolve("analysis_summary",
+               domain_config={"model_routing": {"analysis_summary": "ollama:qwen2.5:3b"}},
+               provider_status=OLLAMA_UP)
+ck("domain override taken", r["source"] == "domain")
+
+# global role config used when no domain override
+r = mr.resolve("interactive_plan", global_roles={"interactive_plan": "ollama:qwen2.5:3b"},
+               provider_status=OLLAMA_UP)
+ck("global role taken", r["source"] == "global")
+
+# cluster role: reachable is contextual (True) even with empty status; place=cluster
+r = mr.resolve("harvest_brain", provider_status={})
+ck("cluster role place", r["place"] == "cluster")
+ck("cluster role reachable in-context", r["reachable"] is True)
+ck("cluster role default model", r["model"] == "ollama:gemma4")
+
+# hard_reasoning is async + rare + cluster
+r = mr.resolve("hard_reasoning", provider_status={})
+ck("hard_reasoning is async", r["is_async"] is True)
+ck("hard_reasoning is rare", r["rare"] is True)
+
+# unknown role → ok False, safe lab fallback
+r = mr.resolve("does_not_exist")
+ck("unknown role ok=False", r["ok"] is False and r["model"] == mr.LAB_SMALL)
+
+# vllm on a lab role is NOT reachable from the lab (cluster-only endpoint)
+ck("vllm not reachable on lab", mr._reachable("vllm:glm-4.7-flash", "lab", OLLAMA_UP) is False)
+ck("role_table lists all roles", len(mr.role_table()) == len(mr.ROLES))
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)
