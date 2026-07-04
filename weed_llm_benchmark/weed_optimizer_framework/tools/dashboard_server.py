@@ -2197,30 +2197,32 @@ async def api_train_submit(request: Request):
         epochs = max(1, min(int(body.get("epochs") or 20), 300))
     except (TypeError, ValueError):
         epochs = 20
-    # 1) stage the dataset to the cluster
-    st = _stage_dataset_to_cluster(slug)
-    if not st.get("ok"):
-        raise HTTPException(502, "data staging to cluster failed: " + st.get("error", ""))
-    base = st["dest"]
-    data_path = base + "/images" if ultra == "classify" else base + "/data.yaml"
-    # 2) make sure the whitelisted template is on the cluster outer root
-    _slurm(["bash", "-lc",
-            "git fetch origin >/dev/null 2>&1; "
-            "git checkout origin/main -- weed_llm_benchmark/run_train_generic.sh 2>/dev/null; "
-            "cp -f weed_llm_benchmark/run_train_generic.sh run_train_generic.sh 2>/dev/null; true"],
-           timeout=60)
-    # 3) submit
-    jobtag = "j" + time.strftime("%m%d%H%M%S")
-    export = ",".join(["ALL", f"TRAIN_TASK={ultra}", f"TRAIN_MODEL={model}",
-                       f"TRAIN_EPOCHS={epochs}", f"TRAIN_DATA={data_path}",
-                       f"TRAIN_DOMAIN={domain}", f"TRAIN_JOBTAG={jobtag}"])
-    r = _slurm(["sbatch", f"--export={export}", "run_train_generic.sh"], timeout=25)
-    ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
-    result = {"ok": ok, "domain": domain, "task": ultra, "model": model,
-              "epochs": epochs, "data": data_path, "jobtag": jobtag,
-              "msg": (r.get("stdout") or r.get("stderr") or "").strip()}
-    _log_action("train_generic", result)
-    return JSONResponse(result)
+    # v3.0.177: stage (rsync lab→cluster) + sbatch is slow (~40-150s) → run it in
+    # the background and return a submit_id immediately so the button never hangs.
+    def _do():
+        st = _stage_dataset_to_cluster(slug)
+        if not st.get("ok"):
+            return {"ok": False, "error": "data staging to cluster failed: " + st.get("error", "")}
+        data_path = st["dest"] + "/images" if ultra == "classify" else st["dest"] + "/data.yaml"
+        _slurm(["bash", "-lc",
+                "git fetch origin >/dev/null 2>&1; "
+                "git checkout origin/main -- weed_llm_benchmark/run_train_generic.sh 2>/dev/null; "
+                "cp -f weed_llm_benchmark/run_train_generic.sh run_train_generic.sh 2>/dev/null; true"],
+               timeout=60)
+        jobtag = "j" + time.strftime("%m%d%H%M%S")
+        export = ",".join(["ALL", f"TRAIN_TASK={ultra}", f"TRAIN_MODEL={model}",
+                           f"TRAIN_EPOCHS={epochs}", f"TRAIN_DATA={data_path}",
+                           f"TRAIN_DOMAIN={domain}", f"TRAIN_JOBTAG={jobtag}"])
+        r = _slurm(["sbatch", f"--export={export}", "run_train_generic.sh"], timeout=25)
+        ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
+        result = {"ok": ok, "domain": domain, "task": ultra, "model": model,
+                  "epochs": epochs, "data": data_path, "jobtag": jobtag,
+                  "msg": (r.get("stdout") or r.get("stderr") or "").strip()}
+        _log_action("train_generic", result)
+        return result
+    sid = await _start_bg_submit("train", _do)
+    return JSONResponse({"ok": True, "pending": True, "submit_id": sid,
+                         "poll": f"/api/submit/status?id={sid}"})
 
 
 @app.post("/api/eval/submit")
@@ -2254,30 +2256,40 @@ async def api_eval_submit(request: Request):
         model = f"yolo11{_m.group(1)}{_suf}.pt"
     elif not model.endswith(".pt"):
         model = "auto"
-    # 1) stage dataset to cluster
-    st = _stage_dataset_to_cluster(slug)
-    if not st.get("ok"):
-        raise HTTPException(502, "data staging to cluster failed: " + st.get("error", ""))
-    base = st["dest"]
-    data_path = base + "/images" if ultra == "classify" else base + "/data.yaml"
-    # 2) ensure the eval template is on the cluster outer root
-    _slurm(["bash", "-lc",
-            "git fetch origin >/dev/null 2>&1; "
-            "git checkout origin/main -- weed_llm_benchmark/run_eval_generic.sh 2>/dev/null; "
-            "cp -f weed_llm_benchmark/run_eval_generic.sh run_eval_generic.sh 2>/dev/null; true"],
-           timeout=60)
-    # 3) submit
-    jobtag = "e" + time.strftime("%m%d%H%M%S")
-    export = ",".join(["ALL", f"EVAL_TASK={ultra}", f"EVAL_MODEL={model}",
-                       f"EVAL_DATA={data_path}", f"EVAL_DOMAIN={domain}",
-                       f"EVAL_JOBTAG={jobtag}"])
-    r = _slurm(["sbatch", f"--export={export}", "run_eval_generic.sh"], timeout=25)
-    ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
-    result = {"ok": ok, "domain": domain, "task": ultra, "model": model,
-              "data": data_path, "jobtag": jobtag,
-              "msg": (r.get("stdout") or r.get("stderr") or "").strip()}
-    _log_action("eval_generic", result)
-    return JSONResponse(result)
+    # v3.0.177: background the slow stage+sbatch; return a submit_id to poll.
+    def _do():
+        st = _stage_dataset_to_cluster(slug)
+        if not st.get("ok"):
+            return {"ok": False, "error": "data staging to cluster failed: " + st.get("error", "")}
+        data_path = st["dest"] + "/images" if ultra == "classify" else st["dest"] + "/data.yaml"
+        _slurm(["bash", "-lc",
+                "git fetch origin >/dev/null 2>&1; "
+                "git checkout origin/main -- weed_llm_benchmark/run_eval_generic.sh 2>/dev/null; "
+                "cp -f weed_llm_benchmark/run_eval_generic.sh run_eval_generic.sh 2>/dev/null; true"],
+               timeout=60)
+        jobtag = "e" + time.strftime("%m%d%H%M%S")
+        export = ",".join(["ALL", f"EVAL_TASK={ultra}", f"EVAL_MODEL={model}",
+                           f"EVAL_DATA={data_path}", f"EVAL_DOMAIN={domain}",
+                           f"EVAL_JOBTAG={jobtag}"])
+        r = _slurm(["sbatch", f"--export={export}", "run_eval_generic.sh"], timeout=25)
+        ok = bool(r["ok"]) and "Submitted batch job" in (r.get("stdout") or "")
+        result = {"ok": ok, "domain": domain, "task": ultra, "model": model,
+                  "data": data_path, "jobtag": jobtag,
+                  "msg": (r.get("stdout") or r.get("stderr") or "").strip()}
+        _log_action("eval_generic", result)
+        return result
+    sid = await _start_bg_submit("eval", _do)
+    return JSONResponse({"ok": True, "pending": True, "submit_id": sid,
+                         "poll": f"/api/submit/status?id={sid}"})
+
+
+@app.get("/api/submit/status")
+def api_submit_status(request: Request, id: str):
+    """Poll an async train/eval submit. status ∈ pending | done | failed."""
+    _ = _actor_from_request(request)
+    with _BG_JOBS_LOCK:
+        st = _BG_JOBS.get(id)
+    return JSONResponse(st or {"status": "unknown"})
 
 
 # ===========================================================================
@@ -3781,6 +3793,34 @@ _WHISPER_LOCK = _threading.Lock()
 # responsive) while one plan/voice/analysis inference runs.
 import asyncio as _asyncio
 _LAB_INFER_SEM = _asyncio.Semaphore(1)
+# v3.0.177 (Phase 0.2): in-process registry for async submits. Slow work (stage
+# data to cluster + sbatch, ~40-150s) runs in a background thread; the endpoint
+# returns a submit_id immediately and the UI polls /api/submit/status. So the
+# Train/Evaluate button never hangs.
+_BG_JOBS = {}
+_BG_JOBS_LOCK = _threading.Lock()
+
+
+async def _start_bg_submit(kind: str, fn) -> str:
+    """Run sync submit-work fn() in a thread; return a submit_id to poll."""
+    sid = kind[0] + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
+    with _BG_JOBS_LOCK:
+        _BG_JOBS[sid] = {"status": "pending", "kind": kind}
+        if len(_BG_JOBS) > 500:                     # bound memory
+            for k in list(_BG_JOBS)[:200]:
+                _BG_JOBS.pop(k, None)
+
+    async def _run():
+        try:
+            res = await _asyncio.to_thread(fn)
+            with _BG_JOBS_LOCK:
+                _BG_JOBS[sid] = {"status": "done", "kind": kind, "result": res}
+        except Exception as e:
+            with _BG_JOBS_LOCK:
+                _BG_JOBS[sid] = {"status": "failed", "kind": kind,
+                                 "error": f"{type(e).__name__}: {str(e)[:200]}"}
+    _asyncio.create_task(_run())
+    return sid
 _WHISPER_SIZE = os.environ.get("WHISPER_MODEL", "base")
 
 
@@ -4790,19 +4830,32 @@ async function submitTrain(){
  var para=(document.getElementById('tr-para')||{}).value||'supervised';
  var msz=(document.getElementById('tr-model')||{}).value||'auto';
  if(!confirm('Stage "'+slug+'" to the cluster and submit a '+para+' GPU training job (model: '+msz+')?'))return;
- go.disabled=true;msg.textContent='\\u23f3 staging + submitting\\u2026';
+ go.disabled=true;msg.textContent='\\u23f3 submitting\\u2026';
  try{var d=await (await fetch('/api/train/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,epochs:parseInt(ep.value||'20'),paradigm:para,model_size:msz})})).json();
-  msg.textContent=(d&&d.ok)?('\\u2705 submitted ('+d.task+', '+d.epochs+'ep) \\u2014 '+(d.msg||'')):'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
+  if(d&&d.pending&&d.submit_id){await pollSubmit(d.submit_id,msg,'training');}
+  else{msg.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}
  catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
+}
+// v3.0.177: submit is async — poll for the real job result so the button never hangs.
+async function pollSubmit(sid,msg,label){
+ for(var i=0;i<80;i++){
+  await new Promise(function(r){setTimeout(r,2500);});
+  var s;try{s=await (await fetch('/api/submit/status?id='+encodeURIComponent(sid),{credentials:'include'})).json();}catch(e){continue;}
+  if(s.status==='done'){var r=s.result||{};msg.textContent=r.ok?('\\u2705 '+label+' job submitted \\u2014 '+(r.msg||'')+(r.task?(' ('+r.task+')'):'')):('\\u274c '+(r.error||r.msg||'failed'));return;}
+  if(s.status==='failed'){msg.textContent='\\u274c '+(s.error||'failed');return;}
+  msg.textContent='\\u23f3 staging data to the cluster + submitting\\u2026 ('+(i+1)+')';
+ }
+ msg.textContent='\\u23f3 still submitting \\u2014 check the console for the job.';
 }
 async function submitEval(){
  var sel=document.getElementById('tr-ds'),msg=document.getElementById('tr-msg'),go=document.getElementById('ev-go');
  var slug=sel.value;if(!slug){msg.textContent='\\u26a0 choose a dataset to evaluate';return;}
  var msz=(document.getElementById('tr-model')||{}).value||'auto';
  if(!confirm('Evaluate on "'+slug+'" (runs model.val on its val split; model: '+msz+' \\u2014 auto uses this project\\u2019s latest trained model, else a baseline)?'))return;
- go.disabled=true;msg.textContent='\\u23f3 staging + submitting eval\\u2026';
+ go.disabled=true;msg.textContent='\\u23f3 submitting eval\\u2026';
  try{var d=await (await fetch('/api/eval/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,model_size:msz})})).json();
-  msg.textContent=(d&&d.ok)?('\\u2705 eval submitted ('+d.task+') \\u2014 '+(d.msg||'')+' \\u00b7 results write to eval_results/'):'\\u274c '+((d&&(d.detail||d.msg))||'failed');}
+  if(d&&d.pending&&d.submit_id){await pollSubmit(d.submit_id,msg,'eval');}
+  else{msg.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}
  catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
 }
 async function saveCap(){

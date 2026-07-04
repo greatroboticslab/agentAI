@@ -110,8 +110,21 @@ ck "voice transcribe ok+text" yes "$(mem --max-time 60 -X POST -H 'Content-Type:
 echo "== 7. permission gate + training =="
 ck "member train BEFORE grant -> 403" 403 "$(HC -H "$CK" -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"e2e_ds\",\"slug\":\"$S_ZIP\",\"epochs\":1,\"task\":\"classification\"}" "$BASE/api/train/submit")"
 curl -s $BA -X POST -H 'Content-Type: application/json' -d '{"user_id":"e2e@uni.edu","allow":true}' "$BASE/api/users/cluster_access" >/dev/null
-TR=$(mem --max-time 200 -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"e2e_ds\",\"slug\":\"$S_ZIP\",\"epochs\":1,\"task\":\"classification\"}" "$BASE/api/train/submit")
-ck "member train AFTER grant -> job" yes "$(echo "$TR" | $PY -c "import json,sys;d=json.load(sys.stdin);print('yes' if d.get('ok') and ('Submitted batch job' in (d.get('msg') or '')) else 'no')")"
+# v3.0.177: submit is async — returns a submit_id fast; poll for the real job.
+T0=$(date +%s)
+TR=$(mem --max-time 30 -X POST -H 'Content-Type: application/json' -d "{\"domain\":\"e2e_ds\",\"slug\":\"$S_ZIP\",\"epochs\":1,\"task\":\"classification\"}" "$BASE/api/train/submit")
+DT=$(( $(date +%s) - T0 ))
+SID=$(echo "$TR" | jget "d.get('submit_id','')")
+ck "train submit returns fast (<10s, async)" yes "$([ "$DT" -lt 10 ] && [ -n "$SID" ] && echo yes || echo no)"
+JOB=no
+for i in $(seq 1 60); do
+  ST=$(mem --max-time 20 "$BASE/api/submit/status?id=$SID")
+  s=$(echo "$ST" | jget "d.get('status')")
+  [ "$s" = "done" ] && { echo "$ST" | $PY -c "import json,sys;r=json.load(sys.stdin).get('result',{});sys.exit(0 if r.get('ok') and 'Submitted batch job' in (r.get('msg') or '') else 1)" && JOB=yes; break; }
+  [ "$s" = "failed" ] && break
+  sleep 3
+done
+ck "member train AFTER grant -> job (via poll)" yes "$JOB"
 
 echo "== 8. cleanup =="
 curl -s $BA -X POST -H 'Content-Type: application/json' -d '{"user_id":"e2e@uni.edu","allow":false}' "$BASE/api/users/cluster_access" >/dev/null

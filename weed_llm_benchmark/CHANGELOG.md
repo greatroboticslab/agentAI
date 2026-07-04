@@ -5150,3 +5150,11 @@ every user during a 10-60s inference. Fixed: both now run the blocking call via 
 single-flight semaphore (_LAB_INFER_SEM — the 12GB 3060 can't run two models at once). The event loop stays
 free → pages/uploads stay responsive while a plan/voice call runs. First step of the platform-optimization
 plan (docs/PLATFORM_OPTIMIZATION_PLAN.md).
+
+### v3.0.177 — Phase 0.2: async train/eval submit (no more 152s button hang)
+
+/api/train/submit + /api/eval/submit validated the request synchronously (auth/slug/task → fast 400/403),
+then did the SLOW part (rsync-stage the dataset lab→cluster + sbatch, ~40-150s) inline — hanging the browser
+button. Now they return a `submit_id` immediately and run the stage+sbatch in a background thread
+(asyncio.to_thread) via a small in-process job registry; the UI polls GET /api/submit/status?id= (new) and
+shows the real job when it lands. Frontend submitTrain/submitEval poll via pollSubmit(). e2e updated to poll.
