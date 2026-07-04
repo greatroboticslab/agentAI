@@ -2378,6 +2378,34 @@ def api_eval_result(request: Request, domain: str, jobtag: str):
     return JSONResponse({"status": "done", "metrics": metrics, "model": d.get("model")})
 
 
+@app.get("/api/train/result")
+def api_train_result(request: Request, domain: str, jobtag: str):
+    """v3.0.192: poll a finished TRAIN job's metrics (run_train_generic.sh writes
+    results/framework/train_results/<domain>_<jobtag>.json) and record the round's
+    `train` step DONE + metrics. Mirrors /api/eval/result. status ∈ pending | done."""
+    actor = _actor_from_request(request)
+    dom = _norm_domain(domain)
+    if not re.match(r"^[A-Za-z0-9_.-]+$", jobtag):
+        raise HTTPException(400, "bad jobtag")
+    r = _slurm(["bash", "-lc",
+                f"cat results/framework/train_results/{dom}_{jobtag}.json 2>/dev/null"], timeout=20)
+    txt = (r.get("stdout") or "").strip()
+    if not txt:
+        return JSONResponse({"status": "pending"})
+    try:
+        d = json.loads(txt)
+    except Exception:
+        return JSONResponse({"status": "pending"})
+    metrics = d.get("metrics") or {}
+    try:
+        from . import db as _dbr
+        _dbr.record_round_step(dom, "train", "done", metrics=metrics, job=jobtag,
+                               detail={"model": d.get("model")}, actor=actor)
+    except Exception:
+        pass
+    return JSONResponse({"status": "done", "metrics": metrics, "model": d.get("model")})
+
+
 @app.get("/api/submit/status")
 def api_submit_status(request: Request, id: str):
     """Poll an async train/eval submit. status ∈ pending | done | failed."""
@@ -5503,9 +5531,22 @@ async function submitTrain(){
  if(!confirm('Stage "'+slug+'" to the cluster and submit a '+para+' GPU training job (model: '+msz+')?'))return;
  go.disabled=true;msg.textContent='\\u23f3 submitting\\u2026';
  try{var d=await (await fetch('/api/train/submit',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'__DOM__',slug:slug,epochs:parseInt(ep.value||'20'),paradigm:para,model_size:msz})})).json();
-  if(d&&d.pending&&d.submit_id){await pollSubmit(d.submit_id,msg,'training');}
+  if(d&&d.pending&&d.submit_id){var r=await pollSubmit(d.submit_id,msg,'training');
+    if(r&&r.ok&&r.jobtag){pollTrainResult('__DOM__',r.jobtag,msg);}}
   else{msg.textContent='\\u274c '+((d&&(d.detail||d.msg))||'failed');}}
  catch(e){msg.textContent='\\u274c '+e;}finally{go.disabled=false;}
+}
+// v3.0.192: after a train job lands, poll its metric + record the round's train step.
+async function pollTrainResult(domain,jobtag,msg){
+ for(var i=0;i<180;i++){
+  await new Promise(function(r){setTimeout(r,10000);});
+  var s;try{s=await (await fetch('/api/train/result?domain='+encodeURIComponent(domain)+'&jobtag='+encodeURIComponent(jobtag),{credentials:'include'})).json();}catch(e){continue;}
+  if(s&&s.status==='done'){var m=s.metrics||{};var ks=Object.keys(m);
+    msg.textContent='\\u2705 training done \\u2014 '+(ks.length?ks.map(function(k){return k+': '+m[k];}).join(', '):'no metric')+(s.model?(' ('+s.model+')'):'');
+    if(typeof loadRounds==='function')loadRounds(); return;}
+  msg.textContent='\\u23f3 training on the cluster\\u2026 metric pending ('+(i+1)+')';
+ }
+ msg.textContent='\\u23f3 training still running \\u2014 metric will appear on the round when done.';
 }
 // v3.0.177: submit is async — poll for the real job result so the button never hangs.
 async function pollSubmit(sid,msg,label){

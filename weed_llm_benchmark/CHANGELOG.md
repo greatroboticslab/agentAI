@@ -5362,3 +5362,11 @@ only (user clicks a job id), so there's no polling SSH churn. Project page gains
 (under the round timeline) listing runs with a ✓/✗ + step icon; each job id is a link that resolves its live
 cluster status inline. smoke +3 (activity ok, job-status bad-id 400, activity view ships — all validation-only,
 no live-cluster assertions).
+
+### v3.0.192.1 — train-step metric writeback (round symmetry with eval)
+
+Closed the open item: `GET /api/train/result?domain=&jobtag=` mirrors the eval writeback — reads the metric
+run_train_generic.sh writes (results/framework/train_results/<domain>_<jobtag>.json) and records the round's
+`train` step DONE + metrics. Frontend `submitTrain` now `pollTrainResult`s after the job lands, shows the
+metric, and refreshes the round timeline. So both train and eval now fill their round step with real metrics.
+smoke +1 (train-result bad-jobtag 400, validation-only).

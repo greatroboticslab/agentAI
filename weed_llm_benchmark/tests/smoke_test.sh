@@ -47,6 +47,7 @@ ck "project page ships brain-select" yes "$(curl -s $BA --max-time 20 "$BASE/age
 ck "project page ships one-click round" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'runFullRound' && echo yes || echo no)"
 ck "async big-review rejects bad slug" 400 "$(HC $BA -X POST -H 'Content-Type: application/json' -d '{"slug":"bad slug!"}' "$BASE/api/dataset/analyze/ai/submit")"
 ck "eval result rejects bad jobtag" 400 "$(HC $BA "$BASE/api/eval/result?domain=weed&jobtag=bad%21tag")"
+ck "train result rejects bad jobtag" 400 "$(HC $BA "$BASE/api/train/result?domain=weed&jobtag=bad%21tag")"
 ck "domain activity ok (action log)" True "$(curl -s $BA --max-time 20 "$BASE/api/domain/activity?domain=weed" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('ok') and isinstance(d.get('activity'),list))" 2>/dev/null)"
 ck "job status rejects non-numeric" 400 "$(HC $BA "$BASE/api/job/status?jobid=abc")"
 ck "project page ships activity view" yes "$(curl -s $BA --max-time 20 "$BASE/agent/weed" | grep -q 'loadActivity' && echo yes || echo no)"
