@@ -5466,3 +5466,13 @@ bleached_coral: 3}`, `labeled 6/6`):
    parent dir; pure-image datasets still point at `images/`.
 3. **Class names not persisted** — `data.yaml` was parsed for names but never written to disk, so analysis fell
    back to generic `class 0/1`. It's now written back (inline-list form the analyzer accepts) so real names surface.
+
+### v3.1.2 — analysis polish + second de-monolith extraction
+
+- **Modality mix miscount** — a YOLO label (`.txt` under `labels/`) matched the "sensor" modality by extension, so
+  a labeled image dataset showed a phantom "sensor" row equal to the label count. Labels are now recognized as
+  annotations and excluded from the modality mix (`dashboard_server._analyze_dataset`).
+- **De-monolith (step 2)** — extracted the pure rule-based quality checker `_detect_dataset_issues` (~70 lines)
+  into `tools/dataset_quality.py` as `detect_dataset_issues`, imported back under the same name (behaviour
+  identical; unit-tested standalone). Continues the v3.0.193 `dataset_eda.py` extraction. dashboard_server.py:
+  ~13,014 → 12,953 lines.
