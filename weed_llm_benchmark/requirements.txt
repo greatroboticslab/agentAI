@@ -1,12 +1,27 @@
+# Full runtime deps (training + inference on the cluster).
+#
+# PIN POLICY: these are minimum-version declarations, NOT an exact lock. For a
+# reproducible environment (papers, lab-server rebuilds), generate a lockfile FROM
+# THE WORKING CLUSTER ENV — `pip freeze > requirements.lock` — and install from
+# that. Do not hand-guess exact ML versions; torch/transformers/ultralytics make
+# breaking changes across minors and a wrong pin is worse than a range.
+#
+# To just run the dashboard + tests locally, use the lighter requirements-dev.txt.
+
+# --- ML / vision stack (heavy; cluster GPU) ---
 torch>=2.0.0
 transformers>=4.40.0
 accelerate>=1.0.0
+ultralytics
+qwen-vl-utils
+
+# --- data / labeling / vision I/O ---
 roboflow
 opencv-python-headless
 Pillow
 matplotlib
 numpy
-requests
-qwen-vl-utils
-ultralytics
+
+# --- platform / storage / http ---
 pymongo>=4.6
+requests

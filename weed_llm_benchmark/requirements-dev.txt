@@ -1,0 +1,16 @@
+# Light dependency set — enough to RUN THE DASHBOARD and the unit tests locally
+# WITHOUT the heavy ML stack (no torch / transformers / ultralytics). The dashboard
+# is server-rendered and boots fine on just these; training/inference need the full
+# requirements.txt on the cluster.
+#
+#   pip install -r requirements-dev.txt
+#   python tests/test_domain_config.py                       # unit tests
+#   echo pw > ~/.dashpass && DASH_USER=me \
+#     uvicorn weed_optimizer_framework.tools.dashboard_server:app --port 8000
+fastapi
+uvicorn
+pymongo
+numpy
+Pillow
+opencv-python-headless
+requests

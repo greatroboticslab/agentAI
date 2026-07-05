@@ -1,0 +1,55 @@
+name: CI
+
+# Lightweight, cluster-free CI. It does NOT install torch/ultralytics (too heavy
+# and not needed to catch the regressions that actually hurt): it byte-compiles
+# every file and runs the pure-logic unit tests (registry merge, per-domain
+# config, round-step ledger, non-image EDA) that guard the data pipeline.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Byte-compile every Python file
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: py_compile all tracked .py
+        run: git ls-files '*.py' | xargs -P4 -n40 python -m py_compile
+
+  unit-tests:
+    name: Unit tests (no Mongo / cluster)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install light deps
+        run: pip install pymongo numpy pillow
+      - name: Domain-config + registry + EDA tests
+        working-directory: weed_llm_benchmark
+        run: python tests/test_domain_config.py
+
+  lint:
+    name: Lint (informational, non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ruff
+        run: |
+          pip install ruff
+          ruff check --output-format=github . || true

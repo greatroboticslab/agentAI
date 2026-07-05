@@ -2,6 +2,10 @@
 
 **A research platform for building detection datasets — collect → review → train, all from one dashboard.**
 
+[![CI](https://github.com/greatroboticslab/agentAI/actions/workflows/ci.yml/badge.svg)](https://github.com/greatroboticslab/agentAI/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![License](https://img.shields.io/badge/license-proprietary-lightgrey)
+
 Built at the [MTSU Great Robotics Lab](https://github.com/greatroboticslab). Create a project for any
 research field, add data of any kind, then point AI agents at it to **harvest, filter, label, and train** —
 any number, any mix, or none. The dashboard runs on the lab server; GPU jobs queue on the PSC Bridges-2 cluster.
@@ -76,12 +80,14 @@ server the same views fill with real datasets, boxed previews, and round history
 ## ⚡ Run it locally
 
 ```bash
-cd weed_llm_benchmark            # the package lives here
-pip install -r requirements.txt
-echo mypassword > ~/.dashpass    # auth fails closed without a configured password
+cd weed_llm_benchmark              # the package lives here
+pip install -r requirements-dev.txt   # light: boots the dashboard without torch
+echo mypassword > ~/.dashpass      # auth fails closed without a configured password
 DASH_USER=me uvicorn weed_optimizer_framework.tools.dashboard_server:app --port 8000
 # → open http://localhost:8000  (log in: me / mypassword)
 ```
+
+Running tests, CI details, and contributing conventions are in **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
 
 ---
 
