@@ -1483,3 +1483,36 @@ the honest post-leak-fix mAP. Everything else is code-only and pushed.
 hardcoded `/ocean/...byler` paths (blocks lab-server migration); unpinned
 deps; near-zero CI; broader outage→empty + Popen-liveness honesty sweep;
 stale "cwd12 ≥ 0.90 DO NOT DRIFT" changelog header (goal met at v3.0.38-A).
+
+## 2026-07-05 — v3.1.1–v3.1.3: upload/analysis fixes, live deploy, E2E, class-name editor
+
+Continuation of the audit thread: made the student upload→analysis flow real,
+verified it on the machines students actually use, and closed the biggest
+onboarding gap.
+
+### Shipped (each verified on the LIVE lab server, not just locally)
+
+- **v3.1.1** — three upload bugs found by end-to-end testing (double-nested
+  `images/images/`, `local_path` hiding sibling `labels/`, class names never
+  persisted): a correctly-labeled YOLO upload no longer analyzes as "no labels".
+- **v3.1.2** — YOLO label `.txt` no longer miscounted as "sensor" modality;
+  second de-monolith extraction (`dataset_quality.py`, dashboard −61 lines).
+- **v3.1.3** — ✎ class-name editor on the analysis page: uploads without
+  `data.yaml` (the common student case) get real class names; writes data.yaml +
+  registry dual-write + cache invalidation. Live E2E: `["class 0","class 1"]` →
+  `["crop","grass weed"]` → distribution shows `grass weed: 81`.
+- **Deployed the full v3.1 fix set to the lab server** (12 files, tar backup,
+  restart, verified) — lab now matches GitHub main; cluster pulled the same
+  commit via its job-start sync.
+- **Full-frontend E2E on live** (desktop + iPhone viewport) with a real 24-image
+  weed dataset: create project → upload (1.1s) → EDA → AI review
+  (`qwen2.5:3b` local; `ready:True`) → gallery → agents; mobile fully
+  responsive. Only false alarm: /console networkidle (page is fine, 200/0.3s).
+- **README refreshed with real-data screenshots** (removed all 0-count
+  empty-state images); added the class-name editor shot. CI green.
+
+### Lesson
+
+API-level "works" ≠ student-level "works": the three v3.1.1 bugs and the
+class-name gap were only visible by driving the real UI with real data on the
+real server. Verify from the user's seat.
