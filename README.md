@@ -58,22 +58,20 @@ then **Train** on the cluster GPU (queued) and **Evaluate** — the resulting mA
 <img src="docs/screenshots/project-config-train.png" width="820" alt="Project auto-config: harvest queries and vocabulary derived from the field, plus train/evaluate">
 </div>
 
-### Once data is flowing
+### What analysis looks like on real data
 
-The same project surfaces three operating views — the one-click **agent-action grid** (recommended order,
-green = the happy path), the human-in-the-loop **labeling console** (push a few → label in Roboflow → export →
-repeat), and per-round **review** (keep/junk each round before it reaches training):
-
-<div align="center">
-<img src="docs/screenshots/console.png" width="270" alt="Mission Control agent-action grid"><img src="docs/screenshots/labeling.png" width="270" alt="Human-in-the-loop labeling console"><img src="docs/screenshots/rounds.png" width="270" alt="Per-round review">
-</div>
+A real weed dataset (24 field images, YOLO boxes) uploaded and analyzed **on the live lab server**: class
+distribution, image-dimension stats, near-duplicate check, and boxed sample previews — plus a one-click
+**AI review** (local model on the server; a bigger cluster model is selectable per-project) that returns a
+plain-English summary and a training-readiness verdict:
 
 <div align="center">
-<sub>Screenshots are a real <b>local dev instance</b> — the Coral Reef project was created live for this walkthrough;
-counts read 0 and cluster-hosted images show placeholders because no data has been harvested yet. On the lab
-server the same views fill with real datasets, boxed previews, and round history. There's also a built-in
-<b>2-minute guide</b> at <code>/guide</code>.</sub>
+<img src="docs/screenshots/weed-analysis.png" width="840" alt="Dataset analysis of a real weed dataset: class distribution, image stats, AI review, boxed samples">
 </div>
+
+Beyond upload+analysis, each project also offers the one-click **agent-action console**, the human-in-the-loop
+**labeling flow** (push a few → label in Roboflow → export → repeat), and per-round **review** before anything
+reaches training. There's a built-in **2-minute guide** at <code>/guide</code>.
 
 ---
 
