@@ -1,54 +1,79 @@
 # agentAI
 
-**A Universal Embodied Multi-Agent Framework for Agricultural Robotics**
+**A research platform for building detection datasets — collect → review → train, all from one dashboard.**
 
-Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), this repository implements **EMACF** (Embodied Multi-Agent Cognitive Framework) — a domain-agnostic agent architecture where an LLM serves as the robot's "brain" and specialized real-time agents serve as its "body". The framework is designed to be universal: the same core agent infrastructure handles weed detection, robot navigation, human-robot interaction, and future applications.
+Built at the [MTSU Great Robotics Lab](https://github.com/greatroboticslab). Create a project for any
+research field, add data of any kind, then point AI agents at it to **harvest, filter, label, and train** —
+any number, any mix, or none. The dashboard runs on the lab server; GPU jobs queue on the PSC Bridges-2 cluster.
+
+<div align="center">
+<img src="docs/screenshots/home.png" width="860" alt="Research Projects home — open a project or start a new one">
+<br>
+<sub>Every research domain is a <b>project</b>. Open one, or start a new one for any data type — images, video, sensor, …</sub>
+</div>
+
+**Jump to:** [60-second tour](#-60-second-tour) · [Run it locally](#-run-it-locally) · [What's in this repo](#whats-in-this-repo) · [Research &amp; benchmarks](#research--benchmarks)
 
 ---
 
-<div align="center">
+## 🌱 60-second tour — from an empty page to a running project
 
-## 🌱 The Research Platform — a 60-second tour
+*Walkthrough of creating a brand-new project from scratch. To show the platform is domain-agnostic (not just
+weeds), we spin up a **marine-biology coral-reef survey**.*
 
-**Collect → review → train detection datasets, all from one dashboard.**
+### Step 1 — Create a project
 
-Create a project for any research field, add data of any kind, then point agents at it to
-harvest, filter, label, and train — any number, any mix, or none. The dashboard runs on the
-lab server; GPU jobs queue on the Bridges-2 cluster.
-
-<img src="docs/screenshots/home.png" width="840" alt="Research Projects home — open a project or start a new one">
-
-<sub>Every research domain is a <b>project</b>. Open one, or spin up a new one for any data type — images, video, sensor, …</sub>
-
-</div>
-
-### How a newcomer uses it
-
-**1 · Get oriented.** A built-in guide lays out the whole flow in four steps: create a project → add datasets → analyze → train. No prior context needed.
+From the home screen, click **New Project**. Name it and tick the data types it will hold — or just describe
+your goal in plain English (*"collect drone images of coral reefs and train a model to spot bleaching"*) and let
+the AI propose the whole setup. No config files, no code.
 
 <div align="center">
-<img src="docs/screenshots/guide.png" width="820" alt="Getting started guide: create a project, add datasets, analyze, train">
+<img src="docs/screenshots/create-project.png" width="760" alt="Create a new project — name, research field, data types, or describe it in plain English">
 </div>
 
-**2 · Drive the pipeline from Mission Control.** Live status up top, then one-click agent actions laid out in recommended order — harvest new data, pre-annotate with OWLv2, curate with DINOv2, train YOLO. Green = the happy path; the numbers are the order; grey = optional variants.
+### Step 2 — Land in your workspace
+
+Every project gives you the same tools, scoped to it:
+
+- **Agents** — five kinds you can add in any mix: **Collector** (harvests data by your queries), **Filter** (DINOv2 quality-scores it), **Labeler** (pushes to Roboflow for human labeling), **Trainer** (trains on your data), **Evaluator** (runs `model.val` on a held-out split). A project with *no* agents is just a clean dataset workspace — that's fine too.
+- **Compounding rounds** — each round is one pass of `collect → filter → label → train → evaluate`, recorded with who ran it and when; evaluation metrics feed back into the next round's collection.
+- **Upload a dataset** — drag-and-drop a `.zip` / folder / images. YOLO (`labels/` + `data.yaml`), COCO/VOC, or class-subfolders are all understood automatically.
 
 <div align="center">
-<img src="docs/screenshots/console.png" width="820" alt="Framework controller with the agent-action grid">
+<img src="docs/screenshots/new-project.png" width="820" alt="A new project workspace: agents, compounding rounds, and dataset upload">
 </div>
 
-**3 · Keep a human in the loop.** Push a handful of images per dataset out for real labeling, export the boxes back, delete to save quota, then push the next batch. Every stage — pushed, agent-labeled, human-labeled, human-verified — is tracked.
+### Step 3 — It configures itself for your field, then trains
+
+Filling in the research field is all it takes to stand up a new domain — the project **auto-generated harvest
+queries** (*"coral reef bleaching detection dataset"*, *"staghorn coral annotated images"*) and an
+**accept-vocabulary** (*coral, reef, polyp*) from the words you typed. Tune the quality thresholds if you like,
+then **Train** on the cluster GPU (queued) and **Evaluate** — the resulting mAP is written straight back here.
 
 <div align="center">
-<img src="docs/screenshots/labeling.png" width="820" alt="Labeling console — human-in-the-loop review">
+<img src="docs/screenshots/project-config-train.png" width="820" alt="Project auto-config: harvest queries and vocabulary derived from the field, plus train/evaluate">
 </div>
 
-**4 · Review every harvest round.** Each round is a versioned snapshot of what the agent collected. Inspect it, judge quality class-by-class, and keep or junk it *before* it can ever reach training.
+### Once data is flowing
+
+The same project surfaces three operating views — the one-click **agent-action grid** (recommended order,
+green = the happy path), the human-in-the-loop **labeling console** (push a few → label in Roboflow → export →
+repeat), and per-round **review** (keep/junk each round before it reaches training):
 
 <div align="center">
-<img src="docs/screenshots/rounds.png" width="820" alt="Harvest rounds — version-by-version review">
+<img src="docs/screenshots/console.png" width="270" alt="Mission Control agent-action grid"><img src="docs/screenshots/labeling.png" width="270" alt="Human-in-the-loop labeling console"><img src="docs/screenshots/rounds.png" width="270" alt="Per-round review">
 </div>
 
-### Run it locally
+<div align="center">
+<sub>Screenshots are a real <b>local dev instance</b> — the Coral Reef project was created live for this walkthrough;
+counts read 0 and cluster-hosted images show placeholders because no data has been harvested yet. On the lab
+server the same views fill with real datasets, boxed previews, and round history. There's also a built-in
+<b>2-minute guide</b> at <code>/guide</code>.</sub>
+</div>
+
+---
+
+## ⚡ Run it locally
 
 ```bash
 cd weed_llm_benchmark            # the package lives here
@@ -58,21 +83,45 @@ DASH_USER=me uvicorn weed_optimizer_framework.tools.dashboard_server:app --port 
 # → open http://localhost:8000  (log in: me / mypassword)
 ```
 
-<sub>The screenshots above are a fresh <b>local dev instance</b> — counts read 0 and cluster-hosted images show
-placeholders because no data has been harvested yet. On the live lab server the same views fill with real
-datasets, boxed previews, and round history.</sub>
+---
+
+## What's in this repo
+
+| Path | What it is |
+|------|-----------|
+| [`weed_llm_benchmark/`](weed_llm_benchmark/) | **The live platform** — dashboard, autonomous harvest → label → train pipeline, MongoDB, Roboflow sync. This is where active work happens. |
+| [`multagent/`](multagent/) | **EMACF** robotics agent framework (Brain / Perception / Targeting / Navigation) — the earlier embodied-robot direction, kept for reference. |
+| [`docs/`](docs/) | Screenshots + platform roadmap. |
+
+> **Latest:** `v3.1.0` — full-framework audit + CRITICAL correctness/security hardening (holdout-leak seal,
+> registry locking, secret removal, honesty fixes). See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
+> and [`RESEARCH_LOG.md`](RESEARCH_LOG.md).
 
 ---
 
-## Repository Structure
+## Research &amp; benchmarks
+
+The platform grew out of two research threads. Full detail is collapsed below to keep this page usable — expand it for the architecture, the 19-model VLM benchmark, every phase, and the results tables.
+
+<details>
+<summary><b>📄 Click to expand — EMACF framework, the VLM-vs-YOLO benchmark, all phases &amp; results, tech stack, papers</b></summary>
+
+### Origin
+
+This repository implements **EMACF** (Embodied Multi-Agent Cognitive Framework) — a domain-agnostic agent
+architecture where an LLM serves as a robot's "brain" and specialized real-time agents serve as its "body".
+The same core infrastructure is designed to handle weed detection, robot navigation, human-robot interaction,
+and future applications. The dataset platform above is the weed-detection domain, generalized.
+
+### Repository structure (research view)
 
 | Directory | Description | Status |
 |-----------|-------------|--------|
-| [`multagent/`](multagent/) | **EMACF core framework** — Event-driven multi-agent system extending MetaGPT for real-time robot control. Includes BrainAgent (LLM), PerceptionAgent (YOLO), TargetingAgent (laser), NavigationAgent, cloud-edge communication, and real-time dashboard. | Active |
-| [`weed_llm_benchmark/`](weed_llm_benchmark/) | **Vision LLM Benchmark** — Evaluates 19 open-source vision LLMs against YOLO for weed detection on CottonWeedDet12 (5,648 images, 12 species). Results feed back to optimize EMACF's PerceptionAgent. | Active |
-| `robot_navigation/` | **Robot Navigation** *(planned)* — Autonomous navigation module sharing the same EMACF agent framework. | Planned |
+| [`multagent/`](multagent/) | **EMACF core framework** — event-driven multi-agent system extending MetaGPT for real-time robot control. BrainAgent (LLM), PerceptionAgent (YOLO), TargetingAgent (laser), NavigationAgent, cloud-edge comms, real-time dashboard. | Reference |
+| [`weed_llm_benchmark/`](weed_llm_benchmark/) | **Vision-LLM benchmark + dataset platform** — evaluates 19 open-source vision LLMs against YOLO on CottonWeedDet12 (5,648 images, 12 species), and hosts the live harvest/label/train platform. | Active |
+| `robot_navigation/` | **Robot navigation** *(planned)* — autonomous navigation sharing the same EMACF framework. | Planned |
 
-## Architecture Overview
+### Architecture overview
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -98,39 +147,17 @@ datasets, boxed previews, and round history.</sub>
                     │   Camera + Laser    │
                     │   + Safety Monitor  │
                     └─────────────────────┘
-
-┌──────────────────────────────────────────────────────────────────┐
-│               weed_llm_benchmark/                                │
-│                                                                  │
-│   19 Vision LLMs  vs  YOLO11n  on  CottonWeedDet12              │
-│   ──────────────────────────────────────────────────             │
-│   Benchmark results → Optimize PerceptionAgent YOLO model        │
-└──────────────────────────────────────────────────────────────────┘
 ```
 
-## Key Design Principles
+### Key design principles
 
-1. **Universal Agent Framework** — Domain logic lives in agent implementations, not the core. The same `EmbodiedTeam`, `EventBus`, and `AgentRegistry` handle any robotic task.
-2. **Event-Driven Architecture** — Agents react to events in real-time, not turn-based. The BrainAgent (LLM) only intervenes on significant events, minimizing latency.
-3. **Hot-Pluggable Agents** — Add or remove agents at runtime via `AgentRegistry`. New tasks (e.g., obstacle avoidance) just require a new agent plugin.
-4. **LLM-Agnostic** — Switch between vLLM, Ollama, OpenAI, or any LLM backend via config.
-5. **Cloud-Edge Separation** — Compute-heavy processing (YOLO, LLM) runs on cloud GPU; edge device handles only hardware I/O with independent safety fallback.
+1. **Universal agent framework** — domain logic lives in agent implementations, not the core. The same `EmbodiedTeam`, `EventBus`, and `AgentRegistry` handle any task.
+2. **Event-driven** — agents react to events in real time, not turn-based. The BrainAgent (LLM) only intervenes on significant events.
+3. **Hot-pluggable agents** — add/remove agents at runtime via `AgentRegistry`.
+4. **LLM-agnostic** — switch between vLLM, Ollama, OpenAI, or any backend via config.
+5. **Cloud-edge separation** — heavy compute (YOLO, LLM) on cloud GPU; edge device handles only hardware I/O with independent safety fallback.
 
-## Current Progress
-
-> **2026-07-04 — v3.1.0 audit + hardening.** A full read-only audit (7 review
-> agents) of the AI-built codebase fixed several CRITICAL issues: a holdout
-> leak that could inflate the cwd12 mAP (renamed re-exports of eval images
-> now blocked by content dHash), registry data-loss/lost-update races (advisory
-> lock + atomic writes + corrupt-guard), a committed Kaggle token (removed;
-> rotate + purge history), and systemic "looks-successful" reporting (job
-> status from real result, auth fails closed, simulated labeling events
-> flagged). See `weed_llm_benchmark/CHANGELOG.md` (v3.1.0) and `RESEARCH_LOG.md`.
-> Known follow-ups: the 12.9k-line dashboard monolith, cluster-hardcoded paths,
-> unpinned deps, and CI are still open. NOTE: the post-fix honest mAP must be
-> re-measured by re-running training.
-
-### EMACF Framework (`multagent/`)
+### Progress — EMACF framework (`multagent/`)
 
 | Component | Status | Description |
 |-----------|--------|-------------|
@@ -142,7 +169,7 @@ datasets, boxed previews, and round history.</sub>
 | Dashboard | Done | Vue 3 real-time visualization (live feed, agent status, metrics) |
 | Edge Client | Done | Camera streaming, command execution, safety monitor |
 
-### Weed LLM Benchmark (`weed_llm_benchmark/`)
+### Progress — Weed LLM benchmark (`weed_llm_benchmark/`)
 
 | Phase | Status | Description |
 |-------|--------|-------------|
@@ -158,15 +185,15 @@ datasets, boxed previews, and round history.</sub>
 | Phase 4: HyperAgent Closed-Loop | **Done** | Qwen2.5-7B Brain: 3 rounds executed, system works but Brain needs stronger reasoning |
 | Phase 4B: Weed Optimizer Framework | **Done** | 14 files, 3,522 lines. Ollama function calling, job chain, plant.id API, HuggingFace model discovery. |
 | Phase 4C: Clone + Train External Models | **Done** | YOLOv8s trained from COCO→CottonWeed: F1=0.888; DETR zero-shot: F1=0; YOLO11n baseline: F1=0.917 |
-| Phase 4D: plant.id Integration | **Done** | API key configured, local test OK (Status 201). Cluster needs pre-cache (network blocked). 49 credits left. |
+| Phase 4D: plant.id Integration | **Done** | API key configured, local test OK (Status 201). Cluster needs pre-cache. 49 credits left. |
 | Phase 4E: DeepSeek-R1 Brain | **Done** | 7 action types (vs Qwen's 1). Autonomously searched HuggingFace + downloaded models. |
 | Phase 4F: Extended Run (6h48m) | **Done** | 7 rounds autonomous. Filter removed 16.3% label noise. Brain reasoning loop validated. |
 | Phase 4G: Anti-Forgetting (LoRA + freeze + distill) | **Done** | Hybrid LoRA: 37 Conv2d layers, 38.15% params. Near-zero mAP forgetting. |
 | Phase 4H: Gemma 4 Brain + Evaluator Fix | **Done** | Gemma 4 31B (MoE). Corrected evaluator (dual-conf). New mAP50: +9.7%, old mAP50: -0.6%. |
-| Phase 4: Ablation Studies | Planned | Prompt engineering, model size, grounding capability |
-| Phase 5: Paper Writing | Planned | Figures, tables, manuscript |
+| Phase 5: Dataset platform (dashboard, provenance, multi-domain) | **Active** | The platform shown at the top of this page. |
+| Paper writing | Planned | Figures, tables, manuscript |
 
-#### Benchmark Results (CottonWeedDet12, 848 test images)
+#### Benchmark results (CottonWeedDet12, 848 test images)
 
 | Model | Type | mAP@0.5 | mAP@0.5:0.95 | Precision | Recall | F1 | Time |
 |-------|------|---------|--------------|-----------|--------|-----|------|
@@ -184,29 +211,32 @@ datasets, boxed previews, and round history.</sub>
 | Llama 3.2 Vision 11B | VLM | 0.000 | 0.000 | 0.005 | 0.007 | 0.006 | 11370s |
 | Moondream / Molmo / LLaVA | VLM | 0.000 | 0.000 | — | — | — | — |
 
-## Technology Stack
+### Technology stack
 
 | Component | Technology |
 |-----------|-----------|
 | Agent Framework | MetaGPT (extended for embodied AI) |
-| Cloud Backend | FastAPI + asyncio + WebSocket |
+| Backend | FastAPI + asyncio + WebSocket |
 | Object Detection | Ultralytics YOLO11n (fine-tuned on CottonWeedDet12) |
 | LLM Integration | vLLM / Ollama / OpenAI-compatible APIs |
-| Dashboard | Vue 3 + Vite + ECharts |
+| Dashboard | Server-rendered FastAPI (platform) + Vue 3 + ECharts (robot demo) |
+| Storage | MongoDB + append-only JSON registry + Roboflow (labeling surface) |
 | Hardware | HeliosDAC (laser) + ESP32 (motor/laser control) |
 | Compute Cluster | PSC Bridges-2 (V100 GPUs) |
-| Benchmark Models | 19 models: Qwen2.5/3-VL, Grounding DINO, Florence-2, PaliGemma2, YOLO-World, InternVL2, Molmo, DeepSeek-VL2, etc. |
 
-## Papers
+### Papers
 
-1. **"Universal Embodied Multi-Agent Cognitive Framework for Agricultural Robotics"** — EMACF architecture paper (targeting *Scientific Reports*)
-2. **"Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Models for Agricultural Object Detection"** — Vision LLM benchmark (targeting *Computers and Electronics in Agriculture*)
+1. **"Universal Embodied Multi-Agent Cognitive Framework for Agricultural Robotics"** — EMACF architecture (targeting *Scientific Reports*)
+2. **"Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Models for Agricultural Object Detection"** — VLM benchmark (targeting *Computers and Electronics in Agriculture*)
 
-## Getting Started
+### Per-project docs
 
-See individual project READMEs:
 - [`multagent/README.md`](multagent/README.md) — EMACF setup and usage
-- [`weed_llm_benchmark/README.md`](weed_llm_benchmark/README.md) — Benchmark framework documentation
+- [`weed_llm_benchmark/README.md`](weed_llm_benchmark/README.md) — platform + benchmark framework documentation
+
+</details>
+
+---
 
 ## License
 
