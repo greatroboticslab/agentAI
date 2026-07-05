@@ -6,12 +6,19 @@ Reader never blocks; if a partial write is encountered, retry after backoff.
 This is the same approach git, etcd, and CockroachDB use for crash-safe state.
 """
 
+import contextlib
 import json
 import os
 import shutil
 import tempfile
 import time
 from pathlib import Path
+
+try:
+    import fcntl  # POSIX only (cluster is Linux, dev is macOS — both have it)
+    _HAVE_FCNTL = True
+except ImportError:  # pragma: no cover - Windows fallback
+    _HAVE_FCNTL = False
 
 
 def atomic_write_json(path, data):
@@ -37,6 +44,75 @@ def atomic_write_json(path, data):
         except FileNotFoundError:
             pass
         raise
+
+
+@contextlib.contextmanager
+def registry_lock(path, timeout=120.0, poll=0.25):
+    """Advisory exclusive lock for read-modify-write on a shared JSON file.
+
+    Holds an `fcntl.flock(LOCK_EX)` on a `<path>.lock` sidecar. This gives
+    CORRECT mutual exclusion between processes ON THE SAME NODE. On Lustre
+    (/ocean) flock is honored across nodes only when the filesystem is mounted
+    with flock support — Bridges-2 /ocean generally is, but callers must NOT
+    treat cross-node exclusion as guaranteed. That is why every writer pairs
+    this lock with `update_registry()` (re-read latest, then `atomic_write_json`):
+    if the lock is ever not honored, the worst case degrades to a small
+    last-writer-wins race, NEVER a torn/corrupt file or a wiped registry.
+
+    On timeout it proceeds WITHOUT the lock (logging is the caller's job) rather
+    than blocking a training/harvest job forever — again safe because the write
+    itself is atomic.
+    """
+    if not _HAVE_FCNTL:
+        yield False
+        return
+    lock_path = str(path) + ".lock"
+    os.makedirs(os.path.dirname(lock_path) or ".", exist_ok=True)
+    f = open(lock_path, "w")
+    held = False
+    start = time.time()
+    try:
+        while True:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                held = True
+                break
+            except OSError:
+                if time.time() - start > timeout:
+                    break  # give up waiting; atomic write still prevents corruption
+                time.sleep(poll)
+        yield held
+    finally:
+        if held:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+        f.close()
+
+
+def update_registry(path, mutate_fn, default=None):
+    """Safe locked read-modify-write for the shared registry.
+
+    Re-reads the LATEST on-disk JSON *under the lock*, applies `mutate_fn(reg)`
+    in place (or uses its return value if it returns a dict), then atomically
+    writes it back. This is the correct replacement for the widespread
+    load-once-at-start / save-whole-dict-hours-later pattern that let a training
+    job clobber everything a concurrent harvest job wrote in the interim.
+
+    Returns the written registry dict.
+    """
+    if default is None:
+        default = {"datasets": {}, "discovered": []}
+    with registry_lock(path):
+        reg = safe_read_json(path)
+        if reg is None:
+            reg = default
+        result = mutate_fn(reg)
+        if result is not None:
+            reg = result
+        atomic_write_json(path, reg)
+        return reg
 
 
 def safe_read_json(path, retries=5, retry_sleep=0.2):

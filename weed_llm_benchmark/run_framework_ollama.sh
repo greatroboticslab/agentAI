@@ -36,7 +36,10 @@ export OLLAMA_MODELS=/ocean/projects/cis240145p/byler/ollama/models
 
 # v3.0.9: Kaggle v2 API token for autonomous dataset search.
 # Brain uses `_kaggle_http_search()` with bearer auth — no ~/.kaggle/kaggle.json needed.
-export KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN:-KGAT_67eb9458d9e565587c47c967c5249584}
+# Token is read from the untracked ~/.kaggle_token file or a pre-set env var.
+# NEVER hardcode the token here (it lands in git history).
+export KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN:-$(cat "$HOME/.kaggle_token" 2>/dev/null)}
+[ -z "$KAGGLE_API_TOKEN" ] && echo "WARN: KAGGLE_API_TOKEN unset (~/.kaggle_token missing) — Kaggle autonomous search disabled" >&2
 # Redirect kagglehub cache off the tiny HOME quota onto /ocean (7TB budget).
 export KAGGLEHUB_CACHE=${KAGGLEHUB_CACHE:-/ocean/projects/cis240145p/byler/kagglehub_cache}
 mkdir -p "$KAGGLEHUB_CACHE" 2>/dev/null

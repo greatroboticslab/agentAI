@@ -5380,3 +5380,66 @@ dashboard_server as `_analyze_nonimage` — behaviour byte-identical (the sensor
 analysis is unchanged). dashboard_server.py: 13,176 → 12,963 lines. Verified: the extracted function works
 standalone (unit test +3, offline — sensor bucket / label column / class count) and the live sensor-analysis
 smoke path still passes. One small extraction per tick, never a big-bang. smoke stays 113.
+
+### v3.1.0 — full-framework audit + CRITICAL correctness/security hardening
+
+A read-only audit of the whole codebase (7 parallel review agents: architecture, error-honesty, concurrency,
+data-integrity, security, maintainability, doc-drift) surfaced several CRITICAL issues that were built up over
+~190 AI-driven iterations. This release fixes the highest-severity ones. Each fix was verified with a
+standalone test (not yet run through the cluster smoke suite).
+
+**C1 — holdout leakage (was paper-blocking).** `mega_trainer._merge_datasets` guarded the cwd12 eval holdout
+out of training with FILENAME-only defences (NEVER_TRAIN slug list + stem filter); `seen_hashes` was never
+seeded with the holdout's dHashes. A re-exported/renamed copy of a cwd12 test image (e.g. Roboflow's
+`orig_jpg.rf.<hex>.jpg`, whose stem no longer matches) bypassed both filters and entered training — silently
+inflating the "never-train" holdout mAP. Fix: added `_load_holdout_dhashes()` and pre-seed `seen_hashes` with
+the dHash of every cwd12 test+valid image (sentinel `__HOLDOUT__`); a content-match is now dropped and counted
+in a new `skipped_holdout_hash` stat. Verified: a resized(→640)+JPEG-re-encoded+renamed holdout copy produces
+an identical dHash and is blocked, while unrelated harvested images still pass. NOTE: this only closes the
+leak — the honest mAP must be re-measured by re-running training; the prior ≥0.90 figure may drop.
+
+**C2 — registry data-loss / lost-updates.** `dataset_registry.json` (the append-only source of truth shared by
+the parallel Job-T/Job-D SLURM jobs) had no lock anywhere; every writer did whole-file read-modify-write, and
+6 writers shared one fixed `dataset_registry.json.tmp` name (concurrent writes → corrupt JSON). A corrupt file
+then hit `dataset_discovery._load_registry`'s `except: pass`, which silently rebuilt an empty registry from
+defaults and overwrote the ~50MB file — unrecoverable. Worst lost-update: `_merge_datasets` flushed the whole
+registry snapshot it had loaded HOURS earlier at merge start, erasing everything Job-D harvested during the
+merge. Fixes: (a) new `registry_lock.registry_lock()` (fcntl.flock advisory lock) + `update_registry()` locked
+re-read-modify-write helper; (b) all 6 fixed-`.tmp` writers now use `atomic_write_json` (unique mkstemp temp) —
+interleave-corruption is impossible; (c) `_load_registry` now backs up a corrupt file to `.corrupt-<ts>` and
+RAISES instead of overwriting with empty; (d) mega_trainer no longer flushes its stale snapshot — it grafts
+only the new `dhash_cache` / `last_mega_weights` onto the current on-disk registry via `update_registry`.
+Verified: 2 concurrent processes × 200 locked updates → counter exactly 400 (0 lost), file always parseable.
+Honest residual: `mark_as_used` + rounds bump still whole-write a fresh (seconds-old) snapshot under the lock
+(atomic, no corruption, small last-writer-wins window); cross-node Lustre flock is not guaranteed but degrades
+safely to atomic-write.
+
+**C3 — committed Kaggle API token.** The real `KGAT_...` token was hardcoded as the default in
+`run_framework_ollama.sh`, `run_v3_0_26_jobd.sh`, `run_v3_0_30_jobd_continuous.sh` (and is in git history). Now
+read from the untracked `~/.kaggle_token` file or a pre-set env var; if unset, Kaggle search is disabled with a
+loud warning (no fallback to a leaked value). ACTION REQUIRED: rotate the token in Kaggle, create
+`~/.kaggle_token` on the cluster, and purge the token from git history before any public push.
+
+**A — error-handling honesty (the "looks-successful" anti-pattern).** (1) `dashboard_server._start_bg_submit`
+marked a background job `done` whenever the fn returned, even if it returned `{"ok": False}` (e.g. cluster
+staging failed and the sbatch was never submitted) — now the status is derived from `res["ok"]` so failed jobs
+report `failed`. (2) Dashboard auth FAILED OPEN when `~/.dashpass` was missing while exposed on a public
+Cloudflare tunnel — now fails CLOSED (503) when no auth method is configured, while still allowing Google-only
+deployments (session-cookie auth) and exempt paths. (3) `labeling_tracker.simulate_cycle` wrote fabricated
+`agent_labeled/human_labeled/human_verified` events into the SAME log the dashboard reports as real
+human-verified counts, with no flag — now every simulated event carries `meta.simulated=True`. (4)
+`dataset_discovery._save_registry` no longer silently discards the Mongo dual-write result — a mirror
+failure is logged so JSON/Mongo divergence is observable.
+
+**C (HIGH) — autolabel confidence floor restored.** `orchestrator.py` hardcoded `conf_threshold=0.12` at both
+autolabel call sites, silently overriding autolabel.py's safe 0.30 default (raised from 0.12 in v3.0.35
+precisely because 0.12 produced FP-dominated pseudo-labels). Both sites now use 0.30.
+
+Files: registry_lock.py, mega_trainer.py, dataset_discovery.py, orchestrator.py, dashboard_server.py,
+labeling_tracker.py, audit_registry_garbage.py, roboflow_sync.py, dinov2_round_filter.py,
+train_yolo_on_verified.py, rounds.py, and the 3 run_*.sh scripts. Verification: standalone tests for the
+holdout dHash guard, the concurrent-registry lock, and the auth/job-status truth tables all pass. Still open
+(documented in the audit, not in this release): the 12,963-line dashboard monolith, the dual on-disk package
+`cp -ar` sync, ~47 hardcoded `/ocean/...byler` paths, unpinned deps, near-zero CI, the broader outage→empty and
+Popen-liveness honesty sweep, and the stale "cwd12 ≥ 0.90 DO NOT DRIFT" header above (the goal was met at
+v3.0.38-A = 0.9033 and the project pivoted to a multi-domain platform).

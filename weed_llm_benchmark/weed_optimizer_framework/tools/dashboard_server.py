@@ -291,9 +291,27 @@ async def _auth_and_rate_limit(request, call_next):
     """Gate every non-exempt request behind HTTP Basic auth.
 
     Rate limit: 5 failed attempts from an IP → 1h lockout (HTTP 429)."""
-    if _AUTH_PASS is None:
-        # Auth not configured; let everything through (logged at startup).
-        return await call_next(request)
+    # C5 fix: FAIL CLOSED. Previously `if _AUTH_PASS is None: allow everything`,
+    # so a missing/empty ~/.dashpass left the entire dashboard open on the public
+    # Cloudflare tunnel (trigger GPU jobs, delete datasets, manage users). Now, if
+    # NO auth method is configured at all — no Basic password, no Google login — we
+    # refuse every non-exempt request with 503 instead of allowing it. (Google-only
+    # deployments legitimately have _AUTH_PASS=None; those still authenticate via
+    # the signed session cookie checked below, so they are NOT blocked.)
+    _auth_configured = (_AUTH_PASS is not None) or _GOOGLE_ENABLED
+    if not _auth_configured:
+        path = request.url.path
+        if request.method == "OPTIONS" or path in _AUTH_EXEMPT_PATHS or any(
+            path.startswith(p) for p in _AUTH_EXEMPT_PREFIXES
+        ):
+            return await call_next(request)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "auth-not-configured",
+                     "msg": "Dashboard auth is not configured (no ~/.dashpass, no "
+                            "Google login). Refusing requests. Configure auth before "
+                            "exposing the server."},
+        )
 
     # v3.0.71.7: CORS preflight (OPTIONS) must pass without auth. Otherwise
     # cross-origin browser fetches with Authorization header fail with
@@ -3999,8 +4017,15 @@ async def _start_bg_submit(kind: str, fn) -> str:
     async def _run():
         try:
             res = await _asyncio.to_thread(fn)
+            # C4 honesty fix: "fn() returned without raising" is NOT "the work
+            # succeeded". If the work reported {"ok": False} (e.g. data staging to
+            # the cluster failed and the sbatch was never submitted), mark the job
+            # FAILED so the poller can't show it as done. Non-dict / no "ok" key →
+            # treat as done (nothing said it failed).
+            ok = res.get("ok", True) if isinstance(res, dict) else True
             with _BG_JOBS_LOCK:
-                _BG_JOBS[sid] = {"status": "done", "kind": kind, "result": res}
+                _BG_JOBS[sid] = {"status": "done" if ok else "failed",
+                                 "kind": kind, "result": res}
         except Exception as e:
             with _BG_JOBS_LOCK:
                 _BG_JOBS[sid] = {"status": "failed", "kind": kind,

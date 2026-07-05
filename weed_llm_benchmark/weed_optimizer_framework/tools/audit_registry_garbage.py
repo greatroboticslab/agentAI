@@ -153,11 +153,13 @@ def audit(labeled_min: int = 100, keep_cwd12: bool = True,
         reg["total_downloaded"] = sum(
             v.get("local_images", 0) for v in ds.values()
         )
-        # Atomic save
-        tmp = str(REGISTRY) + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(reg, f, indent=2)
-        os.replace(tmp, REGISTRY)
+        # Atomic, locked save — unique temp file (via registry_lock) so this can
+        # never interleave with another writer into a shared fixed `.tmp` and
+        # install a corrupt registry.
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from registry_lock import atomic_write_json, registry_lock
+        with registry_lock(REGISTRY):
+            atomic_write_json(REGISTRY, reg)
         print(f"  registry saved: {len(ds)} slugs remain, "
               f"{reg['total_downloaded']:,} imgs total")
 

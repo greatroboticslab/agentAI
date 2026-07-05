@@ -361,8 +361,12 @@ class Orchestrator:
                             remaining = GUARD_TOTAL - total_processed
                             per_ds_cap = min(GUARD_PER_DS, remaining)
                             try:
+                                # v3.1: use the safe 0.30 floor (autolabel.py's
+                                # own default, raised from 0.12 in v3.0.35 because
+                                # 0.12 produced FP-dominated pseudo-labels). Do NOT
+                                # hardcode 0.12 here — that silently defeated the fix.
                                 r = autolabel_dataset(slug, registry_cb,
-                                                      conf_threshold=0.12,
+                                                      conf_threshold=0.30,
                                                       max_images=per_ds_cap)
                                 if r.get("status") == "ok":
                                     got = r.get("labeled_with_owl", 0) + r.get("labeled_with_fallback", 0)
@@ -505,7 +509,7 @@ class Orchestrator:
                     # and never trained. OWLv2-large at ~1.7 img/sec means
                     # 20K imgs ~3h — leaves 4-5h for mega+eval.
                     from .tools.autolabel import autolabel_dataset
-                    conf = params.get("conf_threshold", 0.12)
+                    conf = params.get("conf_threshold", 0.30)  # v3.1: safe floor (was 0.12, the pre-v3.0.35 noise level)
                     max_imgs = params.get("max_images_per_ds", 15000)
                     max_ds = params.get("max_datasets")
                     max_total = params.get("max_total_images", 20000)

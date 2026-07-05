@@ -12,6 +12,7 @@ State persistence: dataset_registry.json tracks all known, downloaded, and used 
 import os
 import json
 import time
+import shutil
 import hashlib
 import logging
 from pathlib import Path
@@ -137,22 +138,38 @@ class DatasetDiscovery:
         Lustre for large files. Only save if _discover_preexisting actually
         added new entries."""
         if os.path.exists(REGISTRY_PATH):
-            try:
-                with open(REGISTRY_PATH) as f:
-                    registry = json.load(f)
-                before_keys = set(registry.get("datasets", {}).keys())
-                self._discover_preexisting(registry)
-                after_keys = set(registry.get("datasets", {}).keys())
-                if after_keys != before_keys:
-                    # New local datasets discovered — worth saving.
-                    try:
-                        self._save_registry(registry)
-                    except Exception as e:
-                        logger.warning(f"[Dataset] registry resave failed (continuing): {e}")
-                return registry
-            except (json.JSONDecodeError, KeyError):
-                pass
+            # safe_read_json retries on JSONDecodeError, so a read that races a
+            # concurrent mid-rename write recovers instead of being seen as corrupt.
+            from .registry_lock import safe_read_json
+            registry = safe_read_json(REGISTRY_PATH)
+            if registry is None or "datasets" not in registry:
+                # The file exists but is unparseable/malformed even after retries.
+                # CRITICAL: do NOT fall through to rebuild-from-KNOWN_DATASETS and
+                # save — that overwrites a recoverable (~50MB) registry with a
+                # near-empty one and permanently loses every harvested slug. Back
+                # it up and fail loud so a human restores a good copy.
+                backup = f"{REGISTRY_PATH}.corrupt-{int(time.time())}"
+                try:
+                    shutil.copy2(REGISTRY_PATH, backup)
+                except Exception:
+                    backup = "(backup copy failed)"
+                raise RuntimeError(
+                    f"dataset_registry.json is corrupt/unparseable at {REGISTRY_PATH}. "
+                    f"Refusing to silently rebuild an empty registry (that would erase "
+                    f"all harvested data). Corrupt file preserved at {backup}. Restore "
+                    f"from a good copy / snapshot before continuing.")
+            before_keys = set(registry.get("datasets", {}).keys())
+            self._discover_preexisting(registry)
+            after_keys = set(registry.get("datasets", {}).keys())
+            if after_keys != before_keys:
+                # New local datasets discovered — worth saving.
+                try:
+                    self._save_registry(registry)
+                except Exception as e:
+                    logger.warning(f"[Dataset] registry resave failed (continuing): {e}")
+            return registry
 
+        # File genuinely absent (first run only) — build the default registry.
         registry = {"datasets": {}, "discovered": [], "total_downloaded": 0,
                     # v3.0.74: round-tracking. Bumped by start_new_round
                     # cluster_action. Every new slug downloaded gets
@@ -226,21 +243,33 @@ class DatasetDiscovery:
         )
 
     def _save_registry(self, registry=None):
-        """Save registry with atomic write."""
+        """Save registry atomically under an advisory lock.
+
+        Uses registry_lock.atomic_write_json (unique mkstemp temp), so concurrent
+        writers can never interleave into a shared fixed `.tmp` and install a
+        syntactically-broken file — which the corrupt-guard in _load_registry
+        would then have to refuse. The lock serializes writers on the node."""
         if registry is None:
             registry = self.registry
+        from .registry_lock import atomic_write_json, registry_lock
         os.makedirs(os.path.dirname(REGISTRY_PATH), exist_ok=True)
-        tmp = REGISTRY_PATH + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(registry, f, indent=2, default=str)
-        os.replace(tmp, REGISTRY_PATH)
+        with registry_lock(REGISTRY_PATH):
+            atomic_write_json(REGISTRY_PATH, registry)
         # Phase 3 dual-write: mirror to Mongo so new harvest lands there too.
-        # Best-effort — never blocks/raises if Mongo is down (db handles it).
+        # Best-effort — never blocks/raises if Mongo is down (db handles it) — but
+        # DO NOT silently discard the result: a swallowed failure is exactly how
+        # the JSON and Mongo copies drift apart with no signal. Log it so the
+        # divergence is observable.
         try:
             from . import db as _db
-            _db.mirror_registry_to_mongo(registry)
-        except Exception:
-            pass
+            res = _db.mirror_registry_to_mongo(registry)
+            if isinstance(res, dict) and not res.get("ok", True):
+                logger.warning(f"[Dataset] Mongo mirror reported failure "
+                               f"(JSON saved, Mongo NOT updated — stores may drift): "
+                               f"{res.get('error') or res}")
+        except Exception as e:
+            logger.warning(f"[Dataset] Mongo mirror raised (JSON saved, Mongo NOT "
+                           f"updated — stores may drift): {type(e).__name__}: {e}")
 
     # =========================================================
     # STATUS TRACKING — mark datasets as used

@@ -141,10 +141,11 @@ def run(round_n: int, dry_run: bool = False) -> dict:
     rmeta = reg.setdefault("rounds", {}).setdefault(str(round_n), {})
     rmeta["trained_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
     rmeta["train_manifest"] = str(manifest_path)
-    tmp = str(REGISTRY) + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(reg, f, indent=2)
-    os.replace(tmp, REGISTRY)
+    # Atomic + locked (unique temp file) — no shared fixed `.tmp` to corrupt.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from registry_lock import atomic_write_json, registry_lock
+    with registry_lock(REGISTRY):
+        atomic_write_json(REGISTRY, reg)
 
     # Queue placeholder SBATCH
     placeholder_sh = REPO / "run_v3_0_74_yolo_trainer_placeholder.sh"

@@ -14,7 +14,8 @@ import shutil
 import logging
 from pathlib import Path
 from ..config import Config
-from .dataset_discovery import DatasetDiscovery
+from .dataset_discovery import DatasetDiscovery, REGISTRY_PATH
+from .registry_lock import update_registry
 
 logger = logging.getLogger(__name__)
 
@@ -156,23 +157,56 @@ NEVER_TRAIN_SLUGS = {
 # filename stem matches a cwd12 test/valid stem. This is the only correct fix for
 # the v3.0.27 leak where 2,313 holdout copies entered training under cottonweed_*
 # prefixes and bypassed the slug-level NEVER_TRAIN check.
-def _load_holdout_stems():
-    """Stems of cwd12 test+valid (the immutable eval set). Resolved against both
-    a cwd-relative path and the absolute project path so this works regardless
-    of caller cwd."""
-    stems = set()
+# Sentinel source marker for pre-seeded holdout dHashes in `seen_hashes`, so a
+# harvested image that collides with a holdout image is reported as a leak
+# (skipped_holdout_hash) rather than a benign cross-dataset duplicate.
+HOLDOUT_HASH_SENTINEL = "__HOLDOUT__"
+
+
+def _holdout_image_dirs():
+    """The cwd12 test+valid image dirs (the immutable eval set). Resolved against
+    both a cwd-relative path and the absolute project path so this works
+    regardless of caller cwd. Returns only dirs that actually exist."""
     candidates = [
         Path("downloads/cottonweeddet12") / "test" / "images",
         Path("downloads/cottonweeddet12") / "valid" / "images",
         Path("/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark") / "downloads/cottonweeddet12" / "test" / "images",
         Path("/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark") / "downloads/cottonweeddet12" / "valid" / "images",
     ]
-    for c in candidates:
-        if c.is_dir():
-            for ext in ("*.jpg", "*.JPG", "*.jpeg", "*.png"):
-                for p in c.glob(ext):
-                    stems.add(p.stem)
-    return stems
+    return [c for c in candidates if c.is_dir()]
+
+
+def _iter_holdout_images():
+    """Yield every cwd12 test+valid image path (dedup by resolved absolute path so
+    the two candidate roots pointing at the same files aren't double-counted)."""
+    seen_paths = set()
+    for c in _holdout_image_dirs():
+        for ext in ("*.jpg", "*.JPG", "*.jpeg", "*.png"):
+            for p in c.glob(ext):
+                rp = str(p.resolve())
+                if rp not in seen_paths:
+                    seen_paths.add(rp)
+                    yield p
+
+
+def _load_holdout_stems():
+    """Stems of cwd12 test+valid — the cheap first-pass filename filter."""
+    return {p.stem for p in _iter_holdout_images()}
+
+
+def _load_holdout_dhashes():
+    """v3.1: content-level holdout guard. dHash of every cwd12 test+valid image,
+    so a re-exported / renamed copy of a holdout image (e.g. Roboflow's
+    `orig_jpg.rf.<hex>.jpg`, whose stem no longer matches) is still caught and
+    dropped from training. The stem filter alone only blocks copies that KEPT
+    their original filename; this closes the rename-bypass leak that inflates the
+    'never-train' holdout mAP. Returns {dhash_int: '__HOLDOUT__'}."""
+    hashes = {}
+    for p in _iter_holdout_images():
+        h = _dhash(p)
+        if h is not None:
+            hashes[h] = HOLDOUT_HASH_SENTINEL
+    return hashes
 
 # Reserve class IDs:
 #   0-11  : 12 canonical weed species (cottonweeddet12)
@@ -281,7 +315,8 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     stats = {"datasets": 0, "images": 0, "labels": 0, "skipped_no_label": 0,
              "skipped_duplicates": 0, "unique_hashes": 0,
              "skipped_autolabel": 0, "skipped_never_train": 0,
-             "skipped_holdout_stem": 0, "skipped_user_flag": 0,
+             "skipped_holdout_stem": 0, "skipped_holdout_hash": 0,
+             "skipped_user_flag": 0,
              "skipped_low_dino": 0,
              "weed_class_instances": {n: 0 for n in CANONICAL_12_NAMES}}
     seen_hashes = {}
@@ -291,6 +326,17 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     holdout_stems = _load_holdout_stems()
     logger.info(f"[Merge] holdout stem filter active: {len(holdout_stems)} stems "
                 f"blocked from training regardless of source slug")
+
+    # v3.1: content-level holdout guard. Pre-seed the dedup set with the dHash of
+    # every cwd12 test+valid image so a renamed / re-exported holdout copy (whose
+    # stem no longer matches, so the stem filter above misses it) is caught by the
+    # existing cross-dataset dedup and dropped. Without this, the stem filter and
+    # NEVER_TRAIN slug list are the ONLY guards, and both are filename-based — a
+    # Roboflow/Kaggle re-upload of cwd12 test images leaks straight into training
+    # and silently inflates the 'never-train' holdout mAP.
+    seen_hashes.update(_load_holdout_dhashes())
+    logger.info(f"[Merge] holdout dHash guard active: {len(seen_hashes)} holdout "
+                f"image hashes pre-seeded (renamed holdout copies now blocked)")
 
     # v3.0.30.1: user-driven REQ-3 quality feedback — slugs the user marked
     # as garbage via the dashboard get skipped here. The flags file is
@@ -421,9 +467,16 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                     cache_updated = True
             if h is not None:
                 if h in seen_hashes:
-                    # Already saw an identical image from another dataset
-                    stats["skipped_duplicates"] += 1
-                    ds_dup_count += 1
+                    if seen_hashes[h] == HOLDOUT_HASH_SENTINEL:
+                        # v3.1: this harvested image is a content-match for a cwd12
+                        # holdout image (renamed copy that slipped past the stem
+                        # filter). Dropping it is what keeps the eval set out of
+                        # training. Tracked separately so leakage is observable.
+                        stats["skipped_holdout_hash"] += 1
+                    else:
+                        # Already saw an identical image from another dataset
+                        stats["skipped_duplicates"] += 1
+                        ds_dup_count += 1
                     continue
                 seen_hashes[h] = ds_name
 
@@ -556,8 +609,26 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                 f"v3.0.28 holdout-stem filter dropped: {stats['skipped_holdout_stem']}. "
                 f"v3.0.30 user-flag GARBAGE skipped: {stats['skipped_user_flag']}. "
                 f"Per-class instances: {stats['weed_class_instances']}")
-    # v3.0.19: persist dHash caches written back to registry entries
-    disc._save_registry()
+    # v3.0.19 / v3.1: persist ONLY the dHash caches we computed, via a locked
+    # re-read-modify-write. The old `disc._save_registry()` here flushed the
+    # WHOLE registry snapshot that DatasetDiscovery loaded at merge start — so a
+    # multi-hour merge would erase every slug a concurrent harvest (Job-D) wrote
+    # during that window (the framework's worst lost-update). Now we graft only
+    # dhash_cache onto the CURRENT on-disk registry and leave the rest untouched.
+    dhash_updates = {
+        ds: entry["dhash_cache"]
+        for ds, entry in disc.registry["datasets"].items()
+        if entry.get("dhash_cache")
+    }
+
+    def _graft_dhash(reg):
+        dsets = reg.setdefault("datasets", {})
+        for ds, cache in dhash_updates.items():
+            if ds in dsets:  # don't resurrect a slug Job-D deleted mid-merge
+                dsets[ds]["dhash_cache"] = cache
+
+    if dhash_updates:
+        update_registry(REGISTRY_PATH, _graft_dhash)
     return out_dir, data_yaml, stats, used_datasets, names_list
 
 
@@ -838,10 +909,17 @@ def train_yolo_mega(strategy, iteration):
             result_summary={"iteration": iteration, "merged_images": stats["images"]},
         )
 
-    # v3.0.19: persist best.pt path for next round's progressive training
+    # v3.0.19 / v3.1: persist best.pt pointer via locked re-read-modify-write so
+    # this doesn't clobber concurrent Job-D writes (was disc._save_registry(),
+    # which rewrote the whole loaded snapshot). Bump the round count against the
+    # LATEST on-disk value, not this process's stale copy.
+    def _graft_weights(reg):
+        reg["last_mega_weights"] = best_pt
+        reg["mega_round_count"] = int(reg.get("mega_round_count", 0)) + 1
+
+    written = update_registry(REGISTRY_PATH, _graft_weights)
     disc.registry["last_mega_weights"] = best_pt
-    disc.registry["mega_round_count"] = disc.registry.get("mega_round_count", 0) + 1
-    disc._save_registry()
+    disc.registry["mega_round_count"] = written.get("mega_round_count", 1)
     logger.info(f"[Mega] Saved last_mega_weights={best_pt} "
                 f"(mega_round_count={disc.registry['mega_round_count']})")
 

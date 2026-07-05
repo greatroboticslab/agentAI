@@ -55,18 +55,29 @@ def round_project_url(workspace: str, round_n: int) -> str:
             f"{round_project_name(round_n)}/browse")
 
 
+def _reg_helpers():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from registry_lock import atomic_write_json, registry_lock, safe_read_json
+    return atomic_write_json, registry_lock, safe_read_json
+
+
 def _load() -> dict:
     if not REGISTRY.exists():
         print(f"FATAL: registry missing at {REGISTRY}", file=sys.stderr)
         sys.exit(2)
-    return json.load(open(REGISTRY))
+    _, _, safe_read_json = _reg_helpers()
+    reg = safe_read_json(REGISTRY)  # retries a torn mid-rename read instead of crashing
+    if reg is None:
+        print(f"FATAL: registry unreadable/corrupt at {REGISTRY}", file=sys.stderr)
+        sys.exit(2)
+    return reg
 
 
 def _save(reg: dict) -> None:
-    tmp = str(REGISTRY) + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(reg, f, indent=2)
-    os.replace(tmp, REGISTRY)
+    # Atomic + locked (unique temp file) — no shared fixed `.tmp` to corrupt.
+    atomic_write_json, registry_lock, _ = _reg_helpers()
+    with registry_lock(REGISTRY):
+        atomic_write_json(REGISTRY, reg)
 
 
 def status(reg: dict | None = None) -> dict:

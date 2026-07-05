@@ -58,6 +58,18 @@ Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), thi
 
 ## Current Progress
 
+> **2026-07-04 — v3.1.0 audit + hardening.** A full read-only audit (7 review
+> agents) of the AI-built codebase fixed several CRITICAL issues: a holdout
+> leak that could inflate the cwd12 mAP (renamed re-exports of eval images
+> now blocked by content dHash), registry data-loss/lost-update races (advisory
+> lock + atomic writes + corrupt-guard), a committed Kaggle token (removed;
+> rotate + purge history), and systemic "looks-successful" reporting (job
+> status from real result, auth fails closed, simulated labeling events
+> flagged). See `weed_llm_benchmark/CHANGELOG.md` (v3.1.0) and `RESEARCH_LOG.md`.
+> Known follow-ups: the 12.9k-line dashboard monolith, cluster-hardcoded paths,
+> unpinned deps, and CI are still open. NOTE: the post-fix honest mAP must be
+> re-measured by re-running training.
+
 ### EMACF Framework (`multagent/`)
 
 | Component | Status | Description |

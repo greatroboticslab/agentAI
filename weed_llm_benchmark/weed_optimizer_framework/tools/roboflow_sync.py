@@ -488,11 +488,12 @@ def cmd_sync_newest_slugs(args):
             info["roboflow_synced_count"] = ok
             n_synced_slugs += 1
 
-    # Save registry mid-flight so progress isn't lost
-    tmp = str(reg_path) + ".tmp"
-    with open(tmp, "w") as f:
-        _json.dump(reg, f, indent=2)
-    os.replace(tmp, reg_path)
+    # Save registry mid-flight so progress isn't lost. Atomic + locked (unique
+    # temp file) so concurrent writers can't corrupt a shared fixed `.tmp`.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from registry_lock import atomic_write_json, registry_lock
+    with registry_lock(reg_path):
+        atomic_write_json(reg_path, reg)
     print(f"\n=== TOTAL: synced {n_synced_slugs}/{len(pending)} slugs, "
           f"uploaded {n_uploaded_total} imgs ===")
 

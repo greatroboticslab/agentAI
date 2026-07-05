@@ -1430,3 +1430,56 @@ Cluster ssh (bridges2) hangs after the password prompt across this
 session — v3.0.38-A result (job 40912927) not yet retrieved and the
 v3.0.38/39 jobs not yet submitted. All code is committed + pushed, so the
 cluster side is a `git pull` + `sbatch` once a login session is healthy.
+
+## 2026-07-04 — full-framework audit + CRITICAL hardening (v3.1.0)
+
+Ran a whole-codebase, read-only audit with 7 parallel review agents
+(architecture / error-honesty / concurrency / data-integrity / security /
+maintainability / doc-drift), then fixed the highest-severity findings.
+
+### Findings that mattered most
+
+- **Holdout leakage was paper-blocking.** The eval holdout was kept out of
+  training only by filename checks (NEVER_TRAIN slug list + stem filter);
+  the dHash dedup set was never seeded with the holdout. A renamed /
+  re-exported copy of a cwd12 test image (the common Roboflow/Kaggle case,
+  `orig_jpg.rf.<hex>.jpg`) slipped past both and trained the model on its
+  own eval set — so the reported ≥0.90 mAP could be inflated.
+- **The registry could be wiped by one bad concurrent write.** No lock;
+  whole-file read-modify-write; 6 writers sharing one fixed `.tmp`; a
+  corrupt parse silently rebuilt an empty registry over the 50MB file.
+- **Systemic "looks-successful" reporting.** Failed background jobs shown
+  as done; simulated labeling events written unflagged into the real
+  counts; dashboard auth failing OPEN on a public tunnel.
+
+### Fixed this session (each verified with a standalone test)
+
+C1 holdout dHash pre-seed (`mega_trainer`); C2 registry lock +
+`update_registry` + atomic writes everywhere + corrupt-guard + killed the
+stale-snapshot flush (`registry_lock`, `dataset_discovery`, `mega_trainer`,
++4 writers); C3 removed the committed Kaggle token (3 scripts); A
+error-honesty (job status from `res["ok"]`, auth fail-closed, `simulated`
+flag on demo labeling events, Mongo-mirror failure logged); C autolabel
+conf floor restored 0.12→0.30 (`orchestrator`). See CHANGELOG v3.1.0.
+
+### Lesson learned
+
+Because every layer was AI-built and iterated, the dangerous defects were
+not crashes but **silent success signals** — code that returns/looks fine
+while the real invariant (holdout purity, registry integrity, "job
+submitted", "human verified") is violated. The audit's highest value was
+finding the places that lie quietly. Verification must exercise the
+invariant, not just check that a function returned.
+
+### Action required (human)
+
+Rotate the Kaggle token + create `~/.kaggle_token` on the cluster; purge
+the token from git history before any public push. Re-run training to get
+the honest post-leak-fix mAP. Everything else is code-only and pushed.
+
+### Still open (see CHANGELOG v3.1.0 + audit memory)
+
+13k-line dashboard monolith; dual on-disk package `cp -ar` sync; ~47
+hardcoded `/ocean/...byler` paths (blocks lab-server migration); unpinned
+deps; near-zero CI; broader outage→empty + Popen-liveness honesty sweep;
+stale "cwd12 ≥ 0.90 DO NOT DRIFT" changelog header (goal met at v3.0.38-A).

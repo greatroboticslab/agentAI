@@ -43,15 +43,25 @@ SLUG_VERDICTS = REPO / "results" / "framework" / "slug_verdicts.jsonl"
 EXEMPLAR_VERDICTS = REPO / "results" / "framework" / "exemplar_verdicts.jsonl"
 
 
+def _reg_lock():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from registry_lock import atomic_write_json, registry_lock, safe_read_json
+    return atomic_write_json, registry_lock, safe_read_json
+
+
 def _load_registry() -> dict:
-    return json.load(open(REGISTRY))
+    _, _, safe_read_json = _reg_lock()
+    reg = safe_read_json(REGISTRY)  # retries torn mid-rename reads instead of crashing
+    if reg is None:
+        raise RuntimeError(f"registry unreadable/corrupt at {REGISTRY}")
+    return reg
 
 
 def _save_registry(reg: dict) -> None:
-    tmp = str(REGISTRY) + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(reg, f, indent=2)
-    os.replace(tmp, REGISTRY)
+    # Atomic + locked (unique temp file) — no shared fixed `.tmp` to corrupt.
+    atomic_write_json, registry_lock, _ = _reg_lock()
+    with registry_lock(REGISTRY):
+        atomic_write_json(REGISTRY, reg)
 
 
 def _round_slugs(reg: dict, round_n: int) -> list:

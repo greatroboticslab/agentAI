@@ -76,19 +76,25 @@ def record_push(slug, images, project="", batch=""):
     return len(images or [])
 
 
-def record_label(slug, image, by="agent", verdict=None, project=""):
-    """by = 'agent' or 'human'."""
+def record_label(slug, image, by="agent", verdict=None, project="", simulated=False):
+    """by = 'agent' or 'human'. simulated=True stamps meta.simulated so demo/
+    end-to-end-test events are never counted as real labeling work."""
     ev = "agent_labeled" if by == "agent" else "human_labeled"
-    return _emit(ev, slug, image, project, meta={"verdict": verdict})
+    meta = {"verdict": verdict}
+    if simulated:
+        meta["simulated"] = True
+    return _emit(ev, slug, image, project, meta=meta)
 
 
-def record_verify(slug, image, project=""):
-    return _emit("human_verified", slug, image, project)
+def record_verify(slug, image, project="", simulated=False):
+    return _emit("human_verified", slug, image, project,
+                 meta={"simulated": True} if simulated else None)
 
 
-def record_delete(slug, images, project="", batch=""):
+def record_delete(slug, images, project="", batch="", simulated=False):
+    meta = {"simulated": True} if simulated else None
     for im in (images or []):
-        _emit("deleted", slug, im, project, batch)
+        _emit("deleted", slug, im, project, batch, meta=meta)
     return len(images or [])
 
 
@@ -113,16 +119,17 @@ def simulate_cycle(slug, project="", delete=True):
     for im in imgs:
         st = state.get(im, {})
         if not st.get("agent_labeled"):
-            record_label(slug, im, by="agent", verdict="weed", project=project)
+            record_label(slug, im, by="agent", verdict="weed", project=project, simulated=True)
             out["agent_labeled"] += 1
         if not st.get("human_labeled"):
-            record_label(slug, im, by="human", verdict="weed", project=project)
+            record_label(slug, im, by="human", verdict="weed", project=project, simulated=True)
             out["human_labeled"] += 1
         if not st.get("human_verified"):
-            record_verify(slug, im, project=project)
+            record_verify(slug, im, project=project, simulated=True)
             out["human_verified"] += 1
     if delete and imgs:
-        out["deleted"] = record_delete(slug, imgs, project=project)
+        out["deleted"] = record_delete(slug, imgs, project=project, simulated=True)
+    out["simulated"] = True
     return out
 
 

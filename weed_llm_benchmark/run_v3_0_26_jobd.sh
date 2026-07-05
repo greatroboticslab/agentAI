@@ -36,7 +36,8 @@ export PYTHONPATH=.:$PYTHONPATH
 export HF_HOME=/ocean/projects/cis240145p/byler/hf_cache
 export OLLAMA_HOST=127.0.0.1:11434
 export OLLAMA_MODELS=/ocean/projects/cis240145p/byler/ollama/models
-export KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN:-KGAT_67eb9458d9e565587c47c967c5249584}
+export KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN:-$(cat "$HOME/.kaggle_token" 2>/dev/null)}  # from untracked ~/.kaggle_token; never hardcode
+[ -z "$KAGGLE_API_TOKEN" ] && echo "WARN: KAGGLE_API_TOKEN unset (~/.kaggle_token missing) — Kaggle search disabled" >&2
 export KAGGLEHUB_CACHE=${KAGGLEHUB_CACHE:-/ocean/projects/cis240145p/byler/kagglehub_cache}
 mkdir -p "$KAGGLEHUB_CACHE" 2>/dev/null
 
