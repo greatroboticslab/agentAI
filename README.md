@@ -69,6 +69,14 @@ plain-English summary and a training-readiness verdict:
 <img src="docs/screenshots/weed-analysis.png" width="840" alt="Dataset analysis of a real weed dataset: class distribution, image stats, AI review, boxed samples">
 </div>
 
+No `data.yaml` in your upload? Analysis first shows generic ids — click **✎ Edit class names** and name each
+YOLO class right on the page (ids map by position). Saving writes `data.yaml`, updates the registry, and the
+real names appear immediately:
+
+<div align="center">
+<img src="docs/screenshots/class-name-editor.png" width="840" alt="Inline class-name editor: name each YOLO class id, save, and the distribution shows real names">
+</div>
+
 Beyond upload+analysis, each project also offers the one-click **agent-action console**, the human-in-the-loop
 **labeling flow** (push a few → label in Roboflow → export → repeat), and per-round **review** before anything
 reaches training. There's a built-in **2-minute guide** at <code>/guide</code>.
