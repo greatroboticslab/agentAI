@@ -3618,6 +3618,75 @@ def api_dataset_analyze(request: Request, slug: str, refresh: int = 0):
     return JSONResponse(_analyze_dataset(slug, refresh=bool(refresh)))
 
 
+# v3.1.3 — class-name editing. Most student uploads have YOLO labels but NO
+# data.yaml, so analysis shows generic "class 0/1". These endpoints let them name
+# classes in the UI: GET returns names ordered BY CLASS ID (positional — never by
+# count), POST writes data.yaml + registry (Mongo+JSON) + invalidates the cache.
+def _current_class_names(root):
+    """Names by class id: data.yaml if present, padded to max id seen in labels."""
+    names = []
+    dy = root / "data.yaml"
+    if dy.is_file():
+        m = re.search(r"names\s*:\s*\[([^\]]*)\]", dy.read_text(errors="replace"))
+        if m:
+            names = [x.strip().strip("'\"") for x in m.group(1).split(",") if x.strip()]
+    max_id = -1
+    lbl_dir = root / "labels"
+    if lbl_dir.is_dir():
+        for i, lp in enumerate(sorted(lbl_dir.glob("*.txt"))):
+            if i >= 500:
+                break
+            for line in lp.read_text(errors="replace").splitlines():
+                p = line.split()
+                if p and p[0].lstrip("-").isdigit():
+                    max_id = max(max_id, int(p[0]))
+    n = max(len(names), max_id + 1)
+    return [names[i] if i < len(names) else f"class {i}" for i in range(n)]
+
+
+@app.get("/api/dataset/classnames")
+def api_dataset_classnames_get(request: Request, slug: str):
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)
+    root = _resolve_slug_dir(slug)
+    if root is None:
+        raise HTTPException(404, "dataset files not found on this host")
+    return JSONResponse({"ok": True, "slug": slug, "names": _current_class_names(Path(root))})
+
+
+@app.post("/api/dataset/classnames")
+async def api_dataset_classnames_set(request: Request, slug: str):
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)
+    body = await request.json()
+    names = [re.sub(r"[^A-Za-z0-9 _\-()]", "", str(x)).strip()[:60] for x in (body.get("names") or [])]
+    if not names or not any(names):
+        raise HTTPException(400, "names required")
+    names = [n or f"class {i}" for i, n in enumerate(names)]
+    root = _resolve_slug_dir(slug)
+    if root is None:
+        raise HTTPException(404, "dataset files not found on this host")
+    root = Path(root)
+    # 1. data.yaml — inline-list form (the analyzer's parser reads this form)
+    quoted = ", ".join("'" + n.replace("'", "") + "'" for n in names)
+    (root / "data.yaml").write_text(f"names: [{quoted}]\nnc: {len(names)}\n")
+    # 2. registry (Mongo + JSON dual-write, best-effort)
+    wrote = {}
+    try:
+        from . import db as _dbcn
+        wrote = _dbcn.upsert_slug(slug, {"class_names": names})
+    except Exception as e:
+        log.warning(f"[classnames] registry update failed for {slug}: {e}")
+    # 3. invalidate cached analysis so the next view shows the real names
+    try:
+        (_DATASET_ANALYSIS_DIR / f"{slug}.json").unlink(missing_ok=True)
+    except Exception:
+        pass
+    return JSONResponse({"ok": True, "slug": slug, "names": names, "registry": wrote})
+
+
 # ===========================================================================
 # v3.0.165 — INTELLIGENT dataset analysis (P2). Detect concrete data issues in
 # CODE first (grounded), then have the lab-local LLM turn the EDA + issues into a
@@ -6321,6 +6390,33 @@ function bars(obj,color){
 }
 function stat(s){return s?('min '+s.min+' · med '+s.median+' · mean '+s.mean+' · max '+s.max):'—';}
 var SEVCOL={high:'#dc2626',medium:'#d97706',low:'#64748b'};
+async function editClassNames(){
+  var ed=document.getElementById('cn-editor'); if(!ed)return;
+  if(ed.style.display!=='none'){ed.style.display='none';return;}
+  ed.style.display='block'; ed.innerHTML='&#8987; loading current names&hellip;';
+  try{
+    var d=await (await fetch('/api/dataset/classnames?slug='+encodeURIComponent(SLUG),{credentials:'include'})).json();
+    if(!d.ok){ed.textContent='❌ '+(d.detail||'failed');return;}
+    var h='<div class="muted" style="margin-bottom:6px">Name each class (YOLO ids map by position). Saving writes data.yaml + updates the registry.</div>';
+    d.names.forEach(function(n,i){
+      h+='<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><span class="muted" style="width:52px;font-family:monospace">id '+i+'</span>'
+        +'<input class="cn-in" value="'+n.replace(/"/g,'&quot;')+'" style="flex:1;max-width:320px;padding:6px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px"></div>';
+    });
+    h+='<button onclick="saveClassNames()" style="margin-top:8px;border:0;background:#059669;color:#fff;font-weight:600;font-size:13px;padding:7px 14px;border-radius:8px;cursor:pointer">Save names</button>'
+      +' <span class="muted" id="cn-msg"></span>';
+    ed.innerHTML=h;
+  }catch(e){ed.textContent='❌ '+e;}
+}
+async function saveClassNames(){
+  var names=[].slice.call(document.querySelectorAll('.cn-in')).map(function(x){return x.value.trim();});
+  var msg=document.getElementById('cn-msg'); msg.textContent='⏳ saving…';
+  try{
+    var r=await fetch('/api/dataset/classnames?slug='+encodeURIComponent(SLUG),{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({names:names})});
+    var d=await r.json();
+    if(r.ok&&d.ok){msg.textContent='✅ saved — refreshing…';setTimeout(function(){location.href=location.pathname+'?refresh=1';},700);}
+    else{msg.textContent='❌ '+(d.detail||('HTTP '+r.status));}
+  }catch(e){msg.textContent='❌ '+e;}
+}
 async function loadAI(refresh){
  var out=document.getElementById('aiout'),btn=document.getElementById('aibtn'),hint=document.getElementById('aihint');
  if(!out)return; if(btn)btn.disabled=true; if(hint)hint.style.display='none';
@@ -6437,10 +6533,15 @@ async function load(refresh){
   if(d.splits&&Object.keys(d.splits).length)html+='<div class="card"><h3>Train / val / test split (images)</h3>'+bars(d.splits,'#7c3aed')+'</div>';
   // class distribution
   if(a.per_class&&Object.keys(a.per_class).length){
-    html+='<div class="card"><h3>Class distribution <span class="muted">('+esc(a.count_kind||'')+', '+esc(a.type)+')</span></h3>'+bars(a.per_class,'#2563eb')
-      +'<div class="muted" style="margin-top:6px">labeled images: '+esc(a.labeled_images)+'</div></div>';
+    html+='<div class="card"><h3>Class distribution <span class="muted">('+esc(a.count_kind||'')+', '+esc(a.type)+')</span>'
+      +' <button onclick="editClassNames()" style="float:right;border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-size:12px;font-weight:600;padding:4px 10px;border-radius:7px;cursor:pointer">&#9998; Edit class names</button></h3>'
+      +bars(a.per_class,'#2563eb')
+      +'<div class="muted" style="margin-top:6px">labeled images: '+esc(a.labeled_images)+'</div>'
+      +'<div id="cn-editor" style="display:none;margin-top:10px;border-top:1px dashed #cbd5e1;padding-top:10px"></div></div>';
   }else if((a.classes||[]).length){
-    html+='<div class="card"><h3>Classes ('+esc(a.type)+')</h3><div class="muted">'+a.classes.map(esc).join(', ')+'</div></div>';
+    html+='<div class="card"><h3>Classes ('+esc(a.type)+')</h3><div class="muted">'+a.classes.map(esc).join(', ')+'</div>'
+      +'<button onclick="editClassNames()" style="margin-top:8px;border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-size:12px;font-weight:600;padding:4px 10px;border-radius:7px;cursor:pointer">&#9998; Edit class names</button>'
+      +'<div id="cn-editor" style="display:none;margin-top:10px;border-top:1px dashed #cbd5e1;padding-top:10px"></div></div>';
   }else{
     html+='<div class="card"><h3>Annotations</h3><div class="muted">none detected — this dataset has no labels yet (upload YOLO labels/ + data.yaml, COCO/VOC, or class subfolders to see class distribution).</div></div>';
   }

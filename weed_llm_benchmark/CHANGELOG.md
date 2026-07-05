@@ -5476,3 +5476,13 @@ bleached_coral: 3}`, `labeled 6/6`):
   into `tools/dataset_quality.py` as `detect_dataset_issues`, imported back under the same name (behaviour
   identical; unit-tested standalone). Continues the v3.0.193 `dataset_eda.py` extraction. dashboard_server.py:
   ~13,014 → 12,953 lines.
+
+### v3.1.3 — class-name editing on the analysis page
+
+Most student uploads have YOLO labels but no `data.yaml`, so analysis showed generic "class 0/1". New: an
+**✎ Edit class names** button on the Class-distribution card opens an inline editor (one input per YOLO class
+id — mapping is positional, never by count). Saving writes `data.yaml` (inline-list form the analyzer reads),
+updates the registry `class_names` (Mongo+JSON dual-write), and invalidates the cached analysis so the real
+names appear immediately. New endpoints `GET/POST /api/dataset/classnames`. Deployed to the lab server and
+verified end-to-end with a real 24-image weed upload: before `["class 0","class 1"]` → saved
+`["crop","grass weed"]` → re-analysis shows `grass weed: 81` (registry mongo:true json:true).
