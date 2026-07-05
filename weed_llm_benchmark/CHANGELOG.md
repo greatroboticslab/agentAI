@@ -5449,3 +5449,20 @@ holdout dHash guard, the concurrent-registry lock, and the auth/job-status truth
 `cp -ar` sync, ~47 hardcoded `/ocean/...byler` paths, unpinned deps, near-zero CI, the broader outage→empty and
 Popen-liveness honesty sweep, and the stale "cwd12 ≥ 0.90 DO NOT DRIFT" header above (the goal was met at
 v3.0.38-A = 0.9033 and the project pivoted to a multi-domain platform).
+
+### v3.1.1 — fix dataset upload → analysis (labels were silently dropped)
+
+End-to-end testing of the newcomer flow (upload a YOLO dataset → analyze) surfaced three real bugs that made
+the analysis wrongly report **"no labels detected"** for a correctly-labeled upload — exactly what a student
+would hit on day one. All fixed in `dashboard_server.py` and verified end-to-end (upload a 6-image YOLO set →
+analysis now shows `type: yolo`, real class names `[coral, bleached_coral]`, `per_class {coral: 3,
+bleached_coral: 3}`, `labeled 6/6`):
+
+1. **Double-nesting** — the extractor placed images at `images/<rel>` where `<rel>` still began with `images/`,
+   producing `images/images/…`; labels landed flat in `labels/`, so image↔label pairing (and thus training)
+   broke. A leading `images/` segment is now stripped while classification `train/<class>/` structure is kept.
+2. **Wrong `local_path`** — an image upload registered `local_path` at the `images/` subdir, so analysis (and
+   training) rooted there and never saw the sibling `labels/`. YOLO uploads (with labels) now register the
+   parent dir; pure-image datasets still point at `images/`.
+3. **Class names not persisted** — `data.yaml` was parsed for names but never written to disk, so analysis fell
+   back to generic `class 0/1`. It's now written back (inline-list form the analyzer accepts) so real names surface.

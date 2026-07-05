@@ -3081,7 +3081,16 @@ async def api_dataset_upload(request: Request):
             try:
                 # preserve structure (train/<class>/img.jpg) for classification +
                 # det/seg splits; the gallery rglobs local_path so it still finds them.
-                outp = img_dir / rel
+                # v3.1 fix: if the source already nests images under an `images/` dir
+                # (standard YOLO layout images/ + labels/), DON'T re-nest under our
+                # canonical images/ — that produced images/images/… which broke
+                # image↔label pairing (labels land flat in labels/), so analysis and
+                # training both reported "no labels". Strip one leading `images/`.
+                img_rel = rel
+                _ip = Path(img_rel).parts
+                if len(_ip) > 1 and _ip[0].lower() == "images":
+                    img_rel = str(Path(*_ip[1:]))
+                outp = img_dir / img_rel
                 outp.parent.mkdir(parents=True, exist_ok=True)
                 with open(outp, "wb") as out:
                     shutil.copyfileobj(src, out, length=1024 * 1024)
@@ -3144,6 +3153,20 @@ async def api_dataset_upload(request: Request):
         cn2, fmt2 = _extract_anno_classes(dest)
         if cn2:
             class_names, detected_fmt = cn2, fmt2
+    # v3.1: persist a data.yaml with the resolved class names. It was parsed for
+    # names but never written to disk, so downstream analysis showed generic
+    # "class 0/1" instead of the real names. Writing it makes analyze + training
+    # surface the true class names and count has_data_yaml correctly.
+    if class_names and n_lbl > 0:
+        try:
+            # inline-list form `names: [a, b]` — matches the analyzer's parser (it
+            # regex-scans for a bracketed list, not block-style YAML) and is valid YAML.
+            _nm = ", ".join("'" + str(c).replace("'", "") + "'" for c in class_names)
+            with open(dest / "data.yaml", "w") as _dy:
+                _dy.write("names: [" + _nm + "]\n")
+                _dy.write("nc: " + str(len(class_names)) + "\n")
+        except Exception:
+            pass
     # v3.0.139: video → extract a few preview frames (cv2) so the gallery shows it.
     if modality == "video":
         try:
@@ -3171,7 +3194,10 @@ async def api_dataset_upload(request: Request):
         "downloaded_at": uploaded_at,
         # image datasets point local_path at images/ (gallery walks it); non-image
         # datasets point at the dataset root so files/ is browsable later.
-        "local_path": str(img_dir if modality == "image" else dest),
+        # v3.1 fix: a YOLO upload (has labels/) registers the PARENT dir so the
+        # sibling labels/ is visible to analysis + training — pointing at images/
+        # alone made analyze and training report "no labels detected".
+        "local_path": str(dest if (modality != "image" or n_lbl > 0) else img_dir),
         "local_images": n_img,
         "n_local_files": n_file,
         "n_local_labels": n_lbl,
