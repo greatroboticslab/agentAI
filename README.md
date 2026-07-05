@@ -4,6 +4,66 @@
 
 Developed at [MTSU Great Robotics Lab](https://github.com/greatroboticslab), this repository implements **EMACF** (Embodied Multi-Agent Cognitive Framework) — a domain-agnostic agent architecture where an LLM serves as the robot's "brain" and specialized real-time agents serve as its "body". The framework is designed to be universal: the same core agent infrastructure handles weed detection, robot navigation, human-robot interaction, and future applications.
 
+---
+
+<div align="center">
+
+## 🌱 The Research Platform — a 60-second tour
+
+**Collect → review → train detection datasets, all from one dashboard.**
+
+Create a project for any research field, add data of any kind, then point agents at it to
+harvest, filter, label, and train — any number, any mix, or none. The dashboard runs on the
+lab server; GPU jobs queue on the Bridges-2 cluster.
+
+<img src="docs/screenshots/home.png" width="840" alt="Research Projects home — open a project or start a new one">
+
+<sub>Every research domain is a <b>project</b>. Open one, or spin up a new one for any data type — images, video, sensor, …</sub>
+
+</div>
+
+### How a newcomer uses it
+
+**1 · Get oriented.** A built-in guide lays out the whole flow in four steps: create a project → add datasets → analyze → train. No prior context needed.
+
+<div align="center">
+<img src="docs/screenshots/guide.png" width="820" alt="Getting started guide: create a project, add datasets, analyze, train">
+</div>
+
+**2 · Drive the pipeline from Mission Control.** Live status up top, then one-click agent actions laid out in recommended order — harvest new data, pre-annotate with OWLv2, curate with DINOv2, train YOLO. Green = the happy path; the numbers are the order; grey = optional variants.
+
+<div align="center">
+<img src="docs/screenshots/console.png" width="820" alt="Framework controller with the agent-action grid">
+</div>
+
+**3 · Keep a human in the loop.** Push a handful of images per dataset out for real labeling, export the boxes back, delete to save quota, then push the next batch. Every stage — pushed, agent-labeled, human-labeled, human-verified — is tracked.
+
+<div align="center">
+<img src="docs/screenshots/labeling.png" width="820" alt="Labeling console — human-in-the-loop review">
+</div>
+
+**4 · Review every harvest round.** Each round is a versioned snapshot of what the agent collected. Inspect it, judge quality class-by-class, and keep or junk it *before* it can ever reach training.
+
+<div align="center">
+<img src="docs/screenshots/rounds.png" width="820" alt="Harvest rounds — version-by-version review">
+</div>
+
+### Run it locally
+
+```bash
+cd weed_llm_benchmark            # the package lives here
+pip install -r requirements.txt
+echo mypassword > ~/.dashpass    # auth fails closed without a configured password
+DASH_USER=me uvicorn weed_optimizer_framework.tools.dashboard_server:app --port 8000
+# → open http://localhost:8000  (log in: me / mypassword)
+```
+
+<sub>The screenshots above are a fresh <b>local dev instance</b> — counts read 0 and cluster-hosted images show
+placeholders because no data has been harvested yet. On the live lab server the same views fill with real
+datasets, boxed previews, and round history.</sub>
+
+---
+
 ## Repository Structure
 
 | Directory | Description | Status |
