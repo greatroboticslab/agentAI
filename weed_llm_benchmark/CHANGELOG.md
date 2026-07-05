@@ -6,6 +6,12 @@
 
 **Primary metric:** cwd12 holdout mAP50-95 ≥ **0.90**
 
+> ✅ **STATUS (2026-07):** This goal was **reached** — v3.0.38-A hit cwd12 mAP50-95 = **0.9033**.
+> Active development has since shifted to the multi-domain dataset **platform** (see the top-level README).
+> The primary metric and the framework requirements below remain the standing invariants for any training work.
+> ⚠️ Post-`v3.1.0` note: the holdout-leak fix (content-level dHash guard) means a fresh training run is needed to
+> re-confirm this number honestly — the earlier 0.9033 was measured before the leak was sealed.
+
 ## 🔒 FRAMEWORK REQUIREMENTS (FIXED — DO NOT DRIFT)
 
 These are non-negotiable. Every phase, every report, every code change

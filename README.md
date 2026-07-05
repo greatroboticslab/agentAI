@@ -240,4 +240,4 @@ and future applications. The dataset platform above is the weed-detection domain
 
 ## License
 
-Research use. MTSU Great Robotics Lab.
+Proprietary — research use only. © 2026 MTSU Great Robotics Lab, all rights reserved. See [LICENSE](LICENSE).
