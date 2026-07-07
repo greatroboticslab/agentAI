@@ -6,6 +6,9 @@
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
+**🔗 Live platform: <https://lab-b660m-c.tailfa6424.ts.net>** — sign in with your MTSU Google account.
+Runs on the lab server; reachable from the lab network / Tailscale. GPU jobs queue on PSC Bridges-2.
+
 Built at the [MTSU Great Robotics Lab](https://github.com/greatroboticslab). Create a project for any
 research field, add data of any kind, then point AI agents at it to **harvest, filter, label, and train** —
 any number, any mix, or none. The dashboard runs on the lab server; GPU jobs queue on the PSC Bridges-2 cluster.

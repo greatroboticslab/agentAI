@@ -1,8 +1,13 @@
 # Research Log
 
-**Paper**: "Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Models for Agricultural Object Detection"
+**Project (current):** a **universal research-data platform for physical/embodied agents** — students create a
+project for any domain (weed detection, mobile robot, humanoid, …), upload or auto-collect datasets, review
+labels with humans in the loop, and train/evaluate on the cluster GPU. Live on the lab server (Google login).
 
-**Focus Dataset**: CottonWeedDet12 (5648 images, 12 weed species)
+**How it got here (three phases, honestly):**
+1. **VLM benchmark** — *"Can Vision LLMs Detect Weeds?"* on CottonWeedDet12 (5,648 images, 12 species): fine-tuned YOLO11n 0.929 mAP@0.5 vs best VLM (Florence-2) 0.434.
+2. **Autonomous data pipeline** — Brain-driven harvest → OWLv2 pseudo-label → DINOv2 curation → cumulative training; reached cwd12 holdout mAP50-95 ≈ 0.90 (to be re-confirmed after the v3.1.0 holdout-guard fix).
+3. **The platform** (June 2026 →) — the weed pipeline generalized into the multi-domain, multi-user platform above. The benchmark and the 0.90 thread are now **one component** of the platform, not the project's identity.
 
 ---
 
@@ -92,6 +97,37 @@ the honest post-leak-fix mAP. Everything else is code-only and pushed.
 hardcoded `/ocean/...byler` paths (blocks lab-server migration); unpinned
 deps; near-zero CI; broader outage→empty + Popen-liveness honesty sweep;
 stale "cwd12 ≥ 0.90 DO NOT DRIFT" changelog header (goal met at v3.0.38-A).
+
+## 2026-06 — the platform month (retrospective summary, written 2026-07-07)
+
+> **Honesty note:** during June the day-to-day record went into `CHANGELOG.md` (per-version, dated) but this
+> log was not updated. This entry back-fills the month from those dated CHANGELOG entries so the log has no
+> gap. For any item below, the CHANGELOG has the full detail under the version number.
+
+June was the pivot from "weed pipeline" to "multi-domain platform":
+
+- **06-03 → 06-05** (v3.0.78–86) — **MongoDB migration**: `db.py` Mongo-first/JSON-fallback layer, dual-write,
+  backfill, SCRAM auth; **multi-domain extensibility** per Prof. Zhang (a `domain` field + config, so a new
+  research field is data, not code); honest per-action status.
+- **06-08 → 06-11** (v3.0.96–99.x) — **data-collection block hardened**: review visualization, Roboflow
+  Universe harvest at scale, then the **labeling loop** (push N → human labels in Roboflow → export back →
+  delete to save quota → next batch), lifecycle tracked in Mongo. Roboflow confirmed as the central library
+  for all data + human review (~110K images uploaded with real class names).
+- **06-12 → 06-22** (v3.0.100–124) — **dashboard frontend epic**: Agent Launcher, Mission Control, browse-data
+  polish, train→round mAP write-back, lab-server migration groundwork (website + Mongo + storage on the lab
+  Ubuntu box; cluster = compute only).
+- **06-23** (v3.0.125–143, "Prof. Zhang platform expansion") — **manual dataset upload**, uploads management,
+  **users in DB + Google login + RBAC** + per-user cluster permission, push caps, **generalized agent+dataset
+  schema beyond weed/image/YOLO** (the keystone), LLM provider abstraction, our-own API keys, self-hosted
+  **model gateway** (on-demand cluster inference).
+- **06-28 → 07-03** (v3.0.144–193) — **project-first UX** (a PROJECT contains AGENTS; create/delete/rename,
+  simplified create form, per-agent run controls), **conversational/voice agent-builder** (describe your goal
+  → AI proposes the setup; Whisper transcription), per-domain config layer, role-based **model router**
+  (brain/curation/labeling-VLM/analysis roles, switchable), modality gates, **round provenance + timeline**,
+  per-domain observability, dataset provenance (license/version), and the first de-monolith extraction.
+
+Where that left us on 07-03: the platform ran end-to-end for the weed domain, but the student upload→analysis
+path still had the silent bugs that the 07-04 audit (one entry up) found and fixed.
 
 ## 2026-05-22 — v3.0.38-C label verifier + v3.0.39 FLUX synthesis
 

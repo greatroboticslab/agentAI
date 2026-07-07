@@ -1,5 +1,8 @@
 # Changelog
 
+> **Reading order:** this file is **chronological — the NEWEST entries are at the BOTTOM** (jump to the end for
+> the latest). For a newest-first narrative summary, read the top-level [`RESEARCH_LOG.md`](../RESEARCH_LOG.md).
+
 ---
 
 ## 🎯 RESEARCH GOAL (FIXED — DO NOT DRIFT)
