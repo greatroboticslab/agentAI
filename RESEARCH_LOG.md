@@ -6,365 +6,341 @@
 
 ---
 
-## Phase 0: Evaluation Module
+*Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
-### 2026-03-15 (Session 1)
-**Goal**: Build evaluation code (mAP, precision, recall) and dataset management
-**Done**:
-- Created `evaluate.py`: mAP@0.5, mAP@0.5:0.95, precision, recall, F1
-- Created `datasets.py`: dataset registry with download helpers (4 datasets)
-- Created `run_yolo_baseline.py`: YOLO baseline runner (zero-shot / fine-tuned / custom weights)
-- Created `run_full_benchmark.py`: orchestrator for datasets x models matrix with resume
-- Created `run_ablations.py`: ablation study experiments
-- Created `generate_paper_figures.py`: publication-quality matplotlib figures
-- Created `generate_tables.py`: LaTeX table generation
-- Created `convert_coco_to_yolo.py`: COCO/LabelMe/VOC to YOLO format converter
-- Updated `yolo_llm_fusion.py`: added batch mode `fuse_dataset()` with 3 strategies
-- Updated `roboflow_bridge.py`: added `--evaluate` flag
-- Updated README.md and CHANGELOG.md
+## 2026-07-05 — v3.1.1–v3.1.3: upload/analysis fixes, live deploy, E2E, class-name editor
 
-### 2026-03-15 (Session 2)
-**Goal**: Download CottonWeedDet12, fix evaluation bugs, set up YOLO fine-tuning
-**Done**:
-- Downloaded CottonWeedDet12 from Zenodo (28GB 7z) locally and on cluster
-- Created train/valid/test splits (65/20/15) with seed=42 from weedImages/ + annotation_YOLO_txt/
-- Split weed2okok into train(70)/valid(21)/test(15)
-- **Fixed critical mAP bug**: evaluate.py was using Precision as mAP (line 367). Rewrote `evaluate_dataset()` with proper PR-curve based AP computation using `_compute_ap_at_iou()`.
-- **Fixed DOWNLOAD_DIR path**: datasets.py, run_yolo_baseline.py, run_full_benchmark.py all pointed to wrong directory. Fixed to use `PROJECT_ROOT/downloads/`.
-- **Discovered yolo11nweed.pt origin**: trained on `weeddataset311` (Windows), NOT on weed2okok or CottonWeedDet12. Cross-dataset transfer performance is low (mAP@0.5=0.316 on CottonWeedDet12).
-- Created SLURM scripts for cluster (Bridges-2):
-  - `run_benchmark_hf.sh`: HF model benchmark per dataset
-  - `run_benchmark_ollama.sh`: Ollama model benchmark per dataset
-  - `submit_all_jobs.sh`: master job submission script
-  - `setup_and_train.sh`: all-in-one download + split + fine-tune YOLO
-  - `run_finetune_cottonweed.sh`: fine-tune only
-- Fixed `run_yolo_baseline.sh` cluster path (was local Mac path)
-- Submitted YOLO fine-tune job on Bridges-2 V100 (Job 38007424, 100 epochs)
+Continuation of the audit thread: made the student upload→analysis flow real,
+verified it on the machines students actually use, and closed the biggest
+onboarding gap.
 
-**Preliminary Results (weed2okok test=15 images)**:
-| Method | mAP@0.5 | Precision | Recall |
-|--------|---------|-----------|--------|
-| YOLO11n zero-shot | 0.000 | 0.000 | 0.000 |
-| yolo11nweed.pt (cross-dataset) | 0.072 | 0.172 | 0.167 |
-| Qwen2.5-VL-7B (zero-shot LLM) | 0.639* | 0.639* | 0.411* |
-| YOLO11n fine-tuned 20ep | 0.909* | 0.909* | 0.667* |
+### Shipped (each verified on the LIVE lab server, not just locally)
 
-*These were computed before the mAP fix, actual values may differ.
+- **v3.1.1** — three upload bugs found by end-to-end testing (double-nested
+  `images/images/`, `local_path` hiding sibling `labels/`, class names never
+  persisted): a correctly-labeled YOLO upload no longer analyzes as "no labels".
+- **v3.1.2** — YOLO label `.txt` no longer miscounted as "sensor" modality;
+  second de-monolith extraction (`dataset_quality.py`, dashboard −61 lines).
+- **v3.1.3** — ✎ class-name editor on the analysis page: uploads without
+  `data.yaml` (the common student case) get real class names; writes data.yaml +
+  registry dual-write + cache invalidation. Live E2E: `["class 0","class 1"]` →
+  `["crop","grass weed"]` → distribution shows `grass weed: 81`.
+- **Deployed the full v3.1 fix set to the lab server** (12 files, tar backup,
+  restart, verified) — lab now matches GitHub main; cluster pulled the same
+  commit via its job-start sync.
+- **Full-frontend E2E on live** (desktop + iPhone viewport) with a real 24-image
+  weed dataset: create project → upload (1.1s) → EDA → AI review
+  (`qwen2.5:3b` local; `ready:True`) → gallery → agents; mobile fully
+  responsive. Only false alarm: /console networkidle (page is fine, 200/0.3s).
+- **README refreshed with real-data screenshots** (removed all 0-count
+  empty-state images); added the class-name editor shot. CI green.
 
-**Preliminary Results (CottonWeedDet12 test=848 images, binary evaluation)**:
-| Method | mAP@0.5 | mAP@0.25 | Precision | Recall |
-|--------|---------|----------|-----------|--------|
-| yolo11nweed.pt (cross-dataset) | 0.316 | 0.374 | 0.473 | 0.404 |
-| YOLO11n fine-tuned 100ep | **0.929** | — | **0.930** | **0.850** |
+### Lesson
 
-**Issues**:
-- Cluster curl doesn't support `--progress-bar` → switched to wget
-- Cluster has no `7z` binary → used Python `py7zr` package
-- rsync to cluster unreliable → used base64 encoding via ssh for file transfer
-- CottonWeedDet12 structure different from expected: images in `weedImages/`, YOLO labels in `annotation_YOLO_txt/` (separate dirs, not alongside images)
+API-level "works" ≠ student-level "works": the three v3.1.1 bugs and the
+class-name gap were only visible by driving the real UI with real data on the
+real server. Verify from the user's seat.
+## 2026-07-04 — full-framework audit + CRITICAL hardening (v3.1.0)
 
-**Next**:
-- Wait for YOLO fine-tune to complete on cluster (target: mAP@0.5:0.95 > 0.9)
-- Run LLM models on CottonWeedDet12 test set
-- Small models (moondream, Qwen-3B) test locally on Mac
+Ran a whole-codebase, read-only audit with 7 parallel review agents
+(architecture / error-honesty / concurrency / data-integrity / security /
+maintainability / doc-drift), then fixed the highest-severity findings.
 
----
+### Findings that mattered most
 
-## Phase 1: YOLO Baseline (Complete)
+- **Holdout leakage was paper-blocking.** The eval holdout was kept out of
+  training only by filename checks (NEVER_TRAIN slug list + stem filter);
+  the dHash dedup set was never seeded with the holdout. A renamed /
+  re-exported copy of a cwd12 test image (the common Roboflow/Kaggle case,
+  `orig_jpg.rf.<hex>.jpg`) slipped past both and trained the model on its
+  own eval set — so the reported ≥0.90 mAP could be inflated.
+- **The registry could be wiped by one bad concurrent write.** No lock;
+  whole-file read-modify-write; 6 writers sharing one fixed `.tmp`; a
+  corrupt parse silently rebuilt an empty registry over the 50MB file.
+- **Systemic "looks-successful" reporting.** Failed background jobs shown
+  as done; simulated labeling events written unflagged into the real
+  counts; dashboard auth failing OPEN on a public tunnel.
 
-### 2026-03-16 (Session 3)
-**Goal**: Optimize YOLO fine-tuning on cluster for better GPU utilization
+### Fixed this session (each verified with a standalone test)
 
-**Done**:
-- Cancelled Job 38007424 (batch=16, only using 2.34G/32G = 7% GPU)
-- Updated `setup_and_train.sh`: batch=-1 (auto), workers=5
-- AutoBatch selected **batch=60** using 19G/32G (60% of V100)
-- Resubmitted as Job 38007481 on V100 (v017)
-- Committed and pushed root README.md update (commit 87fc225)
+C1 holdout dHash pre-seed (`mega_trainer`); C2 registry lock +
+`update_registry` + atomic writes everywhere + corrupt-guard + killed the
+stale-snapshot flush (`registry_lock`, `dataset_discovery`, `mega_trainer`,
++4 writers); C3 removed the committed Kaggle token (3 scripts); A
+error-honesty (job status from `res["ok"]`, auth fail-closed, `simulated`
+flag on demo labeling events, Mongo-mirror failure logged); C autolabel
+conf floor restored 0.12→0.30 (`orchestrator`). See CHANGELOG v3.1.0.
 
-**Training Complete (Job 38007481, 100 epochs, 2.75 hours)**:
+### Lesson learned
 
-| Metric | Validation (best) | **Test (848 images)** |
-|--------|-------------------|----------------------|
-| mAP@0.5 | 0.943 | **0.929** |
-| mAP@0.5:0.95 | 0.898 | **0.865** |
-| Precision | 0.944 | **0.930** |
-| Recall | 0.884 | **0.850** |
+Because every layer was AI-built and iterated, the dangerous defects were
+not crashes but **silent success signals** — code that returns/looks fine
+while the real invariant (holdout purity, registry integrity, "job
+submitted", "human verified") is violated. The audit's highest value was
+finding the places that lie quietly. Verification must exercise the
+invariant, not just check that a function returned.
 
-Per-class validation results:
-| Class | mAP@0.5 | mAP@0.5:0.95 |
-|-------|---------|-------------|
-| Carpetweeds | 0.976 | 0.936 |
-| Crabgrass | 0.979 | 0.935 |
-| Eclipta | 0.920 | 0.878 |
-| Goosegrass | 0.903 | 0.830 |
-| Morningglory | 0.853 | 0.769 |
-| Nutsedge | 0.939 | 0.878 |
-| PalmerAmaranth | 0.955 | 0.917 |
-| PricklySida | 0.970 | 0.947 |
-| Purslane | 0.941 | 0.930 |
-| Ragweed | 0.993 | 0.983 |
-| Sicklepod | 0.945 | 0.858 |
-| SpottedSpurge | 0.950 | 0.919 |
+### Action required (human)
 
-- Training config: batch=60 (auto), AdamW lr=0.000625, cos_lr, warmup=5ep, patience=20
-- Training speed: ~1.8 min/epoch on V100-32GB
-- Model: runs/detect/runs/yolo11n_cottonweeddet12/weights/best.pt (5.5MB)
-- **Bug found**: setup_and_train.sh test eval used wrong path (`runs/yolo11n_cottonweeddet12/` vs actual `runs/detect/runs/yolo11n_cottonweeddet12/`). Fixed by running test eval manually.
+Rotate the Kaggle token + create `~/.kaggle_token` on the cluster; purge
+the token from git history before any public push. Re-run training to get
+the honest post-leak-fix mAP. Everything else is code-only and pushed.
 
-**Next**:
-- Download best.pt from cluster to local
-- Run LLM models on CottonWeedDet12 test set (848 images)
-- Small models (moondream, Qwen-3B) locally on Mac
+### Still open (see CHANGELOG v3.1.0 + audit memory)
 
----
+13k-line dashboard monolith; dual on-disk package `cp -ar` sync; ~47
+hardcoded `/ocean/...byler` paths (blocks lab-server migration); unpinned
+deps; near-zero CI; broader outage→empty + Popen-liveness honesty sweep;
+stale "cwd12 ≥ 0.90 DO NOT DRIFT" changelog header (goal met at v3.0.38-A).
 
-## Phase 2: Full LLM Benchmark (In Progress)
+## 2026-05-22 — v3.0.38-C label verifier + v3.0.39 FLUX synthesis
 
-**Decision**: Paper focuses on CottonWeedDet12 only. All models run on cluster.
+Built the rest of the v3.0.38 data-quality stack and the v3.0.39
+synthetic-training module:
 
-### 2026-03-16 (Session 4)
-**Goal**: Run 10+ vision LLMs on CottonWeedDet12 test set (848 images)
+- **dino_label_verifier.py** — a supervised linear head on frozen DINO
+  features. Filtering (similarity) answers "in/out"; only a classifier
+  answers "is the *label* right". Trained on the cut-paste synthetic bank
+  (guaranteed-correct labels), it flags swapped-class boxes at high
+  confidence (Confident-Learning principle). This is the third and last
+  curation gate.
+- **synth_diffusion.py** — FLUX.1-Fill layout-conditioned generation.
+  Honours Prof. Zhang's requirement that synthetic data also train the
+  detector, in the form the literature shows actually works: inpaint
+  photoreal weeds into chosen boxes on real backgrounds → realism + exact
+  GT, used as augmentation biased to weak classes.
+- DINO backbone made configurable (DINO_BACKBONE) so the fine-grained
+  verifier role can use a plant-specialised checkpoint (PlantCLEF-2024
+  DINOv2 / BioCLIP 2) while the coarse filter keeps generic DINOv2.
 
-**Done**:
-- Fixed `run_full_benchmark.py` bugs: query_ollama returns dict not tuple, JSON parse handles list format
-- Fixed `test_ollama.py`: handle list-format JSON responses
-- Ran moondream locally (848 images, 1173s = 20min)
-- Submitted 5 HF model jobs to Bridges-2 — all failed due to DOWNLOAD_DIR path bug
+Research grounding done this session: DINOv2 self-curation, cleanlab
+ObjectLab / Confident Learning, BioCLIP 2, PlantCLEF-2024 ViT, Simple
+Copy-Paste, DODA, Gen2Det, S3OD, FLORA, weed-detection diffusion
+augmentation. Conclusion: FLUX is the right generative base; the
+breakthrough is layout-conditioning + a DINO-verified closed loop.
 
-### 2026-03-16 (Session 5)
-**Goal**: Fix cluster bugs, run all 11 models on CottonWeedDet12
+Honest caveat carried forward: cwd12 is not a low-data target, so
+synthetic augmentation's gain is expected mainly on weak/rare classes,
+not a blanket +mAP. The plan biases generation accordingly.
 
-**Bugs Fixed**:
-1. **DOWNLOAD_DIR path**: cluster has flat dir structure, `datasets.py` and `run_full_benchmark.py` pointed to wrong downloads path. Fixed with dual-check: `_dl_base if os.path.isdir(_dl_base) else _dl_project`
-2. **query_ollama return type**: `run_full_benchmark.py` tried tuple unpacking but function returns dict. Fixed.
-3. **JSON list format**: models return `[{...}]` instead of `{"detections": [...]}`. Fixed both files.
-4. **Qwen OOM**: CottonWeedDet12 images are high-res, caused 230GB attention allocation on V100-32GB. Fixed by limiting `min_pixels=256*28*28, max_pixels=1280*28*28` in processor.
-5. **InternVL2 transformers 5.0 compat**: `all_tied_weights_keys` attribute missing. Fixed with monkey-patch: `caching_allocator_warmup = lambda: None`
-6. **Florence-2 transformers 5.0 compat**: `forced_bos_token_id` config error. Fixed with `revision="refs/pr/6"` + monkey-patch.
-7. **MiniCPM gated repo**: `openbmb/MiniCPM-V-2_6` requires HF authentication. Skipped for now.
-8. **minicpm-v Ollama**: consistently returns HTTP 500. Skipped.
-9. **Added Florence-2**: new model type in `roboflow_bridge.py` MODEL_REGISTRY with `_infer_florence()` using `<OD>` task for native object detection.
+### Blocker
 
-**Completed Ollama Results (848 images each)**:
-| Model | Size | Pred Boxes | GT Boxes | Notes |
-|-------|------|-----------|----------|-------|
-| moondream | 1.8B | 527 | 1464 | Has predictions but very imprecise |
-| llava:7b | 7B | 0 | 1464 | Cannot produce bounding boxes |
-| llava:13b | 13B | 0 | 1464 | Cannot produce bounding boxes |
-| bakllava | 7B | 0 | 1464 | Cannot produce bounding boxes |
+Cluster ssh (bridges2) hangs after the password prompt across this
+session — v3.0.38-A result (job 40912927) not yet retrieved and the
+v3.0.38/39 jobs not yet submitted. All code is committed + pushed, so the
+cluster side is a `git pull` + `sbatch` once a login session is healthy.
 
-**Still Running on Cluster**:
-- qwen7b (Qwen2.5-VL-7B) — resubmitted with pixel limits, Job 38016297
-- qwen3b (Qwen2.5-VL-3B) — resubmitted with pixel limits, Job 38016298
-- llama3.2-vision:11b — Ollama, Job 38014616 (~45min, processing ~7s/image)
-- internvl2 (InternVL2-8B) — resubmitted with monkey-patch, Job 38016326
-- florence2 (Florence-2-large) — resubmitted with revision fix, Job 38016327
+## 2026-05-19 — v3.0.36/35.2 landed, v3.0.37 timeout, v3.0.38 = clean-first
 
-**Cluster Environment**: transformers==5.0.0.dev0 (bleeding edge, caused many compat issues)
+**v3.0.36 DINOv2 curator (job 40891360)** — success. Whole-image DINOv2
+similarity cleanly separates good vs off-domain data (trusted slugs mean
+0.78, untrusted 0.26, zero overlap). 51 garbage slugs auto-flagged.
+Validates Prof. Zhang's collection-phase similarity-comparison idea.
 
-**Key Insight**: Ollama models without native grounding (LLaVA, BakLLaVA) produce 0 bounding boxes. Only models with native bbox output (Qwen2.5-VL, Florence-2, moondream) can generate coordinates. This is a key finding for the paper.
+**v3.0.35.2 T3 re-test (job 40891361)** — Gemma 4 image-level relevance
+= 96% accuracy with proper negatives. Settles the T1-T4 matrix: Gemma 4
+cannot do bbox (T2) or bbox-verify (T4), but can do image-level relevance
+(T3). DINOv2 cosine + Gemma 4 relevance are two agreeing image filters.
 
-**Next**:
-- Wait for qwen7b, qwen3b, llama3.2-vision, internvl2, florence2 to complete
-- Run evaluation on all completed results
-- If Qwen models succeed, we have 8-10 models for comparison
-- Begin Phase 3 (YOLO+LLM Fusion) and Phase 5 (figures/tables)
+**v3.0.37 yolo26x cumulative-clean (job 40896313)** — TIMEOUT at 18h,
+epoch 19/30, no pyco. In-training cwd12 val ~0.59 and declining. Three
+problems: (1) yolo26x ceiling is 0.7446 — can't reach 0.90; (2) walltime
+too short; (3) clean data still dragged val below yolo26x's own
+cwd12-only number. Conclusion: removing whole garbage datasets is not
+enough — bad autolabel boxes *inside* good datasets are the residual
+noise. Single-stage cumulative training has now failed twice (0.576,
+~0.59).
 
-### 2026-03-16 (Session 6)
-**Goal**: Fix cluster bugs (round 3), expand model coverage for paper
+**Decision (with user, 2026-05-19): clean the data at object level
+BEFORE the next cumulative training run.** Two parallel tracks:
+- our object-level DINOv2 curator (per-bbox crop comparison)
+- Prof. Zhang's copy-paste synthetic + DINO classification head
 
-**Bugs Fixed (Round 3)**:
-1. **Qwen loading speed**: `device_map="auto"` AND `device_map={"": 0}` both trigger transformers 5.0's accelerate weight materialization (~48s/weight x 729 = 10+ hours). Fix: remove device_map entirely, use `.cuda()` instead.
-2. **InternVL2 `all_tied_weights_keys`**: Previous patch used `set()` but callers do `.keys()` on it. Fix: use `{}` (dict) not `set()`.
-3. **Florence-2 `forced_bos_token_id`**: Error happens INSIDE `AutoConfig.from_pretrained` during Florence2LanguageConfig construction, so patching config after load is too late. Fix: patch `PretrainedConfig.forced_bos_token_id = None` class attribute BEFORE loading.
+**v3.0.38-A submitted now:** RF-DETR Large cwd12-only, seeds 101+102,
+60ep — adds 2 points to v3.0.31 (0.8949) / X2 (0.8953) for an honest
+ceiling mean ± std. Gap to 0.90 goal still −0.0047.
 
-**Git Email Fix**: Rewrote all commit history to change placeholder `your.email@university.edu` → `harry567566@gmail.com`.
+### Lesson learned
 
-**Model Coverage Expansion**: Research found 7 important missing models. Added to benchmark:
-
-| Model | Type | Size | Why Add |
-|-------|------|------|---------|
-| Qwen3-VL-8B | VLM+grounding | 8B | Direct successor to Qwen2.5-VL, Jan 2026, best VLM grounding |
-| Grounding DINO | Open-set detector | 172M | #1 zero-shot detection model on HuggingFace, essential baseline |
-| PaliGemma2-3B | Detection VLM | 3B | Google, native `<loc>` tokens for detection, MIT license |
-| YOLO-World v2 | Open-vocab YOLO | ~100M | Bridges YOLO baseline and language-driven detection |
-| MiniCPM-V 4.5 | VLM+detect | 8B | Feb 2026, replaces gated v2.6, surpasses GPT-4o on benchmarks |
-| Molmo-7B-D | VLM+pointing | 7B | Allen AI, precise pixel coordinates, fully open |
-| DeepSeek-VL2 | MoE VLM | 4.5B active | Grounding tokens, efficient MoE architecture |
-
-**Reference**: AgroBench (ICCV 2025) found most open-source VLMs perform near-random on weed identification → validates our paper's importance.
-
-**Cluster Jobs Submitted**: qwen7b, qwen3b, internvl2, florence2 (resubmitted with fixes). llama3.2-vision still running.
-
-**Full Model List (19 models total)**:
-- **YOLO baseline**: YOLO11n fine-tuned (mAP@0.5=0.929)
-- **HF models (12)**: qwen7b, qwen3b, qwen3_8b, internvl2, florence2, grounding_dino, paligemma2, yolo_world, minicpm_v45, molmo2, deepseek_vl2, minicpm (skipped/gated)
-- **Ollama models (6)**: moondream, llava:7b, llava:13b, bakllava, llama3.2-vision:11b, minicpm-v (HTTP 500)
+A data-quality filter that works at the *dataset* level (v3.0.36 DINOv2
+curator) does not fix *instance*-level label noise. The unit of curation
+has to match the unit of noise. Autolabel errors are per-box, so the
+curator must be per-box.
 
 ---
 
-### Session 7 — 2026-03-17: Fixed coordinate conversion, completed 4 HF models
+## Session 40 (2026-05-07) — sanity check + user calibration on "no single number is truth"
 
-**Critical bug fix**: Qwen2.5-VL outputs bbox coords in [0, 1000] normalized range, but `convert_bbox_to_yolo` was dividing by original image dimensions (~3024x4032), producing tiny normalized values. Fixed with multi-scale coordinate detection.
+User pushback was sharp and correct: "the previous high mAP95 was contaminated, so this round is normal" — meaning we should NOT assume 0.896 is the canonical truth just because ultralytics reports it. The 0.910 contamination teaches us to verify every number with independent tools.
 
-**Environment fix**: Created `compat` conda env (transformers==4.46.3) for InternVL2 and Florence-2, which are incompatible with transformers 4.57+.
+### Sanity check (Job 40655183) result
 
-**Results (CottonWeedDet12, 848 test images)**:
+| Test | Tool | mAP50-95 |
+|---|---|---|
+| T1 | ultralytics .val() imgsz=1024 augment=False | 0.8953 |
+| T2 | ultralytics .val() imgsz=1024 augment=True  | 0.8953 (silently fell back to single-scale; YOLO26 doesn't support augment) |
+| T3 | ultralytics .val() imgsz=1280 augment=True  | 0.8643 |
+| WBF/TTA (Job 40624610) | our custom multi-scale + WBF + custom mAP | 0.7440 |
 
-| Model | mAP@0.5 | mAP@0.5:0.95 | Prec@0.5 | Rec@0.5 | F1@0.5 | Time |
-|-------|---------|--------------|----------|---------|--------|------|
-| YOLO11n (fine-tuned) | **0.929** | 0.865 | 0.930 | 0.850 | 0.888 | — |
-| Florence-2-large | **0.329** | 0.302 | 0.692 | 0.431 | 0.531 | 662s |
-| InternVL2-8B | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3799s |
-| Qwen2.5-VL-3B | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
-| Qwen2.5-VL-7B | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
-| llama3.2-vision-11b | 0.000 | 0.000 | 0.005 | 0.007 | 0.006 | 11370s |
-| moondream/llava/bakllava | 0.000 | 0.000 | — | — | — | — |
+### Calibrated reading of the result space
 
-**Key findings**:
-- Florence-2 is the best LLM (mAP=0.329, Prec=0.692) and fastest (662s)
-- YOLO still 2.8x better than the best LLM
-- Models without native grounding (llama, llava) produce ~0 mAP
-- Smaller Qwen (3B) slightly outperforms larger (7B) — likely higher detection rate (844 vs 655/848)
+- 0.8953 ≈ ultralytics' "house" mAP. Reproducible across runs. Maybe slightly generous (matchers, IoU rounding).
+- 0.7440 ≈ our custom matcher + multi-scale TTA fusing low-quality views with high-quality. Multi-scale TTA on a single model HURTS at high IoU thresholds.
+- 0.8643 ≈ what happens when you push a 1024-trained model to 1280 inference.
 
-### Session 8 — 2026-03-17: Expanded to 11 models, fixed checkpoint corruption
+The TRUE canonical number requires pycocotools (industry-standard COCO eval). Submitted Job 40655360 to settle this.
 
-**Batch run of 6 new models**: grounding_dino, qwen3_8b, paligemma2, minicpm_v45, molmo2, deepseek_vl2.
+### Ongoing
 
-**Checkpoint corruption**: Parallel SLURM jobs writing to the same `benchmark_checkpoint.json` caused `JSONDecodeError: Extra data`. Fixed with:
-- Atomic writes (write to `.tmp` then `os.replace`)
-- Corrupted JSON auto-recovery in `load_checkpoint()`
-- Sequential execution in a single SLURM job to prevent concurrent writes
+- Job 40655360 (pycocotools cross-check) — definitive answer on canonical mAP
+- Job 40655361 (v3.0.29.1 safety_long, 24h walltime, 200 epochs from current best.pt) — settles whether the plateau is real or just early stopping
+- Job 40612870 (v3.0.28 PRETRAIN) — still running, 1d 22h elapsed, mAP oscillating around 0.578 (much worse than safety; probably won't beat safety even with chained FT)
 
-**New results**:
-- **MiniCPM-V-4.5**: mAP@0.5 = 0.178, 6695s — successfully detected weeds
-- **Grounding-DINO**: mAP = 0.000 — ran 848 images but detected nothing with "weed . plant ." prompt
-- **Molmo-7B-D**: mAP = 0.000 — outputs natural language, not structured coordinates
+### Lesson learned
 
-**Failed models (incompatible)**:
-- Qwen3-VL-8B: `Qwen3VLForConditionalGeneration` loads but hangs on `.cuda()` and `device_map="auto"`
-- PaliGemma2: gated repo (needs Google HF auth)
-- DeepSeek-VL2: `deepseek_vl_v2` architecture not recognized by transformers
-
-### Session 9 — 2026-03-17/18: Wave 2 models, Florence-2-base tops benchmark
-
-**Added 7 new models** targeting size scaling and dedicated detectors:
-
-| Model | Type | Rationale |
-|-------|------|-----------|
-| Florence-2-base (0.23B) | VLM | Size comparison with Florence-2-large |
-| OWLv2-large (0.4B) | Zero-shot detector | Google's dedicated detector |
-| OmDet-Turbo (0.1B) | Zero-shot detector | Fast COCO detector |
-| InternVL2-2B | VLM | Scaling analysis |
-| InternVL2-4B | VLM | Scaling analysis |
-| InternVL2.5-8B | VLM | Improved InternVL2 |
-| MM-Grounding-DINO | Detector | Improved G-DINO |
-
-**Results**:
-- **Florence-2-base**: mAP@0.5 = **0.434**, Precision = **0.789** — **new best VLM**, outperforms its own larger variant (0.329)
-- **OWLv2**: mAP@0.5 = 0.088, Recall = **0.967** — near-perfect detection sensitivity but very low precision (4 text queries caused duplicate detections)
-- **InternVL2-2B**: mAP = 0.002 — too small for reliable detection
-- **InternVL2.5-8B**: mAP ≈ 0 — regression vs InternVL2-8B, different output format issue
-- **OmDet-Turbo**: failed ("Cannot copy out of meta tensor")
-- **InternVL2-4B**: failed (empty error)
-
-### Session 10 — 2026-03-18: Revalidation run, all results verified
-
-**Goal**: Re-run all non-high-confidence models to ensure academic rigor.
-
-**Fixes applied before revalidation**:
-- OWLv2: changed from 4 text queries `["weed", "weed plant", "broadleaf weed", "grass weed"]` to single `["weed"]` to eliminate duplicate detections
-- Grounding-DINO: changed prompt from `"weed . plant ."` to `"weed"` (confirmed actually ran this time)
-- All 6 models: deleted old output directories, cleared checkpoint entries, ran fresh
-
-**Revalidation results (all confirmed)**:
-
-| Model | Before | After Revalidation | Change |
-|-------|--------|-------------------|--------|
-| Florence-2-base | 0.434 | **0.434** | Confirmed |
-| OWLv2 (single query) | 0.088 | **0.184** | Fixed duplicate detection |
-| MiniCPM-V-4.5 | 0.178 | **0.192** | Slight improvement |
-| Grounding-DINO | 0.000 | **0.000** | Confirmed (cannot detect "weed" zero-shot) |
-| InternVL2-2B | 0.002 | **0.002** | Confirmed |
-| InternVL2.5-8B | 0.000 | **0.000** | Confirmed |
-
-**Final validated benchmark (15 models, all high confidence)**:
-
-| # | Model | Params | mAP@0.5 | mAP@0.5:0.95 | Prec | Rec | F1 | Time |
-|---|-------|--------|---------|--------------|------|-----|-----|------|
-| 1 | YOLO11n (fine-tuned) | 2.6M | **0.929** | 0.865 | 0.930 | 0.850 | 0.888 | — |
-| 2 | Florence-2-base | 0.23B | **0.434** | 0.392 | 0.789 | 0.519 | 0.626 | 558s |
-| 3 | Florence-2-large | 0.77B | 0.329 | 0.302 | 0.692 | 0.431 | 0.531 | 662s |
-| 4 | InternVL2-8B | 8B | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3838s |
-| 5 | Qwen2.5-VL-3B | 3B | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
-| 6 | MiniCPM-V-4.5 | 8B | 0.192 | 0.043 | 0.407 | 0.340 | 0.371 | 6595s |
-| 7 | OWLv2-large | 0.4B | 0.184 | 0.117 | 0.194 | 0.943 | 0.322 | 2519s |
-| 8 | Qwen2.5-VL-7B | 7B | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
-| 9 | InternVL2-2B | 2B | 0.002 | 0.001 | 0.038 | 0.025 | 0.031 | 2094s |
-| 10 | InternVL2.5-8B | 8B | 0.000 | 0.000 | 0.016 | 0.001 | 0.001 | 6238s |
-| 11-15 | G-DINO, Molmo, Llama Vision, Moondream, LLaVA | — | 0.000 | — | — | — | — | — |
-
-**Paper-level conclusions from Phase 2**:
-1. **YOLO dominates**: 0.929 vs 0.434 best VLM (2.1x gap)
-2. **Model size ≠ performance**: Florence-2-base (0.23B) beats all 3-8B VLMs
-3. **Detection architecture > scale**: Dedicated detection heads (Florence-2 `<OD>`, OWLv2) outperform general VLMs prompted for coordinates
-4. **OWLv2 extreme recall**: 94.3% recall but 19.4% precision — potential high-sensitivity pre-filter for YOLO
-5. **Native grounding essential**: 7/15 models produce mAP ≈ 0 (no bbox capability)
-6. **InternVL2.5 regression**: "improved" version scores worse than InternVL2-8B — model updates don't always help for specialized tasks
+Don't anchor on a number from one tool. Always cross-check via pycocotools (or another independent eval) before declaring victory. This is the v3.0.27 lesson generalized.
 
 ---
 
-## Phase 3: YOLO+LLM Fusion (Complete)
+## Session 39 (2026-05-06) — v3.0.28 SAFETY clean result + v3.0.29 SOTA plan
 
-### Session 11 — 2026-03-19: Fusion experiments complete
+**Headline**: First clean (post-leak-fix) cwd12 holdout number landed:
+**mAP50-95 = 0.896** on the v3.0.28 SAFETY job (yolo26x + COCO base, trained
+on cwd12 train alone, validated on cwd12 test+valid). Just 0.004 short of the
+≥0.90 research goal, with only 62 of 200 planned epochs (timeout at 12h
+walltime).
 
-Ran 6 experiments in `run_phase3_fusion.py` using existing YOLO and LLM detection results.
+This validates: (a) the v3.0.28 stem-level holdout filter works, (b) yolo26x is
++3.1% over v3.0.6 yolo11n baseline (0.865) on the same task, (c) we don't need
+"clever tricks" — just clean data + a good base model + enough epochs gets us
+to within 0.004 of the goal.
 
-**E1: Pairwise YOLO + Single LLM Fusion (7 LLMs × 3 strategies = 21 configs)**
+**Deep 2026 frontier research done this session** (web-search pass):
+- arXiv 2603.00160 "DINOv3 Meets YOLO26 for Weed Detection" (2026): the closest
+  analog of our work. They train on 199K filtered crop-weed images, hit
+  mAP50-95 = 0.723 in-domain (lettuce), 0.198-0.331 cross-domain. Our 0.896
+  on cwd12 IID setting is competitive. Their curation pipeline (HSV
+  green-pixel ≥20%, K-means at 3 levels, 518×518 tiling) is now in our
+  v3.0.29 Phase 1B (Job 40624773).
+- YOLO26 (Ultralytics, Jan 2026) is the latest YOLO. NMS-free, MuSGD optimizer,
+  ProgLoss + STAL. We're already on yolo26x.
+- RF-DETR (ICLR 2026, arXiv 2511.09554) — DINOv2 + NAS. Queued for Phase 2B.
+- Knowledge Distillation (arXiv 2507.12344, ICCV 2025 CVPPA): Channel-wise KD
+  on weed detection, +2.5% mAP50 free. Queued for Phase 2C.
+- WBF + multi-scale TTA: standard 2026 competition meta, +0.02-0.05 mAP50-95.
+  Submitted as Job 40624610 (v3029_wb).
 
-YOLO baseline: P=0.821, R=0.915, F1=0.865
+**Path to 0.90 (no shortcuts)**:
+1. Now: Job 40624610 WBF/TTA on safety best.pt → 0.896 + ~0.03 = ~0.92 expected
+2. +30h: v3.0.28 PRETRAIN+FT lands → independent attempt at ≥0.90
+3. +1 week if still <0.90: Phase 2A DINOv3 ViT-S + YOLO26-L dual-branch
+   replicating arXiv 2603.00160's exact recipe + Phase 2B RF-DETR ensemble
+   + Phase 2C CWD distillation
 
-| LLM Partner | supplement F1 | filter F1 | weighted F1 | Best |
-|-------------|---------------|-----------|-------------|------|
-| OWLv2 | 0.326 (-0.539) | **0.883 (+0.018)** | 0.326 (-0.539) | filter ↑ |
-| Florence-2-base | 0.818 (-0.048) | 0.682 (-0.183) | 0.818 (-0.048) | — |
-| Florence-2-large | 0.799 (-0.066) | 0.607 (-0.259) | 0.799 (-0.066) | — |
-| InternVL2-8B | 0.793 (-0.072) | 0.630 (-0.235) | 0.793 (-0.072) | — |
-| MiniCPM-V-4.5 | 0.771 (-0.095) | 0.716 (-0.150) | 0.771 (-0.095) | — |
-| Qwen2.5-VL-3B | 0.759 (-0.106) | 0.616 (-0.250) | 0.759 (-0.106) | — |
-| Qwen2.5-VL-7B | 0.769 (-0.097) | 0.542 (-0.323) | 0.769 (-0.097) | — |
+---
 
-**Only YOLO + OWLv2 filter improves F1** (+0.018): OWLv2's 94.3% recall confirms almost all true YOLO detections while filtering some false positives (precision 0.821→0.869).
+## Session 38 (2026-05-05) — v3.0.27 LEAK RETRACTION + v3.0.28 clean re-run
 
-**E3: Complementarity Analysis (key finding)**
+User pushed back on the "0.910" result with: "我们的模型是多少数据集训练
+出来的，然后你用测试集去微调了？" Forced an audit. Found that two registry
+slugs (`cottonweed_sp8`, `cottonweed_holdout`) physically held the entire
+cwd12 holdout (1977 imgs split as 1229+748) under non-blocked slug names, so
+they slipped past the slug-level `NEVER_TRAIN_SLUGS` filter.
 
-LLM "rescue rate" is extremely low — LLMs almost never detect weeds that YOLO misses:
-- Florence-2-base: 9/1464 GT boxes (0.6%) rescued
-- OWLv2: 25/1464 (1.7%) rescued
-- All other LLMs: <0.2% rescue rate
-- YOLO misses ~8% of GT boxes, and LLMs miss most of the same ones
+Strict exact-suffix audit confirmed: 2,313 holdout-stem copies were physically
+present in `merged_iterv3_0_25_p2/train/images` (the v3.0.26 phase_3 pretrain
+data that v3.0.27 finetuned on). The 0.910 result is memorization, not
+generalization — first-epoch FT mAP50-95 was 0.836 on the supposedly
+"unseen" holdout, which is the smoking gun.
 
-**E5: Multi-LLM Ensemble**
+All cwd12 holdout numbers from v3.0.24 → v3.0.27 are retracted. Only the
+v3.0.6 baseline (0.865, COCO-only pretrain → cwd12 train, never touched merge
+corpus) remains valid.
 
-| Min votes | Prec | Rec | F1 | ΔF1 |
-|-----------|------|-----|-----|-----|
-| ≥1 | 0.206 | 0.962 | 0.339 | -0.526 |
-| ≥2 | 0.598 | 0.921 | 0.726 | -0.140 |
-| ≥3 | 0.780 | 0.919 | 0.844 | -0.022 |
+**Fix (v3.0.28)**: stem-level holdout filter in `mega_trainer.py`. Reads cwd12
+test+valid stems at merge start; drops any image whose stem matches,
+regardless of slug. Verified on cluster: filter blocks exactly 1,977 imgs
+(1229 from cottonweed_sp8 + 748 from cottonweed_holdout).
 
-3-LLM consensus approaches but does not exceed YOLO alone.
+**Submitted (clean)**:
+- Job 40612856 — v3.0.28 SAFETY NET: yolo26x from COCO on cwd12 train alone,
+  200 ep, imgsz=1024. Expected 0.85-0.92.
+- Job 40612870 — v3.0.28 CLEAN PRETRAIN: yolo26x from COCO on de-leaked
+  merge corpus, fresh_start=True, 100 ep, imgsz=1024 batch=5, 48h walltime.
+  Auto-chains FT (Job-T2 via afterok) on success.
 
-**E6: Bootstrap Statistical Significance**
-- YOLO alone: F1 = 0.865 ± 0.009, 95% CI [0.851, 0.883]
-- YOLO+Florence supplement: F1 = 0.817 (below YOLO CI → significantly worse)
+Concurrent Job-D (40594926) still running but idle (Brain not finding new
+slugs for ~9h). Will replace Job-D with a refreshed harvest after clean
+numbers land.
 
-**Paper conclusions for RQ2**:
-1. YOLO+LLM fusion provides marginal improvement only via OWLv2 filter (+0.018 F1)
-2. LLMs cannot supplement YOLO's missed detections (rescue rate <1%)
-3. Supplement strategy universally degrades performance due to LLM false positives
-4. A well-trained YOLO detector already captures the detection space that LLMs can cover
-5. Multi-LLM consensus (≥3 votes) can approach but not exceed fine-tuned YOLO
+---
+
+## Phase 5: Paper Writing (Planned)
+
+Target: *Computers and Electronics in Agriculture*
+Title: "Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Models for Agricultural Object Detection"
+RQ1: VLM vs YOLO comparison on known species (Phase 2 results)
+RQ2: YOLO+LLM fusion on known species (Phase 3 results)
+RQ3: LLM advantage on unseen species + LLM-augmented YOLO training (Phase 3B results)
+RQ4: What drives detection quality — size, prompt, or architecture? (Phase 4 results)
+
+---
+
+## Phase 4: Ablation Studies (Planned)
+
+Code ready in `run_ablations.py`. 4 experiments:
+1. Prompt engineering (3 variants: detailed, grounding, simple)
+2. Model size scaling (Qwen 3B vs 7B, InternVL2 2B vs 4B vs 8B, Florence base vs large)
+3. Grounding capability (Tier 1 native bbox vs Tier 2 text-only)
+4. Fusion IoU threshold sweep (0.1 to 0.7)
+
+---
+
+## Session 36 (2026-04-24) — v3.0.23: First complete v3.0 round
+
+After 5 chained jobs (40177598/698/722, 40224485, 40239932) all died on
+8h walltime cap before any val epoch, raised walltime 8h → 48h and added
+fail-fast conda activation. Result: Job 40260768 ran the full pipeline
+end-to-end for the first time:
+
+- **175,701 unique training images** from 37 datasets, 12 classes
+  (126,179 cross-dataset duplicates removed via dHash)
+- harvest → merge (dHash cache hit, seconds) → autolabel (OWLv2:
+  owl=15,531 / fallback=3,672 / 19,203 processed) → 5-epoch mega
+- Per-epoch: epoch 1 mAP50=0.415, epoch 2 mAP50=0.475 mAP50-95=0.386
+  (peak), epoch 5 mAP50=0.504 mAP50-95=0.379
+- 8h56m training, ~2.67 it/s on V100-32GB at imgsz=512 batch=5
+- best.pt + last.pt + epoch0–4.pt all saved (save_period=1 + 48h
+  walltime gave room)
+
+Caveat: val split is 10% of the 175K mixed corpus — many OWLv2-fallback
+whole-image bbox samples in there. For paper-grade comparison vs the
+v3.0.6 cottonweed leave-4-out F1=0.606 baseline, need a clean eval pass
+against hand-labeled holdout (TODO).
+
+Chain continues: 40260768 still alive at 19h+ on 48h, 40263468 PD via
+afterany. Subsequent rounds use best.pt as progressive base.
+
+### Apr 25 — Clean eval, honest paper number, REGRESSION discovered
+
+Job 40293571 evaluated v3.0.23 best.pt against cottonweeddet12 test (848)
+and valid (1129) human-labeled splits. Results agree to 3 decimals:
+**mAP50 ≈ 0.42, mAP50-95 ≈ 0.40**.
+
+vs YOLO11n FT baseline (cottonweeddet12 alone, 5,648 imgs, 100 epochs):
+mAP50=0.929, mAP50-95=0.865. **We regressed -0.46 mAP50-95 by adding
+175K autonomous-collected images.**
+
+Per-class: 4 species (Eclipta, Goosegrass, Morningglory, Nutsedge) have
+near-zero mAP. Hypothesis: 175K is dominated by plantvillage / disease /
+pest data that share no classes with these 4, so capacity went to learning
+those instead of the rare-in-corpus weeds.
+
+This is the paper's negative result: **autonomous web-scale collection
+without domain filtering hurts target-task accuracy.** Framework works
+end-to-end (architecture validated), but the data-mixing strategy needs
+rethinking. Next session: domain filter + class-balanced sampling +
+higher imgsz + pretrain-then-finetune staging.
 
 ---
 
@@ -1180,339 +1156,365 @@ denominator against the goal.
 
 ---
 
-## Session 36 (2026-04-24) — v3.0.23: First complete v3.0 round
+## Phase 3: YOLO+LLM Fusion (Complete)
 
-After 5 chained jobs (40177598/698/722, 40224485, 40239932) all died on
-8h walltime cap before any val epoch, raised walltime 8h → 48h and added
-fail-fast conda activation. Result: Job 40260768 ran the full pipeline
-end-to-end for the first time:
+### Session 11 — 2026-03-19: Fusion experiments complete
 
-- **175,701 unique training images** from 37 datasets, 12 classes
-  (126,179 cross-dataset duplicates removed via dHash)
-- harvest → merge (dHash cache hit, seconds) → autolabel (OWLv2:
-  owl=15,531 / fallback=3,672 / 19,203 processed) → 5-epoch mega
-- Per-epoch: epoch 1 mAP50=0.415, epoch 2 mAP50=0.475 mAP50-95=0.386
-  (peak), epoch 5 mAP50=0.504 mAP50-95=0.379
-- 8h56m training, ~2.67 it/s on V100-32GB at imgsz=512 batch=5
-- best.pt + last.pt + epoch0–4.pt all saved (save_period=1 + 48h
-  walltime gave room)
+Ran 6 experiments in `run_phase3_fusion.py` using existing YOLO and LLM detection results.
 
-Caveat: val split is 10% of the 175K mixed corpus — many OWLv2-fallback
-whole-image bbox samples in there. For paper-grade comparison vs the
-v3.0.6 cottonweed leave-4-out F1=0.606 baseline, need a clean eval pass
-against hand-labeled holdout (TODO).
+**E1: Pairwise YOLO + Single LLM Fusion (7 LLMs × 3 strategies = 21 configs)**
 
-Chain continues: 40260768 still alive at 19h+ on 48h, 40263468 PD via
-afterany. Subsequent rounds use best.pt as progressive base.
+YOLO baseline: P=0.821, R=0.915, F1=0.865
 
-### Apr 25 — Clean eval, honest paper number, REGRESSION discovered
+| LLM Partner | supplement F1 | filter F1 | weighted F1 | Best |
+|-------------|---------------|-----------|-------------|------|
+| OWLv2 | 0.326 (-0.539) | **0.883 (+0.018)** | 0.326 (-0.539) | filter ↑ |
+| Florence-2-base | 0.818 (-0.048) | 0.682 (-0.183) | 0.818 (-0.048) | — |
+| Florence-2-large | 0.799 (-0.066) | 0.607 (-0.259) | 0.799 (-0.066) | — |
+| InternVL2-8B | 0.793 (-0.072) | 0.630 (-0.235) | 0.793 (-0.072) | — |
+| MiniCPM-V-4.5 | 0.771 (-0.095) | 0.716 (-0.150) | 0.771 (-0.095) | — |
+| Qwen2.5-VL-3B | 0.759 (-0.106) | 0.616 (-0.250) | 0.759 (-0.106) | — |
+| Qwen2.5-VL-7B | 0.769 (-0.097) | 0.542 (-0.323) | 0.769 (-0.097) | — |
 
-Job 40293571 evaluated v3.0.23 best.pt against cottonweeddet12 test (848)
-and valid (1129) human-labeled splits. Results agree to 3 decimals:
-**mAP50 ≈ 0.42, mAP50-95 ≈ 0.40**.
+**Only YOLO + OWLv2 filter improves F1** (+0.018): OWLv2's 94.3% recall confirms almost all true YOLO detections while filtering some false positives (precision 0.821→0.869).
 
-vs YOLO11n FT baseline (cottonweeddet12 alone, 5,648 imgs, 100 epochs):
-mAP50=0.929, mAP50-95=0.865. **We regressed -0.46 mAP50-95 by adding
-175K autonomous-collected images.**
+**E3: Complementarity Analysis (key finding)**
 
-Per-class: 4 species (Eclipta, Goosegrass, Morningglory, Nutsedge) have
-near-zero mAP. Hypothesis: 175K is dominated by plantvillage / disease /
-pest data that share no classes with these 4, so capacity went to learning
-those instead of the rare-in-corpus weeds.
+LLM "rescue rate" is extremely low — LLMs almost never detect weeds that YOLO misses:
+- Florence-2-base: 9/1464 GT boxes (0.6%) rescued
+- OWLv2: 25/1464 (1.7%) rescued
+- All other LLMs: <0.2% rescue rate
+- YOLO misses ~8% of GT boxes, and LLMs miss most of the same ones
 
-This is the paper's negative result: **autonomous web-scale collection
-without domain filtering hurts target-task accuracy.** Framework works
-end-to-end (architecture validated), but the data-mixing strategy needs
-rethinking. Next session: domain filter + class-balanced sampling +
-higher imgsz + pretrain-then-finetune staging.
+**E5: Multi-LLM Ensemble**
 
----
+| Min votes | Prec | Rec | F1 | ΔF1 |
+|-----------|------|-----|-----|-----|
+| ≥1 | 0.206 | 0.962 | 0.339 | -0.526 |
+| ≥2 | 0.598 | 0.921 | 0.726 | -0.140 |
+| ≥3 | 0.780 | 0.919 | 0.844 | -0.022 |
 
-## Phase 4: Ablation Studies (Planned)
+3-LLM consensus approaches but does not exceed YOLO alone.
 
-Code ready in `run_ablations.py`. 4 experiments:
-1. Prompt engineering (3 variants: detailed, grounding, simple)
-2. Model size scaling (Qwen 3B vs 7B, InternVL2 2B vs 4B vs 8B, Florence base vs large)
-3. Grounding capability (Tier 1 native bbox vs Tier 2 text-only)
-4. Fusion IoU threshold sweep (0.1 to 0.7)
+**E6: Bootstrap Statistical Significance**
+- YOLO alone: F1 = 0.865 ± 0.009, 95% CI [0.851, 0.883]
+- YOLO+Florence supplement: F1 = 0.817 (below YOLO CI → significantly worse)
+
+**Paper conclusions for RQ2**:
+1. YOLO+LLM fusion provides marginal improvement only via OWLv2 filter (+0.018 F1)
+2. LLMs cannot supplement YOLO's missed detections (rescue rate <1%)
+3. Supplement strategy universally degrades performance due to LLM false positives
+4. A well-trained YOLO detector already captures the detection space that LLMs can cover
+5. Multi-LLM consensus (≥3 votes) can approach but not exceed fine-tuned YOLO
 
 ---
 
-## Phase 5: Paper Writing (Planned)
+## Phase 2: Full LLM Benchmark (In Progress)
 
-Target: *Computers and Electronics in Agriculture*
-Title: "Can Vision LLMs Detect Weeds? A Benchmark of Open-Source Multimodal Models for Agricultural Object Detection"
-RQ1: VLM vs YOLO comparison on known species (Phase 2 results)
-RQ2: YOLO+LLM fusion on known species (Phase 3 results)
-RQ3: LLM advantage on unseen species + LLM-augmented YOLO training (Phase 3B results)
-RQ4: What drives detection quality — size, prompt, or architecture? (Phase 4 results)
+**Decision**: Paper focuses on CottonWeedDet12 only. All models run on cluster.
 
----
+### 2026-03-16 (Session 4)
+**Goal**: Run 10+ vision LLMs on CottonWeedDet12 test set (848 images)
 
-## Session 38 (2026-05-05) — v3.0.27 LEAK RETRACTION + v3.0.28 clean re-run
+**Done**:
+- Fixed `run_full_benchmark.py` bugs: query_ollama returns dict not tuple, JSON parse handles list format
+- Fixed `test_ollama.py`: handle list-format JSON responses
+- Ran moondream locally (848 images, 1173s = 20min)
+- Submitted 5 HF model jobs to Bridges-2 — all failed due to DOWNLOAD_DIR path bug
 
-User pushed back on the "0.910" result with: "我们的模型是多少数据集训练
-出来的，然后你用测试集去微调了？" Forced an audit. Found that two registry
-slugs (`cottonweed_sp8`, `cottonweed_holdout`) physically held the entire
-cwd12 holdout (1977 imgs split as 1229+748) under non-blocked slug names, so
-they slipped past the slug-level `NEVER_TRAIN_SLUGS` filter.
+### 2026-03-16 (Session 5)
+**Goal**: Fix cluster bugs, run all 11 models on CottonWeedDet12
 
-Strict exact-suffix audit confirmed: 2,313 holdout-stem copies were physically
-present in `merged_iterv3_0_25_p2/train/images` (the v3.0.26 phase_3 pretrain
-data that v3.0.27 finetuned on). The 0.910 result is memorization, not
-generalization — first-epoch FT mAP50-95 was 0.836 on the supposedly
-"unseen" holdout, which is the smoking gun.
+**Bugs Fixed**:
+1. **DOWNLOAD_DIR path**: cluster has flat dir structure, `datasets.py` and `run_full_benchmark.py` pointed to wrong downloads path. Fixed with dual-check: `_dl_base if os.path.isdir(_dl_base) else _dl_project`
+2. **query_ollama return type**: `run_full_benchmark.py` tried tuple unpacking but function returns dict. Fixed.
+3. **JSON list format**: models return `[{...}]` instead of `{"detections": [...]}`. Fixed both files.
+4. **Qwen OOM**: CottonWeedDet12 images are high-res, caused 230GB attention allocation on V100-32GB. Fixed by limiting `min_pixels=256*28*28, max_pixels=1280*28*28` in processor.
+5. **InternVL2 transformers 5.0 compat**: `all_tied_weights_keys` attribute missing. Fixed with monkey-patch: `caching_allocator_warmup = lambda: None`
+6. **Florence-2 transformers 5.0 compat**: `forced_bos_token_id` config error. Fixed with `revision="refs/pr/6"` + monkey-patch.
+7. **MiniCPM gated repo**: `openbmb/MiniCPM-V-2_6` requires HF authentication. Skipped for now.
+8. **minicpm-v Ollama**: consistently returns HTTP 500. Skipped.
+9. **Added Florence-2**: new model type in `roboflow_bridge.py` MODEL_REGISTRY with `_infer_florence()` using `<OD>` task for native object detection.
 
-All cwd12 holdout numbers from v3.0.24 → v3.0.27 are retracted. Only the
-v3.0.6 baseline (0.865, COCO-only pretrain → cwd12 train, never touched merge
-corpus) remains valid.
+**Completed Ollama Results (848 images each)**:
+| Model | Size | Pred Boxes | GT Boxes | Notes |
+|-------|------|-----------|----------|-------|
+| moondream | 1.8B | 527 | 1464 | Has predictions but very imprecise |
+| llava:7b | 7B | 0 | 1464 | Cannot produce bounding boxes |
+| llava:13b | 13B | 0 | 1464 | Cannot produce bounding boxes |
+| bakllava | 7B | 0 | 1464 | Cannot produce bounding boxes |
 
-**Fix (v3.0.28)**: stem-level holdout filter in `mega_trainer.py`. Reads cwd12
-test+valid stems at merge start; drops any image whose stem matches,
-regardless of slug. Verified on cluster: filter blocks exactly 1,977 imgs
-(1229 from cottonweed_sp8 + 748 from cottonweed_holdout).
+**Still Running on Cluster**:
+- qwen7b (Qwen2.5-VL-7B) — resubmitted with pixel limits, Job 38016297
+- qwen3b (Qwen2.5-VL-3B) — resubmitted with pixel limits, Job 38016298
+- llama3.2-vision:11b — Ollama, Job 38014616 (~45min, processing ~7s/image)
+- internvl2 (InternVL2-8B) — resubmitted with monkey-patch, Job 38016326
+- florence2 (Florence-2-large) — resubmitted with revision fix, Job 38016327
 
-**Submitted (clean)**:
-- Job 40612856 — v3.0.28 SAFETY NET: yolo26x from COCO on cwd12 train alone,
-  200 ep, imgsz=1024. Expected 0.85-0.92.
-- Job 40612870 — v3.0.28 CLEAN PRETRAIN: yolo26x from COCO on de-leaked
-  merge corpus, fresh_start=True, 100 ep, imgsz=1024 batch=5, 48h walltime.
-  Auto-chains FT (Job-T2 via afterok) on success.
+**Cluster Environment**: transformers==5.0.0.dev0 (bleeding edge, caused many compat issues)
 
-Concurrent Job-D (40594926) still running but idle (Brain not finding new
-slugs for ~9h). Will replace Job-D with a refreshed harvest after clean
-numbers land.
+**Key Insight**: Ollama models without native grounding (LLaVA, BakLLaVA) produce 0 bounding boxes. Only models with native bbox output (Qwen2.5-VL, Florence-2, moondream) can generate coordinates. This is a key finding for the paper.
 
----
+**Next**:
+- Wait for qwen7b, qwen3b, llama3.2-vision, internvl2, florence2 to complete
+- Run evaluation on all completed results
+- If Qwen models succeed, we have 8-10 models for comparison
+- Begin Phase 3 (YOLO+LLM Fusion) and Phase 5 (figures/tables)
 
-## Session 39 (2026-05-06) — v3.0.28 SAFETY clean result + v3.0.29 SOTA plan
+### 2026-03-16 (Session 6)
+**Goal**: Fix cluster bugs (round 3), expand model coverage for paper
 
-**Headline**: First clean (post-leak-fix) cwd12 holdout number landed:
-**mAP50-95 = 0.896** on the v3.0.28 SAFETY job (yolo26x + COCO base, trained
-on cwd12 train alone, validated on cwd12 test+valid). Just 0.004 short of the
-≥0.90 research goal, with only 62 of 200 planned epochs (timeout at 12h
-walltime).
+**Bugs Fixed (Round 3)**:
+1. **Qwen loading speed**: `device_map="auto"` AND `device_map={"": 0}` both trigger transformers 5.0's accelerate weight materialization (~48s/weight x 729 = 10+ hours). Fix: remove device_map entirely, use `.cuda()` instead.
+2. **InternVL2 `all_tied_weights_keys`**: Previous patch used `set()` but callers do `.keys()` on it. Fix: use `{}` (dict) not `set()`.
+3. **Florence-2 `forced_bos_token_id`**: Error happens INSIDE `AutoConfig.from_pretrained` during Florence2LanguageConfig construction, so patching config after load is too late. Fix: patch `PretrainedConfig.forced_bos_token_id = None` class attribute BEFORE loading.
 
-This validates: (a) the v3.0.28 stem-level holdout filter works, (b) yolo26x is
-+3.1% over v3.0.6 yolo11n baseline (0.865) on the same task, (c) we don't need
-"clever tricks" — just clean data + a good base model + enough epochs gets us
-to within 0.004 of the goal.
+**Git Email Fix**: Rewrote all commit history to change placeholder `your.email@university.edu` → `harry567566@gmail.com`.
 
-**Deep 2026 frontier research done this session** (web-search pass):
-- arXiv 2603.00160 "DINOv3 Meets YOLO26 for Weed Detection" (2026): the closest
-  analog of our work. They train on 199K filtered crop-weed images, hit
-  mAP50-95 = 0.723 in-domain (lettuce), 0.198-0.331 cross-domain. Our 0.896
-  on cwd12 IID setting is competitive. Their curation pipeline (HSV
-  green-pixel ≥20%, K-means at 3 levels, 518×518 tiling) is now in our
-  v3.0.29 Phase 1B (Job 40624773).
-- YOLO26 (Ultralytics, Jan 2026) is the latest YOLO. NMS-free, MuSGD optimizer,
-  ProgLoss + STAL. We're already on yolo26x.
-- RF-DETR (ICLR 2026, arXiv 2511.09554) — DINOv2 + NAS. Queued for Phase 2B.
-- Knowledge Distillation (arXiv 2507.12344, ICCV 2025 CVPPA): Channel-wise KD
-  on weed detection, +2.5% mAP50 free. Queued for Phase 2C.
-- WBF + multi-scale TTA: standard 2026 competition meta, +0.02-0.05 mAP50-95.
-  Submitted as Job 40624610 (v3029_wb).
+**Model Coverage Expansion**: Research found 7 important missing models. Added to benchmark:
 
-**Path to 0.90 (no shortcuts)**:
-1. Now: Job 40624610 WBF/TTA on safety best.pt → 0.896 + ~0.03 = ~0.92 expected
-2. +30h: v3.0.28 PRETRAIN+FT lands → independent attempt at ≥0.90
-3. +1 week if still <0.90: Phase 2A DINOv3 ViT-S + YOLO26-L dual-branch
-   replicating arXiv 2603.00160's exact recipe + Phase 2B RF-DETR ensemble
-   + Phase 2C CWD distillation
+| Model | Type | Size | Why Add |
+|-------|------|------|---------|
+| Qwen3-VL-8B | VLM+grounding | 8B | Direct successor to Qwen2.5-VL, Jan 2026, best VLM grounding |
+| Grounding DINO | Open-set detector | 172M | #1 zero-shot detection model on HuggingFace, essential baseline |
+| PaliGemma2-3B | Detection VLM | 3B | Google, native `<loc>` tokens for detection, MIT license |
+| YOLO-World v2 | Open-vocab YOLO | ~100M | Bridges YOLO baseline and language-driven detection |
+| MiniCPM-V 4.5 | VLM+detect | 8B | Feb 2026, replaces gated v2.6, surpasses GPT-4o on benchmarks |
+| Molmo-7B-D | VLM+pointing | 7B | Allen AI, precise pixel coordinates, fully open |
+| DeepSeek-VL2 | MoE VLM | 4.5B active | Grounding tokens, efficient MoE architecture |
 
----
+**Reference**: AgroBench (ICCV 2025) found most open-source VLMs perform near-random on weed identification → validates our paper's importance.
 
-## Session 40 (2026-05-07) — sanity check + user calibration on "no single number is truth"
+**Cluster Jobs Submitted**: qwen7b, qwen3b, internvl2, florence2 (resubmitted with fixes). llama3.2-vision still running.
 
-User pushback was sharp and correct: "the previous high mAP95 was contaminated, so this round is normal" — meaning we should NOT assume 0.896 is the canonical truth just because ultralytics reports it. The 0.910 contamination teaches us to verify every number with independent tools.
-
-### Sanity check (Job 40655183) result
-
-| Test | Tool | mAP50-95 |
-|---|---|---|
-| T1 | ultralytics .val() imgsz=1024 augment=False | 0.8953 |
-| T2 | ultralytics .val() imgsz=1024 augment=True  | 0.8953 (silently fell back to single-scale; YOLO26 doesn't support augment) |
-| T3 | ultralytics .val() imgsz=1280 augment=True  | 0.8643 |
-| WBF/TTA (Job 40624610) | our custom multi-scale + WBF + custom mAP | 0.7440 |
-
-### Calibrated reading of the result space
-
-- 0.8953 ≈ ultralytics' "house" mAP. Reproducible across runs. Maybe slightly generous (matchers, IoU rounding).
-- 0.7440 ≈ our custom matcher + multi-scale TTA fusing low-quality views with high-quality. Multi-scale TTA on a single model HURTS at high IoU thresholds.
-- 0.8643 ≈ what happens when you push a 1024-trained model to 1280 inference.
-
-The TRUE canonical number requires pycocotools (industry-standard COCO eval). Submitted Job 40655360 to settle this.
-
-### Ongoing
-
-- Job 40655360 (pycocotools cross-check) — definitive answer on canonical mAP
-- Job 40655361 (v3.0.29.1 safety_long, 24h walltime, 200 epochs from current best.pt) — settles whether the plateau is real or just early stopping
-- Job 40612870 (v3.0.28 PRETRAIN) — still running, 1d 22h elapsed, mAP oscillating around 0.578 (much worse than safety; probably won't beat safety even with chained FT)
-
-### Lesson learned
-
-Don't anchor on a number from one tool. Always cross-check via pycocotools (or another independent eval) before declaring victory. This is the v3.0.27 lesson generalized.
+**Full Model List (19 models total)**:
+- **YOLO baseline**: YOLO11n fine-tuned (mAP@0.5=0.929)
+- **HF models (12)**: qwen7b, qwen3b, qwen3_8b, internvl2, florence2, grounding_dino, paligemma2, yolo_world, minicpm_v45, molmo2, deepseek_vl2, minicpm (skipped/gated)
+- **Ollama models (6)**: moondream, llava:7b, llava:13b, bakllava, llama3.2-vision:11b, minicpm-v (HTTP 500)
 
 ---
 
-## 2026-05-19 — v3.0.36/35.2 landed, v3.0.37 timeout, v3.0.38 = clean-first
+### Session 7 — 2026-03-17: Fixed coordinate conversion, completed 4 HF models
 
-**v3.0.36 DINOv2 curator (job 40891360)** — success. Whole-image DINOv2
-similarity cleanly separates good vs off-domain data (trusted slugs mean
-0.78, untrusted 0.26, zero overlap). 51 garbage slugs auto-flagged.
-Validates Prof. Zhang's collection-phase similarity-comparison idea.
+**Critical bug fix**: Qwen2.5-VL outputs bbox coords in [0, 1000] normalized range, but `convert_bbox_to_yolo` was dividing by original image dimensions (~3024x4032), producing tiny normalized values. Fixed with multi-scale coordinate detection.
 
-**v3.0.35.2 T3 re-test (job 40891361)** — Gemma 4 image-level relevance
-= 96% accuracy with proper negatives. Settles the T1-T4 matrix: Gemma 4
-cannot do bbox (T2) or bbox-verify (T4), but can do image-level relevance
-(T3). DINOv2 cosine + Gemma 4 relevance are two agreeing image filters.
+**Environment fix**: Created `compat` conda env (transformers==4.46.3) for InternVL2 and Florence-2, which are incompatible with transformers 4.57+.
 
-**v3.0.37 yolo26x cumulative-clean (job 40896313)** — TIMEOUT at 18h,
-epoch 19/30, no pyco. In-training cwd12 val ~0.59 and declining. Three
-problems: (1) yolo26x ceiling is 0.7446 — can't reach 0.90; (2) walltime
-too short; (3) clean data still dragged val below yolo26x's own
-cwd12-only number. Conclusion: removing whole garbage datasets is not
-enough — bad autolabel boxes *inside* good datasets are the residual
-noise. Single-stage cumulative training has now failed twice (0.576,
-~0.59).
+**Results (CottonWeedDet12, 848 test images)**:
 
-**Decision (with user, 2026-05-19): clean the data at object level
-BEFORE the next cumulative training run.** Two parallel tracks:
-- our object-level DINOv2 curator (per-bbox crop comparison)
-- Prof. Zhang's copy-paste synthetic + DINO classification head
+| Model | mAP@0.5 | mAP@0.5:0.95 | Prec@0.5 | Rec@0.5 | F1@0.5 | Time |
+|-------|---------|--------------|----------|---------|--------|------|
+| YOLO11n (fine-tuned) | **0.929** | 0.865 | 0.930 | 0.850 | 0.888 | — |
+| Florence-2-large | **0.329** | 0.302 | 0.692 | 0.431 | 0.531 | 662s |
+| InternVL2-8B | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3799s |
+| Qwen2.5-VL-3B | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
+| Qwen2.5-VL-7B | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
+| llama3.2-vision-11b | 0.000 | 0.000 | 0.005 | 0.007 | 0.006 | 11370s |
+| moondream/llava/bakllava | 0.000 | 0.000 | — | — | — | — |
 
-**v3.0.38-A submitted now:** RF-DETR Large cwd12-only, seeds 101+102,
-60ep — adds 2 points to v3.0.31 (0.8949) / X2 (0.8953) for an honest
-ceiling mean ± std. Gap to 0.90 goal still −0.0047.
+**Key findings**:
+- Florence-2 is the best LLM (mAP=0.329, Prec=0.692) and fastest (662s)
+- YOLO still 2.8x better than the best LLM
+- Models without native grounding (llama, llava) produce ~0 mAP
+- Smaller Qwen (3B) slightly outperforms larger (7B) — likely higher detection rate (844 vs 655/848)
 
-### Lesson learned
+### Session 8 — 2026-03-17: Expanded to 11 models, fixed checkpoint corruption
 
-A data-quality filter that works at the *dataset* level (v3.0.36 DINOv2
-curator) does not fix *instance*-level label noise. The unit of curation
-has to match the unit of noise. Autolabel errors are per-box, so the
-curator must be per-box.
+**Batch run of 6 new models**: grounding_dino, qwen3_8b, paligemma2, minicpm_v45, molmo2, deepseek_vl2.
+
+**Checkpoint corruption**: Parallel SLURM jobs writing to the same `benchmark_checkpoint.json` caused `JSONDecodeError: Extra data`. Fixed with:
+- Atomic writes (write to `.tmp` then `os.replace`)
+- Corrupted JSON auto-recovery in `load_checkpoint()`
+- Sequential execution in a single SLURM job to prevent concurrent writes
+
+**New results**:
+- **MiniCPM-V-4.5**: mAP@0.5 = 0.178, 6695s — successfully detected weeds
+- **Grounding-DINO**: mAP = 0.000 — ran 848 images but detected nothing with "weed . plant ." prompt
+- **Molmo-7B-D**: mAP = 0.000 — outputs natural language, not structured coordinates
+
+**Failed models (incompatible)**:
+- Qwen3-VL-8B: `Qwen3VLForConditionalGeneration` loads but hangs on `.cuda()` and `device_map="auto"`
+- PaliGemma2: gated repo (needs Google HF auth)
+- DeepSeek-VL2: `deepseek_vl_v2` architecture not recognized by transformers
+
+### Session 9 — 2026-03-17/18: Wave 2 models, Florence-2-base tops benchmark
+
+**Added 7 new models** targeting size scaling and dedicated detectors:
+
+| Model | Type | Rationale |
+|-------|------|-----------|
+| Florence-2-base (0.23B) | VLM | Size comparison with Florence-2-large |
+| OWLv2-large (0.4B) | Zero-shot detector | Google's dedicated detector |
+| OmDet-Turbo (0.1B) | Zero-shot detector | Fast COCO detector |
+| InternVL2-2B | VLM | Scaling analysis |
+| InternVL2-4B | VLM | Scaling analysis |
+| InternVL2.5-8B | VLM | Improved InternVL2 |
+| MM-Grounding-DINO | Detector | Improved G-DINO |
+
+**Results**:
+- **Florence-2-base**: mAP@0.5 = **0.434**, Precision = **0.789** — **new best VLM**, outperforms its own larger variant (0.329)
+- **OWLv2**: mAP@0.5 = 0.088, Recall = **0.967** — near-perfect detection sensitivity but very low precision (4 text queries caused duplicate detections)
+- **InternVL2-2B**: mAP = 0.002 — too small for reliable detection
+- **InternVL2.5-8B**: mAP ≈ 0 — regression vs InternVL2-8B, different output format issue
+- **OmDet-Turbo**: failed ("Cannot copy out of meta tensor")
+- **InternVL2-4B**: failed (empty error)
+
+### Session 10 — 2026-03-18: Revalidation run, all results verified
+
+**Goal**: Re-run all non-high-confidence models to ensure academic rigor.
+
+**Fixes applied before revalidation**:
+- OWLv2: changed from 4 text queries `["weed", "weed plant", "broadleaf weed", "grass weed"]` to single `["weed"]` to eliminate duplicate detections
+- Grounding-DINO: changed prompt from `"weed . plant ."` to `"weed"` (confirmed actually ran this time)
+- All 6 models: deleted old output directories, cleared checkpoint entries, ran fresh
+
+**Revalidation results (all confirmed)**:
+
+| Model | Before | After Revalidation | Change |
+|-------|--------|-------------------|--------|
+| Florence-2-base | 0.434 | **0.434** | Confirmed |
+| OWLv2 (single query) | 0.088 | **0.184** | Fixed duplicate detection |
+| MiniCPM-V-4.5 | 0.178 | **0.192** | Slight improvement |
+| Grounding-DINO | 0.000 | **0.000** | Confirmed (cannot detect "weed" zero-shot) |
+| InternVL2-2B | 0.002 | **0.002** | Confirmed |
+| InternVL2.5-8B | 0.000 | **0.000** | Confirmed |
+
+**Final validated benchmark (15 models, all high confidence)**:
+
+| # | Model | Params | mAP@0.5 | mAP@0.5:0.95 | Prec | Rec | F1 | Time |
+|---|-------|--------|---------|--------------|------|-----|-----|------|
+| 1 | YOLO11n (fine-tuned) | 2.6M | **0.929** | 0.865 | 0.930 | 0.850 | 0.888 | — |
+| 2 | Florence-2-base | 0.23B | **0.434** | 0.392 | 0.789 | 0.519 | 0.626 | 558s |
+| 3 | Florence-2-large | 0.77B | 0.329 | 0.302 | 0.692 | 0.431 | 0.531 | 662s |
+| 4 | InternVL2-8B | 8B | 0.208 | 0.091 | 0.545 | 0.354 | 0.429 | 3838s |
+| 5 | Qwen2.5-VL-3B | 3B | 0.196 | 0.068 | 0.333 | 0.249 | 0.285 | 5898s |
+| 6 | MiniCPM-V-4.5 | 8B | 0.192 | 0.043 | 0.407 | 0.340 | 0.371 | 6595s |
+| 7 | OWLv2-large | 0.4B | 0.184 | 0.117 | 0.194 | 0.943 | 0.322 | 2519s |
+| 8 | Qwen2.5-VL-7B | 7B | 0.176 | 0.059 | 0.334 | 0.214 | 0.261 | 6047s |
+| 9 | InternVL2-2B | 2B | 0.002 | 0.001 | 0.038 | 0.025 | 0.031 | 2094s |
+| 10 | InternVL2.5-8B | 8B | 0.000 | 0.000 | 0.016 | 0.001 | 0.001 | 6238s |
+| 11-15 | G-DINO, Molmo, Llama Vision, Moondream, LLaVA | — | 0.000 | — | — | — | — | — |
+
+**Paper-level conclusions from Phase 2**:
+1. **YOLO dominates**: 0.929 vs 0.434 best VLM (2.1x gap)
+2. **Model size ≠ performance**: Florence-2-base (0.23B) beats all 3-8B VLMs
+3. **Detection architecture > scale**: Dedicated detection heads (Florence-2 `<OD>`, OWLv2) outperform general VLMs prompted for coordinates
+4. **OWLv2 extreme recall**: 94.3% recall but 19.4% precision — potential high-sensitivity pre-filter for YOLO
+5. **Native grounding essential**: 7/15 models produce mAP ≈ 0 (no bbox capability)
+6. **InternVL2.5 regression**: "improved" version scores worse than InternVL2-8B — model updates don't always help for specialized tasks
 
 ---
 
-## 2026-05-22 — v3.0.38-C label verifier + v3.0.39 FLUX synthesis
+## Phase 1: YOLO Baseline (Complete)
 
-Built the rest of the v3.0.38 data-quality stack and the v3.0.39
-synthetic-training module:
+### 2026-03-16 (Session 3)
+**Goal**: Optimize YOLO fine-tuning on cluster for better GPU utilization
 
-- **dino_label_verifier.py** — a supervised linear head on frozen DINO
-  features. Filtering (similarity) answers "in/out"; only a classifier
-  answers "is the *label* right". Trained on the cut-paste synthetic bank
-  (guaranteed-correct labels), it flags swapped-class boxes at high
-  confidence (Confident-Learning principle). This is the third and last
-  curation gate.
-- **synth_diffusion.py** — FLUX.1-Fill layout-conditioned generation.
-  Honours Prof. Zhang's requirement that synthetic data also train the
-  detector, in the form the literature shows actually works: inpaint
-  photoreal weeds into chosen boxes on real backgrounds → realism + exact
-  GT, used as augmentation biased to weak classes.
-- DINO backbone made configurable (DINO_BACKBONE) so the fine-grained
-  verifier role can use a plant-specialised checkpoint (PlantCLEF-2024
-  DINOv2 / BioCLIP 2) while the coarse filter keeps generic DINOv2.
+**Done**:
+- Cancelled Job 38007424 (batch=16, only using 2.34G/32G = 7% GPU)
+- Updated `setup_and_train.sh`: batch=-1 (auto), workers=5
+- AutoBatch selected **batch=60** using 19G/32G (60% of V100)
+- Resubmitted as Job 38007481 on V100 (v017)
+- Committed and pushed root README.md update (commit 87fc225)
 
-Research grounding done this session: DINOv2 self-curation, cleanlab
-ObjectLab / Confident Learning, BioCLIP 2, PlantCLEF-2024 ViT, Simple
-Copy-Paste, DODA, Gen2Det, S3OD, FLORA, weed-detection diffusion
-augmentation. Conclusion: FLUX is the right generative base; the
-breakthrough is layout-conditioning + a DINO-verified closed loop.
+**Training Complete (Job 38007481, 100 epochs, 2.75 hours)**:
 
-Honest caveat carried forward: cwd12 is not a low-data target, so
-synthetic augmentation's gain is expected mainly on weak/rare classes,
-not a blanket +mAP. The plan biases generation accordingly.
+| Metric | Validation (best) | **Test (848 images)** |
+|--------|-------------------|----------------------|
+| mAP@0.5 | 0.943 | **0.929** |
+| mAP@0.5:0.95 | 0.898 | **0.865** |
+| Precision | 0.944 | **0.930** |
+| Recall | 0.884 | **0.850** |
 
-### Blocker
+Per-class validation results:
+| Class | mAP@0.5 | mAP@0.5:0.95 |
+|-------|---------|-------------|
+| Carpetweeds | 0.976 | 0.936 |
+| Crabgrass | 0.979 | 0.935 |
+| Eclipta | 0.920 | 0.878 |
+| Goosegrass | 0.903 | 0.830 |
+| Morningglory | 0.853 | 0.769 |
+| Nutsedge | 0.939 | 0.878 |
+| PalmerAmaranth | 0.955 | 0.917 |
+| PricklySida | 0.970 | 0.947 |
+| Purslane | 0.941 | 0.930 |
+| Ragweed | 0.993 | 0.983 |
+| Sicklepod | 0.945 | 0.858 |
+| SpottedSpurge | 0.950 | 0.919 |
 
-Cluster ssh (bridges2) hangs after the password prompt across this
-session — v3.0.38-A result (job 40912927) not yet retrieved and the
-v3.0.38/39 jobs not yet submitted. All code is committed + pushed, so the
-cluster side is a `git pull` + `sbatch` once a login session is healthy.
+- Training config: batch=60 (auto), AdamW lr=0.000625, cos_lr, warmup=5ep, patience=20
+- Training speed: ~1.8 min/epoch on V100-32GB
+- Model: runs/detect/runs/yolo11n_cottonweeddet12/weights/best.pt (5.5MB)
+- **Bug found**: setup_and_train.sh test eval used wrong path (`runs/yolo11n_cottonweeddet12/` vs actual `runs/detect/runs/yolo11n_cottonweeddet12/`). Fixed by running test eval manually.
 
-## 2026-07-04 — full-framework audit + CRITICAL hardening (v3.1.0)
+**Next**:
+- Download best.pt from cluster to local
+- Run LLM models on CottonWeedDet12 test set (848 images)
+- Small models (moondream, Qwen-3B) locally on Mac
 
-Ran a whole-codebase, read-only audit with 7 parallel review agents
-(architecture / error-honesty / concurrency / data-integrity / security /
-maintainability / doc-drift), then fixed the highest-severity findings.
+---
 
-### Findings that mattered most
+## Phase 0: Evaluation Module
 
-- **Holdout leakage was paper-blocking.** The eval holdout was kept out of
-  training only by filename checks (NEVER_TRAIN slug list + stem filter);
-  the dHash dedup set was never seeded with the holdout. A renamed /
-  re-exported copy of a cwd12 test image (the common Roboflow/Kaggle case,
-  `orig_jpg.rf.<hex>.jpg`) slipped past both and trained the model on its
-  own eval set — so the reported ≥0.90 mAP could be inflated.
-- **The registry could be wiped by one bad concurrent write.** No lock;
-  whole-file read-modify-write; 6 writers sharing one fixed `.tmp`; a
-  corrupt parse silently rebuilt an empty registry over the 50MB file.
-- **Systemic "looks-successful" reporting.** Failed background jobs shown
-  as done; simulated labeling events written unflagged into the real
-  counts; dashboard auth failing OPEN on a public tunnel.
+### 2026-03-15 (Session 1)
+**Goal**: Build evaluation code (mAP, precision, recall) and dataset management
+**Done**:
+- Created `evaluate.py`: mAP@0.5, mAP@0.5:0.95, precision, recall, F1
+- Created `datasets.py`: dataset registry with download helpers (4 datasets)
+- Created `run_yolo_baseline.py`: YOLO baseline runner (zero-shot / fine-tuned / custom weights)
+- Created `run_full_benchmark.py`: orchestrator for datasets x models matrix with resume
+- Created `run_ablations.py`: ablation study experiments
+- Created `generate_paper_figures.py`: publication-quality matplotlib figures
+- Created `generate_tables.py`: LaTeX table generation
+- Created `convert_coco_to_yolo.py`: COCO/LabelMe/VOC to YOLO format converter
+- Updated `yolo_llm_fusion.py`: added batch mode `fuse_dataset()` with 3 strategies
+- Updated `roboflow_bridge.py`: added `--evaluate` flag
+- Updated README.md and CHANGELOG.md
 
-### Fixed this session (each verified with a standalone test)
+### 2026-03-15 (Session 2)
+**Goal**: Download CottonWeedDet12, fix evaluation bugs, set up YOLO fine-tuning
+**Done**:
+- Downloaded CottonWeedDet12 from Zenodo (28GB 7z) locally and on cluster
+- Created train/valid/test splits (65/20/15) with seed=42 from weedImages/ + annotation_YOLO_txt/
+- Split weed2okok into train(70)/valid(21)/test(15)
+- **Fixed critical mAP bug**: evaluate.py was using Precision as mAP (line 367). Rewrote `evaluate_dataset()` with proper PR-curve based AP computation using `_compute_ap_at_iou()`.
+- **Fixed DOWNLOAD_DIR path**: datasets.py, run_yolo_baseline.py, run_full_benchmark.py all pointed to wrong directory. Fixed to use `PROJECT_ROOT/downloads/`.
+- **Discovered yolo11nweed.pt origin**: trained on `weeddataset311` (Windows), NOT on weed2okok or CottonWeedDet12. Cross-dataset transfer performance is low (mAP@0.5=0.316 on CottonWeedDet12).
+- Created SLURM scripts for cluster (Bridges-2):
+  - `run_benchmark_hf.sh`: HF model benchmark per dataset
+  - `run_benchmark_ollama.sh`: Ollama model benchmark per dataset
+  - `submit_all_jobs.sh`: master job submission script
+  - `setup_and_train.sh`: all-in-one download + split + fine-tune YOLO
+  - `run_finetune_cottonweed.sh`: fine-tune only
+- Fixed `run_yolo_baseline.sh` cluster path (was local Mac path)
+- Submitted YOLO fine-tune job on Bridges-2 V100 (Job 38007424, 100 epochs)
 
-C1 holdout dHash pre-seed (`mega_trainer`); C2 registry lock +
-`update_registry` + atomic writes everywhere + corrupt-guard + killed the
-stale-snapshot flush (`registry_lock`, `dataset_discovery`, `mega_trainer`,
-+4 writers); C3 removed the committed Kaggle token (3 scripts); A
-error-honesty (job status from `res["ok"]`, auth fail-closed, `simulated`
-flag on demo labeling events, Mongo-mirror failure logged); C autolabel
-conf floor restored 0.12→0.30 (`orchestrator`). See CHANGELOG v3.1.0.
+**Preliminary Results (weed2okok test=15 images)**:
+| Method | mAP@0.5 | Precision | Recall |
+|--------|---------|-----------|--------|
+| YOLO11n zero-shot | 0.000 | 0.000 | 0.000 |
+| yolo11nweed.pt (cross-dataset) | 0.072 | 0.172 | 0.167 |
+| Qwen2.5-VL-7B (zero-shot LLM) | 0.639* | 0.639* | 0.411* |
+| YOLO11n fine-tuned 20ep | 0.909* | 0.909* | 0.667* |
 
-### Lesson learned
+*These were computed before the mAP fix, actual values may differ.
 
-Because every layer was AI-built and iterated, the dangerous defects were
-not crashes but **silent success signals** — code that returns/looks fine
-while the real invariant (holdout purity, registry integrity, "job
-submitted", "human verified") is violated. The audit's highest value was
-finding the places that lie quietly. Verification must exercise the
-invariant, not just check that a function returned.
+**Preliminary Results (CottonWeedDet12 test=848 images, binary evaluation)**:
+| Method | mAP@0.5 | mAP@0.25 | Precision | Recall |
+|--------|---------|----------|-----------|--------|
+| yolo11nweed.pt (cross-dataset) | 0.316 | 0.374 | 0.473 | 0.404 |
+| YOLO11n fine-tuned 100ep | **0.929** | — | **0.930** | **0.850** |
 
-### Action required (human)
+**Issues**:
+- Cluster curl doesn't support `--progress-bar` → switched to wget
+- Cluster has no `7z` binary → used Python `py7zr` package
+- rsync to cluster unreliable → used base64 encoding via ssh for file transfer
+- CottonWeedDet12 structure different from expected: images in `weedImages/`, YOLO labels in `annotation_YOLO_txt/` (separate dirs, not alongside images)
 
-Rotate the Kaggle token + create `~/.kaggle_token` on the cluster; purge
-the token from git history before any public push. Re-run training to get
-the honest post-leak-fix mAP. Everything else is code-only and pushed.
+**Next**:
+- Wait for YOLO fine-tune to complete on cluster (target: mAP@0.5:0.95 > 0.9)
+- Run LLM models on CottonWeedDet12 test set
+- Small models (moondream, Qwen-3B) test locally on Mac
 
-### Still open (see CHANGELOG v3.1.0 + audit memory)
+---
 
-13k-line dashboard monolith; dual on-disk package `cp -ar` sync; ~47
-hardcoded `/ocean/...byler` paths (blocks lab-server migration); unpinned
-deps; near-zero CI; broader outage→empty + Popen-liveness honesty sweep;
-stale "cwd12 ≥ 0.90 DO NOT DRIFT" changelog header (goal met at v3.0.38-A).
-
-## 2026-07-05 — v3.1.1–v3.1.3: upload/analysis fixes, live deploy, E2E, class-name editor
-
-Continuation of the audit thread: made the student upload→analysis flow real,
-verified it on the machines students actually use, and closed the biggest
-onboarding gap.
-
-### Shipped (each verified on the LIVE lab server, not just locally)
-
-- **v3.1.1** — three upload bugs found by end-to-end testing (double-nested
-  `images/images/`, `local_path` hiding sibling `labels/`, class names never
-  persisted): a correctly-labeled YOLO upload no longer analyzes as "no labels".
-- **v3.1.2** — YOLO label `.txt` no longer miscounted as "sensor" modality;
-  second de-monolith extraction (`dataset_quality.py`, dashboard −61 lines).
-- **v3.1.3** — ✎ class-name editor on the analysis page: uploads without
-  `data.yaml` (the common student case) get real class names; writes data.yaml +
-  registry dual-write + cache invalidation. Live E2E: `["class 0","class 1"]` →
-  `["crop","grass weed"]` → distribution shows `grass weed: 81`.
-- **Deployed the full v3.1 fix set to the lab server** (12 files, tar backup,
-  restart, verified) — lab now matches GitHub main; cluster pulled the same
-  commit via its job-start sync.
-- **Full-frontend E2E on live** (desktop + iPhone viewport) with a real 24-image
-  weed dataset: create project → upload (1.1s) → EDA → AI review
-  (`qwen2.5:3b` local; `ready:True`) → gallery → agents; mobile fully
-  responsive. Only false alarm: /console networkidle (page is fine, 200/0.3s).
-- **README refreshed with real-data screenshots** (removed all 0-count
-  empty-state images); added the class-name editor shot. CI green.
-
-### Lesson
-
-API-level "works" ≠ student-level "works": the three v3.1.1 bugs and the
-class-name gap were only visible by driving the real UI with real data on the
-real server. Verify from the user's seat.
