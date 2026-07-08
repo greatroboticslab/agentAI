@@ -5489,3 +5489,14 @@ updates the registry `class_names` (Mongo+JSON dual-write), and invalidates the 
 names appear immediately. New endpoints `GET/POST /api/dataset/classnames`. Deployed to the lab server and
 verified end-to-end with a real 24-image weed upload: before `["class 0","class 1"]` → saved
 `["crop","grass weed"]` → re-analysis shows `grass weed: 81` (registry mongo:true json:true).
+
+### v3.1.4 — sensor visualization: GPS trajectory + IMU time-series plots
+
+Sensor datasets now get a real picture, not just numeric stats. New pure module `tools/sensor_viz.py`
+(de-monolith pattern): a table with lat/lon columns renders a **trajectory plot** — the route's actual shape,
+equal-aspect, colored by speed when present, start/end markers; any other numeric table (IMU etc.) renders a
+**time-series plot** of up to 4 signals against the time column. Wired into `_analyze_dataset` (PNG cached
+next to the analysis JSON), served by new `GET /api/dataset/sensorviz`, and shown as a card on the analysis
+page. Verified live end-to-end with synthetic data: a 900-point rectangular patrol GPS log renders the
+rectangle with speed coloring; a 3,000-sample IMU log (ax/ay/az/gyro_z) renders stacked signals with the four
+cornering pulses clearly visible. Column detection: lat/latitude, lon/lng/longitude, speed*, t/time/timestamp.

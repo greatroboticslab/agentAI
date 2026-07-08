@@ -3602,6 +3602,18 @@ def _analyze_dataset(slug: str, refresh: bool = False) -> dict:
         "modality_detail": _analyze_nonimage(root),
         "computed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
+    # v3.1.4: sensor visualization — GPS tables get a trajectory (route shape)
+    # plot, other numeric tables (IMU, …) a time-series plot. PNG cached next to
+    # the analysis JSON; served by /api/dataset/sensorviz.
+    try:
+        if modality_counts.get("sensor"):
+            from .sensor_viz import plot_dataset_sensors
+            _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+            viz = plot_dataset_sensors(root, _DATASET_ANALYSIS_DIR / f"{slug}_sensorviz.png")
+            if viz:
+                result["sensor_viz"] = viz
+    except Exception as e:
+        log.warning(f"[analyze] sensor viz failed for {slug}: {e}")
     try:
         _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
         json.dump(result, open(cache, "w"), indent=2)
@@ -3642,6 +3654,18 @@ def _current_class_names(root):
                     max_id = max(max_id, int(p[0]))
     n = max(len(names), max_id + 1)
     return [names[i] if i < len(names) else f"class {i}" for i in range(n)]
+
+
+@app.get("/api/dataset/sensorviz")
+def api_dataset_sensorviz(request: Request, slug: str):
+    """v3.1.4 — serve the cached sensor plot (trajectory / time-series) PNG."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)
+    p = _DATASET_ANALYSIS_DIR / f"{slug}_sensorviz.png"
+    if not p.is_file():
+        raise HTTPException(404, "no sensor visualization for this dataset")
+    return FileResponse(str(p), media_type="image/png")
 
 
 @app.get("/api/dataset/classnames")
@@ -6530,6 +6554,16 @@ async function load(refresh){
     +'<div id="aiout" style="margin-top:12px"></div></div>';
   // modality + splits
   html+='<div class="card"><h3>Modality mix</h3>'+bars(d.modality,'#0e7c66')+'</div>';
+  // v3.1.4: sensor visualization — trajectory (GPS) or time-series (IMU/other)
+  if(d.sensor_viz){
+    var sv=d.sensor_viz;
+    html+='<div class="card"><h3>'+(sv.kind==='trajectory'?'Trajectory — route shape':'Sensor signals over time')
+      +' <span class="muted">('+esc(sv.file)+', '+esc(sv.n_points)+' points)</span></h3>'
+      +'<img src="/api/dataset/sensorviz?slug='+encodeURIComponent(SLUG)+'&v='+Date.now()+'" '
+      +'style="max-width:100%;border:1px solid #e3e7ef;border-radius:10px" alt="sensor visualization">'
+      +(sv.kind==='trajectory'?'<div class="muted" style="margin-top:6px">Path drawn from lat/lon columns; color = speed where available; &#9679; start, &#9632; end.</div>':'')
+      +'</div>';
+  }
   if(d.splits&&Object.keys(d.splits).length)html+='<div class="card"><h3>Train / val / test split (images)</h3>'+bars(d.splits,'#7c3aed')+'</div>';
   // class distribution
   if(a.per_class&&Object.keys(a.per_class).length){
