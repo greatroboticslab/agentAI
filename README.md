@@ -80,6 +80,33 @@ real names appear immediately:
 <img src="docs/screenshots/class-name-editor.png" width="840" alt="Inline class-name editor: name each YOLO class id, save, and the distribution shows real names">
 </div>
 
+### One upload box — four correct analyses
+
+The platform is modality-aware: the same upload flow auto-detects what the data *is* and produces the right
+analysis for it — verified live with real uploads:
+
+| You upload | Auto-detected as | The analysis page shows |
+|---|---|---|
+| Weed field photos + YOLO labels | image | class distribution, boxed samples, near-duplicates |
+| GPS log (CSV with lat/lon) | sensor → trajectory | **the route's shape**, speed-colored, start/end marked |
+| IMU log (CSV, accel + gyro) | sensor → time-series | stacked signals over time (cornering pulses visible) |
+| Robot camera clip (raw .mp4, no zip) | video | duration / fps / frames / resolution + 8 auto-extracted frame previews |
+
+<div align="center">
+<img src="docs/screenshots/sensor-trajectory.png" width="840" alt="GPS log analyzed: the patrol route's rectangular shape, speed-colored">
+<br><sub>A 900-point GPS patrol log — the route's shape drawn automatically, colored by speed.</sub>
+</div>
+
+<div align="center">
+<img src="docs/screenshots/sensor-imu-timeseries.png" width="840" alt="IMU log analyzed: stacked accelerometer and gyro signals over time">
+<br><sub>An IMU log from the same vehicle — same upload box, automatically a different (time-series) analysis.</sub>
+</div>
+
+<div align="center">
+<img src="docs/screenshots/video-analysis.png" width="840" alt="Robot head-camera video analyzed: duration/fps/frames/resolution and auto-extracted frames">
+<br><sub>A humanoid head-camera clip uploaded as a raw .mp4 — metadata + 8 auto-extracted preview frames.</sub>
+</div>
+
 Beyond upload+analysis, each project also offers the one-click **agent-action console**, the human-in-the-loop
 **labeling flow** (push a few → label in Roboflow → export → repeat), and per-round **review** before anything
 reaches training. There's a built-in **2-minute guide** at <code>/guide</code>.

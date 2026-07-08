@@ -5510,3 +5510,8 @@ over: 8 evenly-spaced preview frames are extracted (cv2), analysis shows the vid
 frame count / resolution per file) alongside the frame thumbnails and image-level stats. Verified live with a
 synthetic 12s 15fps humanoid head-camera clip (corridor walk + moving person + HUD): raw .mp4 upload →
 "8 image(s) registered" → analysis renders video metadata + 8 frame samples.
+
+### v3.1.5.1 — README: modality-aware analysis showcase
+
+Added the "one upload box — four correct analyses" section to the top-level README: comparison table
+(image / GPS-trajectory / IMU-time-series / video) with live-captured screenshots of each analysis.
