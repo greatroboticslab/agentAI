@@ -5527,3 +5527,12 @@ AMONG multiple files (the natural move: select gps.zip + imu.zip + clip.mp4 toge
 instead of silently skipped. Upload toast is modality-aware ("2 data file(s) + 8 image(s)" instead of
 "0 image(s)"). Verified live: sensor+video project, one multipart upload of 2 zips + 1 mp4 → 3 data files +
 8 frames, 0 skipped; analysis shows trajectory plot + video card + both sensor tables together.
+
+### v3.1.6.1 — fix: mixed upload in an image-primary project hid sensor/video from analysis
+
+User hit this live on mobile: uploading gps.zip + imu.zip + clip.mp4 into a project whose FIRST modality is
+image succeeded (union-accept worked, frames extracted) but analysis showed only the 8 frames — no trajectory,
+no video card, no sensor tables. Root cause: the registry `local_path` rule still pointed image-primary
+uploads at the `images/` subdir, so analysis never saw the sibling `files/`. Now any upload with non-image
+payload (`n_file > 0`) registers the parent dir. The user's dataset was repaired in place (registry
+local_path updated, Mongo+JSON) and re-analysis verified: trajectory + video card + both sensor tables.

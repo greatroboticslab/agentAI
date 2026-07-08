@@ -3247,7 +3247,11 @@ async def api_dataset_upload(request: Request):
         # v3.1 fix: a YOLO upload (has labels/) registers the PARENT dir so the
         # sibling labels/ is visible to analysis + training — pointing at images/
         # alone made analyze and training report "no labels detected".
-        "local_path": str(dest if (modality != "image" or n_lbl > 0) else img_dir),
+        # v3.1.6.1: also register the PARENT dir when ANY non-image payload exists
+        # (n_file>0) — an image-primary project uploading video+CSVs otherwise had
+        # local_path pointed at images/, so analysis only saw the extracted frames
+        # and missed the sensor/video files entirely (user hit this on mobile).
+        "local_path": str(dest if (modality != "image" or n_lbl > 0 or n_file > 0) else img_dir),
         "local_images": n_img,
         "n_local_files": n_file,
         "n_local_labels": n_lbl,
