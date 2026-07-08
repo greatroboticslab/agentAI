@@ -2958,12 +2958,23 @@ async def api_dataset_upload(request: Request):
                 _defext = {0xFF: ".jpg", 0x89: ".png", ord("B"): ".bmp", ord("R"): ".webp"}
                 single_name = base_nm if Path(base_nm).suffix.lower() in _UPLOAD_IMG_EXT \
                     else base_nm + _defext.get(magic[0] if magic else 0, ".jpg")
+            # v3.1.5: single raw VIDEO — mp4/mov (ftyp box), mkv/webm (EBML), avi
+            # (RIFF). A student's robot-camera clip uploads directly, no zip needed.
+            elif (magic[4:8] == b"ftyp" or magic[:4] == b"\x1a\x45\xdf\xa3"
+                  or (magic[:4] == b"RIFF" and magic[8:12] == b"AVI ")):
+                kind = "video1"
+                base_nm = re.sub(r"[^A-Za-z0-9_.-]", "_", Path(name).name) or "video"
+                _vext = ".mp4" if magic[4:8] == b"ftyp" else \
+                        (".avi" if magic[:4] == b"RIFF" else ".mkv")
+                single_name = base_nm if Path(base_nm).suffix.lower() in _MODALITY_EXT["video"] \
+                    else base_nm + _vext
         except Exception:
             kind = None
         if kind is None:
             os.unlink(zip_path)
             raise HTTPException(400, "unsupported upload — send a .zip / .tar / .tar.gz / .tgz "
-                                     "archive, or a single image (jpg/png/bmp/webp)")
+                                     "archive, a single image (jpg/png/bmp/webp), or a single "
+                                     "video (mp4/mov/avi/mkv/webm)")
 
     # member NAMES (for wrapper-strip + count)
     if kind == "multipart":
@@ -4990,7 +5001,7 @@ def agent_generic(domain_id: str):
      </div>
      <div id="ds-drop" style="border:2px dashed #cbd5e1;border-radius:10px;padding:16px;text-align:center;color:#64748b;font-size:13px;background:#fff;cursor:pointer;margin-bottom:8px">
        <b>Drag &amp; drop</b> files here, or pick:<br>
-       <input id="ds-file" type="file" multiple accept=".zip,.tar,.gz,.tgz,.tar.gz,application/zip,application/x-tar,application/gzip,image/*" style="display:none">
+       <input id="ds-file" type="file" multiple accept=".zip,.tar,.gz,.tgz,.tar.gz,application/zip,application/x-tar,application/gzip,image/*,video/*,audio/*,.csv,.tsv,.json,.jsonl,.gpx,.nmea,.pcd,.ply,.las,.npy,.npz" style="display:none">
        <input id="ds-folder" type="file" webkitdirectory directory multiple style="display:none">
        <button type="button" onclick="document.getElementById('ds-file').click()" style="margin-top:8px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer">&#128193; Choose files</button>
        <button type="button" onclick="document.getElementById('ds-folder').click()" style="margin-top:8px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer">&#128194; Choose folder</button>

@@ -5500,3 +5500,13 @@ next to the analysis JSON), served by new `GET /api/dataset/sensorviz`, and show
 page. Verified live end-to-end with synthetic data: a 900-point rectangular patrol GPS log renders the
 rectangle with speed coloring; a 3,000-sample IMU log (ax/ay/az/gyro_z) renders stacked signals with the four
 cornering pulses clearly visible. Column detection: lat/latitude, lon/lng/longitude, speed*, t/time/timestamp.
+
+### v3.1.5 — single raw video upload (robot-camera clips, no zip needed)
+
+A student's robot-camera clip now uploads directly: magic-byte detection extended to mp4/mov (ftyp), mkv/webm
+(EBML) and avi (RIFF) for the single-file path, and the file picker's accept filter — which previously greyed
+out anything but archives/images — now admits video/audio/sensor files. On upload the existing pipeline takes
+over: 8 evenly-spaced preview frames are extracted (cv2), analysis shows the video card (duration / fps /
+frame count / resolution per file) alongside the frame thumbnails and image-level stats. Verified live with a
+synthetic 12s 15fps humanoid head-camera clip (corridor walk + moving person + HUD): raw .mp4 upload →
+"8 image(s) registered" → analysis renders video metadata + 8 frame samples.
