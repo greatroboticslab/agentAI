@@ -2914,6 +2914,32 @@ async def api_dataset_upload(request: Request):
                     await uf.close()
                 except Exception:
                     pass
+        # v3.1.6: archives selected AMONG multiple files (the natural student move:
+        # select gps.zip + imu.zip + clip.mp4 together) are now extracted in place
+        # instead of being silently skipped by the extension filter.
+        for _ap in list(Path(staging_dir).rglob("*")):
+            if not _ap.is_file():
+                continue
+            _low = _ap.name.lower()
+            try:
+                if _low.endswith(".zip") and zipfile.is_zipfile(_ap):
+                    with zipfile.ZipFile(_ap) as _zf2:
+                        for _m in _zf2.infolist():
+                            if _m.is_dir() or _m.filename.startswith("/") \
+                                    or ".." in Path(_m.filename).parts:
+                                continue
+                            _zf2.extract(_m, _ap.parent / _ap.stem)
+                    _ap.unlink()
+                elif _low.endswith((".tar", ".tar.gz", ".tgz")) and tarfile.is_tarfile(_ap):
+                    with tarfile.open(_ap, "r:*") as _tf2:
+                        for _m in _tf2.getmembers():
+                            if not _m.isfile() or _m.name.startswith("/") \
+                                    or ".." in Path(_m.name).parts:
+                                continue
+                            _tf2.extract(_m, _ap.parent / _ap.stem.replace(".tar", ""))
+                    _ap.unlink()
+            except Exception as _e:
+                log.warning(f"[upload] archive-in-multipart extract failed for {_ap.name}: {_e}")
         kind = "multipart"
     else:
         # STREAM the raw body to a temp file (no whole-file-in-RAM). Accept ZIP,
@@ -3066,18 +3092,29 @@ async def api_dataset_upload(request: Request):
     # v3.0.137: modality — explicit ?modality= wins, else the agent's configured
     # modality, else image. Determines which file types we accept (so video /
     # sensor / point-cloud agents can upload too).
+    # v3.1.6: MULTI-modality projects (a robot has camera + GPS + IMU + lidar).
+    # Previously only the FIRST declared modality's extensions were accepted, so a
+    # sensor+video project rejected the video, and a pointcloud-first project
+    # rejected everything else. Now `proj_mods` = every modality the project
+    # declares (primary first) and accept_ext = the UNION of their extensions;
+    # each file is routed by its own type below.
     modality = re.sub(r"[^a-z]", "", (qp.get("modality") or "").lower())
+    proj_mods = []
+    try:
+        from . import db as _dbm
+        _dd = _dbm.get_domain(domain) or {}
+        proj_mods = [m for m in (_dd.get("modality") or []) if m in _MODALITY_EXT]
+    except Exception:
+        pass
+    if modality in _MODALITY_EXT and modality not in proj_mods:
+        proj_mods.insert(0, modality)
+    if not proj_mods:
+        proj_mods = ["image"]
     if modality not in _MODALITY_EXT:
-        try:
-            from . import db as _dbm
-            _dd = _dbm.get_domain(domain) or {}
-            _mlist = _dd.get("modality") or ["image"]
-            modality = _mlist[0] if _mlist and _mlist[0] in _MODALITY_EXT else "image"
-        except Exception:
-            modality = "image"
-    accept_ext = _MODALITY_EXT.get(modality, _UPLOAD_IMG_EXT)
+        modality = proj_mods[0]
+    accept_ext = set().union(*[_MODALITY_EXT[m] for m in proj_mods])
 
-    n_img = n_lbl = n_file = n_skipped = 0
+    n_img = n_lbl = n_file = n_skipped = n_vid = 0
     data_yaml_bytes = None
     for nm, src in _members():
         if nm.startswith("/") or ".." in Path(nm).parts:    # path-traversal guard
@@ -3088,7 +3125,7 @@ async def api_dataset_upload(request: Request):
             continue
         rel = _rel_of(nm) or safe_name          # wrapper-stripped relative path
         ext = Path(safe_name).suffix.lower()
-        if ext in _UPLOAD_IMG_EXT and modality == "image":
+        if ext in _UPLOAD_IMG_EXT and "image" in proj_mods:
             try:
                 # preserve structure (train/<class>/img.jpg) for classification +
                 # det/seg splits; the gallery rglobs local_path so it still finds them.
@@ -3130,6 +3167,8 @@ async def api_dataset_upload(request: Request):
                 with open(outp, "wb") as out:
                     shutil.copyfileobj(src, out, length=1024 * 1024)
                 n_file += 1
+                if ext in _MODALITY_EXT["video"]:
+                    n_vid += 1
             except Exception:
                 n_skipped += 1
         else:
@@ -3179,7 +3218,7 @@ async def api_dataset_upload(request: Request):
         except Exception:
             pass
     # v3.0.139: video → extract a few preview frames (cv2) so the gallery shows it.
-    if modality == "video":
+    if n_vid:   # v3.1.6: any video file present (mixed-modality uploads included)
         try:
             n_frames = _extract_video_frames(files_dir, img_dir, max_frames=8)
             n_img += n_frames
@@ -5158,7 +5197,7 @@ async function uploadDataset(){
     r=await fetch(url,{method:'POST',credentials:'include',body:fd});
   }
   var d=await r.json();
-  if(r.ok&&d&&d.ok){t.innerHTML='\\u2705 '+d.images+' image(s) registered as <b>'+d.slug+'</b> \\u00b7 <a href="/dataset/'+d.slug+'" target="_blank">analyze</a> \\u00b7 <a href="'+(d.gallery_url||('/gallery/'+d.slug))+'" target="_blank">view</a>';nameEl.value='';dsSetFiles([]);document.getElementById('ds-file').value='';loadUploads();}
+  if(r.ok&&d&&d.ok){var parts=[];if(d.images)parts.push(d.images+' image(s)');if(d.files)parts.push(d.files+' data file(s)');if(d.labels)parts.push(d.labels+' label(s)');t.innerHTML='\\u2705 '+(parts.join(' + ')||'dataset')+' registered as <b>'+d.slug+'</b> \\u00b7 <a href="/dataset/'+d.slug+'" target="_blank">analyze</a> \\u00b7 <a href="'+(d.gallery_url||('/gallery/'+d.slug))+'" target="_blank">view</a>';nameEl.value='';dsSetFiles([]);document.getElementById('ds-file').value='';loadUploads();}
   else{t.textContent='\\u274c '+((d&&(d.detail||d.msg))||('HTTP '+r.status));}
  }catch(e){t.textContent='\\u274c '+e;}finally{btn.disabled=false;}
 }

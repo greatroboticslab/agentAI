@@ -5515,3 +5515,15 @@ synthetic 12s 15fps humanoid head-camera clip (corridor walk + moving person + H
 
 Added the "one upload box — four correct analyses" section to the top-level README: comparison table
 (image / GPS-trajectory / IMU-time-series / video) with live-captured screenshots of each analysis.
+
+### v3.1.6 — true multi-modality projects (one robot, many sensors)
+
+A humanoid/driving robot has camera + GPS + IMU + lidar — but upload only accepted the project's FIRST declared
+modality's extensions, so a sensor+video project rejected the video and a pointcloud-first project rejected
+everything (user hit this live on mobile). Fixed: accepted extensions are now the UNION of every modality the
+project declares; each file routes by its own type (images → images/, video → files/ + auto frame-extract now
+keyed on "any video present" not "project is video-typed", sensor/pointcloud/audio → files/). Archives selected
+AMONG multiple files (the natural move: select gps.zip + imu.zip + clip.mp4 together) are extracted in place
+instead of silently skipped. Upload toast is modality-aware ("2 data file(s) + 8 image(s)" instead of
+"0 image(s)"). Verified live: sensor+video project, one multipart upload of 2 zips + 1 mp4 → 3 data files +
+8 frames, 0 skipped; analysis shows trajectory plot + video card + both sensor tables together.
