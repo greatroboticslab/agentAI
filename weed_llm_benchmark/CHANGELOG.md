@@ -5536,3 +5536,14 @@ no video card, no sensor tables. Root cause: the registry `local_path` rule stil
 uploads at the `images/` subdir, so analysis never saw the sibling `files/`. Now any upload with non-image
 payload (`n_file > 0`) registers the parent dir. The user's dataset was repaired in place (registry
 local_path updated, Mongo+JSON) and re-analysis verified: trajectory + video card + both sensor tables.
+
+### v3.1.7 — live voice preview via progressive Whisper (works on iPhone)
+
+Voice input (project describe + dataset goal) now shows text WHILE you speak, on every device. The old design
+relied on the browser's Web Speech live-caption API for the preview — which iPhone Safari doesn't provide and
+which fought the MediaRecorder for the mic, so on phones words only appeared after Stop. Replaced with
+PROGRESSIVE self-hosted Whisper: while recording, the audio-so-far is sent to /api/voice/transcribe every
+~2.8s and the growing transcript is shown live; on Stop a final full-clip pass replaces it with the clean
+text. No dependence on any browser speech API, so it behaves the same in Chrome and on iPhone. Whisper runs on
+the lab GPU (cuda/float16, ~0.5s warm). Both mic buttons (home intent box + dataset goal) updated; guards
+prevent overlapping in-flight requests and stale-generation writes.
