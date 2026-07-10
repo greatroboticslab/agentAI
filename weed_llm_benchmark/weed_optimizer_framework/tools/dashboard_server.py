@@ -3872,7 +3872,21 @@ def _ai_review_prepare(slug: str, refresh: bool = False) -> dict:
     if _prim_mod != "image":
         for _k in ("n_images", "image_size", "labeled_images"):
             facts.pop(_k, None)
-        facts["data_detail"] = _mdet.get(_prim_mod)
+        _dd = _mdet.get(_prim_mod)
+        # v3.1.8: for SENSOR, send the model a COMPACT, already-interpreted detail —
+        # the small lab model mis-reads raw per-column numbers (e.g. turns 0.85% into
+        # "85%"), so we hand it the signal_quality verdict + shape, not raw stats. The
+        # exact per-signal numbers are shown deterministically in the UI card + the
+        # summary line prepended in _ai_review_merge, so nothing accurate is lost.
+        if _prim_mod == "sensor" and isinstance(_dd, dict):
+            _dd = {
+                "n_files": _dd.get("n_files"), "total_rows": _dd.get("total_rows"),
+                "sampling_hz_est": _dd.get("sampling_hz_est"),
+                "label_column": _dd.get("label_column"), "n_classes": _dd.get("n_classes"),
+                "columns": [c for t in (_dd.get("tables") or [])[:1] for c in (t.get("cols") or [])][:24],
+                "signal_quality": _dd.get("signal_quality"),
+            }
+        facts["data_detail"] = _dd
     base = {"ok": True, "slug": slug, "source": "rules", "issues": issues, "goal": goal,
             "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
     # v3.0.182 (P2): route the model through the role-based router.
