@@ -3902,8 +3902,12 @@ def _ai_review_prepare(slug: str, refresh: bool = False) -> dict:
              + _fit +
              '"issues": [{"severity":"high|medium|low","title":str,"detail":str}], '
              '"recommendations": ["actionable next step", ...]}. '
-             "Keep the given detected_issues and add any you infer. Be honest and specific.")
-    usr = "Dataset FACTS:\n" + json.dumps(facts)[:3500]
+             "Keep the given detected_issues and add any you infer. Be honest and specific. "
+             "If the FACTS contain signal_quality / per-signal noise numbers (data_detail), and "
+             "especially if the stated_goal asks about noise/quality, QUOTE the actual numbers in the "
+             "summary — the overall noise level and the noisiest signal(s) with their noise % / SNR — "
+             "do not give a generic answer when real metrics are present.")
+    usr = "Dataset FACTS:\n" + json.dumps(facts)[:3800]
     return {"cached": None, "base": base, "a": a, "issues": issues, "goal": goal,
             "facts": facts, "usr": usr, "sys_p": sys_p, "model": model,
             "model_source": _pick.get("source"), "place": _pick.get("place")}
@@ -3918,6 +3922,26 @@ def _ai_review_merge(prep: dict, model_text: str, model: str = None,
     issues = prep["issues"]; goal = prep["goal"]; a = prep["a"]
     ann = a.get("annotations") or {}
     model = model or prep["model"]
+    # v3.1.8: deterministic noise finding — the small lab model is inconsistent at
+    # quoting numbers, so when signal_quality metrics exist we compute a grounded
+    # one-liner (real numbers) and prepend it to whatever the model says. This makes
+    # "analyze the noise level" get a real, numeric answer every time.
+    _noise_line = ""
+    try:
+        _sq = ((a.get("modality_detail") or {}).get("sensor") or {}).get("signal_quality")
+        if _sq:
+            _worst = None
+            for _tb in ((a.get("modality_detail") or {}).get("sensor") or {}).get("tables", []):
+                for _c, _z in (_tb.get("noise") or {}).items():
+                    if _worst is None or _z["noise_pct"] > _worst[1]:
+                        _worst = (_c, _z["noise_pct"], _z.get("snr_db"))
+            _noise_line = (f"Noise level: {_sq['overall_noise_level'].upper()} "
+                           f"(median {_sq['median_noise_pct']}% of range across {_sq['n_signals']} signals"
+                           + (f"; noisiest: {_worst[0]} at {_worst[1]}%"
+                              + (f", SNR {_worst[2]} dB" if _worst[2] is not None else "") if _worst else "")
+                           + ").")
+    except Exception:
+        _noise_line = ""
     model_source = model_source or prep.get("model_source")
     try:
         m = re.search(r"\{.*\}", model_text or "", re.S)
@@ -3935,7 +3959,7 @@ def _ai_review_merge(prep: dict, model_text: str, model: str = None,
                 result.update({
                     "source": "ai", "model": model, "model_role": "analysis_summary",
                     "model_source": model_source, "model_place": model_place or prep.get("place"),
-                    "summary": str(obj.get("summary"))[:800],
+                    "summary": ((_noise_line + " ") if _noise_line else "") + str(obj.get("summary"))[:800],
                     "issues": merged[:10],
                     "recommendations": [str(x)[:300] for x in (obj.get("recommendations") or [])][:8],
                 })
@@ -6591,6 +6615,16 @@ function modalityDetail(md){
  if(md.audio){var a=md.audio;
   h+='<div class="card"><h3>&#127925; Audio ('+a.n+' files)</h3><div class="muted">'
     +(a.sampled?('.wav sampled '+a.sampled+' · total '+a.wav_dur_s+'s · '+(a.rate||'?')+'Hz · '+(a.channels||'?')+'ch'):esc(a.note||''))+'</div></div>';}
+ if(md.sensor&&md.sensor.signal_quality){var sq=md.sensor.signal_quality;
+   var _lc=sq.overall_noise_level==='low'?'#059669':(sq.overall_noise_level==='moderate'?'#d97706':'#dc2626');
+   var nrows=(md.sensor.tables||[]).map(function(tb){if(!tb.noise)return '';
+     return Object.keys(tb.noise).map(function(c){var z=tb.noise[c];
+       var _cc=z.noise_pct<2?'#059669':(z.noise_pct<8?'#d97706':'#dc2626');
+       return '<tr><td>'+esc(tb.file)+'</td><td>'+esc(c)+'</td><td style="color:'+_cc+';font-weight:600">'+z.noise_pct+'%</td><td>'+(z.snr_db!=null?z.snr_db+' dB':'\\u2014')+'</td></tr>';}).join('');}).join('');
+   h+='<div class="card"><h3>&#128266; Signal quality &mdash; noise level</h3>'
+     +'<div style="margin:4px 0 10px">Overall: <b style="color:'+_lc+'">'+esc(String(sq.overall_noise_level).toUpperCase())+'</b> <span class="muted">&middot; median '+sq.median_noise_pct+'% of range &middot; '+sq.n_signals+' signals</span></div>'
+     +'<table class="mini"><tr><td><b>file</b></td><td><b>signal</b></td><td><b>noise (% of range)</b></td><td><b>SNR</b></td></tr>'+nrows+'</table>'
+     +'<div class="muted" style="font-size:11px;margin-top:6px">'+esc(sq.method)+'. Lower % / higher dB = cleaner. A near-constant signal (e.g. gravity on the Z axis) reads as high noise because it carries little real variation.</div></div>';}
  if(md.sensor){var s=md.sensor;var t=(s.tables||[]).map(function(tb){
     var nums=Object.keys(tb.numeric||{}).map(function(c){var st=tb.numeric[c];return '<tr><td>'+esc(c)+'</td><td>'+st.min+'</td><td>'+st.mean+'</td><td>'+st.max+'</td></tr>';}).join('');
     return '<div style="margin-top:8px"><b>'+esc(tb.file)+'</b> <span class="muted">· '+tb.rows+' rows · '+ (tb.cols||[]).length +' cols</span>'

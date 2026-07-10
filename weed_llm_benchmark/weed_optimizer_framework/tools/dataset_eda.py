@@ -7,6 +7,53 @@ summary. Behaviour is byte-identical to the in-dashboard version it replaced.
 """
 from __future__ import annotations
 
+import math
+
+
+def _signal_noise(vals: list) -> dict | None:
+    """v3.1.8: grounded NOISE LEVEL for one time-ordered numeric signal.
+
+    Smooths with a centered moving average (O(n) via prefix sums), then measures
+    the high-frequency residual the smoother removed. Reports:
+      - noise_rms : RMS of (signal - smoothed) in the signal's own units
+      - noise_pct : noise_rms as a % of the signal's value range (intuitive)
+      - snr_db    : 20·log10(std(smoothed)/noise_rms) — meaningful-signal vs noise
+    Returns None for series too short to judge."""
+    n = len(vals)
+    if n < 8:
+        return None
+    w = max(3, min(51, (n // 20) | 1))          # odd window, ~5% of the series
+    half = w // 2
+    pref = [0.0] * (n + 1)
+    for i, x in enumerate(vals):
+        pref[i + 1] = pref[i] + x
+    resid_sq = 0.0
+    sm = [0.0] * n
+    for i in range(n):
+        a = i - half if i - half > 0 else 0
+        b = i + half + 1 if i + half + 1 < n else n
+        m = (pref[b] - pref[a]) / (b - a)
+        sm[i] = m
+        d = vals[i] - m
+        resid_sq += d * d
+    noise_rms = math.sqrt(resid_sq / n)
+    mean_sm = sum(sm) / n
+    signal_std = math.sqrt(sum((x - mean_sm) ** 2 for x in sm) / n)
+    rng = max(vals) - min(vals)
+    noise_pct = round(noise_rms / rng * 100, 2) if rng > 0 else 0.0
+    snr_db = (round(20 * math.log10(signal_std / noise_rms), 1)
+              if noise_rms > 0 and signal_std > 0 else None)
+    return {"noise_rms": round(noise_rms, 4), "noise_pct": noise_pct, "snr_db": snr_db}
+
+
+def _noise_level_label(pcts: list) -> str:
+    """Overall low/moderate/high from per-signal noise-% (median)."""
+    if not pcts:
+        return "n/a"
+    s = sorted(pcts)
+    med = s[len(s) // 2]
+    return "low" if med < 2 else ("moderate" if med < 8 else "high")
+
 
 def analyze_nonimage(root) -> dict:
     """v3.0.162 — best-effort per-modality analysis for NON-image data (video /
@@ -102,6 +149,7 @@ def analyze_nonimage(root) -> dict:
         label_col_name = None
         rates = []                  # estimated Hz per file
         total_rows = 0
+        all_noise_pct = []          # v3.1.8: per-signal noise-% across sampled files
         _SAMPLE_N = 24
         for p in tabular[:_SAMPLE_N]:
             try:
@@ -144,7 +192,26 @@ def analyze_nonimage(root) -> dict:
                                    if h in _label_names and i in catcols), None)
                     if lc_idx is None and catcols:
                         lc_idx = max(catcols, key=lambda i: len(catcols[i]))
+                    # v3.1.8: NOISE LEVEL per signal (skip the time + label columns —
+                    # those aren't sensor signals). Feeds both the page card and the
+                    # AI review, so "analyze the noise level" gets real numbers.
+                    tbl_noise = {}
+                    for i, vals in numcols.items():
+                        if i == tcol or i == lc_idx or len(vals) < 8:
+                            continue
+                        nz = _signal_noise(vals)
+                        if nz:
+                            cname = header[i] or f"col{i}"
+                            tbl_noise[cname] = nz
+                            if cname in stats:
+                                stats[cname]["noise_pct"] = nz["noise_pct"]
+                                stats[cname]["snr_db"] = nz["snr_db"]
                     tbl = {"file": p.name, "rows": nrow, "cols": header[:24], "numeric": stats}
+                    if tbl_noise:
+                        tbl["noise"] = tbl_noise
+                        tbl["noise_level"] = _noise_level_label(
+                            [v["noise_pct"] for v in tbl_noise.values()])
+                        all_noise_pct.extend(v["noise_pct"] for v in tbl_noise.values())
                     if lc_idx is not None:
                         label_col_name = header[lc_idx] if lc_idx < len(header) else f"col{lc_idx}"
                         tbl["label_col"] = label_col_name
@@ -172,6 +239,15 @@ def analyze_nonimage(root) -> dict:
                     f"counts over {info['sampled_files']} of {len(sens)} files (sampled)")
         if rates:
             info["sampling_hz_est"] = round(sum(rates) / len(rates), 1)
+        if all_noise_pct:   # v3.1.8: dataset-level signal-quality rollup
+            s = sorted(all_noise_pct)
+            info["signal_quality"] = {
+                "overall_noise_level": _noise_level_label(all_noise_pct),
+                "median_noise_pct": s[len(s) // 2],
+                "max_noise_pct": s[-1],
+                "n_signals": len(all_noise_pct),
+                "method": "residual RMS after moving-average smoothing, as % of each signal's range",
+            }
         out["sensor"] = info
 
     # ---- POINTCLOUD (npy shape / ply,pcd header point count) ----

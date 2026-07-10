@@ -5547,3 +5547,15 @@ PROGRESSIVE self-hosted Whisper: while recording, the audio-so-far is sent to /a
 text. No dependence on any browser speech API, so it behaves the same in Chrome and on iPhone. Whisper runs on
 the lab GPU (cuda/float16, ~0.5s warm). Both mic buttons (home intent box + dataset goal) updated; guards
 prevent overlapping in-flight requests and stale-generation writes.
+
+### v3.1.8 — real NOISE-LEVEL analysis for sensor data (prof feedback: "analyze noise level")
+
+Prof. Zhang asked the platform to "analyze the noise level of the data" and got only the fixed min/mean/max —
+the analysis was goal-blind. Now sensor/tabular analysis computes a grounded per-signal NOISE metric
+(`dataset_eda._signal_noise`): smooth each time-ordered signal with a moving average, measure the residual RMS
+the smoother removed, report noise as % of the signal's range + SNR (dB), and roll up an overall low/moderate/
+high level. Verified on real IMU/GPS: gyro_z/ay (real cornering structure) → good SNR; ax/az (near-constant
+gravity + noise) → high noise / low SNR as expected; clean GPS lat/lon → 0.5% noise / 34 dB. Surfaced three
+ways: (1) a "Signal quality — noise level" card on the analysis page (per-signal, color-coded); (2) fed into
+the AI-review FACTS; (3) since the small lab model is inconsistent at quoting numbers, a deterministic
+noise one-liner (real numbers) is prepended to the AI summary so the noise question is answered every time.
