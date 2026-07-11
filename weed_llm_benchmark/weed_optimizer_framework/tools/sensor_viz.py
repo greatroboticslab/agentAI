@@ -80,6 +80,19 @@ def plot_sensor_table(csv_path, out_png) -> dict | None:
             ax.plot(lon, lat, "-", lw=1.2, color="#2563eb")
         ax.plot(lon[0], lat[0], "o", ms=10, color="#059669", label="start")
         ax.plot(lon[-1], lat[-1], "s", ms=9, color="#dc2626", label="end")
+        # v3.1.9: mark GPS anomalies (implausible jumps) on the route
+        try:
+            from .sensor_anomaly import gps_teleports
+            times_c = _find(cols, _TIME_NAMES)
+            _tv = cols.get(times_c) if times_c else None
+            jt = gps_teleports(lat, lon, _tv if _tv and len(_tv) == len(lat) else None)
+            if jt:
+                ax.scatter([lon[e["index"]] for e in jt if e["index"] < len(lon)],
+                           [lat[e["index"]] for e in jt if e["index"] < len(lat)],
+                           marker="x", s=90, c="#dc2626", linewidths=2.5, zorder=5,
+                           label="anomaly (%d)" % len(jt))
+        except Exception:
+            pass
         ax.set_xlabel(lon_c); ax.set_ylabel(lat_c)
         ax.set_title(f"Trajectory — {csv_path.name} ({len(lat)} points)")
         ax.set_aspect("equal", adjustable="datalim")
@@ -102,8 +115,25 @@ def plot_sensor_table(csv_path, out_png) -> dict | None:
                              dpi=110, sharex=True)
     if len(signals) == 1:
         axes = [axes]
+    # v3.1.9: mark sudden-change anomalies on each signal
+    try:
+        from .sensor_anomaly import robust_jumps
+        _ANG = ("heading", "yaw", "bearing", "course", "azimuth", "roll", "pitch")
+    except Exception:
+        robust_jumps = None
     for ax, s in zip(axes, signals):
-        ax.plot(x, cols[s][:n], lw=0.9, color="#2563eb")
+        sv = cols[s][:n]
+        ax.plot(x, sv, lw=0.9, color="#2563eb")
+        if robust_jumps is not None:
+            try:
+                jj = robust_jumps(sv, x if len(x) == len(sv) else None,
+                                  is_angle=any(a in s.lower() for a in _ANG))
+                if jj:
+                    xi = [x[e["index"]] for e in jj if e["index"] < len(x)]
+                    yi = [sv[e["index"]] for e in jj if e["index"] < len(sv)]
+                    ax.scatter(xi, yi, marker="x", s=60, c="#dc2626", linewidths=2, zorder=5)
+            except Exception:
+                pass
         ax.set_ylabel(s, fontsize=9); ax.grid(alpha=.3)
     axes[-1].set_xlabel(f"{time_c} (s from start)" if time_c else "sample #")
     axes[0].set_title(f"Sensor signals — {csv_path.name} ({n} samples)")

@@ -3673,6 +3673,17 @@ def _analyze_dataset(slug: str, refresh: bool = False) -> dict:
                 result["sensor_viz"] = viz
     except Exception as e:
         log.warning(f"[analyze] sensor viz failed for {slug}: {e}")
+    # v3.1.9: anomaly detection (where are the abnormal events) for sensor data
+    try:
+        if modality_counts.get("sensor"):
+            from .sensor_anomaly import analyze_dataset_anomalies
+            anom = analyze_dataset_anomalies(root)
+            if anom is not None:
+                result["sensor_anomalies"] = anom
+                if isinstance((result.get("modality_detail") or {}).get("sensor"), dict):
+                    result["modality_detail"]["sensor"]["anomalies"] = anom
+    except Exception as e:
+        log.warning(f"[analyze] anomaly detection failed for {slug}: {e}")
     try:
         _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
         json.dump(result, open(cache, "w"), indent=2)
@@ -3886,6 +3897,14 @@ def _ai_review_prepare(slug: str, refresh: bool = False) -> dict:
                 "columns": [c for t in (_dd.get("tables") or [])[:1] for c in (t.get("cols") or [])][:24],
                 "signal_quality": _dd.get("signal_quality"),
             }
+            _an = a.get("sensor_anomalies")
+            if _an:
+                _bt = {}
+                for _f in _an.get("files", []):
+                    for _k, _v in (_f.get("by_type") or {}).items():
+                        _bt[_k] = _bt.get(_k, 0) + _v
+                _dd["anomalies"] = {"overall_level": _an.get("overall_level"),
+                                    "total_events": _an.get("total_events"), "by_type": _bt}
         facts["data_detail"] = _dd
     base = {"ok": True, "slug": slug, "source": "rules", "issues": issues, "goal": goal,
             "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -3956,6 +3975,29 @@ def _ai_review_merge(prep: dict, model_text: str, model: str = None,
                            + ").")
     except Exception:
         _noise_line = ""
+    try:  # v3.1.9: deterministic anomaly one-liner (with a concrete "where")
+        _an = a.get("sensor_anomalies")
+        if _an and _an.get("total_events"):
+            _bt = {}
+            for _f in _an.get("files", []):
+                for _k, _v in (_f.get("by_type") or {}).items():
+                    _bt[_k] = _bt.get(_k, 0) + _v
+            _ex = None
+            for _f in _an.get("files", []):
+                if _f.get("events"):
+                    _e0 = _f["events"][0]
+                    _ex = (f"{_e0['type'].replace('_', ' ')}"
+                           + (f" in {_e0['signal']}" if _e0.get("signal") else "")
+                           + (f" at t={_e0['time']}s" if _e0.get("time") is not None else ""))
+                    break
+            _noise_line += (f" Anomalies: {_an['overall_level'].upper()} "
+                            f"({_an['total_events']} events — "
+                            + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in _bt.items())
+                            + (f"; e.g. {_ex}" if _ex else "") + ").")
+        elif _an is not None and _an.get("total_events") == 0:
+            _noise_line += " Anomalies: none detected."
+    except Exception:
+        pass
     model_source = model_source or prep.get("model_source")
     try:
         m = re.search(r"\{.*\}", model_text or "", re.S)
@@ -6639,6 +6681,18 @@ function modalityDetail(md){
      +'<div style="margin:4px 0 10px">Overall: <b style="color:'+_lc+'">'+esc(String(sq.overall_noise_level).toUpperCase())+'</b> <span class="muted">&middot; median '+sq.median_noise_pct+'% of range &middot; '+sq.n_signals+' signals</span></div>'
      +'<table class="mini"><tr><td><b>file</b></td><td><b>signal</b></td><td><b>noise (% of range)</b></td><td><b>SNR</b></td></tr>'+nrows+'</table>'
      +'<div class="muted" style="font-size:11px;margin-top:6px">'+esc(sq.method)+'. Lower % / higher dB = cleaner. A near-constant signal (e.g. gravity on the Z axis) reads as high noise because it carries little real variation.</div></div>';}
+ if(md.sensor&&md.sensor.anomalies){var an=md.sensor.anomalies;
+   var _al=an.overall_level==='clean'?'#059669':(an.overall_level==='minor'?'#d97706':'#dc2626');
+   var erows=(an.files||[]).map(function(f){return (f.events||[]).slice(0,8).map(function(e){
+     var det=e.type==='sudden_change'?('\\u0394'+e.delta+' ('+e.sigma+'\\u03c3)'):
+             e.type==='gps_jump'?(e.jump_m+'m @ '+e.implied_mps+' m/s'):
+             e.type==='time_gap'?(e.gap_s+'s gap ('+e.x_median+'\\u00d7 median)'):
+             e.type==='flatline'?('stuck '+e.length+' samples @ '+e.value):'';
+     return '<tr><td>'+esc(f.file)+'</td><td>'+esc(e.type.replace(/_/g,' '))+'</td><td>'+(e.signal?esc(e.signal):'\\u2014')+'</td><td>'+(e.time!=null?e.time+'s':'\\u2014')+'</td><td class="muted">'+esc(det)+'</td></tr>';}).join('');}).join('');
+   h+='<div class="card"><h3>&#9888;&#65039; Anomalies detected</h3>'
+     +'<div style="margin:4px 0 8px">Overall: <b style="color:'+_al+'">'+esc(String(an.overall_level).toUpperCase())+'</b> <span class="muted">&middot; '+an.total_events+' event(s)</span></div>'
+     +(an.total_events?('<table class="mini"><tr><td><b>file</b></td><td><b>type</b></td><td><b>signal</b></td><td><b>time</b></td><td><b>detail</b></td></tr>'+erows+'</table>'):'<div class="muted">No abnormal events found &mdash; signals stay within expected bounds.</div>')
+     +'<div class="muted" style="font-size:11px;margin-top:6px">Rapid-change events (robust z-score), GPS jumps, sampling gaps, and stuck-sensor flatlines; marked with a red \\u2715 on the plot above. Note: an expected sharp turn also registers as a rapid-change event.</div></div>';}
  if(md.sensor){var s=md.sensor;var t=(s.tables||[]).map(function(tb){
     var nums=Object.keys(tb.numeric||{}).map(function(c){var st=tb.numeric[c];return '<tr><td>'+esc(c)+'</td><td>'+st.min+'</td><td>'+st.mean+'</td><td>'+st.max+'</td></tr>';}).join('');
     return '<div style="margin-top:8px"><b>'+esc(tb.file)+'</b> <span class="muted">· '+tb.rows+' rows · '+ (tb.cols||[]).length +' cols</span>'

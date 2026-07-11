@@ -5559,3 +5559,15 @@ gravity + noise) → high noise / low SNR as expected; clean GPS lat/lon → 0.5
 ways: (1) a "Signal quality — noise level" card on the analysis page (per-signal, color-coded); (2) fed into
 the AI-review FACTS; (3) since the small lab model is inconsistent at quoting numbers, a deterministic
 noise one-liner (real numbers) is prepended to the AI summary so the noise question is answered every time.
+
+### v3.1.9 — anomaly detection: WHERE are the abnormal events (prof feedback follow-up)
+
+Past noise level ("how dirty") to diagnosis ("what/where"). New pure module `tools/sensor_anomaly.py` runs
+grounded detectors on time-ordered sensor signals: sudden-change events (robust median+MAD z-score on first
+differences, with angle-unwrap so a 359°→1° heading wrap isn't a false jump), GPS teleports (implied speed
+between fixes above a physical bound, haversine), sampling-gap dropouts, and stuck-sensor flatlines — each with
+the exact timestamp. Surfaced three ways: (1) an "Anomalies detected" card listing type/signal/time/detail;
+(2) red ✕ markers on the trajectory + time-series plots (`sensor_viz`); (3) a deterministic anomaly one-liner
+prepended to the AI summary + a compact rollup in the AI facts. Verified live on injected anomalies (GPS 892m
+teleport @60s, stuck speed sensor 61 samples @119.8s, 8.2s time gap @158s) — all detected with correct
+timestamps and marked on the map. Timestamps rebased to seconds-from-start for readability.
