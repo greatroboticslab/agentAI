@@ -13,6 +13,68 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-11 — v3.1.4–v3.2.0: sensor analysis becomes a *diagnosis* (noise → anomalies → cross-modal)
+
+**What drove this.** Prof. feedback on the data-analysis stage was the trigger, and it was fair: he typed
+"analyze the noise level" and the page returned a **hardcoded EDA** that ignored the request — the analysis
+was *goal-blind*. That is the real critique this whole arc answers: move the analysis page from a fixed
+template to something that actually responds to what the data is and what the user asked. Everything below
+was built as an advisor/executor split (top model plans + verifies; Sonnet executors do the bulk edits) and
+every step was verified on the **live lab server**, not just locally.
+
+**The arc (each a pure, testable module in `weed_optimizer_framework/tools/`, wired into the modality-aware
+analysis page):**
+
+- **v3.1.4 `sensor_viz.py`** — sensor data now *shows*, not just tabulates: a GPS table renders its actual
+  **route shape** (equal-aspect, speed-colored); other numeric tables (IMU) render **stacked time-series**.
+  Modality decides the plot.
+- **v3.1.5–v3.1.7** — closed real multimodal gaps found by frontend testing: raw `.mp4` video accepted by
+  magic-bytes (metadata + auto-extracted frames), one project accepting a *union* of declared modalities
+  (a robot with camera + GPS + IMU no longer rejects the sensor files), and progressive Whisper voice
+  (live partial transcription every ~2.8 s, works on iPhone).
+- **v3.1.8 `_signal_noise` (in `dataset_eda.py`)** — the direct answer to the prof: a **real noise metric**.
+  Residual RMS after an O(n) moving-average, expressed as % of each signal's range, plus SNR (dB). Now
+  "analyze the noise level" produces numbers that *change with the data*. Honest subtlety surfaced in the UI:
+  a near-constant signal (IMU Z carrying gravity) reads as "high noise %" because it has little real
+  variation — the page explains this rather than flagging it as bad.
+- **v3.1.9 `sensor_anomaly.py`** — past "how noisy" to **"what went wrong, and exactly when"**. Four grounded,
+  explainable detectors on time-ordered signals: robust rapid-change (median + MAD z-score on first
+  differences, angle-unwrapped so a 359°→1° heading wrap isn't a false jump), GPS teleports (implausible
+  implied speed via haversine), sampling gaps, stuck-sensor flatlines — each returns a **precise timestamp**.
+  Verified on injected faults (892 m teleport @60 s, stuck channel 61 samples @119.8 s, 8.2 s gap @158 s):
+  all detected, all correctly located, marked with a red ✕ on the plot. Deliberately biased to precision over
+  recall (a single naturally-varying speed spike is not flagged); the "an expected sharp turn also registers
+  as a rapid-change event" caveat is shown, not hidden.
+- **v3.2.0 `sensor_align.py` — cross-modal temporal alignment** (the differentiator for a *robotics* lab).
+  Every sensor file's events go on **one shared time axis**; a **correlated moment** is an instant where ≥2
+  different sensors flagged within a 1.0 s window. This is the direct answer to "does IMU pulse N line up with
+  a GPS corner / a video frame?" — cross-sensor *agreement* is far stronger evidence of a real physical event
+  than any single-sensor glitch. Alignment uses absolute timestamps (a true shared clock) when present and
+  says so; falls back to per-file-relative time (assumes synchronized logging) and *states the assumption*.
+  Optional video-frame mapping per moment, explicitly labelled an estimate. Verified live on a 2-file
+  GPS+IMU patrol demo: a GPS-only teleport @30 s and an IMU-only flatline @75 s stay single-sensor, while the
+  @60 s **pothole** is the sole correlated moment (GPS jump + speed drop + IMU vertical-accel spike) — aligned
+  on the true shared clock.
+
+**Deterministic + narrated review.** The 3B local model mangles numbers, so the noise / anomaly / cross-sensor
+findings are computed in code and **prepended deterministically** to the AI summary; the LLM narrates on top
+and rates training-readiness (a stronger cluster model is selectable per project). Grounded facts first,
+prose second.
+
+**README rework.** Replaced the fictional coral-reef tour with a **reproducible 5-minute demo** built on the
+real patrol-robot data (`docs/demo/patrol_multisensor.zip`, faults injected): create project → upload →
+read the three-layer diagnosis (route+noise → timestamped anomalies → cross-sensor timeline), each with live
+screenshots. Repositioned the one-liner around *physical/embodied-agent research data* (the weed benchmark is
+one component). Pushed with CHANGELOG + this log per the standing sync rule.
+
+**Where this leaves the data-analysis stage (honest read).** It has moved from *descriptive* (here are stats)
+to *diagnostic* (here is what's wrong, when, and which sensors agree). The next real increment is deeper
+cross-modal work — pulling video frames into the alignment so a correlated moment links to the exact frame —
+and interactive "ask this dataset" queries. mAP / training remain deliberately out of focus until the
+collection + analysis block is genuinely good end-to-end.
+
+---
+
 ## 2026-07-05 — v3.1.1–v3.1.3: upload/analysis fixes, live deploy, E2E, class-name editor
 
 Continuation of the audit thread: made the student upload→analysis flow real,
