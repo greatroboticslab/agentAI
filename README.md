@@ -1,6 +1,6 @@
 # agentAI
 
-**A research platform for building detection datasets — collect → review → train, all from one dashboard.**
+**A research-data platform for physical & embodied agents — upload any modality (images, video, GPS/IMU sensor logs), get an automatic diagnosis, then collect → review → train, all from one dashboard.**
 
 [![CI](https://github.com/greatroboticslab/agentAI/actions/workflows/ci.yml/badge.svg)](https://github.com/greatroboticslab/agentAI/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
@@ -19,97 +19,119 @@ any number, any mix, or none. The dashboard runs on the lab server; GPU jobs que
 <sub>Every research domain is a <b>project</b>. Open one, or start a new one for any data type — images, video, sensor, …</sub>
 </div>
 
-**Jump to:** [60-second tour](#-60-second-tour) · [Run it locally](#-run-it-locally) · [What's in this repo](#whats-in-this-repo) · [Research &amp; benchmarks](#research--benchmarks)
+**Jump to:** [5-minute demo](#-5-minute-demo--diagnose-a-robots-sensor-logs) · [Every modality](#-one-upload-box-every-modality) · [Autonomous agents](#-its-also-an-autonomous-agent-platform) · [Run it locally](#-run-it-locally) · [Research &amp; benchmarks](#research--benchmarks)
 
 ---
 
-## 🌱 60-second tour — from an empty page to a running project
+## 🚀 5-minute demo — diagnose a robot's sensor logs
 
-*Walkthrough of creating a brand-new project from scratch. To show the platform is domain-agnostic (not just
-weeds), we spin up a **marine-biology coral-reef survey**.*
+A hands-on walkthrough you can **reproduce on the [live platform](https://lab-b660m-c.tailfa6424.ts.net)**.
+We take one patrol robot's raw sensor logs — a **GPS track** and an **IMU** (accelerometer + gyro) — and let
+the platform turn them into a *diagnosis*: how clean each signal is, what went wrong and exactly *when*, and
+which sensors caught the same physical event.
 
-### Step 1 — Create a project
+> **The payoff (Step 4③):** the platform finds that at **t ≈ 60 s** the GPS and the IMU flagged trouble *at the
+> same instant* — the fingerprint of a real pothole — while a bad GPS fix at 30 s and a dead IMU channel at 75 s
+> each show up on **one sensor alone**. That cross-sensor agreement is something no single log can tell you.
 
-From the home screen, click **New Project**. Name it and tick the data types it will hold — or just describe
-your goal in plain English (*"collect drone images of coral reefs and train a model to spot bleaching"*) and let
-the AI propose the whole setup. No config files, no code.
+### Step 1 — Grab the demo data
+
+Download **[`docs/demo/patrol_multisensor.zip`](docs/demo/patrol_multisensor.zip)** (24 KB): two CSVs —
+`gps.csv` (`timestamp, lat, lon, speed_mps, heading_deg`) and `imu.csv` (`timestamp, ax, ay, az, gyro_z`),
+1,000 rows each at 10 Hz, sharing one clock. It's realistically-shaped driving data with **three faults
+deliberately injected** so every detector has something true to find.
+
+### Step 2 — Create a project
+
+On the [home page](https://lab-b660m-c.tailfa6424.ts.net), click **New Project**, name it *Patrol Multisensor*,
+and tick **Sensor** as the data type — or just describe your goal in plain English and let the AI propose the
+setup. No config files, no code.
 
 <div align="center">
 <img src="docs/screenshots/create-project.png" width="760" alt="Create a new project — name, research field, data types, or describe it in plain English">
 </div>
 
-### Step 2 — Land in your workspace
+### Step 3 — Upload the logs
 
-Every project gives you the same tools, scoped to it:
+Open the project and drop the `.zip` onto the upload box. The platform detects both CSVs as **sensor** data and
+registers the dataset. Set a **goal** — *"Find cross-sensor events where GPS and IMU agree"* — so the AI review
+knows what you actually care about.
 
-- **Agents** — five kinds you can add in any mix: **Collector** (harvests data by your queries), **Filter** (DINOv2 quality-scores it), **Labeler** (pushes to Roboflow for human labeling), **Trainer** (trains on your data), **Evaluator** (runs `model.val` on a held-out split). A project with *no* agents is just a clean dataset workspace — that's fine too.
-- **Compounding rounds** — each round is one pass of `collect → filter → label → train → evaluate`, recorded with who ran it and when; evaluation metrics feed back into the next round's collection.
-- **Upload a dataset** — drag-and-drop a `.zip` / folder / images. YOLO (`labels/` + `data.yaml`), COCO/VOC, or class-subfolders are all understood automatically.
+### Step 4 — Read the diagnosis
 
-<div align="center">
-<img src="docs/screenshots/new-project.png" width="820" alt="A new project workspace: agents, compounding rounds, and dataset upload">
-</div>
+Open **Analyze**. The page is modality-aware; for sensor data it builds a three-layer diagnosis, top to bottom.
 
-### Step 3 — It configures itself for your field, then trains
-
-Filling in the research field is all it takes to stand up a new domain — the project **auto-generated harvest
-queries** (*"coral reef bleaching detection dataset"*, *"staghorn coral annotated images"*) and an
-**accept-vocabulary** (*coral, reef, polyp*) from the words you typed. Tune the quality thresholds if you like,
-then **Train** on the cluster GPU (queued) and **Evaluate** — the resulting mAP is written straight back here.
+**① The route — and how clean each signal is.** The GPS track is drawn as its actual shape (colored by speed),
+with a red ✕ everywhere the position jumps implausibly. Below it, every signal gets a noise score: residual
+after smoothing as a % of its range, plus SNR. GPS lat/lon come back clean (0.5–0.8 %); the IMU axes read
+noisier because they carry a constant gravity component with little real variation — the page *says so* instead
+of crying "bad data".
 
 <div align="center">
-<img src="docs/screenshots/project-config-train.png" width="820" alt="Project auto-config: harvest queries and vocabulary derived from the field, plus train/evaluate">
+<img src="docs/screenshots/sensor-route.png" width="760" alt="GPS route drawn as an oval, colored by speed, with red X marks on implausible position jumps">
+<img src="docs/screenshots/sensor-noise.png" width="760" alt="Signal-quality card: per-signal noise % and SNR for all 8 GPS + IMU signals">
 </div>
 
-### What analysis looks like on real data
-
-A real weed dataset (24 field images, YOLO boxes) uploaded and analyzed **on the live lab server**: class
-distribution, image-dimension stats, near-duplicate check, and boxed sample previews — plus a one-click
-**AI review** (local model on the server; a bigger cluster model is selectable per-project) that returns a
-plain-English summary and a training-readiness verdict:
+**② What went wrong — and exactly when.** Four grounded detectors — robust rapid-change (median + MAD z-score),
+GPS teleports (physically implausible implied speed), sampling gaps, and stuck-sensor flatlines — each report a
+**precise timestamp**. Here: a 118 m GPS jump at **30 s**, a stuck IMU `az` channel for 61 samples at **75 s**,
+and a burst of activity at **60 s**.
 
 <div align="center">
-<img src="docs/screenshots/weed-analysis.png" width="840" alt="Dataset analysis of a real weed dataset: class distribution, image stats, AI review, boxed samples">
+<img src="docs/screenshots/sensor-anomalies.png" width="820" alt="Anomalies table: GPS jumps, sudden changes, and an IMU flatline, each with its timestamp and detail">
 </div>
 
-No `data.yaml` in your upload? Analysis first shows generic ids — click **✎ Edit class names** and name each
-YOLO class right on the page (ids map by position). Saving writes `data.yaml`, updates the registry, and the
-real names appear immediately:
+**③ Where the sensors agree — the real events.** This is the part a single sensor can't give you. Every
+sensor's events go onto **one shared time axis**; a **red dashed line** marks any instant where *two or more
+sensors flagged at once*. The 30 s GPS glitch and the 75 s IMU flatline each stand alone — likely sensor faults.
+But at **60.03 s** the GPS jump *and* speed-drop line up with the IMU's vertical-acceleration spike: that
+agreement is the fingerprint of a real **pothole**, not a glitch.
 
 <div align="center">
-<img src="docs/screenshots/class-name-editor.png" width="840" alt="Inline class-name editor: name each YOLO class id, save, and the distribution shows real names">
+<img src="docs/screenshots/sensor-cross-modal.png" width="840" alt="Cross-sensor timeline: events per sensor on a shared time axis, a red dashed line at 60s where GPS and IMU coincide, and a correlated-moments table">
 </div>
 
-### One upload box — four correct analyses
+> **Honest by design.** Alignment uses the files' **absolute timestamps** (a true shared clock) when present, and
+> says so on the card; otherwise it falls back to each file's own start and tells you it's *assuming* synchronized
+> logging. A one-click **AI review** then narrates all of this in plain English and rates training-readiness — a
+> small model runs locally on the server, a stronger cluster model is selectable per project.
 
-The platform is modality-aware: the same upload flow auto-detects what the data *is* and produces the right
-analysis for it — verified live with real uploads:
+---
+
+## 🧩 One upload box, every modality
+
+That sensor pipeline isn't a special case — it's the same upload box every project has. Drop a `.zip`, a folder,
+images, a raw `.mp4`, or CSV logs, and the platform **auto-detects what the data is** (by content, not file
+extension) and runs the analysis that fits it. Verified live with real uploads:
 
 | You upload | Auto-detected as | The analysis page shows |
 |---|---|---|
-| Weed field photos + YOLO labels | image | class distribution, boxed samples, near-duplicates |
-| GPS log (CSV with lat/lon) | sensor → trajectory | **the route's shape**, speed-colored, start/end marked |
-| IMU log (CSV, accel + gyro) | sensor → time-series | stacked signals over time (cornering pulses visible) |
-| Robot camera clip (raw .mp4, no zip) | video | duration / fps / frames / resolution + 8 auto-extracted frame previews |
+| Field photos + YOLO labels | **image** | class distribution, boxed sample previews, near-duplicate check |
+| GPS / IMU logs (CSV) | **sensor** | the 3-layer diagnosis above — route, noise, anomalies, cross-sensor timeline |
+| Robot camera clip (raw `.mp4`) | **video** | duration / fps / frames / resolution + 8 auto-extracted frame previews |
+
+For image datasets you get class distribution, image-dimension stats, near-duplicates, boxed samples, and the
+same one-click AI review. No `data.yaml`? Click **✎ Edit class names** and name each YOLO class right on the
+page — saving writes `data.yaml` and the real names appear immediately.
 
 <div align="center">
-<img src="docs/screenshots/sensor-trajectory.png" width="840" alt="GPS log analyzed: the patrol route's rectangular shape, speed-colored">
-<br><sub>A 900-point GPS patrol log — the route's shape drawn automatically, colored by speed.</sub>
+<img src="docs/screenshots/weed-analysis.png" width="800" alt="Image-dataset analysis: class distribution, image stats, AI review, boxed sample previews">
+<img src="docs/screenshots/video-analysis.png" width="800" alt="Video analysis: duration, fps, frames, resolution, and 8 auto-extracted preview frames">
 </div>
 
-<div align="center">
-<img src="docs/screenshots/sensor-imu-timeseries.png" width="840" alt="IMU log analyzed: stacked accelerometer and gyro signals over time">
-<br><sub>An IMU log from the same vehicle — same upload box, automatically a different (time-series) analysis.</sub>
-</div>
+---
 
-<div align="center">
-<img src="docs/screenshots/video-analysis.png" width="840" alt="Robot head-camera video analyzed: duration/fps/frames/resolution and auto-extracted frames">
-<br><sub>A humanoid head-camera clip uploaded as a raw .mp4 — metadata + 8 auto-extracted preview frames.</sub>
-</div>
+## 🤖 It's also an autonomous agent platform
 
-Beyond upload+analysis, each project also offers the one-click **agent-action console**, the human-in-the-loop
-**labeling flow** (push a few → label in Roboflow → export → repeat), and per-round **review** before anything
-reaches training. There's a built-in **2-minute guide** at <code>/guide</code>.
+Upload-and-analyze is the ground floor. A project can also run **agents** — any number, any mix, or none:
+
+- **Collector** — harvests data by your queries · **Filter** — DINOv2 quality-scores it · **Labeler** — pushes to
+  Roboflow for human labeling · **Trainer** — trains on the cluster GPU · **Evaluator** — runs `model.val` on a
+  held-out split.
+- **Compounding rounds** — each round is one `collect → filter → label → train → evaluate` pass, recorded with who
+  ran it and when; evaluation metrics feed the next round's collection.
+- Fill in a **research field** and the project auto-generates harvest queries and an accept-vocabulary from it — a
+  new domain is config, not code. There's a built-in **2-minute guide** at `/guide`.
 
 ---
 
@@ -135,8 +157,9 @@ Running tests, CI details, and contributing conventions are in **[docs/DEVELOPME
 | [`multagent/`](multagent/) | **EMACF** robotics agent framework (Brain / Perception / Targeting / Navigation) — the earlier embodied-robot direction, kept for reference. |
 | [`docs/`](docs/) | Screenshots + platform roadmap. |
 
-> **Latest:** `v3.1.0` — full-framework audit + CRITICAL correctness/security hardening (holdout-leak seal,
-> registry locking, secret removal, honesty fixes). See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
+> **Latest:** `v3.2.0` — sensor-analysis pipeline: signal noise/SNR, timestamped anomaly detection
+> (GPS teleports, stuck sensors, sampling gaps), and **cross-modal temporal alignment** (finds the instants
+> where multiple sensors flag the same physical event). See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
 > and [`RESEARCH_LOG.md`](RESEARCH_LOG.md).
 
 ---
