@@ -3684,6 +3684,28 @@ def _analyze_dataset(slug: str, refresh: bool = False) -> dict:
                     result["modality_detail"]["sensor"]["anomalies"] = anom
     except Exception as e:
         log.warning(f"[analyze] anomaly detection failed for {slug}: {e}")
+    # v3.2.0: cross-modal temporal alignment — put every sensor's events on one time
+    # axis and find CORRELATED moments (≥2 sensors flag the same instant). Optional
+    # video-frame mapping. Only when there's ≥2 sensor sources to align across.
+    try:
+        _anom = result.get("sensor_anomalies")
+        if _anom and _anom.get("files"):
+            from .sensor_align import build_alignment, plot_alignment
+            _vid = None
+            _vper = ((result.get("modality_detail") or {}).get("video") or {}).get("per") or []
+            if _vper and _vper[0].get("fps"):
+                _vid = {"file": _vper[0].get("file"), "fps": _vper[0]["fps"],
+                        "frames": _vper[0].get("frames")}
+            align = build_alignment(_anom["files"], video=_vid)
+            if align:
+                _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+                if plot_alignment(align, _DATASET_ANALYSIS_DIR / f"{slug}_timeline.png"):
+                    align["has_plot"] = True
+                result["cross_modal"] = align
+                if isinstance((result.get("modality_detail") or {}).get("sensor"), dict):
+                    result["modality_detail"]["sensor"]["cross_modal"] = align
+    except Exception as e:
+        log.warning(f"[analyze] cross-modal alignment failed for {slug}: {e}")
     try:
         _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
         json.dump(result, open(cache, "w"), indent=2)
@@ -3735,6 +3757,18 @@ def api_dataset_sensorviz(request: Request, slug: str):
     p = _DATASET_ANALYSIS_DIR / f"{slug}_sensorviz.png"
     if not p.is_file():
         raise HTTPException(404, "no sensor visualization for this dataset")
+    return FileResponse(str(p), media_type="image/png")
+
+
+@app.get("/api/dataset/timeline")
+def api_dataset_timeline(request: Request, slug: str):
+    """v3.2.0 — serve the cached cross-sensor timeline PNG (temporal alignment)."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)
+    p = _DATASET_ANALYSIS_DIR / f"{slug}_timeline.png"
+    if not p.is_file():
+        raise HTTPException(404, "no timeline for this dataset")
     return FileResponse(str(p), media_type="image/png")
 
 
@@ -3905,6 +3939,11 @@ def _ai_review_prepare(slug: str, refresh: bool = False) -> dict:
                         _bt[_k] = _bt.get(_k, 0) + _v
                 _dd["anomalies"] = {"overall_level": _an.get("overall_level"),
                                     "total_events": _an.get("total_events"), "by_type": _bt}
+            _cm = a.get("cross_modal")
+            if _cm and _cm.get("n_correlated"):
+                _dd["cross_sensor_correlated_moments"] = {
+                    "count": _cm.get("n_correlated"),
+                    "times_s": [c.get("t") for c in (_cm.get("correlated") or [])[:6]]}
         facts["data_detail"] = _dd
     base = {"ok": True, "slug": slug, "source": "rules", "issues": issues, "goal": goal,
             "training_readiness": readiness, "computed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -3996,6 +4035,13 @@ def _ai_review_merge(prep: dict, model_text: str, model: str = None,
                             + (f"; e.g. {_ex}" if _ex else "") + ").")
         elif _an is not None and _an.get("total_events") == 0:
             _noise_line += " Anomalies: none detected."
+        _cm = a.get("cross_modal")
+        if _cm and _cm.get("n_correlated"):
+            _c0 = (_cm.get("correlated") or [{}])[0]
+            _noise_line += (f" Cross-sensor: {_cm['n_correlated']} moment(s) where "
+                            f"multiple sensors flagged together"
+                            + (f" (e.g. {_c0.get('n_files')} sensors at t={_c0.get('t')}s)"
+                               if _c0.get("t") is not None else "") + ".")
     except Exception:
         pass
     model_source = model_source or prep.get("model_source")
@@ -6693,6 +6739,18 @@ function modalityDetail(md){
      +'<div style="margin:4px 0 8px">Overall: <b style="color:'+_al+'">'+esc(String(an.overall_level).toUpperCase())+'</b> <span class="muted">&middot; '+an.total_events+' event(s)</span></div>'
      +(an.total_events?('<table class="mini"><tr><td><b>file</b></td><td><b>type</b></td><td><b>signal</b></td><td><b>time</b></td><td><b>detail</b></td></tr>'+erows+'</table>'):'<div class="muted">No abnormal events found &mdash; signals stay within expected bounds.</div>')
      +'<div class="muted" style="font-size:11px;margin-top:6px">Rapid-change events (robust z-score), GPS jumps, sampling gaps, and stuck-sensor flatlines; marked with a red \\u2715 on the plot above. Note: an expected sharp turn also registers as a rapid-change event.</div></div>';}
+ if(md.sensor&&md.sensor.cross_modal){var cm=md.sensor.cross_modal;
+   var crows=(cm.correlated||[]).map(function(c){
+     var who=(c.involved||[]).map(function(i){return esc(i.file)+(i.signal?(' \\u00b7 '+esc(i.signal)):'')+' ('+esc(String(i.type).replace(/_/g,' '))+')';});
+     var uniq=[];who.forEach(function(w){if(uniq.indexOf(w)<0)uniq.push(w);});
+     var vf=(cm.video&&cm.video.frame_at&&cm.video.frame_at[String(c.t)]!=null)?('<br><span class="muted">\\u2192 video frame \\u2248 '+cm.video.frame_at[String(c.t)]+'</span>'):'';
+     return '<tr><td><b>t='+c.t+'s</b></td><td>'+c.n_files+' sensors</td><td>'+uniq.join('<br>')+vf+'</td></tr>';}).join('');
+   h+='<div class="card"><h3>&#128279; Cross-sensor timeline &mdash; correlated moments</h3>'
+     +'<div class="muted" style="margin:2px 0 8px">Every sensor\\u2019s events on one shared time axis. A <b style="color:#dc2626">red dashed line</b> marks an instant where <b>two or more sensors flagged at once</b> \\u2014 that is far more likely a real physical event (a pothole jolts the IMU and wobbles the GPS together) than a single-sensor glitch.</div>'
+     +(cm.has_plot?('<div style="overflow-x:auto"><img src="/api/dataset/timeline?slug='+encodeURIComponent(SLUG)+'&v='+Date.now()+'" style="max-width:100%;border:1px solid var(--line,#e5e7eb);border-radius:8px"/></div>'):'')
+     +'<div style="margin:8px 0 4px"><b>'+(cm.n_correlated||0)+'</b> correlated moment(s) '+(cm.video?'<span class="muted">&middot; video frames mapped ('+esc(cm.video.note||'')+')</span>':'')+'</div>'
+     +((cm.correlated&&cm.correlated.length)?('<table class="mini"><tr><td><b>time</b></td><td><b>sensors</b></td><td><b>what fired together</b></td></tr>'+crows+'</table>'):'<div class="muted">No cross-sensor coincidences \\u2014 each sensor\\u2019s events stand alone.</div>')
+     +'<div class="muted" style="font-size:11px;margin-top:6px">Aligned on '+esc(cm.basis||'')+'. Coincidence window 1.0s.</div></div>';}
  if(md.sensor){var s=md.sensor;var t=(s.tables||[]).map(function(tb){
     var nums=Object.keys(tb.numeric||{}).map(function(c){var st=tb.numeric[c];return '<tr><td>'+esc(c)+'</td><td>'+st.min+'</td><td>'+st.mean+'</td><td>'+st.max+'</td></tr>';}).join('');
     return '<div style="margin-top:8px"><b>'+esc(tb.file)+'</b> <span class="muted">· '+tb.rows+' rows · '+ (tb.cols||[]).length +' cols</span>'

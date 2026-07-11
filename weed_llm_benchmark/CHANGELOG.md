@@ -5571,3 +5571,20 @@ the exact timestamp. Surfaced three ways: (1) an "Anomalies detected" card listi
 prepended to the AI summary + a compact rollup in the AI facts. Verified live on injected anomalies (GPS 892m
 teleport @60s, stuck speed sensor 61 samples @119.8s, 8.2s time gap @158s) — all detected with correct
 timestamps and marked on the map. Timestamps rebased to seconds-from-start for readability.
+
+### v3.2.0 — cross-modal temporal alignment: which sensors flagged the SAME instant
+
+The multi-sensor differentiator (prof's "does IMU pulse N line up with a GPS corner / a video
+frame?"). New pure module `tools/sensor_align.py` places every sensor file's anomaly events on ONE
+shared time axis and finds CORRELATED MOMENTS — instants where ≥2 different sensors flagged within a
+1.0s window. A pothole shows up as an IMU vertical-accel spike AND a GPS speed-drop/wobble at the same
+second; that agreement is far stronger evidence of a real physical event than any single-sensor glitch.
+Alignment uses the files' absolute timestamps when present (true shared clock) and says so; falls back
+to per-file-relative time (assumes synchronized logging) otherwise — stated, not hidden. Optional
+video-frame mapping per correlated moment (explicit "assumes the clip starts with the sensors"). New:
+`sensor_align.build_alignment/plot_alignment`, `t_start_abs` recorded per file in `analyze_dataset_anomalies`,
+`/api/dataset/timeline` PNG endpoint, a "Cross-sensor timeline — correlated moments" card (horizontal
+per-sensor lanes + red dashed lines at coincidences + a table), a deterministic cross-sensor line in the
+AI summary, and correlated-moment facts in the AI review input. Verified live on a 2-file patrol demo
+(GPS+IMU): GPS-only teleport @30s and IMU-only flatline @75s stay single-sensor; the @60s pothole is the
+sole correlated moment (GPS jump + speed drop + IMU ax/az spike), aligned on the true shared clock.

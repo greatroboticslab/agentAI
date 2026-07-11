@@ -233,14 +233,18 @@ def analyze_dataset_anomalies(root) -> dict | None:
             low = [h.lower() for h in header]
             tcol = next((header[i] for i, h in enumerate(low)
                          if h in _TIME_NAMES and header[i] in cols), None)
-            if tcol and cols[tcol] and cols[tcol][0] > 1e6:   # unix ts → seconds from start
-                _t0 = cols[tcol][0]
-                cols[tcol] = [t - _t0 for t in cols[tcol]]
+            t_start_abs = None                                # absolute start → cross-file alignment
+            if tcol and cols[tcol]:
+                t_start_abs = cols[tcol][0]
+                if cols[tcol][0] > 1e6:                        # unix ts → seconds from start
+                    _t0 = cols[tcol][0]
+                    cols[tcol] = [t - _t0 for t in cols[tcol]]
             lcol = next((header[i] for i, h in enumerate(low) if h in _LABEL_NAMES), None)
             total_rows += max((len(v) for v in cols.values()), default=0)
             r = detect_table(cols, header, tcol, lcol)
             if r:
                 r["file"] = p.name
+                r["t_start_abs"] = t_start_abs
                 per_file.append(r)
                 total_events += r["n_events"]
         except Exception:
