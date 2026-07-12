@@ -5648,3 +5648,16 @@ CURRENT goal, treat earlier turns as context not a template. Fixes a real bug wh
 over-anchored the planner to the previous tool ("what happened around 60s?" re-ran cross_sensor_correlation
 instead of focus_time). Verified live: with the prior turn in history, "what happened around 60 seconds?" now
 correctly routes to focus_time and returns the windowed breakdown (GPS jumps ~60.0-60.1s, speed change 59.8s).
+
+### v3.4.0 — the analysis agent now covers image/video datasets too (not sensor-only)
+
+The prof's "hardcoded analysis" critique was general — image analysis was fixed cards too. The goal-driven agent
+now works on image/video datasets as well. New image tools that read the precomputed EDA dict (no re-reading
+thousands of images): class_distribution (per-class counts + imbalance ratio), image_dimensions (size/aspect/
+file-size stats + histograms), annotation_coverage (labeled % + type + near-duplicates). Tools are tagged by
+modality and the planner is only offered the relevant menu; profile, default-clarify chips, and heuristic
+fallback are all modality-aware; the chat card now shows on image datasets with image-oriented suggestions.
+Endpoint feeds the cached analysis + primary modality into analyze_goal. Also hardened the narrator (use only
+the exact classes/values in the facts; N classes means exactly N — no phantom "both classes"). Verified live on
+a real weed image dataset: "is it balanced?" → class_distribution → grounded 1-class/117-box answer; image
+sizes and train-readiness questions route to their tools.

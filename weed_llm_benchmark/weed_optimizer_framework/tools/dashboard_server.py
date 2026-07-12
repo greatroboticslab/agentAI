@@ -3821,7 +3821,12 @@ async def api_dataset_analyze_goal(request: Request):
         return rr.get("text", "") if rr.get("ok") else ""
 
     try:
-        out = _aa.analyze_goal(str(root), goal, llm_call)
+        _an = _analyze_dataset(slug)   # cached EDA — feeds image/video tools
+    except Exception:
+        _an = None
+    _mod = next(iter((_an or {}).get("modality") or {}), None)
+    try:
+        out = _aa.analyze_goal(str(root), goal, llm_call, analysis=_an, modality=_mod)
     except Exception as e:
         log.warning(f"[analyze_goal] {slug}: {e}")
         raise HTTPException(500, "analysis agent failed")
@@ -6739,6 +6744,9 @@ function renderAgentResult(r){
   if(k==="segments"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var mk=function(o){return Object.keys(o||{}).slice(0,4).map(function(s){return esc(s)+" mean="+esc(o[s].mean)+" std="+esc(o[s].std);}).join(", ");}; return '<div class="muted" style="margin-top:4px">turns = '+esc(Math.round((r.turn_fraction||0)*100))+'% of run (split on '+esc(r.segmented_on)+')<br>in turns: '+mk(r.in_turns)+'<br>in straights: '+mk(r.in_straights)+'</div>'; }
   if(k==="focus"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var rows=(r.per_file||[]).map(function(p){return Object.keys(p.signals||{}).slice(0,6).map(function(s){var v=p.signals[s];return '<tr><td>'+esc(p.file)+":"+esc(s)+'</td><td>'+esc(v.window_mean)+'</td><td>'+esc(v.delta)+'</td></tr>';}).join("");}).join(""); var ah=(r.anomalies_here||[]).map(function(e){return esc(e.type)+(e.signal?(" "+esc(e.signal)):"")+" @"+esc(e.time)+"s";}).join(", "); return '<div class="muted" style="margin-top:4px">around t='+esc(r.center)+'s (&plusmn;'+esc(r.radius_s)+'s):</div><table class="mini" style="margin-top:4px"><tr><td><b>signal</b></td><td><b>window mean</b></td><td><b>vs overall</b></td></tr>'+rows+'</table>'+(ah?'<div class="muted" style="margin-top:4px">anomalies here: '+ah+'</div>':"")+((r.correlated_here&&r.correlated_here.length)?'<div class="muted">cross-sensor here: '+r.correlated_here.map(function(c){return "t="+esc(c.t)+"s";}).join(", ")+'</div>':""); }
   if(k==="stats")return '<table class="mini" style="margin-top:6px"><tr><td><b>signal</b></td><td><b>min</b></td><td><b>mean</b></td><td><b>max</b></td></tr>'+(r.rows||[]).slice(0,8).map(function(x){return '<tr><td>'+esc(x.signal)+'</td><td>'+esc(x.min)+'</td><td>'+esc(x.mean)+'</td><td>'+esc(x.max)+'</td></tr>';}).join("")+'</table>';
+  if(k==="class_dist"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var rows=(r.classes||[]).slice(0,12).map(function(c){return '<tr><td>'+esc(c.name)+'</td><td>'+esc(c.count)+'</td><td>'+esc(c.pct)+'%</td></tr>';}).join(""); return '<div class="muted" style="margin-top:4px">'+esc(r.n_classes)+' classes ('+esc(r.count_kind||"")+'), imbalance '+esc(r.imbalance_ratio)+'&times; (most:least)</div><table class="mini" style="margin-top:4px"><tr><td><b>class</b></td><td><b>count</b></td><td><b>share</b></td></tr>'+rows+'</table>'; }
+  if(k==="img_dims"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; function st(o){return o?(esc(o.min)+" / "+esc(o.mean)+" / "+esc(o.max)):"—";} return '<table class="mini" style="margin-top:6px"><tr><td><b>metric</b></td><td><b>min / mean / max</b></td></tr><tr><td>width</td><td>'+st(r.width)+'</td></tr><tr><td>height</td><td>'+st(r.height)+'</td></tr><tr><td>aspect</td><td>'+st(r.aspect)+'</td></tr><tr><td>file KB</td><td>'+st(r.filesize_kb)+'</td></tr></table>'; }
+  if(k==="coverage")return '<div class="muted" style="margin-top:4px">labeled: '+esc(r.labeled_images)+'/'+esc(r.n_images)+' ('+esc(r.pct_labeled)+'%), type '+esc(r.annotation_type)+', near-duplicates '+esc(r.near_duplicates)+'</div>';
   if(k==="error")return '<div class="muted" style="color:#dc2626;margin-top:4px">'+esc(r.tool)+": "+esc(r.error)+'</div>';
   return "";
 }
@@ -6878,8 +6886,12 @@ async function load(refresh){
   // v3.3.0: goal-driven analysis AGENT (chat) — sensor datasets. The user asks; an
   // LLM planner picks which grounded tools to run for THAT question. Different
   // question -> different analysis. The fixed charts below remain the default read.
-  if(d.modality_detail&&d.modality_detail.sensor){
-    var chips=['How noisy is each sensor, and which is least reliable','Focus on the turns, not the straight sections','Where do GPS and IMU flag the same moment'];
+  var _pm=Object.keys(d.modality||{})[0]||((d.modality_detail&&d.modality_detail.sensor)?"sensor":"");
+  var _agentOK=(_pm==="sensor")||(d.modality_detail&&d.modality_detail.sensor)||(_pm==="image")||(_pm==="video")||(d.n_images>0);
+  if(_agentOK){
+    var chips=(_pm==="image"||_pm==="video"||d.n_images>0&&_pm!=="sensor")
+      ? ['Show the class distribution — is it balanced?','Is this dataset ready to train?','What image sizes / resolutions are in here?']
+      : ['How noisy is each sensor, and which is least reliable','Focus on the turns, not the straight sections','Where do GPS and IMU flag the same moment'];
     html+='<div class="card" style="border-color:#86efac;background:#f2fdf6"><h3>&#128172; Analysis agent &mdash; ask about this data</h3>'
       +'<div class="muted">Tell it what you care about &mdash; it chooses the right analysis for THIS question and answers with real numbers. A different question runs a different analysis; the charts below stay as the standard read.</div>'
       +'<div style="margin:8px 0;display:flex;flex-wrap:wrap;gap:6px">'+chips.map(function(q){return '<button onclick="agentAsk(this.textContent)" style="border:1px solid #86efac;background:#fff;border-radius:14px;padding:4px 10px;font-size:12px;cursor:pointer">'+esc(q)+'</button>';}).join("")+'</div>'

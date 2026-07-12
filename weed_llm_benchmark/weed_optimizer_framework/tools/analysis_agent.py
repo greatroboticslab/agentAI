@@ -24,9 +24,12 @@ from pathlib import Path
 _TIME_NAMES = ("t", "time", "timestamp", "ts", "sec", "seconds", "millis", "ms")
 
 
-def load_context(root, max_rows: int = 20000) -> dict:
-    """Parse csv/tsv sensor files under `root` into a context tools can use:
-    {files:[{name, cols:{col:[float]}, header, time_col, t_start_abs}], signals:[...]}"""
+def load_context(root, analysis: dict | None = None, modality: str | None = None,
+                 max_rows: int = 20000) -> dict:
+    """Build the context tools operate on. Sensor tools read parsed csv/tsv tables;
+    image/video tools read the precomputed EDA `analysis` dict (class distribution,
+    image dims, duplicates) — re-reading thousands of images per question is wasteful.
+    Returns {files:[...], signals:[...], analysis:{...}, modality:'sensor'|'image'|...}"""
     root = Path(root)
     tables = [p for p in sorted(root.rglob("*"))
               if p.is_file() and p.suffix.lower() in (".csv", ".tsv")
@@ -64,11 +67,27 @@ def load_context(root, max_rows: int = 20000) -> dict:
                     signals.append(f"{p.name}:{c}")
         except Exception:
             continue
-    return {"files": files, "signals": signals}
+    if not modality:
+        modality = (next(iter((analysis or {}).get("modality") or {}), None)
+                    or ("sensor" if files else "image"))
+    return {"files": files, "signals": signals,
+            "analysis": analysis or {}, "modality": modality}
 
 
 def profile_text(ctx: dict) -> str:
     """A compact, honest description of what's in the data — fed to the planner."""
+    mod = ctx.get("modality")
+    if mod in ("image", "video") or (not ctx["files"] and ctx.get("analysis")):
+        a = ctx.get("analysis") or {}
+        ann = a.get("annotations") or {}
+        dims = a.get("images") or {}
+        parts = [f"modality={mod or 'image'}", f"n_images={a.get('n_images')}",
+                 f"annotation_type={ann.get('type')}",
+                 f"n_classes={len(ann.get('classes') or [])}",
+                 f"labeled_images={ann.get('labeled_images')}",
+                 f"near_duplicates={a.get('near_duplicates')}",
+                 f"has_dimension_stats={bool(dims.get('ok'))}"]
+        return "IMAGE dataset — " + ", ".join(parts)
     lines = []
     for f in ctx["files"]:
         n = max((len(v) for v in f["cols"].values()), default=0)
@@ -292,34 +311,91 @@ def _t_tool_plot_route(ctx, color_by=None, out_png=None, **_):
             "hint": "trajectory"}
 
 
-# name -> (fn, description, params-doc)
+# ---- image / video tools: read the precomputed EDA dict (ctx["analysis"]) --------
+def _t_img_class_dist(ctx, **_):
+    ann = (ctx.get("analysis") or {}).get("annotations") or {}
+    pc = ann.get("per_class") or {}
+    if not pc:
+        return {"kind": "class_dist", "title": "Class distribution",
+                "note": "no labels/classes detected (upload YOLO labels/ + data.yaml, "
+                        "COCO/VOC, or class subfolders to get a distribution)"}
+    items = sorted(pc.items(), key=lambda kv: -kv[1])
+    total = sum(pc.values()) or 1
+    imbalance = round(items[0][1] / max(1, items[-1][1]), 1) if len(items) > 1 else 1.0
+    return {"kind": "class_dist", "title": "Class distribution",
+            "count_kind": ann.get("count_kind"), "type": ann.get("type"),
+            "n_classes": len(items), "imbalance_ratio": imbalance,
+            "labeled_images": ann.get("labeled_images"),
+            "classes": [{"name": k, "count": v, "pct": round(100 * v / total, 1)}
+                        for k, v in items[:20]]}
+
+
+def _t_img_dims(ctx, **_):
+    d = (ctx.get("analysis") or {}).get("images") or {}
+    if not d.get("ok"):
+        return {"kind": "img_dims", "title": "Image dimensions",
+                "note": "no image-dimension stats for this dataset"}
+    return {"kind": "img_dims", "title": "Image dimensions", "sampled": d.get("sampled"),
+            "width": d.get("width"), "height": d.get("height"), "aspect": d.get("aspect"),
+            "filesize_kb": d.get("filesize_kb"), "resolution_hist": d.get("resolution_hist"),
+            "aspect_hist": d.get("aspect_hist")}
+
+
+def _t_img_coverage(ctx, **_):
+    a = ctx.get("analysis") or {}
+    ann = a.get("annotations") or {}
+    ni = a.get("n_images") or 0
+    li = ann.get("labeled_images") or 0
+    return {"kind": "coverage", "title": "Annotation coverage & duplicates",
+            "n_images": ni, "labeled_images": li,
+            "pct_labeled": round(100 * li / ni, 1) if ni else 0,
+            "annotation_type": ann.get("type"), "near_duplicates": a.get("near_duplicates")}
+
+
+# name -> (fn, description, params-doc, modalities-it-applies-to)
 TOOLS = {
     "signal_noise": (_t_tool_noise,
         "How clean each signal is: residual RMS after smoothing as % of range, plus SNR dB. Use for reliability / 'how noisy' questions.",
-        {"signals": "list of signal names to check, or omit for all"}),
+        {"signals": "list of signal names to check, or omit for all"}, {"sensor"}),
     "detect_anomalies": (_t_tool_anomalies,
         "Timestamped abnormal events: sudden changes, GPS teleports, sampling gaps, stuck-sensor flatlines. Use for 'what went wrong / when'.",
-        {"types": "subset of [sudden_change,gps_jump,time_gap,flatline], or omit for all"}),
+        {"types": "subset of [sudden_change,gps_jump,time_gap,flatline], or omit for all"}, {"sensor"}),
     "cross_sensor_correlation": (_t_tool_cross,
         "Moments where TWO OR MORE sensors flagged the same instant (real physical events vs single-sensor glitches). Needs ≥2 sensor files.",
-        {"window_s": "coincidence window in seconds (default 1.0)"}),
+        {"window_s": "coincidence window in seconds (default 1.0)"}, {"sensor"}),
     "segment_turns_vs_straight": (_t_tool_segment_turns,
         "Split the run into cornering vs straight-line segments by heading-change rate and compare per-segment behaviour. Use when the user cares about turns/corners specifically.",
-        {"heading_col": "heading column name (auto if omitted)", "turn_percentile": "0-100; samples above this heading-change percentile count as turns (default 85 = sharpest 15%)"}),
+        {"heading_col": "heading column name (auto if omitted)", "turn_percentile": "0-100; samples above this heading-change percentile count as turns (default 85 = sharpest 15%)"}, {"sensor"}),
     "focus_time": (_t_tool_focus_time,
         "Zoom into a specific moment: what every signal was doing around time t (window mean vs its overall mean), plus anomalies and cross-sensor moments inside that window. Use when the user names a time or asks 'what happened at / around T seconds'.",
-        {"center": "time in seconds from the start of the run", "radius_s": "half-window in seconds (default 3)"}),
+        {"center": "time in seconds from the start of the run", "radius_s": "half-window in seconds (default 3)"}, {"sensor"}),
     "summary_stats": (_t_tool_stats,
         "min / mean / max / std per numeric signal. Use for a quick quantitative overview.",
-        {"columns": "list of columns, or omit for all"}),
+        {"columns": "list of columns, or omit for all"}, {"sensor"}),
     "plot_route": (_t_tool_plot_route,
         "Draw the GPS route's shape (needs lat/lon). Use when spatial path matters.",
-        {"color_by": "signal to color the path by, e.g. speed"}),
+        {"color_by": "signal to color the path by, e.g. speed"}, {"sensor"}),
+    "class_distribution": (_t_img_class_dist,
+        "Per-class counts and balance for a labeled image dataset (boxes or images), with an imbalance ratio. Use for 'class distribution', 'is it balanced', 'which class is rare'.",
+        {}, {"image", "video"}),
+    "image_dimensions": (_t_img_dims,
+        "Image size statistics: width/height/aspect/file-size (min/mean/max) and resolution & aspect histograms. Use for 'what sizes / resolutions', 'are images consistent'.",
+        {}, {"image", "video"}),
+    "annotation_coverage": (_t_img_coverage,
+        "How much of the image dataset is labeled (labeled vs total, %), the annotation type, and the near-duplicate count. Use for 'is it labeled / ready to train', 'how many duplicates'.",
+        {}, {"image", "video"}),
 }
 
 
-def tool_menu() -> list:
-    return [{"name": k, "description": d, "params": p} for k, (_, d, p) in TOOLS.items()]
+def tool_menu(modality: str | None = None) -> list:
+    """Tools available for `modality` (sensor/image/video). None → all."""
+    out = []
+    for k, (_fn, d, p, mods) in TOOLS.items():
+        if modality and modality not in mods:
+            continue
+        out.append({"name": k, "description": d, "params": p})
+    return out or [{"name": k, "description": d, "params": p}
+                   for k, (_fn, d, p, mods) in TOOLS.items()]
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +428,17 @@ _PLAN_SYS = (
 def _default_clarify(ctx: dict) -> list:
     """Concrete directions tailored to what's actually in the data (used when the
     goal is empty and the model doesn't offer its own)."""
+    if ctx.get("modality") in ("image", "video") or (not ctx["files"] and ctx.get("analysis")):
+        a = ctx.get("analysis") or {}
+        ann = a.get("annotations") or {}
+        qs = []
+        if ann.get("per_class"):
+            qs.append("Show the class distribution — is it balanced or are some classes rare?")
+        qs.append("Is this dataset ready to train — how much is labeled, any duplicates?")
+        if (a.get("images") or {}).get("ok"):
+            qs.append("What image sizes / resolutions are in here, and are they consistent?")
+        qs.append("Give me the key issues I should fix before training")
+        return qs[:4]
     low = set()
     multi = len([f for f in ctx["files"] if f.get("cols")]) >= 2
     for f in ctx["files"]:
@@ -385,7 +472,9 @@ def plan(goal: str, ctx: dict, llm_call) -> dict:
              "report", "here", "can", "you", "please", "everything", "all"}
     _mean = [t for t in _re.findall(r"[a-z]+", _g) if t not in _STOP]
     vague = len(_g) < 6 or not _mean
-    menu = tool_menu()
+    mod = ctx.get("modality")
+    menu = tool_menu(mod)
+    valid = {t["name"] for t in menu}
     prompt = (f"GOAL: {goal.strip() or '(none given)'}\n\n"
               f"DATASET COLUMNS:\n{profile_text(ctx)}\n\n"
               f"AVAILABLE TOOLS:\n{json.dumps(menu, indent=1)}\n\n"
@@ -409,10 +498,10 @@ def plan(goal: str, ctx: dict, llm_call) -> dict:
                 "raw": raw[:1200], "source": source}
     if not steps:
         steps, source = _heuristic_plan(goal, ctx), "heuristic"
-    # keep only known tools, drop duplicate (tool,params) steps
+    # keep only tools valid for this modality, drop duplicate (tool,params) steps
     seen, deduped = set(), []
     for s in steps:
-        if s.get("tool") not in TOOLS:
+        if s.get("tool") not in valid:
             continue
         key = (s["tool"], json.dumps(s.get("params") or {}, sort_keys=True))
         if key in seen:
@@ -449,6 +538,17 @@ def _heuristic_plan(goal: str, ctx: dict) -> list:
     """Keyword fallback so the feature degrades gracefully without a model."""
     g = (goal or "").lower()
     steps = []
+    if ctx.get("modality") in ("image", "video") or (not ctx["files"] and ctx.get("analysis")):
+        if any(w in g for w in ("class", "distribut", "balanc", "rare", "imbalance")):
+            steps.append({"tool": "class_distribution", "params": {}, "why": "class question"})
+        if any(w in g for w in ("size", "resolut", "dimension", "aspect", "pixel")):
+            steps.append({"tool": "image_dimensions", "params": {}, "why": "size question"})
+        if any(w in g for w in ("label", "cover", "ready", "train", "duplicat", "annotat")):
+            steps.append({"tool": "annotation_coverage", "params": {}, "why": "readiness question"})
+        if not steps:
+            steps = [{"tool": "class_distribution", "params": {}, "why": "overview"},
+                     {"tool": "annotation_coverage", "params": {}, "why": "readiness"}]
+        return steps[:4]
     if any(w in g for w in ("turn", "corner", "curve", "bend")):
         steps.append({"tool": "segment_turns_vs_straight", "params": {}, "why": "goal mentions turns"})
     if any(w in g for w in ("noise", "clean", "reliab", "quality", "snr")):
@@ -484,11 +584,14 @@ def run_plan(plan_steps: list, ctx: dict) -> list:
 # narrator — answer the goal using ONLY the grounded results (no invented numbers).
 # ---------------------------------------------------------------------------
 _NARRATE_SYS = (
-    "You are a data analyst answering the user's question about their sensor dataset. "
+    "You are a data analyst answering the user's question about their dataset. "
     "You are given ONLY computed facts (real numbers from tools that ran on the data). "
     "Answer the question directly and specifically, citing the actual numbers/timestamps "
-    "from the facts. Do NOT invent any number that isn't in the facts. If the facts don't "
-    "cover the question, say what you'd need to run next. 2-5 sentences, plain and concrete."
+    "from the facts. STRICT rules: use only the exact values, class names, and signal "
+    "names listed in the facts; never invent a class, count, or number; if the facts say "
+    "there are N classes, there are exactly N (do not say 'both' or imply more); if a "
+    "single class is present, say so. If the facts don't cover the question, say what "
+    "you'd need to run next. 2-5 sentences, plain and concrete."
 )
 
 
@@ -527,6 +630,25 @@ def _facts_digest(results: list) -> str:
             rows = ", ".join(f"{x['signal']}[{x['min']}..{x['max']}] mean {x['mean']} std {x['std']}"
                              for x in r.get("rows", [])[:10])
             out.append(f"[stats] {rows}")
+        elif k == "class_dist":
+            if r.get("note"):
+                out.append(f"[class distribution] {r['note']}")
+            else:
+                cs = ", ".join(f"{c['name']}={c['count']} ({c['pct']}%)" for c in r.get("classes", []))
+                out.append(f"[class distribution] {r.get('n_classes')} classes, "
+                           f"count_kind={r.get('count_kind')}, imbalance_ratio={r.get('imbalance_ratio')} "
+                           f"(most:least), labeled_images={r.get('labeled_images')}: {cs}")
+        elif k == "img_dims":
+            if r.get("note"):
+                out.append(f"[image dimensions] {r['note']}")
+            else:
+                out.append(f"[image dimensions] sampled={r.get('sampled')}, width={r.get('width')}, "
+                           f"height={r.get('height')}, aspect={r.get('aspect')}, "
+                           f"filesize_kb={r.get('filesize_kb')}, resolution_hist={r.get('resolution_hist')}")
+        elif k == "coverage":
+            out.append(f"[coverage] {r.get('labeled_images')}/{r.get('n_images')} labeled "
+                       f"({r.get('pct_labeled')}%), type={r.get('annotation_type')}, "
+                       f"near_duplicates={r.get('near_duplicates')}")
         elif k == "error":
             out.append(f"[{r.get('tool')} error] {r.get('error')}")
         else:
@@ -547,12 +669,14 @@ def narrate(goal: str, results: list, llm_call) -> str:
         return facts
 
 
-def analyze_goal(root, goal: str, llm_call) -> dict:
+def analyze_goal(root, goal: str, llm_call, analysis: dict | None = None,
+                 modality: str | None = None) -> dict:
     """One-shot: plan for `goal`, run the plan, narrate. Returns everything the
-    page needs. `llm_call(prompt, system) -> str`."""
-    ctx = load_context(root)
-    if not ctx["files"]:
-        return {"ok": False, "error": "no tabular sensor files to analyze",
+    page needs. `llm_call(prompt, system) -> str`. For image/video datasets pass the
+    precomputed EDA `analysis` dict (sensor datasets read their csv/tsv files)."""
+    ctx = load_context(root, analysis=analysis, modality=modality)
+    if not ctx["files"] and not ctx.get("analysis"):
+        return {"ok": False, "error": "nothing to analyze for this dataset",
                 "plan": [], "results": [], "answer": ""}
     pl = plan(goal, ctx, llm_call)
     if pl.get("mode") == "clarify":                         # guide the user's intent
