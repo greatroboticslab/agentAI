@@ -5588,3 +5588,18 @@ per-sensor lanes + red dashed lines at coincidences + a table), a deterministic 
 AI summary, and correlated-moment facts in the AI review input. Verified live on a 2-file patrol demo
 (GPS+IMU): GPS-only teleport @30s and IMU-only flatline @75s stay single-sensor; the @60s pothole is the
 sole correlated moment (GPS jump + speed drop + IMU ax/az spike), aligned on the true shared clock.
+
+### v3.3.0 (Phase A core) — goal-driven analysis agent: planner + tool library
+
+Answers the prof's real critique — "no matter how you talk to it, the analysis is always the same hardcoded
+output". New `tools/analysis_agent.py`: the analysis stops being a fixed pipeline and becomes an agent. An LLM
+**planner** reads the user's goal + the dataset's real column profile and **chooses which grounded tools to run,
+with what parameters**, from a tool library (`signal_noise`, `detect_anomalies`, `cross_sensor_correlation`,
+`segment_turns_vs_straight` [new — turns vs straights], `summary_stats`, `plot_route`). Different goal → different
+plan → different analysis. The LLM never invents numbers — every value comes from a tool that computes on the
+data (brain vs hands/eyes). `plan()` takes an injected `llm_call` so it's model-agnostic + unit-testable; falls
+back to a keyword heuristic if no model. Verified on the LIVE server on real 2-file patrol data: even the local
+qwen2.5:3b differentiated three goals correctly ("how noisy" → signal_noise; "the corners" →
+segment_turns_vs_straight; "GPS+IMU same event" → cross_sensor_correlation), synchronously (no queue). Backend
+core only — page/conversation wiring (Phase B) next. The existing fixed cards remain as the default first-pass
+layer; the agent sits on top.
