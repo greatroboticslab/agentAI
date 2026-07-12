@@ -210,6 +210,60 @@ def _t_tool_segment_turns(ctx, heading_col=None, turn_percentile=None, turn_rate
             "in_turns": _seg_stats(turn_idx), "in_straights": _seg_stats(straight_idx)}
 
 
+def _t_tool_focus_time(ctx, center=None, radius_s=3.0, time=None, t=None, **_):
+    """Zoom into a moment: what each signal was doing in [t-rad, t+rad] (window mean
+    vs its overall mean), plus any anomalies / cross-sensor moments inside it. This is
+    the conversational drill-down after 'something happened at t=X'."""
+    c = _num(center)
+    if c is None:
+        c = _num(time)
+    if c is None:
+        c = _num(t)
+    rad = _num(radius_s, 3.0) or 3.0
+    if c is None:
+        return {"kind": "focus", "title": "Focus on a time",
+                "note": "give a time in seconds (from the start of the run) to zoom into"}
+    per = []
+    for f in ctx["files"]:
+        tcol = f["time_col"]
+        if not tcol or tcol not in f["cols"]:
+            continue
+        times = f["cols"][tcol]
+        idx = [i for i, tv in enumerate(times) if abs(tv - c) <= rad]
+        if not idx:
+            continue
+        sig = {}
+        for cn, vals in f["cols"].items():
+            if cn == tcol:
+                continue
+            win = [vals[i] for i in idx if i < len(vals)]
+            if not win:
+                continue
+            wm = sum(win) / len(win)
+            om = sum(vals) / len(vals)
+            sig[cn] = {"window_mean": round(wm, 3), "overall_mean": round(om, 3),
+                       "delta": round(wm - om, 3)}
+        per.append({"file": f["name"], "n_samples": len(idx), "signals": sig})
+    from .sensor_anomaly import detect_table
+    from .sensor_align import build_alignment
+    anoms, anom_full = [], []
+    for f in ctx["files"]:
+        r = detect_table(f["cols"], f["header"], f["time_col"], None)
+        if r:
+            r["file"] = f["name"]; r["t_start_abs"] = f["t_start_abs"]; anom_full.append(r)
+            for e in r["events"]:
+                if e.get("time") is not None and abs(e["time"] - c) <= rad:
+                    anoms.append({"file": f["name"],
+                                  **{k: e[k] for k in ("type", "signal", "time") if k in e}})
+    corr = []
+    al = build_alignment(anom_full) if len(anom_full) >= 2 else None
+    if al:
+        corr = [cc for cc in al["correlated"] if abs(cc["t"] - c) <= rad]
+    return {"kind": "focus", "title": "Focus around t=%.1fs" % c, "center": round(c, 2),
+            "radius_s": rad, "per_file": per, "anomalies_here": anoms[:10],
+            "correlated_here": corr}
+
+
 def _t_tool_stats(ctx, columns=None, **_):
     import math
     rows = []
@@ -252,6 +306,9 @@ TOOLS = {
     "segment_turns_vs_straight": (_t_tool_segment_turns,
         "Split the run into cornering vs straight-line segments by heading-change rate and compare per-segment behaviour. Use when the user cares about turns/corners specifically.",
         {"heading_col": "heading column name (auto if omitted)", "turn_percentile": "0-100; samples above this heading-change percentile count as turns (default 85 = sharpest 15%)"}),
+    "focus_time": (_t_tool_focus_time,
+        "Zoom into a specific moment: what every signal was doing around time t (window mean vs its overall mean), plus anomalies and cross-sensor moments inside that window. Use when the user names a time or asks 'what happened at / around T seconds'.",
+        {"center": "time in seconds from the start of the run", "radius_s": "half-window in seconds (default 3)"}),
     "summary_stats": (_t_tool_stats,
         "min / mean / max / std per numeric signal. Use for a quick quantitative overview.",
         {"columns": "list of columns, or omit for all"}),
@@ -446,6 +503,16 @@ def _facts_digest(results: list) -> str:
                        f"turn_fraction={r.get('turn_fraction')}, "
                        f"in_turns={json.dumps(r.get('in_turns', {}))[:300]}, "
                        f"in_straights={json.dumps(r.get('in_straights', {}))[:300]}")
+        elif k == "focus":
+            if r.get("note"):
+                out.append(f"[focus] {r['note']}")
+            else:
+                sigs = "; ".join(f"{p['file']}: " + ", ".join(
+                    f"{s} window_mean={v['window_mean']} (delta {v['delta']} vs overall)"
+                    for s, v in list(p["signals"].items())[:5]) for p in r.get("per_file", []))
+                out.append(f"[focus t={r.get('center')}s +/-{r.get('radius_s')}s] {sigs} | "
+                           f"anomalies_here={r.get('anomalies_here')} | "
+                           f"correlated_here={r.get('correlated_here')}")
         elif k == "stats":
             rows = ", ".join(f"{x['signal']}[{x['min']}..{x['max']}] mean {x['mean']} std {x['std']}"
                              for x in r.get("rows", [])[:10])

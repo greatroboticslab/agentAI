@@ -5629,3 +5629,12 @@ also emit clarify itself, but a small local model tends to return one run-on met
 model clarify when it's 2+ crisp options and otherwise fall back to the data-aware defaults. Verified live:
 "analyze this data" → 4 tailored options → "show the route / GPS jumps" → detect_anomalies → grounded answer
 (7 GPS jumps). Structural stop-word vagueness detection replaces a brittle exact-match list.
+
+### v3.3.3 — analysis agent gains conversational drill-down (focus_time tool)
+
+New `focus_time` tool: zoom into a moment — what every signal was doing in a window around time t (window
+mean vs its overall mean), plus the anomalies and cross-sensor moments inside that window. Enables the natural
+conversation: "where do GPS and IMU agree?" → "t=60s" → "what happened around 60 seconds?" → a grounded
+breakdown (speed drop, IMU vertical-accel spike, GPS jump, the correlated moment). Verified live: the planner
+picks focus_time when the user names a time and answers from real windowed numbers. Rendered as a per-signal
+window-mean/delta table + anomalies-here list in the chat.
