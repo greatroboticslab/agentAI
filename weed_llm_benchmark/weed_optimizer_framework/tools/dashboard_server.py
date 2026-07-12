@@ -3772,6 +3772,64 @@ def api_dataset_timeline(request: Request, slug: str):
     return FileResponse(str(p), media_type="image/png")
 
 
+@app.post("/api/dataset/analyze_goal")
+async def api_dataset_analyze_goal(request: Request):
+    """v3.3.0 (Phase A/B) — goal-driven analysis AGENT. POST {slug, goal, history?}.
+    An LLM planner picks which grounded tools to run for THIS goal (so a different
+    goal → a different analysis, breaking the old fixed-pipeline behaviour); tools
+    compute the real numbers; the LLM narrates the answer using only those numbers.
+    `history` (prior [{role,content}] turns) makes it conversational — the user can
+    refine ('now look near 60s', 'ignore the straight sections') and it re-plans.
+    Runs synchronously on the local model so the chat stays responsive."""
+    _ = _actor_from_request(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    slug = str(body.get("slug") or "")
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    goal = str(body.get("goal") or "").strip()[:500]
+    history = body.get("history") if isinstance(body.get("history"), list) else []
+    root = _resolve_slug_dir(slug)
+    if not root:
+        raise HTTPException(404, "dataset not found")
+    from . import model_router as _mr, llm_providers as _llmp, analysis_agent as _aa
+    cfg = _read_model_config()
+    _domcfg = None
+    try:
+        from . import db as _dbc
+        _dom = (_read_manual_uploads().get(slug, {}).get("domain")
+                or (json.load(open(REGISTRY_PATH)).get("datasets", {}).get(slug, {}) or {}).get("domain")
+                or "weed")
+        _domcfg = _dbc.get_domain_config(_dom)
+    except Exception:
+        pass
+    pick = _mr.resolve("analysis_summary", domain_config=_domcfg,
+                       global_roles=(cfg.get("roles") or {}),
+                       provider_status=_llmp.provider_status())
+    model = pick["model"]
+    convo = ""
+    for m in history[-6:]:
+        r = str(m.get("role") or ""); c = str(m.get("content") or "")[:400]
+        if r and c:
+            convo += f"\n{r}: {c}"
+
+    def llm_call(prompt, system):
+        p = prompt if not convo else (f"CONVERSATION SO FAR (for context):{convo}\n\n{prompt}")
+        rr = _llmp.chat(model, p, system=system, max_tokens=500, timeout=120)
+        return rr.get("text", "") if rr.get("ok") else ""
+
+    try:
+        out = _aa.analyze_goal(str(root), goal, llm_call)
+    except Exception as e:
+        log.warning(f"[analyze_goal] {slug}: {e}")
+        raise HTTPException(500, "analysis agent failed")
+    out["model"] = model
+    out["model_place"] = pick.get("place")
+    return out
+
+
 @app.get("/api/dataset/classnames")
 def api_dataset_classnames_get(request: Request, slug: str):
     if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
@@ -6646,6 +6704,39 @@ async function loadAI(refresh){
   out.innerHTML=renderReview(d);
  }catch(e){ if(btn)btn.disabled=false; out.innerHTML='<span class="warn">'+esc(e)+'</span>'; }
 }
+var AGENT_HISTORY=[];
+function agentKeydown(e){ if(e.key==="Enter"){ agentSend(); } }
+function agentSend(){ var i=document.getElementById("agentIn"); if(!i)return; agentAsk(i.value); i.value=""; }
+function agentAsk(goal){
+  goal=(goal||"").trim(); if(!goal)return;
+  var log=document.getElementById("agentLog"); if(!log)return;
+  log.insertAdjacentHTML("beforeend",'<div style="margin:8px 0 2px"><b>You:</b> '+esc(goal)+'</div>');
+  var wait=document.createElement("div"); wait.className="muted"; wait.textContent="analyzing this data for your question...";
+  log.appendChild(wait); log.scrollTop=log.scrollHeight;
+  AGENT_HISTORY.push({role:"user",content:goal});
+  fetch("/api/dataset/analyze_goal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,goal:goal,history:AGENT_HISTORY})})
+   .then(function(r){return r.json();})
+   .then(function(o){ wait.remove(); log.insertAdjacentHTML("beforeend",renderAgentOut(o)); if(o&&o.answer)AGENT_HISTORY.push({role:"assistant",content:String(o.answer).slice(0,600)}); log.scrollTop=log.scrollHeight; })
+   .catch(function(e){ wait.remove(); log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626">error: '+esc(String(e))+'</div>'); });
+}
+function renderAgentOut(o){
+  if(!o||!o.ok)return '<div style="color:#dc2626;margin:6px 0">'+esc((o&&o.error)||"analysis failed")+'</div>';
+  var chosen=(o.plan||[]).map(function(s){return esc(s.tool)+(s.why?' <span class="muted">('+esc(s.why)+')</span>':"");}).join(", ");
+  var facts=(o.results||[]).map(renderAgentResult).join("");
+  return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px">'
+    +'<div style="margin-bottom:6px"><b>Agent:</b> '+esc(o.answer||"")+'</div>'
+    +'<div class="muted" style="font-size:12px">ran: '+chosen+'</div>'+facts+'</div>';
+}
+function renderAgentResult(r){
+  var k=r.kind;
+  if(k==="noise")return '<table class="mini" style="margin-top:6px"><tr><td><b>signal</b></td><td><b>noise%</b></td><td><b>SNR</b></td></tr>'+(r.rows||[]).slice(0,8).map(function(x){return '<tr><td>'+esc(x.file)+":"+esc(x.signal)+'</td><td>'+esc(x.noise_pct)+'%</td><td>'+esc(x.snr_db)+' dB</td></tr>';}).join("")+'</table>';
+  if(k==="anomalies")return '<div class="muted" style="margin-top:4px">anomalies: '+esc(r.total)+' &mdash; '+(r.files||[]).map(function(f){return esc(f.file)+" "+esc(JSON.stringify(f.by_type));}).join("; ")+'</div>';
+  if(k==="cross")return '<div class="muted" style="margin-top:4px">correlated moments: '+esc(r.n_correlated)+((r.correlated&&r.correlated.length)?(' &mdash; '+r.correlated.map(function(c){return "t="+esc(c.t)+"s("+esc(c.n_files)+" sensors)";}).join(", ")):"")+'</div>';
+  if(k==="segments"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var mk=function(o){return Object.keys(o||{}).slice(0,4).map(function(s){return esc(s)+" mean="+esc(o[s].mean)+" std="+esc(o[s].std);}).join(", ");}; return '<div class="muted" style="margin-top:4px">turns = '+esc(Math.round((r.turn_fraction||0)*100))+'% of run (split on '+esc(r.segmented_on)+')<br>in turns: '+mk(r.in_turns)+'<br>in straights: '+mk(r.in_straights)+'</div>'; }
+  if(k==="stats")return '<table class="mini" style="margin-top:6px"><tr><td><b>signal</b></td><td><b>min</b></td><td><b>mean</b></td><td><b>max</b></td></tr>'+(r.rows||[]).slice(0,8).map(function(x){return '<tr><td>'+esc(x.signal)+'</td><td>'+esc(x.min)+'</td><td>'+esc(x.mean)+'</td><td>'+esc(x.max)+'</td></tr>';}).join("")+'</table>';
+  if(k==="error")return '<div class="muted" style="color:#dc2626;margin-top:4px">'+esc(r.tool)+": "+esc(r.error)+'</div>';
+  return "";
+}
 function renderReview(d){
   var tr=d.training_readiness||{};
   var badge=tr.ready?'<span style="background:#dcfce7;color:#166534;font-weight:700;font-size:12px;padding:3px 10px;border-radius:20px">\\u2705 Ready to train</span>'
@@ -6779,6 +6870,20 @@ async function load(refresh){
     +'<div class="muted" id="aihint">A local AI model reviews this dataset: plain-English summary, data issues, recommendations, and whether it&rsquo;s ready to train.</div>'
     +'<button onclick="loadAI(1)" id="aibtn" style="margin-top:8px;border:0;cursor:pointer;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:8px">Analyze with AI</button>'
     +'<div id="aiout" style="margin-top:12px"></div></div>';
+  // v3.3.0: goal-driven analysis AGENT (chat) — sensor datasets. The user asks; an
+  // LLM planner picks which grounded tools to run for THAT question. Different
+  // question -> different analysis. The fixed charts below remain the default read.
+  if(d.modality_detail&&d.modality_detail.sensor){
+    var chips=['How noisy is each sensor, and which is least reliable','Focus on the turns, not the straight sections','Where do GPS and IMU flag the same moment'];
+    html+='<div class="card" style="border-color:#86efac;background:#f2fdf6"><h3>&#128172; Analysis agent &mdash; ask about this data</h3>'
+      +'<div class="muted">Tell it what you care about &mdash; it chooses the right analysis for THIS question and answers with real numbers. A different question runs a different analysis; the charts below stay as the standard read.</div>'
+      +'<div style="margin:8px 0;display:flex;flex-wrap:wrap;gap:6px">'+chips.map(function(q){return '<button onclick="agentAsk(this.textContent)" style="border:1px solid #86efac;background:#fff;border-radius:14px;padding:4px 10px;font-size:12px;cursor:pointer">'+esc(q)+'</button>';}).join("")+'</div>'
+      +'<div id="agentLog" style="margin-top:4px;max-height:440px;overflow:auto"></div>'
+      +'<div style="display:flex;gap:6px;margin-top:8px">'
+      +'<input id="agentIn" placeholder="e.g. which signal is noisiest, and when did things go wrong?" onkeydown="agentKeydown(event)" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px">'
+      +'<button onclick="agentSend()" style="border:0;background:#059669;color:#fff;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer">Ask</button></div>'
+      +'<div class="muted" style="font-size:11px;margin-top:6px">Grounded: every number comes from a tool that runs on your data; the model only chooses which tools to run and explains the result &mdash; it does not invent values. Runs on the local model.</div></div>';
+  }
   // modality + splits
   html+='<div class="card"><h3>Modality mix</h3>'+bars(d.modality,'#0e7c66')+'</div>';
   // v3.1.4: sensor visualization — trajectory (GPS) or time-series (IMU/other)

@@ -5603,3 +5603,17 @@ qwen2.5:3b differentiated three goals correctly ("how noisy" → signal_noise; "
 segment_turns_vs_straight; "GPS+IMU same event" → cross_sensor_correlation), synchronously (no queue). Backend
 core only — page/conversation wiring (Phase B) next. The existing fixed cards remain as the default first-pass
 layer; the agent sits on top.
+
+### v3.3.1 (Phase A+B) — the analysis agent is now on the page, and conversational
+
+Wired the goal-driven agent into the dataset analysis page. New `POST /api/dataset/analyze_goal`
+{slug, goal, history} → planner picks tools for the goal → tools compute → LLM narrates grounded in
+those numbers. New "💬 Analysis agent — ask about this data" chat card (sensor datasets): suggested-goal
+chips + free-text box, shows the answer, which tools it ran (+why), and the grounded result tables; keeps
+conversation history so the user can refine ("focus on the turns", "where do GPS and IMU agree") and it
+re-plans in place. The fixed charts remain as the default read; the agent sits on top. Also added
+`analyze_goal()`/`narrate()` and hardened tools against hallucinated params (numeric coercion; the turns
+tool now takes a percentile that speaks the planner's language, with a degenerate-split auto-fallback) plus
+plan dedup. Verified live on the 2-file patrol demo: "focus on the turns" → per-segment turn/straight stats
+(heading 308° vs 170°, speed 8.878 vs 8.979 m/s); "where do GPS and IMU agree" → t=60.03s — two different
+grounded analyses in one conversation, on the local model.

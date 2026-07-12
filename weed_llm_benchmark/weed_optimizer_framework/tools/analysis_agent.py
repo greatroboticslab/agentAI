@@ -81,6 +81,15 @@ def profile_text(ctx: dict) -> str:
 # ---------------------------------------------------------------------------
 # tool library — each tool actually computes on ctx and returns grounded data.
 # ---------------------------------------------------------------------------
+def _num(v, default=None):
+    """Coerce a possibly-bad LLM param to float; fall back on anything non-numeric
+    (the planner sometimes emits things like '85th pct' or 'auto')."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
 def _all_signals(ctx, names=None):
     """Resolve requested signal names (bare or file:col) → [(file_dict, col)]."""
     out = []
@@ -135,7 +144,7 @@ def _t_tool_cross(ctx, window_s: float = 1.0, **_):
             r["file"] = f["name"]
             r["t_start_abs"] = f["t_start_abs"]
             anom.append(r)
-    al = build_alignment(anom, window_s=float(window_s)) if anom else None
+    al = build_alignment(anom, window_s=(_num(window_s, 1.0) or 1.0)) if anom else None
     if not al:
         return {"kind": "cross", "title": "Cross-sensor correlated moments",
                 "n_correlated": 0, "note": "needs ≥2 sensor files to correlate"}
@@ -144,7 +153,7 @@ def _t_tool_cross(ctx, window_s: float = 1.0, **_):
             "correlated": al["correlated"]}
 
 
-def _t_tool_segment_turns(ctx, heading_col=None, turn_rate=None, **_):
+def _t_tool_segment_turns(ctx, heading_col=None, turn_percentile=None, turn_rate=None, **_):
     """NEW: split the run into TURN vs STRAIGHT by heading-change rate, and report
     per-segment behaviour. Answers 'I care about the corners, not the straights.'"""
     import math
@@ -167,7 +176,17 @@ def _t_tool_segment_turns(ctx, heading_col=None, turn_rate=None, **_):
     for i in range(1, n):
         d = ((hd[i] - hd[i - 1] + 180) % 360) - 180
         rate.append(abs(d))
-    thr = float(turn_rate) if turn_rate else (sorted(rate)[int(len(rate) * 0.85)] if rate else 0)
+    # threshold = the Nth-percentile heading-change (top ~(100-N)% sharpest = turns).
+    # Percentile speaks the planner's language; a raw deg/step turn_rate is honored
+    # only if it yields a sane split, else we fall back to the percentile.
+    if not rate:
+        return {"kind": "segments", "title": "Turns vs straights", "note": "series too short"}
+    pct = _num(turn_percentile, 85.0)
+    pct = min(99.0, max(50.0, pct if pct is not None else 85.0))
+    auto_thr = sorted(rate)[min(len(rate) - 1, int(len(rate) * pct / 100.0))]
+    thr = _num(turn_rate)
+    if thr is None or not (0 < sum(1 for r in rate if r > thr) < len(rate) * 0.5):
+        thr = auto_thr                                      # bad/degenerate → auto
     turn_idx = [i + 1 for i, r in enumerate(rate) if r > thr]
     frac = len(turn_idx) / max(n, 1)
 
@@ -232,7 +251,7 @@ TOOLS = {
         {"window_s": "coincidence window in seconds (default 1.0)"}),
     "segment_turns_vs_straight": (_t_tool_segment_turns,
         "Split the run into cornering vs straight-line segments by heading-change rate and compare per-segment behaviour. Use when the user cares about turns/corners specifically.",
-        {"heading_col": "heading column name (auto if omitted)", "turn_rate": "deg/step threshold (auto = 85th pct)"}),
+        {"heading_col": "heading column name (auto if omitted)", "turn_percentile": "0-100; samples above this heading-change percentile count as turns (default 85 = sharpest 15%)"}),
     "summary_stats": (_t_tool_stats,
         "min / mean / max / std per numeric signal. Use for a quick quantitative overview.",
         {"columns": "list of columns, or omit for all"}),
@@ -275,8 +294,17 @@ def plan(goal: str, ctx: dict, llm_call) -> dict:
     parsed = _extract_plan(raw)
     if not parsed:
         parsed, source = _heuristic_plan(goal, ctx), "heuristic"
-    # keep only known tools
-    parsed = [s for s in parsed if s.get("tool") in TOOLS][:4]
+    # keep only known tools, drop duplicate (tool,params) steps
+    seen, deduped = set(), []
+    for s in parsed:
+        if s.get("tool") not in TOOLS:
+            continue
+        key = (s["tool"], json.dumps(s.get("params") or {}, sort_keys=True))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(s)
+    parsed = deduped[:4]
     if not parsed:
         parsed, source = _heuristic_plan(goal, ctx), "heuristic"
     return {"ok": True, "plan": parsed, "raw": raw[:1200], "source": source}
@@ -334,3 +362,75 @@ def run_plan(plan_steps: list, ctx: dict) -> list:
         except Exception as e:
             results.append({"tool": s["tool"], "kind": "error", "error": str(e)[:200]})
     return results
+
+
+# ---------------------------------------------------------------------------
+# narrator — answer the goal using ONLY the grounded results (no invented numbers).
+# ---------------------------------------------------------------------------
+_NARRATE_SYS = (
+    "You are a data analyst answering the user's question about their sensor dataset. "
+    "You are given ONLY computed facts (real numbers from tools that ran on the data). "
+    "Answer the question directly and specifically, citing the actual numbers/timestamps "
+    "from the facts. Do NOT invent any number that isn't in the facts. If the facts don't "
+    "cover the question, say what you'd need to run next. 2-5 sentences, plain and concrete."
+)
+
+
+def _facts_digest(results: list) -> str:
+    """Compact, model-friendly rendering of the grounded results."""
+    out = []
+    for r in results:
+        k = r.get("kind")
+        if k == "noise":
+            rows = ", ".join(f"{x['file']}:{x['signal']} {x['noise_pct']}% (SNR {x['snr_db']}dB)"
+                             for x in r.get("rows", [])[:8])
+            out.append(f"[noise] {rows}")
+        elif k == "anomalies":
+            fs = "; ".join(f"{x['file']}: {x['by_type']}" for x in r.get("files", []))
+            out.append(f"[anomalies] total={r.get('total')}; {fs}")
+        elif k == "cross":
+            cs = "; ".join(f"t={c['t']}s ({c['n_files']} sensors)" for c in r.get("correlated", [])[:6])
+            out.append(f"[cross-sensor] {r.get('n_correlated')} correlated moment(s): {cs or '—'} "
+                       f"(basis: {r.get('basis','?')})")
+        elif k == "segments":
+            out.append(f"[turns vs straights] segmented on {r.get('segmented_on')}, "
+                       f"turn_fraction={r.get('turn_fraction')}, "
+                       f"in_turns={json.dumps(r.get('in_turns', {}))[:300]}, "
+                       f"in_straights={json.dumps(r.get('in_straights', {}))[:300]}")
+        elif k == "stats":
+            rows = ", ".join(f"{x['signal']}[{x['min']}..{x['max']}] mean {x['mean']} std {x['std']}"
+                             for x in r.get("rows", [])[:10])
+            out.append(f"[stats] {rows}")
+        elif k == "error":
+            out.append(f"[{r.get('tool')} error] {r.get('error')}")
+        else:
+            out.append(f"[{k}] {json.dumps({kk: vv for kk, vv in r.items() if kk not in ('tool','why')})[:300]}")
+    return "\n".join(out)
+
+
+def narrate(goal: str, results: list, llm_call) -> str:
+    """LLM answers `goal` grounded ONLY in `results`. Falls back to the digest."""
+    facts = _facts_digest(results)
+    prompt = (f"USER QUESTION / GOAL: {goal.strip() or '(general read)'}\n\n"
+              f"COMPUTED FACTS (the only numbers you may use):\n{facts}\n\n"
+              "Answer now.")
+    try:
+        txt = (llm_call(prompt, _NARRATE_SYS) or "").strip()
+        return txt or facts
+    except Exception:
+        return facts
+
+
+def analyze_goal(root, goal: str, llm_call) -> dict:
+    """One-shot: plan for `goal`, run the plan, narrate. Returns everything the
+    page needs. `llm_call(prompt, system) -> str`."""
+    ctx = load_context(root)
+    if not ctx["files"]:
+        return {"ok": False, "error": "no tabular sensor files to analyze",
+                "plan": [], "results": [], "answer": ""}
+    pl = plan(goal, ctx, llm_call)
+    results = run_plan(pl["plan"], ctx)
+    answer = narrate(goal, results, llm_call)
+    return {"ok": True, "goal": goal, "plan": pl["plan"], "plan_source": pl["source"],
+            "results": results, "answer": answer,
+            "profile": profile_text(ctx)}
