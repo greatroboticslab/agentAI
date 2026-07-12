@@ -335,7 +335,17 @@ _PLAN_SYS = (
     "specific question tailored to THESE columns.\n"
     "Return STRICT JSON, exactly one of:\n"
     '  {"plan":[{"tool":"<name>","params":{...},"why":"<short reason>"}]}\n'
-    '  {"clarify":["<specific question 1>","<specific question 2>","<specific question 3>"]}'
+    '  {"clarify":["<specific question 1>","<specific question 2>","<specific question 3>"]}\n'
+    "Routing guidance (analytical judgment):\n"
+    "- If the user refers to a SPECIFIC TIME ('at 60s', 'around 2 min', 'that moment', "
+    "'what happened at T') -> use focus_time with that time (in seconds) as center. "
+    "This holds even if a previous turn used a different tool.\n"
+    "- noisy / reliable / clean / quality -> signal_noise.\n"
+    "- what went wrong / when / faults / glitches / spikes -> detect_anomalies.\n"
+    "- turns / corners / curves vs straights -> segment_turns_vs_straight.\n"
+    "- do the sensors agree / same event / correlate across sensors -> cross_sensor_correlation.\n"
+    "- Plan for the CURRENT goal; earlier turns are context, not a template to repeat. "
+    "Prefer 1-2 focused tools over many."
 )
 
 

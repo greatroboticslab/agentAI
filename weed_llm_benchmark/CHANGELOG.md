@@ -5638,3 +5638,13 @@ conversation: "where do GPS and IMU agree?" → "t=60s" → "what happened aroun
 breakdown (speed drop, IMU vertical-accel spike, GPS jump, the correlated moment). Verified live: the planner
 picks focus_time when the user names a time and answers from real windowed numbers. Rendered as a per-signal
 window-mean/delta table + anomalies-here list in the chat.
+
+### v3.3.4 (Phase D seed) — analytical routing playbook in the planner
+
+Gave the planner explicit routing heuristics (its own analytical judgment): a specific-time reference →
+focus_time (even if a prior turn used another tool); noisy/reliable → signal_noise; what-went-wrong → 
+detect_anomalies; turns → segment_turns_vs_straight; sensors-agree → cross_sensor_correlation; plan for the
+CURRENT goal, treat earlier turns as context not a template. Fixes a real bug where conversation history
+over-anchored the planner to the previous tool ("what happened around 60s?" re-ran cross_sensor_correlation
+instead of focus_time). Verified live: with the prior turn in history, "what happened around 60 seconds?" now
+correctly routes to focus_time and returns the windowed breakdown (GPS jumps ~60.0-60.1s, speed change 59.8s).
