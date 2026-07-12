@@ -6747,6 +6747,7 @@ function renderAgentResult(r){
   if(k==="class_dist"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var rows=(r.classes||[]).slice(0,12).map(function(c){return '<tr><td>'+esc(c.name)+'</td><td>'+esc(c.count)+'</td><td>'+esc(c.pct)+'%</td></tr>';}).join(""); return '<div class="muted" style="margin-top:4px">'+esc(r.n_classes)+' classes ('+esc(r.count_kind||"")+'), imbalance '+esc(r.imbalance_ratio)+'&times; (most:least)</div><table class="mini" style="margin-top:4px"><tr><td><b>class</b></td><td><b>count</b></td><td><b>share</b></td></tr>'+rows+'</table>'; }
   if(k==="img_dims"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; function st(o){return o?(esc(o.min)+" / "+esc(o.mean)+" / "+esc(o.max)):"—";} return '<table class="mini" style="margin-top:6px"><tr><td><b>metric</b></td><td><b>min / mean / max</b></td></tr><tr><td>width</td><td>'+st(r.width)+'</td></tr><tr><td>height</td><td>'+st(r.height)+'</td></tr><tr><td>aspect</td><td>'+st(r.aspect)+'</td></tr><tr><td>file KB</td><td>'+st(r.filesize_kb)+'</td></tr></table>'; }
   if(k==="coverage")return '<div class="muted" style="margin-top:4px">labeled: '+esc(r.labeled_images)+'/'+esc(r.n_images)+' ('+esc(r.pct_labeled)+'%), type '+esc(r.annotation_type)+', near-duplicates '+esc(r.near_duplicates)+'</div>';
+  if(k==="img_quality"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var soft=(r.softest||[]).map(function(x){return esc(x.file)+" ("+esc(x.sharpness)+")";}).join(", "); return '<div class="muted" style="margin-top:4px">sampled '+esc(r.sampled)+' images &middot; median sharpness '+esc(r.median_sharpness)+' (lower = softer), median brightness '+esc(r.median_brightness)+'/255<br>'+esc(r.n_soft)+' notably soft, '+esc(r.n_dark)+' dark, '+esc(r.n_overexposed)+' overexposed'+(soft?'<br>softest: '+soft:"")+'</div>'; }
   if(k==="error")return '<div class="muted" style="color:#dc2626;margin-top:4px">'+esc(r.tool)+": "+esc(r.error)+'</div>';
   return "";
 }
@@ -6890,7 +6891,7 @@ async function load(refresh){
   var _agentOK=(_pm==="sensor")||(d.modality_detail&&d.modality_detail.sensor)||(_pm==="image")||(_pm==="video")||(d.n_images>0);
   if(_agentOK){
     var chips=(_pm==="image"||_pm==="video"||d.n_images>0&&_pm!=="sensor")
-      ? ['Show the class distribution — is it balanced?','Is this dataset ready to train?','What image sizes / resolutions are in here?']
+      ? ['Show the class distribution — is it balanced?','Are any images blurry or too dark?','Is this dataset ready to train?']
       : ['How noisy is each sensor, and which is least reliable','Focus on the turns, not the straight sections','Where do GPS and IMU flag the same moment'];
     html+='<div class="card" style="border-color:#86efac;background:#f2fdf6"><h3>&#128172; Analysis agent &mdash; ask about this data</h3>'
       +'<div class="muted">Tell it what you care about &mdash; it chooses the right analysis for THIS question and answers with real numbers. A different question runs a different analysis; the charts below stay as the standard read.</div>'

@@ -5661,3 +5661,13 @@ Endpoint feeds the cached analysis + primary modality into analyze_goal. Also ha
 the exact classes/values in the facts; N classes means exactly N — no phantom "both classes"). Verified live on
 a real weed image dataset: "is it balanced?" → class_distribution → grounded 1-class/117-box answer; image
 sizes and train-readiness questions route to their tools.
+
+### v3.4.1 — image_quality tool: the agent actually reads the pixels (grounded CV, no VLM)
+
+New image_quality tool answers "are the images blurry / too dark / good quality" by READING a sample of the
+actual pixels and computing grounded CV metrics — sharpness (variance of Laplacian; low = soft/blurry),
+brightness (mean), contrast (std) — then reporting median sharpness/brightness, counts of notably-soft / dark /
+overexposed images, and the softest filenames. Pure numpy+PIL, bounded (samples <=80, downscaled to 512px), no
+VLM and no invented values. Verified live on the weed image dataset: 40 images sampled, median sharpness 502.5,
+brightness 99.2/255, 2 notably soft, 0 dark. This gives content-quality answers grounded in real pixels; a
+semantic VLM ("does it actually show a weed") remains a separate, heavier/async capability for later.

@@ -70,7 +70,7 @@ def load_context(root, analysis: dict | None = None, modality: str | None = None
     if not modality:
         modality = (next(iter((analysis or {}).get("modality") or {}), None)
                     or ("sensor" if files else "image"))
-    return {"files": files, "signals": signals,
+    return {"files": files, "signals": signals, "root": str(root),
             "analysis": analysis or {}, "modality": modality}
 
 
@@ -352,6 +352,65 @@ def _t_img_coverage(ctx, **_):
             "annotation_type": ann.get("type"), "near_duplicates": a.get("near_duplicates")}
 
 
+def _t_img_quality(ctx, sample=40, **_):
+    """Actually READ the pixels (a sample of images) to judge quality with grounded CV
+    metrics — sharpness (variance of Laplacian; low = soft/blurry), brightness (mean),
+    contrast (std). Answers 'are the images blurry / too dark / good quality' without a
+    VLM and without inventing anything. Bounded: samples <= `sample` images, downscaled."""
+    root = ctx.get("root")
+    if not root:
+        return {"kind": "img_quality", "title": "Image quality", "note": "no image folder"}
+    try:
+        import numpy as np
+        from PIL import Image
+    except Exception:
+        return {"kind": "img_quality", "title": "Image quality",
+                "note": "image libraries unavailable on this server"}
+    from pathlib import Path
+    exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    paths = [p for p in Path(root).rglob("*")
+             if p.suffix.lower() in exts and "labels" not in {x.lower() for x in p.parts}]
+    if not paths:
+        return {"kind": "img_quality", "title": "Image quality", "note": "no images found"}
+    try:
+        sample = int(sample)
+    except (TypeError, ValueError):
+        sample = 40
+    sample = max(5, min(80, sample))
+    step = max(1, len(paths) // sample)
+    paths = paths[::step][:sample]
+    rows = []
+    for p in paths:
+        try:
+            im = Image.open(p).convert("L")
+            im.thumbnail((512, 512))                       # cap work per image
+            a = np.asarray(im, dtype="float32")
+            if a.shape[0] < 3 or a.shape[1] < 3:
+                continue
+            lap = (4 * a[1:-1, 1:-1] - a[:-2, 1:-1] - a[2:, 1:-1]
+                   - a[1:-1, :-2] - a[1:-1, 2:])
+            rows.append({"file": p.name, "sharpness": round(float(lap.var()), 1),
+                         "brightness": round(float(a.mean()), 1),
+                         "contrast": round(float(a.std()), 1)})
+        except Exception:
+            continue
+    if not rows:
+        return {"kind": "img_quality", "title": "Image quality", "note": "could not read images"}
+    sh = sorted(r["sharpness"] for r in rows)
+    med_sh = sh[len(sh) // 2]
+    br = sorted(r["brightness"] for r in rows)
+    med_br = br[len(br) // 2]
+    soft = [r for r in rows if r["sharpness"] < max(30.0, med_sh * 0.4)]   # notably softer
+    dark = [r for r in rows if r["brightness"] < 50]
+    over = [r for r in rows if r["brightness"] > 205]
+    worst = sorted(rows, key=lambda r: r["sharpness"])[:5]
+    return {"kind": "img_quality", "title": "Image quality (sampled pixels)",
+            "sampled": len(rows), "median_sharpness": round(med_sh, 1),
+            "median_brightness": round(med_br, 1),
+            "n_soft": len(soft), "n_dark": len(dark), "n_overexposed": len(over),
+            "softest": [{"file": r["file"], "sharpness": r["sharpness"]} for r in worst]}
+
+
 # name -> (fn, description, params-doc, modalities-it-applies-to)
 TOOLS = {
     "signal_noise": (_t_tool_noise,
@@ -384,6 +443,9 @@ TOOLS = {
     "annotation_coverage": (_t_img_coverage,
         "How much of the image dataset is labeled (labeled vs total, %), the annotation type, and the near-duplicate count. Use for 'is it labeled / ready to train', 'how many duplicates'.",
         {}, {"image", "video"}),
+    "image_quality": (_t_img_quality,
+        "READS a sample of the actual image pixels to judge quality: sharpness (blur), brightness, contrast, and lists the softest/blurriest files. Use for 'are the images blurry / too dark / good quality / any bad images'.",
+        {"sample": "how many images to sample (default 40, max 80)"}, {"image", "video"}),
 }
 
 
@@ -545,6 +607,8 @@ def _heuristic_plan(goal: str, ctx: dict) -> list:
             steps.append({"tool": "image_dimensions", "params": {}, "why": "size question"})
         if any(w in g for w in ("label", "cover", "ready", "train", "duplicat", "annotat")):
             steps.append({"tool": "annotation_coverage", "params": {}, "why": "readiness question"})
+        if any(w in g for w in ("blur", "sharp", "quality", "dark", "bright", "exposure", "focus", "bad image", "clear")):
+            steps.append({"tool": "image_quality", "params": {}, "why": "image-quality question"})
         if not steps:
             steps = [{"tool": "class_distribution", "params": {}, "why": "overview"},
                      {"tool": "annotation_coverage", "params": {}, "why": "readiness"}]
@@ -649,6 +713,15 @@ def _facts_digest(results: list) -> str:
             out.append(f"[coverage] {r.get('labeled_images')}/{r.get('n_images')} labeled "
                        f"({r.get('pct_labeled')}%), type={r.get('annotation_type')}, "
                        f"near_duplicates={r.get('near_duplicates')}")
+        elif k == "img_quality":
+            if r.get("note"):
+                out.append(f"[image quality] {r['note']}")
+            else:
+                out.append(f"[image quality] sampled {r.get('sampled')} images: "
+                           f"median sharpness={r.get('median_sharpness')} (variance of Laplacian; "
+                           f"lower=softer/blurrier), median brightness={r.get('median_brightness')}/255; "
+                           f"{r.get('n_soft')} notably soft, {r.get('n_dark')} dark, "
+                           f"{r.get('n_overexposed')} overexposed; softest={r.get('softest')}")
         elif k == "error":
             out.append(f"[{r.get('tool')} error] {r.get('error')}")
         else:
