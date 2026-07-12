@@ -5617,3 +5617,15 @@ tool now takes a percentile that speaks the planner's language, with a degenerat
 plan dedup. Verified live on the 2-file patrol demo: "focus on the turns" → per-segment turn/straight stats
 (heading 308° vs 170°, speed 8.878 vs 8.979 m/s); "where do GPS and IMU agree" → t=60.03s — two different
 grounded analyses in one conversation, on the local model.
+
+### v3.3.2 (Phase C) — the agent guides vague intent instead of guessing
+
+Prof's other ask — "guide the user's intent". When the goal is empty/generic ("analyze", "analyze this
+data", "give me an overview" — structurally: nothing specific left after stripping stop-words), the analysis
+agent no longer runs a canned analysis. It returns mode=clarify with 2-4 CONCRETE directions tailored to the
+actual columns (route + GPS jumps / turns vs straights / cross-sensor moments / noise + faults), rendered as
+clickable options in the chat; clicking one flows straight into a real grounded analysis. The planner may
+also emit clarify itself, but a small local model tends to return one run-on meta-question, so we only trust
+model clarify when it's 2+ crisp options and otherwise fall back to the data-aware defaults. Verified live:
+"analyze this data" → 4 tailored options → "show the route / GPS jumps" → detect_anomalies → grounded answer
+(7 GPS jumps). Structural stop-word vagueness detection replaces a brittle exact-match list.

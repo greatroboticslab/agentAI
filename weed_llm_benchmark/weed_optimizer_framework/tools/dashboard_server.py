@@ -6721,6 +6721,10 @@ function agentAsk(goal){
 }
 function renderAgentOut(o){
   if(!o||!o.ok)return '<div style="color:#dc2626;margin:6px 0">'+esc((o&&o.error)||"analysis failed")+'</div>';
+  if(o.mode==="clarify"){
+    var qs=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #fcd34d;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
+    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #d97706;background:#fff;border-radius:6px"><div style="margin-bottom:6px"><b>Agent:</b> I can dig into this a few ways &mdash; which do you want? (or type your own)</div>'+qs+'</div>';
+  }
   var chosen=(o.plan||[]).map(function(s){return esc(s.tool)+(s.why?' <span class="muted">('+esc(s.why)+')</span>':"");}).join(", ");
   var facts=(o.results||[]).map(renderAgentResult).join("");
   return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px">'

@@ -271,32 +271,80 @@ def tool_menu() -> list:
 _PLAN_SYS = (
     "You are a data-analysis planner. Given a dataset's real columns and the user's "
     "GOAL, choose which analysis tools to run and with what parameters. Pick only "
-    "tools that serve THIS goal — do not run everything. Return STRICT JSON: "
-    '{"plan":[{"tool":"<name>","params":{...},"why":"<one short reason>"}]}. '
-    "Use 1-4 tools. Only use tool names from the provided list."
+    "tools that serve THIS goal — do not run everything. Use 1-4 tools; only tool "
+    "names from the provided list.\n"
+    "BUT if the GOAL is empty, vague, or too broad to analyze well, do NOT guess — "
+    "instead offer the user concrete directions to choose from, each phrased as a "
+    "specific question tailored to THESE columns.\n"
+    "Return STRICT JSON, exactly one of:\n"
+    '  {"plan":[{"tool":"<name>","params":{...},"why":"<short reason>"}]}\n'
+    '  {"clarify":["<specific question 1>","<specific question 2>","<specific question 3>"]}'
 )
 
 
+def _default_clarify(ctx: dict) -> list:
+    """Concrete directions tailored to what's actually in the data (used when the
+    goal is empty and the model doesn't offer its own)."""
+    low = set()
+    multi = len([f for f in ctx["files"] if f.get("cols")]) >= 2
+    for f in ctx["files"]:
+        low |= {c.lower() for c in f["cols"]}
+    qs = []
+    if {"lat", "latitude"} & low and {"lon", "lng", "longitude"} & low:
+        qs.append("Show the route and where the GPS position jumps unrealistically")
+    if any(k in c for c in low for k in ("heading", "yaw", "bearing")):
+        qs.append("Compare the robot's behaviour in turns vs straight sections")
+    if multi:
+        qs.append("Find moments where two or more sensors reacted to the same event")
+    qs.append("Which signals are noisiest / least reliable, and when did anything go wrong?")
+    return qs[:4]
+
+
 def plan(goal: str, ctx: dict, llm_call) -> dict:
-    """Ask the planner LLM for a tool plan tailored to `goal`. Returns
-    {ok, plan:[{tool,params,why}], raw, source}. Falls back to a heuristic plan
-    if the model is unavailable or returns unusable output."""
+    """Ask the planner LLM for a tool plan tailored to `goal`, OR — when the goal is
+    vague/empty — clarifying questions to guide the user. Returns
+    {ok, mode:'analyze'|'clarify', plan|questions, raw, source}."""
+    _g = (goal or "").strip().lower().rstrip("?. ")
+    # vague = nothing specific left after removing generic/analysis stop-words. This
+    # catches "analyze", "analyze this data", "give me an overview", etc. — the exact
+    # case the prof hit — without a brittle exact-match list.
+    import re as _re
+    _STOP = {"analyze", "analyse", "analysis", "analyzing", "this", "that", "these",
+             "the", "data", "dataset", "please", "for", "me", "my", "our", "us",
+             "review", "eda", "do", "a", "an", "of", "it", "its", "check", "look",
+             "at", "run", "go", "help", "summary", "summarize", "summarise", "explore",
+             "what", "about", "tell", "insights", "give", "some", "show", "and", "to",
+             "on", "in", "is", "are", "perform", "see", "view", "get", "overview",
+             "report", "here", "can", "you", "please", "everything", "all"}
+    _mean = [t for t in _re.findall(r"[a-z]+", _g) if t not in _STOP]
+    vague = len(_g) < 6 or not _mean
     menu = tool_menu()
-    prompt = (f"GOAL: {goal.strip() or '(none given — do a sensible general read)'}\n\n"
+    prompt = (f"GOAL: {goal.strip() or '(none given)'}\n\n"
               f"DATASET COLUMNS:\n{profile_text(ctx)}\n\n"
               f"AVAILABLE TOOLS:\n{json.dumps(menu, indent=1)}\n\n"
-              "Return the JSON plan now.")
+              "Return the JSON now (a plan, or clarify if the goal is unclear).")
     raw, source = "", "llm"
     try:
         raw = llm_call(prompt, _PLAN_SYS) or ""
     except Exception as e:
         raw, source = f"(llm error: {e})", "error"
-    parsed = _extract_plan(raw)
-    if not parsed:
-        parsed, source = _heuristic_plan(goal, ctx), "heuristic"
+    steps, questions = _extract(raw)
+    # only trust model clarify if it's genuinely 2+ crisp options (3B often returns
+    # a single run-on meta-question — worse than our concrete data-aware defaults).
+    good_qs = [q for q in questions if 8 <= len(q) <= 140]
+    if vague and not steps:                                 # empty/generic goal → guide
+        qs = good_qs if len(good_qs) >= 2 else _default_clarify(ctx)
+        return {"ok": True, "mode": "clarify", "questions": qs[:4],
+                "raw": raw[:1200],
+                "source": source if len(good_qs) >= 2 else "default"}
+    if len(good_qs) >= 2 and not steps:                     # model chose to clarify
+        return {"ok": True, "mode": "clarify", "questions": good_qs[:4],
+                "raw": raw[:1200], "source": source}
+    if not steps:
+        steps, source = _heuristic_plan(goal, ctx), "heuristic"
     # keep only known tools, drop duplicate (tool,params) steps
     seen, deduped = set(), []
-    for s in parsed:
+    for s in steps:
         if s.get("tool") not in TOOLS:
             continue
         key = (s["tool"], json.dumps(s.get("params") or {}, sort_keys=True))
@@ -304,29 +352,30 @@ def plan(goal: str, ctx: dict, llm_call) -> dict:
             continue
         seen.add(key)
         deduped.append(s)
-    parsed = deduped[:4]
-    if not parsed:
-        parsed, source = _heuristic_plan(goal, ctx), "heuristic"
-    return {"ok": True, "plan": parsed, "raw": raw[:1200], "source": source}
+    steps = deduped[:4] or _heuristic_plan(goal, ctx)
+    return {"ok": True, "mode": "analyze", "plan": steps, "raw": raw[:1200], "source": source}
 
 
-def _extract_plan(raw: str) -> list:
+def _extract(raw: str):
+    """Parse the planner output → (plan_steps, clarify_questions). Either may be []."""
     import re
     m = re.search(r"\{.*\}", raw or "", re.S)
     if not m:
-        return []
+        return [], []
     try:
         obj = json.loads(m.group(0))
     except Exception:
-        return []
-    steps = obj.get("plan") if isinstance(obj, dict) else obj
-    out = []
-    for s in (steps or []):
+        return [], []
+    if not isinstance(obj, dict):
+        obj = {"plan": obj}
+    steps = []
+    for s in (obj.get("plan") or []):
         if isinstance(s, dict) and s.get("tool"):
-            out.append({"tool": str(s["tool"]).strip(),
-                        "params": s.get("params") or {},
-                        "why": str(s.get("why", ""))[:160]})
-    return out
+            steps.append({"tool": str(s["tool"]).strip(),
+                          "params": s.get("params") or {},
+                          "why": str(s.get("why", ""))[:160]})
+    questions = [str(q)[:180] for q in (obj.get("clarify") or []) if str(q).strip()]
+    return steps, questions
 
 
 def _heuristic_plan(goal: str, ctx: dict) -> list:
@@ -429,8 +478,12 @@ def analyze_goal(root, goal: str, llm_call) -> dict:
         return {"ok": False, "error": "no tabular sensor files to analyze",
                 "plan": [], "results": [], "answer": ""}
     pl = plan(goal, ctx, llm_call)
+    if pl.get("mode") == "clarify":                         # guide the user's intent
+        return {"ok": True, "mode": "clarify", "goal": goal,
+                "questions": pl.get("questions", []), "plan_source": pl["source"],
+                "profile": profile_text(ctx)}
     results = run_plan(pl["plan"], ctx)
     answer = narrate(goal, results, llm_call)
-    return {"ok": True, "goal": goal, "plan": pl["plan"], "plan_source": pl["source"],
-            "results": results, "answer": answer,
+    return {"ok": True, "mode": "analyze", "goal": goal, "plan": pl["plan"],
+            "plan_source": pl["source"], "results": results, "answer": answer,
             "profile": profile_text(ctx)}
