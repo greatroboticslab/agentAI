@@ -450,7 +450,10 @@ def _t_img_quality(ctx, sample=40, **_):
     med_sh = sh[len(sh) // 2]
     br = sorted(r["brightness"] for r in rows)
     med_br = br[len(br) // 2]
-    soft_thr = round(max(30.0, med_sh * 0.4), 1)          # below this = notably soft
+    # RELATIVE threshold: "notably softer than this dataset's own median". An absolute
+    # cut-off misfires — Laplacian variance depends on image content, so flat/low-texture
+    # images read as soft even when sharp. So we compare within the dataset and say so.
+    soft_thr = round(med_sh * 0.4, 2)                     # below this = notably soft (relative)
     n_soft = sum(1 for r in rows if r["sharpness"] < soft_thr)
     dark = [r for r in rows if r["brightness"] < 50]
     over = [r for r in rows if r["brightness"] > 205]
@@ -459,6 +462,8 @@ def _t_img_quality(ctx, sample=40, **_):
             "sampled": len(rows), "median_sharpness": round(med_sh, 1),
             "median_brightness": round(med_br, 1), "soft_threshold": soft_thr,
             "n_soft": n_soft, "n_dark": len(dark), "n_overexposed": len(over),
+            "soft_caveat": "sharpness is relative to image content; flat/low-texture images "
+                           "also read as soft, so treat these as candidates to eyeball, not a verdict",
             # the 5 least-sharp images; `flagged` marks the ones below the soft threshold
             "least_sharp": [{"file": r["file"], "sharpness": r["sharpness"],
                              "flagged": r["sharpness"] < soft_thr} for r in worst]}
@@ -895,12 +900,12 @@ def _facts_digest(results: list) -> str:
             else:
                 flagged = [x for x in r.get("least_sharp", []) if x.get("flagged")]
                 out.append(f"[image quality] sampled {r.get('sampled')} images. Median sharpness="
-                           f"{r.get('median_sharpness')} (variance of Laplacian; lower=softer). "
-                           f"EXACTLY {r.get('n_soft')} image(s) are below the soft threshold "
-                           f"{r.get('soft_threshold')} (these are the blurry ones): {flagged}. "
-                           f"{r.get('n_dark')} dark, {r.get('n_overexposed')} overexposed. "
-                           f"Median brightness={r.get('median_brightness')}/255. For reference the 5 "
-                           f"least-sharp files (not all necessarily blurry) are {r.get('least_sharp')}.")
+                           f"{r.get('median_sharpness')} (variance of Laplacian; lower=softer, and it is "
+                           f"RELATIVE to image content — flat/low-texture images read as soft too). "
+                           f"{r.get('n_soft')} image(s) are notably softer than the median (candidates for "
+                           f"blur, not a verdict): {flagged}. {r.get('n_dark')} dark, "
+                           f"{r.get('n_overexposed')} overexposed. Median brightness="
+                           f"{r.get('median_brightness')}/255. The 5 least-sharp files: {r.get('least_sharp')}.")
         elif k == "error":
             out.append(f"[{r.get('tool')} error] {r.get('error')}")
         else:
@@ -971,9 +976,10 @@ def _answer_sentence(r: dict) -> str:
                 f"({r.get('pct_labeled')}%), type {r.get('annotation_type')}; "
                 f"{r.get('near_duplicates')} near-duplicate pair(s).")
     if k == "img_quality":
-        return (f"Of {r.get('sampled')} sampled images, exactly {r.get('n_soft')} are below the blur "
-                f"threshold ({r.get('soft_threshold')}), {r.get('n_dark')} are dark and "
-                f"{r.get('n_overexposed')} overexposed; median sharpness {r.get('median_sharpness')}.")
+        return (f"Of {r.get('sampled')} sampled images, {r.get('n_soft')} are notably softer than this "
+                f"dataset's median sharpness ({r.get('median_sharpness')}) — candidates for blur, though "
+                f"flat/low-texture images also read as soft. {r.get('n_dark')} are dark and "
+                f"{r.get('n_overexposed')} overexposed.")
     if k == "box_stats":
         bpi = r.get("boxes_per_image") or {}
         return (f"On average {bpi.get('mean')} objects per image (range {bpi.get('min')}-{bpi.get('max')}) "
@@ -1022,8 +1028,8 @@ def _recommendations(results: list) -> list:
         k = r.get("kind")
         if k == "img_quality" and not r.get("note"):
             if r.get("n_soft"):
-                recs.append({"level": "high", "text": f"{r['n_soft']} image(s) are below the blur "
-                             f"threshold ({r.get('soft_threshold')}) — review and consider removing them."})
+                recs.append({"level": "info", "text": f"{r['n_soft']} image(s) are notably softer than the "
+                             f"dataset median — eyeball them for blur (flat/low-texture images also read soft)."})
             if r.get("n_dark"):
                 recs.append({"level": "info", "text": f"{r['n_dark']} image(s) are dark (mean brightness < 50) "
                              f"— check exposure."})

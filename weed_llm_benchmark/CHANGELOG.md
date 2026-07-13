@@ -5743,3 +5743,14 @@ alignment never saw the speed event to pair with the IMU spike (0 correlated) an
 from the display. Raised the retained-event cap to 60 (UI still shows only the top few; cross-modal/focus need
 the fuller set). Verified: cross-modal now catches the gust at t=25.35s (GPS speed_mps + IMU ax/ay agree) and
 the GPS dropout shows (1.9 s gap, 19x median, @41.8s).
+
+### v3.5.4 — image_quality: relative sharpness + honest framing (found in QA)
+
+QA on synthetic flat-background images exposed that image_quality's absolute Laplacian floor (max(30, …))
+flagged 30/32 images as "blurry" — because Laplacian variance measures detail/texture and conflates blur with
+flat/low-texture content. Fixed: the soft threshold is now purely RELATIVE to the dataset's own median
+sharpness (median × 0.4, no absolute floor); results are reframed as "notably softer than this dataset's median
+— candidates for blur, not a verdict" with an explicit caveat that flat/low-texture images also read as soft;
+severity lowered from high to info. On real textured photos behaviour is unchanged (weed dataset still flags the
+2 genuinely-soft, threshold 502×0.4=200). The 5 truly-blurred synthetic images are correctly the 5 lowest
+sharpness (0.03–0.12); the metric just can't distinguish them from other flat images, and now says so.
