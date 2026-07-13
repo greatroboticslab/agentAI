@@ -5671,3 +5671,12 @@ overexposed images, and the softest filenames. Pure numpy+PIL, bounded (samples 
 VLM and no invented values. Verified live on the weed image dataset: 40 images sampled, median sharpness 502.5,
 brightness 99.2/255, 2 notably soft, 0 dark. This gives content-quality answers grounded in real pixels; a
 semantic VLM ("does it actually show a weed") remains a separate, heavier/async capability for later.
+
+### v3.4.2 — image_quality: disambiguate "blurry" (below threshold) from "least sharp" (reference)
+
+Fixed an honesty gap flagged in the previous build: the tool returned a 5-image "softest" list plus a separate
+n_soft count, and the narrator conflated them ("some images blurry" listing all 5). Now the tool reports an
+explicit soft_threshold, an exact n_soft count of images below it, and a "least_sharp" reference list where each
+entry carries a `flagged` boolean. Digest/UI state EXACTLY N below the threshold as the blurry ones and label
+the 5 least-sharp as reference (not all necessarily blurry). Verified live: "are any images blurry?" → "there
+are 2 blurry images (183.3, 197.9), both below the soft threshold 201.0: default_test_001930.jpg, ...918.jpg".

@@ -400,15 +400,18 @@ def _t_img_quality(ctx, sample=40, **_):
     med_sh = sh[len(sh) // 2]
     br = sorted(r["brightness"] for r in rows)
     med_br = br[len(br) // 2]
-    soft = [r for r in rows if r["sharpness"] < max(30.0, med_sh * 0.4)]   # notably softer
+    soft_thr = round(max(30.0, med_sh * 0.4), 1)          # below this = notably soft
+    n_soft = sum(1 for r in rows if r["sharpness"] < soft_thr)
     dark = [r for r in rows if r["brightness"] < 50]
     over = [r for r in rows if r["brightness"] > 205]
     worst = sorted(rows, key=lambda r: r["sharpness"])[:5]
     return {"kind": "img_quality", "title": "Image quality (sampled pixels)",
             "sampled": len(rows), "median_sharpness": round(med_sh, 1),
-            "median_brightness": round(med_br, 1),
-            "n_soft": len(soft), "n_dark": len(dark), "n_overexposed": len(over),
-            "softest": [{"file": r["file"], "sharpness": r["sharpness"]} for r in worst]}
+            "median_brightness": round(med_br, 1), "soft_threshold": soft_thr,
+            "n_soft": n_soft, "n_dark": len(dark), "n_overexposed": len(over),
+            # the 5 least-sharp images; `flagged` marks the ones below the soft threshold
+            "least_sharp": [{"file": r["file"], "sharpness": r["sharpness"],
+                             "flagged": r["sharpness"] < soft_thr} for r in worst]}
 
 
 # name -> (fn, description, params-doc, modalities-it-applies-to)
@@ -717,11 +720,14 @@ def _facts_digest(results: list) -> str:
             if r.get("note"):
                 out.append(f"[image quality] {r['note']}")
             else:
-                out.append(f"[image quality] sampled {r.get('sampled')} images: "
-                           f"median sharpness={r.get('median_sharpness')} (variance of Laplacian; "
-                           f"lower=softer/blurrier), median brightness={r.get('median_brightness')}/255; "
-                           f"{r.get('n_soft')} notably soft, {r.get('n_dark')} dark, "
-                           f"{r.get('n_overexposed')} overexposed; softest={r.get('softest')}")
+                flagged = [x for x in r.get("least_sharp", []) if x.get("flagged")]
+                out.append(f"[image quality] sampled {r.get('sampled')} images. Median sharpness="
+                           f"{r.get('median_sharpness')} (variance of Laplacian; lower=softer). "
+                           f"EXACTLY {r.get('n_soft')} image(s) are below the soft threshold "
+                           f"{r.get('soft_threshold')} (these are the blurry ones): {flagged}. "
+                           f"{r.get('n_dark')} dark, {r.get('n_overexposed')} overexposed. "
+                           f"Median brightness={r.get('median_brightness')}/255. For reference the 5 "
+                           f"least-sharp files (not all necessarily blurry) are {r.get('least_sharp')}.")
         elif k == "error":
             out.append(f"[{r.get('tool')} error] {r.get('error')}")
         else:
