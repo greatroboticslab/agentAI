@@ -283,6 +283,53 @@ def _t_tool_focus_time(ctx, center=None, radius_s=3.0, time=None, t=None, **_):
             "correlated_here": corr}
 
 
+def _t_tool_compare_windows(ctx, a_start=None, a_end=None, b_start=None, b_end=None, **_):
+    """Compare two time windows signal-by-signal (mean in A vs B, delta). If explicit
+    windows aren't given, defaults to first-half vs second-half. Answers 'compare the
+    start to the end', 'is the second lap different', 'before vs after'."""
+    import math
+    a0, a1, b0, b1 = _num(a_start), _num(a_end), _num(b_start), _num(b_end)
+    explicit = None not in (a0, a1, b0, b1) and a1 > a0 and b1 > b0
+
+    def _run(use_explicit):
+        sigs = []
+        for f in ctx["files"]:
+            tc = f["time_col"]
+            times = f["cols"].get(tc) if tc else None
+            n = max((len(v) for v in f["cols"].values()), default=0)
+            if use_explicit and times:
+                a_idx = [i for i, t in enumerate(times) if a0 <= t <= a1]
+                b_idx = [i for i, t in enumerate(times) if b0 <= t <= b1]
+            else:
+                half = n // 2
+                a_idx, b_idx = list(range(0, half)), list(range(half, n))
+            for cn, vals in f["cols"].items():
+                if cn == tc:
+                    continue
+                a = [vals[i] for i in a_idx if i < len(vals)]
+                b = [vals[i] for i in b_idx if i < len(vals)]
+                if len(a) < 2 or len(b) < 2:
+                    continue
+                ma, mb = sum(a) / len(a), sum(b) / len(b)
+                sa = math.sqrt(sum((x - ma) ** 2 for x in a) / len(a))
+                sigs.append({"signal": f"{f['name']}:{cn}", "a_mean": round(ma, 3),
+                             "b_mean": round(mb, 3), "delta": round(mb - ma, 3),
+                             "a_std": round(sa, 3)})
+        return sigs
+
+    sigs = _run(explicit)
+    la, lb = ("%s-%ss" % (a0, a1), "%s-%ss" % (b0, b1)) if explicit else ("first half", "second half")
+    if not sigs and explicit:                              # bad/empty windows → fall back to halves
+        sigs = _run(False)
+        la, lb = "first half", "second half"
+    if not sigs:
+        return {"kind": "compare", "title": "Compare two windows",
+                "note": "need a time column or enough rows to split into two windows"}
+    sigs.sort(key=lambda s: -abs(s["delta"]))
+    return {"kind": "compare", "title": "Compare two windows",
+            "window_a": la, "window_b": lb, "signals": sigs[:12]}
+
+
 def _t_tool_stats(ctx, columns=None, **_):
     import math
     rows = []
@@ -431,6 +478,9 @@ TOOLS = {
     "focus_time": (_t_tool_focus_time,
         "Zoom into a specific moment: what every signal was doing around time t (window mean vs its overall mean), plus anomalies and cross-sensor moments inside that window. Use when the user names a time or asks 'what happened at / around T seconds'.",
         {"center": "time in seconds from the start of the run", "radius_s": "half-window in seconds (default 3)"}, {"sensor"}),
+    "compare_windows": (_t_tool_compare_windows,
+        "Compare two time windows signal-by-signal (mean in A vs B and the change). Defaults to first-half vs second-half if no windows given. Use for 'compare the start to the end', 'before vs after', 'is the second lap/run different'.",
+        {"a_start": "window A start (s)", "a_end": "window A end (s)", "b_start": "window B start (s)", "b_end": "window B end (s)"}, {"sensor"}),
     "summary_stats": (_t_tool_stats,
         "min / mean / max / std per numeric signal. Use for a quick quantitative overview.",
         {"columns": "list of columns, or omit for all"}, {"sensor"}),
@@ -624,6 +674,8 @@ def _heuristic_plan(goal: str, ctx: dict) -> list:
         steps.append({"tool": "cross_sensor_correlation", "params": {}, "why": "goal mentions cross-sensor"})
     if any(w in g for w in ("anomal", "fault", "wrong", "error", "glitch", "spike", "event")):
         steps.append({"tool": "detect_anomalies", "params": {}, "why": "goal mentions anomalies"})
+    if any(w in g for w in ("compare", "first half", "second half", "before", "after", "start to the end", "vs", "versus", "lap")):
+        steps.append({"tool": "compare_windows", "params": {}, "why": "goal asks to compare periods"})
     if not steps:                                   # sensible default read
         steps = [{"tool": "summary_stats", "params": {}, "why": "general overview"},
                  {"tool": "detect_anomalies", "params": {}, "why": "default health check"}]
@@ -697,6 +749,14 @@ def _facts_digest(results: list) -> str:
             rows = ", ".join(f"{x['signal']}[{x['min']}..{x['max']}] mean {x['mean']} std {x['std']}"
                              for x in r.get("rows", [])[:10])
             out.append(f"[stats] {rows}")
+        elif k == "compare":
+            if r.get("note"):
+                out.append(f"[compare] {r['note']}")
+            else:
+                rows = "; ".join(f"{s['signal']}: {r.get('window_a')} mean {s['a_mean']} -> "
+                                 f"{r.get('window_b')} mean {s['b_mean']} (delta {s['delta']})"
+                                 for s in r.get("signals", [])[:8])
+                out.append(f"[compare {r.get('window_a')} vs {r.get('window_b')}] {rows}")
         elif k == "class_dist":
             if r.get("note"):
                 out.append(f"[class distribution] {r['note']}")

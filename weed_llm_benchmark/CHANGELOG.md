@@ -5680,3 +5680,11 @@ explicit soft_threshold, an exact n_soft count of images below it, and a "least_
 entry carries a `flagged` boolean. Digest/UI state EXACTLY N below the threshold as the blurry ones and label
 the 5 least-sharp as reference (not all necessarily blurry). Verified live: "are any images blurry?" → "there
 are 2 blurry images (183.3, 197.9), both below the soft threshold 201.0: default_test_001930.jpg, ...918.jpg".
+
+### v3.4.3 — compare_windows tool: before/after and first-half/second-half comparisons
+
+New sensor tool: compare two time windows signal-by-signal (mean in A vs B and the change). Defaults to
+first-half vs second-half when no explicit windows are given, and falls back to halves if the planner supplies
+degenerate/empty windows (same robustness pattern as the turns tool). Answers "compare the start to the end",
+"before vs after", "is the second lap different". Verified live on the patrol data: first vs second half —
+gyro_z delta -0.248, az +0.102, speed_mps -0.057, heading unchanged.
