@@ -1013,6 +1013,68 @@ def _answer_lead(goal: str, results: list, llm_call) -> str:
     return txt if txt and sum(ch.isdigit() for ch in txt) <= 2 else ""
 
 
+def _recommendations(results: list) -> list:
+    """Deterministic, grounded analytical judgment: turn the computed results into
+    actionable suggestions via explicit thresholds (no model — so these never drift).
+    Each item is {level: 'high'|'info', text}. Only fires on real, cited conditions."""
+    recs = []
+    for r in results:
+        k = r.get("kind")
+        if k == "img_quality" and not r.get("note"):
+            if r.get("n_soft"):
+                recs.append({"level": "high", "text": f"{r['n_soft']} image(s) are below the blur "
+                             f"threshold ({r.get('soft_threshold')}) — review and consider removing them."})
+            if r.get("n_dark"):
+                recs.append({"level": "info", "text": f"{r['n_dark']} image(s) are dark (mean brightness < 50) "
+                             f"— check exposure."})
+            if r.get("n_overexposed"):
+                recs.append({"level": "info", "text": f"{r['n_overexposed']} image(s) are overexposed."})
+        elif k == "box_stats" and not r.get("note"):
+            if r.get("empty_label_files"):
+                recs.append({"level": "high", "text": f"{r['empty_label_files']} label file(s) are empty "
+                             f"(zero boxes) — label or remove them before training."})
+            tot = r.get("total_boxes") or 0
+            if tot and (r.get("tiny_boxes") or 0) / tot > 0.15:
+                recs.append({"level": "info", "text": f"{r['tiny_boxes']} of {tot} boxes are very small "
+                             f"(<1% of image area) — small objects are hard to detect; consider higher-res "
+                             f"training or tiling."})
+        elif k == "class_dist" and not r.get("note"):
+            if r.get("n_classes") == 1:
+                recs.append({"level": "info", "text": "Only one class is present — confirm this is intended "
+                             "(a detector usually needs the classes it will distinguish)."})
+            elif (r.get("imbalance_ratio") or 0) >= 5:
+                recs.append({"level": "high", "text": f"Class imbalance is {r['imbalance_ratio']}x (most vs "
+                             f"least frequent) — consider rebalancing or class weights."})
+        elif k == "coverage" and not r.get("note"):
+            if (r.get("pct_labeled") or 0) < 100 and r.get("n_images"):
+                recs.append({"level": "high", "text": f"Only {r['pct_labeled']}% of images are labeled — label "
+                             f"the rest before training."})
+            if r.get("near_duplicates"):
+                recs.append({"level": "info", "text": f"{r['near_duplicates']} near-duplicate pair(s) — dedupe "
+                             f"to avoid train/val leakage."})
+        elif k == "duplicates" and r.get("n_groups"):
+            recs.append({"level": "high", "text": f"{r['n_groups']} duplicate group(s) ({r.get('n_duplicate_images')} "
+                         f"redundant images) — remove duplicates to prevent train/val leakage."})
+        elif k == "cross" and r.get("n_correlated"):
+            t0 = (r.get("correlated") or [{}])[0].get("t")
+            recs.append({"level": "info", "text": f"Multiple sensors agree at {r['n_correlated']} moment(s) "
+                         f"(e.g. t={t0}s) — these are likely real physical events worth inspecting."})
+        elif k == "noise" and r.get("rows"):
+            bad = [x for x in r["rows"] if (x.get("snr_db") is not None and x["snr_db"] < 0)]
+            if bad:
+                recs.append({"level": "info", "text": f"{len(bad)} signal(s) have negative SNR (noise exceeds "
+                             f"the smoothed signal), e.g. {bad[0]['file']}:{bad[0]['signal']} — treat as "
+                             f"low-reliability."})
+    # de-dup identical texts, cap
+    seen, out = set(), []
+    for x in recs:
+        if x["text"] in seen:
+            continue
+        seen.add(x["text"])
+        out.append(x)
+    return out[:6]
+
+
 def synthesize_answer(goal: str, results: list, llm_call) -> str:
     """The answer is built deterministically from the grounded results — every number,
     name and timestamp is correct by construction. We deliberately do NOT let the small
@@ -1051,7 +1113,7 @@ def analyze_goal(root, goal: str, llm_call, analysis: dict | None = None,
                 "questions": pl.get("questions", []), "plan_source": pl["source"],
                 "profile": profile_text(ctx)}
     results = run_plan(pl["plan"], ctx)
-    answer = synthesize_answer(goal, results, llm_call)   # deterministic facts + light lead
+    answer = synthesize_answer(goal, results, llm_call)   # deterministic facts
     return {"ok": True, "mode": "analyze", "goal": goal, "plan": pl["plan"],
             "plan_source": pl["source"], "results": results, "answer": answer,
-            "profile": profile_text(ctx)}
+            "recommendations": _recommendations(results), "profile": profile_text(ctx)}

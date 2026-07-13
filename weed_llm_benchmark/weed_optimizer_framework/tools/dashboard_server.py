@@ -6732,9 +6732,11 @@ function renderAgentOut(o){
   }
   var chosen=(o.plan||[]).map(function(s){return esc(s.tool)+(s.why?' <span class="muted">('+esc(s.why)+')</span>':"");}).join(", ");
   var facts=(o.results||[]).map(renderAgentResult).join("");
+  var recs=(o.recommendations||[]).map(function(x){var hi=x.level==='high';return '<li style="margin:2px 0;color:'+(hi?'#b45309':'#475569')+'">'+(hi?'&#9888;&#65039; ':'&#8226; ')+esc(x.text)+'</li>';}).join("");
+  var recHtml=recs?('<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#334">Suggestions</div><ul style="margin:2px 0 0;padding-left:18px;font-size:12.5px">'+recs+'</ul></div>'):"";
   return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px">'
     +'<div style="margin-bottom:6px"><b>Agent:</b> '+esc(o.answer||"")+'</div>'
-    +'<div class="muted" style="font-size:12px">ran: '+chosen+'</div>'+facts+'</div>';
+    +'<div class="muted" style="font-size:12px">ran: '+chosen+'</div>'+facts+recHtml+'</div>';
 }
 function renderAgentResult(r){
   var k=r.kind;

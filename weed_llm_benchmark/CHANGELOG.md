@@ -5721,3 +5721,15 @@ speed_mps 6.96% while imu.csv:ay 16.31% was noisier). Strengthened the planner p
 superlative/general questions) AND, as a reliable belt-and-suspenders, signal_noise now always evaluates ALL
 signals regardless of the param — correctness of the superlative beats optional focus. Verified live:
 "which signal is noisiest?" now consistently "Of 8 signals, noisiest imu.csv:ay 16.31%, cleanest gps.csv:lon 0.53%".
+
+### v3.5.2 — deterministic "Suggestions": grounded, actionable recommendations (Phase D, rule-based)
+
+The agent now turns its findings into actionable advice via `_recommendations` — explicit thresholds on the
+grounded results (no model, so the advice never drifts and always matches the numbers). Examples: blurry images
+below the threshold → "review/remove" (high); >15% tiny boxes → "small objects hard to detect, consider
+higher-res/tiling"; empty label files or <100% labeled → "label before training" (high); duplicate groups →
+"dedupe to avoid train/val leakage" (high); class imbalance ≥5x → "rebalance"; single class → "confirm
+intended"; negative-SNR signals → "low reliability"; cross-sensor agreement → "likely real events, inspect".
+Shown as a "Suggestions" list under the answer (⚠️ for high-severity). Verified live: blurry-images question →
+"⚠️ 2 images below the blur threshold — review and consider removing"; sensor → "sensors agree at t=60.03s —
+likely real events". This is the agent's analytical judgment done deterministically — grounded and correct.
