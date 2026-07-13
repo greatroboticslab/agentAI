@@ -5688,3 +5688,13 @@ first-half vs second-half when no explicit windows are given, and falls back to 
 degenerate/empty windows (same robustness pattern as the turns tool). Answers "compare the start to the end",
 "before vs after", "is the second lap different". Verified live on the patrol data: first vs second half —
 gyro_z delta -0.248, az +0.102, speed_mps -0.057, heading unchanged.
+
+### v3.4.4 — box_stats + duplicate_images tools (grounded labeling-quality & cleaning)
+
+Two image tools per the "keep adding grounded tools" direction (no VLM). box_stats reads the YOLO label .txt
+files: objects per image (min/mean/max), empty label files, tiny boxes (<1% of image area), median box area —
+a grounded labeling-quality check. duplicate_images finds near-duplicate images by difference-hash and lists
+the duplicate groups by filename for cleaning. Verified live on the weed dataset: 2.92 boxes/image (1–12), 0
+empty labels, 25 tiny boxes; 0 duplicate groups. Also reworded the box_stats digest (lead with per-image mean;
+explicitly separate "empty labels" from "tiny boxes") after the 3B narrator conflated the image count with the
+per-image average and empty-vs-tiny — grounded UI tables were always correct; this makes the prose match.

@@ -461,6 +461,82 @@ def _t_img_quality(ctx, sample=40, **_):
                              "flagged": r["sharpness"] < soft_thr} for r in worst]}
 
 
+def _t_img_box_stats(ctx, **_):
+    """Read the YOLO label .txt files: objects per image, empty-label files, tiny
+    boxes. Grounded labeling-quality check for detection datasets."""
+    root = ctx.get("root")
+    if not root:
+        return {"kind": "box_stats", "title": "Bounding-box stats", "note": "no dataset folder"}
+    from pathlib import Path
+    lbls = [p for p in Path(root).rglob("*.txt")
+            if any(x.lower() == "labels" for x in p.parts) and p.name.lower() != "classes.txt"]
+    if not lbls:
+        return {"kind": "box_stats", "title": "Bounding-box stats",
+                "note": "no YOLO labels/ folder found (this tool reads YOLO .txt labels)"}
+    per, areas, empty = [], [], 0
+    for p in lbls[:5000]:
+        try:
+            lines = [ln for ln in p.read_text(encoding="utf-8", errors="replace").splitlines() if ln.strip()]
+        except Exception:
+            continue
+        per.append(len(lines))
+        if not lines:
+            empty += 1
+        for ln in lines:
+            parts = ln.split()
+            if len(parts) >= 5:
+                try:
+                    areas.append(float(parts[3]) * float(parts[4]))   # normalized w*h
+                except ValueError:
+                    pass
+    if not per:
+        return {"kind": "box_stats", "title": "Bounding-box stats", "note": "no readable label files"}
+    total = sum(per)
+    tiny = sum(1 for a in areas if a < 0.01)                # < 1% of image area
+    med_area = round(sorted(areas)[len(areas) // 2], 4) if areas else None
+    return {"kind": "box_stats", "title": "Bounding-box stats", "label_files": len(per),
+            "total_boxes": total, "empty_label_files": empty,
+            "boxes_per_image": {"min": min(per), "max": max(per),
+                                "mean": round(total / len(per), 2)},
+            "tiny_boxes": tiny, "median_box_area_frac": med_area}
+
+
+def _t_img_duplicates(ctx, **_):
+    """Find near-duplicate images by difference-hash (dHash) and list the groups —
+    for dataset cleaning ('which images are duplicates?'). Reads downscaled pixels."""
+    root = ctx.get("root")
+    if not root:
+        return {"kind": "duplicates", "title": "Duplicate images", "note": "no image folder"}
+    try:
+        from PIL import Image
+    except Exception:
+        return {"kind": "duplicates", "title": "Duplicate images", "note": "PIL unavailable"}
+    from pathlib import Path
+    exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    paths = [p for p in Path(root).rglob("*")
+             if p.suffix.lower() in exts and "labels" not in {x.lower() for x in p.parts}]
+    if not paths:
+        return {"kind": "duplicates", "title": "Duplicate images", "note": "no images found"}
+    buckets = {}
+    for p in paths[:4000]:
+        try:
+            im = Image.open(p).convert("L").resize((9, 8))
+            px = list(im.getdata())
+            h = 0
+            for r in range(8):
+                for c in range(8):
+                    h = (h << 1) | (1 if px[r * 9 + c] > px[r * 9 + c + 1] else 0)
+            buckets.setdefault(h, []).append(p.name)
+        except Exception:
+            continue
+    groups = [g for g in buckets.values() if len(g) > 1]
+    dup_imgs = sum(len(g) - 1 for g in groups)
+    groups.sort(key=len, reverse=True)
+    return {"kind": "duplicates", "title": "Duplicate images", "scanned": sum(len(v) for v in buckets.values()),
+            "n_groups": len(groups), "n_duplicate_images": dup_imgs,
+            "groups": [g[:6] for g in groups[:8]]}
+
+
 # name -> (fn, description, params-doc, modalities-it-applies-to)
 TOOLS = {
     "signal_noise": (_t_tool_noise,
@@ -499,6 +575,12 @@ TOOLS = {
     "image_quality": (_t_img_quality,
         "READS a sample of the actual image pixels to judge quality: sharpness (blur), brightness, contrast, and lists the softest/blurriest files. Use for 'are the images blurry / too dark / good quality / any bad images'.",
         {"sample": "how many images to sample (default 40, max 80)"}, {"image", "video"}),
+    "box_stats": (_t_img_box_stats,
+        "Reads the YOLO label files: objects per image (min/mean/max), how many label files are empty, and how many boxes are tiny (<1% of the image). Use for labeling-quality / 'how many objects per image' / 'any empty or tiny-box labels'.",
+        {}, {"image", "video"}),
+    "duplicate_images": (_t_img_duplicates,
+        "Finds near-duplicate images (difference-hash) and lists the duplicate groups by filename. Use for 'which images are duplicates', 'should I remove duplicates', dataset cleaning.",
+        {}, {"image", "video"}),
 }
 
 
@@ -662,6 +744,10 @@ def _heuristic_plan(goal: str, ctx: dict) -> list:
             steps.append({"tool": "annotation_coverage", "params": {}, "why": "readiness question"})
         if any(w in g for w in ("blur", "sharp", "quality", "dark", "bright", "exposure", "focus", "bad image", "clear")):
             steps.append({"tool": "image_quality", "params": {}, "why": "image-quality question"})
+        if any(w in g for w in ("box", "object", "per image", "empty label", "tiny", "small box", "how many object")):
+            steps.append({"tool": "box_stats", "params": {}, "why": "box/labeling question"})
+        if any(w in g for w in ("duplicat", "same image", "repeated image", "redundant")):
+            steps.append({"tool": "duplicate_images", "params": {}, "why": "duplicate question"})
         if not steps:
             steps = [{"tool": "class_distribution", "params": {}, "why": "overview"},
                      {"tool": "annotation_coverage", "params": {}, "why": "readiness"}]
@@ -776,6 +862,26 @@ def _facts_digest(results: list) -> str:
             out.append(f"[coverage] {r.get('labeled_images')}/{r.get('n_images')} labeled "
                        f"({r.get('pct_labeled')}%), type={r.get('annotation_type')}, "
                        f"near_duplicates={r.get('near_duplicates')}")
+        elif k == "box_stats":
+            if r.get("note"):
+                out.append(f"[box stats] {r['note']}")
+            else:
+                bpi = r.get("boxes_per_image") or {}
+                out.append(
+                    f"[box stats] Objects per image: mean {bpi.get('mean')} (min {bpi.get('min')}, "
+                    f"max {bpi.get('max')}). Dataset size: {r.get('label_files')} labeled images holding "
+                    f"{r.get('total_boxes')} boxes in total. "
+                    f"Empty label files (zero boxes): exactly {r.get('empty_label_files')}. "
+                    f"Tiny boxes (under 1% of image area): {r.get('tiny_boxes')} out of {r.get('total_boxes')} "
+                    f"boxes — small boxes, NOT empty labels. Median box area = "
+                    f"{r.get('median_box_area_frac')} of the image. "
+                    f"(Do not confuse the image count with the per-image average.)")
+        elif k == "duplicates":
+            if r.get("note"):
+                out.append(f"[duplicates] {r['note']}")
+            else:
+                out.append(f"[duplicates] scanned {r.get('scanned')} images: {r.get('n_groups')} duplicate "
+                           f"group(s), {r.get('n_duplicate_images')} redundant image(s). Groups: {r.get('groups')}")
         elif k == "img_quality":
             if r.get("note"):
                 out.append(f"[image quality] {r['note']}")
