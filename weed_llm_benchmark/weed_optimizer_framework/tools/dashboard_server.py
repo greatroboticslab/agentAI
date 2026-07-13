@@ -6903,7 +6903,7 @@ async function load(refresh){
       +'<div style="display:flex;gap:6px;margin-top:8px">'
       +'<input id="agentIn" placeholder="e.g. which signal is noisiest, and when did things go wrong?" onkeydown="agentKeydown(event)" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px">'
       +'<button onclick="agentSend()" style="border:0;background:#059669;color:#fff;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer">Ask</button></div>'
-      +'<div class="muted" style="font-size:11px;margin-top:6px">Grounded: every number comes from a tool that runs on your data; the model only chooses which tools to run and explains the result &mdash; it does not invent values. Runs on the local model.</div></div>';
+      +'<div class="muted" style="font-size:11px;margin-top:6px">Grounded: the local model chooses which tools to run for your question; the findings are then stated exactly as the tools computed them (not paraphrased by the model), so no number is ever invented.</div></div>';
   }
   // modality + splits
   html+='<div class="card"><h3>Modality mix</h3>'+bars(d.modality,'#0e7c66')+'</div>';

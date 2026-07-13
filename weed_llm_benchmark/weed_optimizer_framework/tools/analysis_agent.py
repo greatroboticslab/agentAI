@@ -901,6 +901,121 @@ def _facts_digest(results: list) -> str:
     return "\n".join(out)
 
 
+def _answer_sentence(r: dict) -> str:
+    """A CORRECT, deterministic one-liner for one result — numbers built in code so
+    they can never be garbled by the model. This is the factual core of the answer."""
+    k = r.get("kind")
+    if r.get("note"):
+        return str(r["note"]).rstrip(".") + "."
+    if k == "noise":
+        rows = r.get("rows", [])
+        if not rows:
+            return ""
+        w = rows[0]
+        best = min(rows, key=lambda x: (x.get("noise_pct") if x.get("noise_pct") is not None else 999))
+        return (f"Of {len(rows)} signals, the noisiest is {w['file']}:{w['signal']} at "
+                f"{w['noise_pct']}% of range (SNR {w['snr_db']} dB); the cleanest is "
+                f"{best['file']}:{best['signal']} at {best['noise_pct']}%.")
+    if k == "anomalies":
+        if not r.get("total"):
+            return "No anomalies were detected."
+        by = "; ".join(f"{f['file']}: " + ", ".join(f"{v} {t.replace('_', ' ')}"
+                        for t, v in (f.get('by_type') or {}).items()) for f in r.get("files", []))
+        return f"{r['total']} anomalies detected — {by}."
+    if k == "cross":
+        n = r.get("n_correlated", 0)
+        if not n:
+            return "No moments where two or more sensors flagged together."
+        cs = ", ".join(f"t={c['t']}s ({c['n_files']} sensors)" for c in r.get("correlated", [])[:5])
+        return f"{n} moment(s) where multiple sensors flagged together: {cs} (aligned on {r.get('basis')})."
+    if k == "segments":
+        pct = round((r.get("turn_fraction") or 0) * 100)
+        return (f"Turns make up ~{pct}% of the run (split on {r.get('segmented_on')}); "
+                f"per-signal means in turns vs straights are tabulated below.")
+    if k == "focus":
+        c = r.get("center")
+        ah = r.get("anomalies_here") or []
+        extra = (f" {len(ah)} anomaly event(s) fall in this window" if ah else " no anomalies in this window")
+        cor = r.get("correlated_here") or []
+        if cor:
+            extra += f"; a cross-sensor moment sits at t={cor[0]['t']}s"
+        return f"Around t={c}s (+/-{r.get('radius_s')}s):{extra}. Per-signal values are tabulated below."
+    if k == "compare":
+        s = (r.get("signals") or [{}])[0]
+        if not s:
+            return ""
+        return (f"Comparing {r.get('window_a')} vs {r.get('window_b')}, the biggest change is "
+                f"{s.get('signal')} ({s.get('a_mean')} -> {s.get('b_mean')}, delta {s.get('delta')}).")
+    if k == "stats":
+        return f"Summary statistics for {len(r.get('rows', []))} signals are tabulated below."
+    if k == "class_dist":
+        n = r.get("n_classes")
+        if n == 1:
+            c = (r.get("classes") or [{}])[0]
+            return f"There is a single class, {c.get('name')} ({c.get('count')} {r.get('count_kind')})."
+        return (f"{n} classes ({r.get('count_kind')}), imbalance ratio {r.get('imbalance_ratio')}x "
+                f"(most vs least frequent); full counts below.")
+    if k == "img_dims":
+        w, h = r.get("width") or {}, r.get("height") or {}
+        return (f"Across {r.get('sampled')} sampled images, width ~{w.get('min')}-{w.get('max')} "
+                f"(mean {w.get('mean')}) and height ~{h.get('min')}-{h.get('max')} (mean {h.get('mean')}).")
+    if k == "coverage":
+        return (f"{r.get('labeled_images')} of {r.get('n_images')} images are labeled "
+                f"({r.get('pct_labeled')}%), type {r.get('annotation_type')}; "
+                f"{r.get('near_duplicates')} near-duplicate pair(s).")
+    if k == "img_quality":
+        return (f"Of {r.get('sampled')} sampled images, exactly {r.get('n_soft')} are below the blur "
+                f"threshold ({r.get('soft_threshold')}), {r.get('n_dark')} are dark and "
+                f"{r.get('n_overexposed')} overexposed; median sharpness {r.get('median_sharpness')}.")
+    if k == "box_stats":
+        bpi = r.get("boxes_per_image") or {}
+        return (f"On average {bpi.get('mean')} objects per image (range {bpi.get('min')}-{bpi.get('max')}) "
+                f"across {r.get('label_files')} labeled images ({r.get('total_boxes')} boxes). "
+                f"{r.get('empty_label_files')} empty label file(s); {r.get('tiny_boxes')} boxes are tiny "
+                f"(<1% of image area).")
+    if k == "duplicates":
+        if not r.get("n_groups"):
+            return f"No duplicate images found among {r.get('scanned')} scanned."
+        return (f"{r.get('n_groups')} duplicate group(s) covering {r.get('n_duplicate_images')} redundant "
+                f"image(s) out of {r.get('scanned')} scanned; groups listed below.")
+    if k == "error":
+        return f"({r.get('tool')} could not run: {r.get('error')})"
+    return ""
+
+
+_LEAD_SYS = (
+    "You write ONE short sentence that qualitatively answers the user's question about "
+    "their dataset (e.g. yes/no, balanced/imbalanced, clean/noisy, ready/not-ready). "
+    "CRITICAL: do NOT include any specific number, filename, class name, or timestamp — "
+    "the exact figures are shown separately. Under 22 words, no preamble."
+)
+
+
+def _answer_lead(goal: str, results: list, llm_call) -> str:
+    """A brief, numbers-free qualitative lead-in. Low-stakes (no figures pass through
+    the model); returns '' on any failure."""
+    if not goal.strip():
+        return ""
+    facts = _facts_digest(results)
+    try:
+        txt = (llm_call(f"Question: {goal}\n\nFindings (for your understanding only, do not "
+                        f"quote numbers):\n{facts}\n\nOne qualitative sentence:", _LEAD_SYS) or "").strip()
+    except Exception:
+        return ""
+    # guard: if the model leaked digits, drop it (keep the deterministic core clean)
+    return txt if txt and sum(ch.isdigit() for ch in txt) <= 2 else ""
+
+
+def synthesize_answer(goal: str, results: list, llm_call) -> str:
+    """The answer is built deterministically from the grounded results — every number,
+    name and timestamp is correct by construction. We deliberately do NOT let the small
+    local model paraphrase the figures (it drifts) or even add a qualitative lead (it
+    contradicted the facts, e.g. calling a single-class set 'imbalanced'). Richer
+    interpretation is a separate opt-in 'deep' pass on a stronger model."""
+    facts = [s for s in (_answer_sentence(r) for r in results) if s]
+    return " ".join(facts) or "No results to report — try a more specific question."
+
+
 def narrate(goal: str, results: list, llm_call) -> str:
     """LLM answers `goal` grounded ONLY in `results`. Falls back to the digest."""
     facts = _facts_digest(results)
@@ -929,7 +1044,7 @@ def analyze_goal(root, goal: str, llm_call, analysis: dict | None = None,
                 "questions": pl.get("questions", []), "plan_source": pl["source"],
                 "profile": profile_text(ctx)}
     results = run_plan(pl["plan"], ctx)
-    answer = narrate(goal, results, llm_call)
+    answer = synthesize_answer(goal, results, llm_call)   # deterministic facts + light lead
     return {"ok": True, "mode": "analyze", "goal": goal, "plan": pl["plan"],
             "plan_source": pl["source"], "results": results, "answer": answer,
             "profile": profile_text(ctx)}

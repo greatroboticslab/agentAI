@@ -5698,3 +5698,17 @@ the duplicate groups by filename for cleaning. Verified live on the weed dataset
 empty labels, 25 tiny boxes; 0 duplicate groups. Also reworded the box_stats digest (lead with per-image mean;
 explicitly separate "empty labels" from "tiny boxes") after the 3B narrator conflated the image count with the
 per-image average and empty-vs-tiny — grounded UI tables were always correct; this makes the prose match.
+
+### v3.5.0 — deterministic answer synthesis: the agent's numbers are now correct by construction
+
+Root-cause fix for the recurring 3B narration slips (calling 40 images "40 objects/image", conflating empty
+labels with tiny boxes, calling a single-class set "severely imbalanced"). The analysis agent's ANSWER is no
+longer paraphrased by the small local model — it is built deterministically in code from the grounded tool
+results (`_answer_sentence` per result kind, `synthesize_answer`), so every number, filename, class name and
+timestamp is correct by construction and multiple tools compose cleanly. The planner LLM still provides the
+intelligence (choosing which tools to run for the question); the model no longer touches the figures. Even a
+numbers-free qualitative "lead" was dropped after the 3B produced a lead that contradicted the facts. Footnote
+updated to say findings are stated exactly as computed. Verified live: "class distribution" → "There is a
+single class, ridderzuring (117 boxes)"; "noisiest + what went wrong" → "19 anomalies … noisiest imu.csv:ay
+16.31% (SNR -16 dB), cleanest gps.csv:lon 0.53%". A stronger-model "deep interpretation" pass remains a
+separate future opt-in (for insight, not for getting numbers right).
