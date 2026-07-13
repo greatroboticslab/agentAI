@@ -5712,3 +5712,12 @@ updated to say findings are stated exactly as computed. Verified live: "class di
 single class, ridderzuring (117 boxes)"; "noisiest + what went wrong" → "19 anomalies … noisiest imu.csv:ay
 16.31% (SNR -16 dB), cleanest gps.csv:lon 0.53%". A stronger-model "deep interpretation" pass remains a
 separate future opt-in (for insight, not for getting numbers right).
+
+### v3.5.1 — signal_noise always evaluates all signals (superlative correctness)
+
+Fixed a planner-scoping bug: the small model often passed a spurious partial `signals` list to signal_noise, so
+"which signal is noisiest" answered over one file's signals and missed the true worst (e.g. reported gps
+speed_mps 6.96% while imu.csv:ay 16.31% was noisier). Strengthened the planner playbook (omit filters for
+superlative/general questions) AND, as a reliable belt-and-suspenders, signal_noise now always evaluates ALL
+signals regardless of the param — correctness of the superlative beats optional focus. Verified live:
+"which signal is noisiest?" now consistently "Of 8 signals, noisiest imu.csv:ay 16.31%, cleanest gps.csv:lon 0.53%".

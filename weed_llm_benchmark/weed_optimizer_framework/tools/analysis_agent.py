@@ -125,9 +125,12 @@ def _all_signals(ctx, names=None):
 
 
 def _t_tool_noise(ctx, signals=None, **_):
+    # Always evaluate ALL signals: a small planner often passes a spurious partial
+    # `signals` list, which would make "which signal is noisiest" answer over a subset
+    # and miss the real worst signal. Correctness of the superlative wins over focus.
     from .dataset_eda import _signal_noise
     rows = []
-    for f, c in _all_signals(ctx, signals):
+    for f, c in _all_signals(ctx, None):
         r = _signal_noise(f["cols"][c])
         if r:
             rows.append({"file": f["name"], "signal": c,
@@ -541,7 +544,7 @@ def _t_img_duplicates(ctx, **_):
 TOOLS = {
     "signal_noise": (_t_tool_noise,
         "How clean each signal is: residual RMS after smoothing as % of range, plus SNR dB. Use for reliability / 'how noisy' questions.",
-        {"signals": "list of signal names to check, or omit for all"}, {"sensor"}),
+        {"signals": "OMIT this to check ALL signals (do so for 'which is noisiest' etc.); only pass a list when the user names specific signals"}, {"sensor"}),
     "detect_anomalies": (_t_tool_anomalies,
         "Timestamped abnormal events: sudden changes, GPS teleports, sampling gaps, stuck-sensor flatlines. Use for 'what went wrong / when'.",
         {"types": "subset of [sudden_change,gps_jump,time_gap,flatline], or omit for all"}, {"sensor"}),
@@ -559,7 +562,7 @@ TOOLS = {
         {"a_start": "window A start (s)", "a_end": "window A end (s)", "b_start": "window B start (s)", "b_end": "window B end (s)"}, {"sensor"}),
     "summary_stats": (_t_tool_stats,
         "min / mean / max / std per numeric signal. Use for a quick quantitative overview.",
-        {"columns": "list of columns, or omit for all"}, {"sensor"}),
+        {"columns": "OMIT this to cover ALL columns; only pass a list when the user names specific columns"}, {"sensor"}),
     "plot_route": (_t_tool_plot_route,
         "Draw the GPS route's shape (needs lat/lon). Use when spatial path matters.",
         {"color_by": "signal to color the path by, e.g. speed"}, {"sensor"}),
@@ -617,6 +620,10 @@ _PLAN_SYS = (
     "- what went wrong / when / faults / glitches / spikes -> detect_anomalies.\n"
     "- turns / corners / curves vs straights -> segment_turns_vs_straight.\n"
     "- do the sensors agree / same event / correlate across sensors -> cross_sensor_correlation.\n"
+    "- For a SUPERLATIVE or general question ('which signal is noisiest', 'what is the "
+    "distribution', 'overall quality'), leave params EMPTY so ALL signals/columns are "
+    "considered. Only pass a signals/columns filter when the user explicitly names "
+    "specific signals to focus on.\n"
     "- Plan for the CURRENT goal; earlier turns are context, not a template to repeat. "
     "Prefer 1-2 focused tools over many."
 )
