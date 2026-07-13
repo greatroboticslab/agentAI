@@ -5733,3 +5733,13 @@ intended"; negative-SNR signals → "low reliability"; cross-sensor agreement �
 Shown as a "Suggestions" list under the answer (⚠️ for high-severity). Verified live: blurry-images question →
 "⚠️ 2 images below the blur threshold — review and consider removing"; sensor → "sensors agree at t=60.03s —
 likely real events". This is the agent's analytical judgment done deterministically — grounded and correct.
+
+### v3.5.3 — fix: anomaly event truncation was breaking cross-sensor correlation (found in QA)
+
+Full-flow QA on fresh drone-survey data surfaced a real bug: detect_table capped each file's events at the
+top 14 by severity, so a strong dominant anomaly (a 148 m GPS teleport, sigma 370) crowded out weaker-but-real
+events — the wind-gust's speed dip (sigma 8.3) and the lone time_gap were detected but truncated, so cross-modal
+alignment never saw the speed event to pair with the IMU spike (0 correlated) and the sampling dropout vanished
+from the display. Raised the retained-event cap to 60 (UI still shows only the top few; cross-modal/focus need
+the fuller set). Verified: cross-modal now catches the gust at t=25.35s (GPS speed_mps + IMU ax/ay agree) and
+the GPS dropout shows (1.9 s gap, 19x median, @41.8s).

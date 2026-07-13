@@ -182,8 +182,12 @@ def detect_table(cols: dict, header: list, time_col: str | None,
     events.sort(key=lambda e: -(e.get("sigma") or e.get("implied_mps") or
                                 e.get("gap_s") or e.get("length") or 0))
     worst = max(per_sig_count, key=per_sig_count.get) if per_sig_count else None
+    # keep a generous set (not just the top-14): a strong dominant anomaly (e.g. a GPS
+    # teleport) otherwise crowds out weaker-but-real events like a speed dip that must
+    # pair with an IMU spike for cross-sensor correlation, or the lone time_gap. The UI
+    # still shows only the top few; downstream (cross-modal, focus) needs the fuller set.
     return {"n_events": len(events), "by_type": by_type,
-            "events": events[:14], "worst_signal": worst}
+            "events": events[:60], "worst_signal": worst}
 
 
 def level_label(total_events: int, total_rows: int) -> str:
