@@ -5754,3 +5754,15 @@ sharpness (median × 0.4, no absolute floor); results are reframed as "notably s
 severity lowered from high to info. On real textured photos behaviour is unchanged (weed dataset still flags the
 2 genuinely-soft, threshold 502×0.4=200). The 5 truly-blurred synthetic images are correctly the 5 lowest
 sharpness (0.03–0.12); the metric just can't distinguish them from other flat images, and now says so.
+
+### v3.6.0 — voice input for the analysis agent (speak your question → different analysis)
+
+Wired the self-hosted Whisper voice pipeline into the analysis-agent chat (previously voice existed only on the
+project-creation page). A 🎙 mic button in the chat records your spoken question (MediaRecorder → /api/voice/
+transcribe on the lab GPU), drops the transcript into the box and auto-runs the agent. So speaking a question now
+drives the goal-driven analysis — a different spoken question runs a different analysis. Verified end-to-end on
+the live site with real spoken audio (Chrome fake-mic feeding recorded WAV through the actual button):
+🎙"which signal is the noisiest" → signal_noise (heading_deg 18.18%, noisiest); 🎙"what happened around 25
+seconds" → focus_time (windowed per-signal values + the anomalies there + cross-sensor moment at t=25.35s) — two
+different analyses of the same dataset, from two different spoken questions. Directly answers the prof's original
+voice feedback: voice now understands intent and changes the analysis, not a fixed response.

@@ -6712,6 +6712,27 @@ async function loadAI(refresh){
 var AGENT_HISTORY=[];
 function agentKeydown(e){ if(e.key==="Enter"){ agentSend(); } }
 function agentSend(){ var i=document.getElementById("agentIn"); if(!i)return; agentAsk(i.value); i.value=""; }
+var _agRec=null,_agChunks=[],_agOn=false;
+function agentMic(){
+  var btn=document.getElementById("agentMic"), inp=document.getElementById("agentIn");
+  if(_agOn&&_agRec){ _agRec.stop(); return; }
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)){ alert("Voice input is not supported in this browser."); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    _agRec=new MediaRecorder(stream); _agChunks=[];
+    _agRec.ondataavailable=function(e){ if(e.data&&e.data.size)_agChunks.push(e.data); };
+    _agRec.onstart=function(){ _agOn=true; btn.innerHTML="&#9209;"; btn.style.background="#fee2e2"; btn.style.color="#b91c1c"; inp.placeholder="listening\\u2026 click again to stop"; };
+    _agRec.onstop=function(){ _agOn=false; btn.innerHTML="&#127908;"; btn.style.background="#eef2ff"; btn.style.color="#2563eb"; inp.placeholder="transcribing your question\\u2026";
+      try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
+      fetch("/api/voice/transcribe",{method:"POST",credentials:"include",headers:{"Content-Type":"application/octet-stream"},body:new Blob(_agChunks,{type:"audio/webm"})})
+       .then(function(r){return r.json();}).then(function(d){
+         inp.placeholder="e.g. which signal is noisiest, and when did things go wrong?";
+         if(d&&d.ok&&(d.text||"").trim()){ var q=d.text.trim(); inp.value=q; agentAsk(q); inp.value=""; }
+         else { inp.placeholder="(could not transcribe \\u2014 try again or type)"; }
+       }).catch(function(){ inp.placeholder="(transcription error \\u2014 type instead)"; });
+    };
+    _agRec.start();
+  }).catch(function(){ alert("Microphone permission was denied."); });
+}
 function agentAsk(goal){
   goal=(goal||"").trim(); if(!goal)return;
   var log=document.getElementById("agentLog"); if(!log)return;
@@ -6899,11 +6920,12 @@ async function load(refresh){
       ? ['Show the class distribution — is it balanced?','Are any images blurry or too dark?','Is this dataset ready to train?']
       : ['How noisy is each sensor, and which is least reliable','Focus on the turns, not the straight sections','Where do GPS and IMU flag the same moment'];
     html+='<div class="card" style="border-color:#86efac;background:#f2fdf6"><h3>&#128172; Analysis agent &mdash; ask about this data</h3>'
-      +'<div class="muted">Tell it what you care about &mdash; it chooses the right analysis for THIS question and answers with real numbers. A different question runs a different analysis; the charts below stay as the standard read.</div>'
+      +'<div class="muted">Tell it what you care about &mdash; type or <b>&#127908; speak</b> your question and it chooses the right analysis for THIS question, answering with real numbers. A different question runs a different analysis; the charts below stay as the standard read.</div>'
       +'<div style="margin:8px 0;display:flex;flex-wrap:wrap;gap:6px">'+chips.map(function(q){return '<button onclick="agentAsk(this.textContent)" style="border:1px solid #86efac;background:#fff;border-radius:14px;padding:4px 10px;font-size:12px;cursor:pointer">'+esc(q)+'</button>';}).join("")+'</div>'
       +'<div id="agentLog" style="margin-top:4px;max-height:440px;overflow:auto"></div>'
       +'<div style="display:flex;gap:6px;margin-top:8px">'
       +'<input id="agentIn" placeholder="e.g. which signal is noisiest, and when did things go wrong?" onkeydown="agentKeydown(event)" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px">'
+      +'<button onclick="agentMic()" id="agentMic" title="Ask by voice (speak your question)" style="border:1px solid #cbd5e1;background:#eef2ff;color:#2563eb;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer">&#127908;</button>'
       +'<button onclick="agentSend()" style="border:0;background:#059669;color:#fff;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer">Ask</button></div>'
       +'<div class="muted" style="font-size:11px;margin-top:6px">Grounded: the local model chooses which tools to run for your question; the findings are then stated exactly as the tools computed them (not paraphrased by the model), so no number is ever invented.</div></div>';
   }
