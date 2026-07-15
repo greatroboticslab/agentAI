@@ -19,7 +19,7 @@ any number, any mix, or none. The dashboard runs on the lab server; GPU jobs que
 <sub>Every research domain is a <b>project</b>. Open one, or start a new one for any data type — images, video, sensor, …</sub>
 </div>
 
-**Jump to:** [5-minute demo](#-5-minute-demo--diagnose-a-robots-sensor-logs) · [Every modality](#-one-upload-box-every-modality) · [Autonomous agents](#-its-also-an-autonomous-agent-platform) · [Run it locally](#-run-it-locally) · [Research &amp; benchmarks](#research--benchmarks)
+**Jump to:** [5-minute demo](#-5-minute-demo--diagnose-a-robots-sensor-logs) · [Ask your data](#-ask-your-data--the-analysis-agent) · [Every modality](#-one-upload-box-every-modality) · [Autonomous agents](#-its-also-an-autonomous-agent-platform) · [Run it locally](#-run-it-locally) · [Research &amp; benchmarks](#research--benchmarks)
 
 ---
 
@@ -98,6 +98,35 @@ agreement is the fingerprint of a real **pothole**, not a glitch.
 
 ---
 
+## 🧠 Ask your data — the analysis agent
+
+Uploading isn't the end. Every sensor / image dataset gets a chat box: **type or 🎙 speak a question**, and an
+agent picks the right analysis *for that question* and answers with real numbers.
+
+- *"which signal is noisiest?"* · *"what happened around 60 seconds?"* · *"do GPS and IMU agree anywhere?"* ·
+  *"are any images blurry?"* · *"compare the first half to the second half"* — each one runs a **different**
+  analysis. A vague question (*"analyze this"*) gets **guided** back to concrete options instead of a canned run.
+- A small local model only **chooses which tools to run**; the findings are computed by real code — robust
+  anomaly detection, cross-sensor time alignment, image blur (variance of Laplacian), class balance — and stated
+  **exactly as computed**, so **no number is ever invented**. It then lists actionable **suggestions** (blurry
+  images to review, unlabeled or duplicate images to fix, class imbalance, and so on).
+- **Voice** runs the whole thing: the 🎙 button records your question, transcribes it on the lab GPU
+  (self-hosted Whisper), and runs the analysis — a different spoken question gives a different analysis.
+
+**Why not just drop the file into a general AI chat?**
+
+| | General AI chat + a file | This analysis agent |
+|---|---|---|
+| **The numbers** | reads a *truncated sample*; can miscount or invent figures (worse the bigger the file) | computed by code over the **whole file**; stated exactly as computed |
+| **The methods** | approximates by "reading" | real signal processing — anomaly detection, GPS-jump, **cross-sensor alignment**, Laplacian blur |
+| **Reproducible** | varies run to run | same question → same computed answer; shows which tools ran, and why |
+| **The data** | a throwaway conversation | a **versioned dataset** on a platform that also labels it and trains on the cluster |
+
+*A general chat is still better for open-ended reasoning and tiny quick reads — this is grounded and specialized
+for real datasets at scale, wired into the collect → label → train pipeline.*
+
+---
+
 ## 🧩 One upload box, every modality
 
 That sensor pipeline isn't a special case — it's the same upload box every project has. Drop a `.zip`, a folder,
@@ -157,9 +186,10 @@ Running tests, CI details, and contributing conventions are in **[docs/DEVELOPME
 | [`multagent/`](multagent/) | **EMACF** robotics agent framework (Brain / Perception / Targeting / Navigation) — the earlier embodied-robot direction, kept for reference. |
 | [`docs/`](docs/) | Screenshots + platform roadmap. |
 
-> **Latest:** `v3.2.0` — sensor-analysis pipeline: signal noise/SNR, timestamped anomaly detection
-> (GPS teleports, stuck sensors, sampling gaps), and **cross-modal temporal alignment** (finds the instants
-> where multiple sensors flag the same physical event). See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
+> **Latest:** `v3.6` — the **analysis agent**: ask any dataset a question by text or 🎙 voice and it picks the
+> right analysis (a different question → a different analysis), with every number computed by code (never
+> invented) plus actionable suggestions. Built on the v3.2 sensor-diagnosis pipeline (noise/SNR, timestamped
+> anomalies, cross-modal alignment). See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
 > and [`RESEARCH_LOG.md`](RESEARCH_LOG.md).
 
 ---

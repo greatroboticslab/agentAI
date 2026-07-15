@@ -13,6 +13,50 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-15 — v3.3–v3.6: analysis becomes a grounded, conversational, voice-driven AGENT
+
+**What drove this.** Prof. Zhang's core critique after using it: the analysis is *hardcoded* — "no matter how
+you talk to it, it's always the same output"; and the voice feature didn't actually do anything with the intent.
+This arc turns the fixed analysis into an **agent that plans over a grounded tool library**, is conversational,
+takes voice, and — crucially — **never lets the model touch the numbers**. Built advisor/executor; every step
+verified on the live lab server.
+
+**The shape.** A small local LLM (qwen2.5:3b) is the *planner only*: it reads the user's question + the dataset's
+real columns and **chooses which tools to run, with what parameters**. Tools do the computing. The answer is then
+**assembled deterministically from the tool outputs** — so every number, filename and timestamp is correct by
+construction. Different question → different plan → different analysis.
+
+- **v3.3.0–v3.3.4 (Phase A–D):** tool library + planner (`analysis_agent.py`); the chat card on the analysis
+  page (`/api/dataset/analyze_goal`); conversation history; **clarify mode** (a vague goal → concrete data-aware
+  options instead of a canned run); **focus_time** drill-down ("what happened around 60s?"); a routing playbook
+  giving the planner analytical judgment (time-ref→focus, superlative→omit filters, compare→compare_windows).
+- **v3.4.x:** the agent covers **image/video** too (class distribution, dims, annotation coverage) and, with
+  `image_quality`, **reads the actual pixels** for blur (variance of Laplacian) / brightness — framed honestly
+  as relative-to-the-dataset, not absolute. Plus `box_stats`, `duplicate_images`.
+- **v3.5.x:** **deterministic answer synthesis** — the root fix for the 3B mangling figures (it had called 40
+  images "40 objects/image", a single class "severely imbalanced"). The model no longer paraphrases numbers.
+  Added a rule-based **Suggestions** layer (Phase D done right): actionable, grounded advice (blurry images →
+  review; >15% tiny boxes → small-object risk; unlabeled/duplicates → fix before training; class imbalance →
+  rebalance). Fixed a planner-scoping bug so "which is noisiest" always covers all signals.
+- **v3.6.0 (voice):** wired the self-hosted Whisper pipeline into the chat — a 🎙 button records → transcribes on
+  the lab GPU → auto-runs the agent. Verified end-to-end on the live site: two different *spoken* questions →
+  two different analyses. Directly answers the prof's voice feedback: voice now understands intent and changes
+  the analysis.
+- **v3.5.3 / v3.6.1 (QA hardening):** running full-flow QA on **fresh, real, unexpected data** (a drone-survey
+  set; the **MHEALTH** wearable dataset from UCI; and 8 adversarial CSVs) exposed and fixed real bugs — event
+  truncation was breaking cross-sensor correlation; label columns (e.g. `activity`) were analyzed as signals; a
+  `NaN` cell crashed analysis with a 500 (non-finite not JSON-serializable); `;`-delimited CSVs and BOM headers
+  were mis-parsed. Lesson logged: real/foreign data surfaces what synthetic data hides — test broadly.
+
+**Why this beats "just drop the file into a general AI chat" (the positioning).** A general chat reading a CSV
+sees only a *truncated sample* and routinely miscounts or invents figures (worse the larger the file); it can't
+actually run robust anomaly detection, GPS-teleport haversine, cross-sensor time alignment, or Laplacian blur —
+it approximates by reading. Ours computes over the **whole file** with real algorithms, states results **exactly
+as computed** (no invented numbers), is **reproducible** (same question → same answer, and it shows which tools
+ran), and lives on a platform that **versions the data and feeds it to labeling + cluster training**. Honest
+boundary: a general chat is still better for open-ended reasoning and tiny quick reads; ours is grounded and
+specialized for real datasets at scale.
+
 ## 2026-07-11 — v3.1.4–v3.2.0: sensor analysis becomes a *diagnosis* (noise → anomalies → cross-modal)
 
 **What drove this.** Prof. feedback on the data-analysis stage was the trigger, and it was fair: he typed
