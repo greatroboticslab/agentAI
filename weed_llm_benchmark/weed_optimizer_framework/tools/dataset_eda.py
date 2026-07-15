@@ -153,10 +153,12 @@ def analyze_nonimage(root) -> dict:
         _SAMPLE_N = 24
         for p in tabular[:_SAMPLE_N]:
             try:
-                delim = "\t" if p.suffix.lower() == ".tsv" else ","
                 with open(p, newline="", encoding="utf-8", errors="replace") as f:
+                    _first = f.readline(); f.seek(0)
+                    delim = ("\t" if p.suffix.lower() == ".tsv"
+                             else max([",", ";", "\t", "|"], key=_first.count))
                     rd = _csv.reader(f, delimiter=delim)
-                    header = next(rd, [])
+                    header = [str(h).replace("\ufeff", "").strip() for h in next(rd, [])]
                     low = [str(h).strip().lower() for h in header]
                     nrow = 0
                     numcols = {}
@@ -169,6 +171,8 @@ def analyze_nonimage(root) -> dict:
                             for i, val in enumerate(row):
                                 try:
                                     fv = float(val)
+                                    if not math.isfinite(fv):
+                                        raise ValueError("non-finite")
                                     numcols.setdefault(i, []).append(fv)
                                     if i == tcol:
                                         tmin = fv if tmin is None else min(tmin, fv)

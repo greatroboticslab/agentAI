@@ -37,10 +37,12 @@ def load_context(root, analysis: dict | None = None, modality: str | None = None
     files, signals = [], []
     for p in tables[:24]:
         try:
-            delim = "\t" if p.suffix.lower() == ".tsv" else ","
             with open(p, newline="", encoding="utf-8", errors="replace") as f:
+                _first = f.readline(); f.seek(0)
+                delim = ("\t" if p.suffix.lower() == ".tsv"
+                         else max([",", ";", "\t", "|"], key=_first.count))
                 rd = csv.reader(f, delimiter=delim)
-                header = [str(h).strip() for h in next(rd, [])]
+                header = [str(h).replace("\ufeff", "").strip() for h in next(rd, [])]
                 cols = {h: [] for h in header}
                 for i, row in enumerate(rd):
                     if i >= max_rows:
@@ -48,7 +50,9 @@ def load_context(root, analysis: dict | None = None, modality: str | None = None
                     for j, val in enumerate(row):
                         if j < len(header):
                             try:
-                                cols[header[j]].append(float(val))
+                                _fv = float(val)
+                                if _fv == _fv and _fv not in (float("inf"), float("-inf")):
+                                    cols[header[j]].append(_fv)
                             except (ValueError, TypeError):
                                 pass
             cols = {k: v for k, v in cols.items() if v}

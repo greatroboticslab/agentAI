@@ -26,10 +26,12 @@ _SPEED_NAMES = ("speed", "speed_mps", "speed_kmh", "velocity", "v")
 
 def _read_table(path: Path, max_rows: int = 100000):
     """Read a csv/tsv into {column_name: [floats]}, skipping non-numeric cells."""
-    delim = "\t" if path.suffix.lower() == ".tsv" else ","
     with open(path, newline="", encoding="utf-8", errors="replace") as f:
+        _first = f.readline(); f.seek(0)
+        delim = ("\t" if path.suffix.lower() == ".tsv"
+                 else max([",", ";", "\t", "|"], key=_first.count))
         rd = csv.reader(f, delimiter=delim)
-        header = [str(h).strip() for h in next(rd, [])]
+        header = [str(h).replace("\ufeff", "").strip() for h in next(rd, [])]
         cols = {h: [] for h in header}
         for i, row in enumerate(rd):
             if i >= max_rows:
@@ -38,7 +40,9 @@ def _read_table(path: Path, max_rows: int = 100000):
                 if j >= len(header):
                     continue
                 try:
-                    cols[header[j]].append(float(val))
+                    _fv = float(val)
+                    if _fv == _fv and _fv not in (float("inf"), float("-inf")):
+                        cols[header[j]].append(_fv)
                 except (ValueError, TypeError):
                     pass
     return {k: v for k, v in cols.items() if v}

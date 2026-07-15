@@ -5766,3 +5766,17 @@ the live site with real spoken audio (Chrome fake-mic feeding recorded WAV throu
 seconds" → focus_time (windowed per-signal values + the anomalies there + cross-sensor moment at t=25.35s) — two
 different analyses of the same dataset, from two different spoken questions. Directly answers the prof's original
 voice feedback: voice now understands intent and changes the analysis, not a fixed response.
+
+### v3.6.1 — robustness hardening from an adversarial-CSV sweep (prof feedback: test more unexpected data)
+
+Ran 8 deliberately-awkward CSVs through the live upload→analyze→agent path and fixed what broke:
+- **CRASH (500) on NaN/inf cells** — `float("NaN")` was accepted, then FastAPI refused to serialize `nan`
+  ("Out of range float values are not JSON compliant"). Now every parse site (dataset_eda, analysis_agent,
+  sensor_anomaly, sensor_viz) rejects non-finite floats, so a log with missing values analyzes fine.
+- **Semicolon/pipe/tab-delimited CSVs silently lost** — a `;`-separated file (common European export) parsed as
+  one text column. All readers now sniff the delimiter (`, ; \t |`) from the first line instead of assuming comma.
+- **BOM + label leaks** — headers are BOM-stripped (a `﻿`-prefixed "Time" column now detected); numeric
+  label columns (e.g. `activity`) are excluded from noise/stats/anomaly tools and the EDA noise card.
+Verified: all 8 cases (semicolon, ISO-timestamp, missing values, BOM+units, unix-ms, non-sensor table, 3-row,
+duplicate columns) now return 200 and degrade gracefully instead of crashing. Also: compare_windows reports
+which window is more active; anomaly answers cite the top distinct events with timestamps.
