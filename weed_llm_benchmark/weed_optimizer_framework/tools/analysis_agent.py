@@ -109,12 +109,21 @@ def _num(v, default=None):
         return default
 
 
+_LABELISH = {"label", "class", "activity", "target", "annotation", "state", "y", "action"}
+
+
+def _is_label(name) -> bool:
+    """A class/label column (e.g. 'activity') is ground-truth, not a sensor signal —
+    tools must not analyze it as one."""
+    return str(name).strip().lower() in _LABELISH
+
+
 def _all_signals(ctx, names=None):
     """Resolve requested signal names (bare or file:col) → [(file_dict, col)]."""
     out = []
     for f in ctx["files"]:
         for c in f["cols"]:
-            if c == f["time_col"]:
+            if c == f["time_col"] or _is_label(c):
                 continue
             if names:
                 want = any(c == n or f"{f['name']}:{c}" == n or n == c for n in names)
@@ -122,6 +131,11 @@ def _all_signals(ctx, names=None):
                     continue
             out.append((f, c))
     return out
+
+
+def _label_col(f):
+    """The file's class/label column, if any (skipped from anomaly detection)."""
+    return next((c for c in f["cols"] if _is_label(c)), None)
 
 
 def _t_tool_noise(ctx, signals=None, **_):
@@ -144,7 +158,7 @@ def _t_tool_anomalies(ctx, types=None, **_):
     from .sensor_anomaly import detect_table
     files = []
     for f in ctx["files"]:
-        r = detect_table(f["cols"], f["header"], f["time_col"], None)
+        r = detect_table(f["cols"], f["header"], f["time_col"], _label_col(f))
         if r:
             evs = r["events"]
             if types:
@@ -161,7 +175,7 @@ def _t_tool_cross(ctx, window_s: float = 1.0, **_):
     from .sensor_align import build_alignment
     anom = []
     for f in ctx["files"]:
-        r = detect_table(f["cols"], f["header"], f["time_col"], None)
+        r = detect_table(f["cols"], f["header"], f["time_col"], _label_col(f))
         if r:
             r["file"] = f["name"]
             r["t_start_abs"] = f["t_start_abs"]
@@ -256,7 +270,7 @@ def _t_tool_focus_time(ctx, center=None, radius_s=3.0, time=None, t=None, **_):
             continue
         sig = {}
         for cn, vals in f["cols"].items():
-            if cn == tcol:
+            if cn == tcol or _is_label(cn):
                 continue
             win = [vals[i] for i in idx if i < len(vals)]
             if not win:
@@ -270,7 +284,7 @@ def _t_tool_focus_time(ctx, center=None, radius_s=3.0, time=None, t=None, **_):
     from .sensor_align import build_alignment
     anoms, anom_full = [], []
     for f in ctx["files"]:
-        r = detect_table(f["cols"], f["header"], f["time_col"], None)
+        r = detect_table(f["cols"], f["header"], f["time_col"], _label_col(f))
         if r:
             r["file"] = f["name"]; r["t_start_abs"] = f["t_start_abs"]; anom_full.append(r)
             for e in r["events"]:
@@ -307,7 +321,7 @@ def _t_tool_compare_windows(ctx, a_start=None, a_end=None, b_start=None, b_end=N
                 half = n // 2
                 a_idx, b_idx = list(range(0, half)), list(range(half, n))
             for cn, vals in f["cols"].items():
-                if cn == tc:
+                if cn == tc or _is_label(cn):
                     continue
                 a = [vals[i] for i in a_idx if i < len(vals)]
                 b = [vals[i] for i in b_idx if i < len(vals)]
@@ -625,6 +639,8 @@ _PLAN_SYS = (
     "- what went wrong / when / faults / glitches / spikes -> detect_anomalies.\n"
     "- turns / corners / curves vs straights -> segment_turns_vs_straight.\n"
     "- do the sensors agree / same event / correlate across sensors -> cross_sensor_correlation.\n"
+    "- compare two periods / 'first half vs second half' / 'first N seconds vs the rest' / "
+    "before vs after -> compare_windows (NOT focus_time; focus_time is for a single moment).\n"
     "- For a SUPERLATIVE or general question ('which signal is noisiest', 'what is the "
     "distribution', 'overall quality'), leave params EMPTY so ALL signals/columns are "
     "considered. Only pass a signals/columns filter when the user explicitly names "
