@@ -1,0 +1,98 @@
+{
+  "yolo11n": {
+    "label": "YOLO11-n (fast)",
+    "kind": "vision",
+    "backend": "ultralytics",
+    "note": "runs on cluster GPU (verified in training)",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "yolo11s": {
+    "label": "YOLO11-s",
+    "kind": "vision",
+    "backend": "ultralytics",
+    "note": "runs on cluster GPU",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "yolo11m": {
+    "label": "YOLO11-m",
+    "kind": "vision",
+    "backend": "ultralytics",
+    "note": "runs on cluster GPU",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "yolo11l": {
+    "label": "YOLO11-l (accurate)",
+    "kind": "vision",
+    "backend": "ultralytics",
+    "note": "runs on cluster GPU",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "ollama:gemma4": {
+    "label": "Gemma4 (current brain)",
+    "kind": "llm",
+    "backend": "ollama",
+    "note": "deployed on cluster \u2014 harvest brain + on-demand gateway",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "ollama:gemma4:e2b": {
+    "label": "Gemma4 e2b",
+    "kind": "llm",
+    "backend": "ollama",
+    "note": "deployed on cluster",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "ollama:qwen3:14b": {
+    "label": "Qwen3 14B",
+    "kind": "llm",
+    "backend": "ollama",
+    "note": "deployed on cluster (earlier brain)",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "ollama:qwen2.5:7b": {
+    "label": "Qwen2.5 7B",
+    "kind": "llm",
+    "backend": "ollama",
+    "note": "deployed on cluster (first brain family)",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "ollama:deepseek-r1:7b": {
+    "label": "DeepSeek-R1 7B (reasoning)",
+    "kind": "llm",
+    "backend": "ollama",
+    "note": "deployed on cluster",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "ollama:llama3.2-vision:11b": {
+    "label": "Llama3.2-Vision 11B (VLM)",
+    "kind": "vlm",
+    "backend": "ollama",
+    "note": "deployed on cluster",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "ollama:minicpm-v": {
+    "label": "MiniCPM-V (VLM)",
+    "kind": "vlm",
+    "backend": "ollama",
+    "note": "deployed on cluster",
+    "status": "available",
+    "verified_at": "seed"
+  },
+  "ollama:moondream": {
+    "label": "Moondream (small VLM)",
+    "kind": "vlm",
+    "backend": "ollama",
+    "note": "deployed on cluster",
+    "status": "available",
+    "verified_at": "seed"
+  }
+}

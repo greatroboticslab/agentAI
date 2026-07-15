@@ -1,0 +1,212 @@
+{
+  "ul_reef-test-set_e61f32bf": {
+    "status": "downloaded",
+    "source": "manual_upload",
+    "domain": "coral_reef_survey",
+    "modality": "image",
+    "format": "yolo",
+    "uploaded_by": "admin",
+    "uploaded_at": "2026-07-05T02:21:27",
+    "downloaded_at": "2026-07-05T02:21:27",
+    "local_path": "/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/uploads/ul_reef-test-set_e61f32bf/images",
+    "local_images": 6,
+    "n_local_files": 0,
+    "n_local_labels": 6,
+    "class_names": [
+      "coral",
+      "bleached_coral"
+    ],
+    "harvest_round": 1,
+    "display_name": "reef-test-set",
+    "goal": "detect coral bleaching",
+    "license": "CC-BY-4.0",
+    "version": 1,
+    "provenance": {
+      "source": "manual_upload",
+      "uploaded_by": "admin",
+      "uploaded_at": "2026-07-05T02:21:27",
+      "license": "CC-BY-4.0",
+      "version": 1
+    }
+  },
+  "ul_reef-flat_ac5d7e24": {
+    "status": "downloaded",
+    "source": "manual_upload",
+    "domain": "coral_reef_survey",
+    "modality": "image",
+    "format": "yolo",
+    "uploaded_by": "admin",
+    "uploaded_at": "2026-07-05T02:23:10",
+    "downloaded_at": "2026-07-05T02:23:10",
+    "local_path": "/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/uploads/ul_reef-flat_ac5d7e24/images",
+    "local_images": 6,
+    "n_local_files": 0,
+    "n_local_labels": 6,
+    "class_names": [
+      "coral",
+      "bleached_coral"
+    ],
+    "harvest_round": 1,
+    "display_name": "reef-flat",
+    "goal": "",
+    "license": "unspecified",
+    "version": 1,
+    "provenance": {
+      "source": "manual_upload",
+      "uploaded_by": "admin",
+      "uploaded_at": "2026-07-05T02:23:10",
+      "license": "unspecified",
+      "version": 1
+    }
+  },
+  "ul_reef-fixed_ac5d7e24": {
+    "status": "downloaded",
+    "source": "manual_upload",
+    "domain": "coral_reef_survey",
+    "modality": "image",
+    "format": "yolo",
+    "uploaded_by": "admin",
+    "uploaded_at": "2026-07-05T02:25:30",
+    "downloaded_at": "2026-07-05T02:25:30",
+    "local_path": "/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/uploads/ul_reef-fixed_ac5d7e24/images",
+    "local_images": 6,
+    "n_local_files": 0,
+    "n_local_labels": 6,
+    "class_names": [
+      "coral",
+      "bleached_coral"
+    ],
+    "harvest_round": 1,
+    "display_name": "reef-fixed",
+    "goal": "",
+    "license": "unspecified",
+    "version": 1,
+    "provenance": {
+      "source": "manual_upload",
+      "uploaded_by": "admin",
+      "uploaded_at": "2026-07-05T02:25:30",
+      "license": "unspecified",
+      "version": 1
+    }
+  },
+  "ul_reef-v3_ac5d7e24": {
+    "status": "downloaded",
+    "source": "manual_upload",
+    "domain": "coral_reef_survey",
+    "modality": "image",
+    "format": "yolo",
+    "uploaded_by": "admin",
+    "uploaded_at": "2026-07-05T02:27:49",
+    "downloaded_at": "2026-07-05T02:27:49",
+    "local_path": "/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/uploads/ul_reef-v3_ac5d7e24",
+    "local_images": 6,
+    "n_local_files": 0,
+    "n_local_labels": 6,
+    "class_names": [
+      "coral",
+      "bleached_coral"
+    ],
+    "harvest_round": 1,
+    "display_name": "reef-v3",
+    "goal": "detect bleaching",
+    "license": "CC-BY-4.0",
+    "version": 1,
+    "provenance": {
+      "source": "manual_upload",
+      "uploaded_by": "admin",
+      "uploaded_at": "2026-07-05T02:27:49",
+      "license": "CC-BY-4.0",
+      "version": 1
+    }
+  },
+  "ul_reef-final_ac5d7e24": {
+    "status": "downloaded",
+    "source": "manual_upload",
+    "domain": "coral_reef_survey",
+    "modality": "image",
+    "format": "yolo",
+    "uploaded_by": "admin",
+    "uploaded_at": "2026-07-05T02:28:54",
+    "downloaded_at": "2026-07-05T02:28:54",
+    "local_path": "/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/uploads/ul_reef-final_ac5d7e24",
+    "local_images": 6,
+    "n_local_files": 0,
+    "n_local_labels": 6,
+    "class_names": [
+      "coral",
+      "bleached_coral"
+    ],
+    "harvest_round": 1,
+    "display_name": "reef-final",
+    "goal": "",
+    "license": "unspecified",
+    "version": 1,
+    "provenance": {
+      "source": "manual_upload",
+      "uploaded_by": "admin",
+      "uploaded_at": "2026-07-05T02:28:54",
+      "license": "unspecified",
+      "version": 1
+    }
+  },
+  "ul_reef-v4_ac5d7e24": {
+    "status": "downloaded",
+    "source": "manual_upload",
+    "domain": "coral_reef_survey",
+    "modality": "image",
+    "format": "yolo",
+    "uploaded_by": "admin",
+    "uploaded_at": "2026-07-05T02:29:46",
+    "downloaded_at": "2026-07-05T02:29:46",
+    "local_path": "/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/uploads/ul_reef-v4_ac5d7e24",
+    "local_images": 6,
+    "n_local_files": 0,
+    "n_local_labels": 6,
+    "class_names": [
+      "coral",
+      "bleached_coral"
+    ],
+    "harvest_round": 1,
+    "display_name": "reef-v4",
+    "goal": "",
+    "license": "unspecified",
+    "version": 1,
+    "provenance": {
+      "source": "manual_upload",
+      "uploaded_by": "admin",
+      "uploaded_at": "2026-07-05T02:29:46",
+      "license": "unspecified",
+      "version": 1
+    }
+  },
+  "ul_s1_ac5d7e24": {
+    "status": "downloaded",
+    "source": "manual_upload",
+    "domain": "smoke_test",
+    "modality": "image",
+    "format": "yolo",
+    "uploaded_by": "admin",
+    "uploaded_at": "2026-07-05T03:09:34",
+    "downloaded_at": "2026-07-05T03:09:34",
+    "local_path": "/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/uploads/ul_s1_ac5d7e24",
+    "local_images": 6,
+    "n_local_files": 0,
+    "n_local_labels": 6,
+    "class_names": [
+      "coral",
+      "bleached_coral"
+    ],
+    "harvest_round": 1,
+    "display_name": "s1",
+    "goal": "",
+    "license": "unspecified",
+    "version": 1,
+    "provenance": {
+      "source": "manual_upload",
+      "uploaded_by": "admin",
+      "uploaded_at": "2026-07-05T03:09:34",
+      "license": "unspecified",
+      "version": 1
+    }
+  }
+}

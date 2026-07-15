@@ -1,0 +1,86 @@
+{
+  "ok": true,
+  "slug": "ul_reef-fixed_ac5d7e24",
+  "root_exists": true,
+  "total_files": 6,
+  "total_size_mb": 0.1,
+  "n_images": 6,
+  "modality": {
+    "image": 6
+  },
+  "ext_top": {
+    ".jpg": 6
+  },
+  "splits": {},
+  "has_data_yaml": false,
+  "annotations": {
+    "type": "none",
+    "classes": [],
+    "per_class": {},
+    "labeled_images": 0,
+    "count_kind": ""
+  },
+  "images": {
+    "ok": true,
+    "sampled": 6,
+    "width": {
+      "min": 256,
+      "max": 256,
+      "mean": 256.0,
+      "median": 256
+    },
+    "height": {
+      "min": 256,
+      "max": 256,
+      "mean": 256.0,
+      "median": 256
+    },
+    "aspect": {
+      "min": 1.0,
+      "max": 1.0,
+      "mean": 1.0,
+      "median": 1.0
+    },
+    "filesize_kb": {
+      "min": 23.8,
+      "max": 23.9,
+      "mean": 23.8,
+      "median": 23.8
+    },
+    "resolution_hist": {
+      "\u2264256": 6
+    },
+    "aspect_hist": {
+      "square 0.8\u20131.25": 6
+    }
+  },
+  "near_duplicates": 5,
+  "sample_grid": [
+    {
+      "cls": "",
+      "file": "reef_005.jpg"
+    },
+    {
+      "cls": "",
+      "file": "reef_004.jpg"
+    },
+    {
+      "cls": "",
+      "file": "reef_003.jpg"
+    },
+    {
+      "cls": "",
+      "file": "reef_002.jpg"
+    },
+    {
+      "cls": "",
+      "file": "reef_000.jpg"
+    },
+    {
+      "cls": "",
+      "file": "reef_001.jpg"
+    }
+  ],
+  "modality_detail": {},
+  "computed_at": "2026-07-05 02:26:27"
+}

@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "slug": "ul_s1_ac5d7e24",
+  "source": "rules",
+  "issues": [
+    {
+      "severity": "high",
+      "title": "Very small dataset",
+      "detail": "Only 6 images \u2014 too few to train a reliable model. Aim for at least a few hundred."
+    },
+    {
+      "severity": "medium",
+      "title": "Classes with too few samples",
+      "detail": "Under 10 samples: bleached_coral, coral."
+    },
+    {
+      "severity": "medium",
+      "title": "Many near-duplicate images",
+      "detail": "~5/6 sampled images look near-identical \u2014 duplicates inflate size without adding information and can leak between train/val."
+    },
+    {
+      "severity": "medium",
+      "title": "No validation split",
+      "detail": "No val/ or test/ split found \u2014 without a held-out set you can't measure real accuracy."
+    }
+  ],
+  "goal": "",
+  "training_readiness": {
+    "ready": false,
+    "reason": "Fix the high-severity issues first: Very small dataset.",
+    "suggested_task": "detection"
+  },
+  "computed_at": "2026-07-05 03:09:34",
+  "llm_error": "HTTPError: HTTP Error 404: Not Found",
+  "summary": "Rules-only review (no AI model reachable). 6 images, yolo labels, 4 issue(s) flagged.",
+  "recommendations": [
+    "Only 6 images \u2014 too few to train a reliable model. Aim for at least a few hundred.",
+    "Under 10 samples: bleached_coral, coral.",
+    "~5/6 sampled images look near-identical \u2014 duplicates inflate size without adding information and can leak between train/val.",
+    "No val/ or test/ split found \u2014 without a held-out set you can't measure real accuracy."
+  ]
+}

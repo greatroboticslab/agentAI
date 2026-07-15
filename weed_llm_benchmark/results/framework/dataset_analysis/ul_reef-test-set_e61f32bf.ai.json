@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "slug": "ul_reef-test-set_e61f32bf",
+  "source": "rules",
+  "issues": [
+    {
+      "severity": "high",
+      "title": "Very small dataset",
+      "detail": "Only 6 images \u2014 too few to train a reliable model. Aim for at least a few hundred."
+    },
+    {
+      "severity": "high",
+      "title": "No labels detected",
+      "detail": "Supervised training needs labels \u2014 add YOLO labels/ + data.yaml, COCO/VOC annotations, or class subfolders (train/<class>/) for classification."
+    },
+    {
+      "severity": "medium",
+      "title": "Many near-duplicate images",
+      "detail": "~5/6 sampled images look near-identical \u2014 duplicates inflate size without adding information and can leak between train/val."
+    }
+  ],
+  "goal": "detect coral bleaching",
+  "training_readiness": {
+    "ready": false,
+    "reason": "No usable labels/classes yet \u2014 add annotations or class subfolders before training.",
+    "suggested_task": "labeling"
+  },
+  "computed_at": "2026-07-05 02:22:18",
+  "llm_error": "HTTPError: HTTP Error 404: Not Found",
+  "summary": "Rules-only review (no AI model reachable). 6 images, none labels, 3 issue(s) flagged.",
+  "recommendations": [
+    "Only 6 images \u2014 too few to train a reliable model. Aim for at least a few hundred.",
+    "Supervised training needs labels \u2014 add YOLO labels/ + data.yaml, COCO/VOC annotations, or class subfolders (train/<class>/) for classification.",
+    "~5/6 sampled images look near-identical \u2014 duplicates inflate size without adding information and can leak between train/val."
+  ]
+}

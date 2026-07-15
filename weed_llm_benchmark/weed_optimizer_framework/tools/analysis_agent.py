@@ -935,14 +935,23 @@ def _answer_sentence(r: dict) -> str:
                         for t, v in (f.get('by_type') or {}).items()) for f in r.get("files", []))
         evs = []
         for f in r.get("files", []):
-            for e in (f.get("events") or [])[:4]:
+            for e in (f.get("events") or []):
                 if e.get("time") is not None:
                     sev = (e.get("sigma") or e.get("jump_m") or e.get("gap_s") or e.get("length") or 0)
                     lbl = (e["type"].replace("_", " ") + (f" in {e['signal']}" if e.get("signal") else "")
                            + f" at t={e['time']}s")
-                    evs.append((sev, lbl))
+                    evs.append((sev, lbl, e["time"]))
         evs.sort(key=lambda x: -x[0])
-        tail = (" Notably: " + "; ".join(l for _, l in evs[:3]) + ".") if evs else ""
+        picked, seen_t = [], set()             # one per ~2s bucket → distinct moments
+        for _sev, lbl, tm in evs:
+            b = round(tm / 2)
+            if b in seen_t:
+                continue
+            seen_t.add(b)
+            picked.append(lbl)
+            if len(picked) >= 3:
+                break
+        tail = (" Notably: " + "; ".join(picked) + ".") if picked else ""
         return f"{r['total']} anomalies detected — {by}.{tail}"
     if k == "cross":
         n = r.get("n_correlated", 0)
