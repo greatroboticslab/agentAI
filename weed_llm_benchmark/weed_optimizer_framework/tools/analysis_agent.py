@@ -329,9 +329,10 @@ def _t_tool_compare_windows(ctx, a_start=None, a_end=None, b_start=None, b_end=N
                     continue
                 ma, mb = sum(a) / len(a), sum(b) / len(b)
                 sa = math.sqrt(sum((x - ma) ** 2 for x in a) / len(a))
+                sb = math.sqrt(sum((x - mb) ** 2 for x in b) / len(b))
                 sigs.append({"signal": f"{f['name']}:{cn}", "a_mean": round(ma, 3),
                              "b_mean": round(mb, 3), "delta": round(mb - ma, 3),
-                             "a_std": round(sa, 3)})
+                             "a_std": round(sa, 3), "b_std": round(sb, 3)})
         return sigs
 
     sigs = _run(explicit)
@@ -342,9 +343,17 @@ def _t_tool_compare_windows(ctx, a_start=None, a_end=None, b_start=None, b_end=N
     if not sigs:
         return {"kind": "compare", "title": "Compare two windows",
                 "note": "need a time column or enough rows to split into two windows"}
+    # overall variability (activity level) per window — captures "still vs active"
+    ka = sum(s["a_std"] for s in sigs) / len(sigs)
+    kb = sum(s["b_std"] for s in sigs) / len(sigs)
+    activity = None
+    if ka > 0 and kb > 0:
+        ratio = round(kb / ka, 1) if kb >= ka else round(ka / kb, 1)
+        if ratio >= 1.5:
+            activity = {"more_active": ("second" if kb > ka else "first"), "ratio": ratio}
     sigs.sort(key=lambda s: -abs(s["delta"]))
     return {"kind": "compare", "title": "Compare two windows",
-            "window_a": la, "window_b": lb, "signals": sigs[:12]}
+            "window_a": la, "window_b": lb, "activity": activity, "signals": sigs[:12]}
 
 
 def _t_tool_stats(ctx, columns=None, **_):
@@ -991,7 +1000,10 @@ def _answer_sentence(r: dict) -> str:
         s = (r.get("signals") or [{}])[0]
         if not s:
             return ""
-        return (f"Comparing {r.get('window_a')} vs {r.get('window_b')}, the biggest change is "
+        act = r.get("activity")
+        head = (f"The {act['more_active']} window is about {act['ratio']}x more active "
+                f"(higher signal variability). " if act else "")
+        return (f"{head}Comparing {r.get('window_a')} vs {r.get('window_b')}, the biggest shift in mean is "
                 f"{s.get('signal')} ({s.get('a_mean')} -> {s.get('b_mean')}, delta {s.get('delta')}).")
     if k == "stats":
         return f"Summary statistics for {len(r.get('rows', []))} signals are tabulated below."
