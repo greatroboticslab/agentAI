@@ -199,6 +199,10 @@ def analyze_nonimage(root) -> dict:
                     for i, vals in numcols.items():
                         if i == tcol or i == lc_idx or len(vals) < 8:
                             continue
+                        # a numeric column NAMED like a label (e.g. 'activity' = 0/11) is
+                        # ground truth, not a sensor signal — don't score its "noise".
+                        if (header[i] if i < len(header) else "").strip().lower() in _label_names:
+                            continue
                         nz = _signal_noise(vals)
                         if nz:
                             cname = header[i] or f"col{i}"
