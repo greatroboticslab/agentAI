@@ -933,7 +933,17 @@ def _answer_sentence(r: dict) -> str:
             return "No anomalies were detected."
         by = "; ".join(f"{f['file']}: " + ", ".join(f"{v} {t.replace('_', ' ')}"
                         for t, v in (f.get('by_type') or {}).items()) for f in r.get("files", []))
-        return f"{r['total']} anomalies detected — {by}."
+        evs = []
+        for f in r.get("files", []):
+            for e in (f.get("events") or [])[:4]:
+                if e.get("time") is not None:
+                    sev = (e.get("sigma") or e.get("jump_m") or e.get("gap_s") or e.get("length") or 0)
+                    lbl = (e["type"].replace("_", " ") + (f" in {e['signal']}" if e.get("signal") else "")
+                           + f" at t={e['time']}s")
+                    evs.append((sev, lbl))
+        evs.sort(key=lambda x: -x[0])
+        tail = (" Notably: " + "; ".join(l for _, l in evs[:3]) + ".") if evs else ""
+        return f"{r['total']} anomalies detected — {by}.{tail}"
     if k == "cross":
         n = r.get("n_correlated", 0)
         if not n:
