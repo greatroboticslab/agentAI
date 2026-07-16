@@ -96,12 +96,35 @@ agreement is the fingerprint of a real **pothole**, not a glitch.
 > logging. A one-click **AI review** then narrates all of this in plain English and rates training-readiness — a
 > small model runs locally on the server, a stronger cluster model is selectable per project.
 
+### Step 5 — Ask it anything, in plain words
+
+The standard read is just the start. Every dataset has an **Analysis agent** chat box: type a question and it
+picks the analysis *for that question*. Ask *"what went wrong during the run and when?"* and it runs anomaly
+detection, answering with the exact events and their timestamps — every number computed by a tool, never invented:
+
+<div align="center">
+<img src="docs/screenshots/sensor-agent-text.png" width="840" alt="Analysis agent answering a typed question: 22 anomalies with the GPS jump at 30s and IMU change at 59.8s, and which tool it ran">
+</div>
+
+Ask a **different** question — *"where do GPS and IMU flag the same moment?"* — and it runs a *different* analysis
+(cross-sensor correlation → the pothole at 60 s), with an actionable suggestion. A vague *"analyze this"* gets
+guided back to concrete options instead of a canned run.
+
+### Step 6 — …or just say it
+
+Click the **🎙 mic** and **speak** your question. It transcribes on the lab GPU (self-hosted Whisper) and runs
+the analysis — a different spoken question gives a different analysis. Below, *"which signal is the noisiest?"*
+was **spoken**, and the agent computed the per-signal noise table and flagged the low-reliability signals:
+
+<div align="center">
+<img src="docs/screenshots/sensor-agent-voice.png" width="840" alt="Analysis agent answering a spoken question: 'which signal is the noisiest' transcribed, then a noise/SNR table and suggestions">
+</div>
+
 ---
 
 ## 🧠 Ask your data — the analysis agent
 
-Uploading isn't the end. Every sensor / image dataset gets a chat box: **type or 🎙 speak a question**, and an
-agent picks the right analysis *for that question* and answers with real numbers.
+That's the agent you just used in Steps 5–6. It works the same on **any** sensor or image dataset:
 
 - *"which signal is noisiest?"* · *"what happened around 60 seconds?"* · *"do GPS and IMU agree anywhere?"* ·
   *"are any images blurry?"* · *"compare the first half to the second half"* — each one runs a **different**
