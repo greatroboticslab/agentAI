@@ -6712,6 +6712,7 @@ async function loadAI(refresh){
 var AGENT_HISTORY=[];
 function agentKeydown(e){ if(e.key==="Enter"){ agentSend(); } }
 function agentSend(){ var i=document.getElementById("agentIn"); if(!i)return; agentAsk(i.value); i.value=""; }
+function agentJump(){ var a=document.getElementById("agentIn"); if(a){ a.scrollIntoView({behavior:"smooth",block:"center"}); try{a.focus();}catch(e){} } }
 // Progressive (streaming) voice: while recording, every ~2.8s the accumulated audio
 // is re-transcribed on the lab GPU and the live text is shown in the box as you speak;
 // on stop, a final pass runs and the agent analyzes the question. Same pattern as the
@@ -6923,6 +6924,16 @@ async function load(refresh){
   var kpis=[['n_images',d.n_images],['total files',d.total_files],['size (MB)',d.total_size_mb],
             ['annotation',a.type],['classes',(a.classes||[]).length],['near-dupes',d.near_duplicates]];
   var html='<div class="cards">'+kpis.map(function(k){return '<div class="kpi"><div class="v">'+esc(k[1])+'</div><div class="l">'+esc(k[0])+'</div></div>';}).join('')+'</div>';
+  // v3.6.4: point users to the goal-driven / voice analysis. Prof feedback: he recorded
+  // audio explaining his intent, clicked Analyze, and "no updates" — because the
+  // intent-driven analysis lives in the chat box below, not in the fixed charts.
+  var _pm=Object.keys(d.modality||{})[0]||((d.modality_detail&&d.modality_detail.sensor)?"sensor":"");
+  var _agentOK=(_pm==="sensor")||(d.modality_detail&&d.modality_detail.sensor)||(_pm==="image")||(_pm==="video")||(d.n_images>0);
+  if(_agentOK){
+    html+='<div class="card" style="border:1px solid #86efac;background:#f2fdf6;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:260px"><b>&#127908; Want the analysis to follow YOUR question?</b> The charts on this page are a fixed <i>standard read</i>. To ask this dataset anything &mdash; <b>by voice or text</b> &mdash; and get an analysis tailored to your question, use the <b>Analysis agent</b> just below.</div>'
+      +'<button onclick="agentJump()" style="border:0;background:#059669;color:#fff;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;white-space:nowrap">Ask by voice or text &darr;</button></div>';
+  }
   // AI review card (on-demand — the smart summary + readiness verdict)
   html+='<div class="card" style="border-color:#c7d2fe;background:#f5f8ff"><h3>&#129302; AI review &amp; training readiness</h3>'
     +'<div class="muted" id="aihint">A local AI model reviews this dataset: plain-English summary, data issues, recommendations, and whether it&rsquo;s ready to train.</div>'
@@ -6931,8 +6942,6 @@ async function load(refresh){
   // v3.3.0: goal-driven analysis AGENT (chat) — sensor datasets. The user asks; an
   // LLM planner picks which grounded tools to run for THAT question. Different
   // question -> different analysis. The fixed charts below remain the default read.
-  var _pm=Object.keys(d.modality||{})[0]||((d.modality_detail&&d.modality_detail.sensor)?"sensor":"");
-  var _agentOK=(_pm==="sensor")||(d.modality_detail&&d.modality_detail.sensor)||(_pm==="image")||(_pm==="video")||(d.n_images>0);
   if(_agentOK){
     var chips=(_pm==="image"||_pm==="video"||d.n_images>0&&_pm!=="sensor")
       ? ['Show the class distribution — is it balanced?','Are any images blurry or too dark?','Is this dataset ready to train?']

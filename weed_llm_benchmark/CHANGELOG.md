@@ -5801,3 +5801,12 @@ rather than mislead. Open-ended "why did X happen?" questions still run the clos
 an honest note that interpretation of *why* isn't available yet. Supported questions are unchanged. This is the
 first half of raising the agent's freedom the right way: be trustworthy about the current ceiling before adding
 the sandboxed code-gen tool that will lift it.
+
+### v3.6.4 — analysis page: banner pointing voice/goal analysis to the chat box
+
+Directly closes the prof's confusion ("I recorded audio explaining my intent, clicked Analyze — no updates"):
+the intent-driven analysis lives in the Analysis-agent chat box, not in the fixed standard charts. Added a
+prominent (English) banner right below the KPIs — "🎙 Want the analysis to follow YOUR question? … use the
+Analysis agent just below" — with an "Ask by voice or text ↓" button that scrolls to and focuses the chat input.
+So a new user (or the professor repeating his exact action) is guided from the Analyze charts to the place where
+voice/typed questions actually drive a tailored analysis.
