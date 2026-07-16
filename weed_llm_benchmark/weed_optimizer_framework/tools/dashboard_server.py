@@ -6712,25 +6712,39 @@ async function loadAI(refresh){
 var AGENT_HISTORY=[];
 function agentKeydown(e){ if(e.key==="Enter"){ agentSend(); } }
 function agentSend(){ var i=document.getElementById("agentIn"); if(!i)return; agentAsk(i.value); i.value=""; }
-var _agRec=null,_agChunks=[],_agOn=false;
+// Progressive (streaming) voice: while recording, every ~2.8s the accumulated audio
+// is re-transcribed on the lab GPU and the live text is shown in the box as you speak;
+// on stop, a final pass runs and the agent analyzes the question. Same pattern as the
+// project-creation "Speak" button, now in the analysis chat.
+var _agRec=null,_agChunks=[],_agOn=false,_agSeq=0,_agTimer=null,_agBusy=false,_agSent=0;
 function agentMic(){
   var btn=document.getElementById("agentMic"), inp=document.getElementById("agentIn");
   if(_agOn&&_agRec){ _agRec.stop(); return; }
   if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)){ alert("Voice input is not supported in this browser."); return; }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-    _agRec=new MediaRecorder(stream); _agChunks=[];
+    _agRec=new MediaRecorder(stream); _agChunks=[]; _agSeq++; var gen=_agSeq; _agSent=0; _agBusy=false;
     _agRec.ondataavailable=function(e){ if(e.data&&e.data.size)_agChunks.push(e.data); };
-    _agRec.onstart=function(){ _agOn=true; btn.innerHTML="&#9209;"; btn.style.background="#fee2e2"; btn.style.color="#b91c1c"; inp.placeholder="listening\\u2026 click again to stop"; };
-    _agRec.onstop=function(){ _agOn=false; btn.innerHTML="&#127908;"; btn.style.background="#eef2ff"; btn.style.color="#2563eb"; inp.placeholder="transcribing your question\\u2026";
+    _agRec.onstart=function(){ _agOn=true; btn.innerHTML="&#9209;"; btn.style.background="#fee2e2"; btn.style.color="#b91c1c"; inp.value=""; inp.placeholder="listening\\u2026 your words appear live \\u2014 click \\u23f9 to run";
+      _agTimer=setInterval(function(){
+        if(!_agOn||_agBusy||_agChunks.length<=_agSent)return;    // nothing new to send
+        _agBusy=true; var sent=_agChunks.length;
+        fetch("/api/voice/transcribe",{method:"POST",credentials:"include",headers:{"Content-Type":"application/octet-stream"},body:new Blob(_agChunks.slice(0),{type:"audio/webm"})})
+         .then(function(r){return r.json();}).then(function(d){
+           if(_agOn&&gen===_agSeq&&d&&d.ok&&(d.text||"").trim()){ inp.value=d.text.trim(); _agSent=sent; }  // live preview
+           _agBusy=false;
+         }).catch(function(){ _agBusy=false; });
+      },2800);
+    };
+    _agRec.onstop=function(){ _agOn=false; clearInterval(_agTimer); btn.innerHTML="&#127908;"; btn.style.background="#eef2ff"; btn.style.color="#2563eb"; inp.placeholder="finalizing\\u2026";
       try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
       fetch("/api/voice/transcribe",{method:"POST",credentials:"include",headers:{"Content-Type":"application/octet-stream"},body:new Blob(_agChunks,{type:"audio/webm"})})
        .then(function(r){return r.json();}).then(function(d){
          inp.placeholder="e.g. which signal is noisiest, and when did things go wrong?";
-         if(d&&d.ok&&(d.text||"").trim()){ var q=d.text.trim(); inp.value=q; agentAsk(q); inp.value=""; }
-         else { inp.placeholder="(could not transcribe \\u2014 try again or type)"; }
-       }).catch(function(){ inp.placeholder="(transcription error \\u2014 type instead)"; });
+         var q=(d&&d.ok&&(d.text||"").trim())?d.text.trim():(inp.value||"").trim();  // fall back to the live text
+         if(q){ inp.value=q; agentAsk(q); inp.value=""; } else { inp.placeholder="(could not transcribe \\u2014 try again or type)"; }
+       }).catch(function(){ var q=(inp.value||"").trim(); if(q){ agentAsk(q); inp.value=""; } else { inp.placeholder="(transcription error \\u2014 type instead)"; } });
     };
-    _agRec.start();
+    _agRec.start(1000);        // timeslice so chunks accumulate for the live passes
   }).catch(function(){ alert("Microphone permission was denied."); });
 }
 function agentAsk(goal){

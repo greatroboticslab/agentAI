@@ -110,14 +110,20 @@ Ask a **different** question — *"where do GPS and IMU flag the same moment?"* 
 (cross-sensor correlation → the pothole at 60 s), with an actionable suggestion. A vague *"analyze this"* gets
 guided back to concrete options instead of a canned run.
 
-### Step 6 — …or just say it
+### Step 6 — …or just say it — live
 
-Click the **🎙 mic** and **speak** your question. It transcribes on the lab GPU (self-hosted Whisper) and runs
-the analysis — a different spoken question gives a different analysis. Below, *"which signal is the noisiest?"*
-was **spoken**, and the agent computed the per-signal noise table and flagged the low-reliability signals:
+Click the **🎙 mic** and **speak** your question. Transcription streams on the lab GPU (self-hosted Whisper),
+so **the words appear in the box as you talk**; when you stop, the agent runs the analysis. A different spoken
+question gives a different analysis — you steer it in real time, by voice.
 
 <div align="center">
-<img src="docs/screenshots/sensor-agent-voice.png" width="840" alt="Analysis agent answering a spoken question: 'which signal is the noisiest' transcribed, then a noise/SNR table and suggestions">
+<img src="docs/screenshots/sensor-agent-voice-live.png" width="840" alt="Live voice: the mic is recording (red) and the spoken words appear in the box in real time">
+<br><sub>Words appear <b>live</b> as you speak (mic recording).</sub>
+</div>
+
+<div align="center">
+<img src="docs/screenshots/sensor-agent-voice.png" width="840" alt="On stop, the agent answers the spoken question: a per-signal noise/SNR table and suggestions">
+<br><sub>On stop, the agent picks the analysis for what you asked and answers with real numbers.</sub>
 </div>
 
 ---
@@ -133,8 +139,9 @@ That's the agent you just used in Steps 5–6. It works the same on **any** sens
   anomaly detection, cross-sensor time alignment, image blur (variance of Laplacian), class balance — and stated
   **exactly as computed**, so **no number is ever invented**. It then lists actionable **suggestions** (blurry
   images to review, unlabeled or duplicate images to fix, class imbalance, and so on).
-- **Voice** runs the whole thing: the 🎙 button records your question, transcribes it on the lab GPU
-  (self-hosted Whisper), and runs the analysis — a different spoken question gives a different analysis.
+- **Voice** runs the whole thing: the 🎙 button streams your question to self-hosted Whisper on the lab GPU —
+  **the words appear live as you speak** — and on stop the agent runs the analysis. A different spoken question
+  gives a different analysis, so you can **steer the analysis in real time, by voice**.
 
 **Why not just drop the file into a general AI chat?**
 

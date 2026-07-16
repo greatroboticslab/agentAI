@@ -5780,3 +5780,13 @@ Ran 8 deliberately-awkward CSVs through the live upload→analyze→agent path a
 Verified: all 8 cases (semicolon, ISO-timestamp, missing values, BOM+units, unix-ms, non-sensor table, 3-row,
 duplicate columns) now return 200 and degrade gracefully instead of crashing. Also: compare_windows reports
 which window is more active; anomaly answers cite the top distinct events with timestamps.
+
+### v3.6.2 — streaming (real-time) voice in the analysis chat
+
+The analysis-agent mic now transcribes **live**: while you speak, the accumulated audio is re-transcribed on the
+lab GPU every ~2.8 s and the text appears in the box in real time (a generation counter + busy flag avoid stale
+updates); on stop, a final pass runs and the agent analyzes the question. Same progressive-Whisper pattern as the
+project-creation "Speak" button, now in the chat — so you steer the analysis in real time by voice, not just
+record-then-wait. Verified live (fake-mic feeding a WAV through the real button): the words appear mid-recording
+("what happened around 60 seconds") before stop, then the agent runs focus_time and answers. README Step 6
+updated with a live-recording screenshot.
