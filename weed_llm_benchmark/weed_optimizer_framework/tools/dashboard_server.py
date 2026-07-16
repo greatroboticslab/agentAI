@@ -3830,9 +3830,57 @@ async def api_dataset_analyze_goal(request: Request):
     except Exception as e:
         log.warning(f"[analyze_goal] {slug}: {e}")
         raise HTTPException(500, "analysis agent failed")
+    # v3.7: code-writing analyst — when the library can't serve it (unsupported
+    # method) or the user asks for a plot/graph, the agent WRITES analysis code,
+    # runs it sandboxed (AST whitelist + rlimits), self-repairs, and returns the
+    # plot + printed findings + the code itself (prof: show agent code in browser).
+    _g = goal.lower()
+    _wants_plot = any(w in _g for w in ("plot", "graph", "chart", "visuali", "histogram",
+                                        "spectrum", "draw", "curve", "scatter"))
+    if (out.get("mode") == "unsupported" or _wants_plot) and _mod == "sensor":
+        try:
+            import tempfile as _tf
+            from . import code_analyst as _ca
+            ctx = _aa.load_context(str(root))
+            if ctx["files"]:
+                def llm_code(p, s):
+                    rr = _llmp.chat("ollama:qwen2.5-coder:7b", p, system=s,
+                                    max_tokens=900, timeout=180)
+                    return rr.get("text", "") if rr.get("ok") else ""
+                wd = Path(_tf.mkdtemp(prefix="codegen_"))
+                _ca.stage_dataset(ctx["files"], wd)
+                r = _ca.write_and_run(goal, ctx["files"], wd, llm_code)
+                plot_url = None
+                if r.get("plot"):
+                    _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+                    import shutil as _sh
+                    _sh.copy(wd / "out.png", _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png")
+                    plot_url = f"/api/dataset/codegen_plot?slug={slug}"
+                if r.get("ok"):
+                    return {"ok": True, "mode": "codegen", "goal": goal,
+                            "answer": (r.get("stdout") or "").strip()[:1500],
+                            "code": r.get("code", ""), "plot_url": plot_url,
+                            "attempts": r.get("attempts"),
+                            "model": "ollama:qwen2.5-coder:7b"}
+                out.setdefault("codegen_error",
+                               (r.get("stderr") or "code generation failed")[:300])
+        except Exception as e:
+            log.warning(f"[analyze_goal codegen] {slug}: {e}")
     out["model"] = model
     out["model_place"] = pick.get("place")
     return out
+
+
+@app.get("/api/dataset/codegen_plot")
+def api_dataset_codegen_plot(request: Request, slug: str):
+    """v3.7 — serve the plot produced by the agent's generated analysis code."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)
+    p = _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png"
+    if not p.is_file():
+        raise HTTPException(404, "no generated plot")
+    return FileResponse(str(p), media_type="image/png")
 
 
 @app.get("/api/dataset/classnames")
@@ -6765,6 +6813,16 @@ function renderAgentOut(o){
   if(o.mode==="clarify"){
     var qs=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #fcd34d;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
     return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #d97706;background:#fff;border-radius:6px"><div style="margin-bottom:6px"><b>Agent:</b> I can dig into this a few ways &mdash; which do you want? (or type your own)</div>'+qs+'</div>';
+  }
+  if(o.mode==="codegen"){
+    var outLines=(o.answer||"").split("\\n").filter(function(x){return x.trim();}).map(function(x){return esc(x);}).join("<br>");
+    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #7c3aed;background:#fff;border-radius:6px">'
+      +'<div style="margin-bottom:6px"><b>Agent:</b> I wrote and ran analysis code for this'+(o.attempts>1?(' (self-repaired, attempt '+o.attempts+')'):'')+':</div>'
+      +(outLines?('<div class="mono" style="font-size:13px;background:#faf5ff;border-radius:6px;padding:8px 10px">'+outLines+'</div>'):"")
+      +(o.plot_url?('<img src="'+o.plot_url+'&v='+Date.now()+'" style="max-width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-top:8px" alt="generated plot">'):"")
+      +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;color:#7c3aed;font-weight:600">View the code it wrote &amp; ran (sandboxed)</summary>'
+      +'<pre style="font-size:11.5px;background:#1e1b2e;color:#e2e8f0;padding:10px;border-radius:8px;overflow-x:auto;margin-top:6px">'+esc(o.code||"")+'</pre></details>'
+      +'<div class="muted" style="font-size:11px;margin-top:6px">Computed by code the agent wrote for your question, run in a sandbox (whitelisted libraries, no network, resource limits). The code is shown above.</div></div>';
   }
   if(o.mode==="unsupported"){
     var qs2=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");

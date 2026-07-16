@@ -5826,3 +5826,15 @@ trend fit, KMeans behaviour phases, custom 10-sigma threshold — 4/4 requested 
 pandas/scipy/scikit-learn into the lab venv; sandbox rlimits made per-limit best-effort so macOS dev tests run.)
 Next: wire into /api/dataset/analyze_goal + chat UI (render plot + collapsible generated code), route the
 honesty-gate "unsupported" cases into this path.
+
+### v3.7.1 — code-writing analyst wired into the chat: plots on demand + code in the browser
+
+The full loop is live. When the tool library can't serve a request (the honesty-gate cases) or the user asks
+for a plot/graph, /api/dataset/analyze_goal now routes to the code analyst: qwen2.5-coder:7b writes a script
+against staged CSV copies, it runs in the AST+rlimit sandbox with self-repair, and the chat renders the printed
+findings, the generated PLOT (served via /api/dataset/codegen_plot), and a collapsible "View the code it wrote &
+ran (sandboxed)" block — the prof's explicit ask ("We can show agent code in browser"). Verified live with his
+exact words: "I want to get basic plots of the data" → 3-panel IMU acceleration plots of his real data, first
+attempt; "dominant frequency of az using an FFT" (previously declined honestly) → spectrum plot + value. Also
+fixed a real bug this exposed: a raw "\n" in the page template broke the page's JS entirely (node --check on the
+extracted script caught it). Honest label under every codegen answer: computed by sandboxed generated code.
