@@ -5810,3 +5810,19 @@ prominent (English) banner right below the KPIs — "🎙 Want the analysis to f
 Analysis agent just below" — with an "Ask by voice or text ↓" button that scrolls to and focuses the chat input.
 So a new user (or the professor repeating his exact action) is guided from the Analyze charts to the place where
 voice/typed questions actually drive a tailored analysis.
+
+### v3.7.0 (core, POC-validated) — code-writing analyst: arbitrary analysis + plots on demand
+
+Research-first build of the prof's ask (arbitrary methods, plots that follow the question, agent code visible
+in the browser). Surveyed the Code-Interpreter / Microsoft-LIDA pattern (codegen → sandbox → self-repair →
+plot+code) and sized to our hardware (lab RTX 3060 12GB → qwen2.5-coder:7b as the dedicated codegen model,
+coexisting with qwen2.5:3b + Whisper in VRAM). New `tools/code_analyst.py`: layered sandbox (AST import/name
+whitelist — no socket/subprocess/os/eval/write; subprocess with POSIX rlimits CPU/mem/fsize, cleaned env,
+throwaway dir, wall-clock kill), codegen prompt contract (read staged CSVs, savefig out.png, print findings),
+and a LIDA-style self-repair loop (traceback fed back, ≤2 retries). Datasets are staged as CSV copies — the
+generated code never touches originals. POC on the live lab box against the real patrol dataset: 5/5
+out-of-library requests succeeded on the FIRST attempt — plot speed over time, FFT spectrum of az, linear
+trend fit, KMeans behaviour phases, custom 10-sigma threshold — 4/4 requested plots rendered. (Also: installed
+pandas/scipy/scikit-learn into the lab venv; sandbox rlimits made per-limit best-effort so macOS dev tests run.)
+Next: wire into /api/dataset/analyze_goal + chat UI (render plot + collapsible generated code), route the
+honesty-gate "unsupported" cases into this path.
