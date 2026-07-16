@@ -663,6 +663,42 @@ _PLAN_SYS = (
 )
 
 
+# ---------------------------------------------------------------------------
+# honesty gate — recognize requests the tool library can't serve, and SAY SO
+# instead of silently running the nearest (misleading) tool.
+# ---------------------------------------------------------------------------
+_UNSUPPORTED_METHOD = [
+    (("fft", "fourier", "spectral", "dominant frequency", "frequency domain",
+      "power spectrum", "periodogram"), "frequency / spectral analysis (FFT)"),
+    (("forecast", "predict when", "extrapolate", "regression", "fit a line", "fit a trend",
+      "fit a linear", "linear trend", "how long until", "time to zero", "project forward",
+      "when will it"), "trend-fitting / forecasting"),
+    (("cluster", "k-means", "kmeans", "pca ", "principal component", "dimensionality",
+      "t-sne", "tsne"), "clustering / dimensionality reduction"),
+    (("stricter threshold", "looser threshold", "custom threshold", "adjust the threshold",
+      "different threshold", "change the threshold", "more sensitive detection",
+      "less sensitive detection"), "custom detection thresholds"),
+    (("cross-correlation", "cross correlation", "time lag", "lagged", "phase shift",
+      "lag between", "time-lag"), "lagged cross-correlation between signals"),
+]
+_INTERPRET_CUES = ("why did", "why do", "why does", "why is", "what caused", "what's causing",
+                   "whats causing", "explain why", "root cause", "reason for",
+                   "what does it mean", "what could explain")
+
+
+def _unsupported_method(goal: str):
+    g = (goal or "").lower()
+    for keys, label in _UNSUPPORTED_METHOD:
+        if any(k in g for k in keys):
+            return label
+    return None
+
+
+def _wants_interpretation(goal: str) -> bool:
+    g = (goal or "").lower()
+    return any(k in g for k in _INTERPRET_CUES)
+
+
 def _default_clarify(ctx: dict) -> list:
     """Concrete directions tailored to what's actually in the data (used when the
     goal is empty and the model doesn't offer its own)."""
@@ -710,6 +746,12 @@ def plan(goal: str, ctx: dict, llm_call) -> dict:
              "report", "here", "can", "you", "please", "everything", "all"}
     _mean = [t for t in _re.findall(r"[a-z]+", _g) if t not in _STOP]
     vague = len(_g) < 6 or not _mean
+    # honesty gate: if the user asks for an analysis METHOD the library doesn't have,
+    # say so — don't silently run the nearest (misleading) tool.
+    _unsup = _unsupported_method(goal)
+    if _unsup and not vague:
+        return {"ok": True, "mode": "unsupported", "method": _unsup,
+                "questions": _default_clarify(ctx), "source": "capability"}
     mod = ctx.get("modality")
     menu = tool_menu(mod)
     valid = {t["name"] for t in menu}
@@ -1169,8 +1211,15 @@ def analyze_goal(root, goal: str, llm_call, analysis: dict | None = None,
         return {"ok": True, "mode": "clarify", "goal": goal,
                 "questions": pl.get("questions", []), "plan_source": pl["source"],
                 "profile": profile_text(ctx)}
+    if pl.get("mode") == "unsupported":                     # honest: not in the library
+        return {"ok": True, "mode": "unsupported", "goal": goal,
+                "method": pl.get("method"), "questions": pl.get("questions", []),
+                "plan_source": pl["source"], "profile": profile_text(ctx)}
     results = run_plan(pl["plan"], ctx)
     answer = synthesize_answer(goal, results, llm_call)   # deterministic facts
+    if _wants_interpretation(goal):                          # asked "why" — we give facts only
+        answer += (" (I report the computed facts and where/when they occur; open-ended "
+                   "interpretation of *why* isn't available yet — that's a planned step.)")
     return {"ok": True, "mode": "analyze", "goal": goal, "plan": pl["plan"],
             "plan_source": pl["source"], "results": results, "answer": answer,
             "recommendations": _recommendations(results), "profile": profile_text(ctx)}

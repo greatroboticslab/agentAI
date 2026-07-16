@@ -5790,3 +5790,14 @@ project-creation "Speak" button, now in the chat — so you steer the analysis i
 record-then-wait. Verified live (fake-mic feeding a WAV through the real button): the words appear mid-recording
 ("what happened around 60 seconds") before stop, then the agent runs focus_time and answers. README Step 6
 updated with a live-recording screenshot.
+
+### v3.6.3 — honesty gate: the agent says what it CAN'T do instead of faking it
+
+Before, an out-of-library request (FFT, regression/forecast, clustering, a custom threshold) made the planner
+silently pick the nearest tool and return a confident but wrong/off-target answer (e.g. "FFT" → focus_time at
+t=0). Now the agent recognizes those method requests and responds honestly — "I can't do <frequency/spectral
+analysis (FFT)> yet — that's not in the analysis library; here's what I can dig into" + the data-aware options —
+rather than mislead. Open-ended "why did X happen?" questions still run the closest factual analysis but append
+an honest note that interpretation of *why* isn't available yet. Supported questions are unchanged. This is the
+first half of raising the agent's freedom the right way: be trustworthy about the current ceiling before adding
+the sandboxed code-gen tool that will lift it.

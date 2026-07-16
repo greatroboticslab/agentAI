@@ -6765,6 +6765,10 @@ function renderAgentOut(o){
     var qs=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #fcd34d;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
     return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #d97706;background:#fff;border-radius:6px"><div style="margin-bottom:6px"><b>Agent:</b> I can dig into this a few ways &mdash; which do you want? (or type your own)</div>'+qs+'</div>';
   }
+  if(o.mode==="unsupported"){
+    var qs2=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
+    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #64748b;background:#fff;border-radius:6px"><div style="margin-bottom:6px"><b>Agent:</b> I can\\u2019t do <b>'+esc(o.method)+'</b> yet &mdash; that\\u2019s not in the analysis library. Rather than run something misleading, here\\u2019s what I <i>can</i> dig into on this data:</div>'+qs2+'</div>';
+  }
   var chosen=(o.plan||[]).map(function(s){return esc(s.tool)+(s.why?' <span class="muted">('+esc(s.why)+')</span>':"");}).join(", ");
   var facts=(o.results||[]).map(renderAgentResult).join("");
   var recs=(o.recommendations||[]).map(function(x){var hi=x.level==='high';return '<li style="margin:2px 0;color:'+(hi?'#b45309':'#475569')+'">'+(hi?'&#9888;&#65039; ':'&#8226; ')+esc(x.text)+'</li>';}).join("");
