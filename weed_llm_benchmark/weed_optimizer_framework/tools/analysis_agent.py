@@ -572,6 +572,130 @@ def _t_img_duplicates(ctx, **_):
             "groups": [g[:6] for g in groups[:8]]}
 
 
+
+def _t_img_suspicious(ctx, top=12, **_):
+    """LABEL-NOISE scan (the platform's oldest pain): score every YOLO box with
+    grounded heuristics — tiny area, touching the image edge, extreme aspect ratio,
+    sitting on a blurry/dark image — and render a crop MONTAGE of the worst ones so
+    a human can eyeball them in the chat and weed out bad labels."""
+    root = ctx.get("root")
+    if not root:
+        return {"kind": "suspicious", "title": "Suspicious labels", "note": "no dataset folder"}
+    try:
+        import numpy as np
+        from PIL import Image, ImageDraw
+    except Exception:
+        return {"kind": "suspicious", "title": "Suspicious labels",
+                "note": "image libraries unavailable"}
+    from pathlib import Path
+    rootp = Path(root)
+    lbls = [p for p in rootp.rglob("*.txt")
+            if any(x.lower() == "labels" for x in p.parts) and p.name.lower() != "classes.txt"]
+    if not lbls:
+        return {"kind": "suspicious", "title": "Suspicious labels",
+                "note": "no YOLO labels/ found (this scan reads YOLO boxes)"}
+    exts = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
+    def _img_for(lp):
+        for d in (lp.parent.parent / "images", lp.parent.parent):
+            for e in exts:
+                c = d / (lp.stem + e)
+                if c.is_file():
+                    return c
+        return None
+    boxes = []
+    for lp in lbls[:2000]:
+        ip = _img_for(lp)
+        try:
+            lines = [l.split() for l in lp.read_text().splitlines() if l.strip()]
+        except Exception:
+            continue
+        if not lines and ip:
+            boxes.append({"file": lp.stem, "why": "empty label file", "score": 3.0,
+                          "img": ip, "box": None, "cls": None})
+            continue
+        sharp = bright = None
+        for ln in lines:
+            if len(ln) < 5:
+                continue
+            try:
+                cls, xc, yc, w, h = ln[0], *map(float, ln[1:5])
+            except ValueError:
+                continue
+            area = w * h
+            reasons, score = [], 0.0
+            if area < 0.004:
+                reasons.append("tiny box (%.2f%% of image)" % (area * 100)); score += 1.5
+            ar = (w / h) if h > 1e-6 else 99
+            if ar > 6 or ar < 1 / 6:
+                reasons.append("extreme aspect ratio %.1f" % ar); score += 1.2
+            if xc - w / 2 < 0.005 or xc + w / 2 > 0.995 or yc - h / 2 < 0.005 or yc + h / 2 > 0.995:
+                reasons.append("touches image edge"); score += 0.8
+            if reasons and ip:
+                if sharp is None:
+                    try:
+                        im = Image.open(ip).convert("L"); im.thumbnail((256, 256))
+                        a = np.asarray(im, dtype="float32")
+                        lap = (4 * a[1:-1, 1:-1] - a[:-2, 1:-1] - a[2:, 1:-1]
+                               - a[1:-1, :-2] - a[1:-1, 2:])
+                        sharp, bright = float(lap.var()), float(a.mean())
+                    except Exception:
+                        sharp, bright = -1, -1
+                if 0 <= sharp < 30:
+                    reasons.append("blurry image"); score += 0.6
+                if 0 <= bright < 50:
+                    reasons.append("dark image"); score += 0.4
+                boxes.append({"file": lp.stem, "why": "; ".join(reasons), "score": score,
+                              "img": ip, "box": (xc, yc, w, h), "cls": cls})
+    if not boxes:
+        return {"kind": "suspicious", "title": "Suspicious labels", "n_flagged": 0,
+                "note_ok": "no suspicious boxes by these heuristics"}
+    boxes.sort(key=lambda b: -b["score"])
+    try:
+        top = max(4, min(16, int(top)))
+    except (TypeError, ValueError):
+        top = 12
+    worst = boxes[:top]
+    # crop montage (4 per row), red box drawn on each crop
+    tiles = []
+    for b in worst:
+        try:
+            im = Image.open(b["img"]).convert("RGB")
+            W, H = im.size
+            if b["box"]:
+                xc, yc, w, h = b["box"]
+                pad = 0.35
+                x0 = max(0, int((xc - w / 2 - w * pad) * W)); x1 = min(W, int((xc + w / 2 + w * pad) * W))
+                y0 = max(0, int((yc - h / 2 - h * pad) * H)); y1 = min(H, int((yc + h / 2 + h * pad) * H))
+                if x1 - x0 < 8 or y1 - y0 < 8:
+                    x0, y0, x1, y1 = 0, 0, W, H
+                crop = im.crop((x0, y0, x1, y1))
+                d = ImageDraw.Draw(crop)
+                d.rectangle([int((xc - w / 2) * W) - x0, int((yc - h / 2) * H) - y0,
+                             int((xc + w / 2) * W) - x0, int((yc + h / 2) * H) - y0],
+                            outline=(220, 40, 40), width=2)
+            else:
+                crop = im
+            crop = crop.resize((160, 160))
+            tiles.append(crop)
+        except Exception:
+            continue
+    montage_path = None
+    if tiles:
+        import tempfile
+        cols = 4
+        rows = (len(tiles) + cols - 1) // cols
+        M = Image.new("RGB", (cols * 164 + 4, rows * 164 + 4), (250, 250, 252))
+        for i, t in enumerate(tiles):
+            M.paste(t, (4 + (i % cols) * 164, 4 + (i // cols) * 164))
+        montage_path = tempfile.mktemp(suffix=".png")
+        M.save(montage_path)
+    return {"kind": "suspicious", "title": "Suspicious labels (label-noise scan)",
+            "n_boxes_scanned": len(boxes), "n_flagged": len(boxes),
+            "worst": [{"file": b["file"], "class": b["cls"], "why": b["why"],
+                       "score": round(b["score"], 1)} for b in worst],
+            "montage_path": montage_path}
+
+
 # name -> (fn, description, params-doc, modalities-it-applies-to)
 TOOLS = {
     "signal_noise": (_t_tool_noise,
@@ -607,6 +731,9 @@ TOOLS = {
     "annotation_coverage": (_t_img_coverage,
         "How much of the image dataset is labeled (labeled vs total, %), the annotation type, and the near-duplicate count. Use for 'is it labeled / ready to train', 'how many duplicates'.",
         {}, {"image", "video"}),
+    "suspicious_labels": (_t_img_suspicious,
+        "LABEL-NOISE scan: flags suspicious YOLO boxes (tiny, extreme aspect, edge-touching, on blurry/dark images, empty label files), returns the worst offenders AND a crop montage image so a human can eyeball them. Use for 'suspicious/bad/wrong labels', 'label noise', 'check annotation quality'.",
+        {"top": "how many worst boxes to show (default 12)"}, {"image", "video"}),
     "image_quality": (_t_img_quality,
         "READS a sample of the actual image pixels to judge quality: sharpness (blur), brightness, contrast, and lists the softest/blurriest files. Use for 'are the images blurry / too dark / good quality / any bad images'.",
         {"sample": "how many images to sample (default 40, max 80)"}, {"image", "video"}),
@@ -825,6 +952,8 @@ def _heuristic_plan(goal: str, ctx: dict) -> list:
             steps.append({"tool": "image_dimensions", "params": {}, "why": "size question"})
         if any(w in g for w in ("label", "cover", "ready", "train", "duplicat", "annotat")):
             steps.append({"tool": "annotation_coverage", "params": {}, "why": "readiness question"})
+        if any(w in g for w in ("suspicious", "label noise", "bad label", "wrong label", "noisy label", "mislabel", "annotation quality", "bad box")):
+            steps.append({"tool": "suspicious_labels", "params": {}, "why": "label-noise question"})
         if any(w in g for w in ("blur", "sharp", "quality", "dark", "bright", "exposure", "focus", "bad image", "clear")):
             steps.append({"tool": "image_quality", "params": {}, "why": "image-quality question"})
         if any(w in g for w in ("box", "object", "per image", "empty label", "tiny", "small box", "how many object")):
@@ -959,6 +1088,13 @@ def _facts_digest(results: list) -> str:
                     f"boxes — small boxes, NOT empty labels. Median box area = "
                     f"{r.get('median_box_area_frac')} of the image. "
                     f"(Do not confuse the image count with the per-image average.)")
+        elif k == "suspicious":
+            if r.get("note"):
+                out.append(f"[suspicious labels] {r['note']}")
+            else:
+                ws = "; ".join(f"{w['file']}: {w['why']}" for w in (r.get("worst") or [])[:8])
+                out.append(f"[suspicious labels] {r.get('n_flagged')} flagged of "
+                           f"{r.get('n_boxes_scanned')} scanned. Worst: {ws}")
         elif k == "duplicates":
             if r.get("note"):
                 out.append(f"[duplicates] {r['note']}")
@@ -1079,6 +1215,17 @@ def _answer_sentence(r: dict) -> str:
                 f"across {r.get('label_files')} labeled images ({r.get('total_boxes')} boxes). "
                 f"{r.get('empty_label_files')} empty label file(s); {r.get('tiny_boxes')} boxes are tiny "
                 f"(<1% of image area).")
+    if k == "suspicious":
+        if r.get("note"):
+            return str(r["note"]).rstrip(".") + "."
+        if not r.get("n_flagged"):
+            return "No suspicious boxes were flagged by the heuristics."
+        w0 = (r.get("worst") or [{}])[0]
+        return (f"{r.get('n_flagged')} suspicious label(s) flagged out of "
+                f"{r.get('n_boxes_scanned')} scanned; the worst is {w0.get('file')} "
+                f"({w0.get('why')}). The crop montage below shows the worst "
+                f"{len(r.get('worst') or [])} — eyeball them and fix/remove bad labels "
+                f"before training.")
     if k == "duplicates":
         if not r.get("n_groups"):
             return f"No duplicate images found among {r.get('scanned')} scanned."
@@ -1151,6 +1298,10 @@ def _recommendations(results: list) -> list:
             if r.get("near_duplicates"):
                 recs.append({"level": "info", "text": f"{r['near_duplicates']} near-duplicate pair(s) — dedupe "
                              f"to avoid train/val leakage."})
+        elif k == "suspicious" and r.get("n_flagged"):
+            recs.append({"level": "high", "text": f"{r['n_flagged']} suspicious label(s) — review the "
+                         f"montage, then fix or remove them (the /classes page has per-image verify) "
+                         f"before this dataset trains."})
         elif k == "duplicates" and r.get("n_groups"):
             recs.append({"level": "high", "text": f"{r['n_groups']} duplicate group(s) ({r.get('n_duplicate_images')} "
                          f"redundant images) — remove duplicates to prevent train/val leakage."})

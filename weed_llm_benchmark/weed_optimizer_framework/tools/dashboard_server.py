@@ -3871,6 +3871,18 @@ async def api_dataset_analyze_goal(request: Request):
                                (r.get("stderr") or "code generation failed")[:300])
         except Exception as e:
             log.warning(f"[analyze_goal codegen] {slug}: {e}")
+    # v3.8.1: a tool may render an image (e.g. the suspicious-labels crop montage) —
+    # publish it via the codegen_plot path so the chat can show it.
+    try:
+        for _r in (out.get("results") or []):
+            _mp = _r.pop("montage_path", None)
+            if _mp and os.path.isfile(_mp):
+                import shutil as _sh
+                _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+                _sh.move(_mp, _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png")
+                out["plot_url"] = f"/api/dataset/codegen_plot?slug={slug}"
+    except Exception:
+        pass
     out["model"] = model
     out["model_place"] = pick.get("place")
     _agent_chat_append(slug, {"kind": out.get("mode") or "analyze", "goal": goal,
@@ -6961,7 +6973,9 @@ function renderAgentOut(o){
   var recHtml=recs?('<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#334">Suggestions</div><ul style="margin:2px 0 0;padding-left:18px;font-size:12.5px">'+recs+'</ul></div>'):"";
   return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px">'
     +'<div style="margin-bottom:6px"><b>Agent:</b> '+esc(o.answer||"")+'</div>'
-    +(chosen?('<div class="muted" style="font-size:12px">ran: '+chosen+'</div>'):"")+facts+recHtml+'</div>';
+    +(chosen?('<div class="muted" style="font-size:12px">ran: '+chosen+'</div>'):"")
+    +(o.plot_url?('<img src="'+o.plot_url+'&v='+Date.now()+'" style="max-width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-top:8px" alt="tool image">'):"")
+    +facts+recHtml+'</div>';
 }
 function renderAgentResult(r){
   var k=r.kind;
@@ -6976,6 +6990,7 @@ function renderAgentResult(r){
   if(k==="img_dims"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; function st(o){return o?(esc(o.min)+" / "+esc(o.mean)+" / "+esc(o.max)):"—";} return '<table class="mini" style="margin-top:6px"><tr><td><b>metric</b></td><td><b>min / mean / max</b></td></tr><tr><td>width</td><td>'+st(r.width)+'</td></tr><tr><td>height</td><td>'+st(r.height)+'</td></tr><tr><td>aspect</td><td>'+st(r.aspect)+'</td></tr><tr><td>file KB</td><td>'+st(r.filesize_kb)+'</td></tr></table>'; }
   if(k==="coverage")return '<div class="muted" style="margin-top:4px">labeled: '+esc(r.labeled_images)+'/'+esc(r.n_images)+' ('+esc(r.pct_labeled)+'%), type '+esc(r.annotation_type)+', near-duplicates '+esc(r.near_duplicates)+'</div>';
   if(k==="box_stats"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var bpi=r.boxes_per_image||{}; return '<div class="muted" style="margin-top:4px">'+esc(r.label_files)+' label files, '+esc(r.total_boxes)+' boxes &middot; per image '+esc(bpi.min)+'/'+esc(bpi.mean)+'/'+esc(bpi.max)+' (min/mean/max)<br>empty label files: '+esc(r.empty_label_files)+', tiny boxes (&lt;1% area): '+esc(r.tiny_boxes)+'</div>'; }
+  if(k==="suspicious"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var rows=(r.worst||[]).map(function(w){return '<tr><td>'+esc(w.file)+'</td><td>'+esc(w.class==null?'—':w.class)+'</td><td>'+esc(w.why)+'</td></tr>';}).join(""); return '<div class="muted" style="margin-top:4px"><b>'+esc(r.n_flagged)+'</b> flagged of '+esc(r.n_boxes_scanned)+' scanned (montage above, red box = the label)</div>'+(rows?('<table class="mini" style="margin-top:4px"><tr><td><b>image</b></td><td><b>class</b></td><td><b>why suspicious</b></td></tr>'+rows+'</table>'):""); }
   if(k==="duplicates"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var gs=(r.groups||[]).map(function(g){return "["+g.map(esc).join(", ")+"]";}).join("<br>"); return '<div class="muted" style="margin-top:4px">scanned '+esc(r.scanned)+' images &middot; '+esc(r.n_groups)+' duplicate group(s), '+esc(r.n_duplicate_images)+' redundant'+(gs?'<br>'+gs:"")+'</div>'; }
   if(k==="img_quality"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var ls=(r.least_sharp||[]).map(function(x){return esc(x.file)+" ("+esc(x.sharpness)+(x.flagged?", soft":"")+")";}).join(", "); return '<div class="muted" style="margin-top:4px">sampled '+esc(r.sampled)+' images &middot; median sharpness '+esc(r.median_sharpness)+' (lower = softer, relative to content), median brightness '+esc(r.median_brightness)+'/255<br><b>'+esc(r.n_soft)+'</b> notably softer than the median (candidates for blur), '+esc(r.n_dark)+' dark, '+esc(r.n_overexposed)+' overexposed'+(ls?'<br>least sharp: '+ls:"")+(r.soft_caveat?'<br><span style="font-size:11px">'+esc(r.soft_caveat)+'</span>':"")+'</div>'; }
   if(k==="error")return '<div class="muted" style="color:#dc2626;margin-top:4px">'+esc(r.tool)+": "+esc(r.error)+'</div>';

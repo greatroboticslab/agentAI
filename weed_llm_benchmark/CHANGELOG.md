@@ -5854,3 +5854,15 @@ real browser: workbench opened, code edited, ran → custom plot + printed findi
 with a plot; `import os` rejected by the safety checker; history rehydrated after reload. Two more non-raw
 template escapes (\n, \') caught by node --check on the extracted page JS — that check is now part of the
 deploy ritual.
+
+### v3.8.1 — label-noise scan in the chat (strategy layer 2, first tool)
+
+The analysis agent now attacks the platform's oldest documented pain (pseudo-label noise). New
+`suspicious_labels` image tool: scores every YOLO box with grounded heuristics (tiny area, extreme aspect
+ratio, edge-touching, on blurry/dark images, empty label files), returns the worst offenders AND renders a
+crop MONTAGE (red box = the label) so a human can eyeball bad labels directly in the conversation. Tool
+images publish through the codegen_plot path; analyze-mode chat answers can now carry an image. Routed by
+the planner + keyword fallback ("suspicious/bad/wrong labels", "label noise", "annotation quality"); a high
+Suggestion points to /classes for fixing before training. Verified live against known ground truth (the
+aerial QA set): flagged exactly the 4 injected tiny boxes + the 1 empty label file — 5/5, zero false
+positives. Next in layer 2: DINOv2 embedding outliers (wrong-species boxes) + one-click verdicts from chat.
