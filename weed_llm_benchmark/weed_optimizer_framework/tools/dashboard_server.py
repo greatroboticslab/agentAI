@@ -3857,17 +3857,108 @@ async def api_dataset_analyze_goal(request: Request):
                     _sh.copy(wd / "out.png", _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png")
                     plot_url = f"/api/dataset/codegen_plot?slug={slug}"
                 if r.get("ok"):
-                    return {"ok": True, "mode": "codegen", "goal": goal,
+                    resp = {"ok": True, "mode": "codegen", "goal": goal,
                             "answer": (r.get("stdout") or "").strip()[:1500],
                             "code": r.get("code", ""), "plot_url": plot_url,
                             "attempts": r.get("attempts"),
                             "model": "ollama:qwen2.5-coder:7b"}
+                    _agent_chat_append(slug, {"kind": "codegen", "goal": goal,
+                                              "answer": resp["answer"][:400],
+                                              "code": resp["code"][:4000],
+                                              "plot": bool(plot_url)})
+                    return resp
                 out.setdefault("codegen_error",
                                (r.get("stderr") or "code generation failed")[:300])
         except Exception as e:
             log.warning(f"[analyze_goal codegen] {slug}: {e}")
     out["model"] = model
     out["model_place"] = pick.get("place")
+    _agent_chat_append(slug, {"kind": out.get("mode") or "analyze", "goal": goal,
+                              "answer": str(out.get("answer") or "")[:400],
+                              "plan": [s.get("tool") for s in (out.get("plan") or [])],
+                              "questions": (out.get("questions") or [])[:4],
+                              "method": out.get("method")})
+    return out
+
+
+def _agent_chat_append(slug: str, entry: dict):
+    """v3.8: persist analysis-chat turns per dataset (jsonl, same pattern as
+    slug_verdicts) so the human+AI iteration survives reloads and accumulates."""
+    try:
+        _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+        entry = {"ts": time.strftime("%Y-%m-%d %H:%M:%S"), **entry}
+        with open(_DATASET_ANALYSIS_DIR / f"{slug}_chat.jsonl", "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:
+        log.warning(f"[agent_chat] append failed for {slug}: {e}")
+
+
+@app.get("/api/dataset/chat_history")
+def api_dataset_chat_history(request: Request, slug: str):
+    """v3.8 — replay the persisted analysis conversation for this dataset."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)
+    p = _DATASET_ANALYSIS_DIR / f"{slug}_chat.jsonl"
+    turns = []
+    if p.is_file():
+        for line in p.read_text(encoding="utf-8", errors="replace").splitlines()[-60:]:
+            try:
+                turns.append(json.loads(line))
+            except Exception:
+                continue
+    return {"ok": True, "turns": turns}
+
+
+@app.post("/api/dataset/run_code")
+async def api_dataset_run_code(request: Request):
+    """v3.8 — the OPEN CODE WORKBENCH (prof's ask). POST {slug, code}: run
+    user-edited or pasted analysis code (e.g. optimized by ChatGPT/Gemini) against
+    a staged COPY of this dataset, inside the same sandbox as agent-generated code
+    (AST whitelist -> subprocess rlimits -> wall-clock kill). Returns stdout /
+    stderr / plot. Nothing is faked: errors come back verbatim."""
+    actor = _actor_from_request(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    slug = str(body.get("slug") or "")
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    code = str(body.get("code") or "")
+    if not code.strip():
+        raise HTTPException(400, "no code")
+    if len(code) > 20000:
+        raise HTTPException(413, "code too long (20k max)")
+    root = _resolve_slug_dir(slug)
+    if not root:
+        raise HTTPException(404, "dataset not found")
+    from . import analysis_agent as _aa, code_analyst as _ca
+    ctx = _aa.load_context(str(root))
+    if not ctx["files"]:
+        return {"ok": False, "error": "no tabular sensor files to stage for this dataset "
+                                      "(the code workbench currently supports sensor datasets)"}
+    why = _ca.check_code(code)
+    if why:
+        return {"ok": False, "error": f"rejected by the safety checker: {why}",
+                "safety": True}
+    import tempfile as _tf
+    wd = Path(_tf.mkdtemp(prefix="usercode_"))
+    _ca.stage_dataset(ctx["files"], wd)
+    r = _ca.run_sandboxed(code, wd)
+    plot_url = None
+    if r.get("plot"):
+        import shutil as _sh
+        _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+        _sh.copy(wd / "out.png", _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png")
+        plot_url = f"/api/dataset/codegen_plot?slug={slug}"
+    out = {"ok": bool(r.get("ok")), "mode": "codegen", "user_code": True,
+           "answer": (r.get("stdout") or "").strip()[:1500],
+           "error": (None if r.get("ok") else (r.get("stderr") or "run failed")[:800]),
+           "code": code, "plot_url": plot_url}
+    _agent_chat_append(slug, {"kind": "run_code", "by": actor, "ok": out["ok"],
+                              "answer": out["answer"][:400], "code": code[:4000],
+                              "plot": bool(plot_url), "error": (out["error"] or "")[:200]})
     return out
 
 
@@ -6757,7 +6848,38 @@ async function loadAI(refresh){
   out.innerHTML=renderReview(d);
  }catch(e){ if(btn)btn.disabled=false; out.innerHTML='<span class="warn">'+esc(e)+'</span>'; }
 }
-var AGENT_HISTORY=[];
+var AGENT_HISTORY=[],AGENT_EDN=0;
+function runUserCode(eid){
+  var ta=document.getElementById(eid); if(!ta)return;
+  var log=document.getElementById("agentLog");
+  var wait=document.createElement("div"); wait.className="muted"; wait.textContent="running your code in the sandbox...";
+  log.appendChild(wait); log.scrollTop=log.scrollHeight;
+  fetch("/api/dataset/run_code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,code:ta.value})})
+   .then(function(r){return r.json();})
+   .then(function(o){ wait.remove();
+     if(o&&(o.mode==="codegen"||o.code)){ o.mode="codegen"; log.insertAdjacentHTML("beforeend",renderAgentOut(o)); }
+     else { log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626;margin:6px 0">'+esc((o&&o.error)||"run failed")+'</div>'); }
+     log.scrollTop=log.scrollHeight; })
+   .catch(function(e){ wait.remove(); log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626">error: '+esc(String(e))+'</div>'); });
+}
+function agentWorkbench(){
+  var log=document.getElementById("agentLog"); if(!log)return;
+  var tpl="import pandas as pd\\nimport matplotlib.pyplot as plt\\n\\n# Files in the working directory are COPIES of this dataset's CSVs (same names).\\n# Write any analysis; save a figure with plt.savefig('out.png'); print() findings.\\n\\n";
+  log.insertAdjacentHTML("beforeend",renderAgentOut({ok:true,mode:"codegen",user_code:true,answer:"",code:tpl,plot_url:null}));
+  log.scrollTop=log.scrollHeight;
+}
+function agentHydrate(){
+  var log=document.getElementById("agentLog"); if(!log||log.childElementCount)return;
+  fetch("/api/dataset/chat_history?slug="+encodeURIComponent(SLUG),{credentials:"include"})
+   .then(function(r){return r.json();}).then(function(d){
+     (d&&d.turns||[]).forEach(function(t){
+       if(t.goal)log.insertAdjacentHTML("beforeend",'<div style="margin:8px 0 2px"><b>You:</b> '+esc(t.goal)+'</div>');
+       if(t.kind==="codegen"||t.kind==="run_code"){ log.insertAdjacentHTML("beforeend",renderAgentOut({ok:true,mode:"codegen",user_code:(t.kind==="run_code"),answer:t.answer||"",code:t.code||"",plot_url:null,error:(t.ok===false?(t.error||"failed"):null)})); }
+       else if(t.answer){ log.insertAdjacentHTML("beforeend",'<div style="margin:2px 0 10px;padding:6px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px"><b>Agent:</b> '+esc(t.answer)+'</div>'); }
+     });
+     if(d&&d.turns&&d.turns.length)log.insertAdjacentHTML("beforeend",'<div class="muted" style="font-size:11px;margin:4px 0 8px">&#8635; restored earlier conversation for this dataset</div>');
+   }).catch(function(){});
+}
 function agentKeydown(e){ if(e.key==="Enter"){ agentSend(); } }
 function agentSend(){ var i=document.getElementById("agentIn"); if(!i)return; agentAsk(i.value); i.value=""; }
 function agentJump(){ var a=document.getElementById("agentIn"); if(a){ a.scrollIntoView({behavior:"smooth",block:"center"}); try{a.focus();}catch(e){} } }
@@ -6816,13 +6938,18 @@ function renderAgentOut(o){
   }
   if(o.mode==="codegen"){
     var outLines=(o.answer||"").split("\\n").filter(function(x){return x.trim();}).map(function(x){return esc(x);}).join("<br>");
+    var eid="ed"+(++AGENT_EDN);
+    var who=o.user_code?"Your code ran in the sandbox":("I wrote and ran analysis code for this"+(o.attempts>1?(" (self-repaired, attempt "+o.attempts+")"):""));
     return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #7c3aed;background:#fff;border-radius:6px">'
-      +'<div style="margin-bottom:6px"><b>Agent:</b> I wrote and ran analysis code for this'+(o.attempts>1?(' (self-repaired, attempt '+o.attempts+')'):'')+':</div>'
+      +'<div style="margin-bottom:6px"><b>Agent:</b> '+who+':</div>'
+      +(o.error?('<div class="mono" style="font-size:12.5px;background:#fef2f2;color:#b91c1c;border-radius:6px;padding:8px 10px">'+esc(o.error)+'</div>'):"")
       +(outLines?('<div class="mono" style="font-size:13px;background:#faf5ff;border-radius:6px;padding:8px 10px">'+outLines+'</div>'):"")
       +(o.plot_url?('<img src="'+o.plot_url+'&v='+Date.now()+'" style="max-width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-top:8px" alt="generated plot">'):"")
-      +'<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;color:#7c3aed;font-weight:600">View the code it wrote &amp; ran (sandboxed)</summary>'
-      +'<pre style="font-size:11.5px;background:#1e1b2e;color:#e2e8f0;padding:10px;border-radius:8px;overflow-x:auto;margin-top:6px">'+esc(o.code||"")+'</pre></details>'
-      +'<div class="muted" style="font-size:11px;margin-top:6px">Computed by code the agent wrote for your question, run in a sandbox (whitelisted libraries, no network, resource limits). The code is shown above.</div></div>';
+      +'<details style="margin-top:8px"'+(o.user_code?' open':'')+'><summary style="cursor:pointer;font-size:12.5px;color:#7c3aed;font-weight:600">View / EDIT the code &amp; re-run (sandboxed)</summary>'
+      +'<textarea id="'+eid+'" spellcheck="false" style="width:100%;min-height:220px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:#1e1b2e;color:#e2e8f0;padding:10px;border-radius:8px;border:1px solid #4c1d95;margin-top:6px;box-sizing:border-box">'+esc(o.code||"")+'</textarea>'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button onclick="runUserCode(&quot;'+eid+'&quot;)" style="border:0;background:#7c3aed;color:#fff;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer">&#9654; Run this code</button>'
+      +'<span class="muted" style="font-size:11.5px">Edit it here &mdash; or paste code optimized by ChatGPT / Gemini &mdash; and it runs in our sandbox on this dataset.</span></div></details>'
+      +'<div class="muted" style="font-size:11px;margin-top:6px">Runs in a sandbox: whitelisted libraries (pandas/numpy/scipy/sklearn/matplotlib/seaborn), no network, no file writes except the plot, resource limits.</div></div>';
   }
   if(o.mode==="unsupported"){
     var qs2=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
@@ -6834,7 +6961,7 @@ function renderAgentOut(o){
   var recHtml=recs?('<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#334">Suggestions</div><ul style="margin:2px 0 0;padding-left:18px;font-size:12.5px">'+recs+'</ul></div>'):"";
   return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px">'
     +'<div style="margin-bottom:6px"><b>Agent:</b> '+esc(o.answer||"")+'</div>'
-    +'<div class="muted" style="font-size:12px">ran: '+chosen+'</div>'+facts+recHtml+'</div>';
+    +(chosen?('<div class="muted" style="font-size:12px">ran: '+chosen+'</div>'):"")+facts+recHtml+'</div>';
 }
 function renderAgentResult(r){
   var k=r.kind;
@@ -7011,6 +7138,7 @@ async function load(refresh){
       +'<div style="display:flex;gap:6px;margin-top:8px">'
       +'<input id="agentIn" placeholder="e.g. which signal is noisiest, and when did things go wrong?" onkeydown="agentKeydown(event)" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px">'
       +'<button onclick="agentMic()" id="agentMic" title="Ask by voice (speak your question)" style="border:1px solid #cbd5e1;background:#eef2ff;color:#2563eb;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer">&#127908;</button>'
+      +'<button onclick="agentWorkbench()" title="Open a blank code editor: write or paste analysis code (e.g. from ChatGPT/Gemini) and run it on this dataset in the sandbox" style="border:1px solid #cbd5e1;background:#f5f3ff;color:#7c3aed;font-weight:700;padding:8px 12px;border-radius:8px;cursor:pointer">&lt;/&gt;</button>'
       +'<button onclick="agentSend()" style="border:0;background:#059669;color:#fff;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer">Ask</button></div>'
       +'<div class="muted" style="font-size:11px;margin-top:6px">Grounded: the local model chooses which tools to run for your question; the findings are then stated exactly as the tools computed them (not paraphrased by the model), so no number is ever invented.</div></div>';
   }
@@ -7062,11 +7190,15 @@ async function load(refresh){
    }).join('')+'</div></div>';
   }
   b.innerHTML=html;
+  agentHydrate();   // v3.8: restore this dataset's saved analysis conversation
  }catch(e){b.innerHTML='<div class="card warn">'+esc(e)+'</div>';}
 }
 load(0);
 </script></body></html>'''
-    return HTMLResponse(html.replace("__SLUG__", s))
+    # v3.8: no-store — the page ships its JS inline; a cached copy on a phone kept
+    # rendering new API responses with old JS (prof saw missing plots/code blocks).
+    return HTMLResponse(html.replace("__SLUG__", s),
+                        headers={"Cache-Control": "no-store, max-age=0"})
 
 
 @app.get("/gallery/{slug}", response_class=HTMLResponse)

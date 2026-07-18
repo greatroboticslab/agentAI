@@ -35,6 +35,7 @@ _ALLOWED_IMPORTS = {
     "matplotlib", "matplotlib.pyplot", "scipy", "scipy.signal", "scipy.stats",
     "scipy.fft", "scipy.cluster", "scipy.optimize", "sklearn", "sklearn.cluster",
     "sklearn.linear_model", "sklearn.decomposition", "sklearn.preprocessing",
+    "seaborn", "sns",
 }
 _BANNED_NAMES = {"eval", "exec", "compile", "__import__", "globals", "locals",
                  "vars", "getattr", "setattr", "delattr", "input", "breakpoint",

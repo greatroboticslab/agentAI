@@ -5838,3 +5838,19 @@ exact words: "I want to get basic plots of the data" → 3-panel IMU acceleratio
 attempt; "dominant frequency of az using an FFT" (previously declined honestly) → spectrum plot + value. Also
 fixed a real bug this exposed: a raw "\n" in the page template broke the page's JS entirely (node --check on the
 extracted script caught it). Honest label under every codegen answer: computed by sandboxed generated code.
+
+### v3.8.0 — open code workbench: edit / paste / run analysis code in the browser (strategy layer 1)
+
+The prof's direction made concrete. (1) POST /api/dataset/run_code {slug, code}: run USER code — edited from
+the agent's, or pasted from ChatGPT/Gemini — against a staged COPY of the dataset in the same sandbox as
+generated code (AST whitelist → rlimits → wall-clock kill); errors return verbatim, nothing faked. seaborn
+whitelisted + installed. (2) The chat's code block is now an EDITABLE textarea with "▶ Run this code"; a new
+</> button opens a blank editor with a template. (3) Conversations persist per dataset (jsonl, same pattern as
+slug_verdicts): every ask/codegen/run_code turn is appended and replayed on page load via
+/api/dataset/chat_history — the human+AI iteration finally accumulates instead of vanishing on reload.
+(4) Dataset page served with Cache-Control: no-store — fixes the prof's phone rendering new API responses with
+stale cached JS (missing plots/code). (5) Empty "ran:" line no longer rendered. Verified live end-to-end in a
+real browser: workbench opened, code edited, ran → custom plot + printed findings; seaborn paste-style code ran
+with a plot; `import os` rejected by the safety checker; history rehydrated after reload. Two more non-raw
+template escapes (\n, \') caught by node --check on the extracted page JS — that check is now part of the
+deploy ritual.
