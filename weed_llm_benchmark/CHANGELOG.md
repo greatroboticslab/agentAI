@@ -5866,3 +5866,15 @@ the planner + keyword fallback ("suspicious/bad/wrong labels", "label noise", "a
 Suggestion points to /classes for fixing before training. Verified live against known ground truth (the
 aerial QA set): flagged exactly the 4 injected tiny boxes + the 1 empty label file — 5/5, zero false
 positives. Next in layer 2: DINOv2 embedding outliers (wrong-species boxes) + one-click verdicts from chat.
+
+### v3.8.2 — one-click ✓/✗ label verdicts from the chat (layer 2: human loop closed)
+
+The suspicious-labels table in the chat now has ✓ (label is fine) / ✗ (bad label) buttons per flagged image.
+POST /api/dataset/label_verdict appends to a per-dataset latest-wins jsonl ({slug}_label_verdicts.jsonl); a ✗
+with a resolvable class name is ALSO forwarded into the established per-class exemplar store (verdict "bad",
+img "slug/stem") so /classes and the round filter see it — the chat now feeds the same curation loop the
+platform already trusts. Re-scans echo prior verdicts as badges ("kept" / "marked bad → curation") instead of
+buttons, so review progress accumulates across sessions. Verified live end-to-end: ✗ img_013 → forwarded:true
+→ landed in class_exemplars/bird.jsonl; ✓ img_019 recorded; a fresh scan showed both statuses; browser click
+on ✗ updated the row in place. This closes the layer-2 human loop: flag → eyeball montage → verdict → curation.
+Next: DINOv2 embedding outliers as an async cluster job (wrong-species boxes — the 27.4% target).

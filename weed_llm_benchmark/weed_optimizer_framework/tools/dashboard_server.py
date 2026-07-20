@@ -3881,6 +3881,10 @@ async def api_dataset_analyze_goal(request: Request):
                 _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
                 _sh.move(_mp, _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png")
                 out["plot_url"] = f"/api/dataset/codegen_plot?slug={slug}"
+            if _r.get("kind") == "suspicious" and _r.get("worst"):
+                _st = _label_verdict_state(slug)   # show prior human verdicts in chat
+                for _w in _r["worst"]:
+                    _w["verdict"] = _st.get(_w.get("file"))
     except Exception:
         pass
     out["model"] = model
@@ -3972,6 +3976,62 @@ async def api_dataset_run_code(request: Request):
                               "answer": out["answer"][:400], "code": code[:4000],
                               "plot": bool(plot_url), "error": (out["error"] or "")[:200]})
     return out
+
+
+def _label_verdict_state(slug: str) -> dict:
+    """Replay {slug}_label_verdicts.jsonl → {file_stem: keep|bad} (latest wins)."""
+    p = _DATASET_ANALYSIS_DIR / f"{slug}_label_verdicts.jsonl"
+    st: dict = {}
+    if p.is_file():
+        for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                ev = json.loads(line)
+                f, v = ev.get("file"), ev.get("verdict")
+                if f and v == "clear":
+                    st.pop(f, None)
+                elif f and v in ("keep", "bad"):
+                    st[f] = v
+            except Exception:
+                continue
+    return st
+
+
+@app.post("/api/dataset/label_verdict")
+async def api_dataset_label_verdict(request: Request):
+    """v3.8.2 — one-click human verdict on a flagged label, straight from the chat
+    montage. POST {slug, file, verdict: keep|bad|clear, cls?}. 'bad' is ALSO
+    forwarded into the existing per-class exemplar store (verdict 'bad') so the
+    established curation loop (/classes, round filter) sees it."""
+    actor = _actor_from_request(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    slug = str(body.get("slug") or "")
+    fstem = str(body.get("file") or "").strip()
+    verdict = str(body.get("verdict") or "")
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug) or not fstem or \
+       not re.match(r"^[A-Za-z0-9_.-]+$", fstem) or verdict not in ("keep", "bad", "clear"):
+        raise HTTPException(400, "bad slug/file/verdict")
+    _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(_DATASET_ANALYSIS_DIR / f"{slug}_label_verdicts.jsonl", "a") as f:
+        f.write(json.dumps({"file": fstem, "verdict": verdict, "by": actor,
+                            "ts": time.strftime("%Y-%m-%d %H:%M:%S")}) + "\n")
+    forwarded = False
+    cls = str(body.get("cls") or "").strip()
+    if verdict == "bad" and cls and _cls_ok(cls):
+        try:  # feed the established curation store (latest-wins jsonl)
+            fp = _exemplar_file(cls)
+            fp.parent.mkdir(parents=True, exist_ok=True)
+            with open(fp, "a") as f:
+                f.write(_json.dumps({"img": f"{slug}/{fstem}", "verdict": "bad",
+                                     "ts": _time_cls.time(),
+                                     "ts_h": _time_cls.strftime(
+                                         "%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())}) + "\n")
+            forwarded = True
+        except Exception as e:
+            log.warning(f"[label_verdict] exemplar forward failed: {e}")
+    return {"ok": True, "file": fstem, "verdict": verdict, "forwarded": forwarded}
 
 
 @app.get("/api/dataset/codegen_plot")
@@ -6874,6 +6934,13 @@ function runUserCode(eid){
      log.scrollTop=log.scrollHeight; })
    .catch(function(e){ wait.remove(); log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626">error: '+esc(String(e))+'</div>'); });
 }
+function labelVerdict(file,verdict,cls){
+  fetch("/api/dataset/label_verdict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,file:file,verdict:verdict,cls:cls||""})})
+   .then(function(r){return r.json();}).then(function(d){
+     var td=document.getElementById("lv_"+file);
+     if(td&&d&&d.ok){ td.innerHTML=(verdict==="keep")?'<span style="color:#059669;font-weight:700">kept</span>':'<span style="color:#dc2626;font-weight:700">marked bad'+(d.forwarded?' &rarr; curation':'')+'</span>'; }
+   }).catch(function(){});
+}
 function agentWorkbench(){
   var log=document.getElementById("agentLog"); if(!log)return;
   var tpl="import pandas as pd\\nimport matplotlib.pyplot as plt\\n\\n# Files in the working directory are COPIES of this dataset's CSVs (same names).\\n# Write any analysis; save a figure with plt.savefig('out.png'); print() findings.\\n\\n";
@@ -6990,7 +7057,16 @@ function renderAgentResult(r){
   if(k==="img_dims"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; function st(o){return o?(esc(o.min)+" / "+esc(o.mean)+" / "+esc(o.max)):"—";} return '<table class="mini" style="margin-top:6px"><tr><td><b>metric</b></td><td><b>min / mean / max</b></td></tr><tr><td>width</td><td>'+st(r.width)+'</td></tr><tr><td>height</td><td>'+st(r.height)+'</td></tr><tr><td>aspect</td><td>'+st(r.aspect)+'</td></tr><tr><td>file KB</td><td>'+st(r.filesize_kb)+'</td></tr></table>'; }
   if(k==="coverage")return '<div class="muted" style="margin-top:4px">labeled: '+esc(r.labeled_images)+'/'+esc(r.n_images)+' ('+esc(r.pct_labeled)+'%), type '+esc(r.annotation_type)+', near-duplicates '+esc(r.near_duplicates)+'</div>';
   if(k==="box_stats"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var bpi=r.boxes_per_image||{}; return '<div class="muted" style="margin-top:4px">'+esc(r.label_files)+' label files, '+esc(r.total_boxes)+' boxes &middot; per image '+esc(bpi.min)+'/'+esc(bpi.mean)+'/'+esc(bpi.max)+' (min/mean/max)<br>empty label files: '+esc(r.empty_label_files)+', tiny boxes (&lt;1% area): '+esc(r.tiny_boxes)+'</div>'; }
-  if(k==="suspicious"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var rows=(r.worst||[]).map(function(w){return '<tr><td>'+esc(w.file)+'</td><td>'+esc(w.class==null?'—':w.class)+'</td><td>'+esc(w.why)+'</td></tr>';}).join(""); return '<div class="muted" style="margin-top:4px"><b>'+esc(r.n_flagged)+'</b> flagged of '+esc(r.n_boxes_scanned)+' scanned (montage above, red box = the label)</div>'+(rows?('<table class="mini" style="margin-top:4px"><tr><td><b>image</b></td><td><b>class</b></td><td><b>why suspicious</b></td></tr>'+rows+'</table>'):""); }
+  if(k==="suspicious"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>';
+    var clsNames=((EDAD&&EDAD.annotations&&EDAD.annotations.classes)||[]);
+    var rows=(r.worst||[]).map(function(w){
+      var cn=(w.class!=null&&clsNames[parseInt(w.class)]!=null)?clsNames[parseInt(w.class)]:(w.class==null?"":String(w.class));
+      var vid="lv_"+esc(w.file);
+      var badge=w.verdict==="keep"?'<span style="color:#059669;font-weight:700">kept</span>':(w.verdict==="bad"?'<span style="color:#dc2626;font-weight:700">marked bad</span>':"");
+      return '<tr><td>'+esc(w.file)+'</td><td>'+esc(cn||'—')+'</td><td>'+esc(w.why)+'</td>'
+        +'<td id="'+vid+'" style="white-space:nowrap">'+(badge||('<button onclick="labelVerdict(&quot;'+esc(w.file)+'&quot;,&quot;keep&quot;,&quot;'+esc(cn)+'&quot;)" title="Label is fine" style="border:1px solid #86efac;background:#f0fdf4;border-radius:6px;padding:2px 8px;cursor:pointer">&#10003;</button> '
+        +'<button onclick="labelVerdict(&quot;'+esc(w.file)+'&quot;,&quot;bad&quot;,&quot;'+esc(cn)+'&quot;)" title="Bad label - exclude/fix" style="border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;padding:2px 8px;cursor:pointer">&#10007;</button>'))+'</td></tr>';}).join("");
+    return '<div class="muted" style="margin-top:4px"><b>'+esc(r.n_flagged)+'</b> flagged of '+esc(r.n_boxes_scanned)+' scanned (montage above, red box = the label) &middot; your &#10003;/&#10007; verdicts feed the curation loop</div>'+(rows?('<table class="mini" style="margin-top:4px"><tr><td><b>image</b></td><td><b>class</b></td><td><b>why suspicious</b></td><td><b>verdict</b></td></tr>'+rows+'</table>'):""); }
   if(k==="duplicates"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var gs=(r.groups||[]).map(function(g){return "["+g.map(esc).join(", ")+"]";}).join("<br>"); return '<div class="muted" style="margin-top:4px">scanned '+esc(r.scanned)+' images &middot; '+esc(r.n_groups)+' duplicate group(s), '+esc(r.n_duplicate_images)+' redundant'+(gs?'<br>'+gs:"")+'</div>'; }
   if(k==="img_quality"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var ls=(r.least_sharp||[]).map(function(x){return esc(x.file)+" ("+esc(x.sharpness)+(x.flagged?", soft":"")+")";}).join(", "); return '<div class="muted" style="margin-top:4px">sampled '+esc(r.sampled)+' images &middot; median sharpness '+esc(r.median_sharpness)+' (lower = softer, relative to content), median brightness '+esc(r.median_brightness)+'/255<br><b>'+esc(r.n_soft)+'</b> notably softer than the median (candidates for blur), '+esc(r.n_dark)+' dark, '+esc(r.n_overexposed)+' overexposed'+(ls?'<br>least sharp: '+ls:"")+(r.soft_caveat?'<br><span style="font-size:11px">'+esc(r.soft_caveat)+'</span>':"")+'</div>'; }
   if(k==="error")return '<div class="muted" style="color:#dc2626;margin-top:4px">'+esc(r.tool)+": "+esc(r.error)+'</div>';
