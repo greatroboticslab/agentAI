@@ -370,6 +370,22 @@ async def _auth_and_rate_limit(request, call_next):
         if (_GOOGLE_ENABLED and not auth_hdr and request.method == "GET"
                 and "text/html" in request.headers.get("accept", "")):
             return RedirectResponse(url="/login", status_code=302)
+        # v3.8.3: only a request that PRESENTED a credential and got it wrong
+        # (bad Basic password, bad X-API-Key) counts toward the brute-force
+        # lock. A request with no credential at all is a browser with an
+        # expired/missing session cookie — its background fetches (chat
+        # history, status polls) were racking up "failed attempts" and locking
+        # the user's IP for 1h just for reopening the site (hit 2026-07-22).
+        presented = bool(auth_hdr) or bool(
+            (request.headers.get("x-api-key") or "").strip())
+        if not presented:
+            return Response(
+                status_code=401,
+                content=b'{"error":"unauthorized",'
+                        b'"msg":"not logged in or session expired - '
+                        b'open /login to sign in again"}',
+                headers={"Content-Type": "application/json"},
+            )
         n_fail += 1
         if n_fail >= _AUTH_LOCK_THRESHOLD:
             _AUTH_FAIL[ip] = (n_fail, now + _AUTH_LOCK_SECONDS)

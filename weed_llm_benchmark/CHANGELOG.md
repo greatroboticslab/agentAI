@@ -5878,3 +5878,17 @@ buttons, so review progress accumulates across sessions. Verified live end-to-en
 → landed in class_exemplars/bird.jsonl; ✓ img_019 recorded; a fresh scan showed both statuses; browser click
 on ✗ updated the row in place. This closes the layer-2 human loop: flag → eyeball montage → verdict → curation.
 Next: DINOv2 embedding outliers as an async cluster job (wrong-species boxes — the 27.4% target).
+
+### v3.8.3 — fix: expired-session browsers no longer brute-force-lock their own IP
+
+**User hit (2026-07-22, phone):** `rate-limited: too many failed auth attempts; locked for 59m` just by
+opening the site. Root cause: the 7-day session cookie had expired, and the page's background `fetch()`
+calls (chat history, status polls) carry no credential — the auth middleware counted every one of them as
+a "failed attempt" (5/IP → 1h lock), so a returning logged-out browser locked itself out.
+
+- Only requests that **presented a credential and got it wrong** (bad Basic password, bad `X-API-Key`)
+  count toward the lock now. No-credential requests get a plain 401 (`"not logged in or session expired -
+  open /login"`) or the existing `/login` redirect for HTML navigations — never counted.
+- Brute-force protection intact — verified live: 8× credential-less API hits → all 401, zero counted;
+  2× wrong Basic password → counted 1/5, 2/5 in the journal; valid session cookie → 200.
+- Deployed to lab (rsync + restart); the restart also cleared the user's active lock immediately.
