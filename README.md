@@ -126,6 +126,29 @@ question gives a different analysis — you steer it in real time, by voice.
 <br><sub>On stop, the agent picks the analysis for what you asked and answers with real numbers.</sub>
 </div>
 
+### Step 7 — It writes code — and hands you the keyboard
+
+Ask for something outside the built-in analyses (*"plot a histogram of the gyroscope z axis"*) and the agent
+**writes Python for your question**, runs it in a sandbox on a copy of your data, and shows the plot, the
+numbers, **and the code itself — in an editable box**. Change the code and hit **▶ Run**; here the user added
+a title and an extra statistic in the browser, and the re-run cross-checks the agent's own numbers:
+
+<div align="center">
+<img src="docs/screenshots/workbench-edited-run.png" width="840" alt="The generated analysis was edited in the browser (crimson user title on the figure) and re-run in the sandbox; the user-added statistic matches the agent's">
+</div>
+
+Or press **`</>`** for a blank editor and **paste code from anywhere** — e.g. take the generated code to
+ChatGPT/Gemini, have it improved, paste it back — it runs in the same sandbox (whitelisted libraries incl.
+seaborn, no network, no file writes except the plot, resource limits; disallowed code is rejected with the
+reason, and errors come back verbatim):
+
+<div align="center">
+<img src="docs/screenshots/workbench-pasted-code.png" width="840" alt="Externally optimized seaborn code pasted into the workbench and run in the sandbox: a two-panel styled figure plus printed statistics">
+</div>
+
+The conversation — questions, answers, and code — **persists per dataset**, so the human-AI iteration
+accumulates instead of vanishing on reload.
+
 ---
 
 ## 🧠 Ask your data — the analysis agent
@@ -216,10 +239,12 @@ Running tests, CI details, and contributing conventions are in **[docs/DEVELOPME
 | [`multagent/`](multagent/) | **EMACF** robotics agent framework (Brain / Perception / Targeting / Navigation) — the earlier embodied-robot direction, kept for reference. |
 | [`docs/`](docs/) | Screenshots + platform roadmap. |
 
-> **Latest:** `v3.6` — the **analysis agent**: ask any dataset a question by text or 🎙 voice and it picks the
-> right analysis (a different question → a different analysis), with every number computed by code (never
-> invented) plus actionable suggestions. Built on the v3.2 sensor-diagnosis pipeline (noise/SNR, timestamped
-> anomalies, cross-modal alignment). See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
+> **Latest:** `v3.8` — the analysis agent now **writes code you can see, edit, and run**: out-of-library
+> questions get purpose-written Python executed in a sandbox, shown in an editable box with a ▶ Run button;
+> paste externally-optimized code (ChatGPT/Gemini) into the `</>` workbench and it runs on your dataset too.
+> Chat + code persist per dataset. It also scans image datasets for **suspicious labels** (crop montage in
+> the chat, one-click ✓/✗ feeding the curation loop). Built on the v3.3–v3.6 grounded tool-library agent and
+> the v3.2 sensor-diagnosis pipeline. See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
 > and [`RESEARCH_LOG.md`](RESEARCH_LOG.md).
 
 ---

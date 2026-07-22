@@ -13,6 +13,39 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-22 — v3.7–v3.8.2: the agent writes code; the user can see, edit, and run it (prof's ask, verified E2E)
+
+**What drove this.** Prof. Zhang's feedback round 2: "I want basic plots" got text-only; he endorsed
+"We can show agent code in browser." Follow-up direction: unsupervised/self-supervised analysis, and the
+code should be *open* — users run it, or take it to ChatGPT/Gemini, optimize, paste back, and run.
+
+**v3.7.0/3.7.1 — code-writing analyst.** `tools/code_analyst.py`: qwen2.5-coder:7b on the lab GPU writes
+Python for questions outside the tool library; sandbox = AST import/call whitelist → subprocess rlimits →
+wall-clock kill, on staged *copies* of the dataset CSVs; LIDA-style self-repair (≤2 attempts). POC 5/5
+first-attempt (plot, FFT, trend fit, KMeans, custom threshold). Wired into `/api/dataset/analyze_goal`:
+plot-intent and out-of-library questions route to codegen; the chat renders findings + plot + the code.
+
+**v3.8.0 — open code workbench.** The code block became an *editor*: edit generated code and ▶ Run, or
+open a blank editor (`</>`) and paste external code (seaborn whitelisted for ChatGPT-style snippets) —
+same sandbox, honest errors. Chat + code persist per dataset (`{slug}_chat.jsonl`, hydrated on load).
+Page served `Cache-Control: no-store` (fixed the stale-JS-on-phone bug the prof hit).
+
+**v3.8.1/v3.8.2 — label noise enters the chat** (strategy layer 2, aimed at the never-cured 27.4%
+pseudo-label FP rate): `suspicious_labels` tool (tiny/aspect/edge/blur/empty heuristics) renders a crop
+montage in the chat (QA: 5/5 injected faults found, zero FP), and each flagged image gets one-click ✓/✗
+— verdicts persist per dataset and ✗ forwards into the existing `class_exemplars` curation store.
+
+**E2E verification (2026-07-22, real browser clicks on the live site, screenshots in
+`docs/screenshots/workbench-*.png`):** ask a new question → generated code visible in the editor with
+plot + real numbers (≈6 s); edit it in the browser → the figure re-renders with the user's title and the
+user-added stat cross-checks the generated one (std 0.5617 vs 0.56); paste ChatGPT-style seaborn code →
+runs (≈1.5 s); `import os` → honestly rejected by the safety checker; reload → all 16 turns + editable
+code restored; works at phone width. **Known gap:** per-turn plots are not restored after reload (one
+`{slug}_codegen.png` is overwritten per run) — fix queued.
+
+**Next:** DINOv2 embedding-outlier scan as an async **cluster** sbatch job (lab = website only), then
+sensor-timeseries self-supervised learning (the paper-able thread the prof pointed at).
+
 ## 2026-07-15 — v3.3–v3.6: analysis becomes a grounded, conversational, voice-driven AGENT
 
 **What drove this.** Prof. Zhang's core critique after using it: the analysis is *hardcoded* — "no matter how
