@@ -97,13 +97,14 @@ _PRELUDE = (
 
 # v3.9: users kept running code that plotted but never called savefig — and saw
 # nothing. This trusted footer (OUR code, appended AFTER the AST check of the
-# user code) captures any open matplotlib figure automatically.
+# user code) captures the FINAL open figure state — always, not only when
+# out.png is missing: a user who edits code and draws a NEW figure after the
+# original savefig must see the new figure, not the stale file (v3.9.1 fix).
 _FOOTER = (
     "\n\ntry:\n"
     "    import matplotlib.pyplot as _plt_cap\n"
-    "    from pathlib import Path as _P_cap\n"
-    "    if _plt_cap.get_fignums() and not _P_cap('out.png').is_file():\n"
-    "        _plt_cap.savefig('out.png', dpi=110, bbox_inches='tight')\n"
+    "    if _plt_cap.get_fignums():\n"
+    "        _plt_cap.gcf().savefig('out.png', dpi=110, bbox_inches='tight')\n"
     "except Exception:\n"
     "    pass\n"
 )

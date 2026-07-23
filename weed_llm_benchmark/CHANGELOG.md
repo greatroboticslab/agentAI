@@ -5923,3 +5923,11 @@ sandbox guarantees; and a bare notebook drops the agent).
 - E2E-verified in a real browser on the live site (screenshots in docs/screenshots/): auto-capture,
   empty-run hint, plot restored after reload, image-dataset codegen, image run_code (40 staged), montage
   regression, notebook export (44 cells / 14 code).
+
+### v3.9.1 — fix: auto-capture keeps the FINAL figure, not the first savefig
+
+Caught while building the showcase demo: editing an answer's code to draw a NEW figure after the
+original `savefig` ran fine but kept showing the OLD image — the capture footer skipped saving when
+out.png already existed. It now always saves the final open figure state (regression-tested: savefig
+then new figure → the new figure wins). Live-verified with a full in-browser rewrite of a generated
+plot (rolling mean + annotation) on the demo1/TestDataset showcase conversation.
