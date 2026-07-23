@@ -3788,6 +3788,44 @@ def api_dataset_timeline(request: Request, slug: str):
     return FileResponse(str(p), media_type="image/png")
 
 
+def _publish_codegen_plot(slug: str, src, move: bool = False) -> tuple:
+    """v3.9: persist a produced figure PER TURN as {slug}_plot_{pid}.png (so the
+    restored conversation can show its plots again — the old single
+    {slug}_codegen.png was overwritten by every run). Also refreshes the legacy
+    single file for old links. Returns (plot_url, pid)."""
+    import shutil as _sh
+    _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+    pid = time.strftime("%Y%m%d%H%M%S") + "_" + _secrets.token_hex(3)
+    dest = _DATASET_ANALYSIS_DIR / f"{slug}_plot_{pid}.png"
+    (_sh.move if move else _sh.copy)(str(src), str(dest))
+    try:
+        _sh.copy(str(dest), str(_DATASET_ANALYSIS_DIR / f"{slug}_codegen.png"))
+        plots = sorted(_DATASET_ANALYSIS_DIR.glob(f"{slug}_plot_*.png"))
+        for old in plots[:-150]:   # keep the newest 150 per dataset
+            old.unlink(missing_ok=True)
+    except Exception:
+        pass
+    return (f"/api/dataset/codegen_plot?slug={slug}&pid={pid}", pid)
+
+
+def _stage_for_workbench(root, ctx, workdir, modality=None, analysis=None) -> tuple:
+    """v3.9: stage BOTH tabular copies and (when present) a bounded image sample
+    into the sandbox dir. Returns (have_tabular, img_manifest, extra_brief)."""
+    from . import code_analyst as _ca
+    have_tab = bool(ctx.get("files"))
+    if have_tab:
+        _ca.stage_dataset(ctx["files"], workdir)
+    img_manifest, extra = {}, ""
+    mods = (analysis or {}).get("modality") or {}
+    if modality == "image" or mods.get("image"):
+        try:
+            img_manifest = _ca.stage_images(Path(root), workdir)
+            extra = _ca.image_brief(img_manifest)
+        except Exception as e:
+            log.warning(f"[workbench stage_images] {e}")
+    return have_tab, img_manifest, extra
+
+
 @app.post("/api/dataset/analyze_goal")
 async def api_dataset_analyze_goal(request: Request):
     """v3.3.0 (Phase A/B) — goal-driven analysis AGENT. POST {slug, goal, history?}.
@@ -3853,25 +3891,24 @@ async def api_dataset_analyze_goal(request: Request):
     _g = goal.lower()
     _wants_plot = any(w in _g for w in ("plot", "graph", "chart", "visuali", "histogram",
                                         "spectrum", "draw", "curve", "scatter"))
-    if (out.get("mode") == "unsupported" or _wants_plot) and _mod == "sensor":
+    if (out.get("mode") == "unsupported" or _wants_plot) and _mod in ("sensor", "image"):
         try:
             import tempfile as _tf
             from . import code_analyst as _ca
             ctx = _aa.load_context(str(root))
-            if ctx["files"]:
+            wd = Path(_tf.mkdtemp(prefix="codegen_"))
+            have_tab, img_m, extra = _stage_for_workbench(root, ctx, wd,
+                                                          modality=_mod, analysis=_an)
+            if have_tab or img_m.get("staged"):
                 def llm_code(p, s):
                     rr = _llmp.chat("ollama:qwen2.5-coder:7b", p, system=s,
                                     max_tokens=900, timeout=180)
                     return rr.get("text", "") if rr.get("ok") else ""
-                wd = Path(_tf.mkdtemp(prefix="codegen_"))
-                _ca.stage_dataset(ctx["files"], wd)
-                r = _ca.write_and_run(goal, ctx["files"], wd, llm_code)
-                plot_url = None
+                r = _ca.write_and_run(goal, ctx["files"], wd, llm_code,
+                                      extra_brief=extra)
+                plot_url, pid = (None, None)
                 if r.get("plot"):
-                    _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
-                    import shutil as _sh
-                    _sh.copy(wd / "out.png", _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png")
-                    plot_url = f"/api/dataset/codegen_plot?slug={slug}"
+                    plot_url, pid = _publish_codegen_plot(slug, wd / "out.png")
                 if r.get("ok"):
                     resp = {"ok": True, "mode": "codegen", "goal": goal,
                             "answer": (r.get("stdout") or "").strip()[:1500],
@@ -3881,7 +3918,7 @@ async def api_dataset_analyze_goal(request: Request):
                     _agent_chat_append(slug, {"kind": "codegen", "goal": goal,
                                               "answer": resp["answer"][:400],
                                               "code": resp["code"][:4000],
-                                              "plot": bool(plot_url)})
+                                              "plot": bool(plot_url), "plot_id": pid})
                     return resp
                 out.setdefault("codegen_error",
                                (r.get("stderr") or "code generation failed")[:300])
@@ -3893,10 +3930,8 @@ async def api_dataset_analyze_goal(request: Request):
         for _r in (out.get("results") or []):
             _mp = _r.pop("montage_path", None)
             if _mp and os.path.isfile(_mp):
-                import shutil as _sh
-                _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
-                _sh.move(_mp, _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png")
-                out["plot_url"] = f"/api/dataset/codegen_plot?slug={slug}"
+                out["plot_url"], _mont_pid = _publish_codegen_plot(slug, _mp, move=True)
+                out["_plot_id"] = _mont_pid
             if _r.get("kind") == "suspicious" and _r.get("worst"):
                 _st = _label_verdict_state(slug)   # show prior human verdicts in chat
                 for _w in _r["worst"]:
@@ -3909,7 +3944,8 @@ async def api_dataset_analyze_goal(request: Request):
                               "answer": str(out.get("answer") or "")[:400],
                               "plan": [s.get("tool") for s in (out.get("plan") or [])],
                               "questions": (out.get("questions") or [])[:4],
-                              "method": out.get("method")})
+                              "method": out.get("method"),
+                              "plot_id": out.pop("_plot_id", None)})
     return out
 
 
@@ -3942,6 +3978,68 @@ def api_dataset_chat_history(request: Request, slug: str):
     return {"ok": True, "turns": turns}
 
 
+@app.get("/api/dataset/export_ipynb")
+def api_dataset_export_ipynb(request: Request, slug: str):
+    """v3.9 — download this dataset's analysis conversation as a real Jupyter
+    notebook (.ipynb): every question becomes a markdown cell, every piece of
+    code (agent-written or user-run) becomes a code cell, with the recorded
+    output noted. Users get the full notebook experience locally without us
+    hosting kernels."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    _ = _actor_from_request(request)
+
+    def md(text):
+        return {"cell_type": "markdown", "metadata": {}, "source": text}
+
+    def codecell(src):
+        return {"cell_type": "code", "execution_count": None, "metadata": {},
+                "outputs": [], "source": src}
+
+    cells = [md(f"# Analysis notebook — dataset `{slug}`\n\n"
+                f"Exported from the platform's analysis conversation on "
+                f"{time.strftime('%Y-%m-%d %H:%M')}.\n\n"
+                f"**To run locally:** put this notebook next to the dataset's "
+                f"CSV files (and an `images/` + `labels/` folder for image "
+                f"datasets) — the cells read them with relative paths. "
+                f"`plt.savefig('out.png')` lines can be removed; figures render "
+                f"inline in Jupyter.")]
+    p = _DATASET_ANALYSIS_DIR / f"{slug}_chat.jsonl"
+    n_code = 0
+    if p.is_file():
+        for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                t = json.loads(line)
+            except Exception:
+                continue
+            if t.get("goal"):
+                cells.append(md(f"### ❓ {t['goal']}\n\n*({t.get('ts', '')})*"))
+            if t.get("kind") in ("codegen", "run_code") and t.get("code"):
+                who = ("user-edited / pasted code" if t.get("kind") == "run_code"
+                       else "code the agent wrote for this question")
+                cells.append(md(f"*{who}:*"))
+                cells.append(codecell(t["code"]))
+                n_code += 1
+                if t.get("answer"):
+                    cells.append(md("Recorded output on the platform:\n```\n"
+                                    + str(t["answer"])[:1200] + "\n```"))
+            elif t.get("answer"):
+                cells.append(md(f"**Agent:** {str(t['answer'])[:1200]}"))
+    if n_code == 0:
+        cells.append(md("_No code cells yet — ask the agent for a plot or open "
+                        "the `</>` workbench on the platform first._"))
+    nb = {"cells": cells,
+          "metadata": {"kernelspec": {"display_name": "Python 3",
+                                      "language": "python", "name": "python3"},
+                       "language_info": {"name": "python"}},
+          "nbformat": 4, "nbformat_minor": 5}
+    return Response(
+        json.dumps(nb, ensure_ascii=False),
+        media_type="application/x-ipynb+json",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{slug}_analysis.ipynb"'})
+
+
 @app.post("/api/dataset/run_code")
 async def api_dataset_run_code(request: Request):
     """v3.8 — the OPEN CODE WORKBENCH (prof's ask). POST {slug, code}: run
@@ -3967,31 +4065,176 @@ async def api_dataset_run_code(request: Request):
         raise HTTPException(404, "dataset not found")
     from . import analysis_agent as _aa, code_analyst as _ca
     ctx = _aa.load_context(str(root))
-    if not ctx["files"]:
-        return {"ok": False, "error": "no tabular sensor files to stage for this dataset "
-                                      "(the code workbench currently supports sensor datasets)"}
     why = _ca.check_code(code)
     if why:
         return {"ok": False, "error": f"rejected by the safety checker: {why}",
                 "safety": True}
     import tempfile as _tf
     wd = Path(_tf.mkdtemp(prefix="usercode_"))
-    _ca.stage_dataset(ctx["files"], wd)
+    try:
+        _an = _analyze_dataset(slug)
+    except Exception:
+        _an = None
+    have_tab, img_m, _extra = _stage_for_workbench(
+        root, ctx, wd, modality=next(iter((_an or {}).get("modality") or {}), None),
+        analysis=_an)
+    if not have_tab and not img_m.get("staged"):
+        return {"ok": False, "error": "nothing to stage for this dataset — the "
+                                      "workbench supports tabular (CSV) and image datasets"}
     r = _ca.run_sandboxed(code, wd)
-    plot_url = None
+    plot_url, pid = (None, None)
     if r.get("plot"):
-        import shutil as _sh
-        _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
-        _sh.copy(wd / "out.png", _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png")
-        plot_url = f"/api/dataset/codegen_plot?slug={slug}"
+        plot_url, pid = _publish_codegen_plot(slug, wd / "out.png")
     out = {"ok": bool(r.get("ok")), "mode": "codegen", "user_code": True,
            "answer": (r.get("stdout") or "").strip()[:1500],
            "error": (None if r.get("ok") else (r.get("stderr") or "run failed")[:800]),
-           "code": code, "plot_url": plot_url}
+           "code": code, "plot_url": plot_url,
+           "staged": {"tabular": have_tab, "images": len(img_m.get("staged") or [])}}
     _agent_chat_append(slug, {"kind": "run_code", "by": actor, "ok": out["ok"],
                               "answer": out["answer"][:400], "code": code[:4000],
-                              "plot": bool(plot_url), "error": (out["error"] or "")[:200]})
+                              "plot": bool(plot_url), "plot_id": pid,
+                              "error": (out["error"] or "")[:200]})
     return out
+
+
+def _cluster_llm_infer(prompt_text: str, model: str, sid: str, pct0: int = 30,
+                       minutes: int = 20) -> tuple:
+    """v3.9: one prompt → one completion on the CLUSTER big model, blocking (for
+    background threads only). Reuses the proven run_llm_infer.sh sbatch gateway
+    (stage prompt file → sbatch → poll result json). Returns (ok, text|error)."""
+    import base64 as _b64
+    pb64 = _b64.b64encode(prompt_text.encode()).decode()
+    jobtag = "c" + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
+    stage = ("mkdir -p results/framework/llm_infer; "
+             f"echo {pb64} | base64 -d > results/framework/llm_infer/{jobtag}.prompt; "
+             "git fetch origin >/dev/null 2>&1; "
+             "git checkout origin/main -- weed_llm_benchmark/run_llm_infer.sh 2>/dev/null; "
+             "cp -f weed_llm_benchmark/run_llm_infer.sh run_llm_infer.sh 2>/dev/null; true")
+    _slurm(["bash", "-lc", stage], timeout=60)
+    export = ",".join(["ALL", f"LLM_MODEL={model}", f"LLM_JOBTAG={jobtag}"])
+    r = _slurm(["sbatch", f"--export={export}", "run_llm_infer.sh"], timeout=25)
+    if not (r.get("ok") and "Submitted batch job" in (r.get("stdout") or "")):
+        return False, ("cluster job submit failed: "
+                       + (r.get("stderr") or r.get("stdout") or "")[:160])
+    import time as _t
+    for i in range(minutes * 4):
+        _t.sleep(15)
+        pr = _slurm(["bash", "-lc",
+                     f"cat results/framework/llm_infer/{jobtag}.json 2>/dev/null"],
+                    timeout=20)
+        outx = (pr.get("stdout") or "").strip()
+        if outx:
+            try:
+                d = json.loads(outx)
+                if d.get("ok"):
+                    return True, d.get("text") or ""
+                return False, "cluster model error: " + str(d.get("error"))[:160]
+            except Exception:
+                pass
+        _bg_set(sid, progress={"stage": f"{model} on the cluster GPU",
+                               "pct": min(pct0 + i, 90)})
+    return False, "cluster job timed out (queue busy or still running)"
+
+
+@app.post("/api/dataset/codegen_deep/submit")
+def api_dataset_codegen_deep_submit(request: Request, payload: dict = Body(default={})):
+    """v3.9 — DEEP code analysis (prof's direction: the smartest OPEN models on
+    the cluster, async with progress). The analysis code for the question is
+    written by the big cluster model (one round-trip), then executed in the same
+    local sandbox; if it errors, repair rounds use the LOCAL coder model so a
+    fix never costs another cluster job. Poll /api/submit/status?id=..."""
+    actor = _actor_from_request(request)
+    if not _can_use_cluster(actor):
+        raise HTTPException(403, "Deep code analysis runs on the cluster GPU — "
+                                 "restricted to admins / cluster-granted users. "
+                                 "The instant local analysis is open to all.")
+    body = payload if isinstance(payload, dict) else {}
+    slug = str(body.get("slug") or "").strip()
+    goal = str(body.get("goal") or "").strip()[:500]
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        raise HTTPException(400, "bad slug")
+    if not goal:
+        raise HTTPException(400, "no goal")
+    root = _resolve_slug_dir(slug)
+    if not root:
+        raise HTTPException(404, "dataset not found")
+    try:
+        _dom = (_read_manual_uploads().get(slug, {}).get("domain")
+                or (json.load(open(REGISTRY_PATH)).get("datasets", {}).get(slug, {}) or {}).get("domain")
+                or "weed")
+    except Exception:
+        _dom = "weed"
+    model = _analysis_cluster_model(_dom, str(body.get("model") or ""))
+    sid = "g" + time.strftime("%m%d%H%M%S") + _secrets.token_hex(2)
+    _bg_set(sid, status="running", kind="codegen_deep", model=model, where="cluster",
+            progress={"stage": "staging dataset copy", "pct": 8})
+
+    def _runner():
+        try:
+            from . import analysis_agent as _aa, code_analyst as _ca, llm_providers as _llmp
+            import tempfile as _tf
+            ctx = _aa.load_context(str(root))
+            try:
+                _an = _analyze_dataset(slug)
+            except Exception:
+                _an = None
+            wd = Path(_tf.mkdtemp(prefix="deepcode_"))
+            have_tab, img_m, extra = _stage_for_workbench(
+                root, ctx, wd,
+                modality=next(iter((_an or {}).get("modality") or {}), None),
+                analysis=_an)
+            if not have_tab and not img_m.get("staged"):
+                _bg_set(sid, status="failed", error="nothing to stage for this dataset",
+                        progress={"stage": "failed", "pct": 100})
+                return
+            calls = {"n": 0}
+
+            def llm_code(p, s):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    _bg_set(sid, progress={"stage": f"queuing {model} on the cluster",
+                                           "pct": 20})
+                    okx, text = _cluster_llm_infer(s + "\n\n" + p, model, sid)
+                    if okx:
+                        _bg_set(sid, progress={"stage": "running its code in the sandbox",
+                                               "pct": 92})
+                        return text
+                    _bg_set(sid, progress={"stage": "cluster unavailable — local coder",
+                                           "pct": 60})
+                    return ""      # empty → the loop retries; retries go local
+                rr = _llmp.chat("ollama:qwen2.5-coder:7b", p, system=s,
+                                max_tokens=900, timeout=180)
+                return rr.get("text", "") if rr.get("ok") else ""
+
+            r = _ca.write_and_run(goal, ctx["files"], wd, llm_code, extra_brief=extra)
+            plot_url, pid2 = (None, None)
+            if r.get("plot"):
+                plot_url, pid2 = _publish_codegen_plot(slug, wd / "out.png")
+            mdl = f"cluster:{model}" + (" + local repair" if calls["n"] > 1 else "")
+            if r.get("ok"):
+                resp = {"ok": True, "mode": "codegen", "deep": True, "goal": goal,
+                        "answer": (r.get("stdout") or "").strip()[:1500],
+                        "code": r.get("code", ""), "plot_url": plot_url,
+                        "attempts": r.get("attempts"), "model": mdl}
+                _agent_chat_append(slug, {"kind": "codegen", "goal": goal + " [deep]",
+                                          "answer": resp["answer"][:400],
+                                          "code": resp["code"][:4000],
+                                          "plot": bool(plot_url), "plot_id": pid2})
+                _bg_set(sid, status="done", result=resp,
+                        progress={"stage": "done", "pct": 100})
+            else:
+                _bg_set(sid, status="done",
+                        result={"ok": False, "mode": "codegen", "deep": True,
+                                "goal": goal, "model": mdl, "code": r.get("code", ""),
+                                "error": (r.get("stderr") or "code generation failed")[:800]},
+                        progress={"stage": "failed", "pct": 100})
+        except Exception as e:
+            _bg_set(sid, status="failed", error=f"{type(e).__name__}: {str(e)[:200]}",
+                    progress={"stage": "failed", "pct": 100})
+
+    _threading.Thread(target=_runner, daemon=True).start()
+    return JSONResponse({"ok": True, "submit_id": sid, "model": model, "where": "cluster",
+                         "poll": f"/api/submit/status?id={sid}"})
 
 
 def _label_verdict_state(slug: str) -> dict:
@@ -4051,12 +4294,19 @@ async def api_dataset_label_verdict(request: Request):
 
 
 @app.get("/api/dataset/codegen_plot")
-def api_dataset_codegen_plot(request: Request, slug: str):
-    """v3.7 — serve the plot produced by the agent's generated analysis code."""
+def api_dataset_codegen_plot(request: Request, slug: str, pid: str = ""):
+    """v3.7 — serve the plot produced by the agent's generated analysis code.
+    v3.9: with ?pid= serves that specific turn's persisted plot (so restored
+    conversations show their figures); without it, the latest (legacy path)."""
     if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
         raise HTTPException(400, "bad slug")
     _ = _actor_from_request(request)
-    p = _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png"
+    if pid:
+        if not re.match(r"^[A-Za-z0-9_]+$", pid):
+            raise HTTPException(400, "bad pid")
+        p = _DATASET_ANALYSIS_DIR / f"{slug}_plot_{pid}.png"
+    else:
+        p = _DATASET_ANALYSIS_DIR / f"{slug}_codegen.png"
     if not p.is_file():
         raise HTTPException(404, "no generated plot")
     return FileResponse(str(p), media_type="image/png")
@@ -6839,6 +7089,26 @@ def guide_page():
      <li><b>&#129302; AI review</b>: a plain-English summary, a list of issues (class imbalance, missing labels, tiny images, no validation split&hellip;), recommendations, a <b>fitness-for-goal</b> check, and a <b>ready / not-ready to train</b> verdict.</li>
    </ul>
  </div>
+ <div class="card"><h2>&#128172; Ask your data &mdash; and run code on it</h2>
+   <p>Every dataset page has an <b>Analysis agent</b> chat box. Type (or &#127908; speak) a question &mdash;
+   it picks the right analysis for <i>that</i> question and answers with real computed numbers.</p>
+   <h3>Getting plots</h3>
+   <p>Ask for one in plain words &mdash; <i>&ldquo;plot a histogram of speed&rdquo;</i>, <i>&ldquo;show the class
+   balance as a bar chart&rdquo;</i>. The agent <b>writes Python for your question</b>, runs it in a sandbox on a
+   <b>copy</b> of your data, and the figure + numbers appear <b>right in the chat bubble</b>, with the code
+   underneath in an editable box.</p>
+   <h3>Edit &amp; re-run the code</h3>
+   <p>Open <b>&ldquo;View / EDIT the code&rdquo;</b> under any answer, change anything, press <b>&#9654; Run this
+   code</b>. Or press <b>&lt;/&gt;</b> for a blank editor and paste code from anywhere (e.g. improved by
+   ChatGPT/Gemini). Just plot &mdash; <b>figures are captured automatically</b>; <code>print()</code> your findings
+   so they show as text. Your CSVs are staged by name in the working directory; image datasets get a sample in
+   <code>./images/</code> (+ YOLO labels in <code>./labels/</code>, open with PIL).</p>
+   <h3>Deep mode &amp; notebook export</h3>
+   <p><b>&#129504; Deep</b> sends your question to the big open model on the cluster (async &mdash; progress shows in
+   the chat; admin/cluster users). <b>&#128211;</b> downloads the whole conversation as a runnable <b>Jupyter
+   notebook</b> (.ipynb). The conversation and code persist per dataset &mdash; reload and it&rsquo;s all still
+   there.</p>
+ </div>
  <div class="card"><h2>Agents you can add</h2>
    <ul>
      <li><b>Collector</b> &mdash; autonomously finds &amp; pulls datasets.</li>
@@ -6959,9 +7229,40 @@ function labelVerdict(file,verdict,cls){
 }
 function agentWorkbench(){
   var log=document.getElementById("agentLog"); if(!log)return;
-  var tpl="import pandas as pd\\nimport matplotlib.pyplot as plt\\n\\n# Files in the working directory are COPIES of this dataset's CSVs (same names).\\n# Write any analysis; save a figure with plt.savefig('out.png'); print() findings.\\n\\n";
+  var tpl="import pandas as pd\\nimport matplotlib.pyplot as plt\\n\\n# The working directory holds COPIES of this dataset:\\n#   - tabular files: ./<name>.csv (same names as the dataset)\\n#   - image datasets: a sample in ./images/ (+ YOLO labels in ./labels/), open with PIL.Image\\n# Just plot \\u2014 figures are captured automatically (savefig not required).\\n# print() your findings so they show up as text.\\n\\n";
   log.insertAdjacentHTML("beforeend",renderAgentOut({ok:true,mode:"codegen",user_code:true,answer:"",code:tpl,plot_url:null}));
   log.scrollTop=log.scrollHeight;
+}
+function agentNotebook(){ window.location="/api/dataset/export_ipynb?slug="+encodeURIComponent(SLUG); }
+var _DEEPON=false;
+function agentDeep(){
+  if(_DEEPON)return;
+  var i=document.getElementById("agentIn"), log=document.getElementById("agentLog");
+  var goal=(i&&i.value||"").trim();
+  if(!goal){ if(i){ i.placeholder="type the question first, then press \\ud83e\\udde0 Deep"; i.focus(); } return; }
+  log.insertAdjacentHTML("beforeend",'<div style="margin:8px 0 2px"><b>You:</b> '+esc(goal)+' <span class="muted">(deep &mdash; big model on the cluster)</span></div>');
+  i.value="";
+  var st=document.createElement("div"); st.className="muted"; st.textContent="submitting to the cluster...";
+  log.appendChild(st); log.scrollTop=log.scrollHeight; _DEEPON=true;
+  fetch("/api/dataset/codegen_deep/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,goal:goal})})
+   .then(function(r){return r.json().then(function(d){return {code:r.status,d:d};});})
+   .then(function(x){
+     if(x.code!==200||!x.d.ok){ _DEEPON=false; st.remove(); log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626;margin:6px 0">'+esc((x.d&&(x.d.detail||x.d.error))||"submit failed")+'</div>'); return; }
+     var sid=x.d.submit_id;
+     var tick=setInterval(function(){
+       fetch("/api/submit/status?id="+sid,{credentials:"include"}).then(function(r){return r.json();}).then(function(s){
+         var pg=(s&&s.progress)||{};
+         st.textContent="deep analysis: "+(pg.stage||s.status||"running")+(pg.pct?(" \\u00b7 "+pg.pct+"%"):"");
+         if(s.status==="done"||s.status==="failed"){
+           clearInterval(tick); _DEEPON=false; st.remove();
+           if(s.status==="done"&&s.result){ log.insertAdjacentHTML("beforeend",renderAgentOut(s.result)); }
+           else { log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626;margin:6px 0">deep analysis failed: '+esc(s.error||"unknown")+'</div>'); }
+           log.scrollTop=log.scrollHeight;
+         }
+       }).catch(function(){});
+     },5000);
+   })
+   .catch(function(e){ _DEEPON=false; st.remove(); log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626">error: '+esc(String(e))+'</div>'); });
 }
 function agentHydrate(){
   var log=document.getElementById("agentLog"); if(!log||log.childElementCount)return;
@@ -6969,7 +7270,7 @@ function agentHydrate(){
    .then(function(r){return r.json();}).then(function(d){
      (d&&d.turns||[]).forEach(function(t){
        if(t.goal)log.insertAdjacentHTML("beforeend",'<div style="margin:8px 0 2px"><b>You:</b> '+esc(t.goal)+'</div>');
-       if(t.kind==="codegen"||t.kind==="run_code"){ log.insertAdjacentHTML("beforeend",renderAgentOut({ok:true,mode:"codegen",user_code:(t.kind==="run_code"),answer:t.answer||"",code:t.code||"",plot_url:null,error:(t.ok===false?(t.error||"failed"):null)})); }
+       if(t.kind==="codegen"||t.kind==="run_code"){ log.insertAdjacentHTML("beforeend",renderAgentOut({ok:true,mode:"codegen",user_code:(t.kind==="run_code"),answer:t.answer||"",code:t.code||"",plot_url:(t.plot_id?("/api/dataset/codegen_plot?slug="+encodeURIComponent(SLUG)+"&pid="+t.plot_id):null),error:(t.ok===false?(t.error||"failed"):null)})); }
        else if(t.answer){ log.insertAdjacentHTML("beforeend",'<div style="margin:2px 0 10px;padding:6px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px"><b>Agent:</b> '+esc(t.answer)+'</div>'); }
      });
      if(d&&d.turns&&d.turns.length)log.insertAdjacentHTML("beforeend",'<div class="muted" style="font-size:11px;margin:4px 0 8px">&#8635; restored earlier conversation for this dataset</div>');
@@ -7034,17 +7335,19 @@ function renderAgentOut(o){
   if(o.mode==="codegen"){
     var outLines=(o.answer||"").split("\\n").filter(function(x){return x.trim();}).map(function(x){return esc(x);}).join("<br>");
     var eid="ed"+(++AGENT_EDN);
-    var who=o.user_code?"Your code ran in the sandbox":("I wrote and ran analysis code for this"+(o.attempts>1?(" (self-repaired, attempt "+o.attempts+")"):""));
+    var who=o.user_code?"Your code ran in the sandbox":((o.deep?("The big model ("+esc(o.model||"cluster")+") wrote and ran analysis code for this"):"I wrote and ran analysis code for this")+(o.attempts>1?(" (self-repaired, attempt "+o.attempts+")"):""));
+    var emptyNote=(!o.error&&!outLines&&!o.plot_url)?'<div style="font-size:12.5px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 10px">The code ran, but it printed nothing and made no figure &mdash; so there is nothing to show. Add <b>print(...)</b> lines for findings, or just create a plot: <b>figures are captured automatically</b> (no savefig needed).</div>':"";
     return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #7c3aed;background:#fff;border-radius:6px">'
       +'<div style="margin-bottom:6px"><b>Agent:</b> '+who+':</div>'
       +(o.error?('<div class="mono" style="font-size:12.5px;background:#fef2f2;color:#b91c1c;border-radius:6px;padding:8px 10px">'+esc(o.error)+'</div>'):"")
+      +emptyNote
       +(outLines?('<div class="mono" style="font-size:13px;background:#faf5ff;border-radius:6px;padding:8px 10px">'+outLines+'</div>'):"")
       +(o.plot_url?('<img src="'+o.plot_url+'&v='+Date.now()+'" style="max-width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-top:8px" alt="generated plot">'):"")
       +'<details style="margin-top:8px"'+(o.user_code?' open':'')+'><summary style="cursor:pointer;font-size:12.5px;color:#7c3aed;font-weight:600">View / EDIT the code &amp; re-run (sandboxed)</summary>'
       +'<textarea id="'+eid+'" spellcheck="false" style="width:100%;min-height:220px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:#1e1b2e;color:#e2e8f0;padding:10px;border-radius:8px;border:1px solid #4c1d95;margin-top:6px;box-sizing:border-box">'+esc(o.code||"")+'</textarea>'
       +'<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button onclick="runUserCode(&quot;'+eid+'&quot;)" style="border:0;background:#7c3aed;color:#fff;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer">&#9654; Run this code</button>'
       +'<span class="muted" style="font-size:11.5px">Edit it here &mdash; or paste code optimized by ChatGPT / Gemini &mdash; and it runs in our sandbox on this dataset.</span></div></details>'
-      +'<div class="muted" style="font-size:11px;margin-top:6px">Runs in a sandbox: whitelisted libraries (pandas/numpy/scipy/sklearn/matplotlib/seaborn), no network, no file writes except the plot, resource limits.</div></div>';
+      +'<div class="muted" style="font-size:11px;margin-top:6px">Runs in a sandbox: whitelisted libraries (pandas/numpy/scipy/sklearn/matplotlib/seaborn/PIL), no network, no file writes except the plot, resource limits. Tabular data as CSVs in ./ ; image datasets as a sample in ./images/ (+ ./labels/). Figures are auto-captured.</div></div>';
   }
   if(o.mode==="unsupported"){
     var qs2=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
@@ -7246,6 +7549,8 @@ async function load(refresh){
       +'<input id="agentIn" placeholder="e.g. which signal is noisiest, and when did things go wrong?" onkeydown="agentKeydown(event)" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px">'
       +'<button onclick="agentMic()" id="agentMic" title="Ask by voice (speak your question)" style="border:1px solid #cbd5e1;background:#eef2ff;color:#2563eb;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer">&#127908;</button>'
       +'<button onclick="agentWorkbench()" title="Open a blank code editor: write or paste analysis code (e.g. from ChatGPT/Gemini) and run it on this dataset in the sandbox" style="border:1px solid #cbd5e1;background:#f5f3ff;color:#7c3aed;font-weight:700;padding:8px 12px;border-radius:8px;cursor:pointer">&lt;/&gt;</button>'
+      +'<button onclick="agentDeep()" title="Deep analysis: the big open model on the cluster writes the code (async, with progress). Admin / cluster-granted users." style="border:1px solid #cbd5e1;background:#fdf4ff;color:#a21caf;font-weight:700;padding:8px 12px;border-radius:8px;cursor:pointer">&#129504;</button>'
+      +'<button onclick="agentNotebook()" title="Download this conversation as a Jupyter notebook (.ipynb): questions as markdown, all code as runnable cells" style="border:1px solid #cbd5e1;background:#f0fdf4;color:#059669;font-weight:700;padding:8px 12px;border-radius:8px;cursor:pointer">&#128211;</button>'
       +'<button onclick="agentSend()" style="border:0;background:#059669;color:#fff;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer">Ask</button></div>'
       +'<div class="muted" style="font-size:11px;margin-top:6px">Grounded: the local model chooses which tools to run for your question; the findings are then stated exactly as the tools computed them (not paraphrased by the model), so no number is ever invented.</div></div>';
   }

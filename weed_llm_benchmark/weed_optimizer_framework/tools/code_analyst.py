@@ -36,6 +36,9 @@ _ALLOWED_IMPORTS = {
     "scipy.fft", "scipy.cluster", "scipy.optimize", "sklearn", "sklearn.cluster",
     "sklearn.linear_model", "sklearn.decomposition", "sklearn.preprocessing",
     "seaborn", "sns",
+    # v3.9: image datasets are staged into the sandbox too — reading pixels
+    # needs PIL (Pillow). Still no network / no file writes.
+    "PIL", "PIL.Image", "PIL.ImageOps", "PIL.ImageStat", "glob", "pathlib",
 }
 _BANNED_NAMES = {"eval", "exec", "compile", "__import__", "globals", "locals",
                  "vars", "getattr", "setattr", "delattr", "input", "breakpoint",
@@ -73,6 +76,14 @@ def check_code(code: str) -> str | None:
         # dunder access like x.__class__ etc.
         if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
             return f"dunder attribute '{node.attr}' is not allowed"
+        # v3.9: with pathlib/glob whitelisted (image staging) keep reads INSIDE
+        # the staged working dir: no absolute paths, no '..', no '~' in string
+        # literals. (Heuristic guard on top of the existing layers, not a VM.)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            s = node.value
+            if s.startswith(("/", "~")) or "/../" in s or s.startswith("../") or s == "..":
+                return (f"path '{s[:40]}' is not allowed — read only the staged "
+                        f"dataset copies in the working directory")
     return None
 
 
@@ -84,13 +95,27 @@ _PRELUDE = (
     "matplotlib.use('Agg')\n"
 )
 
+# v3.9: users kept running code that plotted but never called savefig — and saw
+# nothing. This trusted footer (OUR code, appended AFTER the AST check of the
+# user code) captures any open matplotlib figure automatically.
+_FOOTER = (
+    "\n\ntry:\n"
+    "    import matplotlib.pyplot as _plt_cap\n"
+    "    from pathlib import Path as _P_cap\n"
+    "    if _plt_cap.get_fignums() and not _P_cap('out.png').is_file():\n"
+    "        _plt_cap.savefig('out.png', dpi=110, bbox_inches='tight')\n"
+    "except Exception:\n"
+    "    pass\n"
+)
+
 
 def run_sandboxed(code: str, workdir: Path, timeout_s: int = 25) -> dict:
     """Run `code` in a subprocess inside `workdir` with rlimits. Returns
-    {ok, stdout, stderr, plot: bool}. The script may read ./data*.csv and must
-    save any figure to ./out.png and print findings to stdout."""
+    {ok, stdout, stderr, plot: bool}. The script may read the staged dataset
+    copies; figures are auto-captured to ./out.png (explicit savefig also fine);
+    findings go to stdout."""
     script = workdir / "_script.py"
-    script.write_text(_PRELUDE + code, encoding="utf-8")
+    script.write_text(_PRELUDE + code + _FOOTER, encoding="utf-8")
 
     def _limits():
         import resource
@@ -127,10 +152,13 @@ def run_sandboxed(code: str, workdir: Path, timeout_s: int = 25) -> dict:
 # ---------------------------------------------------------------------------
 _CODE_SYS = (
     "You write ONE short self-contained Python script for data analysis. Rules:\n"
-    "- The working directory contains the dataset as CSV file(s) named exactly as "
-    "listed in the prompt. Read them with pandas.\n"
-    "- Allowed libraries ONLY: pandas, numpy, scipy, sklearn, matplotlib, math, json, "
-    "statistics, collections, datetime, re, io.\n"
+    "- The working directory contains the dataset EXACTLY as listed in the prompt: "
+    "CSV file(s) in ./ (read with pandas), and/or a sample of images in ./images/ "
+    "(open with PIL.Image; convert to numpy with np.asarray) with optional YOLO "
+    "label files in ./labels/ (same stem, .txt: 'class cx cy w h' normalized 0-1).\n"
+    "- Allowed libraries ONLY: pandas, numpy, scipy, sklearn, matplotlib, seaborn, PIL, "
+    "math, json, statistics, collections, datetime, re, io, glob, pathlib.\n"
+    "- Use ONLY relative paths inside the working directory (never absolute, never ..).\n"
     "- If a figure helps, save it with plt.savefig('out.png', dpi=110, bbox_inches='tight'). "
     "Never plt.show().\n"
     "- print() the key numeric findings as short labeled lines (these are shown to the user).\n"
@@ -163,11 +191,12 @@ def data_brief(files: list, max_cols: int = 24) -> str:
 
 
 def write_and_run(question: str, files: list, workdir: Path, llm_code,
-                  max_repairs: int = 2) -> dict:
+                  max_repairs: int = 2, extra_brief: str = "") -> dict:
     """Full loop: prompt the coder LLM, safety-check, execute, self-repair on error.
-    `llm_code(prompt, system) -> str`. Returns
+    `llm_code(prompt, system) -> str`. `extra_brief` describes non-tabular staged
+    data (e.g. the image sample). Returns
     {ok, code, stdout, stderr, plot, attempts, refusal_reason?}."""
-    brief = data_brief(files)
+    brief = (data_brief(files) + ("\n" + extra_brief if extra_brief else "")).strip()
     prompt = (f"DATASET FILES in the working directory:\n{brief}\n\n"
               f"USER REQUEST: {question}\n\nWrite the script now.")
     code, last = "", {}
@@ -191,6 +220,79 @@ def write_and_run(question: str, files: list, workdir: Path, llm_code,
                    f"Fix the problem and output the FULL corrected script.")
     return {"ok": False, "code": code, "stdout": last.get("stdout", ""),
             "stderr": last.get("stderr", ""), "plot": False, "attempts": 1 + max_repairs}
+
+
+_IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+
+def stage_images(src_root: Path, workdir: Path, cap: int = 40,
+                 scan_bound: int = 3000) -> dict:
+    """v3.9: copy a bounded SAMPLE of an image dataset into the sandbox:
+    up to `cap` images into ./images/, matching YOLO label .txt (same stem)
+    into ./labels/, plus class names from data.yaml if present. The walk stops
+    after `scan_bound` files so huge datasets can't stall the request.
+    Returns {staged: [names], n_seen, truncated, classes, labels_staged}."""
+    import shutil as _sh
+    imgs, labels, seen, truncated = [], {}, 0, False
+    for base, dirs, fnames in os.walk(src_root):
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        for fn in sorted(fnames):
+            seen += 1
+            if seen > scan_bound:
+                truncated = True
+                break
+            p = Path(base) / fn
+            ext = p.suffix.lower()
+            if ext in _IMG_EXTS and len(imgs) < cap:
+                imgs.append(p)
+            elif ext == ".txt":
+                labels[p.stem] = p
+        if truncated:
+            break
+    (workdir / "images").mkdir(exist_ok=True)
+    staged, labels_staged = [], 0
+    for p in imgs:
+        name = p.name
+        if (workdir / "images" / name).exists():  # name collision across subdirs
+            name = f"{p.parent.name}_{p.name}"
+        _sh.copy(p, workdir / "images" / name)
+        staged.append(name)
+        lb = labels.get(p.stem)
+        if lb:
+            (workdir / "labels").mkdir(exist_ok=True)
+            _sh.copy(lb, workdir / "labels" / (Path(name).stem + ".txt"))
+            labels_staged += 1
+    classes = []
+    for yml in ("data.yaml", "data.yml"):
+        y = src_root / yml
+        if y.is_file():
+            try:
+                import re as _re
+                m = _re.search(r"names:\s*\[(.*?)\]", y.read_text(errors="replace"),
+                               _re.S)
+                if m:
+                    classes = [c.strip().strip("'\"") for c in m.group(1).split(",")
+                               if c.strip()]
+            except Exception:
+                pass
+            break
+    return {"staged": staged, "n_seen": seen, "truncated": truncated,
+            "classes": classes, "labels_staged": labels_staged}
+
+
+def image_brief(m: dict) -> str:
+    """Compact description of the staged image sample for the codegen prompt."""
+    if not m or not m.get("staged"):
+        return ""
+    lines = [f"- ./images/: {len(m['staged'])} image file(s) staged "
+             f"(a sample{' of a larger dataset' if m.get('truncated') else ''}), "
+             f"e.g. {', '.join(m['staged'][:6])}"]
+    if m.get("labels_staged"):
+        lines.append(f"- ./labels/: YOLO .txt for {m['labels_staged']} of them "
+                     f"(same stem; lines are 'class cx cy w h', normalized)")
+    if m.get("classes"):
+        lines.append(f"- classes: {m['classes']}")
+    return "\n".join(lines)
 
 
 def stage_dataset(files: list, workdir: Path) -> list:

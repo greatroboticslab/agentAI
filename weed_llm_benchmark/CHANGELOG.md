@@ -5892,3 +5892,34 @@ a "failed attempt" (5/IP → 1h lock), so a returning logged-out browser locked 
 - Brute-force protection intact — verified live: 8× credential-less API hits → all 401, zero counted;
   2× wrong Basic password → counted 1/5, 2/5 in the journal; valid session cookie → 200.
 - Deployed to lab (rsync + restart); the restart also cleared the user's active lock immediately.
+
+### v3.9.0 — conversational notebook: auto-captured figures, per-turn plot history, image datasets, deep cluster codegen, .ipynb export
+
+User feedback that drove this (2026-07-22, phone screenshots): ran the blank workbench template → saw
+nothing, asked "where is my plot?"; asked whether ANY dataset works, whether the BIG cluster model can
+write the code, and whether a Jupyter-notebook-style surface would fit better. Answer: evolve the chat
+into a conversational notebook instead of hosting JupyterHub (kernel = arbitrary code, would break the
+sandbox guarantees; and a bare notebook drops the agent).
+
+- **Figures auto-captured** (`code_analyst._FOOTER`, trusted code appended AFTER the AST check): any open
+  matplotlib figure is saved even without `plt.savefig` — the #1 "where is my plot" cause. A run that
+  prints nothing and plots nothing now gets a friendly hint instead of silence.
+- **Per-turn plot persistence**: every produced figure is stored as `{slug}_plot_{pid}.png`
+  (`_publish_codegen_plot`, newest 150 kept) and `chat_history` returns `plot_id` — restored
+  conversations now SHOW their figures (they used to lose them; single legacy file was overwritten).
+- **Image datasets in the workbench**: `stage_images()` copies a bounded sample (≤40 imgs, walk capped at
+  3000 files) + matching YOLO labels + data.yaml classes into the sandbox; PIL/glob/pathlib whitelisted;
+  codegen prompt describes the staged layout. Verified live: "plot the brightness distribution of the
+  images" → PIL code, self-repaired attempt 2, real numbers (mean 90.87).
+- **Sandbox path guard**: with pathlib/glob allowed, string literals that are absolute paths, `~`, or
+  contain `..` are rejected — user code reads only the staged copies.
+- **🧠 Deep mode** (`POST /api/dataset/codegen_deep/submit`): the big open model on the CLUSTER writes the
+  analysis code (prof's direction: smartest open models, async + progress). One cluster round-trip via the
+  proven `run_llm_infer.sh` sbatch gateway; error repair falls back to the local coder so a fix never
+  costs another cluster job. Progress streams into the chat; admin/cluster-granted users.
+- **📓 .ipynb export** (`GET /api/dataset/export_ipynb`): the whole per-dataset conversation as a runnable
+  Jupyter notebook — questions as markdown, all agent/user code as cells, recorded outputs noted.
+- **/guide** gained the full "Ask your data — and run code on it" tutorial section.
+- E2E-verified in a real browser on the live site (screenshots in docs/screenshots/): auto-capture,
+  empty-run hint, plot restored after reload, image-dataset codegen, image run_code (40 staged), montage
+  regression, notebook export (44 cells / 14 code).

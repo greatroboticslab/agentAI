@@ -146,8 +146,19 @@ reason, and errors come back verbatim):
 <img src="docs/screenshots/workbench-pasted-code.png" width="840" alt="Externally optimized seaborn code pasted into the workbench and run in the sandbox: a two-panel styled figure plus printed statistics">
 </div>
 
-The conversation — questions, answers, and code — **persists per dataset**, so the human-AI iteration
-accumulates instead of vanishing on reload.
+It works on **image datasets** too — a sample of the images (plus YOLO labels) is staged into the sandbox,
+and the generated code reads real pixels with PIL:
+
+<div align="center">
+<img src="docs/screenshots/workbench-image-codegen.png" width="840" alt="On an image dataset the agent wrote PIL code (self-repaired on attempt 2) computing the real brightness distribution of the staged images">
+</div>
+
+Quality-of-life, all verified live: **figures are captured automatically** (forget `plt.savefig` — the plot
+still appears); a run that prints nothing and plots nothing gets a **friendly hint instead of silence**; the
+conversation — questions, answers, code **and every figure** — **persists per dataset**, so reloading brings
+the whole session back. **🧠 Deep** sends your question to the big open model on the cluster (async, with live
+progress). And **📓 exports the entire conversation as a runnable Jupyter notebook** (.ipynb) — questions as
+markdown, all code as cells — for anyone who wants the full notebook experience locally.
 
 ---
 
@@ -239,11 +250,11 @@ Running tests, CI details, and contributing conventions are in **[docs/DEVELOPME
 | [`multagent/`](multagent/) | **EMACF** robotics agent framework (Brain / Perception / Targeting / Navigation) — the earlier embodied-robot direction, kept for reference. |
 | [`docs/`](docs/) | Screenshots + platform roadmap. |
 
-> **Latest:** `v3.8` — the analysis agent now **writes code you can see, edit, and run**: out-of-library
-> questions get purpose-written Python executed in a sandbox, shown in an editable box with a ▶ Run button;
-> paste externally-optimized code (ChatGPT/Gemini) into the `</>` workbench and it runs on your dataset too.
-> Chat + code persist per dataset. It also scans image datasets for **suspicious labels** (crop montage in
-> the chat, one-click ✓/✗ feeding the curation loop). Built on the v3.3–v3.6 grounded tool-library agent and
+> **Latest:** `v3.9` — the code workbench grew into a **conversational notebook**: figures auto-captured
+> (no savefig needed), every turn's plot persisted and restored on reload, **image datasets staged into the
+> sandbox** (generated code reads real pixels with PIL), **🧠 Deep mode** (the big open model on the cluster
+> writes the code, async with progress), and **📓 export of the whole conversation as a runnable Jupyter
+> notebook**. Built on the v3.7–v3.8 see/edit/run workbench, the v3.3–v3.6 grounded tool-library agent and
 > the v3.2 sensor-diagnosis pipeline. See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
 > and [`RESEARCH_LOG.md`](RESEARCH_LOG.md).
 

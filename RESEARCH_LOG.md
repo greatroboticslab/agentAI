@@ -13,6 +13,20 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-22 (later) — v3.9.0: the workbench becomes a conversational notebook
+
+**Driven by the user actually using it on their phone:** they ran the blank template, saw nothing ("where
+is my plot?"), and asked three sharp questions — does it work on ANY dataset, can the BIG cluster model
+write the code, and wouldn't Jupyter-notebook-style fit better? Decision: **evolve the chat into a
+conversational notebook** rather than hosting JupyterHub (a kernel is arbitrary code execution — it would
+void the sandbox guarantees — and a bare notebook loses the agent). Shipped, all E2E-verified live:
+figures **auto-captured** (no savefig needed) + friendly empty-run hint; **per-turn plot persistence**
+(restored conversations now show their figures); **image datasets staged into the sandbox** (bounded
+sample + YOLO labels + classes; PIL whitelisted; path-traversal guard added); **🧠 Deep mode** — the big
+open cluster model (glm-4.7-flash) writes the code async via the sbatch LLM gateway with progress in the
+chat, local-coder repair; **📓 export the conversation as a runnable .ipynb**; `/guide` tutorial section.
+Also fixed that morning: expired-session browsers were brute-force-locking their own IP (v3.8.3).
+
 ## 2026-07-22 — v3.7–v3.8.2: the agent writes code; the user can see, edit, and run it (prof's ask, verified E2E)
 
 **What drove this.** Prof. Zhang's feedback round 2: "I want basic plots" got text-only; he endorsed
