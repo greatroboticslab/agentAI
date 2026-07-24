@@ -13,6 +13,16 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-24 — v3.9.2: Prof. Zhang's second hands-on review, fixed same-day
+
+He tested like a real user (email with screenshots): (1) gallery thumbnails blank with no
+feedback → added shimmer placeholders + a live "retrieving thumbnails N/24" spinner counter;
+(2) "I asked it to generate code, no code…" → explicit code-requests now route to the
+code-writing analyst (was plot-words/unsupported only) — his exact sentence now returns code;
+(3) security: logged in as a normal user he could DELETE admin-uploaded datasets → delete is now
+uploader-or-admin only (verified 403). Lesson repeated: every review round from someone who
+didn't build the system finds a class of bug we can't see ourselves.
+
 ## 2026-07-22 (later) — v3.9.0: the workbench becomes a conversational notebook
 
 **Driven by the user actually using it on their phone:** they ran the blank template, saw nothing ("where

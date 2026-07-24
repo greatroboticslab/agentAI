@@ -3401,7 +3401,16 @@ async def api_dataset_delete(request: Request):
         raise HTTPException(400, "bad slug")
     if not _is_manual_dataset(slug):
         raise HTTPException(403, "only manually-uploaded datasets can be deleted here")
-    res = _purge_dataset(slug, actor=_actor_from_request(request))
+    # v3.9.2 (prof found this as a normal user): deleting someone ELSE's dataset
+    # must be denied — only the uploader or an admin may delete. Datasets with no
+    # recorded uploader (old entries) are admin-only to stay safe.
+    actor = _actor_from_request(request)
+    owner = str((_read_manual_uploads().get(slug) or {}).get("uploaded_by") or "")
+    if not (_is_admin(actor) or (owner and owner == actor)):
+        raise HTTPException(403, "you can only delete datasets you uploaded "
+                                 f"(this one was uploaded by {owner or 'an unknown user'}; "
+                                 "ask an admin)")
+    res = _purge_dataset(slug, actor=actor)
     return JSONResponse({"ok": True, "slug": slug, "removed": res})
 
 
@@ -3891,7 +3900,12 @@ async def api_dataset_analyze_goal(request: Request):
     _g = goal.lower()
     _wants_plot = any(w in _g for w in ("plot", "graph", "chart", "visuali", "histogram",
                                         "spectrum", "draw", "curve", "scatter"))
-    if (out.get("mode") == "unsupported" or _wants_plot) and _mod in ("sensor", "image"):
+    # v3.9.2 (prof asked "can you generate code..." and got a stats table, no
+    # code): an explicit request for CODE must route to the code-writing analyst
+    # too, not just plot-words / unsupported methods.
+    _wants_code = bool(re.search(r"\b(code|script|python|notebook|program)\b", _g))
+    if (out.get("mode") == "unsupported" or _wants_plot or _wants_code) \
+            and _mod in ("sensor", "image"):
         try:
             import tempfile as _tf
             from . import code_analyst as _ca
@@ -7703,7 +7717,15 @@ def gallery(slug: str, page: int = 1, per_page: int = 24):
   .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }}
   .card {{ background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: transform 0.15s; }}
   .card:hover {{ transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.12); }}
-  .card img {{ width: 100%; height: 180px; object-fit: cover; display: block; background: #eee; }}
+  .card img {{ width: 100%; height: 180px; object-fit: cover; display: block;
+    background: linear-gradient(100deg, #e8e8ee 30%, #f7f7fb 50%, #e8e8ee 70%);
+    background-size: 200% 100%; animation: shim 1.1s linear infinite; }}
+  .card img.ld {{ animation: none; background: #eee; }}
+  @keyframes shim {{ to {{ background-position: -200% 0; }} }}
+  .spin {{ display: inline-block; width: 12px; height: 12px; border: 2px solid #c7d2fe;
+    border-top-color: #2563eb; border-radius: 50%; animation: sp .8s linear infinite;
+    vertical-align: -2px; margin-right: 4px; }}
+  @keyframes sp {{ to {{ transform: rotate(360deg); }} }}
   .card .caption {{ padding: 8px 10px; font-size: 11px; color: #888; word-break: break-all; }}
   nav.pagination {{ text-align: center; margin: 24px 0; }}
   nav.pagination a, nav.pagination span {{ display: inline-block; padding: 6px 12px; margin: 0 3px; border-radius: 6px; font-size: 14px; }}
@@ -7723,6 +7745,9 @@ def gallery(slug: str, page: int = 1, per_page: int = 24):
     · source: <code>{src}</code>
     · <a href="/slugs">← back to all datasets</a>
   </div>
+  <div id="ldbar" class="meta" style="margin-top:6px;color:#2563eb"><span class="spin"></span>
+    retrieving thumbnails&hellip; <span id="ldn">0</span>/{len(page_files)}
+    <span style="color:#94a3b8">(each preview is rendered with its boxes on first view)</span></div>
 </header>
 
 <nav class="pagination">{nav_html}</nav>
@@ -7732,6 +7757,20 @@ def gallery(slug: str, page: int = 1, per_page: int = 24):
 </div>
 
 <nav class="pagination">{nav_html}</nav>
+<script>
+// v3.9.2 (prof's ask): visible progress while thumbnails are being retrieved.
+var _imgs=[].slice.call(document.querySelectorAll('.card img')),_done=0;
+function _bump(){{ _done++;
+  var n=document.getElementById('ldn'); if(n)n.textContent=_done;
+  if(_done>=_imgs.length){{ var b=document.getElementById('ldbar');
+    if(b){{ b.innerHTML='&#10003; all '+_imgs.length+' previews loaded';
+            setTimeout(function(){{ b.style.display='none'; }},1500); }} }} }}
+_imgs.forEach(function(im){{
+  if(im.complete&&im.naturalWidth>0){{ im.classList.add('ld'); _bump(); }}
+  else {{ im.addEventListener('load',function(){{ im.classList.add('ld'); _bump(); }});
+         im.addEventListener('error',function(){{ im.classList.add('ld'); _bump(); }}); }}
+}});
+</script>
 </body>
 </html>'''
     return HTMLResponse(html)

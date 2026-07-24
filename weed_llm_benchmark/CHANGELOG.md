@@ -5931,3 +5931,19 @@ original `savefig` ran fine but kept showing the OLD image — the capture foote
 out.png already existed. It now always saves the final open figure state (regression-tested: savefig
 then new figure → the new figure wins). Live-verified with a full in-browser rewrite of a generated
 plot (rolling mean + annotation) on the demo1/TestDataset showcase conversation.
+
+### v3.9.2 — Prof. Zhang's 3-point feedback (2026-07-23 email), all fixed & live-verified
+
+1. **Gallery loading animation** ("datasets can not displayed immediately… add an animation icon"):
+   thumbnail cells now shimmer while loading and the header shows a spinner with a live
+   "retrieving thumbnails… N/24" counter that flips to "✓ all loaded" (each preview is
+   bbox-rendered server-side on first view — that's the wait he saw).
+2. **"I asked it to generate code, no code…"**: an explicit request for CODE (code / script /
+   python / notebook / program) now routes to the code-writing analyst — previously only
+   plot-words or unsupported methods did, so "can you generate code for me to analyze the basic
+   features" got a stats table with no code. Verified with his exact sentence → mode=codegen,
+   code + real stats returned.
+3. **Normal users could delete ANYONE's dataset** (he logged in as a normal user and could delete
+   admin uploads): `/api/dataset/delete` now requires uploader-or-admin (datasets with no recorded
+   uploader are admin-only). Verified live: normal member → 403 "you can only delete datasets you
+   uploaded (this one was uploaded by admin)".
