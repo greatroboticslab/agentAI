@@ -1404,6 +1404,7 @@ def agent_weed():
   async function loadWeedUploads(){
    var w=document.getElementById('wul-wrap');if(!w)return;
    try{
+    var me={}; try{ me=await (await fetch('/api/me',{credentials:'include'})).json(); }catch(e){}
     var d=await (await fetch('/api/dataset/uploads?domain=weed',{credentials:'include'})).json();
     var rows=(d&&d.uploads)||[];
     if(!rows.length){w.innerHTML='';return;}
@@ -1411,7 +1412,10 @@ def agent_weed():
     rows.forEach(function(u,i){
      h+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:9px 12px;'+(i?'border-top:1px solid #eef1f6;':'')+'font-size:13px">'
        +'<span><a href="/gallery/'+encodeURIComponent(u.slug)+'" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600">'+(u.name||u.slug)+'</a> <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+'</span></span>'
-       +'<button onclick="deleteWeedUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button></div>';
+       // v3.9.3: Delete only for the uploader / admins (server enforces it too).
+       +((me.is_admin||(me.user&&u.uploaded_by===me.user))
+          ?('<button onclick="deleteWeedUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button>')
+          :('<span title="Only the uploader or an admin can delete this dataset" style="font-size:11px;color:#94a3b8">read-only</span>'))+'</div>';
     });
     h+='</div>';w.innerHTML=h;
    }catch(e){w.innerHTML='';}
@@ -3386,6 +3390,21 @@ def _datasets_for_domain(domain: str) -> list:
     return sorted(out)
 
 
+def _require_dataset_owner(actor: str, slug: str, action: str = "modify") -> None:
+    """v3.9.2/3 — a member must not damage another member's dataset. Only the
+    uploader or an admin may delete/rename/push it. Datasets with no recorded
+    uploader (older entries) are admin-only, deliberately conservative.
+    Found by Prof. Zhang testing as a normal user: he could delete admin data."""
+    if _is_admin(actor):
+        return
+    owner = str((_read_manual_uploads().get(slug) or {}).get("uploaded_by") or "")
+    if owner and owner == actor:
+        return
+    raise HTTPException(403, f"you can only {action} datasets you uploaded "
+                             f"(this one was uploaded by {owner or 'an unknown user'}; "
+                             f"ask an admin)")
+
+
 @app.post("/api/dataset/delete")
 async def api_dataset_delete(request: Request):
     """Delete a MANUALLY-uploaded dataset (manual_uploads + registry + Mongo +
@@ -3401,15 +3420,8 @@ async def api_dataset_delete(request: Request):
         raise HTTPException(400, "bad slug")
     if not _is_manual_dataset(slug):
         raise HTTPException(403, "only manually-uploaded datasets can be deleted here")
-    # v3.9.2 (prof found this as a normal user): deleting someone ELSE's dataset
-    # must be denied — only the uploader or an admin may delete. Datasets with no
-    # recorded uploader (old entries) are admin-only to stay safe.
     actor = _actor_from_request(request)
-    owner = str((_read_manual_uploads().get(slug) or {}).get("uploaded_by") or "")
-    if not (_is_admin(actor) or (owner and owner == actor)):
-        raise HTTPException(403, "you can only delete datasets you uploaded "
-                                 f"(this one was uploaded by {owner or 'an unknown user'}; "
-                                 "ask an admin)")
+    _require_dataset_owner(actor, slug, "delete")
     res = _purge_dataset(slug, actor=actor)
     return JSONResponse({"ok": True, "slug": slug, "removed": res})
 
@@ -4003,12 +4015,19 @@ def api_dataset_export_ipynb(request: Request, slug: str):
         raise HTTPException(400, "bad slug")
     _ = _actor_from_request(request)
 
+    _cid = {"n": 0}
+
+    def _next_id():   # nbformat >= 4.5 requires a per-cell id (warns today, hard error later)
+        _cid["n"] += 1
+        return f"c{_cid['n']:04d}"
+
     def md(text):
-        return {"cell_type": "markdown", "metadata": {}, "source": text}
+        return {"cell_type": "markdown", "id": _next_id(), "metadata": {},
+                "source": text}
 
     def codecell(src):
-        return {"cell_type": "code", "execution_count": None, "metadata": {},
-                "outputs": [], "source": src}
+        return {"cell_type": "code", "id": _next_id(), "execution_count": None,
+                "metadata": {}, "outputs": [], "source": src}
 
     cells = [md(f"# Analysis notebook — dataset `{slug}`\n\n"
                 f"Exported from the platform's analysis conversation on "
@@ -4341,7 +4360,9 @@ def api_dataset_classnames_get(request: Request, slug: str):
 async def api_dataset_classnames_set(request: Request, slug: str):
     if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
         raise HTTPException(400, "bad slug")
-    _ = _actor_from_request(request)
+    # v3.9.3: same class of hole as the delete one the prof found — this REWRITES
+    # data.yaml on disk, so it must be uploader-or-admin too.
+    _require_dataset_owner(_actor_from_request(request), slug, "rename classes in")
     body = await request.json()
     names = [re.sub(r"[^A-Za-z0-9 _\-()]", "", str(x)).strip()[:60] for x in (body.get("names") or [])]
     if not names or not any(names):
@@ -5898,9 +5919,12 @@ async function uploadDataset(){
   else{t.textContent='\\u274c '+((d&&(d.detail||d.msg))||('HTTP '+r.status));}
  }catch(e){t.textContent='\\u274c '+e;}finally{btn.disabled=false;}
 }
+var _ME=null;
+async function whoami(){ if(_ME)return _ME; try{ _ME=await (await fetch('/api/me',{credentials:'include'})).json(); }catch(e){ _ME={}; } return _ME; }
 async function loadUploads(){
  var w=document.getElementById('ul-wrap');if(!w)return;
  try{
+  var me=await whoami();
   var d=await (await fetch('/api/dataset/uploads?domain=__DOM__',{credentials:'include'})).json();
   var rows=(d&&d.uploads)||[];
   if(!rows.length){w.innerHTML='<div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:14px;font-size:13px;color:#475569">&#128228; <b>No datasets yet.</b> Drag &amp; drop files (or a folder) in the box above, or add a Collector agent to gather data automatically. New here? <a href="/guide">Read the 2-min guide &rarr;</a></div>';return;}
@@ -5913,7 +5937,11 @@ async function loadUploads(){
      +' <span style="color:#94a3b8">\\u00b7 '+u.images+' imgs \\u00b7 by '+(u.uploaded_by||'?')+' \\u00b7 '+(u.license||'unspecified')+'</span></span>'
      +'<span style="display:flex;gap:6px">'
      +'<a href="/dataset/'+encodeURIComponent(u.slug)+'" target="_blank" style="border:1px solid #c7d2fe;background:#eef2ff;color:#2563eb;font-weight:600;font-size:12px;padding:5px 10px;border-radius:7px;text-decoration:none">\\ud83d\\udcca Analyze</a>'
-     +'<button onclick="deleteUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button>'
+     // v3.9.3: only the uploader (or an admin) sees Delete — the server enforces
+     // it too, but showing a button that always fails is bad UX (prof's report).
+     +(((me&&me.is_admin)||(me&&me.user&&u.uploaded_by===me.user))
+        ?('<button onclick="deleteUpload(\\''+u.slug+'\\',this)" style="border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;padding:5px 10px;border-radius:7px;cursor:pointer">Delete</button>')
+        :('<span title="Only the uploader or an admin can delete this dataset" style="font-size:11px;color:#94a3b8;padding:5px 4px">read-only</span>'))
      +'</span></div>';
   });
   h+='</div>';w.innerHTML=h;
@@ -11326,10 +11354,12 @@ def _spawn_rf_sync(tail_args, action):
 
 
 @app.post("/api/labeling/push")
-async def api_labeling_push(payload: dict = Body(...)):
+async def api_labeling_push(request: Request, payload: dict = Body(...)):
     slug = str(payload.get("slug", ""))
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
         raise HTTPException(400, "bad slug")
+    # v3.9.3: spends shared Roboflow quota with someone else's data — same guard.
+    _require_dataset_owner(_actor_from_request(request), slug, "push to labeling")
     # v3.0.128 (Z4): enforce the user-set per-domain push cap as the UPPER limit.
     # If n is omitted, default to the cap; otherwise clamp n down to the cap.
     domain = str(payload.get("domain") or "weed")
@@ -11352,10 +11382,12 @@ async def api_labeling_push(payload: dict = Body(...)):
 
 
 @app.post("/api/labeling/delete")
-async def api_labeling_delete(payload: dict = Body(...)):
+async def api_labeling_delete(request: Request, payload: dict = Body(...)):
     slug = str(payload.get("slug", ""))
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', slug):
         raise HTTPException(400, "bad slug")
+    # v3.9.3: removes images from the shared Roboflow project — uploader/admin only.
+    _require_dataset_owner(_actor_from_request(request), slug, "remove from labeling")
     proj = payload.get("project") or "weed-crop-agent-clean"
     if not _re_cls.match(r'^[A-Za-z0-9_.-]+$', proj):
         raise HTTPException(400, "bad project")

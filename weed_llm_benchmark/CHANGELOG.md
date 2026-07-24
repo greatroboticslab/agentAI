@@ -5947,3 +5947,27 @@ plot (rolling mean + annotation) on the demo1/TestDataset showcase conversation.
    admin uploads): `/api/dataset/delete` now requires uploader-or-admin (datasets with no recorded
    uploader are admin-only). Verified live: normal member → 403 "you can only delete datasets you
    uploaded (this one was uploaded by admin)".
+
+### v3.9.3 — self-audit after the prof's review: the delete hole was a CLASS of bug, not one bug
+
+Triggered by the user challenging whether v3.9.2 was really verified. Honest finding: v3.9.2 items 2
+and 3 had only been checked with curl, never in a browser, and the *reverse* case (can the rightful
+owner still delete?) had never been tested at all. Audited every mutating endpoint for an ownership
+guard and fixed the rest:
+
+- **`_require_dataset_owner()`** extracted and now also guards **`/api/dataset/classnames`** (rewrites
+  data.yaml on disk), **`/api/labeling/push`** and **`/api/labeling/delete`** (spend/mutate the shared
+  Roboflow project). Previously: any logged-in member could rename another member's classes or push
+  their data for labeling. (`agent/delete|update`, `project/agent/remove`, `models/role`, `users/role`,
+  `keys*` were already guarded — verified, not assumed.)
+- **UI**: the Delete button is now rendered only for the uploader/admins on BOTH upload lists (the weed
+  home list in the prof's screenshot and the generic project list); others see a "read-only" tag.
+  Server-side enforcement remains the source of truth.
+- **.ipynb export**: cells now carry `id` fields — `nbformat.validate()` passes with no warnings
+  (previously a deprecation warning that becomes a hard error in future nbformat).
+- **Verification matrix actually run this time** (live, both curl and real browser):
+  student B deletes A's dataset → 403; B renames A's classes → 403; B pushes A's data to labeling →
+  403; **A deletes A's own → 200**; **A renames own classes → 200**; **admin deletes B's → 200**;
+  normal member's chat analysis still works (mode=codegen with plot); normal member's Deep click → clean
+  403 message; prof's two exact sentences in a real browser → both return code + editor + ▶ Run
+  (screenshots `70_prof_exact_questions.png`, `80_normal_user_demo1.png`).

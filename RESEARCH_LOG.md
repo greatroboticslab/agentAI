@@ -13,6 +13,19 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-24 (later) — v3.9.3: self-audit — the permission bug was a class, and my own verification had gaps
+
+The user pushed back: "did you really test it, or did you cut corners?" Correct challenge. Two honest
+gaps in the v3.9.2 work: (a) the code-routing fix and the permission fix had only been exercised with
+curl, never through the browser; (b) I never tested the REVERSE case — that the rightful owner can
+still delete. Re-audited all mutating endpoints: `dataset/classnames`, `labeling/push`, `labeling/delete`
+had the same missing ownership guard the prof found on delete, so a member could rewrite another
+member's data.yaml or spend Roboflow quota with their data. All now behind one `_require_dataset_owner`
+helper; Delete buttons hidden for non-owners on both upload lists; full 6-case permission matrix run
+live (3 denials + 3 legitimate successes); prof's exact two sentences replayed in a real browser.
+Lesson recorded: "verified" must mean the positive AND negative case, through the surface the user
+actually touches.
+
 ## 2026-07-24 — v3.9.2: Prof. Zhang's second hands-on review, fixed same-day
 
 He tested like a real user (email with screenshots): (1) gallery thumbnails blank with no
