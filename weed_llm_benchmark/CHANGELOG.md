@@ -5971,3 +5971,33 @@ guard and fixed the rest:
   normal member's chat analysis still works (mode=codegen with plot); normal member's Deep click → clean
   403 message; prof's two exact sentences in a real browser → both return code + editor + ▶ Run
   (screenshots `70_prof_exact_questions.png`, `80_normal_user_demo1.png`).
+
+### v3.10.0 — pick the brain: local OR your own commercial model (GPT / Claude / Gemini), data stays here
+
+Prof. Zhang's direction (2026-07-29/31, voice + PyCharm "AI Chat" mock-up): let users use strong
+commercial AI from inside our chat — on THEIR OWN account — while the data and code execution stay on
+our platform ("we are still data centric"). Do the simple in-app version first (defer the Loom/record
+path). Delivered:
+
+- **Model dropdown in the composer** (PyCharm-style): Local · Qwen Coder (free, grounded) · OpenAI GPT-4o ·
+  Anthropic Claude · Google Gemini. Whatever you pick answers THIS question. Local keeps the grounded
+  tool-planner + coder; a commercial model writes the analysis code, which STILL runs in our sandbox on
+  the staged copy of your data — their brain, our data + execution. Self-repair works with commercial
+  models too.
+- **Bring-your-own-key, encrypted at rest** (`/api/user/llm_key[/delete]`, `/api/user/llm_keys`): each user
+  pastes their own API key in the 🔑 modal. Stored **Fernet-encrypted** (stdlib HMAC-CTR+HMAC fallback if
+  the crypto lib is absent), scoped to that user, **never echoed back** — the UI only ever learns
+  "configured / not". Decrypted for exactly one request and injected into `llm_providers.chat(keys=...)`;
+  never written to the shared server key file. Verified: on-disk value is ciphertext (`f:gAAAA…`, zero
+  plaintext matches); user B cannot see user A's key.
+- **Gemini provider** added to `llm_providers.py` (generateContent API) alongside the existing
+  OpenAI/Anthropic/DeepSeek/GLM; `chat()` gained a per-request `keys` override; HTTP error bodies are now
+  surfaced as clean provider messages (e.g. "API key not valid").
+- **Composer redesign** — rounded PyCharm-style box (auto-grow textarea, model picker + 🔑 on the left,
+  🎙 + Ask on the right), a tidy tools row (Workbench · Deep · Notebook), fully responsive (verified at
+  phone width). The model choice persists per dataset.
+- **Verified live, real browser + curl:** dropdown + modal render and save; local model regression
+  (histogram) still works; commercial routing proven end-to-end — no key → clean "add your key" prompt;
+  a (fake) key → the request reaches OpenAI/Gemini/Anthropic with the user's decrypted key and the
+  provider's real auth error is shown ("API key not valid" / "Incorrect API key"). The only piece needing
+  a valid key is the successful response — which is exactly what the user supplies (BYO-key).

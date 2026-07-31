@@ -262,6 +262,140 @@ def _check_api_key(request):
     return rec if rec else None
 
 
+# ===========================================================================
+# v3.10 — BRING-YOUR-OWN-KEY commercial models (Prof. Zhang's ask: let users use
+# strong commercial AI — GPT/Claude/Gemini — from inside our chat, on their OWN
+# account, while the DATA and CODE EXECUTION stay on our platform). Each user
+# pastes their own API key; we store it ENCRYPTED AT REST (Fernet, or a stdlib
+# authenticated fallback), scoped to that user, and NEVER echo it back — the UI
+# only ever learns "configured / not". The key is decrypted for exactly one
+# request and injected into llm_providers.chat(keys=...); it is never written to
+# the shared server key file.
+# ===========================================================================
+_LLM_MASTER_KEY_FILE = os.path.expanduser("~/.llm_master_key")
+_USER_LLM_KEYS_FILE = os.path.expanduser("~/.user_llm_keys.json")
+# dropdown provider -> (env var llm_providers expects, default model, label)
+_BYOK_PROVIDERS = {
+    "openai":    ("OPENAI_API_KEY",    "gpt-4o",                    "OpenAI · GPT-4o"),
+    "anthropic": ("ANTHROPIC_API_KEY", "claude-3-5-sonnet-latest",  "Anthropic · Claude"),
+    "gemini":    ("GEMINI_API_KEY",    "gemini-2.0-flash",          "Google · Gemini"),
+}
+
+
+def _llm_master_key() -> bytes:
+    """32-byte urlsafe-b64 master key (Fernet format), created once, chmod 600."""
+    try:
+        if os.path.isfile(_LLM_MASTER_KEY_FILE):
+            return open(_LLM_MASTER_KEY_FILE, "rb").read().strip()
+    except Exception:
+        pass
+    try:
+        from cryptography.fernet import Fernet
+        kb = Fernet.generate_key()
+    except Exception:
+        kb = _base64.urlsafe_b64encode(_secrets.token_bytes(32))
+    try:
+        with open(_LLM_MASTER_KEY_FILE, "wb") as f:
+            f.write(kb)
+        os.chmod(_LLM_MASTER_KEY_FILE, 0o600)
+    except Exception:
+        pass
+    return kb
+
+
+def _llm_enc(plaintext: str) -> str:
+    """Encrypt a secret. Prefers Fernet; falls back to a stdlib encrypt-then-MAC
+    stream (HMAC-SHA256 keystream + HMAC tag) so the feature works even without
+    the cryptography lib. Tagged 'f:' / 's:' so decrypt knows which."""
+    mk = _llm_master_key()
+    try:
+        from cryptography.fernet import Fernet
+        return "f:" + Fernet(mk).encrypt(plaintext.encode()).decode()
+    except Exception:
+        raw = _base64.urlsafe_b64decode(mk)
+        nonce = _secrets.token_bytes(16)
+        ek = _hmac.new(raw, b"enc", hashlib.sha256).digest()
+        pt = plaintext.encode()
+        ks = b""
+        i = 0
+        while len(ks) < len(pt):
+            ks += _hmac.new(ek, nonce + i.to_bytes(8, "big"), hashlib.sha256).digest()
+            i += 1
+        ct = bytes(a ^ b for a, b in zip(pt, ks))
+        tag = _hmac.new(_hmac.new(raw, b"mac", hashlib.sha256).digest(),
+                        nonce + ct, hashlib.sha256).digest()
+        return "s:" + _base64.urlsafe_b64encode(nonce + ct + tag).decode()
+
+
+def _llm_dec(token: str) -> str:
+    mk = _llm_master_key()
+    if token.startswith("f:"):
+        from cryptography.fernet import Fernet
+        return Fernet(mk).decrypt(token[2:].encode()).decode()
+    if token.startswith("s:"):
+        raw = _base64.urlsafe_b64decode(mk)
+        blob = _base64.urlsafe_b64decode(token[2:])
+        nonce, ct, tag = blob[:16], blob[16:-32], blob[-32:]
+        exp = _hmac.new(_hmac.new(raw, b"mac", hashlib.sha256).digest(),
+                        nonce + ct, hashlib.sha256).digest()
+        if not _hmac.compare_digest(tag, exp):
+            raise ValueError("bad tag")
+        ek = _hmac.new(raw, b"enc", hashlib.sha256).digest()
+        ks = b""
+        i = 0
+        while len(ks) < len(ct):
+            ks += _hmac.new(ek, nonce + i.to_bytes(8, "big"), hashlib.sha256).digest()
+            i += 1
+        return bytes(a ^ b for a, b in zip(ct, ks)).decode()
+    raise ValueError("unknown token format")
+
+
+def _read_user_llm_keys() -> dict:
+    try:
+        if os.path.isfile(_USER_LLM_KEYS_FILE):
+            return json.load(open(_USER_LLM_KEYS_FILE)) or {}
+    except Exception:
+        pass
+    return {}
+
+
+def _write_user_llm_keys(d: dict) -> None:
+    tmp = _USER_LLM_KEYS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(d, f, indent=2)
+    os.replace(tmp, _USER_LLM_KEYS_FILE)
+    try:
+        os.chmod(_USER_LLM_KEYS_FILE, 0o600)
+    except Exception:
+        pass
+
+
+def _user_provider_status(actor: str) -> dict:
+    """{provider: {configured: bool, model: str, label: str}} — NEVER the key."""
+    store = _read_user_llm_keys().get(actor or "", {})
+    out = {}
+    for prov, (_env, default_model, label) in _BYOK_PROVIDERS.items():
+        rec = store.get(prov) or {}
+        out[prov] = {"configured": bool(rec.get("enc")),
+                     "model": rec.get("model") or default_model,
+                     "label": label}
+    return out
+
+
+def _user_keys_for_chat(actor: str, provider: str) -> dict:
+    """Decrypt this user's key for `provider` into the env-name map that
+    llm_providers.chat(keys=...) consumes. Returns {} if not configured."""
+    rec = (_read_user_llm_keys().get(actor or "", {}) or {}).get(provider) or {}
+    if not rec.get("enc"):
+        return {}
+    try:
+        env = _BYOK_PROVIDERS[provider][0]
+        return {env: _llm_dec(rec["enc"])}
+    except Exception as e:
+        log.warning(f"[byok] decrypt failed for {actor}/{provider}: {type(e).__name__}")
+        return {}
+
+
 # Public paths (no auth required)
 _AUTH_EXEMPT_PATHS = {
     "/healthz",                      # cloudflared probe
@@ -1975,6 +2109,66 @@ def api_me(request: Request):
                          "cluster_requested": actor in reqs,
                          # admins see how many access requests are pending (red dot)
                          "pending_requests": (len(reqs) if is_admin else 0)})
+
+
+@app.get("/api/user/llm_keys")
+def api_user_llm_keys(request: Request):
+    """v3.10 — which commercial providers THIS user has configured (booleans +
+    the chosen model). The key itself is NEVER returned."""
+    actor = _actor_from_request(request)
+    return JSONResponse({"ok": True, "providers": _user_provider_status(actor)})
+
+
+@app.post("/api/user/llm_key")
+async def api_user_llm_key_set(request: Request):
+    """v3.10 — save/update THIS user's own API key for a commercial provider.
+    POST {provider, key, model?}. Key is encrypted at rest and never echoed."""
+    actor = _actor_from_request(request)
+    if not actor or actor == "?":
+        raise HTTPException(401, "sign in to save a key")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    provider = str(body.get("provider") or "").strip().lower()
+    if provider not in _BYOK_PROVIDERS:
+        raise HTTPException(400, f"unknown provider (want one of {list(_BYOK_PROVIDERS)})")
+    key = str(body.get("key") or "").strip()
+    model = str(body.get("model") or "").strip()[:80]
+    store = _read_user_llm_keys()
+    rec = dict((store.get(actor) or {}).get(provider) or {})
+    if key:  # empty key = keep existing, only update model
+        if len(key) < 8 or len(key) > 400:
+            raise HTTPException(400, "that doesn't look like an API key")
+        rec["enc"] = _llm_enc(key)
+    if model:
+        rec["model"] = model
+    if not rec.get("enc"):
+        raise HTTPException(400, "no key on file — paste your API key")
+    store.setdefault(actor, {})[provider] = rec
+    _write_user_llm_keys(store)
+    log.info(f"[byok] {actor} set key for {provider}")
+    return JSONResponse({"ok": True, "provider": provider,
+                         "configured": True,
+                         "model": rec.get("model") or _BYOK_PROVIDERS[provider][1]})
+
+
+@app.post("/api/user/llm_key/delete")
+async def api_user_llm_key_del(request: Request):
+    """v3.10 — remove THIS user's saved key for a provider."""
+    actor = _actor_from_request(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    provider = str(body.get("provider") or "").strip().lower()
+    store = _read_user_llm_keys()
+    if actor in store and provider in store[actor]:
+        store[actor].pop(provider, None)
+        if not store[actor]:
+            store.pop(actor, None)
+        _write_user_llm_keys(store)
+    return JSONResponse({"ok": True, "provider": provider, "configured": False})
 
 
 @app.post("/api/cluster/request")
@@ -3855,8 +4049,12 @@ async def api_dataset_analyze_goal(request: Request):
     compute the real numbers; the LLM narrates the answer using only those numbers.
     `history` (prior [{role,content}] turns) makes it conversational — the user can
     refine ('now look near 60s', 'ignore the straight sections') and it re-plans.
-    Runs synchronously on the local model so the chat stays responsive."""
-    _ = _actor_from_request(request)
+    Runs synchronously on the local model so the chat stays responsive.
+    v3.10: `model` (optional) picks the brain — omitted/"local" keeps the grounded
+    local flow; "openai"/"anthropic"/"gemini" routes to that commercial model
+    using the USER'S OWN key (BYO-key), whose written code still runs in OUR
+    sandbox on OUR data."""
+    actor = _actor_from_request(request)
     try:
         body = await request.json()
     except Exception:
@@ -3900,6 +4098,69 @@ async def api_dataset_analyze_goal(request: Request):
     except Exception:
         _an = None
     _mod = next(iter((_an or {}).get("modality") or {}), None)
+
+    # v3.10 — BRING-YOUR-OWN commercial model. If the user picked GPT / Claude /
+    # Gemini in the dropdown, skip the local tool-planner: THAT model writes the
+    # analysis code, which still runs in OUR sandbox on OUR staged data (their
+    # brain, our data + execution). Uses the user's OWN key, decrypted for this
+    # one request only.
+    _reqmodel = str(body.get("model") or "").strip().lower()
+    _prov = _reqmodel.split(":", 1)[0] if _reqmodel else ""
+    if _prov in _BYOK_PROVIDERS:
+        _plabel = _BYOK_PROVIDERS[_prov][2]
+        if _mod not in ("sensor", "image"):
+            return {"ok": True, "mode": "unsupported", "method": _plabel,
+                    "questions": [], "answer":
+                    f"{_plabel} analysis currently supports tabular (CSV) and "
+                    "image datasets — this dataset isn't one of those yet."}
+        ukeys = _user_keys_for_chat(actor, _prov)
+        if not ukeys:
+            return {"ok": False, "need_key": True, "provider": _prov,
+                    "error": f"Add your {_plabel} API key first — click the "
+                             "⚙ key button next to the model menu."}
+        _pmodel = ((_read_user_llm_keys().get(actor, {}) or {}).get(_prov, {})
+                   or {}).get("model") or _BYOK_PROVIDERS[_prov][1]
+        _model_id = f"{_prov}:{_pmodel}"
+        try:
+            import tempfile as _tf
+            from . import code_analyst as _ca
+            ctx = _aa.load_context(str(root))
+            wd = Path(_tf.mkdtemp(prefix="byok_"))
+            have_tab, img_m, extra = _stage_for_workbench(
+                root, ctx, wd, modality=_mod, analysis=_an)
+            if not have_tab and not img_m.get("staged"):
+                return {"ok": False, "error": "nothing to stage for this dataset"}
+
+            def llm_code(p, s):
+                rr = _llmp.chat(_model_id, p, system=s, max_tokens=1400,
+                                timeout=180, keys=ukeys)
+                if not rr.get("ok"):
+                    raise RuntimeError(rr.get("error") or "model call failed")
+                return rr.get("text", "")
+
+            r = _ca.write_and_run(goal, ctx["files"], wd, llm_code, extra_brief=extra)
+            plot_url, pid = (None, None)
+            if r.get("plot"):
+                plot_url, pid = _publish_codegen_plot(slug, wd / "out.png")
+            resp = {"ok": bool(r.get("ok")), "mode": "codegen", "goal": goal,
+                    "byok": True, "provider": _prov,
+                    "answer": (r.get("stdout") or "").strip()[:1500],
+                    "code": r.get("code", ""), "plot_url": plot_url,
+                    "attempts": r.get("attempts"),
+                    "model": f"{_plabel} (your key)",
+                    "error": (None if r.get("ok")
+                              else (r.get("stderr") or "code generation failed")[:800])}
+            _agent_chat_append(slug, {"kind": "codegen", "goal": goal,
+                                      "answer": resp["answer"][:400],
+                                      "code": resp["code"][:4000],
+                                      "plot": bool(plot_url), "plot_id": pid,
+                                      "model": _model_id})
+            return resp
+        except Exception as e:
+            log.warning(f"[analyze_goal byok] {slug} {_prov}: {e}")
+            return {"ok": False, "mode": "codegen", "byok": True, "provider": _prov,
+                    "error": f"{_plabel}: {str(e)[:300]}"}
+
     try:
         out = _aa.analyze_goal(str(root), goal, llm_call, analysis=_an, modality=_mod)
     except Exception as e:
@@ -7194,6 +7455,61 @@ def dataset_analysis_page(slug: str):
  .grid figcaption{font-size:10px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .muted{color:#64748b;font-size:13px}.warn{color:#b45309}
  table.mini{border-collapse:collapse;font-size:12.5px}.mini td{padding:2px 10px 2px 0}
+ /* v3.10 composer — PyCharm-style: model picker + input in one rounded box */
+ .composer{border:1px solid #cbd5e1;border-radius:14px;background:#fff;padding:8px 8px 8px 10px;
+   box-shadow:0 1px 2px rgba(15,23,42,.05);transition:border-color .15s,box-shadow .15s}
+ .composer:focus-within{border-color:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.12)}
+ .composer textarea{width:100%;border:0;outline:0;resize:none;font:inherit;font-size:14px;
+   line-height:1.5;background:transparent;color:#0f172a;min-height:24px;max-height:160px;padding:2px 2px 6px}
+ .composer textarea::placeholder{color:#94a3b8}
+ .cbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+ .cbar .grow{flex:1 1 auto}
+ .mdl{display:inline-flex;align-items:center;gap:6px;border:1px solid #e2e8f0;background:#f8fafc;
+   border-radius:999px;padding:3px 4px 3px 10px;max-width:100%}
+ .mdl select{border:0;background:transparent;font-size:12.5px;font-weight:600;color:#334155;
+   outline:0;cursor:pointer;max-width:180px;padding:2px 2px}
+ .mdl .keybtn{border:0;background:#eef2ff;color:#2563eb;width:24px;height:24px;border-radius:999px;
+   cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+ .mdl .keybtn:hover{background:#dbeafe}
+ .iconbtn{border:1px solid #e2e8f0;background:#fff;color:#475569;width:34px;height:34px;border-radius:10px;
+   cursor:pointer;font-size:15px;display:inline-flex;align-items:center;justify-content:center;transition:background .12s,border-color .12s}
+ .iconbtn:hover{background:#f1f5f9;border-color:#cbd5e1}
+ .iconbtn.rec{background:#fee2e2;color:#b91c1c;border-color:#fca5a5}
+ .askbtn{border:0;background:#059669;color:#fff;font-weight:700;font-size:14px;padding:0 18px;height:34px;
+   border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .12s}
+ .askbtn:hover{background:#047857}
+ .askbtn:disabled{background:#94a3b8;cursor:default}
+ .tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+ .toolbtn{border:1px solid #e2e8f0;background:#fff;border-radius:9px;padding:5px 11px;font-size:12px;
+   font-weight:600;color:#475569;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:background .12s,border-color .12s}
+ .toolbtn:hover{background:#f8fafc;border-color:#cbd5e1}
+ .toolbtn .em{font-size:13px}
+ .badge-key{font-size:10px;font-weight:700;color:#a16207;background:#fef9c3;border-radius:999px;padding:1px 6px;margin-left:2px}
+ /* key-manager modal */
+ .km-back{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;
+   justify-content:center;z-index:9999;padding:16px}
+ .km-back.on{display:flex}
+ .km{background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:90vh;overflow:auto;
+   box-shadow:0 20px 50px rgba(0,0,0,.3)}
+ .km-hd{padding:16px 20px;border-bottom:1px solid #eef1f6;display:flex;align-items:center;justify-content:space-between}
+ .km-hd h3{margin:0;font-size:16px}
+ .km-x{border:0;background:#f1f5f9;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:16px;color:#475569}
+ .km-bd{padding:16px 20px}
+ .prov{border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-bottom:12px}
+ .prov .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+ .prov .nm{font-weight:700;font-size:14px}
+ .pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+ .pill.on{background:#dcfce7;color:#166534}.pill.off{background:#f1f5f9;color:#64748b}
+ .prov input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:9px;padding:8px 10px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+ .prov .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+ .prov .save{border:0;background:#2563eb;color:#fff;font-weight:600;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer}
+ .prov .rm{border:1px solid #fecaca;background:#fff;color:#dc2626;font-weight:600;font-size:12.5px;padding:7px 12px;border-radius:8px;cursor:pointer}
+ .prov .mdlname{border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:12px;flex:1;min-width:120px}
+ @media(max-width:640px){
+   .mdl select{max-width:130px}
+   .askbtn{padding:0 14px}
+   .cbar .grow{flex-basis:100%;order:-1}
+ }
 </style></head><body>
 <div class="top"><a href="/">&larr; Projects</a><a href="/gallery/__SLUG__">&#128444; Image gallery</a><a href="#" onclick="load(1);return false">&#8635; Recompute</a></div>
 <div class="hero"><h1>&#128202; Dataset analysis</h1><div class="sub"><code>__SLUG__</code> &middot; read-only EDA (no GPU) &middot; <span id="ts"></span></div></div>
@@ -7318,8 +7634,64 @@ function agentHydrate(){
      if(d&&d.turns&&d.turns.length)log.insertAdjacentHTML("beforeend",'<div class="muted" style="font-size:11px;margin:4px 0 8px">&#8635; restored earlier conversation for this dataset</div>');
    }).catch(function(){});
 }
-function agentKeydown(e){ if(e.key==="Enter"){ agentSend(); } }
-function agentSend(){ var i=document.getElementById("agentIn"); if(!i)return; agentAsk(i.value); i.value=""; }
+function agentKeydown(e){ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); agentSend(); } }
+function agentSend(){ var i=document.getElementById("agentIn"); if(!i)return; agentAsk(i.value); i.value=""; agentGrow(i); }
+function agentGrow(t){ if(!t)return; t.style.height="auto"; t.style.height=Math.min(t.scrollHeight,160)+"px"; }
+function agentModelVal(){ var s=document.getElementById("agentModel"); return s?s.value:"local"; }
+var LLM_KEYS={};
+function agentModelChange(){
+  var v=agentModelVal(), f=document.getElementById("agentFoot");
+  try{ localStorage.setItem("agentModel_"+SLUG, v); }catch(e){}
+  if(!f)return;
+  if(v==="local"){ f.innerHTML="Grounded: the local model picks which tools to run; numbers are computed by code, never invented. Commercial models (menu) write the analysis code with your own key — still sandboxed."; }
+  else {
+    var nm={openai:"OpenAI GPT-4o",anthropic:"Anthropic Claude",gemini:"Google Gemini"}[v]||v;
+    f.innerHTML="<b>"+esc(nm)+"</b> writes the analysis code using <b>your API key</b>, and it runs in <b>our sandbox on your data</b>. "
+      +(LLM_KEYS[v]?"":"<span style=\\"color:#b45309;font-weight:600\\">No key yet &mdash; click &#128273; to add one.</span>");
+  }
+}
+function keyBoot(){
+  var sel=document.getElementById("agentModel");
+  if(sel){ try{ var sv=localStorage.getItem("agentModel_"+SLUG); if(sv)sel.value=sv; }catch(e){} }
+  fetch("/api/user/llm_keys",{credentials:"include"}).then(function(r){return r.json();}).then(function(d){
+    var p=(d&&d.providers)||{}; LLM_KEYS={};
+    ["openai","anthropic","gemini"].forEach(function(k){ if(p[k]&&p[k].configured)LLM_KEYS[k]=1; });
+    agentModelChange();
+  }).catch(function(){ agentModelChange(); });
+}
+function keyModalOpen(){ var b=document.getElementById("kmBack"); if(b){ b.classList.add("on"); keyRenderProviders(); } }
+function keyModalClose(){ var b=document.getElementById("kmBack"); if(b)b.classList.remove("on"); }
+function keyRenderProviders(){
+  var box=document.getElementById("kmProviders"); if(!box)return;
+  box.innerHTML='<div class="muted">loading&hellip;</div>';
+  fetch("/api/user/llm_keys",{credentials:"include"}).then(function(r){return r.json();}).then(function(d){
+    var p=(d&&d.providers)||{}; LLM_KEYS={};
+    var order=[["openai","OpenAI &middot; GPT"],["anthropic","Anthropic &middot; Claude"],["gemini","Google &middot; Gemini"]];
+    box.innerHTML=order.map(function(pr){ var k=pr[0], info=p[k]||{}; if(info.configured)LLM_KEYS[k]=1;
+      return '<div class="prov"><div class="row"><span class="nm">'+pr[1]+'</span>'
+        +'<span class="pill '+(info.configured?"on":"off")+'">'+(info.configured?"configured":"not set")+'</span></div>'
+        +'<input id="ki_'+k+'" type="password" autocomplete="off" placeholder="'+(info.configured?"key saved \\u2014 paste a new one to replace":"paste your API key")+'">'
+        +'<div class="acts"><input class="mdlname" id="km_'+k+'" value="'+esc(info.model||"")+'" placeholder="model id (optional)" title="Override the exact model id if you like">'
+        +'<button class="save" onclick="keySave(&quot;'+k+'&quot;)">Save</button>'
+        +(info.configured?('<button class="rm" onclick="keyRemove(&quot;'+k+'&quot;)">Remove</button>'):"")
+        +'</div></div>';
+    }).join(""); agentModelChange();
+  }).catch(function(){ box.innerHTML='<div class="warn">could not load key status</div>'; });
+}
+function keySave(prov){
+  var ki=document.getElementById("ki_"+prov), km=document.getElementById("km_"+prov);
+  var kv=(ki&&ki.value||"").trim(), mv=(km&&km.value||"").trim();
+  if(!kv&&!mv){ alert("Paste your API key first."); return; }
+  fetch("/api/user/llm_key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:prov,key:kv,model:mv})})
+   .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+   .then(function(x){ if(x.ok&&x.d&&x.d.ok){ keyRenderProviders(); } else { alert((x.d&&(x.d.detail||x.d.error))||"save failed"); } })
+   .catch(function(e){ alert(""+e); });
+}
+function keyRemove(prov){
+  if(!confirm("Remove your saved "+prov+" key?"))return;
+  fetch("/api/user/llm_key/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:prov})})
+   .then(function(r){return r.json();}).then(function(){ keyRenderProviders(); }).catch(function(){});
+}
 function agentJump(){ var a=document.getElementById("agentIn"); if(a){ a.scrollIntoView({behavior:"smooth",block:"center"}); try{a.focus();}catch(e){} } }
 // Progressive (streaming) voice: while recording, every ~2.8s the accumulated audio
 // is re-transcribed on the lab GPU and the live text is shown in the box as you speak;
@@ -7333,7 +7705,7 @@ function agentMic(){
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
     _agRec=new MediaRecorder(stream); _agChunks=[]; _agSeq++; var gen=_agSeq; _agSent=0; _agBusy=false;
     _agRec.ondataavailable=function(e){ if(e.data&&e.data.size)_agChunks.push(e.data); };
-    _agRec.onstart=function(){ _agOn=true; btn.innerHTML="&#9209;"; btn.style.background="#fee2e2"; btn.style.color="#b91c1c"; inp.value=""; inp.placeholder="listening\\u2026 your words appear live \\u2014 click \\u23f9 to run";
+    _agRec.onstart=function(){ _agOn=true; btn.innerHTML="&#9209;"; btn.classList.add("rec"); inp.value=""; inp.placeholder="listening\\u2026 your words appear live \\u2014 click \\u23f9 to run";
       _agTimer=setInterval(function(){
         if(!_agOn||_agBusy||_agChunks.length<=_agSent)return;    // nothing new to send
         _agBusy=true; var sent=_agChunks.length;
@@ -7344,7 +7716,7 @@ function agentMic(){
          }).catch(function(){ _agBusy=false; });
       },2800);
     };
-    _agRec.onstop=function(){ _agOn=false; clearInterval(_agTimer); btn.innerHTML="&#127908;"; btn.style.background="#eef2ff"; btn.style.color="#2563eb"; inp.placeholder="finalizing\\u2026";
+    _agRec.onstop=function(){ _agOn=false; clearInterval(_agTimer); btn.innerHTML="&#127908;"; btn.classList.remove("rec"); inp.placeholder="finalizing\\u2026";
       try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
       fetch("/api/voice/transcribe",{method:"POST",credentials:"include",headers:{"Content-Type":"application/octet-stream"},body:new Blob(_agChunks,{type:"audio/webm"})})
        .then(function(r){return r.json();}).then(function(d){
@@ -7359,13 +7731,18 @@ function agentMic(){
 function agentAsk(goal){
   goal=(goal||"").trim(); if(!goal)return;
   var log=document.getElementById("agentLog"); if(!log)return;
-  log.insertAdjacentHTML("beforeend",'<div style="margin:8px 0 2px"><b>You:</b> '+esc(goal)+'</div>');
-  var wait=document.createElement("div"); wait.className="muted"; wait.textContent="analyzing this data for your question...";
+  var mv=agentModelVal();
+  var mtag={local:"",openai:"OpenAI GPT-4o",anthropic:"Anthropic Claude",gemini:"Google Gemini"}[mv]||"";
+  log.insertAdjacentHTML("beforeend",'<div style="margin:8px 0 2px"><b>You:</b> '+esc(goal)+(mtag?(' <span class="muted" style="font-size:11px">&middot; '+esc(mtag)+'</span>'):"")+'</div>');
+  var wait=document.createElement("div"); wait.className="muted";
+  wait.innerHTML='<span class="spin"></span>'+(mv==="local"?"analyzing this data for your question…":(esc(mtag)+" is writing analysis code…"));
   log.appendChild(wait); log.scrollTop=log.scrollHeight;
   AGENT_HISTORY.push({role:"user",content:goal});
-  fetch("/api/dataset/analyze_goal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,goal:goal,history:AGENT_HISTORY})})
+  fetch("/api/dataset/analyze_goal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,goal:goal,history:AGENT_HISTORY,model:mv})})
    .then(function(r){return r.json();})
-   .then(function(o){ wait.remove(); log.insertAdjacentHTML("beforeend",renderAgentOut(o)); if(o&&o.answer)AGENT_HISTORY.push({role:"assistant",content:String(o.answer).slice(0,600)}); log.scrollTop=log.scrollHeight; })
+   .then(function(o){ wait.remove();
+     if(o&&o.need_key){ log.insertAdjacentHTML("beforeend",'<div style="margin:4px 0;padding:8px 10px;border-left:3px solid #d97706;background:#fffbeb;border-radius:6px;font-size:13px">'+esc(o.error)+'</div>'); log.scrollTop=log.scrollHeight; keyModalOpen(); return; }
+     log.insertAdjacentHTML("beforeend",renderAgentOut(o)); if(o&&o.answer)AGENT_HISTORY.push({role:"assistant",content:String(o.answer).slice(0,600)}); log.scrollTop=log.scrollHeight; })
    .catch(function(e){ wait.remove(); log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626">error: '+esc(String(e))+'</div>'); });
 }
 function renderAgentOut(o){
@@ -7377,7 +7754,7 @@ function renderAgentOut(o){
   if(o.mode==="codegen"){
     var outLines=(o.answer||"").split("\\n").filter(function(x){return x.trim();}).map(function(x){return esc(x);}).join("<br>");
     var eid="ed"+(++AGENT_EDN);
-    var who=o.user_code?"Your code ran in the sandbox":((o.deep?("The big model ("+esc(o.model||"cluster")+") wrote and ran analysis code for this"):"I wrote and ran analysis code for this")+(o.attempts>1?(" (self-repaired, attempt "+o.attempts+")"):""));
+    var who=o.user_code?"Your code ran in the sandbox":(((o.deep||o.byok)?(esc(o.model||"The model")+" wrote and ran analysis code for this"):"I wrote and ran analysis code for this")+(o.attempts>1?(" (self-repaired, attempt "+o.attempts+")"):""));
     var emptyNote=(!o.error&&!outLines&&!o.plot_url)?'<div style="font-size:12.5px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 10px">The code ran, but it printed nothing and made no figure &mdash; so there is nothing to show. Add <b>print(...)</b> lines for findings, or just create a plot: <b>figures are captured automatically</b> (no savefig needed).</div>':"";
     return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #7c3aed;background:#fff;border-radius:6px">'
       +'<div style="margin-bottom:6px"><b>Agent:</b> '+who+':</div>'
@@ -7587,14 +7964,36 @@ async function load(refresh){
       +'<div class="muted">Tell it what you care about &mdash; type or <b>&#127908; speak</b> your question and it chooses the right analysis for THIS question, answering with real numbers. A different question runs a different analysis; the charts below stay as the standard read.</div>'
       +'<div style="margin:8px 0;display:flex;flex-wrap:wrap;gap:6px">'+chips.map(function(q){return '<button onclick="agentAsk(this.textContent)" style="border:1px solid #86efac;background:#fff;border-radius:14px;padding:4px 10px;font-size:12px;cursor:pointer">'+esc(q)+'</button>';}).join("")+'</div>'
       +'<div id="agentLog" style="margin-top:4px;max-height:440px;overflow:auto"></div>'
-      +'<div style="display:flex;gap:6px;margin-top:8px">'
-      +'<input id="agentIn" placeholder="e.g. which signal is noisiest, and when did things go wrong?" onkeydown="agentKeydown(event)" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px">'
-      +'<button onclick="agentMic()" id="agentMic" title="Ask by voice (speak your question)" style="border:1px solid #cbd5e1;background:#eef2ff;color:#2563eb;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer">&#127908;</button>'
-      +'<button onclick="agentWorkbench()" title="Open a blank code editor: write or paste analysis code (e.g. from ChatGPT/Gemini) and run it on this dataset in the sandbox" style="border:1px solid #cbd5e1;background:#f5f3ff;color:#7c3aed;font-weight:700;padding:8px 12px;border-radius:8px;cursor:pointer">&lt;/&gt;</button>'
-      +'<button onclick="agentDeep()" title="Deep analysis: the big open model on the cluster writes the code (async, with progress). Admin / cluster-granted users." style="border:1px solid #cbd5e1;background:#fdf4ff;color:#a21caf;font-weight:700;padding:8px 12px;border-radius:8px;cursor:pointer">&#129504;</button>'
-      +'<button onclick="agentNotebook()" title="Download this conversation as a Jupyter notebook (.ipynb): questions as markdown, all code as runnable cells" style="border:1px solid #cbd5e1;background:#f0fdf4;color:#059669;font-weight:700;padding:8px 12px;border-radius:8px;cursor:pointer">&#128211;</button>'
-      +'<button onclick="agentSend()" style="border:0;background:#059669;color:#fff;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer">Ask</button></div>'
-      +'<div class="muted" style="font-size:11px;margin-top:6px">Grounded: the local model chooses which tools to run for your question; the findings are then stated exactly as the tools computed them (not paraphrased by the model), so no number is ever invented.</div></div>';
+      +'<div class="composer" style="margin-top:8px">'
+      +'<textarea id="agentIn" rows="1" placeholder="Ask about this data — e.g. plot speed over time, or which sensor is noisiest…" oninput="agentGrow(this)" onkeydown="agentKeydown(event)"></textarea>'
+      +'<div class="cbar">'
+      +'<span class="mdl" title="Which AI writes the analysis. Local is free and grounded; commercial models use YOUR own API key and still run their code in our sandbox on your data.">'
+      +'<span style="font-size:13px">&#129302;</span>'
+      +'<select id="agentModel" onchange="agentModelChange()">'
+      +'<option value="local">Local &middot; Qwen Coder &middot; free</option>'
+      +'<option value="openai">OpenAI &middot; GPT-4o</option>'
+      +'<option value="anthropic">Anthropic &middot; Claude</option>'
+      +'<option value="gemini">Google &middot; Gemini</option>'
+      +'</select>'
+      +'<button class="keybtn" onclick="keyModalOpen()" title="Manage your API keys (bring your own key)">&#128273;</button>'
+      +'</span>'
+      +'<span class="grow"></span>'
+      +'<button onclick="agentMic()" id="agentMic" class="iconbtn" title="Ask by voice (speak your question)">&#127908;</button>'
+      +'<button onclick="agentSend()" id="agentAskBtn" class="askbtn">Ask &#8593;</button>'
+      +'</div></div>'
+      +'<div class="tools">'
+      +'<button class="toolbtn" onclick="agentWorkbench()" title="Blank code editor: write or paste analysis code (e.g. from ChatGPT/Gemini) and run it in the sandbox"><span class="em">&lt;/&gt;</span> Workbench</button>'
+      +'<button class="toolbtn" onclick="agentDeep()" title="Deep analysis on the cluster big model (async, with progress). Admin / cluster-granted users."><span class="em">&#129504;</span> Deep (cluster)</button>'
+      +'<button class="toolbtn" onclick="agentNotebook()" title="Download this whole conversation as a Jupyter notebook (.ipynb)"><span class="em">&#128211;</span> Notebook</button>'
+      +'</div>'
+      +'<div class="muted" id="agentFoot" style="font-size:11px;margin-top:8px">Grounded: the local model picks which tools to run; numbers are computed by code, never invented. Pick a commercial model and it writes the analysis code — which still runs in our sandbox, on your data.</div>'
+      +'<div class="km-back" id="kmBack" onclick="if(event.target===this)keyModalClose()">'
+      +'<div class="km"><div class="km-hd"><h3>&#128273; Your model API keys</h3><button class="km-x" onclick="keyModalClose()">&times;</button></div>'
+      +'<div class="km-bd"><div class="muted" style="margin-bottom:12px">Use strong commercial models from inside this chat, on <b>your own account</b>. Your key is <b>encrypted on our server</b>, used only for your own requests, and <b>never shown again</b>. The model writes the analysis code; it still runs in our sandbox on your data — nothing leaves the platform except your prompt.</div>'
+      +'<div id="kmProviders"><div class="muted">loading&hellip;</div></div>'
+      +'<div class="muted" style="font-size:11px;margin-top:6px">Where to get a key: OpenAI &rarr; platform.openai.com &middot; Anthropic &rarr; console.anthropic.com &middot; Google &rarr; aistudio.google.com</div>'
+      +'</div></div></div>'
+      +'</div>';
   }
   // modality + splits
   html+='<div class="card"><h3>Modality mix</h3>'+bars(d.modality,'#0e7c66')+'</div>';
@@ -7645,6 +8044,7 @@ async function load(refresh){
   }
   b.innerHTML=html;
   agentHydrate();   // v3.8: restore this dataset's saved analysis conversation
+  keyBoot();        // v3.10: restore model choice + which BYO keys are configured
  }catch(e){b.innerHTML='<div class="card warn">'+esc(e)+'</div>';}
 }
 load(0);

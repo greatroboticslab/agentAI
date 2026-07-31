@@ -160,6 +160,25 @@ the whole session back. **🧠 Deep** sends your question to the big open model 
 progress). And **📓 exports the entire conversation as a runnable Jupyter notebook** (.ipynb) — questions as
 markdown, all code as cells — for anyone who wants the full notebook experience locally.
 
+### Step 8 — Choose the brain: our local model, or your own GPT / Claude / Gemini
+
+A **model menu** sits in the composer (PyCharm-style). Keep the **Local · Qwen Coder** (free, grounded, no
+key) — or pick **OpenAI GPT-4o**, **Anthropic Claude**, or **Google Gemini**. Whatever you choose answers
+*that* question; a commercial model **writes the analysis code, which still runs in our sandbox on your
+data** — its brain, your data and execution stay on the platform.
+
+<div align="center">
+<img src="docs/screenshots/model-composer.png" width="840" alt="The analysis composer with a model dropdown (Local Qwen Coder, OpenAI, Anthropic, Google), a key button, mic, and Ask; below it a Workbench / Deep / Notebook toolbar">
+</div>
+
+You use **your own account**: click the **🔑** button and paste your API key once. It's **encrypted on our
+server, scoped to you, and never shown again** — the app only ever knows "configured / not". The key is
+decrypted for a single request and never written to any shared file.
+
+<div align="center">
+<img src="docs/screenshots/byok-keys.png" width="560" alt="The API-key modal: OpenAI, Anthropic, and Google each with a password field, an optional model id, and configured/not-set status; text explains the key is encrypted and never shown again">
+</div>
+
 ---
 
 ## 🧠 Ask your data — the analysis agent
@@ -250,12 +269,12 @@ Running tests, CI details, and contributing conventions are in **[docs/DEVELOPME
 | [`multagent/`](multagent/) | **EMACF** robotics agent framework (Brain / Perception / Targeting / Navigation) — the earlier embodied-robot direction, kept for reference. |
 | [`docs/`](docs/) | Screenshots + platform roadmap. |
 
-> **Latest:** `v3.9` — the code workbench grew into a **conversational notebook**: figures auto-captured
-> (no savefig needed), every turn's plot persisted and restored on reload, **image datasets staged into the
-> sandbox** (generated code reads real pixels with PIL), **🧠 Deep mode** (the big open model on the cluster
-> writes the code, async with progress), and **📓 export of the whole conversation as a runnable Jupyter
-> notebook**. Built on the v3.7–v3.8 see/edit/run workbench, the v3.3–v3.6 grounded tool-library agent and
-> the v3.2 sensor-diagnosis pipeline. See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
+> **Latest:** `v3.10` — **pick the brain**: a model menu in the chat lets you keep the free grounded local
+> model or use **your own GPT / Claude / Gemini** (bring-your-own-key, encrypted per-user, never echoed).
+> A commercial model **writes the analysis code, which still runs in our sandbox on your data** — its brain,
+> your data stays here. Builds on the v3.9 conversational notebook (auto-captured figures, per-turn plot
+> history, image datasets in the sandbox, Deep cluster mode, .ipynb export) and the v3.3–v3.8 grounded,
+> see/edit/run workbench. See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
 > and [`RESEARCH_LOG.md`](RESEARCH_LOG.md).
 
 ---

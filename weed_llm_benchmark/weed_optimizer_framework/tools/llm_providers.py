@@ -12,6 +12,7 @@ a LOCAL model (Ollama) or a HOSTED API by a single model id:
   vllm@http://NODE:8000/v1:MODEL -> a self-hosted vLLM/SGLang OpenAI endpoint
                                     (e.g. a cluster batch job serving a big model)
   anthropic:claude-...      -> Anthropic
+  gemini:gemini-2.0-flash   -> Google Gemini (generateContent API)
 
 Why this design (cluster reality, 2026-06-27): Bridges-2 has H100-80GB nodes that
 CAN host DeepSeek-V3/V4 & GLM-4.6, but only as time-limited BATCH jobs on a shared
@@ -24,6 +25,7 @@ Keys: environment, or ~/.llm_keys (KEY=VALUE per line):
 """
 import json
 import os
+import urllib.error
 import urllib.request
 
 _OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
@@ -50,7 +52,8 @@ def _load_keys() -> dict:
         pass
     # env overrides file
     for k in ("DEEPSEEK_API_KEY", "ZHIPU_API_KEY", "GLM_API_KEY",
-              "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+              "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
+              "GOOGLE_API_KEY"):
         if os.environ.get(k):
             keys[k] = os.environ[k]
     return keys
@@ -80,6 +83,8 @@ def provider_status() -> dict:
                     "kind": "api", "needs": envs[0]}
     st["anthropic"] = {"configured": bool(_key_for(["ANTHROPIC_API_KEY"], keys)),
                        "kind": "api", "needs": "ANTHROPIC_API_KEY"}
+    st["gemini"] = {"configured": bool(_key_for(["GEMINI_API_KEY", "GOOGLE_API_KEY"], keys)),
+                    "kind": "api", "needs": "GEMINI_API_KEY"}
     st["ollama"] = {"configured": _ollama_up(), "kind": "local",
                     "needs": f"Ollama running at {_OLLAMA_HOST}"}
     st["vllm"] = {"configured": True, "kind": "local",
@@ -90,15 +95,44 @@ def provider_status() -> dict:
 def _http_json(url, payload, headers, timeout):
     data = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        # Surface the provider's own error text (e.g. "Incorrect API key
+        # provided") so bring-your-own-key users see WHY it failed, not a bare
+        # "HTTP Error 401". Never include the request (which holds the key).
+        detail = ""
+        try:
+            body = e.read().decode("utf-8", "replace")[:4000]
+            try:
+                j = json.loads(body)
+                err = j.get("error")
+                if isinstance(err, dict):
+                    detail = err.get("message") or ""
+                elif isinstance(err, str):
+                    detail = err
+                detail = detail or j.get("message") or body
+            except Exception:
+                detail = body
+        except Exception:
+            detail = ""
+        raise RuntimeError(f"HTTP {e.code}: {(detail or e.reason)[:240]}")
 
 
 def chat(model_id: str, prompt: str, system: str = "", max_tokens: int = 256,
-         timeout: int = 60) -> dict:
+         timeout: int = 60, keys: dict = None) -> dict:
     """Send one prompt to `model_id`. Returns {ok, text, error, model, provider}.
-    Never raises — errors come back in the dict."""
-    keys = _load_keys()
+    Never raises — errors come back in the dict.
+
+    `keys` (v3.10): a per-request key map (e.g. {"OPENAI_API_KEY": "..."}) that
+    OVERRIDES the server-global ~/.llm_keys. This is how a user's OWN commercial
+    key (bring-your-own-key) is injected for one request without ever being
+    written to the shared key file."""
+    merged = _load_keys()
+    if keys:
+        merged.update({k: v for k, v in keys.items() if v})
+    keys = merged
     try:
         prov, _, rest = model_id.partition(":")
         prov = prov.strip().lower()
@@ -152,8 +186,32 @@ def chat(model_id: str, prompt: str, system: str = "", max_tokens: int = 256,
             txt = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
             return {"ok": True, "text": txt, "model": model_id, "provider": prov}
 
+        if prov in ("gemini", "google"):
+            api_key = _key_for(["GEMINI_API_KEY", "GOOGLE_API_KEY"], keys)
+            if not api_key:
+                return {"ok": False, "error": "missing GEMINI_API_KEY",
+                        "model": model_id, "provider": "gemini"}
+            body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                    "generationConfig": {"maxOutputTokens": max_tokens}}
+            if system:
+                body["system_instruction"] = {"parts": [{"text": system}]}
+            url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+                   + rest + ":generateContent")
+            out = _http_json(url, body,
+                             {"Content-Type": "application/json",
+                              "x-goog-api-key": api_key}, timeout)
+            cands = out.get("candidates") or []
+            txt = ""
+            if cands:
+                for p in ((cands[0].get("content") or {}).get("parts") or []):
+                    txt += p.get("text", "")
+            return {"ok": True, "text": txt, "model": model_id, "provider": "gemini"}
+
         return {"ok": False, "error": f"unknown provider '{prov}' in '{model_id}'",
                 "model": model_id, "provider": prov}
     except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}",
+        # RuntimeError carries our own already-clean provider message (e.g. the
+        # OpenAI/Gemini auth text); other exceptions get their type for context.
+        msg = str(e) if isinstance(e, RuntimeError) else f"{type(e).__name__}: {str(e)}"
+        return {"ok": False, "error": msg[:240],
                 "model": model_id, "provider": model_id.split(':', 1)[0]}

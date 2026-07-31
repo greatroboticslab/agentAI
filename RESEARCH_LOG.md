@@ -13,6 +13,28 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-31 — v3.10.0: bring commercial AI into the chat, keep the data ours
+
+Prof. Zhang's direction over three messages (voice + a PyCharm "AI Chat" screenshot + a Loom-style repo):
+the overall idea is to *learn from strong AI* and let users *seamlessly switch between different AIs*, but
+"we are still data centric — this will not change." Concretely (his words): add a dropdown that sends the
+current code/context to Gemini/GPT/Claude; users log in with *their own accounts*; do the simple in-app
+version first and defer the Loom/record-screen path ("放弃 LOOM ... 先在我们的网站调的功能试试"). The
+strategic frame he stated: a *middleman* over the frontier models (if one can't solve it, try another),
+and because we see many frontier results we can eventually route to whatever is SOTA.
+
+Shipped exactly the "simple first" slice: a **model dropdown** in the analysis composer (Local · Qwen
+free / OpenAI / Anthropic / Gemini) and **bring-your-own-key** — each user pastes their own API key,
+stored **encrypted at rest** (Fernet, per-user, never echoed) and injected for one request only. A
+commercial model **writes the analysis code; it still runs in our sandbox on our staged data** — their
+brain, our data + execution, which is the data-centric line he drew. The composer was rebuilt PyCharm-
+style and made fully responsive (phone + desktop). Verified live end-to-end (real browser + curl): local
+regression intact; commercial routing proven through to the provider's own auth response (a valid key is
+the only missing piece, which the user provides). Decision I made (he delegated it): server-side
+encrypted storage, because the data-centric design routes the key through our server anyway and he uses
+phone+desktop (keys must persist across devices). Deferred, on his say-so: the Loom/record-screen +
+share-link-back path, and the multi-model "middleman auto-retry".
+
 ## 2026-07-24 (later) — v3.9.3: self-audit — the permission bug was a class, and my own verification had gaps
 
 The user pushed back: "did you really test it, or did you cut corners?" Correct challenge. Two honest
