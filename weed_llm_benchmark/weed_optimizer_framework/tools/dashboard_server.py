@@ -682,6 +682,9 @@ img{background:#0e1626 !important}
 [style*="color:#1e40af"],[style*="color:#166534"],[style*="color:#92400e"],[style*="color:#3f3f46"]{
  color:#cdd9ef !important}
 [style*="color:#64748b"],[style*="color:#6b7280"],[style*="color:#94a3b8"]{color:#9fb0c7 !important}
+/* bold/strong text on many pages has its own dark colour rule (b{color:#0f172a})
+   -> make it INHERIT the (light) surrounding text colour so it's readable */
+b,strong{color:inherit !important}
 /* mobile: the account is a FULL-WIDTH top bar (fully visible, not hidden), and the
    page/nav drop below it so nothing is covered. */
 @media(max-width:768px){
@@ -819,6 +822,10 @@ async def _inject_responsive_css(request: Request, call_next):
         pass
     headers = dict(resp.headers)
     headers.pop("content-length", None)
+    # v3.12.6: never let a phone/browser serve a STALE cached HTML page — that's
+    # why UI fixes "didn't show up". HTML is always fresh; static assets aren't
+    # touched (this only runs for text/html responses).
+    headers["cache-control"] = "no-store, max-age=0"
     return Response(content=body, status_code=resp.status_code, headers=headers)
 
 

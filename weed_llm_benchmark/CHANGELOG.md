@@ -6139,3 +6139,16 @@ account), and the homepage All/My-projects filter buttons overlapped instead of 
 - **Homepage filter toolbar** no longer uses a negative margin (the "pills straddle the hero edge" trick
   that overlapped on mobile) — All/My projects now sit cleanly below the hero on every width. (Verified:
   toolbar top ≥ hero bottom.)
+
+### v3.12.6 — fix black bold text on dark + stop stale-cache from hiding UI updates
+
+Harry: "project / agents / mAP50-95" (and likely elsewhere) were black on the dark theme, and his mobile
+account bar wasn't showing.
+
+- **Black bold text:** the cause was a CSS RULE (not inline) — pages define `b{color:#0f172a}` /
+  `.row b{color:#0f172a}`, which my inline-color lifts didn't touch. Added one global rule
+  `b,strong{color:inherit !important}` so bold text takes its (light) surrounding colour — verified the
+  three words now render light `rgb(226,232,244)`, and this covers every page with such a rule.
+- **Stale cache:** the account bar (and earlier fixes) "didn't show" because HTML pages had no cache
+  header, so phones served an old copy. The HTML-injection middleware now sets `Cache-Control: no-store`
+  on every HTML response — pages are always fresh (static assets untouched). Confirmed on /agent/weed.
