@@ -682,11 +682,15 @@ img{background:#0e1626 !important}
 [style*="color:#1e40af"],[style*="color:#166534"],[style*="color:#92400e"],[style*="color:#3f3f46"]{
  color:#cdd9ef !important}
 [style*="color:#64748b"],[style*="color:#6b7280"],[style*="color:#94a3b8"]{color:#9fb0c7 !important}
-/* mobile: keep the fixed login badge from covering the top nav links */
+/* mobile: the account is a FULL-WIDTH top bar (fully visible, not hidden), and the
+   page/nav drop below it so nothing is covered. */
 @media(max-width:768px){
- #_authbadge{top:6px !important;right:6px !important;font-size:11px !important;max-width:66vw}
- #_authbadge span{padding:3px 8px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
- .top{padding-top:46px !important}
+ #_authbadge{position:fixed !important;top:0 !important;left:0 !important;right:0 !important;
+  width:100% !important;text-align:right !important;background:#0b1220 !important;
+  padding:7px 12px !important;font-size:12px !important;box-shadow:0 1px 0 rgba(255,255,255,.07)}
+ #_authbadge span{background:transparent !important;box-shadow:none !important;opacity:1 !important;padding:0 !important}
+ body{padding-top:36px !important}
+ .top{top:36px !important}
 }
 .stat .v,.stat b,.summary b,.stat .n{color:#f2f6fc !important}
 .stat .l,.help,.note{color:var(--mut) !important}
@@ -1294,7 +1298,7 @@ def root():
  .hero h1{font-size:32px;margin:0 0 10px;font-weight:800;letter-spacing:-.02em}
  .hero .tag{color:#c7d5ee;font-size:15px;max-width:600px;margin:0 auto;line-height:1.6}
  .wrap{max-width:1000px;margin:0 auto;padding:0 20px 40px}
- .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-22px 0 22px;position:relative;z-index:2}
+ .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 22px;position:relative;z-index:2}
  .toolbar .spacer{flex:1}
  .ftab{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:#c7d0de;font-size:13px;font-weight:600;
    padding:8px 15px;border-radius:999px;cursor:pointer}
@@ -1326,7 +1330,7 @@ def root():
  .note{font-size:12px;color:#8a96ab;margin-top:11px;text-align:center;line-height:1.5}
  .foot{margin-top:44px;color:#8a96ab;font-size:12px;text-align:center}
  .foot a{color:#8ecbff}
- @media(max-width:640px){.hero{padding:1.7rem 1rem 2.4rem}.hero h1{font-size:25px}.wrap{padding:0 14px 30px}.toolbar{margin-top:-16px}}
+ @media(max-width:640px){.hero{padding:1.7rem 1rem 2.4rem}.hero h1{font-size:25px}.wrap{padding:0 14px 30px}.toolbar{margin-top:14px}}
 </style></head><body>
  <div class="top">
    <span class="brand2">Greater Robotics <span class="dot">Lab</span></span>

@@ -6127,3 +6127,15 @@ because my earlier lift was non-`!important` and lost to inline colors.
   every `.top` nav gains `padding-top:46px`, so the badge sits in the top strip and the nav links drop below
   it — no more overlap. (Confirmed the 46px padding applies; badge is a viewport-fixed element so the nav
   content clears it.)
+
+### v3.12.5 — mobile: proper account bar (not hidden) + fix All/My-projects overlap
+
+Harry: shrinking/truncating the account badge to dodge the nav was the wrong call (it read as hiding the
+account), and the homepage All/My-projects filter buttons overlapped instead of sitting below the hero.
+
+- **Account is now a full-width top bar on mobile** — the email + Logout are shown in full on a slim dark
+  strip at the very top; `body` gets `padding-top` and the sticky nav drops below it, so nothing is covered
+  and nothing is hidden. (Verified: bar spans the full width, nav + hero sit below it.)
+- **Homepage filter toolbar** no longer uses a negative margin (the "pills straddle the hero edge" trick
+  that overlapped on mobile) — All/My projects now sit cleanly below the hero on every width. (Verified:
+  toolbar top ≥ hero bottom.)
