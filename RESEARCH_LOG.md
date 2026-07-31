@@ -13,6 +13,16 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-31 (later) — v3.12.3: dark theme swept across every page
+
+Extended the audit to all edge pages (annotate/audit/control/manual/morning/roboflow/rounds/synth/
+class-detail/gallery) with a light-element counter, drove it to 0 everywhere. Darkened remaining legacy
+classes, bare <header> banners, <code> chips, table headers; made plain <button> dark by default WITHOUT
+!important (so colored/inline buttons keep their color); darkened my own composer/recorder/key-modal
+components; and caught the tint families the #f prefix missed (#e/#d hexes + light gradient banners).
+Result: 0 light-bg elements across ~20 page instances; class-detail 183->2. Intentional leftovers:
+matplotlib charts render white (chart content) and a few stat numbers slightly dim.
+
 ## 2026-07-31 (later) — v3.12.2: dark-theme audit + fix of the legacy pages
 
 Harry sent a screenshot: the project workspace still had white cards + invisible dropdowns in dark mode.

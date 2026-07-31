@@ -643,15 +643,62 @@ select option{background:#0e1523;color:#eaf0f8}
 table{color:var(--txt)}
 table td,table th{border-color:rgba(255,255,255,.08) !important}
 table.mini td{border-bottom:1px solid rgba(255,255,255,.08) !important}
-/* legacy light components on older pages (console/classes/slugs/labeling/users) -> dark */
-.stat,.help,.filter-bar,.summary,.note,.box,.panel,.sec,.tile,.kv,.row,.item,.entry,.block,.subcard{
+/* legacy light components on older pages -> dark (class-based = reliable) */
+.stat,.help,.filter-bar,.summary,.note,.box,.panel,.sec,.tile,.kv,.row,.item,.entry,.block,.subcard,
+.pipe,.lg,.section,.stage,.proj,.slug-row,.act-btn,.step,.metric,.result,.job,.event,.round,.cardish,.grid-card,
+.round-card,.ok-box,.warn-box,.info-box,.backbtn,.backbar{
  background:#131c30 !important;color:var(--txt) !important;border-color:rgba(255,255,255,.10) !important}
+/* plain buttons: dark by default, but WITHOUT !important so inline-colored and
+   class/active buttons (.btn, button.on, the purple Run button) keep their color */
+button{background:#182236;color:#dbe6f5;border:1px solid rgba(255,255,255,.16)}
+button:hover{background:#22304d}
+th{background:#182236 !important;color:#dbe6f5 !important}
+table{background-color:transparent !important}
+img{background:#0e1626 !important}
+/* my own components built in the light era (composer, recorder, key modal) -> dark */
+.composer{background:#131c30 !important;border-color:rgba(255,255,255,.16) !important}
+.composer textarea{color:#eaf0f8 !important}
+.mdl{background:rgba(255,255,255,.06) !important;border-color:rgba(255,255,255,.16) !important}
+.mdl select{color:#dbe6f5 !important;background:transparent !important}
+.mdl .keybtn{background:rgba(37,99,235,.30) !important;color:#bcd3ff !important}
+.iconbtn,.toolbtn{background:#182236 !important;color:#c7d0de !important;border-color:rgba(255,255,255,.18) !important}
+.iconbtn:hover,.toolbtn:hover{background:#22304d !important}
+.rb{background:#182236 !important;color:#e2e8f4 !important;border-color:rgba(255,255,255,.18) !important}
+.rb:hover{background:rgba(16,185,129,.14) !important}
+.km{background:#141d33 !important;color:var(--txt) !important}
+.km-hd{border-color:rgba(255,255,255,.10) !important}
+.km-x{background:rgba(255,255,255,.08) !important;color:#c7d0de !important}
+.prov{background:#0f1830 !important;border-color:rgba(255,255,255,.12) !important}
+.pill.off{background:rgba(255,255,255,.08) !important;color:#aab4c6 !important}
 .stat .v,.stat b,.summary b,.stat .n{color:#f2f6fc !important}
 .stat .l,.help,.note{color:var(--mut) !important}
+.act-btn.danger,.act-btn.warn{border-color:rgba(220,38,38,.4) !important}
 .filter-tab{background:rgba(255,255,255,.05) !important;color:#c7d0de !important;border:1px solid rgba(255,255,255,.14) !important}
 .filter-tab.on,.filter-tab.active,.filter-tab[aria-selected="true"]{background:#059669 !important;color:#fff !important;border-color:#059669 !important}
 .nav{background:rgba(9,13,21,.72) !important;color:var(--txt) !important;border-color:rgba(255,255,255,.10) !important}
 .nav a{color:#cdd9ef !important}
+/* bare page-banner headers (audit/roboflow/gallery) -> dark banner */
+header:not(.top):not(.hero){background:linear-gradient(120deg,#0c1426,#0e1c2e) !important;color:#fff !important;
+ border-bottom:1px solid rgba(255,255,255,.10) !important}
+header:not(.top) h1,header:not(.top) h2{color:#fff !important}
+/* inline code chips -> dark */
+code{background:rgba(255,255,255,.08) !important;color:#dbe6f5 !important;border-color:rgba(255,255,255,.12) !important}
+pre code,.mono code{background:transparent !important}
+/* gallery thumbnail placeholder */
+img.ld,.card img.ld{background:#0e1626 !important}
+/* pale tints that start with #e (my #f prefix misses these) */
+[style*="background:#ee"],[style*="background:#ef6"],[style*="background:#ef8"],[style*="background:#ec"],
+[style*="background:#e0e"],[style*="background:#e0f"],[style*="background:#e2e"],[style*="background:#e3e"],
+[style*="background:#e5e"],[style*="background:#e7"],[style*="background:#e8"],[style*="background:#ede"],
+[style*="background:#dbe"],[style*="background:#dcf"],[style*="background:#d1f"]{
+ background:#182236 !important;border-color:rgba(255,255,255,.12) !important}
+/* light-tinted GRADIENT highlight banners (info callouts) -> dark tinted */
+[style*="gradient(135deg,#d"],[style*="gradient(135deg,#e"],[style*="gradient(135deg,#f"],
+[style*="gradient(135deg, #d"],[style*="gradient(135deg, #e"],[style*="gradient(120deg,#e"],
+[style*="gradient(120deg,#f"],[style*="gradient(90deg,#e"],[style*="gradient(to right,#e"],
+[style*="gradient(to right,#f"],[style*="gradient(160deg,#f"]{
+ background:linear-gradient(135deg,rgba(37,99,235,.16),rgba(16,185,129,.08)) !important;
+ color:#dbe6f5 !important;border-color:rgba(255,255,255,.12) !important}
 /* net for inline light boxes on old pages: every PALE background is #fXXXXX
    (whites/greys/tints); darks never start with #f — so this one prefix match
    catches them all, in the HTML-parsed source form. JS-set styles serialize to

@@ -6089,3 +6089,24 @@ Ran a real full-page audit (a probe that counts light-background elements per pa
   cards on the console keep a red tint by design.)
 - Honest lesson recorded: verify by SCROLLING full pages, and `[style*="#fff"]` selectors are unreliable
   (browsers serialize inline colors) — match the source-form `#f` prefix or fix at source.
+
+### v3.12.3 — dark theme swept across EVERY page (edge pages audited)
+
+Continued the audit to the remaining pages Harry asked about and then some — annotate, audit(+method/class),
+control, manual, morning_report, roboflow, rounds, synth, class-detail, gallery — plus a regression pass on
+the core + my own components. Built a light-element counter and drove it to zero everywhere:
+
+- Darkened the remaining legacy component classes (`.pipe .lg .section .stage .proj .slug-row .act-btn
+  .round-card .ok-box .backbtn` …), bare page `<header>` banners, `<code>` chips, table headers, and card
+  grids (`section` → transparent).
+- **Plain `<button>`** now dark by default via a NON-`!important` rule — so inline-colored and class/active
+  buttons (`.btn`, the purple Run button, `button.on`) keep their colour while default white buttons go dark.
+- Darkened my own light-era components: the analysis **composer** (`.composer .mdl .toolbtn .iconbtn`), the
+  **recorder** buttons (`.rb`), and the **key-manager modal** (`.km .prov`).
+- Caught the tint families my `#f` prefix missed: pale `#e…`/`#d…` inline colours AND light **gradient**
+  highlight banners (`linear-gradient(135deg,#dbeafe,…)` → dark tinted).
+- Forced image placeholders dark (`img` background).
+- **Result:** 0 light-background elements across ~20 audited page instances (all core + all edge pages);
+  the class-detail image-review page went 183 → ~2 (two neutral ✗ buttons in a deliberate ✓/✗/↻ triad).
+  Known, intentional: matplotlib chart IMAGES render on white (that's chart content, not the theme) and a
+  few stat numbers are slightly dim.
