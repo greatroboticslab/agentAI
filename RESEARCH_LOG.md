@@ -13,6 +13,18 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-31 (later) — v3.12.1: pivot to a premium dark theme
+
+Harry: the platform felt too white; he wants a dark gradient, premium feel. Flipped the injected design
+system from light to premium dark (gradient backdrop + glassmorphic cards + emerald glow), and re-skinned
+the homepage to match. Hit exactly the risk I'd flagged: a global dark flip breaks light-designed
+interactive components — the analysis code-workbench chat bubbles + editor became white islands with faint
+text. Fixed at the source (bubble backgrounds -> dark; code editor keeps its dark bg by dropping
+!important on the global input background). Learned/confirmed: `[style*="#fff"]` attribute selectors do NOT
+match inline styles (browsers serialize colors to rgb()), so per-component source fixes are required.
+Verified premium-dark + readable across ~7 pages incl. the flagship composer. Dense admin pages
+(console/classes) still need a dark pass.
+
 ## 2026-07-31 (later) — v3.12.0: platform-wide design system
 
 Harry's feedback: after v3.10/3.11 he "couldn't see much change in the frontend" — the changes were real

@@ -571,58 +571,85 @@ _RESPONSIVE_CSS = (
 # their structure; they all now look like one product.
 _UI_CSS = '''<style id="_ui">
 :root{
- --brand:#059669;--brand-600:#047857;--brand-700:#065f46;--brand-050:#ecfdf5;--ring:rgba(5,150,105,.26);
- --ink:#0f1b2d;--ink-2:#334155;--mut:#64748b;--faint:#94a3b8;
- --card:#ffffff;--line:#e7ecf3;--line-2:#d8e0ea;
- --nav:#0b1220;--nav-line:#1e2b45;--nav-link:#cdd9ef;
- --info:#2563eb;--warn:#b45309;--danger:#dc2626;
- --r:16px;--r-sm:10px;--r-pill:999px;
- --sh-1:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);
- --sh-2:0 12px 32px -10px rgba(16,24,40,.20);
+ --brand:#10b981;--brand-600:#059669;--ring:rgba(16,185,129,.30);
+ --txt:#e2e8f4;--txt-dim:#aab4c6;--mut:#8a96ab;
+ --glass:rgba(255,255,255,.045);--glass-2:rgba(255,255,255,.07);
+ --line:rgba(255,255,255,.10);--line-2:rgba(255,255,255,.16);
+ --info:#8ecbff;
+ --sh-1:0 6px 22px rgba(0,0,0,.34);--sh-2:0 18px 48px -14px rgba(0,0,0,.6);
 }
+/* premium dark gradient backdrop — fixed so it reads as depth, not a scrolling panel */
 body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
- font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;text-rendering:optimizeLegibility}
-h1,h2,h3{letter-spacing:-.01em}
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;text-rendering:optimizeLegibility;
+ background:
+  radial-gradient(1200px 640px at 50% -12%, rgba(16,185,129,.11), transparent 60%),
+  radial-gradient(1000px 560px at 88% 6%, rgba(56,120,255,.09), transparent 55%),
+  linear-gradient(180deg,#0b1020 0%,#080b13 100%) !important;
+ background-attachment:fixed !important; color:var(--txt) !important;}
+.wrap{color:var(--txt)}
+h1,h2,h3,h4{letter-spacing:-.01em;color:#f2f6fc !important}
+.muted{color:var(--mut) !important}
 a{transition:color .12s}
-::selection{background:rgba(5,150,105,.18)}
-::-webkit-scrollbar{width:11px;height:11px}
-::-webkit-scrollbar-thumb{background:#c7d0dd;border-radius:8px;border:3px solid transparent;background-clip:content-box}
-::-webkit-scrollbar-thumb:hover{background:#aab6c6;background-clip:content-box}
-/* top navigation — consistent across inner pages */
-.top{background:var(--nav)!important;border-bottom:1px solid var(--nav-line);
- position:sticky;top:0;z-index:60;box-shadow:0 1px 0 rgba(255,255,255,.03)}
-.top a{background:rgba(255,255,255,.06)!important;color:var(--nav-link)!important;border-radius:9px!important;
- font-weight:600;transition:background .12s,color .12s}
-.top a:hover{background:rgba(255,255,255,.13)!important;color:#fff!important}
-/* hero band */
-.hero{background:linear-gradient(120deg,#0b1220 0%,#12203a 55%,#0e2b33 100%)!important}
-.hero h1{letter-spacing:-.02em}
-/* cards */
-.card{border:1px solid var(--line)!important;border-radius:var(--r)!important;
- box-shadow:var(--sh-1)!important;transition:box-shadow .16s,border-color .16s,transform .16s}
-.card:hover{box-shadow:var(--sh-2)!important;border-color:var(--line-2)!important}
-.card h3{color:var(--ink);letter-spacing:-.01em}
-.kpi{border:1px solid var(--line)!important;border-radius:14px!important;box-shadow:var(--sh-1)!important}
-.kpi .v{color:var(--ink)}
-.muted{color:var(--mut)!important}
-/* primary buttons (class .btn) — brand emerald; layout left to pages */
-.btn{background:var(--brand)!important;color:#fff!important;border:0!important;border-radius:var(--r-sm)!important;
- font-weight:650;box-shadow:0 1px 2px rgba(5,150,105,.25);transition:background .12s,box-shadow .12s,transform .06s;cursor:pointer}
-.btn:hover{background:var(--brand-600)!important}
-.btn:active{transform:translateY(1px)}
-.btn:disabled{background:#9fb4c4!important;box-shadow:none;cursor:default}
-/* pills / badges */
-.pill{border-radius:var(--r-pill)!important;font-weight:650}
-/* form controls — unified border + emerald focus ring (skip checkboxes/radios) */
-input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{
- border:1px solid var(--line-2)!important;border-radius:var(--r-sm)!important;
- transition:border-color .12s,box-shadow .12s;color:var(--ink)}
-input:not([type=checkbox]):not([type=radio]):not([type=range]):focus,select:focus,textarea:focus{
- outline:0!important;border-color:var(--brand)!important;box-shadow:0 0 0 3px var(--ring)!important}
-/* tables */
-table.mini td{border-bottom:1px solid #f1f4f9}
-/* generic links inside content keep brand on hover */
 .wrap a:not(.btn):not(.pill){color:var(--info)}
+::selection{background:rgba(16,185,129,.28)}
+::placeholder{color:#7f8ba0 !important}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.24);background-clip:content-box}
+/* sticky glass navigation */
+.top{background:rgba(9,13,21,.72) !important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+ border-bottom:1px solid var(--line) !important;position:sticky;top:0;z-index:60}
+.top a{background:rgba(255,255,255,.07) !important;color:#cdd9ef !important;border-radius:9px !important;
+ font-weight:600;transition:background .12s,color .12s}
+.top a:hover{background:rgba(255,255,255,.15) !important;color:#fff !important}
+/* hero band with a soft emerald glow */
+.hero{background:
+  radial-gradient(720px 300px at 28% 0%, rgba(16,185,129,.18), transparent 62%),
+  linear-gradient(120deg,#0c1426,#0e1c2e 60%,#0b2230) !important;
+ border-bottom:1px solid var(--line)}
+.hero,.hero h1,.hero .sub,.hero .tag{color:#fff !important}
+.hero .sub,.hero .tag{color:#c7d5ee !important}
+/* glass cards */
+.card{background:var(--glass) !important;border:1px solid var(--line) !important;color:var(--txt) !important;
+ border-radius:16px !important;box-shadow:var(--sh-1),inset 0 1px 0 rgba(255,255,255,.05) !important;
+ -webkit-backdrop-filter:blur(12px) saturate(1.05);backdrop-filter:blur(12px) saturate(1.05);
+ transition:box-shadow .16s,border-color .16s,transform .16s}
+.card:hover{border-color:rgba(16,185,129,.34) !important;box-shadow:var(--sh-2),0 0 0 1px rgba(16,185,129,.12) !important}
+.kpi{background:var(--glass) !important;border:1px solid var(--line) !important;border-radius:14px !important;
+ box-shadow:var(--sh-1) !important;color:var(--txt) !important}
+.kpi .v{color:#f2f6fc !important}.kpi .l{color:var(--mut) !important}
+/* primary buttons — emerald with a soft glow */
+.btn{background:linear-gradient(180deg,#13c084,#059669) !important;color:#fff !important;border:0 !important;
+ border-radius:10px !important;font-weight:650;box-shadow:0 6px 18px -6px rgba(16,185,129,.55) !important;
+ transition:filter .12s,transform .06s;cursor:pointer}
+.btn:hover{filter:brightness(1.07)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{background:#39465a !important;box-shadow:none !important;color:#94a3b8 !important;cursor:default}
+.pill{border-radius:999px !important;font-weight:650}
+/* form controls — dark glass + emerald focus ring */
+input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{
+ background:rgba(255,255,255,.05);border:1px solid var(--line-2) !important;color:#eaf0f8 !important;
+ border-radius:10px !important;transition:border-color .12s,box-shadow .12s,background .12s}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):focus,select:focus,textarea:focus{
+ outline:0 !important;border-color:var(--brand) !important;box-shadow:0 0 0 3px var(--ring) !important;
+ background:rgba(255,255,255,.07) !important}
+select option{background:#0e1523;color:#eaf0f8}
+/* tables read light on dark */
+table{color:var(--txt)}
+table td,table th{border-color:rgba(255,255,255,.08) !important}
+table.mini td{border-bottom:1px solid rgba(255,255,255,.08) !important}
+/* dark-mode fixes for interactive components that were designed light: the
+   analysis chat bubbles + code editor (inline white/tinted backgrounds inside
+   #agentLog). Scoped so it can't affect anything else. */
+#agentLog{color:#e2e8f4}
+#agentLog [style*="background:#fff;"],#agentLog [style*="background:#fff\""],#agentLog [style*="background:#fff "]{
+ background:rgba(255,255,255,.045) !important;border-color:rgba(255,255,255,.10) !important}
+#agentLog [style*="#faf5ff"]{background:rgba(139,92,246,.14) !important;color:#ede9fe !important}
+#agentLog [style*="#fef2f2"]{background:rgba(220,38,38,.16) !important;color:#fecaca !important}
+#agentLog [style*="#fffbeb"],#agentLog [style*="#fef3c7"]{background:rgba(245,158,11,.14) !important;color:#fde68a !important}
+#agentLog [style*="#f8fafc"],#agentLog [style*="#f1f5f9"]{background:rgba(255,255,255,.05) !important}
+#agentLog .mono{color:#e6ebf5 !important}
+#agentLog table td,#agentLog table th{color:#dbe3f0}
 </style>'''
 
 # v3.0.134: global "signed in as X · Logout" badge, injected before </body> on
@@ -1175,35 +1202,36 @@ def root():
  .wrap{max-width:1000px;margin:0 auto;padding:0 20px 40px}
  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-22px 0 22px;position:relative;z-index:2}
  .toolbar .spacer{flex:1}
- .ftab{background:#fff;border:1px solid #e2e8f0;color:#475569;font-size:13px;font-weight:600;
-   padding:8px 15px;border-radius:999px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.06)}
+ .ftab{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:#c7d0de;font-size:13px;font-weight:600;
+   padding:8px 15px;border-radius:999px;cursor:pointer}
  .ftab.on{background:#059669;border-color:#059669;color:#fff}
  .agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
- .agent{background:#fff;border:1px solid #e7ecf3;border-radius:16px;padding:22px;text-decoration:none;
-   color:inherit;transition:.16s;display:block;box-shadow:0 1px 2px rgba(16,24,40,.05)}
- .agent:hover{transform:translateY(-3px);border-color:#a7f3d0;box-shadow:0 16px 34px -12px rgba(5,150,105,.28)}
+ .agent{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:22px;text-decoration:none;
+   color:#e2e8f4;transition:.16s;display:block;box-shadow:0 6px 22px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.05);
+   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+ .agent:hover{transform:translateY(-3px);border-color:rgba(16,185,129,.4);box-shadow:0 18px 46px -14px rgba(0,0,0,.6),0 0 0 1px rgba(16,185,129,.14)}
  .agent .ic{font-size:34px;margin-bottom:12px}
- .agent .nm{font-size:18px;font-weight:750;margin-bottom:6px;letter-spacing:-.01em}
- .agent .ds{font-size:13px;color:#64748b;line-height:1.5}
+ .agent .nm{font-size:18px;font-weight:750;margin-bottom:6px;letter-spacing:-.01em;color:#f2f6fc}
+ .agent .ds{font-size:13px;color:#aab4c6;line-height:1.5}
  .agent .badge{display:inline-block;margin-top:14px;font-size:11px;padding:3px 11px;border-radius:999px;
-   background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-weight:700}
- .agent.add{border-style:dashed;border-color:#cbd5e1;display:flex;flex-direction:column;align-items:center;
-   justify-content:center;text-align:center;color:#64748b;cursor:pointer;background:#fafcff;min-height:180px}
- .agent.add .plus{font-size:40px;line-height:1;margin-bottom:8px;color:#059669}
- .agent.add:hover{border-color:#059669;background:#f0fdf7;color:#334155}
- #createPanel{display:none;margin-top:22px;background:#fff;border:1px solid #e7ecf3;border-radius:16px;
-   padding:22px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+   background:rgba(16,185,129,.16);color:#5eead4;border:1px solid rgba(16,185,129,.35);font-weight:700}
+ .agent.add{border-style:dashed;border-color:rgba(255,255,255,.18);display:flex;flex-direction:column;align-items:center;
+   justify-content:center;text-align:center;color:#aab4c6;cursor:pointer;background:rgba(255,255,255,.02);min-height:180px}
+ .agent.add .plus{font-size:40px;line-height:1;margin-bottom:8px;color:#10b981}
+ .agent.add:hover{border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.06);color:#e2e8f4}
+ #createPanel{display:none;margin-top:22px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.10);border-radius:16px;
+   padding:22px;box-shadow:0 6px 22px rgba(0,0,0,.34);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
  #createPanel h3{margin:0 0 6px;font-size:17px}
- #createPanel p.h{margin:0 0 14px;font-size:12.5px;color:#64748b}
- #createPanel label{display:block;font-size:12px;color:#475569;margin:13px 0 5px;font-weight:600}
+ #createPanel p.h{margin:0 0 14px;font-size:12.5px;color:#8a96ab}
+ #createPanel label{display:block;font-size:12px;color:#c7d0de;margin:13px 0 5px;font-weight:600}
  #createPanel input,#createPanel select,#createPanel textarea{width:100%;padding:10px 12px;border-radius:10px;
-   border:1px solid #d8e0ea;background:#fff;color:#0f1b2d;font-size:14px}
+   border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#eaf0f8;font-size:14px}
  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
  .btn{margin-top:16px;width:100%;padding:12px;border:0;border-radius:10px;background:#059669;color:#fff;
    font-size:14px;font-weight:700;cursor:pointer}
- .note{font-size:12px;color:#64748b;margin-top:11px;text-align:center;line-height:1.5}
- .foot{margin-top:44px;color:#94a3b8;font-size:12px;text-align:center}
- .foot a{color:#2563eb}
+ .note{font-size:12px;color:#8a96ab;margin-top:11px;text-align:center;line-height:1.5}
+ .foot{margin-top:44px;color:#8a96ab;font-size:12px;text-align:center}
+ .foot a{color:#8ecbff}
  @media(max-width:640px){.hero{padding:1.7rem 1rem 2.4rem}.hero h1{font-size:25px}.wrap{padding:0 14px 30px}.toolbar{margin-top:-16px}}
 </style></head><body>
  <div class="top">
@@ -1243,7 +1271,7 @@ def root():
    <h3>Create a new project</h3>
    <p class="h">A project is a research workspace (any field, any data type). Upload datasets and add agents (collect / filter / label / train) any time &mdash; or none at all.</p>
 
-   <div style="background:#f0f7ff;border:1px solid #cfe2ff;border-radius:12px;padding:14px;margin-bottom:16px">
+   <div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.22);border-radius:12px;padding:14px;margin-bottom:16px">
      <label style="font-weight:600">&#10024; Describe what you want &mdash; we&rsquo;ll propose a setup</label>
      <p class="h" style="margin:.25rem 0 .5rem">Plain language, e.g. &ldquo;collect drone images of coral reefs and train a model to spot bleaching&rdquo;. We suggest a project + agents you can build in one click or edit first.</p>
      <textarea id="intent" rows="3" placeholder="Describe your research data + goal in a sentence or two&hellip;" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
@@ -8179,7 +8207,7 @@ function agentHydrate(){
      (d&&d.turns||[]).forEach(function(t){
        if(t.goal)log.insertAdjacentHTML("beforeend",'<div style="margin:8px 0 2px"><b>You:</b> '+esc(t.goal)+'</div>');
        if(t.kind==="codegen"||t.kind==="run_code"){ log.insertAdjacentHTML("beforeend",renderAgentOut({ok:true,mode:"codegen",user_code:(t.kind==="run_code"),answer:t.answer||"",code:t.code||"",plot_url:(t.plot_id?("/api/dataset/codegen_plot?slug="+encodeURIComponent(SLUG)+"&pid="+t.plot_id):null),error:(t.ok===false?(t.error||"failed"):null)})); }
-       else if(t.answer){ log.insertAdjacentHTML("beforeend",'<div style="margin:2px 0 10px;padding:6px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px"><b>Agent:</b> '+esc(t.answer)+'</div>'); }
+       else if(t.answer){ log.insertAdjacentHTML("beforeend",'<div style="margin:2px 0 10px;padding:6px 10px;border-left:3px solid #059669;background:rgba(255,255,255,.05);border-radius:6px"><b>Agent:</b> '+esc(t.answer)+'</div>'); }
      });
      if(d&&d.turns&&d.turns.length)log.insertAdjacentHTML("beforeend",'<div class="muted" style="font-size:11px;margin:4px 0 8px">&#8635; restored earlier conversation for this dataset</div>');
    }).catch(function(){});
@@ -8291,26 +8319,26 @@ function agentAsk(goal){
   fetch("/api/dataset/analyze_goal",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,goal:goal,history:AGENT_HISTORY,model:mv})})
    .then(function(r){return r.json();})
    .then(function(o){ wait.remove();
-     if(o&&o.need_key){ log.insertAdjacentHTML("beforeend",'<div style="margin:4px 0;padding:8px 10px;border-left:3px solid #d97706;background:#fffbeb;border-radius:6px;font-size:13px">'+esc(o.error)+'</div>'); log.scrollTop=log.scrollHeight; keyModalOpen(); return; }
+     if(o&&o.need_key){ log.insertAdjacentHTML("beforeend",'<div style="margin:4px 0;padding:8px 10px;border-left:3px solid #d97706;background:rgba(245,158,11,.13);border-radius:6px;font-size:13px;color:#fde68a">'+esc(o.error)+'</div>'); log.scrollTop=log.scrollHeight; keyModalOpen(); return; }
      log.insertAdjacentHTML("beforeend",renderAgentOut(o)); if(o&&o.answer)AGENT_HISTORY.push({role:"assistant",content:String(o.answer).slice(0,600)}); log.scrollTop=log.scrollHeight; })
    .catch(function(e){ wait.remove(); log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626">error: '+esc(String(e))+'</div>'); });
 }
 function renderAgentOut(o){
   if(!o||!o.ok)return '<div style="color:#dc2626;margin:6px 0">'+esc((o&&o.error)||"analysis failed")+'</div>';
   if(o.mode==="clarify"){
-    var qs=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #fcd34d;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
-    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #d97706;background:#fff;border-radius:6px"><div style="margin-bottom:6px"><b>Agent:</b> I can dig into this a few ways &mdash; which do you want? (or type your own)</div>'+qs+'</div>';
+    var qs=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #fcd34d;background:rgba(255,255,255,.05);color:#e2e8f4;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
+    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #d97706;background:rgba(255,255,255,.05);border-radius:6px"><div style="margin-bottom:6px"><b>Agent:</b> I can dig into this a few ways &mdash; which do you want? (or type your own)</div>'+qs+'</div>';
   }
   if(o.mode==="codegen"){
     var outLines=(o.answer||"").split("\\n").filter(function(x){return x.trim();}).map(function(x){return esc(x);}).join("<br>");
     var eid="ed"+(++AGENT_EDN);
     var who=o.user_code?"Your code ran in the sandbox":(((o.deep||o.byok)?(esc(o.model||"The model")+" wrote and ran analysis code for this"):"I wrote and ran analysis code for this")+(o.attempts>1?(" (self-repaired, attempt "+o.attempts+")"):""));
-    var emptyNote=(!o.error&&!outLines&&!o.plot_url)?'<div style="font-size:12.5px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 10px">The code ran, but it printed nothing and made no figure &mdash; so there is nothing to show. Add <b>print(...)</b> lines for findings, or just create a plot: <b>figures are captured automatically</b> (no savefig needed).</div>':"";
-    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #7c3aed;background:#fff;border-radius:6px">'
+    var emptyNote=(!o.error&&!outLines&&!o.plot_url)?'<div style="font-size:12.5px;background:rgba(245,158,11,.13);border:1px solid rgba(245,158,11,.35);border-radius:6px;color:#fde68a;padding:8px 10px">The code ran, but it printed nothing and made no figure &mdash; so there is nothing to show. Add <b>print(...)</b> lines for findings, or just create a plot: <b>figures are captured automatically</b> (no savefig needed).</div>':"";
+    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #7c3aed;background:rgba(255,255,255,.05);border-radius:6px">'
       +'<div style="margin-bottom:6px"><b>Agent:</b> '+who+':</div>'
-      +(o.error?('<div class="mono" style="font-size:12.5px;background:#fef2f2;color:#b91c1c;border-radius:6px;padding:8px 10px">'+esc(o.error)+'</div>'):"")
+      +(o.error?('<div class="mono" style="font-size:12.5px;background:rgba(220,38,38,.16);color:#fca5a5;border-radius:6px;padding:8px 10px">'+esc(o.error)+'</div>'):"")
       +emptyNote
-      +(outLines?('<div class="mono" style="font-size:13px;background:#faf5ff;border-radius:6px;padding:8px 10px">'+outLines+'</div>'):"")
+      +(outLines?('<div class="mono" style="font-size:13px;background:rgba(139,92,246,.16);border-radius:6px;padding:8px 10px">'+outLines+'</div>'):"")
       +(o.plot_url?('<img src="'+o.plot_url+'&v='+Date.now()+'" style="max-width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-top:8px" alt="generated plot">'):"")
       +'<details style="margin-top:8px"'+(o.user_code?' open':'')+'><summary style="cursor:pointer;font-size:12.5px;color:#7c3aed;font-weight:600">View / EDIT the code &amp; re-run (sandboxed)</summary>'
       +'<textarea id="'+eid+'" spellcheck="false" style="width:100%;min-height:220px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:#1e1b2e;color:#e2e8f0;padding:10px;border-radius:8px;border:1px solid #4c1d95;margin-top:6px;box-sizing:border-box">'+esc(o.code||"")+'</textarea>'
@@ -8319,14 +8347,14 @@ function renderAgentOut(o){
       +'<div class="muted" style="font-size:11px;margin-top:6px">Runs in a sandbox: whitelisted libraries (pandas/numpy/scipy/sklearn/matplotlib/seaborn/PIL), no network, no file writes except the plot, resource limits. Tabular data as CSVs in ./ ; image datasets as a sample in ./images/ (+ ./labels/). Figures are auto-captured.</div></div>';
   }
   if(o.mode==="unsupported"){
-    var qs2=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
-    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #64748b;background:#fff;border-radius:6px"><div style="margin-bottom:6px"><b>Agent:</b> I can\\u2019t do <b>'+esc(o.method)+'</b> yet &mdash; that\\u2019s not in the analysis library. Rather than run something misleading, here\\u2019s what I <i>can</i> dig into on this data:</div>'+qs2+'</div>';
+    var qs2=(o.questions||[]).map(function(q){return '<button onclick="agentAsk(this.textContent)" style="display:block;text-align:left;width:100%;margin:4px 0;border:1px solid #cbd5e1;background:rgba(255,255,255,.05);color:#e2e8f4;border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">'+esc(q)+'</button>';}).join("");
+    return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #64748b;background:rgba(255,255,255,.05);border-radius:6px"><div style="margin-bottom:6px"><b>Agent:</b> I can\\u2019t do <b>'+esc(o.method)+'</b> yet &mdash; that\\u2019s not in the analysis library. Rather than run something misleading, here\\u2019s what I <i>can</i> dig into on this data:</div>'+qs2+'</div>';
   }
   var chosen=(o.plan||[]).map(function(s){return esc(s.tool)+(s.why?' <span class="muted">('+esc(s.why)+')</span>':"");}).join(", ");
   var facts=(o.results||[]).map(renderAgentResult).join("");
   var recs=(o.recommendations||[]).map(function(x){var hi=x.level==='high';return '<li style="margin:2px 0;color:'+(hi?'#b45309':'#475569')+'">'+(hi?'&#9888;&#65039; ':'&#8226; ')+esc(x.text)+'</li>';}).join("");
   var recHtml=recs?('<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#334">Suggestions</div><ul style="margin:2px 0 0;padding-left:18px;font-size:12.5px">'+recs+'</ul></div>'):"";
-  return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #059669;background:#fff;border-radius:6px">'
+  return '<div style="margin:2px 0 14px;padding:8px 10px;border-left:3px solid #059669;background:rgba(255,255,255,.05);border-radius:6px">'
     +'<div style="margin-bottom:6px"><b>Agent:</b> '+esc(o.answer||"")+'</div>'
     +(chosen?('<div class="muted" style="font-size:12px">ran: '+chosen+'</div>'):"")
     +(o.plot_url?('<img src="'+o.plot_url+'&v='+Date.now()+'" style="max-width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-top:8px" alt="tool image">'):"")

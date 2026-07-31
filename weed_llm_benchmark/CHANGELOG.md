@@ -6049,3 +6049,22 @@ polished product. Done as a real design system, not a page-by-page repaint:
 - **Verified live (real browser, desktop + mobile):** design system injected on every page; homepage
   desktop + mobile + create-panel; regression-screenshotted slugs/models/users/guide/recordings/dataset/
   agent/console — all render correctly, no layout regressions; My-projects filter still works.
+
+### v3.12.1 — premium dark theme (dark gradient + glass), replacing the light look
+
+Harry's steer: "backgrounds are mostly white — I lean toward a dark gradient, premium feel." Pivoted the
+design system from light to a **premium dark** aesthetic, still via the one injected `_UI_CSS` (skin-only):
+
+- **Dark gradient backdrop** (fixed radial emerald/blue glows over a deep navy base), **glassmorphic cards**
+  (translucent + blur + inset highlight + hover glow), sticky glass nav, emerald hero glow, emerald buttons
+  with soft glow, dark form controls with emerald focus rings, light typography. Homepage re-skinned to
+  match (glass project cards on the gradient).
+- **Fixed the light-designed interactive components** that a global dark flip breaks: the analysis
+  code-workbench chat bubbles + code editor rendered as white islands with faint text. Corrected at the
+  source (bubble/output/error/empty backgrounds → dark; the code editor keeps its rich `#1e1b2e` by making
+  the global input-background non-`!important`). Honest note: attribute-substring CSS on inline styles does
+  NOT work (browsers serialize `#fff`→`rgb(...)`), so the fix had to be at the source.
+- **Verified live (real browser):** homepage, models, users, guide, slugs, recordings, and the dataset
+  analysis page **including the flagship composer** all render premium-dark and readable — no dark-on-dark.
+  Remaining light islands (a few action buttons, inline code chips) are intentional/acceptable; dense admin
+  pages (console/classes) not yet fully dark-audited.
