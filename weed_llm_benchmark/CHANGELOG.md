@@ -6027,3 +6027,25 @@ platform:
   real display to exercise — that's the one piece only testable on a real machine.
 - Deferred per the prof's own steer: the "agent auto-clicks the shared link" and the app-monitoring /
   robot-app-hacking extensions — this ships the record + save + share core first.
+
+### v3.12.0 — platform-wide design system: one cohesive look (colors / nav / cards / homepage), mobile + desktop
+
+Harry's ask after v3.10/3.11: the frontend changes were localized; make the WHOLE platform look like one
+polished product. Done as a real design system, not a page-by-page repaint:
+
+- **`_UI_CSS` — one design-system stylesheet injected into every page** (via the existing HTML-injection
+  middleware, id="_ui", placed after each page's own `<style>` so it unifies the SKIN). Deliberately
+  touches only skin — CSS-variable palette, typography, sticky dark nav, cards (soft border + layered
+  shadow + hover lift), primary buttons (brand emerald), form controls (unified border + emerald focus
+  ring), pills, tables, scrollbars, selection — and **never layout** (display/flex/grid/width/position),
+  so no page's structure can break. Every inner page (slugs, models, users, guide, recordings, dataset,
+  agent workspace, console) now reads as one product.
+- **Homepage fully redesigned** — converted from a standalone dark page to the platform system: a sticky
+  dark nav ("Greater Robotics **Lab**"), an emerald-accented hero, and light white project cards with
+  emerald hover + status/owner badges; the create-project panel (AI-suggest + voice) restyled to match.
+  All existing IDs/JS preserved (create, plan, voice, filter).
+- **Palette:** brand emerald `#059669`, slate ink/neutrals, dark slate nav/hero — tying to the lab's
+  robotics/agriculture identity and the green accents already in use.
+- **Verified live (real browser, desktop + mobile):** design system injected on every page; homepage
+  desktop + mobile + create-panel; regression-screenshotted slugs/models/users/guide/recordings/dataset/
+  agent/console — all render correctly, no layout regressions; My-projects filter still works.

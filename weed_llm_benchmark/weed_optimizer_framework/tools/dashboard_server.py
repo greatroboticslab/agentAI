@@ -562,6 +562,69 @@ _RESPONSIVE_CSS = (
     '</style>'
 )
 
+# v3.12 — GLOBAL DESIGN SYSTEM. One stylesheet injected (id="_ui") into every
+# page's <head> AFTER the page's own <style>, so it unifies the SKIN — palette,
+# typography, nav bar, cards, buttons, inputs, pills, tables, shadows, focus
+# rings — across the whole platform. Deliberately touches only skin properties
+# (color/background/border/radius/shadow/font/transition), never layout
+# (display/flex/grid/width/position), so no page's layout can break. Pages keep
+# their structure; they all now look like one product.
+_UI_CSS = '''<style id="_ui">
+:root{
+ --brand:#059669;--brand-600:#047857;--brand-700:#065f46;--brand-050:#ecfdf5;--ring:rgba(5,150,105,.26);
+ --ink:#0f1b2d;--ink-2:#334155;--mut:#64748b;--faint:#94a3b8;
+ --card:#ffffff;--line:#e7ecf3;--line-2:#d8e0ea;
+ --nav:#0b1220;--nav-line:#1e2b45;--nav-link:#cdd9ef;
+ --info:#2563eb;--warn:#b45309;--danger:#dc2626;
+ --r:16px;--r-sm:10px;--r-pill:999px;
+ --sh-1:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);
+ --sh-2:0 12px 32px -10px rgba(16,24,40,.20);
+}
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;text-rendering:optimizeLegibility}
+h1,h2,h3{letter-spacing:-.01em}
+a{transition:color .12s}
+::selection{background:rgba(5,150,105,.18)}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:#c7d0dd;border-radius:8px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#aab6c6;background-clip:content-box}
+/* top navigation — consistent across inner pages */
+.top{background:var(--nav)!important;border-bottom:1px solid var(--nav-line);
+ position:sticky;top:0;z-index:60;box-shadow:0 1px 0 rgba(255,255,255,.03)}
+.top a{background:rgba(255,255,255,.06)!important;color:var(--nav-link)!important;border-radius:9px!important;
+ font-weight:600;transition:background .12s,color .12s}
+.top a:hover{background:rgba(255,255,255,.13)!important;color:#fff!important}
+/* hero band */
+.hero{background:linear-gradient(120deg,#0b1220 0%,#12203a 55%,#0e2b33 100%)!important}
+.hero h1{letter-spacing:-.02em}
+/* cards */
+.card{border:1px solid var(--line)!important;border-radius:var(--r)!important;
+ box-shadow:var(--sh-1)!important;transition:box-shadow .16s,border-color .16s,transform .16s}
+.card:hover{box-shadow:var(--sh-2)!important;border-color:var(--line-2)!important}
+.card h3{color:var(--ink);letter-spacing:-.01em}
+.kpi{border:1px solid var(--line)!important;border-radius:14px!important;box-shadow:var(--sh-1)!important}
+.kpi .v{color:var(--ink)}
+.muted{color:var(--mut)!important}
+/* primary buttons (class .btn) — brand emerald; layout left to pages */
+.btn{background:var(--brand)!important;color:#fff!important;border:0!important;border-radius:var(--r-sm)!important;
+ font-weight:650;box-shadow:0 1px 2px rgba(5,150,105,.25);transition:background .12s,box-shadow .12s,transform .06s;cursor:pointer}
+.btn:hover{background:var(--brand-600)!important}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{background:#9fb4c4!important;box-shadow:none;cursor:default}
+/* pills / badges */
+.pill{border-radius:var(--r-pill)!important;font-weight:650}
+/* form controls — unified border + emerald focus ring (skip checkboxes/radios) */
+input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{
+ border:1px solid var(--line-2)!important;border-radius:var(--r-sm)!important;
+ transition:border-color .12s,box-shadow .12s;color:var(--ink)}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):focus,select:focus,textarea:focus{
+ outline:0!important;border-color:var(--brand)!important;box-shadow:0 0 0 3px var(--ring)!important}
+/* tables */
+table.mini td{border-bottom:1px solid #f1f4f9}
+/* generic links inside content keep brand on hover */
+.wrap a:not(.btn):not(.pill){color:var(--info)}
+</style>'''
+
 # v3.0.134: global "signed in as X · Logout" badge, injected before </body> on
 # every HTML page (one place). Fills itself from /api/me. Skipped on /login.
 _LOGIN_BADGE = (
@@ -614,10 +677,14 @@ async def _inject_responsive_css(request: Request, call_next):
     try:
         text = body.decode("utf-8", "replace")
         if "_rwd" not in text:
+            # v3.12: inject the design system (_ui) then the responsive tweaks,
+            # both right before </head> so they sit AFTER the page's own <style>
+            # (design system wins on skin; responsive @media wins on mobile).
+            inject = (_UI_CSS if 'id="_ui"' not in text else "") + _RESPONSIVE_CSS
             if "</head>" in text:
-                text = text.replace("</head>", _RESPONSIVE_CSS + "</head>", 1)
+                text = text.replace("</head>", inject + "</head>", 1)
             else:
-                text = _RESPONSIVE_CSS + text
+                text = inject + text
         # v3.0.134: login badge on every page except the login page itself.
         if ("_authbadge" not in text and request.url.path != "/login"
                 and "</body>" in text):
@@ -1093,59 +1160,68 @@ def root():
 <style>
  *{box-sizing:border-box}
  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;
-   min-height:100vh;background:linear-gradient(160deg,#1b2433 0%,#0f1218 100%);color:#e7eaf0;
-   display:flex;flex-direction:column;align-items:center;padding:52px 20px}
- .brand{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:#7b8aa5;margin-bottom:8px}
- h1{font-size:30px;margin:0 0 8px;font-weight:700;text-align:center}
- .tag{color:#9aa7bd;font-size:15px;margin-bottom:42px;text-align:center;max-width:580px;line-height:1.55}
- .agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,300px));gap:22px;
-   justify-content:center;width:100%;max-width:960px}
- .agent{background:linear-gradient(160deg,#243049,#1a2230);border:1px solid #2c3a52;border-radius:16px;
-   padding:26px;text-decoration:none;color:inherit;transition:.15s;display:block}
- .agent:hover{transform:translateY(-3px);border-color:#3b82f6;box-shadow:0 14px 34px rgba(0,0,0,.45)}
- .agent .ic{font-size:42px;margin-bottom:14px}
- .agent .nm{font-size:20px;font-weight:700;margin-bottom:7px}
- .agent .ds{font-size:13.5px;color:#9aa7bd;line-height:1.5}
- .agent .badge{display:inline-block;margin-top:15px;font-size:11px;padding:3px 11px;border-radius:20px;
-   background:#16351f;color:#5fd98a;border:1px solid #1f5132}
- .agent.add{border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;
-   text-align:center;color:#8b9bb5;cursor:pointer;background:transparent;min-height:210px}
- .agent.add .plus{font-size:50px;line-height:1;margin-bottom:10px;color:#5b6c8a}
- .agent.add:hover{color:#cdd6e6;border-color:#3b82f6}
- #createPanel{display:none;margin-top:28px;background:#1a2230;border:1px solid #2c3a52;border-radius:14px;
-   padding:24px;width:100%;max-width:470px}
- #createPanel h3{margin:0 0 6px;font-size:17px}
- #createPanel p.h{margin:0 0 14px;font-size:12.5px;color:#7b8aa5}
- #createPanel label{display:block;font-size:12px;color:#9aa7bd;margin:13px 0 5px}
- #createPanel input,#createPanel select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2c3a52;
-   background:#11161f;color:#e7eaf0;font-size:14px}
- .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
- .btn{margin-top:18px;width:100%;padding:12px;border:0;border-radius:9px;background:#2563eb;color:#fff;
-   font-size:14px;font-weight:600;cursor:pointer}
- .note{font-size:12px;color:#7b8aa5;margin-top:11px;text-align:center;line-height:1.5}
- .foot{margin-top:48px;color:#5b6c8a;font-size:12px;text-align:center}
- .foot a{color:#93a3bd}
- .toolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;width:100%;max-width:960px;margin:0 0 20px}
- .toolbar a{color:#9aa7bd;text-decoration:none;font-size:13px}
- .toolbar a:hover{color:#cdd6e6}
+   background:#f5f7fb;color:#0f1b2d;min-height:100vh}
+ .top{background:#0b1220;padding:11px 18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+ .top .brand2{color:#fff;font-weight:800;font-size:15px;letter-spacing:-.01em;margin-right:8px}
+ .top .brand2 .dot{color:#34d399}
+ .top a{display:inline-block;text-decoration:none;font-size:13px;padding:7px 12px;border-radius:9px;
+   background:rgba(255,255,255,.06);color:#cdd9ef}
+ .top a:hover{background:rgba(255,255,255,.13);color:#fff}
+ .hero{padding:2.4rem 2rem 3rem;text-align:center;color:#fff;
+   background:linear-gradient(120deg,#0b1220,#12203a 55%,#0e2b33)}
+ .hero .eyebrow{font-size:11.5px;letter-spacing:2.5px;text-transform:uppercase;color:#6ee7b7;font-weight:700;margin-bottom:10px}
+ .hero h1{font-size:32px;margin:0 0 10px;font-weight:800;letter-spacing:-.02em}
+ .hero .tag{color:#c7d5ee;font-size:15px;max-width:600px;margin:0 auto;line-height:1.6}
+ .wrap{max-width:1000px;margin:0 auto;padding:0 20px 40px}
+ .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-22px 0 22px;position:relative;z-index:2}
  .toolbar .spacer{flex:1}
- .ftab{background:#1a2230;border:1px solid #2c3a52;color:#9aa7bd;font-size:12px;font-weight:600;
-   padding:6px 12px;border-radius:8px;cursor:pointer}
- .ftab.on{background:#2563eb;border-color:#2563eb;color:#fff}
+ .ftab{background:#fff;border:1px solid #e2e8f0;color:#475569;font-size:13px;font-weight:600;
+   padding:8px 15px;border-radius:999px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.06)}
+ .ftab.on{background:#059669;border-color:#059669;color:#fff}
+ .agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+ .agent{background:#fff;border:1px solid #e7ecf3;border-radius:16px;padding:22px;text-decoration:none;
+   color:inherit;transition:.16s;display:block;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+ .agent:hover{transform:translateY(-3px);border-color:#a7f3d0;box-shadow:0 16px 34px -12px rgba(5,150,105,.28)}
+ .agent .ic{font-size:34px;margin-bottom:12px}
+ .agent .nm{font-size:18px;font-weight:750;margin-bottom:6px;letter-spacing:-.01em}
+ .agent .ds{font-size:13px;color:#64748b;line-height:1.5}
+ .agent .badge{display:inline-block;margin-top:14px;font-size:11px;padding:3px 11px;border-radius:999px;
+   background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-weight:700}
+ .agent.add{border-style:dashed;border-color:#cbd5e1;display:flex;flex-direction:column;align-items:center;
+   justify-content:center;text-align:center;color:#64748b;cursor:pointer;background:#fafcff;min-height:180px}
+ .agent.add .plus{font-size:40px;line-height:1;margin-bottom:8px;color:#059669}
+ .agent.add:hover{border-color:#059669;background:#f0fdf7;color:#334155}
+ #createPanel{display:none;margin-top:22px;background:#fff;border:1px solid #e7ecf3;border-radius:16px;
+   padding:22px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+ #createPanel h3{margin:0 0 6px;font-size:17px}
+ #createPanel p.h{margin:0 0 14px;font-size:12.5px;color:#64748b}
+ #createPanel label{display:block;font-size:12px;color:#475569;margin:13px 0 5px;font-weight:600}
+ #createPanel input,#createPanel select,#createPanel textarea{width:100%;padding:10px 12px;border-radius:10px;
+   border:1px solid #d8e0ea;background:#fff;color:#0f1b2d;font-size:14px}
+ .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+ .btn{margin-top:16px;width:100%;padding:12px;border:0;border-radius:10px;background:#059669;color:#fff;
+   font-size:14px;font-weight:700;cursor:pointer}
+ .note{font-size:12px;color:#64748b;margin-top:11px;text-align:center;line-height:1.5}
+ .foot{margin-top:44px;color:#94a3b8;font-size:12px;text-align:center}
+ .foot a{color:#2563eb}
+ @media(max-width:640px){.hero{padding:1.7rem 1rem 2.4rem}.hero h1{font-size:25px}.wrap{padding:0 14px 30px}.toolbar{margin-top:-16px}}
 </style></head><body>
- <div class="brand">Greater Robotics Lab</div>
- <h1>Research Projects</h1>
- <div class="tag">A platform for any research field: create a <b>project</b>, upload datasets of any
-   kind (images, video, sensor, &hellip;), and add <b>agents</b> to collect, filter, label, or train
-   &mdash; any number, any mix, or none. Pick a project to open it, or start a new one.</div>
+ <div class="top">
+   <span class="brand2">Greater Robotics <span class="dot">Lab</span></span>
+   <a href="/guide">&#128075; Guide</a><a href="/recordings">&#127909; Recordings</a><a href="/users">&#128100; Users</a><a href="/models">&#129504; Models</a><a href="/console">&#9881; Console</a><a href="/manual">&#128214; Docs</a>
+ </div>
+ <div class="hero">
+   <div class="eyebrow">Greater Robotics Lab</div>
+   <h1>Research Projects</h1>
+   <div class="tag">A platform for any research field: create a <b>project</b>, upload datasets of any
+     kind (images, video, sensor, &hellip;), and add <b>agents</b> to collect, filter, label, or train
+     &mdash; any number, any mix, or none.</div>
+ </div>
+ <div class="wrap">
  <div class="toolbar">
-   <a href="/guide" style="background:#1d4ed8;color:#fff">&#128075; New here? Guide</a>
-   <a href="/recordings">&#127909; Recordings</a>
-   <a href="/users">&#128100; Users</a><a href="/models">&#129504; Models</a>
-   <a href="/console">&#9881; Console</a><a href="/manual">&#128214; Docs</a>
-   <span class="spacer"></span>
    <button id="f-all" class="ftab on" onclick="filterProj('all')">All projects</button>
    <button id="f-mine" class="ftab" onclick="filterProj('mine')">My projects</button>
+   <span class="spacer"></span>
  </div>
  <div class="agents">
    <a class="agent" data-owner="" href="/agent/weed">
@@ -1162,7 +1238,7 @@ def root():
      <div class="ds">Create a project for any research domain &mdash; upload data, add agents later.</div>
    </div>
  </div>
- <div id="mine-empty" style="display:none;color:#9aa7bd;font-size:13px;margin-top:16px;text-align:center">You don&rsquo;t own any projects yet &mdash; click <b>New Project</b> to start one.</div>
+ <div id="mine-empty" style="display:none;color:#64748b;font-size:13px;margin-top:16px;text-align:center">You don&rsquo;t own any projects yet &mdash; click <b>New Project</b> to start one.</div>
  <div id="createPanel">
    <h3>Create a new project</h3>
    <p class="h">A project is a research workspace (any field, any data type). Upload datasets and add agents (collect / filter / label / train) any time &mdash; or none at all.</p>
@@ -1196,6 +1272,7 @@ def root():
    <div class="note" id="createNote">Creates an empty research workspace. Upload datasets right away, and add agents (collect / filter / label / train) whenever you want &mdash; any number, any mix, or none.</div>
  </div>
  <div class="foot">Lab server &middot; MongoDB &middot; cluster GPU compute &nbsp;|&nbsp; <a href="/console">Advanced console &rarr;</a></div>
+ </div>
  <script>
   async function filterProj(mode){
     document.getElementById('f-all').className='ftab'+(mode==='all'?' on':'');

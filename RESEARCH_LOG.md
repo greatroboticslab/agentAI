@@ -13,6 +13,17 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-31 (later) — v3.12.0: platform-wide design system
+
+Harry's feedback: after v3.10/3.11 he "couldn't see much change in the frontend" — the changes were real
+but localized (analysis composer + recordings page), not a global visual identity. So I did a proper
+design-system pass: one injected stylesheet (_UI_CSS, skin-only, never layout — so nothing breaks) that
+unifies palette/typography/nav/cards/buttons/inputs/shadows across every page, plus a full homepage
+redesign onto that system (dark sticky nav + emerald hero + light cards, all JS preserved). Brand =
+emerald #059669 on slate neutrals. Verified live on ~9 pages at desktop + mobile with no regressions.
+Lesson: "unify the skin, leave the layout" is the safe way to redesign a multi-page server-rendered app
+with no build step.
+
 ## 2026-07-31 (later) — v3.11.0: Recordings — Loom-style capture + share links
 
 Prof. Zhang's second track alongside the in-app model calls: "the proposed interface [is] similar to
