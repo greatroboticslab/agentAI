@@ -6068,3 +6068,24 @@ design system from light to a **premium dark** aesthetic, still via the one inje
   analysis page **including the flagship composer** all render premium-dark and readable — no dark-on-dark.
   Remaining light islands (a few action buttons, inline code chips) are intentional/acceptable; dense admin
   pages (console/classes) not yet fully dark-audited.
+
+### v3.12.2 — dark-theme audit: fixed white cards / invisible inputs on the legacy pages
+
+Harry caught the gap I flagged: the project workspace (and other old pages) still had WHITE cards with
+INVISIBLE dropdowns in dark mode — my earlier "verification" only checked page-tops, not full scroll.
+Ran a real full-page audit (a probe that counts light-background elements per page) and fixed the roots:
+
+- **Cause:** (1) the glassmorphic (translucent) cards looked white because old pages wrap content in
+  light `#f8fafc`/`#fff` containers behind them; (2) my global made input TEXT light but I'd dropped the
+  dark input BACKGROUND, so selects were light-on-light; (3) old pages use many pale hexes + legacy
+  component classes (`.stat`, `.act`, `.class-card`, `.filter-bar`, `.summary`, `.note`, `.nav`).
+- **Fix:** cards + form controls now **solid dark** (readable over any parent; code editors keep their
+  `#1e1b2e`); dark rules for the legacy classes; a comprehensive inline-background catch via the **`#f`
+  prefix** (every pale bg is `#fXXXXX`, darks never are) plus common `rgb(...)` light forms; bare `<section>`
+  card-grids made transparent.
+- **Result — full-page audit now reports 0 light-background elements on all six checked pages**
+  (agent workspace, console, classes, labeling, slugs, users). The project-workspace dropdowns Harry
+  screenshotted are readable; the dense console/classes pages are dark end-to-end. (Two caution-action
+  cards on the console keep a red tint by design.)
+- Honest lesson recorded: verify by SCROLLING full pages, and `[style*="#fff"]` selectors are unreliable
+  (browsers serialize inline colors) — match the source-form `#f` prefix or fix at source.

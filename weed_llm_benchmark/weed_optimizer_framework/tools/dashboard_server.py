@@ -609,13 +609,16 @@ a{transition:color .12s}
  border-bottom:1px solid var(--line)}
 .hero,.hero h1,.hero .sub,.hero .tag{color:#fff !important}
 .hero .sub,.hero .tag{color:#c7d5ee !important}
-/* glass cards */
-.card{background:var(--glass) !important;border:1px solid var(--line) !important;color:var(--txt) !important;
+/* cards — SOLID dark (with a faint top sheen) so they read correctly over ANY
+   parent, including old pages that wrap content in a white div. A translucent
+   "glass" card looked white on those pages; a solid base is robust. */
+.card{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0)),#131c30 !important;
+ border:1px solid rgba(255,255,255,.10) !important;color:var(--txt) !important;
  border-radius:16px !important;box-shadow:var(--sh-1),inset 0 1px 0 rgba(255,255,255,.05) !important;
- -webkit-backdrop-filter:blur(12px) saturate(1.05);backdrop-filter:blur(12px) saturate(1.05);
  transition:box-shadow .16s,border-color .16s,transform .16s}
 .card:hover{border-color:rgba(16,185,129,.34) !important;box-shadow:var(--sh-2),0 0 0 1px rgba(16,185,129,.12) !important}
-.kpi{background:var(--glass) !important;border:1px solid var(--line) !important;border-radius:14px !important;
+.card,.card *:not(a):not(.pill):not(button):not(code):not(.badge){border-color:rgba(255,255,255,.10)}
+.kpi{background:#131c30 !important;border:1px solid rgba(255,255,255,.10) !important;border-radius:14px !important;
  box-shadow:var(--sh-1) !important;color:var(--txt) !important}
 .kpi .v{color:#f2f6fc !important}.kpi .l{color:var(--mut) !important}
 /* primary buttons — emerald with a soft glow */
@@ -626,10 +629,12 @@ a{transition:color .12s}
 .btn:active{transform:translateY(1px)}
 .btn:disabled{background:#39465a !important;box-shadow:none !important;color:#94a3b8 !important;cursor:default}
 .pill{border-radius:999px !important;font-weight:650}
-/* form controls — dark glass + emerald focus ring */
+/* form controls — SOLID dark so they read over any parent + emerald focus ring */
 input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{
- background:rgba(255,255,255,.05);border:1px solid var(--line-2) !important;color:#eaf0f8 !important;
+ background:#0e1626 !important;border:1px solid var(--line-2) !important;color:#eaf0f8 !important;
  border-radius:10px !important;transition:border-color .12s,box-shadow .12s,background .12s}
+/* code editors keep their rich dark editor bg */
+textarea[id^="ed"],#agentIn{background:#1e1b2e !important}
 input:not([type=checkbox]):not([type=radio]):not([type=range]):focus,select:focus,textarea:focus{
  outline:0 !important;border-color:var(--brand) !important;box-shadow:0 0 0 3px var(--ring) !important;
  background:rgba(255,255,255,.07) !important}
@@ -638,6 +643,30 @@ select option{background:#0e1523;color:#eaf0f8}
 table{color:var(--txt)}
 table td,table th{border-color:rgba(255,255,255,.08) !important}
 table.mini td{border-bottom:1px solid rgba(255,255,255,.08) !important}
+/* legacy light components on older pages (console/classes/slugs/labeling/users) -> dark */
+.stat,.help,.filter-bar,.summary,.note,.box,.panel,.sec,.tile,.kv,.row,.item,.entry,.block,.subcard{
+ background:#131c30 !important;color:var(--txt) !important;border-color:rgba(255,255,255,.10) !important}
+.stat .v,.stat b,.summary b,.stat .n{color:#f2f6fc !important}
+.stat .l,.help,.note{color:var(--mut) !important}
+.filter-tab{background:rgba(255,255,255,.05) !important;color:#c7d0de !important;border:1px solid rgba(255,255,255,.14) !important}
+.filter-tab.on,.filter-tab.active,.filter-tab[aria-selected="true"]{background:#059669 !important;color:#fff !important;border-color:#059669 !important}
+.nav{background:rgba(9,13,21,.72) !important;color:var(--txt) !important;border-color:rgba(255,255,255,.10) !important}
+.nav a{color:#cdd9ef !important}
+/* net for inline light boxes on old pages: every PALE background is #fXXXXX
+   (whites/greys/tints); darks never start with #f — so this one prefix match
+   catches them all, in the HTML-parsed source form. JS-set styles serialize to
+   rgb(); cover the common light rgb() prefixes too. */
+[style*="background:#f"]:not(.top):not(.hero),[style*="background: rgb(255, 255, 255)"],
+[style*="background: rgb(248"],[style*="background: rgb(249"],[style*="background: rgb(250"],
+[style*="background: rgb(240"],[style*="background: rgb(238"],[style*="background: rgb(241"],
+[style*="background: rgb(236"],[style*="background: rgb(239"]{
+ background:#182236 !important;border-color:rgba(255,255,255,.12) !important}
+.act,.class-card{background:#182236 !important;color:var(--txt) !important;border-color:rgba(255,255,255,.14) !important}
+.act:hover,.class-card:hover{background:#1e2a44 !important}
+.class-card img{background:#0e1626}
+tr[style*="background:#f"],td[style*="background:#f"]{background:#182236 !important}
+/* bare layout containers (card grids etc.) -> transparent so the dark body shows */
+section:not(.card):not(.hero),main:not(.card){background:transparent !important}
 /* dark-mode fixes for interactive components that were designed light: the
    analysis chat bubbles + code editor (inline white/tinted backgrounds inside
    #agentLog). Scoped so it can't affect anything else. */

@@ -13,6 +13,17 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-31 (later) — v3.12.2: dark-theme audit + fix of the legacy pages
+
+Harry sent a screenshot: the project workspace still had white cards + invisible dropdowns in dark mode.
+My prior "verified" was viewport-tops only — a real gap. Built a full-page audit probe (counts
+light-background elements per page) and fixed the roots: solid-dark cards/inputs (translucent glass looked
+white over old pages' light wrappers), dark rules for legacy classes (.stat/.act/.class-card/etc.), and a
+comprehensive inline-bg catch via the `#f` prefix (all pale colors are #fXXXXX). Audit now: 0 light-bg
+elements across agent/console/classes/labeling/slugs/users. Lesson: scroll full pages when verifying UI,
+and inline-style attribute selectors are unreliable (color serialization) — match source `#f` or fix at
+source.
+
 ## 2026-07-31 (later) — v3.12.1: pivot to a premium dark theme
 
 Harry: the platform felt too white; he wants a dark gradient, premium feel. Flipped the injected design
