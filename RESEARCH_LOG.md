@@ -13,6 +13,22 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-31 (later) — v3.11.0: Recordings — Loom-style capture + share links
+
+Prof. Zhang's second track alongside the in-app model calls: "the proposed interface [is] similar to
+Loom ... it can monitor any interface, even on phone ... beyond that, an agent function to help user to
+click ... this way we incidentally hack the humanoid-robot app." He sent his lab's repo
+(greatroboticslab/humanoidrobotweb) — "mimicked Loom video recording and saving to MongoDB well, you can
+borrow." I studied its VideoDetail.jsx + Flask backend (getDisplayMedia → MediaRecorder → multipart
+upload → file on disk + metadata doc → library → playback → delete) and built the same core into OUR
+platform as a new `/recordings` page: record screen / screen+mic / voice, preview before upload, a
+library with playback + editable titles + copy-share-link + delete, a `/r/{id}` share view, HTTP-range
+media serving (so video seeks), and owner-scoped permissions (same rule as datasets, from the v3.9.3
+lesson). Plus a "paste an external AI share link" box (store, don't scrape). Verified live end-to-end
+(curl + real browser with a fake mic device): the full record→save→library→share loop works and is
+responsive; screen capture shares the identical code and only needs a real display to exercise. Deferred
+on his own steer: the agent-auto-click and app-monitoring/robot-hacking extensions.
+
 ## 2026-07-31 — v3.10.0: bring commercial AI into the chat, keep the data ours
 
 Prof. Zhang's direction over three messages (voice + a PyCharm "AI Chat" screenshot + a Loom-style repo):

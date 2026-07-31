@@ -1140,6 +1140,7 @@ def root():
    &mdash; any number, any mix, or none. Pick a project to open it, or start a new one.</div>
  <div class="toolbar">
    <a href="/guide" style="background:#1d4ed8;color:#fff">&#128075; New here? Guide</a>
+   <a href="/recordings">&#127909; Recordings</a>
    <a href="/users">&#128100; Users</a><a href="/models">&#129504; Models</a>
    <a href="/console">&#9881; Console</a><a href="/manual">&#128214; Docs</a>
    <span class="spacer"></span>
@@ -2169,6 +2170,478 @@ async def api_user_llm_key_del(request: Request):
             store.pop(actor, None)
         _write_user_llm_keys(store)
     return JSONResponse({"ok": True, "provider": provider, "configured": False})
+
+
+# ===========================================================================
+# v3.11 — RECORDINGS (Loom-style capture). Prof. Zhang's direction: record your
+# screen / a session with strong AI / any interface (even a phone or the robot
+# app), save it, get a shareable link. Borrowed pattern from the lab's
+# greatroboticslab/humanoidrobotweb repo (getDisplayMedia -> MediaRecorder ->
+# upload -> store the file + a metadata doc -> library -> playback -> share).
+# Media files live on disk; metadata in a JSON index. Also stores pasted
+# external AI share links (ChatGPT/Claude/Gemini) as reference entries.
+# ===========================================================================
+_RECORDINGS_DIR = REPO / "results" / "framework" / "recordings"
+_RECORDINGS_INDEX = _RECORDINGS_DIR / "index.json"
+_REC_EXT = {"video/webm": ".webm", "video/mp4": ".mp4", "audio/webm": ".webm",
+            "audio/mp4": ".m4a", "audio/ogg": ".ogg", "audio/wav": ".wav",
+            "audio/mpeg": ".mp3"}
+
+
+def _read_recordings() -> dict:
+    try:
+        if _RECORDINGS_INDEX.is_file():
+            return json.load(open(_RECORDINGS_INDEX)) or {}
+    except Exception:
+        pass
+    return {}
+
+
+def _write_recordings(d: dict) -> None:
+    _RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = str(_RECORDINGS_INDEX) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(d, f, indent=2)
+    os.replace(tmp, _RECORDINGS_INDEX)
+
+
+def _rec_can_edit(actor: str, rec: dict) -> bool:
+    return _is_admin(actor) or bool(rec.get("owner") and rec.get("owner") == actor)
+
+
+def _link_source(url: str) -> str:
+    u = url.lower()
+    for host, name in (("chatgpt.com", "ChatGPT"), ("chat.openai", "ChatGPT"),
+                       ("claude.ai", "Claude"), ("gemini.google", "Gemini"),
+                       ("aistudio.google", "Gemini"), ("bard.google", "Gemini"),
+                       ("perplexity", "Perplexity"), ("poe.com", "Poe"),
+                       ("copilot.microsoft", "Copilot")):
+        if host in u:
+            return name
+    return "link"
+
+
+def _serve_with_range(request: Request, path: Path, media_type: str):
+    """Serve a media file with HTTP Range support so <video>/<audio> can seek."""
+    from starlette.responses import StreamingResponse
+    size = path.stat().st_size
+    rng = request.headers.get("range") or request.headers.get("Range")
+    base_hdr = {"Accept-Ranges": "bytes", "Cache-Control": "private, max-age=3600"}
+    m = re.match(r"bytes=(\d*)-(\d*)", rng or "")
+    if not m:
+        return FileResponse(str(path), media_type=media_type, headers=base_hdr)
+    start = int(m.group(1)) if m.group(1) else 0
+    end = int(m.group(2)) if m.group(2) else size - 1
+    end = min(end, size - 1)
+    start = min(start, end)
+    length = end - start + 1
+
+    def _iter():
+        with open(path, "rb") as f:
+            f.seek(start)
+            remaining = length
+            while remaining > 0:
+                chunk = f.read(min(65536, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+    hdr = dict(base_hdr)
+    hdr.update({"Content-Range": f"bytes {start}-{end}/{size}",
+                "Content-Length": str(length)})
+    return StreamingResponse(_iter(), status_code=206, media_type=media_type, headers=hdr)
+
+
+@app.post("/api/recordings")
+async def api_recordings_create(request: Request):
+    """v3.11 — save an uploaded screen/voice recording (multipart: file, title?,
+    kind?, note?, transcript?, duration?). Returns its id + media/view URLs."""
+    actor = _actor_from_request(request)
+    if not actor or actor == "?":
+        raise HTTPException(401, "sign in to save recordings")
+    form = await request.form()
+    uf = form.get("file")
+    if uf is None or not hasattr(uf, "read"):
+        raise HTTPException(400, "no file")
+    data = await uf.read()
+    if not data:
+        raise HTTPException(400, "empty recording")
+    if len(data) > 500 * 1024 * 1024:
+        raise HTTPException(413, "recording too large (500MB max)")
+    mime = (getattr(uf, "content_type", None) or "video/webm").split(";")[0].strip()
+    ext = _REC_EXT.get(mime, ".webm")
+    rid = "rec_" + time.strftime("%Y%m%d%H%M%S") + "_" + _secrets.token_hex(4)
+    _RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(_RECORDINGS_DIR / (rid + ext), "wb") as f:
+        f.write(data)
+    kind = str(form.get("kind") or ("voice" if mime.startswith("audio") else "screen"))[:20]
+    meta = {"id": rid, "owner": actor, "kind": kind, "mime": mime, "ext": ext,
+            "size": len(data),
+            "title": (str(form.get("title") or "").strip()[:140]
+                      or ("Recording " + time.strftime("%Y-%m-%d %H:%M"))),
+            "note": str(form.get("note") or "").strip()[:2000],
+            "transcript": str(form.get("transcript") or "").strip()[:20000],
+            "duration": str(form.get("duration") or "")[:12],
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    store = _read_recordings()
+    store[rid] = meta
+    _write_recordings(store)
+    log.info(f"[recordings] {actor} saved {rid} ({len(data)} bytes, {mime})")
+    return {"ok": True, "id": rid, "media_url": f"/api/recordings/{rid}/media",
+            "view_url": f"/r/{rid}"}
+
+
+@app.post("/api/recordings/link")
+async def api_recordings_link(request: Request):
+    """v3.11 — save a pasted external AI share link (ChatGPT/Claude/Gemini) as a
+    reference. We store the link + note; we do NOT scrape it (prof: manual is
+    fine when agent-fetch is unreliable)."""
+    actor = _actor_from_request(request)
+    if not actor or actor == "?":
+        raise HTTPException(401, "sign in first")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    url = str(body.get("url") or "").strip()[:2000]
+    if not re.match(r"^https?://", url):
+        raise HTTPException(400, "paste a valid http(s) link")
+    rid = "lnk_" + time.strftime("%Y%m%d%H%M%S") + "_" + _secrets.token_hex(4)
+    meta = {"id": rid, "owner": actor, "kind": "link", "ext_link": url,
+            "source": _link_source(url),
+            "title": str(body.get("title") or "").strip()[:140] or (_link_source(url) + " conversation"),
+            "note": str(body.get("note") or "").strip()[:2000],
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    store = _read_recordings()
+    store[rid] = meta
+    _write_recordings(store)
+    return {"ok": True, "id": rid}
+
+
+@app.get("/api/recordings")
+def api_recordings_list(request: Request):
+    """v3.11 — list the current user's recordings + links (admins see all)."""
+    actor = _actor_from_request(request)
+    admin = _is_admin(actor)
+    fields = ("id", "owner", "title", "kind", "mime", "size", "duration",
+              "transcript", "note", "ext_link", "source", "created_at")
+    rows = [{k: r.get(k) for k in fields} for r in _read_recordings().values()
+            if admin or r.get("owner") == actor]
+    rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    return {"ok": True, "n": len(rows), "recordings": rows,
+            "me": actor, "is_admin": admin}
+
+
+@app.get("/api/recordings/{rid}/media")
+def api_recordings_media(request: Request, rid: str):
+    """v3.11 — stream a saved recording (Range-enabled). Auth is enforced by the
+    middleware; the unguessable id acts as a capability URL within the platform."""
+    _ = _actor_from_request(request)
+    if not re.match(r"^[A-Za-z0-9_]+$", rid):
+        raise HTTPException(400, "bad id")
+    rec = _read_recordings().get(rid)
+    if not rec or rec.get("kind") == "link":
+        raise HTTPException(404, "not found")
+    p = _RECORDINGS_DIR / (rid + rec.get("ext", ".webm"))
+    if not p.is_file():
+        raise HTTPException(404, "file missing")
+    return _serve_with_range(request, p, rec.get("mime") or "video/webm")
+
+
+@app.post("/api/recordings/{rid}/delete")
+async def api_recordings_delete(request: Request, rid: str):
+    """v3.11 — delete a recording (owner or admin only — same rule as datasets)."""
+    actor = _actor_from_request(request)
+    store = _read_recordings()
+    rec = store.get(rid)
+    if not rec:
+        raise HTTPException(404, "not found")
+    if not _rec_can_edit(actor, rec):
+        raise HTTPException(403, "you can only delete recordings you made "
+                                 f"(this one is {rec.get('owner') or 'unknown'}'s)")
+    if rec.get("ext"):
+        try:
+            (_RECORDINGS_DIR / (rid + rec["ext"])).unlink(missing_ok=True)
+        except Exception:
+            pass
+    store.pop(rid, None)
+    _write_recordings(store)
+    return {"ok": True, "id": rid}
+
+
+@app.post("/api/recordings/{rid}/update")
+async def api_recordings_update(request: Request, rid: str):
+    """v3.11 — rename / edit the note of a recording (owner or admin)."""
+    actor = _actor_from_request(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    store = _read_recordings()
+    rec = store.get(rid)
+    if not rec:
+        raise HTTPException(404, "not found")
+    if not _rec_can_edit(actor, rec):
+        raise HTTPException(403, "not yours to edit")
+    if "title" in body:
+        rec["title"] = str(body["title"]).strip()[:140] or rec.get("title")
+    if "note" in body:
+        rec["note"] = str(body["note"]).strip()[:2000]
+    store[rid] = rec
+    _write_recordings(store)
+    return {"ok": True, "id": rid, "title": rec.get("title")}
+
+
+_RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Recordings</title><style>
+ :root{--ink:#0f172a;--mut:#64748b;--line:#e3e7ef;--accent:#059669}
+ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f5f7fa;color:var(--ink)}
+ .top{background:#0b1220;padding:10px 16px}.top a{display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px;margin-right:8px}
+ .hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:1.3rem 2rem}.hero h1{margin:0 0 .3rem;font-size:21px}.hero .sub{opacity:.85;font-size:13px}
+ .wrap{padding:1.2rem 2rem;max-width:960px;margin:0 auto}
+ .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+ .card h3{margin:0 0 4px;font-size:15px}.card .hint{color:var(--mut);font-size:12.5px;margin-bottom:12px}
+ .recbtns{display:flex;gap:10px;flex-wrap:wrap}
+ .rb{border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px 16px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .12s,border-color .12s,transform .1s}
+ .rb:hover{background:#f0fdf4;border-color:#86efac;transform:translateY(-1px)}
+ .rb .em{font-size:18px}
+ .live{display:none;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
+ .dot{width:12px;height:12px;border-radius:50%;background:#dc2626;animation:pulse 1s infinite}
+ @keyframes pulse{50%{opacity:.35}}
+ .stopb{border:0;background:#dc2626;color:#fff;font-weight:700;padding:9px 16px;border-radius:10px;cursor:pointer;font-size:14px}
+ .prev{display:none;margin-top:12px}
+ .prev video,.prev audio{width:100%;max-height:340px;border-radius:10px;background:#000}
+ .saverow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+ .saverow input{flex:1;min-width:180px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:14px}
+ .save{border:0;background:var(--accent);color:#fff;font-weight:700;padding:9px 18px;border-radius:10px;cursor:pointer;font-size:14px}
+ .disc{border:1px solid #e2e8f0;background:#fff;color:#64748b;font-weight:600;padding:9px 14px;border-radius:10px;cursor:pointer}
+ .linkrow{display:flex;gap:8px;flex-wrap:wrap}
+ .linkrow input{flex:1;min-width:220px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:14px}
+ .addl{border:0;background:#2563eb;color:#fff;font-weight:700;padding:9px 16px;border-radius:10px;cursor:pointer}
+ .item{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+ .item .h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+ .item .ti{font-weight:700;font-size:14px;border:1px solid transparent;border-radius:6px;padding:2px 6px;margin:-2px -6px;background:transparent}
+ .item .ti:focus{border-color:#cbd5e1;background:#fff;outline:0}
+ .kind{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#4338ca;text-transform:uppercase;letter-spacing:.3px}
+ .kind.voice{background:#fef9c3;color:#a16207}.kind.link{background:#dcfce7;color:#166534}.kind.screen{background:#e0e7ff;color:#4338ca}
+ .meta{color:var(--mut);font-size:12px}
+ .item video,.item audio{width:100%;max-height:300px;border-radius:9px;margin-top:10px;background:#000}
+ .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+ .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#475569;cursor:pointer}
+ .btn:hover{background:#f8fafc}.btn.del{color:#dc2626;border-color:#fecaca}
+ .btn.copy.ok{background:#dcfce7;color:#166534;border-color:#86efac}
+ .tx{margin-top:8px;font-size:12.5px;color:#334155;background:#f8fafc;border-radius:8px;padding:8px 10px;max-height:120px;overflow:auto}
+ .empty{color:var(--mut);font-size:13px;text-align:center;padding:20px;border:1px dashed var(--line);border-radius:12px}
+ a.ext{color:#2563eb;font-weight:600;text-decoration:none}
+ @media(max-width:640px){.wrap{padding:1rem}.hero{padding:1rem}}
+</style></head><body>
+<div class="top"><a href="/">&larr; Projects</a><a href="/guide">Guide</a></div>
+<div class="hero"><h1>&#127909; Recordings</h1><div class="sub">Record your screen or voice &mdash; a session with strong AI, a demo, any interface &mdash; save it, and share a link. Nothing is uploaded until you press Save.</div></div>
+<div class="wrap">
+ <div class="card">
+  <h3>New recording</h3>
+  <div class="hint">Screen capture asks which window/tab to share. On phones, use Voice (screen capture is desktop-only in most mobile browsers).</div>
+  <div class="recbtns" id="recbtns">
+   <button class="rb" onclick="startRec('screen')"><span class="em">&#128421;</span> Record screen</button>
+   <button class="rb" onclick="startRec('screenmic')"><span class="em">&#128421;</span>+&#127908; Screen + mic</button>
+   <button class="rb" onclick="startRec('voice')"><span class="em">&#127908;</span> Voice only</button>
+  </div>
+  <div class="live" id="live"><span class="dot"></span><b id="elapsed">00:00</b><span class="meta" id="livekind"></span><button class="stopb" onclick="stopRec()">&#9209; Stop</button></div>
+  <div class="prev" id="prev"></div>
+  <div class="saverow" id="saverow" style="display:none">
+   <input id="recTitle" placeholder="Title this recording (optional)">
+   <button class="save" onclick="saveRec()" id="saveBtn">Save</button>
+   <button class="disc" onclick="discardRec()">Discard</button>
+  </div>
+ </div>
+ <div class="card">
+  <h3>&#128279; Paste an AI share link</h3>
+  <div class="hint">Worked something out in ChatGPT / Claude / Gemini? Click Share there, paste the link here to keep it with your project. (We store the link &mdash; we don't open your account.)</div>
+  <div class="linkrow"><input id="linkUrl" placeholder="https://chatgpt.com/share/..."><input id="linkTitle" placeholder="Title (optional)" style="flex:0 0 200px"><button class="addl" onclick="addLink()">Add link</button></div>
+ </div>
+ <div class="card">
+  <h3>Your library</h3>
+  <div id="lib"><div class="empty">loading&hellip;</div></div>
+ </div>
+</div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fmtSize(n){ n=+n||0; if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(0)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
+var _stream=null,_rec=null,_chunks=[],_blob=null,_kind='screen',_t0=0,_timer=null;
+function pickMime(video){
+  var c = video ? ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4']
+                : ['audio/webm;codecs=opus','audio/webm','audio/mp4'];
+  for(var i=0;i<c.length;i++){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i]; }
+  return '';
+}
+async function startRec(mode){
+  if(_rec){ return; }
+  _kind = mode==='voice' ? 'voice' : 'screen';
+  try{
+    if(mode==='voice'){
+      _stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    } else {
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){ alert('Screen recording is not supported in this browser. Try Chrome/Edge on desktop, or use Voice.'); return; }
+      _stream = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
+      if(mode==='screenmic'){
+        try{ var mic = await navigator.mediaDevices.getUserMedia({audio:true});
+             mic.getAudioTracks().forEach(function(t){ _stream.addTrack(t); }); }catch(e){}
+      }
+      // stop if the user ends screen-share from the browser chrome
+      var vt=_stream.getVideoTracks()[0]; if(vt) vt.onended=function(){ stopRec(); };
+    }
+  }catch(e){ alert('Could not start: '+e.message); return; }
+  var video = mode!=='voice';
+  var mt = pickMime(video);
+  _chunks=[]; _blob=null;
+  _rec = mt ? new MediaRecorder(_stream,{mimeType:mt}) : new MediaRecorder(_stream);
+  _rec.ondataavailable=function(e){ if(e.data&&e.data.size) _chunks.push(e.data); };
+  _rec.onstop=function(){
+    _blob = new Blob(_chunks,{type:(_rec.mimeType||mt||(video?'video/webm':'audio/webm'))});
+    showPreview(video);
+  };
+  _rec.start();
+  document.getElementById('recbtns').style.display='none';
+  document.getElementById('live').style.display='flex';
+  document.getElementById('livekind').textContent = mode==='voice'?'voice':(mode==='screenmic'?'screen + mic':'screen');
+  document.getElementById('prev').style.display='none';
+  document.getElementById('saverow').style.display='none';
+  _t0=performance.now(); tick();
+  _timer=setInterval(tick,500);
+}
+function tick(){ var s=Math.floor((performance.now()-_t0)/1000); var m=Math.floor(s/60); var ss=s%60;
+  var el=document.getElementById('elapsed'); if(el)el.textContent=(m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+function stopRec(){
+  if(_timer){ clearInterval(_timer); _timer=null; }
+  try{ if(_rec && _rec.state!=='inactive') _rec.stop(); }catch(e){}
+  try{ if(_stream) _stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+  document.getElementById('live').style.display='none';
+  document.getElementById('recbtns').style.display='flex';
+}
+function showPreview(video){
+  var p=document.getElementById('prev'); p.style.display='block';
+  var url=URL.createObjectURL(_blob);
+  p.innerHTML = video ? ('<video src="'+url+'" controls playsinline></video>') : ('<audio src="'+url+'" controls></audio>');
+  document.getElementById('saverow').style.display='flex';
+  _recDur = document.getElementById('elapsed').textContent;
+  _recVideo = video;
+}
+var _recDur='', _recVideo=true;
+function discardRec(){ _blob=null; document.getElementById('prev').innerHTML=''; document.getElementById('prev').style.display='none'; document.getElementById('saverow').style.display='none'; document.getElementById('recTitle').value=''; _rec=null; }
+async function saveRec(){
+  if(!_blob){ alert('Nothing to save yet.'); return; }
+  var btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='Saving…';
+  var ext = (_blob.type.indexOf('mp4')>=0)?'mp4':(_recVideo?'webm':(_blob.type.indexOf('ogg')>=0?'ogg':'webm'));
+  var fd=new FormData();
+  fd.append('file', _blob, 'recording.'+ext);
+  fd.append('title', document.getElementById('recTitle').value||'');
+  fd.append('kind', _recVideo?'screen':'voice');
+  fd.append('duration', _recDur||'');
+  try{
+    var r=await fetch('/api/recordings',{method:'POST',credentials:'include',body:fd});
+    var d=await r.json();
+    if(r.ok && d.ok){ discardRec(); _rec=null; loadLibrary(); }
+    else { alert((d&&(d.detail||d.error))||'save failed'); }
+  }catch(e){ alert('save error: '+e.message); }
+  btn.disabled=false; btn.textContent='Save';
+}
+async function addLink(){
+  var u=document.getElementById('linkUrl').value.trim(); if(!u){ document.getElementById('linkUrl').focus(); return; }
+  var t=document.getElementById('linkTitle').value.trim();
+  try{ var r=await fetch('/api/recordings/link',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u,title:t})});
+    var d=await r.json(); if(r.ok&&d.ok){ document.getElementById('linkUrl').value=''; document.getElementById('linkTitle').value=''; loadLibrary(); }
+    else alert((d&&(d.detail||d.error))||'could not add link');
+  }catch(e){ alert(''+e); }
+}
+function copyShare(id,btn){
+  var url=location.origin+'/r/'+id;
+  var done=function(){ btn.textContent='Copied!'; btn.classList.add('ok'); setTimeout(function(){ btn.textContent='Copy share link'; btn.classList.remove('ok'); },1500); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); }
+  else { prompt('Copy this link:',url); }
+}
+async function delRec(id){ if(!confirm('Delete this recording?'))return;
+  try{ var r=await fetch('/api/recordings/'+id+'/delete',{method:'POST',credentials:'include'}); var d=await r.json();
+    if(r.ok&&d.ok) loadLibrary(); else alert((d&&(d.detail||d.error))||'delete failed'); }catch(e){ alert(''+e); } }
+async function renameRec(id,el){ var t=el.textContent.trim();
+  try{ await fetch('/api/recordings/'+id+'/update',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t})}); }catch(e){} }
+function libItem(r){
+  var media='';
+  if(r.kind==='link'){
+    media = '<div style="margin-top:8px"><a class="ext" href="'+esc(r.ext_link)+'" target="_blank" rel="noopener">'+esc(r.ext_link)+' &#8599;</a></div>';
+  } else if((r.mime||'').indexOf('audio')>=0 || r.kind==='voice'){
+    media = '<audio src="/api/recordings/'+r.id+'/media" controls preload="metadata"></audio>';
+  } else {
+    media = '<video src="/api/recordings/'+r.id+'/media" controls preload="metadata" playsinline></video>';
+  }
+  var badge='<span class="kind '+esc(r.kind||'screen')+'">'+esc(r.source||r.kind||'screen')+'</span>';
+  var sub=[]; if(r.duration)sub.push(esc(r.duration)); if(r.size)sub.push(fmtSize(r.size)); sub.push(esc(r.created_at||''));
+  var share = r.kind==='link' ? '' : '<button class="btn copy" onclick="copyShare(\''+r.id+'\',this)">Copy share link</button>';
+  var tx = r.transcript ? ('<div class="tx"><b>Transcript:</b> '+esc(r.transcript)+'</div>') : '';
+  var note = r.note ? ('<div class="meta" style="margin-top:6px">'+esc(r.note)+'</div>') : '';
+  return '<div class="item"><div class="h"><span class="ti" contenteditable="true" onblur="renameRec(\''+r.id+'\',this)">'+esc(r.title||'Recording')+'</span>'+badge+'</div>'
+    +'<div class="meta">'+sub.join(' &middot; ')+'</div>'+media+tx+note
+    +'<div class="acts">'+share+'<button class="btn del" onclick="delRec(\''+r.id+'\')">Delete</button></div></div>';
+}
+async function loadLibrary(){
+  var box=document.getElementById('lib');
+  try{ var r=await fetch('/api/recordings',{credentials:'include'}); var d=await r.json();
+    var rows=(d&&d.recordings)||[];
+    if(!rows.length){ box.innerHTML='<div class="empty">No recordings yet. Record your screen or voice above &mdash; or paste an AI share link.</div>'; return; }
+    box.innerHTML=rows.map(libItem).join('');
+  }catch(e){ box.innerHTML='<div class="empty">could not load</div>'; }
+}
+loadLibrary();
+</script></body></html>'''
+
+
+@app.get("/recordings", response_class=HTMLResponse)
+def recordings_page():
+    """v3.11 — Loom-style recording library + recorder."""
+    return HTMLResponse(_RECORDINGS_PAGE, headers={"Cache-Control": "no-store, max-age=0"})
+
+
+@app.get("/r/{rid}", response_class=HTMLResponse)
+def recording_share_page(request: Request, rid: str):
+    """v3.11 — share/view page for one recording (auth-gated capability URL)."""
+    if not re.match(r"^[A-Za-z0-9_]+$", rid):
+        raise HTTPException(400, "bad id")
+    rec = _read_recordings().get(rid)
+    if not rec:
+        raise HTTPException(404, "recording not found")
+
+    def h(s):
+        return (str(s or "").replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace('"', "&quot;"))
+    title = h(rec.get("title") or "Recording")
+    if rec.get("kind") == "link":
+        body = (f'<p class="sub">Shared {h(rec.get("source") or "AI")} conversation link:</p>'
+                f'<p><a class="ext" href="{h(rec.get("ext_link"))}" target="_blank" '
+                f'rel="noopener">{h(rec.get("ext_link"))} &#8599;</a></p>')
+    else:
+        is_audio = (rec.get("mime") or "").startswith("audio") or rec.get("kind") == "voice"
+        tag = "audio" if is_audio else "video"
+        extra = "" if is_audio else ' playsinline'
+        body = (f'<{tag} src="/api/recordings/{rid}/media" controls preload="metadata"'
+                f'{extra} style="width:100%;max-height:70vh;border-radius:12px;background:#000"></{tag}>')
+    tx = (f'<div class="tx"><b>Transcript</b><br>{h(rec.get("transcript"))}</div>'
+          if rec.get("transcript") else "")
+    note = f'<p class="note">{h(rec.get("note"))}</p>' if rec.get("note") else ""
+    meta = " · ".join([x for x in [h(rec.get("duration")), h(rec.get("created_at")),
+                                   f"by {h(rec.get('owner'))}"] if x])
+    page = f'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title><style>
+ body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#0b1220;color:#e2e8f0}}
+ .bar{{padding:10px 16px}}.bar a{{color:#93c5fd;text-decoration:none;font-weight:600;font-size:13px}}
+ .wrap{{max-width:900px;margin:0 auto;padding:1.5rem 1.2rem}}
+ h1{{font-size:20px;margin:0 0 4px}} .sub,.meta,.note{{color:#94a3b8;font-size:13px}} .meta{{margin:0 0 16px}}
+ .ext{{color:#93c5fd;word-break:break-all}}
+ .tx{{margin-top:16px;background:#111a2e;border:1px solid #1e293b;border-radius:12px;padding:14px 16px;font-size:13px;color:#cbd5e1;max-height:300px;overflow:auto}}
+ .note{{margin-top:12px}}
+</style></head><body>
+<div class="bar"><a href="/recordings">&larr; Recordings</a></div>
+<div class="wrap"><h1>{title}</h1><div class="meta">{meta}</div>{body}{note}{tx}</div>
+</body></html>'''
+    return HTMLResponse(page, headers={"Cache-Control": "no-store, max-age=0"})
 
 
 @app.post("/api/cluster/request")
@@ -7511,7 +7984,7 @@ def dataset_analysis_page(slug: str):
    .cbar .grow{flex-basis:100%;order:-1}
  }
 </style></head><body>
-<div class="top"><a href="/">&larr; Projects</a><a href="/gallery/__SLUG__">&#128444; Image gallery</a><a href="#" onclick="load(1);return false">&#8635; Recompute</a></div>
+<div class="top"><a href="/">&larr; Projects</a><a href="/gallery/__SLUG__">&#128444; Image gallery</a><a href="/recordings">&#127909; Recordings</a><a href="#" onclick="load(1);return false">&#8635; Recompute</a></div>
 <div class="hero"><h1>&#128202; Dataset analysis</h1><div class="sub"><code>__SLUG__</code> &middot; read-only EDA (no GPU) &middot; <span id="ts"></span></div></div>
 <div class="wrap"><div id="body"><div class="muted">analyzing&hellip; (first run on a big dataset can take a moment)</div></div></div>
 <script>

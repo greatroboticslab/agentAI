@@ -179,6 +179,18 @@ decrypted for a single request and never written to any shared file.
 <img src="docs/screenshots/byok-keys.png" width="560" alt="The API-key modal: OpenAI, Anthropic, and Google each with a password field, an optional model id, and configured/not-set status; text explains the key is encrypted and never shown again">
 </div>
 
+### Step 9 — Record it: screen or voice, then share a link
+
+The **Recordings** page (top nav) captures your **screen**, **screen + mic**, or **voice** — a walkthrough,
+a demo, or a session with strong AI on any interface. A live timer runs; you preview before anything
+uploads; press **Save** and it lands in your library with inline playback, an editable title, and a
+one-click **share link** (`/r/<id>`). You can also **paste an AI share link** (ChatGPT / Claude / Gemini)
+to keep it with the project.
+
+<div align="center">
+<img src="docs/screenshots/recordings-record.png" width="840" alt="The Recordings page: record screen / screen+mic / voice buttons, an audio preview player with a title field and Save/Discard, a paste-AI-link box, and a library">
+</div>
+
 ---
 
 ## 🧠 Ask your data — the analysis agent

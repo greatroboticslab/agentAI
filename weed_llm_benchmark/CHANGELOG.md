@@ -6001,3 +6001,29 @@ path). Delivered:
   a (fake) key → the request reaches OpenAI/Gemini/Anthropic with the user's decrypted key and the
   provider's real auth error is shown ("API key not valid" / "Incorrect API key"). The only piece needing
   a valid key is the successful response — which is exactly what the user supplies (BYO-key).
+
+### v3.11.0 — Recordings: Loom-style screen/voice capture + share links (prof's "record + share" direction)
+
+Prof. Zhang's second track (voice + a Loom-style repo he said "you can borrow", greatroboticslab/
+humanoidrobotweb): record your screen / a session with strong AI / any interface (even a phone or the
+robot app), save it, and share a link. First slice, borrowing his repo's pattern (getDisplayMedia →
+MediaRecorder → upload → store file + metadata → library → playback → share), integrated into our
+platform:
+
+- **`/recordings` page** — record **screen**, **screen + mic**, or **voice**; live elapsed timer; a preview
+  player before anything uploads ("nothing is uploaded until you press Save"); a **library** of saved
+  recordings with inline playback, editable titles, transcripts/notes, per-item **Copy share link**, and
+  delete. Also a **"paste an AI share link"** box (ChatGPT/Claude/Gemini) that keeps the link with the
+  project (stored, not scraped — prof: manual is fine when agent-fetch is unreliable).
+- **`/r/{id}` share page** — a clean dark view page that plays one recording (auth-gated capability URL).
+- **Backend** `POST /api/recordings` (multipart save), `/api/recordings/link`, `GET /api/recordings`
+  (owner-scoped; admins see all), `GET /api/recordings/{id}/media` (**HTTP Range** → 206 so video seeks),
+  `POST /api/recordings/{id}/delete|update` (owner-or-admin, same rule as datasets). Media on disk under
+  `results/framework/recordings/`, metadata in a JSON index.
+- **Verified live (curl + real browser):** save/list/**per-user isolation**/full+**206 range** serve/share
+  page/ownership-403/external-link/delete all pass; in a real browser (fake mic device) the full
+  record → 00:02 timer → stop → preview → Save → library (audio + copy + delete) → `/r/{id}` share loop
+  works; responsive on phone. Screen capture (`getDisplayMedia`) shares the identical code path and needs a
+  real display to exercise — that's the one piece only testable on a real machine.
+- Deferred per the prof's own steer: the "agent auto-clicks the shared link" and the app-monitoring /
+  robot-app-hacking extensions — this ships the record + save + share core first.
