@@ -670,6 +670,24 @@ img{background:#0e1626 !important}
 .km-x{background:rgba(255,255,255,.08) !important;color:#c7d0de !important}
 .prov{background:#0f1830 !important;border-color:rgba(255,255,255,.12) !important}
 .pill.off{background:rgba(255,255,255,.08) !important;color:#aab4c6 !important}
+/* v3.12.4 — lift dark inline TEXT colours that are unreadable on dark (Rename/Edit
+   buttons, "Filter similarity threshold", "Agent push cap", section labels, etc.
+   whose inline color is a dark slate). Coloured text (blue/green/red) isn't listed
+   so it stays. */
+[style*="color:#334155"],[style*="color:#475569"],[style*="color:#0f172a"],[style*="color:#0f1b2d"],
+[style*="color:#1a1a1d"],[style*="color:#1e293b"],[style*="color:#374151"],[style*="color:#1f2937"],
+[style*="color:#334"],[style*="color:#333"],[style*="color:#111"],[style*="color:#222"],
+[style*="color:#444"],[style*="color:#555"],[style*="color:#666"],[style*="color:#0b1220"],
+[style*="color:#1e3a8a"],[style*="color:#3730a3"],[style*="color:#075985"],[style*="color:#312e81"],
+[style*="color:#1e40af"],[style*="color:#166534"],[style*="color:#92400e"],[style*="color:#3f3f46"]{
+ color:#cdd9ef !important}
+[style*="color:#64748b"],[style*="color:#6b7280"],[style*="color:#94a3b8"]{color:#9fb0c7 !important}
+/* mobile: keep the fixed login badge from covering the top nav links */
+@media(max-width:768px){
+ #_authbadge{top:6px !important;right:6px !important;font-size:11px !important;max-width:66vw}
+ #_authbadge span{padding:3px 8px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .top{padding-top:46px !important}
+}
 .stat .v,.stat b,.summary b,.stat .n{color:#f2f6fc !important}
 .stat .l,.help,.note{color:var(--mut) !important}
 .act-btn.danger,.act-btn.warn{border-color:rgba(220,38,38,.4) !important}

@@ -6110,3 +6110,20 @@ the core + my own components. Built a light-element counter and drove it to zero
   the class-detail image-review page went 183 → ~2 (two neutral ✗ buttons in a deliberate ✓/✗/↻ triad).
   Known, intentional: matplotlib chart IMAGES render on white (that's chart content, not the theme) and a
   few stat numbers are slightly dim.
+
+### v3.12.4 — readability: lift dark inline text + fix mobile badge covering the nav
+
+Harry (mobile screenshots): the fixed login badge covered the top-nav links (Guide/Recordings), and many
+labels/buttons were unreadable — dark inline text colors (`#334` on Rename/Edit, `#475569` on
+"Filter similarity threshold", "Agent push cap", section descriptions) stayed dark on the dark theme
+because my earlier lift was non-`!important` and lost to inline colors.
+
+- **Dark inline text → readable:** a set of `[style*="color:#…"]` rules (the common dark slates —
+  `#334 #333 #334155 #475569 #0f172a #1e293b #374151 #1f2937 #111 #222 #444 #555 #666` …) lift to a light
+  slate `#cdd9ef` with `!important` (beats inline); mid-grey `#64748b`/`#94a3b8` lift to `#9fb0c7`. Coloured
+  text (blue/green/red/purple) is not listed, so it keeps its colour. Verified: Rename/Edit button labels,
+  upload help, and project-config labels are now clearly readable.
+- **Mobile login badge:** on ≤768px the fixed `#_authbadge` is shrunk (11px, capped width, ellipsis) and
+  every `.top` nav gains `padding-top:46px`, so the badge sits in the top strip and the nav links drop below
+  it — no more overlap. (Confirmed the 46px padding applies; badge is a viewport-fixed element so the nav
+  content clears it.)
