@@ -762,6 +762,40 @@ img.ld,.card img.ld{background:#0e1626 !important}
  background:#182236 !important;border-color:rgba(255,255,255,.12) !important}
 .act,.class-card{background:#182236 !important;color:var(--txt) !important;border-color:rgba(255,255,255,.14) !important}
 .act:hover,.class-card:hover{background:#1e2a44 !important}
+/* v3.14.2 — buttons that pages style WHITE were unreadable (and glaring) on dark:
+   contrast measured 1.15:1. Give them a dark surface and a MEANINGFUL colour
+   (keep = green, junk = red, unsure = amber), which also calms the page down. */
+.vbtn,button.vbtn{background:#1b2740 !important;border:1px solid rgba(255,255,255,.18) !important;
+ color:#dbe6f5 !important;font-weight:700}
+.vbtn:hover{background:#243356 !important}
+.vbtn.keep{color:#6ee7b7 !important;border-color:rgba(16,185,129,.45) !important}
+.vbtn.keep:hover,.vbtn.keep.on{background:rgba(16,185,129,.20) !important}
+.vbtn.junk{color:#fca5a5 !important;border-color:rgba(239,68,68,.45) !important}
+.vbtn.junk:hover,.vbtn.junk.on{background:rgba(239,68,68,.20) !important}
+.vbtn.unsure{color:#fcd34d !important;border-color:rgba(245,158,11,.45) !important}
+.vbtn.unsure:hover,.vbtn.unsure.on{background:rgba(245,158,11,.18) !important}
+/* generic guard: ANY control the page paints white/near-white gets a dark surface
+   (keeps its own text colour readable) */
+button[style*="background:#f"],button[style*="background: #f"],
+button[style*="background:#e"],button[style*="background: rgb(244"],
+.pill[style*="background:#f"]{background:#1b2740 !important;color:#dbe6f5 !important;
+ border-color:rgba(255,255,255,.18) !important}
+/* descendant buttons in legacy containers (e.g. `.filter-bar button{background:#f4f4f7}`)
+   out-specify a bare `button` rule — override them explicitly, but leave the
+   ACTIVE/selected state its colour so the current filter still stands out. */
+.filter-bar button,.summary button,.section button,.stat button,.box button,
+.panel button,.card button:not(.btn):not(.askbtn):not(.save):not(.rm):not(.fstop):not(.stopb),
+.help button,.note button,.item button,.row button{
+ background:#1b2740 !important;color:#dbe6f5 !important;border-color:rgba(255,255,255,.18) !important}
+.filter-bar button:hover,.item button:hover,.row button:hover{background:#243356 !important}
+.filter-bar button.on,.filter-bar button.active,button.on{
+ background:#059669 !important;color:#fff !important;border-color:#059669 !important}
+/* links on dark: the page's dark-blue (#06c/#2563eb) reads as "muddy" — lift to a
+   calm sky blue so tables stop looking noisy */
+a{color:#93c5fd}
+.wrap a:not(.btn):not(.pill):not(._brand){color:#93c5fd}
+td a,tr a,table a{color:#9ec5fe !important;text-decoration:none}
+td a:hover,table a:hover{color:#c7ddff !important;text-decoration:underline}
 .class-card img{background:#0e1626}
 tr[style*="background:#f"],td[style*="background:#f"]{background:#182236 !important}
 /* bare layout containers (card grids etc.) -> transparent so the dark body shows */
@@ -4161,13 +4195,36 @@ async def api_dataset_upload(request: Request):
                         (".avi" if magic[:4] == b"RIFF" else ".mkv")
                 single_name = base_nm if Path(base_nm).suffix.lower() in _MODALITY_EXT["video"] \
                     else base_nm + _vext
+            # v3.14.1: a single DATA FILE (csv/tsv/json/txt/parquet) — the most
+            # natural thing a newcomer drops in ("here is my sensor log"). Before
+            # this it was rejected as "unsupported upload" because the raw-body
+            # path only sniffed archives/images/video. Found by walking the
+            # newcomer journey end-to-end.
+            if kind is None:
+                # the raw path has no filename (only the dataset name), so sniff
+                # the CONTENT: decodable text that looks tabular/JSON → a data file.
+                _sfx = Path(str(name or "")).suffix.lower()
+                _looks_text = False
+                try:
+                    _head = magic.decode("utf-8")
+                    _looks_text = bool(_head.strip()) and (
+                        "," in _head or "\t" in _head or ";" in _head
+                        or _head.lstrip()[:1] in "[{")
+                except Exception:
+                    _looks_text = False
+                if _sfx in (".csv", ".tsv", ".json", ".jsonl", ".txt", ".ndjson") or _looks_text:
+                    kind = "data1"
+                    _stem = re.sub(r"[^A-Za-z0-9_.-]", "_", Path(str(name or "data")).name) or "data"
+                    _ext = _sfx if _sfx in (".csv", ".tsv", ".json", ".jsonl", ".ndjson", ".txt") else (
+                        ".json" if _head.lstrip()[:1] in "[{" else ".csv")
+                    single_name = _stem if Path(_stem).suffix.lower() == _ext else (_stem + _ext)
         except Exception:
             kind = None
         if kind is None:
             os.unlink(zip_path)
             raise HTTPException(400, "unsupported upload — send a .zip / .tar / .tar.gz / .tgz "
-                                     "archive, a single image (jpg/png/bmp/webp), or a single "
-                                     "video (mp4/mov/avi/mkv/webm)")
+                                     "archive, a data file (csv/tsv/json), a single image "
+                                     "(jpg/png/bmp/webp), or a single video (mp4/mov/avi/mkv/webm)")
 
     # member NAMES (for wrapper-strip + count)
     if kind == "multipart":

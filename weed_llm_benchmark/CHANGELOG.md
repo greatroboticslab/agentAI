@@ -6219,3 +6219,27 @@ month's new features (Recordings 0×, Workbench 0×, API key 0×), and a README 
   (floating bar, auto-transcription, share links, action trace) — coverage went 0 → all; README's Latest
   banner now describes v3.14 and the Recordings section documents the floating bar, auto-transcribe and the
   action-trace timeline, with new screenshots.
+
+### v3.14.1/.2 — full click-through of the newcomer journey (13/13) + two real bugs it found
+
+Walked the entire product on the live server with real clicks, as a new user would, and fixed what broke.
+
+**Bug 1 — a single CSV could not be uploaded from the browser.** Dropping one `.csv` (the most natural
+thing a newcomer does) was rejected: "unsupported upload". The raw-body upload path only sniffed
+archives/images/video, and it has no filename to go by (only the dataset name). Now it **sniffs the
+content** — decodable text that looks tabular/JSON is accepted as a data file (`kind="data1"`), so a lone
+sensor log uploads like an image or a video does. Verified: "✅ 1 data file(s) registered as …".
+
+**Bug 2 — white buttons were invisible and glaring on the dark Data page** (Harry's report). Measured
+contrast was **1.15:1** (white `#f4f4f7`/`#fff` background under light text): the ✓/✗/🤔 verdict buttons and
+the filter tabs. Cause: legacy descendant rules like `.filter-bar button{background:#f4f4f7}` out-specify a
+bare `button` rule. Fixed by overriding descendant buttons inside legacy containers, giving the verdict
+buttons **meaningful colours** (keep = green, junk = red, unsure = amber), and calming the link colour on
+dark (muddy `#06c` → soft sky blue). **Data page now measures 0 low-contrast elements.**
+
+**Journey verified end-to-end, 13/13:** home (unified nav + 3-step card) → create project → upload a real
+CSV → ask a question in plain words (AI wrote code, ran it, plotted, and correctly found the injected
+slowdown at 29.6 s / 2.23 m/s) → edit that code in the browser and re-run (new plot, `rows= 600`) → model
+menu + BYO-key modal (4 models, 3 providers) → export notebook → record with the floating bar + action
+trace → save (auto-transcribe) → share page timeline that seeks the video → a formerly dead-end page has
+the app nav → the guide documents the new features → all test data cleaned up.
