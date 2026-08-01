@@ -6243,3 +6243,12 @@ slowdown at 29.6 s / 2.23 m/s) → edit that code in the browser and re-run (new
 menu + BYO-key modal (4 models, 3 providers) → export notebook → record with the floating bar + action
 trace → save (auto-transcribe) → share page timeline that seeks the video → a formerly dead-end page has
 the app nav → the guide documents the new features → all test data cleaned up.
+
+### v3.14.3 — personal API keys are now findable (AI models page), not only inside the chat
+
+Discoverability gap: bring-your-own-key could only be reached from a dataset's Analyze composer (the 🔑
+button), so a user looking for a settings screen could not find it. The **AI models** page (More menu → AI
+models) now carries a "Your own AI accounts" card with the same three providers, the same encrypted-storage
+guarantees, per-provider model override, Save/Remove, and a pointer to where the model is then selected.
+Both entry points use the same `/api/user/llm_key*` endpoints. Verified on the live page: section renders
+with 3 providers, 3 password fields and working Save controls.

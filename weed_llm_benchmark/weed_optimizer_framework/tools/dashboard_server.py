@@ -3821,7 +3821,17 @@ def models_page():
 <div class="top"><a href="/">&larr; Projects</a></div>
 <div class="hero"><h1>&#129504; Models</h1><div class="sub">Which model each agent role uses. Mix local (Ollama) and APIs (DeepSeek / GLM / OpenAI / Anthropic) or a cluster vLLM endpoint &mdash; switch any time. Model id = <code>provider:name</code>.</div></div>
 <div class="wrap">
- <div class="card"><h3>Providers</h3><div class="d">Green = ready to use now. API keys live in <code>~/.llm_keys</code> on the server (DEEPSEEK_API_KEY, ZHIPU_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY). Ollama = a local model server.</div><div class="prov" id="prov">loading…</div></div>
+ <div class="card" id="mykeys"><h3>&#128273; Your own AI accounts (bring your own key)</h3>
+   <div class="d">Use <b>GPT / Claude / Gemini</b> in the analysis chat on <b>your own account</b>. Your key is
+   <b>encrypted on this server, used only for your requests, and never shown again</b>. Whichever model you
+   pick, it writes the analysis code and <b>the code still runs in our sandbox on your data</b>.
+   Get a key: OpenAI &rarr; platform.openai.com &middot; Anthropic &rarr; console.anthropic.com &middot;
+   Google &rarr; aistudio.google.com (free tier).</div>
+   <div id="mkList">loading&hellip;</div>
+   <div class="d" style="margin-top:8px">Then open any dataset &rarr; <b>Analyze</b> &rarr; pick the model in the
+   <b>&#129302;</b> menu next to the question box.</div>
+ </div>
+ <div class="card"><h3>Providers</h3><div class="d">Green = ready to use now. Server-wide keys live in <code>~/.llm_keys</code>; personal keys are set above. Ollama = a local model server.</div><div class="prov" id="prov">loading…</div></div>
  <div id="roles"></div>
  <div class="card"><h3>Test a model</h3><div class="d">Send a tiny prompt to verify a model id works (admin).</div>
    <input id="tm" placeholder="e.g. deepseek:deepseek-chat or ollama:gemma2"> <button onclick="testModel()">Test</button>
@@ -3842,7 +3852,45 @@ def models_page():
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 var ME={is_admin:false},DATA={};
+// v3.14.3 — personal (bring-your-own) commercial keys, manageable from this page
+// as well as from the analysis chat, so the setting is findable.
+var MK=[['openai','OpenAI · GPT'],['anthropic','Anthropic · Claude'],['gemini','Google · Gemini']];
+async function mkLoad(){
+  var box=document.getElementById('mkList'); if(!box)return;
+  try{
+    var d=await (await fetch('/api/user/llm_keys',{credentials:'include'})).json();
+    var pv=(d&&d.providers)||{};
+    box.innerHTML=MK.map(function(pr){var k=pr[0],i=pv[k]||{};
+      return '<div style="border:1px solid #e3e7ef;border-radius:10px;padding:10px 12px;margin-bottom:8px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'
+        +'<b style="font-size:13.5px">'+pr[1]+'</b>'
+        +'<span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;'
+        +(i.configured?'background:#dcfce7;color:#166534':'background:#f1f5f9;color:#64748b')+'">'
+        +(i.configured?'configured':'not set')+'</span></div>'
+        +'<input id="mk_'+k+'" type="password" autocomplete="off" placeholder="'+(i.configured?'key saved — paste a new one to replace':'paste your API key')+'" style="width:100%">'
+        +'<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'
+        +'<input id="mm_'+k+'" value="'+esc(i.model||'')+'" placeholder="model id (optional)" style="width:200px">'
+        +'<button onclick="mkSave(\\''+k+'\\')">Save</button>'
+        +(i.configured?('<button onclick="mkDel(\\''+k+'\\')" style="color:#dc2626">Remove</button>'):'')
+        +'</div></div>';}).join('');
+  }catch(e){ box.innerHTML='<span style="color:#b45309">could not load key status</span>'; }
+}
+async function mkSave(k){
+  var key=(document.getElementById('mk_'+k).value||'').trim();
+  var mdl=(document.getElementById('mm_'+k).value||'').trim();
+  if(!key&&!mdl){ alert('Paste your API key first.'); return; }
+  var r=await fetch('/api/user/llm_key',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({provider:k,key:key,model:mdl})});
+  var d=await r.json();
+  if(r.ok&&d.ok) mkLoad(); else alert((d&&(d.detail||d.error))||'save failed');
+}
+async function mkDel(k){
+  if(!confirm('Remove your saved '+k+' key?'))return;
+  await fetch('/api/user/llm_key/delete',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:k})});
+  mkLoad();
+}
 async function load(){
+ mkLoad();
  try{ME=await (await fetch('/api/me',{credentials:'include'})).json();}catch(e){}
  DATA=await (await fetch('/api/models',{credentials:'include'})).json();
  var pv=document.getElementById('prov');pv.innerHTML='';
