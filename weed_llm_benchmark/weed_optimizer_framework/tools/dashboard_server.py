@@ -2485,6 +2485,24 @@ async def api_recordings_create(request: Request):
     with open(_RECORDINGS_DIR / (rid + ext), "wb") as f:
         f.write(data)
     kind = str(form.get("kind") or ("voice" if mime.startswith("audio") else "screen"))[:20]
+    # v3.13 (B): the ACTION TRACE recorded alongside the media — timestamped
+    # clicks/keys/navigation captured inside our own pages while recording. This
+    # is the structured half of "record the interface": a video shows WHAT
+    # happened, the trace says WHICH control at WHICH second — the input an agent
+    # would need to replay/assist later (prof: "agent function to help user click").
+    trace = []
+    try:
+        _t = json.loads(str(form.get("trace") or "[]"))
+        if isinstance(_t, list):
+            for ev in _t[:2000]:
+                if isinstance(ev, dict):
+                    trace.append({"t": round(float(ev.get("t") or 0), 2),
+                                  "type": str(ev.get("type") or "")[:16],
+                                  "label": str(ev.get("label") or "")[:120],
+                                  "sel": str(ev.get("sel") or "")[:160],
+                                  "page": str(ev.get("page") or "")[:120]})
+    except Exception:
+        trace = []
     meta = {"id": rid, "owner": actor, "kind": kind, "mime": mime, "ext": ext,
             "size": len(data),
             "title": (str(form.get("title") or "").strip()[:140]
@@ -2492,7 +2510,23 @@ async def api_recordings_create(request: Request):
             "note": str(form.get("note") or "").strip()[:2000],
             "transcript": str(form.get("transcript") or "").strip()[:20000],
             "duration": str(form.get("duration") or "")[:12],
+            "trace": trace,
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    # v3.13 (A3): auto-transcribe on save with the self-hosted Whisper (same model
+    # the voice chat uses), like the lab repo's "Submitting & Transcribing…".
+    if not meta["transcript"] and str(form.get("transcribe") or "1") not in ("0", "false"):
+        try:
+            _wm = _get_whisper()
+            if _wm is not None:
+                _p = str(_RECORDINGS_DIR / (rid + ext))
+
+                def _do_tx():
+                    segs, _i = _wm.transcribe(_p, beam_size=1)
+                    return "".join(s.text for s in segs).strip()
+                async with _LAB_INFER_SEM:
+                    meta["transcript"] = (await _asyncio.to_thread(_do_tx))[:20000]
+        except Exception as e:
+            log.warning(f"[recordings] auto-transcribe failed for {rid}: {e}")
     store = _read_recordings()
     store[rid] = meta
     _write_recordings(store)
@@ -2534,7 +2568,7 @@ def api_recordings_list(request: Request):
     actor = _actor_from_request(request)
     admin = _is_admin(actor)
     fields = ("id", "owner", "title", "kind", "mime", "size", "duration",
-              "transcript", "note", "ext_link", "source", "created_at")
+              "transcript", "note", "ext_link", "source", "created_at", "trace")
     rows = [{k: r.get(k) for k in fields} for r in _read_recordings().values()
             if admin or r.get("owner") == actor]
     rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
@@ -2643,7 +2677,19 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
  .tx{margin-top:8px;font-size:12.5px;color:#334155;background:#f8fafc;border-radius:8px;padding:8px 10px;max-height:120px;overflow:auto}
  .empty{color:var(--mut);font-size:13px;text-align:center;padding:20px;border:1px dashed var(--line);border-radius:12px}
  a.ext{color:#2563eb;font-weight:600;text-decoration:none}
- @media(max-width:640px){.wrap{padding:1rem}.hero{padding:1rem}}
+ /* Loom-style floating recorder bar (stays visible while you work elsewhere) */
+ .fbar{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:99998;display:none;
+   align-items:center;gap:14px;background:rgba(10,15,26,.95);border:1px solid rgba(255,255,255,.16);
+   border-radius:999px;padding:10px 16px;box-shadow:0 18px 44px rgba(0,0,0,.55);
+   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+ .fbar.on{display:flex}
+ .fbar .fdot{width:11px;height:11px;border-radius:50%;background:#ef4444;animation:pulse 1s infinite}
+ .fbar .flabel{font-size:13px;font-weight:600;color:#e2e8f4}
+ .fbar .ftime{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#34d399}
+ .fbar .fstop{border:0;background:#dc2626;color:#fff;font-weight:700;padding:7px 14px;border-radius:999px;cursor:pointer;font-size:13px}
+ .fbar .fsteps{font-size:11.5px;color:#94a3b8}
+ .live video{width:100%;max-width:340px;border-radius:10px;background:#000;margin-top:8px}
+ @media(max-width:640px){.wrap{padding:1rem}.hero{padding:1rem}.fbar{width:calc(100% - 24px);border-radius:14px;justify-content:space-between}}
 </style></head><body>
 <div class="top"><a href="/">&larr; Projects</a><a href="/guide">Guide</a></div>
 <div class="hero"><h1>&#127909; Recordings</h1><div class="sub">Record your screen or voice &mdash; a session with strong AI, a demo, any interface &mdash; save it, and share a link. Nothing is uploaded until you press Save.</div></div>
@@ -2654,9 +2700,11 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
   <div class="recbtns" id="recbtns">
    <button class="rb" onclick="startRec('screen')"><span class="em">&#128421;</span> Record screen</button>
    <button class="rb" onclick="startRec('screenmic')"><span class="em">&#128421;</span>+&#127908; Screen + mic</button>
+   <button class="rb" onclick="startRec('video')"><span class="em">&#127909;</span> Record video (camera)</button>
    <button class="rb" onclick="startRec('voice')"><span class="em">&#127908;</span> Voice only</button>
   </div>
-  <div class="live" id="live"><span class="dot"></span><b id="elapsed">00:00</b><span class="meta" id="livekind"></span><button class="stopb" onclick="stopRec()">&#9209; Stop</button></div>
+  <div class="live" id="live"><span class="dot"></span><b id="elapsed">00:00</b><span class="meta" id="livekind"></span><button class="stopb" onclick="stopRec()">&#9209; Stop</button>
+   <video id="camprev" muted autoplay playsinline style="display:none"></video></div>
   <div class="prev" id="prev"></div>
   <div class="saverow" id="saverow" style="display:none">
    <input id="recTitle" placeholder="Title this recording (optional)">
@@ -2674,6 +2722,12 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
   <div id="lib"><div class="empty">loading&hellip;</div></div>
  </div>
 </div>
+<div class="fbar" id="fbar">
+ <span class="fdot"></span><span class="flabel" id="fkind">Recording</span>
+ <span class="ftime" id="ftime">00:00</span>
+ <span class="fsteps" id="fsteps"></span>
+ <button class="fstop" onclick="stopRec()">&#9632; Stop</button>
+</div>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function fmtSize(n){ n=+n||0; if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(0)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
@@ -2686,12 +2740,16 @@ function pickMime(video){
 }
 async function startRec(mode){
   if(_rec){ return; }
-  _kind = mode==='voice' ? 'voice' : 'screen';
+  _kind = mode==='voice' ? 'voice' : (mode==='video' ? 'video' : 'screen');
   try{
     if(mode==='voice'){
       _stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    } else if(mode==='video'){
+      // camera + mic, with a live preview (works on phones too)
+      _stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:true});
+      var cp=document.getElementById('camprev'); if(cp){ cp.srcObject=_stream; cp.style.display='block'; }
     } else {
-      if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){ alert('Screen recording is not supported in this browser. Try Chrome/Edge on desktop, or use Voice.'); return; }
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){ alert('Screen recording is not supported in this browser. Try Chrome/Edge on desktop, or use "Record video (camera)" / Voice on a phone.'); return; }
       _stream = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
       if(mode==='screenmic'){
         try{ var mic = await navigator.mediaDevices.getUserMedia({audio:true});
@@ -2702,6 +2760,7 @@ async function startRec(mode){
     }
   }catch(e){ alert('Could not start: '+e.message); return; }
   var video = mode!=='voice';
+  traceStart();
   var mt = pickMime(video);
   _chunks=[]; _blob=null;
   _rec = mt ? new MediaRecorder(_stream,{mimeType:mt}) : new MediaRecorder(_stream);
@@ -2711,23 +2770,63 @@ async function startRec(mode){
     showPreview(video);
   };
   _rec.start();
+  var label = mode==='voice'?'voice':(mode==='video'?'camera':(mode==='screenmic'?'screen + mic':'screen'));
   document.getElementById('recbtns').style.display='none';
   document.getElementById('live').style.display='flex';
-  document.getElementById('livekind').textContent = mode==='voice'?'voice':(mode==='screenmic'?'screen + mic':'screen');
+  document.getElementById('livekind').textContent = label;
+  document.getElementById('fkind').textContent = 'Recording '+label;
+  document.getElementById('fbar').classList.add('on');   // Loom-style floating bar
   document.getElementById('prev').style.display='none';
   document.getElementById('saverow').style.display='none';
   _t0=performance.now(); tick();
   _timer=setInterval(tick,500);
 }
 function tick(){ var s=Math.floor((performance.now()-_t0)/1000); var m=Math.floor(s/60); var ss=s%60;
-  var el=document.getElementById('elapsed'); if(el)el.textContent=(m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+  var txt=(m<10?'0':'')+m+':'+(ss<10?'0':'')+ss;
+  var el=document.getElementById('elapsed'); if(el)el.textContent=txt;
+  var ft=document.getElementById('ftime'); if(ft)ft.textContent=txt;
+  var fs=document.getElementById('fsteps'); if(fs)fs.textContent=_trace.length?(_trace.length+' step(s)'):''; }
 function stopRec(){
   if(_timer){ clearInterval(_timer); _timer=null; }
+  traceStop();
   try{ if(_rec && _rec.state!=='inactive') _rec.stop(); }catch(e){}
   try{ if(_stream) _stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+  var cp=document.getElementById('camprev'); if(cp){ cp.srcObject=null; cp.style.display='none'; }
   document.getElementById('live').style.display='none';
+  document.getElementById('fbar').classList.remove('on');
   document.getElementById('recbtns').style.display='flex';
 }
+// ---- ACTION TRACE (B): capture what the user does INSIDE our pages while
+// recording — timestamped clicks/keys/navigation. The video shows what happened;
+// the trace says which control at which second (the input an agent needs later).
+var _trace=[],_traceOn=false,_traceHandlers=null;
+function _elLabel(el){
+  if(!el)return '';
+  var t=(el.innerText||el.value||el.getAttribute&&(el.getAttribute('aria-label')||el.getAttribute('title')||el.getAttribute('placeholder'))||'').trim();
+  return t.replace(/\s+/g,' ').slice(0,80);
+}
+function _elSel(el){
+  if(!el||!el.tagName)return '';
+  var s=el.tagName.toLowerCase();
+  if(el.id)s+='#'+el.id;
+  else if(el.className&&typeof el.className==='string'&&el.className.trim())s+='.'+el.className.trim().split(/\s+/).slice(0,2).join('.');
+  return s.slice(0,150);
+}
+function traceStart(){
+  _trace=[]; _traceOn=true;
+  var onClick=function(e){ if(!_traceOn)return;
+    var el=e.target&&e.target.closest?(e.target.closest('button,a,input,select,textarea,[onclick],.rb,.toolbtn')||e.target):e.target;
+    _trace.push({t:(performance.now()-_t0)/1000,type:'click',label:_elLabel(el),sel:_elSel(el),page:location.pathname}); };
+  var onKey=function(e){ if(!_traceOn)return;
+    if(e.key==='Enter'||e.key==='Escape'||(e.metaKey||e.ctrlKey))
+      _trace.push({t:(performance.now()-_t0)/1000,type:'key',label:(e.ctrlKey?'Ctrl+':'')+(e.metaKey?'Cmd+':'')+e.key,sel:_elSel(e.target),page:location.pathname}); };
+  document.addEventListener('click',onClick,true);
+  document.addEventListener('keydown',onKey,true);
+  _traceHandlers={c:onClick,k:onKey};
+}
+function traceStop(){ _traceOn=false;
+  if(_traceHandlers){ document.removeEventListener('click',_traceHandlers.c,true);
+    document.removeEventListener('keydown',_traceHandlers.k,true); _traceHandlers=null; } }
 function showPreview(video){
   var p=document.getElementById('prev'); p.style.display='block';
   var url=URL.createObjectURL(_blob);
@@ -2740,13 +2839,14 @@ var _recDur='', _recVideo=true;
 function discardRec(){ _blob=null; document.getElementById('prev').innerHTML=''; document.getElementById('prev').style.display='none'; document.getElementById('saverow').style.display='none'; document.getElementById('recTitle').value=''; _rec=null; }
 async function saveRec(){
   if(!_blob){ alert('Nothing to save yet.'); return; }
-  var btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='Saving…';
+  var btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='Saving & transcribing…';
   var ext = (_blob.type.indexOf('mp4')>=0)?'mp4':(_recVideo?'webm':(_blob.type.indexOf('ogg')>=0?'ogg':'webm'));
   var fd=new FormData();
   fd.append('file', _blob, 'recording.'+ext);
   fd.append('title', document.getElementById('recTitle').value||'');
-  fd.append('kind', _recVideo?'screen':'voice');
+  fd.append('kind', _kind||(_recVideo?'screen':'voice'));
   fd.append('duration', _recDur||'');
+  fd.append('trace', JSON.stringify(_trace||[]));
   try{
     var r=await fetch('/api/recordings',{method:'POST',credentials:'include',body:fd});
     var d=await r.json();
@@ -2778,7 +2878,7 @@ function libItem(r){
   var media='';
   if(r.kind==='link'){
     media = '<div style="margin-top:8px"><a class="ext" href="'+esc(r.ext_link)+'" target="_blank" rel="noopener">'+esc(r.ext_link)+' &#8599;</a></div>';
-  } else if((r.mime||'').indexOf('audio')>=0 || r.kind==='voice'){
+  } else if(((r.mime||'').indexOf('audio')>=0 && r.kind!=='video') || r.kind==='voice'){
     media = '<audio src="/api/recordings/'+r.id+'/media" controls preload="metadata"></audio>';
   } else {
     media = '<video src="/api/recordings/'+r.id+'/media" controls preload="metadata" playsinline></video>';
@@ -2787,9 +2887,10 @@ function libItem(r){
   var sub=[]; if(r.duration)sub.push(esc(r.duration)); if(r.size)sub.push(fmtSize(r.size)); sub.push(esc(r.created_at||''));
   var share = r.kind==='link' ? '' : '<button class="btn copy" onclick="copyShare(\''+r.id+'\',this)">Copy share link</button>';
   var tx = r.transcript ? ('<div class="tx"><b>Transcript:</b> '+esc(r.transcript)+'</div>') : '';
+  var steps = (r.trace&&r.trace.length) ? ('<div class="meta" style="margin-top:6px">&#128279; '+r.trace.length+' action step(s) recorded &middot; <a class="ext" href="/r/'+r.id+'">view timeline &rarr;</a></div>') : '';
   var note = r.note ? ('<div class="meta" style="margin-top:6px">'+esc(r.note)+'</div>') : '';
   return '<div class="item"><div class="h"><span class="ti" contenteditable="true" onblur="renameRec(\''+r.id+'\',this)">'+esc(r.title||'Recording')+'</span>'+badge+'</div>'
-    +'<div class="meta">'+sub.join(' &middot; ')+'</div>'+media+tx+note
+    +'<div class="meta">'+sub.join(' &middot; ')+'</div>'+media+steps+tx+note
     +'<div class="acts">'+share+'<button class="btn del" onclick="delRec(\''+r.id+'\')">Delete</button></div></div>';
 }
 async function loadLibrary(){
@@ -2831,8 +2932,26 @@ def recording_share_page(request: Request, rid: str):
         is_audio = (rec.get("mime") or "").startswith("audio") or rec.get("kind") == "voice"
         tag = "audio" if is_audio else "video"
         extra = "" if is_audio else ' playsinline'
-        body = (f'<{tag} src="/api/recordings/{rid}/media" controls preload="metadata"'
+        body = (f'<{tag} id="med" src="/api/recordings/{rid}/media" controls preload="metadata"'
                 f'{extra} style="width:100%;max-height:70vh;border-radius:12px;background:#000"></{tag}>')
+    # v3.13 (B): the recorded ACTION TRACE as a clickable timeline — each step
+    # seeks the media to that moment. Video shows what happened; the trace says
+    # which control, when.
+    _tr = rec.get("trace") or []
+    if _tr:
+        _rows = "".join(
+            f'<div class="ev" data-t="{e.get("t", 0)}">'
+            f'<span class="tt">{int(float(e.get("t") or 0)) // 60:02d}:'
+            f'{int(float(e.get("t") or 0)) % 60:02d}</span>'
+            f'<span class="ty">{h(e.get("type"))}</span>'
+            f'<span class="lb">{h(e.get("label"))}</span></div>'
+            for e in _tr[:400])
+        body += (f'<div class="trace"><b>Action trace</b> '
+                 f'<span class="sub">{len(_tr)} step(s) recorded inside the platform — '
+                 f'click one to jump the video there</span>{_rows}</div>'
+                 '<script>document.querySelectorAll(".ev").forEach(function(el){'
+                 'el.onclick=function(){var m=document.getElementById("med");'
+                 'if(m){m.currentTime=parseFloat(el.dataset.t)||0;m.play();}};});</script>')
     tx = (f'<div class="tx"><b>Transcript</b><br>{h(rec.get("transcript"))}</div>'
           if rec.get("transcript") else "")
     note = f'<p class="note">{h(rec.get("note"))}</p>' if rec.get("note") else ""
@@ -2847,6 +2966,12 @@ def recording_share_page(request: Request, rid: str):
  .ext{{color:#93c5fd;word-break:break-all}}
  .tx{{margin-top:16px;background:#111a2e;border:1px solid #1e293b;border-radius:12px;padding:14px 16px;font-size:13px;color:#cbd5e1;max-height:300px;overflow:auto}}
  .note{{margin-top:12px}}
+ .trace{{margin-top:16px;background:#111a2e;border:1px solid #1e293b;border-radius:12px;padding:14px 16px;max-height:340px;overflow:auto}}
+ .trace b{{font-size:13px}} .trace .sub{{color:#94a3b8;font-size:12px;margin-left:6px}}
+ .ev{{display:flex;gap:10px;align-items:baseline;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12.5px}}
+ .ev:hover{{background:rgba(16,185,129,.14)}}
+ .ev .tt{{color:#34d399;font-family:ui-monospace,Menlo,monospace;flex:0 0 46px}}
+ .ev .ty{{color:#93c5fd;flex:0 0 62px}} .ev .lb{{color:#cbd5e1}}
 </style></head><body>
 <div class="bar"><a href="/recordings">&larr; Recordings</a></div>
 <div class="wrap"><h1>{title}</h1><div class="meta">{meta}</div>{body}{note}{tx}</div>

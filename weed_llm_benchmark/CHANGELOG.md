@@ -6152,3 +6152,32 @@ account bar wasn't showing.
 - **Stale cache:** the account bar (and earlier fixes) "didn't show" because HTML pages had no cache
   header, so phones served an old copy. The HTML-injection middleware now sets `Cache-Control: no-store`
   on every HTML response — pages are always fresh (static assets untouched). Confirmed on /agent/weed.
+
+### v3.13.0 — Loom parity (floating bar, camera, auto-transcribe) + action trace ("beyond Loom", first slice)
+
+Re-read the lab's greatroboticslab/humanoidrobotweb recorder properly and closed the gaps, then took the
+first real step on the prof's "please improve / beyond what Loom can do".
+
+**A — parity with their Loom implementation:**
+- **Floating recorder bar** (their signature UI): a fixed pill with a pulsing red dot, the kind being
+  recorded, a live `mm:ss` timer, the live action-step count, and Stop — stays visible while you work in
+  other windows.
+- **Record video (camera)** with a live preview, alongside Record screen / Screen+mic / Voice. Works on
+  phones, where screen capture is unavailable.
+- **Auto-transcribe on save** (their "Submitting & Transcribing…"): the self-hosted Whisper on the lab GPU
+  transcribes the saved media server-side; the transcript shows in the library and on the share page.
+
+**B — beyond Loom (the direction he actually asked for):** while recording, we also capture a timestamped
+**ACTION TRACE** of what the user does inside our pages (clicks/keys → label, selector, page, t+seconds).
+A video shows *what* happened; the trace records *which control at which second* — the structured input an
+agent needs to assist or replay later. Rendered on the share page as a **clickable timeline that seeks the
+video** to each step, and surfaced in the library.
+
+**Verified live (real browser, fake camera/mic):** buttons = screen / screen+mic / camera / voice; floating
+bar visible + labeled + counting steps; camera preview live; 4 trace steps captured with real labels
+("Title (optional)", "New recording") and saved; share page renders 4 steps and clicking one seeks the
+video to t=1.86s; **auto-transcribe proven with real speech** — saving a real voice message returned
+"Purpose is to learn from strong AI ... recording screen ... upload files to MongoDB".
+
+Still open (honest): the agent that *acts on* a trace (auto-clicking / monitoring apps outside our pages)
+is not built — the trace is its prerequisite, and capture outside our own tab isn't possible from a browser.

@@ -13,6 +13,18 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-07-31 (later) — v3.13.0: Loom parity + action trace
+
+Harry asked whether I'd really referenced the prof's repo. Honest answer was "half" — I'd borrowed the
+technical core (getDisplayMedia -> MediaRecorder -> upload -> library) but skipped their signature UI and
+the "improve beyond Loom" ask. Re-read their VideoDetail.jsx properly and closed it: floating recorder bar
+(red dot + timer + Stop, visible while you work elsewhere), camera recording with live preview, and
+auto-transcribe on save via our self-hosted Whisper. Then the first real step BEYOND Loom: while recording
+we capture a timestamped ACTION TRACE of clicks/keys inside our pages (label + selector + page + t), shown
+on the share page as a clickable timeline that seeks the video. That trace is the prerequisite for the
+prof's "agent function to help user click". Verified live incl. auto-transcribe on real speech. Not built:
+an agent that replays/acts on traces, and capture outside our own tab (browser-impossible).
+
 ## 2026-07-31 (later) — v3.12.3: dark theme swept across every page
 
 Extended the audit to all edge pages (annotate/audit/control/manual/morning/roboflow/rounds/synth/
