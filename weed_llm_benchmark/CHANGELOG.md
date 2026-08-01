@@ -6252,3 +6252,25 @@ models) now carries a "Your own AI accounts" card with the same three providers,
 guarantees, per-provider model override, Save/Remove, and a pointer to where the model is then selected.
 Both entry points use the same `/api/user/llm_key*` endpoints. Verified on the live page: section renders
 with 3 providers, 3 password fields and working Save controls.
+
+### v3.14.5 — colour pass: every page measured, plus a runtime contrast safety net
+
+A reported white patch on the class-audit (cotton weed) page prompted a proper WCAG-style scan of the whole
+site with a valid session. (An earlier "all clean" scan was invalid — the session had expired, so it was
+measuring the login page. Sessions are now re-minted before each audit run.)
+
+- **Measured**: 25 text elements below ~3.2:1 across 12 pages — greys (`#666`, `#555`), near-black
+  (`#0f172a`) and saturated blues set by page *rules* (not inline styles), plus pale chips/pills carrying
+  light text.
+- **Fixed statically** where a selector could reach it: legacy text classes (`.ds .cls .lab .val .num .ord
+  .act-status .navhelp`), headings, badges/pills/chips (with semantic colours: ok = green, bad = red,
+  warn = amber), filter/bulk/toolbar buttons, and the class-audit page's white filter buttons and badges.
+- **Runtime contrast pass** for what CSS cannot reach (page `!important` rules and JS-rendered markup): after
+  load, each text node's colour is measured against its effective background and only failing ones are
+  lifted — dark-on-dark goes light, light-on-pale goes dark. Bounded (≤600 fixes, leaf text ≤80 chars) and
+  run at load + 1.8 s + 4 s to catch dynamic content.
+- **Destructive-action cards** (restart / bulk download) changed from a pale pink block to a dark red tint,
+  keeping the warning meaning without glaring on the dark theme.
+
+**Result: 0 low-contrast text elements across all 12 audited pages** (home, Data, Recordings, Guide, AI
+models, project, dataset analysis, console, browse images, labeling, rounds, users).

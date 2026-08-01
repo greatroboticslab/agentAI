@@ -725,6 +725,12 @@ b,strong{color:inherit !important}
 .stat .v,.stat b,.summary b,.stat .n{color:#f2f6fc !important}
 .stat .l,.help,.note{color:var(--mut) !important}
 .act-btn.danger,.act-btn.warn{border-color:rgba(220,38,38,.4) !important}
+/* destructive actions keep their warning meaning, but as a dark red tint rather
+   than a pale block that glares on the dark theme */
+.dangerous,.act.dangerous,.danger-card{background:rgba(220,38,38,.13) !important;
+ border:1px solid rgba(239,68,68,.38) !important}
+.dangerous .nm,.dangerous b,.danger-card .nm{color:#fca5a5 !important}
+.dangerous .ds,.dangerous div{color:#e3b9bd !important}
 .filter-tab{background:rgba(255,255,255,.05) !important;color:#c7d0de !important;border:1px solid rgba(255,255,255,.14) !important}
 .filter-tab.on,.filter-tab.active,.filter-tab[aria-selected="true"]{background:#059669 !important;color:#fff !important;border-color:#059669 !important}
 .nav{background:rgba(9,13,21,.72) !important;color:var(--txt) !important;border-color:rgba(255,255,255,.10) !important}
@@ -785,8 +791,31 @@ button[style*="background:#e"],button[style*="background: rgb(244"],
    ACTIVE/selected state its colour so the current filter still stands out. */
 .filter-bar button,.summary button,.section button,.stat button,.box button,
 .panel button,.card button:not(.btn):not(.askbtn):not(.save):not(.rm):not(.fstop):not(.stopb),
-.help button,.note button,.item button,.row button{
+.help button,.note button,.item button,.row button,
+.bulk button,.bulk-clear,.backbar button,.toolbar button:not(.ftab),
+.filters button,.tabs button,.controls button,.actions button{
  background:#1b2740 !important;color:#dbe6f5 !important;border-color:rgba(255,255,255,.18) !important}
+/* status badges that pages paint white/pale (e.g. "✗ mislabeled 0") */
+.badge:not(.on),.badge.bad,.badge.ok,.badge.warn,.tag,.chip{
+ background:#1b2740 !important;border:1px solid rgba(255,255,255,.16) !important}
+/* v3.14.5 — text colours set by page RULES (not inline) that fail contrast on dark.
+   Measured with a WCAG-style scan; every selector below was under ~3.2:1. */
+.ds,.cls,.lab,.val,.num,.ord,.ord.alt,.act-status,.navhelp,.sub,.desc,.hint,.small,.meta2{
+ color:#aab7cc !important}
+h1,h2,h3,h4,h5,.val,.n,.big{color:#f2f6fc !important}
+.badge,.pill,.cls-chip,.tag,.chip{color:#cfe0f7 !important}
+.badge.ok,.pill.ok,.cls-chip.ok{color:#6ee7b7 !important}
+.badge.bad,.pill.bad{color:#fca5a5 !important}
+.badge.warn,.cls-chip.uncategorized,.cls-chip.warn{color:#fcd34d !important;
+ background:rgba(245,158,11,.14) !important;border-color:rgba(245,158,11,.35) !important}
+.act-status{color:#6ee7b7 !important}
+.navhelp{color:#7dd3a8 !important}
+/* saturated-blue buttons/links that pages use for actions -> readable on dark */
+.exp,.cta,.go,button.exp{color:#04263a !important}
+a[style*="color:#2563eb"],a[style*="color:#1d4ed8"],.pill[style*="color:#1d4ed8"]{color:#93c5fd !important}
+.badge.bad{color:#fca5a5 !important;border-color:rgba(239,68,68,.40) !important}
+.badge.ok{color:#6ee7b7 !important;border-color:rgba(16,185,129,.40) !important}
+.badge.warn{color:#fcd34d !important;border-color:rgba(245,158,11,.40) !important}
 .filter-bar button:hover,.item button:hover,.row button:hover{background:#243356 !important}
 .filter-bar button.on,.filter-bar button.active,button.on{
  background:#059669 !important;color:#fff !important;border-color:#059669 !important}
@@ -880,6 +909,38 @@ document.addEventListener('click',function(){var m=document.getElementById('_nav
   });
  }
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_navTidy); else _navTidy();
+
+ // v3.14.5 — runtime CONTRAST PASS. Legacy pages set text/background colours in
+ // their own rules (sometimes !important) and in JS-rendered markup, so no static
+ // stylesheet can catch them all. After load, measure each text node's colour
+ // against its effective background and lift only what fails (<3.2:1) — dark text
+ // on dark goes light, light text on a pale chip goes dark. Bounded and run twice
+ // (load + after dynamic content) so it cannot cost noticeable time.
+ function _fixContrast(){
+   var lum=function(x){x/=255;return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4);};
+   var L=function(c){return 0.2126*lum(c[0])+0.7152*lum(c[1])+0.0722*lum(c[2]);};
+   var parse=function(s){var m=s&&s.match(/rgba?\\((\\d+), (\\d+), (\\d+)(?:, ([\\d.]+))?/);
+     return m?{c:[+m[1],+m[2],+m[3]],a:(m[4]!==undefined?+m[4]:1)}:null;};
+   var bgOf=function(el){var n=el;while(n&&n.nodeType===1){var b=parse(getComputedStyle(n).backgroundColor);
+     if(b&&b.a>0.5)return b.c; n=n.parentElement;} return [11,16,32];};
+   var els=document.querySelectorAll('a,button,span,td,th,li,p,h1,h2,h3,h4,label,div,strong,b,code');
+   var n=0;
+   for(var i=0;i<els.length && n<600;i++){
+     var el=els[i];
+     if(el.children.length||!el.offsetWidth||!el.offsetHeight)continue;
+     var t=(el.textContent||'').trim(); if(!t||t.length>80)continue;
+     var cs=getComputedStyle(el); var fg=parse(cs.color); if(!fg)continue;
+     var bg=bgOf(el); var l1=L(fg.c), l2=L(bg);
+     var ratio=(Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05);
+     if(ratio>=3.2)continue;
+     // pick the readable direction from the BACKGROUND, keeping a hint of the hue
+     el.style.setProperty('color', l2>0.4?'#0b1220':'#dbe6f5', 'important');
+     n++;
+   }
+ }
+ var _cpass=function(){ try{_fixContrast();}catch(e){} };
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_cpass); else _cpass();
+ setTimeout(_cpass,1800); setTimeout(_cpass,4000);
 })();
 </script>'''
 
@@ -2535,6 +2596,50 @@ async def api_user_llm_key_set(request: Request):
                          "model": rec.get("model") or _BYOK_PROVIDERS[provider][1]})
 
 
+@app.get("/api/user/llm_models")
+def api_user_llm_models(request: Request, provider: str):
+    """v3.14.4 — list the models THIS user's own key can actually use, so the UI
+    offers a dropdown instead of asking them to type a model id."""
+    actor = _actor_from_request(request)
+    provider = (provider or "").strip().lower()
+    if provider not in _BYOK_PROVIDERS:
+        raise HTTPException(400, "unknown provider")
+    keys = _user_keys_for_chat(actor, provider)
+    if not keys:
+        return {"ok": False, "error": "save your API key first", "models": []}
+    from . import llm_providers as _llmp
+    return _llmp.list_models(provider, keys=keys)
+
+
+@app.post("/api/user/llm_key/test")
+async def api_user_llm_key_test(request: Request):
+    """v3.14.4 — verify a saved key really works: one tiny live call, timed.
+    Returns {ok, model, ms, reply|error} — nothing is faked."""
+    actor = _actor_from_request(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    provider = str(body.get("provider") or "").strip().lower()
+    if provider not in _BYOK_PROVIDERS:
+        raise HTTPException(400, "unknown provider")
+    keys = _user_keys_for_chat(actor, provider)
+    if not keys:
+        return {"ok": False, "error": "save your API key first"}
+    model = (str(body.get("model") or "").strip()
+             or ((_read_user_llm_keys().get(actor, {}) or {}).get(provider, {}) or {}).get("model")
+             or _BYOK_PROVIDERS[provider][1])
+    from . import llm_providers as _llmp
+    t0 = time.time()
+    r = _llmp.chat(f"{provider}:{model}", "Reply with the single word: ready",
+                   max_tokens=12, timeout=45, keys=keys)
+    ms = int((time.time() - t0) * 1000)
+    if r.get("ok"):
+        return {"ok": True, "model": model, "ms": ms,
+                "reply": (r.get("text") or "").strip()[:80]}
+    return {"ok": False, "model": model, "ms": ms, "error": (r.get("error") or "call failed")[:240]}
+
+
 @app.post("/api/user/llm_key/delete")
 async def api_user_llm_key_del(request: Request):
     """v3.10 — remove THIS user's saved key for a provider."""
@@ -3868,12 +3973,44 @@ async function mkLoad(){
         +(i.configured?'background:#dcfce7;color:#166534':'background:#f1f5f9;color:#64748b')+'">'
         +(i.configured?'configured':'not set')+'</span></div>'
         +'<input id="mk_'+k+'" type="password" autocomplete="off" placeholder="'+(i.configured?'key saved — paste a new one to replace':'paste your API key')+'" style="width:100%">'
-        +'<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'
-        +'<input id="mm_'+k+'" value="'+esc(i.model||'')+'" placeholder="model id (optional)" style="width:200px">'
+        +'<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center">'
+        +'<select id="mm_'+k+'" style="min-width:230px">'
+          +(i.model?('<option value="'+esc(i.model)+'">'+esc(i.model)+'</option>'):'<option value="">(default model)</option>')
+        +'</select>'
+        +'<button onclick="mkList(\\''+k+'\\')" title="Ask the provider which models your account can use">&#8635; Load my models</button>'
         +'<button onclick="mkSave(\\''+k+'\\')">Save</button>'
+        +(i.configured?('<button onclick="mkTest(\\''+k+'\\')" style="color:#059669;font-weight:700">&#10003; Test</button>'):'')
         +(i.configured?('<button onclick="mkDel(\\''+k+'\\')" style="color:#dc2626">Remove</button>'):'')
+        +'<span id="ms_'+k+'" style="font-size:12px;color:#64748b"></span>'
         +'</div></div>';}).join('');
   }catch(e){ box.innerHTML='<span style="color:#b45309">could not load key status</span>'; }
+}
+// ask the provider which models this account can use → fill the dropdown
+async function mkList(k){
+  var msg=document.getElementById('ms_'+k), sel=document.getElementById('mm_'+k);
+  msg.textContent='asking '+k+'…'; msg.style.color='#64748b';
+  try{
+    var d=await (await fetch('/api/user/llm_models?provider='+k,{credentials:'include'})).json();
+    if(!d.ok){ msg.textContent='✗ '+(d.error||'could not list models'); msg.style.color='#dc2626'; return; }
+    var cur=sel.value;
+    sel.innerHTML=(d.models||[]).map(function(m){
+      return '<option value="'+esc(m.id)+'"'+(m.id===cur?' selected':'')+'>'+esc(m.label||m.id)+'</option>';}).join('')
+      ||'<option value="">(none returned)</option>';
+    msg.textContent='✓ '+(d.models||[]).length+' models available — pick one, then Save';
+    msg.style.color='#059669';
+  }catch(e){ msg.textContent='✗ '+e; msg.style.color='#dc2626'; }
+}
+// really call the provider once and report what happened
+async function mkTest(k){
+  var msg=document.getElementById('ms_'+k), sel=document.getElementById('mm_'+k);
+  msg.textContent='testing…'; msg.style.color='#64748b';
+  try{
+    var r=await fetch('/api/user/llm_key/test',{method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:k,model:sel.value||''})});
+    var d=await r.json();
+    if(d.ok){ msg.textContent='✓ works — '+d.model+' replied in '+d.ms+' ms'; msg.style.color='#059669'; }
+    else { msg.textContent='✗ '+(d.error||'failed'); msg.style.color='#dc2626'; }
+  }catch(e){ msg.textContent='✗ '+e; msg.style.color='#dc2626'; }
 }
 async function mkSave(k){
   var key=(document.getElementById('mk_'+k).value||'').trim();

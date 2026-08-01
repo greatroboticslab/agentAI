@@ -120,6 +120,74 @@ def _http_json(url, payload, headers, timeout):
         raise RuntimeError(f"HTTP {e.code}: {(detail or e.reason)[:240]}")
 
 
+def _http_get_json(url, headers, timeout=20):
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            body = e.read().decode("utf-8", "replace")[:4000]
+            j = json.loads(body)
+            err = j.get("error")
+            detail = (err.get("message") if isinstance(err, dict) else err) or j.get("message") or body
+        except Exception:
+            pass
+        raise RuntimeError(f"HTTP {e.code}: {(detail or e.reason)[:200]}")
+
+
+def list_models(provider: str, keys: dict = None) -> dict:
+    """v3.14.4 — ask the PROVIDER which models this account can actually use, so
+    the UI can offer a dropdown instead of asking the user to type a model id.
+    Returns {ok, models:[{id,label}], error}."""
+    merged = _load_keys()
+    if keys:
+        merged.update({k: v for k, v in keys.items() if v})
+    prov = (provider or "").strip().lower()
+    try:
+        if prov == "openai":
+            k = _key_for(["OPENAI_API_KEY"], merged)
+            if not k:
+                return {"ok": False, "error": "no OpenAI key saved", "models": []}
+            out = _http_get_json("https://api.openai.com/v1/models",
+                                 {"Authorization": "Bearer " + k})
+            ids = sorted({m.get("id", "") for m in (out.get("data") or [])})
+            keep = [i for i in ids if i.startswith(("gpt-", "o1", "o3", "o4", "chatgpt"))
+                    and not any(x in i for x in ("audio", "realtime", "transcribe", "tts",
+                                                 "image", "embedding", "moderation"))]
+            return {"ok": True, "models": [{"id": i, "label": i} for i in keep] or
+                    [{"id": i, "label": i} for i in ids[:60]]}
+        if prov == "anthropic":
+            k = _key_for(["ANTHROPIC_API_KEY"], merged)
+            if not k:
+                return {"ok": False, "error": "no Anthropic key saved", "models": []}
+            out = _http_get_json("https://api.anthropic.com/v1/models?limit=100",
+                                 {"x-api-key": k, "anthropic-version": "2023-06-01"})
+            ms = [{"id": m.get("id", ""), "label": m.get("display_name") or m.get("id", "")}
+                  for m in (out.get("data") or []) if m.get("id")]
+            return {"ok": True, "models": ms}
+        if prov in ("gemini", "google"):
+            k = _key_for(["GEMINI_API_KEY", "GOOGLE_API_KEY"], merged)
+            if not k:
+                return {"ok": False, "error": "no Gemini key saved", "models": []}
+            out = _http_get_json(
+                "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+                {"x-goog-api-key": k})
+            ms = []
+            for m in (out.get("models") or []):
+                if "generateContent" not in (m.get("supportedGenerationMethods") or []):
+                    continue
+                mid = (m.get("name") or "").replace("models/", "")
+                if mid:
+                    ms.append({"id": mid, "label": m.get("displayName") or mid})
+            return {"ok": True, "models": ms}
+        return {"ok": False, "error": f"unknown provider '{provider}'", "models": []}
+    except Exception as e:
+        msg = str(e) if isinstance(e, RuntimeError) else f"{type(e).__name__}: {e}"
+        return {"ok": False, "error": msg[:240], "models": []}
+
+
 def chat(model_id: str, prompt: str, system: str = "", max_tokens: int = 256,
          timeout: int = 60, keys: dict = None) -> dict:
     """Send one prompt to `model_id`. Returns {ok, text, error, model, provider}.
