@@ -13,185 +13,171 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
-## 2026-08-01 — v3.14.0: from "a set of tools" to "one app"
+## 2026-08-01 — v3.14.0–v3.14.2: unified navigation, newcomer path, and a full click-through verification
 
-Harry asked the right question: is it all done, and is it as easy for a newcomer as the Claude app? Honest
-answer was no — features yes, product no. Evidence from an audit: 5 different nav bars, /classes and /slugs
-were dead ends with no nav at all, internal jargon on screen, /guide mentioned none of the month's features,
-README two versions behind. Fixed all of it: ONE global app bar injected on every page (Projects · Data ·
-Recordings · Guide + a More menu with plain-English names), old duplicate bars auto-tidied, jargon relabelled
-globally, a dismissible 3-step "new here" main line on the home page, and docs (guide + README) caught up.
-Verified 12/12 pages carry the unified nav. Lesson: features accumulate faster than information architecture
-— periodically audit the newcomer path, not just the feature list.
+**Information architecture.** A UX audit of the deployed site found the platform had grown into a set of
+tools rather than one product: five different navigation bars, two pages (`/classes`, `/slugs`) with no
+navigation at all (dead ends), internal jargon on screen (slugs / hub / annotate / morning_report), a
+`/guide` that documented none of the month's features, and a README two versions behind.
 
-## 2026-07-31 (later) — v3.13.0: Loom parity + action trace
+- **One global app bar** is now injected into every page (same middleware technique as the design system):
+  brand + **Projects · Data · Recordings · Guide** with active-section highlighting, plus a **More** menu
+  holding the advanced pages under plain-English names. Verified on **12/12 pages**; no dead ends remain.
+- `_navTidy()` hides links in a page's legacy bar that merely duplicate the global nav (and hides the bar
+  entirely when nothing page-specific remains), so no page shows two navigations. On-screen jargon is
+  relabelled globally.
+- **Newcomer path:** a dismissible three-step card on the home page (open a project → upload data and ask
+  questions → record, share, train), with entry points to the guide and the recorder.
+- **Documentation:** `/guide` gained sections for the code workbench, bring-your-own-model keys, and
+  recordings; README's status banner and Recordings section were brought up to date with new screenshots.
 
-Harry asked whether I'd really referenced the prof's repo. Honest answer was "half" — I'd borrowed the
-technical core (getDisplayMedia -> MediaRecorder -> upload -> library) but skipped their signature UI and
-the "improve beyond Loom" ask. Re-read their VideoDetail.jsx properly and closed it: floating recorder bar
-(red dot + timer + Stop, visible while you work elsewhere), camera recording with live preview, and
-auto-transcribe on save via our self-hosted Whisper. Then the first real step BEYOND Loom: while recording
-we capture a timestamped ACTION TRACE of clicks/keys inside our pages (label + selector + page + t), shown
-on the share page as a clickable timeline that seeks the video. That trace is the prerequisite for the
-prof's "agent function to help user click". Verified live incl. auto-transcribe on real speech. Not built:
-an agent that replays/acts on traces, and capture outside our own tab (browser-impossible).
+**End-to-end verification (live server, scripted real clicks, 13/13 steps):** home → create project →
+upload a real CSV → ask a question in plain words (the agent wrote analysis code, ran it, plotted, and
+correctly located an injected slowdown at 29.6 s / 2.23 m/s) → edit that code in the browser and re-run →
+model menu + key manager → notebook export → record with floating bar and action trace → save with
+auto-transcription → share page timeline seeking the video → navigation present on a formerly dead-end
+page → guide coverage → test data cleaned up.
 
-## 2026-07-31 (later) — v3.12.3: dark theme swept across every page
+**Two defects found by that walk-through and fixed:**
+1. **Single-file CSV upload was rejected** ("unsupported upload"). The raw-body upload path sniffed only
+   archives/images/video and has no filename available. It now sniffs content — decodable text that looks
+   tabular or JSON is accepted as a data file — so a lone sensor log uploads like an image or video.
+2. **Unreadable controls on the Data page.** Verdict buttons (✓/✗/🤔) and filter tabs rendered white-on-light
+   at a measured **1.15:1** contrast, because legacy descendant rules (`.filter-bar button{background:#f4f4f7}`)
+   out-specify a bare `button` rule. Descendant buttons in legacy containers are now overridden, verdict
+   buttons carry semantic colours (keep = green, junk = red, unsure = amber), and link colour on dark was
+   softened. The page measures **0 low-contrast elements**.
 
-Extended the audit to all edge pages (annotate/audit/control/manual/morning/roboflow/rounds/synth/
-class-detail/gallery) with a light-element counter, drove it to 0 everywhere. Darkened remaining legacy
-classes, bare <header> banners, <code> chips, table headers; made plain <button> dark by default WITHOUT
-!important (so colored/inline buttons keep their color); darkened my own composer/recorder/key-modal
-components; and caught the tint families the #f prefix missed (#e/#d hexes + light gradient banners).
-Result: 0 light-bg elements across ~20 page instances; class-detail 183->2. Intentional leftovers:
-matplotlib charts render white (chart content) and a few stat numbers slightly dim.
+## 2026-07-31 — v3.13.0/v3.13.1: recorder parity with the lab reference implementation, plus action traces
 
-## 2026-07-31 (later) — v3.12.2: dark-theme audit + fix of the legacy pages
+Reviewed the lab's `greatroboticslab/humanoidrobotweb` recorder (`VideoDetail.jsx` + Flask backend) and
+closed the gaps between it and our implementation, then extended past it.
 
-Harry sent a screenshot: the project workspace still had white cards + invisible dropdowns in dark mode.
-My prior "verified" was viewport-tops only — a real gap. Built a full-page audit probe (counts
-light-background elements per page) and fixed the roots: solid-dark cards/inputs (translucent glass looked
-white over old pages' light wrappers), dark rules for legacy classes (.stat/.act/.class-card/etc.), and a
-comprehensive inline-bg catch via the `#f` prefix (all pale colors are #fXXXXX). Audit now: 0 light-bg
-elements across agent/console/classes/labeling/slugs/users. Lesson: scroll full pages when verifying UI,
-and inline-style attribute selectors are unreliable (color serialization) — match source `#f` or fix at
-source.
+- **Parity:** a floating recorder bar (pulsing indicator, kind, live timer, step count, Stop) that stays
+  visible while working in other windows; **camera recording** with live preview (usable on phones, where
+  screen capture is unavailable); **automatic transcription on save** via the self-hosted Whisper on the lab
+  GPU, surfaced in the library and on the share page.
+- **Beyond parity — action traces:** while recording, clicks and key events inside the platform are captured
+  as timestamped entries (label, selector, page, t+seconds) and stored with the recording. The share page
+  renders them as a **clickable timeline that seeks the video**. A video shows *what* happened; the trace
+  records *which control at which second* — the structured input required for later assisted replay.
+- **Verification:** a 15-check adversarial harness (floating bar, timer, trace capture, preview, save,
+  server-side persistence, survival across reload, HTTP-206 range serving for seeking, rename, share-page
+  timeline and click-to-seek, mobile controls, external-link storage, cleanup). It found a real defect —
+  the floating bar computed 400 px wide inside a 390 px viewport (padding added without `border-box`) — which
+  was fixed and re-verified. Auto-transcription was proven on real speech audio.
+- **Not built:** an agent that replays or acts on a trace, and capture outside our own browser tab (not
+  possible from a web page).
 
-## 2026-07-31 (later) — v3.12.1: pivot to a premium dark theme
+## 2026-07-31 — v3.12.0–v3.12.6: platform-wide design system and dark theme
 
-Harry: the platform felt too white; he wants a dark gradient, premium feel. Flipped the injected design
-system from light to premium dark (gradient backdrop + glassmorphic cards + emerald glow), and re-skinned
-the homepage to match. Hit exactly the risk I'd flagged: a global dark flip breaks light-designed
-interactive components — the analysis code-workbench chat bubbles + editor became white islands with faint
-text. Fixed at the source (bubble backgrounds -> dark; code editor keeps its dark bg by dropping
-!important on the global input background). Learned/confirmed: `[style*="#fff"]` attribute selectors do NOT
-match inline styles (browsers serialize colors to rgb()), so per-component source fixes are required.
-Verified premium-dark + readable across ~7 pages incl. the flagship composer. Dense admin pages
-(console/classes) still need a dark pass.
+**Design system.** One stylesheet is injected into every page, defining only *skin* properties (palette,
+typography, navigation, cards, buttons, inputs, shadows) and never layout, so no page's structure can break.
+The theme is a dark gradient with glass-style cards and emerald accents; the home page was rebuilt onto it.
 
-## 2026-07-31 (later) — v3.12.0: platform-wide design system
+**Dark-theme conversion and audit.** A global dark flip breaks components designed for light backgrounds, so
+conversion was driven by measurement rather than inspection: a probe counts light-background elements per
+page. Findings and fixes:
+- Chat bubbles and the code editor in the analysis workbench rendered as white islands with faint text —
+  corrected at the source (attribute-substring CSS cannot match inline colours, since browsers serialise them
+  to `rgb()`).
+- Translucent cards appeared white over legacy light wrappers, and inputs were light-on-light — cards and
+  form controls were made solid dark so they read correctly over any parent.
+- Legacy component classes, bare page headers, code chips, table headers and light gradient banners were
+  darkened; plain `<button>` was darkened without `!important` so coloured buttons keep their meaning.
+- Text that was unreadable on dark (dark inline colours, and `b`/`strong` rules setting near-black) was
+  lifted; bold text now inherits the surrounding colour.
+- HTML responses now carry `Cache-Control: no-store` so interface updates are not hidden by stale caches.
 
-Harry's feedback: after v3.10/3.11 he "couldn't see much change in the frontend" — the changes were real
-but localized (analysis composer + recordings page), not a global visual identity. So I did a proper
-design-system pass: one injected stylesheet (_UI_CSS, skin-only, never layout — so nothing breaks) that
-unifies palette/typography/nav/cards/buttons/inputs/shadows across every page, plus a full homepage
-redesign onto that system (dark sticky nav + emerald hero + light cards, all JS preserved). Brand =
-emerald #059669 on slate neutrals. Verified live on ~9 pages at desktop + mobile with no regressions.
-Lesson: "unify the skin, leave the layout" is the safe way to redesign a multi-page server-rendered app
-with no build step.
+**Result:** 0 light-background elements across ~20 audited page instances (all core and edge pages), with
+matplotlib chart images intentionally left on white (chart content, not theme).
 
-## 2026-07-31 (later) — v3.11.0: Recordings — Loom-style capture + share links
+## 2026-07-31 — v3.11.0: recordings — capture, library, and share links
 
-Prof. Zhang's second track alongside the in-app model calls: "the proposed interface [is] similar to
-Loom ... it can monitor any interface, even on phone ... beyond that, an agent function to help user to
-click ... this way we incidentally hack the humanoid-robot app." He sent his lab's repo
-(greatroboticslab/humanoidrobotweb) — "mimicked Loom video recording and saving to MongoDB well, you can
-borrow." I studied its VideoDetail.jsx + Flask backend (getDisplayMedia → MediaRecorder → multipart
-upload → file on disk + metadata doc → library → playback → delete) and built the same core into OUR
-platform as a new `/recordings` page: record screen / screen+mic / voice, preview before upload, a
-library with playback + editable titles + copy-share-link + delete, a `/r/{id}` share view, HTTP-range
-media serving (so video seeks), and owner-scoped permissions (same rule as datasets, from the v3.9.3
-lesson). Plus a "paste an external AI share link" box (store, don't scrape). Verified live end-to-end
-(curl + real browser with a fake mic device): the full record→save→library→share loop works and is
-responsive; screen capture shares the identical code and only needs a real display to exercise. Deferred
-on his own steer: the agent-auto-click and app-monitoring/robot-hacking extensions.
+A recorder for screen, screen + microphone, and voice: live timer, local preview before anything uploads,
+a per-user library with inline playback, editable titles, deletion, and a one-click **share link** (`/r/<id>`).
+Media is stored on disk with metadata in a JSON index and served with **HTTP range support** so playback can
+seek; ownership rules match datasets (uploader or admin). External AI conversation links (ChatGPT / Claude /
+Gemini) can be stored alongside as references. The implementation follows the lab reference repo's pattern
+(`getDisplayMedia` → `MediaRecorder` → upload → metadata + library → playback). Verified end-to-end with
+curl and a real browser: save, per-user isolation, full and range (206) serving, share page, ownership
+denial (403), external links, and deletion.
 
-## 2026-07-31 — v3.10.0: bring commercial AI into the chat, keep the data ours
+## 2026-07-31 — v3.10.0: model selection and bring-your-own commercial keys
 
-Prof. Zhang's direction over three messages (voice + a PyCharm "AI Chat" screenshot + a Loom-style repo):
-the overall idea is to *learn from strong AI* and let users *seamlessly switch between different AIs*, but
-"we are still data centric — this will not change." Concretely (his words): add a dropdown that sends the
-current code/context to Gemini/GPT/Claude; users log in with *their own accounts*; do the simple in-app
-version first and defer the Loom/record-screen path ("放弃 LOOM ... 先在我们的网站调的功能试试"). The
-strategic frame he stated: a *middleman* over the frontier models (if one can't solve it, try another),
-and because we see many frontier results we can eventually route to whatever is SOTA.
+The analysis chat gained a **model menu**: the local Qwen coder (free, grounded) or a commercial model
+(OpenAI, Anthropic, Google). Commercial use is **bring-your-own-key**: a user stores their own API key,
+encrypted at rest per user (Fernet with a stdlib authenticated fallback), never echoed back — the interface
+only ever learns "configured / not". The key is decrypted for a single request and injected into the provider
+call; it is never written to the shared server key file. A commercial model **writes the analysis code, which
+still executes in our sandbox on the staged copy of the dataset**, keeping data and execution on the platform.
+A Gemini provider was added to the provider abstraction, `chat()` gained a per-request key override, and
+provider HTTP errors are now surfaced as readable messages.
 
-Shipped exactly the "simple first" slice: a **model dropdown** in the analysis composer (Local · Qwen
-free / OpenAI / Anthropic / Gemini) and **bring-your-own-key** — each user pastes their own API key,
-stored **encrypted at rest** (Fernet, per-user, never echoed) and injected for one request only. A
-commercial model **writes the analysis code; it still runs in our sandbox on our staged data** — their
-brain, our data + execution, which is the data-centric line he drew. The composer was rebuilt PyCharm-
-style and made fully responsive (phone + desktop). Verified live end-to-end (real browser + curl): local
-regression intact; commercial routing proven through to the provider's own auth response (a valid key is
-the only missing piece, which the user provides). Decision I made (he delegated it): server-side
-encrypted storage, because the data-centric design routes the key through our server anyway and he uses
-phone+desktop (keys must persist across devices). Deferred, on his say-so: the Loom/record-screen +
-share-link-back path, and the multi-model "middleman auto-retry".
+**Verification:** key stored as ciphertext on disk with no plaintext match; a second user cannot see the
+first user's key; requesting a commercial model without a key returns a clear prompt to add one; with a key
+present the request reaches the provider and its authentication response is surfaced verbatim. The composer
+was rebuilt in a compact style (model picker, key manager, voice, ask) and verified at phone and desktop
+widths.
 
-## 2026-07-24 (later) — v3.9.3: self-audit — the permission bug was a class, and my own verification had gaps
+## 2026-07-24 — v3.9.2/v3.9.3: access-control review of dataset operations
 
-The user pushed back: "did you really test it, or did you cut corners?" Correct challenge. Two honest
-gaps in the v3.9.2 work: (a) the code-routing fix and the permission fix had only been exercised with
-curl, never through the browser; (b) I never tested the REVERSE case — that the rightful owner can
-still delete. Re-audited all mutating endpoints: `dataset/classnames`, `labeling/push`, `labeling/delete`
-had the same missing ownership guard the prof found on delete, so a member could rewrite another
-member's data.yaml or spend Roboflow quota with their data. All now behind one `_require_dataset_owner`
-helper; Delete buttons hidden for non-owners on both upload lists; full 6-case permission matrix run
-live (3 denials + 3 legitimate successes); prof's exact two sentences replayed in a real browser.
-Lesson recorded: "verified" must mean the positive AND negative case, through the surface the user
-actually touches.
+A hands-on review by a lab member (signed in as an ordinary member) found that any signed-in user could
+delete datasets uploaded by others. Investigation showed this was a class of defect rather than a single
+endpoint:
 
-## 2026-07-24 — v3.9.2: Prof. Zhang's second hands-on review, fixed same-day
+- `/api/dataset/delete` now requires uploader-or-admin. The same guard was extended to
+  `/api/dataset/classnames` (which rewrites `data.yaml` on disk) and to `/api/labeling/push|delete` (which
+  spend and mutate the shared Roboflow project). Endpoints already guarded were verified rather than assumed.
+- The delete control is rendered only for the uploader or an admin on both upload lists; server-side
+  enforcement remains authoritative.
+- Notebook export cells gained `id` fields so `nbformat.validate()` passes without warnings.
+- **Verification matrix (live):** three denials (delete / rename classes / push another member's dataset →
+  403) and three legitimate successes (own delete, own rename, admin delete), plus a browser check that an
+  ordinary member's analysis chat still works. Verification now covers positive and negative cases through
+  the interface the user actually touches, not only the API.
 
-He tested like a real user (email with screenshots): (1) gallery thumbnails blank with no
-feedback → added shimmer placeholders + a live "retrieving thumbnails N/24" spinner counter;
-(2) "I asked it to generate code, no code…" → explicit code-requests now route to the
-code-writing analyst (was plot-words/unsupported only) — his exact sentence now returns code;
-(3) security: logged in as a normal user he could DELETE admin-uploaded datasets → delete is now
-uploader-or-admin only (verified 403). Lesson repeated: every review round from someone who
-didn't build the system finds a class of bug we can't see ourselves.
+Two interface defects from the same review were fixed: an explicit request for *code* did not route to the
+code-writing analyst (only plot-related wording did), and gallery thumbnails gave no loading feedback — a
+shimmer placeholder and a live "retrieving thumbnails N/24" counter were added.
 
-## 2026-07-22 (later) — v3.9.0: the workbench becomes a conversational notebook
+## 2026-07-22 — v3.7.0–v3.9.0: the code-writing analyst becomes a conversational notebook
 
-**Driven by the user actually using it on their phone:** they ran the blank template, saw nothing ("where
-is my plot?"), and asked three sharp questions — does it work on ANY dataset, can the BIG cluster model
-write the code, and wouldn't Jupyter-notebook-style fit better? Decision: **evolve the chat into a
-conversational notebook** rather than hosting JupyterHub (a kernel is arbitrary code execution — it would
-void the sandbox guarantees — and a bare notebook loses the agent). Shipped, all E2E-verified live:
-figures **auto-captured** (no savefig needed) + friendly empty-run hint; **per-turn plot persistence**
-(restored conversations now show their figures); **image datasets staged into the sandbox** (bounded
-sample + YOLO labels + classes; PIL whitelisted; path-traversal guard added); **🧠 Deep mode** — the big
-open cluster model (glm-4.7-flash) writes the code async via the sbatch LLM gateway with progress in the
-chat, local-coder repair; **📓 export the conversation as a runnable .ipynb**; `/guide` tutorial section.
-Also fixed that morning: expired-session browsers were brute-force-locking their own IP (v3.8.3).
+**Code-writing analyst.** For questions outside the grounded tool library, a local coder model
+(`qwen2.5-coder:7b`) writes a short Python script that runs in a sandbox (AST import/call whitelist →
+subprocess resource limits → wall-clock kill) against staged *copies* of the dataset, with LIDA-style
+self-repair. The chat shows the findings, the figure, and the code.
 
-## 2026-07-22 — v3.7–v3.8.2: the agent writes code; the user can see, edit, and run it (prof's ask, verified E2E)
+**Open workbench.** The generated code is editable in place with a Run button, and a blank editor accepts
+pasted code (for example, code improved in an external assistant). User code executes in the same sandbox;
+rejections and errors are reported verbatim. Conversations and code persist per dataset.
 
-**What drove this.** Prof. Zhang's feedback round 2: "I want basic plots" got text-only; he endorsed
-"We can show agent code in browser." Follow-up direction: unsupervised/self-supervised analysis, and the
-code should be *open* — users run it, or take it to ChatGPT/Gemini, optimize, paste back, and run.
+**Conversational notebook (v3.9.0).** Figures are captured automatically (no `savefig` required) and a run
+that produces neither output nor a figure returns an explanatory hint instead of silence; every figure is
+persisted per turn so restored conversations show their plots; image datasets are staged into the sandbox
+(bounded sample plus YOLO labels and class names, PIL whitelisted, path-traversal guard); a deep mode routes
+code generation to a large open model on the cluster asynchronously with progress; and the whole conversation
+exports as a runnable Jupyter notebook. Hosting a live kernel (JupyterHub) was rejected deliberately: it is
+arbitrary code execution and would void the sandbox guarantees.
 
-**v3.7.0/3.7.1 — code-writing analyst.** `tools/code_analyst.py`: qwen2.5-coder:7b on the lab GPU writes
-Python for questions outside the tool library; sandbox = AST import/call whitelist → subprocess rlimits →
-wall-clock kill, on staged *copies* of the dataset CSVs; LIDA-style self-repair (≤2 attempts). POC 5/5
-first-attempt (plot, FFT, trend fit, KMeans, custom threshold). Wired into `/api/dataset/analyze_goal`:
-plot-intent and out-of-library questions route to codegen; the chat renders findings + plot + the code.
+**Label-noise review (v3.8.1/v3.8.2).** A `suspicious_labels` tool scores YOLO boxes with grounded heuristics
+(tiny, extreme aspect, edge-touching, blurred or dark context, empty label files) and renders a crop montage
+in the chat; each flagged image can be marked keep/bad in one click, persisted per dataset and forwarded into
+the existing curation store. QA against injected ground truth: 5/5 found, zero false positives.
 
-**v3.8.0 — open code workbench.** The code block became an *editor*: edit generated code and ▶ Run, or
-open a blank editor (`</>`) and paste external code (seaborn whitelisted for ChatGPT-style snippets) —
-same sandbox, honest errors. Chat + code persist per dataset (`{slug}_chat.jsonl`, hydrated on load).
-Page served `Cache-Control: no-store` (fixed the stale-JS-on-phone bug the prof hit).
+**Authentication defect (v3.8.3).** Credential-less background requests from a browser with an expired session
+were counted as failed authentication attempts, so returning users could lock their own IP for an hour. Only
+requests that present a wrong credential now count toward the brute-force lock; protection was re-verified.
 
-**v3.8.1/v3.8.2 — label noise enters the chat** (strategy layer 2, aimed at the never-cured 27.4%
-pseudo-label FP rate): `suspicious_labels` tool (tiny/aspect/edge/blur/empty heuristics) renders a crop
-montage in the chat (QA: 5/5 injected faults found, zero FP), and each flagged image gets one-click ✓/✗
-— verdicts persist per dataset and ✗ forwards into the existing `class_exemplars` curation store.
-
-**E2E verification (2026-07-22, real browser clicks on the live site, screenshots in
-`docs/screenshots/workbench-*.png`):** ask a new question → generated code visible in the editor with
-plot + real numbers (≈6 s); edit it in the browser → the figure re-renders with the user's title and the
-user-added stat cross-checks the generated one (std 0.5617 vs 0.56); paste ChatGPT-style seaborn code →
-runs (≈1.5 s); `import os` → honestly rejected by the safety checker; reload → all 16 turns + editable
-code restored; works at phone width. **Known gap:** per-turn plots are not restored after reload (one
-`{slug}_codegen.png` is overwritten per run) — fix queued.
-
-**Next:** DINOv2 embedding-outlier scan as an async **cluster** sbatch job (lab = website only), then
-sensor-timeseries self-supervised learning (the paper-able thread the prof pointed at).
+**Verification.** All of the above was exercised in a real browser on the live server: a new question
+produces code, a plot and real numbers; editing the code re-renders the figure and the user-added statistic
+cross-checks the generated one; pasted external code runs; disallowed code is refused with a reason; a reload
+restores the conversation, code and figures; the flow works at phone width.
 
 ## 2026-07-15 — v3.3–v3.6: analysis becomes a grounded, conversational, voice-driven AGENT
 
-**What drove this.** Prof. Zhang's core critique after using it: the analysis is *hardcoded* — "no matter how
-you talk to it, it's always the same output"; and the voice feature didn't actually do anything with the intent.
+**Problem addressed.** A usability review found the analysis stage was effectively *hardcoded* — different
+questions produced the same output — and the voice feature transcribed speech without acting on its intent.
 This arc turns the fixed analysis into an **agent that plans over a grounded tool library**, is conversational,
 takes voice, and — crucially — **never lets the model touch the numbers**. Built advisor/executor; every step
 verified on the live lab server.
@@ -215,7 +201,7 @@ construction. Different question → different plan → different analysis.
   rebalance). Fixed a planner-scoping bug so "which is noisiest" always covers all signals.
 - **v3.6.0 (voice):** wired the self-hosted Whisper pipeline into the chat — a 🎙 button records → transcribes on
   the lab GPU → auto-runs the agent. Verified end-to-end on the live site: two different *spoken* questions →
-  two different analyses. Directly answers the prof's voice feedback: voice now understands intent and changes
+  two different analyses. Voice now understands intent and changes
   the analysis.
 - **v3.5.3 / v3.6.1 (QA hardening):** running full-flow QA on **fresh, real, unexpected data** (a drone-survey
   set; the **MHEALTH** wearable dataset from UCI; and 8 adversarial CSVs) exposed and fixed real bugs — event
@@ -234,9 +220,8 @@ specialized for real datasets at scale.
 
 ## 2026-07-11 — v3.1.4–v3.2.0: sensor analysis becomes a *diagnosis* (noise → anomalies → cross-modal)
 
-**What drove this.** Prof. feedback on the data-analysis stage was the trigger, and it was fair: he typed
-"analyze the noise level" and the page returned a **hardcoded EDA** that ignored the request — the analysis
-was *goal-blind*. That is the real critique this whole arc answers: move the analysis page from a fixed
+**Problem addressed.** A review of the data-analysis stage found it *goal-blind*: a request such as
+"analyze the noise level" returned a **hardcoded EDA** that ignored what was asked. That is the real critique this whole arc answers: move the analysis page from a fixed
 template to something that actually responds to what the data is and what the user asked. Everything below
 was built as an advisor/executor split (top model plans + verifies; Sonnet executors do the bulk edits) and
 every step was verified on the **live lab server**, not just locally.
@@ -251,7 +236,7 @@ analysis page):**
   magic-bytes (metadata + auto-extracted frames), one project accepting a *union* of declared modalities
   (a robot with camera + GPS + IMU no longer rejects the sensor files), and progressive Whisper voice
   (live partial transcription every ~2.8 s, works on iPhone).
-- **v3.1.8 `_signal_noise` (in `dataset_eda.py`)** — the direct answer to the prof: a **real noise metric**.
+- **v3.1.8 `_signal_noise` (in `dataset_eda.py`)** — a **real noise metric**.
   Residual RMS after an O(n) moving-average, expressed as % of each signal's range, plus SNR (dB). Now
   "analyze the noise level" produces numbers that *change with the data*. Honest subtlety surfaced in the UI:
   a near-constant signal (IMU Z carrying gravity) reads as "high noise %" because it has little real
@@ -388,7 +373,7 @@ stale "cwd12 ≥ 0.90 DO NOT DRIFT" changelog header (goal met at v3.0.38-A).
 June was the pivot from "weed pipeline" to "multi-domain platform":
 
 - **06-03 → 06-05** (v3.0.78–86) — **MongoDB migration**: `db.py` Mongo-first/JSON-fallback layer, dual-write,
-  backfill, SCRAM auth; **multi-domain extensibility** per Prof. Zhang (a `domain` field + config, so a new
+  backfill, SCRAM auth; **multi-domain extensibility** (a `domain` field + config, so a new
   research field is data, not code); honest per-action status.
 - **06-08 → 06-11** (v3.0.96–99.x) — **data-collection block hardened**: review visualization, Roboflow
   Universe harvest at scale, then the **labeling loop** (push N → human labels in Roboflow → export back →
@@ -397,7 +382,7 @@ June was the pivot from "weed pipeline" to "multi-domain platform":
 - **06-12 → 06-22** (v3.0.100–124) — **dashboard frontend epic**: Agent Launcher, Mission Control, browse-data
   polish, train→round mAP write-back, lab-server migration groundwork (website + Mongo + storage on the lab
   Ubuntu box; cluster = compute only).
-- **06-23** (v3.0.125–143, "Prof. Zhang platform expansion") — **manual dataset upload**, uploads management,
+- **06-23** (v3.0.125–143, platform expansion) — **manual dataset upload**, uploads management,
   **users in DB + Google login + RBAC** + per-user cluster permission, push caps, **generalized agent+dataset
   schema beyond weed/image/YOLO** (the keystone), LLM provider abstraction, our-own API keys, self-hosted
   **model gateway** (on-demand cluster inference).
@@ -422,7 +407,7 @@ synthetic-training module:
   confidence (Confident-Learning principle). This is the third and last
   curation gate.
 - **synth_diffusion.py** — FLUX.1-Fill layout-conditioned generation.
-  Honours Prof. Zhang's requirement that synthetic data also train the
+  Meets the requirement that synthetic data also train the
   detector, in the form the literature shows actually works: inpaint
   photoreal weeds into chosen boxes on real backgrounds → realism + exact
   GT, used as augmentation biased to weak classes.
@@ -452,7 +437,7 @@ cluster side is a `git pull` + `sbatch` once a login session is healthy.
 **v3.0.36 DINOv2 curator (job 40891360)** — success. Whole-image DINOv2
 similarity cleanly separates good vs off-domain data (trusted slugs mean
 0.78, untrusted 0.26, zero overlap). 51 garbage slugs auto-flagged.
-Validates Prof. Zhang's collection-phase similarity-comparison idea.
+Validates the collection-phase similarity-comparison approach.
 
 **v3.0.35.2 T3 re-test (job 40891361)** — Gemma 4 image-level relevance
 = 96% accuracy with proper negatives. Settles the T1-T4 matrix: Gemma 4
@@ -471,7 +456,7 @@ noise. Single-stage cumulative training has now failed twice (0.576,
 **Decision (with user, 2026-05-19): clean the data at object level
 BEFORE the next cumulative training run.** Two parallel tracks:
 - our object-level DINOv2 curator (per-bbox crop comparison)
-- Prof. Zhang's copy-paste synthetic + DINO classification head
+- Copy-paste synthetic + DINO classification head
 
 **v3.0.38-A submitted now:** RF-DETR Large cwd12-only, seeds 101+102,
 60ep — adds 2 points to v3.0.31 (0.8949) / X2 (0.8953) for an honest

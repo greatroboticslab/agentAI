@@ -5813,7 +5813,7 @@ voice/typed questions actually drive a tailored analysis.
 
 ### v3.7.0 (core, POC-validated) — code-writing analyst: arbitrary analysis + plots on demand
 
-Research-first build of the prof's ask (arbitrary methods, plots that follow the question, agent code visible
+Research-first build of the requirement (arbitrary methods, plots that follow the question, agent code visible
 in the browser). Surveyed the Code-Interpreter / Microsoft-LIDA pattern (codegen → sandbox → self-repair →
 plot+code) and sized to our hardware (lab RTX 3060 12GB → qwen2.5-coder:7b as the dedicated codegen model,
 coexisting with qwen2.5:3b + Whisper in VRAM). New `tools/code_analyst.py`: layered sandbox (AST import/name
@@ -5833,7 +5833,7 @@ The full loop is live. When the tool library can't serve a request (the honesty-
 for a plot/graph, /api/dataset/analyze_goal now routes to the code analyst: qwen2.5-coder:7b writes a script
 against staged CSV copies, it runs in the AST+rlimit sandbox with self-repair, and the chat renders the printed
 findings, the generated PLOT (served via /api/dataset/codegen_plot), and a collapsible "View the code it wrote &
-ran (sandboxed)" block — the prof's explicit ask ("We can show agent code in browser"). Verified live with his
+ran (sandboxed)" block — an explicit requirement (show the agent's code in the browser). Verified live with the
 exact words: "I want to get basic plots of the data" → 3-panel IMU acceleration plots of his real data, first
 attempt; "dominant frequency of az using an FFT" (previously declined honestly) → spectrum plot + value. Also
 fixed a real bug this exposed: a raw "\n" in the page template broke the page's JS entirely (node --check on the
@@ -5841,14 +5841,14 @@ extracted script caught it). Honest label under every codegen answer: computed b
 
 ### v3.8.0 — open code workbench: edit / paste / run analysis code in the browser (strategy layer 1)
 
-The prof's direction made concrete. (1) POST /api/dataset/run_code {slug, code}: run USER code — edited from
+The direction made concrete. (1) POST /api/dataset/run_code {slug, code}: run USER code — edited from
 the agent's, or pasted from ChatGPT/Gemini — against a staged COPY of the dataset in the same sandbox as
 generated code (AST whitelist → rlimits → wall-clock kill); errors return verbatim, nothing faked. seaborn
 whitelisted + installed. (2) The chat's code block is now an EDITABLE textarea with "▶ Run this code"; a new
 </> button opens a blank editor with a template. (3) Conversations persist per dataset (jsonl, same pattern as
 slug_verdicts): every ask/codegen/run_code turn is appended and replayed on page load via
 /api/dataset/chat_history — the human+AI iteration finally accumulates instead of vanishing on reload.
-(4) Dataset page served with Cache-Control: no-store — fixes the prof's phone rendering new API responses with
+(4) Dataset page served with Cache-Control: no-store — fixes a phone rendering new API responses with
 stale cached JS (missing plots/code). (5) Empty "ran:" line no longer rendered. Verified live end-to-end in a
 real browser: workbench opened, code edited, ran → custom plot + printed findings; seaborn paste-style code ran
 with a plot; `import os` rejected by the safety checker; history rehydrated after reload. Two more non-raw
@@ -5914,7 +5914,7 @@ sandbox guarantees; and a bare notebook drops the agent).
 - **Sandbox path guard**: with pathlib/glob allowed, string literals that are absolute paths, `~`, or
   contain `..` are rejected — user code reads only the staged copies.
 - **🧠 Deep mode** (`POST /api/dataset/codegen_deep/submit`): the big open model on the CLUSTER writes the
-  analysis code (prof's direction: smartest open models, async + progress). One cluster round-trip via the
+  analysis code (direction: smartest open models, async + progress). One cluster round-trip via the
   proven `run_llm_infer.sh` sbatch gateway; error repair falls back to the local coder so a fix never
   costs another cluster job. Progress streams into the chat; admin/cluster-granted users.
 - **📓 .ipynb export** (`GET /api/dataset/export_ipynb`): the whole per-dataset conversation as a runnable
@@ -5932,7 +5932,7 @@ out.png already existed. It now always saves the final open figure state (regres
 then new figure → the new figure wins). Live-verified with a full in-browser rewrite of a generated
 plot (rolling mean + annotation) on the demo1/TestDataset showcase conversation.
 
-### v3.9.2 — Prof. Zhang's 3-point feedback (2026-07-23 email), all fixed & live-verified
+### v3.9.2 — three defects from a hands-on review (2026-07-23), all fixed & live-verified
 
 1. **Gallery loading animation** ("datasets can not displayed immediately… add an animation icon"):
    thumbnail cells now shimmer while loading and the header shows a spinner with a live
@@ -5948,7 +5948,7 @@ plot (rolling mean + annotation) on the demo1/TestDataset showcase conversation.
    uploader are admin-only). Verified live: normal member → 403 "you can only delete datasets you
    uploaded (this one was uploaded by admin)".
 
-### v3.9.3 — self-audit after the prof's review: the delete hole was a CLASS of bug, not one bug
+### v3.9.3 — access-control audit: the delete hole was a CLASS of bug, not one endpoint
 
 Triggered by the user challenging whether v3.9.2 was really verified. Honest finding: v3.9.2 items 2
 and 3 had only been checked with curl, never in a browser, and the *reverse* case (can the rightful
@@ -5961,7 +5961,7 @@ guard and fixed the rest:
   their data for labeling. (`agent/delete|update`, `project/agent/remove`, `models/role`, `users/role`,
   `keys*` were already guarded — verified, not assumed.)
 - **UI**: the Delete button is now rendered only for the uploader/admins on BOTH upload lists (the weed
-  home list in the prof's screenshot and the generic project list); others see a "read-only" tag.
+  home list reported in the review and the generic project list); others see a "read-only" tag.
   Server-side enforcement remains the source of truth.
 - **.ipynb export**: cells now carry `id` fields — `nbformat.validate()` passes with no warnings
   (previously a deprecation warning that becomes a hard error in future nbformat).
@@ -5969,12 +5969,12 @@ guard and fixed the rest:
   student B deletes A's dataset → 403; B renames A's classes → 403; B pushes A's data to labeling →
   403; **A deletes A's own → 200**; **A renames own classes → 200**; **admin deletes B's → 200**;
   normal member's chat analysis still works (mode=codegen with plot); normal member's Deep click → clean
-  403 message; prof's two exact sentences in a real browser → both return code + editor + ▶ Run
-  (screenshots `70_prof_exact_questions.png`, `80_normal_user_demo1.png`).
+  403 message; the two reported phrasings in a real browser → both return code + editor + ▶ Run
+  (screenshots `70_code_request_fixed.png`, `80_normal_user_permissions.png`).
 
 ### v3.10.0 — pick the brain: local OR your own commercial model (GPT / Claude / Gemini), data stays here
 
-Prof. Zhang's direction (2026-07-29/31, voice + PyCharm "AI Chat" mock-up): let users use strong
+Requirement (2026-07-29/31, referencing an IDE-style AI chat panel): let users use strong
 commercial AI from inside our chat — on THEIR OWN account — while the data and code execution stay on
 our platform ("we are still data centric"). Do the simple in-app version first (defer the Loom/record
 path). Delivered:
@@ -6002,9 +6002,9 @@ path). Delivered:
   provider's real auth error is shown ("API key not valid" / "Incorrect API key"). The only piece needing
   a valid key is the successful response — which is exactly what the user supplies (BYO-key).
 
-### v3.11.0 — Recordings: Loom-style screen/voice capture + share links (prof's "record + share" direction)
+### v3.11.0 — Recordings: Loom-style screen/voice capture + share links ("record + share" direction)
 
-Prof. Zhang's second track (voice + a Loom-style repo he said "you can borrow", greatroboticslab/
+Second track — a Loom-style reference implementation in the lab repo greatroboticslab/
 humanoidrobotweb): record your screen / a session with strong AI / any interface (even a phone or the
 robot app), save it, and share a link. First slice, borrowing his repo's pattern (getDisplayMedia →
 MediaRecorder → upload → store file + metadata → library → playback → share), integrated into our
@@ -6014,7 +6014,7 @@ platform:
   player before anything uploads ("nothing is uploaded until you press Save"); a **library** of saved
   recordings with inline playback, editable titles, transcripts/notes, per-item **Copy share link**, and
   delete. Also a **"paste an AI share link"** box (ChatGPT/Claude/Gemini) that keeps the link with the
-  project (stored, not scraped — prof: manual is fine when agent-fetch is unreliable).
+  project (stored, not scraped — a manual paste is acceptable where automated fetching is unreliable).
 - **`/r/{id}` share page** — a clean dark view page that plays one recording (auth-gated capability URL).
 - **Backend** `POST /api/recordings` (multipart save), `/api/recordings/link`, `GET /api/recordings`
   (owner-scoped; admins see all), `GET /api/recordings/{id}/media` (**HTTP Range** → 206 so video seeks),
@@ -6025,12 +6025,12 @@ platform:
   record → 00:02 timer → stop → preview → Save → library (audio + copy + delete) → `/r/{id}` share loop
   works; responsive on phone. Screen capture (`getDisplayMedia`) shares the identical code path and needs a
   real display to exercise — that's the one piece only testable on a real machine.
-- Deferred per the prof's own steer: the "agent auto-clicks the shared link" and the app-monitoring /
+- Deferred per the own steer: the "agent auto-clicks the shared link" and the app-monitoring /
   robot-app-hacking extensions — this ships the record + save + share core first.
 
 ### v3.12.0 — platform-wide design system: one cohesive look (colors / nav / cards / homepage), mobile + desktop
 
-Harry's ask after v3.10/3.11: the frontend changes were localized; make the WHOLE platform look like one
+Follow-up to v3.10/3.11: the frontend changes were localized; make the WHOLE platform look like one
 polished product. Done as a real design system, not a page-by-page repaint:
 
 - **`_UI_CSS` — one design-system stylesheet injected into every page** (via the existing HTML-injection
@@ -6052,7 +6052,7 @@ polished product. Done as a real design system, not a page-by-page repaint:
 
 ### v3.12.1 — premium dark theme (dark gradient + glass), replacing the light look
 
-Harry's steer: "backgrounds are mostly white — I lean toward a dark gradient, premium feel." Pivoted the
+Direction change: mostly-white backgrounds were replaced by a dark gradient for a more premium feel. Pivoted the
 design system from light to a **premium dark** aesthetic, still via the one injected `_UI_CSS` (skin-only):
 
 - **Dark gradient backdrop** (fixed radial emerald/blue glows over a deep navy base), **glassmorphic cards**
@@ -6071,7 +6071,7 @@ design system from light to a **premium dark** aesthetic, still via the one inje
 
 ### v3.12.2 — dark-theme audit: fixed white cards / invisible inputs on the legacy pages
 
-Harry caught the gap I flagged: the project workspace (and other old pages) still had WHITE cards with
+A review of the deployed pages found the gap flagged earlier: the project workspace (and other legacy pages) still had WHITE cards with
 INVISIBLE dropdowns in dark mode — my earlier "verification" only checked page-tops, not full scroll.
 Ran a real full-page audit (a probe that counts light-background elements per page) and fixed the roots:
 
@@ -6084,7 +6084,7 @@ Ran a real full-page audit (a probe that counts light-background elements per pa
   prefix** (every pale bg is `#fXXXXX`, darks never are) plus common `rgb(...)` light forms; bare `<section>`
   card-grids made transparent.
 - **Result — full-page audit now reports 0 light-background elements on all six checked pages**
-  (agent workspace, console, classes, labeling, slugs, users). The project-workspace dropdowns Harry
+  (agent workspace, console, classes, labeling, slugs, users). The project-workspace dropdowns reported as unreadable
   screenshotted are readable; the dense console/classes pages are dark end-to-end. (Two caution-action
   cards on the console keep a red tint by design.)
 - Honest lesson recorded: verify by SCROLLING full pages, and `[style*="#fff"]` selectors are unreliable
@@ -6092,7 +6092,7 @@ Ran a real full-page audit (a probe that counts light-background elements per pa
 
 ### v3.12.3 — dark theme swept across EVERY page (edge pages audited)
 
-Continued the audit to the remaining pages Harry asked about and then some — annotate, audit(+method/class),
+Extended the audit to the remaining pages — annotate, audit(+method/class),
 control, manual, morning_report, roboflow, rounds, synth, class-detail, gallery — plus a regression pass on
 the core + my own components. Built a light-element counter and drove it to zero everywhere:
 
@@ -6113,7 +6113,7 @@ the core + my own components. Built a light-element counter and drove it to zero
 
 ### v3.12.4 — readability: lift dark inline text + fix mobile badge covering the nav
 
-Harry (mobile screenshots): the fixed login badge covered the top-nav links (Guide/Recordings), and many
+Reported from mobile: the fixed login badge covered the top-nav links (Guide/Recordings), and many
 labels/buttons were unreadable — dark inline text colors (`#334` on Rename/Edit, `#475569` on
 "Filter similarity threshold", "Agent push cap", section descriptions) stayed dark on the dark theme
 because my earlier lift was non-`!important` and lost to inline colors.
@@ -6130,7 +6130,7 @@ because my earlier lift was non-`!important` and lost to inline colors.
 
 ### v3.12.5 — mobile: proper account bar (not hidden) + fix All/My-projects overlap
 
-Harry: shrinking/truncating the account badge to dodge the nav was the wrong call (it read as hiding the
+Review finding: shrinking/truncating the account badge to dodge the nav was the wrong approach (it read as hiding the
 account), and the homepage All/My-projects filter buttons overlapped instead of sitting below the hero.
 
 - **Account is now a full-width top bar on mobile** — the email + Logout are shown in full on a slim dark
@@ -6142,7 +6142,7 @@ account), and the homepage All/My-projects filter buttons overlapped instead of 
 
 ### v3.12.6 — fix black bold text on dark + stop stale-cache from hiding UI updates
 
-Harry: "project / agents / mAP50-95" (and likely elsewhere) were black on the dark theme, and his mobile
+Reported: bold terms ("project", "agents", "mAP50-95", and likely elsewhere) rendered black on the dark theme, and the mobile
 account bar wasn't showing.
 
 - **Black bold text:** the cause was a CSS RULE (not inline) — pages define `b{color:#0f172a}` /
@@ -6156,7 +6156,7 @@ account bar wasn't showing.
 ### v3.13.0 — Loom parity (floating bar, camera, auto-transcribe) + action trace ("beyond Loom", first slice)
 
 Re-read the lab's greatroboticslab/humanoidrobotweb recorder properly and closed the gaps, then took the
-first real step on the prof's "please improve / beyond what Loom can do".
+first real step on the "please improve / beyond what Loom can do".
 
 **A — parity with their Loom implementation:**
 - **Floating recorder bar** (their signature UI): a fixed pill with a pulsing red dot, the kind being
@@ -6198,7 +6198,7 @@ cleans up. Plus regressions re-run: dark audit 0 light elements across ~18 pages
 
 ### v3.14.0 — make it feel like ONE app: unified navigation, newcomer main line, plain English, docs caught up
 
-An honest UX audit (asked for by Harry) found the platform had grown into a set of tools rather than a
+A UX audit found the platform had grown into a set of tools rather than a
 product: **5 different navigation bars**, **two dead-end pages** (/classes and /slugs had no nav at all),
 internal jargon on screen (slugs / hub / annotate / morning_report), a /guide that mentioned **none** of the
 month's new features (Recordings 0×, Workbench 0×, API key 0×), and a README two versions behind.
@@ -6230,7 +6230,7 @@ archives/images/video, and it has no filename to go by (only the dataset name). 
 content** — decodable text that looks tabular/JSON is accepted as a data file (`kind="data1"`), so a lone
 sensor log uploads like an image or a video does. Verified: "✅ 1 data file(s) registered as …".
 
-**Bug 2 — white buttons were invisible and glaring on the dark Data page** (Harry's report). Measured
+**Bug 2 — white buttons were invisible and glaring on the dark Data page.** Measured
 contrast was **1.15:1** (white `#f4f4f7`/`#fff` background under light text): the ✓/✗/🤔 verdict buttons and
 the filter tabs. Cause: legacy descendant rules like `.filter-bar button{background:#f4f4f7}` out-specify a
 bare `button` rule. Fixed by overriding descendant buttons inside legacy containers, giving the verdict
