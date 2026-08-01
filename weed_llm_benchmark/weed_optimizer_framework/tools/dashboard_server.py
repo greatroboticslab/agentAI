@@ -2689,7 +2689,10 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
  .fbar .fstop{border:0;background:#dc2626;color:#fff;font-weight:700;padding:7px 14px;border-radius:999px;cursor:pointer;font-size:13px}
  .fbar .fsteps{font-size:11.5px;color:#94a3b8}
  .live video{width:100%;max-width:340px;border-radius:10px;background:#000;margin-top:8px}
- @media(max-width:640px){.wrap{padding:1rem}.hero{padding:1rem}.fbar{width:calc(100% - 24px);border-radius:14px;justify-content:space-between}}
+ @media(max-width:640px){.wrap{padding:1rem}.hero{padding:1rem}
+   .fbar{box-sizing:border-box;left:12px;right:12px;width:auto;max-width:none;transform:none;
+     border-radius:14px;justify-content:space-between;gap:8px;padding:10px 12px}
+   .fbar .flabel{font-size:12px}.fbar .fsteps{display:none}}
 </style></head><body>
 <div class="top"><a href="/">&larr; Projects</a><a href="/guide">Guide</a></div>
 <div class="hero"><h1>&#127909; Recordings</h1><div class="sub">Record your screen or voice &mdash; a session with strong AI, a demo, any interface &mdash; save it, and share a link. Nothing is uploaded until you press Save.</div></div>

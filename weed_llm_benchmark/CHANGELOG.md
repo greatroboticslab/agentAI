@@ -6181,3 +6181,17 @@ video to t=1.86s; **auto-transcribe proven with real speech** — saving a real 
 
 Still open (honest): the agent that *acts on* a trace (auto-clicking / monitoring apps outside our pages)
 is not built — the trace is its prerequisite, and capture outside our own tab isn't possible from a browser.
+
+### v3.13.1 — deep verification of the recorder; fixed the mobile floating bar overflowing
+
+Ran an adversarial 15-check harness against the v3.13 recorder instead of trusting the happy path. It found
+a real bug: on a 390px phone the floating recorder bar computed to **400px wide** (padding added on top of
+`width:calc(100% - 24px)` without border-box), i.e. it hung off-screen. Fixed with `box-sizing:border-box` +
+left/right anchoring (and the step counter hides on narrow screens).
+
+**Verification now 15/15**, covering paths not previously tested: floating bar shows/hides, live timer,
+trace captured during recording, preview before upload, save, **trace persisted server-side**, survives a
+page reload, media served with **HTTP 206 range** (seek works), rename, share-page timeline + click-to-seek,
+mobile has all 4 record buttons, mobile bar fits the viewport, external AI link still works, and test data
+cleans up. Plus regressions re-run: dark audit 0 light elements across ~18 pages; local-model analysis
+(codegen + plot), workbench run_code, BYO-key endpoints, and .ipynb export all still work.
