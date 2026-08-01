@@ -13,6 +13,17 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-01 — v3.14.0: from "a set of tools" to "one app"
+
+Harry asked the right question: is it all done, and is it as easy for a newcomer as the Claude app? Honest
+answer was no — features yes, product no. Evidence from an audit: 5 different nav bars, /classes and /slugs
+were dead ends with no nav at all, internal jargon on screen, /guide mentioned none of the month's features,
+README two versions behind. Fixed all of it: ONE global app bar injected on every page (Projects · Data ·
+Recordings · Guide + a More menu with plain-English names), old duplicate bars auto-tidied, jargon relabelled
+globally, a dismissible 3-step "new here" main line on the home page, and docs (guide + README) caught up.
+Verified 12/12 pages carry the unified nav. Lesson: features accumulate faster than information architecture
+— periodically audit the newcomer path, not just the feature list.
+
 ## 2026-07-31 (later) — v3.13.0: Loom parity + action trace
 
 Harry asked whether I'd really referenced the prof's repo. Honest answer was "half" — I'd borrowed the

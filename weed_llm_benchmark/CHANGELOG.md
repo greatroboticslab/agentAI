@@ -6195,3 +6195,27 @@ page reload, media served with **HTTP 206 range** (seek works), rename, share-pa
 mobile has all 4 record buttons, mobile bar fits the viewport, external AI link still works, and test data
 cleans up. Plus regressions re-run: dark audit 0 light elements across ~18 pages; local-model analysis
 (codegen + plot), workbench run_code, BYO-key endpoints, and .ipynb export all still work.
+
+### v3.14.0 — make it feel like ONE app: unified navigation, newcomer main line, plain English, docs caught up
+
+An honest UX audit (asked for by Harry) found the platform had grown into a set of tools rather than a
+product: **5 different navigation bars**, **two dead-end pages** (/classes and /slugs had no nav at all),
+internal jargon on screen (slugs / hub / annotate / morning_report), a /guide that mentioned **none** of the
+month's new features (Recordings 0×, Workbench 0×, API key 0×), and a README two versions behind.
+
+- **One global app bar on every page** (injected like the design system): brand + **Projects · Data ·
+  Recordings · Guide** with an active-section highlight, and a **More** menu holding the advanced/internal
+  pages under plain-English names (Browse images, Labeling, Collection rounds, AI models, Users & access,
+  Roboflow, Advanced console, Full documentation). Verified **12/12 pages**; the dead ends are gone.
+- **No double navigation:** `_navTidy()` hides links in a page's old bar that merely duplicate the global
+  nav (and hides the bar entirely if nothing page-specific remains), while keeping page actions like
+  "Image gallery" / "Recompute". 9 of 12 pages now show a single bar.
+- **Plain English:** on-screen jargon is relabelled globally (slugs → Datasets, hub → Home, annotate →
+  Labeling guide, classes → Browse images, rounds → Collection rounds, manual → Documentation).
+- **Newcomer main line** on the home page: a dismissible "New here? It works in three steps" card
+  (open a project → upload data & ask questions → record, share, train) with CTAs to the guide and to
+  Recordings. Remembered per browser once dismissed.
+- **Docs caught up:** /guide gained "Use your own AI (GPT/Claude/Gemini)" and a full **Recordings** section
+  (floating bar, auto-transcription, share links, action trace) — coverage went 0 → all; README's Latest
+  banner now describes v3.14 and the Recordings section documents the floating bar, auto-transcribe and the
+  action-trace timeline, with new screenshots.

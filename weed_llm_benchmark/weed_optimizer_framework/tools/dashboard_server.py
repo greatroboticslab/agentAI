@@ -596,7 +596,34 @@ a{transition:color .12s}
 ::-webkit-scrollbar{width:11px;height:11px}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px;border:3px solid transparent;background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.24);background-clip:content-box}
-/* sticky glass navigation */
+/* v3.14 — the ONE global app bar (same on every page) */
+#_appnav{position:sticky;top:0;z-index:80;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+ padding:9px 16px;background:rgba(9,13,21,.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+ border-bottom:1px solid rgba(255,255,255,.10)}
+#_appnav ._brand{color:#fff !important;text-decoration:none;font-weight:800;font-size:14.5px;letter-spacing:-.01em;margin-right:6px}
+#_appnav ._brand b{color:#34d399}
+#_appnav ._lk{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+#_appnav a{color:#c7d3e8 !important;text-decoration:none;font-size:13px;font-weight:600;
+ padding:7px 12px;border-radius:9px;transition:background .12s,color .12s}
+#_appnav ._lk a:hover{background:rgba(255,255,255,.09);color:#fff !important}
+#_appnav ._lk a.on{background:rgba(16,185,129,.18);color:#6ee7b7 !important;box-shadow:inset 0 0 0 1px rgba(16,185,129,.35)}
+#_appnav ._more{position:relative;margin-left:auto}
+#_appnav ._more>button{background:rgba(255,255,255,.07);color:#c7d3e8;border:1px solid rgba(255,255,255,.14);
+ font-size:13px;font-weight:600;padding:7px 12px;border-radius:9px;cursor:pointer}
+#_appnav ._more>button:hover{background:rgba(255,255,255,.14);color:#fff}
+#_appnav ._menu{display:none;position:absolute;right:0;top:calc(100% + 8px);min-width:224px;
+ background:#111b2e;border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:6px;
+ box-shadow:0 20px 46px rgba(0,0,0,.55);z-index:90}
+#_appnav ._menu.on{display:block}
+#_appnav ._menu a{display:block;padding:9px 12px;font-weight:500}
+#_appnav ._menu a:hover{background:rgba(255,255,255,.08);color:#fff !important}
+@media(max-width:640px){
+ #_appnav{padding:8px 10px;gap:6px}
+ #_appnav ._brand{font-size:13px;width:100%;margin-bottom:2px}
+ #_appnav a{font-size:12.5px;padding:6px 10px}
+ #_appnav ._more{margin-left:auto}
+}
+/* page-specific old bars become a SECONDARY action row under the app bar */
 .top{background:rgba(9,13,21,.72) !important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
  border-bottom:1px solid var(--line) !important;position:sticky;top:0;z-index:60}
 .top a{background:rgba(255,255,255,.07) !important;color:#cdd9ef !important;border-radius:9px !important;
@@ -753,6 +780,75 @@ section:not(.card):not(.hero),main:not(.card){background:transparent !important}
 #agentLog table td,#agentLog table th{color:#dbe3f0}
 </style>'''
 
+# ===========================================================================
+# v3.14 — ONE GLOBAL APP NAVIGATION, injected into every page (same technique as
+# the design system). Before this the site had 5 different nav bars and two
+# dead-end pages (/classes, /slugs had none): a newcomer could not build a mental
+# model of "where am I / where can I go". Now every page carries the same bar,
+# with plain-English labels; internal/advanced pages move under "More".
+# Page-specific actions in a page's own old bar are kept; links that merely
+# duplicate this global nav are hidden by _navTidy() so there's no double nav.
+# ===========================================================================
+_APP_NAV = '''<nav id="_appnav" aria-label="Main">
+ <a class="_brand" href="/">&#9670; Greater Robotics <b>Lab</b></a>
+ <div class="_lk">
+  <a href="/" data-p="/">Projects</a>
+  <a href="/slugs" data-p="/slugs">Data</a>
+  <a href="/recordings" data-p="/recordings">Recordings</a>
+  <a href="/guide" data-p="/guide">Guide</a>
+ </div>
+ <div class="_more">
+  <button type="button" onclick="_navMore(event)">More &#9662;</button>
+  <div class="_menu" id="_navmenu">
+   <a href="/classes">&#128444; Browse images</a>
+   <a href="/labeling">&#127991; Labeling</a>
+   <a href="/rounds">&#128260; Collection rounds</a>
+   <a href="/models">&#129504; AI models</a>
+   <a href="/users">&#128100; Users &amp; access</a>
+   <a href="/roboflow">&#128202; Roboflow</a>
+   <a href="/console">&#9881; Advanced console</a>
+   <a href="/manual">&#128214; Full documentation</a>
+  </div>
+ </div>
+</nav>
+<script>
+function _navMore(e){ if(e)e.stopPropagation();
+ var m=document.getElementById('_navmenu'); if(m)m.classList.toggle('on'); }
+document.addEventListener('click',function(){var m=document.getElementById('_navmenu');if(m)m.classList.remove('on');});
+(function _navInit(){
+ // highlight the current section
+ var here=location.pathname;
+ document.querySelectorAll('#_appnav ._lk a').forEach(function(a){
+   var p=a.getAttribute('data-p');
+   if(p==='/'? (here==='/'||here.indexOf('/agent/')===0) : here.indexOf(p)===0) a.classList.add('on');
+ });
+ // plain-English relabelling of internal jargon, wherever it appears in old bars
+ var MAP={'slugs':'Datasets','📦 slugs':'📦 Datasets','hub':'Home','🏠 hub':'🏠 Home',
+   'annotate':'Labeling guide','🏷️ annotate':'🏷️ Labeling guide','classes':'Browse images',
+   '📋 classes':'📋 Browse images','rounds':'Collection rounds','🔄 rounds':'🔄 Collection rounds',
+   'manual':'Documentation','📖 manual':'📖 Documentation','morning_report':'Daily report'};
+ function _navTidy(){
+  var globals=['/','/slugs','/recordings','/guide','/classes','/labeling','/rounds','/models','/users','/console','/manual','/roboflow'];
+  document.querySelectorAll('.top,.nav').forEach(function(bar){
+    if(bar.id==='_appnav')return;
+    var kept=0;
+    bar.querySelectorAll('a').forEach(function(a){
+      var t=(a.textContent||'').trim();
+      Object.keys(MAP).forEach(function(k){ if(t===k||t.replace(/\\s+/g,' ')===k) a.textContent=MAP[k]; });
+      var href=a.getAttribute('href')||'';
+      try{ var u=new URL(href,location.origin);
+        // hide links that only duplicate the global nav (keep page actions)
+        if(globals.indexOf(u.pathname)>=0 && !/gallery|Recompute|JSON|back/i.test(t)){ a.style.display='none'; return; }
+      }catch(err){}
+      kept++;
+    });
+    if(!kept) bar.style.display='none';   // the whole bar was duplicate nav
+  });
+ }
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_navTidy); else _navTidy();
+})();
+</script>'''
+
 # v3.0.134: global "signed in as X · Logout" badge, injected before </body> on
 # every HTML page (one place). Fills itself from /api/me. Skipped on /login.
 _LOGIN_BADGE = (
@@ -813,6 +909,14 @@ async def _inject_responsive_css(request: Request, call_next):
                 text = text.replace("</head>", inject + "</head>", 1)
             else:
                 text = inject + text
+        # v3.14: ONE global app nav on every page (not the login/share views), so
+        # no page is a dead end and the whole site navigates the same way.
+        _p = request.url.path
+        if ('id="_appnav"' not in text and _p != "/login"
+                and not _p.startswith("/r/")):
+            _m = re.search(r"<body[^>]*>", text)
+            if _m:
+                text = text[:_m.end()] + _APP_NAV + text[_m.end():]
         # v3.0.134: login badge on every page except the login page itself.
         if ("_authbadge" not in text and request.url.path != "/login"
                 and "</body>" in text):
@@ -1337,6 +1441,21 @@ def root():
  .note{font-size:12px;color:#8a96ab;margin-top:11px;text-align:center;line-height:1.5}
  .foot{margin-top:44px;color:#8a96ab;font-size:12px;text-align:center}
  .foot a{color:#8ecbff}
+ /* v3.14 newcomer main line */
+ .start{background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(37,99,235,.10));
+   border:1px solid rgba(16,185,129,.28);border-radius:16px;padding:16px 18px;margin:18px 0 6px}
+ .sh-head{display:flex;align-items:center;justify-content:space-between;font-size:14.5px;color:#eaf3ff;margin-bottom:12px}
+ .sh-x{background:transparent;border:0;color:#9fb0c7;font-size:20px;cursor:pointer;line-height:1;padding:0 4px}
+ .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+ .step{display:flex;gap:10px;align-items:flex-start}
+ .step .n{flex:0 0 24px;height:24px;border-radius:50%;background:#059669;color:#fff;font-weight:700;
+   font-size:12.5px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+ .step b{display:block;font-size:13.5px;color:#f2f6fc;margin-bottom:2px}
+ .step span{font-size:12.5px;color:#aab4c6;line-height:1.5}
+ .sh-cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+ .sh-cta .go{background:#059669;color:#fff;font-weight:700;font-size:13px;padding:9px 16px;border-radius:10px;text-decoration:none}
+ .sh-cta .go2{background:rgba(255,255,255,.07);color:#c7d3e8;font-weight:600;font-size:13px;
+   padding:9px 16px;border-radius:10px;text-decoration:none;border:1px solid rgba(255,255,255,.16)}
  @media(max-width:640px){.hero{padding:1.7rem 1rem 2.4rem}.hero h1{font-size:25px}.wrap{padding:0 14px 30px}.toolbar{margin-top:14px}}
 </style></head><body>
  <div class="top">
@@ -1351,6 +1470,20 @@ def root():
      &mdash; any number, any mix, or none.</div>
  </div>
  <div class="wrap">
+ <div class="start" id="startHere">
+   <div class="sh-head"><b>&#128075; New here? It works in three steps</b>
+     <button class="sh-x" onclick="shHide()" title="Hide this">&times;</button></div>
+   <div class="steps">
+     <div class="step"><span class="n">1</span><div><b>Open or create a project</b>
+       <span>A project is your workspace. Pick one below, or make a new one for any research field.</span></div></div>
+     <div class="step"><span class="n">2</span><div><b>Upload your data &amp; ask questions</b>
+       <span>Drop in images, video or sensor files &mdash; then just ask in plain words. The AI writes the analysis code, runs it, and shows the charts.</span></div></div>
+     <div class="step"><span class="n">3</span><div><b>Record, share, and train</b>
+       <span>Record your screen or voice for a teammate, share a link, review labels, and train a model on the cluster.</span></div></div>
+   </div>
+   <div class="sh-cta"><a class="go" href="/guide">Read the 2-minute guide &rarr;</a>
+     <a class="go2" href="/recordings">&#127909; Try recording</a></div>
+ </div>
  <div class="toolbar">
    <button id="f-all" class="ftab on" onclick="filterProj('all')">All projects</button>
    <button id="f-mine" class="ftab" onclick="filterProj('mine')">My projects</button>
@@ -1407,6 +1540,10 @@ def root():
  <div class="foot">Lab server &middot; MongoDB &middot; cluster GPU compute &nbsp;|&nbsp; <a href="/console">Advanced console &rarr;</a></div>
  </div>
  <script>
+  // v3.14: the "new here?" main line — dismissible, remembered per browser
+  function shHide(){ var e=document.getElementById('startHere'); if(e)e.style.display='none';
+    try{ localStorage.setItem('sh_hidden','1'); }catch(err){} }
+  (function(){ try{ if(localStorage.getItem('sh_hidden')==='1'){ var e=document.getElementById('startHere'); if(e)e.style.display='none'; } }catch(err){} })();
   async function filterProj(mode){
     document.getElementById('f-all').className='ftab'+(mode==='all'?' on':'');
     document.getElementById('f-mine').className='ftab'+(mode==='mine'?' on':'');
@@ -8222,6 +8359,24 @@ def guide_page():
    the chat; admin/cluster users). <b>&#128211;</b> downloads the whole conversation as a runnable <b>Jupyter
    notebook</b> (.ipynb). The conversation and code persist per dataset &mdash; reload and it&rsquo;s all still
    there.</p>
+   <h3>Use your own AI (GPT / Claude / Gemini)</h3>
+   <p>The <b>&#129302; model menu</b> in the chat box picks the brain. <b>Local &middot; Qwen Coder</b> is free and needs
+   nothing. Choose <b>OpenAI</b>, <b>Anthropic</b> or <b>Google</b> to use a strong commercial model on
+   <b>your own account</b>: click the <b>&#128273;</b> button and paste your API key once. It is
+   <b>encrypted on our server, used only for your requests, and never shown again</b>. Whichever model you pick,
+   it writes the analysis code and <b>the code still runs in our sandbox on your data</b>.</p>
+ </div>
+ <div class="card"><h2>&#127909; Recordings &mdash; show, don&rsquo;t explain</h2>
+   <p>Open <b>Recordings</b> in the top bar to capture <b>your screen</b>, <b>screen + mic</b>, <b>camera</b>, or
+   just <b>voice</b> &mdash; a walkthrough, a bug, or a session with an AI. A floating bar shows a red dot, a timer
+   and Stop while you work; you preview before anything uploads.</p>
+   <ul>
+     <li>Press <b>Save</b> and it is <b>transcribed automatically</b> (our own Whisper on the lab GPU).</li>
+     <li>Each recording gets a <b>share link</b> &mdash; send it to a teammate or your advisor.</li>
+     <li>Clicks you make on the platform while recording become an <b>action trace</b>: a clickable timeline
+       on the share page that <b>jumps the video</b> to that moment.</li>
+     <li>Worked something out in ChatGPT/Claude/Gemini? Paste its <b>share link</b> to keep it with the project.</li>
+   </ul>
  </div>
  <div class="card"><h2>Agents you can add</h2>
    <ul>

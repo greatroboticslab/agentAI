@@ -181,14 +181,24 @@ decrypted for a single request and never written to any shared file.
 
 ### Step 9 — Record it: screen or voice, then share a link
 
-The **Recordings** page (top nav) captures your **screen**, **screen + mic**, or **voice** — a walkthrough,
-a demo, or a session with strong AI on any interface. A live timer runs; you preview before anything
-uploads; press **Save** and it lands in your library with inline playback, an editable title, and a
-one-click **share link** (`/r/<id>`). You can also **paste an AI share link** (ChatGPT / Claude / Gemini)
-to keep it with the project.
+The **Recordings** page (top nav) captures your **screen**, **screen + mic**, **camera**, or **voice** — a
+walkthrough, a demo, or a session with strong AI on any interface. A Loom-style **floating bar** (red dot,
+live timer, Stop) stays visible while you work in other windows; you preview before anything uploads.
+Press **Save** and it is **transcribed automatically** (self-hosted Whisper on the lab GPU) and lands in your
+library with inline playback, an editable title, and a one-click **share link** (`/r/<id>`). You can also
+**paste an AI share link** (ChatGPT / Claude / Gemini) to keep it with the project.
 
 <div align="center">
-<img src="docs/screenshots/recordings-record.png" width="840" alt="The Recordings page: record screen / screen+mic / voice buttons, an audio preview player with a title field and Save/Discard, a paste-AI-link box, and a library">
+<img src="docs/screenshots/loom-floating-bar.png" width="840" alt="Recording in progress: a floating pill at the bottom shows a red dot, 'Recording camera', a live timer, the action-step count and a Stop button, with a live camera preview above">
+</div>
+
+Beyond a screen recorder: every click you make on the platform while recording is captured as a timestamped
+**action trace**. The share page renders it as a **clickable timeline** — click a step and the video jumps to
+that moment. (A video shows *what* happened; the trace records *which control, at which second* — the
+structured input an agent needs to assist or replay later.)
+
+<div align="center">
+<img src="docs/screenshots/loom-action-trace.png" width="840" alt="Share page: the recorded video with an 'Action trace' panel listing timestamped steps that seek the video when clicked">
 </div>
 
 ---
@@ -281,12 +291,13 @@ Running tests, CI details, and contributing conventions are in **[docs/DEVELOPME
 | [`multagent/`](multagent/) | **EMACF** robotics agent framework (Brain / Perception / Targeting / Navigation) — the earlier embodied-robot direction, kept for reference. |
 | [`docs/`](docs/) | Screenshots + platform roadmap. |
 
-> **Latest:** `v3.10` — **pick the brain**: a model menu in the chat lets you keep the free grounded local
-> model or use **your own GPT / Claude / Gemini** (bring-your-own-key, encrypted per-user, never echoed).
-> A commercial model **writes the analysis code, which still runs in our sandbox on your data** — its brain,
-> your data stays here. Builds on the v3.9 conversational notebook (auto-captured figures, per-turn plot
-> history, image datasets in the sandbox, Deep cluster mode, .ipynb export) and the v3.3–v3.8 grounded,
-> see/edit/run workbench. See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
+> **Latest:** `v3.14` — the platform now behaves like **one app**: a single navigation bar on every page
+> (plain-English labels, advanced tools under *More*, no dead ends), a **"new here?" 3-step main line** on the
+> home page, and a **premium dark theme** across every screen (phone + desktop). Recent feature work:
+> **Recordings** (Loom-style screen / camera / voice capture with a floating recorder bar, auto-transcription,
+> share links, and a clickable **action trace** timeline), and **bring-your-own AI** — pick Local · Qwen (free)
+> or your own **GPT / Claude / Gemini** key (encrypted per user) to write analysis code that still runs in our
+> sandbox on your data. See [`weed_llm_benchmark/CHANGELOG.md`](weed_llm_benchmark/CHANGELOG.md)
 > and [`RESEARCH_LOG.md`](RESEARCH_LOG.md).
 
 ---
