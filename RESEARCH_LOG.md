@@ -13,6 +13,38 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-03 — v3.16.1: saved AI conversations are captured honestly, or not claimed at all
+
+**Defect found in testing.** The previous release fetched a text snapshot of a pasted AI share link. Tested
+against a real Gemini share URL, the fetch returned HTTP 200 but only 77 characters of sign-in scaffold —
+which the library then presented as "Saved snapshot". The conversation had not been captured, yet the
+interface implied it had. Share pages that assemble their content in the browser with JavaScript are not
+readable by a server-side fetch.
+
+**Server-side rendering evaluated and rejected.** Chrome 140 is present on the lab server but cannot drive
+this: `--dump-dom` emits nothing, `Page.navigate` goes unanswered on a flat DevTools session, and a tab
+opened directly at a URL issues its network request (`Network.requestWillBeSent`) but never receives a
+response — unchanged by `--no-proxy-server`, `--disable-quic` or `--dns-prefetch-disable`, while plain
+`urllib` from the same user and host succeeds. Beyond the malfunction, running a full browser against
+user-supplied URLs would widen the attack surface of that endpoint.
+
+**Changes.**
+- Fetches returning under 400 characters of visible text, or sign-in / "enable JavaScript" scaffold under
+  2500 characters, are reported as failures naming the cause and the remedy instead of being stored.
+- The conversation text can be pasted directly, either when saving the link or afterwards on an existing
+  entry (`text` field on `POST /api/recordings/link` and `/api/recordings/{id}/update`, up to 200 000
+  characters). Pasted text overrides any fetch and is labelled `pasted`, so a reader can tell user-supplied
+  content from a page scrape.
+- Rows saved before the fix now display the explanation rather than scaffold text; stored records are
+  unchanged.
+- The snapshot panel was restyled to the dark design system and preserves line breaks.
+
+**Verification (live server).** 7/7 API checks and 8/8 browser checks passed: the real Gemini link reports
+failure at 56 characters; pasted text is stored (549 characters), labelled, and read back; an internal
+address (`http://127.0.0.1:8000/...`) is refused by the host allow-list; the library states the cause and
+offers the paste action. Test entries were created under a separate throwaway identity and deleted
+afterwards; the owner's three existing entries were verified intact.
+
 ## 2026-08-01 — v3.14.0–v3.14.2: unified navigation, newcomer path, and a full click-through verification
 
 **Information architecture.** A UX audit of the deployed site found the platform had grown into a set of

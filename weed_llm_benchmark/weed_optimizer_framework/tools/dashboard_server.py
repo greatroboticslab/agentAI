@@ -2798,6 +2798,18 @@ def _fetch_link_preview(url: str) -> dict:
         body = re.sub(r"(?s)<[^>]+>", " ", body)
         body = re.sub(r"&(nbsp|amp|quot|#39|lt|gt);", " ", body)
         body = re.sub(r"\s+", " ", body).strip()
+        # Many share pages (Gemini, Claude) render the conversation with JavaScript,
+        # so a plain fetch returns only the app shell / sign-in scaffold. Storing that
+        # as a "snapshot" would be misleading, so detect it and report a real failure.
+        low = body.lower()
+        shell = any(k in low for k in (
+            "enable javascript", "requires javascript", "javascript is disabled",
+            "direct access to google ai", "sign in to continue", "you need to sign in"))
+        if len(body) < 400 or (shell and len(body) < 2500):
+            return {"ok": False, "chars": len(body),
+                    "error": ("that page builds its conversation with JavaScript, so only an empty "
+                              "page shell came back (%d characters). The link is saved — use "
+                              "“Paste the conversation text” to keep the content." % len(body))}
         excerpt = (desc + "  " if desc else "") + body[:4000]
         return {"ok": True, "title": title, "excerpt": excerpt.strip()[:4000],
                 "chars": len(body)}
@@ -2936,25 +2948,32 @@ async def api_recordings_link(request: Request):
     url = str(body.get("url") or "").strip()[:2000]
     if not re.match(r"^https?://", url):
         raise HTTPException(400, "paste a valid http(s) link")
+    pasted = str(body.get("text") or "").strip()[:200_000]
     rid = "lnk_" + time.strftime("%Y%m%d%H%M%S") + "_" + _secrets.token_hex(4)
     # try to capture a readable snapshot so the entry is useful later even if the
-    # share link is revoked — honest about it when the page can't be read.
+    # share link is revoked — honest about it when the page can't be read. Text the
+    # user pasted always wins: it is the conversation itself, not a page scrape.
     prev = await _asyncio.to_thread(_fetch_link_preview, url)
+    saved = pasted or (prev.get("excerpt") or "")[:4000]
+    ok = bool(pasted) or bool(prev.get("ok"))
     meta = {"id": rid, "owner": actor, "kind": "link", "ext_link": url,
             "source": _link_source(url),
             "title": (str(body.get("title") or "").strip()[:140]
                       or (prev.get("title") or "").strip()[:140]
                       or (_link_source(url) + " conversation")),
             "note": str(body.get("note") or "").strip()[:2000],
-            "preview": (prev.get("excerpt") or "")[:4000],
-            "preview_error": (None if prev.get("ok") else prev.get("error")),
-            "fetched_at": (time.strftime("%Y-%m-%d %H:%M:%S") if prev.get("ok") else None),
+            "preview": saved,
+            "preview_source": ("pasted" if pasted else ("fetched" if prev.get("ok") else None)),
+            "preview_error": (None if ok else prev.get("error")),
+            "fetched_at": (time.strftime("%Y-%m-%d %H:%M:%S") if ok else None),
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S")}
     store = _read_recordings()
     store[rid] = meta
     _write_recordings(store)
-    return {"ok": True, "id": rid, "preview_ok": bool(prev.get("ok")),
-            "title": meta["title"], "chars": prev.get("chars") or 0,
+    return {"ok": True, "id": rid, "preview_ok": ok,
+            "title": meta["title"],
+            "chars": len(pasted) if pasted else (prev.get("chars") or 0),
+            "preview_source": meta["preview_source"],
             "preview_error": meta["preview_error"]}
 
 
@@ -2965,7 +2984,7 @@ def api_recordings_list(request: Request):
     admin = _is_admin(actor)
     fields = ("id", "owner", "title", "kind", "mime", "size", "duration",
               "transcript", "note", "ext_link", "source", "created_at", "trace",
-              "preview", "preview_error", "fetched_at")
+              "preview", "preview_error", "preview_source", "fetched_at")
     rows = [{k: r.get(k) for k in fields} for r in _read_recordings().values()
             if admin or r.get("owner") == actor]
     rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
@@ -3028,9 +3047,18 @@ async def api_recordings_update(request: Request, rid: str):
         rec["title"] = str(body["title"]).strip()[:140] or rec.get("title")
     if "note" in body:
         rec["note"] = str(body["note"]).strip()[:2000]
+    if "text" in body:
+        # attach (or replace) the conversation text on a link saved earlier, for
+        # share pages whose content a plain fetch cannot read
+        txt = str(body["text"]).strip()[:200_000]
+        rec["preview"] = txt
+        rec["preview_source"] = "pasted" if txt else None
+        rec["preview_error"] = None if txt else rec.get("preview_error")
+        rec["fetched_at"] = time.strftime("%Y-%m-%d %H:%M:%S") if txt else None
     store[rid] = rec
     _write_recordings(store)
-    return {"ok": True, "id": rid, "title": rec.get("title")}
+    return {"ok": True, "id": rid, "title": rec.get("title"),
+            "chars": len(rec.get("preview") or "")}
 
 
 _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
@@ -3071,7 +3099,7 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#475569;cursor:pointer}
  .btn:hover{background:#f8fafc}.btn.del{color:#dc2626;border-color:#fecaca}
  .btn.copy.ok{background:#dcfce7;color:#166534;border-color:#86efac}
- .tx{margin-top:8px;font-size:12.5px;color:#334155;background:#f8fafc;border-radius:8px;padding:8px 10px;max-height:120px;overflow:auto}
+ .tx{margin-top:8px;font-size:12.5px;color:#cbd5e1;background:#111a2e;border:1px solid #1e293b;border-radius:8px;padding:8px 10px;max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-word}
  .empty{color:var(--mut);font-size:13px;text-align:center;padding:20px;border:1px dashed var(--line);border-radius:12px}
  a.ext{color:#2563eb;font-weight:600;text-decoration:none}
  /* Loom-style floating recorder bar (stays visible while you work elsewhere) */
@@ -3130,10 +3158,22 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
    Save its link here so it stays with the project: you (or your advisor) can reopen it later to see
    <i>where an idea came from</i>, and teammates can read it instead of repeating the same questions.<br>
    <b>How:</b> in ChatGPT/Claude/Gemini click <b>Share</b> &rarr; <b>Copy link</b> &rarr; paste it below.<br>
-   <b>What we store:</b> the link, plus a <b>text snapshot of that public share page</b> so the content
-   survives even if the link is later revoked. We read only the page the link points to &mdash; never your
-   AI account, and never anything private.</div>
+   <b>What we store:</b> the link, plus a <b>text snapshot of that public share page</b> when we can read it,
+   so the content survives even if the link is later revoked. We read only the page the link points to
+   &mdash; never your AI account, and never anything private.<br>
+   <b>Note:</b> some share pages (often Gemini and Claude) build the conversation in your browser with
+   JavaScript, so a server fetch sees an empty page. When that happens we say so instead of saving a blank
+   snapshot &mdash; then just select the conversation, copy it, and paste it below to keep the full text.</div>
   <div class="linkrow"><input id="linkUrl" placeholder="https://chatgpt.com/share/..."><input id="linkTitle" placeholder="What was it about? (optional)" style="flex:0 0 220px"><button class="addl" onclick="addLink()">Save link</button></div>
+  <div style="margin-top:10px">
+   <button class="btn" onclick="toggleLinkText()" id="ltTog" style="font-size:12px">&#9998; Paste the conversation text (optional)</button>
+   <div id="ltWrap" style="display:none;margin-top:8px">
+    <textarea id="linkText" rows="6" placeholder="Select the conversation on the share page, copy it, and paste it here. This is stored exactly as pasted, and is what teammates will read."
+      style="width:100%;padding:10px;border-radius:10px"></textarea>
+    <div class="hint" style="margin-top:6px">Pasted text always wins over what we could fetch &mdash; it is the
+     conversation itself rather than a page scrape.</div>
+   </div>
+  </div>
  </div>
  <div class="card">
   <h3>Your library</h3>
@@ -3316,12 +3356,32 @@ async function saveRec(){
   }catch(e){ alert('save error: '+e.message); }
   btn.disabled=false; btn.textContent='Save';
 }
+function toggleLinkText(){
+  var w=document.getElementById('ltWrap'), on=w.style.display==='none';
+  w.style.display=on?'block':'none';
+  document.getElementById('ltTog').innerHTML=(on?'✕ Hide the text box':'✎ Paste the conversation text (optional)');
+  if(on) document.getElementById('linkText').focus();
+}
 async function addLink(){
   var u=document.getElementById('linkUrl').value.trim(); if(!u){ document.getElementById('linkUrl').focus(); return; }
   var t=document.getElementById('linkTitle').value.trim();
-  try{ var r=await fetch('/api/recordings/link',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u,title:t})});
-    var d=await r.json(); if(r.ok&&d.ok){ document.getElementById('linkUrl').value=''; document.getElementById('linkTitle').value=''; loadLibrary(); }
+  var x=document.getElementById('linkText').value.trim();
+  var btn=document.querySelector('.addl'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{ var r=await fetch('/api/recordings/link',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u,title:t,text:x})});
+    var d=await r.json();
+    if(r.ok&&d.ok){ document.getElementById('linkUrl').value=''; document.getElementById('linkTitle').value='';
+      document.getElementById('linkText').value=''; loadLibrary();
+      if(!d.preview_ok) alert('Link saved, but the page content could not be read:\n\n'+(d.preview_error||'unknown reason')+'\n\nTip: open the share page, select the conversation, copy it, and use “Paste the conversation text”.');
+    }
     else alert((d&&(d.detail||d.error))||'could not add link');
+  }catch(e){ alert(''+e); }
+  if(btn){ btn.disabled=false; btn.textContent='Save link'; }
+}
+async function addText(id){
+  var t=prompt('Paste the conversation text for this link (it will be stored exactly as pasted):','');
+  if(t===null) return; t=t.trim(); if(!t) return;
+  try{ var r=await fetch('/api/recordings/'+id+'/update',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+    var d=await r.json(); if(r.ok&&d.ok) loadLibrary(); else alert((d&&(d.detail||d.error))||'could not save the text');
   }catch(e){ alert(''+e); }
 }
 function copyShare(id,btn){
@@ -3338,9 +3398,17 @@ async function renameRec(id,el){ var t=el.textContent.trim();
 function libItem(r){
   var media='';
   if(r.kind==='link'){
-    var pv = r.preview ? ('<div class="tx"><b>Saved snapshot</b> ('+(r.fetched_at||'')+'):<br>'+esc(r.preview.slice(0,600))+(r.preview.length>600?'…':'')+'</div>')
-           : (r.preview_error ? ('<div class="meta" style="margin-top:6px">&#9888; could not read the page — only the link is stored ('+esc(r.preview_error)+')</div>') : '');
-    media = '<div style="margin-top:8px"><a class="ext" href="'+esc(r.ext_link)+'" target="_blank" rel="noopener">'+esc(r.ext_link)+' &#8599;</a></div>'+pv;
+    // entries saved before the shell-detection fix can hold a few dozen characters of
+    // sign-in scaffold; show them as unreadable rather than as a snapshot
+    if(r.preview && r.preview_source!=='pasted' && r.preview.length<400){
+      r.preview_error = r.preview_error || 'that page builds its conversation with JavaScript, so only an empty page shell was captured ('+r.preview.length+' characters) — use “Paste the conversation text” to keep the content.';
+      r.preview = '';
+    }
+    var lbl = r.preview_source==='pasted' ? 'Conversation text (pasted by you)' : 'Saved snapshot of the share page';
+    var pv = r.preview ? ('<div class="tx"><b>'+lbl+'</b> ('+(r.fetched_at||'')+', '+r.preview.length+' chars):<br>'+esc(r.preview.slice(0,600))+(r.preview.length>600?'…':'')+'</div>')
+           : (r.preview_error ? ('<div class="meta" style="margin-top:6px">&#9888; '+esc(r.preview_error)+'</div>') : '');
+    var addBtn = '<button class="btn" onclick="addText(\''+r.id+'\')" style="margin-top:6px;font-size:12px">'+(r.preview?'&#9998; Replace the saved text':'&#9998; Paste the conversation text')+'</button>';
+    media = '<div style="margin-top:8px"><a class="ext" href="'+esc(r.ext_link)+'" target="_blank" rel="noopener">'+esc(r.ext_link)+' &#8599;</a></div>'+pv+addBtn;
   } else if(((r.mime||'').indexOf('audio')>=0 && r.kind!=='video') || r.kind==='voice'){
     media = '<audio src="/api/recordings/'+r.id+'/media" controls preload="metadata"></audio>';
   } else {
@@ -3519,10 +3587,14 @@ def recording_share_page(request: Request, rid: str):
     title = h(rec.get("title") or "Recording")
     if rec.get("kind") == "link":
         _pv = rec.get("preview") or ""
-        _pv_html = (f'<div class="tx"><b>Snapshot saved {h(rec.get("fetched_at"))}</b><br>'
+        if _pv and rec.get("preview_source") != "pasted" and len(_pv) < 400:
+            _pv = ""   # pre-fix entry holding only sign-in scaffold, not a real snapshot
+        _pv_lbl = ("Conversation text saved" if rec.get("preview_source") == "pasted"
+                   else "Snapshot of the share page saved")
+        _pv_html = (f'<div class="tx"><b>{_pv_lbl} {h(rec.get("fetched_at"))}</b><br>'
                     f'{h(_pv)}</div>' if _pv else
-                    (f'<p class="note">Only the link is stored — the page could not be read '
-                     f'({h(rec.get("preview_error"))}).</p>' if rec.get("preview_error") else ""))
+                    (f'<p class="note">Only the link is stored — {h(rec.get("preview_error"))}</p>'
+                     if rec.get("preview_error") else ""))
         body = (f'<p class="sub">Shared {h(rec.get("source") or "AI")} conversation:</p>'
                 f'<p><a class="ext" href="{h(rec.get("ext_link"))}" target="_blank" '
                 f'rel="noopener">{h(rec.get("ext_link"))} &#8599;</a></p>{_pv_html}')
@@ -3562,7 +3634,7 @@ def recording_share_page(request: Request, rid: str):
  .wrap{{max-width:900px;margin:0 auto;padding:1.5rem 1.2rem}}
  h1{{font-size:20px;margin:0 0 4px}} .sub,.meta,.note{{color:#94a3b8;font-size:13px}} .meta{{margin:0 0 16px}}
  .ext{{color:#93c5fd;word-break:break-all}}
- .tx{{margin-top:16px;background:#111a2e;border:1px solid #1e293b;border-radius:12px;padding:14px 16px;font-size:13px;color:#cbd5e1;max-height:300px;overflow:auto}}
+ .tx{{margin-top:16px;background:#111a2e;border:1px solid #1e293b;border-radius:12px;padding:14px 16px;font-size:13px;color:#cbd5e1;max-height:400px;overflow:auto;white-space:pre-wrap;word-break:break-word}}
  .note{{margin-top:12px}}
  .trace{{margin-top:16px;background:#111a2e;border:1px solid #1e293b;border-radius:12px;padding:14px 16px;max-height:340px;overflow:auto}}
  .trace b{{font-size:13px}} .trace .sub{{color:#94a3b8;font-size:12px;margin-left:6px}}

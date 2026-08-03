@@ -6370,3 +6370,37 @@ server fetches that **public share page** and stores a text snapshot alongside i
   cannot be read the entry says so plainly instead of implying content was saved.
 - Copy updated to state exactly what is stored: the link plus a snapshot of that public page — never the
   user's AI account.
+
+### v3.16.1 — share-link capture: report unreadable pages honestly, allow pasting the conversation
+
+Testing v3.16.0 with a real Gemini share link exposed a correctness defect: the fetch succeeded (HTTP 200)
+but returned only the app shell — 77 characters of sign-in scaffold — which was then displayed as
+"Saved snapshot". A user reading the library would believe the conversation had been captured when nothing
+had been. Share pages that assemble their content in the browser with JavaScript cannot be read by a server
+fetch at all.
+
+Server-side rendering was evaluated as a fix and rejected. Chrome 140 is installed on the lab server but is
+unusable for this: `--dump-dom` produces no output, `Page.navigate` is not answered on a flat DevTools
+session, and when a tab is opened directly at a URL (`PUT /json/new`) the request is issued
+(`Network.requestWillBeSent`) but never receives a response, with or without `--no-proxy-server`,
+`--disable-quic` and `--dns-prefetch-disable`. Plain `urllib` from the same user and host works, so the
+stall is specific to Chrome's network stack on this machine. A headless browser would also enlarge the
+attack surface of an endpoint that fetches user-supplied URLs.
+
+- **Empty-shell detection** — a fetch yielding fewer than 400 characters of visible text, or containing
+  sign-in/"enable JavaScript" scaffold markers under 2500 characters, is now reported as a failure with the
+  cause and the remedy, rather than stored as a snapshot.
+- **Paste path** — `POST /api/recordings/link` accepts a `text` field, and `POST /api/recordings/{id}/update`
+  accepts `text` so a conversation can be attached to a link saved earlier. Pasted text takes precedence over
+  any fetch and is recorded with `preview_source: "pasted"` so the library distinguishes user-supplied
+  content (up to 200 000 characters) from a page scrape.
+- **Existing entries** — the library and share page treat a short non-pasted preview as unreadable, so rows
+  saved before this fix stop displaying scaffold text as a snapshot. Stored records are not modified.
+- Snapshot box restyled to the dark design system (`#111a2e` on `#cbd5e1`) with `white-space: pre-wrap`, so
+  multi-line conversations keep their line breaks; it previously rendered as a light panel.
+
+Verified on the live server: 7/7 API checks (real Gemini link reports failure with `chars=56`; pasted text
+stored at 549 characters, labelled `pasted`, error cleared, content read back; internal address refused) and
+8/8 browser checks (toggle reveals the textarea, honest alert on save, library states the cause and offers
+the paste action, pasted text renders and is labelled). The owner's three existing entries were left intact
+and their pre-fix entry now displays the explanation instead of the scaffold.
