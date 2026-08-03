@@ -13,6 +13,32 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-03 — v3.17.0: recording now begins on a single click
+
+**Problem.** Users other than the author could not get screen recording started, while a comparable recorder
+in the lab's `greatroboticslab/humanoidrobotweb` repository was reported to work immediately. Reading that
+implementation showed it calls the same API we do — `getDisplayMedia({video:true, audio:true})` followed by
+`MediaRecorder` — so capability was never the difference; it records inline from one button press.
+
+**Measurement.** Scripted clicks against the live server confirmed our flow cost two clicks and a window:
+**Record screen** opened a 520×210 popup whose own **● Start recording** button had to be found and pressed.
+A popup that opens behind the main window makes the first click look like it did nothing.
+
+**Changes.** Capture now starts in the page itself, leaving the browser's share-picker as the only step
+after the click; the separate window survives as an explicit *Advanced* option for recording across
+navigation in the same tab. Because the capturing document must stay loaded, link clicks during a recording
+open a new tab and an unload guard is installed. In-page recording publishes the same cross-tab state the
+popup used, so one floating bar with the timer, step count and Stop appears on every page and in every tab.
+Two silent-failure modes were also removed: dismissing the share dialog produced an error alert that read as
+a malfunction, and a successful save gave no confirmation at all.
+
+**Verification.** 13/13 scripted checks passed on the live server (single click starts `MediaRecorder`; no
+extra window; in-page and global bars appear; an internal link opens a new tab while the recording
+continues; the second tab shows the bar; Stop from the bar halts it; state clears). Saving was verified
+separately — a 54,504-byte file stored with its library entry and success message. The screen picker itself
+cannot be driven from a headless browser, so `Record screen` remains to be confirmed on a real machine; the
+automated run used `Voice only`.
+
 ## 2026-08-03 — v3.16.1: saved AI conversations are captured honestly, or not claimed at all
 
 **Defect found in testing.** The previous release fetched a text snapshot of a pasted AI share link. Tested

@@ -6404,3 +6404,39 @@ stored at 549 characters, labelled `pasted`, error cleared, content read back; i
 8/8 browser checks (toggle reveals the textarea, honest alert on save, library states the cause and offers
 the paste action, pasted text renders and is labelled). The owner's three existing entries were left intact
 and their pre-fix entry now displays the explanation instead of the scaffold.
+
+### v3.17.0 — recording starts on one click (the extra window is now optional)
+
+A usability comparison against the lab's `greatroboticslab/humanoidrobotweb` recorder found the difference
+was not the capture API — both call `getDisplayMedia({video:true, audio:true})`, so both can record the
+entire desktop — but the number of steps before recording begins.
+
+Measured on the live server with scripted clicks: pressing **Record screen** opened a 520×210 popup window
+and left the user there with a second **● Start recording** button to find and press. Two clicks, plus a
+separate window that can open behind the main one; if it is not noticed, nothing appears to happen. The
+comparison implementation records inline from a single click, which is why it reads as working immediately.
+
+- **Record buttons now start capture in the page** (`startHere` → `startRec`), so the browser's own
+  share-picker is the only step after the click. The floating-window recorder is retained behind an
+  explicit **Advanced** checkbox (remembered in `localStorage`) for people who need to navigate this tab
+  while recording.
+- **Browsing cannot kill an in-page recording:** while recording, link clicks are redirected to a new tab
+  (`keepPageAlive`) and a `beforeunload` guard covers accidental tab closing. The document that owns the
+  capture therefore stays alive.
+- **One recording indicator everywhere:** in-page recording now publishes the same
+  `localStorage['grl_rec']` + `BroadcastChannel('grl_rec')` state the popup used, so the global floating
+  bar (timer, step count, Stop) appears on every page and in every tab, its Stop halts the in-page
+  recorder, and clicks made in other tabs still enter the action trace (deduplicated by page path).
+- **Dismissing the share dialog is no longer reported as an error** — it produced an
+  `alert('Could not start: Permission denied')` that read as a malfunction. It now shows an inline hint
+  explaining how to retry; genuine failures still surface their message.
+- **Saving now confirms itself.** Previously the panel simply disappeared, leaving no indication that
+  anything had been stored; it now shows "Saved. It is in Your library below." with a link to the share page.
+
+Verified on the live server with scripted real clicks — 13/13: no extra window opens, `MediaRecorder`
+enters `recording` on the first click, the in-page timer and the global floating bar both appear, clicking
+an internal link opens a new tab while this tab keeps recording, the other tab shows the recording bar,
+Stop on the floating bar halts it, the save row appears, and global state clears. Saving was confirmed
+separately (54,504-byte file stored, entry in the library, success message rendered). Screen capture itself
+could not be exercised in a headless browser — the OS share-picker cannot be driven — so `Record screen`
+needs a check on a real machine; `Voice only` was used for the automated run.

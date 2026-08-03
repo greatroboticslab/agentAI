@@ -3124,17 +3124,23 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
 <div class="wrap">
  <div class="card">
   <h3>New recording</h3>
-  <div class="hint">Recording opens a <b>small always-visible window</b> with the timer and Stop, so you can
-   browse the whole platform (or any other tab) while it keeps recording. Screen capture asks which
-   window/tab to share; on phones use Camera or Voice.</div>
+  <div class="hint"><b>One click starts it.</b> Your browser then asks what to share &mdash; pick
+   <b>Entire Screen</b> to record everything, including apps outside the browser. A timer and a
+   <b>Stop</b> button stay on screen. While recording, links here open in a new tab so this page keeps
+   the recording running. Nothing is uploaded until you press Save. On phones use Camera or Voice.</div>
   <div class="recbtns" id="recbtns">
-   <button class="rb" onclick="openRecorder('screen')"><span class="em">&#128421;</span> Record screen</button>
-   <button class="rb" onclick="openRecorder('screenmic')"><span class="em">&#128421;</span>+&#127908; Screen + mic</button>
-   <button class="rb" onclick="openRecorder('video')"><span class="em">&#127909;</span> Record video (camera)</button>
-   <button class="rb" onclick="openRecorder('voice')"><span class="em">&#127908;</span> Voice only</button>
+   <button class="rb" onclick="startHere('screen')"><span class="em">&#128421;</span> Record screen</button>
+   <button class="rb" onclick="startHere('screenmic')"><span class="em">&#128421;</span>+&#127908; Screen + mic</button>
+   <button class="rb" onclick="startHere('video')"><span class="em">&#127909;</span> Record video (camera)</button>
+   <button class="rb" onclick="startHere('voice')"><span class="em">&#127908;</span> Voice only</button>
    <button class="rb" onclick="document.getElementById('upfile').click()"><span class="em">&#11014;</span> Upload a recording</button>
    <input id="upfile" type="file" accept="video/*,audio/*" style="display:none" onchange="uploadExisting(this)">
   </div>
+  <label class="hint" id="popModeLbl" style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer">
+   <input type="checkbox" id="popMode" onchange="savePopMode()" style="width:16px;height:16px;flex:0 0 auto">
+   <span>Advanced: run the recorder in a <b>separate small window</b> instead &mdash; it keeps recording even
+    if you navigate away in this tab, but you must click <b>Start</b> once more in that window.</span>
+  </label>
   <div class="hint" id="iosHint" style="display:none;margin-top:10px;border-left:3px solid #34d399;padding-left:10px">
    <b>On iPhone / iPad:</b> web pages cannot capture the screen (an Apple restriction — no browser or
    extension can, only iOS itself). Use <b>Control Centre &rarr; Screen Recording</b>, then come back and press
@@ -3227,6 +3233,58 @@ async function uploadExisting(inp){
   }catch(e){ msg.textContent='❌ '+e.message; }
   inp.value='';
 }
+// v3.17 — ONE CLICK starts recording on this page. A usability test showed the
+// previous flow (open a small window, find it, click Start there) stalled people
+// who did not notice the second window: two clicks and a window to hunt for.
+// Recording in the page keeps the browser's own permission prompt as the only
+// step after the click. The separate window is still available as an option for
+// people who need to navigate this tab while recording.
+function savePopMode(){
+  try{ localStorage.setItem('grl_popmode', document.getElementById('popMode').checked?'1':'0'); }catch(e){}
+}
+(function(){ try{ if(localStorage.getItem('grl_popmode')==='1')
+  document.getElementById('popMode').checked=true; }catch(e){} })();
+function startHere(mode){
+  var cb=document.getElementById('popMode');
+  if(cb && cb.checked) return openRecorder(mode);
+  return startRec(mode);
+}
+// While recording in the page, unloading this document stops the capture. Send
+// link clicks to a new tab instead, so browsing the platform cannot kill a
+// recording in progress, and guard the tab against accidental closing.
+function _recNavGuard(e){
+  var a=e.target && e.target.closest ? e.target.closest('a[href]') : null;
+  if(!a) return;
+  var href=a.getAttribute('href')||'';
+  if(!href || href.charAt(0)==='#' || /^(javascript:|mailto:|tel:|blob:)/i.test(href)) return;
+  if(a.target==='_blank' || a.hasAttribute('download')) return;
+  e.preventDefault(); e.stopPropagation();
+  try{ window.open(a.href,'_blank','noopener'); }catch(err){ location.href=a.href; }
+}
+function _recBeforeUnload(e){ e.preventDefault(); e.returnValue=''; return ''; }
+// Publish the same state the popup publishes, so the global floating bar (injected
+// on every page) shows this in-page recording too, its Stop works from any tab, and
+// clicks made in other tabs still land in the action trace.
+var _PCH=null; try{ _PCH=new BroadcastChannel('grl_rec'); }catch(e){}
+var _t0ms=0,_label='';
+function pubState(o){
+  try{ localStorage.setItem('grl_rec', JSON.stringify(o)); }catch(e){}
+  if(_PCH){ try{ _PCH.postMessage({type:'state'}); }catch(e){} }
+}
+function pubLive(){ if(_rec) pubState({active:true,kind:_label,t0:_t0ms,steps:_trace.length}); }
+window.addEventListener('storage',function(e){ if(e.key==='grl_rec_stop' && _rec) stopRec(); });
+if(_PCH) _PCH.onmessage=function(e){
+  var d=e.data||{};
+  if(d.type==='stopRequest' && _rec) return stopRec();
+  // traces broadcast by OTHER pages (this page records its own clicks locally)
+  if(d.type==='trace' && _rec && d.ev && d.ev.page!==location.pathname) _trace.push(d.ev);
+};
+function keepPageAlive(on){
+  if(on){ document.addEventListener('click',_recNavGuard,true);
+          window.addEventListener('beforeunload',_recBeforeUnload); }
+  else  { document.removeEventListener('click',_recNavGuard,true);
+          window.removeEventListener('beforeunload',_recBeforeUnload); }
+}
 // v3.15 — open the recorder in its own window so it survives navigation in the
 // main window. Falls back to in-page recording if the popup is blocked.
 function openRecorder(mode){
@@ -3259,7 +3317,21 @@ async function startRec(mode){
       // stop if the user ends screen-share from the browser chrome
       var vt=_stream.getVideoTracks()[0]; if(vt) vt.onended=function(){ stopRec(); };
     }
-  }catch(e){ alert('Could not start: '+e.message); return; }
+  }catch(e){
+    // dismissing the browser's own picker is a normal choice, not a failure —
+    // an alert there reads as "this is broken"
+    var nm=(e&&e.name)||'';
+    var msg=document.getElementById('upmsg');
+    if(nm==='NotAllowedError'||nm==='AbortError'){
+      if(msg){ msg.style.display='block';
+        msg.innerHTML='Recording was not started (you closed the share dialog, or the browser blocked it). '
+          +'Press a record button to try again — in the dialog choose <b>Entire Screen</b>, a window, or a tab, then <b>Share</b>.'; }
+    } else if(msg){
+      msg.style.display='block';
+      msg.textContent='Could not start recording: '+(e.message||nm||'unknown error');
+    } else { alert('Could not start: '+(e.message||nm)); }
+    return;
+  }
   var video = mode!=='voice';
   traceStart();
   var mt = pickMime(video);
@@ -3276,19 +3348,24 @@ async function startRec(mode){
   document.getElementById('live').style.display='flex';
   document.getElementById('livekind').textContent = label;
   document.getElementById('fkind').textContent = 'Recording '+label;
-  document.getElementById('fbar').classList.add('on');   // Loom-style floating bar
   document.getElementById('prev').style.display='none';
   document.getElementById('saverow').style.display='none';
-  _t0=performance.now(); tick();
+  keepPageAlive(true);   // this document owns the capture — do not let it unload
+  _t0=performance.now(); _t0ms=Date.now(); _label=label;
+  pubLive();             // the global floating bar renders from this state
+  tick();
   _timer=setInterval(tick,500);
 }
 function tick(){ var s=Math.floor((performance.now()-_t0)/1000); var m=Math.floor(s/60); var ss=s%60;
   var txt=(m<10?'0':'')+m+':'+(ss<10?'0':'')+ss;
   var el=document.getElementById('elapsed'); if(el)el.textContent=txt;
   var ft=document.getElementById('ftime'); if(ft)ft.textContent=txt;
-  var fs=document.getElementById('fsteps'); if(fs)fs.textContent=_trace.length?(_trace.length+' step(s)'):''; }
+  var fs=document.getElementById('fsteps'); if(fs)fs.textContent=_trace.length?(_trace.length+' step(s)'):'';
+  pubLive(); }
 function stopRec(){
   if(_timer){ clearInterval(_timer); _timer=null; }
+  keepPageAlive(false);
+  pubState({active:false});
   traceStop();
   try{ if(_rec && _rec.state!=='inactive') _rec.stop(); }catch(e){}
   try{ if(_stream) _stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
@@ -3351,7 +3428,14 @@ async function saveRec(){
   try{
     var r=await fetch('/api/recordings',{method:'POST',credentials:'include',body:fd});
     var d=await r.json();
-    if(r.ok && d.ok){ discardRec(); _rec=null; loadLibrary(); }
+    if(r.ok && d.ok){ discardRec(); _rec=null; loadLibrary();
+      // say plainly that it worked — the panel simply disappearing left people
+      // unsure whether anything had been stored
+      var m=document.getElementById('upmsg');
+      if(m){ m.style.display='block';
+        m.innerHTML='&#9989; <b>Saved.</b> It is in <b>Your library</b> below. '
+          +'<a class="ext" href="/r/'+d.id+'" target="_blank" rel="noopener">Open its share page &#8599;</a>'; }
+    }
     else { alert((d&&(d.detail||d.error))||'save failed'); }
   }catch(e){ alert('save error: '+e.message); }
   btn.disabled=false; btn.textContent='Save';
