@@ -7168,10 +7168,20 @@ load();
 @app.get("/login", response_class=HTMLResponse)
 def login_page():
     if _GOOGLE_ENABLED:
-        body = ('<a class="gbtn" href="/auth/google/start">'
-                '<span style="font-weight:700">G</span>&nbsp; Sign in with Google</a>'
-                '<p class="muted">Sign in with your institutional Google account. '
-                'Your uploads and labeling actions are recorded under your name.</p>')
+        # official multi-colour Google "G" so the button reads as genuine SSO
+        _g_logo = ('<svg viewBox="0 0 48 48" width="19" height="19" aria-hidden="true">'
+                   '<path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 '
+                   '14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>'
+                   '<path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 '
+                   '5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>'
+                   '<path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 '
+                   '16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>'
+                   '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 '
+                   '2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>')
+        body = (f'<a class="gbtn" href="/auth/google/start">{_g_logo}'
+                '<span>Sign in with Google</span></a>'
+                '<p class="muted">Use your institutional Google account. Your uploads and '
+                'labeling actions are recorded under your name.</p>')
     else:
         body = ('<p class="muted">Google sign-in is not configured on this server yet. '
                 'Use the shared access credentials in the browser prompt, or ask the '
@@ -7189,27 +7199,64 @@ def login_page():
                 '</ol></details>')
     html = f'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in — AgentAI dataset platform</title><style>
- body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;
-   min-height:100vh;display:flex;align-items:center;justify-content:center;
-   background:linear-gradient(135deg,#0f172a,#1e293b);color:#1a1a1d}}
- .card{{background:#fff;border-radius:16px;padding:36px 30px;max-width:380px;width:92%;
-   text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)}}
- h1{{margin:0 0 4px;font-size:20px}} .sub{{color:#64748b;font-size:13px;margin-bottom:22px}}
- .muted{{color:#64748b;font-size:13px;line-height:1.6;margin-top:16px}}
- .gbtn{{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+<title>Sign in — Greater Robotics Lab</title><style>
+ *{{box-sizing:border-box}}
+ :root{{--brand:#10b981;--ink:#e6edf8;--mut:#94a3b8;--line:rgba(255,255,255,.12)}}
+ html,body{{height:100%}}
+ body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;
+   min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:22px;
+   color:var(--ink);background:#070b14;overflow:hidden;position:relative}}
+ /* depth: slow-drifting brand glows behind the card */
+ .glow{{position:fixed;border-radius:50%;filter:blur(90px);opacity:.5;pointer-events:none;z-index:0}}
+ .g1{{width:520px;height:520px;background:rgba(16,185,129,.40);top:-160px;left:-120px;animation:d1 18s ease-in-out infinite alternate}}
+ .g2{{width:460px;height:460px;background:rgba(37,99,235,.34);bottom:-170px;right:-110px;animation:d2 21s ease-in-out infinite alternate}}
+ .g3{{width:320px;height:320px;background:rgba(56,189,248,.20);top:38%;right:22%;animation:d1 26s ease-in-out infinite alternate-reverse}}
+ @keyframes d1{{to{{transform:translate3d(70px,50px,0) scale(1.12)}}}}
+ @keyframes d2{{to{{transform:translate3d(-60px,-45px,0) scale(1.08)}}}}
+ .card{{position:relative;z-index:1;width:100%;max-width:400px;padding:34px 30px 28px;text-align:center;
+   background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));
+   border:1px solid var(--line);border-radius:22px;
+   box-shadow:0 30px 80px -20px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.10);
+   -webkit-backdrop-filter:blur(18px) saturate(1.1);backdrop-filter:blur(18px) saturate(1.1);
+   animation:rise .5s cubic-bezier(.2,.8,.2,1) both}}
+ @keyframes rise{{from{{opacity:0;transform:translateY(14px)}}}}
+ .mark{{width:56px;height:56px;margin:0 auto 16px;border-radius:16px;display:flex;align-items:center;
+   justify-content:center;font-size:27px;
+   background:linear-gradient(145deg,rgba(16,185,129,.30),rgba(37,99,235,.26));
+   border:1px solid rgba(16,185,129,.42);box-shadow:0 8px 26px -8px rgba(16,185,129,.6)}}
+ .lab{{font-size:11px;letter-spacing:2.6px;text-transform:uppercase;color:#6ee7b7;font-weight:700;margin-bottom:8px}}
+ h1{{margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-.02em;color:#fff}}
+ .sub{{color:var(--mut);font-size:13.5px;line-height:1.55;margin:0 0 24px}}
+ .gbtn{{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
    text-decoration:none;background:#fff;color:#3c4043;border:1px solid #dadce0;
-   font-weight:600;font-size:14px;padding:11px 18px;border-radius:9px;width:100%}}
- .gbtn:hover{{background:#f8fafc}}
- code{{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:12px}}
+   font-weight:600;font-size:14.5px;height:48px;border-radius:12px;
+   box-shadow:0 6px 18px -6px rgba(0,0,0,.55);transition:transform .12s,box-shadow .12s,background .12s}}
+ .gbtn:hover{{background:#f6f8fc;transform:translateY(-1px);box-shadow:0 12px 26px -10px rgba(0,0,0,.65)}}
+ .gbtn:active{{transform:translateY(0)}}
+ .gbtn svg{{flex:0 0 19px}}
+ .muted{{color:var(--mut);font-size:12.5px;line-height:1.65;margin:16px 0 0}}
+ .feat{{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:22px 0 0;padding-top:18px;
+   border-top:1px solid var(--line)}}
+ .feat span{{font-size:11.5px;color:#b6c4da;background:rgba(255,255,255,.06);
+   border:1px solid var(--line);border-radius:999px;padding:5px 11px;white-space:nowrap}}
+ code{{background:rgba(255,255,255,.10);padding:1px 5px;border-radius:4px;font-size:12px;color:#dbe6f5}}
+ details{{color:var(--mut)}} summary{{color:#7dd3fc}}
+ a{{color:#93c5fd}}
+ @media(max-width:420px){{.card{{padding:26px 20px 22px}} h1{{font-size:19.5px}} .glow{{filter:blur(70px)}}}}
 </style></head><body>
- <div class="card">
-   <h1>&#129302; AgentAI Dataset Platform</h1>
-   <div class="sub">Autonomous data-collection agents</div>
+ <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+ <main class="card">
+   <div class="mark">&#129302;</div>
+   <div class="lab">Greater Robotics Lab</div>
+   <h1>AgentAI Dataset Platform</h1>
+   <p class="sub">Collect, analyse and label research data &mdash; with AI agents that
+     explain their work.</p>
    {body}
- </div>
+   <div class="feat"><span>&#128202; Ask your data</span><span>&#129302; Bring your own AI</span>
+     <span>&#127909; Record &amp; share</span></div>
+ </main>
 </body></html>'''
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store, max-age=0"})
 
 
 @app.get("/auth/google/start")

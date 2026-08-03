@@ -6320,3 +6320,19 @@ end, the page now explains it and offers the path that does work:
 **Verified:** simulating a browser without `getDisplayMedia` shows the dimmed buttons, the explanation and
 the upload control; uploading a real media file end-to-end produced a stored recording with a correct
 automatic transcript and a working share page.
+
+### v3.15.2 — sign-in page redesigned; fixed the misaligned Google button
+
+Reported: the Google button looked crooked on both phone and desktop, giving an unprofessional first
+impression. **Root cause:** `.gbtn` used `width:100%` with padding and a border but the login page — the one
+page deliberately excluded from the global stylesheet — had no `box-sizing:border-box`, so the button
+computed wider than the card's content box and overflowed to the right.
+
+- **Fixed** with a local reset; alignment is now verified numerically rather than by eye: button overflow
+  −1 px (fully inside), symmetric side gaps, button centred in the card and card centred in the viewport,
+  on both 1280 px desktop and 390 px mobile.
+- **Redesigned** as a proper entry point: deep gradient backdrop with three slow-drifting brand glows, a
+  glass card with a lifted brand mark, lab eyebrow, clear product line, and three capability chips
+  (Ask your data · Bring your own AI · Record & share).
+- The Google button now uses the **official four-colour "G" mark** (inline SVG), a 48 px hit area and
+  hover/press states, so it reads as genuine SSO.
