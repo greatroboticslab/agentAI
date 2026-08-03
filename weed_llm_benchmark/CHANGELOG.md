@@ -6336,3 +6336,20 @@ computed wider than the card's content box and overflowed to the right.
   (Ask your data · Bring your own AI · Record & share).
 - The Google button now uses the **official four-colour "G" mark** (inline SVG), a 48 px hit area and
   hover/press states, so it reads as genuine SSO.
+
+### v3.15.3 — an original brand mark and custom icons (no more emoji)
+
+Emoji were standing in for a logo and for the feature icons, which read as unfinished. Replaced with
+purpose-drawn inline SVG:
+
+- **Brand mark** — a hexagonal chip frame (robotics) enclosing a leaf on a two-node link (the lab's field
+  science and the agent/data idea), drawn in the platform's emerald→sky gradient. Used large on the sign-in
+  page and at 20 px in the global navigation of every page, so the identity is consistent everywhere.
+- **Feature icons** — monoline 24-grid icons replacing 📊/🤖/🎥: a chat bubble containing bars
+  ("Ask your data"), a processor with pins ("Bring your own AI"), and a record dot with an outward arrow
+  ("Record & share"). They inherit `currentColor`, so they follow the theme.
+- Being inline SVG they are crisp on any display, need no network request, and never render as a different
+  glyph across operating systems (the usual emoji problem).
+
+Sign-in alignment re-verified after the change: button overflow −1 px, centred in card and viewport, on
+desktop and mobile.

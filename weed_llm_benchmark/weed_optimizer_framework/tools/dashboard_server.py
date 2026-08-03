@@ -600,7 +600,9 @@ a{transition:color .12s}
 #_appnav{position:sticky;top:0;z-index:80;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
  padding:9px 16px;background:rgba(9,13,21,.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
  border-bottom:1px solid rgba(255,255,255,.10)}
-#_appnav ._brand{color:#fff !important;text-decoration:none;font-weight:800;font-size:14.5px;letter-spacing:-.01em;margin-right:6px}
+#_appnav ._brand{display:inline-flex;align-items:center;gap:8px;color:#fff !important;text-decoration:none;
+ font-weight:800;font-size:14.5px;letter-spacing:-.01em;margin-right:6px}
+#_appnav ._brand svg{width:20px;height:20px;flex:0 0 20px}
 #_appnav ._brand b{color:#34d399}
 #_appnav ._lk{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 #_appnav a{color:#c7d3e8 !important;text-decoration:none;font-size:13px;font-weight:600;
@@ -853,7 +855,13 @@ section:not(.card):not(.hero),main:not(.card){background:transparent !important}
 # duplicate this global nav are hidden by _navTidy() so there's no double nav.
 # ===========================================================================
 _APP_NAV = '''<nav id="_appnav" aria-label="Main">
- <a class="_brand" href="/">&#9670; Greater Robotics <b>Lab</b></a>
+ <a class="_brand" href="/"><svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><defs>
+   <linearGradient id="_lgn" x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#6ee7b7"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+   <polygon points="32,4.5 55.4,18 55.4,45 32,58.5 8.6,45 8.6,18" stroke="url(#_lgn)" stroke-width="4" stroke-linejoin="round"/>
+   <path d="M22.5 44.5c-.6-12.4 6.6-19.9 20-21.6 1 12.7-6.2 20.3-20 21.6z" fill="url(#_lgn)" fill-opacity=".25" stroke="url(#_lgn)" stroke-width="3.2" stroke-linejoin="round"/>
+   <circle cx="22.5" cy="44.5" r="3.4" fill="url(#_lgn)"/><circle cx="42.5" cy="22.9" r="3.4" fill="url(#_lgn)"/>
+  </svg><span>Greater Robotics <b>Lab</b></span></a>
  <div class="_lk">
   <a href="/" data-p="/">Projects</a>
   <a href="/slugs" data-p="/slugs">Data</a>
@@ -7237,8 +7245,10 @@ def login_page():
  .muted{{color:var(--mut);font-size:12.5px;line-height:1.65;margin:16px 0 0}}
  .feat{{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:22px 0 0;padding-top:18px;
    border-top:1px solid var(--line)}}
- .feat span{{font-size:11.5px;color:#b6c4da;background:rgba(255,255,255,.06);
-   border:1px solid var(--line);border-radius:999px;padding:5px 11px;white-space:nowrap}}
+ .feat span{{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#b6c4da;
+   background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;
+   padding:6px 12px;white-space:nowrap}}
+ .feat svg{{width:14px;height:14px;flex:0 0 14px;color:#6ee7b7}}
  code{{background:rgba(255,255,255,.10);padding:1px 5px;border-radius:4px;font-size:12px;color:#dbe6f5}}
  details{{color:var(--mut)}} summary{{color:#7dd3fc}}
  a{{color:#93c5fd}}
@@ -7246,14 +7256,39 @@ def login_page():
 </style></head><body>
  <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
  <main class="card">
-   <div class="mark">&#129302;</div>
+   <!-- original mark: a hexagonal "chip" frame around a leaf on a node link —
+        robotics (chip + nodes) meeting the lab's field science (leaf). -->
+   <div class="mark">
+     <svg viewBox="0 0 64 64" width="34" height="34" fill="none" aria-label="Greater Robotics Lab">
+       <defs><linearGradient id="lgm" x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse">
+         <stop stop-color="#6ee7b7"/><stop offset=".55" stop-color="#34d399"/><stop offset="1" stop-color="#38bdf8"/>
+       </linearGradient></defs>
+       <polygon points="32,4.5 55.4,18 55.4,45 32,58.5 8.6,45 8.6,18"
+         stroke="url(#lgm)" stroke-width="3" stroke-linejoin="round" opacity=".95"/>
+       <path d="M22.5 44.5c-.6-12.4 6.6-19.9 20-21.6 1 12.7-6.2 20.3-20 21.6z"
+         fill="url(#lgm)" fill-opacity=".22" stroke="url(#lgm)" stroke-width="2.5" stroke-linejoin="round"/>
+       <path d="M22.5 44.5 42.5 22.9" stroke="url(#lgm)" stroke-width="2.5" stroke-linecap="round"/>
+       <circle cx="22.5" cy="44.5" r="3.1" fill="url(#lgm)"/>
+       <circle cx="42.5" cy="22.9" r="3.1" fill="url(#lgm)"/>
+     </svg>
+   </div>
    <div class="lab">Greater Robotics Lab</div>
    <h1>AgentAI Dataset Platform</h1>
    <p class="sub">Collect, analyse and label research data &mdash; with AI agents that
      explain their work.</p>
    {body}
-   <div class="feat"><span>&#128202; Ask your data</span><span>&#129302; Bring your own AI</span>
-     <span>&#127909; Record &amp; share</span></div>
+   <div class="feat">
+     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round"><path d="M21 14.5a3 3 0 0 1-3 3H8.5L4 20.5V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/>
+       <path d="M8.8 13.4v-2.6M12.5 13.4V8.6M16.2 13.4V6.9"/></svg>Ask your data</span>
+     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round"><rect x="7.5" y="7.5" width="9" height="9" rx="2.2"/>
+       <path d="M10.2 3.4v4.1M13.8 3.4v4.1M10.2 16.5v4.1M13.8 16.5v4.1M3.4 10.2h4.1M3.4 13.8h4.1M16.5 10.2h4.1M16.5 13.8h4.1"/></svg>Bring your own AI</span>
+     <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+       stroke-linecap="round" stroke-linejoin="round"><circle cx="9.8" cy="14.2" r="6.2"/>
+       <circle cx="9.8" cy="14.2" r="2.3" fill="currentColor" stroke="none"/>
+       <path d="M15.4 8.6h5v5M20.4 8.6 14.6 14.4"/></svg>Record &amp; share</span>
+   </div>
  </main>
 </body></html>'''
     return HTMLResponse(html, headers={"Cache-Control": "no-store, max-age=0"})
