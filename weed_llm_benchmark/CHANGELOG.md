@@ -6440,3 +6440,45 @@ Stop on the floating bar halts it, the save row appears, and global state clears
 separately (54,504-byte file stored, entry in the library, success message rendered). Screen capture itself
 could not be exercised in a headless browser — the OS share-picker cannot be driven — so `Record screen`
 needs a check on a real machine; `Voice only` was used for the automated run.
+
+### v3.17.1 — the microphone was silently dropped from screen recordings
+
+Reported after v3.17.0: a screen recording captured the audio the shared tab played, but not the person
+speaking. `Voice only` recorded the microphone correctly, which located the fault in how the two audio
+sources were combined:
+
+```js
+mic.getAudioTracks().forEach(function(t){ _stream.addTrack(t); });   // second audio track
+```
+
+**MediaRecorder encodes only the first audio track of a stream.** The microphone track was therefore
+attached, appeared in `stream.getAudioTracks()`, and was then discarded at encode time with no error — so
+`Screen + mic` never actually recorded a voice.
+
+Measured in a browser, recording two known tones (220 Hz standing for the shared screen audio, 880 Hz for
+the microphone) and analysing the decoded result per frequency:
+
+| stream built as | 220 Hz | 880 Hz | noise @3.3 kHz |
+|---|---|---|---|
+| two separate audio tracks (old) | 0.3946 | **0.0001** | 0 |
+| one track, mixed with Web Audio (new) | 0.3937 | **0.3131** | 0.0003 |
+
+- The shared audio and the microphone are now mixed through an `AudioContext` +
+  `MediaStreamAudioDestinationNode` into a **single** track, and the recorded stream is rebuilt as
+  `[videoTrack, mixedAudioTrack]`. The microphone is requested with echo cancellation, noise suppression
+  and auto gain. If mixing is unavailable the voice is kept in preference to the shared audio.
+- Because the recorded track is now a mix rather than the capture itself, the original streams are kept in
+  `_srcStreams` and stopped on Stop, along with closing the `AudioContext` — otherwise the browser's
+  "sharing your screen" state would persist after stopping.
+- **The page states which sounds it is capturing** as soon as recording starts ("screen + your voice +
+  screen audio", "screen + screen audio (no microphone)"), and if the microphone was requested but not
+  granted it says so and explains how to allow it — the failure used to be silent until playback.
+- Buttons renamed for what they do: **Record screen + my voice** (listed first, highlighted) and
+  **Screen only (no microphone)**. The previous "Record screen" / "Screen + mic" pair did not make clear
+  that plain screen capture never includes a microphone.
+- The same defect and the same fix apply to the separate-window recorder retained under the Advanced option.
+
+Verified on the live server, 11/11 checks: the two-track stream measurably loses its second source, the
+mixed stream retains both about 1000× above the noise floor, and `startRec('screenmic')` now yields one
+audio track plus video, reports both sources, keeps both source streams for cleanup, and labels the
+recording accurately.

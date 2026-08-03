@@ -3127,10 +3127,13 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
   <div class="hint"><b>One click starts it.</b> Your browser then asks what to share &mdash; pick
    <b>Entire Screen</b> to record everything, including apps outside the browser. A timer and a
    <b>Stop</b> button stay on screen. While recording, links here open in a new tab so this page keeps
-   the recording running. Nothing is uploaded until you press Save. On phones use Camera or Voice.</div>
+   the recording running. Nothing is uploaded until you press Save. On phones use Camera or Voice.<br>
+   <b>To narrate, use “Record screen + my voice”</b> &mdash; plain screen capture records only the sound
+   the shared screen or tab plays, never your microphone (that is how the browser works, not a setting).
+   The page tells you which sounds it is capturing once recording starts.</div>
   <div class="recbtns" id="recbtns">
-   <button class="rb" onclick="startHere('screen')"><span class="em">&#128421;</span> Record screen</button>
-   <button class="rb" onclick="startHere('screenmic')"><span class="em">&#128421;</span>+&#127908; Screen + mic</button>
+   <button class="rb" onclick="startHere('screenmic')" style="border-color:#34d399"><span class="em">&#128421;</span>+&#127908; Record screen + my voice</button>
+   <button class="rb" onclick="startHere('screen')"><span class="em">&#128421;</span> Screen only (no microphone)</button>
    <button class="rb" onclick="startHere('video')"><span class="em">&#127909;</span> Record video (camera)</button>
    <button class="rb" onclick="startHere('voice')"><span class="em">&#127908;</span> Voice only</button>
    <button class="rb" onclick="document.getElementById('upfile').click()"><span class="em">&#11014;</span> Upload a recording</button>
@@ -3196,6 +3199,9 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function fmtSize(n){ n=+n||0; if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(0)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
 var _stream=null,_rec=null,_chunks=[],_blob=null,_kind='screen',_t0=0,_timer=null;
+// screen capture builds a stream from several sources; keep the originals so they
+// can all be stopped, and remember which audio actually made it in
+var _srcStreams=[],_actx=null,_hasMic=false,_hasSys=false,_micDenied=false;
 function pickMime(video){
   var c = video ? ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4']
                 : ['audio/webm;codecs=opus','audio/webm','audio/mp4'];
@@ -3300,6 +3306,7 @@ window.addEventListener('message',function(e){ if(e.data&&e.data.grlSaved) loadL
 async function startRec(mode){
   if(_rec){ return; }
   _kind = mode==='voice' ? 'voice' : (mode==='video' ? 'video' : 'screen');
+  _hasMic=false; _hasSys=false; _micDenied=false; _srcStreams=[];
   try{
     if(mode==='voice'){
       _stream = await navigator.mediaDevices.getUserMedia({audio:true});
@@ -3309,13 +3316,33 @@ async function startRec(mode){
       var cp=document.getElementById('camprev'); if(cp){ cp.srcObject=_stream; cp.style.display='block'; }
     } else {
       if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){ alert('Screen recording is not supported in this browser. Try Chrome/Edge on desktop, or use "Record video (camera)" / Voice on a phone.'); return; }
-      _stream = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
+      var disp = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
+      var mic = null;
       if(mode==='screenmic'){
-        try{ var mic = await navigator.mediaDevices.getUserMedia({audio:true});
-             mic.getAudioTracks().forEach(function(t){ _stream.addTrack(t); }); }catch(e){}
+        try{ mic = await navigator.mediaDevices.getUserMedia(
+               {audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }
+        catch(e){ _micDenied = true; }
       }
+      // MediaRecorder encodes only the FIRST audio track of a stream, so simply
+      // adding the microphone next to the shared-audio track silently dropped the
+      // voice. Mix both sources into a single track with Web Audio instead.
+      var sysT = disp.getAudioTracks(), micT = mic ? mic.getAudioTracks() : [], aTrack = null;
+      if(sysT.length && micT.length){
+        try{
+          _actx = new (window.AudioContext||window.webkitAudioContext)();
+          var dest = _actx.createMediaStreamDestination();
+          _actx.createMediaStreamSource(new MediaStream(sysT)).connect(dest);
+          _actx.createMediaStreamSource(new MediaStream(micT)).connect(dest);
+          aTrack = dest.stream.getAudioTracks()[0];
+        }catch(e){ aTrack = micT[0]; }   // mixing unavailable — keep the voice
+      } else if(micT.length){ aTrack = micT[0]; }
+      else if(sysT.length){ aTrack = sysT[0]; }
+      _srcStreams = [disp, mic];
+      _hasMic = !!micT.length; _hasSys = !!sysT.length;
+      _stream = new MediaStream(aTrack ? [disp.getVideoTracks()[0], aTrack]
+                                       : [disp.getVideoTracks()[0]]);
       // stop if the user ends screen-share from the browser chrome
-      var vt=_stream.getVideoTracks()[0]; if(vt) vt.onended=function(){ stopRec(); };
+      var vt=disp.getVideoTracks()[0]; if(vt) vt.onended=function(){ stopRec(); };
     }
   }catch(e){
     // dismissing the browser's own picker is a normal choice, not a failure —
@@ -3343,7 +3370,31 @@ async function startRec(mode){
     showPreview(video);
   };
   _rec.start();
-  var label = mode==='voice'?'voice':(mode==='video'?'camera':(mode==='screenmic'?'screen + mic':'screen'));
+  // name what is actually being captured, so a missing voice track is visible
+  // immediately rather than discovered when the recording is played back
+  var label = mode==='voice' ? 'voice' : (mode==='video' ? 'camera'
+      : (mode==='screenmic'
+           ? (_hasMic ? (_hasSys ? 'screen + your voice + screen audio' : 'screen + your voice')
+                      : 'screen — MICROPHONE BLOCKED')
+           : (_hasSys ? 'screen + screen audio (no microphone)' : 'screen only (no sound)')));
+  var note=document.getElementById('upmsg');
+  if(note){
+    if(mode==='screenmic' && !_hasMic){
+      note.style.display='block';
+      note.innerHTML='&#9888; <b>Your microphone was not captured</b> ('
+        +(_micDenied?'the browser blocked it':'no microphone track was returned')
+        +'), so your voice will not be in this recording. Stop, allow the microphone for this site '
+        +'(padlock icon in the address bar &rarr; Microphone &rarr; Allow), and start again.';
+    } else if(mode==='screen'){
+      note.style.display='block';
+      note.innerHTML='Recording the screen'+(_hasSys?' and the audio the shared screen/tab plays':'')
+        +'. <b>Your microphone is not included</b> — to narrate, stop and use '
+        +'<b>&#128421;+&#127908; Screen + mic</b> instead.';
+    } else if(mode==='screenmic'){
+      note.style.display='block';
+      note.innerHTML='&#127908; Recording your voice'+(_hasSys?' mixed with the audio the shared screen/tab plays':'')+'.';
+    }
+  }
   document.getElementById('recbtns').style.display='none';
   document.getElementById('live').style.display='flex';
   document.getElementById('livekind').textContent = label;
@@ -3369,6 +3420,10 @@ function stopRec(){
   traceStop();
   try{ if(_rec && _rec.state!=='inactive') _rec.stop(); }catch(e){}
   try{ if(_stream) _stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+  // the mixed track is not the capture itself — stop the sources it was built from
+  try{ _srcStreams.forEach(function(s){ if(s) s.getTracks().forEach(function(t){ t.stop(); }); }); }catch(e){}
+  try{ if(_actx){ _actx.close(); _actx=null; } }catch(e){}
+  _srcStreams=[];
   var cp=document.getElementById('camprev'); if(cp){ cp.srcObject=null; cp.style.display='none'; }
   document.getElementById('live').style.display='none';
   document.getElementById('fbar').classList.remove('on');
@@ -3551,8 +3606,9 @@ _RECORDER_POPUP = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"
 </div>
 <script>
 var MODE=new URLSearchParams(location.search).get('mode')||'screen';
-var LABEL={screen:'screen',screenmic:'screen + mic',video:'camera',voice:'voice'}[MODE]||MODE;
+var LABEL={screen:'screen (no microphone)',screenmic:'screen + your voice',video:'camera',voice:'voice'}[MODE]||MODE;
 var rec=null,stream=null,chunks=[],t0=0,timer=null,trace=[],blob=null,recVideo=(MODE!=='voice');
+var srcStreams=[],actx=null;   // screen capture is assembled from several sources
 var CH=null; try{ CH=new BroadcastChannel('grl_rec'); }catch(e){}
 document.getElementById('kind').textContent='Record '+LABEL;
 function state(o){ try{ localStorage.setItem('grl_rec', JSON.stringify(o)); }catch(e){}
@@ -3578,10 +3634,28 @@ document.getElementById('go').onclick=async function(){
           +'<b>Upload a recording</b> on the Recordings page.<br>On a computer use <b>Chrome, Edge or Safari</b>. '
           +'<b>Camera</b> and <b>Voice</b> recording work here.';
         return; }
-      stream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
-      if(MODE==='screenmic'){ try{ var mic=await navigator.mediaDevices.getUserMedia({audio:true});
-        mic.getAudioTracks().forEach(function(t){stream.addTrack(t);}); }catch(e2){} }
-      var vt=stream.getVideoTracks()[0]; if(vt) vt.onended=function(){ stopRec(); };
+      var disp=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+      var mic=null;
+      if(MODE==='screenmic'){ try{ mic=await navigator.mediaDevices.getUserMedia(
+        {audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }catch(e2){} }
+      // MediaRecorder encodes only the first audio track, so the microphone must be
+      // mixed with the shared audio rather than appended beside it
+      var sysT=disp.getAudioTracks(), micT=mic?mic.getAudioTracks():[], aTrack=null;
+      if(sysT.length && micT.length){
+        try{ actx=new (window.AudioContext||window.webkitAudioContext)();
+             var dest=actx.createMediaStreamDestination();
+             actx.createMediaStreamSource(new MediaStream(sysT)).connect(dest);
+             actx.createMediaStreamSource(new MediaStream(micT)).connect(dest);
+             aTrack=dest.stream.getAudioTracks()[0];
+        }catch(e3){ aTrack=micT[0]; }
+      } else if(micT.length){ aTrack=micT[0]; } else if(sysT.length){ aTrack=sysT[0]; }
+      srcStreams=[disp,mic];
+      if(MODE==='screenmic' && !micT.length){
+        err.innerHTML='&#9888; Microphone not captured — your voice will NOT be recorded. '
+          +'Allow the microphone for this site and start again.';
+      }
+      stream=new MediaStream(aTrack?[disp.getVideoTracks()[0],aTrack]:[disp.getVideoTracks()[0]]);
+      var vt=disp.getVideoTracks()[0]; if(vt) vt.onended=function(){ stopRec(); };
     }
   }catch(e){ err.textContent='Could not start: '+e.message; return; }
   var mt=mimeFor(recVideo); chunks=[];
@@ -3605,6 +3679,9 @@ function stopRec(){
   if(timer){clearInterval(timer);timer=null;}
   try{ if(rec&&rec.state!=='inactive') rec.stop(); }catch(e){}
   try{ if(stream) stream.getTracks().forEach(function(t){t.stop();}); }catch(e){}
+  try{ srcStreams.forEach(function(s){ if(s) s.getTracks().forEach(function(t){t.stop();}); }); }catch(e){}
+  try{ if(actx){ actx.close(); actx=null; } }catch(e){}
+  srcStreams=[];
   state({active:false});
 }
 function showSave(){

@@ -13,6 +13,32 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-03 — v3.17.1: screen recordings were losing the narrator's voice
+
+**Report.** A screen recording contained the sound played by the shared tab but not the speaker's voice,
+while `Voice only` recorded the microphone correctly — isolating the fault to the combination of the two
+audio sources rather than to microphone access.
+
+**Cause.** The microphone track was appended to the capture stream as a second audio track. MediaRecorder
+encodes only the first audio track, so the voice was dropped at encode time without any error: the track
+was present in `getAudioTracks()`, and absent from the file.
+
+**Measurement.** Recording two known tones — 220 Hz representing the shared screen audio and 880 Hz the
+microphone — and analysing the decoded audio per frequency gave 220 Hz = 0.3946 and 880 Hz = 0.0001 for the
+two-track stream, against 0.3937 and 0.3131 once the sources were mixed into a single track (noise floor
+0.0003).
+
+**Fix.** The two sources are mixed through an `AudioContext` into one track and the stream is rebuilt as
+video plus that mixed track; the microphone is requested with echo cancellation, noise suppression and auto
+gain. The original streams are retained and stopped on Stop, since the recorded track is now a mix rather
+than the capture itself. The interface now states which sounds are being captured the moment recording
+starts, and reports a blocked microphone instead of failing silently. The record buttons were renamed to
+**Record screen + my voice** and **Screen only (no microphone)**, because the earlier naming did not convey
+that plain screen capture never includes a microphone.
+
+**Verification.** 11/11 checks on the live server, including the frequency measurements above and the
+structure of the stream the page now builds.
+
 ## 2026-08-03 — v3.17.0: recording now begins on a single click
 
 **Problem.** Users other than the author could not get screen recording started, while a comparable recorder
