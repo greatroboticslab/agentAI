@@ -13,6 +13,29 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-03 — v3.18.0: recordings made private by default after a permission audit
+
+**Audit.** The question "can anyone else see my recording?" was answered by probing the live server as four
+identities — the owner, another member, an administrator, and signed out. The library listing was correctly
+owner-scoped (another member saw zero entries) and signed-out access was refused everywhere (401). But the
+share URL `/r/<id>` and the media stream served **any signed-in member** who held the id, because the id
+itself was the capability. Editing was already restricted: a non-owner attempting to delete or rename
+received 403.
+
+**Change.** Recordings now carry a `visibility` field defaulting to *private*; the share page and media
+stream are granted to the owner, to administrators, or to everyone only once the owner explicitly switches
+that recording to *shared*. Entries predating the field are treated as private, so no recording becomes
+more visible through the upgrade. Each library row shows and toggles its own state with a confirmation
+naming who gains access, and copying a share link from a private recording offers to switch it first rather
+than handing out a link that will not open. A non-owner opening a private link gets a plain explanation
+page instead of a raw error.
+
+**Verification.** New recordings are created private; while private, another member is refused on both the
+share page and the media file (403) while owner and administrators are served; after switching to shared
+the other member is served; changing visibility as a non-owner returns 403 and an invalid value returns
+400; signed-out access remains 401 in every state. Browser checks confirmed the row state, the toggle, and
+that the media player now renders dark rather than as a light control bar.
+
 ## 2026-08-03 — v3.17.1: screen recordings were losing the narrator's voice
 
 **Report.** A screen recording contained the sound played by the shared tab but not the speaker's voice,

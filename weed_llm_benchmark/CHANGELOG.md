@@ -6482,3 +6482,39 @@ Verified on the live server, 11/11 checks: the two-track stream measurably loses
 mixed stream retains both about 1000× above the noise floor, and `startRec('screenmic')` now yields one
 audio track plus video, reports both sources, keeps both source streams for cleanup, and labels the
 recording accurately.
+
+### v3.18.0 — recordings are private by default, with an explicit share switch
+
+A permission audit of the live server, probed as four identities, found that the library listing was
+correctly owner-scoped but the share URL was not: **any signed-in member holding `/r/<id>` could watch and
+download any recording**, because the id alone was treated as the capability. That was the original
+Loom-style intent, but it makes "only I can see my recording" untrue, and nothing on screen said so.
+
+Audit result before the change (probe recording owned by a test member):
+
+| identity | library listing | `/r/<id>` | media file |
+|---|---|---|---|
+| owner | sees it | 200 | 200 |
+| another member | 0 entries | **200 — watchable** | **200 — downloads** |
+| administrator | sees it | 200 | 200 |
+| signed out | 401 | 401 | 401 |
+
+- New field `visibility` on every recording, defaulting to **private**. `_rec_can_view()` grants the share
+  page and the media stream to the owner, to administrators, or to anyone only when the owner has switched
+  that recording to **shared**. Entries stored before this release have no field and are treated as
+  private — an upgrade never makes a recording more visible.
+- Each library row states its status and toggles it: **🔒 Private — only you** / **🔗 Shared — anyone
+  signed in with the link**, with a confirmation naming exactly who gains access.
+- **Copy share link** on a private recording no longer hands out a link that will not open; it offers to
+  switch the recording to shared first.
+- A non-owner opening a private share URL gets a plain "This recording is private" page (HTTP 403) rather
+  than a raw error; `visibility` is owner/admin-only to change and rejects any value other than
+  private/shared.
+- Media controls now render dark (`color-scheme: dark` on `audio`/`video` in the global stylesheet); the
+  browser default light control bar was the last white panel left on these pages.
+
+Verified on the live server: a new recording is created `private`; while private another member is refused
+on both the share page and the media file (403) while the owner and administrators are served; after the
+owner switches it to shared, the other member is served; a non-owner attempting to change visibility gets
+403 and an invalid value gets 400; signed-out access stays 401 throughout. Browser checks confirm the row
+renders its state, the toggle switches it with a confirmation, and the player is dark.

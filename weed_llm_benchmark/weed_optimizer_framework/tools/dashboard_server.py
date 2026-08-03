@@ -570,6 +570,9 @@ _RESPONSIVE_CSS = (
 # (display/flex/grid/width/position), so no page's layout can break. Pages keep
 # their structure; they all now look like one product.
 _UI_CSS = '''<style id="_ui">
+/* the browser's built-in media controls default to a light bar, which reads as a
+   white island on these pages — color-scheme makes Chrome/Safari draw them dark */
+audio,video{color-scheme:dark}
 :root{
  --brand:#10b981;--brand-600:#059669;--ring:rgba(16,185,129,.30);
  --txt:#e2e8f4;--txt-dim:#aab4c6;--mut:#8a96ab;
@@ -2756,6 +2759,23 @@ def _rec_can_edit(actor: str, rec: dict) -> bool:
     return _is_admin(actor) or bool(rec.get("owner") and rec.get("owner") == actor)
 
 
+def _rec_visibility(rec: dict) -> str:
+    """private (default) or shared. Entries saved before v3.18 have no field and
+    are treated as private — a recording never becomes more visible by upgrade."""
+    return "shared" if (rec.get("visibility") == "shared") else "private"
+
+
+def _rec_can_view(actor: str, rec: dict) -> bool:
+    """v3.18 — the share URL is only a capability for recordings the owner has
+    explicitly marked as shared. Before this, any signed-in member holding the id
+    could open any recording."""
+    if not actor or actor == "?":
+        return False
+    if _rec_can_edit(actor, rec):
+        return True
+    return _rec_visibility(rec) == "shared"
+
+
 # v3.16 — fetch a PREVIEW of a shared AI conversation. Only public share pages of
 # known assistants are fetched (allow-list), which also prevents the endpoint from
 # being used to probe internal addresses (SSRF) with a user-supplied URL.
@@ -2902,7 +2922,7 @@ async def api_recordings_create(request: Request):
     except Exception:
         trace = []
     meta = {"id": rid, "owner": actor, "kind": kind, "mime": mime, "ext": ext,
-            "size": len(data),
+            "size": len(data), "visibility": "private",   # v3.18 — opt in to sharing
             "title": (str(form.get("title") or "").strip()[:140]
                       or ("Recording " + time.strftime("%Y-%m-%d %H:%M"))),
             "note": str(form.get("note") or "").strip()[:2000],
@@ -2957,7 +2977,7 @@ async def api_recordings_link(request: Request):
     saved = pasted or (prev.get("excerpt") or "")[:4000]
     ok = bool(pasted) or bool(prev.get("ok"))
     meta = {"id": rid, "owner": actor, "kind": "link", "ext_link": url,
-            "source": _link_source(url),
+            "source": _link_source(url), "visibility": "private",
             "title": (str(body.get("title") or "").strip()[:140]
                       or (prev.get("title") or "").strip()[:140]
                       or (_link_source(url) + " conversation")),
@@ -2984,7 +3004,7 @@ def api_recordings_list(request: Request):
     admin = _is_admin(actor)
     fields = ("id", "owner", "title", "kind", "mime", "size", "duration",
               "transcript", "note", "ext_link", "source", "created_at", "trace",
-              "preview", "preview_error", "preview_source", "fetched_at")
+              "preview", "preview_error", "preview_source", "fetched_at", "visibility")
     rows = [{k: r.get(k) for k in fields} for r in _read_recordings().values()
             if admin or r.get("owner") == actor]
     rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
@@ -2996,12 +3016,14 @@ def api_recordings_list(request: Request):
 def api_recordings_media(request: Request, rid: str):
     """v3.11 — stream a saved recording (Range-enabled). Auth is enforced by the
     middleware; the unguessable id acts as a capability URL within the platform."""
-    _ = _actor_from_request(request)
+    actor = _actor_from_request(request)
     if not re.match(r"^[A-Za-z0-9_]+$", rid):
         raise HTTPException(400, "bad id")
     rec = _read_recordings().get(rid)
     if not rec or rec.get("kind") == "link":
         raise HTTPException(404, "not found")
+    if not _rec_can_view(actor, rec):
+        raise HTTPException(403, "this recording is private to the person who made it")
     p = _RECORDINGS_DIR / (rid + rec.get("ext", ".webm"))
     if not p.is_file():
         raise HTTPException(404, "file missing")
@@ -3047,6 +3069,12 @@ async def api_recordings_update(request: Request, rid: str):
         rec["title"] = str(body["title"]).strip()[:140] or rec.get("title")
     if "note" in body:
         rec["note"] = str(body["note"]).strip()[:2000]
+    if "visibility" in body:
+        v = str(body["visibility"]).strip().lower()
+        if v not in ("private", "shared"):
+            raise HTTPException(400, "visibility must be 'private' or 'shared'")
+        rec["visibility"] = v
+        log.info(f"[recordings] {actor} set {rid} to {v}")
     if "text" in body:
         # attach (or replace) the conversation text on a link saved earlier, for
         # share pages whose content a plain fetch cannot read
@@ -3058,6 +3086,7 @@ async def api_recordings_update(request: Request, rid: str):
     store[rid] = rec
     _write_recordings(store)
     return {"ok": True, "id": rid, "title": rec.get("title"),
+            "visibility": _rec_visibility(rec),
             "chars": len(rec.get("preview") or "")}
 
 
@@ -3523,7 +3552,20 @@ async function addText(id){
     var d=await r.json(); if(r.ok&&d.ok) loadLibrary(); else alert((d&&(d.detail||d.error))||'could not save the text');
   }catch(e){ alert(''+e); }
 }
-function copyShare(id,btn){
+async function setVis(id,to,quiet){
+  if(to==='shared' && !quiet && !confirm('Make this recording shareable?\n\nAnyone signed in to this platform who has '
+      +'the link will be able to watch and download it. You can switch it back to Private at any time.')) return;
+  try{ var r=await fetch('/api/recordings/'+id+'/update',{method:'POST',credentials:'include',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({visibility:to})});
+    var d=await r.json(); if(r.ok&&d.ok) loadLibrary(); else alert((d&&(d.detail||d.error))||'could not change this');
+  }catch(e){ alert(''+e); }
+}
+function copyShare(id,btn,vis){
+  if(vis!=='shared'){
+    if(!confirm('This recording is Private — the link will not open for anyone else.\n\n'
+      +'Switch it to Shared and copy the link?')) return;
+    return setVis(id,'shared',true).then(function(){ copyShare(id,btn,'shared'); });
+  }
   var url=location.origin+'/r/'+id;
   var done=function(){ btn.textContent='Copied!'; btn.classList.add('ok'); setTimeout(function(){ btn.textContent='Copy share link'; btn.classList.remove('ok'); },1500); };
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); }
@@ -3555,13 +3597,21 @@ function libItem(r){
   }
   var badge='<span class="kind '+esc(r.kind||'screen')+'">'+esc(r.source||r.kind||'screen')+'</span>';
   var sub=[]; if(r.duration)sub.push(esc(r.duration)); if(r.size)sub.push(fmtSize(r.size)); sub.push(esc(r.created_at||''));
-  var share = r.kind==='link' ? '' : '<button class="btn copy" onclick="copyShare(\''+r.id+'\',this)">Copy share link</button>';
+  // who can open this one — stated on every row, because "I have the link" used to
+  // be enough for any signed-in member to watch someone else's recording
+  var vis = (r.visibility==='shared') ? 'shared' : 'private';
+  var visBtn = '<button class="btn" onclick="setVis(\''+r.id+'\',\''+(vis==='shared'?'private':'shared')+'\')" '
+    + 'title="Click to change who can open this" style="'
+    + (vis==='shared' ? 'border-color:#f59e0b;color:#fbbf24' : 'border-color:#34d399;color:#34d399')+'">'
+    + (vis==='shared' ? '&#128279; Shared — anyone signed in with the link'
+                      : '&#128274; Private — only you')+'</button>';
+  var share = r.kind==='link' ? '' : '<button class="btn copy" onclick="copyShare(\''+r.id+'\',this,\''+vis+'\')">Copy share link</button>';
   var tx = r.transcript ? ('<div class="tx"><b>Transcript:</b> '+esc(r.transcript)+'</div>') : '';
   var steps = (r.trace&&r.trace.length) ? ('<div class="meta" style="margin-top:6px">&#128279; '+r.trace.length+' action step(s) recorded &middot; <a class="ext" href="/r/'+r.id+'">view timeline &rarr;</a></div>') : '';
   var note = r.note ? ('<div class="meta" style="margin-top:6px">'+esc(r.note)+'</div>') : '';
   return '<div class="item"><div class="h"><span class="ti" contenteditable="true" onblur="renameRec(\''+r.id+'\',this)">'+esc(r.title||'Recording')+'</span>'+badge+'</div>'
     +'<div class="meta">'+sub.join(' &middot; ')+'</div>'+media+steps+tx+note
-    +'<div class="acts">'+share+'<button class="btn del" onclick="delRec(\''+r.id+'\')">Delete</button></div></div>';
+    +'<div class="acts">'+visBtn+share+'<button class="btn del" onclick="delRec(\''+r.id+'\')">Delete</button></div></div>';
 }
 async function loadLibrary(){
   var box=document.getElementById('lib');
@@ -3741,6 +3791,16 @@ def recording_share_page(request: Request, rid: str):
     rec = _read_recordings().get(rid)
     if not rec:
         raise HTTPException(404, "recording not found")
+    if not _rec_can_view(_actor_from_request(request), rec):
+        return HTMLResponse(
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;'
+            'background:#070b14;color:#e2e8f4;font:15px/1.6 -apple-system,BlinkMacSystemFont,sans-serif">'
+            '<div style="max-width:420px;text-align:center;padding:28px">'
+            '<div style="font-size:38px">&#128274;</div>'
+            '<h1 style="font-size:19px;margin:10px 0 8px">This recording is private</h1>'
+            '<p style="color:#94a3b8;margin:0">Only the person who made it can open it. Ask them to switch '
+            'it to <b>Shared</b> on their Recordings page, then this link will work.</p></div></div>',
+            status_code=403)
 
     def h(s):
         return (str(s or "").replace("&", "&amp;").replace("<", "&lt;")
