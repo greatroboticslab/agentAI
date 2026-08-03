@@ -941,6 +941,59 @@ document.addEventListener('click',function(){var m=document.getElementById('_nav
  var _cpass=function(){ try{_fixContrast();}catch(e){} };
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_cpass); else _cpass();
  setTimeout(_cpass,1800); setTimeout(_cpass,4000);
+
+ // v3.15 — GLOBAL RECORDING INDICATOR. A web page cannot keep recording after you
+ // navigate away, so the recorder itself runs in its own small window; this bar is
+ // the part that "always exists wherever we are": every page shows the live red
+ // dot + timer + Stop while a recording is running, and every page contributes its
+ // clicks to the action trace.
+ var _RCH=null; try{ _RCH=new BroadcastChannel('grl_rec'); }catch(e){}
+ var _rbar=null,_rtimer=null;
+ function _recState(){ try{ return JSON.parse(localStorage.getItem('grl_rec')||'{}'); }catch(e){ return {}; } }
+ function _recFmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+ function _recRender(){
+   var st=_recState();
+   if(!st.active){ if(_rbar){_rbar.remove();_rbar=null;} if(_rtimer){clearInterval(_rtimer);_rtimer=null;} return; }
+   if(!_rbar){
+     _rbar=document.createElement('div');
+     _rbar.id='_recbar';
+     _rbar.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:100000;'
+       +'display:flex;align-items:center;gap:12px;background:rgba(10,15,26,.96);color:#e2e8f4;'
+       +'border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 16px;'
+       +'box-shadow:0 18px 44px rgba(0,0,0,.55);font:600 13px -apple-system,BlinkMacSystemFont,sans-serif';
+     _rbar.innerHTML='<span style="width:10px;height:10px;border-radius:50%;background:#ef4444;'
+       +'animation:_rp 1s infinite"></span><span id="_rk"></span>'
+       +'<span id="_rt" style="font-family:ui-monospace,Menlo,monospace;color:#34d399"></span>'
+       +'<span id="_rs" style="color:#94a3b8;font-weight:500"></span>'
+       +'<button id="_rx" style="border:0;background:#dc2626;color:#fff;font-weight:700;'
+       +'padding:6px 13px;border-radius:999px;cursor:pointer">&#9632; Stop</button>';
+     document.body.appendChild(_rbar);
+     if(!document.getElementById('_rpkf')){ var s=document.createElement('style'); s.id='_rpkf';
+       s.textContent='@keyframes _rp{50%{opacity:.3}}'; document.head.appendChild(s); }
+     document.getElementById('_rx').onclick=function(){
+       try{ localStorage.setItem('grl_rec_stop', String(Date.now())); }catch(e){}
+       if(_RCH) try{ _RCH.postMessage({type:'stopRequest'}); }catch(e){}
+     };
+     if(!_rtimer) _rtimer=setInterval(_recRender,500);
+   }
+   var s2=_recState();
+   document.getElementById('_rk').textContent='Recording '+(s2.kind||'');
+   document.getElementById('_rt').textContent=_recFmt(Math.floor((Date.now()-(s2.t0||Date.now()))/1000));
+   document.getElementById('_rs').textContent=s2.steps?(s2.steps+' step(s)'):'';
+ }
+ // this page's clicks/keys feed the trace while a recording is active
+ document.addEventListener('click',function(e){
+   var st=_recState(); if(!st.active||!_RCH)return;
+   var el=(e.target&&e.target.closest)?(e.target.closest('button,a,input,select,textarea,[onclick]')||e.target):e.target;
+   var lab=((el&&(el.innerText||el.value||(el.getAttribute&&(el.getAttribute('aria-label')||el.getAttribute('placeholder')))))||'').trim().replace(/\\s+/g,' ').slice(0,80);
+   var sel=el&&el.tagName?(el.tagName.toLowerCase()+(el.id?('#'+el.id):'')):'';
+   try{ _RCH.postMessage({type:'trace',ev:{t:(Date.now()-(st.t0||Date.now()))/1000,type:'click',
+     label:lab,sel:sel,page:location.pathname}}); }catch(err){}
+ },true);
+ window.addEventListener('storage',function(e){ if(e.key==='grl_rec') _recRender(); });
+ if(_RCH) _RCH.onmessage=function(e){ if((e.data||{}).type==='state') _recRender(); };
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_recRender); else _recRender();
+ setInterval(_recRender,1500);
 })();
 </script>'''
 
@@ -1008,7 +1061,7 @@ async def _inject_responsive_css(request: Request, call_next):
         # no page is a dead end and the whole site navigates the same way.
         _p = request.url.path
         if ('id="_appnav"' not in text and _p != "/login"
-                and not _p.startswith("/r/")):
+                and _p != "/recorder" and not _p.startswith("/r/")):
             _m = re.search(r"<body[^>]*>", text)
             if _m:
                 text = text[:_m.end()] + _APP_NAV + text[_m.end():]
@@ -2975,12 +3028,14 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
 <div class="wrap">
  <div class="card">
   <h3>New recording</h3>
-  <div class="hint">Screen capture asks which window/tab to share. On phones, use Voice (screen capture is desktop-only in most mobile browsers).</div>
+  <div class="hint">Recording opens a <b>small always-visible window</b> with the timer and Stop, so you can
+   browse the whole platform (or any other tab) while it keeps recording. Screen capture asks which
+   window/tab to share; on phones use Camera or Voice.</div>
   <div class="recbtns" id="recbtns">
-   <button class="rb" onclick="startRec('screen')"><span class="em">&#128421;</span> Record screen</button>
-   <button class="rb" onclick="startRec('screenmic')"><span class="em">&#128421;</span>+&#127908; Screen + mic</button>
-   <button class="rb" onclick="startRec('video')"><span class="em">&#127909;</span> Record video (camera)</button>
-   <button class="rb" onclick="startRec('voice')"><span class="em">&#127908;</span> Voice only</button>
+   <button class="rb" onclick="openRecorder('screen')"><span class="em">&#128421;</span> Record screen</button>
+   <button class="rb" onclick="openRecorder('screenmic')"><span class="em">&#128421;</span>+&#127908; Screen + mic</button>
+   <button class="rb" onclick="openRecorder('video')"><span class="em">&#127909;</span> Record video (camera)</button>
+   <button class="rb" onclick="openRecorder('voice')"><span class="em">&#127908;</span> Voice only</button>
   </div>
   <div class="live" id="live"><span class="dot"></span><b id="elapsed">00:00</b><span class="meta" id="livekind"></span><button class="stopb" onclick="stopRec()">&#9209; Stop</button>
    <video id="camprev" muted autoplay playsinline style="display:none"></video></div>
@@ -2992,9 +3047,14 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
   </div>
  </div>
  <div class="card">
-  <h3>&#128279; Paste an AI share link</h3>
-  <div class="hint">Worked something out in ChatGPT / Claude / Gemini? Click Share there, paste the link here to keep it with your project. (We store the link &mdash; we don't open your account.)</div>
-  <div class="linkrow"><input id="linkUrl" placeholder="https://chatgpt.com/share/..."><input id="linkTitle" placeholder="Title (optional)" style="flex:0 0 200px"><button class="addl" onclick="addLink()">Add link</button></div>
+  <h3>&#128279; Keep a ChatGPT / Claude / Gemini conversation with this project</h3>
+  <div class="hint"><b>What is this for?</b> When you solve something with an outside AI &mdash; it fixed your
+   code, explained a result, suggested an approach &mdash; that conversation is part of how the work was done.
+   Save its link here so it stays with the project: you (or your advisor) can reopen it later to see
+   <i>where an idea came from</i>, and teammates can read it instead of repeating the same questions.<br>
+   <b>How:</b> in ChatGPT/Claude/Gemini click <b>Share</b> &rarr; <b>Copy link</b> &rarr; paste it below.
+   We only store the link &mdash; we never open or read your AI account.</div>
+  <div class="linkrow"><input id="linkUrl" placeholder="https://chatgpt.com/share/..."><input id="linkTitle" placeholder="What was it about? (optional)" style="flex:0 0 220px"><button class="addl" onclick="addLink()">Save link</button></div>
  </div>
  <div class="card">
   <h3>Your library</h3>
@@ -3017,6 +3077,18 @@ function pickMime(video){
   for(var i=0;i<c.length;i++){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i]; }
   return '';
 }
+// v3.15 — open the recorder in its own window so it survives navigation in the
+// main window. Falls back to in-page recording if the popup is blocked.
+function openRecorder(mode){
+  var w=520,h=210;
+  var y=(screen.height-h-80), x=(screen.width-w-40);
+  var win=window.open('/recorder?mode='+encodeURIComponent(mode),'grl_recorder',
+    'width='+w+',height='+h+',left='+x+',top='+y+',menubar=no,toolbar=no,location=no,status=no,resizable=yes');
+  if(!win){ alert('Your browser blocked the recorder window — allow pop-ups for this site, or use the in-page recorder.');
+    return startRec(mode); }
+  try{ win.focus(); }catch(e){}
+}
+window.addEventListener('message',function(e){ if(e.data&&e.data.grlSaved) loadLibrary(); });
 async function startRec(mode){
   if(_rec){ return; }
   _kind = mode==='voice' ? 'voice' : (mode==='video' ? 'video' : 'screen');
@@ -3182,6 +3254,131 @@ async function loadLibrary(){
 }
 loadLibrary();
 </script></body></html>'''
+
+
+_RECORDER_POPUP = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Recorder</title><style>
+ *{box-sizing:border-box}
+ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+   background:#0b1220;color:#e2e8f4;display:flex;align-items:center;justify-content:center;
+   height:100vh;padding:14px}
+ .box{width:100%;text-align:center}
+ .row{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+ .dot{width:12px;height:12px;border-radius:50%;background:#ef4444;animation:pulse 1s infinite}
+ @keyframes pulse{50%{opacity:.3}}
+ .kind{font-weight:700;font-size:14px}
+ .time{font-family:ui-monospace,Menlo,monospace;font-size:20px;color:#34d399;font-weight:700}
+ .steps{font-size:12px;color:#94a3b8}
+ button{border:0;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer}
+ .start{background:#10b981;color:#fff}
+ .stop{background:#dc2626;color:#fff}
+ .hint{font-size:11.5px;color:#94a3b8;margin-top:10px;line-height:1.5}
+ .ok{color:#6ee7b7;font-weight:700}
+ .err{color:#fca5a5;font-size:12px;margin-top:8px}
+ input{width:100%;margin-top:10px;padding:8px 10px;border-radius:8px;border:1px solid #334155;
+   background:#111c30;color:#e2e8f4;font-size:13px}
+</style></head><body>
+<div class="box" id="box">
+ <div class="row"><span class="kind" id="kind">Ready</span></div>
+ <div class="hint" id="hint">Click start — then go back to the main window and work normally.
+   This little window keeps recording and stays visible.</div>
+ <div class="row" style="margin-top:12px"><button class="start" id="go">&#9679; Start recording</button></div>
+ <div class="err" id="err"></div>
+</div>
+<script>
+var MODE=new URLSearchParams(location.search).get('mode')||'screen';
+var LABEL={screen:'screen',screenmic:'screen + mic',video:'camera',voice:'voice'}[MODE]||MODE;
+var rec=null,stream=null,chunks=[],t0=0,timer=null,trace=[],blob=null,recVideo=(MODE!=='voice');
+var CH=null; try{ CH=new BroadcastChannel('grl_rec'); }catch(e){}
+document.getElementById('kind').textContent='Record '+LABEL;
+function state(o){ try{ localStorage.setItem('grl_rec', JSON.stringify(o)); }catch(e){}
+  if(CH) try{ CH.postMessage({type:'state',data:o}); }catch(e){} }
+function mimeFor(v){var c=v?['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4']
+  :['audio/webm;codecs=opus','audio/webm','audio/mp4'];
+  for(var i=0;i<c.length;i++){if(window.MediaRecorder&&MediaRecorder.isTypeSupported(c[i]))return c[i];}return '';}
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+// collect trace events broadcast by ANY page in the main window
+if(CH) CH.onmessage=function(e){ var m=e.data||{};
+  if(m.type==='trace'&&t0){ trace.push(m.ev); }
+  if(m.type==='stopRequest'){ stopRec(); } };
+window.addEventListener('storage',function(e){ if(e.key==='grl_rec_stop'&&t0) stopRec(); });
+document.getElementById('go').onclick=async function(){
+  var err=document.getElementById('err'); err.textContent='';
+  try{
+    if(MODE==='voice'){ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+    else if(MODE==='video'){ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:true}); }
+    else{
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){ err.textContent='Screen capture is not supported in this browser.'; return; }
+      stream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+      if(MODE==='screenmic'){ try{ var mic=await navigator.mediaDevices.getUserMedia({audio:true});
+        mic.getAudioTracks().forEach(function(t){stream.addTrack(t);}); }catch(e2){} }
+      var vt=stream.getVideoTracks()[0]; if(vt) vt.onended=function(){ stopRec(); };
+    }
+  }catch(e){ err.textContent='Could not start: '+e.message; return; }
+  var mt=mimeFor(recVideo); chunks=[];
+  rec = mt? new MediaRecorder(stream,{mimeType:mt}) : new MediaRecorder(stream);
+  rec.ondataavailable=function(e){ if(e.data&&e.data.size) chunks.push(e.data); };
+  rec.onstop=function(){ blob=new Blob(chunks,{type:(rec.mimeType||mt||(recVideo?'video/webm':'audio/webm'))}); showSave(); };
+  rec.start(); t0=Date.now();
+  state({active:true,t0:t0,kind:LABEL});
+  document.getElementById('box').innerHTML=
+    '<div class="row"><span class="dot"></span><span class="kind">Recording '+LABEL+'</span>'
+    +'<span class="time" id="tm">00:00</span><span class="steps" id="st"></span></div>'
+    +'<div class="row" style="margin-top:12px"><button class="stop" onclick="stopRec()">&#9632; Stop &amp; save</button></div>'
+    +'<div class="hint">Switch to the main window and work normally — recording continues.</div>';
+  timer=setInterval(function(){ var s=Math.floor((Date.now()-t0)/1000);
+    var tm=document.getElementById('tm'); if(tm)tm.textContent=fmt(s);
+    var st=document.getElementById('st'); if(st)st.textContent=trace.length?(trace.length+' step(s)'):'';
+    state({active:true,t0:t0,kind:LABEL,steps:trace.length});
+  },500);
+};
+function stopRec(){
+  if(timer){clearInterval(timer);timer=null;}
+  try{ if(rec&&rec.state!=='inactive') rec.stop(); }catch(e){}
+  try{ if(stream) stream.getTracks().forEach(function(t){t.stop();}); }catch(e){}
+  state({active:false});
+}
+function showSave(){
+  var secs=Math.floor((Date.now()-t0)/1000);
+  document.getElementById('box').innerHTML=
+    '<div class="kind">Recorded '+fmt(secs)+' &middot; '+LABEL+'</div>'
+    +'<input id="ti" placeholder="Title (optional)">'
+    +'<div class="row" style="margin-top:10px"><button class="start" id="sv">Save</button>'
+    +'<button class="stop" onclick="window.close()">Discard</button></div>'
+    +'<div class="hint" id="msg">Saving also transcribes it automatically.</div>';
+  document.getElementById('sv').onclick=async function(){
+    var b=this; b.disabled=true; b.textContent='Saving…';
+    var msg=document.getElementById('msg'); msg.textContent='uploading + transcribing…';
+    var ext=(blob.type.indexOf('mp4')>=0)?'mp4':(recVideo?'webm':'webm');
+    var fd=new FormData();
+    fd.append('file',blob,'recording.'+ext);
+    fd.append('title',(document.getElementById('ti').value||''));
+    fd.append('kind',(MODE==='voice'?'voice':(MODE==='video'?'video':'screen')));
+    fd.append('duration',fmt(secs));
+    fd.append('trace',JSON.stringify(trace||[]));
+    try{
+      var r=await fetch('/api/recordings',{method:'POST',credentials:'include',body:fd});
+      var d=await r.json();
+      if(r.ok&&d.ok){ msg.innerHTML='<span class="ok">&#10003; Saved.</span> '
+          +'<a href="/r/'+d.id+'" target="_blank" style="color:#93c5fd">open share page</a>';
+        b.textContent='Saved'; try{ if(window.opener&&!window.opener.closed) window.opener.postMessage({grlSaved:d.id},'*'); }catch(e){}
+        setTimeout(function(){ window.close(); },2500); }
+      else { msg.textContent='save failed: '+((d&&(d.detail||d.error))||r.status); b.disabled=false; b.textContent='Save'; }
+    }catch(e){ msg.textContent='save error: '+e.message; b.disabled=false; b.textContent='Save'; }
+  };
+}
+window.addEventListener('beforeunload',function(){ state({active:false}); });
+</script></body></html>'''
+
+
+@app.get("/recorder", response_class=HTMLResponse)
+def recorder_popup():
+    """v3.15 — the recorder lives in its OWN small window so it survives page
+    navigation in the main window (a web page cannot keep recording once it is
+    unloaded). The popup owns the MediaRecorder, shows the red dot / timer / Stop,
+    collects action-trace events broadcast by any page, and uploads on stop."""
+    return HTMLResponse(_RECORDER_POPUP,
+                        headers={"Cache-Control": "no-store, max-age=0"})
 
 
 @app.get("/recordings", response_class=HTMLResponse)

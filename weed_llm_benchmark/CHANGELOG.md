@@ -6274,3 +6274,31 @@ measuring the login page. Sessions are now re-minted before each audit run.)
 
 **Result: 0 low-contrast text elements across all 12 audited pages** (home, Data, Recordings, Guide, AI
 models, project, dataset analysis, console, browse images, labeling, rounds, users).
+
+### v3.15.0 — the recorder now survives navigation (persistent bar on every page) + clearer purpose copy
+
+Review feedback: the floating recorder bar disappeared as soon as you moved to another screen ("it should
+not disappear — this one always exists regardless wherever we are"), and the "Paste an AI share link" card
+did not explain what it was for.
+
+**Why it disappeared:** a web page cannot keep a `MediaRecorder` alive once it is unloaded, so an in-page bar
+dies with the page. (Loom achieves this with a desktop app / browser extension.) Solved without requiring an
+install:
+
+- **The recorder now runs in its own small window** (`/recorder`, opened by the record buttons). It owns the
+  capture, shows the red dot, live timer and Stop, and uploads on stop — so navigation in the main window no
+  longer interrupts anything. Pop-up blocked → falls back to the previous in-page recorder.
+- **A live indicator bar is injected on EVERY page** while a recording is running: red dot, kind, running
+  timer, step count and a **Stop button that stops the recording from wherever you are** (state shared via
+  `localStorage` + `BroadcastChannel`).
+- **The action trace now spans the whole site**: clicks on any page are broadcast to the recorder window, so
+  a walkthrough that moves between screens produces one continuous timeline (previously only the recordings
+  page was captured).
+- **Copy rewritten** for the external-AI card: it now states *what it is for* (keep the conversation that
+  produced a result with the project, so the reasoning can be reopened later and teammates need not repeat
+  it) and *how* (Share → Copy link → paste), plus the assurance that only the link is stored.
+
+**Verified live:** recording started in the popup, then the main window navigated Home → Data → Guide → AI
+models — the bar stayed visible on all four with the timer running continuously (00:04 → 00:13); a button
+clicked on another page was captured into the trace; Stop pressed from a different page ended the recording;
+the file saved with its transcript and trace; the bar disappeared afterwards.
