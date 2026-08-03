@@ -6302,3 +6302,21 @@ install:
 models — the bar stayed visible on all four with the timer running continuously (00:04 → 00:13); a button
 clicked on another page was captured into the trace; Stop pressed from a different page ended the recording;
 the file saved with its transcript and trace; the bar disappeared afterwards.
+
+### v3.15.1 — honest handling of iOS (no web screen capture) + upload an existing recording
+
+Reported from an iPhone: "Record screen" showed only "Screen capture is not supported in this browser".
+That is an Apple platform restriction — `getDisplayMedia` does not exist in any iOS browser, and a browser
+extension cannot change it (iOS grants screen capture only to the OS recorder). Rather than leave a dead
+end, the page now explains it and offers the path that does work:
+
+- **iOS detection**: when `getDisplayMedia` is unavailable the two screen buttons are dimmed with a tooltip
+  and a note appears — record with **Control Centre → Screen Recording**, then use the new upload button;
+  **Camera** and **Voice** capture continue to work in-page on iOS.
+- **⬆ Upload a recording**: any existing video/audio file (e.g. an iOS screen recording) is stored, **auto
+  transcribed**, listed in the library and gets a share link, exactly like an in-app recording.
+- The recorder window's failure message now states the same, instead of a bare "not supported".
+
+**Verified:** simulating a browser without `getDisplayMedia` shows the dimmed buttons, the explanation and
+the upload control; uploading a real media file end-to-end produced a stored recording with a correct
+automatic transcript and a working share page.

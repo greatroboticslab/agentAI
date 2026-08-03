@@ -3036,7 +3036,16 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
    <button class="rb" onclick="openRecorder('screenmic')"><span class="em">&#128421;</span>+&#127908; Screen + mic</button>
    <button class="rb" onclick="openRecorder('video')"><span class="em">&#127909;</span> Record video (camera)</button>
    <button class="rb" onclick="openRecorder('voice')"><span class="em">&#127908;</span> Voice only</button>
+   <button class="rb" onclick="document.getElementById('upfile').click()"><span class="em">&#11014;</span> Upload a recording</button>
+   <input id="upfile" type="file" accept="video/*,audio/*" style="display:none" onchange="uploadExisting(this)">
   </div>
+  <div class="hint" id="iosHint" style="display:none;margin-top:10px;border-left:3px solid #34d399;padding-left:10px">
+   <b>On iPhone / iPad:</b> web pages cannot capture the screen (an Apple restriction — no browser or
+   extension can, only iOS itself). Use <b>Control Centre &rarr; Screen Recording</b>, then come back and press
+   <b>&#11014; Upload a recording</b> — it is stored, transcribed and gets a share link just like an in-app
+   recording. <b>Camera</b> and <b>Voice</b> recording work directly here.
+  </div>
+  <div id="upmsg" class="hint" style="display:none;margin-top:8px"></div>
   <div class="live" id="live"><span class="dot"></span><b id="elapsed">00:00</b><span class="meta" id="livekind"></span><button class="stopb" onclick="stopRec()">&#9209; Stop</button>
    <video id="camprev" muted autoplay playsinline style="display:none"></video></div>
   <div class="prev" id="prev"></div>
@@ -3076,6 +3085,37 @@ function pickMime(video){
                 : ['audio/webm;codecs=opus','audio/webm','audio/mp4'];
   for(var i=0;i<c.length;i++){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i]; }
   return '';
+}
+// v3.15.1 — on iOS no browser can capture the screen (Apple restriction), so tell
+// the user what DOES work there instead of failing silently.
+(function(){
+  var canScreen = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  if(!canScreen){
+    var h=document.getElementById('iosHint'); if(h)h.style.display='block';
+    ['screen','screenmic'].forEach(function(m){
+      document.querySelectorAll('.rb').forEach(function(b){
+        if(new RegExp(m==='screen'?'Record screen':'Screen \\+ mic').test(b.textContent)){
+          b.style.opacity='.45'; b.title='Screen capture is not available in this browser (iOS restriction) — use Upload a recording';
+        }});
+    });
+  }
+})();
+// upload a recording made elsewhere (e.g. the iPhone screen recorder)
+async function uploadExisting(inp){
+  var f=inp.files&&inp.files[0]; if(!f)return;
+  var msg=document.getElementById('upmsg'); msg.style.display='block';
+  msg.textContent='uploading “'+f.name+'” ('+Math.round(f.size/1048576*10)/10+' MB) — transcribing after upload…';
+  var fd=new FormData();
+  fd.append('file', f, f.name);
+  fd.append('title', f.name.replace(/\.[^.]+$/,''));
+  fd.append('kind', (f.type||'').indexOf('audio')===0 ? 'voice' : 'screen');
+  try{
+    var r=await fetch('/api/recordings',{method:'POST',credentials:'include',body:fd});
+    var d=await r.json();
+    if(r.ok&&d.ok){ msg.innerHTML='✅ saved — <a class="ext" href="/r/'+d.id+'">open share page</a>'; loadLibrary(); }
+    else { msg.textContent='❌ '+((d&&(d.detail||d.error))||('HTTP '+r.status)); }
+  }catch(e){ msg.textContent='❌ '+e.message; }
+  inp.value='';
 }
 // v3.15 — open the recorder in its own window so it survives navigation in the
 // main window. Falls back to in-page recording if the popup is blocked.
@@ -3308,7 +3348,12 @@ document.getElementById('go').onclick=async function(){
     if(MODE==='voice'){ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
     else if(MODE==='video'){ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:true}); }
     else{
-      if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){ err.textContent='Screen capture is not supported in this browser.'; return; }
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){
+        err.innerHTML='This browser cannot capture the screen.<br>On <b>iPhone/iPad</b> no browser or extension can '
+          +'(Apple only allows it from iOS itself): use <b>Control Centre &rarr; Screen Recording</b>, then '
+          +'<b>Upload a recording</b> on the Recordings page.<br>On a computer use <b>Chrome, Edge or Safari</b>. '
+          +'<b>Camera</b> and <b>Voice</b> recording work here.';
+        return; }
       stream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
       if(MODE==='screenmic'){ try{ var mic=await navigator.mediaDevices.getUserMedia({audio:true});
         mic.getAudioTracks().forEach(function(t){stream.addTrack(t);}); }catch(e2){} }
