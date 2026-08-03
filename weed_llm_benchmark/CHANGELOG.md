@@ -6353,3 +6353,20 @@ purpose-drawn inline SVG:
 
 Sign-in alignment re-verified after the change: button overflow −1 px, centred in card and viewport, on
 desktop and mobile.
+
+### v3.16.0 — saved AI conversations now keep a text snapshot (not just a URL)
+
+Question raised in review: does saving a share link actually capture the conversation? It did not — only
+the URL was stored, so if the link were revoked the entry became worthless. Now, when a link is added the
+server fetches that **public share page** and stores a text snapshot alongside it.
+
+- `_fetch_link_preview()` retrieves the page with a browser user-agent (3 MB cap, 20 s timeout) and extracts
+  the title (`og:title`/`<title>`), the description, and visible text with scripts/markup stripped. Verified
+  live: ChatGPT, Claude and Gemini share hosts are all reachable from the lab server and return HTTP 200.
+- **SSRF protection**: only the share hosts of known assistants are fetched (allow-list). A user-supplied
+  internal address is refused — verified with `http://127.0.0.1:8000/…`, which returns "not a known AI share
+  site" and stores the link without fetching.
+- The snapshot appears in the library and on the share page with the time it was captured; when a page
+  cannot be read the entry says so plainly instead of implying content was saved.
+- Copy updated to state exactly what is stored: the link plus a snapshot of that public page — never the
+  user's AI account.

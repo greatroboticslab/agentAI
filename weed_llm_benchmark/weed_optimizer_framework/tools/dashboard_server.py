@@ -2756,6 +2756,55 @@ def _rec_can_edit(actor: str, rec: dict) -> bool:
     return _is_admin(actor) or bool(rec.get("owner") and rec.get("owner") == actor)
 
 
+# v3.16 — fetch a PREVIEW of a shared AI conversation. Only public share pages of
+# known assistants are fetched (allow-list), which also prevents the endpoint from
+# being used to probe internal addresses (SSRF) with a user-supplied URL.
+_LINK_FETCH_HOSTS = ("chatgpt.com", "chat.openai.com", "claude.ai", "gemini.google.com",
+                     "aistudio.google.com", "g.co", "perplexity.ai", "www.perplexity.ai",
+                     "poe.com", "copilot.microsoft.com")
+
+
+def _fetch_link_preview(url: str) -> dict:
+    """Best-effort: title + text excerpt from a public AI share page.
+    Returns {ok, title, excerpt, chars, error}. Never raises."""
+    try:
+        import urllib.request as _ureq
+        from urllib.parse import urlparse
+        host = (urlparse(url).hostname or "").lower()
+        if host not in _LINK_FETCH_HOSTS:
+            return {"ok": False, "error": f"preview not fetched ({host or 'unknown host'} "
+                                          "is not a known AI share site — the link is still saved)"}
+        req = _ureq.Request(url, headers={
+            "User-Agent": ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                           "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"),
+            "Accept-Language": "en-US,en;q=0.9"})
+        with _ureq.urlopen(req, timeout=20) as r:
+            raw = r.read(3_000_000).decode("utf-8", "replace")
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
+    try:
+        title = ""
+        m = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)', raw, re.I) \
+            or re.search(r"<title[^>]*>(.*?)</title>", raw, re.I | re.S)
+        if m:
+            title = re.sub(r"\s+", " ", m.group(1)).strip()[:160]
+        desc = ""
+        m2 = re.search(r'<meta[^>]+(?:property|name)=["\'](?:og:description|description)["\']'
+                       r'[^>]+content=["\']([^"\']+)', raw, re.I)
+        if m2:
+            desc = re.sub(r"\s+", " ", m2.group(1)).strip()[:400]
+        # visible text (works when the page is server-rendered, e.g. ChatGPT shares)
+        body = re.sub(r"(?is)<(script|style|noscript|svg)[^>]*>.*?</\1>", " ", raw)
+        body = re.sub(r"(?s)<[^>]+>", " ", body)
+        body = re.sub(r"&(nbsp|amp|quot|#39|lt|gt);", " ", body)
+        body = re.sub(r"\s+", " ", body).strip()
+        excerpt = (desc + "  " if desc else "") + body[:4000]
+        return {"ok": True, "title": title, "excerpt": excerpt.strip()[:4000],
+                "chars": len(body)}
+    except Exception as e:
+        return {"ok": False, "error": f"parse failed: {type(e).__name__}"}
+
+
 def _link_source(url: str) -> str:
     u = url.lower()
     for host, name in (("chatgpt.com", "ChatGPT"), ("chat.openai", "ChatGPT"),
@@ -2888,15 +2937,25 @@ async def api_recordings_link(request: Request):
     if not re.match(r"^https?://", url):
         raise HTTPException(400, "paste a valid http(s) link")
     rid = "lnk_" + time.strftime("%Y%m%d%H%M%S") + "_" + _secrets.token_hex(4)
+    # try to capture a readable snapshot so the entry is useful later even if the
+    # share link is revoked — honest about it when the page can't be read.
+    prev = await _asyncio.to_thread(_fetch_link_preview, url)
     meta = {"id": rid, "owner": actor, "kind": "link", "ext_link": url,
             "source": _link_source(url),
-            "title": str(body.get("title") or "").strip()[:140] or (_link_source(url) + " conversation"),
+            "title": (str(body.get("title") or "").strip()[:140]
+                      or (prev.get("title") or "").strip()[:140]
+                      or (_link_source(url) + " conversation")),
             "note": str(body.get("note") or "").strip()[:2000],
+            "preview": (prev.get("excerpt") or "")[:4000],
+            "preview_error": (None if prev.get("ok") else prev.get("error")),
+            "fetched_at": (time.strftime("%Y-%m-%d %H:%M:%S") if prev.get("ok") else None),
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S")}
     store = _read_recordings()
     store[rid] = meta
     _write_recordings(store)
-    return {"ok": True, "id": rid}
+    return {"ok": True, "id": rid, "preview_ok": bool(prev.get("ok")),
+            "title": meta["title"], "chars": prev.get("chars") or 0,
+            "preview_error": meta["preview_error"]}
 
 
 @app.get("/api/recordings")
@@ -2905,7 +2964,8 @@ def api_recordings_list(request: Request):
     actor = _actor_from_request(request)
     admin = _is_admin(actor)
     fields = ("id", "owner", "title", "kind", "mime", "size", "duration",
-              "transcript", "note", "ext_link", "source", "created_at", "trace")
+              "transcript", "note", "ext_link", "source", "created_at", "trace",
+              "preview", "preview_error", "fetched_at")
     rows = [{k: r.get(k) for k in fields} for r in _read_recordings().values()
             if admin or r.get("owner") == actor]
     rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
@@ -3069,8 +3129,10 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
    code, explained a result, suggested an approach &mdash; that conversation is part of how the work was done.
    Save its link here so it stays with the project: you (or your advisor) can reopen it later to see
    <i>where an idea came from</i>, and teammates can read it instead of repeating the same questions.<br>
-   <b>How:</b> in ChatGPT/Claude/Gemini click <b>Share</b> &rarr; <b>Copy link</b> &rarr; paste it below.
-   We only store the link &mdash; we never open or read your AI account.</div>
+   <b>How:</b> in ChatGPT/Claude/Gemini click <b>Share</b> &rarr; <b>Copy link</b> &rarr; paste it below.<br>
+   <b>What we store:</b> the link, plus a <b>text snapshot of that public share page</b> so the content
+   survives even if the link is later revoked. We read only the page the link points to &mdash; never your
+   AI account, and never anything private.</div>
   <div class="linkrow"><input id="linkUrl" placeholder="https://chatgpt.com/share/..."><input id="linkTitle" placeholder="What was it about? (optional)" style="flex:0 0 220px"><button class="addl" onclick="addLink()">Save link</button></div>
  </div>
  <div class="card">
@@ -3276,7 +3338,9 @@ async function renameRec(id,el){ var t=el.textContent.trim();
 function libItem(r){
   var media='';
   if(r.kind==='link'){
-    media = '<div style="margin-top:8px"><a class="ext" href="'+esc(r.ext_link)+'" target="_blank" rel="noopener">'+esc(r.ext_link)+' &#8599;</a></div>';
+    var pv = r.preview ? ('<div class="tx"><b>Saved snapshot</b> ('+(r.fetched_at||'')+'):<br>'+esc(r.preview.slice(0,600))+(r.preview.length>600?'…':'')+'</div>')
+           : (r.preview_error ? ('<div class="meta" style="margin-top:6px">&#9888; could not read the page — only the link is stored ('+esc(r.preview_error)+')</div>') : '');
+    media = '<div style="margin-top:8px"><a class="ext" href="'+esc(r.ext_link)+'" target="_blank" rel="noopener">'+esc(r.ext_link)+' &#8599;</a></div>'+pv;
   } else if(((r.mime||'').indexOf('audio')>=0 && r.kind!=='video') || r.kind==='voice'){
     media = '<audio src="/api/recordings/'+r.id+'/media" controls preload="metadata"></audio>';
   } else {
@@ -3454,9 +3518,14 @@ def recording_share_page(request: Request, rid: str):
                 .replace(">", "&gt;").replace('"', "&quot;"))
     title = h(rec.get("title") or "Recording")
     if rec.get("kind") == "link":
-        body = (f'<p class="sub">Shared {h(rec.get("source") or "AI")} conversation link:</p>'
+        _pv = rec.get("preview") or ""
+        _pv_html = (f'<div class="tx"><b>Snapshot saved {h(rec.get("fetched_at"))}</b><br>'
+                    f'{h(_pv)}</div>' if _pv else
+                    (f'<p class="note">Only the link is stored — the page could not be read '
+                     f'({h(rec.get("preview_error"))}).</p>' if rec.get("preview_error") else ""))
+        body = (f'<p class="sub">Shared {h(rec.get("source") or "AI")} conversation:</p>'
                 f'<p><a class="ext" href="{h(rec.get("ext_link"))}" target="_blank" '
-                f'rel="noopener">{h(rec.get("ext_link"))} &#8599;</a></p>')
+                f'rel="noopener">{h(rec.get("ext_link"))} &#8599;</a></p>{_pv_html}')
     else:
         is_audio = (rec.get("mime") or "").startswith("audio") or rec.get("kind") == "voice"
         tag = "audio" if is_audio else "video"
