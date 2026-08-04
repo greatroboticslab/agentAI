@@ -6585,3 +6585,27 @@ prompt reads like a failed capture even though the content was there.
 Verified against both real share links: the ChatGPT share now stores 234 characters beginning at
 "ChatGPT said:" with the answer intact and no sidebar or sign-in text; the Gemini share stores 4,503
 characters titled from its own heading. Both reach `capture_status: done`.
+
+### v3.19.2 — a short conversation is not a failed capture
+
+Saving a genuinely brief ChatGPT share (one greeting and one reply) stored the conversation correctly —
+`capture_status: done`, `preview_source: browser`, 257 characters of real content — but the library
+displayed "only an empty page shell was captured (259 characters)". A leftover client-side rule from
+v3.16.1 treated **any** non-pasted preview under 400 characters as a shell. That rule exists for the old
+HTTP-fetched entries; it was never updated when browser capture arrived, so successful captures of short
+conversations were shown as failures while the content sat in the store.
+
+- The client-side shell rule now applies only to entries with no `preview_source` — the legacy
+  HTTP-fetched ones. A browser capture or pasted text is real content however short.
+- Trailing disclaimers are cut from 40 characters in rather than 200, so a short exchange loses its
+  footer too ("ChatGPT is AI. By using it, you agree…" previously survived on brief conversations).
+- The untrimmed-text fallback now triggers only when trimming leaves under 40 characters or removes more
+  than 95% of the page, instead of any result under 200 characters — the earlier rule re-attached the
+  footer to every short conversation.
+- A browser capture is accepted from 60 characters. Each of these three numbers had been set to catch an
+  un-rendered page; each was also, unintentionally, a minimum conversation length.
+
+Verified against three real share links: a 112-character greeting, a 234-character answer, and a
+4,505-character conversation all reach `capture_status: done` with their content intact and no footer. A
+browser check confirms the short one renders as *Conversation read from the share page* with its text
+visible, and no longer as an empty shell.

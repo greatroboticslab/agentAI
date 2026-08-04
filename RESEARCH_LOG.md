@@ -13,6 +13,24 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-03 — v3.19.2: short conversations were being reported as failed captures
+
+**Finding.** A brief shared conversation (one greeting, one reply) was captured correctly and stored — 257
+characters, `capture_status: done` — but the library displayed it as "only an empty page shell was
+captured". A client-side rule introduced with shell detection treated any non-pasted preview under 400
+characters as an un-rendered page. It was written for entries fetched over HTTP and was not revisited when
+browser capture was added, so a successful capture of a short conversation was presented as a failure.
+
+**Underlying pattern.** Three separate thresholds — the client-side shell rule, the trimming fallback, and
+the acceptance minimum — had all been set to distinguish a rendered page from an empty shell, and each of
+them also acted as an unintended minimum conversation length. They now key on how the text was obtained
+rather than on its length: the shell rule applies only to entries with no capture source, trimming falls
+back only when it leaves almost nothing, and a browser capture is accepted from 60 characters.
+
+**Verification.** Three real share links — a 112-character greeting, a 234-character answer and a
+4,505-character conversation — all complete with their content intact and their footers removed, and a
+browser check confirms the short one now renders as captured rather than as an empty shell.
+
 ## 2026-08-03 — v3.19.1: trimming the product interface out of captured conversations
 
 **Finding.** The browser capture worked on a real ChatGPT share link but stored the surrounding interface

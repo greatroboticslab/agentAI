@@ -88,8 +88,10 @@ def render(url: str, settle_ms: int = 6000, timeout_ms: int = 60000,
     text = _tidy(text)
     raw_chars = len(text)
     stripped = _strip_chrome(text, heading)
-    # a short conversation can be mostly chrome; never trade content for tidiness
-    if len(stripped) < 200 <= raw_chars:
+    # never trade content for tidiness: fall back to the untrimmed text only when
+    # trimming left essentially nothing, or removed almost the whole page. A short
+    # conversation legitimately trims down to a few lines.
+    if raw_chars >= 200 and (len(stripped) < 40 or len(stripped) < raw_chars * 0.05):
         stripped = text
     text = stripped
     return {"ok": True, "title": (heading[:160] or title), "page_title": title,
@@ -143,7 +145,7 @@ def _strip_chrome(text: str, heading: str = "") -> str:
                 text = "\n".join(lines[k:])
     for m in _END_MARKERS:
         i = text.find(m)
-        if i > 200:
+        if i > 40:      # a short exchange reaches its footer quickly
             text = text[:i]
     # drop interface furniture left at the very top ("Report conversation", …)
     lines = text.split("\n")

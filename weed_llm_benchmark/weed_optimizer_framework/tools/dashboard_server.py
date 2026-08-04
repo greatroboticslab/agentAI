@@ -2868,7 +2868,7 @@ def _capture_link_in_browser(rid: str, url: str) -> None:
     # a rendered page that produced almost nothing did not load; but a genuinely
     # short shared answer is legitimate, so this threshold is far below the one
     # used to detect an un-rendered shell from a plain HTTP fetch
-    if res.get("ok") and len(text) >= 120:
+    if res.get("ok") and len(text) >= 60:
         rec["preview"] = text[:200_000]
         rec["preview_source"] = "browser"
         rec["preview_error"] = None
@@ -3676,8 +3676,10 @@ function libItem(r){
   var media='';
   if(r.kind==='link'){
     // entries saved before the shell-detection fix can hold a few dozen characters of
-    // sign-in scaffold; show them as unreadable rather than as a snapshot
-    if(r.preview && r.preview_source!=='pasted' && r.preview.length<400){
+    // sign-in scaffold; show them as unreadable rather than as a snapshot. This only
+    // applies to those old HTTP-fetched entries — a browser capture or pasted text is
+    // real content however short, and a brief conversation IS brief.
+    if(r.preview && !r.preview_source && r.preview.length<400){
       r.preview_error = r.preview_error || 'that page builds its conversation with JavaScript, so only an empty page shell was captured ('+r.preview.length+' characters) — use “Paste the conversation text” to keep the content.';
       r.preview = '';
     }
