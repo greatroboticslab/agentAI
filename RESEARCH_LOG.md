@@ -13,6 +13,29 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-03 — v3.19.0: reading AI share pages with a browser engine
+
+**Revised conclusion.** The previous entry recorded that JavaScript-built share pages could not be read
+server-side, because Chrome on the dashboard host cannot complete network requests. Retesting showed the
+fault is specific to Chrome: **Firefox on the same host renders normally**. A real Gemini share link that
+yields 56 characters through `urllib` yields **4,604 characters** through Firefox — the entire conversation.
+
+**No authentication is required.** The share pages are public; the "Sign in" string in the fetched shell is
+the product's header button, not an access wall. This was confirmed by rendering the page with no session
+of any kind and reading the full conversation, so no credentials are stored or automated anywhere.
+
+**Implementation.** `tools/share_capture.py` drives headless Firefox through Playwright and returns the
+page's visible text, serialised to one render at a time. The link endpoint keeps its fast HTTP path and
+escalates to the browser only when that path returns a shell, and only for hosts already on the allow-list
+that prevents internal-address probing. Because a render takes about ten seconds, it runs in a background
+thread: the request returns in 0.3 s, the entry is marked `capturing`, and the library row polls until the
+text arrives. The conversation's heading becomes the entry title and the site navigation is trimmed from
+the stored text. Text pasted by a user is never overwritten by a capture.
+
+**Verification.** End to end on the live server: save returns in 0.3 s, the entry reaches `done` after
+about 12 s carrying 4,604 characters of the actual conversation with `preview_source=browser`, and a
+browser check confirms the row shows the capturing state and updates itself without a reload.
+
 ## 2026-08-03 — v3.18.0: recordings made private by default after a permission audit
 
 **Audit.** The question "can anyone else see my recording?" was answered by probing the live server as four

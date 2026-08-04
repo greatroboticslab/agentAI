@@ -2837,6 +2837,59 @@ def _fetch_link_preview(url: str) -> dict:
         return {"ok": False, "error": f"parse failed: {type(e).__name__}"}
 
 
+def _browser_capture_possible(url: str) -> bool:
+    """Only allow-listed share hosts, and only if a browser engine is present."""
+    try:
+        from urllib.parse import urlparse
+        if (urlparse(url).hostname or "").lower() not in _LINK_FETCH_HOSTS:
+            return False
+        from . import share_capture
+        return share_capture.available()
+    except Exception:
+        return False
+
+
+def _capture_link_in_browser(rid: str, url: str) -> None:
+    """Background: render the share page and store the conversation it contains.
+
+    Runs off the request because a browser render takes roughly 10 s. Only ever
+    replaces a preview the user did not paste themselves.
+    """
+    try:
+        from . import share_capture
+        res = share_capture.render(url)
+    except Exception as e:
+        res = {"ok": False, "error": "%s: %s" % (type(e).__name__, str(e)[:120])}
+    store = _read_recordings()
+    rec = store.get(rid)
+    if not rec or rec.get("preview_source") == "pasted":
+        return                      # deleted, or the user supplied the text meanwhile
+    text = (res.get("text") or "").strip()
+    if res.get("ok") and len(text) >= 400:
+        rec["preview"] = text[:200_000]
+        rec["preview_source"] = "browser"
+        rec["preview_error"] = None
+        rec["capture_status"] = "done"
+        rec["fetched_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        # only replace the placeholder title ("Gemini conversation"), never a
+        # title the user typed themselves
+        if not rec.get("title") or rec["title"].endswith(" conversation"):
+            t = (res.get("title") or "").strip()
+            if t and t != (res.get("page_title") or ""):
+                rec["title"] = t[:140]
+        log.info(f"[recordings] browser-captured {rid}: {len(text)} chars "
+                 f"in {res.get('secs')}s")
+    else:
+        rec["capture_status"] = "failed"
+        rec["preview_error"] = (
+            "could not read that page even with a browser (%s) — open the share "
+            "page, copy the conversation, and use “Paste the conversation text”"
+            % (res.get("error") or ("only %d characters were visible" % len(text))))
+        log.info(f"[recordings] browser capture failed for {rid}: {rec['preview_error'][:90]}")
+    store[rid] = rec
+    _write_recordings(store)
+
+
 def _link_source(url: str) -> str:
     u = url.lower()
     for host, name in (("chatgpt.com", "ChatGPT"), ("chat.openai", "ChatGPT"),
@@ -2987,13 +3040,25 @@ async def api_recordings_link(request: Request):
             "preview_error": (None if ok else prev.get("error")),
             "fetched_at": (time.strftime("%Y-%m-%d %H:%M:%S") if ok else None),
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    # v3.19 — when a plain fetch only saw the page shell, open the page in a real
+    # browser instead (JS-built conversations are invisible to a fetch). It takes
+    # ~10 s, so it runs after the reply and the entry updates itself.
+    escalate = (not ok) and _browser_capture_possible(url)
+    if escalate:
+        meta["capture_status"] = "capturing"
+        meta["preview_error"] = ("reading the page in a browser — this takes a few "
+                                 "seconds, the entry updates itself")
     store = _read_recordings()
     store[rid] = meta
     _write_recordings(store)
+    if escalate:
+        _threading.Thread(target=_capture_link_in_browser, args=(rid, url),
+                          name="linkcapture", daemon=True).start()
     return {"ok": True, "id": rid, "preview_ok": ok,
             "title": meta["title"],
             "chars": len(pasted) if pasted else (prev.get("chars") or 0),
             "preview_source": meta["preview_source"],
+            "capture_status": meta.get("capture_status"),
             "preview_error": meta["preview_error"]}
 
 
@@ -3004,7 +3069,8 @@ def api_recordings_list(request: Request):
     admin = _is_admin(actor)
     fields = ("id", "owner", "title", "kind", "mime", "size", "duration",
               "transcript", "note", "ext_link", "source", "created_at", "trace",
-              "preview", "preview_error", "preview_source", "fetched_at", "visibility")
+              "preview", "preview_error", "preview_source", "fetched_at", "visibility",
+              "capture_status")
     rows = [{k: r.get(k) for k in fields} for r in _read_recordings().values()
             if admin or r.get("owner") == actor]
     rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
@@ -3576,6 +3642,19 @@ async function delRec(id){ if(!confirm('Delete this recording?'))return;
     if(r.ok&&d.ok) loadLibrary(); else alert((d&&(d.detail||d.error))||'delete failed'); }catch(e){ alert(''+e); } }
 async function renameRec(id,el){ var t=el.textContent.trim();
   try{ await fetch('/api/recordings/'+id+'/update',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t})}); }catch(e){} }
+// while any entry is being read by the browser, refresh the library until it is
+// done — bounded so a stuck capture cannot poll forever
+var _pollT=null,_pollN=0;
+function _pollCapture(){
+  if(_pollT) return;
+  _pollN=0;
+  _pollT=setInterval(function(){
+    _pollN++;
+    if(_pollN>20){ clearInterval(_pollT); _pollT=null; return; }
+    loadLibrary(true);
+  },4000);
+}
+function _pollStop(){ if(_pollT){ clearInterval(_pollT); _pollT=null; } }
 function libItem(r){
   var media='';
   if(r.kind==='link'){
@@ -3585,10 +3664,20 @@ function libItem(r){
       r.preview_error = r.preview_error || 'that page builds its conversation with JavaScript, so only an empty page shell was captured ('+r.preview.length+' characters) — use “Paste the conversation text” to keep the content.';
       r.preview = '';
     }
-    var lbl = r.preview_source==='pasted' ? 'Conversation text (pasted by you)' : 'Saved snapshot of the share page';
-    var pv = r.preview ? ('<div class="tx"><b>'+lbl+'</b> ('+(r.fetched_at||'')+', '+r.preview.length+' chars):<br>'+esc(r.preview.slice(0,600))+(r.preview.length>600?'…':'')+'</div>')
-           : (r.preview_error ? ('<div class="meta" style="margin-top:6px">&#9888; '+esc(r.preview_error)+'</div>') : '');
-    var addBtn = '<button class="btn" onclick="addText(\''+r.id+'\')" style="margin-top:6px;font-size:12px">'+(r.preview?'&#9998; Replace the saved text':'&#9998; Paste the conversation text')+'</button>';
+    var lbl = r.preview_source==='pasted' ? 'Conversation text (pasted by you)'
+            : (r.preview_source==='browser' ? 'Conversation read from the share page'
+                                            : 'Saved snapshot of the share page');
+    var pv, addBtn='';
+    if(r.capture_status==='capturing'){
+      // a browser is opening the page right now — the row refreshes itself
+      _pollCapture();
+      pv = '<div class="meta" style="margin-top:6px">&#8987; <b>Reading the conversation in a browser…</b>'
+         + ' about 10 seconds — the text appears here on its own.</div>';
+    } else {
+      pv = r.preview ? ('<div class="tx"><b>'+lbl+'</b> ('+(r.fetched_at||'')+', '+r.preview.length+' chars):<br>'+esc(r.preview.slice(0,600))+(r.preview.length>600?'…':'')+'</div>')
+         : (r.preview_error ? ('<div class="meta" style="margin-top:6px">&#9888; '+esc(r.preview_error)+'</div>') : '');
+      addBtn = '<button class="btn" onclick="addText(\''+r.id+'\')" style="margin-top:6px;font-size:12px">'+(r.preview?'&#9998; Replace the saved text':'&#9998; Paste the conversation text')+'</button>';
+    }
     media = '<div style="margin-top:8px"><a class="ext" href="'+esc(r.ext_link)+'" target="_blank" rel="noopener">'+esc(r.ext_link)+' &#8599;</a></div>'+pv+addBtn;
   } else if(((r.mime||'').indexOf('audio')>=0 && r.kind!=='video') || r.kind==='voice'){
     media = '<audio src="/api/recordings/'+r.id+'/media" controls preload="metadata"></audio>';
@@ -3613,13 +3702,15 @@ function libItem(r){
     +'<div class="meta">'+sub.join(' &middot; ')+'</div>'+media+steps+tx+note
     +'<div class="acts">'+visBtn+share+'<button class="btn del" onclick="delRec(\''+r.id+'\')">Delete</button></div></div>';
 }
-async function loadLibrary(){
+async function loadLibrary(fromPoll){
   var box=document.getElementById('lib');
   try{ var r=await fetch('/api/recordings',{credentials:'include'}); var d=await r.json();
     var rows=(d&&d.recordings)||[];
-    if(!rows.length){ box.innerHTML='<div class="empty">No recordings yet. Record your screen or voice above &mdash; or paste an AI share link.</div>'; return; }
+    if(!rows.length){ _pollStop(); box.innerHTML='<div class="empty">No recordings yet. Record your screen or voice above &mdash; or paste an AI share link.</div>'; return; }
+    // stop polling once nothing is still being read
+    if(!rows.some(function(x){ return x.capture_status==='capturing'; })) _pollStop();
     box.innerHTML=rows.map(libItem).join('');
-  }catch(e){ box.innerHTML='<div class="empty">could not load</div>'; }
+  }catch(e){ if(!fromPoll) box.innerHTML='<div class="empty">could not load</div>'; }
 }
 loadLibrary();
 </script></body></html>'''

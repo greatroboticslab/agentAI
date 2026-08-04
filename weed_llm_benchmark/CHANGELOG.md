@@ -6518,3 +6518,43 @@ on both the share page and the media file (403) while the owner and administrato
 owner switches it to shared, the other member is served; a non-owner attempting to change visibility gets
 403 and an invalid value gets 400; signed-out access stays 401 throughout. Browser checks confirm the row
 renders its state, the toggle switches it with a confirmation, and the player is dark.
+
+### v3.19.0 — AI share pages are now read by a real browser (56 → 4,604 characters)
+
+v3.16.1 reported honestly that a JavaScript-built share page could not be read by an HTTP fetch, and asked
+the user to paste the conversation instead. Server-side rendering had been ruled out because Chrome on this
+host cannot complete network requests. That conclusion was too broad: **Firefox on the same host works**.
+
+Rendering the same real Gemini share link:
+
+| method | characters captured |
+|---|---|
+| `urllib` fetch (page shell only) | 56 |
+| Firefox via Playwright | **4,604** |
+
+No sign-in is involved. These share pages are public; the "Sign in" text in the shell is Google's header
+button, not an access wall — confirmed by rendering the page anonymously and reading the whole conversation.
+
+- New module `tools/share_capture.py`: `available()` / `render(url)` drives headless Firefox through
+  Playwright, waits for network idle plus a settle delay, and returns the page's visible text. One render
+  at a time (`threading.Semaphore`), 60 s navigation timeout, output capped at 200,000 characters.
+- `POST /api/recordings/link` keeps the fast `urllib` path and **escalates to the browser only when that
+  returns a shell**, and only for hosts on the existing allow-list. The render runs in a background thread
+  so the request still returns in ~0.3 s; the entry carries `capture_status: capturing` and updates itself
+  when the text arrives (~12 s end to end).
+- The library row shows "Reading the conversation in a browser…" and polls until the text appears (bounded
+  to 20 polls). Captured text is labelled *Conversation read from the share page*, distinct from text the
+  user pasted, which is never overwritten.
+- The conversation's own heading becomes the entry title ("Floating Desktop AI Overlays Explained" rather
+  than the product's page title), and the site's navigation chrome is trimmed from the stored text.
+- Failures stay honest: if the browser also comes back with under 400 characters, the row says so and still
+  offers the paste path.
+
+Verified on the live server end to end: save returns in 0.3 s with `capture_status=capturing`; the entry
+becomes `done` after ~12 s with `preview_source=browser` and 4,604 characters containing the actual
+conversation; the title is set from the heading and the navigation prefix is gone; a browser check confirms
+the capturing state renders and the text appears without reloading the page.
+
+Note: Chrome remains unusable on this host (`Page.navigate` unanswered, `Network.requestWillBeSent` with no
+response, unaffected by proxy/QUIC/DNS flags) while `urllib` and Firefox work — so any future server-side
+rendering here must use Firefox.
