@@ -2865,7 +2865,10 @@ def _capture_link_in_browser(rid: str, url: str) -> None:
     if not rec or rec.get("preview_source") == "pasted":
         return                      # deleted, or the user supplied the text meanwhile
     text = (res.get("text") or "").strip()
-    if res.get("ok") and len(text) >= 400:
+    # a rendered page that produced almost nothing did not load; but a genuinely
+    # short shared answer is legitimate, so this threshold is far below the one
+    # used to detect an un-rendered shell from a plain HTTP fetch
+    if res.get("ok") and len(text) >= 120:
         rec["preview"] = text[:200_000]
         rec["preview_source"] = "browser"
         rec["preview_error"] = None
@@ -3073,6 +3076,20 @@ def api_recordings_list(request: Request):
               "capture_status")
     rows = [{k: r.get(k) for k in fields} for r in _read_recordings().values()
             if admin or r.get("owner") == actor]
+    # a capture interrupted by a restart would otherwise leave the row spinning
+    # forever; report it as failed once it is clearly too old to still be running
+    for r in rows:
+        if r.get("capture_status") == "capturing":
+            try:
+                age = time.time() - time.mktime(time.strptime(r.get("created_at") or "",
+                                                              "%Y-%m-%d %H:%M:%S"))
+            except Exception:
+                age = 0
+            if age > 300:
+                r["capture_status"] = "failed"
+                r["preview_error"] = ("reading the page did not finish (the server was "
+                                      "restarted) — use “Paste the conversation text”, "
+                                      "or save the link again to retry")
     rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return {"ok": True, "n": len(rows), "recordings": rows,
             "me": actor, "is_admin": admin}

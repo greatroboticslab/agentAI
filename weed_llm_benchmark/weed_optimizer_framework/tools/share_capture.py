@@ -68,6 +68,9 @@ def render(url: str, settle_ms: int = 6000, timeout_ms: int = 60000,
                         loc = page.locator(sel).first
                         if loc.count():
                             heading = (loc.inner_text(timeout=2000) or "").strip()
+                            # "Chat history" is the sidebar, not the conversation
+                            if heading.lower() in _JUNK_HEADINGS:
+                                heading = ""
                             if heading:
                                 break
                     except Exception:
@@ -83,14 +86,71 @@ def render(url: str, settle_ms: int = 6000, timeout_ms: int = 60000,
         _SLOT.release()
 
     text = _tidy(text)
-    # drop the site's navigation chrome by starting at the conversation's heading
-    if heading and len(heading) > 3:
-        i = text.find(heading)
-        if 0 < i < 1500:
-            text = text[i:]
+    raw_chars = len(text)
+    stripped = _strip_chrome(text, heading)
+    # a short conversation can be mostly chrome; never trade content for tidiness
+    if len(stripped) < 200 <= raw_chars:
+        stripped = text
+    text = stripped
     return {"ok": True, "title": (heading[:160] or title), "page_title": title,
-            "text": text[:_MAX_CHARS], "chars": len(text),
+            "text": text[:_MAX_CHARS], "chars": len(text), "raw_chars": raw_chars,
             "url": final_url, "secs": round(time.time() - t0, 1)}
+
+
+# lines that mark where the shared conversation actually begins / ends. A rendered
+# page also contains the product's sidebar, sign-in prompts and footer, which look
+# like a failed capture when they sit at the top of a saved conversation.
+_START_MARKERS = (
+    "This is a copy of a shared ChatGPT conversation",
+    "Report conversation",
+)
+# headings that belong to the product's interface, not to the conversation, and
+# single lines of interface furniture left behind after the start marker
+_JUNK_HEADINGS = {"chat history", "new chat", "chatgpt", "gemini", "claude",
+                  "conversation", "menu", "navigation", "chats", "history"}
+_CHROME_LINES = {"report conversation", "share", "copy link", "new chat",
+                 "chat history", "report", "open in app"}
+_END_MARKERS = (
+    "ChatGPT is AI. By using it, you agree",
+    "Gemini may display inaccurate info",
+    "Claude can make mistakes",
+    "ChatGPT can make mistakes",
+)
+
+
+def _strip_chrome(text: str, heading: str = "") -> str:
+    """Remove the surrounding product interface from a rendered share page."""
+    head = text[:4000]
+    # 1. an explicit marker is the most reliable start
+    for m in _START_MARKERS:
+        i = head.find(m)
+        if i >= 0:
+            text = text[i + len(m):].lstrip("\n")
+            break
+    else:
+        # 2. otherwise start at the conversation's own heading
+        if heading and len(heading) > 3:
+            i = text.find(heading)
+            if 0 < i < 1500:
+                text = text[i:]
+        else:
+            # 3. otherwise drop the leading run of short menu-like lines
+            lines = text.split("\n")
+            k = 0
+            while k < min(40, len(lines)) and len(lines[k].strip()) < 30:
+                k += 1
+            if k and k < len(lines):
+                text = "\n".join(lines[k:])
+    for m in _END_MARKERS:
+        i = text.find(m)
+        if i > 200:
+            text = text[:i]
+    # drop interface furniture left at the very top ("Report conversation", …)
+    lines = text.split("\n")
+    while lines and (not lines[0].strip()
+                     or lines[0].strip().lower() in _CHROME_LINES):
+        lines.pop(0)
+    return "\n".join(lines).strip()
 
 
 def _tidy(text: str) -> str:

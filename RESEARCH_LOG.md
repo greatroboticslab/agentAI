@@ -13,6 +13,27 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-03 — v3.19.1: trimming the product interface out of captured conversations
+
+**Finding.** The browser capture worked on a real ChatGPT share link but stored the surrounding interface
+with it — sidebar entries, plan advertising and a "Log in to get answers based on saved chats" prompt ahead
+of the answer — which makes a successful capture look like a failure.
+
+**Change.** The stored text now begins at an explicit share marker, or at the conversation's heading, or
+after the leading run of short menu lines, with trailing disclaimers and leftover single-line furniture
+removed. Headings that belong to the interface rather than the conversation are rejected as titles.
+
+**Correction found by testing.** The first version of this trimming cut a short shared answer from 695 to
+315 characters, below the threshold used to detect an un-rendered page, so the entry was marked failed and
+nothing was stored. Two guards were added: trimming falls back to the untrimmed text whenever it would
+leave under 200 characters, and a browser capture is accepted from 120 characters, since that threshold
+exists to detect a page that never rendered, not to judge how long a conversation is. A capture interrupted
+by a restart is now also reported as failed after five minutes rather than waiting indefinitely.
+
+**Verification.** Both real share links reach `capture_status: done` — the ChatGPT share stores 234
+characters starting at "ChatGPT said:" with the answer intact and no interface text, and the Gemini share
+stores 4,503 characters titled from its own heading.
+
 ## 2026-08-03 — v3.19.0: reading AI share pages with a browser engine
 
 **Revised conclusion.** The previous entry recorded that JavaScript-built share pages could not be read

@@ -6558,3 +6558,30 @@ the capturing state renders and the text appears without reloading the page.
 Note: Chrome remains unusable on this host (`Page.navigate` unanswered, `Network.requestWillBeSent` with no
 response, unaffected by proxy/QUIC/DNS flags) while `urllib` and Firefox work — so any future server-side
 rendering here must use Firefox.
+
+### v3.19.1 — captured conversations no longer carry the product's interface
+
+Testing the browser capture against a real ChatGPT share link stored 695 characters that opened with the
+product's own furniture — "Chat history / New chat / Images / Plugins / See plans and pricing / Log in to
+get answers based on saved chats" — before the answer. A saved conversation that begins with a sign-in
+prompt reads like a failed capture even though the content was there.
+
+- `_strip_chrome()` starts the stored text at an explicit marker ("This is a copy of a shared ChatGPT
+  conversation"), else at the conversation's own heading, else after the leading run of short menu lines;
+  trailing disclaimers ("ChatGPT is AI…", "Gemini may display inaccurate info…") are cut, and leftover
+  single-line furniture ("Report conversation") is dropped from the top.
+- **Stripping never costs content:** if it would leave under 200 characters while the rendered page had at
+  least that much, the untrimmed text is kept instead. This was found by testing — the first version of
+  the trimming reduced a short shared answer to 315 characters, under the shell-detection threshold, and
+  the entry was wrongly marked failed with nothing stored.
+- The acceptance threshold for a *browser* capture is now 120 characters, not the 400 used to detect an
+  un-rendered shell from a plain HTTP fetch; a genuinely short shared answer is legitimate.
+- Headings belonging to the interface ("Chat history", "New chat", the product name) are rejected as
+  titles, so a short ChatGPT share keeps the neutral "ChatGPT conversation" instead of being titled after
+  the sidebar.
+- A capture interrupted by a server restart no longer leaves a row waiting forever: an entry still marked
+  `capturing` more than five minutes after creation is reported as failed, with the paste option offered.
+
+Verified against both real share links: the ChatGPT share now stores 234 characters beginning at
+"ChatGPT said:" with the answer intact and no sidebar or sign-in text; the Gemini share stores 4,503
+characters titled from its own heading. Both reach `capture_status: done`.
