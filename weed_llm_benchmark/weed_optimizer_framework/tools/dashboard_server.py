@@ -2732,6 +2732,9 @@ async def api_user_llm_key_del(request: Request):
 # external AI share links (ChatGPT/Claude/Gemini) as reference entries.
 # ===========================================================================
 _RECORDINGS_DIR = REPO / "results" / "framework" / "recordings"
+# how much of a stored conversation the library listing carries; the rest is
+# fetched per entry when the reader expands it
+_PREVIEW_EXCERPT = 2000
 _RECORDINGS_INDEX = _RECORDINGS_DIR / "index.json"
 _REC_EXT = {"video/webm": ".webm", "video/mp4": ".mp4", "audio/webm": ".webm",
             "audio/mp4": ".m4a", "audio/ogg": ".ogg", "audio/wav": ".wav",
@@ -3090,9 +3093,31 @@ def api_recordings_list(request: Request):
                 r["preview_error"] = ("reading the page did not finish (the server was "
                                       "restarted) — use “Paste the conversation text”, "
                                       "or save the link again to retry")
+        # a stored conversation can be 200,000 characters; send an excerpt here and
+        # let the row fetch the rest on demand (`/api/recordings/{id}/text`)
+        pv = r.get("preview") or ""
+        r["preview_chars"] = len(pv)
+        if len(pv) > _PREVIEW_EXCERPT:
+            r["preview"] = pv[:_PREVIEW_EXCERPT]
     rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return {"ok": True, "n": len(rows), "recordings": rows,
             "me": actor, "is_admin": admin}
+
+
+@app.get("/api/recordings/{rid}/text")
+def api_recordings_text(request: Request, rid: str):
+    """v3.19.3 — the full stored conversation, fetched only when a row is expanded."""
+    actor = _actor_from_request(request)
+    if not re.match(r"^[A-Za-z0-9_]+$", rid):
+        raise HTTPException(400, "bad id")
+    rec = _read_recordings().get(rid)
+    if not rec:
+        raise HTTPException(404, "not found")
+    if not _rec_can_view(actor, rec):
+        raise HTTPException(403, "this entry is private to the person who saved it")
+    txt = rec.get("preview") or ""
+    return {"ok": True, "id": rid, "chars": len(txt), "text": txt,
+            "source": rec.get("preview_source"), "fetched_at": rec.get("fetched_at")}
 
 
 @app.get("/api/recordings/{rid}/media")
@@ -3211,7 +3236,7 @@ _RECORDINGS_PAGE = r'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8
  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#475569;cursor:pointer}
  .btn:hover{background:#f8fafc}.btn.del{color:#dc2626;border-color:#fecaca}
  .btn.copy.ok{background:#dcfce7;color:#166534;border-color:#86efac}
- .tx{margin-top:8px;font-size:12.5px;color:#cbd5e1;background:#111a2e;border:1px solid #1e293b;border-radius:8px;padding:8px 10px;max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+ .tx{margin-top:8px;font-size:12.5px;line-height:1.55;color:#cbd5e1;background:#111a2e;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word}
  .empty{color:var(--mut);font-size:13px;text-align:center;padding:20px;border:1px dashed var(--line);border-radius:12px}
  a.ext{color:#2563eb;font-weight:600;text-decoration:none}
  /* Loom-style floating recorder bar (stays visible while you work elsewhere) */
@@ -3628,6 +3653,27 @@ async function addLink(){
   }catch(e){ alert(''+e); }
   if(btn){ btn.disabled=false; btn.textContent='Save link'; }
 }
+// grow the box to its full height, pulling the rest of the text if the listing
+// only carried an excerpt
+async function expandTx(id, needsFetch, btn){
+  var box=document.getElementById('tx_'+id), span=document.getElementById('txt_'+id);
+  if(!box) return;
+  if(box.dataset.open==='1'){
+    box.style.maxHeight='220px'; box.dataset.open='';
+    btn.innerHTML='&#11021; Expand'; box.scrollTop=0; return;
+  }
+  if(needsFetch && box.dataset.full!=='1'){
+    btn.disabled=true; btn.textContent='Loading…';
+    try{ var r=await fetch('/api/recordings/'+id+'/text',{credentials:'include'});
+      var d=await r.json();
+      if(r.ok&&d.ok){ span.textContent=d.text; box.dataset.full='1'; }
+      else { btn.disabled=false; btn.textContent='could not load'; return; }
+    }catch(e){ btn.disabled=false; btn.textContent='could not load'; return; }
+    btn.disabled=false;
+  }
+  box.style.maxHeight='none'; box.dataset.open='1';
+  btn.innerHTML='&#11014; Collapse';
+}
 async function addText(id){
   var t=prompt('Paste the conversation text for this link (it will be stored exactly as pasted):','');
   if(t===null) return; t=t.trim(); if(!t) return;
@@ -3693,8 +3739,21 @@ function libItem(r){
       pv = '<div class="meta" style="margin-top:6px">&#8987; <b>Reading the conversation in a browser…</b>'
          + ' about 10 seconds — the text appears here on its own.</div>';
     } else {
-      pv = r.preview ? ('<div class="tx"><b>'+lbl+'</b> ('+(r.fetched_at||'')+', '+r.preview.length+' chars):<br>'+esc(r.preview.slice(0,600))+(r.preview.length>600?'…':'')+'</div>')
-         : (r.preview_error ? ('<div class="meta" style="margin-top:6px">&#9888; '+esc(r.preview_error)+'</div>') : '');
+      if(r.preview){
+        // show the conversation itself, scrollable, with the rest one click away —
+        // a fixed 600-character cut left no way to read what had been captured
+        var total = r.preview_chars || r.preview.length;
+        var more  = total > r.preview.length;
+        pv = '<div class="tx" id="tx_'+r.id+'"><b>'+lbl+'</b> ('+(r.fetched_at||'')+', '+total+' chars):<br>'
+           + '<span id="txt_'+r.id+'">'+esc(r.preview)+'</span></div>'
+           + '<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">'
+           + '<button class="btn" style="font-size:12px" onclick="expandTx(\''+r.id+'\','+(more?'true':'false')+',this)">'
+           + (more ? '&#128214; Read all '+total+' characters' : '&#11021; Expand') + '</button>'
+           + '<a class="btn" style="font-size:12px;text-decoration:none" href="/r/'+r.id+'" target="_blank" rel="noopener">Open as a page &#8599;</a>'
+           + '</div>';
+      } else {
+        pv = r.preview_error ? ('<div class="meta" style="margin-top:6px">&#9888; '+esc(r.preview_error)+'</div>') : '';
+      }
       addBtn = '<button class="btn" onclick="addText(\''+r.id+'\')" style="margin-top:6px;font-size:12px">'+(r.preview?'&#9998; Replace the saved text':'&#9998; Paste the conversation text')+'</button>';
     }
     media = '<div style="margin-top:8px"><a class="ext" href="'+esc(r.ext_link)+'" target="_blank" rel="noopener">'+esc(r.ext_link)+' &#8599;</a></div>'+pv+addBtn;

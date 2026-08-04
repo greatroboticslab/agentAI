@@ -13,6 +13,24 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-03 — v3.19.3: making a captured conversation readable in full
+
+**Finding.** A captured conversation was displayed truncated at 600 characters with an ellipsis, inside a
+scrollable box — but the box could only scroll through those 600 characters, since the remainder was never
+sent to the page. An 8,705-character conversation appeared to have been cut off with no way to read the
+rest.
+
+**Change.** The listing now sends a 2,000-character excerpt together with the true length, and a new
+per-entry endpoint returns the full text under the same access rule as the share page. Each row offers to
+read all of it: the remainder is fetched on demand and the box expands to full height, with a collapse
+back and a link to open the entry as its own page. This also removes a scaling problem — with entries
+capped at 200,000 characters, the listing had been sending whole conversations on every refresh, including
+the automatic refreshes while a capture was running.
+
+**Verification.** In a browser against a 29,352-character conversation: the listing carries 2,000
+characters while reporting the full length, expanding loads the complete text (verified by matching its
+final line), and the box grows and collapses as offered.
+
 ## 2026-08-03 — v3.19.2: short conversations were being reported as failed captures
 
 **Finding.** A brief shared conversation (one greeting, one reply) was captured correctly and stored — 257

@@ -6609,3 +6609,25 @@ Verified against three real share links: a 112-character greeting, a 234-charact
 4,505-character conversation all reach `capture_status: done` with their content intact and no footer. A
 browser check confirms the short one renders as *Conversation read from the share page* with its text
 visible, and no longer as an empty shell.
+
+### v3.19.3 — the whole captured conversation can actually be read
+
+The library showed a captured conversation truncated at 600 characters followed by an ellipsis, inside a
+box that scrolled — but scrolling only ever revealed those 600 characters, because the rest was never sent
+to the page. An 8,705-character conversation therefore looked like it had been cut short, with no way to
+reach the remainder.
+
+- The listing now carries a 2,000-character excerpt plus `preview_chars`, the true length, and the box
+  scrolls through that excerpt instead of a fixed 600-character slice.
+- New **`GET /api/recordings/{id}/text`** returns the full stored text, gated by the same `_rec_can_view`
+  rule as the share page — owner, administrator, or a recording its owner marked shared.
+- Each row offers **"📖 Read all N characters"**, which fetches the remainder and expands the box to full
+  height, then **"⬆ Collapse"**. Entries already shorter than the excerpt simply get Expand/Collapse with
+  no request. An **"Open as a page ↗"** link goes to the share page for reading it on its own.
+- The listing no longer carries entire conversations: with a 200,000-character cap per entry, a library of
+  saved conversations was sending megabytes on every refresh, including the polling refresh during a
+  capture.
+
+Verified in a browser on a 29,352-character conversation: the listing sends 2,000 characters while
+reporting the full length, the button offers to read all of them, expanding loads the complete text
+(confirmed by matching the final line), the box grows to full height and collapses again.
