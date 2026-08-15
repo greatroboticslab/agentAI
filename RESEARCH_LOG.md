@@ -13,6 +13,23 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-15 — v3.20.1: the live stream shows up inside the project page
+
+**Finding.** With v3.20.0 the live view existed only at `/robot/live`; opening the project during a
+stream showed a dataset entry but no picture — the live feed was invisible exactly where an operator
+looks first. Live-session imagery is also personal footage, so its lifecycle must be user-controlled.
+
+**Change.** The project page gains a live robot card (appears ≤4 s after a robot goes live in that
+project: pulsing dot, camera frame at 1.5 s refresh, per-source counters, honest drop count, link to the
+full page) plus a "Robot live" workspace button; `/api/robot/sessions` gains a `domain` filter. Robot
+datasets use the existing uploader-or-admin Delete flow — one click removes registry + Mongo + files.
+
+**Verification.** Synthetic live session (generated JPEG, no real footage) on the deployed server: card
+rendered (`display:block`, `frames 1 · imu 10 · gps 3`), element screenshot captured, then stop + delete
+left the sessions list empty and the files gone. All prior robot test datasets (two live runs + the
+bench smoke, which contained real camera frames) were deleted through the same endpoint — `manual`,
+`registry` and `files` all reported removed, and `uploads/` holds zero robot directories.
+
 ## 2026-08-15 — v3.20.0: robots stream live data into the platform
 
 **Context.** The lab's robots (241 testbed now, lasercar next) need their camera + sensor data flowing

@@ -8117,10 +8117,22 @@ def agent_generic(domain_id: str):
        <span id="tr-msg" style="font-size:13px;color:#475569"></span>
      </div>
    </div>''')}
+   <!-- v3.20.1: live robot card — appears the moment a robot streams into THIS project -->
+   <div id="rlv" style="display:none;margin-top:22px;background:#0f172a;border-radius:12px;padding:14px;color:#e2e8f0">
+     <div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
+       <span style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;animation:rlvp 1.2s infinite"></span>
+       <b>Robot streaming LIVE</b> <span id="rlv-meta" style="color:#94a3b8"></span>
+       <a href="/robot/live" style="margin-left:auto;color:#93c5fd;text-decoration:none">Full live view &#8599;</a>
+     </div>
+     <img id="rlv-img" alt="live camera" style="max-width:100%;border-radius:8px;margin-top:10px;display:none">
+     <div id="rlv-stats" style="font-size:12px;color:#cbd5e1;margin-top:6px"></div>
+     <style>@keyframes rlvp{{50%{{opacity:.3}}}}</style>
+   </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/slugs?domain=__DOM__">Datasets</a>
+     <a class="btn" style="margin-top:0;background:#fef2f2;color:#dc2626" href="/robot/live">&#128308; Robot live</a>
    </div>
    <a class="btn" href="/" style="margin-top:20px">&larr; Back to agents</a>
  </div></div>
@@ -8133,6 +8145,27 @@ function startHarvest(){
   .then(function(r){return r.json();}).then(function(d){t.textContent=(d&&d.ok?'\\u2705 Harvest submitted to cluster.':'\\u274c '+((d&&(d.msg||d.stderr))||'failed'));})
   .catch(function(e){t.textContent='\\u274c '+e;}).finally(function(){b.disabled=false;});
 }
+// v3.20.1: live robot card — polls this project's sessions; shows the camera +
+// counters the moment a robot goes LIVE, hides again when the stream stops.
+var _rlvSid=null;
+function rlvPoll(){
+ fetch('/api/robot/sessions?domain=__DOM__&limit=3',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+  var live=((d&&d.sessions)||[]).filter(function(s){return s.status==='live';})[0];
+  var card=document.getElementById('rlv'); if(!card)return;
+  if(!live){card.style.display='none';_rlvSid=null;return;}
+  _rlvSid=live.sid; card.style.display='block';
+  var c=live.counts||{},parts=[]; for(var k in c){parts.push(k+' '+c[k]);}
+  document.getElementById('rlv-meta').textContent=(live.name||'')+' \\u00b7 '+(live.robot_id||'');
+  document.getElementById('rlv-stats').textContent='frames '+(live.frame_count||0)+' \\u00b7 '+parts.join(' \\u00b7 ')+(live.dropped?' \\u00b7 dropped '+live.dropped:'');
+ }).catch(function(e){});
+}
+function rlvFrame(){
+ if(!_rlvSid)return;
+ var im=document.getElementById('rlv-img');
+ if(im){im.onerror=function(){im.style.display='none';};im.onload=function(){im.style.display='block';};
+  im.src='/api/robot/frame_latest/'+_rlvSid+'.jpg?t='+Date.now();}
+}
+rlvPoll(); setInterval(rlvPoll,4000); setInterval(rlvFrame,1500);
 var DS_FILES=[];   // the chosen file list (from picker, folder, or drag-drop)
 function dsSetFiles(list){
  DS_FILES=Array.prototype.slice.call(list||[]);

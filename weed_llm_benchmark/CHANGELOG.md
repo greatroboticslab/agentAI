@@ -6670,3 +6670,27 @@ live page), then a real stream from the 241 robot over the public internet: 74 b
 view showing fresh frames and counts at 1–2 s latency, and the finalized dataset
 (`rl_live-20260815-162600_e46a9424`) rendering trajectory (74 GPS points), cross-sensor
 alignment on the true shared clock (72.4 s span), and anomaly cards.
+
+### v3.20.1 — the live robot stream is visible where people actually look
+
+A robot could stream into a project (v3.20.0) and the live view existed — but only as its
+own page (`/robot/live`), so opening the project showed the growing dataset entry and no
+picture. The live view now surfaces in the project page itself.
+
+- The project workspace (`/agent/{domain}`) gains a **live robot card**: hidden normally,
+  it appears within 4 s of a robot going live in THAT project — red pulsing dot, session
+  name and robot id, the camera frame refreshing every 1.5 s, per-source sample counters
+  and the honest dropped count, plus a link to the full live page. It hides again when
+  the stream ends (the finished session is then a normal dataset row below, with the
+  existing uploader-or-admin **Delete** button — robot uploads are fully user-removable:
+  one click removes registry + Mongo + files).
+- `GET /api/robot/sessions` gains a `domain` filter so the card polls only its own
+  project's sessions.
+- A **"🔴 Robot live"** button joins the workspace row (Browse data · Datasets) for
+  reaching the full live page when nothing is currently streaming.
+
+Verified on the deployed server with a synthetic live session (generated JPEG, not robot
+footage): the card appeared with `display:block`, showed the frame and
+`frames 1 · imu 10 · gps 3`, an element screenshot confirmed the rendering, and after
+`session/stop` + dataset delete the sessions list returned empty and the card's data
+source was gone. The check dataset was deleted afterwards; nothing persists.

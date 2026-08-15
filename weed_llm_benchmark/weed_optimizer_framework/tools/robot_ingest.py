@@ -489,23 +489,32 @@ async def robot_session_stop(request: Request):
 # live view (poll-based, matching the platform's no-WebSocket style)
 # --------------------------------------------------------------------------- #
 @router.get("/api/robot/sessions")
-def robot_sessions(request: Request, limit: int = 20):
+def robot_sessions(request: Request, limit: int = 20, domain: str = ""):
+    """Recent sessions, live first. `domain` scopes it to one project (the
+    project page's live card polls with its own domain)."""
+    dom = re.sub(r"[^a-z0-9_]", "", domain.lower())[:40]
     out = []
     with _LOCK:
         live = list(_SESS.values())
     for s in live:
+        if dom and s.get("domain") != dom:
+            continue
         out.append({k: s[k] for k in ("sid", "slug", "robot_id", "domain", "name",
                                       "status", "started", "last_seen", "counts",
                                       "dropped", "frame_count")})
     try:                                            # recent finished, newest first
         dirs = sorted(_uploads_root().glob("rl_*/robot_session.json"),
                       key=lambda p: p.stat().st_mtime, reverse=True)
-        for p in dirs[:max(0, limit - len(out))]:
+        for p in dirs:
+            if len(out) >= limit:
+                break
             try:
                 j = json.loads(p.read_text())
             except Exception:
                 continue
             if j.get("status") == "live":           # stale file of a live session
+                continue
+            if dom and j.get("domain") != dom:
                 continue
             out.append({k: j.get(k) for k in ("sid", "slug", "robot_id", "domain",
                                               "name", "status", "started", "last_seen",
