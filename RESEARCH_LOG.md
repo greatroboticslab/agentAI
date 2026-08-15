@@ -13,6 +13,30 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-15 — v3.20.0: robots stream live data into the platform
+
+**Context.** The lab's robots (241 testbed now, lasercar next) need their camera + sensor data flowing
+into the platform over the internet — the entry point of the data-driven loop (collect → dataset → train →
+deploy → advise). A cross-repo wire contract (241robot `docs/CLOUD_UPLINK_PLAN.md` rev 1.1) fixed the
+interface; the robot's batch mode (zip a recorded session → `POST /api/dataset/upload?modality=sensor`)
+was verified end-to-end the same day with a 60 s five-source bench session that rendered the full sensor
+diagnosis (trajectory / anomalies / cross-sensor on a true shared clock).
+
+**Change.** New `tools/robot_ingest.py` implements the live half: session lifecycle (`/api/robot/session/
+start|stop`), gzip JSON telemetry batches with `seq` dedupe and honest drop accounting, raw-JPEG frame
+posts, contract rate/size limits (429/413/507 semantics), 10-minute idle auto-finalize with 410 re-open,
+crash recovery at boot, per-session `uploads/<slug>/` storage (JSONL ground truth + frames + rolling
+platform-native CSVs), dataset registration at session start so a running stream is a visible, analyzable
+dataset — plus a 1 s-polling live view (`/robot/live`) with latest frame and per-source counters.
+
+**Verification.** A 17-check conformance suite against the deployed server (all pass, including a
+concurrent burst yielding exactly 8×200 + 8×429 `Retry-After: 1`), then the first real stream from the 241
+robot over the public internet: 74 batches / 3,596 samples / 64 camera frames in 74 s, 0 dropped, 0
+duplicates, live view fresh within 1–2 s, finalized dataset rendering trajectory (74 GPS points) and a
+72.4 s shared-clock cross-sensor span. The real run caught one defect the synthetic suite missed — CSV
+floats printed with `%.6g` collapsed epoch timestamps and zeroed the shared-clock span; fixed with
+`repr()` and re-materialized.
+
 ## 2026-08-03 — v3.19.3: making a captured conversation readable in full
 
 **Finding.** A captured conversation was displayed truncated at 600 characters with an ellipsis, inside a

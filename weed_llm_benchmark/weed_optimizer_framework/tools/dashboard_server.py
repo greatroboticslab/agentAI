@@ -16626,3 +16626,24 @@ setInterval(loadRounds, 30000);  // 30s auto-refresh
 </script>
 </body></html>'''
     return HTMLResponse(html)
+
+
+# --------------------------------------------------------------------------- #
+# v3.20.0 — robot live ingest (/api/robot/* + /robot/live): the platform half of
+# the 241robot cloud uplink (contract: 241robot docs/CLOUD_UPLINK_PLAN.md rev 1.1).
+# Kept in its own module; the monolith's helpers are injected explicitly so the
+# module has no import-time dependency back into this file.
+# --------------------------------------------------------------------------- #
+try:
+    from . import robot_ingest as _robot_ingest
+    _robot_ingest.mount(app, {
+        "repo": REPO,
+        "log": log,
+        "actor": _actor_from_request,
+        "append_manual_upload": _append_manual_upload,
+        "read_manual_uploads": _read_manual_uploads,
+        "current_round": _registry_current_round,
+    })
+    log.info("[robot] live ingest mounted (/api/robot/*, /robot/live)")
+except Exception as _e:
+    log.error(f"[robot] ingest module failed to mount: {_e}")

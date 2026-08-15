@@ -6631,3 +6631,42 @@ reach the remainder.
 Verified in a browser on a 29,352-character conversation: the listing sends 2,000 characters while
 reporting the full length, the button offers to read all of them, expanding loads the complete text
 (confirmed by matching the final line), the box grows to full height and collapses again.
+
+### v3.20.0 — robot live uplink: /api/robot/* ingest and a live view
+
+The platform half of the robot cloud uplink (cross-repo contract: 241robot
+`docs/CLOUD_UPLINK_PLAN.md` rev 1.1 + `CLOUD_UPLINK_PLATFORM_REVIEW.md`). A robot on any
+internet connection can now stream telemetry + camera frames into a project, watched live
+and finalized as a normal, analyzable platform dataset.
+
+- New module `tools/robot_ingest.py`, mounted by the dashboard at startup: `GET
+  /api/robot/ping`, `POST /api/robot/session/start`, `POST /api/robot/ingest` (gzip JSON
+  batches, `seq`-deduped, honest `dropped_since_last` accounting), `POST /api/robot/frame`
+  (raw JPEG), `POST /api/robot/session/stop`, plus a poll-based live view: `/robot/live`
+  page, `GET /api/robot/sessions`, `GET /api/robot/live/{sid}`, `GET
+  /api/robot/frame_latest/{sid}.jpg`.
+- Storage: one `uploads/<slug>/` directory per session — append-only `<source>.jsonl`
+  ground truth + `frames/<ts>.jpg` + `manifest.json`. The session is registered as a
+  dataset at **start** (`source: robot_live`), so a running stream is visible mid-flight;
+  platform-native CSVs (`gps/imu/telemetry/control`, shared absolute timestamps, §4.5
+  column mapping) are materialized every 5 minutes and at stop. Unknown sources (a future
+  lasercar `laser` feed) are stored and get a best-effort generic CSV.
+- Contract limits enforced: 4 ingest req/s + 6 frame req/s per key (429 with
+  `Retry-After`), 1 MB batch and 300 KB frame caps (413), 5 GB per-session frame quota
+  (507 — telemetry still accepted), 10-minute idle auto-finalize (the robot receives 410
+  and re-opens), and sessions left `live` by a server restart are finalized as
+  interrupted on boot. Request-body gzip is decompressed in the endpoint (the ASGI stack
+  does not do it).
+- Fix found by the first real run: CSV floats were written with `%.6g`, which collapsed
+  epoch timestamps (`1786829160.35` → `1.78683e+09`) — the cross-sensor shared-clock span
+  read 0.0 s and lat/lon lost ~10 m of precision. Floats now use `repr()` (shortest
+  round-trip); the same run re-materialized to a 72.4 s span.
+
+Verified against the deployed server: a 17-check contract-conformance suite (key auth,
+gzip + dup-seq semantics, unknown source, oversize/non-JPEG rejects, concurrent burst →
+8×200 + 8×429 with `Retry-After: 1`, post-stop 410, idempotent stop, analyzer render,
+live page), then a real stream from the 241 robot over the public internet: 74 batches /
+3,596 samples / 64 JPEG frames in 74 s with 0 drops and 0 duplicate batches, the live
+view showing fresh frames and counts at 1–2 s latency, and the finalized dataset
+(`rl_live-20260815-162600_e46a9424`) rendering trajectory (74 GPS points), cross-sensor
+alignment on the true shared clock (72.4 s span), and anomaly cards.
