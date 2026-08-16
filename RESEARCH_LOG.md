@@ -13,6 +13,24 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-15 — v3.21.0: the platform advises the driver in real time (P4)
+
+**Context.** The uplink contract reserved an advice channel: the robot polls
+`GET /api/robot/advice` while live and shows new items on its UI ticker (that half is already deployed
+on the Jetson, dormant behind a quiet-on-404 probe). The platform half — actually producing advice —
+was the last unimplemented piece of the contract.
+
+**Change.** A deterministic rule engine evaluates every accepted ingest batch (battery low, motor
+current spike, overheat, voltage sag, GPS jump, silent source, honest drop relay), with per-rule
+cooldowns; `/api/robot/advice` serves the contract shape, and advice also renders on the live page,
+the project live card, and into the finalized session's manifest. Rule-based rather than LLM-based by
+design: real-time, deterministic, explainable; big-model analysis stays the async path.
+
+**Verification.** 11-check suite against the deployed server using crafted batches: each rule fired
+with the expected text/severity (GPS jump measured 66 m), cooldowns suppressed repeats, unknown
+sessions returned the quiet empty shape, and the advice reached the snapshot API, sessions listing and
+manifest. Check data deleted afterwards.
+
 ## 2026-08-15 — v3.20.1: the live stream shows up inside the project page
 
 **Finding.** With v3.20.0 the live view existed only at `/robot/live`; opening the project during a

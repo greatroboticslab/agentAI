@@ -8126,6 +8126,7 @@ def agent_generic(domain_id: str):
      </div>
      <img id="rlv-img" alt="live camera" style="max-width:100%;border-radius:8px;margin-top:10px;display:none">
      <div id="rlv-stats" style="font-size:12px;color:#cbd5e1;margin-top:6px"></div>
+     <div id="rlv-adv" style="display:none;font-size:12px;color:#fbbf24;margin-top:4px"></div>
      <style>@keyframes rlvp{{50%{{opacity:.3}}}}</style>
    </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
@@ -8157,6 +8158,8 @@ function rlvPoll(){
   var c=live.counts||{},parts=[]; for(var k in c){parts.push(k+' '+c[k]);}
   document.getElementById('rlv-meta').textContent=(live.name||'')+' \\u00b7 '+(live.robot_id||'');
   document.getElementById('rlv-stats').textContent='frames '+(live.frame_count||0)+' \\u00b7 '+parts.join(' \\u00b7 ')+(live.dropped?' \\u00b7 dropped '+live.dropped:'');
+  var ad=document.getElementById('rlv-adv'),al=live.advice_latest;
+  if(ad){if(al&&al.text){ad.style.display='block';ad.textContent='\\u26a0 '+al.text;}else{ad.style.display='none';}}
  }).catch(function(e){});
 }
 function rlvFrame(){

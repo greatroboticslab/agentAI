@@ -6694,3 +6694,28 @@ footage): the card appeared with `display:block`, showed the frame and
 `frames 1 · imu 10 · gps 3`, an element screenshot confirmed the rendering, and after
 `session/stop` + dataset delete the sessions list returned empty and the card's data
 source was gone. The check dataset was deleted afterwards; nothing persists.
+
+### v3.21.0 — P4 advice: the platform watches the live stream and warns the driver
+
+The uplink contract's last platform-side piece. The robot's advice poller (already
+deployed on the Jetson, quiet until now) lights up automatically on its next live
+session — no robot-side changes.
+
+- New `GET /api/robot/advice?robot_id=&session_id=` (contract §5.1.4 reserved shape:
+  `{advice:[{ts,severity,text}], next_poll_s:5}`). Unknown/finished sessions get a quiet
+  `200` with an empty list, since the robot's poller reads `404` as "not deployed".
+- A deterministic rule engine runs on every accepted ingest batch (in-process, no LLM,
+  per-rule cooldowns so it's a heads-up, not a siren): battery ≤20 % / ≤10 %, motor
+  current ≥12 A (possible stall), controller ≥60 °C, voltage sag ≥1.5 V within ~10 s,
+  GPS jump >30 m between consecutive fixes, a declared source silent >20 s (camera
+  >30 s), and honest relay of the robot's own `dropped_since_last` report.
+- Advice is visible everywhere the stream is: the `/robot/live` page gains an amber
+  Advice card, the project page's live card shows the latest line, the live snapshot
+  API carries the last five, and the finalized session's `manifest.json` archives the
+  full list.
+
+Verified on the deployed server with crafted batches: an 11-check suite — battery,
+current-spike, GPS-jump (66 m) and drop-report all fire with the expected texts and
+severities, the cooldown suppresses repeats, unknown sessions return the quiet empty
+shape, `next_poll_s=5`, and the advice list lands in the live snapshot, the sessions
+listing, and the manifest. The check dataset was removed afterwards.

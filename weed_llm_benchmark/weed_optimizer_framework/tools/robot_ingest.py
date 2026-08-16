@@ -25,6 +25,7 @@ sessions found still "live" at server start are finalized as interrupted.
 """
 import gzip
 import json
+import math
 import re
 import secrets
 import threading
@@ -53,6 +54,17 @@ SESSION_DISK_CAP = 5 * 1024 ** 3   # frames stop with 507 above this; telemetry 
 INGEST_RPS, FRAME_RPS = 4, 6       # per-actor token buckets (contract §review 2.6)
 IDLE_CLOSE_S = 600                 # auto-finalize after 10 min silence
 CSV_ROLL_S = 300                   # re-materialize CSVs every 5 min while live
+
+# ---- P4 advice: rule thresholds (evaluated on every accepted batch) ----------
+ADVICE_MAX = 40                    # per-session advice kept (robot dedupes by ts|text)
+ADV_BATTERY_WARN = 20              # percent
+ADV_BATTERY_URGENT = 10
+ADV_CURRENT_A = 12.0               # amps — possible stall (idle measured ~2 A)
+ADV_TEMP_C = 60.0
+ADV_SAG_V = 1.5                    # volts dropped within ~10 s
+ADV_GPS_JUMP_M = 30.0              # metres between consecutive fixes (~1 Hz)
+ADV_SILENT_S = 20                  # a declared source stopped arriving
+ADV_FRAME_SILENT_S = 30
 
 _SID_RE = re.compile(r"^rs_[a-f0-9]{16}$")
 
@@ -301,6 +313,7 @@ def _finalize(s: dict, robot_counts=None, interrupted=False):
             "started": s["started"], "ended": time.time(), "counts": s["counts"],
             "dropped_reported": s["dropped"], "frame_count": s["frame_count"],
             "frame_bytes": s["frame_bytes"], "meters_per_count": s.get("meters_per_count"),
+            "advice": s.get("advice") or [],
             "robot_counts": robot_counts, "interrupted": interrupted}, indent=1))
     except Exception:
         pass
@@ -315,6 +328,101 @@ def _finalize(s: dict, robot_counts=None, interrupted=False):
     _log().info(f"[robot] session {s['sid']} finalized -> {s['slug']} "
                 f"(counts={s['counts']} frames={s['frame_count']}"
                 f"{' INTERRUPTED' if interrupted else ''})")
+
+
+# --------------------------------------------------------------------------- #
+# P4 advice — deterministic real-time checks on the incoming stream. Runs on
+# every accepted batch (cheap, in-process); each rule has a cooldown so the
+# driver gets a heads-up, not a siren. The robot polls /api/robot/advice and
+# shows these on its own UI ticker.
+# --------------------------------------------------------------------------- #
+def _emit_advice(s: dict, key: str, severity: str, text: str, cooldown: float):
+    now = time.time()
+    if now - s["adv"]["cool"].get(key, 0) < cooldown:
+        return
+    s["adv"]["cool"][key] = now
+    s["advice"].append({"ts": round(now, 3), "severity": severity, "text": text[:280]})
+    if len(s["advice"]) > ADVICE_MAX:
+        s["advice"] = s["advice"][-ADVICE_MAX:]
+
+
+def _advise(s: dict, by_src: dict, dropped_new: int):
+    """Called with the session lock held, after a batch was appended."""
+    now = time.time()
+    adv = s["adv"]
+    for src, rows in by_src.items():
+        adv["src_ts"][src] = rows[-1].get("ts") or now
+    # a declared source went quiet while others still flow
+    for src in s["sources"]:
+        if src == "camera":
+            continue
+        t0 = adv["src_ts"].get(src)
+        if t0 and now - t0 > ADV_SILENT_S:
+            _emit_advice(s, "silent-" + src, "info",
+                         "'%s' has been silent for %d s" % (src, int(now - t0)), 120)
+    if "camera" in s["sources"] and s["latest_frame_ts"] \
+            and now - s["latest_frame_ts"] > ADV_FRAME_SILENT_S:
+        _emit_advice(s, "silent-camera", "info",
+                     "camera frames stopped %d s ago" % int(now - s["latest_frame_ts"]), 120)
+    for r in (by_src.get("telemetry") or []):
+        d = r.get("data") or {}
+        ts = r.get("ts") or now
+        try:
+            pct = float(d.get("percent"))
+        except (TypeError, ValueError):
+            pct = None
+        if pct is not None and pct <= ADV_BATTERY_URGENT:
+            _emit_advice(s, "bat10", "warn",
+                         "Battery at %d%% — return to charge now" % pct, 300)
+        elif pct is not None and pct <= ADV_BATTERY_WARN:
+            _emit_advice(s, "bat20", "warn",
+                         "Battery at %d%% — plan to head back" % pct, 300)
+        try:
+            cur = max(abs(float(d.get("currentL") or 0)), abs(float(d.get("currentR") or 0)))
+        except (TypeError, ValueError):
+            cur = 0.0
+        if cur >= ADV_CURRENT_A:
+            _emit_advice(s, "stall", "warn",
+                         "Motor current spike (%.1f A) — possible stall or obstacle" % cur, 60)
+        try:
+            tc = float(d.get("temp"))
+        except (TypeError, ValueError):
+            tc = None
+        if tc is not None and tc >= ADV_TEMP_C:
+            _emit_advice(s, "hot", "warn",
+                         "Controller temperature %.0f °C — let it cool down" % tc, 300)
+        try:
+            v = float(d.get("voltage"))
+        except (TypeError, ValueError):
+            v = None
+        if v is not None:
+            adv["volts"].append((ts, v))
+            adv["volts"] = [x for x in adv["volts"] if ts - x[0] <= 12]
+            aged = [x for x in adv["volts"] if ts - x[0] >= 8]
+            if aged and aged[0][1] - v >= ADV_SAG_V:
+                _emit_advice(s, "sag", "warn",
+                             "Voltage sagged %.1f V → %.1f V within ~10 s"
+                             % (aged[0][1], v), 180)
+    for r in (by_src.get("gps") or []):
+        d = r.get("data") or {}
+        lat = d.get("pi_lat") if d.get("pi_lat") is not None else d.get("board_lat")
+        lon = d.get("pi_lon") if d.get("pi_lon") is not None else d.get("board_lon")
+        ts = r.get("ts") or now
+        if lat is None or lon is None:
+            continue
+        prev = adv.get("gps")
+        if prev and ts - prev[0] <= 5:
+            dx = (lon - prev[2]) * 111320.0 * math.cos(math.radians(lat))
+            dy = (lat - prev[1]) * 110540.0
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist > ADV_GPS_JUMP_M:
+                _emit_advice(s, "gpsjump", "warn", "GPS jumped %.0f m at %s" %
+                             (dist, time.strftime("%H:%M:%S", time.localtime(ts))), 60)
+        adv["gps"] = (ts, lat, lon)
+    if dropped_new > 0:
+        _emit_advice(s, "drops", "info",
+                     "Uplink dropped %d samples since the last batch (link congestion)"
+                     % dropped_new, 120)
 
 
 # --------------------------------------------------------------------------- #
@@ -372,6 +480,7 @@ async def robot_session_start(request: Request):
          "started": time.time(), "last_seen": time.time(), "last_seq": 0,
          "counts": {}, "dropped": 0, "frame_count": 0, "frame_bytes": 0,
          "latest": {}, "latest_frame_ts": None, "last_csv": 0.0, "n_files": 0,
+         "advice": [], "adv": {"cool": {}, "gps": None, "volts": [], "src_ts": {}},
          "status": "live", "lock": threading.Lock()}
     with _LOCK:
         _SESS[sid] = s
@@ -434,7 +543,25 @@ async def robot_ingest(request: Request):
             s["counts"][src] = s["counts"].get(src, 0) + len(rows)
             last = rows[-1]
             s["latest"][src] = {"ts": last.get("ts"), "data": last.get("data") or {}}
+        try:
+            _advise(s, by_src, int(body.get("dropped_since_last") or 0))
+        except Exception as e:
+            _log().warning(f"[robot] advice rules failed: {e}")
     return JSONResponse({"ok": True, "received": n})
+
+
+@router.get("/api/robot/advice")
+def robot_advice(request: Request, robot_id: str = "", session_id: str = ""):
+    """P4: the robot polls this while live and shows new items on its ticker.
+    It dedupes by (ts, text), so returning the recent list every time is safe.
+    Always 200 with an empty list for unknown/finished sessions — the robot's
+    poller treats 404 as 'endpoint not deployed'."""
+    s = _session(session_id)
+    if not s:
+        return JSONResponse({"ok": True, "advice": [], "next_poll_s": 10})
+    with s["lock"]:
+        items = list(s["advice"])[-15:]
+    return JSONResponse({"ok": True, "advice": items, "next_poll_s": 5})
 
 
 @router.post("/api/robot/frame")
@@ -499,9 +626,11 @@ def robot_sessions(request: Request, limit: int = 20, domain: str = ""):
     for s in live:
         if dom and s.get("domain") != dom:
             continue
-        out.append({k: s[k] for k in ("sid", "slug", "robot_id", "domain", "name",
-                                      "status", "started", "last_seen", "counts",
-                                      "dropped", "frame_count")})
+        row = {k: s[k] for k in ("sid", "slug", "robot_id", "domain", "name",
+                                 "status", "started", "last_seen", "counts",
+                                 "dropped", "frame_count")}
+        row["advice_latest"] = s["advice"][-1] if s.get("advice") else None
+        out.append(row)
     try:                                            # recent finished, newest first
         dirs = sorted(_uploads_root().glob("rl_*/robot_session.json"),
                       key=lambda p: p.stat().st_mtime, reverse=True)
@@ -544,6 +673,7 @@ def robot_live(request: Request, sid: str):
             "last_seen_s": round(time.time() - s["last_seen"], 1),
             "counts": s["counts"], "dropped": s["dropped"], "seq": s["last_seq"],
             "frame_count": s["frame_count"], "frame_bytes": s["frame_bytes"],
+            "advice": list(s["advice"])[-5:],
             "latest": s["latest"], "latest_frame_ts": s["latest_frame_ts"],
             "frame_url": ("/api/robot/frame_latest/%s.jpg" % sid
                           if s["latest_frame_ts"] else None)})
@@ -586,6 +716,10 @@ _LIVE_PAGE = r'''<!doctype html><html><head><meta charset="utf-8">
 <div class="row"><select id="pick"></select>
  <span class="kv" id="meta"></span></div>
 <div class="card"><img id="frame" alt="waiting for the first camera frame…"></div>
+<div class="card" id="advbox" style="display:none;border-color:#d97706">
+  <b style="font-size:13px">&#9888; Advice</b>
+  <div id="advlist" style="font-size:12.5px;margin-top:6px;line-height:1.6"></div>
+</div>
 <div class="card"><div class="row" id="stats"></div></div>
 <div class="card kv" id="latest" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px"></div>
 <script>
@@ -619,6 +753,15 @@ async function tick(){
       kv('seq',d.seq)+kv('frames',d.frame_count)+kv('dropped',d.dropped)+
       Object.keys(c).map(k=>kv(k,c[k])).join('');
     if(d.frame_url){document.getElementById('frame').src=d.frame_url+'?t='+Date.now();}
+    const A=d.advice||[];
+    const ab=document.getElementById('advbox');
+    if(A.length){ab.style.display='block';
+      document.getElementById('advlist').textContent='';
+      A.slice().reverse().forEach(a=>{const dv=document.createElement('div');
+        dv.textContent='['+a.severity+'] '+new Date(a.ts*1000).toLocaleTimeString()+' — '+a.text;
+        if(a.severity==='warn')dv.style.color='#f59e0b';
+        document.getElementById('advlist').appendChild(dv);});}
+    else{ab.style.display='none';}
     const L=d.latest||{};
     document.getElementById('latest').textContent=Object.keys(L).map(
       k=>k.padEnd(10)+JSON.stringify(L[k].data)).join('\n');
@@ -674,6 +817,8 @@ def _recover():
             j.setdefault("frame_count", 0)
             j.setdefault("frame_bytes", 0)
             j.setdefault("n_files", 0)
+            j.setdefault("advice", [])
+            j.setdefault("adv", {"cool": {}, "gps": None, "volts": [], "src_ts": {}})
             _log().info(f"[robot] recovering interrupted session {j.get('sid')}")
             with _LOCK:
                 _SESS[j["sid"]] = j
