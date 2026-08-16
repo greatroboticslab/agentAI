@@ -1051,6 +1051,10 @@ def _warm_cluster_master():
 @app.middleware("http")
 async def _inject_responsive_css(request: Request, call_next):
     resp = await call_next(request)
+    # v3.22: /drive/* proxies the ROBOT's own console pages — pass them through
+    # byte-for-byte (no platform CSS/nav/badge, no body buffering).
+    if request.url.path.startswith("/drive/"):
+        return resp
     ctype = (resp.headers.get("content-type", "") or "").lower()
     if "text/html" not in ctype:
         return resp
@@ -8130,7 +8134,7 @@ def agent_generic(domain_id: str):
      <style>@keyframes rlvp{{50%{{opacity:.3}}}}</style>
    </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
-   <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+   <div id="wsrow" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/slugs?domain=__DOM__">Datasets</a>
      <a class="btn" style="margin-top:0;background:#fef2f2;color:#dc2626" href="/robot/live">&#128308; Robot live</a>
@@ -8169,6 +8173,18 @@ function rlvFrame(){
   im.src='/api/robot/frame_latest/'+_rlvSid+'.jpg?t='+Date.now();}
 }
 rlvPoll(); setInterval(rlvPoll,4000); setInterval(rlvFrame,1500);
+// v3.22: Drive button — appears when this project has a drivable robot behind
+// the platform's /drive proxy (no Tailscale needed on the viewer's device).
+fetch('/api/robot/drive_targets?domain=__DOM__',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+ var row=document.getElementById('wsrow'); if(!row)return;
+ ((d&&d.targets)||[]).forEach(function(t){
+  var a=document.createElement('a'); a.className='btn'; a.target='_blank';
+  a.style.cssText='margin-top:0;background:#0f172a;color:#e2e8f0';
+  a.href='/drive/'+encodeURIComponent(t.robot)+'/m';
+  a.textContent='\\ud83c\\udfae Drive '+(t.label||t.robot);
+  row.appendChild(a);
+ });
+}).catch(function(e){});
 var DS_FILES=[];   // the chosen file list (from picker, folder, or drag-drop)
 function dsSetFiles(list){
  DS_FILES=Array.prototype.slice.call(list||[]);
@@ -16683,3 +16699,13 @@ try:
     log.info("[robot] live ingest mounted (/api/robot/*, /robot/live)")
 except Exception as _e:
     log.error(f"[robot] ingest module failed to mount: {_e}")
+
+# v3.22.0 — platform-relayed robot driving (uplink contract P6/§8.2): any signed-in
+# user drives the robot console through /drive/<robot>/* — the platform (a tailnet
+# member) proxies to the robot's tailnet address; viewers install nothing.
+try:
+    from . import robot_proxy as _robot_proxy
+    _robot_proxy.mount(app, {"log": log})
+    log.info("[drive] robot console proxy mounted (/drive/*)")
+except Exception as _e:
+    log.error(f"[drive] proxy module failed to mount: {_e}")

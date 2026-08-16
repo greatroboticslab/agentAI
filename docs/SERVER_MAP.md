@@ -45,7 +45,7 @@ Server-rendered HTML (f-strings) + JSON APIs. Boots without torch (see `requirem
 - **Synth:** `synth_cutpaste.py` · `synth_diffusion.py`/`flux_lora_train.py` (FLUX).
 - **Models/LLM:** `model_router.py` (role→model→where) · `llm_providers.py` (stdlib LLM abstraction) · `model_discovery.py` · `vlm_pool.py` · `web_identifier.py`.
 - **Analysis agent:** `tools/analysis_agent.py` (grounded tool registry incl. `suspicious_labels` montage, planner, deterministic narrator) · `tools/code_analyst.py` (codegen sandbox: AST whitelist → rlimit subprocess → wall-clock kill; staged CSV copies; self-repair ≤2; also runs user code for the workbench).
-- **Robot uplink:** `tools/robot_ingest.py` (live `/api/robot/*` ingest + live view; dashboard injects its helpers via `mount(app, ctx)` — no import back into the monolith) · `tools/share_capture.py` (headless-Firefox reader for AI share pages).
+- **Robot uplink:** `tools/robot_ingest.py` (live `/api/robot/*` ingest + live view; dashboard injects its helpers via `mount(app, ctx)` — no import back into the monolith) · `tools/robot_proxy.py` (v3.22: `/drive/{robot}/*` reverse proxy to allow-listed tailnet robot consoles from `~/.robot_targets.json`; streams via `read1()`; sends `X-Forwarded-Prefix`, re-prefixes `Location`, scopes `Set-Cookie` to `/drive/<robot>`, strips the platform session cookie; `/drive/*` is exempt from the global HTML injection; `GET /api/robot/drive_targets?domain=` feeds the project-page 🎮 Drive button) · `tools/share_capture.py` (headless-Firefox reader for AI share pages).
 
 ## Core data flows
 1. **Create project:** `POST /api/agent/create` → `db` writes domain (Mongo). Auto-derives harvest queries + accept-vocab from research field. Redirects to `/agent/{domain}`.

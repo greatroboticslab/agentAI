@@ -13,6 +13,25 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-16 — v3.22.0: drive the robot from a plain browser (P6 platform relay)
+
+**Finding.** Remote driving required Tailscale on every viewer's device — the robot console sits on a
+tailnet-only address the public internet cannot reach. The operator proposed the right product shape:
+the project's demo page should present the exact driving console with no installs; what that needs
+technically is a reverse proxy, since an embedded page still loads from the *viewer's* machine.
+
+**Change.** New `tools/robot_proxy.py`: `/drive/{robot}/*` relays every method to an allow-listed robot
+target (never arbitrary URLs), streaming via `read1()`, with `X-Forwarded-Prefix` for the robot to emit
+prefixed URLs, Location re-prefixing, Set-Cookie path scoping, platform-session-cookie stripping, a
+`/drive/*` exemption from the global HTML injection, a friendly powered-off page, and a "🎮 Drive"
+button on the project page. Two gates remain: platform login, then the robot's own password page.
+
+**Verification.** 13-check suite against the live server with a contract-faithful mock robot — all
+pass; a real streaming-latency defect was found and fixed (`read()` blocked until 8 KB accumulated:
+four reads took 12.8 s, `read1()` takes 1.2 s). The real robot target, powered off, renders the offline
+page. Remaining for end-to-end: the robot's pages honoring `X-Forwarded-Prefix` (robot side, agreed)
+and the joint live-drive test at next power-on.
+
 ## 2026-08-15 — v3.21.0: the platform advises the driver in real time (P4)
 
 **Context.** The uplink contract reserved an advice channel: the robot polls

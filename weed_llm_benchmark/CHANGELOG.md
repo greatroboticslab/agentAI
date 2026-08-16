@@ -6719,3 +6719,37 @@ current-spike, GPS-jump (66 m) and drop-report all fire with the expected texts 
 severities, the cooldown suppresses repeats, unknown sessions return the quiet empty
 shape, `next_poll_s=5`, and the advice list lands in the live snapshot, the sessions
 listing, and the manifest. The check dataset was removed afterwards.
+
+### v3.22.0 — drive the robot from a plain browser: the platform relays (P6)
+
+Driving remotely required every person to install Tailscale — the robot console lives
+on a tailnet address (100.x) that the public internet cannot route to. The platform
+server is itself a tailnet member, so it now relays: any signed-in platform user opens
+`/drive/robot241/m` and drives through two gates (platform login, then the robot's own
+password page). Zero installs for viewers; the operator's product idea, verbatim.
+
+- New module `tools/robot_proxy.py`: `/drive/{robot}/{path}` streams every method
+  through to the robot's console. Targets come from `~/.robot_targets.json` — an
+  explicit allow-list (`robot241 → http://100.97.4.109:5014`), never arbitrary URLs.
+- Proxy contract for the robot side: the prefix is stripped (the robot keeps serving
+  `/m`, `/status`, …) and `X-Forwarded-Prefix: /drive/<robot>` is sent so the robot can
+  emit prefixed URLs; `Location: /...` redirects are re-prefixed; `Set-Cookie` gets
+  `Path=/drive/<robot>` so the console cookie rides only on proxied requests; the
+  platform's own session cookie is stripped before forwarding.
+- Streaming uses `read1()` (bytes as they arrive). The first implementation used
+  `read(8192)`, which blocks until a full 8 KB accumulates — a slow stream trickled
+  through at ~4 s per read; with `read1()` the same probe streams in real time
+  (12.8 s → 1.2 s for four reads). MJPEG camera passes through live.
+- `/drive/*` is exempt from the global HTML injection (the robot's pages arrive
+  byte-for-byte, no platform nav/CSS), and a friendly 502 page explains when the robot
+  is powered off. The project page grows a **"🎮 Drive"** button (via
+  `GET /api/robot/drive_targets?domain=`) next to Browse data / Datasets / Robot live.
+
+Verified against the live server with a contract-faithful mock robot (13 checks):
+root redirect, HTML byte-passthrough with no injection, `X-Forwarded-Prefix` received,
+platform-cookie stripping, Location rewrite, Set-Cookie path scoping, POST body
+round-trip, real-time streaming, friendly 502, unknown-robot 404, unauthenticated
+401, and domain-scoped drive targets. The real `robot241` target (powered off at the
+time) renders the offline page. The joint live-drive test runs when the robot powers
+on; full function inside the proxy needs the robot's pages to honor
+`X-Forwarded-Prefix` (robot-side change, agreed in the contract).
