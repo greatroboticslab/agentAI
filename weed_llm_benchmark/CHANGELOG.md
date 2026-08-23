@@ -6773,3 +6773,17 @@ Two consolidation documents distilled from the full git history (558 commits,
   M0–M4 (honest re-measurement, continuous-loop revival, one-script results package,
   end-to-end robot→train→deploy story, hygiene: Kaggle token rotation still open in
   public git history, license sweep, environment pin).
+
+### v3.22.2 — docs: the SuperWeed campaign master plan
+
+`docs/SUPERWEED_PLAN.md` operationalizes SCIENCE_AUDIT's M0–M4 into an executable
+campaign: revive the double-agent loop at scale via autonomous web harvest → curation →
+multi-method training, run platform-first as the `weed` project. Defines success
+criteria (≥50K unique audited detection images; honest mean±std headline over ≥3 method
+families incl. Mamba-YOLO; compounding chart on the project page; one-script figures),
+seven standing constraints (holdout sanctity, log-verified honesty, locked registry,
+cluster etiquette, ≤4,000 SU envelope, license governance, platform-first operation),
+phases S0–S6 with per-phase budgets and verifiable gates, the supervision-tick protocol
+for unattended 24/7 operation, and a risk register grounded in previously observed
+failures (garbage floods, pseudo-label noise at scale, registry corruption, SSH
+throttling, package drift).

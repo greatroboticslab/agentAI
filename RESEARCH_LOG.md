@@ -13,6 +13,17 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-22 — v3.22.2: the SuperWeed campaign plan
+
+**Change.** `docs/SUPERWEED_PLAN.md` — the executable campaign that operationalizes the audit's
+milestones: S0 baseline/hygiene + the honest re-measurement, S1 supervised collector revival with
+per-source audit gates and quarantine-with-reason, S2 curation hardening, S3 a budgeted multi-method
+trainer matrix (YOLO11 family, RF-DETR, Mamba-YOLO-T, ensembles) that re-plots the scale-vs-quality
+curve as tiers land, S4 the unattended continuous double-agent mode with a compounding chart and a
+24 h soak gate, S5 a one-script results package, S6 deployment integration. Includes standing
+constraints, per-phase SU envelopes (campaign ≤4,000 SU), a supervision-tick protocol for 24/7
+operation, and a risk register built from previously observed failure modes.
+
 ## 2026-08-22 — v3.22.1: consolidating the double-agent record + scientific audit
 
 **Context.** The concurrent Collector⇄Trainer system (autonomous web harvest + parallel training with
