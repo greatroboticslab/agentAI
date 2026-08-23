@@ -407,6 +407,15 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                         f"reason: {(user_flags[ds_name] or {}).get('reason','')[:80]}")
             continue
 
+        # v3.22.9: registry-level quarantine (SUPERWEED_PLAN S1) — sources parked
+        # with a reason (off-goal, failed sample audit, license problem) never
+        # train, but are kept on disk and listed grey in the UI, not deleted.
+        if str(info.get("status")) == "quarantined":
+            stats["skipped_quarantined"] = stats.get("skipped_quarantined", 0) + 1
+            logger.info(f"[Merge] {ds_name} QUARANTINED — skipped. reason: "
+                        f"{str(info.get('quarantine_reason'))[:80]}")
+            continue
+
         # v3.0.99.28 (D): DINOv2 quality gate — drop low-similarity slugs when the
         # clean-subset experiment sets min_dino_score. A slug with NO score is kept
         # (don't penalize unscored data); only an explicit below-threshold score skips.

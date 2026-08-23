@@ -13,6 +13,16 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-23 — v3.22.9: cluster arm repaired, licenses 38/45, scheduler deployed
+
+**Change.** The dashboard's cluster-control path was repaired (missing askpass file for the
+SSH_ASKPASS+ControlMaster design — live SLURM state now answers in ~4 s), the license audit went from
+0/45 to 38/45 explicit licenses via a new source-API resolver (33× CC BY 4.0; capture now happens at
+collection), quarantine-with-reason replaced deletion as the garbage mechanism (merge skips quarantined
+sources with a counted stat), and the unattended round scheduler shipped disabled-by-default — the same
+ledger the project page's compounding chart reads. The campaign's first harvest round was fired through
+the platform action itself, proving the repaired arm end-to-end.
+
 ## 2026-08-23 — v3.22.8: parallel progress while M1 trains
 
 **Change.** The reproducibility package (`make_figures.py` — every figure/table from anchored,

@@ -6930,3 +6930,36 @@ comparison. S1 harvesting therefore starts at the next supervision tick, not now
   dedicated `mambayolo` conda env (torch 2.3/cu121), repo clone, `selective_scan`
   CUDA extension compiled for sm90. Result checked at the next tick; the pinned
   `bench` env is untouched.
+
+### v3.22.9 — the platform's cluster arm repaired; license backfill; quarantine; the S4 scheduler
+
+A continuous work block while M1 trains (all six seeds running on h100). Four pieces:
+
+- **Platform→cluster control repaired.** The dashboard's cluster path (v3.0.99.41
+  design: SSH_ASKPASS password + ControlMaster multiplexing) was dead because the
+  askpass file the service points at was missing its current password. Restored;
+  `/api/cluster_status` now answers in ~4 s with live SLURM state through the
+  multiplexed master. This is the foundation every agent card, train submit, and the
+  new scheduler stand on. (Transfer note recorded for operators: Bridges-2 has BOTH
+  scp paths disabled — SFTP subsystem off and no remote scp binary — so file transfer
+  is inline base64 over ssh, the pattern the repo has used since March.)
+- **License backfill (M0): 0/45 → 38/45 datasets with an explicit license.** New
+  `tools/license_audit.py` resolves licenses from the source APIs by slug convention
+  (Roboflow/Kaggle/GitHub/HF) — mix: 33× CC BY 4.0, 3× public domain, 1× MIT,
+  1× AGPL-3.0; 7 unresolved/unreachable stay non-redistributable. Wired into
+  `dataset_discovery` so every future harvest captures license at collection; the
+  first platform-fired harvest of the campaign (job 44236325) runs with it.
+- **Quarantine instead of deletion (S1):** `tools/quarantine.py` (mark/unmark/list,
+  reasons, reversible, locked registry writes) + `mega_trainer` skips
+  `status=quarantined` with a `skipped_quarantined` stat.
+- **`tools/round_scheduler.py` (S4 logic half):** per-project unattended
+  collect→filter→train→eval cycling over the rounds ledger — fires the same cluster
+  actions the agent cards fire, records real job ids, polls SLURM, attaches the
+  holdout metric from the train artifact, per-day round cap, 2-failure stop-loss,
+  disabled by default (`/api/rounds/scheduler`, admin). Deployed and mounted; the
+  weed domain stays OFF until M1 completes (GPU budget discipline). The S4 soak gate
+  runs after that.
+
+Also: `make_figures.py` updated for the post-backfill license schema (a KeyError I
+introduced an hour earlier), and the first S1 harvest was fired **through the platform
+action** (submitted 4.3 s → job 44236325, capped at 5 new datasets for gate testing).

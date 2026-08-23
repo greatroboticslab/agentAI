@@ -136,9 +136,9 @@ def main():
         lines.append("- **%s** — %s · guard: %s · %s" %
                      (p["label"], state, p["guard"], p["anchor"]))
     ls = d["license_sweep_2026_08_23"]
-    lines.append("\n## Data governance (license sweep 2026-08-23)")
-    lines.append("- %d registry datasets, **%d with a recorded license**; sources: %s" %
-                 (ls["datasets"], ls["license_recorded"], ls["sources"]))
+    lines.append("\n## Data governance (license audit + backfill, 2026-08-23)")
+    lines.append("- %d registry datasets, **%d with an explicit license after backfill**; mix: %s" %
+                 (ls["datasets"], ls["license_recorded_after_backfill"], ls["mix"]))
     lines.append("- Consequence: %s" % ls["consequence"])
     (OUT / "summary.md").write_text("\n".join(lines) + "\n")
 

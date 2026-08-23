@@ -730,6 +730,17 @@ class DatasetDiscovery:
                 # v3.0.108: tag with the harvest's domain (defaults to "weed")
                 "domain": getattr(self, "_harvest_domain", "weed"),
             }
+            # v3.22.9 (S1 gate): capture the source license AT collection time —
+            # the 2026-08-23 audit found 0/45 datasets with any license record.
+            try:
+                from .license_audit import detect_license
+                prov = self.registry["datasets"][name].get("provenance") or {}
+                if not prov.get("license") or prov.get("license") in ("unresolved", "unreachable"):
+                    prov.update(detect_license(name))
+                    prov["license_checked_at"] = datetime.now().isoformat()
+                    update_dict["provenance"] = prov
+            except Exception as e:
+                logger.warning(f"[Dataset] {name}: license capture failed: {e}")
             # Only WRITE class_names if we extracted any — never clobber a
             # previously curated set with [].
             if extracted_class_names:

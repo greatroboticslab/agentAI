@@ -16758,3 +16758,23 @@ try:
     log.info("[drive] robot console proxy mounted (/drive/*)")
 except Exception as _e:
     log.error(f"[drive] proxy module failed to mount: {_e}")
+
+# v3.22.9 — unattended round scheduler (SUPERWEED_PLAN S4): per-project continuous
+# collect→filter→train→eval cycling over the rounds ledger, disabled by default,
+# admin-toggled, stop-loss guarded. The project page's compounding chart reads the
+# same ledger the scheduler writes.
+try:
+    from . import round_scheduler as _round_scheduler
+    from . import db as _rs_db
+    _round_scheduler.mount(app, {
+        "log": log,
+        "db": _rs_db,
+        "actor": _actor_from_request,
+        "is_admin": _is_admin,
+        "record_step": _rs_db.record_round_step,
+        "slurm": _slurm,
+        "slurm_sh": (lambda s, timeout=60: _slurm(["bash", "-lc", s], timeout)),
+    })
+    log.info("[rounds] scheduler mounted (disabled by default; /api/rounds/scheduler)")
+except Exception as _e:
+    log.error(f"[rounds] scheduler failed to mount: {_e}")
