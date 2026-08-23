@@ -6879,3 +6879,23 @@ Submitted as job 44228844 (`TIER=curated`, `MIN_DINO_SCORE=0.50`, seeds 101/102/
 The raw tier (jobs 44224995_1, 44225260_2/3) is training on 55,690 merged images
 against the 1,977-image sealed holdout, with `seed=101/102/103` confirmed live in the
 ultralytics configuration — the v3.22.3 passthrough works.
+
+### v3.22.7 — walltime arithmetic caught mid-flight: M1 moved to uniform H100
+
+Live supervision of the running M1 arrays surfaced a planning error before it corrupted
+the comparison. Measured per-epoch times on V100 (from each run's `results.csv`): the
+curated tier (~17.9k images) trains at ~17 min/epoch, but the raw tier (55,690 images,
+`yolo26x`) needs ~75–90 min/epoch — 60 epochs ≈ **75 hours**, which fits neither the
+12 h submitted walltime nor the partition's 48 h ceiling. Left alone, raw would have
+been walltime-killed near epoch 9 while curated reached ~40: two tiers at wildly
+unequal optimization, and a kill during `model.train()` also means the end-of-run
+artifact (with the holdout-guard counters) is never written.
+
+Correction, keeping the pre-registered protocol (60 epochs, identical hyperparameters,
+sealed 1,977-image holdout) unchanged: both tiers resubmitted on **h100-80** — the same
+hardware for both, so the tier comparison carries no device confound — as jobs 44234060
+(raw, 36 h ceiling) and 44234063 (curated, 12 h). Estimated cost ≈156 SU at the H100
+rate; the cancelled V100 attempt consumed ≈13 SU. Live snapshot before cancellation,
+for the record: curated at epochs 4–5 already read holdout mAP50-95 0.540–0.567; raw at
+epoch 1 read 0.533–0.562 — too early to mean anything, noted only as the state at the
+moment of the switch.
