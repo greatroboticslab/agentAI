@@ -168,10 +168,10 @@ its metric says.
 
 | Phase | State | Closed on |
 |---|---|---|
-| S0 | **in progress** — audit done, token installed, registry backed up, M1 submitted (jobs 44224995 raw / 44224997 curated, 3 seeds each); pending: `requirements.lock`, M1 results | — |
-| S1 | not started | — |
-| S2 | not started | — |
+| S0 | **CLOSED** — audit+backup ✅ tokens ✅ requirements.lock ✅ M1 sealed re-measurement published (raw 0.6032±0.0046, curated 0.5894±0.0025, guard verified, RESEARCH_LOG 2026-08-23) | 2026-08-23 |
+| S1 | in progress — round 1 done (platform-fired, 3 real weed sets +2,847 imgs, 2 off-goal quarantined); hardening queued (strict topic mode, hf_id-based license resolve, auto-backfill in scheduler) | — |
+| S2 | partial — DINOv2 scoring shipped (45/45), threshold rule pre-registered; full-pool dedup/taxonomy pending | — |
 | S3 | not started | — |
 | S4 | not started | — |
-| S5 | not started | — |
+| S5 | partial — make_figures.py live and auto-filling; byte-stability gate pending | — |
 | S6 | not started | — |

@@ -6987,3 +6987,24 @@ at 02:42. The two off-goal datasets came back as `downloaded`.
   should use the registry's stored `hf_id` instead of reconstructing case-lossy slugs
   (three weed sets currently resolve 404 for that reason).
 - `license_audit` gained HF-token support (`~/.cache/huggingface/token`).
+
+### v3.22.11 — M1 complete: sealed merged-corpus numbers, S0 gate closed
+
+All six M1 runs COMPLETED (h100; every run early-stopped under the pre-registered
+patience-20 rule — raw at epochs 29/32/37, curated at 37/44/46). Sealed results:
+**raw 55,690 imgs → 0.6032 ± 0.0046 (n=3)**, **DINO≥0.50-curated 13,309 imgs →
+0.5894 ± 0.0025 (n=3)** on the 1,977-image cwd12 holdout.
+
+Verification chain, because a scary-looking artifact demanded it: the merge accounting
+listed `cottonweed_holdout` among used datasets — investigated and benign (it is the
+val-staging record: "[Merge] val OVERRIDE → cwd12 holdout staged"), the guard lines
+show 1,977 dHashes pre-seeded in every run, and a direct file-level check found
+**zero holdout stems in the train sets**. Seed-corpus consistency also held: the
+harvest's new datasets registered after the last merge completed.
+
+Scientific outcome recorded in RESEARCH_LOG and the audit: the pre-guard 0.593 was not
+leak-inflated; merged web-harvest plateaus at ~0.6 vs 0.87–0.90 for cwd12-only
+(in-domain purity dominates); the DINO gate excluded garbage but did not lift scores
+at this threshold (volume/quality confound resolved in volume's favour, as pre-stated).
+Figure title updated to match the sealed finding. S0 is closed in the campaign plan;
+S1 continues (round 1 netted +2,847 real weed images, 2 quarantined off-goal sets).

@@ -47,20 +47,22 @@
   {
    "label": "M1 raw · 55.7K merged (sealed)",
    "train_images": 55690,
-   "map50_95": null,
+   "map50_95": 0.6032,
    "n_seeds": 3,
-   "pending": true,
+   "pending": false,
    "guard": "SEALED (1,977 holdout dHashes pre-seeded)",
-   "anchor": "jobs 44234060_[1-3], yolo26x 60 ep, seeds 101/102/103"
+   "anchor": "jobs 44234060_[1-3] (h100, yolo26x@640, patience-20 early stop at ep 29/32/37); per-seed 0.6055/0.5979/0.6062 from results.csv; guard active (1,977 dHashes pre-seeded), train∩holdout stems = 0",
+   "std": 0.0046
   },
   {
-   "label": "M1 curated · 17.9K @ DINO≥0.50 (sealed)",
-   "train_images": 17870,
-   "map50_95": null,
+   "label": "M1 curated · 13.3K @ DINO≥0.50 (sealed)",
+   "train_images": 13309,
+   "map50_95": 0.5894,
    "n_seeds": 3,
-   "pending": true,
+   "pending": false,
    "guard": "SEALED",
-   "anchor": "jobs 44234063_[1-3]; threshold by pre-registered rule (CHANGELOG v3.22.6)"
+   "anchor": "jobs 44234063_[1-3] (h100, same recipe; DINO gate skipped 36/45 slugs; early stop ep 37/44/46); per-seed 0.5873/0.5887/0.5921; guard active, train∩holdout stems = 0",
+   "std": 0.0025
   }
  ],
  "benchmark_cwd12_map50": [
@@ -262,5 +264,30 @@
   },
   "backfilled": "2026-08-23 via tools/license_audit.py (source APIs: Roboflow/Kaggle/GitHub/HF)",
   "consequence": "38/45 datasets now carry an explicit license (33x CC BY 4.0 - reusable with attribution); the 7 unresolved/unreachable stay non-redistributable; the S1 harvest gate captures license at collection time"
+ },
+ "m1_sealed_2026_08_23": {
+  "raw": {
+   "per_seed": [
+    0.6055,
+    0.5979,
+    0.6062
+   ],
+   "mean": 0.6032,
+   "std": 0.0046,
+   "train_images": 55690
+  },
+  "curated": {
+   "per_seed": [
+    0.5873,
+    0.5887,
+    0.5921
+   ],
+   "mean": 0.5894,
+   "std": 0.0025,
+   "train_images": 13309,
+   "min_dino_score": 0.5
+  },
+  "protocol": "yolo26x@640, 60-ep cap with patience 20 (all runs early-stopped), seeds 101/102/103, sealed cwd12 holdout (1,977 imgs) as val, holdout dHash guard active, train/holdout stem intersection verified 0",
+  "stated_confound": "curated has both higher quality AND 4x less data; at this design the volume effect dominated (raw wins by 0.014)"
  }
 }

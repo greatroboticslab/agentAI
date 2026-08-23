@@ -76,7 +76,9 @@ defensible result:
 | **RF-DETR Large, cwd12-only** | cwd12 alone | **0.8974 ± 0.0040** (n=4 seeds; best 0.9033) | none — `train_rfdetr.py` stages cwd12 directly, holdout stems excluded | v3.0.31/34/38 |
 | Naive scale + pseudo-labels | 244,675 harvested imgs | **0.593** ⚠ pre-guard | `mega_trainer` merge | v3.0.26-p2 |
 | Cumulative scale variant | ~150–240K | 0.576 ⚠ pre-guard | `mega_trainer` merge | v3.0.32 |
-| Curated clean subset | safety-clean merge | **0.896** ⚠ pre-guard | `mega_trainer` merge | v3.0.28 |
+| Curated clean subset (cwd12-only staging) | 3,671 | **0.896** | none (zero merge calls; reclassified v3.22.3) | v3.0.28 |
+| **M1 sealed · merged raw** | 55,690 | **0.6032 ± 0.0046** (n=3) | `mega_trainer` + content-hash guard; train∩holdout = 0 | jobs 44234060, 2026-08-23 |
+| **M1 sealed · merged @ DINO≥0.50** | 13,309 | **0.5894 ± 0.0025** (n=3) | same, gate skipped 36/45 slugs | jobs 44234063, 2026-08-23 |
 
 Uncurated pseudo-labeled scale *hurt* accuracy by ~0.27 absolute; the curation stack
 (DINOv2 + label filters + consensus) recovered it and beat the supervised baseline.

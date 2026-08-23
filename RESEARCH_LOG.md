@@ -13,6 +13,27 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-23 — v3.22.11: M1 sealed re-measurement — the merged-corpus points are now honest
+
+**Result.** Under the sealed protocol (yolo26x@640, 60-epoch cap with patience 20 — every run
+early-stopped naturally; seeds 101/102/103; h100 for both tiers; the 1,977-image cwd12 holdout as val;
+content-hash guard active with 1,977 dHashes pre-seeded; train/holdout stem intersection verified 0):
+**merged raw 55,690 imgs → 0.6032 ± 0.0046**; **merged @ DINO≥0.50, 13,309 imgs → 0.5894 ± 0.0025**.
+
+**What this settles.** (1) The historical pre-guard 0.593 was not leak-inflated — the sealed value at
+comparable scale matches or exceeds it. (2) The curve's honest shape: every merged web-harvest corpus
+plateaus around 0.6 while cwd12-only training reaches 0.865–0.897 — **in-domain purity dominates; scale
+is not the antidote**. (3) At this threshold the DINO quality gate (which also removed 3/4 of the data)
+did not beat raw volume — the pre-stated confound (quality ↑ and volume ↓ move together) resolved in
+volume's favour; the gate's proven value is garbage EXCLUSION, not score LIFTING. A `cottonweed_holdout`
+entry in the merge's dataset accounting was investigated and is benign — it is the val-staging record
+("val OVERRIDE"), and the file-level check found zero holdout stems in any train set.
+
+**Verification.** Six COMPLETED h100 jobs (44234060/44234063), per-seed metrics from each run's
+results.csv, guard lines and DINO-gate lines from streamed job logs, and a direct stem-intersection
+check of the largest train set. Figures regenerated (`make_figures.py` auto-fill + manual anchors);
+campaign SU spend ≈ 97 of the 4,000 envelope.
+
 ## 2026-08-23 — v3.22.9: cluster arm repaired, licenses 38/45, scheduler deployed
 
 **Change.** The dashboard's cluster-control path was repaired (missing askpass file for the

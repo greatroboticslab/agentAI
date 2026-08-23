@@ -54,7 +54,7 @@ def fig_quality_vs_scale(d):
     pts = d["quality_vs_scale"]
     fig, ax = plt.subplots(figsize=(8.6, 5.2), dpi=150)
     # stagger annotation offsets so co-located cwd12-only points don't overprint
-    offsets = [(10, -13), (12, 2), (-160, 12), (-150, 10), (8, -16), (8, 8), (8, 8)]
+    offsets = [(10, -13), (12, 2), (-160, 12), (10, 14), (8, -18), (10, 6), (-178, -16)]
     for i, p in enumerate(pts):
         x = p["train_images"]
         if p.get("pending"):
@@ -78,7 +78,7 @@ def fig_quality_vs_scale(d):
     ax.set_xscale("log")
     ax.set_xlabel("training images (log scale)")
     ax.set_ylabel("cwd12 holdout mAP50-95 (pycocotools)")
-    ax.set_title("Quality beats scale: uncurated pseudo-labeled volume hurts")
+    ax.set_title("Sealed cwd12 holdout: in-domain data dominates; merged web-harvest plateaus at ~0.6")
     ax.grid(True, alpha=0.25)
     from matplotlib.lines import Line2D
     ax.legend(handles=[
