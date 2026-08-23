@@ -6963,3 +6963,27 @@ A continuous work block while M1 trains (all six seeds running on h100). Four pi
 Also: `make_figures.py` updated for the post-backfill license schema (a KeyError I
 introduced an hour earlier), and the first S1 harvest was fired **through the platform
 action** (submitted 4.3 s → job 44236325, capped at 5 new datasets for gate testing).
+
+### v3.22.10 — the audit's "small last-writer-wins window" bit for real; merge-write fix
+
+The v3.1.0 audit documented an honest residual in the registry hardening: some writers
+still whole-write a snapshot under the lock — "atomic, no corruption, small
+last-writer-wins window". On 2026-08-23 that window swallowed a supervisory action:
+a quarantine + license backfill written at 02:56, mid-harvest, was erased at 03:11 when
+the harvest job's end-of-run `_save_registry()` wrote back the snapshot it had loaded
+at 02:42. The two off-goal datasets came back as `downloaded`.
+
+- `dataset_discovery._save_registry` now **merge-writes**: under the lock it re-reads
+  the latest on-disk registry and grafts only its own slugs onto it; supervisory
+  fields — the quarantine block and `provenance.license` — are never resurrected-over
+  by a writer's stale copy. The quarantine + licenses were re-applied and verified to
+  stick.
+- Harvest round 1 outcome, honestly: 83 queries → 5 downloads. Three are real weed
+  detection data (+2,847 images: `project_agml__weed_crop_detection` 1,120,
+  `francesco__weed_crop_aerial` 1,176, `project_agml__imageweeds_aerial_weed_detection`
+  551); two were off-goal (maritime SAR, underwater fish — the filter ran with
+  `strict=False` and accepted on `task_categories=['object-detection']` alone) and are
+  quarantined with reasons. S1 hardening queued: strict topic mode + the resolver
+  should use the registry's stored `hf_id` instead of reconstructing case-lossy slugs
+  (three weed sets currently resolve 404 for that reason).
+- `license_audit` gained HF-token support (`~/.cache/huggingface/token`).

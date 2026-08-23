@@ -45,6 +45,14 @@ def _kaggle_token():
     return os.environ.get("KAGGLE_API_TOKEN", "")
 
 
+def _hf_token():
+    for p in ("~/.hf_token", "~/.cache/huggingface/token"):
+        p = os.path.expanduser(p)
+        if os.path.isfile(p):
+            return open(p).read().strip()
+    return os.environ.get("HF_TOKEN", "") or os.environ.get("HUGGING_FACE_HUB_TOKEN", "")
+
+
 def _roboflow_key():
     p = os.path.expanduser("~/.roboflow_key")
     if os.path.isfile(p):
@@ -89,7 +97,11 @@ def detect_license(slug: str) -> dict:
         # Hugging Face style: owner__name (e.g. francesco__grass_weeds)
         if "__" in slug:
             ref = slug.replace("__", "/", 1)
-            d = _http_json("https://huggingface.co/api/datasets/" + ref)
+            hdrs = {}
+            tok = _hf_token()
+            if tok:
+                hdrs["Authorization"] = "Bearer " + tok
+            d = _http_json("https://huggingface.co/api/datasets/" + ref, hdrs)
             lic = d.get("cardData", {}).get("license") or next(
                 (t.split(":", 1)[1] for t in d.get("tags", [])
                  if isinstance(t, str) and t.startswith("license:")), None)

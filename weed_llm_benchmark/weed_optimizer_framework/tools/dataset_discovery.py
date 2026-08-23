@@ -251,9 +251,47 @@ class DatasetDiscovery:
         would then have to refuse. The lock serializes writers on the node."""
         if registry is None:
             registry = self.registry
-        from .registry_lock import atomic_write_json, registry_lock
+        from .registry_lock import atomic_write_json, registry_lock, safe_read_json
         os.makedirs(os.path.dirname(REGISTRY_PATH), exist_ok=True)
         with registry_lock(REGISTRY_PATH):
+            # v3.22.10 — MERGE-write instead of whole-write. The whole-write of a
+            # snapshot loaded at job start was the audit's documented last-writer-
+            # wins window, and it bit for real on 2026-08-23: a supervisor
+            # quarantine (+ license backfill) written MID-harvest was erased by the
+            # harvest's end-of-job save of its 28-minute-old dict. Under the lock we
+            # re-read the latest on-disk registry and graft only OUR slugs onto it;
+            # supervisory fields (quarantine block, provenance.license) on disk are
+            # never resurrected-over by our stale copy.
+            disk = safe_read_json(REGISTRY_PATH)
+            if isinstance(disk, dict) and isinstance(disk.get("datasets"), dict):
+                merged = disk
+                for slug, info in (registry.get("datasets") or {}).items():
+                    cur = merged["datasets"].get(slug)
+                    if isinstance(cur, dict) and isinstance(info, dict):
+                        nu = dict(info)
+                        if (cur.get("status") == "quarantined"
+                                and info.get("status") != "quarantined"):
+                            for k in ("status", "quarantine_reason", "quarantined_at",
+                                      "status_before_quarantine"):
+                                if k in cur:
+                                    nu[k] = cur[k]
+                        prov_d = cur.get("provenance") or {}
+                        prov_o = nu.get("provenance") or {}
+                        if prov_d.get("license") and not prov_o.get("license"):
+                            keep = dict(prov_d)
+                            keep.update({k: v for k, v in prov_o.items() if v})
+                            nu["provenance"] = keep
+                        merged["datasets"][slug] = nu
+                    else:
+                        merged["datasets"][slug] = info
+                for k, v in registry.items():
+                    if k != "datasets":
+                        merged[k] = v
+                merged["total_downloaded"] = sum(
+                    (d.get("local_images", 0) or 0)
+                    for d in merged["datasets"].values() if isinstance(d, dict))
+                registry = merged
+                self.registry = merged
             atomic_write_json(REGISTRY_PATH, registry)
         # Phase 3 dual-write: mirror to Mongo so new harvest lands there too.
         # Best-effort — never blocks/raises if Mongo is down (db handles it) — but
