@@ -6899,3 +6899,34 @@ rate; the cancelled V100 attempt consumed ≈13 SU. Live snapshot before cancell
 for the record: curated at epochs 4–5 already read holdout mAP50-95 0.540–0.567; raw at
 epoch 1 read 0.533–0.562 — too early to mean anything, noted only as the state at the
 moment of the switch.
+
+### v3.22.8 — the waiting time put to work: figures package, chart card, license audit, Mamba env
+
+Everything below ran while the M1 arrays queue/train (5/6 tasks running on h100 within
+the hour). One deliberate freeze is in force: **no registry writes until all six M1
+merges complete** — each array task merges the registry at its own start time, so a
+mid-flight harvest would give different seeds different corpora and void the tier
+comparison. S1 harvesting therefore starts at the next supervision tick, not now.
+
+- **`make_figures.py` + `results/framework/figures_data.json` (S5 core):** one command
+  regenerates the quality-vs-scale curve, the 15-model benchmark table, the per-species
+  table, the RF-DETR seed table, and a summary that states each number's evidentiary
+  status. Every data point carries its anchor and guard state; the two M1 points render
+  as "running" markers and fill automatically from `m1_<tier>_seed*.json` when the jobs
+  land. Verified by running it (lab server, matplotlib 3.11) and inspecting the output;
+  two rendering defects found and fixed (legend shape/guard mismatch, off-axis labels).
+- **Compounding chart card (S4's visible half):** the project page gains an
+  "Autonomous rounds" card — hidden until a project has recorded rounds, then a
+  round/status/metric table and, from two scored rounds up, a canvas line chart of
+  round № vs holdout mAP50-95. Deployed; verified the card ships on `/agent/weed` and
+  stays hidden while the rounds ledger is empty (the Mongo ledger on the lab holds 0
+  rounds — the historical round_001 lives on the cluster filesystem).
+- **License audit (M0, read-only):** all **45 registry datasets carry no license
+  record** (35 Roboflow Universe, 4 GitHub, 2 Kaggle, 2 HF, 2 local). Recorded in
+  `figures_data.json` and surfaced in the summary: harvested imagery is not
+  redistributable until per-source licenses are established; the S1 gate captures
+  license at collection time going forward.
+- **Mamba-YOLO environment (S3 de-risk):** a background login-node build started —
+  dedicated `mambayolo` conda env (torch 2.3/cu121), repo clone, `selective_scan`
+  CUDA extension compiled for sm90. Result checked at the next tick; the pinned
+  `bench` env is untouched.

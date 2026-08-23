@@ -13,6 +13,16 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-23 — v3.22.8: parallel progress while M1 trains
+
+**Change.** The reproducibility package (`make_figures.py` — every figure/table from anchored,
+checked-in data; M1 points fill in automatically when the jobs land), the project page's
+autonomous-rounds chart card (hidden until rounds exist), a read-only license audit (45/45 registry
+datasets have no license record — harvested imagery is not redistributable until that changes; the
+harvest gate now captures license at collection), and a background Mamba-YOLO environment build on the
+cluster login node. One freeze honored: no registry writes until all six M1 merges complete, since each
+task merges at its own start time and a mid-flight harvest would give seeds different corpora.
+
 ## 2026-08-22 — v3.22.2: the SuperWeed campaign plan
 
 **Change.** `docs/SUPERWEED_PLAN.md` — the executable campaign that operationalizes the audit's

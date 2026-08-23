@@ -1,0 +1,76 @@
+{
+  "_what": "Anchored source data for make_figures.py. Every point cites where it was recorded; guard states whether the holdout content-hash guard applies to it. Pending entries are filled by the M1 jobs' JSON artifacts when they land.",
+  "quality_vs_scale": [
+    {"label": "YOLO11n · cwd12-only", "train_images": 5648, "map50_95": 0.865, "n_seeds": 1,
+     "guard": "not-applicable (single dataset, standard split)",
+     "anchor": "RESEARCH_LOG Phase 1 (job 38007481, 100 ep); CHANGELOG v3.0.6"},
+    {"label": "RF-DETR L · cwd12-only", "train_images": 3671, "map50_95": 0.8974, "std": 0.004,
+     "n_seeds": 4, "best": 0.9033,
+     "guard": "not-applicable (stages cwd12 directly, holdout stems excluded)",
+     "anchor": "CHANGELOG 2026-05-22 (v3.0.31/34/38: 0.8949/0.8953/0.8961/0.9033)"},
+    {"label": "yolo26x · safety-clean cwd12-only", "train_images": 3671, "map50_95": 0.896,
+     "n_seeds": 1, "guard": "not-applicable (cwd12-only staging, zero merge calls)",
+     "anchor": "CHANGELOG v3.0.28"},
+    {"label": "merged raw · 244K pseudo-labeled", "train_images": 244675, "map50_95": 0.593,
+     "n_seeds": 1, "guard": "PRE-GUARD (filename-only holdout defence at the time)",
+     "anchor": "CHANGELOG v3.0.26 phase 2"},
+    {"label": "merged cumulative · ~200K", "train_images": 200000, "x_approx": true,
+     "map50_95": 0.576, "n_seeds": 1, "guard": "PRE-GUARD",
+     "anchor": "CHANGELOG v3.0.32"},
+    {"label": "M1 raw · 55.7K merged (sealed)", "train_images": 55690, "map50_95": null,
+     "n_seeds": 3, "pending": true, "guard": "SEALED (1,977 holdout dHashes pre-seeded)",
+     "anchor": "jobs 44234060_[1-3], yolo26x 60 ep, seeds 101/102/103"},
+    {"label": "M1 curated · 17.9K @ DINO≥0.50 (sealed)", "train_images": 17870,
+     "map50_95": null, "n_seeds": 3, "pending": true, "guard": "SEALED",
+     "anchor": "jobs 44234063_[1-3]; threshold by pre-registered rule (CHANGELOG v3.22.6)"}
+  ],
+  "benchmark_cwd12_map50": [
+    {"rank": 1, "model": "YOLO11n (fine-tuned)", "params": "2.6M", "map50": 0.929, "map50_95": 0.865},
+    {"rank": 2, "model": "Florence-2-base", "params": "0.23B", "map50": 0.434, "map50_95": 0.392},
+    {"rank": 3, "model": "Florence-2-large", "params": "0.77B", "map50": 0.329, "map50_95": 0.302},
+    {"rank": 4, "model": "InternVL2-8B", "params": "8B", "map50": 0.208, "map50_95": 0.091},
+    {"rank": 5, "model": "Qwen2.5-VL-3B", "params": "3B", "map50": 0.196, "map50_95": 0.068},
+    {"rank": 6, "model": "MiniCPM-V-4.5", "params": "8B", "map50": 0.192, "map50_95": 0.043},
+    {"rank": 7, "model": "OWLv2-large", "params": "0.4B", "map50": 0.184, "map50_95": 0.117,
+     "note": "recall 0.943 / precision 0.194 — the high-recall pre-filter finding"},
+    {"rank": 8, "model": "Qwen2.5-VL-7B", "params": "7B", "map50": 0.176, "map50_95": 0.059},
+    {"rank": 9, "model": "InternVL2-2B", "params": "2B", "map50": 0.002, "map50_95": 0.001},
+    {"rank": 10, "model": "InternVL2.5-8B", "params": "8B", "map50": 0.0, "map50_95": 0.0},
+    {"rank": "11-15", "model": "G-DINO / Molmo / Llama-Vision / Moondream / LLaVA",
+     "params": "-", "map50": 0.0, "map50_95": null,
+     "note": "no usable grounding — mAP ≈ 0"}
+  ],
+  "benchmark_anchor": "RESEARCH_LOG Phase 2 table (15 models, CottonWeedDet12)",
+  "per_species_yolo11n_val": {
+    "anchor": "RESEARCH_LOG Phase 1 per-class validation (YOLO11n baseline)",
+    "rows": [
+      {"cls": "Carpetweeds", "map50": 0.976, "map50_95": 0.936},
+      {"cls": "Crabgrass", "map50": 0.979, "map50_95": 0.935},
+      {"cls": "Eclipta", "map50": 0.92, "map50_95": 0.878},
+      {"cls": "Goosegrass", "map50": 0.903, "map50_95": 0.83},
+      {"cls": "Morningglory", "map50": 0.853, "map50_95": 0.769},
+      {"cls": "Nutsedge", "map50": 0.939, "map50_95": 0.878},
+      {"cls": "PalmerAmaranth", "map50": 0.955, "map50_95": 0.917},
+      {"cls": "PricklySida", "map50": 0.97, "map50_95": 0.947},
+      {"cls": "Purslane", "map50": 0.941, "map50_95": 0.93},
+      {"cls": "Ragweed", "map50": 0.993, "map50_95": 0.983},
+      {"cls": "Sicklepod", "map50": 0.945, "map50_95": 0.858},
+      {"cls": "SpottedSpurge", "map50": 0.95, "map50_95": 0.919}
+    ]
+  },
+  "rfdetr_seeds": {
+    "anchor": "CHANGELOG 2026-05-22 — RF-DETR Large, cwd12-only, 60 ep unless noted",
+    "rows": [
+      {"run": "v3.0.31", "seed": "default", "epochs": 60, "map50_95": 0.8949, "map50": 0.9461, "map75": 0.9209},
+      {"run": "v3.0.34-X2", "seed": "default", "epochs": 100, "map50_95": 0.8953, "map50": 0.947, "map75": 0.9216},
+      {"run": "v3.0.38 s101", "seed": 101, "epochs": 60, "map50_95": 0.8961, "map50": 0.9472, "map75": 0.9247},
+      {"run": "v3.0.38 s102", "seed": 102, "epochs": 60, "map50_95": 0.9033, "map50": 0.9529, "map75": 0.9344}
+    ],
+    "mean": 0.8974, "std": 0.004
+  },
+  "license_sweep_2026_08_23": {
+    "datasets": 45, "license_recorded": 0,
+    "sources": {"roboflow_universe": 35, "github": 4, "kaggle": 2, "huggingface": 2, "local": 2},
+    "consequence": "no harvested imagery may be redistributed in figures until per-source licenses are established; training-use is retained for experiments; the S1 harvest gate captures license at collection time going forward"
+  }
+}

@@ -8133,6 +8133,16 @@ def agent_generic(domain_id: str):
      <div id="rlv-adv" style="display:none;font-size:12px;color:#fbbf24;margin-top:4px"></div>
      <style>@keyframes rlvp{{50%{{opacity:.3}}}}</style>
    </div>
+   <!-- v3.22.8: compounding chart — the double-agent loop's rounds vs holdout metric.
+        Hidden until this project has at least one recorded round. -->
+   <div id="cmpx" style="display:none;margin-top:22px;background:#f8fafc;border:1px solid #e3e7ef;border-radius:12px;padding:14px">
+     <div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
+       <b>&#128257; Autonomous rounds</b>
+       <span id="cmpx-meta" style="color:#64748b"></span>
+     </div>
+     <canvas id="cmpx-cv" width="820" height="200" style="width:100%;max-width:820px;margin-top:8px;display:none"></canvas>
+     <div id="cmpx-tbl" style="font-size:12px;margin-top:6px;overflow-x:auto"></div>
+   </div>
    <div style="margin-top:22px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8">Workspace (scoped to this agent)</div>
    <div id="wsrow" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
      <a class="btn" style="margin-top:0;background:#eef2ff;color:#2563eb" href="/classes?domain=__DOM__">Browse data</a>
@@ -8173,6 +8183,45 @@ function rlvFrame(){
   im.src='/api/robot/frame_latest/'+_rlvSid+'.jpg?t='+Date.now();}
 }
 rlvPoll(); setInterval(rlvPoll,4000); setInterval(rlvFrame,1500);
+// v3.22.8: compounding chart — rounds ledger -> round# vs holdout metric + pool size.
+function cmpxMetric(r){
+ // metric location varies by round writer version — search common spots, then deep-scan
+ var cand=[(r.eval||{}).map50_95,(r.eval||{}).mAP50_95,(r.metrics||{}).map50_95,r.map50_95];
+ for(var i=0;i<cand.length;i++){if(typeof cand[i]==='number')return cand[i];}
+ var found=null;
+ (function scan(o,d){if(found||!o||typeof o!=='object'||d>3)return;
+   for(var k in o){var v=o[k];
+     if(typeof v==='number'&&/map ?50[-_]?95/i.test(k)&&v>0&&v<=1){found=v;return;}
+     if(typeof v==='object')scan(v,d+1);}})(r,0);
+ return found;
+}
+fetch('/api/domain/rounds?domain=__DOM__',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+ var rounds=(d&&d.rounds)||[]; if(!rounds.length)return;
+ var card=document.getElementById('cmpx'); card.style.display='block';
+ var pts=rounds.map(function(r){return {n:r.round_num||r.round||0,m:cmpxMetric(r),s:r.status||''};});
+ document.getElementById('cmpx-meta').textContent=rounds.length+' round(s) recorded \\u00b7 metric = cwd12 holdout mAP50-95';
+ var h='<table style="border-collapse:collapse"><tr><th style="text-align:left;padding:2px 10px 2px 0">round</th><th style="text-align:left;padding:2px 10px">status</th><th style="text-align:left;padding:2px 10px">holdout metric</th></tr>';
+ pts.forEach(function(p){h+='<tr><td style="padding:2px 10px 2px 0">#'+p.n+'</td><td style="padding:2px 10px">'+p.s+'</td><td style="padding:2px 10px">'+(p.m==null?'\\u2014':p.m.toFixed(4))+'</td></tr>';});
+ document.getElementById('cmpx-tbl').innerHTML=h+'</table>';
+ var withM=pts.filter(function(p){return p.m!=null;});
+ if(withM.length>=2){
+   var cv=document.getElementById('cmpx-cv');cv.style.display='block';
+   var c=cv.getContext('2d'),W=cv.width,H=cv.height,P=34;
+   var ys=withM.map(function(p){return p.m;});
+   var y0=Math.min.apply(null,ys)-0.02,y1=Math.max.apply(null,ys)+0.02;
+   c.clearRect(0,0,W,H);c.strokeStyle='#cbd5e1';c.strokeRect(P,8,W-P-8,H-P-8);
+   c.strokeStyle='#2563eb';c.lineWidth=2;c.beginPath();
+   withM.forEach(function(p,i){
+     var x=P+(W-P-16)*(i/(withM.length-1)),y=8+(H-P-16)*(1-(p.m-y0)/(y1-y0));
+     i?c.lineTo(x,y):c.moveTo(x,y);});
+   c.stroke();c.fillStyle='#2563eb';
+   withM.forEach(function(p,i){
+     var x=P+(W-P-16)*(i/(withM.length-1)),y=8+(H-P-16)*(1-(p.m-y0)/(y1-y0));
+     c.beginPath();c.arc(x,y,3.5,0,7);c.fill();
+     c.fillStyle='#334155';c.font='10px system-ui';c.fillText('#'+p.n,x-6,H-P+14);c.fillText(p.m.toFixed(3),x-14,y-8);c.fillStyle='#2563eb';});
+   c.fillStyle='#64748b';c.font='10px system-ui';c.fillText(y1.toFixed(2),4,16);c.fillText(y0.toFixed(2),4,H-P-6);
+ }
+}).catch(function(e){});
 // v3.22: Drive button — appears when this project has a drivable robot behind
 // the platform's /drive proxy (no Tailscale needed on the viewer's device).
 fetch('/api/robot/drive_targets?domain=__DOM__',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
