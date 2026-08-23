@@ -70,13 +70,13 @@ a Streamlit view, was removed with the old dashboard).
 The recorded numbers tell a **quality-beats-scale** story, which is the system's most
 defensible result:
 
-| Recipe | Data | cwd12 holdout mAP50-95 | Anchor |
-|---|---|---|---|
-| Supervised baseline | cwd12 alone (5,648 imgs) | **0.865** (0.929 mAP@0.5) | v3.0.6 |
-| Naive scale + pseudo-labels | 244,675 harvested imgs | **0.593** | v3.0.26-p2 |
-| Cumulative scale variant | ~150-240K | 0.576 | v3.0.32 |
-| Curated clean subset | safety-clean merge | **0.896** | v3.0.28 |
-| Curated + tuned (best of N seeds) | curated | **0.9033** ⚠ pre-guard | v3.0.38-A |
+| Recipe | Data | cwd12 holdout mAP50-95 | Merge path | Anchor |
+|---|---|---|---|---|
+| Supervised YOLO11n baseline | cwd12 alone (5,648 imgs) | **0.865** (0.929 mAP@0.5) | none | v3.0.6 |
+| **RF-DETR Large, cwd12-only** | cwd12 alone | **0.8974 ± 0.0040** (n=4 seeds; best 0.9033) | none — `train_rfdetr.py` stages cwd12 directly, holdout stems excluded | v3.0.31/34/38 |
+| Naive scale + pseudo-labels | 244,675 harvested imgs | **0.593** ⚠ pre-guard | `mega_trainer` merge | v3.0.26-p2 |
+| Cumulative scale variant | ~150–240K | 0.576 ⚠ pre-guard | `mega_trainer` merge | v3.0.32 |
+| Curated clean subset | safety-clean merge | **0.896** ⚠ pre-guard | `mega_trainer` merge | v3.0.28 |
 
 Uncurated pseudo-labeled scale *hurt* accuracy by ~0.27 absolute; the curation stack
 (DINOv2 + label filters + consensus) recovered it and beat the supervised baseline.
@@ -85,10 +85,12 @@ per-species table in `RESEARCH_LOG.md` (§2026-07 entries), anti-forgetting roun
 (round-3 zero-forgetting, CHANGELOG L685-691), and the small-object failure analysis
 (mAP 0.87 → 0.40 on small-box subsets, CHANGELOG L1944-1961).
 
-⚠ **The 0.9033 headline is not currently defensible** — it predates the holdout
-content-hash guard and is a best-of-N-seeds selection. `docs/SCIENCE_AUDIT.md` §2 defines
-the re-measurement protocol; until that run completes, quote 0.865 (supervised baseline,
-clean) and the quality-vs-scale finding, not 0.9033.
+**Which numbers are quotable today** (see `SCIENCE_AUDIT.md` §1): the two *single-dataset*
+rows are clean — they never pass through the merge, so the C1 leak channel cannot reach
+them; quote RF-DETR as **0.8974 ± 0.0040 (n=4)**, never the bare best run. The three
+*merged-corpus* rows carry a pre-guard caveat until M1 re-measures them under the sealed
+content-hash guard; the direction of the quality-vs-scale effect (large, ~0.3 absolute)
+is far bigger than any plausible leak correction, but the exact values must be restated.
 
 ## 5. How it plugs into today's platform
 

@@ -796,6 +796,9 @@ def train_yolo_mega(strategy, iteration):
       base_model: override, defaults to Config.DETECTION_MODEL
       epochs (default 100), batch_size, lr (default 0.001),
       patience (default 50), workers, imgsz (default 1024),
+      seed (default 0) — RNG seed passed to ultralytics; vary it to obtain a
+        mean +/- std over repeats instead of a single run (v3.22.3)
+      deterministic (default True)
       include_autolabel (default False — set True in v3.0.25 once
         per-dataset class assignment is verified working)
       val_dataset_root (default None) — path to cottonweeddet12 holdout root.
@@ -884,6 +887,12 @@ def train_yolo_mega(strategy, iteration):
         cos_lr=True,    # v3.0.24: cosine LR schedule for longer training
         mosaic=1.0,     # v3.0.24: full mosaic for the smaller real-bbox corpus
         mixup=0.1,      # v3.0.24: mild mixup helps with limited data
+        # v3.22.3: explicit seed so a recipe can be repeated across seeds and
+        # reported as mean +/- std instead of a single unreproducible run.
+        # Ultralytics defaults to seed=0; passing it through makes the default
+        # explicit and the sweep intentional.
+        seed=int(strategy.get("seed", 0)),
+        deterministic=bool(strategy.get("deterministic", True)),
     )
 
     # Resolve actual save_dir (ultralytics increments train/train2/... if dir exists)

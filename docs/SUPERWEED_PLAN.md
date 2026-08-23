@@ -168,7 +168,7 @@ its metric says.
 
 | Phase | State | Closed on |
 |---|---|---|
-| S0 | not started | — |
+| S0 | **in progress** — audit done, token installed, registry backed up, M1 submitted (jobs 44224995 raw / 44224997 curated, 3 seeds each); pending: `requirements.lock`, M1 results | — |
 | S1 | not started | — |
 | S2 | not started | — |
 | S3 | not started | — |

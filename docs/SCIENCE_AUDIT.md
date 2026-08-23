@@ -14,26 +14,35 @@ seven-dimension audit), `RESEARCH_LOG.md`, on-disk artifacts.*
 | 1 | VLM benchmark: 15 models on CottonWeedDet12; best VLM (Florence-2) 0.434 mAP@0.5 vs fine-tuned YOLO11n 0.929 | verified runs, per-model table, fixed eval protocol (2026-03) | **DEFENSIBLE** | none — strongest standalone result |
 | 2 | Supervised baseline cwd12: 0.865 mAP50-95 / 0.929 mAP@0.5 | standard train/val/test split, single dataset, no external data → leak channel not applicable | **DEFENSIBLE** | re-run once with pinned seeds for error bars (cheap) |
 | 3 | Quality-beats-scale: 244K noisy pseudo-labeled imgs → 0.593; curated subset → 0.896 | multiple recorded runs across v3.0.26–.32; direction is large (−0.27) and consistent | **DEFENSIBLE as a finding** (honest negative + recovery) | present as the system's core lesson; state pseudo-label noise as the mechanism |
-| 4 | **cwd12 holdout mAP50-95 = 0.9033** (v3.0.38-A) | measured **before** the v3.1.0 holdout content-hash guard; filename-only guard was bypassable by re-exported copies (audit C1); also best-of-N-seeds selection | **NOT DEFENSIBLE as stated** | re-train with the sealed guard (post-`bf621ce` code), fixed protocol, report mean±std over ≥3 seeds; quote whatever comes out |
+| 4 | **cwd12 holdout mAP50-95: 0.8974 ± 0.0040 over 4 seeds, best run 0.9033** (v3.0.38-A, RF-DETR Large, 60 ep) | `tools/train_rfdetr.py` stages **cwd12 only** — it never calls `mega_trainer`, the registry, or harvested data, and builds explicit test+valid stem sets to exclude the holdout. The C1 merge-leak channel (re-exported cross-dataset copies) is therefore **structurally inapplicable**. Eval is pycocotools on the sealed test split. CHANGELOG already reports both the mean±std and the best run | **DEFENSIBLE** — quote as `0.8974 ± 0.0040 (n=4 seeds)`, best 0.9033 | none required. Optional: +2 seeds to tighten the interval (cheap, ~2×24 h V100). **Never quote 0.9033 alone** |
+| 4b | Cumulative / merged-corpus numbers (0.593 @244K, 0.576, 0.896 "safety clean") | these DID pass through `mega_trainer._merge_datasets`, i.e. the C1 leak channel, and predate the content-hash guard | **NOT DEFENSIBLE as stated** | re-measure under the sealed guard with `skipped_holdout_hash` reported — this is what M1 now targets, because the quality-vs-scale curve rests on these points |
 | 5 | Anti-forgetting: round-3 zero forgetting on old species while +9.7% mAP@0.5 on new | recorded rounds (CHANGELOG L685-731) | **SUGGESTIVE** | small n, single config — present as observation, not law |
 | 6 | Autonomous discovery works (no curated lists) | `dataset_discovery.py` + registry provenance; harvests recorded across rounds | **DEFENSIBLE mechanically** | licensing review per source before showing any harvested image (see §3.4) |
 | 7 | Robot→platform live pipeline (v3.20-3.22) | contract docs + joint verifications recorded (74-batch stream, 0 loss; soak 14 min, 0 loss; both counters reconciled) | **DEFENSIBLE** (engineering claim) | none |
 | 8 | Dashboard headline counts (labeled/verified totals) | v3.1.0 fixed the `simulate_cycle` unflagged-fake-events and failed-jobs-marked-done classes; historical totals predating the fix may still include simulated events | **QUOTE WITH CARE** | regenerate any presented count from `meta.simulated`-aware queries only |
 
-## 2. The one measurement that must be redone
+## 2. The measurement that must be redone (M1, re-scoped 2026-08-22)
 
-**Protocol for an honest headline number** (runs on the cluster, days not weeks):
+**Corrected scope.** The single-dataset headline (row 4) needs no re-measurement — it
+never entered the leak channel. What must be redone are the **merged-corpus** points
+(row 4b), because the quality-vs-scale curve — the campaign's signature scientific
+claim — is built from them.
 
-1. Code: current `main` (post-`bf621ce`): holdout dHashes pre-seeded (`__HOLDOUT__`
-   sentinel), `skipped_holdout_hash` stat must be reported alongside the metric.
-2. Data: the v3.0.38 curated recipe, re-merged from the registry with the guard active.
-3. Training: 3 seeds minimum, identical hyperparameters; report mean ± std, not max.
-4. Eval: pycocotools mAP50-95 on the sealed cwd12 test split; per-species table.
-5. Publish the run artifacts (config, seed list, `skipped_holdout_hash`, curves) under
-   `results/framework/` and reference them from `RESEARCH_LOG.md`.
+**Protocol** (cluster; wall-clock bound by queue + training):
 
-Whatever the number is — 0.86 or 0.91 — it becomes the citable one. The current 0.9033
-must not be shown without the "pre-guard, best-of-N" caveat attached.
+1. Code: current `main` (post-`bf621ce`) — holdout dHashes pre-seeded (`__HOLDOUT__`
+   sentinel); `skipped_holdout_hash` printed and archived with every run.
+2. Data: two tiers re-merged from the registry with the guard active — the *curated*
+   recipe (the 0.896 point) and a *raw-scale* tier (the 0.593 point) — so the curve's
+   two ends are both re-established honestly.
+3. Training: ≥3 seeds per tier, identical hyperparameters; report mean ± std, never max.
+4. Eval: pycocotools mAP50-95 on the sealed cwd12 test split + per-species table.
+5. Publish artifacts (config, seed list, `skipped_holdout_hash`, curves) under
+   `results/framework/`, referenced from `RESEARCH_LOG.md`.
+
+Whatever comes out — higher or lower than the pre-guard values — becomes the citable
+curve. Until it lands, the merged-corpus numbers carry the "pre-guard" caveat, while
+the cwd12-only headline (0.8974 ± 0.0040) is quotable today.
 
 ## 3. Threats to validity a strong reviewer will raise (and our answers)
 

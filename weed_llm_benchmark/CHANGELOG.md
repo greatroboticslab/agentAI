@@ -6787,3 +6787,34 @@ phases S0–S6 with per-phase budgets and verifiable gates, the supervision-tick
 for unattended 24/7 operation, and a risk register grounded in previously observed
 failures (garbage floods, pseudo-label noise at scale, registry corruption, SSH
 throttling, package drift).
+
+### v3.22.3 — M1: seeded, guard-verified re-measurement of the merged-corpus points
+
+Two corrections to the audit came out of reading the actual training code, and both
+are recorded because getting them wrong in either direction would misrepresent the work:
+
+- **The cwd12-only numbers never touched the leak channel.** `tools/train_rfdetr.py`
+  stages CottonWeedDet12 directly and excludes the test+valid stems; it never calls
+  `mega_trainer`, the registry, or harvested data. `run_v3_0_28_safety.sh` likewise
+  contains zero merge calls. So RF-DETR Large **0.8974 ± 0.0040 (n=4 seeds, best
+  0.9033)** and the YOLO 0.865/0.896 points are quotable today — the earlier blanket
+  "0.9033 is not defensible" caveat was wrong and is withdrawn.
+- **What does need re-measuring** are the cumulative *merged-corpus* points (0.593 at
+  244K images, 0.576), which pass through `mega_trainer._merge_datasets` — the channel
+  the v3.1.0 content-hash guard closed. They are the two ends of the quality-vs-scale
+  curve, so the curve is what M1 re-establishes.
+
+- `mega_trainer.train_yolo_mega` gains `seed` / `deterministic` strategy keys passed
+  through to ultralytics, so a recipe can be repeated and reported as mean ± std
+  instead of a single unreproducible run.
+- New `run_m1_merged_seeds.sh`: a seed-arrayed SBATCH for the re-measurement, one array
+  per tier (`TIER=raw` = pseudo-label scale, `TIER=curated` = + DINOv2 quality gate),
+  honest holdout val (`val_dataset_root` = cwd12), the outer/nested package refreshed
+  from the tracked copy at job start, and a per-run JSON artifact carrying the merge
+  stats — including `skipped_holdout_hash` — next to the metric.
+
+Pre-submission verification on the login node (per the project's own rule that imports
+are proven before any GPU job): seed passthrough present, `_load_holdout_dhashes`
+importable, **1,977 holdout stems and 1,977 holdout dHashes loaded** (the full cwd12
+test+valid set), merge signature confirmed, `sbatch --test-only` accepted. Submitted as
+jobs 44224995 (raw ×3 seeds) and 44224997 (curated ×3 seeds) on `v100-32`.
