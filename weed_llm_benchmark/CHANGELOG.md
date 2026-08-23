@@ -7045,3 +7045,34 @@ there. The toolchain is now pinned down (CUDA 12.4.99, GCC 8.5.0, torch 2.3.0+cu
 a toolkit/torch minor mismatch) but pip filtered the actual diagnostics out of the log,
 so a third build invokes `setup.py build_ext` directly with output captured unfiltered
 (job 44275211).
+
+### v3.22.13 — the gate that actually works: usable labels, not a subject blocklist
+
+The autonomous loop's first scheduled round harvested five datasets and the split is
+instructive: **two genuinely useful sets (+8,208 labelled images —
+`project_agml/imageweeds_weed_detection` 3,208 imgs / 3,208 labelled / 5 classes and
+`project_agml/mh_weed16_weed_detection` 5,000 / 4,993 / 15 classes)** alongside two
+off-goal ones (ExDark low-light street scenes, GWHD wheat heads).
+
+The v3.22.12 subject check did not stop them, and the reason matters: a **blocklist can
+only reject what it has heard of**, and neither "exdark" nor "gwhd" is in any
+vocabulary. An allowlist would not have helped either — the uploader's name is
+`dronefreak`, and `drone` is in the *accept* vocabulary.
+
+The decisive signal was already being computed and thrown away. Every off-goal dataset
+across both rounds — maritime rescue, underwater fish, low-light scenes, wheat heads —
+arrived with **`labeled=0, classes=0`**, while every useful one came back essentially
+fully labelled with real class names. `BRAIN_STRICT` implements exactly that rejection
+(under 50 labels or zero classes) and **defaulted to off**. It is now the default in
+`run_v3_0_43_brain_harvest_oneshot.sh`; `BRAIN_STRICT=0` opts out. Subject-agnostic,
+and it catches the unknown-unknowns a vocabulary never can.
+
+The two zero-label sets are quarantined with their measured reason. Registry: 55
+datasets, 4 quarantined, 41 with an explicit license.
+
+**Mamba-YOLO root cause found.** With diagnostics finally unfiltered, the failure is
+`error: overflow in constant expression` inside torch's own `DispatchKeySet.h` — the
+signature of **GCC 8.5 (the system compiler) being too old for torch 2.3**, which needs
+GCC ≥ 9. Rebuilding with `module load gcc/10.2.0` (job 44280678). Four builds, four
+distinct layers: pip build isolation → login-node/GPU-node difference → filtered
+diagnostics → compiler version.

@@ -92,9 +92,16 @@ fi
 
 # v3.0.68: read configurable knobs from env (set by dashboard POST body).
 # BRAIN_STRICT=1     → reject downloads with <100 labels or 0 classes
+#
+# v3.22.13: STRICT IS NOW THE DEFAULT. Two harvest rounds (2026-08-23) admitted
+# four off-goal datasets — maritime rescue, underwater fish, low-light street
+# scenes, wheat heads — and every one of them had labeled=0 / classes=0, while
+# every genuinely useful set came back ~100% labeled with real class names. A
+# subject blocklist cannot catch what it has never heard of; "has usable labels"
+# is subject-agnostic and caught all four. Set BRAIN_STRICT=0 to opt out.
 # BRAIN_MAX_NEW=N    → cap new datasets per round (default 5)
 # BRAIN_MAX_IMGS=N   → cap images per dataset (default 5000)
-echo "[config] BRAIN_STRICT=${BRAIN_STRICT:-0}"
+echo "[config] BRAIN_STRICT=${BRAIN_STRICT:-1}"
 echo "[config] BRAIN_MAX_NEW=${BRAIN_MAX_NEW:-5}"
 echo "[config] BRAIN_MAX_IMGS=${BRAIN_MAX_IMGS:-5000}"
 
@@ -112,7 +119,7 @@ print(f"[harvest] before: {before} slugs in registry")
 # v3.0.68: env-driven knobs (env var > kwarg default)
 max_new = int(os.environ.get("BRAIN_MAX_NEW", "5"))
 max_imgs = int(os.environ.get("BRAIN_MAX_IMGS", "5000"))
-strict = bool(int(os.environ.get("BRAIN_STRICT", "0")))
+strict = bool(int(os.environ.get("BRAIN_STRICT", "1")))
 print(f"[harvest] config max_new={max_new} max_imgs={max_imgs} strict={strict}")
 
 result = d.harvest_new_datasets(
