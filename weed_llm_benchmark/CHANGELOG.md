@@ -6753,3 +6753,23 @@ round-trip, real-time streaming, friendly 502, unknown-robot 404, unauthenticate
 time) renders the offline page. The joint live-drive test runs when the robot powers
 on; full function inside the proxy needs the robot's pages to honor
 `X-Forwarded-Prefix` (robot-side change, agreed in the contract).
+
+### v3.22.1 — docs: the double-agent system record + a reviewer-grade scientific audit
+
+Two consolidation documents distilled from the full git history (558 commits,
+2026-03-12 → 2026-08-16), the framework source, and the on-disk result artifacts:
+
+- **`docs/DOUBLE_AGENT_SYSTEM.md`** — the definitive record of the concurrent
+  Collector-agent ⇄ Trainer-agent architecture (Job-D/Job-T, locked registry,
+  hot-reload, two Brain modes): component map with verified line counts (nothing of the
+  core was ever deleted), commit-anchored evolution timeline, and the honest results
+  table — including the quality-beats-scale finding (244,675 noisy pseudo-labeled
+  images → 0.593 mAP50-95 vs 0.896 curated vs 0.865 supervised baseline) and where the
+  loop's controls live in today's platform (agent cards, round endpoints).
+- **`docs/SCIENCE_AUDIT.md`** — claim-by-claim verdicts (defensible: VLM benchmark,
+  supervised baseline, quality-vs-scale, robot live pipeline; **not defensible as
+  stated: the pre-guard best-of-N 0.9033**, with the §2 re-measurement protocol),
+  seven reviewer-level threats to validity with answers, and hardening milestones
+  M0–M4 (honest re-measurement, continuous-loop revival, one-script results package,
+  end-to-end robot→train→deploy story, hygiene: Kaggle token rotation still open in
+  public git history, license sweep, environment pin).

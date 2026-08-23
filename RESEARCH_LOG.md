@@ -13,6 +13,28 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-22 — v3.22.1: consolidating the double-agent record + scientific audit
+
+**Context.** The concurrent Collector⇄Trainer system (autonomous web harvest + parallel training with
+hot-reload) predates the platform and was parked mid-flight when development pivoted to platform
+features; its record was scattered across ~190 iterations of CHANGELOG entries, old run scripts, and
+result files. Before building on it again, the record and its scientific standing needed one honest
+consolidation.
+
+**Change.** `docs/DOUBLE_AGENT_SYSTEM.md` (architecture, component map — the core was never deleted —
+commit-anchored timeline, honest results with provenance) and `docs/SCIENCE_AUDIT.md` (claim-by-claim
+verdicts, threats to validity, hardening milestones M0–M4). Key stances taken: the citable results
+today are the VLM benchmark (Florence-2 0.434 vs YOLO11n 0.929 mAP@0.5), the supervised baseline
+(0.865 mAP50-95), and the quality-beats-scale finding (244K noisy pseudo-labeled images *hurt* to
+0.593; curation recovered 0.896); **the pre-guard best-of-N 0.9033 is quotable only after the sealed
+re-measurement** (3 seeds, mean±std, `skipped_holdout_hash` reported). Open hygiene: the historically
+committed Kaggle token is clean at HEAD but persists in public git history — rotation unconfirmed.
+
+**Verification.** Every number in both documents was re-grepped from CHANGELOG/RESEARCH_LOG line
+anchors or artifact files during writing; component presence and line counts verified on `main`
+(orchestrator 1,185 · brain 764 · dataset_discovery 1,533 · hot_reload 250 · registry_lock present);
+the v3.1.0 audit-hardening merge (`bf621ce`) confirmed in `main` history.
+
 ## 2026-08-16 — v3.22.0: drive the robot from a plain browser (P6 platform relay)
 
 **Finding.** Remote driving required Tailscale on every viewer's device — the robot console sits on a
