@@ -13,6 +13,20 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-23 — v3.22.12: the collection gate hardened; the loop starts running itself
+
+**Change.** The harvest's bbox hint no longer bypasses the topic vocabulary — a detection tag proves the
+annotation type, not the subject — and the reject vocabulary gained the maritime family that slipped
+through (verified offline on the three real cases). The license resolver now uses the registry's stored
+source id instead of a case-lossy slug reconstruction (41/47 explicit, zero unreachable), with an
+automatic backfill after every scheduled harvest. The round scheduler was enabled for the weed project
+and opened round 1 by itself, submitting the collect step with a real job id onto the ledger the
+project page's compounding chart reads.
+
+**Verification.** Offline rejection test on the exact datasets that leaked; license backfill rerun
+showing the three previously-404 weed sets resolving to cc-by-4.0; the scheduler's first tick observed
+in the service log and the round visible through the rounds API.
+
 ## 2026-08-23 — v3.22.11: M1 sealed re-measurement — the merged-corpus points are now honest
 
 **Result.** Under the sealed protocol (yolo26x@640, 60-epoch cap with patience 20 — every run

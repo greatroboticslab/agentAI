@@ -7008,3 +7008,40 @@ leak-inflated; merged web-harvest plateaus at ~0.6 vs 0.87–0.90 for cwd12-only
 at this threshold (volume/quality confound resolved in volume's favour, as pre-stated).
 Figure title updated to match the sealed finding. S0 is closed in the campaign plan;
 S1 continues (round 1 netted +2,847 real weed images, 2 quarantined off-goal sets).
+
+### v3.22.12 — S1 hardened, licenses complete, and the loop is running itself
+
+Four lines advanced in parallel now that the M1 GPUs freed up.
+
+**S1 — the hole that let marine data in is closed.** `_card_suggests_bbox` returned
+True the moment a dataset's `task_categories` mentioned detection, short-circuiting the
+topic vocabulary entirely — which is precisely how a sea-rescue drone dataset and an
+underwater fish dataset entered the pool on 2026-08-23. A detection tag proves the
+**annotation type, never the subject**: the hint now has to survive a subject check
+against the reject vocabulary, and that vocabulary gained the maritime/aquatic family
+(`seadrones`, `brackish`, `underwater`, `marine`, `boat`, `sonar`, `coral`, …).
+Verified offline against the three real cases: both leaked datasets are now rejected
+with the reason `reject-vocab ['seadrones'] (detection tag is not a subject)`, while
+`project_agml/weed_crop_detection` still passes.
+
+**Licenses — the last unreachable entries resolved.** The resolver reconstructed
+`owner/name` from the slug, which is case-lossy (`project_AgML` → `project_agml` → 404).
+It now prefers the registry's stored source id (`hf_id`/`source_id`/`repo_id`) and only
+falls back to slug reconstruction. Result: **41/47 datasets with an explicit license,
+zero `unreachable`** (was 5). The scheduler's collect step also runs
+`license_audit backfill` after every harvest, closing the gap once for all
+registration paths rather than hooking each one.
+
+**S4 — the double-agent loop is now running unattended.** The scheduler was enabled for
+the `weed` project (2 rounds/day cap) and, on its first tick, opened round 1 and
+submitted the collect step itself (job 44275184) — recorded on the rounds ledger with
+its real job id, which is what the project page's compounding chart reads. This is the
+loop the campaign set out to revive, running without a human in the step.
+
+**S3 — Mamba-YOLO still blocked, one layer deeper.** The login-node failure was pip's
+build isolation (`No module named 'torch'` in the build env); with
+`--no-build-isolation` on a GPU node the extension reaches the compiler and fails
+there. The toolchain is now pinned down (CUDA 12.4.99, GCC 8.5.0, torch 2.3.0+cu121 —
+a toolkit/torch minor mismatch) but pip filtered the actual diagnostics out of the log,
+so a third build invokes `setup.py build_ext` directly with output captured unfiltered
+(job 44275211).

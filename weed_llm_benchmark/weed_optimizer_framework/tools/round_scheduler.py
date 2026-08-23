@@ -135,6 +135,14 @@ def _advance(domain: str, dcfg: dict):
                 st["fails"] += 1
             return
         if state == "COMPLETED":
+            if st["step"] == "collect":
+                # v3.22.12: capture licenses for whatever the harvest registered.
+                # Per-registration-site hooks are whack-a-mole (HF builder datasets
+                # register through a different path), so the scheduler closes the
+                # gap once, after the step, for every source.
+                _CTX["slurm_sh"](
+                    "python -m weed_optimizer_framework.tools.license_audit backfill "
+                    "2>&1 | tail -3", timeout=300)
             metrics = _train_metric() if st["step"] == "train" else None
             _record(domain, st["step"], "done", job=st["job"], metrics=metrics)
             if st["step"] == "train" and metrics:

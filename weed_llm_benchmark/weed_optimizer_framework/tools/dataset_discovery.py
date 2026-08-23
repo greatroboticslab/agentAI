@@ -774,7 +774,7 @@ class DatasetDiscovery:
                 from .license_audit import detect_license
                 prov = self.registry["datasets"][name].get("provenance") or {}
                 if not prov.get("license") or prov.get("license") in ("unresolved", "unreachable"):
-                    prov.update(detect_license(name))
+                    prov.update(detect_license(name, self.registry["datasets"].get(name)))
                     prov["license_checked_at"] = datetime.now().isoformat()
                     update_dict["provenance"] = prov
             except Exception as e:
@@ -923,6 +923,13 @@ class DatasetDiscovery:
         #  project_agml cowpea). Block at source so they can't be re-harvested.
         "coconut", "cowpea", "poultry", "livestock", "cattle", "fish-detect",
         "fruit-detect", "flower-detect", "face-detect", "vehicle-detect",
+        # v3.22.12: the maritime/aquatic family that got through on 2026-08-23
+        # (dronefreak/SeaDronesSee = sea rescue, dronefreak/Brackish = underwater
+        # fish). They were accepted on task_categories alone — see the bbox-hint
+        # fix below, which no longer lets a detection tag bypass the vocabulary.
+        "seadrones", "sea-drones", "brackish", "underwater", "marine",
+        "maritime", "boat", "vessel", "swimmer", "sonar", "aquatic",
+        "coral", "fishery", "shark", "turtle-detect",
         # ** v3.0.43.20 NEW: non-plant categories that slipped through **
         "price_tag", "price-tag",        # d_shatnev__price_tag_detection
         "commonform",                    # jbarrow/kurianmelvin/wewocram commonforms (forms!)
@@ -990,6 +997,17 @@ class DatasetDiscovery:
             else:
                 tasks = getattr(card, "task_categories", []) or []
             if any("detection" in str(t).lower() for t in tasks):
+                # v3.22.12: a detection tag proves the ANNOTATION TYPE, never the
+                # SUBJECT. Returning True here bypassed the topic vocabulary and
+                # is exactly how maritime rescue and underwater fish datasets
+                # entered the pool on 2026-08-23. The hint now has to survive a
+                # subject check against the reject vocabulary.
+                blob = " ".join([str(getattr(ds_info, "id", "")),
+                                 " ".join(str(t) for t in tags)]).lower()
+                bad = [w for w in getattr(self, "_reject_vocab", self.AG_VOCAB_REJECT)
+                       if w in blob]
+                if bad:
+                    return False, f"reject-vocab {bad[:3]} (detection tag is not a subject)"
                 return True, f"task_categories={tasks}"
             # tags check
             for t in tags:

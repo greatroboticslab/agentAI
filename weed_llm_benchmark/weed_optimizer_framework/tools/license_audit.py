@@ -65,9 +65,18 @@ def _norm(lic):
     return lic if lic else "unresolved"
 
 
-def detect_license(slug: str) -> dict:
-    """Return {"license": str, "license_source": str} — never raises."""
+def detect_license(slug: str, info: dict = None) -> dict:
+    """Return {"license": str, "license_source": str} — never raises.
+
+    `info` is the registry entry when available: it carries the ORIGINAL source id
+    (`hf_id`, `kaggle_ref`, …). Reconstructing "owner/name" from a slug is
+    case-lossy — HF ids like `project_AgML/weed_crop_detection` become
+    `project_agml/...` and 404 — so the stored id is always preferred.
+    """
+    info = info or {}
     try:
+        stored = (info.get("hf_id") or info.get("source_id")
+                  or info.get("repo_id") or info.get("kaggle_ref") or "")
         if slug.startswith("kg_"):
             ref = slug[3:].replace("__", "/", 1)
             tok = _kaggle_token()
@@ -95,8 +104,8 @@ def detect_license(slug: str) -> dict:
                 lic = "unresolved"
             return {"license": _norm(lic), "license_source": "github:repo (repo-level)"}
         # Hugging Face style: owner__name (e.g. francesco__grass_weeds)
-        if "__" in slug:
-            ref = slug.replace("__", "/", 1)
+        if stored or "__" in slug:
+            ref = stored if "/" in str(stored) else slug.replace("__", "/", 1)
             hdrs = {}
             tok = _hf_token()
             if tok:
@@ -132,7 +141,7 @@ def backfill(only_missing=True, sleep_s=0.6):
     print("resolving %d/%d datasets..." % (len(todo), len(ds)))
     resolved = {}
     for i, slug in enumerate(todo):
-        resolved[slug] = detect_license(slug)
+        resolved[slug] = detect_license(slug, ds.get(slug) if isinstance(ds.get(slug), dict) else None)
         print("  %-52s -> %-28s (%s)" % (slug[:52], resolved[slug]["license"],
                                          resolved[slug]["license_source"]))
         time.sleep(sleep_s)                      # be polite to the source APIs
