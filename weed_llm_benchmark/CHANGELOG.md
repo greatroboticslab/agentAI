@@ -6818,3 +6818,14 @@ are proven before any GPU job): seed passthrough present, `_load_holdout_dhashes
 importable, **1,977 holdout stems and 1,977 holdout dHashes loaded** (the full cwd12
 test+valid set), merge signature confirmed, `sbatch --test-only` accepted. Submitted as
 jobs 44224995 (raw ×3 seeds) and 44224997 (curated ×3 seeds) on `v100-32`.
+
+### v3.22.4 — reproducibility: the exact cluster training environment is now recorded
+
+`weed_llm_benchmark/requirements.lock` — a `pip freeze` of the `bench` conda environment
+on Bridges-2, the environment behind every GPU result in this repository (211 packages;
+`torch==2.5.1+cu121`, `torchvision==0.20.1+cu121`, `ultralytics==8.4.37`,
+`rfdetr==1.6.5.post0`, `pycocotools==2.0.11`, `numpy==2.2.6`). Recorded with a header
+stating what it is: a record for reproducing published numbers, not a local install
+target (that remains `requirements-dev.txt` for the light path and `requirements.txt`
+for the loose runtime set). This closes the environment-pin gap the v3.1.0 audit left
+open under reproducibility.
