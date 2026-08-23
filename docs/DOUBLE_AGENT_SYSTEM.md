@@ -67,8 +67,10 @@ a Streamlit view, was removed with the old dashboard).
 
 ## 4. The honest scientific finding the curves actually show
 
-The recorded numbers tell a **quality-beats-scale** story, which is the system's most
-defensible result:
+The sealed numbers (M1, 2026-08-23) settle the story: **in-domain purity dominates** —
+every merged web-harvest corpus plateaus near 0.6 while cwd12-only training reaches
+0.87–0.90, and at DINO≥0.50 the quality gate (which also cut data 4×) did not out-score
+raw volume. The gate's proven value is garbage *exclusion*, not score *lifting*:
 
 | Recipe | Data | cwd12 holdout mAP50-95 | Merge path | Anchor |
 |---|---|---|---|---|
@@ -80,19 +82,16 @@ defensible result:
 | **M1 sealed · merged raw** | 55,690 | **0.6032 ± 0.0046** (n=3) | `mega_trainer` + content-hash guard; train∩holdout = 0 | jobs 44234060, 2026-08-23 |
 | **M1 sealed · merged @ DINO≥0.50** | 13,309 | **0.5894 ± 0.0025** (n=3) | same, gate skipped 36/45 slugs | jobs 44234063, 2026-08-23 |
 
-Uncurated pseudo-labeled scale *hurt* accuracy by ~0.27 absolute; the curation stack
-(DINOv2 + label filters + consensus) recovered it and beat the supervised baseline.
-Supporting artifacts: `results/framework/*_results.json`, `v3_0_23_mega_iter6_train8_results.csv`,
+Merging harvested data costs ~0.27–0.30 absolute versus training on the in-domain set
+alone — sealed and pre-guard points agree on this. Supporting artifacts: `results/framework/*_results.json`, `v3_0_23_mega_iter6_train8_results.csv`,
 per-species table in `RESEARCH_LOG.md` (§2026-07 entries), anti-forgetting rounds
 (round-3 zero-forgetting, CHANGELOG L685-691), and the small-object failure analysis
 (mAP 0.87 → 0.40 on small-box subsets, CHANGELOG L1944-1961).
 
-**Which numbers are quotable today** (see `SCIENCE_AUDIT.md` §1): the two *single-dataset*
-rows are clean — they never pass through the merge, so the C1 leak channel cannot reach
-them; quote RF-DETR as **0.8974 ± 0.0040 (n=4)**, never the bare best run. The three
-*merged-corpus* rows carry a pre-guard caveat until M1 re-measures them under the sealed
-content-hash guard; the direction of the quality-vs-scale effect (large, ~0.3 absolute)
-is far bigger than any plausible leak correction, but the exact values must be restated.
+**Which numbers are quotable today** (see `SCIENCE_AUDIT.md` §1): everything in the table
+except the two ⚠ pre-guard rows — and those may be cited as history alongside their
+sealed replacements (the M1 rows), which confirmed the pre-guard values were not
+leak-inflated. Quote means ± std with n, never a bare best run.
 
 ## 5. How it plugs into today's platform
 

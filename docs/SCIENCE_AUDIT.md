@@ -40,9 +40,10 @@ claim — is built from them.
 5. Publish artifacts (config, seed list, `skipped_holdout_hash`, curves) under
    `results/framework/`, referenced from `RESEARCH_LOG.md`.
 
-Whatever comes out — higher or lower than the pre-guard values — becomes the citable
-curve. Until it lands, the merged-corpus numbers carry the "pre-guard" caveat, while
-the cwd12-only headline (0.8974 ± 0.0040) is quotable today.
+**Status: COMPLETED 2026-08-23** — results in row 4b and RESEARCH_LOG. One protocol
+note recorded honestly: every run early-stopped under the pre-registered patience-20
+rule (raw at epochs 29/32/37, curated at 37/44/46) rather than reaching the 60-epoch
+cap; the rule was identical across tiers, so the comparison stands.
 
 ## 3. Threats to validity a strong reviewer will raise (and our answers)
 
