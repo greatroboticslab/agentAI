@@ -55,9 +55,15 @@ conda activate bench || { echo "FATAL: conda activate bench failed" >&2; exit 1;
 echo "python: $(which python)  $(python -V 2>&1)"
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
 
-python - <<PYEOF
-import json, os, time, traceback
+python -u - <<PYEOF
+import json, logging, os, sys, time, traceback
 from pathlib import Path
+
+# The merge scans ~100k images before it prints anything of its own; stream the
+# framework's logger to stdout so a multi-hour job is observable while it runs
+# instead of only at exit.
+logging.basicConfig(level=logging.INFO, stream=sys.stdout,
+                    format="%(asctime)s %(name)s %(message)s")
 
 REPO = "$REPO"
 TIER = "$TIER"
@@ -85,8 +91,18 @@ strategy = {
     "val_dataset_root": CWD12,
 }
 if TIER == "curated":
-    # quality-core gate: drop slugs whose DINOv2 trusted-pool score is too low
-    strategy["min_dino_score"] = float(os.environ.get("MIN_DINO_SCORE", "0.5"))
+    # Quality-core gate: drop slugs whose DINOv2 trusted-pool score is too low.
+    # The gate reads results/framework/dinov2_curator/slug_scores.json and, if that
+    # file is missing, mega_trainer logs a warning and silently DISABLES itself —
+    # which would produce a run labelled "curated" that is byte-identical to "raw".
+    # Fail loudly instead: a mislabelled data point is worse than no data point.
+    scores = Path(REPO) / "results" / "framework" / "dinov2_curator" / "slug_scores.json"
+    if not scores.is_file():
+        raise SystemExit(
+            "REFUSING TO RUN: TIER=curated needs %s, which does not exist. "
+            "Run the DINOv2 curator scoring pass first (run_s2_dino_scores.sh), "
+            "then choose MIN_DINO_SCORE from the real score distribution." % scores)
+    strategy["min_dino_score"] = float(os.environ["MIN_DINO_SCORE"])
 
 out = {"tier": TIER, "seed": SEED, "iteration": ITER,
        "job_id": os.environ.get("SLURM_JOB_ID"), "strategy": strategy,

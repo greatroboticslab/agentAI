@@ -6829,3 +6829,26 @@ stating what it is: a record for reproducing published numbers, not a local inst
 target (that remains `requirements-dev.txt` for the light path and `requirements.txt`
 for the loose runtime set). This closes the environment-pin gap the v3.1.0 audit left
 open under reproducibility.
+
+### v3.22.5 — a "curated" run that would not have been curated, caught before it ran
+
+Supervising the M1 submission surfaced a silent-degradation bug in the quality gate.
+`mega_trainer._merge_datasets(min_dino_score=...)` reads
+`results/framework/dinov2_curator/slug_scores.json`; **that file does not exist on the
+cluster**, and the loader's `except` branch logs a warning and continues with the gate
+disabled. The queued curated tier would therefore have trained on the entire raw pool
+and published the result as the *curated* end of the quality-vs-scale curve — a
+mislabelled data point, which is worse than a missing one.
+
+- The curated tier now **refuses to start** when `slug_scores.json` is absent, naming
+  the file, the job that produces it, and the fact that `MIN_DINO_SCORE` must be chosen
+  from a real distribution (it is now a required variable, not a guessed default).
+- New `run_s2_dino_scores.sh`: the DINOv2 curator pass (`build-reference` → `score-all`)
+  that produces the scores, ending with the score distribution and a kept-slugs-per-
+  threshold table so the threshold is picked from data.
+- `run_m1_merged_seeds.sh` now runs unbuffered with the framework logger streamed to
+  stdout — the merge scans ~100k images before printing anything of its own, and a
+  12-hour job that emits nothing for hours cannot be supervised.
+- Queue actions: the curated array was cancelled before it consumed GPU time; the raw
+  tier (the point that does not depend on the gate) continues, resubmitted for the
+  pending seeds so all three carry the streamed logs.
