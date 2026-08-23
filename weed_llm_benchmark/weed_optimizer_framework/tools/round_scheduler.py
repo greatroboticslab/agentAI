@@ -95,19 +95,42 @@ def _job_state(jobid: str) -> str:
     return st.split()[0] if st else "UNKNOWN"
 
 
-def _train_metric() -> dict:
-    """Best holdout mAP50-95 from the newest round-train artifact (results.csv)."""
+def _train_metric(started_ts: float = 0.0) -> dict:
+    """Holdout mAP50-95 of THIS round's train run.
+
+    Deliberately strict about which artifact it reads. Ultralytics increments its
+    run directory (train, train2, …), so a repeated recipe leaves older runs in
+    place: on 2026-08-23 the round's own result lived in `train2` while `train`
+    still held the previous day's M1 result. Globbing the plain `train` path would
+    have attached a stale number to a fresh round — a fabricated metric, which is
+    worse than none. So: take the NEWEST results.csv, and only accept it if it was
+    written after this step started. Otherwise return no metric.
+    """
     res = _CTX["slurm_sh"](
-        "D=$(ls -td results/framework/mega_iterm1_curated_s101/train "
-        "results/framework/mega_iter*/train 2>/dev/null | head -1); "
-        "tail -n +2 \"$D/results.csv\" 2>/dev/null | "
-        "awk -F, 'BEGIN{b=0} {for(i=1;i<=NF;i++) if($i>b && $i<1 && i>=8 && i<=13) b=$i} END{print b}'; "
-        "echo \"$D\"")
-    lines = (res.get("stdout") or "").strip().splitlines()
-    try:
-        return {"map50_95": float(lines[0]), "source": lines[1] if len(lines) > 1 else "?"}
-    except Exception:
+        "F=$(ls -t results/framework/mega_iter*/train*/results.csv 2>/dev/null | head -1); "
+        "[ -z \"$F\" ] && exit 0; "
+        "echo \"$F\"; stat -c %Y \"$F\"; "
+        "python3 - \"$F\" <<'PY'\n"
+        "import csv, sys\n"
+        "rows = list(csv.DictReader(open(sys.argv[1])))\n"
+        "col = [k for k in (rows[0] if rows else {}) if 'mAP50-95' in k]\n"
+        "vals = [float(r[col[0]]) for r in rows if col and r.get(col[0])]\n"
+        "print(max(vals) if vals else '')\n"
+        "print(len(rows))\n"
+        "PY", timeout=90)
+    lines = [x.strip() for x in (res.get("stdout") or "").strip().splitlines() if x.strip()]
+    if len(lines) < 4:
         return {}
+    path, mtime, best, epochs = lines[0], lines[1], lines[2], lines[3]
+    try:
+        mtime_f, best_f = float(mtime), float(best)
+    except ValueError:
+        return {}
+    if started_ts and mtime_f < started_ts:
+        _log().warning("[rounds] newest results.csv (%s) predates this step — "
+                       "refusing to attach a stale metric" % path)
+        return {}
+    return {"map50_95": round(best_f, 4), "epochs": int(epochs or 0), "source": path}
 
 
 def _record(domain, step, status, detail=None, job=None, metrics=None):
@@ -143,7 +166,7 @@ def _advance(domain: str, dcfg: dict):
                 _CTX["slurm_sh"](
                     "python -m weed_optimizer_framework.tools.license_audit backfill "
                     "2>&1 | tail -3", timeout=300)
-            metrics = _train_metric() if st["step"] == "train" else None
+            metrics = _train_metric(st.get("started", 0)) if st["step"] == "train" else None
             _record(domain, st["step"], "done", job=st["job"], metrics=metrics)
             if st["step"] == "train" and metrics:
                 _record(domain, "eval", "done", job=st["job"], metrics=metrics,
@@ -254,7 +277,37 @@ async def scheduler_set(request: Request):
     return JSONResponse({"ok": True, "domain": domain, "config": d})
 
 
+def _recover_inflight():
+    """Re-adopt steps still marked `running` on the ledger after a restart.
+
+    `_STATE` is in-process, so a dashboard restart mid-round would otherwise leave
+    a live SLURM job untracked and the scheduler free to submit the same step
+    again. The ledger already holds the truth (step status + real job id), so read
+    it back on boot. Verified need: a restart at 17:5x happened while round 1's
+    train job was 2h40m in.
+    """
+    try:
+        db = _CTX["db"]
+        for domain, dcfg in (_cfg().get("domains") or {}).items():
+            if not dcfg.get("enabled"):
+                continue
+            cur = db.get_current_round(domain) or {}
+            for step, entry in (cur.get("steps") or {}).items():
+                if isinstance(entry, dict) and entry.get("status") == "running" \
+                        and entry.get("job"):
+                    _STATE[domain] = {"job": str(entry["job"]), "step": step,
+                                      "fails": 0, "started": time.time(),
+                                      "day": time.strftime("%Y-%m-%d"),
+                                      "rounds_today": 1}
+                    _log().info("[rounds] %s: re-adopted in-flight step %s (job %s) "
+                                "from the ledger after restart"
+                                % (domain, step, entry["job"]))
+    except Exception as e:
+        _log().warning("[rounds] in-flight recovery failed: %s" % e)
+
+
 def mount(app, ctx: dict):
     _CTX.update(ctx)
+    _recover_inflight()
     threading.Thread(target=_loop, daemon=True).start()
     app.include_router(router)

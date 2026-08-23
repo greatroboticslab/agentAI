@@ -7076,3 +7076,33 @@ signature of **GCC 8.5 (the system compiler) being too old for torch 2.3**, whic
 GCC ≥ 9. Rebuilding with `module load gcc/10.2.0` (job 44280678). Four builds, four
 distinct layers: pip build isolation → login-node/GPU-node difference → filtered
 diagnostics → compiler version.
+
+### v3.22.14 — a stale metric caught before it was published; Mamba-YOLO builds
+
+**The scheduler would have reported yesterday's number as today's result.** Ultralytics
+increments its run directory, so the round's own training wrote to
+`mega_iterm1_curated_s101/train2` while `train/` still held the previous day's M1 run.
+`_train_metric()` globbed the plain `train` path first and would have attached
+**0.5873 — an artifact from 04:52 — to a round that started at 15:05**, i.e. a
+fabricated result on the compounding chart the whole S4 milestone rests on. Caught
+while the round's train step was still running.
+
+- `_train_metric(started_ts)` now takes the **newest** `results.csv` under
+  `mega_iter*/train*/` and accepts it **only if it was written after the step started**;
+  otherwise it logs the refusal and attaches no metric. No metric is a fact; a stale
+  metric is a lie.
+- Redeploying exposed a second gap: `_STATE` is in-process, so the restart orphaned a
+  live 2 h 40 m training job and left the scheduler free to submit the step again. The
+  ledger already holds the truth, so `_recover_inflight()` re-adopts any step still
+  marked `running` with its real job id at mount. Verified in the service log:
+  *"weed: re-adopted in-flight step train (job 44278259) from the ledger after restart"*.
+
+**Mamba-YOLO's CUDA extension now builds and imports** (job 44280678). Root cause of
+four failed attempts, in order: pip build isolation → login-node vs GPU-node → pip
+filtering the compiler diagnostics → **GCC 8.5 too old for torch 2.3's headers**
+(`overflow in constant expression` in `DispatchKeySet.h`). With `gcc/10.2.0` the build
+and install both return 0. Two follow-on notes for whoever runs it: this fork produces
+`selective_scan_cuda_{core,ndstate,oflex}`, not a plain `selective_scan_cuda`, and
+`import torch` must come first or the extension fails to find `libc10.so`. Verified:
+all three modules import under torch 2.3.0+cu121. The professor's Mamba-YOLO training
+task is unblocked.
