@@ -6852,3 +6852,30 @@ mislabelled data point, which is worse than a missing one.
 - Queue actions: the curated array was cancelled before it consumed GPU time; the raw
   tier (the point that does not depend on the gate) continues, resubmitted for the
   pending seeds so all three carry the streamed logs.
+
+### v3.22.6 — the curated tier's threshold, chosen from data by a pre-registered rule
+
+`run_s2_dino_scores.sh` completed (14 min, job 44225271) and produced the missing
+`dinov2_curator/slug_scores.json`. All 45 registry slugs are scored, so the gate now
+actually bites (nothing falls through the "unscored slugs are kept" path).
+
+Score distribution: min 0.084 · p25 0.305 · median 0.327 · p75 0.493 · max 0.794 — a
+clearly bimodal pool, with a cliff between 0.30 (84% of slugs kept) and 0.35 (47%).
+
+The threshold was fixed by a rule stated **before** looking at which value it would
+select: *the highest threshold whose kept pool still holds ≥15,000 images and is ≤60%
+of the raw pool* — trainable, and a genuine contrast rather than a near-copy of raw.
+That rule selects **0.50**: 9 slugs, 17,870 registry images, 16.9% of the raw pool.
+
+A sanity check on what the gate keeps, recorded because it is evidence the curation
+signal is meaningful rather than arbitrary: the highest-scoring slugs are exactly the
+cotton-weed *detection* datasets (`cottonweed_holdout` 0.794, `cottonweed_sp8` 0.764,
+then five Roboflow weed-detection sets 0.52–0.64), while off-target material scores
+low and is dropped. The in-domain training data (`cottonweed_sp8`) survives the gate;
+`cottonweed_holdout` is excluded from training by NEVER_TRAIN and the content-hash
+guard regardless of its score.
+
+Submitted as job 44228844 (`TIER=curated`, `MIN_DINO_SCORE=0.50`, seeds 101/102/103).
+The raw tier (jobs 44224995_1, 44225260_2/3) is training on 55,690 merged images
+against the 1,977-image sealed holdout, with `seed=101/102/103` confirmed live in the
+ultralytics configuration — the v3.22.3 passthrough works.
