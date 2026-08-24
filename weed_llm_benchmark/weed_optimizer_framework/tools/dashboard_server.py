@@ -15056,18 +15056,31 @@ def slugs_landing(domain: str = "weed"):
         n_imgs = info.get("local_images") or info.get("images") or 0
         used = info.get("used_for_training", False)
         verdict = verdicts.get(slug, "")
+        # v3.22.16: surface the campaign's data-governance state on the page an
+        # operator actually looks at — quarantined sources were being skipped by
+        # the merge and listed only by a CLI, so the UI showed no trace of them.
+        card = info.get("scorecard") or {}
+        audit = card.get("sample_audit") or {}
         rows.append({
             "slug": slug, "cn": cn, "lp": lp, "status": st,
             "n_imgs": n_imgs, "used": used, "verdict": verdict,
             "has_local": bool(lp and os.path.isdir(lp)),
+            "quarantined": st == "quarantined",
+            "q_reason": info.get("quarantine_reason") or "",
+            "labeled": card.get("labeled"),
+            "in_pool": card.get("in_audited_pool"),
+            "audit_prec": audit.get("audited_precision"),
+            "audit_pass": audit.get("passes_bar"),
         })
     # Sort by verdict (unverified first, junk last)
     def sort_key(r):
         order = {"": 0, "keep": 1, "unsure": 2, "junk": 3}
-        return (order.get(r["verdict"], 0), -r["n_imgs"])
+        # quarantined sinks to the bottom, below every judged slug
+        return (1 if r["quarantined"] else 0, order.get(r["verdict"], 0), -r["n_imgs"])
     rows.sort(key=sort_key)
 
     # Render table
+    import html as _esc
     tr_html = []
     for r in rows:
         cn_str = ", ".join(r["cn"][:4]) + (f" (+{len(r['cn'])-4})" if len(r["cn"]) > 4 else "")
@@ -15076,6 +15089,23 @@ def slugs_landing(domain: str = "weed"):
         used_badge = '<span class="badge badge-used">TRAINED</span>' if r["used"] else ""
         local_badge = '' if r["has_local"] else '<span class="badge badge-no-local">no local</span>'
         v_class = f" verdict-{r['verdict']}" if r["verdict"] else ""
+        q_badge = ""
+        row_style = ""
+        if r["quarantined"]:
+            q_badge = ('<span class="badge" style="background:#7c2d12;color:#fed7aa" '
+                       f'title="{_esc.escape(str(r["q_reason"]))[:180]}">QUARANTINED</span>')
+            row_style = ' style="opacity:.45"'
+        pool_badge = ""
+        if r["audit_prec"] is not None:
+            ok = r["audit_pass"]
+            pool_badge = ('<span class="badge" style="background:%s;color:#fff" '
+                          'title="label sample-audit: OWLv2 recall probe + geometry">'
+                          'audit %.2f</span>'
+                          % ("#166534" if ok else "#991b1b", float(r["audit_prec"])))
+        elif r["in_pool"] is False and not r["quarantined"]:
+            pool_badge = ('<span class="badge" style="background:#334155;color:#cbd5e1" '
+                          'title="not eligible for the training pool (too few or too thin labels)">'
+                          'not in pool</span>')
         v_buttons = "".join(
             f'<button class="vbtn {k}{"" if r["verdict"]!=k else " on"}" '
             f'data-v="{k}" title="{lbl}">{sym}</button>'
@@ -15086,11 +15116,11 @@ def slugs_landing(domain: str = "weed"):
             ]
         )
         tr_html.append(f'''
-        <tr class="srow{v_class}" data-slug="{r["slug"]}" data-verdict="{r["verdict"]}">
+        <tr class="srow{v_class}"{row_style} data-slug="{r["slug"]}" data-verdict="{r["verdict"]}">
           <td class="slug-col">
             <a href="/gallery/{r["slug"]}" target="_blank" title="View this dataset's images (to judge keep / junk)">{r["slug"]}</a>
             <a href="/gallery/{r["slug"]}" target="_blank" title="View images" style="text-decoration:none;margin-left:6px">🖼</a>
-            {used_badge} {local_badge}
+            {used_badge} {local_badge} {q_badge} {pool_badge}
           </td>
           <td>{r["status"]}</td>
           <td class="num">{r["n_imgs"]}</td>

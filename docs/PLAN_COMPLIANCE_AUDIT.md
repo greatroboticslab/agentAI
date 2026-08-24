@@ -28,7 +28,7 @@ when the outcome was good.*
 | **S2** | pool report regenerable by script | ✅ **MET (same day)** — `tools/pool_report.py report --json` emits size, class balance, DINO quality histogram, license mix, quarantine list and the audited-pool criteria; `scorecards` writes a per-source card into each registry entry. First run exposed and fixed a label-counting error in the tool itself (see §3.3) |
 | **S3** | ≥12 ledgered runs across ≥3 method families | ❌ **NOT STARTED** — 7 runs so far, all one family (yolo26x). Mamba-YOLO's extension only became buildable today; RF-DETR not re-run |
 | **S4** | ≥24 h unattended, ≥2 complete rounds, zero fake-success | 🔄 **IN PROGRESS** — round 1 is at collect ✅ → filter ✅ → label skipped → train running (5 h). Zero fake-success **so far, but only because the stale-metric bug was caught before publishing**, not because it never happened |
-| **S5** | clean checkout → one command → byte-stable assets | ⚠️ **PARTIAL** — `make_figures.py` regenerates everything and auto-fills M1, but it has only ever run on the lab server against a hand-copied data file; byte-stability was never tested |
+| **S5** | clean checkout → one command → byte-stable assets | ✅ **MET (same day)** — two independent runs from separate clean copies produced byte-identical output for all five artifacts (`quality_vs_scale.png` md5 `0391ee13…`, plus the four tables) |
 | **S6** | deployment integration | ⏸ not started (correctly — it follows S3) |
 
 ## 3. Deviations worth naming
@@ -40,9 +40,18 @@ when the outcome was good.*
    supervisor judgement plus, since v3.22.13, the label gate. That works, but it is not
    the plan, it does not scale past a human in the loop, and the S1 gate cannot be
    honestly declared met without it.
-2. **Quarantine is enforced but invisible** — the plan says quarantined sources are
-   "listed greyed-out" on the platform. The merge skips them with a counted stat and
-   the CLI lists them, but no UI surfaces them, so an operator sees no trace.
+2. ~~**Quarantine is enforced but invisible**~~ — **fixed the same day**, and fixing it
+   exposed something worse. The `/slugs` page now greys out quarantined sources with
+   their reason and shows audit/pool badges — but the badges rendered empty at first,
+   because **the lab→cluster sync had been hung since 2026-08-03**: an rsync process
+   sat waiting 20 days 18 hours on an authentication prompt that never came (the
+   service's askpass file held a stale password until it was replaced earlier the same
+   day for an unrelated reason). Every governance action taken on the cluster —
+   quarantines, licenses, scorecards — was therefore invisible on the platform, and the
+   "platform-first" constraint was silently only half-true. The service was killed and
+   restarted, the registry re-pulled, and the UI now shows all four quarantined sources
+   greyed out. **A stuck sync is indistinguishable from a quiet one; it needs an
+   age alarm** (added to the corrective list).
 3. **D1's target is already met, and the first measurement of it was wrong.** The pool
    report initially read **15,789 labelled** because `local_labeled` is a field only
    later harvests populate — legacy entries report 0 even for `cottonweed_sp8`, the
@@ -73,9 +82,12 @@ when the outcome was good.*
    confidence histogram, DINO verifier score, montage) — the last missing S1
    mechanism. The per-source **scorecard** now exists (`pool_report.py scorecards`).
 2. ~~Write `pool_report.py`~~ — **done**, S2 gate met.
-3. Surface **quarantined datasets in the UI**, greyed-out with their reason.
+3. ~~Surface quarantined datasets in the UI~~ — **done**.
+3b. **Add a staleness alarm on the lab↔cluster sync** — surface the registry's age on
+   the dashboard and fail loudly past a threshold, so a hung sync cannot masquerade as
+   a quiet period for three weeks again.
 4. Amend the plan: state **labelled** images in D1/S1/S3 targets, and schedule the
    autolabel decision that the tier ladder depends on.
-5. Run `make_figures.py` from a **clean checkout** twice and diff, to earn S5's gate.
+5. ~~Run `make_figures.py` from a clean checkout twice and diff~~ — **done**, S5 met.
 6. Restore cluster etiquette on every future build/submit — no exceptions for "cheap"
    jobs.

@@ -7137,3 +7137,38 @@ met; the audited half is not.
 Also recorded: round 1's training reads **0.6019 at epoch 17** against the sealed M1
 curated **0.5894 ± 0.0025** at the same recipe — the compounding effect appearing, on
 one unfinished seed, and quotable as nothing more than that yet.
+
+### v3.22.16 — working the audit's corrective list; a three-week-old truth surfaces
+
+Acting on `PLAN_COMPLIANCE_AUDIT.md` §5, in order.
+
+- **S1's last missing mechanism, built:** `tools/sample_audit.py` samples a source's
+  labelled images, cross-checks them, flags geometry outliers, saves a montage, and
+  records the verdict in the source's registry scorecard. The cross-check is
+  deliberately one-directional: this project measured OWLv2 at **recall 0.943 /
+  precision 0.194**, so it is worthless as ground truth but excellent as a recall
+  probe — a label that a 94 %-recall detector cannot see at all is suspect, while an
+  OWLv2 box is never taken as evidence a label is *right*. The metric is
+  `audited_precision = 1 − (GT boxes unseen by OWLv2 / GT boxes)`, always stored with
+  its sample size. Verified on the login node before submitting (the etiquette rule the
+  audit had just caught being skipped); sweep running as job 44294276.
+- **S5 gate earned:** two independent `make_figures.py` runs from separate clean copies
+  produce byte-identical output across all five artifacts.
+- **Quarantine is now visible** on `/slugs`: quarantined sources sink to the bottom,
+  render at 45 % opacity with a QUARANTINED badge carrying the reason, and every row
+  shows its audited precision or a "not in pool" marker.
+
+**And that fix exposed a three-week-old failure.** The badges rendered empty at first
+because the platform was serving a registry from 2026-08-18 with 60 datasets and zero
+governance fields. The cause: **`weed-sync.service` had been hung since 2026-08-03** —
+`ps` showed the same rsync alive for **20 days 18 hours**, blocked on an authentication
+prompt that never came, because the service's askpass file held a stale password until
+it happened to be replaced earlier the same day for an unrelated reason. A systemd
+timer will not start a new run while the old one is alive, so the sync simply stopped
+without ever reporting a failure. Every quarantine, license and scorecard written on
+the cluster had been invisible on the platform for the whole campaign.
+
+Killed, restarted, registry re-pulled, `fix_local_paths` re-run (55/70 paths rewritten,
+Mongo re-mirrored), UI verified: four quarantined sources greyed out with reasons, 43
+"not in pool" markers. A staleness alarm is now on the corrective list — **a hung sync
+is indistinguishable from a quiet one, and this one hid for three weeks.**

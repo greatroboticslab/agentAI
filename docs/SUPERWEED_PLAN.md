@@ -18,7 +18,7 @@ with every claim reproducible.
 
 | ID | Deliverable | Acceptance |
 |---|---|---|
-| D1 | **SuperWeed dataset**: ≥50,000 (stretch ≥150,000) unique weed-relevant detection images, deduped (dHash), holdout-guarded, license-tracked, canonical-taxonomy labels | registry scorecard per source; sample-audit precision ≥90% on audited batches; 0 holdout content matches (`skipped_holdout_hash` reported) |
+| D1 | **SuperWeed dataset**: ≥50,000 (stretch ≥150,000) unique **labelled** weed-relevant detection images (labelled is the number that trains — the merge consumes nothing else; counted from disk, not from the `local_labeled` registry field, which legacy entries never set), deduped (dHash), holdout-guarded, license-tracked, canonical-taxonomy labels | registry scorecard per source; sample-audit precision ≥90% on audited batches; 0 holdout content matches (`skipped_holdout_hash` reported) |
 | D2 | **Model suite**: best honest cwd12 holdout mAP50-95 + cross-dataset generalization, over ≥3 method families (YOLO11 n/s/m; RF-DETR; Mamba-YOLO-T) ± WBF/TTA ceiling | every run: pinned config + seed; headline = mean±std over ≥3 seeds, never best-of-N |
 | D3 | **Platform-native operation**: the whole campaign runs as the `weed` project — agent cards fire the jobs, rounds ledger records them, a compounding chart (round № vs holdout metric) renders on the project page | a stranger can read the project page and see what ran, when, and what it scored |
 | D4 | **Reproducibility package**: `make_figures.py` regenerates every table/figure from checked-in artifacts | one command, no hand edits |
@@ -169,9 +169,9 @@ its metric says.
 | Phase | State | Closed on |
 |---|---|---|
 | S0 | **CLOSED** — audit+backup ✅ tokens ✅ requirements.lock ✅ M1 sealed re-measurement published (raw 0.6032±0.0046, curated 0.5894±0.0025, guard verified, RESEARCH_LOG 2026-08-23) | 2026-08-23 |
-| S1 | in progress — round 1 done (platform-fired, 3 real weed sets +2,847 imgs, 2 off-goal quarantined); hardening queued (strict topic mode, hf_id-based license resolve, auto-backfill in scheduler) | — |
-| S2 | partial — DINOv2 scoring shipped (45/45), threshold rule pre-registered; full-pool dedup/taxonomy pending | — |
+| S1 | in progress — 2 harvest rounds (+8,208 labelled); gate hardened (label gate default-on, subject check, license at collection); scorecards ✅, sample-audit sweep running (job 44294276); pool = 120,515 labelled / 50 sources | — |
+| S2 | **CLOSED** — `tools/pool_report.py` emits the pool report (size, class balance, DINO histogram, license mix, quarantine list) and writes per-source scorecards into the registry | 2026-08-23 |
 | S3 | not started | — |
 | S4 | not started | — |
-| S5 | partial — make_figures.py live and auto-filling; byte-stability gate pending | — |
+| S5 | **CLOSED** — two independent runs from clean copies produce byte-identical output for all five artifacts (md5 0391ee13…) | 2026-08-23 |
 | S6 | not started | — |
