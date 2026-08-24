@@ -7250,3 +7250,29 @@ Both scripts write an `s3_*.json` artifact (family, seed, epochs ran, best holdo
 mAP50-95, job id) for the S3 ledger; ~15 SU estimated for the wave. With the six M1
 yolo26x runs and the two scheduler rounds, the ≥12-runs / ≥3-families gate needs this
 wave plus the tier ladder to close.
+
+### v3.22.20 — the fork's trainer is unusable; call its API directly
+
+Mamba-YOLO-T's first run (44323304) died in 113 s, and reading `mbyolo_train.py`
+found three problems rather than one:
+
+1. Every path argument is used as `ROOT + opt.<arg>`, so an absolute `--data` becomes
+   `/Mamba-YOLO//ocean/.../cwd12_sealed.yaml`. That is what killed the job.
+2. `task_type = {"train": YOLO(c).train(**a), "val": ..., "test": ...}` is a **dict
+   literal**, so all three branches evaluate eagerly regardless of `--task`; `YOLO` has
+   no `.test()`, so the process dies after training every time.
+3. It exposes no `--seed`, which would have left this family unable to report the
+   mean±std the campaign requires of every headline.
+
+The fork's `ultralytics` (8.2.29, vendored) imports fine on its own, so the runner now
+calls that API directly from the fork's directory — fixing all three at once and giving
+Mamba the *same* seeded protocol as YOLO11n and yolo26x.
+
+A login-node build check was attempted per the cluster-etiquette rule and revealed its
+own limit: constructing this model touches CUDA, so it cannot be verified without a
+GPU. Rather than queue three long runs on an unvalidated family, a **25-minute smoke
+job** (44325279) builds the model on a real GPU and trains 2 epochs, printing the
+projected 100-epoch wall-clock. Full seeded runs follow only if it passes.
+
+Meanwhile YOLO11n's sealed 3-seed baseline is healthy at epoch 29/100 — 0.8172 /
+0.8202 / 0.8157, converging toward the historical 0.865 single-run figure.
