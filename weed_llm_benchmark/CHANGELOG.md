@@ -7325,3 +7325,26 @@ back at it.
 Meanwhile the harvest keeps compounding: the pool is at **156,521 labelled images across
 63 datasets** (6 quarantined), and the scheduler is mid-round-3 with the 10-hour collect
 walltime in force.
+
+### v3.22.23 — Mamba-YOLO-T's number, and the control that makes it mean something
+
+All three seeds reached epoch 100. **Mamba-YOLO-T: 0.8266 ± 0.0064** (per-seed 0.8331 /
+0.8263 / 0.8203; 6.13 M params, batch 16, SGD, ~4 h per run on a V100).
+
+The obvious reading — that the AAAI-2025 architecture loses to a 2.6 M-parameter
+YOLO11n at 0.8755 ± 0.0029 — **is not supported by this experiment**, and the reason is
+in how each model was initialised. YOLO11n started from **COCO-pretrained `yolo11n.pt`**;
+the fork releases no Mamba-YOLO checkpoints, so Mamba-YOLO-T started from a YAML with
+**random weights**. On 3,671 training images, pretraining is very likely worth more than
+architecture. Publishing the pair as an architecture comparison would have been a
+straightforward misreading of our own setup.
+
+So a control is running: **YOLO11n from scratch** (`yolo11n.yaml`, same seeds, same
+protocol, jobs 44368952_[1-3]). Whatever it scores is the number Mamba-YOLO-T should be
+compared against; the pretrained row stays as the answer to a different question ("what
+is the best cwd12 model we can train?").
+
+Both figures are recorded with the confound attached in `figures_data.json`, so the
+caveat travels with the data rather than living in a commit message. Elsewhere the loop
+is healthy: round 3's collect finished in 2 h 30 m (comfortably inside the new 10 h
+walltime), DINO scoring completed, and round 3's training is underway.

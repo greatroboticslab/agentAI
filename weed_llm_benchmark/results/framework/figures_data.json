@@ -316,7 +316,23 @@
    "note": "supersedes the 2026-03 single-run 0.865 with the first error bar for this family"
   },
   "mamba_yolo_t": {
-   "status": "model builds on GPU (6.13M params); smoke blocked by numpy 2 removing np.trapz in the fork's vendored ultralytics 8.2.29; env pinned to numpy<2, smoke resubmitted"
+   "per_seed": [
+    0.8331,
+    0.8263,
+    0.8203
+   ],
+   "mean": 0.8266,
+   "std": 0.0064,
+   "n_seeds": 3,
+   "epochs": 100,
+   "params_M": 6.13,
+   "init": "FROM SCRATCH (yaml) — the fork releases no Mamba-YOLO weights",
+   "protocol": "cwd12_sealed.yaml — train 3,671 / val = 1,977 holdout; seeds 101/102/103; batch 16; SGD; V100 ~4h/run",
+   "jobs": "44351282_[1-3]",
+   "CONFOUND": "not comparable to the YOLO11n row as an architecture result: YOLO11n started from COCO-pretrained yolo11n.pt, Mamba-YOLO-T from random init. A from-scratch YOLO11n control (jobs 44368952) removes the asymmetry."
+  },
+  "yolo11n_scratch_control": {
+   "status": "running (44368952_[1-3]), init=yolo11n.yaml"
   }
  }
 }
