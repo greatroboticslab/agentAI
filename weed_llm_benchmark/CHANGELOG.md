@@ -7106,3 +7106,34 @@ and install both return 0. Two follow-on notes for whoever runs it: this fork pr
 `import torch` must come first or the extension fails to find `libc10.so`. Verified:
 all three modules import under torch 2.3.0+cu121. The professor's Mamba-YOLO training
 task is unblocked.
+
+### v3.22.15 — auditing the campaign against its own plan; the pool report it was missing
+
+A scheduled check of execution against `SUPERWEED_PLAN.md` rather than against
+impressions — `docs/PLAN_COMPLIANCE_AUDIT.md`. Verdicts: **S0 met**, **S2 met** (once
+the missing tool was written, below), **S1 not met**, **S3 not started**, **S4 in
+progress**, **S5 partial**. Constraints: five of seven held cleanly; two did not —
+the registry suffered one real incident (the lost-update erasure, since fixed), and
+cluster etiquette was skipped for the four Mamba builds, which were submitted without
+the login-node verification the plan requires even though M1 followed it exactly.
+
+The audit named two mechanisms the plan specified that execution had quietly replaced
+with supervisor judgement: the **per-source scorecard** and the **per-round scorecard**.
+One is now built: `tools/pool_report.py` — `scorecards` writes a card (images, labelled,
+label ratio, classes, DINO score, license, status, pool eligibility) into every registry
+entry so it travels with the data; `report --json` emits the aggregate the S2 gate asks
+for. The image-level sample-audit (≥25 images, OWLv2 histogram, montage) remains open,
+so **S1 stays open regardless of image count**.
+
+Running the new tool immediately caught an error in the new tool: it read
+`local_labeled`, a field only later harvests populate, and so reported **15,789
+labelled images** — including a flat 0 for `cottonweed_sp8`, the in-domain core the
+merge trains on every round. Counting label files on disk instead (bounded to `labels*`
+directories, never descending into image trees, per this project's own Lustre lesson)
+gives the real figure: **120,515 labelled images across 50 audited-pool sources**,
+121,721 active, 105 distinct classes, 4 quarantined. On volume, D1's ≥50,000 target is
+met; the audited half is not.
+
+Also recorded: round 1's training reads **0.6019 at epoch 17** against the sealed M1
+curated **0.5894 ± 0.0025** at the same recipe — the compounding effect appearing, on
+one unfinished seed, and quotable as nothing more than that yet.
