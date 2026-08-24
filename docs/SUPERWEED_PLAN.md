@@ -171,7 +171,7 @@ its metric says.
 | S0 | **CLOSED** — audit+backup ✅ tokens ✅ requirements.lock ✅ M1 sealed re-measurement published (raw 0.6032±0.0046, curated 0.5894±0.0025, guard verified, RESEARCH_LOG 2026-08-23) | 2026-08-23 |
 | S1 | in progress — 2 harvest rounds (+8,208 labelled); gate hardened (label gate default-on, subject check, license at collection); scorecards ✅, sample-audit sweep running (job 44294276); pool = 120,515 labelled / 50 sources | — |
 | S2 | **CLOSED** — `tools/pool_report.py` emits the pool report (size, class balance, DINO histogram, license mix, quarantine list) and writes per-source scorecards into the registry | 2026-08-23 |
-| S3 | not started | — |
+| S3 | **in progress** — wave 1 submitted 2026-08-24: Mamba-YOLO-T first train (fork installed, no --seed flag → recorded as default-seed pipeline validation) + YOLO11n ×3 seeds, both on the sealed cwd12 protocol (`cwd12_sealed.yaml`: train 3,671 / holdout-val 1,977) | — |
 | S4 | **CLOSED** — soak gate met: rounds #1 and #2 fully closed unattended (collect→filter→train→eval, real job ids, fresh-artifact metrics 0.6019 / 0.5919 on the ledger the chart reads); round #3 self-started. Zero fake-success entries | 2026-08-24 |
 | S5 | **CLOSED** — two independent runs from clean copies produce byte-identical output for all five artifacts (md5 0391ee13…) | 2026-08-23 |
 | S6 | not started | — |

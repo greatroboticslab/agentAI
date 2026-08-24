@@ -7229,3 +7229,24 @@ as its reason) and `mh_weed16` scores 0.452 with valid geometry, an honest
 quality question for a 15-class set rather than a tooling artefact. The failing sources
 stay in training for now (M1 already measured that pool honestly); their audited state
 is recorded on their scorecards for the S3 tiering decisions.
+
+### v3.22.19 — S3 opens: two new method families on the sealed protocol
+
+The trainer campaign's first wave, both runs on a shared `cwd12_sealed.yaml`
+(train = the 3,671-image train split; val = the 1,977-image test+valid holdout):
+
+- **Mamba-YOLO-T** (family #3, the professor's named architecture): the fork installed
+  editable into the `mambayolo` env (its own ultralytics 8.2.29), first training run
+  submitted (job 44323304). `mbyolo_train.py` exposes no `--seed` and defaults to
+  8 GPUs / batch 512 / 128 workers, so every knob is pinned for one V100 (batch 16,
+  workers 4, 100 epochs) and the artifact records `seed=default` — this run validates
+  the pipeline; seed variance comes once it works.
+- **YOLO11n × 3 seeds** (family #2): the historical 0.865 baseline was one run on the
+  pre-split full set; jobs 44323305_[1-3] (seeds 101/102/103, 100 ep, deterministic)
+  give the family a sealed mean±std. `yolo11n.pt` pre-fetched on the login node since
+  compute nodes may lack internet.
+
+Both scripts write an `s3_*.json` artifact (family, seed, epochs ran, best holdout
+mAP50-95, job id) for the S3 ledger; ~15 SU estimated for the wave. With the six M1
+yolo26x runs and the two scheduler rounds, the ≥12-runs / ≥3-families gate needs this
+wave plus the tier ladder to close.
