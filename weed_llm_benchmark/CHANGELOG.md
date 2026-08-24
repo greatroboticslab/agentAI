@@ -7201,3 +7201,31 @@ human-labelled cwd12 first. An instrument never read against a known quantity ca
 condemn anything: whatever the probe scores on our best data is the ceiling it can
 measure, and a 0.90 bar set above that ceiling would only be measuring OWLv2's limits.
 All prior verdicts were cleared as mis-measured; calibration + re-audit is job 44300150.
+
+### v3.22.18 — the soak gate is met: the double-agent loop closed two rounds on its own
+
+The S4 gate asked for ≥2 complete unattended rounds from real jobs with the chart
+advancing and zero fake-success entries. The ledger now shows exactly that:
+
+- **Round #1**: collect (44275184) → filter (44276626) → train (44278259, 5 h 37 m) →
+  eval, metric **0.6019** from the round's own artifact (`train2/results.csv`).
+- **Round #2**: collect (44295046, the first strict-gate harvest — all six downloads
+  arrived fully labelled) → filter (44303585) → train (44304828, 6 h 34 m) → eval,
+  metric **0.5919** from `train3/results.csv` — the freshness guard attached the right
+  artifact both times.
+- **Round #3**: opened and its collect submitted by the scheduler itself (44322382).
+
+No human touched a step across either round. The labelled pool grew to **145,869
+images** (61 datasets, 5 quarantined). Round metrics are single-seed and within noise
+of each other and of M1; the compounding story needs more rounds before it is a claim.
+
+**The audit probe is now a calibrated instrument.** Run against human-labelled cwd12 it
+reads **precision 1.000 on both** `cottonweed_sp8` and `cottonweed_holdout` — so the
+0.90 bar sits comfortably under a measured ceiling, and a FAIL means the data, not the
+probe. Re-audit under the fixed prompts: 3 sources PASS at 1.000 (both cwd12 sets +
+`imageweeds_weed_detection`), 6 FAIL — of which `synthetic_cowpea_pod_detection` fails
+on model-free geometry alone (25/25 degenerate boxes, quarantined with the measurement
+as its reason) and `mh_weed16` scores 0.452 with valid geometry, an honest
+quality question for a 15-class set rather than a tooling artefact. The failing sources
+stay in training for now (M1 already measured that pool honestly); their audited state
+is recorded on their scorecards for the S3 tiering decisions.
