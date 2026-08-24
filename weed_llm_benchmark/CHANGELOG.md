@@ -7276,3 +7276,33 @@ projected 100-epoch wall-clock. Full seeded runs follow only if it passes.
 
 Meanwhile YOLO11n's sealed 3-seed baseline is healthy at epoch 29/100 — 0.8172 /
 0.8202 / 0.8157, converging toward the historical 0.865 single-run figure.
+
+### v3.22.21 — YOLO11n gets its error bar; a success that was recorded as a failure
+
+**Result.** YOLO11n on the sealed protocol, 3 seeds, 100 epochs each:
+**0.8755 ± 0.0029** (per-seed 0.8739 / 0.8789 / 0.8737). The 2026-03 figure of 0.865
+was a single run on the pre-split full set; this is the family's first honest error bar
+and it sits slightly above that number. Both rows are kept in the results table — the
+historical one labelled as history.
+
+**A defect in the scheduler, caught by cross-reading SLURM.** Round 3's harvest
+(44322382) ran 3 h 10 m and `sacct` records it **COMPLETED** — but the scheduler had
+recorded that step **failed**, because `_job_state()` polled during the gap where a job
+has left `squeue` and has not yet appeared in `sacct`, got nothing, and returned
+`UNKNOWN`, which the caller treated as failure. That miscount then contributed to the
+stop-loss. **A success miscounted as a failure is the same class of defect as the
+reverse**, and it is the harder one to notice because the system looks appropriately
+cautious. `_job_state()` now polls up to four times with backoff, and an `UNKNOWN`
+leaves the step in flight instead of inventing a verdict.
+
+**And a real failure underneath it.** Round 4's harvest genuinely hit `TIMEOUT` at
+4 h 00 m 29 s: the harvest script's `#SBATCH --time=04:00:00` was sized when the
+registry held 45 datasets and it now holds 61 — round 3 already needed 3 h 10 m. The
+scheduler's collect step now overrides to 10 h on the command line, leaving the script
+untouched for manual use. So the stop-loss fired on one real failure and one phantom;
+with both fixed, the weed domain is re-enabled.
+
+**Mamba-YOLO-T:** the model **builds on a real GPU (6.13 M params)** — the architecture
+works. The smoke then died in metrics on `np.trapz`, removed in NumPy 2, which the
+fork's vendored ultralytics 8.2.29 still calls. The `mambayolo` env is pinned to
+`numpy<2` (isolated; `bench` untouched) and the smoke resubmitted as 44344817.

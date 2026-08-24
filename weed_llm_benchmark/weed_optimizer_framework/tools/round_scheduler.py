@@ -45,7 +45,10 @@ DEFAULT_CFG = {"domains": {}}    # {"weed": {"enabled": False, "max_rounds_per_d
 
 # step -> (submit command argv ON the cluster repo root, jobname prefix)
 _WEED_STEPS = {
-    "collect": ("sbatch run_v3_0_43_brain_harvest_oneshot.sh", "brain"),
+    # v3.22.21: the script's own #SBATCH is 4 h, which was enough at 45 datasets
+    # and is not at 61 — round 3's harvest ran 3 h 10 m and round 4 hit the wall.
+    # Override on the command line so the script stays untouched for manual use.
+    "collect": ("sbatch --time=10:00:00 run_v3_0_43_brain_harvest_oneshot.sh", "brain"),
     "filter": ("sbatch run_s2_dino_scores.sh", "s2_dino"),
     "train": ("sbatch --array=1-1 --job-name=rndtrain --gres=gpu:h100-80:1 "
               "--time=12:00:00 --export=ALL,TIER=curated,MIN_DINO_SCORE=0.50 "
@@ -86,13 +89,29 @@ def _submit(shell_cmd: str):
 
 
 def _job_state(jobid: str) -> str:
-    q = _slurm(["squeue", "-j", jobid, "-h", "-o", "%T"], timeout=30)
-    st = (q.get("stdout") or "").strip()
-    if st:
-        return st.splitlines()[0]
-    a = _slurm(["sacct", "-j", jobid, "-X", "-n", "-o", "State"], timeout=30)
-    st = ((a.get("stdout") or "").strip().splitlines() or ["UNKNOWN"])[0].strip()
-    return st.split()[0] if st else "UNKNOWN"
+    """SLURM state for a job, or "UNKNOWN" only after sacct has had time to catch up.
+
+    v3.22.21: a job that has just left the queue is briefly in neither `squeue`
+    nor `sacct`, and the first version treated that gap as a failure — job
+    44322382 COMPLETED normally and was recorded as a failed step, which then
+    counted toward the stop-loss. A success miscounted as a failure is the same
+    class of defect as a failure miscounted as a success. Poll a few times before
+    concluding anything.
+    """
+    for attempt in range(4):
+        q = _slurm(["squeue", "-j", jobid, "-h", "-o", "%T"], timeout=30)
+        st = (q.get("stdout") or "").strip()
+        if st:
+            return st.splitlines()[0]
+        a = _slurm(["sacct", "-j", jobid, "-X", "-n", "-o", "State"], timeout=30)
+        st = ((a.get("stdout") or "").strip().splitlines() or [""])[0].strip()
+        if st:
+            return st.split()[0]
+        if attempt < 3:
+            time.sleep(20)                    # sacct lag, not a verdict
+    _log().warning("[rounds] job %s in neither squeue nor sacct after 4 polls "
+                   "— reporting UNKNOWN" % jobid)
+    return "UNKNOWN"
 
 
 def _train_metric(started_ts: float = 0.0) -> dict:
@@ -149,6 +168,10 @@ def _advance(domain: str, dcfg: dict):
 
     if st["job"]:                                   # a step is in flight — poll it
         state = _job_state(st["job"])
+        if state == "UNKNOWN":
+            # still ambiguous after retries: leave it in flight rather than
+            # inventing a verdict; the next tick asks again.
+            return
         if state in ("RUNNING", "PENDING", "CONFIGURING", "COMPLETING"):
             if time.time() - st["started"] > STEP_TIMEOUT_H * 3600:
                 _record(domain, st["step"], "failed", detail="step timeout",

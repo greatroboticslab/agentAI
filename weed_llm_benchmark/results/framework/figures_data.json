@@ -2,12 +2,13 @@
  "_what": "Anchored source data for make_figures.py. Every point cites where it was recorded; guard states whether the holdout content-hash guard applies to it. Pending entries are filled by the M1 jobs' JSON artifacts when they land.",
  "quality_vs_scale": [
   {
-   "label": "YOLO11n · cwd12-only",
-   "train_images": 5648,
-   "map50_95": 0.865,
-   "n_seeds": 1,
-   "guard": "not-applicable (single dataset, standard split)",
-   "anchor": "RESEARCH_LOG Phase 1 (job 38007481, 100 ep); CHANGELOG v3.0.6"
+   "label": "YOLO11n · cwd12-only (sealed, n=3)",
+   "train_images": 3671,
+   "map50_95": 0.8755,
+   "n_seeds": 3,
+   "guard": "not-applicable (single dataset; train split only, holdout=test+valid as val)",
+   "anchor": "jobs 44323305_[1-3] 2026-08-24, cwd12_sealed.yaml, 100 ep, seeds 101/102/103, per-seed [0.8739, 0.8789, 0.8737]; supersedes the single pre-split run 0.865 (RESEARCH_LOG Phase 1) which is kept below for history",
+   "std": 0.0029
   },
   {
    "label": "RF-DETR L · cwd12-only",
@@ -63,6 +64,15 @@
    "guard": "SEALED",
    "anchor": "jobs 44234063_[1-3] (h100, same recipe; DINO gate skipped 36/45 slugs; early stop ep 37/44/46); per-seed 0.5873/0.5887/0.5921; guard active, train∩holdout stems = 0",
    "std": 0.0025
+  },
+  {
+   "label": "YOLO11n · cwd12-only (2026-03, single run)",
+   "train_images": 5648,
+   "map50_95": 0.865,
+   "n_seeds": 1,
+   "historical": true,
+   "guard": "not-applicable",
+   "anchor": "RESEARCH_LOG Phase 1 (job 38007481, 100 ep) — pre-split full set"
   }
  ],
  "benchmark_cwd12_map50": [
@@ -289,5 +299,24 @@
   },
   "protocol": "yolo26x@640, 60-ep cap with patience 20 (all runs early-stopped), seeds 101/102/103, sealed cwd12 holdout (1,977 imgs) as val, holdout dHash guard active, train/holdout stem intersection verified 0",
   "stated_confound": "curated has both higher quality AND 4x less data; at this design the volume effect dominated (raw wins by 0.014)"
+ },
+ "s3_families_2026_08_24": {
+  "yolo11n_sealed": {
+   "per_seed": [
+    0.8739,
+    0.8789,
+    0.8737
+   ],
+   "mean": 0.8755,
+   "std": 0.0029,
+   "n_seeds": 3,
+   "epochs": 100,
+   "protocol": "cwd12_sealed.yaml — train 3,671 / val = 1,977-image test+valid holdout; seeds 101/102/103; deterministic",
+   "jobs": "44323305_[1-3]",
+   "note": "supersedes the 2026-03 single-run 0.865 with the first error bar for this family"
+  },
+  "mamba_yolo_t": {
+   "status": "model builds on GPU (6.13M params); smoke blocked by numpy 2 removing np.trapz in the fork's vendored ultralytics 8.2.29; env pinned to numpy<2, smoke resubmitted"
+  }
  }
 }
