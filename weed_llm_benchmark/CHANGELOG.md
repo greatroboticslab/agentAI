@@ -7306,3 +7306,22 @@ with both fixed, the weed domain is re-enabled.
 works. The smoke then died in metrics on `np.trapz`, removed in NumPy 2, which the
 fork's vendored ultralytics 8.2.29 still calls. The `mambayolo` env is pinned to
 `numpy<2` (isolated; `bench` untouched) and the smoke resubmitted as 44344817.
+
+### v3.22.22 — Mamba-YOLO-T passes its gate and enters the campaign
+
+The smoke job (44344817) did its job: **model builds at 6.13 M parameters, 2 epochs in
+9.6 minutes → 100 epochs projected at ~8 h** on one V100. With the family validated for
+25 minutes of GPU instead of three speculative 16-hour queue slots, the seeded runs are
+submitted (44351282_[1-3], seeds 101/102/103, sealed cwd12 protocol) — the professor's
+named architecture is now a first-class member of the S3 matrix with the same protocol
+as YOLO11n and yolo26x.
+
+Environment note for anyone reproducing: the fork's vendored ultralytics 8.2.29 calls
+`np.trapz`, removed in NumPy 2, so the `mambayolo` env is pinned to `numpy<2` (1.26.4).
+That env's `opencv-python` 5.0 declares `numpy>=2`; the smoke ran cleanly regardless, so
+the declared conflict is not a real one here — recorded in case a later failure points
+back at it.
+
+Meanwhile the harvest keeps compounding: the pool is at **156,521 labelled images across
+63 datasets** (6 quarantined), and the scheduler is mid-round-3 with the 10-hour collect
+walltime in force.
