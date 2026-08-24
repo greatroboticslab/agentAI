@@ -132,16 +132,29 @@ def audit(slug, n=25, montage=True):
     import numpy as np, torch
     from transformers import Owlv2Processor, Owlv2ForObjectDetection
 
-    names = [str(c) for c in (info.get("class_names") or [])]
-    prompt = [["a photo of a weed", "a photo of a crop plant"]]
-    if names:
-        prompt = [["a photo of a " + nm for nm in names[:12]]]
+    # v3.22.17 — a class name is only usable as a text prompt if it is actually a
+    # word. Harvested sets routinely carry names like ['0','1','2'], and feeding
+    # OWLv2 "a photo of a 0" produced zero detections on a dataset whose labels
+    # were later verified perfectly valid — i.e. the probe was measuring the
+    # prompt, not the labels.
+    def _usable(nm):
+        nm = str(nm).strip()
+        core = nm.split()[-1] if nm.split() else nm
+        return len(core) >= 3 and any(ch.isalpha() for ch in core) and not core.isdigit()
+
+    names = [str(c).strip() for c in (info.get("class_names") or []) if _usable(c)]
+    generic = ["a photo of a weed", "a photo of a weed plant",
+               "a photo of a crop plant", "a photo of a plant leaf"]
+    prompt = [(["a photo of a " + nm for nm in names[:10]] + generic[:2])
+              if names else generic]
+    prompt_mode = "class-names+generic" if names else "generic-only"
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     proc = Owlv2Processor.from_pretrained("google/owlv2-large-patch14-ensemble")
     model = Owlv2ForObjectDetection.from_pretrained(
         "google/owlv2-large-patch14-ensemble").to(dev).eval()
 
     tot_gt = suspect = geom_bad = empty_lbl = 0
+    small_gt = small_suspect = 0
     per_image, thumbs = [], []
     for img_path, lbl_path in sample:
         boxes = _read_yolo(lbl_path)
@@ -156,15 +169,22 @@ def audit(slug, n=25, montage=True):
         gt = [((x - w / 2) * W, (y - h / 2) * H, (x + w / 2) * W, (y + h / 2) * H)
               for _c, x, y, w, h in boxes]
         geom_bad += _geometry_flags(boxes)
+        # a box under ~32 px on the long side is below what an open-vocabulary
+        # detector reliably sees; counted separately so it cannot masquerade as a
+        # labelling error (this corpus is known to be small-object heavy)
+        small_flags = [max(w * W, h * H) < 32 for _c, x, y, w, h in boxes]
         with torch.no_grad():
             inp = proc(text=prompt, images=im, return_tensors="pt").to(dev)
             out = model(**inp)
             res = proc.post_process_grounded_object_detection(
                 out, target_sizes=torch.tensor([[H, W]]).to(dev), threshold=OWL_CONF)[0]
         owl = [tuple(float(v) for v in b) for b in res["boxes"].cpu().numpy()]
-        miss = sum(1 for g in gt if max([_iou(g, o) for o in owl] or [0.0]) < IOU_MATCH)
+        misses = [max([_iou(g, o) for o in owl] or [0.0]) < IOU_MATCH for g in gt]
+        miss = sum(misses)
         tot_gt += len(gt)
         suspect += miss
+        small_gt += sum(small_flags)
+        small_suspect += sum(1 for m, sm in zip(misses, small_flags) if m and sm)
         per_image.append({"image": os.path.basename(img_path), "gt": len(gt),
                           "owl": len(owl), "unseen_gt": miss})
         if montage and len(thumbs) < 12:
@@ -173,8 +193,16 @@ def audit(slug, n=25, montage=True):
             thumbs.append(th)
 
     rate = (suspect / tot_gt) if tot_gt else 1.0
+    big_gt = tot_gt - small_gt
+    big_suspect = suspect - small_suspect
+    rate_big = (big_suspect / big_gt) if big_gt else None
     verdict = {
         "ok": True,
+        "prompt_mode": prompt_mode,
+        "small_boxes": small_gt,
+        "small_box_fraction": round(small_gt / tot_gt, 3) if tot_gt else None,
+        "audited_precision_excl_small": (round(1 - rate_big, 4)
+                                         if rate_big is not None else None),
         "sampled_images": len(sample),
         "images_with_labels": len(sample) - empty_lbl,
         "gt_boxes": tot_gt,
@@ -183,7 +211,9 @@ def audit(slug, n=25, montage=True):
         "audited_precision": round(1 - rate, 4),
         "geometry_bad_boxes": geom_bad,
         "empty_label_files": empty_lbl,
-        "passes_bar": bool(tot_gt and (1 - rate) >= PASS_BAR and geom_bad == 0),
+        "passes_bar": bool(tot_gt and geom_bad == 0 and
+                           (1 - (rate_big if rate_big is not None else rate))
+                           >= PASS_BAR),
         "bar": PASS_BAR,
         "method": ("OWLv2 recall probe (conf %.2f, IoU %.2f). OWLv2 is 0.943-recall / "
                    "0.194-precision on cwd12, so it is used only to flag labels it "
@@ -250,6 +280,25 @@ def audit_all(limit=10, n=25, only_unaudited=True):
             print("  %-46s FAILED %s: %s" % (slug[:46], type(e).__name__, str(e)[:90]))
 
 
+def calibrate(n=25):
+    """Run the probe on human-labelled cwd12 — a known-good source.
+
+    An instrument that has never been read against a known quantity cannot
+    condemn anything. Whatever the probe scores here is the ceiling it can
+    measure; a source scoring near it is as clean as our best data, and a bar set
+    above it would only be measuring OWLv2's limits.
+    """
+    for slug in ("cottonweed_sp8", "cottonweed_holdout"):
+        try:
+            v = audit(slug, n=n, montage=False)
+            print("CALIBRATION %-24s precision=%s (excl. small: %s) small_frac=%s"
+                  % (slug, v.get("audited_precision"),
+                     v.get("audited_precision_excl_small"),
+                     v.get("small_box_fraction")))
+        except SystemExit as e:
+            print("CALIBRATION %-24s unavailable: %s" % (slug, e))
+
+
 def report():
     reg = _registry()
     rows = []
@@ -265,10 +314,13 @@ def report():
     rows.sort(key=lambda r: r[1].get("audited_precision", 0))
     print("SAMPLE AUDITS (%d source(s), bar %.2f)" % (len(rows), PASS_BAR))
     for slug, a in rows:
-        print("  %-46s precision=%.3f %s  gt=%-5s geom_bad=%s"
+        big = a.get("audited_precision_excl_small")
+        print("  %-46s prec=%.3f excl-small=%s %s gt=%-5s small=%s geom_bad=%s [%s]"
               % (slug[:46], a.get("audited_precision", 0),
+                 ("%.3f" % big) if big is not None else "  n/a",
                  "PASS" if a.get("passes_bar") else "FAIL",
-                 a.get("gt_boxes"), a.get("geometry_bad_boxes")))
+                 a.get("gt_boxes"), a.get("small_box_fraction"),
+                 a.get("geometry_bad_boxes"), a.get("prompt_mode", "?")))
     failed = [s for s, a in rows if not a.get("passes_bar")]
     if failed:
         print("\nbelow the bar — re-label or quarantine: %s" % failed)
@@ -279,11 +331,14 @@ if __name__ == "__main__":
     sub = ap.add_subparsers(dest="cmd", required=True)
     a1 = sub.add_parser("audit"); a1.add_argument("slug"); a1.add_argument("--n", type=int, default=25)
     a2 = sub.add_parser("audit-all"); a2.add_argument("--limit", type=int, default=10); a2.add_argument("--n", type=int, default=25)
+    a3 = sub.add_parser("calibrate"); a3.add_argument("--n", type=int, default=25)
     sub.add_parser("report")
     a = ap.parse_args()
     if a.cmd == "audit":
         audit(a.slug, n=a.n)
     elif a.cmd == "audit-all":
         audit_all(limit=a.limit, n=a.n)
+    elif a.cmd == "calibrate":
+        calibrate(n=a.n)
     else:
         report()

@@ -7172,3 +7172,32 @@ Killed, restarted, registry re-pulled, `fix_local_paths` re-run (55/70 paths rew
 Mongo re-mirrored), UI verified: four quarantined sources greyed out with reasons, 43
 "not in pool" markers. A staleness alarm is now on the corrective list — **a hung sync
 is indistinguishable from a quiet one, and this one hid for three weeks.**
+
+### v3.22.17 — the audit tool audited: calibrate the instrument before it condemns data
+
+The first sample-audit sweep failed **8 of 8 sources**, three at precision 0.000.
+A result that extreme is a claim about the instrument before it is a claim about the
+data, so the labels were read directly. Three distinct findings:
+
+- **A prompt bug in the tool.** `project_agml/mh_weed16_weed_detection` scored 0.000
+  with 239 boxes and zero geometry flags — and its labels are perfectly valid YOLO
+  (55×81 px boxes on 1920×1080). Its class names are `['0','1','2','3','4']`, so the
+  audit had been asking OWLv2 for *"a photo of a 0"*. The probe was measuring the
+  prompt, not the labels. Class names are now accepted as prompts only when they are
+  words (≥3 chars, alphabetic, non-numeric); otherwise the generic weed/plant prompts
+  are used, and the mode is recorded in the verdict.
+- **A blind spot in the metric.** This corpus is small-object heavy, and an
+  open-vocabulary detector cannot reliably see a 30-pixel weed. Boxes under 32 px are
+  now counted separately, reported as `small_box_fraction`, and the pass/fail decision
+  uses `audited_precision_excl_small` so an honest small-object dataset is not
+  condemned for the probe's limits.
+- **A real data defect, correctly caught.** `project_agml/cotton_weed_detection`:
+  every one of 5,670 sampled boxes is sub-pixel — `0.000001 × 0.000003` of a 4096×3072
+  image. That verdict comes from the model-free geometry check, so it stands
+  independently of any OWLv2 behaviour. Quarantined with the measurement as its reason.
+
+Most importantly, the tool gained a **`calibrate`** mode that runs the probe against
+human-labelled cwd12 first. An instrument never read against a known quantity cannot
+condemn anything: whatever the probe scores on our best data is the ceiling it can
+measure, and a 0.90 bar set above that ceiling would only be measuring OWLv2's limits.
+All prior verdicts were cleared as mis-measured; calibration + re-audit is job 44300150.
