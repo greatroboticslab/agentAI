@@ -79,10 +79,14 @@ is flat from 3,671 to 43,671 training images.
 
 1. **Single benchmark.** Every number is CottonWeedDet12 — 12 cotton-field weed species,
    one capture campaign. Cross-dataset generalisation is *not* established here.
-2. **The deployment gap is untested.** This model has never been evaluated on robot
-   camera frames. cwd12 is close-range handheld photography; the 241 robot and the laser
-   cart see a different distribution entirely. Treat field accuracy as unknown until
-   measured — that measurement is S6.
+2. **The deployment gap is half-measured (2026-08-25).** Run over **358 real robot
+   frames** from eight stored sessions of both robots (indoor/bench scenes, no weeds
+   present), the model produced **zero detections at the deployment threshold** —
+   3.7 ms per frame. That is the property a laser-weeding system depends on when it
+   drives past non-target scenery: it does not fire at nothing. What remains unmeasured
+   is **recall and precision on robot frames that do contain weeds**, which needs an
+   outdoor run; field accuracy stays unknown until then. Artifact:
+   `results/framework/s6_domain_gap.json`.
 3. **No test-time augmentation or ensembling.** The WBF/TTA ceiling run in the S3 plan
    was not executed; the number is a plain single-model forward pass.
 4. **RF-DETR's four seeds** come from May 2026 runs under the same cwd12-only staging

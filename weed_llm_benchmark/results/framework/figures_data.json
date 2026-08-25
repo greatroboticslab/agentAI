@@ -528,5 +528,21 @@
   "species_spread": 0.2443,
   "reading": "The 0.244 spread between best and worst species is ~80x the seed noise (0.003), so per-species weakness is a property of the model, not run variance. Morningglory (0.7324), Goosegrass (0.7973) and Eclipta (0.8219) are where a laser-weeding system would miss most.",
   "card": "docs/BEST_MODEL_CARD.md"
+ },
+ "s6_domain_gap_2026_08_25": {
+  "what": "cwd12-trained YOLO11n run over every stored real robot frame on the lab server",
+  "frames": 358,
+  "sessions": 8,
+  "robots": [
+   "lasercar",
+   "241robot"
+  ],
+  "frames_with_any_detection_at_conf_0.25": 0,
+  "false_positive_frame_rate": 0.0,
+  "ms_per_frame": 3.7,
+  "scene_content": "indoor/bench scenes with no weeds present",
+  "what_this_measures": "NOT recall — there are no weeds in these frames. It measures the property a laser-weeding system depends on when driving past non-target scenery: does the detector fire when there is nothing to fire at? Zero detections across 358 frames at the deployment threshold.",
+  "what_is_still_unmeasured": "recall and precision on robot-captured frames that DO contain weeds. That needs an outdoor run; until then field accuracy stays unknown, as the model card states.",
+  "artifact": "results/framework/s6_domain_gap.json"
  }
 }

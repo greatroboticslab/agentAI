@@ -8194,6 +8194,8 @@ def agent_generic(domain_id: str):
      <img id="rlv-img" alt="live camera" style="max-width:100%;border-radius:8px;margin-top:10px;display:none">
      <div id="rlv-stats" style="font-size:12px;color:#cbd5e1;margin-top:6px"></div>
      <div id="rlv-adv" style="display:none;font-size:12px;color:#fbbf24;margin-top:4px"></div>
+     <label style="font-size:11.5px;color:#94a3b8;display:flex;gap:6px;align-items:center;margin-top:6px">
+       <input type="checkbox" id="rlv-det"> run weed detection on the live frame</label>
      <style>@keyframes rlvp{{50%{{opacity:.3}}}}</style>
    </div>
    <!-- v3.23.0: evidence panel — what this project has actually measured. Hidden
@@ -8252,9 +8254,11 @@ function rlvPoll(){
 }
 function rlvFrame(){
  if(!_rlvSid)return;
- var im=document.getElementById('rlv-img');
+ var im=document.getElementById('rlv-img'), dt=document.getElementById('rlv-det');
  if(im){im.onerror=function(){im.style.display='none';};im.onload=function(){im.style.display='block';};
-  im.src='/api/robot/frame_latest/'+_rlvSid+'.jpg?t='+Date.now();}
+  // v3.24.1: same frame, optionally through the campaign's own detector
+  var on=dt&&dt.checked;
+  im.src=(on?('/api/detect/frame/'+_rlvSid+'.jpg'):('/api/robot/frame_latest/'+_rlvSid+'.jpg'))+'?t='+Date.now();}
 }
 rlvPoll(); setInterval(rlvPoll,4000); setInterval(rlvFrame,1500);
 // v3.23.0: evidence panel — the measured results, read from the same artifacts the

@@ -715,7 +715,12 @@ _LIVE_PAGE = r'''<!doctype html><html><head><meta charset="utf-8">
 <h2 style="margin:4px 0"><span class="dot" id="dot"></span>Robot Live</h2>
 <div class="row"><select id="pick"></select>
  <span class="kv" id="meta"></span></div>
-<div class="card"><img id="frame" alt="waiting for the first camera frame…"></div>
+<div class="card">
+  <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin-bottom:6px">
+    <input type="checkbox" id="det"> detect weeds on this frame
+    <span id="detinfo" style="color:#94a3b8"></span>
+  </label>
+  <img id="frame" alt="waiting for the first camera frame…"></div>
 <div class="card" id="advbox" style="display:none;border-color:#d97706">
   <b style="font-size:13px">&#9888; Advice</b>
   <div id="advlist" style="font-size:12.5px;margin-top:6px;line-height:1.6"></div>
@@ -752,7 +757,16 @@ async function tick(){
     document.getElementById('stats').innerHTML=
       kv('seq',d.seq)+kv('frames',d.frame_count)+kv('dropped',d.dropped)+
       Object.keys(c).map(k=>kv(k,c[k])).join('');
-    if(d.frame_url){document.getElementById('frame').src=d.frame_url+'?t='+Date.now();}
+    if(d.frame_url){
+      // v3.24.1: the same frame, optionally through the campaign's own detector.
+      // The detect endpoint falls back to the raw frame if inference fails, so
+      // ticking the box can never blank the live view.
+      var on=document.getElementById('det').checked;
+      var url=on?('/api/detect/frame/'+SID+'.jpg'):d.frame_url;
+      var im=document.getElementById('frame');
+      im.onload=function(){document.getElementById('detinfo').textContent=on?'model: cwd12 YOLO11n':'';};
+      im.src=url+'?t='+Date.now();
+    }
     const A=d.advice||[];
     const ab=document.getElementById('advbox');
     if(A.length){ab.style.display='block';

@@ -7579,3 +7579,27 @@ that keeps showing the robot beats one that errors out because a detector could 
 The honest gap remains open and is stated in the card: this model has never been
 evaluated on robot camera frames. cwd12 is close-range handheld photography; the robots
 see something else. Measuring that is the rest of S6.
+
+### v3.24.1 — detection on the live view, and half the domain gap measured
+
+**The toggle.** `/robot/live` and the project page's live card each gained a checkbox
+that routes the same frame through `/api/detect/frame/{sid}.jpg` instead of the raw
+endpoint. Because that endpoint falls back to the unannotated frame when inference
+fails, ticking the box can never blank the live view — the worst case is that the
+picture simply has no boxes on it.
+
+**And the measurement that did not need to wait.** The model card said field accuracy
+was unknown because the model had never seen robot frames. The lab still holds **358
+frames across eight sessions** from both robots, so the question could be asked
+immediately — of the half of it that these frames can answer.
+
+They are indoor and bench scenes with no weeds in them, so this is **not** a recall
+measurement. It measures the property a laser-weeding system depends on every time it
+drives past non-target scenery: **does the detector fire when there is nothing to fire
+at?** Across all 358 frames, at the deployment confidence threshold, the model produced
+**zero detections**, at 3.7 ms per frame. For a system whose output can discharge a
+laser, "it does not fire at nothing" is worth measuring before "it hits everything".
+
+The other half stays honestly open in the card: recall and precision on robot frames
+that *do* contain weeds needs an outdoor run. Aggregate statistics only were recorded —
+the frames are the operator's own footage and none of it left the lab machine.
