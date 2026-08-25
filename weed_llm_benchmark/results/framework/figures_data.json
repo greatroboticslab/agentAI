@@ -450,12 +450,43 @@
    {
     "added": 40000,
     "train": 43671,
-    "map50_95": 0.8408,
-    "epochs": 62,
-    "partial": true
+    "map50_95": 0.8436,
+    "epochs": 90
    }
   ],
-  "reading": "Adding web-harvested data to a clean in-domain core is essentially FREE and essentially USELESS: +5,000 costs 0.004, +15,000 costs 0.002, and only at +40,000 does a ~0.02 decline appear (still training). The honest cost of scale here is 0.00-0.02, not the 0.27 previously claimed - that figure came from a crippled core (0.5601 with zero harvested images) and was retracted 2026-08-25.",
-  "residual_note": "core+0 reads 0.8636 here vs 0.8755 in the nc=12 sealed run; the ~0.012 difference is the 100-class head carrying 88 unused classes, quantified rather than assumed."
+  "reading": "Adding web-harvested data to a clean in-domain core is close to free and close to useless: +5,000 costs 0.004, +15,000 costs 0.002, +40,000 costs 0.020. Twelve times the training data buys nothing and eventually costs a little. The honest cost of scale is 0.00-0.02, not the 0.27 previously claimed, which came from a crippled core (0.5601 at zero harvested) and was retracted 2026-08-25.",
+  "residual_note": "core+0 reads 0.8636 here vs 0.8755 in the nc=12 sealed run; the ~0.012 difference is the 100-class head carrying 88 unused classes, quantified rather than assumed.",
+  "complete": true
+ },
+ "s3_summary_2026_08_25": {
+  "method_families": {
+   "RF-DETR Large (pretrained)": {
+    "mean": 0.8974,
+    "std": 0.004,
+    "n": 4
+   },
+   "YOLO11n (pretrained)": {
+    "mean": 0.8755,
+    "std": 0.0029,
+    "n": 3
+   },
+   "Mamba-YOLO-T (scratch)": {
+    "mean": 0.8266,
+    "std": 0.0064,
+    "n": 3
+   },
+   "YOLO11n (scratch)": {
+    "mean": 0.8041,
+    "std": 0.0028,
+    "n": 3
+   }
+  },
+  "effects_measured": {
+   "COCO pretraining (YOLO11n)": 0.0714,
+   "architecture at equal init (Mamba-T over YOLO11n)": 0.0225,
+   "100-class head vs 12-class head": -0.012,
+   "adding 40,000 harvested images to a clean core": -0.02
+  },
+  "reading": "Ranked by what actually moves the metric on 3,671 in-domain images: pretraining (+0.071) > architecture (+0.023) > head width (-0.012) ~ forty thousand extra web images (-0.020). The data-collection lever, the one the double-agent loop was built around, is the weakest of the four."
  }
 }

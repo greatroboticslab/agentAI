@@ -92,6 +92,35 @@ def fig_quality_vs_scale(d):
     plt.close(fig)
 
 
+def fig_tier_ladder(d):
+    """The ladder: what adding web-harvested data to a clean core actually costs."""
+    L = d.get("tier_ladder_v2_2026_08_25")
+    if not L or not L.get("points"):
+        return
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    pts = sorted(L["points"], key=lambda p: p["added"])
+    x = [p["added"] for p in pts]
+    y = [p["map50_95"] for p in pts]
+    fig, ax = plt.subplots(figsize=(7.6, 4.4), dpi=150)
+    ax.plot(x, y, "o-", color="#1f77b4", lw=2, ms=7)
+    for p in pts:
+        ax.annotate("%.4f" % p["map50_95"], (p["added"], p["map50_95"]),
+                    textcoords="offset points", xytext=(0, 9), ha="center", fontsize=8)
+    ax.axhline(y[0], color="#94a3b8", ls=":", lw=1)
+    ax.annotate("clean core alone", (x[-1], y[0]), textcoords="offset points",
+                xytext=(-6, 6), ha="right", fontsize=8, color="#64748b")
+    ax.set_xlabel("web-harvested images added to the 3,671-image clean core")
+    ax.set_ylabel("cwd12 holdout mAP50-95")
+    ax.set_title("Adding harvested data: near-free, and near-useless")
+    ax.grid(True, alpha=0.25)
+    ax.set_ylim(min(y) - 0.02, max(y) + 0.02)
+    fig.tight_layout()
+    fig.savefig(OUT / "tier_ladder.png")
+    plt.close(fig)
+
+
 def md_table(rows, cols, headers):
     out = ["| " + " | ".join(headers) + " |",
            "|" + "|".join("---" for _ in headers) + "|"]
@@ -105,6 +134,7 @@ def main():
     d = load()
 
     fig_quality_vs_scale(d)
+    fig_tier_ladder(d)
 
     b = d["benchmark_cwd12_map50"]
     (OUT / "benchmark_table.md").write_text(

@@ -7482,3 +7482,38 @@ that more data is always better.
 
 The next question the campaign should answer is no longer "how much more data" but
 "which data" — the curation side — and that is where S3's remaining budget belongs.
+
+### v3.23.3 — the ladder closes, and it ranks the levers
+
+The +40,000 rung finished (10 h 33 m, 90 epochs): **0.8436**. The full curve, one clean
+in-domain core plus increasing web-harvested data, same model and same sealed holdout:
+
+| harvested added | train images | holdout mAP50-95 |
+|---|---|---|
+| 0 | 3,671 | **0.8636** |
+| +5,000 | 8,671 | 0.8599 |
+| +15,000 | 18,671 | 0.8614 |
+| +40,000 | 43,671 | 0.8436 |
+
+**Twelve times the training data buys nothing and eventually costs 0.02.** `make_figures.py`
+now renders this as `tier_ladder.png`, so it regenerates with everything else.
+
+With every S3 measurement in hand, the levers can finally be ranked by what they are
+actually worth on this task:
+
+| lever | effect |
+|---|---|
+| COCO pretraining (YOLO11n) | **+0.0714** |
+| architecture at equal init (Mamba-YOLO-T over YOLO11n) | **+0.0225** |
+| 100-class head vs 12-class head | −0.012 |
+| adding 40,000 harvested images to a clean core | −0.020 |
+
+The uncomfortable reading is the honest one: **the data-collection lever — the one the
+whole double-agent loop is built around — is the weakest of the four.** That does not make
+the loop worthless; it makes its value curation and provenance rather than volume, which
+is what the campaign's own tooling (quarantine, scorecards, sample-audit, license capture)
+turned out to be good at. It is also why the harvest was capped in v3.23.2: the system
+measured its own headline mechanism and adjusted.
+
+Meanwhile the loop keeps running unattended: round 3 closed at 0.5951 (its fourth
+consecutive metric on the merged corpus) and round 4 is in its filter step.
