@@ -16891,6 +16891,20 @@ try:
 except Exception as _e:
     log.error(f"[drive] proxy module failed to mount: {_e}")
 
+# v3.24.0 — weed detection service (SUPERWEED_PLAN S6): the campaign's own model,
+# applied to the frames the robots are streaming right now. Closes the loop from
+# collection through training back to the robot that collected the data.
+try:
+    from . import weed_detect as _weed_detect
+    _weed_detect.mount(app, {
+        "log": log,
+        "actor": _actor_from_request,
+        "latest_frame": _robot_ingest.latest_frame_bytes,
+    })
+    log.info("[detect] weed detection service mounted (/api/detect/*)")
+except Exception as _e:
+    log.error(f"[detect] service failed to mount: {_e}")
+
 # v3.22.9 — unattended round scheduler (SUPERWEED_PLAN S4): per-project continuous
 # collect→filter→train→eval cycling over the rounds ledger, disabled by default,
 # admin-toggled, stop-loss guarded. The project page's compounding chart reads the

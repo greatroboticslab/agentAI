@@ -827,6 +827,18 @@ def _recover():
         _log().warning(f"[robot] recovery scan failed: {e}")
 
 
+def latest_frame_bytes(sid: str):
+    """Newest received JPEG for a live session, or None. v3.24: used in-process by
+    the detection service so annotating a frame costs no extra HTTP hop."""
+    s = _session(sid)
+    if not s or not s.get("latest_frame_ts"):
+        return None
+    try:
+        return (Path(s["dir"]) / "frames" / ("%.3f.jpg" % s["latest_frame_ts"])).read_bytes()
+    except Exception:
+        return None
+
+
 def mount(app, ctx: dict):
     """Called once by dashboard_server after its helpers exist."""
     _CTX.update(ctx)

@@ -7548,3 +7548,34 @@ executed and is recorded as not-done rather than quietly dropped.
 **S3 is closed**: 20 ledgered runs, 3 method families, the tier ladder, the ranked
 levers, and the card. The campaign's remaining phases are S1's formal count and S6's
 deployment.
+
+### v3.24.0 — S6 begins: the model comes back to the robots that fed it
+
+`tools/weed_detect.py` puts the campaign's own model where the data came from. The lab
+server has an RTX 3060, so the deployable checkpoint (`s3_yolo11n/s102/weights/best.pt`,
+5.2 MB) was pulled across to `~/models/cwd12_yolo11n_s102.pt` and is served at:
+
+- `GET /api/detect/model` — what is loaded, its sealed metric, and what it is bad at
+- `POST /api/detect` — JPEG body → JSON detections
+- `GET /api/detect/frame/{sid}.jpg` — the newest frame from a live robot session with
+  boxes drawn, a drop-in replacement for `/api/robot/frame_latest/{sid}.jpg`
+
+Verified end-to-end through the public URL: model loads on CUDA device 0, inference runs
+in **57–148 ms** (comfortably ahead of the robots' 1 fps), and a real field photograph
+returns `Goosegrass conf=0.44`.
+
+That example is also the reason for the design choice worth naming: **the model card's
+per-species reliability travels with every prediction.** The response carries
+`species_holdout_map50_95: 0.7973` and `low_reliability_species: true` for that
+detection, because Goosegrass is one of the three species the card identifies as weak
+(0.7973, against Ragweed's 0.9767). A detection is not a fact of uniform quality, and a
+laser-weeding system deciding whether to fire deserves to know which kind it just got.
+
+Two robustness properties: the model loads lazily and exactly once — a dashboard restart
+does not pay for it and a machine without the weights still boots — and the frame
+endpoint **falls back to the unannotated frame** if inference fails, because a live view
+that keeps showing the robot beats one that errors out because a detector could not load.
+
+The honest gap remains open and is stated in the card: this model has never been
+evaluated on robot camera frames. cwd12 is close-range handheld photography; the robots
+see something else. Measuring that is the rest of S6.
