@@ -269,12 +269,22 @@ class DatasetDiscovery:
                     cur = merged["datasets"].get(slug)
                     if isinstance(cur, dict) and isinstance(info, dict):
                         nu = dict(info)
+                        # v3.24.2 — SUPERVISORY FIELDS ARE NEVER WRITTEN BY A COLLECTOR.
+                        # v3.22.10 protected the quarantine block and the license after a
+                        # harvest erased a quarantine; on 2026-08-25 the same mechanism
+                        # rolled a source's `scorecard` back from its corrected 23:04
+                        # audit to the buggy-probe 20:48 one, because every other key
+                        # still came from the harvester's stale snapshot. Enumerating the
+                        # fields a harvest may not own fixes the class, not the instance:
+                        # a data collector reports what it downloaded, never what a
+                        # supervisor concluded about it.
+                        for k in ("scorecard", "status", "quarantine_reason",
+                                  "quarantined_at", "status_before_quarantine"):
+                            if k in cur and k != "status":
+                                nu[k] = cur[k]
                         if (cur.get("status") == "quarantined"
                                 and info.get("status") != "quarantined"):
-                            for k in ("status", "quarantine_reason", "quarantined_at",
-                                      "status_before_quarantine"):
-                                if k in cur:
-                                    nu[k] = cur[k]
+                            nu["status"] = cur["status"]
                         prov_d = cur.get("provenance") or {}
                         prov_o = nu.get("provenance") or {}
                         if prov_d.get("license") and not prov_o.get("license"):

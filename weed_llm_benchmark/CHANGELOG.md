@@ -7603,3 +7603,42 @@ laser, "it does not fire at nothing" is worth measuring before "it hits everythi
 The other half stays honestly open in the card: recall and precision on robot frames
 that *do* contain weeds needs an outdoor run. Aggregate statistics only were recorded —
 the frames are the operator's own footage and none of it left the lab machine.
+
+### v3.24.2 — S1 closes without meeting its gate, and the failure is the result
+
+Closing S1 required counting how much harvested data actually passes the audit bar. The
+count exposed a regression first: the registry held **audit verdicts from 20:48** — the
+buggy-probe run — while the corrected 23:04–23:10 verdicts survived only in
+`results/framework/sample_audits/*.json`. Cause: the same mechanism as v3.22.10. That
+fix protected the quarantine block and the license, but every *other* key still came
+from the harvester's stale snapshot, so `scorecard` rolled back.
+
+**Fixed at the class level rather than the instance.** A data collector reports what it
+downloaded; it never owns what a supervisor concluded. `scorecard` and the quarantine
+fields are now enumerated as supervisory and read from disk on every merge-write. The
+ten corrected verdicts were restored from the standalone artifacts — which exist
+precisely because `sample_audit._store` writes both, a decision that paid for itself.
+
+**The gate, honestly:**
+
+| source | labelled | audited precision | |
+|---|---|---|---|
+| `project_agml/imageweeds_weed_detection` | 3,208 | **1.0000** | PASS |
+| `project_agml/weed_crop_detection` | 1,120 | 0.7371 | fail |
+| `project_agml/imageweeds_aerial_weed_detection` | 551 | 0.6496 | fail |
+| `francesco/grass_weeds` | 2,479 | 0.5775 | fail |
+| `project_agml/mh_weed16_weed_detection` | 4,993 | 0.4519 | fail |
+| `francesco/weed_crop_aerial` | 1,176 | 0.1845 | fail |
+
+Six audited harvested sources, 13,527 labelled images, **one source clears the 0.90 bar
+with 3,208 images** against a target of +10,000. Two registry incidents occurred rather
+than zero. **S1's gate is NOT MET**, and it is closed rather than re-attempted.
+
+That is not a shortfall to make up — it is the same conclusion the S3 tier ladder
+reached from the other direction. The probe reads **1.000 on human-labelled cwd12**, so
+sources scoring 0.18–0.74 are being measured accurately; and the ladder shows adding
+harvested data is worth 0.00–0.02 regardless. **Web harvest at this scale supplies
+volume, not usable supervision.** Every S1 mechanism works — the label gate, subject
+check, license-at-collection, quarantine-with-reason, scorecards, the calibrated probe —
+and what they collectively established is that the objective they were built to serve
+was the wrong one. The remaining budget belongs in curation and deployment.
