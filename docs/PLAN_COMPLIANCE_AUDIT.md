@@ -44,14 +44,29 @@ when the outcome was good.*
    exposed something worse. The `/slugs` page now greys out quarantined sources with
    their reason and shows audit/pool badges — but the badges rendered empty at first,
    because **the lab→cluster sync had been hung since 2026-08-03**: an rsync process
-   sat waiting 20 days 18 hours on an authentication prompt that never came (the
-   service's askpass file held a stale password until it was replaced earlier the same
-   day for an unrelated reason). Every governance action taken on the cluster —
+   sat waiting 20 days 18 hours on an ssh that never authenticated. Every governance
+   action taken on the cluster —
    quarantines, licenses, scorecards — was therefore invisible on the platform, and the
    "platform-first" constraint was silently only half-true. The service was killed and
    restarted, the registry re-pulled, and the UI now shows all four quarantined sources
    greyed out. **A stuck sync is indistinguishable from a quiet one; it needs an
    age alarm** (added to the corrective list).
+
+   **Correction, 2026-08-25.** The cause recorded above — a stale askpass password —
+   was wrong, and killing the process fixed nothing. The very next timer firing wedged
+   in exactly the same way and sat there for another two days; the last successful sync
+   was still 2026-08-03, so the platform served **22 days** of stale data, not 20. The
+   real cause was found by reading the blocked process instead of inferring from
+   circumstance: `SSH_AUTH_SOCK` pointed at `/run/user/1000/keyring/ssh`, a
+   gnome-keyring agent socket left from a session where the ssh component was enabled.
+   gnome-keyring now runs `--components=pkcs11,secrets`, so the socket file exists but
+   nothing accepts on it, and every ssh blocked in `connect()` before authentication
+   began — kernel wait channel `unix_wait_for_peer`, confirmed by `ssh-add -l` against
+   that socket timing out. `ConnectTimeout` does not cover agent sockets, so nothing
+   bounded it. The fix removes the dependency (`IdentityAgent=none`, `SSH_AUTH_SOCK`
+   unset) rather than the symptom. **The lesson generalises past this bug: a diagnosis
+   that is never tested by a return to service is a guess, and this one was recorded in
+   an audit document as fact for two days.**
 3. **D1's target is already met, and the first measurement of it was wrong.** The pool
    report initially read **15,789 labelled** because `local_labeled` is a field only
    later harvests populate — legacy entries report 0 even for `cottonweed_sp8`, the
@@ -83,9 +98,17 @@ when the outcome was good.*
    mechanism. The per-source **scorecard** now exists (`pool_report.py scorecards`).
 2. ~~Write `pool_report.py`~~ — **done**, S2 gate met.
 3. ~~Surface quarantined datasets in the UI~~ — **done**.
-3b. **Add a staleness alarm on the lab↔cluster sync** — surface the registry's age on
-   the dashboard and fail loudly past a threshold, so a hung sync cannot masquerade as
-   a quiet period for three weeks again.
+3b. ~~**Add a staleness alarm on the lab↔cluster sync**~~ — **done 2026-08-25**
+   (`sync_health.py`, `GET /api/health/sync`, site-wide banner). Built as a *positive
+   heartbeat that goes stale*, not as error reporting: a wedged process reports nothing,
+   so an alarm waiting to be told about a failure is structurally blind to this whole
+   class of outage. A missing heartbeat file, a hung box, a disabled timer, a killed run
+   and a crashed run all produce one verdict — the age of the last **successful** sync —
+   and a missing heartbeat reads `crit`, never `ok`. Verified against six cases
+   including the live 22-day outage. Independently, the run is now bounded at three
+   levels (per-transfer `timeout`, `TimeoutStartSec=7200` replacing the `oneshot`
+   default of *infinity* that let one blocked ssh cancel the whole schedule, and the
+   root-cause `IdentityAgent=none`), so a wedge costs one cycle instead of the year.
 4. Amend the plan: state **labelled** images in D1/S1/S3 targets, and schedule the
    autolabel decision that the tier ladder depends on.
 5. ~~Run `make_figures.py` from a clean checkout twice and diff~~ — **done**, S5 met.

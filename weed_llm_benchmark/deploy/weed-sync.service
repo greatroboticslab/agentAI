@@ -5,3 +5,15 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=%h/weed_llm_benchmark/deploy/sync_from_cluster.sh
+
+# A Type=oneshot unit defaults to TimeoutStartSec=infinity. That default is what
+# turned a single blocked ssh into a 22-day outage: the unit stayed `activating`
+# forever and systemd skipped every subsequent timer firing, so the sync stopped
+# without ever failing. Bounding the run means a wedge costs one cycle, not the
+# whole schedule. Sized above the script's own per-transfer timeouts (4x300s
+# metadata + 3x1800s data + Mongo refresh), so this only fires when those are
+# themselves bypassed.
+TimeoutStartSec=7200
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=120

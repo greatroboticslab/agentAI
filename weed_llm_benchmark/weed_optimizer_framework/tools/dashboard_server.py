@@ -404,6 +404,11 @@ _AUTH_EXEMPT_PATHS = {
     "/logout",                       # clear session
     "/auth/google/start",            # OAuth redirect to Google
     "/auth/google/callback",         # OAuth return
+    # v3.24.3: the sync freshness alarm. Deliberately unauthenticated — an
+    # external monitor has to be able to reach it, and a health check that needs
+    # a session cookie is a health check nobody runs. It returns timing only
+    # (last-success age, stage name, outcome word), no data and no credentials.
+    "/api/health/sync",
 }
 _AUTH_EXEMPT_PREFIXES = (
     "/static/",                      # static assets if any
@@ -1080,6 +1085,22 @@ async def _inject_responsive_css(request: Request, call_next):
             _m = re.search(r"<body[^>]*>", text)
             if _m:
                 text = text[:_m.end()] + _APP_NAV + text[_m.end():]
+        # v3.24.3: stale-data alarm above everything else. The cluster->lab sync
+        # has twice wedged silently and left the platform serving weeks-old data
+        # that looked current; a page that may be lying about its freshness has
+        # to say so on the page itself, not in a log nobody reads. Returns ''
+        # when the sync is healthy, and is memoised so this costs one stat per
+        # 30s, not one per request.
+        if 'id="_syncalarm"' not in text:
+            try:
+                from . import sync_health as _sh
+                _bar = _sh.banner_html()
+            except Exception:
+                _bar = ""
+            if _bar:
+                _mb = re.search(r"<body[^>]*>", text)
+                if _mb:
+                    text = text[:_mb.end()] + _bar + text[_mb.end():]
         # v3.0.134: login badge on every page except the login page itself.
         if ("_authbadge" not in text and request.url.path != "/login"
                 and "</body>" in text):
@@ -16928,3 +16949,14 @@ try:
     log.info("[rounds] scheduler mounted (disabled by default; /api/rounds/scheduler)")
 except Exception as _e:
     log.error(f"[rounds] scheduler failed to mount: {_e}")
+
+# v3.24.3 — sync freshness alarm. The heartbeat this reads is written by
+# deploy/sync_from_cluster.sh; the verdict is driven by the AGE of the last
+# successful run, so a wedged, killed, crashed or never-scheduled sync all
+# surface identically instead of looking like silence.
+try:
+    from . import sync_health as _sync_health
+    _sync_health.mount(app, {"log": log, "repo": str(REPO)})
+    log.info("[health] sync freshness alarm mounted (/api/health/sync)")
+except Exception as _e:
+    log.error(f"[health] sync alarm failed to mount: {_e}")

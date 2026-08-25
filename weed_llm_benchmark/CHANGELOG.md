@@ -7642,3 +7642,59 @@ volume, not usable supervision.** Every S1 mechanism works — the label gate, s
 check, license-at-collection, quarantine-with-reason, scorecards, the calibrated probe —
 and what they collectively established is that the objective they were built to serve
 was the wrong one. The remaining budget belongs in curation and deployment.
+
+### v3.24.3 — the sync had been dead for 22 days, and the fix that "worked" hadn't
+
+Building the staleness alarm meant looking at the sync, and the sync was wedged
+again. Same shape as the 2026-08-03 incident: `weed-sync.service` sat in
+`activating` for two days, systemd refused to start a second run while the first
+lived, the timer stopped firing, and nothing failed or logged. **The last
+successful sync was still 2026-08-03 — 22 days.** The earlier "fix" had killed a
+process and verified nothing afterwards.
+
+**The recorded diagnosis was wrong.** `PLAN_COMPLIANCE_AUDIT.md` blamed a stale
+askpass password. Reading the blocked process instead of the circumstances:
+
+```
+ssh  wchan = unix_wait_for_peer          # blocked pre-auth, in connect()
+     SSH_AUTH_SOCK=/run/user/1000/keyring/ssh
+gnome-keyring-daemon --components=pkcs11,secrets     # no ssh component
+SSH_AUTH_SOCK=... ssh-add -l  ->  rc=124 (timeout)   # nobody accepts
+```
+
+The agent socket is a leftover file from a session where gnome-keyring served
+ssh. It still exists, nothing listens, and every ssh blocks forever trying to
+reach it — before authentication starts, which is why no password or ControlMaster
+theory could have been right. `ConnectTimeout` bounds the TCP handshake, not agent
+sockets, so nothing bounded it.
+
+**Fixed at the cause:** `IdentityAgent=none` and `SSH_AUTH_SOCK` unset — this
+connection authenticates by password through the askpass and has no use for an
+agent. On the first run after the change the sync pulled all four metadata files
+in seconds, and **the registry went from 52 slugs to 78**: three weeks of harvest
+that had been stranded on the cluster.
+
+**Bounded at three levels, because the next wedge will be something else.**
+Per-transfer `timeout` (300 s metadata, 1800 s data, `--partial` resumes);
+`TimeoutStartSec=7200` on the unit — a `Type=oneshot` service defaults to
+**infinity**, which is precisely what let one blocked ssh cancel the schedule
+indefinitely; and ssh-level `ServerAlive*`, `ConnectionAttempts=1`,
+`NumberOfPasswordPrompts=1`, plus a stale-ControlMaster probe.
+
+**The alarm — `sync_health.py`, `GET /api/health/sync`, site-wide banner.**
+Deliberately shaped as a *positive heartbeat that goes stale* rather than error
+reporting, because a wedged process reports nothing: an alarm that waits to be
+told about a failure cannot see this class of outage at all. The sync writes a
+heartbeat at every stage (and on the EXIT trap, so a systemd kill is recorded
+too); the verdict is the **age of the last successful run**, so a hung box, a
+disabled timer, a killed run, a crashed run and a missing heartbeat all surface
+identically. A missing heartbeat reads `crit`, never `ok` — defaulting to healthy
+on no evidence is the bug this exists to prevent. Warn at 3 h, crit at 12 h, plus
+a wedged-run flag at 2 h in flight.
+
+Verified end-to-end on the live dashboard: six verdict cases including the real
+22-day outage; the banner renders directly after `<body>`, above the app nav, on
+authenticated pages; `/api/health/sync` is auth-exempt (returning timing only, no
+data) because a health check that needs a session cookie is one no monitor can
+run, and it answers `503` while alarming; `python -m ...sync_health` exits 1 so a
+cron can gate on it.
