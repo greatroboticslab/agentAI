@@ -85,8 +85,14 @@ raw volume. The gate's proven value is garbage *exclusion*, not score *lifting*:
 | **M1 sealed · merged raw** | 55,690 | **0.6032 ± 0.0046** (n=3) | `mega_trainer` + content-hash guard; train∩holdout = 0 | jobs 44234060, 2026-08-23 |
 | **M1 sealed · merged @ DINO≥0.50** | 13,309 | **0.5894 ± 0.0025** (n=3) | same, gate skipped 36/45 slugs | jobs 44234063, 2026-08-23 |
 
-Merging harvested data costs ~0.27–0.30 absolute versus training on the in-domain set
-alone — sealed and pre-guard points agree on this. Supporting artifacts: `results/framework/*_results.json`, `v3_0_23_mega_iter6_train8_results.csv`,
+⚠️ **Retracted 2026-08-25.** The apparent ~0.27–0.30 cost of merging harvested data is not
+supported. A zero-harvest control inside the same merge pipeline (tier ladder, core only)
+scores **0.5601** — the gap exists *before any harvested image is added*. The merged corpus's
+in-domain core is instance-starved by the pipeline's own dedup and holdout-stem filters
+(4,175 instances vs cwd12's 6,131; Goosegrass 44 vs cwd12's minimum of 81), and mAP averaged
+over 12 classes punishes starved classes hard. Within the pipeline the ladder is **flat**
+(0.5601 → 0.5588 → 0.5455 at +0/+5k/+15k), i.e. harvested data is closer to neutral than
+harmful. The corrected ladder, cored on the real cwd12 train split, is jobs 44397807. Supporting artifacts: `results/framework/*_results.json`, `v3_0_23_mega_iter6_train8_results.csv`,
 per-species table in `RESEARCH_LOG.md` (§2026-07 entries), anti-forgetting rounds
 (round-3 zero-forgetting, CHANGELOG L685-691), and the small-object failure analysis
 (mAP 0.87 → 0.40 on small-box subsets, CHANGELOG L1944-1961).

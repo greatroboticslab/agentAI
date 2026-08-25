@@ -53,7 +53,8 @@
    "pending": false,
    "guard": "SEALED (1,977 holdout dHashes pre-seeded)",
    "anchor": "jobs 44234060_[1-3] (h100, yolo26x@640, patience-20 early stop at ep 29/32/37); per-seed 0.6055/0.5979/0.6062 from results.csv; guard active (1,977 dHashes pre-seeded), train∩holdout stems = 0",
-   "std": 0.0046
+   "std": 0.0046,
+   "caveat_2026_08_25": "NOT comparable to the cwd12-only rows as a data-quality result: the merged corpus's in-domain core is instance-starved (4,175 vs 6,131 instances; Goosegrass 44 vs cwd12's minimum 81). A zero-harvest control in the same pipeline scores 0.5601, so most of the gap is corpus construction, not harvested-data quality. Re-measurement: jobs 44397807."
   },
   {
    "label": "M1 curated · 13.3K @ DINO≥0.50 (sealed)",
@@ -63,7 +64,8 @@
    "pending": false,
    "guard": "SEALED",
    "anchor": "jobs 44234063_[1-3] (h100, same recipe; DINO gate skipped 36/45 slugs; early stop ep 37/44/46); per-seed 0.5873/0.5887/0.5921; guard active, train∩holdout stems = 0",
-   "std": 0.0025
+   "std": 0.0025,
+   "caveat_2026_08_25": "NOT comparable to the cwd12-only rows as a data-quality result: the merged corpus's in-domain core is instance-starved (4,175 vs 6,131 instances; Goosegrass 44 vs cwd12's minimum 81). A zero-harvest control in the same pipeline scores 0.5601, so most of the gap is corpus construction, not harvested-data quality. Re-measurement: jobs 44397807."
   },
   {
    "label": "YOLO11n · cwd12-only (2026-03, single run)",
@@ -396,5 +398,30 @@
   "user_flagged_garbage_slugs": 57,
   "campaign_quarantined": 6,
   "reading": "The harvested pool is heavily redundant: dHash dedup removes 44,750 cross-dataset duplicates — the same weed photos re-exported across many Roboflow projects. 'More images' from the web is not the same as more information, and this funnel is why the trainer sees ~59k, not 156k."
+ },
+ "tier_ladder_v1_RETRACTED_2026_08_25": {
+  "runs": {
+   "core+0": 0.5601,
+   "core+5000": 0.5588,
+   "core+15000": 0.5455,
+   "core+40000": "~0.5572 (partial)"
+  },
+  "core_composition": {
+   "images": 2918,
+   "instances": 4175,
+   "starved_classes": {
+    "Goosegrass": 44,
+    "SpottedSpurge": 59,
+    "Sicklepod": 91
+   }
+  },
+  "cwd12_reference": {
+   "images": 3671,
+   "instances": 6131,
+   "min_class_instances": 81
+  },
+  "why_retracted": "the core was taken from the merged corpus's own cottonweed_* files, which the merge's dedup and holdout-stem filter had already stripped by 32% of instances, hitting the rare classes hardest. It scored 0.5601 with ZERO harvested images added, so the gap it was meant to explain existed before any harvested image was involved.",
+  "what_it_does_show": "within this pipeline the ladder is FLAT — adding 5k/15k/40k harvested images moves the metric by <0.015. Harvested data is close to neutral here, not harmful.",
+  "replacement": "jobs 44397807 — same ladder with the real cwd12 train split (3,671 imgs, remapped to canonical ids) as the core"
  }
 }

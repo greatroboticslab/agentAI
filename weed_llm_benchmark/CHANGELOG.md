@@ -7410,3 +7410,45 @@ sample so each tier is reproducible, trained with the same pretrained YOLO11n re
 against the same sealed holdout. It measures the question a platform user actually has —
 *how much harvested data can I add to my clean data before it starts hurting?* — with the
 0.8755 and 0.6032 endpoints already in hand.
+
+### v3.23.1 — a retraction: the tier ladder disproved our own headline claim
+
+The tier ladder was built to measure how much harvested data can be added before it
+hurts. Its first rung — **core, zero harvested images — scored 0.5601**, and that single
+number invalidates the campaign's most-quoted finding.
+
+| tier | train images | holdout mAP50-95 |
+|---|---|---|
+| core + 0 | 2,918 | **0.5601** |
+| core + 5,000 | 7,918 | 0.5588 |
+| core + 15,000 | 17,918 | 0.5455 |
+| core + 40,000 | 42,918 | ~0.5572 (partial) |
+
+We had been reading the merged-corpus results (0.6032) against the cwd12-only results
+(0.8755) and concluding that **merging harvested data costs ~0.27–0.30**. But the gap is
+already there with *no harvested data at all*, so harvested data cannot be its cause.
+
+The cause, measured directly: the merged corpus's in-domain core is **instance-starved by
+the pipeline's own filters**. cwd12's train split has 3,671 images and **6,131 annotated
+instances** with its rarest class at 81; the merge's core has 2,918 images and **4,175
+instances**, with **Goosegrass at 44**, SpottedSpurge at 59, Sicklepod at 91. Dedup and
+the holdout-stem filter strip the rare classes hardest, and mAP averaged over 12 classes
+punishes starved classes severely. (The 12 species are also split across two registry
+slugs — `cottonweed_sp8` holds 8, `cottonweed_holdout` the other 4 — so the holdout
+filter lands almost entirely on those four.)
+
+What the ladder *does* support is nearly the opposite of the retracted claim: **within
+the pipeline the curve is flat** — 40,000 added harvested images move the metric by under
+0.015. Harvested data is close to neutral here, not harmful.
+
+Actions taken:
+- The causal claim is **retracted** in `SCIENCE_AUDIT.md` (claims 3 and 4b),
+  `DOUBLE_AGENT_SYSTEM.md`, and on the M1 rows in `figures_data.json`, which the platform's
+  Evidence panel reads — so the correction reaches the page, not just the commit log.
+- The ladder is rebuilt with the **real cwd12 train split as its core** (3,671 images,
+  remapped from cwd12's original class order to canonical) and resubmitted as jobs
+  44397807 at 100 epochs, so it measures what it claims to.
+
+The numbers were never wrong; the sentence we attached to them was. It survived several
+supervision passes because it was plausible and matched the historical narrative — which
+is exactly why a control with the treatment removed is worth its GPU hours.
