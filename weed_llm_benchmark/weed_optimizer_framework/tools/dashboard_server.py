@@ -7237,6 +7237,69 @@ async def api_set_domain_config(request: Request):
     return JSONResponse({"ok": True, "domain": dom, "config": new_cfg})
 
 
+# --------------------------------------------------------------------------- #
+# v3.23.0 — EVIDENCE API. Every result this project produced lived in git and in
+# JSON on disk while the platform itself showed none of it; D3 of the campaign
+# plan asks that "a stranger can read the project page and see what ran, when,
+# and what it scored". This serves exactly the artifacts the science is written
+# from — no re-derivation, no hand-copied numbers.
+# --------------------------------------------------------------------------- #
+@app.get("/api/evidence")
+def api_evidence(request: Request):
+    _ = _actor_from_request(request)
+    fw = REPO / "results" / "framework"
+    out = {"ok": True, "sources": {}}
+
+    def _load(name, path):
+        try:
+            out["sources"][name] = {"path": str(path.relative_to(REPO)),
+                                    "mtime": int(path.stat().st_mtime)}
+            return json.loads(path.read_text())
+        except Exception as e:
+            out["sources"][name] = {"path": str(path), "error": str(e)[:120]}
+            return None
+
+    fig = _load("figures_data", fw / "figures_data.json") or {}
+    pool = _load("pool_report", fw / "pool_report.json") or {}
+
+    # model leaderboard, newest evidence first; every row carries n and provenance
+    board = []
+    for pt in (fig.get("quality_vs_scale") or []):
+        if pt.get("map50_95") is None or pt.get("historical"):
+            continue
+        board.append({"label": pt.get("label"), "map50_95": pt.get("map50_95"),
+                      "std": pt.get("std"), "n_seeds": pt.get("n_seeds", 1),
+                      "train_images": pt.get("train_images"),
+                      "guard": pt.get("guard"), "anchor": pt.get("anchor")})
+    board.sort(key=lambda r: -(r.get("map50_95") or 0))
+    out["leaderboard"] = board
+    out["fair_comparison"] = fig.get("s3_fair_comparison")
+    out["merge_funnel"] = fig.get("merge_funnel_2026_08_23")
+    out["m1_sealed"] = fig.get("m1_sealed_2026_08_23")
+    out["pool"] = {k: pool.get(k) for k in
+                   ("generated_at", "datasets", "images", "labeled",
+                    "distinct_classes", "quality_histogram_dino", "license_mix",
+                    "quarantined")} if pool else None
+
+    # per-run artifacts the campaign wrote (s3_*.json / m1_*.json)
+    runs = []
+    for pat in ("s3_*.json", "m1_*_seed*.json"):
+        for f in sorted(fw.glob(pat)):
+            try:
+                j = json.loads(f.read_text())
+            except Exception:
+                continue
+            runs.append({"file": f.name, "model": j.get("model") or j.get("tier"),
+                         "seed": j.get("seed"), "tier_added": j.get("tier_added"),
+                         "train_images": j.get("train_images"),
+                         "metric": j.get("best_map50_95"),
+                         "epochs": j.get("epochs_ran"), "job": j.get("job"),
+                         "ok": j.get("ok")})
+    out["runs"] = runs
+    out["n_runs"] = len(runs)
+    return JSONResponse(out)
+
+
 @app.get("/api/domain/rounds")
 def api_domain_rounds(domain: str = "weed"):
     """v3.0.186 (P4): the per-domain compounding-loop rounds — each round's
@@ -8133,6 +8196,17 @@ def agent_generic(domain_id: str):
      <div id="rlv-adv" style="display:none;font-size:12px;color:#fbbf24;margin-top:4px"></div>
      <style>@keyframes rlvp{{50%{{opacity:.3}}}}</style>
    </div>
+   <!-- v3.23.0: evidence panel — what this project has actually measured. Hidden
+        until there is evidence to show; every row carries n and provenance. -->
+   <div id="evd" style="display:none;margin-top:22px;background:#fff;border:1px solid #e3e7ef;border-radius:12px;padding:14px">
+     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+       <b style="font-size:14px">&#128202; Evidence</b>
+       <span id="evd-sub" style="font-size:12px;color:#64748b"></span>
+     </div>
+     <div id="evd-board" style="margin-top:10px;overflow-x:auto"></div>
+     <div id="evd-notes" style="margin-top:10px;font-size:12.5px;color:#334155;line-height:1.6"></div>
+     <div id="evd-pool" style="margin-top:8px;font-size:12px;color:#64748b"></div>
+   </div>
    <!-- v3.22.8: compounding chart — the double-agent loop's rounds vs holdout metric.
         Hidden until this project has at least one recorded round. -->
    <div id="cmpx" style="display:none;margin-top:22px;background:#f8fafc;border:1px solid #e3e7ef;border-radius:12px;padding:14px">
@@ -8183,6 +8257,34 @@ function rlvFrame(){
   im.src='/api/robot/frame_latest/'+_rlvSid+'.jpg?t='+Date.now();}
 }
 rlvPoll(); setInterval(rlvPoll,4000); setInterval(rlvFrame,1500);
+// v3.23.0: evidence panel — the measured results, read from the same artifacts the
+// papers/figures are written from. Only rendered for the project that owns them.
+if('__DOM__'==='weed'){fetch('/api/evidence',{credentials:'include'}).then(function(r){return r.json();}).then(function(d){
+ var b=(d&&d.leaderboard)||[]; if(!b.length)return;
+ document.getElementById('evd').style.display='block';
+ document.getElementById('evd-sub').textContent=b.length+' measured configurations \u00b7 '+(d.n_runs||0)+' recorded runs \u00b7 metric = cwd12 holdout mAP50-95';
+ var h='<table style="border-collapse:collapse;font-size:12.5px;width:100%">'
+      +'<tr style="text-align:left;color:#64748b"><th style="padding:3px 12px 3px 0">configuration</th><th style="padding:3px 12px">train imgs</th><th style="padding:3px 12px">mAP50-95</th><th style="padding:3px 12px">seeds</th></tr>';
+ b.forEach(function(r,i){
+   var v=r.map50_95.toFixed(4)+(r.std?(' \u00b1 '+r.std.toFixed(4)):'');
+   h+='<tr style="border-top:1px solid #eef1f6'+(i===0?';font-weight:600':'')+'">'
+     +'<td style="padding:5px 12px 5px 0" title="'+(r.anchor||'').replace(/"/g,"&quot;")+'">'+r.label+'</td>'
+     +'<td style="padding:5px 12px">'+(r.train_images!=null?r.train_images.toLocaleString():'\u2014')+'</td>'
+     +'<td style="padding:5px 12px">'+v+'</td>'
+     +'<td style="padding:5px 12px">'+(r.n_seeds||1)+'</td></tr>';});
+ document.getElementById('evd-board').innerHTML=h+'</table>';
+ var n=[];
+ if(d.fair_comparison&&d.fair_comparison.reading) n.push('<b>Architecture vs initialisation.</b> '+d.fair_comparison.reading);
+ if(d.merge_funnel&&d.merge_funnel.reading) n.push('<b>Merge funnel.</b> '+d.merge_funnel.reading);
+ document.getElementById('evd-notes').innerHTML=n.map(function(x){return '<div style="margin-top:4px">'+x+'</div>';}).join('');
+ if(d.pool&&d.pool.labeled){
+   var p=d.pool;
+   document.getElementById('evd-pool').textContent=
+     'Pool: '+(p.labeled.audited_pool||0).toLocaleString()+' labelled images \u00b7 '
+     +(p.datasets?p.datasets.active:'?')+' active datasets \u00b7 '
+     +(p.datasets?p.datasets.quarantined:0)+' quarantined \u00b7 '
+     +(p.distinct_classes||0)+' classes \u00b7 licenses '+JSON.stringify(p.license_mix||{}).slice(0,90);}
+}).catch(function(e){});}
 // v3.22.8: compounding chart — rounds ledger -> round# vs holdout metric + pool size.
 function cmpxMetric(r){
  // metric location varies by round writer version — search common spots, then deep-scan

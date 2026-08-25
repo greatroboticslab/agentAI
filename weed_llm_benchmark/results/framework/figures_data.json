@@ -73,6 +73,24 @@
    "historical": true,
    "guard": "not-applicable",
    "anchor": "RESEARCH_LOG Phase 1 (job 38007481, 100 ep) — pre-split full set"
+  },
+  {
+   "label": "Mamba-YOLO-T · cwd12-only (from scratch)",
+   "train_images": 3671,
+   "map50_95": 0.8266,
+   "std": 0.0064,
+   "n_seeds": 3,
+   "guard": "not-applicable (single dataset; sealed 1,977 holdout as val)",
+   "anchor": "jobs 44351282_[1-3] 2026-08-24; random init — the fork releases no weights"
+  },
+  {
+   "label": "YOLO11n · cwd12-only (from scratch, fairness control)",
+   "train_images": 3671,
+   "map50_95": 0.8041,
+   "std": 0.0028,
+   "n_seeds": 3,
+   "guard": "not-applicable (single dataset; sealed holdout as val)",
+   "anchor": "jobs 44368952_[1-3] 2026-08-24; the like-for-like opponent for Mamba-YOLO-T"
   }
  ],
  "benchmark_cwd12_map50": [

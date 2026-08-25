@@ -7376,3 +7376,37 @@ quarantines, leaving **59,134 unique images from 30 datasets**. The harvested po
 heavily redundant — the same weed photographs re-exported across many Roboflow projects.
 "More images from the web" is not the same as more information, and this funnel is the
 measured reason the merged-corpus curve plateaus where it does.
+
+### v3.23.0 — the platform finally shows what it has learned
+
+Every result this campaign produced lived in git and in JSON on the cluster while the
+platform itself displayed none of it. D3 of the plan asks that *"a stranger can read the
+project page and see what ran, when, and what it scored"* — that was not true until now.
+
+- **`GET /api/evidence`** serves the campaign's findings straight from the artifacts the
+  figures and papers are written from (`figures_data.json`, `pool_report.json`, and every
+  per-run `s3_*.json` / `m1_*_seed*.json`). No re-derivation and no hand-copied numbers:
+  if a claim is on the page, the same file produced it.
+- **An Evidence panel on the project page** renders a leaderboard of **9 measured
+  configurations across 16 recorded runs**, each row carrying its training-set size, seed
+  count and — in the tooltip — its provenance anchor. Below it sit the two readings that
+  a number alone would hide: that on 3,671 images **initialisation (+0.071) outweighs
+  architecture (+0.022)**, and that **44,750 of the harvested pool's images are
+  cross-dataset duplicates**, which is why the trainer sees ~59k and not 156k. The panel
+  closes with the pool's governance state (labelled count, active/quarantined datasets,
+  class count, license mix).
+- The lab↔cluster sync now carries `pool_report.json` and `figures_data.json`, and the
+  per-run artifacts were pulled across, so the panel keeps itself current instead of
+  freezing at whatever was hand-copied.
+
+Verified on the deployed server: the API returns 9 leaderboard rows and 16 runs, and a
+headless screenshot confirms the panel renders — the honest ordering, RF-DETR at the top
+and the merged-corpus rows at the bottom, with the from-scratch pair adjacent so the
+architecture comparison reads correctly.
+
+**S3's tier ladder is also running** (jobs 44383471, array 0-3): core, core+5k, core+15k,
+core+40k harvested images, built from the already-canonicalised M1 merge with a seeded
+sample so each tier is reproducible, trained with the same pretrained YOLO11n recipe
+against the same sealed holdout. It measures the question a platform user actually has —
+*how much harvested data can I add to my clean data before it starts hurting?* — with the
+0.8755 and 0.6032 endpoints already in hand.
