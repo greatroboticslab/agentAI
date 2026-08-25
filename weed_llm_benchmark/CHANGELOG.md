@@ -7517,3 +7517,34 @@ measured its own headline mechanism and adjusted.
 
 Meanwhile the loop keeps running unattended: round 3 closed at 0.5951 (its fourth
 consecutive metric on the merged corpus) and round 4 is in its filter step.
+
+### v3.23.4 — S3 closes: the best-model card, with its weaknesses named
+
+`docs/BEST_MODEL_CARD.md` completes the last item on S3's gate. It answers two questions
+rather than one, because they have different answers:
+
+- **Best accuracy:** RF-DETR Large, **0.8974 ± 0.0040** (n=4).
+- **Best deployment:** **YOLO11n, 0.8759 ± 0.0030** (n=3) — 2.6 M parameters and a 5.2 MB
+  checkpoint against RF-DETR Large's ~128 M, for a Jetson Nano destination, at a cost of
+  0.021 which is smaller than the pretraining effect this campaign measured.
+
+The card's numbers come from an **independent re-evaluation of the checkpoints**
+(job 44454237), not from the training loop's own bookkeeping: 0.8746 / 0.8793 / 0.8737
+across seeds, which agrees with the training-time 0.8755 to within the seed noise.
+
+The part worth having is the per-species table. The spread between the best and worst
+species is **0.244 — roughly eighty times the seed noise of 0.003** — so weakness by
+species is a property of the model rather than run variance. Ragweed reaches 0.9767;
+**Morningglory reaches 0.7324**, with Goosegrass 0.7973 and Eclipta 0.8219 behind it.
+A laser-weeding system acting on this model will miss those three most often, and that
+belongs in a model card rather than in a footnote.
+
+Five limits are stated plainly, including the one that matters most for this lab: the
+model has **never been evaluated on robot camera frames**. cwd12 is close-range handheld
+photography and the robots see a different distribution, so field accuracy is unknown
+until measured — which is exactly what S6 is for. The WBF/TTA ceiling run was not
+executed and is recorded as not-done rather than quietly dropped.
+
+**S3 is closed**: 20 ledgered runs, 3 method families, the tier ladder, the ranked
+levers, and the card. The campaign's remaining phases are S1's formal count and S6's
+deployment.

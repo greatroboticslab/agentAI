@@ -31,9 +31,13 @@ for seed in (101,102,103):
     r=YOLO(w).val(data=REPO+"/cwd12_sealed.yaml", imgsz=640, device=0,
                   workers=4, verbose=False, plots=False,
                   project=REPO+"/results/framework/s3_bmeval", name=f"s{seed}")
-    ap=list(getattr(r.box, "maps", []) or [])
+    # `maps` is a numpy array; `x or []` evaluates its truth value and raises
+    # "truth value of an array ... is ambiguous". Convert explicitly.
+    maps = getattr(r.box, "maps", None)
+    ap = [] if maps is None else [float(v) for v in list(maps)]
     per_seed[seed]={"map50_95":round(float(r.box.map),4),"map50":round(float(r.box.map50),4),
-                    "per_class":{NAMES[i]: round(float(v),4) for i,v in enumerate(ap) if i<len(NAMES)}}
+                    "n_classes_reported":len(ap),
+                    "per_class":{NAMES[i]: round(v,4) for i,v in enumerate(ap) if i<len(NAMES)}}
     print("[bm] seed %d mAP50-95=%.4f mAP50=%.4f" % (seed, r.box.map, r.box.map50))
 cls={}
 for n in NAMES:

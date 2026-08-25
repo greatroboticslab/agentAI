@@ -488,5 +488,45 @@
    "adding 40,000 harvested images to a clean core": -0.02
   },
   "reading": "Ranked by what actually moves the metric on 3,671 in-domain images: pretraining (+0.071) > architecture (+0.023) > head width (-0.012) ~ forty thousand extra web images (-0.020). The data-collection lever, the one the double-agent loop was built around, is the weakest of the four."
+ },
+ "best_model_card_2026_08_25": {
+  "deployable": {
+   "model": "YOLO11n (COCO-pretrained)",
+   "map50_95": 0.8759,
+   "std": 0.003,
+   "n": 3,
+   "map50_per_seed": [
+    0.933,
+    0.9369,
+    0.9328
+   ],
+   "params_M": 2.6,
+   "checkpoint_MB": 5.2,
+   "artifact": "results/framework/s3_yolo11n/s102/weights/best.pt",
+   "eval_job": "44454237"
+  },
+  "best_accuracy": {
+   "model": "RF-DETR Large (COCO-pretrained)",
+   "map50_95": 0.8974,
+   "std": 0.004,
+   "n": 4
+  },
+  "per_species_map50_95": {
+   "Ragweed": 0.9767,
+   "Purslane": 0.9276,
+   "PalmerAmaranth": 0.9163,
+   "Crabgrass": 0.9157,
+   "Carpetweeds": 0.9151,
+   "PricklySida": 0.9118,
+   "SpottedSpurge": 0.8818,
+   "Nutsedge": 0.8585,
+   "Sicklepod": 0.8555,
+   "Eclipta": 0.8219,
+   "Goosegrass": 0.7973,
+   "Morningglory": 0.7324
+  },
+  "species_spread": 0.2443,
+  "reading": "The 0.244 spread between best and worst species is ~80x the seed noise (0.003), so per-species weakness is a property of the model, not run variance. Morningglory (0.7324), Goosegrass (0.7973) and Eclipta (0.8219) are where a laser-weeding system would miss most.",
+  "card": "docs/BEST_MODEL_CARD.md"
  }
 }
