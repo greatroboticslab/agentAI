@@ -423,5 +423,39 @@
   "why_retracted": "the core was taken from the merged corpus's own cottonweed_* files, which the merge's dedup and holdout-stem filter had already stripped by 32% of instances, hitting the rare classes hardest. It scored 0.5601 with ZERO harvested images added, so the gap it was meant to explain existed before any harvested image was involved.",
   "what_it_does_show": "within this pipeline the ladder is FLAT — adding 5k/15k/40k harvested images moves the metric by <0.015. Harvested data is close to neutral here, not harmful.",
   "replacement": "jobs 44397807 — same ladder with the real cwd12 train split (3,671 imgs, remapped to canonical ids) as the core"
+ },
+ "tier_ladder_v2_2026_08_25": {
+  "core": "real cwd12 train split (3,671 imgs, 6,131 instances), remapped orig->canonical ids",
+  "protocol": "YOLO11n COCO-pretrained, 100 ep cap, seed 101, nc=100, sealed 1,977-image holdout",
+  "jobs": "44397807_[0-3]",
+  "points": [
+   {
+    "added": 0,
+    "train": 3671,
+    "map50_95": 0.8636,
+    "epochs": 97
+   },
+   {
+    "added": 5000,
+    "train": 8671,
+    "map50_95": 0.8599,
+    "epochs": 91
+   },
+   {
+    "added": 15000,
+    "train": 18671,
+    "map50_95": 0.8614,
+    "epochs": 100
+   },
+   {
+    "added": 40000,
+    "train": 43671,
+    "map50_95": 0.8408,
+    "epochs": 62,
+    "partial": true
+   }
+  ],
+  "reading": "Adding web-harvested data to a clean in-domain core is essentially FREE and essentially USELESS: +5,000 costs 0.004, +15,000 costs 0.002, and only at +40,000 does a ~0.02 decline appear (still training). The honest cost of scale here is 0.00-0.02, not the 0.27 previously claimed - that figure came from a crippled core (0.5601 with zero harvested images) and was retracted 2026-08-25.",
+  "residual_note": "core+0 reads 0.8636 here vs 0.8755 in the nc=12 sealed run; the ~0.012 difference is the 100-class head carrying 88 unused classes, quantified rather than assumed."
  }
 }

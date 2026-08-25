@@ -48,7 +48,14 @@ _WEED_STEPS = {
     # v3.22.21: the script's own #SBATCH is 4 h, which was enough at 45 datasets
     # and is not at 61 — round 3's harvest ran 3 h 10 m and round 4 hit the wall.
     # Override on the command line so the script stays untouched for manual use.
-    "collect": ("sbatch --time=10:00:00 run_v3_0_43_brain_harvest_oneshot.sh", "brain"),
+    # v3.23.2: harvest is now capped at 3 new datasets per round, on evidence.
+    # The corrected tier ladder shows added web-harvested data is worth ~0.00-0.02
+    # against a clean core, while a 10 h harvest managed only three Roboflow
+    # datasets (each zip is downloaded whole before being capped to 5,000 images)
+    # and still timed out. Collecting more is no longer buying accuracy, so the
+    # loop spends less on it rather than pretending the volume matters.
+    "collect": ("sbatch --time=10:00:00 --export=ALL,BRAIN_MAX_NEW=3 "
+                "run_v3_0_43_brain_harvest_oneshot.sh", "brain"),
     "filter": ("sbatch run_s2_dino_scores.sh", "s2_dino"),
     "train": ("sbatch --array=1-1 --job-name=rndtrain --gres=gpu:h100-80:1 "
               "--time=12:00:00 --export=ALL,TIER=curated,MIN_DINO_SCORE=0.50 "

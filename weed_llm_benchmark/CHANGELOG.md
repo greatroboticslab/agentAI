@@ -7452,3 +7452,33 @@ Actions taken:
 The numbers were never wrong; the sentence we attached to them was. It survived several
 supervision passes because it was plausible and matched the historical narrative — which
 is exactly why a control with the treatment removed is worth its GPU hours.
+
+### v3.23.2 — the corrected ladder, and a harvest decision made on its evidence
+
+The rebuilt tier ladder (real cwd12 train split as its core, remapped to canonical ids,
+100 epochs) settles the question the retraction opened:
+
+| harvested added | train images | holdout mAP50-95 |
+|---|---|---|
+| 0 | 3,671 | **0.8636** |
+| +5,000 | 8,671 | 0.8599 |
+| +15,000 | 18,671 | 0.8614 |
+| +40,000 | 43,671 | 0.8408 *(epoch 62, still training)* |
+
+**Adding web-harvested data to a clean in-domain core costs 0.00–0.02 — and gains
+nothing.** The retracted 0.27 was almost entirely the crippled core (0.5601 with zero
+harvested images); with a real core the same pipeline starts at 0.8636. A useful
+by-product: `core+0` reads 0.8636 here against 0.8755 in the nc=12 sealed run, so the
+100-class head with 88 unused classes costs ~0.012 — now measured instead of assumed.
+
+**And a decision follows from it.** A 10-hour harvest (44385850) timed out having
+downloaded only three Roboflow datasets: each zip is fetched whole before being capped to
+5,000 images. The pool is at 179,989 images across 63 datasets, and the ladder says more
+of them are not buying accuracy. So the scheduler's collect step is capped at
+`BRAIN_MAX_NEW=3` per round — the loop spends less on collection because the measurement
+says collection has stopped paying, which is the double-agent system doing what it was
+built to do: change its own behaviour on its own evidence rather than on the assumption
+that more data is always better.
+
+The next question the campaign should answer is no longer "how much more data" but
+"which data" — the curation side — and that is where S3's remaining budget belongs.

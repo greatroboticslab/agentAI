@@ -85,6 +85,20 @@ raw volume. The gate's proven value is garbage *exclusion*, not score *lifting*:
 | **M1 sealed · merged raw** | 55,690 | **0.6032 ± 0.0046** (n=3) | `mega_trainer` + content-hash guard; train∩holdout = 0 | jobs 44234060, 2026-08-23 |
 | **M1 sealed · merged @ DINO≥0.50** | 13,309 | **0.5894 ± 0.0025** (n=3) | same, gate skipped 36/45 slugs | jobs 44234063, 2026-08-23 |
 
+**The corrected measurement (2026-08-25, jobs 44397807).** Adding web-harvested images to a
+clean in-domain core, same model, same sealed holdout:
+
+| harvested added | train images | holdout mAP50-95 |
+|---|---|---|
+| 0 | 3,671 | **0.8636** |
+| +5,000 | 8,671 | 0.8599 |
+| +15,000 | 18,671 | 0.8614 |
+| +40,000 | 43,671 | 0.8408 *(still training)* |
+
+**The honest cost of adding harvested data is 0.00–0.02, not 0.27.** It buys nothing either —
+a flat curve is the finding. (`core+0` reads 0.8636 here against 0.8755 in the nc=12 run; the
+~0.012 difference is the 100-class head carrying 88 unused classes, measured rather than assumed.)
+
 ⚠️ **Retracted 2026-08-25.** The apparent ~0.27–0.30 cost of merging harvested data is not
 supported. A zero-harvest control inside the same merge pipeline (tier ladder, core only)
 scores **0.5601** — the gap exists *before any harvested image is added*. The merged corpus's
