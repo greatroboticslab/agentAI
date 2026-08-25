@@ -76,6 +76,8 @@ raw volume. The gate's proven value is garbage *exclusion*, not score *lifting*:
 |---|---|---|---|---|
 | Supervised YOLO11n baseline | cwd12 alone (5,648 imgs) | 0.865 (0.929 mAP@0.5), single run | none | v3.0.6 |
 | **YOLO11n, sealed protocol** | cwd12 train split (3,671) | **0.8755 ± 0.0029** (n=3 seeds) | none — sealed 1,977-image holdout as val | jobs 44323305, 2026-08-24 |
+| **Mamba-YOLO-T, from scratch** | cwd12 train split (3,671) | **0.8266 ± 0.0064** (n=3) | none — sealed holdout as val | jobs 44351282, 2026-08-24 |
+| **YOLO11n, from scratch** (fairness control) | cwd12 train split (3,671) | **0.8041 ± 0.0028** (n=3) | none | jobs 44368952, 2026-08-24 |
 | **RF-DETR Large, cwd12-only** | cwd12 alone | **0.8974 ± 0.0040** (n=4 seeds; best 0.9033) | none — `train_rfdetr.py` stages cwd12 directly, holdout stems excluded | v3.0.31/34/38 |
 | Naive scale + pseudo-labels | 244,675 harvested imgs | **0.593** ⚠ pre-guard | `mega_trainer` merge | v3.0.26-p2 |
 | Cumulative scale variant | ~150–240K | 0.576 ⚠ pre-guard | `mega_trainer` merge | v3.0.32 |

@@ -7348,3 +7348,31 @@ Both figures are recorded with the confound attached in `figures_data.json`, so 
 caveat travels with the data rather than living in a commit message. Elsewhere the loop
 is healthy: round 3's collect finished in 2 h 30 m (comfortably inside the new 10 h
 walltime), DINO scoring completed, and round 3's training is underway.
+
+### v3.22.24 — the control reversed the conclusion; and where two thirds of the data goes
+
+**The fairness control landed and it flips the architecture reading.** YOLO11n trained
+from scratch on the sealed protocol scores **0.8041 ± 0.0028** (per-seed 0.8055 / 0.8009
+/ 0.8059). Against that — the only like-for-like opponent, since the Mamba fork ships no
+weights — **Mamba-YOLO-T at 0.8266 ± 0.0064 wins by +0.0225**. Had the pretrained
+YOLO11n row been published as the comparison, we would have reported the AAAI-2025
+architecture *losing* when at equal initialisation it wins.
+
+Two effects, both real, only one of them an architecture claim:
+
+| effect | size |
+|---|---|
+| COCO pretraining, YOLO11n (0.8755 vs 0.8041) | **+0.0714** |
+| architecture at equal random init (Mamba-T vs YOLO11n) | **+0.0225** |
+
+On 3,671 in-domain images the initialisation choice is worth about three times the
+architecture choice. The pretrained row remains the answer to "what is the best cwd12
+model we can train"; the scratch pair is the answer to "which architecture is better".
+
+**Merge funnel — why the trainer sees 59k images and not 156k.** Read from the M1 raw
+merge log: of the pool, **44,750 images are cross-dataset duplicates** removed by dHash,
+1,977 are the holdout, 57 slugs carry historical garbage flags and 6 are campaign
+quarantines, leaving **59,134 unique images from 30 datasets**. The harvested pool is
+heavily redundant — the same weed photographs re-exported across many Roboflow projects.
+"More images from the web" is not the same as more information, and this funnel is the
+measured reason the merged-corpus curve plateaus where it does.

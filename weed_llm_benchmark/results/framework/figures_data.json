@@ -332,7 +332,51 @@
    "CONFOUND": "not comparable to the YOLO11n row as an architecture result: YOLO11n started from COCO-pretrained yolo11n.pt, Mamba-YOLO-T from random init. A from-scratch YOLO11n control (jobs 44368952) removes the asymmetry."
   },
   "yolo11n_scratch_control": {
-   "status": "running (44368952_[1-3]), init=yolo11n.yaml"
+   "per_seed": [
+    0.8055,
+    0.8009,
+    0.8059
+   ],
+   "mean": 0.8041,
+   "std": 0.0028,
+   "n_seeds": 3,
+   "epochs": 100,
+   "init": "yolo11n.yaml (random)",
+   "jobs": "44368952_[1-3]",
+   "verdict": "this is the fair opponent for Mamba-YOLO-T. At equal (random) initialisation Mamba-YOLO-T 0.8266 BEATS YOLO11n 0.8041 by +0.0225 — the opposite of the naive pretrained-vs-scratch reading. Pretraining alone is worth +0.0714 to YOLO11n (0.8755 pretrained vs 0.8041 scratch), i.e. ~3x the architecture gap."
   }
+ },
+ "s3_fair_comparison": {
+  "at_equal_random_init": {
+   "Mamba-YOLO-T": {
+    "mean": 0.8266,
+    "std": 0.0064,
+    "params_M": 6.13
+   },
+   "YOLO11n": {
+    "mean": 0.8041,
+    "std": 0.0028,
+    "params_M": 2.6
+   },
+   "delta_mamba_minus_yolo": 0.0225
+  },
+  "pretraining_effect_yolo11n": {
+   "pretrained": 0.8755,
+   "scratch": 0.8041,
+   "delta": 0.0714
+  },
+  "protocol": "cwd12_sealed.yaml, 100 ep, seeds 101/102/103, V100, sealed 1,977-image holdout",
+  "reading": "On 3,671 in-domain images the initialisation choice (+0.071) outweighs the architecture choice (+0.022). Both are real; only the second is an architecture claim."
+ },
+ "merge_funnel_2026_08_23": {
+  "source": "M1 raw merge log (job 44234193)",
+  "registry_labelled_images": 156521,
+  "unique_after_dedup": 59134,
+  "datasets_used": 30,
+  "cross_dataset_duplicates_skipped": 44750,
+  "holdout_stem_filter_dropped": 1977,
+  "user_flagged_garbage_slugs": 57,
+  "campaign_quarantined": 6,
+  "reading": "The harvested pool is heavily redundant: dHash dedup removes 44,750 cross-dataset duplicates — the same weed photos re-exported across many Roboflow projects. 'More images' from the web is not the same as more information, and this funnel is why the trainer sees ~59k, not 156k."
  }
 }
