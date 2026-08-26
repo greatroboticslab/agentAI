@@ -13,6 +13,77 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-26 — S1 closes without meeting its gate; a 22-day silent outage; auditing the audit
+
+Three threads land together, and they share a theme: every mechanism worked, and what the
+mechanisms measured was not what the plan hoped.
+
+**S1 (autonomous collection at scale) is closed with its gate NOT MET — deliberately.** The gate
+asked for +10,000 audited-pool images with per-source scorecards and zero registry incidents.
+The calibrated sample audit (the probe reads 1.000 on human-labelled cwd12) gives, across the six
+harvested sources it could score:
+
+| source | labelled | audited precision |
+|---|---|---|
+| `project_agml/imageweeds_weed_detection` | 3,208 | **1.0000** — the only pass |
+| `project_agml/weed_crop_detection` | 1,120 | 0.7371 |
+| `project_agml/imageweeds_aerial_weed_detection` | 551 | 0.6496 |
+| `francesco/grass_weeds` | 2,479 | 0.5775 |
+| `project_agml/mh_weed16_weed_detection` | 4,993 | 0.4519 |
+| `francesco/weed_crop_aerial` | 1,176 | 0.1845 |
+
+3,208 of 13,527 audited harvested images clear the 0.90 bar, against a +10,000 target; and there
+were two registry incidents, not zero. The phase is closed rather than re-attempted because the
+S3 tier ladder had already priced additional harvested data at 0.00–0.02 from the other
+direction: **web harvest at this scale supplies volume, not usable supervision.** The remaining
+budget goes to curation and deployment. (One consequence taken up immediately below the fold:
+the single audit-passing source is the natural testbed for the model card's untested
+cross-dataset claim.)
+
+**The platform served three-week-old data with nothing in any log.** The cluster→lab sync had
+been wedged since 2026-08-03 — and the first repair (killing the stuck process, 2026-08-24)
+fixed nothing: the next timer firing wedged identically, which is what exposed the recorded
+diagnosis as a guess. Reading the blocked process directly (`/proc/<pid>/wchan`, `environ`, `fd`)
+gave the real cause: `SSH_AUTH_SOCK` pointed at a gnome-keyring agent socket whose daemon no
+longer serves ssh — the socket file exists, nothing accepts, and every ssh blocked in `connect()`
+*before authentication*, where `ConnectTimeout` does not apply. One blocked ssh became a
+permanent outage because a `Type=oneshot` systemd unit defaults to an **infinite** start timeout,
+and systemd will not start the next run while the last one lives.
+
+Fixes, in order of importance: the dependency is removed (`IdentityAgent=none` — the connection
+authenticates by password and has no use for an agent); the run is bounded at three levels
+(per-transfer `timeout`, unit-level `TimeoutStartSec`, ssh keepalives); and a freshness alarm now
+exists that cannot be blinded by this failure class — a **positive heartbeat that goes stale**,
+not error reporting, because a wedged process reports nothing. The alarm verdict is the age of
+the last successful *metadata* refresh (registry + Mongo — what the dashboard actually serves),
+so a multi-cycle catch-up of the 132 GB image trees does not pin the banner red; a permanently
+red banner trains people to scroll past it, which is the same failure as no banner. Verified
+against the live outage: the first bounded run recorded `rc=124` instead of hanging, the next
+run raised the heartbeat within ~25 s, and the registry jumped **52 → 78 slugs** — three weeks
+of stranded harvest arriving at once. `GET /api/health/sync` serves the verdict (timing only,
+auth-exempt) and `python -m ...sync_health` exits non-zero when alarming so anything can gate
+on it.
+
+**Auditing the audit found three silent-wrongness defects — zero crashes among them.**
+(1) The registry's corrected probe verdicts had been rolled back by a harvester's stale-snapshot
+merge-write; the v3.22.10 fix had protected quarantine fields specifically, so `scorecard`
+regressed the same way. Fixed at the class level: supervisory fields are enumerated and re-read
+from disk on every merge — a collector reports what it downloaded, never what a supervisor
+concluded. The corrected verdicts were restored from the standalone `sample_audits/*.json`
+artifacts, which exist precisely because the audit tool dual-writes. (2) `wbf_tta_eval.py`
+hardcoded a class list in a different order than `cwd12_sealed.yaml` — overall mAP is unaffected
+(it averages over ids), which is exactly why nothing looked wrong, while every per-species AP
+was attributed to the wrong weed. Class names now come from the yaml the training run recorded.
+(3) The sync's own progress line computed "X/Y exist" with numerator and denominator drawn from
+two different dataset populations, making disk state look non-monotonic during the outage
+review. All three share the property that makes them dangerous: the output stays plausible.
+
+**In flight:** the WBF/TTA ceiling (jobs 44463762 + 44463922), the one S3 recipe recorded as
+not executed. Six arms isolate fusion, multi-scale, hflip, and 3-seed ensembling, all scored by
+one matcher *including a plain baseline* — the first landed arms already justify that design:
+the script's matcher reads the same checkpoint 0.024 lower than Ultralytics' validator, an
+offset that would otherwise have been mistaken for a TTA effect.
+
 ## 2026-08-25 — S3: what actually moves the metric, and one retraction
 
 **Result.** With every method family measured on the same sealed protocol (cwd12 train split for
