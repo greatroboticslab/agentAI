@@ -7816,3 +7816,51 @@ a reviewer would impose:
 Registered while setting this up: the registry held `license: None` for this slug
 although the HF card states **CC BY 4.0** — one of the license sweep's unresolved
 six. Fixed through `registry_lock.update_registry` with the source cited.
+
+### v3.24.8 — the inference ceiling and the domain wall, both measured
+
+The card's two open limits close on the same day, in opposite emotional directions.
+
+**The ceiling (jobs 44463762 + 44463922).** Six arms, one matcher, deltas against the
+shared plain baseline (0.8554; the Ultralytics validator reads the same checkpoint
+0.8793, so the −0.024 metric offset is now a reported number instead of a possible
+confound):
+
+| arm | mAP50-95 | vs plain |
+|---|---|---|
+| WBF fusion alone | 0.8524 | −0.003 (nothing) |
+| multi-scale | 0.8653 | +0.010 |
+| multi-scale + hflip | 0.8728 | +0.017 |
+| 3-seed ensemble @640 | 0.8726 | +0.017 |
+| ensemble × scales × flip (18 views) | **0.8830** | **+0.028** |
+
+Single-model TTA equals 3-seed ensembling to the third decimal; stacked they are worth
++0.028 (≈0.907 on the validator scale if the offset composes). The cost is 2.44 s per
+image on a V100 — **~660× the deployed 3.7 ms** — so this is recorded as the ceiling it
+is, and the deployment recommendation is unchanged.
+
+**The wall (job 44465026).** Zero-shot cross-dataset transfer onto the one harvested
+source that passed the calibrated audit at 1.0000:
+
+| measurement | in-domain (cwd12 holdout) | ImageWeeds |
+|---|---|---|
+| class-agnostic weed localisation | 0.8730 ± 0.0011 | **0.1003 ± 0.0053** |
+| ragweed (same-name class) | 0.9604 ± 0.0018 | **0.0006 ± 0.0009** |
+
+The number was not trusted until its two fake explanations were killed by inspection:
+EXIF orientation is 1 on all 3,208 images (no rotated-frame mismatch), and the leak
+check found **zero** content-hash collisions at Hamming ≤ 6 against train *and* holdout
+(nearest neighbours sit at ≤10: 16 and 12), so all 3,208 images stand and the word
+"cross-dataset" is earned. A GT-vs-prediction montage (`xds_verify_montage.jpg`) then
+supplied the mechanism: ImageWeeds is greenhouse/potted-seedling photography — trays,
+artificial light, median relative box area 0.036 vs cwd12's 0.105 — and the collapse
+decomposes into recall lost on tiny seedlings (the known small-object weakness) plus
+species confusion on the plants the model does localise, often accurately.
+
+Together with the flat tier ladder this closes the campaign's data argument from both
+ends: **web aggregation does not improve the in-domain model, and the in-domain model
+does not travel.** What remains is per-domain collection in the deployment domain —
+which is what the platform and the robots are for. `weed_detect.py`'s MODEL_META now
+carries the measured warning instead of a hypothetical one, so every live API consumer
+sees it. Both limits in `BEST_MODEL_CARD.md` are rewritten as measurements; artifacts
+committed under `results/framework/`.

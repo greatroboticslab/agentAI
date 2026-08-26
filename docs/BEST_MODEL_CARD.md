@@ -77,8 +77,19 @@ is flat from 3,671 to 43,671 training images.
 
 ## 5. Honest limits
 
-1. **Single benchmark.** Every number is CottonWeedDet12 — 12 cotton-field weed species,
-   one capture campaign. Cross-dataset generalisation is *not* established here.
+1. **Cross-dataset generalisation: measured 2026-08-26, and it collapses.** Zero-shot on
+   `project_agml/imageweeds_weed_detection` — the one harvested source that passed the
+   calibrated audit (precision 1.0000), leak-checked at 0 content-hash collisions
+   (Hamming ≤ 6 vs train *and* holdout, EXIF all clean) — the same checkpoints score
+   **0.1003 ± 0.0053 class-agnostic** against **0.8730 ± 0.0011** on the cwd12 holdout
+   under the identical matcher, and **0.0006 ± 0.0009** on ragweed against **0.9604**
+   in-domain for the same-name class (species-level identity of their `ragweed` is not
+   stated on the card). Inspection (`xds_verify_montage.jpg`) shows why: ImageWeeds is
+   greenhouse/potted-seedling imagery with ~3× smaller relative boxes; tiny seedlings go
+   undetected (the known small-object weakness) and, where the model does localise —
+   often accurately — it assigns the wrong species. **This model does not travel; treat
+   any new deployment domain as unmeasured until evaluated in it.** Artifact:
+   `s6_crossdataset_imageweeds.json` (job 44465026).
 2. **The deployment gap is half-measured (2026-08-25).** Run over **358 real robot
    frames** from eight stored sessions of both robots (indoor/bench scenes, no weeds
    present), the model produced **zero detections at the deployment threshold** —
@@ -87,8 +98,14 @@ is flat from 3,671 to 43,671 training images.
    is **recall and precision on robot frames that do contain weeds**, which needs an
    outdoor run; field accuracy stays unknown until then. Artifact:
    `results/framework/s6_domain_gap.json`.
-3. **No test-time augmentation or ensembling.** The WBF/TTA ceiling run in the S3 plan
-   was not executed; the number is a plain single-model forward pass.
+3. **TTA/WBF ceiling: measured 2026-08-26** (jobs 44463762 + 44463922). Six arms under
+   one shared matcher (its plain baseline reads 0.8554 for the checkpoint the validator
+   scores 0.8793 — a −0.024 metric offset that would otherwise masquerade as a TTA
+   effect): WBF fusion alone **−0.003** (nothing); multi-scale **+0.010**; scale+flip
+   **+0.017**; 3-seed ensemble **+0.017**; all stacked (18 views) **+0.028**, ≈ 0.907 on
+   the validator scale if the offset composes. At 2.44 s/image on a V100 — **~660× the
+   deployed 3.7 ms** — this is a ceiling, not a deployment option; the §1 recommendation
+   is unchanged. Artifacts: `s3_tta_ceiling/`.
 4. **RF-DETR's four seeds** come from May 2026 runs under the same cwd12-only staging
    (verified leak-free in v3.22.3) but not re-run in this campaign.
 5. **Licensing.** cwd12 is the training source for this model; the harvested pool — which

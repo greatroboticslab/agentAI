@@ -1,0 +1,98 @@
+{
+  "label": "ens3_tta",
+  "weights": [
+    "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/s3_yolo11n/s101/weights/best.pt",
+    "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/s3_yolo11n/s102/weights/best.pt",
+    "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/s3_yolo11n/s103/weights/best.pt"
+  ],
+  "n_models": 3,
+  "imgszs": [
+    512,
+    640,
+    768
+  ],
+  "hflip": true,
+  "wbf": true,
+  "wbf_iou": 0.55,
+  "data_yaml": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/cwd12_sealed.yaml",
+  "n_images": 1977,
+  "names": [
+    "Carpetweeds",
+    "Crabgrass",
+    "Eclipta",
+    "Goosegrass",
+    "Morningglory",
+    "Nutsedge",
+    "PalmerAmaranth",
+    "PricklySida",
+    "Purslane",
+    "Ragweed",
+    "Sicklepod",
+    "SpottedSpurge"
+  ],
+  "seconds": 5891.1,
+  "mAP50": 0.9438074231147766,
+  "mAP50_95": 0.8829593658447266,
+  "per_class": {
+    "Carpetweeds": {
+      "AP50": 0.9683560132980347,
+      "AP50_95": 0.9182775616645813,
+      "n_gt": 688
+    },
+    "Crabgrass": {
+      "AP50": 0.968407154083252,
+      "AP50_95": 0.9099228978157043,
+      "n_gt": 456
+    },
+    "Eclipta": {
+      "AP50": 0.9180760979652405,
+      "AP50_95": 0.8346172571182251,
+      "n_gt": 353
+    },
+    "Goosegrass": {
+      "AP50": 0.8971481919288635,
+      "AP50_95": 0.7868484258651733,
+      "n_gt": 320
+    },
+    "Morningglory": {
+      "AP50": 0.8817223310470581,
+      "AP50_95": 0.7632943987846375,
+      "n_gt": 349
+    },
+    "Nutsedge": {
+      "AP50": 0.9500248432159424,
+      "AP50_95": 0.8647602796554565,
+      "n_gt": 315
+    },
+    "PalmerAmaranth": {
+      "AP50": 0.97024005651474,
+      "AP50_95": 0.9267059564590454,
+      "n_gt": 278
+    },
+    "PricklySida": {
+      "AP50": 0.9575576186180115,
+      "AP50_95": 0.9247238039970398,
+      "n_gt": 180
+    },
+    "Purslane": {
+      "AP50": 0.953068733215332,
+      "AP50_95": 0.9289882779121399,
+      "n_gt": 109
+    },
+    "Ragweed": {
+      "AP50": 0.9924052953720093,
+      "AP50_95": 0.9784564971923828,
+      "n_gt": 91
+    },
+    "Sicklepod": {
+      "AP50": 0.9447304010391235,
+      "AP50_95": 0.8624231219291687,
+      "n_gt": 76
+    },
+    "SpottedSpurge": {
+      "AP50": 0.9239524602890015,
+      "AP50_95": 0.8964939117431641,
+      "n_gt": 42
+    }
+  }
+}

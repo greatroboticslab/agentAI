@@ -563,5 +563,75 @@
   "registry_incidents": 2,
   "verdict": "NOT MET",
   "reading": "Of 13,527 labelled images from six audited harvested sources, only 3,208 come from a source that clears the 0.90 audit bar. Five of six sources fall between 0.18 and 0.74 — the probe reads 1.000 on human-labelled cwd12, so those are the data, not the instrument. Independently, the S3 tier ladder shows adding harvested data is worth 0.00-0.02. Both measurements point the same way: web harvest at this scale supplies volume, not usable supervision."
+ },
+ "tta_ceiling_2026_08_26": {
+  "jobs": [
+   44463762,
+   44463922
+  ],
+  "matcher": "wbf_tta_eval.compute_map, shared across ALL arms incl. the plain baseline",
+  "arms_map50_95": {
+   "plain_s102": 0.8554,
+   "wbf_s102_640": 0.8524,
+   "tta_scales": 0.8653,
+   "tta_scales_flip": 0.8728,
+   "ens3_640": 0.8726,
+   "ens3_tta": 0.883
+  },
+  "deltas_vs_plain": {
+   "fusion_alone": -0.003,
+   "multiscale": 0.0099,
+   "multiscale_flip": 0.0175,
+   "ensemble3_640": 0.0172,
+   "full_ceiling_18views": 0.0276
+  },
+  "ultralytics_anchor_s102": 0.8793,
+  "matcher_offset": 0.0239,
+  "ceiling_on_validator_scale_if_offset_composes": 0.907,
+  "seed_noise_bar": 0.006,
+  "reading": "Fusion alone is nothing (-0.003, within noise). Multi-scale, hflip and 3-seed ensembling are each real; single-model TTA (+0.017) equals 3-seed ensembling (+0.017); stacked they give +0.028. At 2.44 s/image on a V100 -- ~660x the deployed 3.7 ms -- this is a ceiling, not a deployment option; the deployed recommendation is unchanged.",
+  "artifacts": "results/framework/s3_tta_ceiling/"
+ },
+ "crossdataset_imageweeds_2026_08_26": {
+  "job": 44465026,
+  "testbed": "project_agml__imageweeds_weed_detection -- the ONE harvested source passing the calibrated audit (precision 1.0000); 3,208 images, CC BY 4.0",
+  "leak_check": {
+   "hamming_threshold": 6,
+   "collisions_vs_train": 0,
+   "collisions_vs_holdout": 0,
+   "excluded": 0,
+   "nearest_hamming_le10": {
+    "train": 16,
+    "holdout": 12
+   },
+   "exif_orientation_all_1": true
+  },
+  "summary_map50_95": {
+   "holdout_class_agnostic": {
+    "mean": 0.873,
+    "std": 0.0011
+   },
+   "iw_class_agnostic": {
+    "mean": 0.1003,
+    "std": 0.0053
+   },
+   "holdout_ragweed": {
+    "mean": 0.9604,
+    "std": 0.0018
+   },
+   "iw_ragweed": {
+    "mean": 0.0006,
+    "std": 0.0009
+   }
+  },
+  "mechanisms_verified_by_inspection": {
+   "imagery": "ImageWeeds is greenhouse/potted-seedling photography (trays, artificial light), not field imagery -- montage: xds_verify_montage.jpg",
+   "box_scale": "median relative box area 0.036 vs cwd12-train 0.105 (~3x smaller)",
+   "recall_collapse": "tiny seedlings largely undetected (matches the known small-object weakness)",
+   "species_confusion": "where the model does localise (often well), it assigns the wrong species"
+  },
+  "caveat": "ImageWeeds 'ragweed' species-level identity (A. artemisiifolia vs trifida) is not stated on the card; treated as same-name-class transfer",
+  "reading": "Zero-shot transfer collapses: 0.873 -> 0.100 class-agnostic; the model's best in-domain species (Ragweed 0.960) transfers at ~0.000. The data passed the audit; the model is domain-parochial. Together with the flat tier ladder this closes the argument: web aggregation does not help, and in-domain models do not travel -- per-domain collection in the deployment domain is what remains.",
+  "artifact": "results/framework/s6_crossdataset_imageweeds.json"
  }
 }

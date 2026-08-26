@@ -1,0 +1,67 @@
+{
+ "per_seed": {
+  "101": {
+   "iw_class_agnostic": 0.10632308572530746,
+   "iw_ragweed": 6.214009772520512e-06,
+   "holdout_class_agnostic": 0.8730026483535767,
+   "holdout_ragweed": 0.9600261449813843
+  },
+  "102": {
+   "iw_class_agnostic": 0.09335458278656006,
+   "iw_ragweed": 3.055861088796519e-05,
+   "holdout_class_agnostic": 0.8743157386779785,
+   "holdout_ragweed": 0.9627463221549988
+  },
+  "103": {
+   "iw_class_agnostic": 0.10126526653766632,
+   "iw_ragweed": 0.0018216811586171389,
+   "holdout_class_agnostic": 0.8715838193893433,
+   "holdout_ragweed": 0.9583953022956848
+  }
+ },
+ "protocol": {
+  "conf": 0.001,
+  "imgsz": 640,
+  "iou_nms": 0.6,
+  "matcher": "wbf_tta_eval.compute_map (101-pt COCO-style)",
+  "iw_class_map_source": "HF dataset card dataset_info, 2026-08-26",
+  "corn_gt_boxes_dropped": 3,
+  "note": "redrootpigweed (A. retroflexus) deliberately NOT mapped to PalmerAmaranth (A. palmeri): same genus, different species"
+ },
+ "summary": {
+  "iw_class_agnostic": {
+   "mean": 0.10031431168317795,
+   "std": 0.005336900065864158
+  },
+  "iw_ragweed": {
+   "mean": 0.0006194845930925416,
+   "std": 0.0008501394401391732
+  },
+  "holdout_class_agnostic": {
+   "mean": 0.8729674021402994,
+   "std": 0.0011155798108508786
+  },
+  "holdout_ragweed": {
+   "mean": 0.960389256477356,
+   "std": 0.0017947573509003423
+  }
+ },
+ "leak_check": {
+  "hamming_threshold": 6,
+  "vs_train": {
+   "<=0": 0,
+   "<=4": 0,
+   "<=6": 0,
+   "<=10": 16
+  },
+  "vs_holdout": {
+   "<=0": 0,
+   "<=4": 0,
+   "<=6": 0,
+   "<=10": 12
+  },
+  "excluded_images": 0,
+  "excluded_names": []
+ },
+ "n_transfer_images": 3208
+}

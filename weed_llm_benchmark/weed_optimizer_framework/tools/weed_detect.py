@@ -55,9 +55,13 @@ MODEL_META = {
     "trained_on": "CottonWeedDet12 train split (3,671 images, 12 species)",
     "card": "docs/BEST_MODEL_CARD.md",
     "known_weak_species": WEAK,
-    "domain_gap_warning": ("trained on close-range handheld field photography; robot "
-                           "camera frames are a different distribution and field "
-                           "accuracy is unmeasured"),
+    "domain_gap_warning": ("trained on close-range handheld field photography. "
+                           "Measured 2026-08-26: zero-shot transfer to a clean "
+                           "greenhouse-seedling weed dataset collapses (class-agnostic "
+                           "mAP50-95 0.873 in-domain -> 0.100; same-name best species "
+                           "0.960 -> ~0.000) -- treat any new camera/domain as "
+                           "unmeasured until evaluated in it; robot-frame recall is "
+                           "still pending an outdoor run"),
 }
 
 

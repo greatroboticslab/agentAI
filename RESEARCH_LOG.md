@@ -13,6 +13,38 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-08-26 (later) — the inference ceiling and the domain wall
+
+The model card's two open limits became measurements today, and they point in opposite
+directions.
+
+**Upward: the TTA/WBF ceiling.** Six arms under one matcher whose own offset versus the
+Ultralytics validator (−0.024) was measured rather than assumed: fusion alone is worth
+nothing (−0.003); multi-scale +0.010; adding hflip +0.017; a 3-seed ensemble at fixed
+scale also +0.017; everything stacked, 18 views per image, **+0.028** — roughly 0.907 on
+the validator scale. It costs ~660× the deployed latency, so the deployment
+recommendation stands; the ceiling is recorded as a ceiling.
+
+**Downward: cross-dataset transfer collapses.** On the one harvested source that passed
+the calibrated audit (ImageWeeds, 3,208 images, label precision 1.0000), the deployed
+model scores **0.1003 ± 0.0053** class-agnostic against **0.8730 ± 0.0011** in-domain
+under the identical matcher — and **0.0006** on ragweed, the same-name class it scores
+**0.9604** on at home. Before accepting this, both artifact explanations were killed by
+inspection: EXIF orientations are all 1, and the content-hash leak check found zero
+collisions at Hamming ≤ 6 against train and holdout — the images are genuinely foreign.
+A GT-versus-prediction montage supplied the mechanism: ImageWeeds is greenhouse
+seedling photography with ~3× smaller relative boxes; tiny plants go undetected and the
+ones the model does localise — often quite well — get the wrong species.
+
+**The two results compose into the campaign's cleanest sentence:** more web data does
+not help the in-domain model (tier ladder, flat), and the in-domain model does not
+leave its domain (transfer, collapsed). Neither aggregation nor transfer substitutes
+for collecting in the deployment domain — which is the platform's and the robots' job.
+The audit instrument was also vindicated in passing: it scored ImageWeeds' *labels*
+1.0000, and the montage confirms the labels are good; it is the *model* that fails
+there. Instruments and models measure different things, and this pair of results needed
+both.
+
 ## 2026-08-26 — S1 closes without meeting its gate; a 22-day silent outage; auditing the audit
 
 Three threads land together, and they share a theme: every mechanism worked, and what the

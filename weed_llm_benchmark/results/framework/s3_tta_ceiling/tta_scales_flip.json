@@ -1,0 +1,96 @@
+{
+  "label": "tta_scales_flip",
+  "weights": [
+    "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/s3_yolo11n/s102/weights/best.pt"
+  ],
+  "n_models": 1,
+  "imgszs": [
+    512,
+    640,
+    768
+  ],
+  "hflip": true,
+  "wbf": true,
+  "wbf_iou": 0.55,
+  "data_yaml": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/cwd12_sealed.yaml",
+  "n_images": 1977,
+  "names": [
+    "Carpetweeds",
+    "Crabgrass",
+    "Eclipta",
+    "Goosegrass",
+    "Morningglory",
+    "Nutsedge",
+    "PalmerAmaranth",
+    "PricklySida",
+    "Purslane",
+    "Ragweed",
+    "Sicklepod",
+    "SpottedSpurge"
+  ],
+  "seconds": 2057.1,
+  "mAP50": 0.9344626069068909,
+  "mAP50_95": 0.872846782207489,
+  "per_class": {
+    "Carpetweeds": {
+      "AP50": 0.9660305976867676,
+      "AP50_95": 0.9172080755233765,
+      "n_gt": 688
+    },
+    "Crabgrass": {
+      "AP50": 0.9617847204208374,
+      "AP50_95": 0.9051775932312012,
+      "n_gt": 456
+    },
+    "Eclipta": {
+      "AP50": 0.9025683403015137,
+      "AP50_95": 0.8244778513908386,
+      "n_gt": 353
+    },
+    "Goosegrass": {
+      "AP50": 0.8929253220558167,
+      "AP50_95": 0.780449628829956,
+      "n_gt": 320
+    },
+    "Morningglory": {
+      "AP50": 0.8711870908737183,
+      "AP50_95": 0.7490906715393066,
+      "n_gt": 349
+    },
+    "Nutsedge": {
+      "AP50": 0.9412041306495667,
+      "AP50_95": 0.8536419868469238,
+      "n_gt": 315
+    },
+    "PalmerAmaranth": {
+      "AP50": 0.961090624332428,
+      "AP50_95": 0.9163324236869812,
+      "n_gt": 278
+    },
+    "PricklySida": {
+      "AP50": 0.9386113286018372,
+      "AP50_95": 0.9029701948165894,
+      "n_gt": 180
+    },
+    "Purslane": {
+      "AP50": 0.9481974840164185,
+      "AP50_95": 0.9245071411132812,
+      "n_gt": 109
+    },
+    "Ragweed": {
+      "AP50": 0.9930465817451477,
+      "AP50_95": 0.9736515879631042,
+      "n_gt": 91
+    },
+    "Sicklepod": {
+      "AP50": 0.9532968997955322,
+      "AP50_95": 0.8606590032577515,
+      "n_gt": 76
+    },
+    "SpottedSpurge": {
+      "AP50": 0.8836074471473694,
+      "AP50_95": 0.8659955859184265,
+      "n_gt": 42
+    }
+  }
+}
