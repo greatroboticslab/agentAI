@@ -7783,3 +7783,36 @@ the second (already-merged file) included them, so the printed count jumped
 mid-outage. Both halves of "X/Y exist" now come from the final merged dict. The
 cluster-origin trend underneath was monotonic all along: 49 → 63 dataset directories
 on disk and climbing.
+
+### v3.24.7 — measuring the card's first limit: cross-dataset transfer
+
+`BEST_MODEL_CARD.md` limit #1 states that cross-dataset generalisation is not
+established. The S1 audit left exactly one harvested source qualified to test it:
+`project_agml__imageweeds_weed_detection` — audited precision **1.0000**, 3,208
+ground-level field images, 6,932 boxes, and (from the HF card) a class vocabulary
+whose id 3 `ragweed` **is the same species** as cwd12's Ragweed, the deployed
+model's strongest class in-domain (0.9767).
+
+`tools/crossdataset_eval.py` (job 44465026) measures transfer under the constraints
+a reviewer would impose:
+
+- **Content-level leak check before any evaluation.** ImageWeeds' filenames are
+  anonymised, so stems prove nothing; every image is dHashed against both the cwd12
+  train split and the sealed holdout at Hamming ≤ 6, because re-encoded re-exports
+  shift a few bits and an exact-match-only check can report a false clean bill.
+  Collisions are excluded and reported.
+- **Two measurements**: class-agnostic weed localisation (all classes → one; the 3
+  `corn` crop boxes dropped from GT), and Ragweed-only species-matched transfer
+  (predictions filtered to the model's own Ragweed id, looked up from the
+  checkpoint, never hardcoded). `redrootpigweed` (*A. retroflexus*) is deliberately
+  NOT mapped to PalmerAmaranth (*A. palmeri*) — same genus is not same species.
+- **In-domain reference under the identical metric.** Both measurements run on the
+  cwd12 holdout with the same checkpoints, matcher (wbf_tta_eval's, whose offset vs
+  the Ultralytics validator the TTA runs measure), conf floor and image size — so
+  the transfer gap can only come from the data.
+- n=3 seeds, one inference pass per (seed, image); all four metrics are post-hoc
+  filters over the same cached predictions.
+
+Registered while setting this up: the registry held `license: None` for this slug
+although the HF card states **CC BY 4.0** — one of the license sweep's unresolved
+six. Fixed through `registry_lock.update_registry` with the source cited.
