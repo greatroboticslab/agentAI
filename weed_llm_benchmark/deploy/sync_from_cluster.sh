@@ -57,10 +57,16 @@ now = time.time()
 cur.update(run_started_ts=float(os.environ["RUN_TS"]), updated_ts=now, stage=detail)
 if st == "running":
     cur["in_flight"] = True
+elif st == "meta_ok":
+    # The registry is pulled and Mongo is re-mirrored: everything the dashboard
+    # reads is now current, even though the image trees below may take several
+    # more cycles to catch up. The run is still in flight.
+    cur.update(in_flight=True, last_meta_success_ts=now)
 else:
     cur.update(in_flight=False, last_end_ts=now, last_outcome=st, detail=detail)
     if st == "ok":
         cur["last_success_ts"] = now
+        cur["last_meta_success_ts"] = now
 os.makedirs(os.path.dirname(p), exist_ok=True)
 tmp = p + ".tmp"
 json.dump(cur, open(tmp, "w"), indent=1)
@@ -118,6 +124,13 @@ done
 STAGE="fix_local_paths (early)"; _hb running "$STAGE"
 cd "$LAB"; source .venv/bin/activate 2>/dev/null
 REPO_ROOT="$LAB" CLUSTER_REPO="$CL" PYTHONPATH="$LAB" python deploy/fix_local_paths.py | tail -2
+REPO_ROOT="$LAB" PYTHONPATH="$LAB" python -m weed_optimizer_framework.tools.mongo_import_events | tail -1
+# Everything the dashboard serves — registry, local paths, Mongo — is current as
+# of here. Record that separately from the whole-run success below, because the
+# image trees can legitimately need several cycles to catch up after an outage,
+# and an alarm that stays red through all of them is an alarm people learn to
+# ignore. Freshness of what is SERVED is the thing worth alarming on.
+_hb meta_ok "metadata current; image trees still syncing"
 
 # 2) ALL dataset dirs the registry references (incremental: only new/changed).
 #    Registry slugs live in datasets/ + results/leave4out/ + downloads/ — sync all 3.

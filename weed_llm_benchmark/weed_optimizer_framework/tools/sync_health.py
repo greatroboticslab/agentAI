@@ -16,9 +16,18 @@ proving it is alive, and the absence of that proof is itself the alarm. A
 missing heartbeat file, a hung box, a disabled timer, a killed run and a
 crashed run all produce the same verdict, which is the point.
 
-What it reports is *data freshness* — the age of the last SUCCESSFUL sync —
+What it reports is *data freshness* — the age of the last successful sync —
 because that is what a person looking at the dashboard actually needs to know.
 The cause (hung / failed / never ran) rides along as detail.
+
+Freshness is measured on the METADATA leg (registry pulled, local paths
+rewritten, Mongo re-mirrored), not on the whole run. That leg is everything the
+dashboard actually serves; the image trees behind it are hundreds of gigabytes
+and can legitimately need several cycles to catch up after an outage. Alarming on
+the full run would leave the banner red through every one of those cycles, and an
+alarm that is always red is one people learn to scroll past — which is the same
+failure as having no alarm, arrived at from the other direction. Image-tree lag is
+still reported, as detail rather than as an alarm.
 
 Surfaces
 --------
@@ -89,8 +98,11 @@ def verdict(now=None):
     except Exception as e:
         read_err = "heartbeat unreadable (%s)" % str(e)[:80]
 
-    last_ok = st.get("last_success_ts")
+    # Metadata freshness drives the verdict; full-run freshness is detail.
+    last_full = st.get("last_success_ts")
+    last_ok = st.get("last_meta_success_ts") or last_full
     age = (now - last_ok) if last_ok else None
+    full_age = (now - last_full) if last_full else None
     started = st.get("run_started_ts")
     in_flight = bool(st.get("in_flight"))
     in_flight_for = (now - started) if (in_flight and started) else None
@@ -100,11 +112,11 @@ def verdict(now=None):
     elif age is None:
         level, why = "crit", "no successful sync has ever been recorded"
     elif age > CRIT_AFTER_S:
-        level, why = "crit", "last successful sync was %s ago" % _human(age)
+        level, why = "crit", "registry last refreshed %s ago" % _human(age)
     elif age > WARN_AFTER_S:
-        level, why = "warn", "last successful sync was %s ago" % _human(age)
+        level, why = "warn", "registry last refreshed %s ago" % _human(age)
     else:
-        level, why = "ok", "last successful sync %s ago" % _human(age)
+        level, why = "ok", "registry last refreshed %s ago" % _human(age)
 
     # A run wedged in flight is worth naming even while the data is still fresh
     # enough to pass — it is the leading indicator of the outage above.
@@ -113,9 +125,17 @@ def verdict(now=None):
         if level == "ok":
             level = "warn"
 
+    # Image trees lagging far behind the metadata is worth saying out loud, but
+    # it is not the same outage: the pages still render correct, current records.
+    if full_age and age is not None and full_age - age > CRIT_AFTER_S:
+        why += ("; image trees are %s behind and still catching up"
+                % _human(full_age))
+
     return {
         "level": level, "ok": level == "ok", "reason": why,
         "last_success_ts": last_ok, "last_success_age_s": age,
+        "last_full_sync_ts": last_full, "last_full_sync_age_s": full_age,
+        "last_full_sync_human": _human(full_age),
         "last_success_human": _human(age),
         "last_outcome": st.get("last_outcome"), "last_detail": st.get("detail"),
         "stage": st.get("stage"), "in_flight": in_flight,
@@ -157,7 +177,7 @@ def banner_html():
         return ""
     crit = v.get("level") == "crit"
     bg, fg = ("#7f1d1d", "#fff") if crit else ("#fef3c7", "#78350f")
-    head = ("DATA MAY BE STALE — cluster sync has not completed"
+    head = ("DATA MAY BE STALE — the registry has not refreshed"
             if crit else "Cluster sync is behind")
     return _BAR % (bg, fg, head, v.get("reason", ""))
 

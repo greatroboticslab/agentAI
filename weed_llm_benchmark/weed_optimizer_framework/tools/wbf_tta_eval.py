@@ -20,6 +20,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional
@@ -30,9 +31,16 @@ from ensemble_boxes import weighted_boxes_fusion
 from PIL import Image
 from ultralytics import YOLO
 
-CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-                "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-                "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
+# v3.24.4: this list is NOT the sealed protocol's class order. cwd12_sealed.yaml
+# orders the 12 species alphabetically; this one does not, so using it to name
+# per-class APs silently attributes every species' score to a different weed
+# (id 2 is Eclipta in the data, PalmerAmaranth here). Overall mAP is unaffected —
+# it averages over ids — which is exactly why the error is easy to miss. Class
+# names now come from the dataset yaml via --data-yaml; this remains only so old
+# invocations keep working, and it is never the default when a yaml is given.
+_LEGACY_CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
+                        "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
+                        "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
 
 
 def yolo_to_xyxy_norm(box, w, h):
@@ -63,10 +71,16 @@ def read_yolo_labels(lbl_path: Path):
     return out
 
 
-def predict_one_scale(model, img_path, imgsz, conf, iou_nms, hflip):
-    """Run YOLO inference at one scale (optionally with hflip).
-    Returns (xyxy_norm, scores, classes) as parallel lists.
+def predict_one_scale(model, img_path, imgsz, conf, iou_nms, hflip=False):
+    """Run YOLO inference at one scale. Returns (xyxy_norm, scores, classes).
+
+    hflip must stay False here: this function would mirror the *coordinates* of
+    predictions made on an UNflipped image, which is not test-time augmentation,
+    it is a wrong answer. Use predict_one_scale_hflip, which flips the image.
     """
+    if hflip:
+        raise ValueError("predict_one_scale(hflip=True) is not TTA — "
+                         "use predict_one_scale_hflip()")
     res = model.predict(source=str(img_path), imgsz=imgsz, conf=conf,
                         iou=iou_nms, augment=False, verbose=False, device=0)[0]
     boxes = res.boxes
@@ -77,10 +91,6 @@ def predict_one_scale(model, img_path, imgsz, conf, iou_nms, hflip):
     xyxy = boxes.xyxy.cpu().numpy().astype(np.float32)
     xyxy[:, [0, 2]] /= w
     xyxy[:, [1, 3]] /= h
-    if hflip:
-        xyxy_flip = xyxy.copy()
-        xyxy_flip[:, [0, 2]] = 1.0 - xyxy[:, [2, 0]]
-        xyxy = xyxy_flip
     xyxy = np.clip(xyxy, 0.0, 1.0)
     scores = boxes.conf.cpu().numpy().astype(np.float32)
     cls = boxes.cls.cpu().numpy().astype(np.int32)
@@ -128,11 +138,12 @@ def iou_xyxy(a, b):
     return inter / union
 
 
-def compute_map(per_image_preds, per_image_gts, n_classes):
+def compute_map(per_image_preds, per_image_gts, n_classes, names=None):
     """COCO-style mAP at IoU thresholds 0.5 and 0.5:0.95.
 
     per_image_preds[i] = (xyxy, scores, classes) lists for image i.
     per_image_gts[i]   = list of (class, [xyxy]) for image i.
+    names              = class-id -> species name, from the dataset yaml.
 
     Returns: dict with mAP50, mAP50-95, per-class AP for each threshold.
     """
@@ -219,7 +230,7 @@ def compute_map(per_image_preds, per_image_gts, n_classes):
         "mAP50": float(ap_at_50.mean()) if len(ap_at_50) else 0.0,
         "mAP50_95": float(ap_at_5095.mean()) if len(ap_at_5095) else 0.0,
         "per_class": {
-            CANONICAL_12[c] if c < 12 else f"aux_{c}": {
+            (names[c] if names and c < len(names) else f"class_{c}"): {
                 "AP50": float(per_class_ap[c][0]),
                 "AP50_95": float(per_class_ap[c].mean()),
                 "n_gt": cls_records[c]["n_gt"],
@@ -229,96 +240,139 @@ def compute_map(per_image_preds, per_image_gts, n_classes):
     }
 
 
+def _resolve_holdout(data_yaml):
+    """Val image dirs + class names, straight from the dataset yaml.
+
+    The sealed protocol's `val` is a LIST (test/images + valid/images = the 1,977
+    holdout), and its class order is alphabetical. Reading both from the yaml the
+    training run actually used is the only way this evaluation and that run agree
+    on what class 2 means.
+    """
+    import yaml
+    d = yaml.safe_load(open(data_yaml))
+    root = Path(d.get("path", "")).expanduser()
+    val = d["val"]
+    if isinstance(val, str):
+        val = [val]
+    dirs = [Path(v) if Path(v).is_absolute() else root / v for v in val]
+    names = d["names"]
+    if isinstance(names, dict):
+        names = [names[k] for k in sorted(names)]
+    return dirs, list(names)
+
+
+def _collect(dirs):
+    """(image, label) pairs. Labels mirror images: .../images/x.jpg -> .../labels/x.txt"""
+    pairs = []
+    for d in dirs:
+        for ext in ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.PNG"):
+            for img in sorted(d.glob(ext)):
+                lbl = Path(str(img.parent).replace("/images", "/labels")) / (img.stem + ".txt")
+                pairs.append((img, lbl))
+    return pairs
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--weights", required=True)
-    ap.add_argument("--val-imgs", required=True)
-    ap.add_argument("--val-lbls", required=True)
-    ap.add_argument("--imgszs", type=int, nargs="+", default=[1024])
+    ap.add_argument("--weights", required=True, nargs="+",
+                    help="one checkpoint, or several to ensemble via WBF")
+    ap.add_argument("--data-yaml", help="dataset yaml (preferred: gives val dirs AND "
+                                        "the class order the model was trained with)")
+    ap.add_argument("--val-imgs", help="legacy: single image dir")
+    ap.add_argument("--val-lbls", help="legacy: single label dir")
+    ap.add_argument("--imgszs", type=int, nargs="+", default=[640])
     ap.add_argument("--hflip", action="store_true")
+    ap.add_argument("--no-wbf", action="store_true",
+                    help="skip fusion entirely and report the raw NMS output. This is "
+                         "the honest baseline: it shares this script's matcher with "
+                         "every TTA arm, so their differences are the augmentation "
+                         "and not the metric implementation.")
     ap.add_argument("--conf", type=float, default=0.001)
     ap.add_argument("--iou", type=float, default=0.6, help="per-scale NMS IoU")
     ap.add_argument("--wbf-iou", type=float, default=0.55, help="WBF merge IoU")
     ap.add_argument("--wbf-skip", type=float, default=0.001,
                     help="drop boxes below this score before WBF")
-    ap.add_argument("--n-classes", type=int, default=12,
-                    help="12 for safety model, 100 for pretrain/FT model")
+    ap.add_argument("--n-classes", type=int, default=None)
+    ap.add_argument("--label", default="", help="arm name, recorded in the output")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    print(f"[wbf-tta] weights={args.weights}")
-    print(f"[wbf-tta] imgszs={args.imgszs}  hflip={args.hflip}")
-    print(f"[wbf-tta] WBF iou={args.wbf_iou}  skip={args.wbf_skip}")
-    model = YOLO(args.weights)
+    if args.no_wbf and (len(args.weights) > 1 or len(args.imgszs) > 1 or args.hflip):
+        raise SystemExit("--no-wbf is a single-model single-scale no-flip baseline; "
+                         "with more views there is nothing to combine them but fusion.")
 
-    val_imgs_dir = Path(args.val_imgs)
-    val_lbls_dir = Path(args.val_lbls)
-    img_files = sorted([p for p in val_imgs_dir.glob("*.jpg")])
-    print(f"[wbf-tta] val images: {len(img_files)}")
+    if args.data_yaml:
+        val_dirs, names = _resolve_holdout(args.data_yaml)
+    elif args.val_imgs:
+        val_dirs, names = [Path(args.val_imgs)], _LEGACY_CANONICAL_12
+        print("[wbf-tta] WARNING: no --data-yaml; per-class names fall back to the "
+              "legacy order, which does NOT match cwd12_sealed.yaml")
+    else:
+        raise SystemExit("need --data-yaml (preferred) or --val-imgs")
+    n_classes = args.n_classes or len(names)
 
-    per_img_preds = []
-    per_img_gts = []
+    print(f"[wbf-tta] arm={args.label or '(unnamed)'}")
+    print(f"[wbf-tta] models={len(args.weights)}: {[Path(w).parent.parent.name for w in args.weights]}")
+    print(f"[wbf-tta] imgszs={args.imgszs}  hflip={args.hflip}  wbf={'off' if args.no_wbf else 'on'}")
+    print(f"[wbf-tta] classes={n_classes} {names}")
 
-    for i, img_path in enumerate(img_files):
-        # GT
-        lbl = val_lbls_dir / (img_path.stem + ".txt")
-        gts = read_yolo_labels(lbl)
-        per_img_gts.append(gts)
+    models = [YOLO(w) for w in args.weights]
+    pairs = _collect(val_dirs)
+    if args.val_lbls:      # legacy override
+        pairs = [(i, Path(args.val_lbls) / (i.stem + ".txt")) for i, _ in pairs]
+    n_lbl = sum(1 for _, l in pairs if l.exists())
+    print(f"[wbf-tta] holdout: {len(pairs)} images from {[str(d) for d in val_dirs]}"
+          f"  ({n_lbl} with labels)")
+    if not pairs:
+        raise SystemExit("no images found — check the yaml's path/val entries")
 
-        # Multi-scale + optional hflip predictions
-        boxes_lists, scores_lists, labels_lists = [], [], []
-        weights_per_view = []
-        for sz in args.imgszs:
-            xyxy, scs, cls = predict_one_scale(model, img_path, sz,
-                                                args.conf, args.iou, hflip=False)
-            if xyxy:
-                boxes_lists.append(xyxy)
-                scores_lists.append(scs)
-                labels_lists.append(cls)
-                weights_per_view.append(1.0)
-            if args.hflip:
-                xyxy_f, scs_f, cls_f = predict_one_scale_hflip(
-                    model, img_path, sz, args.conf, args.iou)
-                if xyxy_f:
-                    boxes_lists.append(xyxy_f)
-                    scores_lists.append(scs_f)
-                    labels_lists.append(cls_f)
-                    weights_per_view.append(1.0)
+    per_img_preds, per_img_gts = [], []
+    t0 = time.time()
+    for i, (img_path, lbl) in enumerate(pairs):
+        per_img_gts.append(read_yolo_labels(lbl))
+        boxes_lists, scores_lists, labels_lists, wts = [], [], [], []
+        for model in models:
+            for sz in args.imgszs:
+                xyxy, scs, cls = predict_one_scale(model, img_path, sz,
+                                                   args.conf, args.iou)
+                if xyxy:
+                    boxes_lists.append(xyxy); scores_lists.append(scs)
+                    labels_lists.append(cls); wts.append(1.0)
+                if args.hflip:
+                    fx, fs, fc = predict_one_scale_hflip(model, img_path, sz,
+                                                         args.conf, args.iou)
+                    if fx:
+                        boxes_lists.append(fx); scores_lists.append(fs)
+                        labels_lists.append(fc); wts.append(1.0)
 
         if not boxes_lists:
             per_img_preds.append(([], [], []))
+        elif args.no_wbf:
+            per_img_preds.append((boxes_lists[0], scores_lists[0], labels_lists[0]))
         else:
-            fused_boxes, fused_scores, fused_labels = weighted_boxes_fusion(
-                boxes_lists, scores_lists, labels_lists,
-                weights=weights_per_view,
-                iou_thr=args.wbf_iou, skip_box_thr=args.wbf_skip,
-            )
-            per_img_preds.append(
-                (fused_boxes.tolist(), fused_scores.tolist(),
-                 [int(c) for c in fused_labels])
-            )
+            fb, fs, fl = weighted_boxes_fusion(
+                boxes_lists, scores_lists, labels_lists, weights=wts,
+                iou_thr=args.wbf_iou, skip_box_thr=args.wbf_skip)
+            per_img_preds.append((fb.tolist(), fs.tolist(), [int(c) for c in fl]))
 
-        if (i + 1) % 100 == 0:
-            print(f"[wbf-tta] processed {i+1}/{len(img_files)}")
+        if (i + 1) % 250 == 0:
+            print(f"[wbf-tta] {i+1}/{len(pairs)}  ({time.time()-t0:.0f}s)", flush=True)
 
-    # Compute mAP
     print("\n[wbf-tta] computing mAP...")
-    res = compute_map(per_img_preds, per_img_gts, n_classes=args.n_classes)
-    print(f"\n=== WBF + TTA RESULTS ===")
+    res = compute_map(per_img_preds, per_img_gts, n_classes=n_classes, names=names)
+    print(f"\n=== {args.label or 'RESULT'} ===")
     print(f"mAP50:    {res['mAP50']:.4f}")
     print(f"mAP50-95: {res['mAP50_95']:.4f}")
-    print(f"per-class:")
-    for cname, st in res["per_class"].items():
+    for cname, st in sorted(res["per_class"].items(),
+                            key=lambda kv: -kv[1]["AP50_95"]):
         print(f"  {cname:18s} AP50={st['AP50']:.3f}  AP50-95={st['AP50_95']:.3f}  "
               f"n_gt={st['n_gt']}")
 
-    out = {
-        "weights": args.weights,
-        "imgszs": args.imgszs,
-        "hflip": args.hflip,
-        "wbf_iou": args.wbf_iou,
-        **res,
-    }
+    out = {"label": args.label, "weights": args.weights, "n_models": len(args.weights),
+           "imgszs": args.imgszs, "hflip": args.hflip, "wbf": not args.no_wbf,
+           "wbf_iou": args.wbf_iou, "data_yaml": args.data_yaml,
+           "n_images": len(pairs), "names": names,
+           "seconds": round(time.time() - t0, 1), **res}
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as f:
         json.dump(out, f, indent=2)

@@ -7698,3 +7698,49 @@ authenticated pages; `/api/health/sync` is auth-exempt (returning timing only, n
 data) because a health check that needs a session cookie is one no monitor can
 run, and it answers `503` while alarming; `python -m ...sync_health` exits 1 so a
 cron can gate on it.
+
+### v3.24.4 — the alarm alarms on what the platform serves; TTA tooling corrected
+
+**Alarm refinement, from watching the real system.** The first catch-up run after
+the 22-day outage sat in the `datasets` stage for a long time — 132 GB of image
+trees with three weeks of additions — while the registry and Mongo had already
+refreshed successfully within the first minute. Alarming on whole-run completion
+would have held the banner red through every catch-up cycle, and a banner that is
+always red is one people scroll past: the same failure as no alarm, reached from
+the other side.
+
+The heartbeat now records a **metadata-level success** (`meta_ok`) separately from
+full-run success, raised right after the registry pull, path rewrite and Mongo
+re-mirror. That leg is exactly what the dashboard serves. Freshness of *that* is
+the verdict; image-tree lag is reported as detail (`image trees are 30h behind and
+still catching up`) and does not raise an alarm. Verified against a simulated
+mid-catch-up state: metadata 5 min old with the full tree 30 h behind reads `ok`
+with the lag named.
+
+**`wbf_tta_eval.py` had a silent mislabelling bug.** Its hardcoded `CANONICAL_12`
+is in a different order than `cwd12_sealed.yaml`, which is alphabetical. Class id 2
+is Eclipta in the data and PalmerAmaranth in that list. Overall mAP is unaffected —
+it averages over ids — so nothing would have looked wrong, while every per-species
+AP would have been attributed to the wrong weed. Since per-species weakness is
+precisely what `BEST_MODEL_CARD.md` uses to warn a laser-weeding system where it
+will miss, that table being quietly permuted is a publish-grade defect.
+
+Class names and holdout directories now come from the dataset yaml the training run
+itself recorded (`--data-yaml`), so the evaluation and the run cannot disagree about
+what class 2 means. The old list is kept as `_LEGACY_CANONICAL_12` for existing
+invocations, with a warning printed when it is used. Also fixed:
+`predict_one_scale(hflip=True)` mirrored the *coordinates* of predictions made on an
+unflipped image — not augmentation, just a wrong answer — and now raises instead.
+The tool gained multi-model WBF ensembling, multi-directory holdouts (the sealed
+`val` is a list: test + valid), and a `--no-wbf` plain arm.
+
+Pre-flighted on the login node before spending GPU time: the yaml resolves to
+**1,977 images with 1,977 labels** (848 test + 1,129 valid) in the correct
+alphabetical class order.
+
+**`run_s3_tta_ceiling.sh`** (job 44463762) runs six arms that isolate each lever —
+fusion alone, multi-scale alone, single-model TTA, ensembling alone, and the full
+3-seed ensemble ceiling — plus an Ultralytics re-measurement so the offset between
+this script's matcher and the validator that produced the card's 0.8759 is reported
+rather than assumed to be zero. Every arm shares one matcher, including the plain
+baseline, so a difference between arms is the augmentation and not the metric.
