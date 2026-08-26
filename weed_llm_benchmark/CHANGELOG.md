@@ -7764,3 +7764,22 @@ The trees are converging rather than thrashing: datasets present on disk went
 **49/78 → 63/78** in a single 30-minute window, with `--partial` resuming each
 cycle. The registry itself is current at **78 slugs**, up from the 52 the platform
 had been stuck on since 2026-08-03.
+
+### v3.24.6 — the sync log's exist-count compared two different populations
+
+Post-compaction self-audit of the v3.24.2–v3.24.5 work re-derived every committed
+number from the ground: the S1 gate table matches the `audited_precision` fields in
+the freshly-synced registry (e.g. `francesco/weed_crop_aerial` 0.1845), the corrected
+probe verdicts survived a real harvest write and a real sync — the class-level
+supervisory-field protection holding in production — and no commit carries an
+attribution trailer.
+
+The one defect the audit surfaced was in the audit's own instrument:
+`fix_local_paths.py` counted `exists` inside the rewrite loop, before the
+manual-upload merge added 15 slugs, while the denominator was taken after. Within one
+sync run the first invocation (fresh cluster registry) skipped the manual slugs and
+the second (already-merged file) included them, so the printed count jumped
+63/78 → 78/78 → 63/78 across runs and read like datasets appearing and vanishing
+mid-outage. Both halves of "X/Y exist" now come from the final merged dict. The
+cluster-origin trend underneath was monotonic all along: 49 → 63 dataset directories
+on disk and climbing.
