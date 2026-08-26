@@ -7744,3 +7744,23 @@ fusion alone, multi-scale alone, single-model TTA, ensembling alone, and the ful
 this script's matcher and the validator that produced the card's 0.8759 is reported
 rather than assumed to be zero. Every arm shares one matcher, including the plain
 baseline, so a difference between arms is the augmentation and not the metric.
+
+### v3.24.5 — the bound and the alarm both fired, on the real outage
+
+Verification of v3.24.3/v3.24.4 against the live system rather than a simulation.
+The catch-up run after the 22-day outage reached its per-transfer bound in the
+`datasets` stage and the heartbeat recorded `datasets rsync rc=124` — rc 124 being
+`timeout`'s own exit code, so the guard fired instead of the process hanging
+forever, which is precisely what the old code could not do. The unit then left
+`activating`, the timer fired normally, and the next run started immediately.
+
+That next run pulled the metadata, rewrote paths, re-mirrored Mongo (78 slugs) and
+raised `meta_ok` within ~25 seconds. The alarm flipped to `{"level":"ok","reason":
+"registry last refreshed 2m ago"}` while the image trees kept transferring in the
+background — the intended behaviour, and the reason the metadata leg is tracked
+separately.
+
+The trees are converging rather than thrashing: datasets present on disk went
+**49/78 → 63/78** in a single 30-minute window, with `--partial` resuming each
+cycle. The registry itself is current at **78 slugs**, up from the 52 the platform
+had been stuck on since 2026-08-03.
