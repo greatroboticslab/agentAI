@@ -7864,3 +7864,33 @@ which is what the platform and the robots are for. `weed_detect.py`'s MODEL_META
 carries the measured warning instead of a hypothetical one, so every live API consumer
 sees it. Both limits in `BEST_MODEL_CARD.md` are rewritten as measurements; artifacts
 committed under `results/framework/`.
+
+### v3.24.9 — dual-camera frames (cam=) and the gallery's third whitelist miss
+
+**cam= (agreed with the robot side for the lasercar's second camera).** One physical
+run stays one session: `POST /api/robot/frame` accepts an optional `cam=` tag
+(sanitised `[a-z0-9_]{1,16}`), stored as `frames/<cam>_<ts>.jpg`; sessions track
+per-camera counts and latest frames, the manifest records them, and the live JSON
+exposes `cams{count, age_s}`. `frame_latest/{sid}.jpg` (and the detect overlay
+endpoint) take `?cam=`: no parameter serves the **down** camera when tagged frames
+exist — the scientific payload, per the robot side's if-one-view-show-this rule —
+`any` serves the newest regardless, an unknown cam 404s naming what exists. Requests
+without `cam=` keep byte-for-byte legacy behaviour, so either side can deploy first.
+The live page grows a camera toggle only when tags are present. Verified live with a
+four-frame synthetic session (down/front/down/untagged): default returned the down
+frame, `front` the front frame, `any` the untagged newest; manifest recorded
+`{down: 2, front: 1}`; the test dataset was then deleted (files + registry checked).
+
+**The per-image 404 was the whitelist failing its third layout.**
+`LustreBackend.get_image_path` resolves a bare filename against a fixed list of
+subdirectories; robot sessions store frames under `frames/`, which post-dates the
+list — so the gallery (which enumerates with rglob) rendered thumbnails while the
+full-size click 404'd on a file that demonstrably exists, reading to the operator as
+"did my data even get collected?". Same failure shape as v3.0.61's missing `test/`.
+Fixed with `frames/` in the list plus a last-resort lazy recursive search that stops
+at the first hit — full tree walk only on the true-404 path, the cost `/api/sample`
+already pays. Verified on the operator's exact failing URL: HTTP 200, 640×360 JPEG.
+
+Also confirmed this session: the 241's new fifth sensor source `witimu` archived
+with zero platform changes (`witimu.csv` beside `imu.csv`, 147 rows, manifest
+sources/counts correct) — the CSV pipeline is source-name-driven by design.

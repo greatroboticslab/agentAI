@@ -312,7 +312,9 @@ def _finalize(s: dict, robot_counts=None, interrupted=False):
             "domain": s["domain"], "sources": s["sources"], "contract": s["contract"],
             "started": s["started"], "ended": time.time(), "counts": s["counts"],
             "dropped_reported": s["dropped"], "frame_count": s["frame_count"],
-            "frame_bytes": s["frame_bytes"], "meters_per_count": s.get("meters_per_count"),
+            "frame_bytes": s["frame_bytes"],
+            "cams": {k: v["count"] for k, v in (s.get("cams") or {}).items()},
+            "meters_per_count": s.get("meters_per_count"),
             "advice": s.get("advice") or [],
             "robot_counts": robot_counts, "interrupted": interrupted}, indent=1))
     except Exception:
@@ -584,11 +586,25 @@ async def robot_frame(request: Request):
         ts = float(qp.get("ts") or time.time())
     except Exception:
         ts = time.time()
+    # v3.24.9 (option B, agreed with the robot side 2026-08-28): an optional
+    # cam= tag so one physical run stays ONE session even with two cameras
+    # (lasercar: down = scientific payload, front = navigation context).
+    # No cam= -> exactly the old filename and behaviour, so an old client or a
+    # reverted cart keeps working against a new platform and vice versa.
+    cam = re.sub(r"[^a-z0-9_]", "", str(qp.get("cam") or "").lower())[:16]
+    fname = ("%s_%.3f.jpg" % (cam, ts)) if cam else ("%.3f.jpg" % ts)
     with s["lock"]:
-        (Path(s["dir"]) / "frames" / ("%.3f.jpg" % ts)).write_bytes(body)
+        (Path(s["dir"]) / "frames" / fname).write_bytes(body)
         s["frame_count"] += 1
         s["frame_bytes"] += len(body)
         s["latest_frame_ts"] = ts
+        s["latest_frame_name"] = fname
+        if cam:
+            c = s.setdefault("cams", {}).setdefault(
+                cam, {"count": 0, "latest_ts": 0.0, "latest_name": ""})
+            c["count"] += 1
+            c["latest_ts"] = ts
+            c["latest_name"] = fname
         s["last_seen"] = time.time()
     return JSONResponse({"ok": True})
 
@@ -675,18 +691,44 @@ def robot_live(request: Request, sid: str):
             "frame_count": s["frame_count"], "frame_bytes": s["frame_bytes"],
             "advice": list(s["advice"])[-5:],
             "latest": s["latest"], "latest_frame_ts": s["latest_frame_ts"],
+            "cams": {k: {"count": v["count"],
+                         "age_s": round(time.time() - v["latest_ts"], 1)}
+                     for k, v in (s.get("cams") or {}).items()},
             "frame_url": ("/api/robot/frame_latest/%s.jpg" % sid
                           if s["latest_frame_ts"] else None)})
 
 
+def _pick_frame_name(s: dict, cam: str = ""):
+    """Which stored frame to serve. cam='' -> the agreed default view: `down`
+    when camera-tagged frames exist (the scientific payload; the robot side's
+    rule: if a card can only show one view, show this one), else the newest
+    overall. cam='any' -> newest overall regardless of tags. cam=<name> ->
+    that camera only. Untagged legacy sessions behave exactly as before."""
+    cams = s.get("cams") or {}
+    if cam and cam != "any":
+        rec = cams.get(cam)
+        return rec["latest_name"] if rec else None
+    newest = s.get("latest_frame_name") or (
+        ("%.3f.jpg" % s["latest_frame_ts"]) if s.get("latest_frame_ts") else None)
+    if cam == "any" or not cams:
+        return newest
+    rec = cams.get("down")
+    return rec["latest_name"] if rec else newest
+
+
 @router.get("/api/robot/frame_latest/{sid}.jpg")
-def robot_frame_latest(request: Request, sid: str):
+def robot_frame_latest(request: Request, sid: str, cam: str = ""):
     if not _SID_RE.match(sid):
         return _err(400, "bad session id")
     s = _session(sid)
     if not s or not s["latest_frame_ts"]:
         return _err(404, "no frame yet")
-    p = Path(s["dir"]) / "frames" / ("%.3f.jpg" % s["latest_frame_ts"])
+    cam = re.sub(r"[^a-z0-9_]", "", (cam or "").lower())[:16]
+    name = _pick_frame_name(s, cam)
+    if not name:
+        return _err(404, "no frame for cam '%s' (have: %s)"
+                    % (cam, ",".join(sorted((s.get("cams") or {}).keys())) or "untagged"))
+    p = Path(s["dir"]) / "frames" / name
     try:
         return Response(p.read_bytes(), media_type="image/jpeg",
                         headers={"Cache-Control": "no-store"})
@@ -710,6 +752,7 @@ _LIVE_PAGE = r'''<!doctype html><html><head><meta charset="utf-8">
  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#888;margin-right:6px}
  .dot.live{background:#e33;animation:p 1.2s infinite}@keyframes p{50%{opacity:.35}}
  select{padding:6px;border-radius:8px}
+ .camb{border:1px solid #4445;background:#fff1;border-radius:7px;padding:3px 9px;font-size:12px;cursor:pointer}
  a{color:inherit}
 </style></head><body>
 <h2 style="margin:4px 0"><span class="dot" id="dot"></span>Robot Live</h2>
@@ -719,6 +762,7 @@ _LIVE_PAGE = r'''<!doctype html><html><head><meta charset="utf-8">
   <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin-bottom:6px">
     <input type="checkbox" id="det"> detect weeds on this frame
     <span id="detinfo" style="color:#94a3b8"></span>
+    <span id="cambar" style="display:none;gap:4px;margin-left:auto"></span>
   </label>
   <img id="frame" alt="waiting for the first camera frame…"></div>
 <div class="card" id="advbox" style="display:none;border-color:#d97706">
@@ -757,6 +801,16 @@ async function tick(){
     document.getElementById('stats').innerHTML=
       kv('seq',d.seq)+kv('frames',d.frame_count)+kv('dropped',d.dropped)+
       Object.keys(c).map(k=>kv(k,c[k])).join('');
+    // v3.24.9: camera toggle — appears only when the robot tags frames (cam=).
+    const cams=Object.keys(d.cams||{});
+    const cb=document.getElementById('cambar');
+    if(cams.length){cb.style.display='inline-flex';
+      const want=['down'].concat(cams.filter(k=>k!=='down')).concat(['any']);
+      if(cb.dataset.built!==want.join(',')){cb.dataset.built=want.join(',');
+        cb.innerHTML=want.map(k=>'<button class="camb" data-cam="'+(k==='any'?'any':k)+'">'+k+'</button>').join('');
+        cb.querySelectorAll('.camb').forEach(b=>b.onclick=()=>{window._CAM=b.dataset.cam==='any'?'any':b.dataset.cam;
+          cb.querySelectorAll('.camb').forEach(x=>x.style.fontWeight=x===b?'700':'400');});}
+    } else {cb.style.display='none';}
     if(d.frame_url){
       // v3.24.1: the same frame, optionally through the campaign's own detector.
       // The detect endpoint falls back to the raw frame if inference fails, so
@@ -765,7 +819,8 @@ async function tick(){
       var url=on?('/api/detect/frame/'+SID+'.jpg'):d.frame_url;
       var im=document.getElementById('frame');
       im.onload=function(){document.getElementById('detinfo').textContent=on?'model: cwd12 YOLO11n':'';};
-      im.src=url+'?t='+Date.now();
+      var q='?t='+Date.now()+((window._CAM&&window._CAM!=='')?('&cam='+window._CAM):'');
+      im.src=url+q;
     }
     const A=d.advice||[];
     const ab=document.getElementById('advbox');
@@ -841,14 +896,19 @@ def _recover():
         _log().warning(f"[robot] recovery scan failed: {e}")
 
 
-def latest_frame_bytes(sid: str):
+def latest_frame_bytes(sid: str, cam: str = ""):
     """Newest received JPEG for a live session, or None. v3.24: used in-process by
-    the detection service so annotating a frame costs no extra HTTP hop."""
+    the detection service so annotating a frame costs no extra HTTP hop.
+    v3.24.9: optional cam tag; '' applies the same down-first default as the
+    frame_latest endpoint, so the overlay annotates the scientific view."""
     s = _session(sid)
     if not s or not s.get("latest_frame_ts"):
         return None
+    name = _pick_frame_name(s, re.sub(r"[^a-z0-9_]", "", (cam or "").lower())[:16])
+    if not name:
+        return None
     try:
-        return (Path(s["dir"]) / "frames" / ("%.3f.jpg" % s["latest_frame_ts"])).read_bytes()
+        return (Path(s["dir"]) / "frames" / name).read_bytes()
     except Exception:
         return None
 

@@ -189,10 +189,25 @@ class LustreBackend:
                         slug_dir / "train",
                         slug_dir / "valid",
                         slug_dir / "test",
+                        slug_dir / "frames",      # robot live sessions (v3.24.9)
                         slug_dir):
                 cand = sub / image_key
                 if cand.is_file():
                     return str(cand)
+            # v3.24.9: LAST RESORT — first recursive hit, then stop. This list
+            # has now been wrong twice for the same reason (test/ in v3.0.61,
+            # frames/ today): a new layout appears, the gallery enumerates it
+            # with rglob and renders thumbnails, and this whitelist 404s the
+            # full-size click on a file that demonstrably exists. The generator
+            # stops at the FIRST match, so the tree is only walked in full on
+            # the true-404 path — the same cost /api/sample already pays.
+            try:
+                hit = next((q for q in slug_dir.rglob(image_key) if q.is_file()),
+                           None)
+                if hit:
+                    return str(hit)
+            except Exception:
+                pass
         return None
 
     def get_labels_dir(self, slug: str) -> Optional[str]:

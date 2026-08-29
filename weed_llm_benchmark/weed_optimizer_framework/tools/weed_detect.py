@@ -144,7 +144,7 @@ async def detect_post(request: Request):
 
 
 @router.get("/api/detect/frame/{sid}.jpg")
-async def detect_frame(request: Request, sid: str):
+async def detect_frame(request: Request, sid: str, cam: str = ""):
     """Latest live robot frame with detections drawn.
 
     Falls back to the unannotated frame when the model is unavailable — a live view
@@ -153,7 +153,11 @@ async def detect_frame(request: Request, sid: str):
     """
     _ = _CTX["actor"](request)
     try:
-        raw = _CTX["latest_frame"](sid)
+        # v3.24.9: cam passthrough — '' keeps the down-first default, so the
+        # overlay annotates the scientific view unless the viewer picks another.
+        raw = _CTX["latest_frame"](sid, cam)
+    except TypeError:
+        raw = _CTX["latest_frame"](sid)      # older ingest module signature
     except Exception:
         raw = None
     if not raw:
