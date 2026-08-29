@@ -7922,3 +7922,19 @@ totalling exactly the robot-reported 10,737 rows + 215 frames with zero platform
 loss — and no witimu, whose absence the totals attribute to the sender, not the
 archive. Every synthetic verification dataset was deleted after use (files +
 registry confirmed).
+
+### v3.24.11 — the camera toggle nobody could find
+
+First real dual-camera live session: the cart streamed both views flawlessly
+(archives: 14/14 and 36/36 down/front, zero dropped), and the operator watching the
+live page never saw the front camera. Two causes, one per surface. The project-page
+live card shows the down view only, by the agreed contract (down is the scientific
+payload) — it has no toggle and that stands. The full live view DID have the toggle,
+but tucked inside the detect-checkbox line where a person under field lighting never
+found it: a feature that ships invisible has not shipped.
+
+The toggle now sits in its own labelled row directly above the video —
+`camera: [down] [front] [any]`, default bolded — and this time the verification was
+a real browser, not an argument: Playwright Firefox against a live dual-cam session,
+clicked `front`, watched the frame URL gain `&cam=front` and the front image render.
+Screenshot archived; the synthetic session was deleted after use.

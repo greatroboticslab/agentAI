@@ -774,8 +774,10 @@ _LIVE_PAGE = r'''<!doctype html><html><head><meta charset="utf-8">
   <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin-bottom:6px">
     <input type="checkbox" id="det"> detect weeds on this frame
     <span id="detinfo" style="color:#94a3b8"></span>
-    <span id="cambar" style="display:none;gap:4px;margin-left:auto"></span>
   </label>
+  <div id="camrow" style="display:none;align-items:center;gap:8px;margin:0 0 8px;font-size:13px">
+    <b>camera:</b> <span id="cambar" style="display:inline-flex;gap:5px"></span>
+  </div>
   <img id="frame" alt="waiting for the first camera frame…"></div>
 <div class="card" id="advbox" style="display:none;border-color:#d97706">
   <b style="font-size:13px">&#9888; Advice</b>
@@ -814,15 +816,20 @@ async function tick(){
       kv('seq',d.seq)+kv('frames',d.frame_count)+kv('dropped',d.dropped)+
       Object.keys(c).map(k=>kv(k,c[k])).join('');
     // v3.24.9: camera toggle — appears only when the robot tags frames (cam=).
+    // v3.24.11: own labelled row above the video (was tucked inside the detect
+    // label — the operator watched a real dual-cam session and never found it).
     const cams=Object.keys(d.cams||{});
+    const camrow=document.getElementById('camrow');
     const cb=document.getElementById('cambar');
-    if(cams.length){cb.style.display='inline-flex';
+    if(cams.length){camrow.style.display='flex';
       const want=['down'].concat(cams.filter(k=>k!=='down')).concat(['any']);
       if(cb.dataset.built!==want.join(',')){cb.dataset.built=want.join(',');
-        cb.innerHTML=want.map(k=>'<button class="camb" data-cam="'+(k==='any'?'any':k)+'">'+k+'</button>').join('');
-        cb.querySelectorAll('.camb').forEach(b=>b.onclick=()=>{window._CAM=b.dataset.cam==='any'?'any':b.dataset.cam;
-          cb.querySelectorAll('.camb').forEach(x=>x.style.fontWeight=x===b?'700':'400');});}
-    } else {cb.style.display='none';}
+        cb.innerHTML=want.map(k=>'<button type="button" class="camb" data-cam="'+k+'">'+k+'</button>').join('');
+        const bs=cb.querySelectorAll('.camb');
+        bs.forEach(b=>{b.onclick=()=>{window._CAM=b.dataset.cam;
+          bs.forEach(x=>x.style.fontWeight=x===b?'700':'400');};});
+        bs[0].style.fontWeight='700';}
+    } else {camrow.style.display='none';}
     if(d.frame_url){
       // v3.24.1: the same frame, optionally through the campaign's own detector.
       // The detect endpoint falls back to the raw frame if inference fails, so
