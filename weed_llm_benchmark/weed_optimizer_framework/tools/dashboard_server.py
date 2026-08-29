@@ -9559,6 +9559,159 @@ def api_img(slug: str, filename: str):
     return FileResponse(img_path, media_type="image/jpeg")
 
 
+# --------------------------------------------------------------------------- #
+# v3.24.10 - raw dataset files: view a CSV in the browser, download the whole
+# dataset as a zip. Until now the ONLY window onto a dataset's non-image files
+# was the Analyze page's aggregates; a field operator checking "did my data
+# actually get collected?" needs to open imu.csv / witimu.csv themselves and
+# take the whole session home. Kept deliberately small: top-level files only
+# for the raw viewer (frames are in the zip and in the gallery), a 2 GiB cap
+# on the zip with an honest 413 above it, and everything behind normal auth.
+# --------------------------------------------------------------------------- #
+_DSFILE_RE = re.compile(r"^[A-Za-z0-9_. -]+$")
+_DSFILE_EXT = (".csv", ".json", ".jsonl", ".yaml", ".yml", ".txt", ".md")
+_DSZIP_CAP = 2 * 1024 ** 3
+
+
+def _dataset_dir(slug: str):
+    if not re.match(r"^[A-Za-z0-9_.-]+$", slug):
+        return None
+    try:
+        with open(REGISTRY_PATH) as f:
+            local = json.load(f)["datasets"][slug].get("local_path")
+    except Exception:
+        return None
+    if not local or not os.path.isdir(local):
+        return None
+    return Path(local)
+
+
+def _dataset_files(root: Path):
+    files, frames_n, frames_b = [], 0, 0
+    for p in sorted(root.iterdir()):
+        if p.is_file():
+            files.append({"name": p.name, "bytes": p.stat().st_size,
+                          "viewable": p.suffix.lower() in _DSFILE_EXT})
+    fr = root / "frames"
+    if fr.is_dir():
+        for p in fr.iterdir():
+            if p.is_file():
+                frames_n += 1
+                frames_b += p.stat().st_size
+    return files, frames_n, frames_b
+
+
+@app.get("/api/dataset/files/{slug}")
+def api_dataset_files(slug: str):
+    root = _dataset_dir(slug)
+    if root is None:
+        raise HTTPException(404, "unknown dataset or no local files")
+    files, fn, fb = _dataset_files(root)
+    return JSONResponse({"ok": True, "slug": slug, "files": files,
+                         "frames": {"count": fn, "bytes": fb},
+                         "zip_url": f"/api/dataset/zip/{slug}"})
+
+
+@app.get("/api/dataset/rawfile/{slug}/{fname}")
+def api_dataset_rawfile(slug: str, fname: str, download: int = 0):
+    root = _dataset_dir(slug)
+    if root is None:
+        raise HTTPException(404, "unknown dataset")
+    if not _DSFILE_RE.match(fname) or "/" in fname or fname.startswith("."):
+        raise HTTPException(400, "bad filename")
+    p = root / fname
+    if not p.is_file():
+        raise HTTPException(404, f"no such file: {fname}")
+    if p.suffix.lower() not in _DSFILE_EXT:
+        raise HTTPException(415, "only data/text files here - images are in the "
+                                 "gallery, everything is in the zip")
+    if p.stat().st_size > 100 * 1024 * 1024:
+        raise HTTPException(413, "file too large for the browser view - use the zip")
+    media = "text/csv" if p.suffix.lower() == ".csv" else "text/plain"
+    disp = "attachment" if download else "inline"
+    return FileResponse(str(p), media_type=media, headers={
+        "Content-Disposition": f'{disp}; filename="{fname}"'})
+
+
+@app.get("/api/dataset/zip/{slug}")
+def api_dataset_zip(slug: str):
+    root = _dataset_dir(slug)
+    if root is None:
+        raise HTTPException(404, "unknown dataset")
+    total = sum(p.stat().st_size for p in root.rglob("*") if p.is_file())
+    if total > _DSZIP_CAP:
+        raise HTTPException(413, f"dataset is {total/1e9:.1f} GB - above the "
+                                 f"{_DSZIP_CAP/1e9:.0f} GB zip cap; fetch files "
+                                 "individually or ask an admin")
+    newest = max((p.stat().st_mtime for p in root.rglob("*") if p.is_file()),
+                 default=0)
+    zdir = Path(REPO) / "dashboard_cache" / "dszips"
+    zdir.mkdir(parents=True, exist_ok=True)
+    zp = zdir / f"{slug}-{int(newest)}.zip"
+    if not zp.is_file():
+        for old in zdir.glob(f"{slug}-*.zip"):
+            try:
+                old.unlink()
+            except Exception:
+                pass
+        import zipfile
+        tmp = zp.with_suffix(".tmp")
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+            for p in sorted(root.rglob("*")):
+                if p.is_file():
+                    z.write(p, arcname=str(Path(slug) / p.relative_to(root)))
+        tmp.replace(zp)
+        log.info(f"[files] built zip for {slug} ({zp.stat().st_size} bytes)")
+    return FileResponse(str(zp), media_type="application/zip", headers={
+        "Content-Disposition": f'attachment; filename="{slug}.zip"'})
+
+
+@app.get("/files/{slug}", response_class=HTMLResponse)
+def dataset_files_page(slug: str):
+    root = _dataset_dir(slug)
+    if root is None:
+        raise HTTPException(404, "unknown dataset or no local files")
+    files, fn, fb = _dataset_files(root)
+    rows = []
+    for f in files:
+        kb = f["bytes"] / 1024
+        size = ("%.1f MB" % (kb / 1024)) if kb > 1024 else ("%.0f KB" % kb)
+        if f["viewable"]:
+            act = ('<a href="/api/dataset/rawfile/{s}/{n}" target="_blank">view</a>'
+                   ' &middot; <a href="/api/dataset/rawfile/{s}/{n}?download=1">'
+                   'download</a>').format(s=slug, n=f["name"])
+        else:
+            act = '<span style="color:#94a3b8">in zip</span>'
+        rows.append('<tr><td style="font-family:ui-monospace,monospace">%s</td>'
+                    '<td style="text-align:right;color:#64748b">%s</td><td>%s</td></tr>'
+                    % (f["name"], size, act))
+    frames_line = ('<p style="color:#64748b;font-size:13px">camera frames: %d files, '
+                   '%.1f MB - browse them in the <a href="/gallery/%s">image '
+                   'gallery</a>; all of them are inside the zip.</p>'
+                   % (fn, fb / 1e6, slug)) if fn else ""
+    css = ('body{font-family:-apple-system,system-ui,sans-serif;margin:0;background:#f5f7fa}'
+           '.top{background:#0b1220;padding:10px 16px}'
+           '.top a{display:inline-block;text-decoration:none;background:#1e293b;color:#93c5fd;'
+           'font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px;margin-right:8px}'
+           '.wrap{max-width:760px;margin:0 auto;padding:1.2rem}'
+           'table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e3e7ef;'
+           'border-radius:12px;overflow:hidden}'
+           'td,th{padding:9px 12px;border-bottom:1px solid #eef2f7;font-size:13.5px;text-align:left}'
+           '.dl{display:inline-block;background:#059669;color:#fff;font-weight:700;font-size:14px;'
+           'padding:10px 18px;border-radius:10px;text-decoration:none;margin:10px 0}')
+    return HTMLResponse(
+        '<!doctype html><html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<title>Dataset files</title><style>' + css + '</style></head><body>'
+        + '<div class="top"><a href="/dataset/%s">&larr; Analyze</a>'
+          '<a href="/gallery/%s">&#128444; Gallery</a></div>' % (slug, slug)
+        + '<div class="wrap"><h2 style="margin:8px 0">&#128193; %s</h2>' % slug
+        + '<a class="dl" href="/api/dataset/zip/%s">&#11015; Download whole dataset (.zip)</a>' % slug
+        + frames_line
+        + '<table><tr><th>file</th><th style="text-align:right">size</th><th>open</th></tr>'
+        + "".join(rows) + '</table></div></body></html>')
+
+
 @app.get("/api/slug/{slug}/samples")
 def api_slug_samples(slug: str, n: int = 12, offset: int = 0):
     """Return list of filenames for this slug's sample images.
@@ -9802,7 +9955,7 @@ def dataset_analysis_page(slug: str):
    .cbar .grow{flex-basis:100%;order:-1}
  }
 </style></head><body>
-<div class="top"><a href="/">&larr; Projects</a><a href="/gallery/__SLUG__">&#128444; Image gallery</a><a href="/recordings">&#127909; Recordings</a><a href="#" onclick="load(1);return false">&#8635; Recompute</a></div>
+<div class="top"><a href="/">&larr; Projects</a><a href="/gallery/__SLUG__">&#128444; Image gallery</a><a href="/files/__SLUG__">&#128193; Files &amp; CSV</a><a href="/recordings">&#127909; Recordings</a><a href="#" onclick="load(1);return false">&#8635; Recompute</a></div>
 <div class="hero"><h1>&#128202; Dataset analysis</h1><div class="sub"><code>__SLUG__</code> &middot; read-only EDA (no GPU) &middot; <span id="ts"></span></div></div>
 <div class="wrap"><div id="body"><div class="muted">analyzing&hellip; (first run on a big dataset can take a moment)</div></div></div>
 <script>

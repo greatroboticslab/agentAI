@@ -594,7 +594,19 @@ async def robot_frame(request: Request):
     cam = re.sub(r"[^a-z0-9_]", "", str(qp.get("cam") or "").lower())[:16]
     fname = ("%s_%.3f.jpg" % (cam, ts)) if cam else ("%.3f.jpg" % ts)
     with s["lock"]:
-        (Path(s["dir"]) / "frames" / fname).write_bytes(body)
+        # v3.24.11: NEVER overwrite on a timestamp collision. The lasercar's
+        # first dual-cam test sent front frames with second-resolution ts, so
+        # 6 of 18 fronts silently overwrote each other — counters said 18,
+        # disk had 12. A frame that arrived is data; if its name is taken,
+        # suffix it rather than eat its predecessor.
+        target = Path(s["dir"]) / "frames" / fname
+        if target.exists():
+            stem, k = fname[:-4], 2
+            while target.exists():
+                target = Path(s["dir"]) / "frames" / ("%s-%d.jpg" % (stem, k))
+                k += 1
+            fname = target.name
+        target.write_bytes(body)
         s["frame_count"] += 1
         s["frame_bytes"] += len(body)
         s["latest_frame_ts"] = ts

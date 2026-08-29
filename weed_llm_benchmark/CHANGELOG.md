@@ -7894,3 +7894,31 @@ already pays. Verified on the operator's exact failing URL: HTTP 200, 640×360 J
 Also confirmed this session: the 241's new fifth sensor source `witimu` archived
 with zero platform changes (`witimu.csv` beside `imu.csv`, 147 rows, manifest
 sources/counts correct) — the CSV pipeline is source-name-driven by design.
+
+### v3.24.10 — a dataset's raw files, finally visible; frames that can't eat each other
+
+**Files & CSV.** The only window onto a dataset's non-image files was the Analyze
+page's aggregates — a field operator asking "did my data actually get collected?"
+could not open imu.csv or take the session home. Now: `/files/{slug}` (linked from
+the Analyze top bar as "📁 Files & CSV") lists every top-level file with view /
+download actions; `/api/dataset/rawfile/{slug}/{fname}` serves CSV/JSON/JSONL/YAML/
+text inline (100 MB cap, strict name check, registry-resolved paths only);
+`/api/dataset/zip/{slug}` builds a cached whole-dataset zip (2 GiB cap with an
+honest 413, stale zips for the slug pruned on rebuild). Verified against a real
+robot session: text/csv 200 on imu.csv, a 5.4 MB zip with 225 entries including all
+frames, and the page renders both actions per file. All behind normal auth.
+
+**Frame timestamp collisions no longer overwrite.** The lasercar's first dual-camera
+session sent front frames with second-resolution timestamps: the platform counted 18
+fronts but disk held 12 — same filename, silent overwrite, six frames eaten. A frame
+that arrived is data: on a name collision the file now gets a `-2`, `-3`… suffix.
+Verified with three same-ts posts → three files on disk, counters matching. (The
+count-vs-disk mismatch in that session's manifest is the fossil of the old
+behaviour; the client is also being fixed to send unique sub-second timestamps,
+which is what makes frames orderable.)
+
+Cross-checked in the same sitting: the 241's session 192804 archived four sources
+totalling exactly the robot-reported 10,737 rows + 215 frames with zero platform
+loss — and no witimu, whose absence the totals attribute to the sender, not the
+archive. Every synthetic verification dataset was deleted after use (files +
+registry confirmed).
