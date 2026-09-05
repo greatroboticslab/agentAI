@@ -525,6 +525,25 @@ _STEP_CMD_METACHARS = ";&|`$()<>"
 # loop outside the repository root.
 _STEP_SCRIPT_RE = re.compile(r"run_[a-z0-9_.-]+\.sh")
 _STEP_CMD_MAX = 4000
+# The scripts the round scheduler may submit. This is CODE, not config: a
+# per-domain `steps` template can choose parameters, never a new executable, and
+# a project owner patching config over HTTP therefore cannot introduce one. A new
+# research domain reuses these entry points with its own parameters; adding an
+# entry point is a code change on purpose.
+#
+# Membership replaced an is_file() check on the repository root. The renderer runs
+# on the always-on server while the scripts live in the cluster checkout, so that
+# check refused every legitimate template wherever the two trees differ — and a
+# refusal drops the command, which would have stopped the loop silently. Existence
+# is verified where it is authoritative and loud: sbatch fails immediately on a
+# missing script and the submission is recorded failed.
+_STEP_ALLOWED_SCRIPTS = frozenset({
+    "run_v3_0_43_brain_harvest_oneshot.sh",   # collect
+    "run_s2_dino_scores.sh",                  # filter
+    "run_m1_merged_seeds.sh",                 # train
+    "run_train_generic.sh",                   # per-project training
+    "run_eval_generic.sh",                    # per-project evaluation
+})
 
 
 def validate_step_command(cmd) -> tuple:
@@ -539,7 +558,8 @@ def validate_step_command(cmd) -> tuple:
       * it starts with "sbatch " — the loop submits batch jobs, nothing else;
       * it contains none of ; & | ` $ ( ) < > and no control character, so it
         cannot chain, substitute, redirect or span lines;
-      * its last token is a literal run_*.sh that exists in the repository root.
+      * its last token is a literal run_*.sh from _STEP_ALLOWED_SCRIPTS, so a
+        config patch can choose parameters but never a new executable.
 
     Refusing is always safe: the caller drops the command instead of submitting
     it, which stops a round rather than running an unreviewed one.
@@ -557,8 +577,8 @@ def validate_step_command(cmd) -> tuple:
     script = cmd.split()[-1]
     if not _STEP_SCRIPT_RE.fullmatch(script):
         return False, ("must end in a run_*.sh script name, not %r" % script[:80])
-    if not (REPO / script).is_file():
-        return False, ("script %r is not in the repository root" % script[:80])
+    if script not in _STEP_ALLOWED_SCRIPTS:
+        return False, ("script %r is not one the scheduler may submit" % script[:80])
     return True, ""
 
 

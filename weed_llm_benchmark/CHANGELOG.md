@@ -8023,7 +8023,12 @@ result is handed to a shell on the shared cluster account, so
 start with `sbatch`, carry no shell metacharacter that could chain or substitute,
 and end in a `run_*.sh` that exists in the repository root. It is enforced at render
 time, on both render paths, and on any config patch that touches `steps` — an
-unsafe template is refused and audited rather than stored.
+unsafe template is refused and audited rather than stored. The script must be one
+of a small allow-list held in code, so a config patch chooses parameters and never
+a new executable; that replaced an existence check against the repository root,
+which refused every legitimate template on the always-on server (where the loop
+renders) because the scripts live in the cluster checkout. Existence is verified
+where it is authoritative and loud: `sbatch` fails immediately on a missing script.
 
 Also in this release: scheduler counters (`fails`, `rounds_today`, the resubmit cap,
 the correction memo, the step start time from `sacct`) persist across a restart, so
