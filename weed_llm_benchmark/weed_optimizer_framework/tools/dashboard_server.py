@@ -409,6 +409,7 @@ _AUTH_EXEMPT_PATHS = {
     # a session cookie is a health check nobody runs. It returns timing only
     # (last-success age, stage name, outcome word), no data and no credentials.
     "/api/health/sync",
+    "/api/health/scheduler",         # v3.25.0: same reasoning, unattended loop
 }
 _AUTH_EXEMPT_PREFIXES = (
     "/static/",                      # static assets if any
@@ -1101,6 +1102,21 @@ async def _inject_responsive_css(request: Request, call_next):
                 _mb = re.search(r"<body[^>]*>", text)
                 if _mb:
                     text = text[:_mb.end()] + _bar + text[_mb.end():]
+        # v3.25.0: the same positive-heartbeat check for the round scheduler. On
+        # 2026-08-29 the weed loop tripped its stop-loss and stayed paused for six
+        # days while every page still looked healthy — a stopped loop and an idle
+        # one are indistinguishable unless the page says which it is. Memoised
+        # the same way, so this costs one stat per 15s rather than one per request.
+        if 'id="_schedalarm"' not in text:
+            try:
+                from .brain import scheduler_health as _shs
+                _sbar = _shs.banner_html()
+            except Exception:
+                _sbar = ""
+            if _sbar:
+                _msb = re.search(r"<body[^>]*>", text)
+                if _msb:
+                    text = text[:_msb.end()] + _sbar + text[_msb.end():]
         # v3.0.134: login badge on every page except the login page itself.
         if ("_authbadge" not in text and request.url.path != "/login"
                 and "</body>" in text):
@@ -7303,9 +7319,16 @@ def api_evidence(request: Request):
                     "quarantined")} if pool else None
 
     # per-run artifacts the campaign wrote (s3_*.json / m1_*.json)
+    # v3.25.0: run_m1_merged_seeds.sh now also writes a job-scoped copy
+    # (m1_<tier>_seed<N>_<jobid>.json) so a job killed at its walltime still
+    # leaves an artifact behind. It matches the same glob and carries the same
+    # content, so counting it here would report every M1 run twice.
+    _job_scoped_copy = re.compile(r"_seed\d+_\w+\.json$")
     runs = []
     for pat in ("s3_*.json", "m1_*_seed*.json"):
         for f in sorted(fw.glob(pat)):
+            if _job_scoped_copy.search(f.name):
+                continue
             try:
                 j = json.loads(f.read_text())
             except Exception:
@@ -12122,7 +12145,14 @@ def api_cancel_job(jobid: str):
         return JSONResponse({"ok": False, "msg": f"job {jobid} not in queue"})
     # Whitelist: agent jobs only. Don't cancel the dashboard from /control
     # (use restart_dashboard action for that instead).
-    SAFE_PREFIXES = ("dl_known", "brain_hrv", "topic_bf", "smoke", "lora_")
+    # v3.25.0: the round scheduler's own job names are on the list too. Its steps
+    # were the only jobs the UI could not stop, so on 2026-08-29 two train steps
+    # ran the full 12 h into a TIMEOUT that was diagnosable at epoch 3 and there
+    # was no way to cancel them short of a shell on the cluster. A supervisor
+    # that can detect a doomed step must be able to end it.
+    SAFE_PREFIXES = ("dl_known", "brain_hrv", "topic_bf", "smoke", "lora_",
+                     "s2_dino", "rndtrain", "m1_merged", "brain_", "llm_",
+                     "supervisor_", "vllm_")
     if not any(name.startswith(p) for p in SAFE_PREFIXES):
         return JSONResponse({"ok": False, "msg":
             f"refuse to cancel {name!r} — only agent jobs cancellable from UI"})
@@ -17098,6 +17128,14 @@ try:
         "record_step": _rs_db.record_round_step,
         "slurm": _slurm,
         "slurm_sh": (lambda s, timeout=60: _slurm(["bash", "-lc", s], timeout)),
+        # v3.25.0: the loop was the only thing on the platform that could start a
+        # GPU job without leaving a row in cluster_actions.jsonl, so the history
+        # panel and every audit built on it under-reported its spend entirely.
+        "log_action": _log_action,
+        # The tick heartbeat must land where the alarm reads it. Both sides
+        # resolve a repo root of their own otherwise, and a disagreement would
+        # read as a permanently dead scheduler.
+        "repo": str(REPO),
     })
     log.info("[rounds] scheduler mounted (disabled by default; /api/rounds/scheduler)")
 except Exception as _e:
@@ -17113,3 +17151,14 @@ try:
     log.info("[health] sync freshness alarm mounted (/api/health/sync)")
 except Exception as _e:
     log.error(f"[health] sync alarm failed to mount: {_e}")
+
+# v3.25.0 — round-scheduler liveness alarm. Reads the tick heartbeat the
+# scheduler writes to results/framework/scheduler_status.json, so a stop-loss
+# pause, a dead scheduler thread and a dead process all surface as the same red
+# banner instead of as six quiet days.
+try:
+    from .brain import scheduler_health as _sched_health
+    _sched_health.mount(app, {"log": log, "repo": str(REPO)})
+    log.info("[health] scheduler alarm mounted (/api/health/scheduler)")
+except Exception as _e:
+    log.error(f"[health] scheduler alarm failed to mount: {_e}")

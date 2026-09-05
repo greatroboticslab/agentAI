@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 IMG_EXTS = ('.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG', '.bmp')
 
 
-def _resolve_best_pt(model, project_dir):
+def _resolve_best_pt(model, project_dir, run_tag=None):
     """Resolve actual best.pt after ultralytics training.
 
     v3.0.22: fallback to last.pt if best.pt doesn't exist (walltime cut
@@ -41,8 +41,16 @@ def _resolve_best_pt(model, project_dir):
     except Exception:
         pass
     try:
+        # v3.25.0: a job-scoped run name (run_tag) does not start with "train",
+        # so the directory scan below would miss it and the last.pt fallback
+        # would go blind exactly when the trainer object is unavailable.
+        patterns = ["train*"] + ([str(run_tag)] if run_tag else [])
+        seen = set()
+        train_dirs = []
+        for pat in patterns:
+            train_dirs += [p for p in Path(project_dir).glob(pat) if p.is_dir()]
         train_dirs = sorted(
-            (p for p in Path(project_dir).glob("train*") if p.is_dir()),
+            (d for d in train_dirs if not (str(d) in seen or seen.add(str(d)))),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )
@@ -798,7 +806,7 @@ def _stage_cwd12_holdout(cwd12_root, out_dir):
     return img_d
 
 
-def train_yolo_mega(strategy, iteration):
+def train_yolo_mega(strategy, iteration, run_tag=None):
     """Train the largest YOLO on merged real-labeled datasets (v3.0 approach).
 
     Strategy keys:
@@ -816,11 +824,66 @@ def train_yolo_mega(strategy, iteration):
       min_dino_score (default None) — v3.0.99.28 (D) clean-subset gate. When set,
         slugs with DINOv2 trusted-pool score below it are dropped from training
         (quality-core experiment). Unscored slugs are kept.
+      time_h (default None) — v3.25.0 wall-clock cap in hours, passed to
+        ultralytics `time=`. It overrides `epochs` and still ends with a valid
+        best.pt. None (the default) keeps the uncapped epoch budget.
+      trace_path (default None) — JSONL file that receives one record per
+        validated epoch plus a start/end pair. None writes no trace.
+      trace_meta (default None) — dict merged into every trace record
+        (domain, round, step, job_id).
+
+    run_tag (default None) — ultralytics run name. None keeps the historical
+      "train", which ultralytics auto-increments to train2/train3 when the
+      directory already exists; that ambiguity is how a metric reader can
+      attach results.csv from a foreign run. A job-scoped tag makes the
+      save_dir deterministic: <FRAMEWORK_DIR>/mega_iter<iteration>/<run_tag>/.
 
     Returns: (best_pt_path, result_summary)
     """
+    import hashlib
+    import time as _time
+
     import torch
     from ultralytics import YOLO
+
+    # v3.25.0 tracing. The 2026-08-29 double TIMEOUT (12 h walltime reached at
+    # epoch 24/60 and 16/60) left no per-epoch artifact at all, so nothing could
+    # project the finish time while the job was still running. These records are
+    # that evidence, and being evidence they must never abort a training run.
+    _trace_path = strategy.get("trace_path")
+    _trace_meta = strategy.get("trace_meta") or {}
+
+    def _trace(record):
+        if not _trace_path:
+            return
+        try:
+            from .brain import trace as _trace_mod
+            rec = dict(_trace_meta)
+            rec.update(record)
+            _trace_mod.append(_trace_path, rec)
+        except Exception:
+            pass
+
+    def _walltime_s():
+        # Exported by the job script from squeue; absent outside SLURM.
+        try:
+            return int(float(os.environ.get("SLURM_WALLTIME_S") or ""))
+        except (TypeError, ValueError):
+            return None
+
+    def _file_sha256(path):
+        # Empty string when the base is a bare model name that gets downloaded.
+        try:
+            p = Path(str(path))
+            if not p.is_file():
+                return ""
+            h = hashlib.sha256()
+            with open(p, "rb") as fh:
+                for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                    h.update(chunk)
+            return h.hexdigest()
+        except Exception:
+            return ""
 
     include_autolabel = bool(strategy.get("include_autolabel", False))
     val_dataset_root = strategy.get("val_dataset_root")
@@ -875,6 +938,91 @@ def train_yolo_mega(strategy, iteration):
                 f"classes={len(names_list)}, datasets={used_datasets}")
     project_dir = os.path.join(Config.FRAMEWORK_DIR, f"mega_iter{iteration}")
 
+    t0 = _time.time()
+    base_weights_sha256 = _file_sha256(base_weights)
+    fresh_start = bool(strategy.get("fresh_start", False))
+
+    # v3.25.0: `time=` is added only when a cap was asked for, so an uncapped
+    # call passes exactly the arguments it passed before this change.
+    train_kwargs = {}
+    time_h = strategy.get("time_h")
+    try:
+        if time_h is not None and float(time_h) > 0:
+            train_kwargs["time"] = float(time_h)
+    except (TypeError, ValueError):
+        logger.warning(f"[Mega] ignoring unparseable time_h={time_h!r}")
+    if "time" in train_kwargs:
+        logger.info(f"[Mega] Wall-clock cap: time={train_kwargs['time']}h "
+                    f"(overrides epochs={strategy.get('epochs', 100)}; "
+                    f"training still ends with a valid best.pt)")
+
+    effective = {
+        "epochs": strategy.get("epochs", 100),
+        "imgsz": strategy.get("imgsz", 1024),
+        "batch": strategy.get("batch_size", -1),
+        "patience": strategy.get("patience", 50),
+        "lr0": strategy.get("lr", 0.001),
+        "workers": strategy.get("workers", 4),
+        "seed": int(strategy.get("seed", 0)),
+        "deterministic": bool(strategy.get("deterministic", True)),
+        "name": run_tag or "train",
+        "time_h": train_kwargs.get("time"),
+    }
+
+    def _on_fit_epoch_end(trainer):
+        # One record per validated epoch. Every trainer attribute is read
+        # defensively: an ultralytics API change must degrade the trace, not
+        # kill the job.
+        try:
+            metrics = getattr(trainer, "metrics", None) or {}
+            map5095 = None
+            for k in metrics:
+                if "mAP50-95" in str(k):
+                    try:
+                        map5095 = float(metrics[k])
+                    except (TypeError, ValueError):
+                        map5095 = None
+                    break
+            done = int(getattr(trainer, "epoch", 0) or 0) + 1
+            # Under a `time=` cap ultralytics rewrites trainer.epochs to the
+            # count it now expects to finish, which is the honest ETA base.
+            total = int(getattr(trainer, "epochs", 0) or effective["epochs"] or 0)
+            started = getattr(trainer, "train_time_start", None) or t0
+            elapsed = max(0.0, _time.time() - float(started))
+            eta = (elapsed / done) * total if done > 0 and total > 0 else None
+            _trace({
+                "kind": "epoch",
+                "epoch": done,
+                "map50_95": map5095,
+                "elapsed_s": round(elapsed, 3),
+                "eta_total_s": round(eta, 3) if eta is not None else None,
+                "walltime_s": _walltime_s(),
+                "save_dir": str(getattr(trainer, "save_dir", "") or ""),
+            })
+        except Exception:
+            pass
+
+    if _trace_path:
+        try:
+            model.add_callback("on_fit_epoch_end", _on_fit_epoch_end)
+        except Exception as e:
+            logger.warning(f"[Mega] epoch trace callback not registered: {e}")
+
+    _trace({
+        "kind": "start",
+        "iteration": str(iteration),
+        "run_tag": run_tag or "train",
+        "project_dir": project_dir,
+        "base_weights": base_weights,
+        "base_weights_sha256": base_weights_sha256,
+        "fresh_start": fresh_start,
+        "merged_images": stats["images"],
+        "datasets_used": len(used_datasets),
+        "num_classes": len(names_list),
+        "walltime_s": _walltime_s(),
+        "strategy": effective,
+    })
+
     # v3.0.24: defaults raised to match v3.0.6 YOLO11n baseline that achieved
     # mAP50-95=0.865 on cottonweeddet12 (5648 imgs, 100 epochs, imgsz=640).
     # Now using yolo26x as base + cleaner real-bbox-only data + imgsz 1024,
@@ -886,7 +1034,7 @@ def train_yolo_mega(strategy, iteration):
         imgsz=strategy.get("imgsz", 1024),
         device=device,
         project=project_dir,
-        name="train",
+        name=run_tag or "train",
         patience=strategy.get("patience", 50),
         lr0=strategy.get("lr", 0.001),
         workers=strategy.get("workers", 4),
@@ -902,10 +1050,47 @@ def train_yolo_mega(strategy, iteration):
         # explicit and the sweep intentional.
         seed=int(strategy.get("seed", 0)),
         deterministic=bool(strategy.get("deterministic", True)),
+        **train_kwargs,
     )
 
     # Resolve actual save_dir (ultralytics increments train/train2/... if dir exists)
-    best_pt = _resolve_best_pt(model, project_dir)
+    best_pt = _resolve_best_pt(model, project_dir, run_tag=run_tag)
+
+    # Read save_dir off the trainer while the model still exists: it is the only
+    # unambiguous pointer to the results.csv that belongs to THIS run.
+    save_dir = ""
+    try:
+        save_dir = str(getattr(getattr(model, "trainer", None), "save_dir", "") or "")
+    except Exception:
+        save_dir = ""
+    if not save_dir and best_pt:
+        save_dir = str(Path(best_pt).parent.parent)
+
+    # A `time=` cap ends the run early and still reports COMPLETED, so a recipe
+    # that asked for 60 epochs and got 24 looks identical to one that ran in
+    # full unless the two counts are recorded side by side. Silence here would
+    # replace the loud 2026-08-29 TIMEOUT with a quiet short run.
+    epochs_completed = None
+    try:
+        _ep = getattr(getattr(model, "trainer", None), "epoch", None)
+        if _ep is not None:
+            epochs_completed = int(_ep) + 1
+    except Exception:
+        epochs_completed = None
+
+    _trace({
+        "kind": "end",
+        "iteration": str(iteration),
+        "run_tag": run_tag or "train",
+        "save_dir": save_dir,
+        "best_pt": best_pt,
+        "ok": bool(best_pt and os.path.exists(best_pt)),
+        "elapsed_s": round(_time.time() - t0, 3),
+        "walltime_s": _walltime_s(),
+        "epochs_requested": effective["epochs"],
+        "epochs_completed": epochs_completed,
+        "time_h": effective["time_h"],
+    })
 
     del model
     torch.cuda.empty_cache()
@@ -948,6 +1133,16 @@ def train_yolo_mega(strategy, iteration):
         "num_classes": len(names_list),
         "base_model": base_weights,
         "mega_round_count": disc.registry["mega_round_count"],
+        # v3.25.0 run identity + lineage: which directory holds this run's
+        # results.csv, and which checkpoint it continued from.
+        "save_dir": save_dir,
+        "run_tag": run_tag or "train",
+        "base_weights": base_weights,
+        "base_weights_sha256": base_weights_sha256,
+        "fresh_start": fresh_start,
+        "epochs_requested": effective["epochs"],
+        "epochs_completed": epochs_completed,
+        "time_h": effective["time_h"],
     }
     logger.info(f"[Mega] Complete: {summary}")
     return best_pt, summary

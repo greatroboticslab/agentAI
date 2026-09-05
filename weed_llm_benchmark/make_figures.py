@@ -11,12 +11,21 @@ When the M1 re-measurement artifacts (results/framework/m1_<tier>_seed*.json)
 exist, their mean±std fills the pending points automatically.
 """
 import json
+import re
 import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "results" / "framework" / "figures_data.json"
 OUT = ROOT / "results" / "figures"
+
+# v3.25.0: the M1 job also writes a job-scoped copy of its artifact,
+# m1_<tier>_seed<N>_<jobkey>.json, so a run killed at its walltime still
+# leaves evidence behind (two 12 h trains were killed at epoch 24/60 and
+# 16/60 on 2026-08-29 and left none). It carries the same value and matches
+# the same glob, so counting it would enter every seed twice: n doubles and
+# the reported std is deflated. Match the copy by name and skip it.
+_JOB_SCOPED_ARTIFACT = re.compile(r"_seed\d+_\w+\.json$")
 
 
 def load():
@@ -28,6 +37,8 @@ def load():
         tier = "raw" if "raw" in p["label"] else "curated"
         vals = []
         for f in sorted((ROOT / "results" / "framework").glob(f"m1_{tier}_seed*.json")):
+            if _JOB_SCOPED_ARTIFACT.search(f.name):
+                continue      # duplicate of m1_<tier>_seed<N>.json, already counted
             try:
                 j = json.loads(f.read_text())
             except Exception:

@@ -60,6 +60,26 @@ Cookie: on the lab, b64url(JSON `{uid, exp}`) + `.` + b64url(HMAC-SHA256 over th
 raw 32 bytes of `~/.dash_session_key`), sent as `agentai_session=`. **Never poll unauthenticated**
 (5 failures per IP = 1 h lockout). Basic auth is disabled.
 
+### A.3b Publishing a change to the cluster (the step that is easy to forget)
+
+The cluster repo root holds **untracked runtime copies** of the job scripts and of the package.
+`sbatch` reads the script from the repo root at submit time, and the job's own
+`git reset --hard origin/main` does **not** refresh an untracked file. A pushed change therefore
+does not reach a job until it is published:
+
+```
+# after `git push origin main`, in ONE batched relay command:
+cd /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark \
+  && git fetch origin && git reset --hard origin/main \
+  && cp -f weed_llm_benchmark/run_*.sh . \
+  && rsync -a --delete weed_llm_benchmark/weed_optimizer_framework/ weed_optimizer_framework/ \
+  && git log --oneline -1 && md5sum run_m1_merged_seeds.sh weed_llm_benchmark/run_m1_merged_seeds.sh
+```
+
+The two md5 sums must match; that is the proof the outer copy is the code that was pushed.
+Job scripts also rsync the package themselves at start, so the package copy is belt and braces —
+the `run_*.sh` copy is the one nothing else does for you.
+
 ### A.4 Verification standard
 "Launched" ≠ done. Done = the code path ran on real infrastructure, the artifact exists (`ls -la`,
 `tail`), the ledger row exists (JSON), the page renders in a real browser (screenshot),
@@ -502,4 +522,8 @@ never corpus/signals/channel/alarm):
 | deepseek-v3:671b at num_ctx 32768 | verify job **45198717** (whole node, pending), jobtag `v671b_ctx32k` |
 | vLLM apptainer image | built and verified (job 45197071): `/ocean/projects/cis240145p/byler/containers/vllm-openai.sif` |
 | weed scheduler | paused by stop-loss since 2026-08-29; re-enable only after WP1 gate |
-| WP1–WP8 | not started |
+| ultralytics on the cluster | 8.4.37 — `time` present in DEFAULT_CFG_DICT and `on_fit_epoch_end` is a real callback hook, so the walltime cap and the per-epoch trace in WP1 rest on verified API |
+| DeepSeek-V4-Flash checkpoint | staged, 149 GB / 46 shards; `config.json`: `DeepseekV4ForCausalLM`, block-**FP8** (e4m3, 128x128, ue8m0 scales) — native on H100, no dequant path; 43 layers, 256 routed experts / 6 active, 64 heads (divisible by TP=4), native context 65536 with YaRN x16 to 1M |
+| vLLM verify job | `run_vllm_verify.sh` written and submitted as job 45225918 (GPU-shared, 4x H100, 240G, 90 min): loads, times a 12K-token prefill, measures batch-1 decode, and tests strict JSON output; writes `results/framework/model_deploy/v4flash_verify1.json` |
+| WP1 | implementation landed 2026-09-04 (trace, train cap + per-epoch callback, ledger attempts, scheduler review state machine, scheduler alarm); under review, not yet deployed |
+| WP2–WP8 | not started |

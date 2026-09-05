@@ -45,3 +45,19 @@ multagent/dashboard/frontend/dist/
 # IDE
 .idea/
 *.iml
+
+# Cluster job output and staged supervision state (v3.25.0).
+# These live at the REPO ROOT on the cluster only (Config.FRAMEWORK_DIR =
+# <root>/results/framework); the tracked results/ trees under
+# weed_llm_benchmark/ are untouched by these anchored patterns.
+results/framework/_brain/
+results/framework/_endpoints/
+results/framework/llm_infer/
+results/framework/model_deploy/
+# Benchmark cases keep bundle.json + truth.json in git; the raw job artifacts
+# they cite are large and may carry unscrubbed paths, so they stay out.
+results/framework/supervision_bench/cases/*/artifacts/raw/
+results/framework/*.out
+
+# AppleDouble sidecars written when a mac writes to the shared filesystem
+._*

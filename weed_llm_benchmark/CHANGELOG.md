@@ -7938,3 +7938,107 @@ The toggle now sits in its own labelled row directly above the video —
 a real browser, not an argument: Playwright Firefox against a live dual-cam session,
 clicked `front`, watched the frame URL gain `&cam=front` and the front image render.
 Screenshot archived; the synthetic session was deleted after use.
+
+### v3.25.0 — the loop can now be walltime-bound without going quiet
+
+On 2026-08-29 the unattended round scheduler submitted a 12 h training job whose
+merged pool had grown to 8,583 iterations per epoch — 60 epochs needed about 29 h.
+It hit the walltime at epoch 24, was recorded `TIMEOUT`, and the next tick
+resubmitted the identical command, which failed at epoch 16. Two failures tripped
+the stop-loss, the domain paused, and nothing said so: six days later the platform
+still looked healthy and the loop had not run a round. Everything the jobs knew
+died with them, because the only metric writer ran at the end.
+
+The scheduler behaved exactly as designed at every step. What it could not do was
+detect early, diagnose, correct, or tell anyone — so this release adds those four
+and leaves the scripted loop otherwise unchanged. Rendered with the shipped
+defaults, the collect and filter commands are byte-identical to the literals they
+replace; that equality is asserted by a test rather than assumed.
+
+**A run that cannot finish now stops on time instead of at the wall.**
+`run_m1_merged_seeds.sh` takes `TRAIN_EPOCHS` / `TRAIN_TIME_H` / `IMGSZ` /
+`PATIENCE` / `ITER_NAME` from the environment (defaults reproduce today exactly),
+and a non-empty `TRAIN_TIME_H` becomes Ultralytics `time=`, which overrides the
+epoch budget and still writes a valid `best.pt`. The scheduler's train template
+passes a cap of 0.9 x walltime. Because a capped run ends early and still reports
+COMPLETED, the summary, the job log and the trace now carry `epochs_requested`
+alongside `epochs_completed` — a 60-epoch recipe that ran 24 must not be
+indistinguishable from one that ran in full.
+
+**A run that dies still leaves its evidence.** New
+`weed_optimizer_framework/tools/brain/trace.py`: an append-only, hash-chained
+JSONL trace written *as the job goes* — one record per epoch from epoch 1 (via an
+Ultralytics `on_fit_epoch_end` callback), per harvest candidate, plus start and end
+records. Each line carries `sha` and `sha_prev`, so an edited or deleted record
+breaks the chain and `verify()` reports where. A writer killed mid-write leaves a
+torn line; `append()` links across it rather than gluing the next record onto the
+fragment, and the reader skips it — a job killed at its walltime must not read as a
+tampered file. Nothing here can raise: a trace observes a run, it never ends one.
+
+**The metric can no longer come from someone else's run.** Ultralytics increments
+`train` to `train2`, so the old global-newest `results.csv` reader could attach a
+foreign number to a round. Training now writes into a job-scoped run directory and
+a job-scoped artifact, and the scheduler reads that artifact by job id and refuses
+it when the id does not match. The artifact is written twice — once at start with
+`status: running`, once at the end — so a walltime kill still leaves a record. It
+is keyed on `SLURM_ARRAY_JOB_ID`, verified on the cluster: a `--array=1-3`
+submission printed 45227822 while its first task ran as `SLURM_JOB_ID` 45227848,
+so keying on the task id would have silently disabled both new readers for every
+task after the first.
+
+**A failure waits for a verdict instead of repeating itself.** A failed step is
+held with `review: awaiting` and is not resubmitted until a verdict arrives or the
+review times out (90 min, per-domain). On timeout the loop applies one
+deterministic correction — halve the epochs — but only when the failure was
+walltime-shaped (`sacct TIMEOUT`, or the in-flight projection had already warned on
+that job); a CUDA OOM or a rejected `sbatch` is resubmitted unchanged and the
+ledger says so. The correction is bounded and reversible: it never writes below a
+configurable floor, and it records `{old, new, reason, from_round, review_id}` so a
+person can revert it. Ledger step entries keep an `attempts[]` history instead of
+being replaced, and an entry authored by a supervisor or a person is never
+overwritten by the scheduler.
+
+**In flight, the projection is read every tick.** While a train step runs, the
+scheduler reads the last epoch record and warns when the projected total exceeds
+0.95 x walltime. When the projection is unavailable — no trace, no `walltime_s` —
+it says so once per job at warning level, because a detector that switches itself
+off silently is the failure class this release exists to close.
+
+**A paused domain can no longer be silent.** New
+`brain/scheduler_health.py` plus `GET /api/health/scheduler` (unauthenticated,
+timing only) plus a site-wide banner, on the same positive-heartbeat principle as
+the sync alarm: the scheduler must keep proving it is alive. Missing or stale
+heartbeat, a paused domain, or ledger writes that are failing all read `crit`; an
+overdue review or a slow tick reads `warn`. The alarm fails closed — when its own
+check raises it paints a warning bar rather than nothing. `mount()` writes one
+heartbeat before the thread starts, so a planned restart does not paint the bar red
+for two minutes.
+
+**Step commands moved from code into per-domain config, and that opened a hole
+which is closed in the same release.** `_WEED_STEPS` is now a documented fallback;
+the loop renders `steps` templates from the domain config, so a correction is a
+config write rather than a code edit. That config is writable over HTTP and the
+result is handed to a shell on the shared cluster account, so
+`db.validate_step_command` is now the single choke point: a rendered command must
+start with `sbatch`, carry no shell metacharacter that could chain or substitute,
+and end in a `run_*.sh` that exists in the repository root. It is enforced at render
+time, on both render paths, and on any config patch that touches `steps` — an
+unsafe template is refused and audited rather than stored.
+
+Also in this release: scheduler counters (`fails`, `rounds_today`, the resubmit cap,
+the correction memo, the step start time from `sacct`) persist across a restart, so
+a restart no longer re-arms a guard or re-applies a correction; a job stuck
+`UNKNOWN` is now subject to the step deadline instead of blocking a domain forever
+behind a green banner; `supersede_step` returns busy instead of proceeding without
+the lock; scheduler submissions reach the action log; `/api/cancel_job` accepts the
+scheduler's own job names; and `make_figures.py` and the runs listing skip the
+job-scoped artifact copy, which their `m1_*_seed*.json` globs would otherwise have
+counted as a second seed and used to deflate a reported standard deviation.
+
+Verified before deploy: 236 assertions across six test files (`test_brain_trace`,
+`test_round_ledger`, `test_round_templates`, `test_scheduler_state`,
+`test_scheduler_review`, and the pre-existing `test_domain_config`) all pass; every
+changed module compiles; `bash -n` clean; `sbatch --test-only` accepts the rendered
+train line including its trailing empty `BRAIN_TRACE=`; and the cluster's
+ultralytics 8.4.37 carries both `time` and the `on_fit_epoch_end` hook the design
+rests on.

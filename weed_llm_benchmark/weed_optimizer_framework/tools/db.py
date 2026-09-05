@@ -50,6 +50,7 @@ NOT here yet. This file is read-only on purpose so it can land without risk.
 from __future__ import annotations
 
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Optional
@@ -441,6 +442,44 @@ DEFAULT_DOMAIN_CONFIG = {
     "modality": "image",
     "target_metric": "",       # "" → per-task default
     "model_routing": {},       # role -> model id overrides
+    # v3.25.0 — the loop's step commands lived as three hardcoded sbatch
+    # literals in round_scheduler._WEED_STEPS, so changing one parameter was a
+    # code change and the 2026-08-29 walltime failures (jobs 44727703,
+    # 44767709) could only be corrected by hand. Rendering them from per-domain
+    # templates keeps the same commands (collect and filter render byte-identical
+    # to those literals — tests/test_round_ledger.py asserts it) and gives a
+    # second domain its own knobs with no code change.
+    "steps": {
+        "collect": ("sbatch --time={collect_time_h}:00:00 "
+                    "--export=ALL,BRAIN_MAX_NEW={max_new} "
+                    "run_v3_0_43_brain_harvest_oneshot.sh"),
+        "filter": "sbatch run_s2_dino_scores.sh",
+        "train": ("sbatch --array=1-1 --job-name=rndtrain --gres=gpu:h100-80:1 "
+                  "--time={train_time_h}:00:00 --export=ALL,TIER={tier},"
+                  "MIN_DINO_SCORE={min_dino_score},TRAIN_EPOCHS={epochs},"
+                  "TRAIN_TIME_H={train_time_cap_h},IMGSZ={imgsz},"
+                  "PATIENCE={patience},ITER_NAME={iter_name},"
+                  "BRAIN_DOMAIN={domain},BRAIN_TRACE={trace} "
+                  "run_m1_merged_seeds.sh"),
+    },
+    # train_time_cap_h is 0.9 × train_time_h: the trainer's own time cap ends the
+    # run with a valid best.pt before SLURM kills the job. Its absence is why two
+    # consecutive 12 h train steps ended TIMEOUT at epoch 24/60 and 16/60 with no
+    # metric and no checkpoint.
+    "round_params": {"collect_time_h": 10, "max_new": 3, "tier": "curated",
+                     "min_dino_score": 0.50, "epochs": 60, "train_time_h": 12,
+                     "train_time_cap_h": 10.8, "imgsz": 640, "patience": 20},
+    # "scripted" = the deterministic loop, no model decides anything (the
+    # baseline). An empty tier id means that tier is not wired, so a missing
+    # deployment can never silently promote another model into a review role.
+    "brain": {"policy": "scripted",
+              "tiers": {"worker": "", "fast": "", "deep": "", "planner": ""},
+              "review_timeout_min": 90, "periodic_audit_every": 4},
+    "budget": {"su_envelope": 1500, "daily_cap": 120, "per_round_cap": 60},
+    # Sealed 2× seed-std per recipe: a round-to-round delta under this value is
+    # noise and must not be reported as an effect.
+    "noise_floor": {"merged_curated": 0.005, "merged_raw": 0.009,
+                    "cwd12_core": 0.006},
 }
 
 
@@ -473,6 +512,87 @@ def get_domain_config(domain_id: str) -> dict:
     return cfg
 
 
+# v3.25.0 moved the loop's submit commands out of code and into
+# DEFAULT_DOMAIN_CONFIG["steps"], which is patchable at runtime through the
+# domain-config endpoint. Before that, changing what the unattended loop submits
+# took a code edit and a deploy; now a rendered template reaches `bash -lc` on
+# the shared cluster account. These two constants and validate_step_command()
+# are the one choke point between a project config and that shell.
+# Metacharacters that could chain, substitute or redirect. `$` is refused whole,
+# not just `$(`: `${x}` and `$x` expand as well.
+_STEP_CMD_METACHARS = ";&|`$()<>"
+# A literal script name, no path separator, so a template can never point the
+# loop outside the repository root.
+_STEP_SCRIPT_RE = re.compile(r"run_[a-z0-9_.-]+\.sh")
+_STEP_CMD_MAX = 4000
+
+
+def validate_step_command(cmd) -> tuple:
+    """(ok, reason) for a RENDERED step command. Allow-list, not deny-list.
+
+    THE choke point between a project config and a shell on the cluster: the
+    round scheduler renders `steps` templates from a per-domain config that any
+    project owner can patch over HTTP, then submits the result through
+    `bash -lc` under the shared account. Nothing else stands between the two, so
+    a command is submittable only when all of these hold:
+
+      * it starts with "sbatch " — the loop submits batch jobs, nothing else;
+      * it contains none of ; & | ` $ ( ) < > and no control character, so it
+        cannot chain, substitute, redirect or span lines;
+      * its last token is a literal run_*.sh that exists in the repository root.
+
+    Refusing is always safe: the caller drops the command instead of submitting
+    it, which stops a round rather than running an unreviewed one.
+    """
+    if not isinstance(cmd, str) or not cmd.strip():
+        return False, "empty command"
+    if len(cmd) > _STEP_CMD_MAX:
+        return False, "command is longer than %d characters" % _STEP_CMD_MAX
+    if not cmd.startswith("sbatch "):
+        return False, "must start with 'sbatch '"
+    bad = sorted({c for c in cmd if c in _STEP_CMD_METACHARS or ord(c) < 32})
+    if bad:
+        return False, ("contains shell metacharacter(s) %s"
+                       % " ".join(repr(c) for c in bad))
+    script = cmd.split()[-1]
+    if not _STEP_SCRIPT_RE.fullmatch(script):
+        return False, ("must end in a run_*.sh script name, not %r" % script[:80])
+    if not (REPO / script).is_file():
+        return False, ("script %r is not in the repository root" % script[:80])
+    return True, ""
+
+
+class _ProbeFields(dict):
+    """Render fields for a not-yet-submitted template: the config's own
+    round_params, with a harmless literal for anything the scheduler supplies
+    per submission. A field standing in for the script name therefore fails
+    validate_step_command's last-token check, which is the point — the script
+    the loop runs must be literal in the template, not chosen at submit time."""
+
+    def __missing__(self, key):
+        return "0"
+
+
+def _validate_steps_patch(effective_cfg: dict, patch_steps: dict) -> tuple:
+    """(ok, reason) for the `steps` block of a config patch, checked as it would
+    render. Structure only: the values a submission fills in are re-checked at
+    render time, where their real values are known."""
+    if not isinstance(patch_steps, dict):
+        return False, "steps must be an object"
+    for step, tpl in patch_steps.items():
+        if not isinstance(tpl, str) or not tpl.strip():
+            return False, "step %r has no command template" % (step,)
+        fields = _ProbeFields((effective_cfg or {}).get("round_params") or {})
+        try:
+            rendered = tpl.format_map(fields)
+        except Exception as e:
+            return False, "step %r does not render (%s)" % (step, str(e)[:80])
+        ok, why = validate_step_command(rendered)
+        if not ok:
+            return False, "step %r: %s" % (step, why)
+    return True, ""
+
+
 def set_domain_config(domain_id: str, patch: dict, actor: str = "user") -> Optional[dict]:
     """Deep-merge patch into a domain's config, persist, audit. Returns the new
     effective config, or None if Mongo down / domain missing."""
@@ -484,6 +604,23 @@ def set_domain_config(domain_id: str, patch: dict, actor: str = "user") -> Optio
         if not d:
             return None
         new_cfg = _deep_merge(d.get("config") or {}, patch or {})
+        # A `steps` patch is a remote-execution surface: the unattended loop
+        # renders it and runs it through `bash -lc` on the shared account. An
+        # unsafe template is refused whole and recorded — never half-stored, and
+        # never stored to be caught later at submit time (v3.25.0).
+        if "steps" in (patch or {}):
+            import copy as _copy
+            _probe = _deep_merge(_copy.deepcopy(DEFAULT_DOMAIN_CONFIG), new_cfg)
+            _ok, _why = _validate_steps_patch(_probe, (patch or {}).get("steps"))
+            if not _ok:
+                try:
+                    db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
+                        "event": "domain.config.refused",
+                        "target": {"kind": "domain", "id": domain_id},
+                        "after": {"reason": _why, "patch": patch}})
+                except Exception:
+                    pass
+                return None
         db[COLL_DOMAINS].update_one({"_id": domain_id}, {"$set": {"config": new_cfg}})
         try:
             db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
@@ -519,16 +656,124 @@ def _round_id(domain_id: str, n: int) -> str:
     return f"{domain_id}#{int(n)}"
 
 
+# v3.25.0 — how many superseded head entries a step keeps. Bounded because the
+# round doc is returned whole to the project page on every poll.
+_MAX_STEP_ATTEMPTS = 20
+# Actors whose entry is a supervision record: a diagnosis, a correction or a
+# human decision. Never overwritten by the automation below.
+_OWNER_ACTOR_PREFIXES = ("tier1:", "tier2:", "human:")
+# Actors that run unattended every tick.
+_AUTOMATION_ACTORS = ("round-scheduler",)
+_AUTOMATION_ACTOR_PREFIXES = ("tier0:",)
+
+
 def _round_step_entry(status: str, detail=None, job=None, actor: str = "user",
-                      now: str = "") -> dict:
-    """Pure builder for one step's provenance entry (unit-testable, no Mongo)."""
+                      now: str = "", params=None, decided_by=None,
+                      review=None, su=None) -> dict:
+    """Pure builder for one step's provenance entry (unit-testable, no Mongo).
+
+    v3.25.0 adds the supervision fields, all optional and written only when
+    supplied so a pre-v3.25.0 caller still produces the old three-key entry:
+    `params` (what the step was actually rendered with), `decided_by`
+    (default|rule|advisory|tier1|human), `review`
+    ({status, review_id, queued_at}) and `su`."""
     st = status if status in _ROUND_STATUSES else "pending"
     e = {"status": st, "actor": actor, "at": now}
     if job:
         e["job"] = str(job)[:120]
     if detail is not None:
         e["detail"] = detail
+    if isinstance(params, dict) and params:
+        e["params"] = dict(params)
+    if decided_by:
+        e["decided_by"] = str(decided_by)[:40]
+    if isinstance(review, dict) and review:
+        e["review"] = dict(review)
+    if su is not None:
+        try:
+            e["su"] = float(su)
+        except (TypeError, ValueError):
+            pass
     return e
+
+
+def _is_owner_actor(actor) -> bool:
+    return str(actor or "").startswith(_OWNER_ACTOR_PREFIXES)
+
+
+def _is_automation_actor(actor) -> bool:
+    a = str(actor or "")
+    return a in _AUTOMATION_ACTORS or a.startswith(_AUTOMATION_ACTOR_PREFIXES)
+
+
+def _as_attempt(entry: dict) -> dict:
+    """One history row: a head entry without its own history (no nesting)."""
+    return {k: v for k, v in entry.items() if k != "attempts"}
+
+
+def merge_step_entry(existing, incoming: dict, incoming_actor: str = "") -> dict:
+    """Merge a new step entry onto the one already on the round doc. Pure.
+
+    Two properties the loop needs that a plain $set cannot give (v3.25.0):
+
+      * history — the head used to be replaced outright, so a retry's
+        "running" erased the "failed" it was retrying. The 2026-08-29 double
+        TIMEOUT therefore left one step entry on the ledger for two burnt 12 h
+        jobs. The previous head is now pushed onto `attempts` (oldest first,
+        capped at _MAX_STEP_ATTEMPTS) on every write.
+      * ownership — a diagnosis or correction written by a supervisor
+        (`tier1:`/`tier2:`) or a person (`human:`) must survive the next
+        scheduler tick. Such a head stays in place and the automated write is
+        recorded as an attempt instead, so nothing is lost either way.
+
+    `existing` may be None (first write) or a legacy entry with no `attempts`.
+    """
+    prev = existing if isinstance(existing, dict) else None
+    attempts = []
+    if prev and isinstance(prev.get("attempts"), list):
+        attempts = [a for a in prev["attempts"] if isinstance(a, dict)]
+    inc = dict(incoming or {})
+    actor = incoming_actor or inc.get("actor") or ""
+    if prev and _is_owner_actor(prev.get("actor")) and _is_automation_actor(actor):
+        head = _as_attempt(prev)
+        attempts = attempts + [_as_attempt(inc)]
+    else:
+        head = _as_attempt(inc)
+        if prev:
+            attempts = attempts + [_as_attempt(prev)]
+    head["attempts"] = attempts[-_MAX_STEP_ATTEMPTS:]
+    return head
+
+
+def render_step_command(domain_cfg: dict, step: str, **fields) -> str:
+    """Render one step's submit command from the domain config's template.
+
+    v3.25.0: the scheduler held these as literals, so a parameter change was a
+    code change and a correction could not reach a running campaign. Rendering
+    from `steps` + `round_params` (plus per-submission `fields` such as
+    iter_name / domain / trace) keeps the defaults byte-identical while letting
+    a config or a correction change one field. A missing placeholder raises
+    KeyError and a command that fails validate_step_command raises ValueError —
+    a half-rendered or unsafe sbatch line must never be submitted."""
+    steps = (domain_cfg or {}).get("steps") or {}
+    tpl = steps.get(step)
+    if not isinstance(tpl, str) or not tpl:
+        raise KeyError("no command template for step %r in this domain config" % (step,))
+    vals = dict((domain_cfg or {}).get("round_params") or {})
+    vals.update(fields)
+    try:
+        cmd = tpl.format(**vals)
+    except KeyError as e:
+        missing = e.args[0] if e.args else "?"
+        raise KeyError("step %r command template needs field %r; have %s"
+                       % (step, missing, sorted(vals))) from None
+    # Checked here rather than at each call site: this is the only place a
+    # config value becomes a command line, and the values substituted above come
+    # from the same patchable config (v3.25.0).
+    ok, why = validate_step_command(cmd)
+    if not ok:
+        raise ValueError("step %r command is not submittable: %s" % (step, why))
+    return cmd
 
 
 def start_round(domain_id: str, actor: str = "user") -> Optional[dict]:
@@ -559,11 +804,18 @@ def start_round(domain_id: str, actor: str = "user") -> Optional[dict]:
 
 def record_round_step(domain_id: str, step: str, status: str, detail=None,
                       job=None, actor: str = "user", round_num=None,
-                      metrics=None) -> Optional[dict]:
+                      metrics=None, params=None, decided_by=None,
+                      review=None, su=None) -> Optional[dict]:
     """Record a pipeline step's provenance on a round (the current open one unless
     round_num is given; auto-opens round 1 if none exists). `metrics` (from eval)
     merge onto round.metrics — the compounding feedback the next collect can read.
-    Returns the updated round doc, or None if Mongo down / bad step."""
+    Returns the updated round doc, or None if Mongo down / bad step.
+
+    v3.25.0: `params`, `decided_by`, `review` and `su` are optional supervision
+    fields (see _round_step_entry), and the write goes through merge_step_entry
+    so the previous head survives in `attempts` and a tier-1/tier-2/human entry
+    is not overwritten by the scheduler. Old docs without `attempts` are read
+    unchanged."""
     if step not in ROUND_STEPS:
         return None
     db = _get_db()
@@ -579,20 +831,31 @@ def record_round_step(domain_id: str, step: str, status: str, detail=None,
                     return None
             round_num = cur["round_num"]
         now = _now_iso()
-        sets = {f"steps.{step}": _round_step_entry(status, detail, job, actor, now),
+        rid = _round_id(domain_id, round_num)
+        entry = _round_step_entry(status, detail, job, actor, now,
+                                  params=params, decided_by=decided_by,
+                                  review=review, su=su)
+        # Read-modify-write (the step name is validated against ROUND_STEPS
+        # above, so the projection key is not caller-controlled).
+        try:
+            _steps = (db[COLL_ROUNDS].find_one({"_id": rid},
+                                               {f"steps.{step}": 1}) or {}).get("steps")
+            head = (_steps or {}).get(step)
+        except Exception:
+            head = None
+        sets = {f"steps.{step}": merge_step_entry(head, entry, actor),
                 "updated_at": now}
         if isinstance(metrics, dict) and metrics:
             for k, v in metrics.items():
                 sets[f"metrics.{k}"] = v
-        db[COLL_ROUNDS].update_one({"_id": _round_id(domain_id, round_num)},
-                                   {"$set": sets}, upsert=True)
+        db[COLL_ROUNDS].update_one({"_id": rid}, {"$set": sets}, upsert=True)
         try:
             db[COLL_AUDIT].insert_one({"ts": _now(), "actor": actor,
                 "event": "round.step", "target": {"kind": "domain", "id": domain_id},
                 "after": {"round_num": round_num, "step": step, "status": status}})
         except Exception:
             pass
-        return db[COLL_ROUNDS].find_one({"_id": _round_id(domain_id, round_num)})
+        return db[COLL_ROUNDS].find_one({"_id": rid})
     except Exception:
         return None
 
