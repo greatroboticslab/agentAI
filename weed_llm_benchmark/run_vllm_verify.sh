@@ -67,7 +67,6 @@ apptainer exec --nv -B /ocean "$SIF" \
       --gpu-memory-utilization "$UTIL" \
       --host 127.0.0.1 --port "$PORT" \
       --trust-remote-code \
-      --disable-log-requests \
       $EXTRA > "$LOG" 2>&1 &
 SERVE_PID=$!
 trap 'kill $SERVE_PID 2>/dev/null' EXIT
@@ -76,7 +75,10 @@ T0=$(date +%s)
 READY=0
 for i in $(seq 1 240); do          # up to 40 min: a 150 GB checkpoint loads from Lustre
     if ! kill -0 $SERVE_PID 2>/dev/null; then
-        echo "server process exited early; last log lines:"; tail -40 "$LOG"; break
+        # An unrecognised flag or a bad checkpoint kills the server in seconds and
+        # the poll would otherwise report only "never became healthy". Print what
+        # it actually said, and stop waiting.
+        echo "server process exited early after ${i}0s; last log lines:"; tail -40 "$LOG"; break
     fi
     if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then READY=1; break; fi
     sleep 10
