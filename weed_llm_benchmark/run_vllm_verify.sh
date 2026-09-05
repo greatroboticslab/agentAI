@@ -25,6 +25,7 @@
 #        VLLM_MAXLEN       (max model len)
 #        VLLM_GPU_UTIL     (fraction of each GPU vLLM may use)
 #        VLLM_JOBTAG       (names the result file)
+#        VLLM_KV_DTYPE     (--kv-cache-dtype; some models require fp8)
 #        VLLM_EXTRA        (extra flags appended verbatim to vllm serve)
 #   writes: results/framework/model_deploy/<JOBTAG>.json
 set -uo pipefail
@@ -39,6 +40,10 @@ TP="${VLLM_TP:-4}"
 MAXLEN="${VLLM_MAXLEN:-65536}"
 UTIL="${VLLM_GPU_UTIL:-0.90}"
 EXTRA="${VLLM_EXTRA:-}"
+# DeepSeek-V4's attention in vLLM 0.28 asserts an fp8 KV cache
+# (_resolve_dsv4_kv_cache_dtype), so the default "auto" aborts every worker at
+# model-build time. Kept as a variable because it is a per-model property.
+KVDTYPE="${VLLM_KV_DTYPE:-}"
 JOBTAG="${VLLM_JOBTAG:-job${SLURM_JOB_ID:-0}}"
 PORT=$(( 8000 + ${SLURM_JOB_ID:-0} % 1000 ))
 OUTDIR="$REPO/results/framework/model_deploy"
@@ -46,7 +51,7 @@ OUT="$OUTDIR/${JOBTAG}.json"
 LOG="$REPO/results/framework/vllm_serve_${JOBTAG}.log"
 mkdir -p "$OUTDIR"
 
-echo "=== vllm_verify model=$MODEL name=$NAME tp=$TP maxlen=$MAXLEN port=$PORT $(date) ==="
+echo "=== vllm_verify model=$MODEL name=$NAME tp=$TP maxlen=$MAXLEN kv=${KVDTYPE:-auto} port=$PORT $(date) ==="
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader
 [ -f "$SIF" ] || { echo "FATAL: container image missing: $SIF" >&2; exit 1; }
 [ -d "$MODEL" ] || { echo "FATAL: model directory missing: $MODEL" >&2; exit 1; }
@@ -67,6 +72,7 @@ apptainer exec --nv -B /ocean "$SIF" \
       --gpu-memory-utilization "$UTIL" \
       --host 127.0.0.1 --port "$PORT" \
       --trust-remote-code \
+      ${KVDTYPE:+--kv-cache-dtype "$KVDTYPE"} \
       $EXTRA > "$LOG" 2>&1 &
 SERVE_PID=$!
 trap 'kill $SERVE_PID 2>/dev/null' EXIT
@@ -94,6 +100,7 @@ port = os.environ["PORT"]; base = "http://127.0.0.1:%s/v1" % port
 res = {"jobtag": os.environ["JOBTAG"], "kind": "vllm", "model_path": os.environ["MODEL"],
        "served_name": os.environ["NAME"], "tp": int(os.environ["TP"]),
        "max_model_len": int(os.environ["MAXLEN"]), "load_s": int(os.environ["LOAD_S"]),
+       "kv_cache_dtype": os.environ.get("KVDTYPE") or "auto",
        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "ok": False}
 
 def post(path, payload, timeout=900):

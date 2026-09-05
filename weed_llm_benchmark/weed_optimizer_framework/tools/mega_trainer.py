@@ -900,7 +900,27 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
             f"Download more datasets first (search_datasets/download_dataset)."
         )
 
+    # v3.25.2: a GPU job that cannot see a GPU must fail here, not train on the
+    # CPU. Job 45250479 was allocated a GPU on a node whose driver was mismatched
+    # ("Failed to initialize NVML: Driver/library version mismatch"), torch fell
+    # back silently, one epoch took 48 minutes instead of ~2, and the run still
+    # produced a real-looking mAP. A slow correct-looking number burned against an
+    # unusable allocation is worse than a refusal, and Slurm keeps scheduling onto
+    # such a node because it is not drained. WEED_ALLOW_CPU_TRAIN=1 re-enables the
+    # fallback for a deliberate CPU run.
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cpu" and not os.environ.get("WEED_ALLOW_CPU_TRAIN"):
+        gpus = (os.environ.get("SLURM_JOB_GPUS")
+                or os.environ.get("SLURM_GPUS_ON_NODE")
+                or os.environ.get("CUDA_VISIBLE_DEVICES") or "")
+        if os.environ.get("SLURM_JOB_ID") or gpus:
+            raise RuntimeError(
+                "CUDA is not available in a job that was allocated GPUs "
+                "(SLURM_JOB_ID=%s, gpus=%r). Training on the CPU here is ~25x "
+                "slower and would report a metric against an allocation it never "
+                "used. Check the node's driver (nvidia-smi) and resubmit; set "
+                "WEED_ALLOW_CPU_TRAIN=1 only for a deliberate CPU run."
+                % (os.environ.get("SLURM_JOB_ID"), gpus))
 
     # v3.0.19: progressive training — if a prior round saved best.pt, use it as
     # base so each job picks up where the last left off. Data set can grow between
