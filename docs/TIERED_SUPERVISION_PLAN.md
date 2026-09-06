@@ -143,6 +143,55 @@ arrays against the sealed table with the 0.006 (2×seed std) significance rule.
   `/api/job_log` at the absolute line, corrections with actor + reason, escalation markers,
   approval queue, plan versions (simulated label), per-tier brain-select from the deployed catalog.
 
+## 3.1 Why this is a platform layer and not an interactive assistant session
+
+The mechanism — cheap workers, a stronger supervisor, a rarely-consulted planner — is commodity.
+It is available today inside general-purpose coding-assistant sessions, which already run
+sub-agents and already gate tools behind permissions. This section records why the workload still
+needs the layer to live in the platform, so the decision is not re-litigated later. Each point is a
+property the campaign demonstrably requires, not a comparison of products.
+
+1. **Unattended continuity is the whole failure mode.** The incident this plan is built around ran
+   from 2026-08-29 17:53 to 2026-09-04: two 12 h training jobs killed at the wall, the stop-loss
+   correctly holding the domain, and six days in which nothing observed it. Supervision that exists
+   only while a session is open cannot cover the interval in which that failure occurred. The
+   scheduler thread and the cluster jobs run whether or not anyone is present.
+
+2. **A replayable record, not a transcript.** Corrections are append-only and hash-chained, each
+   carrying actor, reason and a verbatim quote; signals, the digest and the parallelism decision are
+   pure functions over artifacts with no clock reads, so the same inputs yield the same output. This
+   is what makes the attribution ledger and the benchmark possible at all: a decision taken in
+   August can be re-scored in September against the same bundle. A session transcript is a
+   narrative of what happened, not an input a later evaluation can replay.
+
+3. **The unit of authorisation is a priced action, not a permitted tool.** Every action carries
+   parameter bounds, a risk tier, an SU estimate and the list of tiers allowed to take it, checked
+   at one choke point that both the web API and the scheduler pass through. Tool-level permission
+   cannot express "this actor may resubmit its own training step within this budget, may file a
+   request to quarantine a source, and may never delete a dataset."
+
+4. **Supervision has to run where the data is.** The evidence bundle is assembled on the cluster in
+   one batched command, and the deep model tier is a windowed batch job draining a file inbox,
+   because compute nodes reach neither the lab database nor a dependable outbound network. A
+   reviewer that must pull artifacts back to a workstation cannot read a running job's trace or a
+   780 MB corpus, and would be measuring what it could fetch rather than what happened.
+
+5. **The claim has to be measurable.** 162 sealed cases, a dev/test split fixed by hash, and a
+   rubric committed before any model was run; the claim is a margin over a signals-only arm on that
+   corpus, with a stated falsification condition. Ad-hoc supervision, however good, produces no
+   number that can be compared or refuted.
+
+6. **A second domain must cost configuration, not code.** Steps, round parameters, tier
+   assignments, budget and noise floor are per-domain config, so another collection domain gets the
+   same loop, the same governance and the same page with no code change.
+
+7. **What is not claimed.** None of the above makes the tiering itself novel, and the layer is not
+   claimed to raise detection accuracy round over round — the campaign's own rounds sit inside the
+   sealed noise floor. The contribution under test is the artifact-grounded, governed and replayable
+   instance of a known mechanism on a real months-long pipeline, plus the benchmark that makes its
+   escalation rule falsifiable. An interactive session remains the right tool for writing this code
+   and for one-off diagnosis; it is not the right tool for being the layer.
+
 ## 4. Evaluation protocol (pre-registered)
 
 4.1 **Corpus.** Every incident in CHANGELOG/RESEARCH_LOG with surviving raw artifacts on /ocean

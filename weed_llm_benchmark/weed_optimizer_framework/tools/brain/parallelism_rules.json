@@ -1,0 +1,71 @@
+{
+  "_doc": "Caps and role rules for brain/parallelism.py. Every value carries the reason it has that value. There are no compiled fallbacks: a key this file does not declare makes the corresponding cap `unknown`, which is treated as the floor, and the missing key is named in the decision. Two copies of a governing number drift, and a drifted cap silently changes what the layer is allowed to do.",
+
+  "seeds_for_claim": {
+    "value": 3,
+    "reason": "A round-to-round delta is only reportable as mean+/-std with n>=3; the campaign's own seed spread (101/102/103) is what noise_floor was sealed from. A claim run at n=1 cannot be distinguished from seed noise, so parallelism for a claim is a scientific requirement, not an optimisation."
+  },
+
+  "su_safety_margin": {
+    "value": 0.15,
+    "reason": "SLURM bills the allocation, not the request, and a job that runs to its wall costs more than its estimate. Committing the last 15 percent of the envelope to a parallel fan-out has no room left to re-run a failed seed, which is the run most likely to be needed."
+  },
+
+  "min_free_gb_per_unit": {
+    "value": 25,
+    "reason": "Each trainer writes checkpoints, plots and a run directory to the shared project quota; /ocean is the whole lab's quota and exhausting it breaks every lab job, not just this campaign. Measured run directories for the m1 recipe sit near 18 GB, so 25 GB per parallel unit leaves margin for the validation artefacts."
+  },
+
+  "queue_depth_bands": {
+    "value": [
+      {"max_pending": 200, "cap": 8},
+      {"max_pending": 1000, "cap": 4},
+      {"max_pending": 3000, "cap": 3},
+      {"max_pending": null, "cap": 2}
+    ],
+    "reason": "Parallel submissions into a congested queue lengthen wall-clock rather than shortening it: on 2026-09-05 the cluster held 3,670 pending jobs and a whole-node request was scheduled two days out. Above 3,000 pending, the marginal parallel job is expected to start after the serial one would have finished, so the cap falls to 2."
+  },
+
+  "roles": {
+    "collect": {
+      "floor": 1,
+      "ceiling": 1,
+      "mutates": ["dataset_registry", "roboflow_project"],
+      "requires": [],
+      "reason": "Fixed at one. The collector writes the shared dataset registry and the labelling project; two collectors racing on the registry is exactly the single-writer violation the correction channel exists to prevent, and a duplicate slug pulled twice costs quota with no new data. Parallelism here buys nothing and risks the campaign's own bookkeeping."
+    },
+    "filter": {
+      "floor": 1,
+      "ceiling": 2,
+      "mutates": ["score_files"],
+      "requires": ["per_shard_outputs"],
+      "reason": "Embedding and scoring are read-mostly and shard cleanly, so two units are safe when each writes its own score shard. Without per-shard outputs the two would contend for one score file, so the requirement is a precondition rather than a preference."
+    },
+    "train": {
+      "floor": 1,
+      "ceiling": 3,
+      "mutates": ["weights_registry"],
+      "requires": ["job_scoped_metric"],
+      "reason": "Ceiling 3 because that is the seed count a claim needs and more trainers than seeds buys no evidence. The precondition is not optional: before job-scoped artefacts existed, two concurrent trainers wrote metric files matched by the same glob, and a second seed read as a second sample of the first -- the failure that would have deflated a published standard deviation."
+    },
+    "audit": {
+      "floor": 1,
+      "ceiling": 2,
+      "mutates": [],
+      "requires": [],
+      "reason": "Read-only over artefacts already on disk, so it may run beside a training step; capped at 2 because the third concurrent reader contends for the same shared filesystem without shortening the audit."
+    },
+    "experiment": {
+      "floor": 1,
+      "ceiling": 3,
+      "mutates": ["weights_registry"],
+      "requires": ["job_scoped_metric", "sealed_holdout"],
+      "reason": "An experiment arm is a claim, so it runs at the seed count or not at all. The sealed holdout is a precondition because an arm evaluated against a split the campaign has trained on measures leakage, not the recipe."
+    }
+  },
+
+  "citation_required_above": {
+    "value": 1,
+    "reason": "A model asking for more than one unit is asking to spend the shared allocation, so it must point at the signal or plan step that justifies it. This is the same discipline the correction channel applies to configuration changes: an LLM-authored request with no verbatim citation is refused, because an uncited request is indistinguishable from a guess."
+  }
+}

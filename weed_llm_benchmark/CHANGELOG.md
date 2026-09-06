@@ -8196,3 +8196,47 @@ case fires with a null value, which is the point of forcing the format. Export i
 byte-identical across two runs. Six brain test files pass, including new renderer
 checks that L1 keeps `State`, `Elapsed` and `Timelimit` while receiving neither
 the verbatim line nor a citable line number.
+
+## 2026-09-06 — v3.28.0 how many agents to run, and what may be changed
+
+**`tools/brain/parallelism.py`** answers "one worker or several, and how many" as
+a resource and evidence decision. Four caps are computed independently — the role
+rule, the SU envelope, the queue depth, and quota headroom — the most restrictive
+binds, and the binding one is named in the decision. Nothing consults a model, and
+nothing a model returns can raise a cap; a request for eight trainers against a
+budget for one returns one and says which constraint decided it.
+
+Two of the caps are not optimisations. A claim runs at three seeds or not at all:
+when the caps allow fewer, the answer is `feasible: false`, because one seed of a
+three-seed comparison is not a cheaper experiment but an unpublishable one, and
+returning it would produce a run that reads as a result. The collector is fixed at
+one, since it writes the shared dataset registry and a second one is the
+single-writer violation the correction channel exists to detect.
+
+Unknowns narrow rather than widen: a missing queue reading contributes the role
+floor and is named, so a decision taken without knowing the queue depth is visibly
+that. Numeric strings are not coerced, `NaN` and infinity are refused, and asking
+for more than one unit without citing a signal or plan step is reduced to one —
+the same discipline the correction channel applies to configuration changes, for
+the same reason. `plan()` reads no clock, so a decision replays from its inputs;
+a test asserts the absence of clock calls rather than trusting the convention.
+29 checks, including that the planner survives a proposal that is not a dict —
+which the first version did not, because its own error handler read fields off it.
+
+**`db.py` gains the sealed `lever_menu`**: eight things an experiment may change,
+each with its options, the control it is measured against, its risk tier, an SU
+estimate, and the reason it is on the list. It is pre-registered because a lever
+chosen after seeing the result is not an experiment, and because a planner handed
+this table during its own evaluation is doing answer-key lookup — which is why the
+digest builder takes an `omit_levers` flag. Tests assert every lever names a
+control and a reason, that none is R4, and that every recipe the menu offers has a
+sealed noise floor to be judged against.
+
+**`docs/TIERED_SUPERVISION_PLAN.md` §3.1** records why this layer belongs in the
+platform rather than in an interactive assistant session, so the decision is not
+re-litigated: the motivating incident ran six days with no session open; the
+ledger has to be replayable rather than narrated; authorisation is per priced
+action rather than per permitted tool; the bundle has to be built where the
+compute nodes can reach the artifacts; and the claim has to be measurable against
+a sealed corpus. It also states what is not claimed — the tiering mechanism is
+commodity, and the layer is not asserted to raise accuracy round over round.

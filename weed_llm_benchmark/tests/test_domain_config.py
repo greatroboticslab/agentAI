@@ -150,6 +150,34 @@ ck("analyze_nonimage detects label column", (_r.get("sensor") or {}).get("label_
 ck("analyze_nonimage counts 2 classes", (_r.get("sensor") or {}).get("n_classes") == 2)
 
 
+# ---- sealed lever menu (v3.28.0) -----------------------------------------
+# The menu is pre-registered evidence, not a convenience list: an experiment
+# whose lever was picked after the result is not an experiment, and a lever
+# reported without its control reports the campaign's drift instead of the
+# lever's effect. These checks are what keep a later edit from quietly
+# loosening either property.
+_LM = D.get("lever_menu") or []
+ck("lever_menu is present and non-empty", len(_LM) > 0)
+ck("every lever has a stable id", all(str(l.get("id") or "").strip() for l in _LM))
+ck("lever ids are unique", len({l.get("id") for l in _LM}) == len(_LM))
+ck("every lever names a control", all(str(l.get("control") or "").strip() for l in _LM))
+ck("every lever states a reason", all(len(str(l.get("reason") or "")) > 40 for l in _LM))
+ck("every lever declares options", all(l.get("options") not in (None, [], {}) for l in _LM))
+ck("every lever names the step it applies to",
+   all(l.get("applies_to") in ("collect", "filter", "train") for l in _LM))
+ck("every lever carries a risk tier",
+   all(str(l.get("risk") or "") in ("R1", "R2", "R3", "R4") for l in _LM))
+ck("no lever is R4 (an experiment must never be irreversible)",
+   all(l.get("risk") != "R4" for l in _LM))
+ck("every lever carries an SU estimate",
+   all(isinstance(l.get("est_su"), (int, float)) and l["est_su"] >= 0 for l in _LM))
+ck("the recipe comparison is on the menu with cwd12_core as its control",
+   any(l["id"] == "core_recipe" and "cwd12_core" in str(l.get("control")) for l in _LM))
+ck("every recipe named by the core_recipe lever has a sealed noise floor",
+   all(o.split("+")[0] in D["noise_floor"]
+       for l in _LM if l["id"] == "core_recipe" for o in l["options"]))
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)

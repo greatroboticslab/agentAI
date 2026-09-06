@@ -476,6 +476,64 @@ DEFAULT_DOMAIN_CONFIG = {
               "tiers": {"worker": "", "fast": "", "deep": "", "planner": ""},
               "review_timeout_min": 90, "periodic_audit_every": 4},
     "budget": {"su_envelope": 1500, "daily_cap": 120, "per_round_cap": 60},
+    # The sealed menu of things an experiment is allowed to change, and the
+    # control each change is measured against. It is pre-registered for two
+    # reasons: an experiment whose lever was chosen after seeing the result is
+    # not an experiment, and a planner handed this table during its own
+    # evaluation is doing answer-key lookup rather than planning (digest.build
+    # takes omit_levers for exactly that arm). Every entry names its control,
+    # because a lever measured without one reports the campaign's drift.
+    "lever_menu": [
+        {"id": "source_admission",
+         "question": "Admit a harvested source only when its audit precision is at or above the bar?",
+         "options": [0.80, 0.90, 0.95], "control": "current admission rule",
+         "applies_to": "collect", "risk": "R2", "est_su": 0,
+         "reason": "Pool growth without precision growth is the mechanism behind both the "
+                   "walltime failures and the flat rounds; this lever tests the trade directly."},
+        {"id": "per_box_verification_gate",
+         "question": "Gate merged boxes on verify_scores.json?",
+         "options": [True, False], "control": "gate off, same corpus",
+         "applies_to": "filter", "risk": "R2", "est_su": 0,
+         "reason": "Per-box scores are produced but never consumed by the merge, so their value "
+                   "to the trained model has never been measured."},
+        {"id": "core_recipe",
+         "question": "Which corpus does the round train on?",
+         "options": ["merged_curated", "cwd12_core+audited", "cwd12_core"],
+         "control": "cwd12_core alone", "applies_to": "train", "risk": "R2", "est_su": 72,
+         "reason": "The campaign's harvested volume has been worth between 0.00 and -0.02 to the "
+                   "target metric; this is the comparison that settles whether merging helps."},
+        {"id": "fresh_start",
+         "question": "Start from COCO weights or continue from last_mega_weights?",
+         "options": [True, False], "control": "continue, same recipe",
+         "applies_to": "train", "risk": "R2", "est_su": 72,
+         "reason": "Continuing carries every earlier round's fit, so a plateau may be the "
+                   "checkpoint rather than the data."},
+        {"id": "pretrained_backbone",
+         "question": "COCO pretraining on or off?",
+         "options": [True, False], "control": "pretraining on",
+         "applies_to": "train", "risk": "R2", "est_su": 72,
+         "reason": "Separates what the harvested corpus contributes from what the backbone "
+                   "already knew."},
+        {"id": "model_family",
+         "question": "Which detector?",
+         "options": ["yolo11n", "yolo11s", "yolo11m", "rfdetr", "mamba-t"],
+         "control": "the family the campaign has been running",
+         "applies_to": "train", "risk": "R3", "est_su": 120,
+         "reason": "A capacity-bound plateau and a data-bound plateau look identical in the "
+                   "metric and are told apart only by changing capacity."},
+        {"id": "class_head",
+         "question": "Train a 12-class head or the full taxonomy?",
+         "options": [12, 100], "control": "12-class head",
+         "applies_to": "train", "risk": "R2", "est_su": 72,
+         "reason": "The target metric is defined on 12 classes; a wider head may help or may "
+                   "spend capacity on classes the metric never scores."},
+        {"id": "epoch_budget",
+         "question": "Epochs and the trainer time cap for the round.",
+         "options": {"epochs": [40, 60, 90], "train_time_cap_h": [8.0, 10.8, 16.0]},
+         "control": "60 epochs at a 10.8 h cap", "applies_to": "train", "risk": "R1", "est_su": 24,
+         "reason": "The cap turns a walltime kill into a truncated recipe, so the honest question "
+                   "is which pairing finishes; epochs_truncated measures the answer."},
+    ],
     # Sealed 2× seed-std per recipe: a round-to-round delta under this value is
     # noise and must not be reported as an effect.
     "noise_floor": {"merged_curated": 0.005, "merged_raw": 0.009,
