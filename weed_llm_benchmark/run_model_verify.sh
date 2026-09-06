@@ -222,6 +222,44 @@ json.dump(res, open(os.environ["OUT"], "w"), indent=1, default=str)
 print(json.dumps({k: v for k, v in res.items() if k != "log_tail"}, indent=1)[:2000])
 PYEOF
 
+# ---------------------------------------------------------------------------
+# Optional second phase: the reviewer comparison itself.
+#
+# The battery above measures what a model COSTS to serve. Which model is the
+# better auditor is a different question and it has to be answered by scoring
+# real cases. It runs here, inside the job, because the endpoint lives on this
+# compute node: login-to-compute TCP is unverified on this cluster, so nothing
+# outside the allocation can reach the port this server is listening on.
+#
+# Set VERIFY_BENCH=1 to run it. The entry point is the CLASS -- naming the
+# factory function gave bench a callable it invoked with three arguments, every
+# call raised, and the run produced a full table of zeros (v3.31.1).
+if [ "${VERIFY_BENCH:-0}" = "1" ]; then
+  echo "=== reviewer benchmark $(date) ==="
+  BENCH_ROOT="${BENCH_ROOT:-$REPO/results/framework/supervision_bench}"
+  BENCH_ARMS="${BENCH_ARMS:-A0,A0p,L2,L3}"
+  BENCH_SPLIT="${BENCH_SPLIT:-dev}"
+  BENCH_REPEATS="${BENCH_REPEATS:-3}"
+  export BRAIN_ENDPOINT="http://127.0.0.1:${PORT}/v1"
+  export BRAIN_MODEL="$NAME"
+  export BRAIN_NUM_CTX="${BENCH_NUM_CTX:-32768}"
+  # H100 = 2 SU per GPU-hour and this job holds $GPUS of them; the ledger owns
+  # the rate, this only tells the client what one review costs while it runs.
+  # SLURM knows how many GPUs this allocation actually holds; 4 is the
+  # GPU-shared cap and only stands in when the variable is absent.
+  BENCH_GPUS="${SLURM_GPUS_ON_NODE:-${VLLM_TP:-4}}"
+  export BRAIN_SU_PER_HOUR="${BRAIN_SU_PER_HOUR:-$(( 2 * BENCH_GPUS ))}"
+  cd "$REPO" && python3 -m weed_optimizer_framework.tools.brain.bench run \
+      --root "$BENCH_ROOT" \
+      --arms "$BENCH_ARMS" \
+      --split "$BENCH_SPLIT" \
+      --repeats "$BENCH_REPEATS" \
+      --model-entry weed_optimizer_framework.tools.brain.supervisor:OpenAICompatClient \
+      --model "$NAME" \
+      --num-ctx "${BENCH_NUM_CTX:-32768}" 2>&1
+  echo "=== reviewer benchmark exit $? ==="
+fi
+
 kill $SERVE_PID 2>/dev/null
 wait $SERVE_PID 2>/dev/null
 echo "=== model_verify done $(date) ==="
