@@ -8089,3 +8089,53 @@ with an fp8 KV cache (its attention asserts one, which is what aborted the first
 two attempts): 149 GB loaded in 1,031 s, a 16,113-token prefill in 0.75 s, 147
 tokens/s decoding at batch 1, and strict JSON-schema output accepted. Those are the
 numbers a review cadence can be budgeted against, rather than assumed.
+
+### v3.26.0 — the incident corpus, counted honestly
+
+The defensible claim in this campaign is not the tiered architecture, which is
+commodity, but a replayable benchmark of real supervision incidents from a
+months-long autonomous collection and training campaign on an HPC cluster. This
+release builds the corpus and the harness that scores arms over it.
+
+**What the record actually contains.** A full pass over CHANGELOG, RESEARCH_LOG,
+SCIENCE_AUDIT and PLAN_COMPLIANCE_AUDIT yields **127 incidents** (116 in benchmark
+scope; 11 platform and robot-surface failures inventoried but excluded because
+their evidence is lab-server state, not a job artifact), **31 healthy controls**,
+and **4 designed controls whose correct verdict is "no incident"** — among them the
+chronic `SKIPPING github` line, which sits inside the worked example's own bundle
+and would otherwise be scored as a detection.
+
+By correction class, in scope: code 62, config 32, design 15, plan 7. By actor:
+assistant 102, human 11, none 3, **agent 0**. No autonomous model originated a
+correction anywhere in the record; the tool-caller era produced tool choices inside
+a round, never a campaign parameter.
+
+**The ceiling on the deterministic arm is stated up front.** `signals_expected` is
+`none` for 56 of the 127: library-version mismatches, path assumptions, ownership
+holes and experimental-design errors that no artifact invariant reaches. Roughly
+half the failures this campaign suffered are out of reach of the rules, which is
+the room a supervisor model has to earn — and it has to be said before any arm is
+scored, not after.
+
+**The pre-registered date split is reported as a count, not a comparison.** It
+gives dev 107 / test 9, because 92 % of the corpus predates the day the campaign's
+design work was written down. At n=9 no paired test is possible (a McNemar floor of
+six discordant cases is a recall margin of 0.67) and the unpaired Wilson half-width
+around 0.5 is 0.273. The rule stands as written — it is pre-registration, and its
+job is to answer when the detectors were conceived — but headline numbers come from
+the signal-blind pass over all 116, where each case is scored with its own covering
+signal removed, and from leave-one-class-out.
+
+**`tools/brain/corpus.py`** exports cases with absolute line numbers preserved,
+the sha256 of the original file (not of the numbered copy), scrubbing of usernames,
+absolute paths and token shapes with a refusal when a target survives, head-and-tail
+excerpts with the omitted range stated for anything over 1 MB, and byte-identical
+output across two runs. An incident whose artifacts cannot be found is exported as
+`record-only` with a reason and an empty artifacts directory; it is never
+reconstructed from prose.
+
+**`tools/brain/bench.py`** scores A0 (the scripted scheduler, with detection
+defined in code rather than asserted), signals-only, signals-plus-alarm, and four
+model arms that differ only in what they are shown. Every proportion carries a
+Wilson interval, every comparison prints its minimum detectable difference next to
+it, and every model arm is reported as a margin over the signals arm.
