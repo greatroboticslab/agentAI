@@ -83,6 +83,7 @@ from `check_mirror`'s return value alone, on the very next call.
 """
 import hashlib
 import json
+import sys
 import os
 import pathlib
 import re
@@ -552,3 +553,52 @@ def check_mirror(domain, path, root=None):
     return {"ok": w["ok"] and content_ok and mode_ok, "content_ok": content_ok,
             "mode_ok": mode_ok, "expected_hash": _sha256_bytes(expected),
             "actual_hash": _sha256_bytes(actual), "reason": reason}
+
+
+# --- CLI (read-only by design) ----------------------------------------------
+
+def _main(argv):
+    """Inspect the chain from a shell. There is deliberately no `append` here.
+
+    Appending is single-writer: only the lab scheduler thread holds the lock, and
+    a shell command that took it would be a second writer by definition. The
+    commands below read. During an incident the questions are "is the chain
+    intact", "what is in force for this round" and "has the mirror been touched",
+    and an append-only ledger nobody can inspect from a terminal is one nobody
+    audits.
+    """
+    import argparse
+    ap = argparse.ArgumentParser(prog="corrections")
+    ap.add_argument("--root", default=None)
+    ap.add_argument("--json", action="store_true")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    v = sub.add_parser("verify", help="recompute the whole chain")
+    v.add_argument("domain")
+    e = sub.add_parser("effective", help="corrections in force for a round")
+    e.add_argument("domain")
+    e.add_argument("round_no", type=int)
+    m = sub.add_parser("check-mirror", help="compare the staged mirror to the chain")
+    m.add_argument("domain")
+    m.add_argument("path")
+    try:
+        a = ap.parse_args(argv[1:])
+    except SystemExit as exc:
+        return int(exc.code or 0)
+
+    if a.cmd == "verify":
+        rep = verify(a.domain, root=a.root)
+        print(json.dumps(rep, indent=1, sort_keys=True, default=str))
+        return 0 if rep.get("ok") else 1
+    if a.cmd == "effective":
+        rows = effective(a.domain, a.round_no, root=a.root)
+        print(json.dumps(rows, indent=1, sort_keys=True, default=str))
+        return 0
+    if a.cmd == "check-mirror":
+        rep = check_mirror(a.domain, a.path, root=a.root)
+        print(json.dumps(rep, indent=1, sort_keys=True, default=str))
+        return 0 if rep.get("ok") else 1
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(_main(sys.argv))

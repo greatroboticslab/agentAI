@@ -427,9 +427,11 @@ def ledger_row(decision, actor, ts, review_id=None):
 # --- CLI ---------------------------------------------------------------------
 
 def _main(argv):
-    if len(argv) < 2:
+    if len(argv) < 2 or argv[1] in ("-h", "--help", "help"):
+        # A hand-rolled dispatcher still owes a person `--help`; printing
+        # "unknown command '--help'" is how a working tool looks broken.
         print("usage: parallelism.py {plan|caps|explain|rules} [json]", file=sys.stderr)
-        return 2
+        return 0 if len(argv) > 1 else 2
     cmd = argv[1]
     if cmd == "rules":
         print(json.dumps(load_rules(), indent=2, sort_keys=True))
