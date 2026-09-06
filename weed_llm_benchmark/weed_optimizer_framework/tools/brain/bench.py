@@ -724,15 +724,25 @@ def resolve_quote(bundle, quote, lines=None):
     against the bundle's line texts) because scoring a committed verdict must
     not require the cluster-side package.
     """
+    # Delegation must not lose the extra lines. `lines` carries what a retrieval
+    # round put in front of the model, which is not in the bundle; handing the
+    # shared validator only the bundle made every L4 citation unresolvable, so
+    # the arm scored zero citation validity and a correct quote read as a
+    # fabricated one. Delegate when the caller asked about the bundle alone, or
+    # when the shared validator accepts the extra lines; otherwise use the local
+    # rule, which is the same pre-registered rule over the wider set.
     cit = _wp3("citations")
     if cit is not None and hasattr(cit, "resolve"):
         try:
-            hit = cit.resolve(bundle, quote)
+            hit = (cit.resolve(bundle, quote) if lines is None
+                   else cit.resolve(bundle, quote, lines=lines))
             if isinstance(hit, dict) and hit.get("artifact_id") is not None:
                 return {"artifact_id": _artifact_key(hit.get("artifact_id")),
                         "line": int(_num(hit.get("line"), 0) or 0)}
             if hit is None:
                 return None
+        except TypeError:
+            pass                              # no `lines` support: local rule
         except Exception:
             pass                              # fall through to the local rule
     q = _norm_text(quote)

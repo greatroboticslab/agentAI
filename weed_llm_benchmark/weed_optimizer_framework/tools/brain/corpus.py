@@ -146,7 +146,18 @@ DEFAULT_OUT_DIR = pathlib.Path(os.environ.get(
 SECTIONS = ("ledger", "sacct", "out_tail", "results_csv", "strategy", "trace",
             "slug_scores", "registry_diff", "harvest", "resources", "su",
             "corrections", "plan", "signals")
-CASE_CLASSES = ("operational", "config", "code", "design")
+# Correction classes, taken from what the record actually contains rather than
+# from what is convenient to validate. `operational` is a runtime failure the
+# loop hit without anything being edited; `config`, `code` and `design` are the
+# three edit kinds the campaign made. `plan` is the fourth and it is real: seven
+# cases are a decision to stop or redirect a phase on the evidence — closing S1
+# with its gate deliberately unmet is the clearest — which is neither a
+# parameter change nor a code edit and cannot be scored as one. `none` is what a
+# healthy control and a designed no-incident control carry, because no
+# correction was made; without it every control fails validation. Exporting the
+# 162-case inventory against the previous four-value tuple refused all 162 on
+# this line.
+CASE_CLASSES = ("operational", "config", "code", "design", "plan", "none")
 ESCALATIONS = ("none", "tier1", "tier2", "human")
 # Vocabulary for truth.provenance. Computed by the exporter from what it could
 # actually read, never taken from the inventory: a case cannot declare itself raw.
