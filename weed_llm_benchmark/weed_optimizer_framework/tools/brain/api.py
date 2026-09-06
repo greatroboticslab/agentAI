@@ -483,6 +483,34 @@ function table(head, rows){
   return '<div class="scroll"><table><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr>'
     + rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('') + '</table></div>';
 }
+function longestDigitRun(name){
+  // Written without a regular expression on purpose: this page is a Python
+  // string, and a character class needs a backslash that Python eats before the
+  // browser sees it. A test asserts the served script contains no backslash at
+  // all, which is the cheapest way to keep that whole class of bug out.
+  const s = String(name || "");
+  let best = "", cur = "";
+  for(let i = 0; i < s.length; i++){
+    const c = s.charAt(i);
+    if(c >= "0" && c <= "9"){ cur += c; if(cur.length > best.length){ best = cur; } }
+    else { cur = ""; }
+  }
+  return best.length >= 6 ? best : "";
+}
+function citeLink(e){
+  // A citation's whole value is that a person can go and read the line. The
+  // artifact name carries the job id, and the log route takes an absolute line,
+  // so the address becomes a link rather than a string to copy by hand. An
+  // artifact whose name carries no job id stays plain text: a link that cannot
+  // land on the right line is worse than none.
+  if(!e) return '';
+  const addr = esc(e.artifact_id) + ':' + esc(e.line);
+  const job = longestDigitRun(e.artifact_id);
+  if(!job || !e.line) return '<code>' + addr + '</code>';
+  const href = "/api/job_log/" + job + "?around=" + encodeURIComponent(e.line);
+  return '<a href="' + href + '" target="_blank" rel="noopener">' +
+         '<code>' + addr + '</code></a>';
+}
 function decideControls(r){
   // Data attributes and a delegated listener, never an inline onclick. The
   // page is a Python string, and an escaped quote inside an inline handler is
@@ -524,8 +552,7 @@ function render(key, data){
   if(!data.available) return '<div class="missing">Not available &mdash; '+esc(data.reason)+'</div>';
   if(key==="signals"){
     const rows = (data.rows||[]).map(r=>[sev(r.severity), esc(r.signal),
-      esc(r.reason), (r.evidence&&r.evidence[0]) ?
-        '<code>'+esc(r.evidence[0].artifact_id)+':'+esc(r.evidence[0].line)+'</code>' : '']);
+      esc(r.reason), citeLink(r.evidence && r.evidence[0])]);
     return '<div class="sub">'+data.n_fired+' firing, '+data.n_unknown+
            ' could not run</div>'+table(["severity","check","why","evidence"], rows);
   }

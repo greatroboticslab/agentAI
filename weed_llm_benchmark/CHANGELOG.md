@@ -8715,3 +8715,30 @@ button present, an empty reason refused in the page, a reason accepted, the row
 moving to approved with the decider recorded as the session user, the button gone
 because the item is no longer pending, and no errors at any point. The
 demonstration record was removed afterwards.
+
+## 2026-09-06 — v3.32.3 a citation you can click, and one that admits it cannot be shown
+
+A finding cites (artifact, line), and the whole value of that address is that a
+person can go and read the line. `GET /api/job_log/{jobid}` only tailed, and a
+tail cannot show line 286 of a long log. It takes `around` and `context` now,
+returns the window with each line's absolute number, and the supervision page
+turns every evidence address into a link to it — the job id is read out of the
+artifact name, and an artifact whose name carries no job id stays plain text,
+because a link that cannot land on the right line is worse than none.
+
+**An empty window is not a success.** Asked for line 286 of the running round's
+log, the first version answered `ok: true` with nothing in it, which reads on a
+page as "here is your evidence". It now answers 404 naming the file, the real
+line count, and why: that log holds 282 newline-separated lines after hours of
+output, because a training progress bar is written with carriage returns. That is
+worth knowing about the corpus's own line addressing, and it was only visible
+because the route was asked for a line that does not exist.
+
+The helper that reads a job id out of an artifact name is written without a
+regular expression, deliberately: this page is a Python string, a character class
+needs a backslash, and Python eats it before the browser sees it. The test that
+asserts the served script contains no backslash at all caught the regex the
+moment it was added — the same test written an hour earlier after the same class
+of bug took the whole page down. Its companion, a hand-rolled quote-balance
+check, was replaced by a real parse: the heuristic failed on an apostrophe in a
+comment, and a test that cries wolf teaches people to ignore a red run.

@@ -12929,23 +12929,43 @@ _AGENT_LOG_DIR = REPO / "logs" / "agent_tasks"
 
 
 @app.get("/api/job_log/{jobid}")
-def api_job_log(jobid: str, tail: int = 200):
+def api_job_log(jobid: str, tail: int = 200, around: int = 0, context: int = 20):
     """Return the last `tail` lines of the SLURM output file for jobid.
 
     SLURM writes to results/framework/<name>_<jobid>.out (with SBATCH --output).
-    We glob for *_{jobid}.out to find the file regardless of name."""
+    We glob for *_{jobid}.out to find the file regardless of name.
+
+    v3.32.3 — `around` returns a window centred on one ABSOLUTE line instead of
+    the tail. A supervisor finding cites (artifact, line), and the whole point of
+    that address is that a person can go and read the line; a tail cannot show
+    line 286 of a 40,000-line log. `context` lines are returned either side, and
+    the response says which absolute line each returned line is, so the citation
+    can be checked rather than taken on trust."""
     if not _re_cls.match(r'^[0-9_]+$', jobid):
         raise HTTPException(400, "bad jobid chars")
     if not 1 <= tail <= 2000:
         tail = 200
+    around = around if isinstance(around, int) and around > 0 else 0
+    context = context if isinstance(context, int) and 0 < context <= 200 else 20
 
     # v3.0.99.40: lab-control mode → the .out lives on the cluster; find newest
     # matching file there + tail it over SSH.
     if _CLUSTER_SSH:
+        if around:
+            lo, hi = max(1, around - context), around + context
+            # The total is asked for in the same call: a window that comes back
+            # empty is either "that line is past the end" or "the file has no
+            # newlines there", and both are answers a caller needs. A training
+            # log writes its progress with carriage returns, so a 40,000-epoch
+            # run can be a handful of newline-separated lines.
+            body = (f'echo "__TOTAL__:$(wc -l < \"$f\")"; '
+                    f'sed -n "{lo},{hi}p" "$f"')
+        else:
+            body = f'tail -n {tail} "$f"'
         script = (f"f=$(ls -t results/framework/*_{jobid}.out "
                   f"results/*_{jobid}.out logs/*{jobid}*.out 2>/dev/null | head -1); "
                   f'if [ -z "$f" ]; then echo __NOFILE__; '
-                  f'else echo "__FILE__:$f"; tail -n {tail} "$f"; fi')
+                  f'else echo "__FILE__:$f"; {body}; fi')
         r = _slurm(["bash", "-lc", script], timeout=45)
         out = r.get("stdout", "")
         if (not r["ok"]) or "__NOFILE__" in out:
@@ -12953,11 +12973,34 @@ def api_job_log(jobid: str, tail: int = 200):
                 "msg": f"no output file for {jobid} on cluster"}, status_code=404)
         lines = out.splitlines()
         fpath = ""
+        total = None
         if lines and lines[0].startswith("__FILE__:"):
             fpath = lines[0][len("__FILE__:"):]
             lines = lines[1:]
+        if lines and lines[0].startswith("__TOTAL__:"):
+            try:
+                total = int(lines[0][len("__TOTAL__:"):].strip())
+            except ValueError:
+                total = None
+            lines = lines[1:]
+        first = max(1, around - context) if around else None
+        if around and not lines:
+            # Never "ok" with nothing in it: a citation that cannot be shown is
+            # a failed citation, and saying so is the point of the address.
+            return JSONResponse({"ok": False, "jobid": jobid, "remote": True,
+                "file": fpath, "around": around, "total_lines": total,
+                "lines_returned": 0,
+                "msg": ("line %d is not in %s (%s newline-separated line(s)); a "
+                        "log written with carriage returns has far fewer lines "
+                        "than it has output"
+                        % (around, fpath or "that file",
+                           "unknown" if total is None else total))},
+                status_code=404)
         return JSONResponse({"ok": True, "jobid": jobid, "remote": True,
-            "file": fpath, "lines_returned": len(lines),
+            "file": fpath, "lines_returned": len(lines), "total_lines": total,
+            "around": around or None, "first_line": first,
+            "numbered": ([[first + i, t] for i, t in enumerate(lines)]
+                         if first else None),
             "content": "\n".join(lines)})
 
     # Search standard locations

@@ -297,12 +297,29 @@ class TestServedScript(Base):
             self.assertIn(needle, js, needle)
 
     def test_the_served_script_parses(self):
-        """Balanced quotes and braces, as a cheap stand-in for a parser."""
-        js = self._served_script()
-        for pair in ("{}", "()", "[]"):
-            self.assertEqual(js.count(pair[0]), js.count(pair[1]), pair)
-        for q in ("'", '"'):
-            self.assertEqual(js.count(q) % 2, 0, "unbalanced %s" % q)
+        """Parse the served script with a real parser when one is on the box.
+
+        The first version of this counted quotes and braces. It failed the
+        moment a comment contained an apostrophe, which is noise that teaches
+        people to ignore a red test. A real parse or an honest skip is worth
+        more than a heuristic that cries wolf.
+        """
+        import shutil
+        import subprocess
+        import tempfile
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node on this machine; the served script is parsed "
+                          "wherever one is available")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:
+            fh.write(self._served_script())
+            path = fh.name
+        try:
+            r = subprocess.run([node, "--check", path], capture_output=True,
+                               text=True, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stderr[:500])
+        finally:
+            os.unlink(path)
 
 
 if __name__ == "__main__":
