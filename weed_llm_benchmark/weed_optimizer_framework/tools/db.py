@@ -459,7 +459,7 @@ DEFAULT_DOMAIN_CONFIG = {
                   "MIN_DINO_SCORE={min_dino_score},TRAIN_EPOCHS={epochs},"
                   "TRAIN_TIME_H={train_time_cap_h},IMGSZ={imgsz},"
                   "PATIENCE={patience},ITER_NAME={iter_name},"
-                  "BRAIN_DOMAIN={domain},BRAIN_TRACE={trace} "
+                  "BRAIN_DOMAIN={domain},BRAIN_ROUND={round},BRAIN_TRACE={trace} "
                   "run_m1_merged_seeds.sh"),
     },
     # train_time_cap_h is 0.9 × train_time_h: the trainer's own time cap ends the

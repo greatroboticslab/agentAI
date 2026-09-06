@@ -167,7 +167,8 @@ ck("filter renders byte-identical to the hardcoded literal",
    db.render_step_command(D, "filter") == FILTER)
 
 train = db.render_step_command(D, "train", iter_name="rnd5_train_44900001",
-                               domain="weed", trace="/x/_brain/weed/trace/t.jsonl")
+                               domain="weed", round=5,
+                               trace="/x/_brain/weed/trace/t.jsonl")
 ck("train keeps the h100 gres and the array", "--gres=gpu:h100-80:1" in train
    and "--array=1-1" in train)
 ck("train keeps the 12 h walltime", "--time=12:00:00" in train)
@@ -178,6 +179,12 @@ ck("train carries the job-scoped iteration name",
 ck("train carries the trace path",
    "BRAIN_TRACE=/x/_brain/weed/trace/t.jsonl" in train and "BRAIN_DOMAIN=weed" in train)
 ck("train ends with the job script", train.endswith(" run_m1_merged_seeds.sh"))
+# The job script has always read BRAIN_ROUND and the template never exported it,
+# so every per-epoch trace record carried an empty round and could only be grouped
+# by job id. The field is bounded in the policy catalogue for the same reason it is
+# rendered here: the gate authorises exactly what a template substitutes.
+ck("train carries the round number the job script reads",
+   "BRAIN_ROUND=5" in train)
 
 _missing = ""
 try:

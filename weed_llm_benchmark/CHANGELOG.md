@@ -8473,3 +8473,18 @@ trainer time cap now reads 10.0 h, applied by the review fallback — passes the
 policy gate for all three steps; the dashboard restarted with the scheduler still
 tracking its running job, Mongo healthy and no pause; a legitimate cluster action
 returns 200 through the live gate; smoke test 113 passed, 0 failed.
+
+## 2026-09-06 — v3.30.2 the per-epoch trace records which round it belongs to
+
+The training job script has always read `BRAIN_ROUND`, and the step template never
+exported it, so every trace record written since the mechanism landed carried an
+empty round and could only be grouped by job id. Confirmed on the live round: ten
+epoch records for job 45326516, hash chain intact, `eta_total_s` 36,284 against a
+`walltime_s` of 43,200 — the in-flight projection the 2026-08-29 failure needed —
+and `round` blank on every one.
+
+The template now exports it, and the policy catalogue declares its bound, for the
+same reason the field is rendered at all: the gate authorises exactly what a
+template substitutes, so a rendered field with no declared bound would refuse the
+step. That coupling is deliberate and is why adding a field to a template is now a
+two-file change.

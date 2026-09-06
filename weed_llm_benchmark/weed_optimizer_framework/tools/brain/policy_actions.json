@@ -722,6 +722,12 @@
         "trace": {
           "type": "str",
           "pattern": "^[A-Za-z0-9_./-]{0,200}$"
+        },
+        "round": {
+          "type": "int",
+          "min": 0,
+          "max": 100000,
+          "why": "The campaign round this job belongs to, exported so the job's own per-epoch trace can be grouped by round afterwards. Bounded because the policy gate authorises exactly the fields the template renders, and a field with no declared bound is refused."
         }
       },
       "risk": "R2",
