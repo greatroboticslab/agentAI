@@ -8680,3 +8680,16 @@ The demonstration records written during that verification were removed
 afterwards. They were the only entries in the log, they referred to an action that
 never ran, and leaving them would have put a fabricated request and approval into
 the campaign's own governance history.
+
+## 2026-09-06 — v3.32.1 the governance columns fit
+
+Three attempts at the same defect, each verified by looking at the render rather
+than at the markup. The approval table carries five columns of identifiers and
+the two that matter most — who asked, who decided — were falling off the card.
+`overflow-wrap:anywhere` brought them back and chopped "pending" across two
+lines; `break-word` kept the words and hid the columns again. Both were ways of
+hiding the answer rather than showing it.
+
+The approval, catalogue and timeline cards now span two grid columns, collapsing
+to one below 780 px. Verified at 1440 and 390: no page errors, no sideways body
+scroll, and both actor columns readable at each width.

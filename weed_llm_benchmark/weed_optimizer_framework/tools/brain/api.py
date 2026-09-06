@@ -432,6 +432,12 @@ _PAGE = """<!doctype html><html><head><meta charset="utf-8">
  .missing{opacity:.6;font-style:italic}
  /* A long table scrolls inside its own card rather than growing the page.
     Both axes: wide rows scroll sideways, long ones scroll down. */
+ /* The governance cards carry five columns of identifiers. In one grid column
+    the last two -- who asked, who decided -- fell off the card, and the two
+    fixes that keep them (break every word, or scroll sideways) both hide the
+    answer rather than showing it. Width is the honest fix. */
+ .wide{grid-column:span 2}
+ @media (max-width: 780px){ .wide{grid-column:span 1} }
  .scroll{overflow-x:auto;max-height:22rem;overflow-y:auto}
  /* Deliberately NOT white-space:nowrap. These cells carry prose -- a lever's
     control, a check's reason -- and forcing them onto one line pushed the
@@ -442,7 +448,10 @@ _PAGE = """<!doctype html><html><head><meta charset="utf-8">
     artifact names -- so without this they refuse to wrap and push the later
     columns out of the card. The governance columns (who asked, who decided)
     are the ones that were disappearing. */
- td{overflow-wrap:anywhere}
+ /* break-word, not anywhere: `anywhere` lets the engine break a word to make
+    the column narrower even when it would have fitted, which chopped "pending"
+    across two lines. This breaks only what genuinely cannot fit. */
+ td{overflow-wrap:break-word}
 </style></head><body>
 <h1>Supervision &mdash; __DOMAIN__</h1>
 <div class="sub">Everything this layer knows about the campaign, read from the
@@ -544,7 +553,8 @@ function render(key, data){
 const grid = document.getElementById("grid");
 SECTIONS.forEach(([key,title])=>{
   const el = document.createElement("div");
-  el.className = "card";
+  // Two cards carry five identifier columns and need the width; the rest do not.
+  el.className = "card" + (["approvals","policy","timeline"].includes(key) ? " wide" : "");
   el.innerHTML = '<h3>'+title+'</h3><div id="s_'+key+'">loading&hellip;</div>';
   grid.appendChild(el);
   fetch("/api/brain/"+encodeURIComponent(DOMAIN)+"/"+key)
