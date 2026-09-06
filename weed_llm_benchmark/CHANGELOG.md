@@ -8434,3 +8434,42 @@ to act. Both are now true of the same correction and both fire: tier-2 is where
 such a change is asked for, a person is who makes it, and the higher destination
 wins. A test asserts the module and the rubric agree per correction class, so the
 two statements of one fact cannot drift apart.
+
+## 2026-09-06 — v3.30.1 the planner interface and agent-proposed experiments
+
+`tools/brain/planner.py` turns a campaign digest into a plan: hypotheses, ordered
+experiments each naming a control and a success criterion, and stop rules. An
+entry with no control or no criterion is refused at construction, because an
+experiment without a control measures the campaign's drift and one without a
+criterion cannot conclude. Three backends: `mock` rules over the digest, a
+versioned `file` backend that never overwrites a version, and `cluster:<model>`
+through the supervisor's client, where an unreachable endpoint or a malformed
+reply is a failed plan and never a silently empty one. A mock plan is marked
+`simulated` and every surface can say so; presenting a rules-generated plan as a
+model's would misrepresent the result.
+
+**The lever blindfold is enforced by the planner, not by caller discipline.** A
+plan built from a digest that omitted the sealed lever menu cannot name a lever
+even if a caller passes the menu in, because the planner checks the digest's own
+section metadata rather than trusting its arguments. Tested in both directions, so
+the negative test is not vacuous: a planner handed the lever table during its own
+evaluation is doing answer-key lookup, not planning.
+
+`tools/brain/experiments.py` proposes only from the domain's sealed `lever_menu`
+and never invents a lever. The three pinned weed proposals are the recipe
+comparison against `cwd12_core` alone, the per-box verification gate against the
+same corpus with the gate off, and a fresh start against continuing from the last
+weights. Each is filed as an R3 approval item whose SU estimate is a passthrough of
+`policy.estimate_su`, never recomputed locally. A verdict is `within_noise`
+whenever the difference is under the recipe's sealed floor, and `insufficient` at
+fewer than three seeds — the floor was derived from three seeds, so a single seed
+cannot be compared against it and is never reported as a winner. Mean, standard
+deviation, seed count and the floor travel together on the result row, so no
+consumer can quote the mean alone.
+
+**Deployed and verified on the lab.** All twelve module tests plus the gate tests
+pass on the lab with its own interpreter; the live domain configuration — whose
+trainer time cap now reads 10.0 h, applied by the review fallback — passes the
+policy gate for all three steps; the dashboard restarted with the scheduler still
+tracking its running job, Mongo healthy and no pause; a legitimate cluster action
+returns 200 through the live gate; smoke test 113 passed, 0 failed.
