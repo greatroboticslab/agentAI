@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=vllm_verify
+#SBATCH --job-name=model_verify
 #SBATCH --partition=GPU-shared
 #SBATCH --gres=gpu:h100-80:4
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=240G
 #SBATCH --time=01:30:00
-#SBATCH --output=results/framework/vllm_verify_%j.out
+#SBATCH --output=results/framework/model_verify_%j.out
 #
 # v3.25.0 — verify that a locally staged open-weight model actually serves on this
 # cluster, and MEASURE what it costs, before any part of the platform is allowed to
@@ -25,6 +25,10 @@
 #        VLLM_MAXLEN       (max model len)
 #        VLLM_GPU_UTIL     (fraction of each GPU vLLM may use)
 #        VLLM_JOBTAG       (names the result file)
+#        VERIFY_BACKEND    (vllm | ollama) — the same measurement battery either way,
+#                          which is the only way two models can be compared at all
+#        OLLAMA_MODEL      (ollama tag, when VERIFY_BACKEND=ollama)
+#        OLLAMA_NUM_CTX    (context the ollama server is asked to hold)
 #        VLLM_KV_DTYPE     (--kv-cache-dtype; some models require fp8)
 #        VLLM_EXTRA        (extra flags appended verbatim to vllm serve)
 #   writes: results/framework/model_deploy/<JOBTAG>.json
@@ -45,16 +49,22 @@ EXTRA="${VLLM_EXTRA:-}"
 # model-build time. Kept as a variable because it is a per-model property.
 KVDTYPE="${VLLM_KV_DTYPE:-}"
 JOBTAG="${VLLM_JOBTAG:-job${SLURM_JOB_ID:-0}}"
+BACKEND="${VERIFY_BACKEND:-vllm}"
+OLLAMA_TAG="${OLLAMA_MODEL:-}"
+OLLAMA_CTX="${OLLAMA_NUM_CTX:-32768}"
+[ "$BACKEND" = "ollama" ] && NAME="${OLLAMA_TAG:?OLLAMA_MODEL required when VERIFY_BACKEND=ollama}"
 PORT=$(( 8000 + ${SLURM_JOB_ID:-0} % 1000 ))
 OUTDIR="$REPO/results/framework/model_deploy"
 OUT="$OUTDIR/${JOBTAG}.json"
-LOG="$REPO/results/framework/vllm_serve_${JOBTAG}.log"
+LOG="$REPO/results/framework/model_serve_${JOBTAG}.log"
 mkdir -p "$OUTDIR"
 
-echo "=== vllm_verify model=$MODEL name=$NAME tp=$TP maxlen=$MAXLEN kv=${KVDTYPE:-auto} port=$PORT $(date) ==="
+echo "=== model_verify backend=${VERIFY_BACKEND:-vllm} model=${OLLAMA_MODEL:-$MODEL} name=$NAME tp=$TP maxlen=$MAXLEN kv=${VLLM_KV_DTYPE:-auto} port=$PORT $(date) ==="
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader
-[ -f "$SIF" ] || { echo "FATAL: container image missing: $SIF" >&2; exit 1; }
-[ -d "$MODEL" ] || { echo "FATAL: model directory missing: $MODEL" >&2; exit 1; }
+if [ "$BACKEND" = "vllm" ]; then
+    [ -f "$SIF" ] || { echo "FATAL: container image missing: $SIF" >&2; exit 1; }
+    [ -d "$MODEL" ] || { echo "FATAL: model directory missing: $MODEL" >&2; exit 1; }
+fi
 
 export APPTAINERENV_HF_HUB_OFFLINE=1
 export APPTAINERENV_TRANSFORMERS_OFFLINE=1
@@ -64,6 +74,27 @@ export APPTAINERENV_OMP_NUM_THREADS=8
 
 # Serving in the SBATCH main body, never under `srun --overlap`: a step's cgroup
 # takes its children with it when the step ends.
+if [ "$BACKEND" = "ollama" ]; then
+    # The ollama server speaks the same OpenAI-compatible /v1 API, so the whole
+    # measurement battery below is byte-identical between the two backends. A
+    # head-to-head where each model is measured by its own harness compares the
+    # harnesses.
+    export OLLAMA_HOST="127.0.0.1:$PORT"
+    export OLLAMA_MODELS=/ocean/projects/cis240145p/byler/ollama/models
+    export OLLAMA_CONTEXT_LENGTH="$OLLAMA_CTX"
+    export OLLAMA_KEEP_ALIVE=30m
+    OLLAMA_BIN=/ocean/projects/cis240145p/byler/ollama/bin/ollama
+    "$OLLAMA_BIN" serve > "$LOG" 2>&1 &
+    SERVE_PID=$!
+    trap 'kill $SERVE_PID 2>/dev/null' EXIT
+    for i in $(seq 1 60); do
+        curl -sf "http://127.0.0.1:$PORT/api/tags" >/dev/null 2>&1 && break
+        sleep 2
+    done
+    # Pull is a no-op when the blobs are already in the shared store; loading the
+    # weights is what the timer below is actually measuring.
+    "$OLLAMA_BIN" pull "$NAME" 2>&1 | tail -2
+else
 apptainer exec --nv -B /ocean "$SIF" \
     vllm serve "$MODEL" \
       --served-model-name "$NAME" \
@@ -76,6 +107,7 @@ apptainer exec --nv -B /ocean "$SIF" \
       $EXTRA > "$LOG" 2>&1 &
 SERVE_PID=$!
 trap 'kill $SERVE_PID 2>/dev/null' EXIT
+fi
 
 T0=$(date +%s)
 READY=0
@@ -86,20 +118,28 @@ for i in $(seq 1 240); do          # up to 40 min: a 150 GB checkpoint loads fro
         # it actually said, and stop waiting.
         echo "server process exited early after ${i}0s; last log lines:"; tail -40 "$LOG"; break
     fi
-    if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then READY=1; break; fi
+    if [ "$BACKEND" = "ollama" ]; then
+        # /api/tags answers as soon as the socket is up, long before 376 GB of
+        # weights are resident, so readiness is the first real generation.
+        if curl -sf -m 900 -X POST "http://127.0.0.1:$PORT/v1/chat/completions" \
+             -H 'Content-Type: application/json' \
+             -d "{\"model\":\"$NAME\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}" \
+             >/dev/null 2>&1; then READY=1; break; fi
+    elif curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then READY=1; break; fi
     sleep 10
 done
 LOAD_S=$(( $(date +%s) - T0 ))
 echo "ready=$READY after ${LOAD_S}s"
 
 MODEL="$MODEL" NAME="$NAME" PORT="$PORT" OUT="$OUT" LOG="$LOG" READY="$READY" \
-LOAD_S="$LOAD_S" TP="$TP" MAXLEN="$MAXLEN" JOBTAG="$JOBTAG" KVDTYPE="$KVDTYPE" python3 - <<'PYEOF'
+LOAD_S="$LOAD_S" TP="$TP" MAXLEN="$MAXLEN" JOBTAG="$JOBTAG" KVDTYPE="$KVDTYPE" BACKEND="$BACKEND" python3 - <<'PYEOF'
 import json, os, time, urllib.request, urllib.error
 
 port = os.environ["PORT"]; base = "http://127.0.0.1:%s/v1" % port
 res = {"jobtag": os.environ["JOBTAG"], "kind": "vllm", "model_path": os.environ["MODEL"],
        "served_name": os.environ["NAME"], "tp": int(os.environ["TP"]),
        "max_model_len": int(os.environ["MAXLEN"]), "load_s": int(os.environ["LOAD_S"]),
+       "backend": os.environ.get("BACKEND") or "vllm",
        "kv_cache_dtype": os.environ.get("KVDTYPE") or "auto",
        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "ok": False}
 
@@ -184,4 +224,4 @@ PYEOF
 
 kill $SERVE_PID 2>/dev/null
 wait $SERVE_PID 2>/dev/null
-echo "=== vllm_verify done $(date) ==="
+echo "=== model_verify done $(date) ==="
