@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-round3-collect-44322382",
+ "class": "none",
+ "date": "2026-08-24",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ncommand_collected: sacct -j 44322382\ntitle: Round 3 collect completed in 3 h 10 m\nsymptom: sacct records COMPLETED for a harvest the scheduler booked as failed.\nactor_who_corrected: none\nversion_tag: v3.22.21\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44322382\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/v3_0_43_brain_harvest_44322382.out; sacct -j 44322382\ninventory_notes: Named control, and the healthy half of the job_unknown incident: the STEP is clean, the BOOKING is the defect. Pair it with v3-22-21-job-unknown-booked-as-failed.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

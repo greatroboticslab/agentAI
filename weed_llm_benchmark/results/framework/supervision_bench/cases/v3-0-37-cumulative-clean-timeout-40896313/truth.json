@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-37-cumulative-clean-timeout-40896313",
+ "class": "design",
+ "date": "2026-05-19",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ncommand_collected: sacct -j 40896313\nglob_truncated: results/framework/mega_iter*/train*/results.csv kept 8 newest of 40 matches\ntitle: A mis-designed experiment timed out at epoch 19 with a declining metric\nsymptom: TIMEOUT at 18 h; in-training holdout mAP50-95 hovered around 0.59 and was falling.\nroot_cause: Three at once: the model's own cwd12-only ceiling is 0.7446 so the run could not reach the goal by construction; 30 epochs at 896 px did not fit 18 h; and removing 51 whole garbage datasets does not remove per-box noise inside good ones.\ncorrection_made: Single-stage cumulative training abandoned until object-level curation existed; the unit-of-curation lesson recorded.\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.0.37/v3.0.38\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40896313\ndetectable_from: a declining validation curve over the last epochs; the recipe's own known ceiling against the target\nartifact_paths_expected: results/framework/v3_0_37_yolo26x_cumulative_clean_40896313.out; sacct -j 40896313; results/framework/mega_iter*/train*/results.csv\nprovenance_guess: record-only\nprovenance_reason: May .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "plateau"
+ ]
+}

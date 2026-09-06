@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-24-9-gallery-frames-whitelist-404",
+ "class": "code",
+ "date": "2026-08-28",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Thumbnails rendered and the full-size click 404'd on a file that demonstrably exists\nsymptom: Robot sessions store frames under frames/, which post-dates the backend's fixed list of subdirectories, while the gallery enumerates with rglob.\nroot_cause: Two code paths disagreed about where a dataset's images can live; the same failure shape as an earlier missing test/ entry.\ncorrection_made: frames/ added to the list plus a last-resort lazy recursive search that stops at the first hit, so a full tree walk happens only on the true-404 path.\ncorrection_class: code\nactor_who_corrected: human\nversion_tag: v3.24.9\ncategory: incident\nscope: robot-uplink\nhealthy_control: false\ndetectable_from: a 404 for a path that ls resolves\nartifact_paths_expected: uploads/<robot-session-slug>/frames/\nprovenance_guess: raw\nprovenance_reason: the session directories are live datasets.\ninventory_notes: Read by the operator as 'did my data even get collected?'.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "none"
+ ]
+}

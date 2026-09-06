@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-24-4-wbf-tta-class-order-permuted",
+ "class": "code",
+ "date": "2026-08-25",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Every per-species AP was attributed to the wrong weed and overall mAP looked fine\nsymptom: wbf_tta_eval.py's hardcoded CANONICAL_12 is in a different order than the alphabetical cwd12_sealed.yaml; class id 2 is Eclipta in the data and PalmerAmaranth in that list.\nroot_cause: Class names were held in the evaluation tool instead of read from the dataset yaml the training run recorded, so the evaluation and the run could disagree about what a class id means. Overall mAP averages over ids and is unaffected, which is why nothing looked wrong.\ncorrection_made: Class names and holdout directories come from --data-yaml; the old list kept as _LEGACY_CANONICAL_12 with a warning when used. Pre-flighted on the login node: 1,977 images with 1,977 labels in the correct alphabetical order.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.24.4\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\njob_ids: 44463762; 44463922\ndetectable_from: the class list used by the evaluator against the class list in the run's own data yaml\nartifact_paths_expected: results/framework/s3_tta_ceiling/*.json; weed_optimizer_framework/tools/wbf_tta_eval.py; results/framework/cwd12_sealed.yaml\nprovenance_guess: raw\nprovenance_reason: the s3_tta_ceiling artifacts and cwd12_sealed.yaml are both present.\ninventory_notes: Publish-grade: the per-species table is what the model card uses to warn a laser-weeding system where it will miss. Same family as v3-0-24-class-passthrough.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

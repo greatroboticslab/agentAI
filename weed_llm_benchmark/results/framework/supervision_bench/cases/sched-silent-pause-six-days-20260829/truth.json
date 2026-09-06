@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "sched-silent-pause-six-days-20260829",
+ "class": "code",
+ "date": "2026-08-29",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: The domain paused itself and nobody was told for six days\nsymptom: The lab journal recorded 'weed PAUSED by stop-loss' and the platform kept looking healthy; the loop had not run a round when the pause was noticed on 2026-09-04.\nroot_cause: The stop-loss had no notification surface: the sync alarm covers data freshness and nothing covered the scheduler itself, so a correctly-paused domain is indistinguishable from an idle one.\ncorrection_made: brain/scheduler_health.py plus GET /api/health/scheduler and a site-wide banner on the same positive-heartbeat principle as the sync alarm: a missing or stale heartbeat, a paused domain, or failing ledger writes all read crit; the alarm fails closed.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.25.0\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: the domain's enabled flag and paused_reason in the scheduler state file; the age of the last ledger round-step transition\nartifact_paths_expected: ~/.round_scheduler.json; lab journalctl --user -u weed-dashboard; results/framework/scheduler_status.json\nprovenance_guess: record-only\nprovenance_reason: the evidence is a lab-side journal line and the scheduler state file; there is no cluster artifact for a job that was never submitted.\ninventory_notes: Distinct from the walltime case: the failure here is the absence of an event, which no bundle built from job artifacts can contain. It is the argument for the alarm arm (A0++).",
+ "provenance": "record-only",
+ "signals_expected": [
+  "none"
+ ]
+}

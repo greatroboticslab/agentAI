@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-29-greenpixel-threshold-40624773",
+ "class": "config",
+ "date": "2026-05-07",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: A published curation filter kept 8.4% of the in-domain training data\nsymptom: A 20% green-pixel threshold dropped 22.4% of the pool overall but kept only 8.4% of cottonweed_sp8 and 0% of a real weed dataset.\nroot_cause: The threshold was copied from a paper without calibrating it against known-good data (cotton field photography is brown soil and white cotton).\ncorrection_made: Filter not applied; superseded by DINOv2 similarity curation, which was calibrated against a trusted reference pool.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.29.1B\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40624773\ndetectable_from: a filter's keep-rate on the known-good slug\nartifact_paths_expected: results/framework/v3_0_29_curate_40624773.out\nprovenance_guess: record-only\nprovenance_reason: May .out.\ninventory_notes: The direct ancestor of the v3.22.17 rule: calibrate an instrument before it condemns data.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

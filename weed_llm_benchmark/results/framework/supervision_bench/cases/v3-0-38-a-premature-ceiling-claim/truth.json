@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-38-a-premature-ceiling-claim",
+ "class": "design",
+ "date": "2026-05-22",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: An 'architecture ceiling' was declared and then crossed by a different seed\nsymptom: 0.8953 had been called the practical ceiling; seed 102 of the same 60-epoch configuration scored 0.9033.\nroot_cause: A ceiling was inferred from two runs whose difference (0.0004) was inside seed noise; no error bar existed.\ncorrection_made: Four seeds reported as 0.8974 +/- 0.0040 with the best run named; the project's rule became mean+/-std with n, never best-of-N alone.\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.0.38-A\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40912927; 40878511; 40839152\ndetectable_from: a claim of convergence resting on fewer runs than the recipe's noise floor requires\nartifact_paths_expected: results/framework/v3_0_38_rfdetr_seed1_40912927.out; results/framework/v3_0_38_rfdetr_seed2_40912927.out; results/framework/figures_data.json\nprovenance_guess: raw\nprovenance_reason: the rfdetr_seeds block is committed in figures_data.json; the per-seed .out files may also survive.",
+ "provenance": "raw",
+ "signals_expected": [
+  "plateau"
+ ]
+}

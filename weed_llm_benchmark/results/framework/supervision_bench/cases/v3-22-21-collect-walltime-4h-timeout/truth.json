@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-21-collect-walltime-4h-timeout",
+ "class": "config",
+ "date": "2026-08-24",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\nglob_truncated: results/framework/v3_0_43_brain_harvest_*.out kept 8 newest of 36 matches\ncommand_collected (failed): sacct -S 2026-08-24 -u <ACCOUNT> --name=brain\ntitle: Round 4's harvest genuinely timed out at four hours\nsymptom: TIMEOUT at 4 h 00 m 29 s on the harvest script's own #SBATCH --time=04:00:00.\nroot_cause: The 4 h walltime was sized when the registry held 45 datasets; it now held 61 and round 3 already needed 3 h 10 m.\ncorrection_made: The scheduler's collect step overrides to 10 h on the command line, leaving the script untouched for manual use.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.22.21\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\ndetectable_from: step elapsed trending toward the walltime across rounds as the registry grows; sacct TIMEOUT\nartifact_paths_expected: results/framework/v3_0_43_brain_harvest_*.out; sacct -S 2026-08-24 -u <ACCOUNT> --name=brain\nprovenance_guess: raw\nprovenance_reason: the sacct row survives even if the .out does not.\ninventory_notes: VERIFY: the round-4 collect job id is not recorded anywhere. Recover it with sacct -S 2026-08-23 -E 2026-08-25 -u <ACCOUNT> --format=JobID,JobName,State,Elapsed.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "pool_growth"
+ ]
+}

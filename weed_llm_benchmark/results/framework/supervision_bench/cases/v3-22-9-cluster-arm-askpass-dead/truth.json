@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-9-cluster-arm-askpass-dead",
+ "class": "config",
+ "date": "2026-08-23",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: The platform's cluster control path was dead because an askpass file held no current password\nsymptom: Every agent card, train submit and cluster status query failed; /api/cluster_status did not answer.\nroot_cause: The SSH_ASKPASS file the service points at was stale, so the multiplexed master could not authenticate.\ncorrection_made: Askpass restored; cluster status answers in ~4 s through the ControlMaster.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.22.9\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: every cluster action failing at the transport layer while jobs continue running\nartifact_paths_expected: results/framework/cluster_actions.jsonl\nprovenance_guess: record-only\nprovenance_reason: a lab-server configuration failure; no cluster artifact.\ninventory_notes: The same credential file was later wrongly blamed for the sync outage (see v3-24-3).",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

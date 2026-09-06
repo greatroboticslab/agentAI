@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-17-epoch-budget-100h-40124683",
+ "class": "config",
+ "date": "2026-04-21",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\nglob_truncated: results/framework/mega_iter*/train*/results.csv kept 8 newest of 40 matches\ntitle: Training started with a 100-hour epoch budget inside an 8-hour job\nsymptom: Mega training reached epoch 1/50 at 43% when the walltime killed it; 21,536 iterations per epoch at 4-5 it/s.\nroot_cause: Epoch count and image size were carried over from a 5,648-image recipe onto a 100,569-image corpus with no walltime arithmetic.\ncorrection_made: epochs 50 -> 5, imgsz 640 -> 512, patience 15 -> 3.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.18\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40124683\ndetectable_from: iterations per epoch x measured it/s x epochs vs remaining walltime\nartifact_paths_expected: results/framework/slurm_ollama_40124683.out; results/framework/mega_iter*/train*/results.csv\nprovenance_guess: raw\nprovenance_reason: the mega_iter run directories persisted long enough to be re-read in August.\ninventory_notes: Exactly the projection the 2026-08-29 dev case needed and did not have.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "pool_growth"
+ ]
+}

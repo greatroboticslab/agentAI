@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-13-exdark-gwhd-zero-label-admitted",
+ "class": "config",
+ "date": "2026-08-23",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: Two more off-goal datasets passed the hardened subject check, and the signal that would have stopped them was already being computed and thrown away\nsymptom: The first scheduled round harvested five datasets: two useful (+8,208 labelled) and two off-goal (low-light street scenes, wheat heads), both arriving with labeled=0 and classes=0.\nroot_cause: A blocklist can only reject names it has heard of, and the allowlist matched 'drone' inside the uploader name dronefreak. BRAIN_STRICT, which rejects on under 50 labels or zero classes, defaulted to off.\ncorrection_made: BRAIN_STRICT default-on in run_v3_0_43_brain_harvest_oneshot.sh; both zero-label sets quarantined with their measured reason.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.22.13\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44275184\ndetectable_from: per-download labelled and class counts in the harvest log; registry entries with local_labeled 0\nartifact_paths_expected: results/framework/v3_0_43_brain_harvest_44275184.out; results/framework/dataset_registry.json\nprovenance_guess: raw\nprovenance_reason: round 1's collect .out is a campaign artifact and the quarantine reasons are in the registry.\ninventory_notes: Subject-agnostic usable-labels beat every vocabulary; this is the correction a supervisor limited to config could actually have made.",
+ "provenance": "raw",
+ "signals_expected": [
+  "pool_growth"
+ ]
+}

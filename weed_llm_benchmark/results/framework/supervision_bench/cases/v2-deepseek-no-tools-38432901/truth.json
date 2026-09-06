@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v2-deepseek-no-tools-38432901",
+ "class": "code",
+ "date": "2026-04-04",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 38432901\ntitle: DeepSeek-R1:7b returned HTTP 400 'does not support tools' on every call\nsymptom: Every Brain call 400'd and silently fell through to the fixed fallback pipeline, so the run reproduced Qwen's results with a different model name in the log.\nroot_cause: The model has no Ollama tool-calling support; the caller treated the error as a generic failure and used the fallback without recording that the Brain never decided anything.\ncorrection_made: brain._ollama_text_decide() \u2014 detect the no-tools error and switch to a numbered text prompt.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v1.2/v2.0\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 38432901\ndetectable_from: repeated 400 'does not support tools' lines in the .out; run_log.json actions all tagged fallback\nartifact_paths_expected: results/framework/slurm_ollama_38432901.out; sacct -j 38432901\nprovenance_guess: record-only\nprovenance_reason: April .out; a silent-degradation case whose evidence is one log line.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

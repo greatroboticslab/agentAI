@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-24-4-matcher-offset-would-have-masqueraded-as-tta",
+ "class": "design",
+ "date": "2026-08-25",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: A metric offset of 0.024 would have been reported as a TTA effect\nsymptom: The evaluation script's own matcher reads the same checkpoint 0.0239 lower than the Ultralytics validator (0.8554 vs 0.8793).\nroot_cause: Two matchers disagree, and an arm compared across matchers attributes the difference to the treatment.\ncorrection_made: Every arm including a plain no-augmentation baseline runs through one matcher, and an Ultralytics re-measurement is reported alongside, so the offset is a number rather than an assumption.\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.24.4/v3.24.8\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\njob_ids: 44463762; 44463922\ndetectable_from: two evaluations of one checkpoint under different matchers with no shared baseline\nartifact_paths_expected: results/framework/s3_tta_ceiling/plain_s102.json; results/framework/s3_tta_ceiling/ultralytics_val_s102.json; results/framework/s3_tta_ceiling/summary.json\nprovenance_guess: raw\nprovenance_reason: all six arm JSONs plus the summary are committed under results/framework/s3_tta_ceiling/.\ninventory_notes: A prevented incident. Its artifacts are the cleanest healthy-versus-treatment pair in the corpus.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

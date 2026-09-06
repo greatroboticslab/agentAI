@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-23-1-retraction-027-causal-claim",
+ "class": "design",
+ "date": "2026-08-25",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: RETRACTION: the campaign's most-quoted causal claim was disproved by its own control\nsymptom: The tier ladder's zero-harvest rung scored 0.5601, so the gap that had been attributed to harvested data existed with no harvested data at all.\nroot_cause: The merged corpus's in-domain core is instance-starved by the pipeline's own dedup and holdout-stem filters (4,175 instances against cwd12's 6,131; Goosegrass 44 against a minimum of 81), because cwd12's twelve species live in two registry slugs and the holdout filter lands almost entirely on four of them.\ncorrection_made: Claim retracted in SCIENCE_AUDIT, DOUBLE_AGENT_SYSTEM and figures_data.json (which the platform's Evidence panel serves); the ladder rebuilt on the real cwd12 train split and resubmitted at 100 epochs.\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.23.1/v3.23.2\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\njob_ids: 44383471; 44397807\ndetectable_from: a causal claim with no zero-treatment control; per-class instance counts of the treatment and control corpora\nartifact_paths_expected: results/framework/s3_tier_*_44383471.out; results/framework/s3_tier_*_44397807.out; results/framework/figures_data.json\nprovenance_guess: raw\nprovenance_reason: both ladders' artifacts and the retracted/replacement blocks are committed in figures_data.json.\ninventory_notes: It survived several supervision passes because it was plausible and matched the historical narrative. The single most important design-class case in the corpus.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

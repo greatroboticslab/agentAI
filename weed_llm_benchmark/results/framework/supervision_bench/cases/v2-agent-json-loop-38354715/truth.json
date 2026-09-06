@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v2-agent-json-loop-38354715",
+ "class": "code",
+ "date": "2026-04-02",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 38354715\ntitle: Agent mode v1: Brain could not emit an action, looped 30x on the fallback\nsymptom: Qwen-7B never produced a parseable action; 30 consecutive fallback-pipeline calls, no training, no evaluation.\nroot_cause: Free-text JSON action contract with no native tool-calling; the model can generate prose but not the schema.\ncorrection_made: Ollama native function calling added as a backend (brain.py three-backend design).\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v1.1\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 38354715\ndetectable_from: the .out action log: same action repeated with no state change\nartifact_paths_expected: results/framework/slurm_ollama_38354715.out; sacct -j 38354715; results/framework/run_log.json\nprovenance_guess: record-only\nprovenance_reason: April .out files are five months old on /ocean and were never archived; survival must be checked with ls.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

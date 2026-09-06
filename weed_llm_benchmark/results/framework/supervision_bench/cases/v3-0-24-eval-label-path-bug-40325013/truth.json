@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-24-eval-label-path-bug-40325013",
+ "class": "code",
+ "date": "2026-04-27",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: The first clean-eval job failed on a label-path assumption\nsymptom: Eval crashed because images live in test/images and labels in test/labels rather than side by side.\nroot_cause: The staging script assumed co-located images and labels.\ncorrection_made: Path remap; re-run as job 40327811.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.24\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40325013; 40327811\ndetectable_from: eval job FAILED with a path error while the dataset exists\nartifact_paths_expected: results/framework/v3_0_24_eval_40325013.out; results/framework/v3_0_24_eval_40327811.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "ctrl-crossdataset-explanations-killed",
+ "class": "none",
+ "date": "2026-08-26",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ntitle: CONTROL: two plausible artifact explanations tested and rejected before a surprising number was accepted\nsymptom: Zero-shot transfer collapsed from 0.8730 to 0.1003, which invites an 'it must be a bug' verdict.\nroot_cause: Neither explanation survived: EXIF orientation is 1 on all 3,208 images and the content-hash leak check found zero collisions at Hamming <= 6 against train and holdout (nearest neighbours at 16 and 12). A GT-versus-prediction montage supplied the real mechanism (greenhouse seedlings, roughly 3x smaller relative boxes).\ncorrection_made: None needed; the model card's limit was rewritten as a measurement.\nactor_who_corrected: none\nversion_tag: v3.24.7/v3.24.8\ncategory: false-alarm-control\nscope: campaign-governance\nhealthy_control: false\njob_ids: 44465026\ndetectable_from: the leak-check and EXIF sections of the result JSON\nartifact_paths_expected: results/framework/s6_crossdataset_imageweeds.json; results/framework/s6_xds_44465026.out; results/framework/xds_verify_montage.jpg\nprovenance_guess: raw\nprovenance_reason: the result JSON and the montage are committed in this repository.\ninventory_notes: The correct verdict is 'the measurement stands'. Useful against arms that reflexively attribute a surprising number to a defect.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

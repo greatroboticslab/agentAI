@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-99-github-unreachable-from-compute",
+ "class": "config",
+ "date": "2026-06-08",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\nglob_truncated: results/framework/v3_0_43_brain_harvest_*.out kept 8 newest of 36 matches\ntitle: GitHub is unreachable from compute nodes, so one harvest source is permanently dead\nsymptom: Clone attempts time out; compute-to-login SSH is disabled and no HTTP proxy exists.\nroot_cause: Cluster network policy. Not a defect in the pipeline.\ncorrection_made: The GitHub phase skips with a warning; Kaggle and HuggingFace carry the harvest.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.99\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\ndetectable_from: the '[net] WARN: SOCKS proxy ... SKIPPING github' line in every harvest log\nartifact_paths_expected: results/framework/v3_0_43_brain_harvest_*.out\nprovenance_guess: raw\nprovenance_reason: the SKIPPING github line appears in every surviving harvest .out including the 2026-08-29 one.\ninventory_notes: First occurrence only is an incident. Every later occurrence is an environment fact and must be reported at info severity; see ctrl-socks-github-skip-chronic.",
+ "provenance": "raw",
+ "signals_expected": [
+  "source_degraded"
+ ]
+}

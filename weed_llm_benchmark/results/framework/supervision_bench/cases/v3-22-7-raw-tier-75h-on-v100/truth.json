@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-7-raw-tier-75h-on-v100",
+ "class": "config",
+ "date": "2026-08-23",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\nglob_unmatched: results/framework/m1_merged_m1raw_s*_44224995.out\ncommand_collected: sacct -j 44224995\ntitle: Walltime arithmetic caught mid-flight: the raw tier needed ~75 h in a 12 h job\nsymptom: Measured per-epoch times from each run's results.csv gave the curated tier ~17 min/epoch and the raw tier 75-90 min/epoch, so 60 epochs of raw needed about 75 hours.\nroot_cause: Both tiers were sized on the smaller tier's throughput; the raw tier is 4x the images on the same walltime.\ncorrection_made: Both tiers cancelled and resubmitted on uniform h100 so the comparison carries no device confound; ~156 SU estimated, ~13 SU already spent.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.22.7\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44224995; 44225260; 44234060; 44234063\ndetectable_from: the time column of results.csv after 3 rows, projected against the job's walltime\nartifact_paths_expected: results/framework/m1_merged_m1raw_s*_44224995.out; results/framework/mega_iterm1_raw_s101/train*/results.csv; sacct -j 44224995\nprovenance_guess: raw\nprovenance_reason: the cancelled runs' results.csv rows are what made the projection; they are the natural walltime_bound fixture alongside 2026-08-29.\ninventory_notes: This is the same detection the 2026-08-29 case needed. It worked here because a human read results.csv.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound"
+ ]
+}

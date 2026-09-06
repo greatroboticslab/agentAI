@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-m1-curated-s103-44234063",
+ "class": "none",
+ "date": "2026-08-23",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ncommand_collected: sacct -j 44234063_3\ntitle: M1 sealed run: curated tier, seed 103\nsymptom: COMPLETED on h100 under the same protocol.\nactor_who_corrected: none\nversion_tag: v3.22.11\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44234063_3\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/m1_merged_m1cur_s3_44234063.out; results/framework/m1_curated_seed103.json; sacct -j 44234063_3\ninventory_notes: Named control.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

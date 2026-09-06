@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-27-cwd12-train-blocked-by-overreading",
+ "class": "design",
+ "date": "2026-05-04",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: An over-conservative reading of the holdout rule blocked the in-domain training split entirely\nsymptom: Every model was trained without cwd12's own 3,671-image train split, turning an in-distribution task into domain generalisation and costing about 0.27 mAP50-95.\nroot_cause: NEVER_TRAIN_SLUGS banned the whole cottonweeddet12 slug; the operator's instruction had been to protect test+valid only.\ncorrection_made: Discipline restated (never train on the 1,977 test+valid; the train split is fair game) and the missing pretrain -> finetune stage added as job 40594919.\ncorrection_class: design\nactor_who_corrected: human\nversion_tag: v3.0.27\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40594919\ndetectable_from: the merge's used-datasets list against the task's in-domain source; training-set composition vs the evaluation set\nartifact_paths_expected: results/framework/v3_0_27_FT_40594919.out; weed_optimizer_framework/tools/mega_trainer.py\nprovenance_guess: record-only\nprovenance_reason: a design decision recorded in prose; the run artifact exists but is not the finding.\ninventory_notes: Triggered by the operator asking whether the project was on the right track.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

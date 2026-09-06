@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-99-owl-imagecond-precision-002",
+ "class": "design",
+ "date": "2026-06-08",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\nglob_unmatched: results/framework/owl_precision*.json\ntitle: Image-conditioned auto-labelling measured at ~0.02 precision and was gated out\nsymptom: OWLv2 image-conditioned proposals over-fired on every image even at confidence 0.97.\nroot_cause: Image-conditioned open-vocabulary detection does not transfer to this domain at any threshold tested.\ncorrection_made: A precision gate refuses low-quality proposals; auto-labelling is explicitly not allowed to skip human review.\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.0.99\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: measured precision of a proposal source before it is trusted\nartifact_paths_expected: results/framework/owl_precision*.json; results/framework/methodology_log.jsonl\nprovenance_guess: record-only\nprovenance_reason: job ids for the OWL precision runs are not recorded in the changelog. VERIFY with ls results/framework/*owl*.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

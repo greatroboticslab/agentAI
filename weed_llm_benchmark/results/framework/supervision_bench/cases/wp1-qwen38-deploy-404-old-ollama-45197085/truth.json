@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "wp1-qwen38-deploy-404-old-ollama-45197085",
+ "class": "config",
+ "date": "2026-09-04",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: A model deploy failed with 404 because the cluster binary was two years behind the tag\nsymptom: The pull returned 404 for a library tag that exists.\nroot_cause: ollama 0.20.6 predates the model; the deploy path had no version precondition.\ncorrection_made: ollama upgraded to v0.33.3 with the old binary kept in bin-0.20.6-bak/, and the deploy resubmitted (job 45198752).\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: WP1-era\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\njob_ids: 45197085; 45198752\ndetectable_from: a 404 on a tag that resolves from a newer client\nartifact_paths_expected: results/framework/model_deploy_45197085.out; results/framework/model_deploy/*.json\nprovenance_guess: raw\nprovenance_reason: September artifacts.",
+ "provenance": "raw",
+ "signals_expected": [
+  "source_degraded"
+ ]
+}

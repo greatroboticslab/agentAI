@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-21-mamba-numpy2-trapz",
+ "class": "config",
+ "date": "2026-08-24",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: The smoke job built the model and then died in metrics on a function NumPy 2 removed\nsymptom: np.trapz raised in the fork's vendored ultralytics 8.2.29 after the architecture had already built successfully.\nroot_cause: Environment drift: the fork pins an old ultralytics that calls a removed NumPy API.\ncorrection_made: The mambayolo env pinned to numpy<2 (isolated; bench untouched) and the smoke resubmitted.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.22.21/v3.22.22\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44325279; 44344817\ndetectable_from: a traceback after the model summary line\nartifact_paths_expected: results/framework/s3_mamba_s*_44325279.out; results/framework/s3_mamba_s*_44344817.out\nprovenance_guess: raw\nprovenance_reason: August .out files.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

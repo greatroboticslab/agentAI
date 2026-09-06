@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-s2-dino-scores-44225271",
+ "class": "none",
+ "date": "2026-08-22",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ntitle: DINOv2 scoring pass that produced the missing gate input\nsymptom: COMPLETED in 14 minutes; all 45 registry slugs scored.\nactor_who_corrected: none\nversion_tag: v3.22.6\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44225271\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/s2_dino_scores_44225271.out; results/framework/dinov2_curator/slug_scores.json\ninventory_notes:  Not in the plan's named control set; added to widen the false-alarm denominator.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

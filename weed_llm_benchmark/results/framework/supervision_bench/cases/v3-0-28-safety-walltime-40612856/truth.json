@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-28-safety-walltime-40612856",
+ "class": "config",
+ "date": "2026-05-06",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ncommand_collected: sacct -j 40612856\nglob_truncated: results/framework/mega_iter*/train*/results.csv kept 8 newest of 40 matches\ntitle: The first clean baseline timed out at 62 of 200 epochs\nsymptom: TIMEOUT at the 12 h walltime with the best metric recorded around epoch 30.\nroot_cause: A 200-epoch request on a 12 h allocation.\ncorrection_made: Re-run at 24 h as job 40655361; the 12 h number was reported with its epoch count attached.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.28/v3.0.29.1\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40612856; 40655361\ndetectable_from: sacct TIMEOUT; epochs completed vs epochs requested in results.csv\nartifact_paths_expected: results/framework/v3_0_28_safety_40612856.out; sacct -j 40612856; results/framework/mega_iter*/train*/results.csv\nprovenance_guess: raw\nprovenance_reason: the safety run's results.csv underpins a still-quoted number, so it is the most likely May artifact to survive.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound"
+ ]
+}

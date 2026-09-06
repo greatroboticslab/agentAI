@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-30-6-supervision-detections-metadata-40803244",
+ "class": "code",
+ "date": "2026-05-13",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A finished 60-epoch run produced zero predictions because two libraries disagreed\nsymptom: The canonical evaluation wrote 'total preds: 0' after failing on every one of 1,977 images with \"'Detections' object has no attribute 'metadata'\"; exit=1 and no summary JSON.\nroot_cause: supervision 0.6.0 is pinned by groundingdino-py while rfdetr 1.6.5 writes Detections.metadata and .data, added in supervision 0.25/0.21.\ncorrection_made: Idempotent monkey-patch of sv.Detections at import, plus an --eval-only mode so the finished checkpoint did not need a 12 h retrain.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.30.6\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40803244; 40825950\ndetectable_from: an evaluation writing an empty prediction file with a non-zero exit; a per-image error repeated for the whole set\nartifact_paths_expected: results/framework/v3_0_29_rfdetr_40803244.out; results/framework/v3_0_29_rfdetr_eval_40825950.out; results/framework/mega_iterv3_0_29_rfdetr/v3_0_29_rfdetr_pycoco_summary.json\nprovenance_guess: raw\nprovenance_reason: the RF-DETR pycoco summary is a still-quoted artifact, so its directory is likely intact.",
+ "provenance": "raw",
+ "signals_expected": [
+  "stale_artifact"
+ ]
+}

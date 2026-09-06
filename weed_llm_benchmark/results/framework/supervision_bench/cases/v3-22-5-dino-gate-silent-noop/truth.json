@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-5-dino-gate-silent-noop",
+ "class": "code",
+ "date": "2026-08-22",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\nglob_unmatched: results/framework/m1_merged_m1cur_s*_44224997.out\ntitle: The curated tier would have trained on the raw pool and been published as curated\nsymptom: mega_trainer read results/framework/dinov2_curator/slug_scores.json, the file did not exist on the cluster, and the loader's except logged a warning and continued with the gate disabled.\nroot_cause: A quality gate that degrades to no-gate on a missing input, plus MIN_DINO_SCORE having a guessed default.\ncorrection_made: The curated tier refuses to start without the scores file, naming the file and the job that produces it; MIN_DINO_SCORE became a required variable; run_s2_dino_scores.sh added; the queued array was cancelled before it consumed GPU time.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.22.5\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44224997; 44225271; 44228844\ndetectable_from: the merge log's gate line ('gate disabled' warning) against the tier the run claims; kept == raw image count for a curated tier\nartifact_paths_expected: results/framework/m1_merged_m1cur_s*_44224997.out; results/framework/dinov2_curator/slug_scores.json; results/framework/s2_dino_scores_44225271.out\nprovenance_guess: raw\nprovenance_reason: August artifacts; slug_scores.json is live and read by every curated merge.\ninventory_notes: Caught before it ran, so the incident is a near-miss with a cancelled job as its artifact. The canonical gate_noop fixture.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

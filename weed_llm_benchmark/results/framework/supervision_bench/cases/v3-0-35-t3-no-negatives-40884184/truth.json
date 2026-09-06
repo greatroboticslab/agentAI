@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-35-t3-no-negatives-40884184",
+ "class": "design",
+ "date": "2026-05-16",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: A relevance test reported 94% accuracy having tested only positives\nsymptom: The T3 arm ran on 50 positive images because the script could not find non-weed images on disk, and the number was nearly published.\nroot_cause: The test set was assembled by a path glob with no assertion that both classes were present.\ncorrection_made: Re-run with 100 positives and 50 negatives (job 40891361) giving 96% accuracy; the first result recorded as not interpretable.\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.0.35.2\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40884184; 40891361\ndetectable_from: class balance of an evaluation set printed beside its accuracy\nartifact_paths_expected: results/framework/v3_0_35_quality_eval_40884184.out; results/framework/v3_0_35_2_t3_only_40891361.out\nprovenance_guess: record-only\nprovenance_reason: May .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

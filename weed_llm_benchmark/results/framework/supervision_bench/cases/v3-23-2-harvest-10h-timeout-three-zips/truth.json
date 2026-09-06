@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-23-2-harvest-10h-timeout-three-zips",
+ "class": "config",
+ "date": "2026-08-25",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ncommand_collected: sacct -j 44385850\ntitle: A ten-hour harvest downloaded three datasets and timed out\nsymptom: TIMEOUT at the 10 h walltime with three Roboflow datasets fetched.\nroot_cause: Each Roboflow zip is downloaded whole before the 5,000-image cap is applied, so the cap does not bound download time.\ncorrection_made: Collect capped at BRAIN_MAX_NEW=3 per round, decided on the tier ladder's evidence that more harvested data is worth 0.00-0.02.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.23.2\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44385850\ndetectable_from: sacct TIMEOUT on a collect step; datasets registered per hour of collect\nartifact_paths_expected: results/framework/v3_0_43_brain_harvest_44385850.out; sacct -j 44385850\nprovenance_guess: raw\nprovenance_reason: August .out and sacct row.\ninventory_notes: The only campaign correction where a measurement changed the loop's own parameters.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "source_degraded"
+ ]
+}

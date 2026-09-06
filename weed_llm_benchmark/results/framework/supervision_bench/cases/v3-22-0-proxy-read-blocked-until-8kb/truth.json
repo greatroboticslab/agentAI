@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-0-proxy-read-blocked-until-8kb",
+ "class": "code",
+ "date": "2026-08-16",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A streaming relay buffered until 8 KB and made a live camera unusable\nsymptom: Four reads took 12.8 s through the proxy and 1.2 s with read1().\nroot_cause: read(8192) blocks until the buffer fills; a slow stream trickles.\ncorrection_made: read1() so bytes pass as they arrive.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.22.0\ncategory: incident\nscope: robot-uplink\nhealthy_control: false\ndetectable_from: measured per-read latency against the source's own rate\nprovenance_guess: record-only\nprovenance_reason: a measured browser/proxy defect.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "none"
+ ]
+}

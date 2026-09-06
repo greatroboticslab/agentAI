@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-32-cumulative-walltime-3x-40839159",
+ "class": "config",
+ "date": "2026-05-15",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ncommand_collected: sacct -j 40839159\nglob_truncated: results/framework/mega_iter*/train*/results.csv kept 8 newest of 40 matches\ntitle: A cumulative run needed about 104 hours inside a 36-hour allocation\nsymptom: TIMEOUT at 7 of 30 epochs on a 202,846-image corpus.\nroot_cause: 30 epochs x batch 6 x imgsz 896 on 202K images is ~1M iterations at ~2.7 it/s; the walltime was roughly three times too small.\ncorrection_made: An eval-only job (40877439) read the partial checkpoint so the data point was not lost; later recipes sized epochs and image size to the corpus.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.32\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40839159; 40877439\ndetectable_from: iterations/epoch x it/s x epochs vs requested walltime, computable from the first epoch\nartifact_paths_expected: results/framework/v3_0_32_yolo26x_cumulative_40839159.out; sacct -j 40839159; results/framework/mega_iter*/train*/results.csv\nprovenance_guess: raw\nprovenance_reason: the partial run's results.csv had to survive for the eval-only job to read it.\ninventory_notes: Same failure class as the 2026-08-29 dev case, three months earlier and with the same missing projection.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "pool_growth"
+ ]
+}

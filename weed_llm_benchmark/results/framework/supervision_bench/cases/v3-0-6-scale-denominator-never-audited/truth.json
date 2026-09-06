@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-6-scale-denominator-never-audited",
+ "class": "plan",
+ "date": "2026-04-18",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "plan",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: plan (from correction_class)\nescalation_expected: human (rule: correction_class=plan: no agent tier may stop or redirect a phase)\ntitle: Six releases of bug fixes, none of which audited the corpus size against the stated goal\nsymptom: Registry held 9,303 images against a stated 10^4-10^5 north star, and job 39682959's celebrated 0.902 was overfitting on that 9K set.\nroot_cause: Each revision fixed the next bug and declared progress; no release compared the denominator to the objective.\ncorrection_made: Scale audit; new sources (Roboflow, all-configs HF, Kaggle); a standing memory rule to audit the registry total at every session start.\ncorrection_class: plan\nactor_who_corrected: human\nversion_tag: v3.0.7\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39682959\ndetectable_from: registry image total vs the plan's target; training-set size behind a headline metric\nartifact_paths_expected: results/framework/dataset_registry.json; results/framework/slurm_ollama_39682959.out\nprovenance_guess: record-only\nprovenance_reason: a plan-level miss; the evidence is the registry total, which has since grown.",
+ "provenance": "raw",
+ "signals_expected": [
+  "pool_growth",
+  "plateau"
+ ]
+}

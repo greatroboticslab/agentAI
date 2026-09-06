@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-1-still-yolo11x-39393048",
+ "class": "code",
+ "date": "2026-04-16",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Second attempt still trained yolo11x on the same 5,648 images\nsymptom: The run reported success while training the pre-v3.0 corpus with the pre-v3.0 model.\nroot_cause: Three compounding defects: a conservative default model, HF downloads dropping bboxes (only item['image'] saved), and no gate on mega training so the Brain trained on pre-registered leave4out data.\ncorrection_made: yolo26x default, schema-aware HF converter, hard DATA GATE with an injected READY/INSUFFICIENT status.\ncorrection_class: code\nactor_who_corrected: human\nversion_tag: v3.0.2\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39393048\ndetectable_from: training image count equal to the previous run's; registry bbox delta of 0 after a harvest step\nartifact_paths_expected: results/framework/slurm_ollama_39393048.out; results/framework/dataset_registry.json\nprovenance_guess: record-only\nprovenance_reason: April .out; detected by the operator reading the dashboard, not by any automated check.\ninventory_notes: Operator detection: 'why is it yolo11 and the same 5000-odd labels'.",
+ "provenance": "raw",
+ "signals_expected": [
+  "pool_growth"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v2-ollama-coldstart-timeout-38477380",
+ "class": "config",
+ "date": "2026-04-04",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: First Brain call timed out on a 5-minute model cold start\nsymptom: The first decision request exceeded the Ollama client timeout and fell to the fallback pipeline.\nroot_cause: Client timeout was sized for a warm model; a cold 7B load takes about five minutes on the shared node.\ncorrection_made: Recorded; subsequent calls succeeded once the model was resident. No timeout change was made at the time.\ncorrection_class: config\nactor_who_corrected: none\nversion_tag: v2.0\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 38477380\ndetectable_from: one timeout line followed by fallback, then normal calls\nartifact_paths_expected: results/framework/slurm_ollama_38477380.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

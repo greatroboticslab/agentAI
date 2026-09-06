@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-99-roboflow-15m-file-export",
+ "class": "code",
+ "date": "2026-06-08",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\nglob_unmatched: results/framework/v3_0_99_rf_pull_*.out\ntitle: A 10K-image export was a 1.5-million-file dump that extracted for eight hours and blocked the batch\nsymptom: One pull stalled a whole bulk harvest on Lustre extraction.\nroot_cause: No per-pull timeout and no size sanity check before extraction.\ncorrection_made: Each pull runs as a subprocess with a 360 s timeout; mega datasets are skipped.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.99.10-.14\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\ndetectable_from: a collect step's elapsed time with no registry delta; file count of an in-progress extraction\nartifact_paths_expected: results/framework/v3_0_99_rf_pull_*.out\nprovenance_guess: record-only\nprovenance_reason: job id not recorded. VERIFY with ls results/framework/*rf_pull*.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "walltime_bound"
+ ]
+}

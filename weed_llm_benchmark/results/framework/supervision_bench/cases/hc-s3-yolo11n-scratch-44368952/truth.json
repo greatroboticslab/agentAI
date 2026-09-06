@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-s3-yolo11n-scratch-44368952",
+ "class": "none",
+ "date": "2026-08-24",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\nglob_unmatched: results/framework/s3_yolo11n_scratch_s10*.json\ntitle: S3 fairness control: YOLO11n from scratch, 3 seeds (0.8041 +/- 0.0028)\nsymptom: All three tasks COMPLETED; this is the control that reversed the architecture reading.\nactor_who_corrected: none\nversion_tag: v3.22.24\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44368952_1; 44368952_2; 44368952_3\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/s3_y11nsc_s*_44368952.out; results/framework/s3_yolo11n_scratch_s10*.json\ninventory_notes:  Not in the plan's named control set; added to widen the false-alarm denominator.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-25-3-probe-repointed-campaign-state-45290759",
+ "class": "code",
+ "date": "2026-09-06",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\nglob_unmatched: results/framework/mega_iter*job45290759/train/weights/best.pt\ntitle: A one-epoch probe repointed the registry's progressive-training checkpoint at itself\nsymptom: The successful walltime-cap smoke set last_mega_weights to its own one-epoch checkpoint and incremented mega_round_count, so the next real round would have continued from a probe and deleting the probe directory would have broken the chain.\nroot_cause: Every training run mutated campaign state; nothing distinguished a probe from a round.\ncorrection_made: WEED_SMOKE=1 keeps the training and its artifacts and skips only the registry mutation; the pointer was restored to the last completed round's checkpoint through the locked merge-write.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.25.3\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 45290759\ndetectable_from: last_mega_weights pointing into a run directory whose results.csv has one row; registry mtime inside a probe job's window\nartifact_paths_expected: results/framework/m1_merged_*_45290759.out; results/framework/dataset_registry.json; results/framework/mega_iter*job45290759/train/weights/best.pt\nprovenance_guess: raw\nprovenance_reason: September artifacts; the registry field and the probe run directory both exist.\ninventory_notes: Same ownership family as the two campaign registry incidents, this time a worker overwriting a campaign pointer rather than a supervisory field.",
+ "provenance": "raw",
+ "signals_expected": [
+  "ownership_violation",
+  "stale_artifact"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-14-stale-metric-train2",
+ "class": "code",
+ "date": "2026-08-23",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: The scheduler was about to attach a day-old number to a fresh round\nsymptom: The round's training wrote to mega_iterm1_curated_s101/train2 while train/ still held the previous day's M1 run; _train_metric globbed the plain train path and would have published 0.5873 from 04:52 as the result of a round that started at 15:05.\nroot_cause: Ultralytics increments the run directory and the reader took a fixed path, with no freshness or ownership check.\ncorrection_made: _train_metric(started_ts) takes the newest results.csv under mega_iter*/train*/ and accepts it only if written after the step started, otherwise logs the refusal and attaches no metric. WP1 later replaced this with a job-scoped artifact read by job id.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.22.14\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44278259\ndetectable_from: results.csv mtime against the step start time; two sibling run directories under one mega_iter\nartifact_paths_expected: results/framework/mega_iterm1_curated_s101/train/results.csv; results/framework/mega_iterm1_curated_s101/train2/results.csv; results/framework/m1_merged_rndtrain_s1_44278259.out\nprovenance_guess: raw\nprovenance_reason: both run directories are named in the record and were still present when the scheduler read them.\ninventory_notes: Canonical stale_artifact fixture: the two mtimes are the whole case.",
+ "provenance": "raw",
+ "signals_expected": [
+  "stale_artifact"
+ ]
+}

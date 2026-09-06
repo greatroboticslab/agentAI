@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-14-autolabel-eats-walltime-40069494",
+ "class": "config",
+ "date": "2026-04-20",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: Auto-labelling worked and still left no walltime for training\nsymptom: 41K images labelled at 97.6% real detection rate, 93K total, and no mega training in 8 h.\nroot_cause: No per-round budget on the labelling step.\ncorrection_made: Per-round caps (20,000 total / 15,000 per dataset) in the autolabel_pending handler.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.15\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40069494\ndetectable_from: step elapsed vs walltime with the next step never started\nartifact_paths_expected: results/framework/slurm_ollama_40069494.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound"
+ ]
+}

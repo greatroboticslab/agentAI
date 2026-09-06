@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-keyword-table-miss-39363972",
+ "class": "code",
+ "date": "2026-04-16",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: v3.0 shipped and no v3.0 feature fired\nsymptom: A 1 h 56 m training run completed with none of the new tools called; the Brain emitted plain text 'filter_labels'.\nroot_cause: _parse_text_action's keyword table did not contain the new v3.0 tool names, so text-mode responses routed to legacy actions; the trainer separately hardcoded YOLO11n.\ncorrection_made: Keyword table extended to all 18 tools; trainer takes strategy['base_model'] then Config.DETECTION_MODEL.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.1\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39363972\ndetectable_from: the .out's model banner ('YOLO11n summary ... 2,583,907 parameters') contradicting the configured yolo26x\nartifact_paths_expected: results/framework/slurm_ollama_39363972.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

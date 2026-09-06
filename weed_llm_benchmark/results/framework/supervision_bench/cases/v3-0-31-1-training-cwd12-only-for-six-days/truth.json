@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-31-1-training-cwd12-only-for-six-days",
+ "class": "plan",
+ "date": "2026-05-14",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "plan",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: plan (from correction_class)\nescalation_expected: human (rule: correction_class=plan: no agent tier may stop or redirect a phase)\ntitle: The collector accumulated 1.5M images while the trainer used only 3,671 of them\nsymptom: Asked whether the two agents were actually coupled, the honest answer was no: training had been cwd12-only since the leak retraction six days earlier.\nroot_cause: After the retraction the safest training recipe was adopted and never revisited, so the loop's two halves ran independently.\ncorrection_made: v3.0.32 cumulative training submitted (job 40839159) as the missing link, with a triple-defence leak check.\ncorrection_class: plan\nactor_who_corrected: human\nversion_tag: v3.0.31.1/v3.0.32\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40839159\ndetectable_from: the training corpus composition against the registry's growth over the same period\nartifact_paths_expected: results/framework/dataset_registry.json; results/framework/v3_0_32_yolo26x_cumulative_40839159.out\nprovenance_guess: record-only\nprovenance_reason: a plan-level miss found by an operator question; the artifact is the absence of harvested data in the merges.",
+ "provenance": "raw",
+ "signals_expected": [
+  "pool_growth"
+ ]
+}

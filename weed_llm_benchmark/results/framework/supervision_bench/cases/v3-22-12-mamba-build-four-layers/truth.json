@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-12-mamba-build-four-layers",
+ "class": "config",
+ "date": "2026-08-23",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: A CUDA extension took four failed builds, each hiding the next cause\nsymptom: Four consecutive build jobs failed for four distinct reasons before the extension imported.\nroot_cause: pip build isolation (no torch in the build env) -> login-node vs GPU-node difference -> pip filtering the compiler diagnostics out of the log -> GCC 8.5 too old for torch 2.3's headers ('overflow in constant expression' in DispatchKeySet.h).\ncorrection_made: --no-build-isolation on a GPU node, setup.py build_ext invoked directly with output unfiltered, and module load gcc/10.2.0; all three produced modules import under torch 2.3.0+cu121.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.22.12/v3.22.13\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44275211; 44280678\ndetectable_from: a build log whose real diagnostic is filtered away by the wrapper\nartifact_paths_expected: results/framework/*_44275211.out; results/framework/*_44280678.out\nprovenance_guess: raw\nprovenance_reason: August .out files.\ninventory_notes: These four submissions are the campaign's recorded cluster-etiquette violation (see v3-22-15-cluster-etiquette-skipped).",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

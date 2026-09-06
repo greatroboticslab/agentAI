@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-1-0-c1-holdout-dhash-not-seeded",
+ "class": "code",
+ "date": "2026-07-04",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: The holdout guard was filename-only, so a re-exported copy of a test image could train\nsymptom: A resized, re-encoded and renamed holdout image (the common Roboflow orig_jpg.rf.<hex>.jpg case) passed both the slug list and the stem filter.\nroot_cause: seen_hashes was never seeded with the holdout's own dHashes, so content-level identity was never checked.\ncorrection_made: _load_holdout_dhashes() pre-seeds seen_hashes with all 1,977 holdout dHashes under a __HOLDOUT__ sentinel and counts skipped_holdout_hash; every subsequent run prints the counter.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.1.0\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: absence of a content-level guard counter in a merge summary; a dHash intersection between the train set and the holdout\nartifact_paths_expected: results/framework/m1_raw_seed101.json; results/framework/m1_curated_seed101.json; weed_optimizer_framework/tools/mega_trainer.py\nprovenance_guess: raw\nprovenance_reason: every M1 artifact carries the guard counter; the pre-fix state is provable by its absence in older merge logs.\ninventory_notes: Paper-blocking when found. The M1 re-measurement (2026-08-23) is the correction's proof.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

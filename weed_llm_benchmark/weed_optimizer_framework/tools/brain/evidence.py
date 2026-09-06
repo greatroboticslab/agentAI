@@ -371,7 +371,7 @@ S harvest $rc
   echo "[block] squeue"
   echo "[value] squeue_depth=$(squeue -h -u "${USER:-nobody}" 2>/dev/null | wc -l | tr -d ' ')"
   echo "[block] quota"
-  echo "[none] the per-project quota is not readable from df; VERIFY: run the site quota command for __PROJ__ and stage the answer as $BR/su.json"; } > "$O" 2> "$E"; rc=$?
+  if [ -f "$BR/quota.json" ]; then NUMBER "$BR/quota.json"; else echo "[none] the per-project quota is not readable from df; VERIFY: run the site quota command for __PROJ__ and stage its answer as $BR/quota.json"; fi; } > "$O" 2> "$E"; rc=$?
 S resources $rc
 
 C "$BR/su.json" "no staged SU ledger at $BR/su.json" > "$O" 2> "$E"; rc=$?
@@ -387,6 +387,18 @@ case "$T" in */ev_*) rm -rf "$T" 2>/dev/null ;; esac
 exit 0
 """
 
+# VERIFY (each line is the exact command that settles the fact above it):
+#   the .out naming for an array task, which is why the gather globs on both the
+#   printed job id and sacct's JobIDRaw:
+#     ls -la results/framework/*44727703*.out
+#   JobIDRaw exists and carries the task's own numeric id:
+#     sacct -j 44727703 -X -P -o JobID,JobIDRaw,State,Elapsed,Timelimit,AllocTRES
+#   the job-scoped run directory shape the results.csv globs assume:
+#     ls -d results/framework/mega_iter*/job*/results.csv
+#   the tools this script needs on a compute and a login node:
+#     command -v awk sed sha256sum stat wc squeue sacct df base64 gunzip
+#   whether stat takes -c (GNU) or -f (BSD); the script tries -c then -f:
+#     stat -c %Y results/framework 2>&1 | head -1
 # The order the script emits, and the order the parser expects.
 REMOTE_SECTIONS = ("ledger", "sacct", "out_tail", "results_csv", "strategy",
                    "trace", "slug_scores", "registry_diff", "harvest",
@@ -700,9 +712,25 @@ def _resources_value(sec, lim):
     if sq is not None:
         depth = _num(sq)
         out["squeue_depth"] = int(depth) if depth is not None else None
+    # The per-project allocation is a different number from filesystem free and
+    # df cannot see it, so it is only ever reported when the lab staged it.
     quota = sec["blocks"].get("quota", _blank_block())
     if quota.get("none"):
         out["quota_reason"] = quota["none"]
+    elif quota["pairs"]:
+        obj, why = _json_of(quota)
+        if isinstance(obj, dict):
+            for key in ("quota_headroom_gb", "headroom_gb", "available_gb",
+                        "free_gb"):
+                if _num(obj.get(key)) is not None:
+                    out["quota_headroom_gb"] = _num(obj[key])
+                    out["quota_reason"] = "staged as %s" % key
+                    break
+            else:
+                out["quota_reason"] = ("the staged quota file names no headroom "
+                                       "field this reads")
+        else:
+            out["quota_reason"] = why or "the staged quota file is not JSON"
     return out
 
 

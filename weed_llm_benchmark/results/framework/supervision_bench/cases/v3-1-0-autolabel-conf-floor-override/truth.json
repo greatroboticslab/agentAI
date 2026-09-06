@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-1-0-autolabel-conf-floor-override",
+ "class": "code",
+ "date": "2026-07-04",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A caller hardcoded a confidence floor that silently undid a safety change\nsymptom: orchestrator.py passed conf_threshold=0.12 at both autolabel call sites, overriding the 0.30 default that had been raised precisely because 0.12 produced false-positive-dominated pseudo-labels.\nroot_cause: A defaulted safety parameter was overridden at the call site and the override outlived the reason for the default.\ncorrection_made: Both sites use 0.30.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.1.0\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\ndetectable_from: the effective threshold printed by the labelling step against the module default\nartifact_paths_expected: weed_optimizer_framework/orchestrator.py; weed_optimizer_framework/tools/autolabel.py\nprovenance_guess: record-only\nprovenance_reason: a code-audit finding.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

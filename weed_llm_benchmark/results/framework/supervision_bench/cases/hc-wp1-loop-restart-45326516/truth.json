@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-wp1-loop-restart-45326516",
+ "class": "none",
+ "date": "2026-09-06",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ntitle: First round after the loop was re-enabled\nsymptom: Submitted with the corrected parameters (TRAIN_TIME_H=10.0) rather than the command that had failed twice.\nactor_who_corrected: none\nversion_tag: v3.25.3\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 45326516\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/m1_merged_rndtrain_s1_45326516.out; results/framework/m1_curated_seed101_45326516.json; results/framework/_brain/weed/trace/*_45326516.jsonl\ninventory_notes: VERIFY the outcome before labelling this clean: it was still in flight when WP1 closed. Not in the plan's named control set; added to widen the false-alarm denominator.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

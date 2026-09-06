@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "ctrl-cottonweed-holdout-in-merge-accounting",
+ "class": "none",
+ "date": "2026-08-23",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ntitle: CONTROL: a scary-looking merge line that is benign\nsymptom: The merge accounting listed cottonweed_holdout among used datasets, which reads as a holdout leak.\nroot_cause: It is the val-staging record ('[Merge] val OVERRIDE -> cwd12 holdout staged'); the guard lines show 1,977 dHashes pre-seeded in every run and a direct file-level check found zero holdout stems in the train sets.\ncorrection_made: None needed. Investigated and recorded as benign with the verification chain attached.\nactor_who_corrected: none\nversion_tag: v3.22.11\ncategory: false-alarm-control\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44234060; 44234063\ndetectable_from: the guard counter lines beside the used-datasets list; a stem intersection check\nartifact_paths_expected: results/framework/m1_raw_seed101.json; results/framework/m1_merged_m1raw_s1_44234060.out\nprovenance_guess: raw\nprovenance_reason: the M1 artifacts carry both the alarming line and the exonerating counters.\ninventory_notes: The correct verdict is 'no incident'. Any arm that flags this is a false alarm on a case where the artifact genuinely looks wrong.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

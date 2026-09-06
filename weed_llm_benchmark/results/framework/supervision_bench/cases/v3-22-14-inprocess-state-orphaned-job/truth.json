@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-14-inprocess-state-orphaned-job",
+ "class": "code",
+ "date": "2026-08-23",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A dashboard restart orphaned a live 2 h 40 m training job and freed the scheduler to submit it again\nsymptom: In-process _STATE was lost on restart; the ledger still showed the step running but the scheduler no longer knew about it.\nroot_cause: Scheduler state lived only in process memory while the durable truth was on the ledger.\ncorrection_made: _recover_inflight() re-adopts any step still marked running with its real job id at mount; verified in the service log for job 44278259.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.22.14\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44278259\ndetectable_from: a ledger step marked running with no in-process owner after a restart; squeue showing a job the scheduler does not track\nartifact_paths_expected: results/framework/cluster_actions.jsonl; ~/.round_scheduler.json\nprovenance_guess: record-only\nprovenance_reason: the evidence is a lab-server journal line plus the scheduler state file.",
+ "provenance": "raw",
+ "signals_expected": [
+  "job_unknown"
+ ]
+}

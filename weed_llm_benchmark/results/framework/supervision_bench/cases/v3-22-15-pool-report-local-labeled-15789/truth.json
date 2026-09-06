@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-15-pool-report-local-labeled-15789",
+ "class": "code",
+ "date": "2026-08-23",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A new measurement tool reported 15,789 labelled images against a real 120,515\nsymptom: The pool report read a flat 0 for cottonweed_sp8, the in-domain core the merge trains on every round.\nroot_cause: It read the registry field local_labeled, which only later harvests populate; legacy entries report 0.\ncorrection_made: Count label files on disk, bounded to labels* directories and never descending into image trees.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.22.15\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: a per-source labelled count of 0 for a source known to be labelled\nartifact_paths_expected: results/framework/pool_report.json; results/framework/dataset_registry.json\nprovenance_guess: raw\nprovenance_reason: pool_report.json is synced to the lab and read by the Evidence panel.\ninventory_notes: The tool caught an error in itself on its first run; a good instrument-calibration control.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

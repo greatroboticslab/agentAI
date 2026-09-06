@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-s6-crossdataset-44465026",
+ "class": "none",
+ "date": "2026-08-25",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ntitle: Cross-dataset transfer evaluation with its leak check\nsymptom: COMPLETED; n=3 seeds, leak check clean at Hamming <= 6, in-domain reference under the identical matcher.\nactor_who_corrected: none\nversion_tag: v3.24.7\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44465026\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/s6_xds_44465026.out; results/framework/s6_crossdataset_imageweeds.json\ninventory_notes:  Not in the plan's named control set; added to widen the false-alarm denominator.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

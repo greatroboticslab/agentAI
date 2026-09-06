@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-9-plantvillage-zero-bbox-39928698",
+ "class": "code",
+ "date": "2026-04-18",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Autonomous Kaggle search added 379,959 images with zero bounding boxes\nsymptom: Three large downloads succeeded and the log read '+379959 images (0 with bboxes)'.\nroot_cause: The pre-filter required agriculture vocabulary only, so 'plantvillage' passed on 'plant' + 'village'; classification sets entered the registry as detection candidates.\ncorrection_made: Require an agriculture term AND a detection hint before download; reject zero-label downloads at registration (later softened into the needs_autolabel path).\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.10\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39928698\ndetectable_from: images added with labelled=0 for the whole round; registry entries with annotation kind image_only\nartifact_paths_expected: results/framework/slurm_ollama_39928698.out; results/framework/dataset_registry.json\nprovenance_guess: record-only\nprovenance_reason: the three datasets were later deleted from /ocean to reclaim space; only the log line survives.\ninventory_notes: This is the ancestor of the campaign's BRAIN_STRICT labelled==0 gate (v3.22.13).",
+ "provenance": "raw",
+ "signals_expected": [
+  "pool_growth"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v2-labeldir-zero-f1-38477380",
+ "class": "code",
+ "date": "2026-04-05",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Round 1 scored old_f1=0 / new_f1=0 from a label-directory bug\nsymptom: A complete round trained and evaluated but both F1 values read exactly 0.\nroot_cause: Evaluator pointed at a label directory that held no labels for the evaluated split.\ncorrection_made: Label path corrected; the round re-ran in the same job.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v2.0\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 38477380\ndetectable_from: a metric of exactly 0.0 for both arms is an instrument failure, not a result\nartifact_paths_expected: results/framework/slurm_ollama_38477380.out; results/framework/deepseek_r1_results.json\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

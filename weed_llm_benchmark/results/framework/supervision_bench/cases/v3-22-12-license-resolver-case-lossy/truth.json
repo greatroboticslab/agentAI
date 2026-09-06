@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-12-license-resolver-case-lossy",
+ "class": "code",
+ "date": "2026-08-23",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Three weed datasets reported no licence because the resolver rebuilt their ids from a lowercased slug\nsymptom: project_AgML resolved as project_agml and 404'd; five entries stayed unreachable.\nroot_cause: The resolver reconstructed owner/name from the slug instead of using the registry's stored source id.\ncorrection_made: Prefer hf_id/source_id/repo_id, fall back to reconstruction; licence backfill runs after every scheduled harvest. Result 41/47 explicit, zero unreachable.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.22.12\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: count of registry entries with an unreachable licence status\nartifact_paths_expected: results/framework/dataset_registry.json; results/framework/figures_data.json\nprovenance_guess: raw\nprovenance_reason: the licence sweep block is committed in figures_data.json.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

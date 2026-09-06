@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-21-job-unknown-booked-as-failed",
+ "class": "code",
+ "date": "2026-08-24",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 44322382\ntitle: A COMPLETED harvest was recorded as failed and fed the stop-loss\nsymptom: Round 3's collect ran 3 h 10 m and sacct records COMPLETED, but the scheduler booked the step failed.\nroot_cause: _job_state() polled in the gap where a job has left squeue and has not yet appeared in sacct, got nothing, returned UNKNOWN, and the caller treated UNKNOWN as failure.\ncorrection_made: _job_state() polls up to four times with backoff and an UNKNOWN leaves the step in flight instead of inventing a verdict.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.22.21\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44322382\ndetectable_from: the ledger's step outcome against the sacct row for the same job id\nartifact_paths_expected: results/framework/v3_0_43_brain_harvest_44322382.out; sacct -j 44322382; results/framework/cluster_actions.jsonl\nprovenance_guess: raw\nprovenance_reason: the sacct row and the collect .out are both durable; the contradiction between them is the whole case.\ninventory_notes: Canonical job_unknown fixture. A success miscounted as a failure is the harder direction to notice because the system looks cautious.",
+ "provenance": "raw",
+ "signals_expected": [
+  "job_unknown"
+ ]
+}

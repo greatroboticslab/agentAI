@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-24-7-imageweeds-license-none",
+ "class": "config",
+ "date": "2026-08-25",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: The one audit-passing source carried no licence although its card states CC BY 4.0\nsymptom: registry license: None on the slug about to be used for the cross-dataset measurement.\nroot_cause: One of the licence sweep's six unresolved entries.\ncorrection_made: Fixed through registry_lock.update_registry with the source cited.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.24.7\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: licence field of every source used in a published measurement\nartifact_paths_expected: results/framework/dataset_registry.json\nprovenance_guess: raw\nprovenance_reason: the registry entry now carries the licence and its source.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

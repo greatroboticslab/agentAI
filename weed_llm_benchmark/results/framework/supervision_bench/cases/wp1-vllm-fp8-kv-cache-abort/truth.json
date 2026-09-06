@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "wp1-vllm-fp8-kv-cache-abort",
+ "class": "config",
+ "date": "2026-09-05",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: A serving job aborted every tensor-parallel worker at model build, twice, before the cause was named\nsymptom: vLLM 0.28's DeepSeek-V4 attention asserts an fp8 KV cache and the default aborted the build; separately, vllm serve rejected --disable-log-requests and exited immediately while the poll loop reported only 'server never became healthy' after its full interval.\nroot_cause: An unstated model requirement plus a removed CLI flag, both hidden behind a poll loop that reported a timeout instead of the server's own message.\ncorrection_made: VLLM_KV_DTYPE added and set to fp8; the rejected flag removed; the early-exit branch prints the server's own message and the elapsed time so a rejected argument reads as a rejected argument.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.25.2\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\njob_ids: 45225918\ndetectable_from: a health poll reporting a timeout while the server process exited seconds after start\nartifact_paths_expected: results/framework/vllm_verify_45225918.out; results/framework/model_deploy/v4flash_verify1.json\nprovenance_guess: raw\nprovenance_reason: September artifacts.\ninventory_notes: VERIFY the job ids of the second and third verify attempts; only verify1 and verify3 result files are named in the record.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

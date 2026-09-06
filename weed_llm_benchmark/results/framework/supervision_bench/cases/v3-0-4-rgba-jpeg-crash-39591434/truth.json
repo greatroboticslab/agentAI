@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-4-rgba-jpeg-crash-39591434",
+ "class": "code",
+ "date": "2026-04-16",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: The one candidate that passed the harvest filter crashed on save\nsymptom: 'cannot write mode RGBA as JPEG' aborted the download of the only passing dataset; the round then trained on the old corpus.\nroot_cause: PIL cannot save RGBA to JPEG; no mode normalisation before write.\ncorrection_made: Flatten RGBA/LA/P/CMYK onto white before JPEG save; count per-dataset save errors instead of aborting the dataset.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.5\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39591434\ndetectable_from: harvest reported 1 candidate passed and 0 datasets registered\nartifact_paths_expected: results/framework/slurm_ollama_39591434.out\nprovenance_guess: record-only\nprovenance_reason: April .out; job cancelled mid-run.",
+ "provenance": "raw",
+ "signals_expected": [
+  "pool_growth"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-7-roboflow-search-401-39760438",
+ "class": "config",
+ "date": "2026-04-18",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: Roboflow search returned 401 nineteen times and five of six project slugs 404'd\nsymptom: An entire configured source contributed zero images while logging only warnings.\nroot_cause: The public Roboflow search endpoint does not accept a workspace-scoped key, and the project slugs had been guessed rather than resolved.\ncorrection_made: Roboflow made a no-op source until a programmatic search existed (later restored in v3.0.99.8).\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.8/v3.0.9\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39760438\ndetectable_from: per-source candidate counts in the harvest log: a source at 0 with HTTP errors\nartifact_paths_expected: results/framework/slurm_ollama_39760438.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "source_degraded"
+ ]
+}

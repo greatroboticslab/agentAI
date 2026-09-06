@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-25-1-step-command-allowlist-refused-on-lab",
+ "class": "code",
+ "date": "2026-09-05",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A safety check would have stopped the loop silently on the machine that runs it\nsymptom: validate_step_command's is_file() check refused every legitimate template on the lab server, where the loop renders and the run scripts do not exist.\nroot_cause: Existence was verified where it is not authoritative; the scripts live in the cluster checkout.\ncorrection_made: A code-held allow-list of script names is the single choke point (a config patch chooses parameters, never a new executable); existence is verified where it is loud, because sbatch fails immediately on a missing script.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.25.1\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\ndetectable_from: running the tests on the machine that executes the code, not only on a development box\nartifact_paths_expected: weed_optimizer_framework/tools/db.py; tests/test_round_templates.py\nprovenance_guess: record-only\nprovenance_reason: caught during deploy by running the test suite on the lab venv; no run artifact.\ninventory_notes: Caught only by running the tests where the code runs, not by reasoning.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

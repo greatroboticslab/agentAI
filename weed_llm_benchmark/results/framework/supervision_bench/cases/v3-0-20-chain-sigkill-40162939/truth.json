@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-20-chain-sigkill-40162939",
+ "class": "code",
+ "date": "2026-04-22",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 40162939\ntitle: The self-chain died because the walltime SIGKILL preceded the shell's submit line\nsymptom: The job ran to its wall and the follow-up job was never submitted, so an unattended chain stopped without any failure being recorded.\nroot_cause: Chain continuation was written as post-Python shell work, which a walltime kill removes.\ncorrection_made: Inverted semantics: pre-queue the next job with --dependency=afterany at start; write stop_chain.txt to cancel; next job re-checks the flag at start; depth cap 40.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.21\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40162939\ndetectable_from: sacct shows no successor job after a TIMEOUT; chain depth counter unchanged\nartifact_paths_expected: results/framework/slurm_ollama_40162939.out; sacct -j 40162939\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "job_unknown"
+ ]
+}

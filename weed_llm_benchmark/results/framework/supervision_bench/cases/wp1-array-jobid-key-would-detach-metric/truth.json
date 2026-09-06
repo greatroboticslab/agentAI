@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "wp1-array-jobid-key-would-detach-metric",
+ "class": "code",
+ "date": "2026-09-05",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\nglob_unmatched: results/framework/m1_*_45227822.json\ncommand_collected: sacct -j 45227822\ntitle: Keying artifacts on SLURM_JOB_ID would have silently disabled both new readers for every array task after the first\nsymptom: An --array=1-3 submission printed 45227822 while its first task ran as SLURM_JOB_ID 45227848.\nroot_cause: sbatch prints SLURM_ARRAY_JOB_ID; every task after the first gets a fresh SLURM_JOB_ID, so files named after the latter cannot be found by the id the scheduler holds.\ncorrection_made: JOB_KEY = SLURM_ARRAY_JOB_ID with a fallback to SLURM_JOB_ID; verified on the cluster with a real array submission.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.25.0\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 45227822; 45227848\ndetectable_from: the id sbatch printed against the id inside the job's environment\nartifact_paths_expected: results/framework/m1_*_45227822.json; sacct -j 45227822\nprovenance_guess: raw\nprovenance_reason: the verification run's artifacts exist and are dated 2026-09-05.\ninventory_notes: Would have reproduced the 2026-08-29 silence for every multi-seed round.",
+ "provenance": "raw",
+ "signals_expected": [
+  "stale_artifact"
+ ]
+}

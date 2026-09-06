@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-31-1-rfdetr-large-resolution-40832757",
+ "class": "config",
+ "date": "2026-05-14",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: RF-DETR Large crashed at startup on the Medium model's resolution\nsymptom: size mismatch for position_embeddings: expected [1,1937,384] (704), configured [1,1297,384] (576).\nroot_cause: Large is pretrained at 704, Medium at 576; the launcher reused the Medium setting.\ncorrection_made: --resolution 704; re-submitted as job 40839152, which ran 14 h 36 m.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.31.1\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40832757; 40839152\ndetectable_from: sacct FAILED at sub-minute Elapsed with a shape error\nartifact_paths_expected: results/framework/v3_0_31_rfdetr_large_40832757.out; results/framework/v3_0_31_rfdetr_large_40839152.out\nprovenance_guess: record-only\nprovenance_reason: May .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

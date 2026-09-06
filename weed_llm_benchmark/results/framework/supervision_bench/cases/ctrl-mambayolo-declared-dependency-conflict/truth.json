@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "ctrl-mambayolo-declared-dependency-conflict",
+ "class": "none",
+ "date": "2026-08-24",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ntitle: CONTROL: a declared dependency conflict that is not a real one\nsymptom: The mambayolo env pins numpy<2 while its opencv-python 5.0 declares numpy>=2.\nroot_cause: The declaration is wrong for this usage; the smoke ran cleanly regardless.\ncorrection_made: None. Recorded in case a later failure points back at it.\nactor_who_corrected: none\nversion_tag: v3.22.22\ncategory: false-alarm-control\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44344817\ndetectable_from: the pip resolver warning against the job's actual outcome\nartifact_paths_expected: results/framework/s3_mamba_s*_44344817.out\nprovenance_guess: raw\nprovenance_reason: August .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

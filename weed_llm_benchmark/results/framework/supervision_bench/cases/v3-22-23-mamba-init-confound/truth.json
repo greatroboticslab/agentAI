@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-23-mamba-init-confound",
+ "class": "design",
+ "date": "2026-08-24",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\nglob_truncated: results/framework/s3_*.json kept 8 newest of 19 matches\ntitle: An architecture comparison was about to be published with the initialisation confounded\nsymptom: Mamba-YOLO-T at 0.8266 appeared to lose to YOLO11n at 0.8755, which would have reported the AAAI-2025 architecture losing.\nroot_cause: YOLO11n started from COCO-pretrained weights; the Mamba fork releases none, so it trained from random init. On 3,671 images pretraining is worth about three times the architecture difference.\ncorrection_made: A from-scratch YOLO11n control was run on the same protocol (0.8041 +/- 0.0028), reversing the reading: at equal init Mamba-YOLO-T wins by +0.0225. Both figures carry the confound in figures_data.json so the caveat travels with the data.\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.22.23/v3.22.24\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\njob_ids: 44351282; 44323305; 44368952\ndetectable_from: the init field of each run's artifact before the two are compared\nartifact_paths_expected: results/framework/s3_mamba_s*_44351282.out; results/framework/s3_y11nsc_s*_44368952.out; results/framework/figures_data.json; results/framework/s3_*.json\nprovenance_guess: raw\nprovenance_reason: the per-run s3_*.json artifacts and the figures_data block are committed.\ninventory_notes: A design-class decision case: the correction is running a control, not changing a parameter.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

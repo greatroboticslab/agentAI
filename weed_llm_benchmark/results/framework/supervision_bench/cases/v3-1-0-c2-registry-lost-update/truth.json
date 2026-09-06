@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-1-0-c2-registry-lost-update",
+ "class": "code",
+ "date": "2026-07-04",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\nglob_unmatched: results/framework/dataset_registry.json.corrupt-*\ntitle: The shared registry had no lock, six writers shared one temp filename, and a corrupt parse rebuilt it empty\nsymptom: Concurrent Job-T/Job-D writes could interleave into invalid JSON, which _load_registry's bare except then replaced with defaults over the 50 MB file; the merge separately flushed a hours-old snapshot, erasing everything harvested during the merge.\nroot_cause: Whole-file read-modify-write with no advisory lock, a fixed .tmp name, and an except that treated corruption as absence.\ncorrection_made: registry_lock.registry_lock()/update_registry() with fcntl.flock; unique mkstemp temps for all six writers; corrupt files backed up and the error raised; the merge grafts only its own keys instead of flushing its snapshot.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.1.0\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: registry slug count decreasing between snapshots; a registry mtime inside another writer's window\nartifact_paths_expected: results/framework/dataset_registry.json; results/framework/dataset_registry.json.corrupt-*; weed_optimizer_framework/tools/registry_lock.py\nprovenance_guess: raw\nprovenance_reason: registry snapshots and the .bak files are on /ocean; the ownership rule is now enumerated in code.\ninventory_notes: The residual last-writer-wins window this fix left open is exactly what bit on 2026-08-23 (v3.22.10).",
+ "provenance": "raw",
+ "signals_expected": [
+  "ownership_violation"
+ ]
+}

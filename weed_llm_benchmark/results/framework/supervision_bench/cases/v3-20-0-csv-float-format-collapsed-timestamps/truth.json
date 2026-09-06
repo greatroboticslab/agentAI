@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-20-0-csv-float-format-collapsed-timestamps",
+ "class": "code",
+ "date": "2026-08-15",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Epoch timestamps were written with %.6g and the shared-clock span read 0.0 seconds\nsymptom: 1786829160.35 became 1.78683e+09; cross-sensor alignment reported no shared time span and latitude/longitude lost about ten metres of precision.\nroot_cause: A default float format applied to values whose magnitude needs full precision.\ncorrection_made: repr() (shortest round-trip) for every CSV float; the run re-materialised to a 72.4 s span.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.20.0\ncategory: incident\nscope: robot-uplink\nhealthy_control: false\ndetectable_from: a computed time span of exactly zero over data that demonstrably covers a minute\nartifact_paths_expected: uploads/rl_live-20260815-162600_e46a9424/gps.csv; uploads/rl_live-20260815-162600_e46a9424/manifest.json\nprovenance_guess: raw\nprovenance_reason: the session directory is a registered dataset on the lab server.\ninventory_notes: Found by the first real robot stream; the 17-check synthetic suite had passed.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "none"
+ ]
+}

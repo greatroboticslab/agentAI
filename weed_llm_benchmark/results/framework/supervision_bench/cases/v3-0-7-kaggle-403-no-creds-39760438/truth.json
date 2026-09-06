@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-7-kaggle-403-no-creds-39760438",
+ "class": "config",
+ "date": "2026-04-18",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: Every Kaggle download returned 403 because the job had no credentials\nsymptom: Five curated Kaggle datasets all 403'd at download; the source yielded nothing and the run continued.\nroot_cause: No ~/.kaggle/kaggle.json on the cluster and no credential precondition check before the phase ran.\ncorrection_made: Kaggle v2 bearer token provisioned by the operator and exported by the job script; KAGGLEHUB_CACHE moved to /ocean after a HOME quota failure.\ncorrection_class: config\nactor_who_corrected: human\nversion_tag: v3.0.9\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39760438\ndetectable_from: repeated 403 lines from one source in the harvest log\nartifact_paths_expected: results/framework/slurm_ollama_39760438.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "source_degraded"
+ ]
+}

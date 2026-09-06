@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-35-gemma4-verifier-rubber-stamp-40884184",
+ "class": "design",
+ "date": "2026-05-16",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: The crop verifier answered yes to every crop: 0.0% false-positive rejection\nsymptom: Asked to verify pseudo-label crops, the model rejected none of them.\nroot_cause: Yes-bias in a small instruction-tuned model on a binary confirm task with no negative anchoring.\ncorrection_made: Verifier role abandoned; verification moved to a supervised linear head on frozen DINO features (v3.0.38-C).\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.0.35\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40884184\ndetectable_from: a verifier's rejection rate of exactly zero on a set known to contain errors\nartifact_paths_expected: results/framework/v3_0_35_quality_eval_40884184.out\nprovenance_guess: record-only\nprovenance_reason: May .out.\ninventory_notes: The standing reason this project distrusts a model-confidence gate; it is cited in the tiered-supervision plan as a threat to the supervisor itself.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

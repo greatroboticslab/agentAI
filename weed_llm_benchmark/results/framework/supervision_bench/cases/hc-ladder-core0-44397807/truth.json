@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-ladder-core0-44397807",
+ "class": "none",
+ "date": "2026-08-25",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ncommand_collected: sacct -j 44397807_0\ntitle: Corrected tier ladder rung: core + 0 harvested (0.8636, 97 ep)\nsymptom: COMPLETED; core is the real cwd12 train split remapped to canonical ids.\nactor_who_corrected: none\nversion_tag: v3.23.2\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44397807_0\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/s3_tier_0_44397807.out; results/framework/s3_tier0.json; sacct -j 44397807_0\ninventory_notes: Named control (S3 ladder).",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

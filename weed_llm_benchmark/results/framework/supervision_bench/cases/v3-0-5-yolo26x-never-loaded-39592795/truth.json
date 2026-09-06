@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-5-yolo26x-never-loaded-39592795",
+ "class": "code",
+ "date": "2026-04-17",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: The v3.0 model was never loaded in any v3.0 run\nsymptom: An 8 h run logged 'YOLO11n summary (fused): 101 layers, 2,583,907 parameters' while the release claimed yolo26x.\nroot_cause: yolo_trainer.py read Config.YOLO_8SP_WEIGHTS whenever the Brain fell off train_yolo_mega into train_yolo; the fallback path never consulted Config.DETECTION_MODEL.\ncorrection_made: Candidate-list selection (strategy override > DETECTION_MODEL + fallbacks > legacy weights, legacy opt-in only).\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.6\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39592795\ndetectable_from: the model summary line in the .out vs the configured model id\nartifact_paths_expected: results/framework/slurm_ollama_39592795.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

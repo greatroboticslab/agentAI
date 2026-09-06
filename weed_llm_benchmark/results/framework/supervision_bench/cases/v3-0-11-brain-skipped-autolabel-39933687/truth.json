@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-11-brain-skipped-autolabel-39933687",
+ "class": "code",
+ "date": "2026-04-19",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Brain skipped the labelling step while 380K unlabelled images sat on disk\nsymptom: After a 2 h 39 m harvest the Brain called train_yolo_mega directly; the gate auto-released on bbox_delta=0 and 5 h were spent training the stale 11K corpus.\nroot_cause: The fallback pipeline is advisory, not enforcing, and the keyword parse routed the text response straight to the trainer.\ncorrection_made: Orchestrator guardrail: synthesize and execute autolabel_pending in place of the mega call whenever needs_autolabel entries exist.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.12\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39933687\ndetectable_from: registry needs_autolabel count > 0 at the moment a train step starts\nartifact_paths_expected: results/framework/slurm_ollama_39933687.out; results/framework/dataset_registry.json\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

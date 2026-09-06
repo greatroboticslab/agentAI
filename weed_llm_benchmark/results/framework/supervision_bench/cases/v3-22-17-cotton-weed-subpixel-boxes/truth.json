@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-17-cotton-weed-subpixel-boxes",
+ "class": "config",
+ "date": "2026-08-23",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: A harvested source's every sampled box was sub-pixel\nsymptom: All 5,670 sampled boxes measured 0.000001 x 0.000003 of a 4096x3072 image.\nroot_cause: A defect in the source dataset's annotations, not in the pipeline.\ncorrection_made: Quarantined with the measurement as its reason; the verdict rests on the model-free geometry check so it stands independently of the probe.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.22.17\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44294276\ndetectable_from: box area distribution of a source's labels\nartifact_paths_expected: results/framework/sample_audits/project_agml__cotton_weed_detection.json; results/framework/dataset_registry.json\nprovenance_guess: raw\nprovenance_reason: the audit JSON and the quarantine reason are both durable.\ninventory_notes: A true positive found in the same sweep whose other verdicts were instrument artefacts; useful as a discrimination case.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

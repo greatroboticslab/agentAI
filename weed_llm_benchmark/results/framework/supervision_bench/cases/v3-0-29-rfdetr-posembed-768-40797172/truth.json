@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-29-rfdetr-posembed-768-40797172",
+ "class": "config",
+ "date": "2026-05-12",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: RF-DETR attempt 3 failed on a position-embedding size mismatch\nsymptom: pos_embeddings expected 1297, model configured 2305 at resolution 768.\nroot_cause: The checkpoint was pretrained at 576; the resolution must match the checkpoint, not merely satisfy divisibility.\ncorrection_made: resolution=576 (36x16), which trained.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.29\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40797172; 40803244\ndetectable_from: sacct FAILED sub-minute with a shape mismatch in the .out\nartifact_paths_expected: results/framework/v3_0_29_rfdetr_40797172.out\nprovenance_guess: record-only\nprovenance_reason: May .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

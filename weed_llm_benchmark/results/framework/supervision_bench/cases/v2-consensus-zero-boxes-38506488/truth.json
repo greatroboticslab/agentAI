@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v2-consensus-zero-boxes-38506488",
+ "class": "code",
+ "date": "2026-04-06",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Multi-model consensus produced zero boxes\nsymptom: generate_consensus returned 0 boxes for every image while both label sources existed on disk.\nroot_cause: Five ext_* directories were the same model across iterations, and external models only covered 50 of 1,458 images, so min_votes demanded votes from sources absent for that image.\ncorrection_made: De-duplicate ext_* by model type; adaptive min_votes = min(min_votes, sources present for this image).\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v2.2\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 38506488\ndetectable_from: consensus box count 0 with non-empty source label dirs\nartifact_paths_expected: results/framework/slurm_ollama_38506488.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

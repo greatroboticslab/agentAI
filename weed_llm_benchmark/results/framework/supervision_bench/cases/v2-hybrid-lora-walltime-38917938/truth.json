@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v2-hybrid-lora-walltime-38917938",
+ "class": "config",
+ "date": "2026-04-13",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ncommand_collected: sacct -j 38917938\ntitle: Overnight hybrid-LoRA run hit its 8 h walltime mid-round\nsymptom: TIMEOUT at 8 h after 7+ rounds; the run ended inside a round rather than at a round boundary.\nroot_cause: Round budget was not bounded by remaining walltime.\ncorrection_made: None at the time; walltime was later raised to 48 h (v3.0.23).\ncorrection_class: config\nactor_who_corrected: none\nversion_tag: v2.6\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 38917938\ndetectable_from: sacct State=TIMEOUT; last round record has no evaluate entry\nartifact_paths_expected: results/framework/slurm_ollama_38917938.out; sacct -j 38917938\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound"
+ ]
+}

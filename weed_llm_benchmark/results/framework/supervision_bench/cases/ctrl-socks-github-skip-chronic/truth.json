@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "ctrl-socks-github-skip-chronic",
+ "class": "none",
+ "date": "2026-08-29",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\nglob_truncated: results/framework/v3_0_43_brain_harvest_*.out kept 8 newest of 36 matches\ntitle: CONTROL: the chronic degraded-source line that must stay at info\nsymptom: '[net] WARN: SOCKS proxy ... SKIPPING github' appears in every harvest log including the one attached to the 2026-08-29 incident.\nroot_cause: GitHub is unreachable from Bridges-2 compute nodes; this is an environment fact, not a change.\ncorrection_made: None. The source_degraded signal is defined as new degradation only (candidates > 0 last round and 0 now), so a chronic skip is reported at info.\nactor_who_corrected: none\nversion_tag: v3.0.99 onward\ncategory: environment-control\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44727703\ndetectable_from: the same line present in the previous round's log\nartifact_paths_expected: results/framework/v3_0_43_brain_harvest_*.out\nprovenance_guess: raw\nprovenance_reason: present in every surviving harvest log.\ninventory_notes: A reviewer-mandated control: it sits inside the dev case's own bundle, so an arm that escalates it is producing a false alarm on the very case it is meant to solve.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

@@ -24,8 +24,10 @@ actually see. Covered:
 Run:  python3 tests/test_brain_evidence.py
 """
 import base64
+import contextlib
 import gzip
 import hashlib
+import io
 import json
 import os
 import pathlib
@@ -203,8 +205,9 @@ def capture(out_extra=(), overrides=None):
     add("resources", 0,
         [numbered(1, "Filesystem     1024-blocks       Used  Available Capacity Mounted on"),
          numbered(2, "ocean          107374182400 106300000000 1074741824      99% /ocean"),
-         "[block] squeue", "[value] squeue_depth=7", "[block] quota",
-         "[none] the per-project quota is not readable from df"])
+         "[block] squeue", "[value] squeue_depth=7", "[block] quota"]
+        + [numbered(i + 1, t) for i, t in enumerate(
+            corpus.canonical_json({"quota_headroom_gb": 980.5}).split("\n"))])
     add("su", 0, json_block(STAGED_SU, "results/framework/_brain/weed/su.json"))
     add("corrections", 0, json_block(
         CORRECTIONS, "results/framework/_brain/weed/corrections.json"))
@@ -301,7 +304,7 @@ ck("the staged round/campaign/envelope survive",
 ck("resources reports filesystem free and queue depth separately",
    bundle["sections"]["resources"]["squeue_depth"] == 7
    and abs(bundle["sections"]["resources"]["fs_free_tb"] - 1.0) < 0.01
-   and bundle["sections"]["resources"]["quota_headroom_gb"] is None)
+   and bundle["sections"]["resources"]["quota_headroom_gb"] == 980.5)
 ck("harvest per_source is null with a reason, not an invented count",
    bundle["sections"]["harvest"]["per_source"] is None
    and bundle["sections"]["harvest"]["per_source_reason"])
@@ -403,7 +406,9 @@ ck("token_estimate is corpus.token_estimate of the sections",
 ck("out_tail respects the line cap",
    len(full["sections"]["out_tail"]["lines"]) <= full["caps"]["out_tail_lines"])
 
-budget = 1500
+# Above the floor the untrimmable core sets (sacct + strategy + signals + the
+# out_tail floor), so the stages have room to work and the result is checkable.
+budget = 3000
 small = evidence.trim(full, budget)
 trec = small["export"]["trim"]
 ck("trim reports the budget it was given", trec["budget_tokens"] == budget)
@@ -503,8 +508,10 @@ loop["self"] = loop
 ck("staging refuses a payload it cannot serialise",
    evidence.stage_commands("weed", {"bad": loop}) == [])
 
-# Incompressible, so the 96 KB ceiling is what splits it rather than gzip.
-noise = {"blob": hashlib.sha512(b"seed").hexdigest() * 3000}
+# Distinct digests, so gzip cannot fold it away and the 96 KB relay ceiling is
+# what splits the payload.
+noise = {"blob": "".join(hashlib.sha512(str(i).encode()).hexdigest()
+                         for i in range(3000))}
 noisy = evidence.stage_commands("weed", {"ledger": noise})
 ck("an incompressible payload is split across commands", len(noisy) >= 2)
 staged_runner = Runner(capture())
@@ -586,7 +593,11 @@ gathered = [n for n in corpus.SECTIONS if blind["sections"][n] is not None]
 ck("a dead channel produces a bundle that says the channel died: "
    + repr(gathered),
    any("Connection closed" in w for w in blind["export"]["warnings"])
-   and gathered == ["su"])
+   and gathered in (["su"], ["su", "signals"]))
+if blind["sections"]["signals"]:
+    ck("with nothing gathered, every signal reports itself unknown",
+       all(sig.get("severity") == "unknown"
+           for sig in blind["sections"]["signals"]))
 ck("every null section in that bundle carries a reason",
    all(blind["export"]["missing"].get(n) for n in corpus.SECTIONS
        if blind["sections"][n] is None))
@@ -615,13 +626,20 @@ ck("the CLI builds a bundle from captured output and validates it", rc == 0)
 written = corpus.read_json(bundle_path)
 ck("the written bundle is the same object",
    isinstance(written, dict) and evidence.validate(written)["ok"])
-ck("CLI script subcommand returns 0",
-   evidence.main(["script", "--domain", DOMAIN, "--step", STEP,
-                  "--jobid", JOB]) == 0)
-ck("CLI with no command returns 2", evidence.main([]) == 2)
-ck("CLI with a missing capture file returns 1",
-   evidence.main(["build", "--domain", DOMAIN, "--step", STEP, "--jobid", JOB,
-                  "--from-file", os.path.join(_tmp, "nope.txt")]) == 1)
+# The CLI writes the script and argparse's help to stdout; capture both so the
+# test output stays readable.
+_buf, _err = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(_buf), contextlib.redirect_stderr(_err):
+    rc_script = evidence.main(["script", "--domain", DOMAIN, "--step", STEP,
+                               "--jobid", JOB])
+    rc_none = evidence.main([])
+    rc_missing = evidence.main(["build", "--domain", DOMAIN, "--step", STEP,
+                                "--jobid", JOB, "--from-file",
+                                os.path.join(_tmp, "nope.txt")])
+ck("CLI script subcommand prints the gather and returns 0",
+   rc_script == 0 and "BEGIN" in _buf.getvalue())
+ck("CLI with no command returns 2", rc_none == 2)
+ck("CLI with a missing capture file returns 1", rc_missing == 1)
 
 out_dir2 = os.path.join(_tmp, "evidence_out")
 os.makedirs(out_dir2)

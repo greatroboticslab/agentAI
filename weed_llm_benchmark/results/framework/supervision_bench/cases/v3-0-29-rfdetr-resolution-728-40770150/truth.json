@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-29-rfdetr-resolution-728-40770150",
+ "class": "config",
+ "date": "2026-05-12",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: RF-DETR attempt 2 rejected a resolution that was not a multiple of 32\nsymptom: resolution=728 % 32 != 0.\nroot_cause: Resolution constraint read from documentation as a multiple of 56 rather than of 32.\ncorrection_made: resolution=768.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.29\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40770150\ndetectable_from: sacct FAILED with a sub-minute Elapsed\nartifact_paths_expected: results/framework/v3_0_29_rfdetr_40770150.out\nprovenance_guess: record-only\nprovenance_reason: May .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

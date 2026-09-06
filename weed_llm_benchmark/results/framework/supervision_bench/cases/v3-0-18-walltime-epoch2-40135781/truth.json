@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-18-walltime-epoch2-40135781",
+ "class": "code",
+ "date": "2026-04-22",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\nglob_truncated: results/framework/mega_iter*/train*/results.csv kept 8 newest of 40 matches\ntitle: First end-to-end round ended at epoch 2 of 5 with one validation pass\nsymptom: TIMEOUT after harvest + autolabel + a 2 h merge left 1 h 45 m for training.\nroot_cause: The merge step (dHash over 185K images with per-image copy) took two hours and was not budgeted.\ncorrection_made: Per-dataset dHash cache and symlink merge (v3.0.19/v3.0.22).\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.18/v3.0.19\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40135781\ndetectable_from: per-stage timestamps in the .out; epochs completed vs epochs requested\nartifact_paths_expected: results/framework/slurm_ollama_40135781.out; results/framework/mega_iter*/train*/results.csv\nprovenance_guess: raw\nprovenance_reason: results.csv for this run is the earliest surviving per-epoch trace of the merged corpus.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound"
+ ]
+}

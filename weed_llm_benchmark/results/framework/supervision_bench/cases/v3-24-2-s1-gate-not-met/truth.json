@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-24-2-s1-gate-not-met",
+ "class": "plan",
+ "date": "2026-08-25",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "plan",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: plan (from correction_class)\nescalation_expected: human (rule: correction_class=plan: no agent tier may stop or redirect a phase)\nglob_truncated: results/framework/sample_audits/*.json kept 8 newest of 10 matches\ntitle: A campaign phase was closed with its gate deliberately not met, and the shortfall is the result\nsymptom: Six audited harvested sources, 13,527 labelled images, exactly one clearing the 0.90 bar with 3,208 images against a +10,000 target, and two registry incidents rather than zero.\nroot_cause: Web harvest at this scale supplies volume, not usable supervision; the probe reads 1.000 on human-labelled cwd12, so the 0.18-0.74 scores are the data and not the instrument.\ncorrection_made: S1 closed rather than re-attempted, with the budget moved to curation and deployment; the plan records 'do not reopen S1 as collect more'.\ncorrection_class: plan\nactor_who_corrected: assistant\nversion_tag: v3.24.2\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: the per-source audited precision table against the gate's threshold\nartifact_paths_expected: results/framework/figures_data.json; results/framework/sample_audits/*.json; results/framework/pool_report.json\nprovenance_guess: raw\nprovenance_reason: the s1_gate_verdict block is committed in figures_data.json with every per-source number.",
+ "provenance": "raw",
+ "signals_expected": [
+  "plateau",
+  "budget"
+ ]
+}

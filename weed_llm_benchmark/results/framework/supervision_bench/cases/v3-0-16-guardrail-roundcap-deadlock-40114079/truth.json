@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-16-guardrail-roundcap-deadlock-40114079",
+ "class": "code",
+ "date": "2026-04-20",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 40114079\ntitle: Guardrail and round cap formed a loop that consumed a whole job\nsymptom: Two autolabel passes (4 h + 3.3 h), zero training, TIME LIMIT.\nroot_cause: The round cap intentionally defers datasets to the next round, leaving needs_autolabel entries that the guardrail reads as a reason to reroute the trainer again.\ncorrection_made: The guardrail consults actions_taken and does not reroute if autolabel already ran this round.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.17\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40114079\ndetectable_from: two identical step types in one round with no progress between them\nartifact_paths_expected: results/framework/slurm_ollama_40114079.out; sacct -j 40114079\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "gate_noop"
+ ]
+}

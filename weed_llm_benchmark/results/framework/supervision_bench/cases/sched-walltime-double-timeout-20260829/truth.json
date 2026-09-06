@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "sched-walltime-double-timeout-20260829",
+ "class": "config",
+ "date": "2026-08-29",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ncommand_collected: sacct -j 44727703,44767709\nglob_truncated: results/framework/mega_iterm1_curated_s101/train*/results.csv kept 8 newest of 10 matches\ntitle: DEV CASE: two identical 12 h training jobs died at the wall and the loop paused itself\nsymptom: Job 44727703 hit the walltime at epoch 24 of 60 and was recorded TIMEOUT; the next tick resubmitted the identical command, which failed at epoch 16; two failures tripped the stop-loss.\nroot_cause: The merged pool had grown to 8,583 iterations per epoch, so 60 epochs needed about 29 hours against a 12 hour walltime. No projection was computed in flight and the only metric writer ran at the end, so everything the jobs knew died with them.\ncorrection_made: v3.25.0: an Ultralytics time= cap at 0.9x walltime so a run stops on time with a valid best.pt; an append-only hash-chained per-epoch trace written as the job goes; a job-scoped run directory and artifact read by job id; a review state machine that holds a failed step instead of resubmitting, with a bounded walltime-shaped-only fallback correction (halve the epochs, never below a floor, recorded as {old,new,reason,from_round,review_id}).\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.25.0\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 44727703; 44767709\ndetectable_from: the time column of results.csv after three epochs, projected against sacct Timelimit; sacct State=TIMEOUT on the train step; the resubmitted command being byte-identical to the one that just failed; the pool's iterations-per-epoch against the previous round's\nartifact_paths_expected: results/framework/m1_merged_rndtrain_s1_44727703.out; results/framework/m1_merged_rndtrain_s1_44767709.out; sacct -j 44727703,44767709; results/framework/mega_iterm1_curated_s101/train*/results.csv; results/framework/dataset_registry.json; ~/.round_scheduler.json\nprovenance_guess: raw\nprovenance_reason: the two .out files, the sacct rows and the partial results.csv are the newest cluster artifacts of the incident era and are the whole reason WP2 exports before new jobs overwrite them.\ninventory_notes: DEV CASE per the plan: excluded from every reported number. The job-scoped artifact does NOT exist for these two runs (pre-WP1 the writer ran only at the end), which is itself part of what makes the case hard.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "pool_growth"
+ ]
+}

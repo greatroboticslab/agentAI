@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-round1-collect-44275184",
+ "class": "none",
+ "date": "2026-08-23",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ncommand_collected: sacct -j 44275184\ntitle: Round 1 collect completed\nsymptom: Harvest ran to COMPLETED and registered +8,208 labelled images across two useful datasets.\nactor_who_corrected: none\nversion_tag: v3.22.12\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44275184\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/v3_0_43_brain_harvest_44275184.out; sacct -j 44275184; results/framework/dataset_registry.json\ninventory_notes: Named control (rounds 1-3). Note the same job also admitted two zero-label sets, which is a separate incident case.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-28-holdout-leak-retraction-0910",
+ "class": "code",
+ "date": "2026-05-05",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\nglob_truncated: results/framework/mega_iter*/train*/results.csv kept 8 newest of 40 matches\ntitle: RETRACTION: 0.910 was memorisation \u2014 2,313 holdout copies were inside the training set\nsymptom: A finetune reached 0.836 on the supposedly unseen holdout at epoch 1, and a stem audit found all 1,977 cwd12 holdout images present in the merged train directory under two unbanned slug names.\nroot_cause: Slug-level NEVER_TRAIN could not see that cottonweed_sp8 (1,229) and cottonweed_holdout (748) physically contained the holdout images; v3.0.25 oversampling duplicated some of them up to 10x.\ncorrection_made: Stem-level holdout filter at merge (drops any image whose stem is in the holdout set, whatever the slug), with a skipped_holdout_stem counter; all v3.0.24-v3.0.27 holdout numbers retracted.\ncorrection_class: code\nactor_who_corrected: human\nversion_tag: v3.0.28\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40612856; 40612870\ndetectable_from: epoch-1 holdout metric implausibly close to the final one; a stem intersection between the train directory and the holdout list\nartifact_paths_expected: results/framework/merged_iterv3_0_25_p2/train/images; results/framework/v3_0_28_safety_40612856.out; results/framework/mega_iter*/train*/results.csv\nprovenance_guess: record-only\nprovenance_reason: the contaminated merge directories were rebuilt long ago; the smoking-gun epoch-1 row may survive in the finetune's results.csv.\ninventory_notes: Detected by the operator's question about whether the test set had been used for finetuning. The flagship science incident of the whole record.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

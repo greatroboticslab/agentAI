@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-round1-train-44278259",
+ "class": "none",
+ "date": "2026-08-23",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ncommand_collected: sacct -j 44278259\ntitle: Round 1 train completed in 5 h 37 m at 0.6019\nsymptom: Training completed inside its walltime and the metric was read from the round's own results.csv.\nactor_who_corrected: none\nversion_tag: v3.22.18\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44278259\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/m1_merged_rndtrain_s1_44278259.out; results/framework/mega_iterm1_curated_s101/train2/results.csv; sacct -j 44278259\ninventory_notes: Named control. The sibling train/ directory in the same mega_iter is what the stale-metric case is about, so this bundle must be labelled clean only with the freshness check applied.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

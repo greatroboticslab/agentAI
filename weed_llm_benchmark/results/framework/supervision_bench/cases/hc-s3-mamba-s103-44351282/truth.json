@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-s3-mamba-s103-44351282",
+ "class": "none",
+ "date": "2026-08-24",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ntitle: S3 family run: Mamba-YOLO-T from scratch, seed 103 (0.8203)\nsymptom: COMPLETED under the same protocol.\nactor_who_corrected: none\nversion_tag: v3.22.23\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44351282_3\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/s3_mamba_s3_44351282.out; results/framework/s3_mamba_s103.json\ninventory_notes:  Not in the plan's named control set; added to widen the false-alarm denominator.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

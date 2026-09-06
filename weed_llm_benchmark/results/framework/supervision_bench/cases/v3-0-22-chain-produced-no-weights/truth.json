@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-22-chain-produced-no-weights",
+ "class": "config",
+ "date": "2026-04-23",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: Four chained rounds produced zero checkpoints and the chain believed it was progressing\nsymptom: No best.pt or last.pt anywhere on the cluster after four rounds; registry mega_round_count 0, last_mega_weights N/A.\nroot_cause: Every mega attempt was walltime-killed before its first validation epoch, and Ultralytics only writes best.pt after a validation pass, so the progressive-training chain never accumulated.\ncorrection_made: Walltime 8 h -> 48 h on the operator's directive; save_period=1 and a last.pt fallback in _resolve_best_pt.\ncorrection_class: config\nactor_who_corrected: human\nversion_tag: v3.0.22/v3.0.23\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40177598; 40224485; 40239932\ndetectable_from: registry last_mega_weights absent while the chain reports rounds completed; ls of the run directories for weights\nartifact_paths_expected: results/framework/slurm_ollama_40177598.out; results/framework/slurm_ollama_40239932.out; results/framework/dataset_registry.json\nprovenance_guess: record-only\nprovenance_reason: the missing artifact IS the evidence; the .out files may survive.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "stale_artifact"
+ ]
+}

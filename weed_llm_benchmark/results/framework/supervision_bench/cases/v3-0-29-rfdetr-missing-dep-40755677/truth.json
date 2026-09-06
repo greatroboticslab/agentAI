@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-29-rfdetr-missing-dep-40755677",
+ "class": "config",
+ "date": "2026-05-11",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ncommand_collected: sacct -j 40755677\ntitle: RF-DETR attempt 1 died on a missing dependency\nsymptom: ModuleNotFoundError: pytorch_lightning within seconds of start.\nroot_cause: rfdetr's training extras were not installed in the env.\ncorrection_made: pip install rfdetr[train,loggers].\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.0.29\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40755677\ndetectable_from: sacct FAILED with an Elapsed under a minute\nartifact_paths_expected: results/framework/v3_0_29_rfdetr_40755677.out; sacct -j 40755677\nprovenance_guess: record-only\nprovenance_reason: May .out, a few lines.\ninventory_notes: One of four consecutive submissions that a login-node import check would have caught; the campaign's cluster-etiquette rule comes from this family.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

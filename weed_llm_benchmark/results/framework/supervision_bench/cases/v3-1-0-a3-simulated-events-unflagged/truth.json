@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-1-0-a3-simulated-events-unflagged",
+ "class": "code",
+ "date": "2026-07-04",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Simulated labelling events were written into the log the dashboard reported as real human verification\nsymptom: agent_labeled / human_labeled / human_verified counts included fabricated demo events with no marker.\nroot_cause: A demo helper wrote to the production event log without a provenance field.\ncorrection_made: Every simulated event carries meta.simulated=True; presented counts must be queried simulated-aware.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.1.0\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: event bursts with impossible human review rates; absence of a provenance field on a counted event\nartifact_paths_expected: results/framework/labeling_events.jsonl\nprovenance_guess: raw\nprovenance_reason: the event log is on the lab server; historical totals predating the fix are still contaminated.\ninventory_notes: Any count quoted from before this fix is not usable without a simulated-aware query.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

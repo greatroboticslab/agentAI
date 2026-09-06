@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-13-owlv2-oom-garbage-fallback-40068162",
+ "class": "code",
+ "date": "2026-04-20",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Every batch OOMed and the defensive except wrote whole-image boxes\nsymptom: owl=0 fb=512 \u2014 all 512 labels written were the trivial 0.5 0.5 1.0 1.0 fallback, with no error visible above warning level.\nroot_cause: OWLv2-large at 960x960 with batch=16 needs 12.82 GiB per batch, above what remained of a 31.7 GiB V100; the exception handler silently substituted the whole-image fallback.\ncorrection_made: Recursive batch halving on OOM (depth 4), default batch 4; job cancelled before more garbage was written.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.14\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40068162\ndetectable_from: the owl=/fb= counters in the autolabel summary; a label file whose single box is exactly 0.5 0.5 1.0 1.0\nartifact_paths_expected: results/framework/slurm_ollama_40068162.out; results/framework/dataset_registry.json\nprovenance_guess: record-only\nprovenance_reason: the garbage labels were overwritten by later autolabel passes; the counter line is the surviving evidence.\ninventory_notes: Textbook silent wrongness: zero crashes, plausible output, useless supervision.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

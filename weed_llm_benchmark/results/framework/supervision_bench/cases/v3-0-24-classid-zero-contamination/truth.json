@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-24-classid-zero-contamination",
+ "class": "code",
+ "date": "2026-04-25",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: All 175,701 auto-labelled images were trained as a single class\nsymptom: cwd12 holdout mAP50-95 fell to 0.40 (-0.46 vs the supervised baseline) with four species at 0.00-0.04 and Carpetweeds at 0.88.\nroot_cause: autolabel.py wrote class_id=0 for every pseudo-label and _merge_datasets built class_name_to_id from the first dataset with class_names, so every pseudo-label passed through as Carpetweeds.\ncorrection_made: include_autolabel=False by default; epochs/imgsz/patience restored to baseline parity; per-dataset canonical class mapping designed for v3.0.25.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.24\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40260768; 40293571\ndetectable_from: the per-class table (one class dominant, four near zero); a sample of written label files showing class 0 everywhere\nartifact_paths_expected: results/framework/v3_0_23_eval_40293571.out; results/v3_0_23_eval.json; results/framework/mega_iter6/train8/weights/best.pt; results/framework/v3_0_23_mega_iter6_train8_results.csv\nprovenance_guess: raw\nprovenance_reason: results/v3_0_23_eval.json and the copied results.csv are committed in the repo; the eval .out should still be on /ocean.\ninventory_notes: The two eval splits agreed to three decimals, which is what made the number credible enough to investigate.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop"
+ ]
+}

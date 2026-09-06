@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-12-owlv2-one-image-per-second-40035529",
+ "class": "code",
+ "date": "2026-04-19",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 40035529\ntitle: Auto-labelling ran at ~1 image/second and consumed the whole walltime\nsymptom: The guardrail fired correctly, then 8 h produced 26,000 of 175,767 labels and no training.\nroot_cause: Single-image OWLv2 forward passes on a V100; 380K images at 1 img/s is 105 h.\ncorrection_made: Batched inference, fp16, resume by existing .txt, a per-dataset cap and incremental registry saves.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.13\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40035529\ndetectable_from: labels-per-second in the progress lines vs images remaining vs walltime left\nartifact_paths_expected: results/framework/slurm_ollama_40035529.out; sacct -j 40035529\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-s3-yolo11n-s101-44323305",
+ "class": "none",
+ "date": "2026-08-24",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ntitle: S3 family run: YOLO11n pretrained, seed 101 (0.8739)\nsymptom: COMPLETED, 100 epochs, sealed protocol.\nactor_who_corrected: none\nversion_tag: v3.22.21\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44323305_1\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/s3_y11n_s1_44323305.out; results/framework/s3_yolo11n_s101.json\ninventory_notes:  Not in the plan's named control set; added to widen the false-alarm denominator.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "none"
+ ]
+}

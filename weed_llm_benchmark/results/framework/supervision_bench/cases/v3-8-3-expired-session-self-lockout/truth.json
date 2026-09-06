@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-8-3-expired-session-self-lockout",
+ "class": "code",
+ "date": "2026-07-22",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A returning browser locked its own IP out for an hour by loading the page\nsymptom: Background fetches carrying no credential were counted as failed authentication attempts, so five of them tripped the brute-force lock.\nroot_cause: The lock counted 'request without a valid session' rather than 'request that presented a wrong credential'.\ncorrection_made: Only a presented-and-wrong credential counts; credential-less requests get a plain 401 or the login redirect.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.8.3\ncategory: incident\nscope: platform-ui\nhealthy_control: false\ndetectable_from: lockout events correlated with page loads rather than login attempts\nartifact_paths_expected: lab journalctl --user -u weed-dashboard\nprovenance_guess: record-only\nprovenance_reason: lab-server journal, rotated.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "none"
+ ]
+}

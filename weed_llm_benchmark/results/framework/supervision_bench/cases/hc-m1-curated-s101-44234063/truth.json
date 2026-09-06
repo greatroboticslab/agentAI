@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "hc-m1-curated-s101-44234063",
+ "class": "none",
+ "date": "2026-08-23",
+ "escalation_expected": "none",
+ "incident": false,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "none",
+   "detect": false
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: none (from correction_class, empty = none)\nescalation_expected: none (rule: healthy or designed control: nothing to escalate)\ncommand_collected: sacct -j 44234063\ntitle: M1 sealed run: curated tier, seed 101\nsymptom: COMPLETED on h100 with the DINO gate active at MIN_DINO_SCORE=0.50.\nactor_who_corrected: none\nversion_tag: v3.22.11\ncategory: healthy-control\nscope: cluster-pipeline\nhealthy_control: true\njob_ids: 44234063\ndetectable_from: sacct State and Elapsed; the step's own artifact (results.csv / per-run JSON / registry delta)\nartifact_paths_expected: results/framework/m1_merged_m1cur_s1_44234063.out; results/framework/m1_curated_seed101.json; results/framework/mega_iterm1_curated_s101/train/results.csv; sacct -j 44234063\ninventory_notes: Named control. This run's train/ directory is the stale artifact the scheduler nearly attached to round 1.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

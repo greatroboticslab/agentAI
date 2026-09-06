@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-19-1-trimming-discarded-a-real-capture",
+ "class": "code",
+ "date": "2026-08-03",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A guard against empty pages silently became a minimum conversation length\nsymptom: Trimming cut a 695-character share to 315, below the shell-detection threshold, so the entry was marked failed and nothing was stored.\nroot_cause: Three thresholds written to distinguish a rendered page from an empty shell each also acted as a minimum content length.\ncorrection_made: Thresholds keyed on how the text was obtained rather than on its length; untrimmed fallback; acceptance from 60 characters for a browser capture.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.19.1/v3.19.2\ncategory: incident\nscope: platform-ui\nhealthy_control: false\ndetectable_from: a stored length below the threshold that judged it\nartifact_paths_expected: results/framework/recordings/index.json\nprovenance_guess: raw\nprovenance_reason: the index records capture_status and preview_source.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "none"
+ ]
+}

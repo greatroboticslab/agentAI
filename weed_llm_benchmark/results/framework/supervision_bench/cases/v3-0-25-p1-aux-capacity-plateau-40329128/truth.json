@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-25-p1-aux-capacity-plateau-40329128",
+ "class": "design",
+ "date": "2026-04-29",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: Training plateaued after 14 epochs because 77K auxiliary images ate the capacity\nsymptom: cwd12 holdout mAP50-95 moved 0.5145 -> 0.5539 in 14 epochs / 26 h 28 m and then stopped improving.\nroot_cause: The merged 84K corpus carried ~7K weed instances across 12 classes against 77K auxiliary images, with a 20:1 imbalance between Carpetweeds (1,474) and Goosegrass (75).\ncorrection_made: Class-balanced oversampling of weak classes and a progressive Phase 2 (job 40357694).\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.0.25\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40329128; 40357694\ndetectable_from: last-3-epoch spread on the holdout metric; per-class instance counts printed at merge\nartifact_paths_expected: results/framework/v3_0_25_p1_40329128.out; results/framework/mega_iterv3_0_25_p1/train*/results.csv\nprovenance_guess: raw\nprovenance_reason: merged_iterv3_0_25_p1 was still on /ocean in May when the leak audit counted its images.",
+ "provenance": "raw",
+ "signals_expected": [
+  "plateau"
+ ]
+}

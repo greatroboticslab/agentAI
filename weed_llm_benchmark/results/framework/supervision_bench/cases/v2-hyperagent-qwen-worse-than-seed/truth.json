@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v2-hyperagent-qwen-worse-than-seed",
+ "class": "design",
+ "date": "2026-03-30",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: Every Qwen2.5-7B-proposed strategy lost to the human seed\nsymptom: Three closed-loop rounds all scored below the seeded Florence+OWLv2 consensus (new_f1 0.622) and all caused forgetting.\nroot_cause: Qwen2.5-7B repeats conventional wisdom (more freeze / more votes / more replay) \u2014 approaches the project had already measured as ineffective; brain capability, not framework design.\ncorrection_made: Recorded as a negative result; Brain swapped to DeepSeek-R1:7b, later Gemma 4.\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v1.0/HyperAgent\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\ndetectable_from: per-round old_f1/new_f1 table vs the seed row\nartifact_paths_expected: results/framework/framework_results.json\nprovenance_guess: record-only\nprovenance_reason: run_hyperagent.py predates the results/framework .out convention; no job id is recorded anywhere.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "plateau"
+ ]
+}

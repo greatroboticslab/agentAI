@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-1-0-c3-committed-kaggle-token",
+ "class": "config",
+ "date": "2026-07-04",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: A live API token was the hardcoded default in three job scripts and is in public git history\nsymptom: The a Kaggle API token token appeared verbatim in run_framework_ollama.sh and two harvest scripts.\nroot_cause: A credential was written as a default value to make a source work without operator setup.\ncorrection_made: Read from an untracked ~/.kaggle_token or a pre-set env var, with the source disabled and a loud warning if unset; rotation performed by the operator. History purge remains unconfirmed.\ncorrection_class: config\nactor_who_corrected: human\nversion_tag: v3.1.0\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: a secret-shaped literal in a tracked file\nartifact_paths_expected: run_framework_ollama.sh; run_v3_0_30_jobd_continuous.sh\nprovenance_guess: record-only\nprovenance_reason: HEAD is clean; the evidence lives in git history, which the corpus must NOT copy.\ninventory_notes: EXCLUDE from any exported bundle: the scrub check greps for a Kaggle API token prefixes.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

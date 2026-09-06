@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-24-3-sync-dead-22-days-wrong-diagnosis",
+ "class": "config",
+ "date": "2026-08-25",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: The sync had been dead 22 days, the earlier repair fixed nothing, and the recorded diagnosis was wrong\nsymptom: weed-sync.service sat in activating for two days; the last successful sync was still 2026-08-03; nothing failed and nothing logged.\nroot_cause: SSH_AUTH_SOCK pointed at a gnome-keyring agent socket whose daemon no longer serves ssh, so the file exists, nothing accepts, and every ssh blocked in connect() before authentication, where ConnectTimeout does not apply. A Type=oneshot unit defaults to TimeoutStartSec=infinity, so one blocked ssh cancelled the schedule indefinitely.\ncorrection_made: IdentityAgent=none and SSH_AUTH_SOCK unset (the dependency removed, not the symptom); bounded at three levels (per-transfer timeout, TimeoutStartSec=7200, ssh keepalives); and a positive-heartbeat freshness alarm (sync_health.py, GET /api/health/sync, site-wide banner) where a missing heartbeat reads crit and never ok. First run afterwards took the registry from 52 to 78 slugs.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.24.3\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: age of the last successful metadata refresh; the blocked process's wait channel and environment, not the circumstances\nartifact_paths_expected: results/framework/sync_heartbeat.json; results/framework/dataset_registry.json; /proc/<pid>/wchan (transient)\nprovenance_guess: record-only\nprovenance_reason: the root-cause evidence was transient process state; only the heartbeat file and the registry jump survive as artifacts.\ninventory_notes: A diagnosis that is never tested by a return to service is a guess, and this one was recorded in an audit document as fact for two days.",
+ "provenance": "raw",
+ "signals_expected": [
+  "stale_artifact"
+ ]
+}

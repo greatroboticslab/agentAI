@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-24-6-fix-local-paths-two-populations",
+ "class": "code",
+ "date": "2026-08-25",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A progress line compared a numerator and a denominator drawn from different populations\nsymptom: The printed count jumped 63/78 -> 78/78 -> 63/78 across runs, reading like datasets appearing and vanishing mid-outage.\nroot_cause: exists was counted inside the rewrite loop, before the manual-upload merge added 15 slugs, while the denominator was taken after.\ncorrection_made: Both halves of 'X/Y exist' come from the final merged dict; the underlying cluster-origin trend was monotonic all along (49 -> 63).\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.24.6\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: a ratio that is not monotonic where the underlying quantity must be\nartifact_paths_expected: deploy/fix_local_paths.py; results/framework/sync_heartbeat.json\nprovenance_guess: record-only\nprovenance_reason: a defect in the audit's own instrument, found during a self-audit.",
+ "provenance": "record-only",
+ "signals_expected": [
+  "none"
+ ]
+}

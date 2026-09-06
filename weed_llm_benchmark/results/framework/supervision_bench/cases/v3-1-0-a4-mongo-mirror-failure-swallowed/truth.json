@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-1-0-a4-mongo-mirror-failure-swallowed",
+ "class": "code",
+ "date": "2026-07-04",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A failed database mirror was discarded, so JSON and Mongo could diverge unobserved\nsymptom: _save_registry ignored the result of the dual write.\nroot_cause: Best-effort write with no observability.\ncorrection_made: Mirror failures are logged so divergence is visible.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.1.0\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: registry slug count in Mongo vs the JSON file\nartifact_paths_expected: weed_optimizer_framework/tools/dataset_discovery.py\nprovenance_guess: record-only\nprovenance_reason: a code-audit finding.",
+ "provenance": "raw",
+ "signals_expected": [
+  "mongo_down"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-9-2-dataset-delete-any-owner",
+ "class": "code",
+ "date": "2026-07-23",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Any signed-in member could delete another member's dataset, and it was a class of defect\nsymptom: A lab member signed in as an ordinary user and deleted an admin's upload.\nroot_cause: Ownership was enforced on some mutating endpoints and not others; the audit found the same gap on class renaming and on the two labelling endpoints that spend shared quota.\ncorrection_made: _require_dataset_owner() extracted and applied to delete, classnames, labeling/push and labeling/delete; the delete control rendered only for the uploader or an admin; a positive-and-negative verification matrix run in a real browser.\ncorrection_class: code\nactor_who_corrected: human\nversion_tag: v3.9.2/v3.9.3\ncategory: incident\nscope: platform-ui\nhealthy_control: false\ndetectable_from: a mutating route without an ownership guard\nartifact_paths_expected: weed_optimizer_framework/tools/dashboard_server.py\nprovenance_guess: record-only\nprovenance_reason: a code and live-probe finding.\ninventory_notes: The first 'verification' had only used curl and had never tested that the rightful owner could still act.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

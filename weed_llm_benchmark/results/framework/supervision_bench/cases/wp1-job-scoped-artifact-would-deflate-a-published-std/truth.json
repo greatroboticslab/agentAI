@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "wp1-job-scoped-artifact-would-deflate-a-published-std",
+ "class": "code",
+ "date": "2026-09-05",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A new artifact would have been counted as a second seed and deflated a published standard deviation\nsymptom: The job-scoped copy m1_<tier>_seed<N>_<jobid>.json matches make_figures.py's m1_*_seed*.json glob.\nroot_cause: A new file name landed inside an existing reader's glob.\ncorrection_made: Both readers skip the job-scoped copy by regex; caught in adversarial review before shipping.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.25.0\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: n reported by a figure against the seed list the recipe declares\nartifact_paths_expected: make_figures.py; results/framework/m1_curated_seed101.json\nprovenance_guess: record-only\nprovenance_reason: a prevented defect found in review; no artifact exists.\ninventory_notes: A science error, not a crash: the published number would have moved and nothing would have failed.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-29-wbf-multiscale-hurts-40624610",
+ "class": "design",
+ "date": "2026-05-07",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "design",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: design (from correction_class)\nescalation_expected: human (rule: correction_class=design: no agent tier may redesign an experiment)\ntitle: Multi-scale WBF scored 0.744 against 0.8953 and was nearly read as the true number\nsymptom: A custom TTA + custom matcher pipeline disagreed with the validator by 0.15 with sensible per-class values.\nroot_cause: WBF averages box positions; at high IoU thresholds fusing low-quality scales with the trained scale moves boxes off target. The custom matcher also carried its own offset, unmeasured at the time.\ncorrection_made: Path abandoned for single-model TTA; in August the same lesson was re-learned properly by running every arm through one matcher including a plain baseline (v3.24.4).\ncorrection_class: design\nactor_who_corrected: assistant\nversion_tag: v3.0.29/v3.0.30.8\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40624610\ndetectable_from: two evaluations of one checkpoint disagreeing without a shared baseline arm\nartifact_paths_expected: results/framework/v3_0_29_wbf_eval_40624610.out\nprovenance_guess: record-only\nprovenance_reason: May .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

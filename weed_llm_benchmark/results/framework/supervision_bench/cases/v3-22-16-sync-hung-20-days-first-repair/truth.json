@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-22-16-sync-hung-20-days-first-repair",
+ "class": "config",
+ "date": "2026-08-23",
+ "escalation_expected": "tier1",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "config",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: config (from correction_class)\nescalation_expected: tier1 (rule: correction_class=config: a bounded parameter change is tier1's reach)\ntitle: The platform had been serving a 2026-08-18 registry: the cluster sync had been hung since 2026-08-03\nsymptom: Quarantine badges rendered empty because the dashboard's registry had 60 datasets and no governance fields; ps showed one rsync alive for 20 days 18 hours.\nroot_cause: A blocked ssh; systemd will not start a new run while the old one lives, so the timer simply stopped without ever reporting a failure. The recorded cause (a stale askpass password) was a guess.\ncorrection_made: Process killed, service restarted, registry re-pulled, fix_local_paths re-run, UI verified. A staleness alarm was added to the corrective list.\ncorrection_class: config\nactor_who_corrected: assistant\nversion_tag: v3.22.16\ncategory: incident\nscope: campaign-governance\nhealthy_control: false\ndetectable_from: age of the last successful sync; registry slug count on the lab vs the cluster\nartifact_paths_expected: results/framework/sync_heartbeat.json; results/framework/dataset_registry.json\nprovenance_guess: record-only\nprovenance_reason: a lab-server outage; the durable evidence is the registry's own staleness and the later heartbeat file.\ninventory_notes: This repair did not hold; see v3-24-3. A diagnosis never tested by a return to service is a guess.",
+ "provenance": "raw",
+ "signals_expected": [
+  "stale_artifact"
+ ]
+}

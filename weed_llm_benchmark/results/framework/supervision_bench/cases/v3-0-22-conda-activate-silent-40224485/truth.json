@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-22-conda-activate-silent-40224485",
+ "class": "code",
+ "date": "2026-04-23",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 40224485\ntitle: A chain slot was consumed by a job that exited in 20 seconds with 'python: command not found'\nsymptom: exit=127 after 20 s; the afterany dependency carried the chain forward as if the round had run.\nroot_cause: conda activate failed silently on that compute node and nothing checked that python existed before the workload started.\ncorrection_made: Fail-fast activation: set -e around the hook plus an explicit command -v python check exiting 2.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.23\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40224485\ndetectable_from: sacct Elapsed of seconds with ExitCode 127; an .out shorter than the environment banner\nartifact_paths_expected: results/framework/slurm_ollama_40224485.out; sacct -j 40224485\nprovenance_guess: record-only\nprovenance_reason: April .out; the file is a few lines long.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-30-5-jobd-harvest-silently-dead-40800343",
+ "class": "code",
+ "date": "2026-05-13",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: The continuous harvester was dead for about three days and reported nothing but a warning\nsymptom: 35 consecutive iterations logged 'harvest_new_datasets not available' and 'this iter found 0 new slugs (registry now 71)'.\nroot_cause: The job imported harvest_new_datasets as a module-level function when it is a method on DatasetDiscovery; the ImportError was swallowed by try/except and the handle set to None.\ncorrection_made: The broken import removed and the method called on the instantiated object, with the exception logged rather than swallowed.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.30.5\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40800343; 40803346\ndetectable_from: registry slug count constant across many iterations of a collector; a repeated warning line in a long-running job\nartifact_paths_expected: results/framework/v3_0_30_jobD_40800343.out; results/framework/dataset_registry.json\nprovenance_guess: record-only\nprovenance_reason: a 3-day .out from a self-chaining job; large and likely rotated.\ninventory_notes: Pure SU burn with a healthy-looking job state; the archetype of the class this benchmark is about.",
+ "provenance": "raw",
+ "signals_expected": [
+  "pool_growth",
+  "source_degraded"
+ ]
+}

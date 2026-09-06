@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-25-2-cpu-train-on-gpu-allocation-45250479",
+ "class": "code",
+ "date": "2026-09-05",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 45250479\ntitle: A GPU job trained on the CPU on a driver-mismatched node and produced a real-looking metric\nsymptom: nvidia-smi reported 'Failed to initialize NVML: Driver/library version mismatch', torch fell back silently, one epoch took 48 minutes instead of about two, and the run reported mAP50-95 0.566 before hitting its walltime in validation.\nroot_cause: torch's CPU fallback is silent, and Slurm keeps scheduling onto that node because it is not drained.\ncorrection_made: train_yolo_mega refuses to start when CUDA is unavailable inside a job that was allocated GPUs; WEED_ALLOW_CPU_TRAIN=1 re-enables the fallback for a deliberate CPU run.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.25.2\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 45250479\ndetectable_from: seconds per epoch against the same recipe's history; sacct AllocTRES showing a GPU next to a log with no CUDA device; the NVML line in the job's own output\nartifact_paths_expected: results/framework/m1_merged_*_45250479.out; sacct -j 45250479; results/framework/_brain/weed/trace/*_45250479.jsonl\nprovenance_guess: raw\nprovenance_reason: September artifacts, still on /ocean.\ninventory_notes: A metric measured against a GPU allocation the job never used. The newest instance of the silent-wrongness class and a good test-split case.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound"
+ ]
+}

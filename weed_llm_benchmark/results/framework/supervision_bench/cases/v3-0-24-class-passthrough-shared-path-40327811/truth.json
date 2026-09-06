@@ -1,0 +1,21 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-24-class-passthrough-shared-path-40327811",
+ "class": "code",
+ "date": "2026-04-27",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: Two registry slugs shared one directory and silently permuted four species\nsymptom: After the class_id fix, Eclipta, Goosegrass, Morningglory and Nutsedge still scored ~0.0001 on the holdout.\nroot_cause: cottonweed_sp8 and cottonweed_holdout both point at results/leave4out/data; sp8 was processed first with an 8-class map and ds_class_map.get(src_cls, src_cls) passed unmapped ids through, so Eclipta (id 2) merged as PalmerAmaranth.\ncorrection_made: CANONICAL_12_NAMES plus _build_canonical_class_map, and a STRICT remap that drops a box whose source id is not explicitly mapped.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.25\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 40327811\ndetectable_from: per-class AP near zero for exactly the classes owned by the second slug; two registry entries with the same local_path\nartifact_paths_expected: results/framework/v3_0_24_eval_40327811.out; results/v3_0_24_eval/v3_0_24_eval.json; results/framework/dataset_registry.json\nprovenance_guess: record-only\nprovenance_reason: the eval JSON path is recorded but not committed in this repo copy; check /ocean.\ninventory_notes: Same family as the v3.24.4 class-order permutation: overall mAP hides a per-class permutation.",
+ "provenance": "raw",
+ "signals_expected": [
+  "none"
+ ]
+}

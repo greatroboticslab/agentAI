@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-2-datasets-shadowed-39397819",
+ "class": "code",
+ "date": "2026-04-16",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ncommand_collected: sacct -j 39397819\ntitle: A local datasets.py shadowed the HuggingFace package; every download died at import\nsymptom: download_dataset('weedsense') failed four times with 'cannot import name load_dataset'; the job then burned its remaining 8 h re-training the old corpus and TIMEOUTed.\nroot_cause: Top-level datasets.py in the repo root shadowed the installed `datasets` package for every import inside the job.\ncorrection_made: git mv datasets.py local_datasets.py; three legacy importers updated.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.3\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39397819\ndetectable_from: four identical ImportError lines naming the repo's own file path; sacct TIMEOUT with no new registry entries\nartifact_paths_expected: results/framework/slurm_ollama_39397819.out; sacct -j 39397819\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "walltime_bound",
+  "pool_growth"
+ ]
+}

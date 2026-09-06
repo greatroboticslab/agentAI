@@ -1,0 +1,22 @@
+{
+ "acceptable_corrections": [],
+ "case_id": "v3-0-7-mega-gate-blocked-39760438",
+ "class": "code",
+ "date": "2026-04-18",
+ "escalation_expected": "human",
+ "incident": true,
+ "labels": {
+  "adjudicated": {},
+  "pre_registered": {
+   "correction_class": "code",
+   "detect": true
+  }
+ },
+ "load_bearing_lines": [],
+ "notes": "class: code (from correction_class)\nescalation_expected: human (rule: correction_class=code: no agent tier may edit code)\ntitle: A strict data gate blocked training three times and produced a 0.90 -> 0.51 regression\nsymptom: MEGA_MIN=15000 blocked train_yolo_mega three times; force-progression routed to the v2.x pseudo-label path and the run scored 0.51-0.56 against the previous 0.902.\nroot_cause: The gate had no release valve for an exhausted pool: blocking only pushed the loop onto a worse code path.\ncorrection_made: Gate auto-release when the harvest already ran and returned no new bbox data.\ncorrection_class: code\nactor_who_corrected: assistant\nversion_tag: v3.0.8\ncategory: incident\nscope: cluster-pipeline\nhealthy_control: false\njob_ids: 39760438\ndetectable_from: three BLOCKED gate messages followed by a legacy action; metric drop vs the previous round\nartifact_paths_expected: results/framework/slurm_ollama_39760438.out\nprovenance_guess: record-only\nprovenance_reason: April .out.",
+ "provenance": "raw",
+ "signals_expected": [
+  "gate_noop",
+  "plateau"
+ ]
+}

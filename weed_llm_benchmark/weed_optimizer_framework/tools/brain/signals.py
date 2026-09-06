@@ -1259,6 +1259,8 @@ def _check_gate_noop(b):
                                    ).strip())
         return _ok(name, ("the gate scored %d slugs and the merge kept %d. %s"
                           % (int(scored), int(kept), note)).strip())
+    ev += [_ev_line(r) for r in b.grep(
+        r"min_dino_score|kept \d+ of \d+|slug[_ ]scores", last=True, limit=1)]
     return _sig(name, "warn", value, "the run claims the curated tier but " +
                 "; ".join(firing), ev)
 
@@ -1315,9 +1317,9 @@ def _check_stale_artifact(b):
     worst = stale[0]
     return _sig(name, "warn", worst[0],
                 "%s predates the start of the step it is read for by %.0f s "
-                "(step start from %s). A metric read out of a file the step "
+                "(%s; step start from %s). A metric read out of a file the step "
                 "never wrote belongs to some earlier run.%s"
-                % (worst[1], worst[0], source,
+                % (worst[1], worst[0], _hours(worst[0]), source,
                    "" if len(stale) == 1 else " Also stale: %s."
                    % ", ".join(s[1] for s in stale[1:])), ev)
 
@@ -1515,14 +1517,33 @@ def _source_history(b):
     return out
 
 
+_REFUSAL_RE = re.compile(r"SKIP\w*|40[134]|no candidates|failed|unreachable|"
+                         r"credential", re.I)
+
+
 def _source_lines(b, sources):
-    """Log lines that name a source and say it was skipped or refused."""
+    """Log lines that name a source and say it was skipped or refused.
+
+    A log line often names two sources ("SKIPPING github, using Kaggle/HF
+    only"), so the first match is regularly the wrong one: the candidate whose
+    source name sits closest to the refusal word wins, and the last such line
+    breaks a tie, because a job's failures accumulate towards its end. Evidence
+    that quotes a line about another source is worse than no line at all.
+    """
     ev = []
     for src in sources[:3]:
-        rows = b.grep(r"(SKIP\w*|403|401|404|no candidates|WARN).{0,80}%s|"
-                      r"%s.{0,80}(SKIP\w*|403|401|404|no candidates)"
-                      % (re.escape(src), re.escape(src)), last=False, limit=1)
-        ev += [_ev_line(r) for r in rows]
+        name_re = re.compile(re.escape(src), re.I)
+        best = None
+        for row in b.lines():
+            hits = [m.start() for m in name_re.finditer(row["text"])]
+            refusals = [m.start() for m in _REFUSAL_RE.finditer(row["text"])]
+            if not hits or not refusals:
+                continue
+            gap = min(abs(a - c) for a in hits for c in refusals)
+            if best is None or gap <= best[0]:
+                best = (gap, row)
+        if best is not None:
+            ev.append(_ev_line(best[1]))
     return ev
 
 
@@ -1587,42 +1608,44 @@ def _check_budget(b):
     if budget_cfg:
         ev.append(_ev_section("ledger", 1, "budget " + _kv(
             budget_cfg, "su_envelope", "daily_cap", "per_round_cap")))
-    hits, value, severity = [], None, "ok"
+    # (severity, ratio, sentence) per rule that fired; the worst one decides,
+    # and its own ratio is the value — not whichever rule happened to run last.
+    fired, notes = [], []
     if round_su is not None and cap:
         ratio = _round(round_su / cap, 4)
         if round_su > cap:
-            hits.append("this round has spent %.1f SU against a per-round cap of "
-                        "%.1f (%.2fx)" % (round_su, cap, ratio))
-            value, severity = ratio, "warn"
+            fired.append(("warn", ratio,
+                          "this round has spent %.1f SU against a per-round cap "
+                          "of %.1f (%.2fx)" % (round_su, cap, ratio)))
     elif round_su is None:
-        hits.append("(the su section records no round cost)")
+        notes.append("the su section records no round cost")
     elif not cap:
-        hits.append("(no per-round cap is configured)")
+        notes.append("no per-round cap is configured")
     if campaign is not None and envelope:
         ratio = _round(campaign / envelope, 4)
         if ratio >= crit_frac:
-            hits.append("the campaign has spent %.0f of its %.0f SU envelope "
-                        "(%.0f%%)" % (campaign, envelope, ratio * 100.0))
-            value, severity = ratio, "crit"
+            fired.append(("crit", ratio,
+                          "the campaign has spent %.0f of its %.0f SU envelope "
+                          "(%.0f%%)" % (campaign, envelope, ratio * 100.0)))
         elif ratio >= warn_frac:
-            hits.append("the campaign has spent %.0f of its %.0f SU envelope "
-                        "(%.0f%%, past the %.0f%% mark)"
-                        % (campaign, envelope, ratio * 100.0, warn_frac * 100.0))
-            if severity != "crit":
-                value, severity = ratio, "warn"
-    elif campaign is None or not envelope:
-        hits.append("(the campaign total or its envelope is not recorded)")
-    firing = [h for h in hits if not h.startswith("(")]
-    if not firing:
-        notes = " ".join(h for h in hits if h.startswith("("))
-        if len(notes.split("(")) > 2:
-            return _unknown(name, ("neither budget comparison could be made: "
-                                   + notes).strip())
-        return _ok(name, ("round and campaign spend are inside their limits. "
-                          + notes).strip())
-    return _sig(name, severity, value, "; ".join(firing) +
-                ". SU spent past a cap is spent whatever the next round decides",
-                ev)
+            fired.append(("warn", ratio,
+                          "the campaign has spent %.0f of its %.0f SU envelope "
+                          "(%.0f%%, past the %.0f%% mark)"
+                          % (campaign, envelope, ratio * 100.0,
+                             warn_frac * 100.0)))
+    else:
+        notes.append("the campaign total or its envelope is not recorded")
+    tail = (" (%s)" % "; ".join(notes)) if notes else ""
+    if not fired:
+        if len(notes) > 1:
+            return _unknown(name, "neither budget comparison could be made: "
+                                  + "; ".join(notes))
+        return _ok(name, "round and campaign spend are inside their limits."
+                         + tail)
+    worst = max(fired, key=lambda f: (_SEV_RANK[f[0]], f[1]))
+    return _sig(name, worst[0], worst[1],
+                "; ".join(f[2] for f in fired) + ". SU spent past a cap is spent "
+                "whatever the next round decides" + tail, ev)
 
 
 def _check_disk_low(b):
