@@ -17205,3 +17205,17 @@ try:
     log.info("[health] scheduler alarm mounted (/api/health/scheduler)")
 except Exception as _e:
     log.error(f"[health] scheduler alarm failed to mount: {_e}")
+
+# v3.31.0 — read-only HTTP surface over the supervision layer. Every part of it
+# has to be readable from the platform itself, by a person with a browser and no
+# agent session anywhere in the picture; a layer whose state is only visible from
+# a terminal is a private tool with a web page next to it. Writes deliberately do
+# not live here: corrections go through the single-writer channel and actions
+# through the policy gate in api_cluster_action.
+try:
+    from .brain import api as _brain_api
+    from . import db as _brain_api_db          # not a module-level name here
+    _brain_api.mount(app, {"log": log, "repo": str(REPO), "db": _brain_api_db})
+    log.info("[brain] supervision API mounted (/api/brain/{domain}/...)")
+except Exception as _e:
+    log.error(f"[brain] supervision API failed to mount: {_e}")

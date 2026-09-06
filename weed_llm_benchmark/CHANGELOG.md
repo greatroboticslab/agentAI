@@ -8520,3 +8520,36 @@ bounded — never descending into image directories, capped per directory, per c
 and globally — and every cap and every skip is recorded rather than silently
 truncating. Section routing is not re-derived: it reuses the adapter's own
 `section_for` and the one shared sacct parser.
+
+## 2026-09-06 — v3.31.0 the supervision layer is readable from the platform
+
+`tools/brain/api.py` mounts eight read-only routes under `/api/brain/{domain}/`:
+the correction chain with the result of recomputing it, service-unit spend against
+its envelope, the deterministic checks over the latest bundle, plan versions with
+their simulated flag, experiment proposals and results, which model is wired to
+each tier, the action catalogue as the gate sees it, and one merged timeline.
+
+Every part of the layer has to be readable from the platform itself, by a person
+with a browser and no agent session anywhere in the picture. A supervision layer
+whose state is only visible from a terminal is a private tool with a web page next
+to it.
+
+**A missing store and an empty one are reported differently**, and a test asserts
+it per store. `{"available": false, "reason": ...}` means the layer cannot see that
+state; `{"available": true, "rows": []}` means it looked and found nothing. The
+SU route needed this most: the ledger's own `total` returns zero spend for a
+domain with no ledger, which is true of an empty file and false of an absent one,
+and "0 SU" on a page is exactly the silence-mistaken-for-health this layer was
+built after. An unwired tier reports `null` rather than a default, because a
+missing deployment must never silently promote another model into a review role. A
+broken correction chain still returns its rows next to `chain_ok: false`, since
+withholding them would hide the evidence of the tampering along with it. A torn
+final line — what a walltime-killed writer leaves — costs that one line, not the
+file.
+
+**The surface is read-only by construction, not by convention.** Tests parse the
+module and assert every route is a GET, that it opens no file for writing, that
+none of its paths is exempt from authentication, and that the dashboard mounts it.
+Writes stay where they already belong: corrections through the single-writer
+channel on the scheduler thread, actions through the policy gate. A second write
+path here would be a second writer, which is what the correction channel refuses.
