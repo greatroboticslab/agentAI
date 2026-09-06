@@ -128,19 +128,31 @@ class TestSafety(Base):
             self.assertFalse(r["available"])
             self.assertNotIn("..", r.get("path", ""))
 
-    def test_the_module_declares_no_write_routes(self):
+    def test_there_is_exactly_one_write_route_and_it_is_the_approval(self):
+        """Pinning the exception is stronger than forbidding all writes.
+
+        Corrections and actions have their own owners -- the single-writer
+        channel and the policy gate -- and nothing here may take those over. An
+        approval is different in kind: it is a PERSON ruling on a queued request,
+        and there is nowhere else on the platform for them to do it. So the rule
+        is not "no writes"; it is "this write and no other", which is a claim a
+        test can actually hold.
+        """
         src = pathlib.Path(A.__file__).read_text()
         tree = ast.parse(src)
-        verbs = set()
+        routes = []
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for dec in node.decorator_list:
                     f = dec.func if isinstance(dec, ast.Call) else dec
-                    if isinstance(f, ast.Attribute):
-                        verbs.add(f.attr)
-        self.assertEqual(verbs, {"get"},
-                         "writes belong to the single-writer channel and the "
-                         "policy gate, not to this surface")
+                    if isinstance(f, ast.Attribute) and f.attr in ("get", "post",
+                                                                   "put", "patch",
+                                                                   "delete"):
+                        routes.append((f.attr, node.name))
+        writes = [n for verb, n in routes if verb != "get"]
+        self.assertEqual(writes, ["api_brain_approvals_decide"],
+                         "the only write on this surface is a person deciding "
+                         "an approval; everything else belongs to its own owner")
 
     def test_the_module_opens_no_file_for_writing(self):
         src = pathlib.Path(A.__file__).read_text()
@@ -192,6 +204,64 @@ class TestPage(Base):
         body = A.page_supervision("weed").body.decode("utf-8")
         self.assertIn("if(!data.available)", body)
         self.assertIn("Not available", body)
+
+
+class TestApprovals(Base):
+    """The one write on this surface, and why it is not a second writer.
+
+    An approval is a PERSON deciding, and there is nowhere else on the platform
+    for them to do it. The single-writer rule protects the correction chain from
+    a second automated author; it was never about keeping people out of their own
+    governance queue. What matters is that the author cannot be forged.
+    """
+
+    def test_an_empty_queue_says_so_rather_than_showing_nothing(self):
+        r = A.api_brain_approvals("weed")
+        self.assertFalse(r["available"])
+        self.assertIn("queued for approval", r["reason"])
+
+    def test_a_decision_is_refused_when_the_caller_cannot_be_identified(self):
+        A._CTX.pop("actor_of", None)
+        r = A.api_brain_approvals_decide("weed", "ap-1", {"decision": "approve",
+                                                          "reason": "ok"}, None)
+        self.assertFalse(r["ok"])
+        self.assertIn("no author", r["reason"])
+
+    def test_the_body_cannot_name_the_decider(self):
+        """A decision whose author the body could name is one anyone can
+        attribute to anyone."""
+        from weed_optimizer_framework.tools.brain import approvals as AP
+        AP.propose("weed", "clean_train_d", {}, "R3", "tier1:x", "because",
+                   1788700000.0, root=self.root)
+        item = list(AP.state("weed", root=self.root))[0]
+        A._CTX["actor_of"] = lambda req: "harry"
+        A._CTX["can_manage"] = lambda actor, dom: True
+        r = A.api_brain_approvals_decide("weed", item,
+                                         {"decision": "approve", "reason": "yes",
+                                          "decided_by": "human:someone_else"}, None)
+        self.assertTrue(r["ok"], r.get("reason"))
+        self.assertEqual(r["item"]["decided_by"], "human:harry")
+
+    def test_a_caller_who_does_not_manage_the_agent_is_refused(self):
+        A._CTX["actor_of"] = lambda req: "stranger"
+        A._CTX["can_manage"] = lambda actor, dom: False
+        r = A.api_brain_approvals_decide("weed", "ap-1",
+                                         {"decision": "approve", "reason": "x"}, None)
+        self.assertFalse(r["ok"])
+        self.assertIn("do not manage", r["reason"])
+
+    def test_the_queue_shows_up_after_something_is_queued(self):
+        from weed_optimizer_framework.tools.brain import approvals as AP
+        AP.propose("weed", "clean_train_d", {}, "R3", "tier1:x", "because",
+                   1788700000.0, root=self.root)
+        r = A.api_brain_approvals("weed")
+        self.assertTrue(r["available"])
+        self.assertEqual(r["n_pending"], 1)
+
+    def test_the_page_renders_the_queue(self):
+        body = A.page_supervision("weed").body.decode("utf-8")
+        self.assertIn('"approvals"', body)
+        self.assertIn("Waiting on a person", body)
 
 
 if __name__ == "__main__":

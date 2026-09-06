@@ -32,7 +32,7 @@ import json
 import os
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 router = APIRouter()
 _CTX = {}
@@ -324,6 +324,85 @@ def api_brain_timeline(domain: str):
             "sources_unavailable": missing, "checked_ts": time.time()}
 
 
+# --- approvals: the one place a person rules on a queued request -------------
+#
+# This is the exception to the read-only rule above, and it is the exception
+# because it is the opposite of a second writer: an approval is a PERSON
+# deciding, and there is nowhere else on the platform for them to do it. The
+# single-writer rule protects the correction chain from a second automated
+# author; it was never about keeping people out of their own governance queue.
+
+@router.get("/api/brain/{domain}/approvals")
+def api_brain_approvals(domain: str):
+    """Everything that has been queued, with what a person decided."""
+    dom = _domain(domain)
+    try:
+        from . import approvals as AP
+    except Exception as e:
+        return _unavailable("approval queue unavailable: %s" % e)
+    log_path = AP.path(dom, root=_repo())
+    if not os.path.exists(log_path):
+        return _unavailable("nothing has been queued for approval in this domain yet",
+                            path=log_path)
+    try:
+        items = AP.state(dom, root=_repo())
+    except Exception as e:
+        return _unavailable("approval queue could not be read: %s" % e)
+    rows = sorted(items.values(), key=lambda r: (r.get("ts") or 0))
+    return {"available": True, "domain": dom, "rows": rows[-MAX_ROWS:],
+            "n_pending": sum(1 for r in rows if r.get("status") == "pending")}
+
+
+@router.post("/api/brain/{domain}/approvals/{item_id}")
+def api_brain_approvals_decide(domain: str, item_id: str, payload: dict = None,
+                               request: Request = None):
+    """Approve or deny one queued request.
+
+    The actor comes from the signed session, never from the request body: a
+    decision whose author the body could name is a decision anyone can attribute
+    to anyone. If this module cannot identify the person -- no identity hook
+    wired, or the caller may not manage this agent -- it refuses. Failing open
+    here would let an unauthenticated call approve an R3 action.
+    """
+    dom = _domain(domain)
+    body = payload if isinstance(payload, dict) else {}
+    who = _CTX.get("actor_of")
+    can = _CTX.get("can_manage")
+    if not callable(who):
+        return {"ok": False, "reason": "no identity hook is wired; refusing to "
+                                       "record a decision with no author"}
+    try:
+        actor = str(who(request) or "")
+    except Exception as e:
+        return {"ok": False, "reason": "could not identify the caller: %s" % e}
+    if not actor:
+        return {"ok": False, "reason": "could not identify the caller"}
+    if callable(can):
+        try:
+            allowed = bool(can(actor, dom))
+        except Exception as e:
+            return {"ok": False, "reason": "permission check failed: %s" % e}
+        if not allowed:
+            return {"ok": False, "reason": "you do not manage this agent"}
+    try:
+        from . import approvals as AP
+    except Exception as e:
+        return {"ok": False, "reason": "approval queue unavailable: %s" % e}
+    res = AP.decide(dom, str(item_id), str(body.get("decision") or ""),
+                    "human:" + actor, str(body.get("reason") or ""),
+                    time.time(), root=_repo())
+    try:
+        log = _CTX.get("log_action")
+        if callable(log):
+            log("brain_approval", {"ok": bool(res.get("ok")), "domain": dom,
+                                   "item": item_id, "actor": actor,
+                                   "decision": body.get("decision"),
+                                   "msg": res.get("reason") or ""})
+    except Exception:
+        pass
+    return res
+
+
 # --- the page ----------------------------------------------------------------
 
 _PAGE = """<!doctype html><html><head><meta charset="utf-8">
@@ -359,6 +438,11 @@ _PAGE = """<!doctype html><html><head><meta charset="utf-8">
     later columns out of the card entirely, which reads as a broken table
     rather than as a scrollable one. */
  .scroll th{position:sticky;top:0;background:#0e1626}
+ /* Identifiers here are long and have no spaces -- action ids, actor ids,
+    artifact names -- so without this they refuse to wrap and push the later
+    columns out of the card. The governance columns (who asked, who decided)
+    are the ones that were disappearing. */
+ td{overflow-wrap:anywhere}
 </style></head><body>
 <h1>Supervision &mdash; __DOMAIN__</h1>
 <div class="sub">Everything this layer knows about the campaign, read from the
@@ -375,6 +459,7 @@ const SECTIONS = [
   ["roles",       "Tiers and levers"],
   ["plans",       "Plans"],
   ["experiments", "Experiments"],
+  ["approvals",   "Waiting on a person"],
   ["policy",      "What this layer may do"],
   ["timeline",    "Timeline"]
 ];
@@ -431,6 +516,14 @@ function render(key, data){
     return table(["lever","status","verdict","n"],
       (data.rows||[]).map(r=>[esc(r.lever||r.id), esc(r.status),
         esc(r.verdict), esc(r.n)]));
+  }
+  if(key==="approvals"){
+    return '<div class="sub">'+esc(data.n_pending)+' waiting</div>' + table(
+      ["status","action","risk","asked by","decided by"],
+      (data.rows||[]).map(r=>[
+        r.status==="pending" ? '<span class="warn">pending</span>' : esc(r.status),
+        esc(r.action), esc(r.risk), esc(r.requested_by),
+        r.decided_by ? esc(r.decided_by) : '<span class="missing">—</span>']));
   }
   if(key==="policy"){
     return '<div class="sub">'+esc(data.n_actions)+' action(s) in the catalogue</div>'

@@ -8642,3 +8642,41 @@ rather than by reasoning about the markup: the 35-row action catalogue stretched
 every card in its row to its own height, and a `nowrap` added to fix the first
 pushed the lever controls out of the card. Long tables now scroll inside their own
 card on both axes, and prose cells wrap.
+
+## 2026-09-06 — v3.32.0 the approval queue, and the one write on the page
+
+`tools/brain/approvals.py` holds what an agent tier asked for until a person
+rules on it. Without that queue, R3 collapses into R4 in practice: an action
+nobody can ever request is indistinguishable from one nobody may take.
+
+Three rules make it a governance record rather than a to-do list. **Only a person
+decides** — `decide()` refuses any author that is not a `human:*` actor, because
+a tier that could approve its own request has no ceiling and the risk table would
+be decoration. **R4 is never queued** — an irreversible action is refused at
+proposal time, not parked where one impatient click would run it. **A decision is
+final and the log is append-only** — a second ruling is refused and recorded as an
+attempt, so "approved by one person and denied by another" is a readable event
+rather than a silent overwrite. A torn final line costs that line, not the log.
+
+`POST /api/brain/{domain}/approvals/{id}` is the only write on the supervision
+surface, and the test that used to forbid all writes now pins that exact
+exception, which is a stronger claim than a blanket ban. Corrections and actions
+keep their own owners; an approval is different in kind, because it is a person
+ruling and there is nowhere else on the platform for them to do it.
+
+**The author comes from the signed session, never from the body.** Verified
+against the live server: a request queued by `tier1:deepseek-v4-flash` was
+approved through the API with `"decided_by": "human:someone_else"` in the body,
+and the record says `human:harry567566@gmail.com` — the session user. A second
+decision on the same item was refused with the first decision named. Unauthenticated
+returns 401, and a caller who does not manage the agent is refused.
+
+The queue renders as a ninth card. Fixing it exposed a real layout defect: long
+identifiers have no spaces, so action and actor ids refused to wrap and pushed the
+two governance columns — who asked, who decided — out of the card entirely. Cells
+break anywhere now.
+
+The demonstration records written during that verification were removed
+afterwards. They were the only entries in the log, they referred to an action that
+never ran, and leaving them would have put a fabricated request and approval into
+the campaign's own governance history.

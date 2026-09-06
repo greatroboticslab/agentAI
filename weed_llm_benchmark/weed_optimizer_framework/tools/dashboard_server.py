@@ -17216,7 +17216,15 @@ except Exception as _e:
 try:
     from .brain import api as _brain_api
     from . import db as _brain_api_db          # not a module-level name here
-    _brain_api.mount(app, {"log": log, "repo": str(REPO), "db": _brain_api_db})
+    _brain_api.mount(app, {"log": log, "repo": str(REPO), "db": _brain_api_db,
+                           # The approval route identifies the person from the
+                           # signed session and checks they manage this agent;
+                           # without these hooks it refuses rather than
+                           # recording a decision with no author.
+                           "actor_of": _actor_from_request,
+                           "can_manage": lambda actor, dom: _is_admin(actor)
+                                                            or _can_use_cluster(actor),
+                           "log_action": _log_action})
     log.info("[brain] supervision API mounted (/api/brain/{domain}/...)")
 except Exception as _e:
     log.error(f"[brain] supervision API failed to mount: {_e}")
