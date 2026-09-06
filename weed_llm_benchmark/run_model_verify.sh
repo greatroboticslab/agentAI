@@ -109,6 +109,28 @@ SERVE_PID=$!
 trap 'kill $SERVE_PID 2>/dev/null' EXIT
 fi
 
+# v3.32.4 — write the result file BEFORE waiting, not only after.
+#
+# Job 45331031 (deepseek-v3:671b on 4 shared H100s) was killed at its 2 h wall
+# while still loading tensors. The Python writer below never ran, so the job left
+# no result file at all: from the artifacts alone the run was indistinguishable
+# from one that was never submitted. That is precisely the failure class this
+# campaign exists to close, reproduced by the tool built to measure it.
+#
+# A start marker is written now and overwritten at the end. A walltime kill
+# therefore leaves a record that says what was attempted and that it never
+# finished loading, instead of leaving silence.
+mkdir -p "$OUTDIR"
+JOBTAG="$JOBTAG" OUT="$OUT" NAME="$NAME" BACKEND="$BACKEND" python3 - <<'PYSTART'
+import json, os
+json.dump({"jobtag": os.environ["JOBTAG"], "kind": os.environ.get("BACKEND", "?"),
+           "model": os.environ.get("NAME", ""), "status": "loading", "ok": None,
+           "note": ("written at job start; if this file still says loading, the "
+                    "job ended before the model became ready -- check sacct, it "
+                    "will say TIMEOUT")},
+          open(os.environ["OUT"], "w"), indent=1)
+PYSTART
+
 T0=$(date +%s)
 READY=0
 for i in $(seq 1 240); do          # up to 40 min: a 150 GB checkpoint loads from Lustre

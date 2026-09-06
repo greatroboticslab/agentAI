@@ -8742,3 +8742,37 @@ moment it was added — the same test written an hour earlier after the same cla
 of bug took the whole page down. Its companion, a hand-rolled quote-balance
 check, was replaced by a real parse: the heuristic failed on an apostrophe in a
 comment, and a test that cries wolf teaches people to ignore a red run.
+
+## 2026-09-06 — v3.32.4 the deep tier has one usable model, and the measuring tool went silent
+
+`results/framework/model_serving_headtohead.md` records which candidate for the
+deep reviewer tier can be served on this allocation. It answers serving only;
+which model audits better is scored against the incident corpus and is reported
+separately.
+
+**DeepSeek-V4-Flash serves.** On four shared H100s through vLLM: 621 s to first
+token at 32K context (1031 s at 64K), a 16,113-token prefill in 0.75 s, 147.4
+tok/s decode, fp8 KV cache (the engine asserts it for this architecture), JSON
+mode accepted. Halving the context halved the load and changed nothing else
+measured.
+
+**deepseek-v3:671b did not.** On eight GPUs the server returned `HTTP 500` on
+its first generation and the job ended after 7 minutes. On four it was killed at
+its two-hour wall still loading tensors, having never answered a one-token
+request: the Q4 checkpoint is ~376 GB against 320 GB of device memory, so ollama
+placed part of it on the host and loaded through `mmap` from the shared
+filesystem — its own log says "tensor overrides to CPU are used with mmap
+enabled". This is a statement about serving it here, not about the model; a
+different backend, quantisation or allocation may well work.
+
+The plan already treated the deep tier as windowed with nothing depending on it.
+That is now measured rather than assumed: a tier whose model can take two hours
+to load, or fail to, cannot sit on the path of a scheduler tick.
+
+**The measuring tool reproduced the failure it exists to measure.** The job
+killed at its wall never reached the result writer, so it left no result file —
+from the artifacts alone, indistinguishable from a job that was never submitted.
+`run_model_verify.sh` now writes a `status: loading` marker at job start and
+overwrites it at the end, so a walltime kill leaves a record of what was
+attempted instead of leaving silence. The same repair, for the same reason, as
+the per-epoch trace and the job-scoped metric.
