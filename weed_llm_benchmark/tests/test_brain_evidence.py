@@ -308,6 +308,15 @@ ck("resources reports filesystem free and queue depth separately",
 ck("harvest per_source is null with a reason, not an invented count",
    bundle["sections"]["harvest"]["per_source"] is None
    and bundle["sections"]["harvest"]["per_source_reason"])
+staged_reg = evidence.build(DOMAIN, ROUND, STEP, JOB, {"run": Runner(capture(
+    overrides={"registry_diff": emit("registry_diff", 0, [
+        "[file] path=results/framework/dataset_registry.json bytes=4194304 "
+        "mtime=1756400000 sha256=%s" % ("f" * 64), "[block] prev"]
+        + json_block({"added_slugs": ["kaggle/new-weeds"], "slugs": []},
+                     "results/framework/_brain/weed/registry_prev.json"))}))})
+ck("a slug diff the lab staged is passed through, never recomputed here",
+   staged_reg["sections"]["registry_diff"]["added_slugs"]
+   == ["kaggle/new-weeds"])
 ck("registry_diff reports identity and states why there is no diff",
    bundle["sections"]["registry_diff"]["registry"]["sha256"] == "f" * 64
    and bundle["sections"]["registry_diff"]["added_slugs"] is None
@@ -430,8 +439,13 @@ ck("trimming did not touch the original bundle",
    > len(small["sections"]["out_tail"]["lines"]))
 ck("the trimmed bundle re-hashes to its own content",
    evidence.validate(small)["ok"])
+noop = evidence.trim(full, 0)
 ck("trim with no budget is a no-op that says so",
-   evidence.trim(full, 0)["export"]["trim"]["reason"] is not None)
+   noop["export"]["trim"]["reason"] is not None
+   and noop["sections"]["out_tail"]["lines"]
+   == full["sections"]["out_tail"]["lines"])
+ck("a no-op trim still leaves a bundle whose hash verifies",
+   evidence.validate(noop)["ok"])
 
 tiny = evidence.trim(full, 10)
 ck("a budget nothing can meet is reported ok=False with a reason",
@@ -614,7 +628,33 @@ ck("remote_script survives odd input",
 ck("stage_commands survives a non-dict", evidence.stage_commands("weed", None) == [])
 
 # --------------------------------------------------------------------------
-print("\n[10] CLI and on-disk output")
+print("\n[10] every limit is overridable, in one resolution order")
+ck("the defaults are what the file does not override",
+   evidence._limits(None)["token_budget"]
+   == evidence._file_limits().get("token_budget",
+                                  evidence.DEFAULTS["token_budget"]))
+ck("a caller's limits beat the defaults",
+   evidence._limits({"limits": {"token_budget": 4321}})["token_budget"] == 4321)
+ck("a limit nothing declares is ignored",
+   "made_up" not in evidence._limits({"limits": {"made_up": 1}}))
+os.environ["EVIDENCE_TOKEN_BUDGET"] = "777"
+try:
+    ck("the environment is highest",
+       evidence._limits({"limits": {"token_budget": 4321}})["token_budget"] == 777)
+    os.environ["EVIDENCE_TOKEN_BUDGET"] = "not a number"
+    ck("an unreadable override keeps the value it was overriding",
+       evidence._limits(None)["token_budget"]
+       == evidence.DEFAULTS["token_budget"])
+finally:
+    os.environ.pop("EVIDENCE_TOKEN_BUDGET", None)
+ck("a cap override reaches the shell script",
+   "-v K=7 " in evidence.remote_script(DOMAIN, ROUND, STEP, JOB,
+                                       limits={"out_tail_tail_lines": 7}))
+ck("the threshold file is read for an evidence block, if it grows one",
+   isinstance(evidence._file_limits(), dict))
+
+# --------------------------------------------------------------------------
+print("\n[11] CLI and on-disk output")
 cap_path = os.path.join(_tmp, "captured.txt")
 with open(cap_path, "w", encoding="utf-8") as f:
     f.write(capture())

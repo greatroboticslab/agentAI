@@ -80,6 +80,24 @@ reads them and never writes; it ignores `sections["signals"]`, which is where it
 own output is stored. Shapes it relies on are named in `explain()` per signal and
 in the extractor docstrings. Anything unrecognised is a reason, not a guess.
 
+Three facts do not live in any section and have to be staged onto the bundle by
+whoever builds it, or the checks that need them report `unknown` instead of
+assuming a value (v3.27.0):
+
+* the **domain config**, under `sections.ledger.config` (or `.domain_config`, or
+  the same keys on `plan`): `plateau` reads `noise_floor` from it and `budget`
+  reads `budget`. Both are per-campaign measurements, not thresholds, so they are
+  deliberately not in `thresholds.json`.
+* the **previous train's iterations per epoch**, on the earlier round's `train`
+  step entry (`steps.train.params.iterations_per_epoch`) or as
+  `previous_iterations_per_epoch` on the strategy. `pool_growth` is the second
+  most common signal in the corpus and it is the one fact the round doc does not
+  already carry.
+* the **per-source harvest counts** of the previous round, as
+  `harvest.previous_per_source` or on an earlier round's `collect` entry.
+  Without them a source at zero cannot be told from a source that has always
+  been at zero, and `source_degraded` says so rather than guessing.
+
 Pure stdlib, no network, no I/O beyond `thresholds.json`: this imports inside a
 SLURM job body, on the always-on server and on a laptop.
 
@@ -388,9 +406,9 @@ def _ev_section(section, index, quote):
     """Evidence from a parsed section, which has no line numbers in the bundle.
 
     `artifact_id` is `section:<name>` and `line` is the 1-based index of the row
-    or record inside that section as the bundle carries it. It is provenance,
-    not a citation: `citations.resolve` will not resolve it, and that is the
-    honest answer for a fact that was read out of parsed JSON.
+    or record inside that section as the bundle carries it (v3.27.0). It is
+    provenance, not a citation: `citations.resolve` will not resolve it, and
+    that is the honest answer for a fact read out of parsed JSON.
     """
     return {"artifact_id": "section:%s" % section,
             "line": max(1, _int(index, 1) or 1),
@@ -1177,7 +1195,7 @@ def _check_gate_noop(b):
     grace = b.th_num("gate_noop.stale_scores_grace_s")
     kept_max = b.th_num("gate_noop.kept_fraction_max")
     unscored_max = b.th_num("gate_noop.max_unscored_in_merge")
-    tier, tier_label, _key = "", "", ""
+    tier, tier_label = "", ""
     for label, holder in b.strategy_holders():
         got = _text(_get(holder, "tier", "TIER"))
         if got:
@@ -1237,7 +1255,15 @@ def _check_gate_noop(b):
                 used, kept_label, kept_key = float(len(got)), label, "datasets_used"
                 break
         kept = used
-    if kept is not None and scored:
+    if kept is not None and scored is not None and scored <= 0 and kept > 0:
+        # A gate that scored nothing is not a strict case of "kept everything it
+        # scored" (there is nothing to divide by), but every slug in the merge
+        # got in unscored, which is the same no-op reached from the other side.
+        ev.append(_ev_section(kept_label, 1, "%s=%d" % (kept_key, int(kept))))
+        hits.append("the merge used %d slug(s) and the gate scored none of them"
+                    % int(kept))
+        value = float(kept) if value is None else value
+    elif kept is not None and scored:
         ev.append(_ev_section(kept_label, 1, "%s=%d" % (kept_key, int(kept))))
         ratio = _round(kept / scored, 4)
         if ratio >= kept_max:
@@ -1253,7 +1279,7 @@ def _check_gate_noop(b):
     firing = [h for h in hits if not h.startswith("(")]
     if not firing:
         note = " ".join(h for h in hits if h.startswith("("))
-        if kept is None or not scored:
+        if kept is None or scored is None:
             return _unknown(name, ("the curated tier's gate cannot be checked: no "
                                    "kept/scored slug counts are recorded. " + note
                                    ).strip())
@@ -1426,6 +1452,9 @@ def _check_source_degraded(b):
                               "per_source block, so no source can be compared "
                               "against itself")
     history = _source_history(b)
+    if not now:
+        return _unknown(name, "the harvest section's per_source block is empty, "
+                              "so no source was reported either way")
     zero = sorted(s for s, n in now.items() if n is not None and n <= 0)
     if not zero:
         return _ok(name, "every source in the per-source report returned "
@@ -1960,8 +1989,10 @@ def _run_check(name, b):
         return _unknown(name, "the check returned severity %r, which is not one "
                               "of %s" % (severity, ", ".join(SEVERITIES)))
     if _SEV_RANK[severity] >= _SEV_RANK["info"] and not sig.get("evidence"):
-        # Structural, not stylistic: an unaddressed finding cannot be checked by
-        # anyone, and a signal nobody can check is worth less than silence.
+        # v3.27.0, structural rather than stylistic: an unaddressed finding
+        # cannot be checked by anyone, and a signal nobody can check is worth
+        # less than silence. Enforcing it here means the invariant cannot be
+        # broken by a thirteenth check written later.
         return _unknown(name, "the check fired at %s but produced no evidence; a "
                               "signal with no artifact address is not actionable "
                               "and is reported as unknown instead. Reason it "

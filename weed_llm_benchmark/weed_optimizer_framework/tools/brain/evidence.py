@@ -181,22 +181,63 @@ _DOM_RE = re.compile(r"[^a-z0-9_]")
 _STEP_RE = re.compile(r"[^a-z0-9_]")
 
 
+# The pre-registered threshold file, read for an optional `evidence` block so a
+# number that reaches a result can be pre-registered beside the signal
+# thresholds rather than only living in code. That file is the record of which
+# values exist; a key it does not declare keeps the default above.
+THRESHOLD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "thresholds.json")
+_FILE_CACHE = {"mtime": None, "values": {}}
+
+
+def _file_limits():
+    """The `evidence` block of the threshold file, cached on its mtime.
+
+    Never raises and never invents: an absent file, an absent block or an
+    unparseable one leaves the defaults in place.
+    """
+    try:
+        mtime = os.path.getmtime(THRESHOLD_FILE)
+    except OSError:
+        return {}
+    if _FILE_CACHE["mtime"] == mtime:
+        return _FILE_CACHE["values"]
+    values = {}
+    try:
+        with open(THRESHOLD_FILE, "r", encoding="utf-8") as f:
+            block = json.load(f).get("evidence")
+        if isinstance(block, dict):
+            values = {k: v for k, v in block.items()
+                      if k in DEFAULTS and isinstance(v, (int, float))}
+    except Exception:
+        values = {}
+    _FILE_CACHE.update(mtime=mtime, values=values)
+    return values
+
+
 def _limits(ctx=None):
-    """Resolved limits: defaults, then environment, then the caller's ctx."""
+    """Resolved limits, in the campaign's resolution order.
+
+    Code defaults, then the threshold file, then the caller's `ctx["limits"]`,
+    then the environment (highest). Only keys DEFAULTS already declares are
+    accepted from any of the three, so an override can change a limit but never
+    introduce one nothing reads.
+    """
     out = dict(DEFAULTS)
-    for key, default in DEFAULTS.items():
-        raw = os.environ.get("EVIDENCE_" + key.upper())
-        if raw is None:
-            continue
-        try:
-            out[key] = type(default)(raw)
-        except (TypeError, ValueError):
-            pass                     # an unreadable override keeps the default
+    out.update(_file_limits())
     given = (ctx or {}).get("limits") if isinstance(ctx, dict) else None
     if isinstance(given, dict):
         for key, val in given.items():
             if key in out and isinstance(val, (int, float)):
                 out[key] = val
+    for key in DEFAULTS:
+        raw = os.environ.get("EVIDENCE_" + key.upper())
+        if raw is None:
+            continue
+        try:
+            out[key] = type(DEFAULTS[key])(raw)
+        except (TypeError, ValueError):
+            pass                     # an unreadable override keeps the default
     return out
 
 
@@ -412,9 +453,7 @@ def remote_script(domain, round_num, step, job_id, limits=None, project=None):
     round and step for the nonce only: the round scheduler's own step is
     identified by its job id on the cluster, and a round number is not a path.
     """
-    lim = dict(DEFAULTS)
-    if isinstance(limits, dict):
-        lim.update({k: v for k, v in limits.items() if k in lim})
+    lim = _limits({"limits": limits} if isinstance(limits, dict) else None)
     subs = {
         "__EV__": "EV" + nonce(domain, round_num, step, job_id),
         "__JOBID__": _job(job_id) or "0",
@@ -869,13 +908,14 @@ def _registry_value(sec):
                          or "no previous snapshot was staged; only the current "
                             "registry's identity is reported")
         return out
-    now_slugs = prev.get("_current_slugs")
-    old = prev.get("slugs")
-    if isinstance(old, list) and isinstance(now_slugs, list):
-        out["added_slugs"] = sorted(set(now_slugs) - set(old))
-    else:
-        out["reason"] = ("the staged snapshot carries no slug list, so the "
-                         "diff is unknown; identity and mtime are reported")
+    added = prev.get("added_slugs")
+    if isinstance(added, list):
+        out["added_slugs"] = added          # the lab computed it from its own
+        return out                          # snapshots and staged the answer
+    out["reason"] = ("the registry is not parsed here (it is %d bytes and this "
+                     "runs inside a scheduler tick), so the slug diff is "
+                     "whatever the lab staged; identity, size and mtime are "
+                     "reported" % int(main["file"].get("bytes") or 0))
     return out
 
 
@@ -1108,19 +1148,30 @@ def _t_ledger(sections, lim, arg):
 
 
 def _t_list(section):
+    """Cap the longest list a section holds — `items`, `rounds`, whatever it
+    calls it — keeping the newest entries."""
     def _fn(sections, lim, arg):
         sec = sections.get(section)
-        items = sec if isinstance(sec, list) else (
-            sec.get("items") if isinstance(sec, dict) else None)
+        if isinstance(sec, list):
+            key, items = None, sec
+        elif isinstance(sec, dict):
+            key, items = None, None
+            for name, val in sec.items():
+                if isinstance(val, list) and (items is None
+                                              or len(val) > len(items)):
+                    key, items = name, val
+        else:
+            return None
         if not isinstance(items, list) or len(items) <= int(arg):
             return None
         before = len(items)
         kept = items[-int(arg):]
-        if isinstance(sec, list):
+        if key is None:
             sections[section] = kept
         else:
-            sec["items"] = kept
-        return {"action": "keep the last %d of %d entr(ies)" % (int(arg), before),
+            sec[key] = kept
+        return {"action": "keep the last %d of %d entr(ies) in %s"
+                          % (int(arg), before, key or section),
                 "removed": before - int(arg)}
     return _fn
 
@@ -1166,6 +1217,7 @@ def trim(bundle, budget_tokens):
     if budget is None or budget <= 0:
         record["reason"] = "no budget was given; nothing was trimmed"
         _put_trim(out, record)
+        _seal(out)
         return out
     record["budget_tokens"] = int(budget)
     for name, fn, arg in TRIM_STAGES:
