@@ -8488,3 +8488,35 @@ same reason the field is rendered at all: the gate authorises exactly what a
 template substitutes, so a rendered field with no declared bound would refuse the
 step. That coupling is deliberate and is why adding a field to a template is now a
 two-file change.
+
+## 2026-09-06 — v3.30.3 recovering the evidence the inventory never named
+
+`tools/brain/inventory_recover.py` closes the listing half of the reachability
+gap. `results_csv` present in 17 of 162 cases is not an archival limit: nearly
+every training job wrote one into a run directory that still exists, and the
+case's inventory entry simply never named it.
+
+`scan` proposes, `apply` writes, `report` says what would change. The matching
+rules come from what the job scripts actually do, not from what filenames look
+like: a job id in a filename (the SBATCH `%j` convention), a job id in a
+directory name (`RUN_TAG="job$SLURM_JOB_ID"`, which exists precisely so a
+`results.csv` cannot be misattributed), and strongest of all, a recipe JSON
+already matched by one of those, opened so its own `save_dir` or `best_pt` leads
+to the file it names — nothing inferred from a name, the artifact states its own
+path. An array task is also searched under its array-base id, because the job
+key the script writes is the array job id and not the per-task one.
+
+A candidate whose only evidence is a modification time inside the job's window
+scores 0.35 and sits far below the 0.80 apply threshold, since it cannot separate
+two jobs that ran at once. A file merely sitting in a plausible directory earns no
+proposal at all rather than a weak one: a corpus that quietly acquires
+plausible-looking evidence is worse than one that is honestly thin, because the
+first cannot be audited.
+
+The tool adds artifacts and never labels. `signals_expected`, `class`, `date` and
+every other truth field are read-only to it and a test asserts it; the labels are
+pre-registration and a recovery pass must not be able to widen them. Search is
+bounded — never descending into image directories, capped per directory, per case
+and globally — and every cap and every skip is recorded rather than silently
+truncating. Section routing is not re-derived: it reuses the adapter's own
+`section_for` and the one shared sacct parser.
