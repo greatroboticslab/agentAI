@@ -787,6 +787,39 @@ if _signals is not None and _citations is not None:
        _tree(SEAM_OUT2) == _tree(SEAM_OUT))
 
 
+# ---- the scrub prefix is a path, never a character (v3.29.0) ---------------
+# `--root .` is the ordinary way to run an export from the repo directory, and
+# it made the repo scrub pattern the single character ".", so every decimal in
+# every training log became "<REPO>": `25.8G` -> `25<REPO>8G`, `1.145` ->
+# `1<REPO>145`. Nothing caught it -- the export succeeded, the hashes matched
+# and `verify` reported drift 0, because a corpus-wide corruption is perfectly
+# self-consistent. It destroyed exactly what the corpus is for: the progress
+# lines the epoch and pool-growth checks parse, and every number a model would
+# have to quote.
+_LINE = "      24/60      25.8G      1.145      1.029   0.005116        141        640"
+_cfg_rel = corpus.scrub_config({}, ".")
+ck("a relative root resolves to an absolute path",
+   all(r.startswith(os.sep) for r in _cfg_rel["repos"]))
+ck("a relative root leaves no bare-dot pattern",
+   "." not in _cfg_rel["repos"])
+_out, _counts = corpus.scrub_text(_LINE, _cfg_rel)
+ck("scrubbing a progress line under a relative root changes nothing",
+   _out == _LINE and not _counts)
+
+_cfg_short = corpus.scrub_config({"scrub_repo_paths": ["/x", ".", "/tmp"]}, "/tmp/whatever")
+ck("a too-short repo prefix is refused", "/x" not in _cfg_short["repos"])
+ck("a refused prefix is named rather than dropped silently",
+   "/x" in _cfg_short["rejected_repos"])
+_out2, _ = corpus.scrub_text("a/x/b and 1.5 and /tmp/x", _cfg_short)
+ck("a refused prefix rewrites nothing", "1.5" in _out2 and "<REPO>" not in _out2)
+
+_real = "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"
+_cfg_ok = corpus.scrub_config({}, _real)
+_out3, _c3 = corpus.scrub_text("wrote " + _real + "/results/x.json", _cfg_ok)
+ck("a real repo path is still scrubbed", "<REPO>/results/x.json" in _out3)
+ck("the real scrub is counted", _c3.get("repo_path") == 1)
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)

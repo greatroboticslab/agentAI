@@ -8240,3 +8240,29 @@ action rather than per permitted tool; the bundle has to be built where the
 compute nodes can reach the artifacts; and the claim has to be measurable against
 a sealed corpus. It also states what is not claimed — the tiering mechanism is
 commodity, and the layer is not asserted to raise accuracy round over round.
+
+## 2026-09-06 — v3.28.1 the scrub prefix was a single character
+
+Exporting the incident corpus with `--root .`, which is the ordinary way to run
+it from the repository directory, made the repo scrub pattern the string `"."`.
+Every decimal point in every stored artifact was then replaced: `25.8G` became
+`25<REPO>8G`, a loss of `1.145` became `1<REPO>145`, and one case reported
+647,928 `repo_path` substitutions in a single training log.
+
+Nothing caught it. The export succeeded, the stored copies hashed cleanly, and
+`verify` reported drift 0 — a corpus-wide corruption is perfectly self-consistent.
+What it destroyed is exactly what the corpus exists for: the per-epoch progress
+lines that the epoch-count and pool-growth checks parse, and every number a
+supervisor model would otherwise have to quote verbatim. It is also why three
+checks still answered `unknown` on the worked example after the sacct seam was
+repaired: the lines they read had been rewritten character by character.
+
+The root is now resolved to an absolute path before the scrub configuration is
+built, and a repo prefix shorter than twelve characters or carrying no path
+separator is refused and named in `rejected_repos` rather than applied. Refusing
+is the right failure: a scrub that leaves a path in the corpus is greppable, and
+one that rewrites every artifact is invisible.
+
+Verified: scrubbing a real progress line under a relative root now changes
+nothing and counts nothing; a refused prefix rewrites nothing and is reported; a
+genuine repository path is still replaced and still counted.

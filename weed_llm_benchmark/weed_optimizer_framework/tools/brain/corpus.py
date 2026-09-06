@@ -236,6 +236,12 @@ def _env_list(name):
     return tuple(s.strip() for s in raw.split(",") if s.strip())
 
 
+# A repo prefix short enough to appear inside ordinary text is a configuration
+# error, not a scrub rule. Twelve characters is longer than any plausible
+# accident (".", "/", "/tmp") and far shorter than any real repository path.
+_MIN_SCRUB_PATH_CHARS = 12
+
+
 def scrub_config(spec=None, root=None):
     """Build the scrub configuration for one export run.
 
@@ -255,13 +261,34 @@ def scrub_config(spec=None, root=None):
     repos = [str(root or REPO), CLUSTER_REPO]
     for extra in (spec.get("scrub_repo_paths") or ()):
         repos.append(str(extra))
+    # Resolve before scrubbing. `--root .` is the ordinary way to run an export
+    # from the repo directory, and it made the scrub pattern the single
+    # character "." -- so every decimal point in every training log became
+    # "<REPO>", turning `25.8G` into `25<REPO>8G` and `1.145` into `1<REPO>145`.
+    # The artifacts still exported, still hashed and still verified clean,
+    # because a corpus-wide corruption is perfectly self-consistent. What it
+    # destroyed was the evidence: the progress lines the epoch and pool-growth
+    # checks parse, and every number a model would otherwise have to quote.
+    repos = [os.path.abspath(r) if r else r for r in repos]
+    rejected, keep = [], []
+    for r in {str(r).rstrip("/") for r in repos if r}:
+        # A repo prefix is a path. Anything shorter than this, or carrying no
+        # separator, is a pattern that rewrites ordinary text, and no correct
+        # configuration produces one. Refusing is not optional: a scrub that
+        # mangles every artifact is worse than one that leaves a path in, since
+        # the first is invisible and the second is greppable.
+        if len(r) < _MIN_SCRUB_PATH_CHARS or os.sep not in r.lstrip(os.sep):
+            rejected.append(r)
+            continue
+        keep.append(r)
     # Longest first: the repo path is itself an /ocean home prefix, so it has to
     # win before the home rule turns its first four segments into <HOME>.
-    repos = sorted({r.rstrip("/") for r in repos if r}, key=len, reverse=True)
+    repos = sorted(keep, key=len, reverse=True)
     return {
         "users": sorted({u for u in users if u}, key=len, reverse=True),
         "literals": sorted({s for s in literals if s}, key=len, reverse=True),
         "repos": repos,
+        "rejected_repos": sorted(rejected),
     }
 
 
@@ -663,12 +690,13 @@ def _sacct_rows(pairs, cap, artifact_id="sacct"):
     instead of to a parsed field with no provenance. sacct has no column of
     those three names, so nothing is overwritten.
 
-    Known consequence, stated here because it is not visible from this file:
-    `bench.render_prompt` withholds a whole section whose rows are
-    line-addressed when it renders the status-only arm, so that arm now sees
-    `(withheld)` where it used to see the sacct fields its own section list
-    entitles it to. Its renderer has to drop the line array and keep the fields,
-    which is a change in `bench.py` and not in this module.
+    Consequence handled in `bench.py`, recorded here because it is not visible
+    from this file: giving these rows a line address made them match the
+    renderer's test for a line-addressed artifact, and its status-only arm
+    withheld such sections whole -- so the arm whose section list grants it
+    sacct was about to be asked whether status fields suffice with the status
+    fields removed. `render_prompt` now drops the line array and keeps the
+    fields (v3.27.1).
     """
     lines = [[n, t] for n, t in pairs if str(t).strip()]
     found = _sacct_header(lines)
@@ -719,6 +747,24 @@ def _sacct_rows(pairs, cap, artifact_id="sacct"):
         return [], ("the sacct output carries a header but no accounting row: "
                     "the query returned nothing for this job")
     return rows, None
+
+
+def parse_sacct_text(text, cap=None, artifact_id="sacct"):
+    """Public entry point: raw `sacct` output -> (rows, reason).
+
+    Exists so no other module needs its own copy of the two layouts. A second
+    sacct parser is not a hypothetical risk here: the whole v3.27.1 repair was
+    caused by two readers disagreeing about what a stored sacct section holds,
+    and a duplicate would be free to drift again the next time the collected
+    format changes. Accepts one string or a sequence of lines; line numbers are
+    1-based positions within `text`, which is the address a citation resolves to.
+    """
+    if isinstance(text, (list, tuple)):
+        lines = [str(t) for t in text]
+    else:
+        lines = str(text or "").splitlines()
+    pairs = [[i + 1, t] for i, t in enumerate(lines)]
+    return _sacct_rows(pairs, cap if cap is not None else len(pairs) + 1, artifact_id)
 
 
 def _table_rows(pairs, cap):
