@@ -264,5 +264,46 @@ class TestApprovals(Base):
         self.assertIn("Waiting on a person", body)
 
 
+class TestServedScript(Base):
+    """Check the script the browser receives, not the one in the file.
+
+    The page is a Python string. An escaped quote written for the browser is
+    collapsed by Python before the browser sees it, so a handler that parsed
+    perfectly as source arrived as `decide(''+id+'','approve')` and threw
+    "unexpected token: string literal" on load, taking the whole page with it.
+    A syntax check on the file would have passed. This checks what is served.
+    """
+
+    def _served_script(self):
+        page = A._PAGE
+        return page[page.index("<script>") + 8:page.rindex("</script>")]
+
+    def test_the_served_script_carries_no_backslash_escapes(self):
+        js = self._served_script()
+        self.assertNotIn("\\", js,
+                         "a backslash in this string was written for the browser "
+                         "and will be eaten by Python first")
+
+    def test_the_page_uses_no_inline_event_handlers(self):
+        js = self._served_script()
+        self.assertNotIn("onclick=", js,
+                         "inline handlers need quotes inside quotes inside a "
+                         "Python string; use a data attribute and a listener")
+
+    def test_the_decision_controls_are_reachable_from_the_markup(self):
+        js = self._served_script()
+        for needle in ('data-act="approve"', 'data-act="deny"',
+                       'button[data-act]', "a decision needs a reason"):
+            self.assertIn(needle, js, needle)
+
+    def test_the_served_script_parses(self):
+        """Balanced quotes and braces, as a cheap stand-in for a parser."""
+        js = self._served_script()
+        for pair in ("{}", "()", "[]"):
+            self.assertEqual(js.count(pair[0]), js.count(pair[1]), pair)
+        for q in ("'", '"'):
+            self.assertEqual(js.count(q) % 2, 0, "unbalanced %s" % q)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -8693,3 +8693,25 @@ hiding the answer rather than showing it.
 The approval, catalogue and timeline cards now span two grid columns, collapsing
 to one below 780 px. Verified at 1440 and 390: no page errors, no sideways body
 scroll, and both actor columns readable at each width.
+
+## 2026-09-06 — v3.32.2 approve and deny by clicking, and the check that would have caught it
+
+The approval card carries a reason box and two buttons. A decision with no reason
+is refused in the page before any request is sent, matching the server, which
+refuses it too: a queue of approvals nobody can explain later is not a record.
+
+**A defect this exposed is worth more than the buttons.** The first version used
+inline `onclick` handlers. The page is a Python string, so the escaped quotes
+written for the browser were collapsed by Python before the browser saw them, and
+`decide('id','approve')` arrived as `decide(''+id+'','approve')`. The page threw
+"unexpected token: string literal" on load and rendered nothing at all — and a
+syntax check on the file passed, because the file was not what was served. The
+controls now use data attributes and one delegated listener, the served script
+contains no backslash at all, and `tests/test_brain_api.py` checks the string the
+page actually serves rather than the source it was written in.
+
+Verified by clicking it in a real browser on the lab: no errors on load, the
+button present, an empty reason refused in the page, a reason accepted, the row
+moving to approved with the decider recorded as the session user, the button gone
+because the item is no longer pending, and no errors at any point. The
+demonstration record was removed afterwards.

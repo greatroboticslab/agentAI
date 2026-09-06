@@ -439,6 +439,10 @@ _PAGE = """<!doctype html><html><head><meta charset="utf-8">
  .wide{grid-column:span 2}
  @media (max-width: 780px){ .wide{grid-column:span 1} }
  .scroll{overflow-x:auto;max-height:22rem;overflow-y:auto}
+ .err{color:#ff6b6b;font-size:.75rem;margin-top:.2rem}
+ button{font:inherit;padding:.15rem .6rem;border-radius:6px;cursor:pointer}
+ input.why{font:inherit;padding:.15rem .4rem;border-radius:6px;width:10rem;
+           margin-right:.35rem}
  /* Deliberately NOT white-space:nowrap. These cells carry prose -- a lever's
     control, a check's reason -- and forcing them onto one line pushed the
     later columns out of the card entirely, which reads as a broken table
@@ -479,6 +483,40 @@ function table(head, rows){
   return '<div class="scroll"><table><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr>'
     + rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('') + '</table></div>';
 }
+function decideControls(r){
+  // Data attributes and a delegated listener, never an inline onclick. The
+  // page is a Python string, and an escaped quote inside an inline handler is
+  // collapsed by Python before the browser ever sees it -- which produced a
+  // page that parsed fine as a file and threw "unexpected token" as served.
+  // Nothing here needs a backslash.
+  const id = esc(r.id);
+  return '<input class="why" data-why="' + id + '" placeholder="why (required)">' +
+         '<button data-act="approve" data-id="' + id + '">Approve</button> ' +
+         '<button data-act="deny" data-id="' + id + '">Deny</button>' +
+         '<div class="err" data-err="' + id + '"></div>';
+}
+function decide(id, what){
+  const box = document.querySelector('[data-why="' + id + '"]');
+  const err = document.querySelector('[data-err="' + id + '"]');
+  const why = ((box && box.value) || "").trim();
+  // The reason is not decoration: the server refuses a decision without one,
+  // and a queue of approvals nobody can explain later is not a record.
+  if(!why){ err.textContent = "a decision needs a reason"; return; }
+  err.textContent = "sending\u2026";
+  fetch("/api/brain/" + encodeURIComponent(DOMAIN) + "/approvals/" +
+        encodeURIComponent(id), {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({decision: what, reason: why})
+  }).then(r => r.json()).then(d => {
+    // The author comes from the signed session, never from this page, so
+    // nothing here could name a different decider.
+    if(d.ok){ load("approvals"); } else { err.textContent = d.reason || "refused"; }
+  }).catch(e => { err.textContent = String(e); });
+}
+document.addEventListener("click", function(ev){
+  const b = ev.target.closest ? ev.target.closest("button[data-act]") : null;
+  if(b){ decide(b.getAttribute("data-id"), b.getAttribute("data-act")); }
+});
 function render(key, data){
   // A store the layer cannot see is said so, never drawn as an empty one: an
   // empty table where a missing store belongs is exactly the silence this
@@ -528,11 +566,13 @@ function render(key, data){
   }
   if(key==="approvals"){
     return '<div class="sub">'+esc(data.n_pending)+' waiting</div>' + table(
-      ["status","action","risk","asked by","decided by"],
+      ["status","action","risk","asked by","decided by","decision"],
       (data.rows||[]).map(r=>[
         r.status==="pending" ? '<span class="warn">pending</span>' : esc(r.status),
         esc(r.action), esc(r.risk), esc(r.requested_by),
-        r.decided_by ? esc(r.decided_by) : '<span class="missing">—</span>']));
+        r.decided_by ? esc(r.decided_by) : '<span class="missing">—</span>',
+        r.status==="pending" ? decideControls(r)
+          : '<span class="missing">'+esc(r.decision_reason||"")+'</span>']));
   }
   if(key==="policy"){
     return '<div class="sub">'+esc(data.n_actions)+' action(s) in the catalogue</div>'
@@ -551,17 +591,20 @@ function render(key, data){
   return '<pre>'+esc(JSON.stringify(data,null,1)).slice(0,2000)+'</pre>';
 }
 const grid = document.getElementById("grid");
+function load(key){
+  return fetch("/api/brain/"+encodeURIComponent(DOMAIN)+"/"+key)
+    .then(r=>r.json())
+    .then(d=>{document.getElementById("s_"+key).innerHTML = render(key,d);})
+    .catch(e=>{document.getElementById("s_"+key).innerHTML =
+      '<div class="crit">could not load: '+esc(e)+'</div>';});
+}
 SECTIONS.forEach(([key,title])=>{
   const el = document.createElement("div");
   // Two cards carry five identifier columns and need the width; the rest do not.
   el.className = "card" + (["approvals","policy","timeline"].includes(key) ? " wide" : "");
   el.innerHTML = '<h3>'+title+'</h3><div id="s_'+key+'">loading&hellip;</div>';
   grid.appendChild(el);
-  fetch("/api/brain/"+encodeURIComponent(DOMAIN)+"/"+key)
-    .then(r=>r.json())
-    .then(d=>{document.getElementById("s_"+key).innerHTML = render(key,d);})
-    .catch(e=>{document.getElementById("s_"+key).innerHTML =
-      '<div class="crit">could not load: '+esc(e)+'</div>';});
+  load(key);
 });
 </script></body></html>"""
 
