@@ -61,8 +61,8 @@
         "why": "An artifact may predate its step's start by this many seconds before it is reported. The mtime is written by the cluster filesystem and the step start comes from sacct or from the lab's ledger, which are different clocks; a minute absorbs that skew and Lustre's mtime granularity. It hides nothing real: the failures in this class are hours to weeks old, such as a results.csv from an earlier run or a three-week-old audit verdict read as current."
       },
       "sections": {
-        "value": ["results_csv", "slug_scores", "strategy", "registry_diff"],
-        "why": "The bundle sections whose mtime is compared with the step start: the artifacts a metric or a gate decision is actually read out of. 'trace' and 'out_tail' are deliberately absent because they are written as the job goes, so their mtime is the job's own and cannot be stale by construction; including them would add two guaranteed non-findings to every check."
+        "value": ["results_csv", "strategy"],
+        "why": "The bundle sections whose mtime is compared with the step start: the artifacts the step itself is supposed to have WRITTEN, which is where a metric comes from. Inputs are deliberately absent, slug_scores above all: the filter step legitimately runs before the train step, so watching it here would fire on every healthy round, and its staleness is a different comparison (against the round's own collect End) that gate_noop makes. 'trace' and 'out_tail' are absent because they are written as the job goes, so their mtime is the job's own and cannot be stale by construction."
       }
     },
 

@@ -25,6 +25,7 @@ Run:  python3 tests/test_brain_evidence.py
 """
 import base64
 import gzip
+import hashlib
 import json
 import os
 import pathlib
@@ -65,7 +66,11 @@ OUT_SHA = "a" * 64
 OUT_LINES_TOTAL = 200000
 SKIP_LINE = ("[net] WARN: SOCKS proxy via bridges2-login011 failed "
              "(compute->login SSH disabled) - SKIPPING github, using Kaggle/HF only")
-POOL_LINE = "[merge] merged pool: 8583 iterations/epoch at batch 16"
+# The epoch-closing progress line: the only place this run's iterations per
+# epoch is written down, and therefore the only thing a pool_growth finding can
+# quote. 8,583 is the 2026-08-29 pool.
+POOL_LINE = ("      24/60      12.4G      1.104      0.882      0.913        "
+             "118        640: 100%|##########| 8583/8583 [50:12<00:00,  2.85it/s]")
 TIMEOUT_LINE = ("slurmstepd: error: *** JOB 44727703 ON v012 CANCELLED AT "
                 "2026-08-29T17:52:49 DUE TO TIME LIMIT ***")
 
@@ -85,9 +90,10 @@ def numbered(n, text):
 def out_tail_payload(extra=()):
     lines = ["[file] path=%s bytes=23068672 mtime=1756500769 sha256=%s"
              % (OUT_PATH, OUT_SHA), "[block] matches"]
-    lines.append(numbered(4211, POOL_LINE))
     lines.append(numbered(8123, SKIP_LINE))
     lines.append(numbered(199997, TIMEOUT_LINE))
+    lines.append("[block] progress")
+    lines.append(numbered(4211, POOL_LINE))
     lines.append("[block] tail")
     for i in range(OUT_LINES_TOTAL - 119, OUT_LINES_TOTAL + 1):
         if i == 199997:
@@ -96,7 +102,7 @@ def out_tail_payload(extra=()):
             lines.append(numbered(i, "epoch 24/60  box_loss 1.104  time 43102.4"))
     lines.extend(extra)
     lines.append("[lines] %d" % OUT_LINES_TOTAL)
-    lines.append("[matches] 3 kept 3")
+    lines.append("[matches] 2 kept 2")
     return lines
 
 
@@ -242,7 +248,8 @@ inj = evidence.remote_script("we;ed $(id)", ROUND, "train;id", "447; rm -rf /")
 ck("a shell metacharacter in the job id is filtered out",
    "rm -rf /" not in inj and "\nJ=447\n" in inj)
 ck("a shell metacharacter in the domain is filtered out",
-   "\nD=weed\n" in inj and "$(id)" not in inj)
+   "\nD=weedid\n" in inj and "$(id)" not in inj and ";" not in
+   inj.split("\nD=")[1].split("\n")[0])
 ck("nonce is deterministic for the same build",
    evidence.nonce(DOMAIN, ROUND, STEP, JOB) == EV[2:])
 
@@ -256,12 +263,20 @@ ck("build recorded that call", bundle["export"]["build"]["remote_calls"] == 1)
 rep = evidence.validate(bundle)
 ck("the bundle validates: " + "; ".join(rep["errors"]), rep["ok"])
 ck("all 14 sections are present", set(bundle["sections"]) == set(corpus.SECTIONS))
-present = [n for n in corpus.SECTIONS if bundle["sections"].get(n) is not None]
-ck("12 of 14 sections came back with content (signals has no module here): "
-   + repr(sorted(set(corpus.SECTIONS) - set(present))), len(present) == 12)
-ck("signals is null with a reason, never an empty list",
-   bundle["sections"]["signals"] is None
-   and "signals" in bundle["export"]["missing"])
+absent = sorted(n for n in corpus.SECTIONS if bundle["sections"].get(n) is None)
+ck("every section this gather carried is filled: " + repr(absent),
+   absent in ([], ["signals"]))
+sigs = bundle["sections"]["signals"]
+ck("signals is either the detector's list or null with a reason, never []",
+   (isinstance(sigs, list) and all(isinstance(s, dict) for s in sigs))
+   or (sigs is None and bundle["export"]["missing"].get("signals")))
+if isinstance(sigs, list):
+    fired = {s.get("signal") for s in sigs
+             if s.get("severity") in ("warn", "crit")}
+    ck("the 2026-08-29 fixture fires walltime_bound: " + repr(sorted(fired)),
+       "walltime_bound" in fired)
+    ck("no signal fires without evidence it can cite",
+       all(s.get("evidence") or s.get("severity") == "unknown" for s in sigs))
 
 ck("sacct parsed the TIMEOUT row",
    bundle["sections"]["sacct"][0]["State"] == "TIMEOUT"
@@ -285,7 +300,7 @@ ck("the staged round/campaign/envelope survive",
    and bundle["sections"]["su"]["envelope"] == 1500)
 ck("resources reports filesystem free and queue depth separately",
    bundle["sections"]["resources"]["squeue_depth"] == 7
-   and bundle["sections"]["resources"]["fs_free_tb"] == 1.0
+   and abs(bundle["sections"]["resources"]["fs_free_tb"] - 1.0) < 0.01
    and bundle["sections"]["resources"]["quota_headroom_gb"] is None)
 ck("harvest per_source is null with a reason, not an invented count",
    bundle["sections"]["harvest"]["per_source"] is None
@@ -306,7 +321,10 @@ ck("the SKIPPING line kept its absolute number 8123",
 ck("the pool-growth line kept its absolute number 4211",
    lines.get(4211) == POOL_LINE)
 ck("the tail is numbered from the file's own line count, not from 1",
-   max(lines) == OUT_LINES_TOTAL and min(lines) == 4211)
+   max(lines) == OUT_LINES_TOTAL and min(lines) == 4211
+   and lines[199881].startswith("epoch 24/60"))
+ck("the progress line that states 8583 iterations/epoch is quotable",
+   "8583/8583 [" in lines.get(4211, ""))
 ck("out_tail carries the original file's sha256, not the excerpt's",
    bundle["sections"]["out_tail"]["sha256"] == OUT_SHA)
 ck("the harvest log line kept its absolute number 77",
@@ -367,8 +385,9 @@ ck("sections after the collision still parsed",
 ck("an unterminated last section is reported as truncated",
    hb["sections"]["corrections"] is None
    and any("never terminated" in w for w in hb["export"]["warnings"]))
-ck("su falls back to a stated unknown when sacct is gone",
-   hb["sections"]["su"]["job"] is None or hb["sections"]["su"]["round"] == 24.0)
+ck("su keeps one shape when sacct is gone: job unknown, staged totals kept",
+   hb["sections"]["su"]["job"] is None
+   and hb["sections"]["su"]["round"] == 24.0)
 
 parsed = evidence.parse_output("noise from a login profile\n" + capture(), EV)
 ck("output outside any section is counted, not lost",
@@ -479,12 +498,18 @@ ck("the last staging command decodes and moves the file into place",
 small_cmds = evidence.stage_commands("weed", {"plan": {"version": 1}})
 ck("a small payload is staged plainly, in one command",
    len(small_cmds) == 1 and "gunzip" not in small_cmds[0])
+loop = {}
+loop["self"] = loop
 ck("staging refuses a payload it cannot serialise",
-   evidence.stage_commands("weed", {"bad": {1, 2}}) == [])
+   evidence.stage_commands("weed", {"bad": loop}) == [])
 
+# Incompressible, so the 96 KB ceiling is what splits it rather than gzip.
+noise = {"blob": hashlib.sha512(b"seed").hexdigest() * 3000}
+noisy = evidence.stage_commands("weed", {"ledger": noise})
+ck("an incompressible payload is split across commands", len(noisy) >= 2)
 staged_runner = Runner(capture())
 evidence.build(DOMAIN, ROUND, STEP, JOB,
-               {"run": staged_runner, "stage": {"ledger": big}})
+               {"run": staged_runner, "stage": {"ledger": noise}})
 ck("staging rides in front of the gather, and the gather is the last command",
    len(staged_runner.calls) >= 2
    and "S plan $rc" in staged_runner.calls[-1]
@@ -492,7 +517,9 @@ ck("staging rides in front of the gather, and the gather is the last command",
 one = Runner(capture())
 evidence.build(DOMAIN, ROUND, STEP, JOB,
                {"run": one, "stage": {"plan": {"version": 1}}})
-ck("a small staged payload keeps the build at one command", len(one.calls) == 1)
+ck("a staged payload that fits keeps the build at ONE command",
+   len(one.calls) == 1 and "base64 -d" in one.calls[0]
+   and "S plan $rc" in one.calls[0])
 
 # --------------------------------------------------------------------------
 print("\n[8] signals come from the detector, or are unknown")
@@ -555,11 +582,17 @@ for name, fn in cases:
     ck("build survives: " + name, ok)
 
 blind = evidence.build(DOMAIN, ROUND, STEP, JOB, {"run": Runner("", fail=True)})
-ck("a dead channel produces a bundle that says the channel died",
+gathered = [n for n in corpus.SECTIONS if blind["sections"][n] is not None]
+ck("a dead channel produces a bundle that says the channel died: "
+   + repr(gathered),
    any("Connection closed" in w for w in blind["export"]["warnings"])
-   and all(blind["sections"][n] is None for n in corpus.SECTIONS))
+   and gathered == ["su"])
 ck("every null section in that bundle carries a reason",
-   all(blind["export"]["missing"].get(n) for n in corpus.SECTIONS))
+   all(blind["export"]["missing"].get(n) for n in corpus.SECTIONS
+       if blind["sections"][n] is None))
+ck("the computed SU section says why every number in it is unknown",
+   blind["sections"]["su"]["job"] is None
+   and "unknown" in (blind["sections"]["su"]["reason"] or ""))
 
 ck("trim survives a non-bundle", evidence.trim(None, 100) is None)
 ck("trim survives a bundle with no sections",

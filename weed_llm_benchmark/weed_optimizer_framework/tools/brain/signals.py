@@ -895,26 +895,113 @@ def _step_start(b):
     return None, "", []
 
 
-def _pool_now(b):
-    """(value, unit, [evidence], reason) — this run's iterations per epoch."""
+def _pool_pair(b):
+    """(now, previous, unit, [evidence], reason) — this pool against the last.
+
+    Iterations per epoch is the operational form of the pool and is tried
+    first, on both sides, from the strategy artifact, the log's own progress
+    bar and the previous round's train entry. Merged image counts are the
+    fallback and are only ever compared with each other: the two are different
+    units, and a growth computed across them would be arithmetic on nothing.
+    """
+    now, ev_now, why_now = _iters_now(b)
+    prev, ev_prev, why_prev = _iters_prev(b)
+    if now is not None and prev is not None:
+        return now, prev, "iterations/epoch", ev_now + ev_prev, ""
+    img_now, bat_now, ev_now2, why_now2 = _images_now(b)
+    img_prev, bat_prev, ev_prev2, why_prev2 = _images_prev(b)
+    if img_now is not None and img_prev is not None:
+        if bat_now and bat_prev and bat_now != bat_prev:
+            return None, None, "", [], (
+                "only image counts are available and the batch size changed "
+                "from %d to %d, so the two rounds' iteration counts are not in "
+                "the same ratio as their pools" % (int(bat_prev), int(bat_now)))
+        note = ("" if (bat_now and bat_prev) else
+                " (measured on the merged image count, which grows in the same "
+                "ratio as iterations per epoch only if the batch size did not "
+                "change; no batch size is recorded on both sides)")
+        return img_now, img_prev, "images", ev_now2 + ev_prev2, note
+    missing = [w for w in (why_now or why_now2, why_prev or why_prev2) if w]
+    return None, None, "", [], "; ".join(missing) or (
+        "neither an iteration count nor a merged image count is available for "
+        "both this round and the one before it")
+
+
+def _iters_now(b):
+    """(iterations per epoch, [evidence], reason) for this run."""
     value, label, key = _scan(b.strategy_holders(), _ITER_KEYS)
     if value is not None and value > 0:
         ev = [_ev_section(label, 1, "%s=%d" % (key, int(value)))]
         ev += [_ev_line(r) for r in _progress_rows(b, int(value))]
-        return value, "iterations/epoch", ev, ""
+        return value, ev, ""
     rows = _progress_rows(b)
     if rows:
         row = rows[-1]
-        got = _int(_PROGRESS_RE.search(row["text"]).group(1))
-        return got, "iterations/epoch", [_ev_line(row)], ""
-    images, ilabel, ikey = _scan(b.strategy_holders(), _IMAGE_KEYS)
-    if images is not None and images > 0:
-        return images, "images", [
-            _ev_section(ilabel, 1, "%s=%d" % (ikey, int(images)))], ""
-    return None, "", [], ("no iteration count for this run: the strategy carries "
-                          "none of %s, no progress line in the log states one, "
-                          "and no merged image count is recorded"
-                          % ", ".join(_ITER_KEYS))
+        return _int(_PROGRESS_RE.search(row["text"]).group(1)), [_ev_line(row)], ""
+    return None, [], ("no iteration count for this run: the strategy carries "
+                      "none of %s and no completed progress line in the log "
+                      "states one" % ", ".join(_ITER_KEYS))
+
+
+def _iters_prev(b):
+    """(iterations per epoch, [evidence], reason) for the previous train.
+
+    Never from this run's own numbers: growth measured against itself is zero.
+    """
+    value, label, key = _scan(b.strategy_holders(), _PREV_ITER_KEYS)
+    if value is not None and value > 0:
+        return value, [_ev_section(label, 1, "%s=%d" % (key, int(value)))], ""
+    for doc in b.previous_round_docs():
+        rnd = _int(_get(doc, "round_num", "round"))
+        for idx, entry in enumerate(b.step_entries(doc, "train")):
+            holders = [("ledger", h) for h in
+                       _dicts(entry, entry.get("params"), entry.get("metrics"))]
+            got, _lab, gkey = _scan(holders, _ITER_KEYS)
+            if got is not None and got > 0:
+                return got, [_ev_section("ledger", idx + 1,
+                                         "round=%s train %s=%d"
+                                         % (rnd, gkey, int(got)))], ""
+    return None, [], ("no previous train to compare against: neither the "
+                      "strategy nor the staged ledger records an earlier "
+                      "round's iterations per epoch")
+
+
+def _images_now(b):
+    """(merged images, batch, [evidence], reason) for this run."""
+    value, label, key = _scan(b.strategy_holders(), _IMAGE_KEYS)
+    batch, _bl, _bk = _scan(b.strategy_holders(), _BATCH_KEYS)
+    if value is not None and value > 0:
+        return value, batch, [_ev_section(label, 1, "%s=%d" % (key, int(value)))], ""
+    diff = b.sec_dict("registry_diff")
+    after = _num(_get(diff, "images_after", "images_now", "images"))
+    if after is not None and after > 0:
+        return after, batch, [_ev_section("registry_diff", 1,
+                                          _kv(diff, "images_before",
+                                              "images_after"))], ""
+    return None, batch, [], "no merged image count is recorded for this run"
+
+
+def _images_prev(b):
+    """(merged images, batch, [evidence], reason) for the previous train."""
+    diff = b.sec_dict("registry_diff")
+    before = _num(_get(diff, "images_before", "images_previous"))
+    if before is not None and before > 0:
+        return before, None, [_ev_section("registry_diff", 1,
+                                          _kv(diff, "images_before",
+                                              "images_after"))], ""
+    for doc in b.previous_round_docs():
+        rnd = _int(_get(doc, "round_num", "round"))
+        for idx, entry in enumerate(b.step_entries(doc, "train")):
+            holders = [("ledger", h) for h in
+                       _dicts(entry, entry.get("params"), entry.get("metrics"))]
+            got, _lab, gkey = _scan(holders, _IMAGE_KEYS)
+            batch, _bl, _bk = _scan(holders, _BATCH_KEYS)
+            if got is not None and got > 0:
+                return got, batch, [_ev_section("ledger", idx + 1,
+                                               "round=%s train %s=%d"
+                                               % (rnd, gkey, int(got)))], ""
+    return None, None, [], ("no previous train's merged image count is on the "
+                            "staged ledger")
 
 
 def _progress_rows(b, want=None):
@@ -928,37 +1015,6 @@ def _progress_rows(b, want=None):
             continue
         out.append(row)
     return out[-1:]
-
-
-def _pool_prev(b):
-    """(value, unit, [evidence], reason) — the previous train's pool size.
-
-    Read from the previous round's own train entry on the staged ledger, or
-    from an explicit `previous_iterations_per_epoch` the builder recorded. Never
-    from this run's own numbers: a growth measured against itself is zero.
-    """
-    value, label, key = _scan(b.strategy_holders(), _PREV_ITER_KEYS)
-    if value is not None and value > 0:
-        return value, "iterations/epoch", [
-            _ev_section(label, 1, "%s=%d" % (key, int(value)))], ""
-    for doc in b.previous_round_docs():
-        rnd = _int(_get(doc, "round_num", "round"))
-        for idx, entry in enumerate(b.step_entries(doc, "train")):
-            holders = [("ledger", h) for h in
-                       _dicts(entry, entry.get("params"), entry.get("metrics"))]
-            got, _lab, gkey = _scan(holders, _ITER_KEYS)
-            if got is not None and got > 0:
-                return got, "iterations/epoch", [
-                    _ev_section("ledger", idx + 1,
-                                "round=%s train %s=%d" % (rnd, gkey, int(got)))], ""
-            got, _lab, gkey = _scan(holders, _IMAGE_KEYS)
-            if got is not None and got > 0:
-                return got, "images", [
-                    _ev_section("ledger", idx + 1,
-                                "round=%s train %s=%d" % (rnd, gkey, int(got)))], ""
-    return None, "", [], ("no previous train to compare against: the staged "
-                          "ledger carries no earlier round whose train step "
-                          "records an iteration or image count")
 
 
 # --- the twelve -------------------------------------------------------------
@@ -1037,12 +1093,17 @@ def _check_walltime_bound(b):
     detail = ("%s projects %s total against a %s walltime (%.2f of it, over the "
               "%.2f trigger)" % (source, _hours(eta), _hours(wall), ratio, frac))
     if cap_h:
-        ev.append(_ev_section(cap_label, 1, "%s=%s" % (cap_key, cap_h)))
-        return _sig(name, "info", ratio,
-                    detail + ("; a %s h time cap is active, so the run will stop "
-                              "on time with a valid checkpoint instead of being "
-                              "killed — the shortfall it leaves is reported by "
-                              "epochs_truncated, not here" % cap_h), ev)
+        # A capped run is not walltime-bound: it stops on time and leaves a
+        # valid checkpoint. What it leaves behind is a recipe that did not run
+        # in full, which is epochs_truncated's finding, and reporting both would
+        # double-count one fact. The projection is kept in the reason so
+        # detect_all() still shows that this check ran and what it saw.
+        return _ok(name, detail + ("; a %s h time cap is active (%s.%s), so the "
+                                   "run stops on time with a valid checkpoint "
+                                   "rather than being killed. The shortfall it "
+                                   "leaves is reported by epochs_truncated, not "
+                                   "as a walltime kill"
+                                   % (cap_h, cap_label, cap_key)))
     return _sig(name, "warn", ratio,
                 detail + "; no time cap is active, so this run ends at the wall "
                          "with no checkpoint and no metric", ev)
@@ -1089,34 +1150,26 @@ def _check_pool_growth(b):
     name = "pool_growth"
     trigger = b.th_num("pool_growth.growth_fraction")
     floor = b.th_num("pool_growth.min_previous_iterations")
-    now, unit_now, ev_now, why_now = _pool_now(b)
-    prev, unit_prev, ev_prev, why_prev = _pool_prev(b)
-    if now is None:
-        return _unknown(name, why_now)
-    if prev is None:
-        return _unknown(name, why_prev)
-    if unit_now != unit_prev:
-        return _unknown(name, "this run is measured in %s and the previous one in "
-                              "%s; the two are not comparable"
-                              % (unit_now, unit_prev))
+    now, prev, unit, ev, note = _pool_pair(b)
+    if now is None or prev is None:
+        return _unknown(name, note)
     if prev < floor:
         return _unknown(name, "the previous train ran %d %s, below the %d floor: "
                               "a probe run is not a round, and dividing by it "
                               "would report every real round as growth"
-                              % (int(prev), unit_now, int(floor)))
+                              % (int(prev), unit, int(floor)))
     growth = _round((now - prev) / prev, 4)
-    ev = ev_now + ev_prev
     if growth <= trigger:
         return _ok(name, "%d %s against %d last round (%+.1f%%, at or under the "
-                         "%.0f%% trigger)"
-                         % (int(now), unit_now, int(prev), growth * 100.0,
-                            trigger * 100.0))
+                         "%.0f%% trigger)%s"
+                         % (int(now), unit, int(prev), growth * 100.0,
+                            trigger * 100.0, note))
     return _sig(name, "warn", growth,
-                "%d %s against %d last round: %+.1f%% over the %.0f%% trigger. "
-                "The recipe's epoch count was chosen for the smaller pool, so "
-                "the same epochs now need %.2fx the time they did"
-                % (int(now), unit_now, int(prev), growth * 100.0,
-                   trigger * 100.0, now / prev), ev)
+                "%d %s against %d last round: %+.1f%%, over the %.0f%% trigger. "
+                "The epoch budget was chosen for the smaller pool, so the same "
+                "recipe now needs %.2fx the time it did%s"
+                % (int(now), unit, int(prev), growth * 100.0, trigger * 100.0,
+                   now / prev, note), ev)
 
 
 def _check_gate_noop(b):

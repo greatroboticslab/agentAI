@@ -129,6 +129,14 @@ DEFAULTS = {
     # always-kept tail, so a full transfer cannot exceed the local cap.
     "out_tail_match_lines": max(
         1, corpus.CAPS["out_tail_lines"] - corpus.CAPS["out_tail_tail_lines"]),
+    # Epoch-closing progress lines kept from a train log. The pool-size reader
+    # uses the last one only; five leaves room for interleaved output on a
+    # shared node.
+    "out_tail_progress_lines": 5,
+    # The floor the trimmer will not go below: every kept-pattern line plus
+    # this many of the log's last lines. Twenty is the crash context a person
+    # reads first (the slurmstepd line and what preceded it).
+    "out_tail_floor_tail_lines": 20,
     # A 22 MB .out reduces to these; the remote side never ships the whole file.
     "trace_lines": 200,          # JSONL lines pulled before the record cap
     "harvest_lines": 120,        # matched [net]/[src] lines from the harvest log
@@ -159,9 +167,13 @@ DEFAULTS = {
 # SKIPPING: the chronic `SKIPPING github` line is the designed control in the
 # 2026-08-29 bundle, and a bundle that trims it away cannot be scored on the
 # verdict it exists to test.
+# The `\d+/\d+ [` alternative is the epoch-closing progress bar: it is the
+# only line that states this run's iterations per epoch, which is what a
+# pool_growth finding has to quote (8,583 on 2026-08-29). Dropping it would
+# leave the second most common signal in the corpus with nothing to cite.
 OUT_TAIL_KEEP_RE = re.compile(
     r"(WARN|ERROR|FAIL|TIMEOUT|CANCELLED|Traceback|slurmstepd|SKIPPING|"
-    r"out of memory|CUDA|Killed|exceeded)", re.I)
+    r"out of memory|CUDA|Killed|exceeded|\b\d{2,}/\d{2,}\b\s*\[)", re.I)
 
 _LINE_RE = re.compile(r"^(\d{6})\t(.*)$", re.S)
 _ID_RE = re.compile(r"[^0-9]")
@@ -289,13 +301,17 @@ S sacct $rc
 { F=$(P '*' '*.out')
   if [ -n "$F" ]; then
     H "$F"
-    awk -v K=__TAILN__ -v M=__MATCHN__ '
+    awk -v K=__TAILN__ -v M=__MATCHN__ -v G=__PROGN__ '
       { u=toupper($0)
         if (u ~ /WARN|ERROR|FAIL|TIMEOUT|CANCELLED|TRACEBACK|SLURMSTEPD|SKIPPING|CUDA|KILLED|EXCEEDED|OUT OF MEMORY/) { mi++; mn[mi%M]=NR; mt[mi%M]=$0 }
+        else if ($0 ~ /[0-9][0-9]+\/[0-9][0-9]+[ ]*\[/) { pi++; pn[pi%G]=NR; pt[pi%G]=$0 }
         tb[NR%K]=$0; n=NR }
       END { print "[block] matches"
             s=mi-M+1; if (s<1) s=1
             for (i=s;i<=mi;i++) printf "%06d\t%s\n", mn[i%M], mt[i%M]
+            print "[block] progress"
+            s=pi-G+1; if (s<1) s=1
+            for (i=s;i<=pi;i++) printf "%06d\t%s\n", pn[i%G], pt[i%G]
             print "[block] tail"
             s=n-K+1; if (s<1) s=1
             for (i=s;i<=n;i++) printf "%06d\t%s\n", i, tb[i%K]
@@ -396,6 +412,7 @@ def remote_script(domain, round_num, step, job_id, limits=None, project=None):
         "__JSONMAX__": str(int(lim["json_max_bytes"])),
         "__TAILN__": str(max(1, int(lim["out_tail_tail_lines"]))),
         "__MATCHN__": str(max(1, int(lim["out_tail_match_lines"]))),
+        "__PROGN__": str(max(1, int(lim["out_tail_progress_lines"]))),
         "__CSVN__": str(max(1, int(lim["results_csv_lines"]))),
         "__TRACEN__": str(max(1, int(lim["trace_lines"]))),
         "__HARVN__": str(max(1, int(lim["harvest_lines"]))),
@@ -617,19 +634,33 @@ def parse_output(text, ev):
 
 
 # --- section values --------------------------------------------------------
-def _trim_out_tail(pairs, cap, tail_n):
-    """WARN/ERROR/TIMEOUT/SKIPPING lines plus the tail, capped.
+def _select_out_tail(pairs, tail_n):
+    """The floor: every kept-pattern line plus the last `tail_n`, in order.
 
-    Same rule as corpus._trim_out_tail, with SKIPPING added to the keep set;
-    the earliest matches go first because a job's failure is at its end.
+    Same rule as corpus._trim_out_tail, with SKIPPING and the progress line
+    added to the keep set.
     """
     if not pairs:
         return []
     tail_from = pairs[max(0, len(pairs) - int(tail_n))][0]
-    sel = [p for p in pairs
-           if p[0] >= tail_from or OUT_TAIL_KEEP_RE.search(p[1])]
-    if cap and len(sel) > int(cap):
-        sel = sel[-int(cap):]
+    return [p for p in pairs
+            if p[0] >= tail_from or OUT_TAIL_KEEP_RE.search(p[1])]
+
+
+def _cap_out_tail(pairs, cap, tail_n):
+    """Build-time cap. Everything that arrived is kept while it fits the cap.
+
+    The remote side already selected: it shipped the alert lines, the last few
+    epoch-closing progress lines and the tail, out of a log that can be 22 MB.
+    Applying the floor again here would discard evidence that costs nothing to
+    keep — the priority rule exists for the budget, and the budget is not tight
+    until the trimmer says so.
+    """
+    if not cap or len(pairs) <= int(cap):
+        return list(pairs)
+    sel = _select_out_tail(pairs, tail_n)
+    if len(sel) > int(cap):
+        sel = sel[-int(cap):]      # the earliest matches go, never the tail
     return sel
 
 
@@ -736,13 +767,18 @@ def _su_value(sacct_rows, staged, lim):
         if su is not None:
             out["job"], out["gpu_family"] = su, fam
             break
+    why = []
+    if out["job"] is None:
+        why.append("this job's SU is unknown: no sacct row carries a GPU "
+                   "allocation and an elapsed time")
     if isinstance(staged, dict):
         for key in ("round", "campaign", "envelope"):
             if staged.get(key) is not None:
                 out[key] = staged[key]
     else:
-        out["reason"] = ("no SU ledger was staged; round and campaign totals "
-                         "are unknown, not zero")
+        why.append("no SU ledger was staged; round and campaign totals are "
+                   "unknown, not zero")
+    out["reason"] = "; ".join(why) or None
     return out
 
 
@@ -883,14 +919,14 @@ def _one_section(name, sec, main, lim):
         if not main["file"]:
             return None, (main.get("none") or "no .out was read")
         pairs = {}
-        for block in ("matches", "tail", ""):
-            for pair in sec["blocks"].get(block, _blank_block())["pairs"]:
+        for block in sec["blocks"].values():
+            for pair in block["pairs"]:
                 pairs[pair[0]] = pair[1]        # the blocks overlap by design
         ordered = [[n, pairs[n]] for n in sorted(pairs)]
         return {"artifact_id": os.path.basename(main["file"]["path"]),
                 "path": main["file"]["path"], "sha256": main["file"]["sha256"],
-                "lines": _trim_out_tail(ordered, lim["out_tail_lines"],
-                                        lim["out_tail_tail_lines"])}, None
+                "lines": _cap_out_tail(ordered, lim["out_tail_lines"],
+                                       lim["out_tail_tail_lines"])}, None
     if name == "sacct":
         rows = corpus._table_rows(main["pairs"], int(lim["sacct_rows"]))
         if not rows:
@@ -977,33 +1013,25 @@ def _size(obj):
         return 0
 
 
-def _t_out_tail_half(sections, lim, arg):
+def _t_out_tail(sections, lim, arg):
+    """Every kept-pattern line plus the last `arg` lines of the log.
+
+    Both out_tail stages go through here, so no stage can drop a WARN, ERROR,
+    FAIL, TIMEOUT, CANCELLED, SKIPPING or epoch-closing progress line to save
+    tokens: shrinking the window shortens the tail, never the evidence.
+    """
     sec = sections.get("out_tail")
     if not isinstance(sec, dict) or not sec.get("lines"):
         return None
     before = len(sec["lines"])
-    keep = max(int(lim["out_tail_tail_lines"]), before // 2)
-    if keep >= before:
+    keep = _select_out_tail(sec["lines"], int(arg))
+    if len(keep) >= before:
         return None
-    sec["lines"] = sec["lines"][-keep:]
-    return {"action": "keep the last %d of %d line(s)" % (keep, before),
-            "removed": before - keep}
-
-
-def _t_out_tail_floor(sections, lim, arg):
-    """Down to the floor: every kept-pattern line plus the last `arg`."""
-    sec = sections.get("out_tail")
-    if not isinstance(sec, dict) or not sec.get("lines"):
-        return None
-    before = len(sec["lines"])
-    floor = _trim_out_tail(sec["lines"], None, int(arg))
-    if len(floor) >= before:
-        return None
-    sec["lines"] = floor
-    return {"action": ("keep every WARN/ERROR/FAIL/TIMEOUT/CANCELLED/SKIPPING "
-                       "line plus the last %d: %d of %d line(s)"
-                       % (int(arg), len(floor), before)),
-            "removed": before - len(floor)}
+    sec["lines"] = keep
+    return {"action": ("keep every WARN/ERROR/FAIL/TIMEOUT/CANCELLED/SKIPPING/"
+                       "progress line plus the last %d: %d of %d line(s)"
+                       % (int(arg), len(keep), before)),
+            "removed": before - len(keep)}
 
 
 def _t_trace(sections, lim, arg):
@@ -1072,11 +1100,11 @@ def _t_list(section):
 # Priority order, most droppable first. Each stage names the section it touches
 # and the argument it trims to; the loop stops as soon as the budget is met.
 TRIM_STAGES = (
-    ("out_tail", _t_out_tail_half, None),
+    ("out_tail", _t_out_tail, 60),
     ("trace", _t_trace, 10),
     ("harvest", _t_harvest_lines, 20),
     ("registry_diff", _t_registry, None),
-    ("out_tail", _t_out_tail_floor, 40),
+    ("out_tail", _t_out_tail, None),
     ("ledger", _t_ledger, 2),
     ("corrections", _t_list("corrections"), 5),
     ("plan", _t_list("plan"), 3),
@@ -1118,6 +1146,8 @@ def trim(bundle, budget_tokens):
         if name in NEVER_TRIM or sections.get(name) is None:
             continue
         was = corpus.token_estimate(sections)
+        if name == "out_tail" and arg is None:
+            arg = lim["out_tail_floor_tail_lines"]
         try:
             got = fn(sections, lim, arg)
         except Exception as exc:
@@ -1286,16 +1316,17 @@ def build(domain, round_num, step, job_id, ctx=None):
         bundle["export"]["section_source"].update(source)
         bundle["export"]["artifacts"] = artifacts
         warn.extend(more)
-        if isinstance(bundle["sections"].get("sacct"), list):
-            # This job's own SU is measured from sacct; the round and campaign
-            # totals can only come from the lab, so they stay null with a
-            # reason when nothing was staged.
-            staged_su = bundle["sections"].get("su")
-            bundle["sections"]["su"] = _su_value(bundle["sections"]["sacct"],
-                                                 staged_su, lim)
-            bundle["export"]["missing"].pop("su", None)
-            bundle["export"]["section_source"]["su"] = (
-                "sacct" if not isinstance(staged_su, dict) else "sacct+staged")
+        # This job's own SU is measured from sacct; the round and campaign
+        # totals can only come from the lab, so they stay null with a reason
+        # when nothing was staged. Always the same shape: a consumer that has
+        # to branch on which fields exist ends up guessing.
+        rows = bundle["sections"].get("sacct")
+        staged_su = bundle["sections"].get("su")
+        bundle["sections"]["su"] = _su_value(
+            rows if isinstance(rows, list) else [], staged_su, lim)
+        bundle["export"]["missing"].pop("su", None)
+        bundle["export"]["section_source"]["su"] = (
+            "sacct+staged" if isinstance(staged_su, dict) else "sacct")
         for name in SECTIONS:
             if bundle["sections"].get(name) is None:
                 bundle["export"]["missing"].setdefault(
