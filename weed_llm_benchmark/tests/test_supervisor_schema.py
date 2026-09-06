@@ -235,10 +235,26 @@ class TestClient(ServerCase):
         self.assertEqual(out["su"], 0.0)
         self.assertEqual(out["su_source"], "no rate declared")
 
-    def test_the_client_matches_the_signature_bench_resolves(self):
+    def test_the_benchmark_entry_point_is_callable_with_benchs_signature(self):
+        """Resolving is not enough: bench CALLS what it resolves.
+
+        The factory function resolved fine and then raised on every call, so a
+        run finished with a table of zeros and no model had been asked anything.
+        This asserts the resolved object survives the call bench actually makes.
+        """
         entry, why = B.load_model_entry(
-            "weed_optimizer_framework.tools.brain.supervisor:default_client")
+            "weed_optimizer_framework.tools.brain.supervisor:OpenAICompatClient")
         self.assertTrue(callable(entry), why)
+        entry.endpoint = self.base
+        entry.model = "fake-model"
+        out = entry("hello", "fake-model", 32768)
+        self.assertEqual(out["error"], "")
+        self.assertTrue(_Handler.seen, "bench's entry point never reached the server")
+
+    def test_the_factory_refuses_to_be_used_as_the_entry_point(self):
+        with self.assertRaises(TypeError) as cm:
+            S.default_client("prompt", "model", 32768)
+        self.assertIn("OpenAICompatClient", str(cm.exception))
 
 
 class TestHeartbeat(unittest.TestCase):

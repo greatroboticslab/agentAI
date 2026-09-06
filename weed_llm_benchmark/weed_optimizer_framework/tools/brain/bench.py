@@ -218,18 +218,22 @@ SECTION_ORDER = ("ledger", "sacct", "out_tail", "results_csv", "strategy",
                  "trace", "slug_scores", "registry_diff", "harvest",
                  "resources", "su", "corrections", "plan", "signals")
 
-PROMPT_TASK = (
-    "You are reviewing one step of an autonomous data-collection and training "
-    "loop on an HPC cluster. Decide whether this step went wrong.\n"
-    "Answer with one JSON object and nothing else:\n"
-    '{"verdict":"ok|issue",'
-    '"findings":[{"signal":"","quote":"","diagnosis":"","severity":"info|warn|crit"}],'
-    '"corrections":[{"action":"","params":{},"risk":"R1|R2|R3|R4","reason":"","quote":""}],'
-    '"escalate":{"to":"none|tier1|tier2|human","reason":""},'
-    '"confidence":0.0}\n'
-    "Every finding must quote a line of the evidence below verbatim; a quote "
-    "that does not resolve to a line is discarded and is never actionable.\n"
-)
+def _load_prompt_task():
+    """The reviewer instructions, read from the file production also sends.
+
+    bench used to carry its own copy of this text. The renderer was already
+    shared with the live path, so the two agreed on what the model is SHOWN and
+    disagreed on what it is ASKED -- which makes a benchmark score a statement
+    about instructions nothing in production uses. There is no compiled
+    fallback: a missing prompt file raises here rather than quietly scoring a
+    run against a different question.
+    """
+    path = pathlib.Path(__file__).resolve().parent / "prompts" / "supervisor.txt"
+    with open(str(path), "rb") as fh:
+        return fh.read().decode("utf-8")
+
+
+PROMPT_TASK = _load_prompt_task()
 PROMPT_RETRIEVAL_NOTE = (
     'You may request more evidence once by adding "retrieve":["<artifact or '
     'section name>"] to the object; you will then be asked again with it.\n'
@@ -453,16 +457,33 @@ def load_split(root=None):
     out["test"] = [str(x) for x in (obj.get("test") or [])]
     out["rule"] = str(obj.get("rule") or "")
     out["sha256"] = str(obj.get("sha256") or "")
-    body = {k: v for k, v in obj.items() if k != "sha256"}
-    computed = _sha256(body)
+    # `sha256` in a frozen split is the CORPUS digest -- case id, the bundle's
+    # own sha256 and the sha256 of truth.json, per the rule text the file itself
+    # carries -- not a hash of the split object. This function used to hash the
+    # object, so every legitimately frozen split failed the check and every run
+    # printed an error and exited non-zero. Two quantities under one field name
+    # is the same defect as two parsers for one format, so the number is computed
+    # in exactly one place and this delegates to it.
+    computed = ""
+    try:
+        from . import corpus as _corpus
+        computed = _corpus.corpus_digest(root, list(out["dev"]) + list(out["test"]))
+    except Exception as e:
+        out["errors"].append("could not recompute the corpus digest: %s" % e)
     out["computed_sha256"] = computed
-    if out["sha256"]:
+    # Kept and reported, never asserted: it answers a different question (was
+    # this file edited) from the one the frozen number answers (is this the
+    # corpus that was frozen).
+    out["body_sha256"] = _sha256({k: v for k, v in obj.items() if k != "sha256"})
+    if out["sha256"] and computed:
         out["sha_ok"] = (out["sha256"] == computed)
         if not out["sha_ok"]:
             out["errors"].append(
-                "split.json sha256 does not match its content "
-                "(committed %s, computed %s)" % (out["sha256"][:12], computed[:12]))
-    else:
+                "split.json sha256 does not match the corpus it names "
+                "(committed %s, recomputed %s) -- the corpus was re-exported "
+                "without re-freezing, or this is not that corpus"
+                % (out["sha256"][:12], computed[:12]))
+    elif not out["sha256"]:
         out["errors"].append("split.json carries no sha256")
     overlap = sorted(set(out["dev"]) & set(out["test"]))
     if overlap:
@@ -2091,7 +2112,7 @@ def render_report(result, metrics=None, group="all"):
     add("supervision benchmark — %s" % result.get("run_id", ""))
     add("  corpus %s  rubric %s" % ((result.get("corpus_hash") or "")[:12],
                                     (result.get("rubric_sha256") or "")[:12]))
-    add("  split %s (%s cases, sha %s, self-hash %s)"
+    add("  split %s (%s cases, sha %s, digest %s)"
         % (split.get("name"), split.get("n_cases"),
            (split.get("sha256") or "")[:12],
            {True: "ok", False: "MISMATCH", None: "absent"}.get(split.get("sha_ok"))))

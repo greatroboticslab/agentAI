@@ -8553,3 +8553,40 @@ none of its paths is exempt from authentication, and that the dashboard mounts i
 Writes stay where they already belong: corrections through the single-writer
 channel on the scheduler thread, actions through the policy gate. A second write
 path here would be a second writer, which is what the correction channel refuses.
+
+## 2026-09-06 — v3.31.1 rehearsing the head-to-head found three faults on the measurement path
+
+The command the model comparison will run had never been run. Rehearsing it
+against a local server standing in for a deployed model found three defects, each
+of which would have produced a complete, plausible, wrong results table.
+
+**The documented entry point was a factory function.** `bench.load_model_entry`
+instantiates a resolved class and calls anything else directly, so naming
+`supervisor:default_client` gave bench a callable it then invoked as
+`default_client(prompt, model_id, num_ctx)`. Every call raised, every review
+scored as no detection, and the run finished with a full table of zeros. A
+two-hour window on a large model would have been spent measuring nothing. The
+entry point is now the class, and the factory raises a message naming it when
+called with arguments.
+
+**`sha256` meant two different things in one file.** A frozen split's `sha256` is
+the digest over the case set — case id, the bundle's own sha256, the sha256 of
+`truth.json` — which is what the split's own rule text says. `bench.load_split`
+hashed the split object instead, so every legitimately frozen corpus failed the
+check and every run printed an error and exited non-zero. Bench now recomputes the
+corpus digest through the one implementation that produces it, and reports the
+object hash separately as what it is: an answer to a different question.
+
+**The benchmark asked a different question from production.** The renderer was
+already shared, so both paths agreed on what the model is *shown* and disagreed on
+what it is *asked* — bench carried its own copy of the reviewer instructions. A
+score measured under instructions nothing in production sends is not a statement
+about the deployed layer. Both now read `prompts/supervisor.txt`, with no compiled
+fallback. Unifying them also surfaced that the instructions offered a `tier1`
+escalation the supervisor's shape check rejected as malformed, which is a
+destination `escalation.py`'s E1 family actually produces.
+
+`tests/test_bench_model_path.py` keeps the rehearsal: the run reaches the model
+once per case, the prompt carries the evidence and the instructions, JSON mode is
+requested, the two paths ask the same question, and a factory entry point is
+refused rather than silently scoring zero.

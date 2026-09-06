@@ -305,7 +305,12 @@ def build_corpus(root):
                       "healthy_noisy_log"],
              "rule": "dev = incidents dated <= 2026-08-25 kept out of reported "
                      "numbers; test = everything else"}
-    split["sha256"] = bench._sha256(split)
+    # What `corpus.freeze` writes: the digest over the case set, not a hash of
+    # this object. The two were both called `sha256` until v3.31.1, so this
+    # fixture certified a different quantity from the one a real split carries
+    # and the check passed here while failing on every frozen corpus.
+    from weed_optimizer_framework.tools.brain import corpus as _corpus
+    split["sha256"] = _corpus.corpus_digest(root, split["dev"] + split["test"])
     with open(root / "split.json", "w") as f:
         json.dump(split, f, indent=2, sort_keys=True)
     return root
@@ -458,7 +463,7 @@ ck("no load errors", CORPUS["errors"] == [])
 ck("corpus hash is stable across loads",
    bench.load_corpus(ROOT)["hash"] == CORPUS["hash"])
 SPLIT = bench.load_split(ROOT)
-ck("split.json certifies itself", SPLIT["sha_ok"] is True)
+ck("split.json names the corpus it was frozen over", SPLIT["sha_ok"] is True)
 known, missing = bench.select_cases(CORPUS, SPLIT, "test")
 ck_eq("test split names five cases", len(known), 5)
 ck("the dev case is not in the test split", "inc_design_confound" not in known)
@@ -470,7 +475,8 @@ _bad["test"] = _bad["test"] + ["inc_design_confound"]
 shutil.copy(ROOT / "split.json", ROOT / "split_good.json")
 shutil.copy(ROOT / "split_bad.json", ROOT / "split.json")
 _check = bench.load_split(ROOT)
-ck("an edited split fails its own hash", _check["sha_ok"] is False)
+ck("a split naming cases it was not frozen over fails the check",
+   _check["sha_ok"] is False)
 ck("an edited split reports dev/test overlap",
    any("overlap" in e for e in _check["errors"]))
 shutil.copy(ROOT / "split_good.json", ROOT / "split.json")
@@ -887,7 +893,7 @@ ck("an unknown arm is refused", rc_bad == 2)
 ck("a missing corpus reports instead of raising", rc_none == 1)
 ck("the report names the baseline every arm is a margin over", "margins over A0p" in text)
 ck("the report prints the MDD beside every comparison", "mdd" in text)
-ck("the report shows the split's self-hash check", "self-hash ok" in text)
+ck("the report shows the corpus-digest check", "digest ok" in text)
 
 print("\n-- two models in one verdicts tree are not one arm --")
 OUT2 = TMP / "out2"

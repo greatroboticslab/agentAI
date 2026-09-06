@@ -33,7 +33,11 @@ The callable contract
 ---------------------
 `OpenAICompatClient` is `(prompt, model_id, num_ctx) -> {text, tokens_in,
 tokens_out, latency_s, su}`, which is exactly what `bench.py --model-entry`
-resolves and calls. The benchmark and the live path therefore drive the same
+resolves and calls. The entry point is the CLASS, because `load_model_entry`
+instantiates a class and calls anything else directly:
+
+    --model-entry weed_optimizer_framework.tools.brain.supervisor:OpenAICompatClient
+ The benchmark and the live path therefore drive the same
 client, and a bug in transport shows up in both rather than in only the one
 nobody is watching.
 
@@ -212,8 +216,22 @@ class OpenAICompatClient(object):
         return out
 
 
-def default_client():
-    """Entry point for `bench.py --model-entry ...brain.supervisor:default_client`."""
+def default_client(*args, **kwargs):
+    """Factory for callers that want a client. NOT the benchmark entry point.
+
+    `bench.load_model_entry` instantiates a resolved CLASS and calls anything
+    else directly, so naming this function as `--model-entry` produced a
+    callable that bench then invoked as `default_client(prompt, model_id,
+    num_ctx)`. Every call raised, every review scored as no detection, and the
+    run completed with a full results table of zeros -- a two-hour model window
+    would have been spent measuring nothing. The guard below turns that silent
+    shape mismatch into a message naming the right entry point.
+    """
+    if args or kwargs:
+        raise TypeError(
+            "default_client() is a factory and takes no arguments; the benchmark "
+            "entry point is the class: --model-entry "
+            "weed_optimizer_framework.tools.brain.supervisor:OpenAICompatClient")
     return OpenAICompatClient()
 
 
@@ -255,7 +273,10 @@ def check_shape(obj):
     if esc is not None:
         if not isinstance(esc, dict):
             problems.append("escalate is not an object")
-        elif esc.get("to") not in ("none", "tier2", "human", None):
+        # tier1 is a real destination: escalation.py's E1 family routes there,
+        # and a shape check that rejected it would mark a correct verdict
+        # malformed.
+        elif esc.get("to") not in ("none", "tier1", "tier2", "human", None):
             problems.append("escalate.to is %r" % (esc.get("to"),))
     conf = obj.get("confidence")
     if conf is not None:
