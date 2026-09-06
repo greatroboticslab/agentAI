@@ -185,6 +185,55 @@ cmd, _p, used_fallback = rs._step_command("weed", "nosuchstep", 7)
 ck("an unwired step yields no command", cmd is None and used_fallback is True)
 
 
+# ---- the policy gate authorises what the command actually carries (v3.29.1) --
+# The loop is an actor with real permissions on a shared allocation, so every
+# submission passes the same gate the web path uses. The parameters authorised
+# must be the ones the template substitutes: handing the whole round dict to the
+# gate made all three steps refuse, because a bound is declared per action and
+# `epochs` arriving with a collect submission is an undeclared parameter reaching
+# a command line. This is the second time a validation added to this path would
+# have silently stopped the campaign, so it is asserted rather than reasoned about.
+from weed_optimizer_framework.tools.brain import policy as _policy  # noqa: E402
+
+_D = db.DEFAULT_DOMAIN_CONFIG
+ck("collect renders only its own two fields",
+   db.step_fields(_D, "collect") == ["collect_time_h", "max_new"])
+ck("filter renders no parameters at all", db.step_fields(_D, "filter") == [])
+ck("train renders the recipe fields",
+   set(db.step_fields(_D, "train")) >= {"epochs", "train_time_h", "train_time_cap_h",
+                                        "imgsz", "patience", "tier", "min_dino_score"})
+ck("an unknown step renders nothing rather than guessing",
+   db.step_fields(_D, "nosuchstep") == [])
+
+for _step in ("collect", "filter", "train"):
+    _sub = {k: v for k, v in _D["round_params"].items()
+            if k in db.step_fields(_D, _step)}
+    _d = _policy.authorize("round-scheduler", "round_" + _step, _sub, None, None)
+    ck("the live %s step passes the gate" % _step,
+       _d["allowed"] and not _d["needs_approval"])
+
+_bad = {k: v for k, v in _D["round_params"].items()
+        if k in db.step_fields(_D, "train")}
+_bad["epochs"] = 100000
+ck("an out-of-bounds epoch count is refused",
+   not _policy.authorize("round-scheduler", "round_train", _bad, None, None)["allowed"])
+
+_extra = {k: v for k, v in _D["round_params"].items()
+          if k in db.step_fields(_D, "collect")}
+_extra["epochs"] = 60
+ck("a parameter the collect template never renders is refused",
+   not _policy.authorize("round-scheduler", "round_collect", _extra, None, None)["allowed"])
+
+# An earlier block left a stub wired; the gate asks the CURRENT database for
+# the fields, so point it at the real one for this check.
+rs._CTX["db"] = db
+ck("the scheduler filters params down to the rendered set",
+   rs._gate_params(_D, "collect", _D["round_params"]) ==
+   {"collect_time_h": 10, "max_new": 3})
+ck("refused is a status the ledger can record, distinct from failed and skipped",
+   "refused" in db._ROUND_STATUSES)
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)

@@ -12580,6 +12580,13 @@ def api_cluster_status():
 
 
 # Map of action_id → (script_path, allowed?). Whitelist.
+# The body fields `api_cluster_action` reads. Held here so the policy gate
+# authorises exactly what can reach a command line: a field the handler never
+# reads cannot change what runs, and refusing a caller for sending one would
+# block working buttons without making anything safer.
+_CLUSTER_BODY_KEYS = ("dino_min", "domain", "epochs", "time_h")
+
+
 _CLUSTER_ACTIONS = {
     "restart_dashboard": {
         "type": "restart_self",
@@ -13109,6 +13116,42 @@ def api_cluster_action(action: str, request: Request, payload: dict = Body(defau
     # v3.0.178: sync def (thread-pooled) so blocking _slurm/subprocess don't stall
     # the event loop. Body injected instead of `await request.body()`.
     body = payload if isinstance(payload, dict) else {}
+
+    # v3.29.1 — one authorisation choke point, shared with the scheduler. The
+    # RBAC check above answers "may this person use the cluster at all"; the
+    # policy gate answers "may this actor take THIS action with THESE
+    # parameters", which is the question an automated tier asks through the same
+    # table. Web callers are people, so the practical effect here is parameter
+    # bounds and the R4 rule; the value is that both paths are governed by one
+    # catalogue rather than by two sets of hand-written checks.
+    #
+    # An action the catalogue does not know is logged and allowed on THIS path
+    # only. A partially-synced table must not brick the dashboard for the admin
+    # who would fix it, and a person is present to read the error. The scheduler
+    # makes the opposite choice for the opposite reason: nobody is watching it.
+    # Only the keys this handler actually reads can influence the command it
+    # builds; anything else in the body is inert. Authorising the whole body
+    # would refuse a caller for sending a field nothing consumes, which is the
+    # same over-strictness that made the scheduler's own gate reject every step.
+    # tests/test_policy_gate_paths.py parses this function and fails if the set
+    # drifts from the keys the code reads, so it cannot quietly fall behind.
+    _gated_body = {k: v for k, v in body.items() if k in _CLUSTER_BODY_KEYS}
+    try:
+        from weed_optimizer_framework.tools.brain import policy as _brain_policy
+        _dec = _brain_policy.authorize("human:" + str(_actor), action, _gated_body,
+                                       None, None)
+    except Exception as _pe:
+        log.error("[policy] gate unavailable for %r: %s", action, _pe)
+        _dec = None
+    if isinstance(_dec, dict) and not _dec.get("allowed"):
+        _why = "; ".join(_dec.get("reasons") or ["refused"])
+        if "not a recognised action" in _why:
+            log.error("[policy] no catalogue row for %r; allowing (a person is "
+                      "present and RBAC has already passed)", action)
+        else:
+            log.warning("[policy] refused %s for %s: %s", action, _actor, _why)
+            raise HTTPException(403, "Refused by policy: " + _why)
+
 
     # v3.0.185 (P3): honest modality gate for vision-only agent actions. The FILTER
     # (DINOv2 image embeddings) and LABELER (Roboflow image annotation) only make

@@ -720,7 +720,12 @@ def set_domain_config(domain_id: str, patch: dict, actor: str = "user") -> Optio
 # weed-registry harvest_round tags (which track which datasets, not which steps).
 # ===========================================================================
 ROUND_STEPS = ["collect", "filter", "label", "train", "eval"]
-_ROUND_STATUSES = {"pending", "running", "done", "failed", "skipped"}
+# "refused" (v3.29.1) is deliberately distinct from "failed" and "skipped":
+# the job never ran because the policy gate declined it, which is an
+# authorisation event to review, not a step that broke and not one that had
+# nothing to do. A status outside this set silently becomes "pending", so a
+# refusal recorded under an unlisted name would read as work still to come.
+_ROUND_STATUSES = {"pending", "running", "done", "failed", "skipped", "refused"}
 
 
 def _now_iso() -> str:
@@ -821,6 +826,35 @@ def merge_step_entry(existing, incoming: dict, incoming_actor: str = "") -> dict
             attempts = attempts + [_as_attempt(prev)]
     head["attempts"] = attempts[-_MAX_STEP_ATTEMPTS:]
     return head
+
+
+def step_fields(domain_cfg: dict, step: str) -> list:
+    """The placeholder names one step's template actually substitutes.
+
+    The scheduler holds one `round_params` dict for the whole round, but a step
+    only ever renders the subset its own template names. Handing the full dict to
+    the policy gate made every step refuse: a bound is declared per action, so
+    `epochs` arriving with a collect submission reads as an undeclared parameter
+    reaching a command line, which is exactly what the gate should refuse. The
+    fix belongs here, not in a looser gate -- the authorised parameters are the
+    ones that become the command, and this is where that is known.
+    """
+    tpl = ((domain_cfg or {}).get("steps") or {}).get(step)
+    if not isinstance(tpl, str):
+        return []
+    out, i = [], 0
+    while True:
+        a = tpl.find("{", i)
+        if a < 0:
+            break
+        b = tpl.find("}", a + 1)
+        if b < 0:
+            break
+        name = tpl[a + 1:b].split("!")[0].split(":")[0].strip()
+        if name and name not in out:
+            out.append(name)
+        i = b + 1
+    return out
 
 
 def render_step_command(domain_cfg: dict, step: str, **fields) -> str:

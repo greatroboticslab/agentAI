@@ -165,6 +165,52 @@ def _submit(shell_cmd: str):
     return (m.group(1) if m else None), out.strip()[:300]
 
 
+def _gate_params(dcfg, step, params):
+    """The parameters this step actually renders, which are the ones to authorise.
+
+    A round carries one parameter dict; a step substitutes only the subset its own
+    template names. Authorising the whole dict made every step refuse, because a
+    bound is declared per action and `epochs` arriving with a collect submission
+    is an undeclared parameter reaching a command line. Falling back to the full
+    dict when the template cannot be read is deliberate: that path refuses, and
+    refusing is the safe direction for an unattended loop.
+    """
+    src = params if isinstance(params, dict) else {}
+    try:
+        fields = _CTX["db"].step_fields(dcfg, step)
+    except Exception:
+        return dict(src)
+    if not fields:
+        return {}
+    return {k: v for k, v in src.items() if k in fields}
+
+
+def _policy_ok(actor, action, params):
+    """(allowed, reason) from the policy gate, failing CLOSED for this caller.
+
+    The web path may fall back to the person in front of it when the action
+    catalogue cannot be read; this path has nobody in front of it. An unattended
+    loop that submits GPU jobs because its own authorisation table failed to load
+    is the shape of incident this layer exists to prevent, so anything other than
+    an explicit permission stops the step.
+    """
+    try:
+        from .brain import policy
+    except Exception as e:
+        return False, "policy gate unavailable (%s: %s)" % (type(e).__name__, e)
+    try:
+        d = policy.authorize(actor, action, params if isinstance(params, dict) else {},
+                             None, None)
+    except Exception as e:
+        return False, "policy gate raised (%s: %s)" % (type(e).__name__, e)
+    if not isinstance(d, dict) or not d.get("allowed"):
+        why = "; ".join((d or {}).get("reasons") or ["no reason given"])
+        return False, why
+    if d.get("needs_approval"):
+        return False, "needs approval: " + "; ".join(d.get("reasons") or [])
+    return True, ""
+
+
 def _log_action(action: str, result: dict):
     """Mirror a scheduler submission into the dashboard's cluster-action history.
 
@@ -1118,6 +1164,22 @@ def _advance(domain: str, dcfg: dict):
     cmd, params, _fallback = _step_command(domain, nxt, cur.get("round_num"))
     if not cmd:
         _record(domain, nxt, "skipped", detail="no action wired for this domain")
+        return
+    # One authorisation choke point, the same one the web path uses. The loop is
+    # an actor with real permissions on a shared allocation; it asks before it
+    # spends, and a refusal pauses the domain rather than being retried, because
+    # a refusal is an authorisation decision and retrying it is how a bounded
+    # gate becomes a rate limiter.
+    _gated = _gate_params(dcfg, nxt, params)
+    _ok, _why = _policy_ok("round-scheduler", "round_" + nxt, _gated)
+    if not _ok:
+        _log().error("[rounds] %s: step %s REFUSED by policy (%s)" % (domain, nxt, _why))
+        _record(domain, nxt, "refused", detail=("policy refused: " + _why)[:200])
+        _log_action("rounds_" + nxt, {"ok": False, "domain": domain,
+                                      "round": cur.get("round_num"), "step": nxt,
+                                      "jobid": None, "cmd": cmd,
+                                      "msg": "policy refused: " + _why})
+        _pause(domain, dcfg, st, "policy refused step %s: %s" % (nxt, _why))
         return
     jobid, out = _submit(cmd)
     _log_action("rounds_" + nxt, {"ok": bool(jobid), "domain": domain,

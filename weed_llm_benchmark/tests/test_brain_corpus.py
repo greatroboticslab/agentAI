@@ -820,6 +820,61 @@ ck("a real repo path is still scrubbed", "<REPO>/results/x.json" in _out3)
 ck("the real scrub is counted", _c3.get("repo_path") == 1)
 
 
+# ---- re-freezing a pre-registered split is deliberate (v3.29.1) ------------
+# `freeze` documented "never overwrites one" and then wrote the file anyway,
+# after appending a warning that claimed the run had been a dry run. Re-freezing
+# is legitimate when the corpus was re-exported -- the digest covers each
+# bundle's own sha256, so a corrected export changes the number without moving
+# anyone between halves -- and illegitimate once results are known. The flag
+# makes which one is happening explicit and the report has to say whether
+# membership moved.
+_fz = pathlib.Path(tempfile.mkdtemp(prefix="corpus_freeze_")) / "bench"
+(_fz / "cases").mkdir(parents=True)
+(_fz / "rubric.md").write_text("rubric\n")
+for _cid, _date in (("old-a", "2026-01-01"), ("old-b", "2026-02-02"),
+                    ("new-c", "2026-09-01")):
+    _d = _fz / "cases" / _cid
+    _d.mkdir()
+    (_d / "truth.json").write_text(json.dumps({"date": _date, "incident": True}))
+    (_d / "bundle.json").write_text(json.dumps({"sha256": "sha-" + _cid}))
+
+_r1 = corpus.freeze(out_dir=_fz)
+ck("a first freeze succeeds", _r1["ok"])
+ck("the date rule puts the old cases in dev", _r1["split"]["dev"] == ["old-a", "old-b"])
+ck("and the recent case in test", _r1["split"]["test"] == ["new-c"])
+
+_r2 = corpus.freeze(out_dir=_fz)
+ck("a second freeze is refused without force", not _r2["ok"])
+ck("the refusal names the flag that would allow it",
+   any("--force" in e for e in _r2["errors"]))
+ck("the refusal writes no split", _r2["split"] is None)
+
+# A corrected export changes each bundle's sha256 and nothing else.
+for _cid in ("old-a", "old-b", "new-c"):
+    (_fz / "cases" / _cid / "bundle.json").write_text(
+        json.dumps({"sha256": "corrected-" + _cid}))
+_r3 = corpus.freeze(out_dir=_fz, force=True)
+ck("a forced re-freeze after a corrected export succeeds", _r3["ok"])
+ck("it reports membership unchanged", _r3.get("membership_changed") is False)
+ck("it says the digest moved",
+   any("digest updated" in w for w in _r3["warnings"]))
+ck("and the digest really did change",
+   _r3["split"]["sha256"] != _r1["split"]["sha256"])
+
+# A case moving halves is the thing the pre-registration exists to prevent, so
+# it must be reported loudly even when the caller asked for a re-freeze.
+(_fz / "cases" / "new-c" / "truth.json").write_text(
+    json.dumps({"date": "2026-01-05", "incident": True}))
+_r4 = corpus.freeze(out_dir=_fz, force=True)
+ck("a re-freeze that moves a case says so", _r4.get("membership_changed") is True)
+ck("and names the case that moved",
+   "new-c" in (_r4["membership_diff"]["dev_added"]
+               + _r4["membership_diff"]["test_removed"]))
+ck("and warns that this is no longer a pre-registered split",
+   any("not a pre-registered split" in w for w in _r4["warnings"]))
+shutil.rmtree(_fz.parent, ignore_errors=True)
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)

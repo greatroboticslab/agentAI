@@ -98,6 +98,12 @@ class FakeLedger:
         return copy.deepcopy(self.config)
 
     render_step_command = staticmethod(db.render_step_command)
+    # The stub must expose whatever the scheduler asks a database for. The
+    # policy gate authorises the parameters a step actually renders, and a
+    # stub missing this helper makes the gate fall back to the whole round
+    # dict and refuse every step -- a stale stub reading as a policy failure.
+    step_fields = staticmethod(db.step_fields)
+    validate_step_command = staticmethod(db.validate_step_command)
 
     # -- rounds
     def get_current_round(self, domain):

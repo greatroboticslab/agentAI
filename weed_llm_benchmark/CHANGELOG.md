@@ -8334,3 +8334,43 @@ that lets its evidence be silently truncated is committing the defect class it
 was built to detect. A provider outage is returned as a failed review, never
 raised, because an outage is a real supervision outcome and must not vanish from
 the matrix.
+
+## 2026-09-06 — v3.29.1 one authorisation gate on both submission paths
+
+Every job the platform starts now passes `policy.authorize`, from the web action
+handler and from the round scheduler, so the two paths are governed by one
+catalogue instead of two sets of hand-written checks.
+
+**The gate authorises the parameters that can actually reach a command.** A round
+carries one parameter dict and a step substitutes only the subset its own template
+names, so handing the whole dict to the gate made all three steps refuse: a bound
+is declared per action, and `epochs` arriving with a collect submission reads as an
+undeclared parameter reaching a command line. `db.step_fields` reports what a
+template substitutes and the scheduler gates exactly that. The web handler does the
+same with `_CLUSTER_BODY_KEYS`, the four body fields it actually reads; a field
+nothing consumes cannot change what runs, and refusing a caller for sending one
+would block working buttons without making anything safer. This is the third time a
+validation added to a submission path would have stopped the campaign silently, and
+each time it was a test that caught it, so `tests/test_policy_gate_paths.py` now
+parses the live source and fails if the declared key set drifts from the keys the
+code reads.
+
+**The two paths fail in opposite directions, deliberately.** The scheduler refuses
+when the policy module cannot be imported, when the gate raises, or when an action
+needs approval: nobody is watching an unattended loop, and a loop that submits GPU
+jobs because its own authorisation table failed to load is the incident shape this
+layer exists to prevent. The web path logs and allows an action the catalogue does
+not know, because a partially synced table must not lock the administrator out of
+the dashboard they would use to fix it, and a person is present to read the error.
+A refused step records status `refused`, which is new and distinct from `failed`
+and `skipped` — the job never ran, and it did not break and did not have nothing to
+do. A status outside the recorded set silently becomes `pending`, so a refusal
+under an unlisted name would have read as work still to come.
+
+**`corpus.freeze` gains `--force`.** Re-freezing a pre-registered split is
+legitimate in exactly one case: the corpus was re-exported, so each bundle's own
+sha256 changed and the digest no longer recomputes although nobody moved between
+halves. It is illegitimate once results are known. The flag makes which one is
+happening explicit, and the report states whether membership actually held rather
+than asserting that it did — including naming any case that moved and warning that
+a split redrawn after the fact is not a pre-registered split.

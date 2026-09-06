@@ -1596,12 +1596,17 @@ def corpus_digest(out_dir, ids):
 _corpus_digest = corpus_digest
 
 
-def freeze(out_dir=None, cutoff=DEV_CUTOFF, dev_extra=(), dry_run=False):
-    """Write split.json over the exported case set. Never overwrites one.
+def freeze(out_dir=None, cutoff=DEV_CUTOFF, dev_extra=(), dry_run=False,
+           force=False):
+    """Write split.json over the exported case set. Refuses to overwrite one
+    unless `force`, and then reports whether membership moved.
 
     Pre-registration is the whole value of this file: a split that can be
-    rewritten after a model has been run is not a split. There is deliberately
-    no --force; removing the file is a decision a person makes by hand.
+    rewritten after a model has been run is not a split. `force` exists for the
+    one legitimate case -- the corpus itself was re-exported, so each bundle's
+    sha256 changed and the digest no longer recomputes even though nobody moved
+    between halves -- and it reports whether membership actually held, because
+    that is the property a reader needs and not the one the flag asserts.
     """
     out_dir = pathlib.Path(str(out_dir or DEFAULT_OUT_DIR))
     path = out_dir / "split.json"
@@ -1612,10 +1617,12 @@ def freeze(out_dir=None, cutoff=DEV_CUTOFF, dev_extra=(), dry_run=False):
         rep["errors"].append("no cases under %s — nothing to freeze"
                              % (out_dir / "cases"))
         return rep
-    if path.exists() and not dry_run:
+    if path.exists() and not dry_run and not force:
         rep["errors"].append(
             "%s already exists; the split is frozen and this tool will not overwrite it "
-            "(remove the file by hand if the corpus is being re-registered)" % path)
+            "(pass --force only when the corpus was re-exported; membership moves "
+            "are reported either way)" % path)
+        rep["split"] = None
         return rep
     extra = set(dev_extra or ())
     dev, test = [], []
@@ -1634,8 +1641,41 @@ def freeze(out_dir=None, cutoff=DEV_CUTOFF, dev_extra=(), dry_run=False):
              "sha256": corpus_digest(out_dir, ids)}
     rep["split"] = split
     if path.exists():
-        rep["warnings"].append("%s already exists; this is a dry run of what a "
-                               "fresh freeze would produce" % path)
+        # A frozen split is pre-registration. Re-freezing is legitimate when the
+        # corpus itself was re-exported -- the digest covers each bundle's own
+        # sha256, so a corrected export changes the number without changing who
+        # is in which half -- but it must be deliberate and it must prove the
+        # membership did not move. Silently rewriting it would let a split be
+        # re-drawn after the results are known, which is the one thing a
+        # pre-registered split exists to prevent. The previous behaviour warned
+        # that this was "a dry run of what a fresh freeze would produce" and then
+        # wrote the file anyway.
+        prev = read_json(path) or {}
+        moved = {"dev_added": sorted(set(split["dev"]) - set(prev.get("dev") or [])),
+                 "dev_removed": sorted(set(prev.get("dev") or []) - set(split["dev"])),
+                 "test_added": sorted(set(split["test"]) - set(prev.get("test") or [])),
+                 "test_removed": sorted(set(prev.get("test") or []) - set(split["test"]))}
+        rep["previous"] = {"sha256": prev.get("sha256"),
+                           "dev": len(prev.get("dev") or []),
+                           "test": len(prev.get("test") or [])}
+        rep["membership_changed"] = any(moved.values())
+        rep["membership_diff"] = moved
+        if not force:
+            rep["errors"].append(
+                "%s already exists; pass --force to re-freeze. Membership would "
+                "%s." % (path, "MOVE: " + json.dumps(moved)
+                         if any(moved.values()) else "be unchanged"))
+            rep["ok"] = False
+            return rep
+        if any(moved.values()):
+            rep["warnings"].append(
+                "re-freeze MOVED cases between dev and test: %s. A split redrawn "
+                "after results are known is not a pre-registered split."
+                % json.dumps(moved))
+        else:
+            rep["warnings"].append(
+                "re-freeze: membership unchanged, digest updated %s -> %s"
+                % (str(prev.get("sha256"))[:16], split["sha256"][:16]))
     if not (out_dir / "rubric.md").exists():
         rep["warnings"].append(
             "rubric.md is not present; the gate requires it committed with the split")
@@ -1719,6 +1759,11 @@ def main(argv=None):
     p.add_argument("--cutoff", default=DEV_CUTOFF)
     p.add_argument("--dev-extra", nargs="*", default=())
     p.add_argument("--dry-run", action="store_true")
+    # Re-freezing is legitimate after a corrected export and illegitimate after
+    # results are known; the flag makes which one is happening explicit, and the
+    # report says whether membership moved either way.
+    p.add_argument("--force", action="store_true",
+                   help="re-freeze an existing split.json (reports membership moves)")
 
     try:
         a = ap.parse_args(argv)
@@ -1758,7 +1803,7 @@ def main(argv=None):
             return 0 if rows else 1
         if a.cmd == "freeze":
             rep = freeze(out_dir=a.out, cutoff=a.cutoff, dev_extra=a.dev_extra,
-                         dry_run=a.dry_run)
+                         dry_run=a.dry_run, force=getattr(a, "force", False))
             if a.json:
                 print(json.dumps(rep, sort_keys=True, indent=1))
             else:
