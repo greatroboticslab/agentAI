@@ -8047,3 +8047,45 @@ changed module compiles; `bash -n` clean; `sbatch --test-only` accepts the rende
 train line including its trailing empty `BRAIN_TRACE=`; and the cluster's
 ultralytics 8.4.37 carries both `time` and the `on_fit_epoch_end` hook the design
 rests on.
+
+### v3.25.2 / v3.25.3 — what the walltime-cap smoke actually found
+
+The cap works. Job 45290759 requested 200 epochs with a 0.4 h cap, ultralytics
+reported `Starting training for 0.4 hours`, training stopped after one epoch, a
+valid `best.pt` was written, and the summary and the epoch trace both carry
+`epochs_requested 200` / `epochs_completed 1` — the pair that makes a truncated
+recipe distinguishable from a completed one. The job-scoped run directory
+(`.../job45290759`), the job-scoped artifact written `running` at start and `done`
+at the end, and the base-checkpoint sha256 all landed as designed.
+
+Getting there took three runs, and two of them were worth more than the smoke.
+
+**A GPU job that cannot see a GPU no longer trains on the CPU.** The first attempt
+was scheduled onto a node whose driver was mismatched (`Failed to initialize NVML:
+Driver/library version mismatch`). torch fell back silently, one epoch took 48
+minutes instead of about two, and the run still produced a real-looking
+mAP50-95 of 0.566 — a metric measured against a GPU allocation the job never used.
+Slurm reports that node as IDLE, so it keeps receiving work. `train_yolo_mega` now
+refuses to start when CUDA is unavailable inside a job that was allocated GPUs;
+`WEED_ALLOW_CPU_TRAIN=1` re-enables the fallback for a deliberate CPU run.
+
+**A probe run no longer moves campaign state.** The successful smoke repointed the
+registry's `last_mega_weights` at its own one-epoch checkpoint and incremented
+`mega_round_count`, so the next real round would have continued from a probe — and
+deleting the probe directory would have broken the progressive chain outright.
+`WEED_SMOKE=1` keeps the training and its artifacts and skips only the registry
+mutation. The pointer was restored to the last completed round's checkpoint
+through the locked merge-write path.
+
+**The verification job now reports the configuration it actually ran.**
+`run_vllm_verify.sh` passed `--kv-cache-dtype fp8` to the server but recorded
+`"auto"` in its result file, because the variable was never exported to the writer.
+A result that misreports its own configuration is worse than no result, and this
+one is destined for a model comparison.
+
+**DeepSeek-V4-Flash serves here, measured.** On four H100s in the shared partition
+(no whole-node wait), vLLM 0.28 from the apptainer image, native block-FP8 weights
+with an fp8 KV cache (its attention asserts one, which is what aborted the first
+two attempts): 149 GB loaded in 1,031 s, a 16,113-token prefill in 0.75 s, 147
+tokens/s decoding at batch 1, and strict JSON-schema output accepted. Those are the
+numbers a review cadence can be budgeted against, rather than assumed.

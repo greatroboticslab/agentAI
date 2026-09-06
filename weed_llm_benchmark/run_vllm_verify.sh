@@ -93,7 +93,7 @@ LOAD_S=$(( $(date +%s) - T0 ))
 echo "ready=$READY after ${LOAD_S}s"
 
 MODEL="$MODEL" NAME="$NAME" PORT="$PORT" OUT="$OUT" LOG="$LOG" READY="$READY" \
-LOAD_S="$LOAD_S" TP="$TP" MAXLEN="$MAXLEN" JOBTAG="$JOBTAG" python3 - <<'PYEOF'
+LOAD_S="$LOAD_S" TP="$TP" MAXLEN="$MAXLEN" JOBTAG="$JOBTAG" KVDTYPE="$KVDTYPE" python3 - <<'PYEOF'
 import json, os, time, urllib.request, urllib.error
 
 port = os.environ["PORT"]; base = "http://127.0.0.1:%s/v1" % port

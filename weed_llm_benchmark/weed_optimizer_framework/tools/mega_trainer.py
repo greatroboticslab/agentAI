@@ -1140,11 +1140,23 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
         reg["last_mega_weights"] = best_pt
         reg["mega_round_count"] = int(reg.get("mega_round_count", 0)) + 1
 
-    written = update_registry(REGISTRY_PATH, _graft_weights)
-    disc.registry["last_mega_weights"] = best_pt
-    disc.registry["mega_round_count"] = written.get("mega_round_count", 1)
-    logger.info(f"[Mega] Saved last_mega_weights={best_pt} "
-                f"(mega_round_count={disc.registry['mega_round_count']})")
+    # v3.25.3: a probe run must not move campaign state. The WP1 walltime-cap
+    # smoke completed one deliberate epoch and repointed last_mega_weights at its
+    # own checkpoint, so the next real round would have continued from a probe and
+    # deleting the probe directory would have broken the progressive chain
+    # entirely. WEED_SMOKE=1 keeps the training and the artifacts and skips only
+    # the registry mutation.
+    if os.environ.get("WEED_SMOKE"):
+        logger.warning("[Mega] WEED_SMOKE=1 — leaving last_mega_weights and "
+                       "mega_round_count untouched (best_pt=%s)" % best_pt)
+        written = {}
+    else:
+        written = update_registry(REGISTRY_PATH, _graft_weights)
+        disc.registry["last_mega_weights"] = best_pt
+        disc.registry["mega_round_count"] = written.get("mega_round_count", 1)
+    if written:
+        logger.info(f"[Mega] Saved last_mega_weights={best_pt} "
+                    f"(mega_round_count={disc.registry['mega_round_count']})")
 
     summary = {
         "best_pt": best_pt,
