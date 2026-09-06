@@ -51,6 +51,15 @@ its output as an artifact beside the adapted spec; without it the command text
 is recorded in the case notes and nothing is executed. The cluster is the only
 place `sacct` answers, so the flag is off by default.
 
+Every `sacct` query is normalised before it runs (`normalise_sacct`): the job
+selection the inventory recorded is kept exactly and the output form is forced
+to one parsable field list. The inventory's literal queries print sacct's
+default columns, which carry no Elapsed, no Timelimit, no Start and no End, so
+the artifact they produced could not answer the question the walltime checks ask
+and those checks returned `unknown` (v3.27.1). Both the inventory's string and
+the query that ran are written into the case notes; the artifact itself echoes
+the query that produced its rows.
+
 Pure stdlib; nothing raises out of `main()`.
 """
 import argparse
@@ -116,8 +125,17 @@ SECTION_RULES = (
     (("sacct_*", "sacct.*", "*.sacct"), "sacct"),
     # Per-slug DINO scores, the file the `gate_noop` signal reads for staleness.
     (("slug_scores*.json",), "slug_scores"),
-    # The job-scoped strategy dict the trainer writes beside its run.
-    (("strategy*.json", "*_strategy.json"), "strategy"),
+    # The per-run recipe the trainer writes beside its run. `run_m1_merged_seeds.sh`
+    # names it `m1_<tier>_seed<N>.json` (and, since v3.25.0, a job-scoped
+    # `m1_<tier>_seed<N>_<jobid>.json` written before training starts), and that
+    # file is where `epochs`, `time_h`, `tier` and `min_dino_score` live. Without
+    # this row those artifacts mapped to no section at all, so `epochs_truncated`
+    # and `gate_noop` had no recipe to read and answered `unknown` (v3.27.1). The
+    # second pattern also catches the safe name of an unmatched
+    # `m1_*_<jobid>.json` glob, so the absence lands on the strategy section
+    # instead of nowhere.
+    (("strategy*.json", "*_strategy.json", "m1_*_seed*.json", "m1_*.json"),
+     "strategy"),
     # The round ledger, staged from the lab into the cluster-side bundle.
     (("ledger*.json", "*_ledger.json"), "ledger"),
     # `registry_lock.diff` output. A whole `dataset_registry.json` snapshot is
@@ -344,6 +362,89 @@ def build_notes(entry, derived_lines):
     return "\n".join(lines)
 
 
+# --- the canonical accounting query ----------------------------------------
+# Every `sacct` query is collected in ONE parsable form. The fields and the two
+# flags are exactly what the live gather in `evidence.py` asks for, so an
+# archived row and a row a running scheduler sees carry the same columns; a
+# corpus whose accounting rows have a different shape from the live ones is two
+# corpora.
+#
+# `-X` (allocations only: one row per job, no `.batch`/`.extern` step rows) is
+# deliberate. Every signal reasons about a job — its State, its Elapsed against
+# its Timelimit, its Start — and the step rows underneath repeat that state once
+# per step, which is noise in a bundle with a token budget. What `-X` costs is
+# MaxRSS, which SLURM records only on step rows. No signal reads MaxRSS today,
+# and asking for a column that `-X` always returns empty would put a
+# measurement in the corpus that was never taken; a memory signal would need its
+# own step-level query, which is a second command, not a wider one.
+#
+# `-P` prints `|`-separated fields with no padding, so a value wider than its
+# column is not truncated and no column ruler has to be parsed. Field widths
+# (`JobName%30`) only affect padded output and are therefore not asked for.
+SACCT_FORMAT = ("JobID,JobIDRaw,JobName,State,Elapsed,Timelimit,Start,End,"
+                "Submit,AllocTRES,ExitCode,NodeList")
+SACCT_FLAGS = ("-P", "-X")
+
+# Flags that decide what sacct PRINTS. They are dropped from an inventoried
+# command and replaced by the canonical pair above. Everything else — the job
+# ids, `-S`/`-E`, `-u`, `--name`, `--state` — is job selection and is kept
+# verbatim: the inventory decides which jobs a case is about, this module only
+# decides how their rows are printed.
+_SACCT_FORMAT_FLAGS = ("-o", "--format", "--fields", "--delimiter")
+_SACCT_PRINT_FLAGS = ("-P", "--parsable2", "-p", "--parsable", "-X",
+                      "--allocations", "-n", "--noheader", "-l", "--long",
+                      "--json", "--yaml")
+
+
+def normalise_sacct(command):
+    """(command to run, note) for one inventoried accounting query.
+
+    The inventory recorded literal queries such as `sacct -j 44727703,44767709`.
+    Run as written, sacct prints its default columns — JobID, JobName,
+    Partition, Account, AllocCPUS, State, ExitCode — with no Elapsed, no
+    Timelimit, no Start and no End, so the collected artifact cannot answer the
+    question every walltime check asks and the checks answer `unknown`
+    (v3.27.1). This forces the field list and the parsable separator and changes
+    nothing else.
+
+    A command that is not a `sacct` query comes back unchanged with an empty
+    note: `squeue` and `scontrol` print something else entirely and are never
+    rewritten. So does a query already in the canonical form.
+    """
+    text = str(command or "").strip()
+    try:
+        tokens = shlex.split(text)
+    except ValueError:                    # unbalanced quoting: not ours to fix
+        return text, ""
+    if not tokens or os.path.basename(tokens[0]) != "sacct":
+        return text, ""
+    kept, dropped, i = [tokens[0]], [], 1
+    while i < len(tokens):
+        tok = tokens[i]
+        head = tok.split("=", 1)[0]
+        if head in _SACCT_FORMAT_FLAGS or (tok.startswith("-o") and len(tok) > 2):
+            dropped.append(tok)
+            if "=" not in tok and tok in _SACCT_FORMAT_FLAGS and i + 1 < len(tokens):
+                i += 1                    # the flag's own value, not a selector
+                dropped.append(tokens[i])
+        elif tok in _SACCT_PRINT_FLAGS:
+            dropped.append(tok)
+        else:
+            kept.append(tok)
+        i += 1
+    kept.append("--format=%s" % SACCT_FORMAT)
+    kept.extend(SACCT_FLAGS)
+    # Quoted per token so the string round-trips through `shlex.split` exactly as
+    # it will be executed; a token that needs no quoting is not quoted.
+    out = " ".join(shlex.quote(t) for t in kept)
+    if out == text:
+        return text, ""
+    note = "forced to the canonical parsable form"
+    if dropped:
+        note += "; dropped %s" % " ".join(dropped)
+    return out, note
+
+
 # --- command collection ----------------------------------------------------
 def run_command(command, timeout=COMMAND_TIMEOUT_S):
     """(body, ok) for one command. Never raises.
@@ -415,21 +516,33 @@ def adapt_case(entry, root, collect_dir=None, runner=run_command):
         if not text:
             continue
         if kind == "command":
+            # The artifact keeps the name the inventory's own query earns, so a
+            # reader finds the file by the job it asks about; what RUNS is the
+            # normalised query. Both strings go into the notes: a corpus that
+            # silently rewrites what it claims to have run is not evidence.
             name = command_artifact_name(text)
+            run_text, why = normalise_sacct(text)
+            if why:
+                derived.append("command_as_inventoried: %s" % text)
+                derived.append("command_normalised: %s (%s)" % (run_text, why))
             if collect_dir is None:
                 stats["commands_skipped"] += 1
-                derived.append("command_not_collected: %s" % text)
+                derived.append("command_not_collected: %s" % run_text)
                 continue
-            body, ok = runner(text)
+            # The body is left exactly as the runner produced it: `run_command`
+            # already echoes the command it ran as the artifact's own first
+            # line, so the stored file says which query produced its rows, and
+            # the notes say which inventory string that query came from.
+            body, ok = runner(run_text)
             written = _write_collected(collect_dir, case_id or "unnamed", name, body)
             if written is None:
                 stats["commands_skipped"] += 1
-                derived.append("command_not_stored: %s" % text)
+                derived.append("command_not_stored: %s" % run_text)
                 continue
             stats["commands_collected"] += 1
             stats["present"] += 1
             add(name, str(written),
-                "command_collected%s: %s" % ("" if ok else " (failed)", text))
+                "command_collected%s: %s" % ("" if ok else " (failed)", run_text))
             continue
         if kind == "glob":
             matches, truncated = expand_glob(text, root)

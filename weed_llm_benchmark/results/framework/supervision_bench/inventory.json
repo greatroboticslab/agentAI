@@ -3657,6 +3657,9 @@
     "results/framework/m1_merged_rndtrain_s1_44767709.out",
     "sacct -j 44727703,44767709",
     "results/framework/mega_iterm1_curated_s101/train*/results.csv",
+    "results/framework/m1_curated_seed101_44727703.json",
+    "results/framework/m1_curated_seed101_44767709.json",
+    "results/framework/m1_curated_seed101.json",
     "results/framework/dataset_registry.json",
     "~/.round_scheduler.json"
    ],
@@ -3677,7 +3680,7 @@
     "44727703",
     "44767709"
    ],
-   "notes": "DEV CASE per the plan: excluded from every reported number. The job-scoped artifact does NOT exist for these two runs (pre-WP1 the writer ran only at the end), which is itself part of what makes the case hard.",
+   "notes": "DEV CASE per the plan: excluded from every reported number. The job-scoped artifact does NOT exist for these two runs (pre-WP1 the writer ran only at the end), which is itself part of what makes the case hard. The two m1_curated_seed101_<jobid>.json paths are listed so their absence is on the record rather than nowhere; the recipe these runs used is m1_curated_seed101.json, which run_m1_merged_seeds.sh writes at the END of a run and which therefore belongs to the last run of this tier and seed that finished, not to either of these two. Read it as the recipe (tier, epochs, imgsz, min_dino_score), never as this run outcome.",
    "one_line_symptom": "Job 44727703 hit the walltime at epoch 24 of 60 and was recorded TIMEOUT; the next tick resubmitted the identical command, which failed at epoch 16; two failures tripped the stop-loss.",
    "provenance_guess": "raw",
    "provenance_reason": "the two .out files, the sacct rows and the partial results.csv are the newest cluster artifacts of the incident era and are the whole reason WP2 exports before new jobs overwrite them.",

@@ -899,6 +899,25 @@ _RENDER_MAX_ITEMS = 50
 _RENDER_MAX_DEPTH = 6
 
 
+def _strip_line_arrays(value, depth=0):
+    """`value` with every `lines` back-reference (and its `raw` twin) removed.
+
+    Used only for the scalars-only view. A row that carries both parsed columns
+    and the verbatim line it came from is two things at once: status fields,
+    which L1 is entitled to, and a quotable raw line, which it is not. Removing
+    the line arrays keeps the first and drops the second, instead of discarding
+    the row wholesale.
+    """
+    if depth > _RENDER_MAX_DEPTH:
+        return value
+    if isinstance(value, dict):
+        return {k: _strip_line_arrays(v, depth + 1)
+                for k, v in value.items() if k not in ("lines", "raw")}
+    if isinstance(value, (list, tuple)):
+        return [_strip_line_arrays(v, depth + 1) for v in value]
+    return value
+
+
 def _render_scalar(key, value, out, prefix="", depth=0):
     """Flatten one value into `prefix.key: value` lines, recursing into lists.
 
@@ -940,9 +959,10 @@ def render_prompt(view, task=PROMPT_TASK, retrieval=False):
 
     Line-addressed sections render as `%6d\\t%s` with the artifact's absolute
     line numbers, which is the address a quote is later resolved to. Under
-    `scalars_only` (L1) those arrays are dropped entirely rather than
-    summarised — L1's claim is that status fields are enough, and leaving it a
-    sample of the raw file would answer that question by accident.
+    `scalars_only` (L1) the line arrays are dropped and the remaining status
+    fields are rendered — L1's claim is that status fields are enough, and
+    leaving it a sample of the raw file would answer that question by accident,
+    while removing the fields with the lines would answer it the other way.
     """
     parts = [task]
     if retrieval:
@@ -959,7 +979,33 @@ def render_prompt(view, task=PROMPT_TASK, retrieval=False):
         arts = _as_line_artifacts(sec)
         if arts:
             if scalars_only:
-                parts.append("(withheld: raw lines are not a status field)")
+                # v3.27.1: this branch used to withhold the whole section, which
+                # silently removed sacct from L1 -- a section L1_SECTIONS
+                # explicitly grants it. Once the exporter made sacct rows
+                # citable they gained a `lines` back-reference and began
+                # matching _as_line_artifacts, so the arm whose claim is
+                # "status fields are enough" was being asked that question
+                # without them, and would have scored as a model failure. Drop
+                # the line arrays, render whatever status fields remain, and
+                # withhold only when the section really was nothing but raw
+                # lines (an `out_tail`, which is what the rule was written for).
+                body = []
+                for i, item in enumerate(sec if isinstance(sec, list) else [sec]):
+                    scalars = _strip_line_arrays(item)
+                    if isinstance(scalars, dict):
+                        scalars = {k: v for k, v in scalars.items()
+                                   if k not in ("sha256", "path")}
+                        # An artifact id alone is provenance, not a status
+                        # field: a row that keeps nothing else was only ever a
+                        # wrapper around raw lines and stays withheld.
+                        if not [k for k in scalars if k != "artifact_id"]:
+                            continue
+                    if scalars:
+                        _render_scalar(i, scalars, body)
+                if body:
+                    parts.extend(body)
+                else:
+                    parts.append("(withheld: raw lines are not a status field)")
                 continue
             for art in arts:
                 parts.append("artifact: %s  sha256:%s" % (art["artifact_id"],
@@ -969,8 +1015,11 @@ def render_prompt(view, task=PROMPT_TASK, retrieval=False):
             continue
         if isinstance(sec, dict):
             body = []
-            for k in sorted(sec):
-                _render_scalar(k, sec[k], body)
+            # Under scalars_only nothing was rendered above, so a nested
+            # line-addressed artifact must not be summarised as though it was.
+            src = _strip_line_arrays(sec) if scalars_only else sec
+            for k in sorted(src):
+                _render_scalar(k, src[k], body)
             parts.extend(body)
         elif isinstance(sec, list):
             for i, row in enumerate(sec[:200]):
@@ -980,7 +1029,7 @@ def render_prompt(view, task=PROMPT_TASK, retrieval=False):
                     # anything that looks like a quotable artifact line.
                     if scalars_only:
                         body = []
-                        _render_scalar(i, row, body)
+                        _render_scalar(i, _strip_line_arrays(row), body)
                         parts.extend(body)
                     else:
                         parts.append(_canonical(row))

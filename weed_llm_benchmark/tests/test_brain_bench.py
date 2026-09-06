@@ -906,6 +906,54 @@ ck("the deterministic arm, which has no model, stays one arm",
 ck("both model arms are still margins over the same baseline",
    {r["baseline"] for r in MIX["comparisons"]} == {"A0p"})
 
+# ---- L1 keeps its status fields when a section becomes citable (v3.27.1) ----
+# The exporter gave sacct rows a `lines` back-reference so a finding can cite
+# them. That made the rows match _as_line_artifacts, and the renderer's
+# scalars-only branch withheld the whole section -- so L1, whose entire claim is
+# that status fields suffice, was being asked that question with sacct removed.
+# A model arm would have scored as blind on a view the protocol says it gets.
+_SACCT_SEC = [
+    {"artifact_id": "sacct_44727703.txt", "JobID": "44727703", "State": "TIMEOUT",
+     "Elapsed": "12:00:18", "Timelimit": "12:00:00",
+     "raw": "44727703|rndtrain|TIMEOUT|12:00:18|12:00:00",
+     "lines": [[3, "44727703|rndtrain|TIMEOUT|12:00:18|12:00:00"]]},
+]
+_TAIL_SEC = {"artifact_id": "train_44727703.out", "sha256": "deadbeef",
+             "lines": [[811, "epoch 24/60 ..."], [812, "slurmstepd: JOB CANCELLED"]]}
+
+_v_l1 = {"case_id": "t", "scalars_only": True,
+         "sections": {"sacct": _SACCT_SEC, "out_tail": _TAIL_SEC}}
+_p_l1 = bench.render_prompt(_v_l1)
+ck("L1 still receives the sacct State field", "State: TIMEOUT" in _p_l1)
+ck("L1 still receives Elapsed and Timelimit",
+   "Elapsed: 12:00:18" in _p_l1 and "Timelimit: 12:00:00" in _p_l1)
+ck("L1 is not given the verbatim sacct line", "rndtrain|TIMEOUT" not in _p_l1)
+ck("L1 is not given a line number it could cite", "\t44727703|" not in _p_l1)
+ck("L1 still has raw job output withheld",
+   "withheld: raw lines are not a status field" in _p_l1)
+ck("L1 does not see the job output text", "JOB CANCELLED" not in _p_l1)
+ck("L1 is not told lines were rendered above when none were",
+   "rendered above" not in _p_l1)
+
+_v_l2 = {"case_id": "t", "scalars_only": False,
+         "sections": {"sacct": _SACCT_SEC, "out_tail": _TAIL_SEC}}
+_p_l2 = bench.render_prompt(_v_l2)
+ck("a full-view arm still gets the citable sacct line",
+   "44727703|rndtrain|TIMEOUT" in _p_l2)
+ck("a full-view arm still gets the job output", "JOB CANCELLED" in _p_l2)
+ck("a full-view arm gets absolute line numbers", "   811\t" in _p_l2)
+
+# A section that is nothing but raw lines must still be withheld from L1: that
+# is the rule this branch was written for and the fix must not loosen it.
+_p_only_tail = bench.render_prompt(
+    {"case_id": "t", "scalars_only": True, "sections": {"out_tail": _TAIL_SEC}})
+ck("a lines-only section is still fully withheld from L1",
+   "withheld: raw lines are not a status field" in _p_only_tail
+   and "epoch 24/60" not in _p_only_tail)
+
+ck("rendering stays deterministic", bench.render_prompt(_v_l1) == _p_l1)
+
+
 if _fails:
     print("\nFAILED: %d -> %s" % (len(_fails), _fails))
     shutil.rmtree(TMP, ignore_errors=True)

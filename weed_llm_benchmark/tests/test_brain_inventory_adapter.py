@@ -368,6 +368,97 @@ ck("the failure is noted as a failure",
 ck("a failing command is still counted as collected", _s["commands_collected"] == 1)
 
 
+# ---- the canonical accounting query --------------------------------------
+# The inventory recorded literal queries (`sacct -j 44727703,44767709`), whose
+# default columns are JobID/JobName/Partition/Account/AllocCPUS/State/ExitCode.
+# Collected as written they carry no Elapsed, no Timelimit, no Start and no End,
+# and every walltime check reading the bundle answered `unknown` (v3.27.1). The
+# job selection is the inventory's to make; the output form is not.
+print("sacct normalisation")
+_norm, _why = ia.normalise_sacct("sacct -j 44727703,44767709")
+ck("the job selection the inventory gave is kept verbatim",
+   _norm.startswith("sacct -j 44727703,44767709 "))
+ck("the field list is forced", "--format=%s" % ia.SACCT_FORMAT in _norm)
+ck("the parsable separator and one-row-per-job are forced",
+   _norm.endswith(" -P -X"))
+ck("the rewrite is reported, not silent", _why != "")
+for _col in ("JobID", "JobIDRaw", "State", "Elapsed", "Timelimit", "Start",
+             "End", "AllocTRES", "ExitCode"):
+    ck("the format asks for %s, which a signal reads" % _col,
+       _col in ia.SACCT_FORMAT.split(","))
+ck("MaxRSS is not asked for: -X returns only allocation rows and SLURM records "
+   "MaxRSS on step rows", "MaxRSS" not in ia.SACCT_FORMAT)
+
+_f1, _ = ia.normalise_sacct("sacct -S 2026-08-24 -u someone --name=brain")
+ck("a date-ranged query keeps -S, -u and --name",
+   "-S 2026-08-24" in _f1 and "-u someone" in _f1 and "--name=brain" in _f1)
+ck("an array-task selector survives",
+   ia.normalise_sacct("sacct -j 44234060_2")[0].startswith("sacct -j 44234060_2 "))
+
+_f2, _w2 = ia.normalise_sacct("sacct -j 1 -o JobID,State -n -X -p")
+ck("an output format the inventory chose is replaced, not appended",
+   "-o JobID,State" not in _f2 and _f2.count("--format=") == 1)
+ck("print-shape flags are dropped before the canonical pair is added",
+   _f2.count(" -P") == 1 and _f2.count(" -X") == 1 and " -n " not in _f2
+   and not _f2.endswith(" -p"))
+ck("what was dropped is named in the note",
+   "dropped" in _w2 and "-o" in _w2 and "-n" in _w2)
+ck("normalisation is idempotent",
+   ia.normalise_sacct(_norm) == (_norm, ""))
+ck("a non-sacct accounting command is never rewritten",
+   ia.normalise_sacct("squeue -u someone") == ("squeue -u someone", "")
+   and ia.normalise_sacct("scontrol show job 1") == ("scontrol show job 1", ""))
+ck("an empty or malformed command is returned as it stands, not raised",
+   ia.normalise_sacct("") == ("", "")
+   and ia.normalise_sacct('sacct -j "unclosed')[0] == 'sacct -j "unclosed')
+
+_ran = []
+
+
+def _stub_record(cmd, timeout=ia.COMMAND_TIMEOUT_S):
+    _ran.append(cmd)
+    return "$ %s\nJobID|State\n44727703|TIMEOUT\n" % cmd, True
+
+
+_c, _s = adapt_one(entry(case_id="normalise-case",
+                         artifact_paths_expected=["sacct -j 44727703"]),
+                   collect_dir=COLLECT, runner=_stub_record)
+ck("the normalised query is the one that runs",
+   len(_ran) == 1 and _ran[0] == ia.normalise_sacct("sacct -j 44727703")[0])
+ck("the notes carry the command the inventory recorded",
+   "command_as_inventoried: sacct -j 44727703" in _c["notes"])
+ck("the notes carry the command that was actually run",
+   ("command_normalised: %s" % _ran[0]) in _c["notes"])
+ck("the stored artifact echoes the query that produced its rows",
+   open(_c["artifacts"][0]["path"]).read().startswith("$ %s\n" % _ran[0]))
+ck("the artifact is still named after the job the inventory asked about",
+   _c["artifacts"][0]["name"] == "sacct_44727703.txt")
+
+_c, _s = adapt_one(entry(case_id="normalise-skipped",
+                         artifact_paths_expected=["sacct -j 44727703"]))
+ck("a command that is not collected still records both strings",
+   "command_as_inventoried: sacct -j 44727703" in _c["notes"]
+   and "command_normalised: sacct -j 44727703 --format=" in _c["notes"])
+
+
+# ---- the per-run recipe maps to the strategy section ----------------------
+# `run_m1_merged_seeds.sh` writes results/framework/m1_<tier>_seed<N>.json (and,
+# since v3.25.0, a job-scoped m1_<tier>_seed<N>_<jobid>.json before training
+# starts). That file carries epochs, time_h, tier and min_dino_score. It matched
+# no section rule, so `epochs_truncated` and `gate_noop` had no recipe to read.
+print("strategy artifacts")
+ck("m1_<tier>_seed<N>.json -> strategy",
+   ia.section_for("m1_curated_seed101.json") == "strategy")
+ck("the job-scoped copy -> strategy",
+   ia.section_for("m1_curated_seed101_44727703.json") == "strategy")
+ck("the safe name of an unmatched m1_*_<jobid>.json glob -> strategy",
+   ia.section_for(ia.safe_basename("results/framework/m1_*_45227822.json"))
+   == "strategy")
+ck("a strategy*.json still maps to strategy",
+   ia.section_for("strategy_100.json") == "strategy")
+ck("an unrelated json is still unmapped",
+   ia.section_for("pool_report.json") is None)
+
 # ---- determinism ---------------------------------------------------------
 print("determinism")
 SPEC = os.path.join(_tmp, "spec.json")

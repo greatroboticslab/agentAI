@@ -604,6 +604,189 @@ ck("main with a missing spec returns 1",
 ck("main with no command returns 2", corpus.main([]) == 2)
 
 
+# ---- the seam: an exported bundle has to fire the signals -----------------
+# The corpus verified clean and the signals passed their own fixtures while,
+# run against the real 2026-08-29 worked example, every check answered
+# `unknown`: the exporter stored the accounting output as raw `{"line": ...}`
+# records and `signals.sacct_rows()` reads dict rows keyed by column name. Both
+# layouts the corpus holds are exercised end to end here -- the `-P` form the
+# collector now forces and the fixed-width default of the queries collected
+# before it -- from export to a quote that resolves to a line. Signals and
+# citations are imported lazily so this file still runs standalone on a
+# checkout that carries only the exporter (v3.27.1).
+print("\n-- exported bundle -> signals -> citations --")
+try:
+    from weed_optimizer_framework.tools.brain import signals as _signals
+    from weed_optimizer_framework.tools.brain import citations as _citations
+except Exception as _exc:                  # reported, never raised out of a test
+    _signals = _citations = None
+    print("  note  signals/citations are not importable (%s: %s); the seam "
+          "check did not run" % (type(_exc).__name__, _exc))
+
+if _signals is not None and _citations is not None:
+    SEAM_ROOT = os.path.join(_tmp, "seam_root")
+    SEAM_OUT = os.path.join(_tmp, "seam_bench")
+    SEAM_OUT2 = os.path.join(_tmp, "seam_bench2")
+    os.makedirs(os.path.join(SEAM_ROOT, "logs"))
+
+    def _sw(rel, text):
+        p = os.path.join(SEAM_ROOT, rel)
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(text)
+        return p
+
+    # What `sacct -j <id> --format=... -P -X` prints. The artifact's first line
+    # is the shell echo of the query: it carries no delimiter, and it is what
+    # sent the generic table reader down its raw-line fallback.
+    _sw("logs/sacct_44727703.txt", "\n".join([
+        "$ sacct -j 44727703 --format=JobID,JobIDRaw,JobName,State,Elapsed,"
+        "Timelimit,Start,End,Submit,AllocTRES,ExitCode,NodeList -P -X",
+        "JobID|JobIDRaw|JobName|State|Elapsed|Timelimit|Start|End|Submit|"
+        "AllocTRES|ExitCode|NodeList",
+        "44727703|44727703|rndtrain|TIMEOUT|12:00:11|12:00:00|"
+        "2026-08-29T05:52:41|2026-08-29T17:52:52|2026-08-29T05:50:01|"
+        "billing=8,cpu=5,gres/gpu:h100=1,mem=63000M,node=1|0:0|w007",
+    ]) + "\n")
+    # And what a bare `sacct -j <id>` printed before the query was normalised:
+    # fixed width under a column ruler, default columns, no Elapsed and no
+    # Timelimit anywhere in them.
+    _sw("logs/sacct_44767709.txt", "\n".join([
+        "$ sacct -j 44767709",
+        "       JobID    JobName  Partition    Account  AllocCPUS      State "
+        "ExitCode ",
+        "------------ ---------- ---------- ---------- ---------- ---------- "
+        "-------- ",
+        "    44767709   rndtrain GPU-shared  alloc123p          5    TIMEOUT "
+        "     0:0 ",
+        "44767709.ba+      batch             alloc123p          5    TIMEOUT "
+        "     0:0 ",
+    ]) + "\n")
+    # An accounting query that answered nothing: no header, so no rows.
+    _sw("logs/sacct_broken.txt", "$ sacct -j 999\nsacct: error: no such job\n")
+
+    SEAM_P = "seam_parsable_44727703"
+    SEAM_FIXED = "seam_fixed_44767709"
+    SEAM_BROKEN = "seam_unparsable_999"
+    SEAM_SPEC = {
+        "root": SEAM_ROOT, "domain": "weed",
+        "cases": [
+            {"case_id": SEAM_P, "date": "2026-08-29", "incident": True,
+             "class": "operational", "job_id": "44727703",
+             "signals_expected": ["walltime_bound"],
+             "escalation_expected": "tier1",
+             "artifacts": [
+                 {"name": "sacct_44727703.txt", "path": "logs/sacct_44727703.txt",
+                  "section": "sacct"},
+                 {"name": "sacct_44767709.txt", "path": "logs/sacct_44767709.txt",
+                  "section": "sacct"}]},
+            {"case_id": SEAM_FIXED, "date": "2026-08-29", "incident": True,
+             "class": "operational", "job_id": "44767709",
+             "signals_expected": ["walltime_bound"],
+             "escalation_expected": "tier1",
+             "artifacts": [
+                 {"name": "sacct_44767709.txt", "path": "logs/sacct_44767709.txt",
+                  "section": "sacct"}]},
+            {"case_id": SEAM_BROKEN, "date": "2026-08-29", "incident": True,
+             "class": "operational", "job_id": "999", "signals_expected": [],
+             "escalation_expected": "none",
+             "artifacts": [
+                 {"name": "sacct_broken.txt", "path": "logs/sacct_broken.txt",
+                  "section": "sacct"}]},
+        ],
+    }
+    SEAM_SPEC_PATH = os.path.join(_tmp, "seam_inventory.json")
+    with open(SEAM_SPEC_PATH, "w", encoding="utf-8") as f:
+        json.dump(SEAM_SPEC, f)
+
+    seam_rep = corpus.export(SEAM_SPEC_PATH, out_dir=SEAM_OUT, root=SEAM_ROOT)
+    ck("the seam cases export", seam_rep["counts"]["written"] == 3)
+
+    def _seam_bundle(cid):
+        return json.loads(_read(os.path.join(SEAM_OUT, "cases", cid,
+                                             "bundle.json")))
+
+    def _fires(bundle, name):
+        for sig in _signals.detect(bundle):
+            if sig["signal"] == name:
+                return sig
+        return None
+
+    pb = _seam_bundle(SEAM_P)
+    prows = pb["sections"]["sacct"] or []
+    prow = prows[0] if prows else {}
+    ck("a -P sacct artifact parses into column-keyed rows",
+       isinstance(pb["sections"]["sacct"], list)
+       and prow.get("JobID") == "44727703" and prow.get("State") == "TIMEOUT"
+       and prow.get("Elapsed") == "12:00:11"
+       and prow.get("Timelimit") == "12:00:00")
+    ck("the command echo above the header is skipped, not read as a row",
+       len(prows) == 1)
+    ck("each row keeps its raw line and its absolute address",
+       prow.get("raw", "").startswith("44727703|")
+       and prow.get("lines") == [[3, prow.get("raw")]]
+       and prow.get("artifact_id") == "sacct_44727703.txt")
+
+    psig = _fires(pb, "walltime_bound")
+    ck("walltime_bound fires on the exported -P bundle", psig is not None)
+    ck("and it fires at crit, off the TIMEOUT state",
+       psig is not None and psig["severity"] == "crit")
+    ck("the elapsed-against-timelimit ratio comes from the parsed row",
+       psig is not None and psig["value"] == round(43211 / 43200.0, 4))
+    presolved = [e for e in (psig or {}).get("evidence", [])
+                 if _citations.resolve(pb, e.get("quote"))]
+    ck("at least one evidence quote resolves to an (artifact, line) address",
+       len(presolved) >= 1)
+    _hit = _citations.resolve(pb, presolved[0]["quote"]) if presolved else None
+    ck("the resolved address names the stored artifact and its real line",
+       _hit is not None and _hit["artifact_id"] == "sacct_44727703.txt"
+       and _hit["line"] == 3)
+
+    fb = _seam_bundle(SEAM_FIXED)
+    frows = fb["sections"]["sacct"] or []
+    ck("a fixed-width sacct artifact parses through its column ruler",
+       len(frows) == 2 and frows[0].get("JobID") == "44767709"
+       and frows[0].get("State") == "TIMEOUT"
+       and frows[0].get("Partition") == "GPU-shared")
+    ck("the ruler line itself is not a row",
+       all("------" not in r.get("raw", "") for r in frows))
+    fsig = _fires(fb, "walltime_bound")
+    ck("walltime_bound fires at crit on the fixed-width bundle too",
+       fsig is not None and fsig["severity"] == "crit")
+    ck("but the default columns carry no Elapsed, so there is no ratio to give",
+       fsig is not None and fsig["value"] is None)
+    ck("its evidence resolves as well",
+       fsig is not None and any(_citations.resolve(fb, e.get("quote"))
+                                for e in fsig["evidence"]))
+
+    # The second sacct artifact of the first case is stored and citable but does
+    # not fill the section. The manifest says so rather than leaving a reader to
+    # infer it from section_source.
+    _pa = {a["artifact_id"]: a for a in pb["export"]["artifacts"]}
+    ck("the artifact that filled the section says so",
+       _pa["sacct_44727703.txt"]["sectioned"] is True
+       and "fills section sacct" in _pa["sacct_44727703.txt"]["section_reason"])
+    ck("the one that did not says which artifact took it",
+       _pa["sacct_44767709.txt"]["sectioned"] is False
+       and "filled by sacct_44727703.txt"
+       in _pa["sacct_44767709.txt"]["section_reason"])
+
+    bb = _seam_bundle(SEAM_BROKEN)
+    ck("an unparsable accounting artifact leaves the section null, not raw lines",
+       bb["sections"]["sacct"] is None)
+    ck("and says why, naming what it looked for",
+       "JobID" in (bb["export"]["missing"].get("sacct") or ""))
+    ck("the artifact is still stored, so its lines stay quotable",
+       os.path.isfile(os.path.join(SEAM_OUT, "cases", SEAM_BROKEN, "artifacts",
+                                   corpus._stored_name("sacct_broken.txt"))))
+    ck("no seam bundle carries a section that is both filled and missing",
+       all(not (b["sections"][n] is not None and n in b["export"]["missing"])
+           for b in (pb, fb, bb) for n in corpus.SECTIONS))
+
+    corpus.export(SEAM_SPEC_PATH, out_dir=SEAM_OUT2, root=SEAM_ROOT)
+    ck("the seam export is byte-identical across two runs",
+       _tree(SEAM_OUT2) == _tree(SEAM_OUT))
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)

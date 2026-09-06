@@ -592,9 +592,148 @@ def _delimiter(line):
     return None
 
 
+# A sacct header always names its first column `JobID` (or `JobIDRaw` when only
+# the raw id was asked for), whatever `--format` follows it. The header is found
+# by that name rather than by position because a collected artifact begins with
+# the shell echo of the command that produced it, and an echo line is not a
+# table row.
+_SACCT_ID_COLUMNS = ("jobid", "jobidraw")
+# The ruler sacct prints under a fixed-width header (`------- ---- ------`).
+_SACCT_RULER_RE = re.compile(r"^[- ]*-[- ]*$")
+
+
+def _ruler_spans(text):
+    """[(start, end), ...] column spans of a fixed-width ruler line."""
+    spans, start = [], None
+    for i, ch in enumerate(text):
+        if ch == "-":
+            if start is None:
+                start = i
+        elif start is not None:
+            spans.append((start, i))
+            start = None
+    if start is not None:
+        spans.append((start, len(text)))
+    return spans
+
+
+def _span_cells(text, spans):
+    """Cells of one fixed-width line. The last column runs to end of line."""
+    out = []
+    for i, (a, b) in enumerate(spans):
+        out.append((text[a:] if i == len(spans) - 1 else text[a:b]).strip())
+    return out
+
+
+def _sacct_header(lines):
+    """(index, header cells, delimiter) of the header row, or None.
+
+    `lines` is [[absolute_line_number, text], ...] with blank lines removed.
+    """
+    for i, pair in enumerate(lines):
+        text = pair[1]
+        d = _delimiter(text)
+        cells = [c.strip() for c in text.split(d)] if d else text.split()
+        if cells and cells[0].lower() in _SACCT_ID_COLUMNS:
+            return i, cells, d
+    return None
+
+
+def _sacct_rows(pairs, cap, artifact_id="sacct"):
+    """(rows, reason) for a stored `sacct` output. One shape for both builders.
+
+    Why this is not the generic table reader: a collected accounting artifact
+    starts with the shell echo of its own command, that first line carries no
+    delimiter, and the generic reader therefore fell back to raw
+    `{"line": ...}` records. Run against the real 2026-08-29 worked example,
+    every check that reads a job's state answered `unknown` on a bundle that
+    contained the TIMEOUT row all along (v3.27.1).
+
+    Two layouts are read because both are already in the corpus: the `-P`
+    parsable form the collector now asks for (pipe, tab or comma separated) and
+    the fixed-width default of the queries collected before it, whose column
+    boundaries come from the ruler line sacct prints under its header. Anything
+    printed before the header -- the command echo, a `[command failed]` line --
+    is skipped rather than parsed.
+
+    Each row carries the column names sacct printed plus three fields of its
+    own: `raw` (the line as it stands in the artifact), `lines` (its absolute
+    line number, the address `citations.resolve` indexes) and `artifact_id`. A
+    finding about a job's state then resolves to a real (artifact, line) address
+    instead of to a parsed field with no provenance. sacct has no column of
+    those three names, so nothing is overwritten.
+
+    Known consequence, stated here because it is not visible from this file:
+    `bench.render_prompt` withholds a whole section whose rows are
+    line-addressed when it renders the status-only arm, so that arm now sees
+    `(withheld)` where it used to see the sacct fields its own section list
+    entitles it to. Its renderer has to drop the line array and keep the fields,
+    which is a change in `bench.py` and not in this module.
+    """
+    lines = [[n, t] for n, t in pairs if str(t).strip()]
+    found = _sacct_header(lines)
+    if found is None:
+        return [], ("no sacct header row is present in this output (no line "
+                    "whose first column is JobID), so nothing in it can be read "
+                    "as accounting rows; the artifact is stored and citable as "
+                    "it stands")
+    idx, header, delim = found
+    spans = None
+    if delim is None:
+        nxt = lines[idx + 1][1] if idx + 1 < len(lines) else ""
+        if nxt and _SACCT_RULER_RE.match(nxt):
+            spans = _ruler_spans(nxt)
+        if not spans:
+            return [], ("the sacct output is fixed-width and carries no column "
+                        "ruler under its header, so its column boundaries "
+                        "cannot be read; re-collect the query with -P")
+        header = _span_cells(lines[idx][1], spans)
+    rows = []
+    for pair in lines[idx + (2 if spans else 1):]:
+        num, text = pair[0], pair[1]
+        if spans and _SACCT_RULER_RE.match(text):
+            continue
+        cells = _span_cells(text, spans) if spans else \
+            [c.strip() for c in text.split(delim)]
+        if len([c for c in cells if c]) < 2:
+            continue
+        row = {}
+        for i, cell in enumerate(cells):
+            key = header[i] if i < len(header) else "col%d" % i
+            if key:
+                row[key] = cell
+        if not row:
+            continue
+        row["raw"] = text
+        row["artifact_id"] = str(artifact_id)
+        try:
+            row["lines"] = [[int(num), text]]
+        except (TypeError, ValueError):
+            # No absolute number means no address; the row keeps its columns and
+            # its raw text and simply cannot be cited.
+            row["lines"] = []
+        rows.append(row)
+        if len(rows) >= cap:
+            break
+    if not rows:
+        return [], ("the sacct output carries a header but no accounting row: "
+                    "the query returned nothing for this job")
+    return rows, None
+
+
 def _table_rows(pairs, cap):
-    """Parse a delimited table into row dicts; fall back to raw line records."""
-    texts = [t for _, t in pairs if t.strip()]
+    """Parse a delimited table into row dicts; fall back to raw line records.
+
+    A sacct output goes to `_sacct_rows` instead, so the archived builder here
+    and the live builder in `evidence.py` -- which both call this function --
+    produce one row shape rather than two. The fall-back to raw line records is
+    kept for the only other table this reads, the `df` block of the `resources`
+    section, whose header names no JobID column.
+    """
+    lines = [[n, t] for n, t in pairs if str(t).strip()]
+    if _sacct_header(lines) is not None:
+        return _sacct_rows(pairs, cap)[0]
+    texts = [t for _, t in lines]
     if not texts:
         return []
     d = _delimiter(texts[0])
@@ -812,7 +951,7 @@ def _build_case(case, root, cfg):
     entries = []            # manifest rows, in inventory order
     stored = {}             # stored relative path -> text
     raw_copies = {}         # artifact name -> source path (for --keep-raw)
-    by_section = {}         # section -> (artifact_id, pairs, info)
+    candidates = {}         # section -> [(artifact_id, pairs, info, path)]
     missing = {}
     scrub_counts = {}
 
@@ -888,12 +1027,11 @@ def _build_case(case, root, cfg):
             report["warnings"].append("artifact %s is empty (0 lines)" % name)
         report["bytes_original"] += info["bytes"]
         report["bytes_stored"] += len(text.encode("utf-8"))
-        if sec and sec not in by_section:
-            by_section[sec] = (name, pairs, info)
-        elif sec:
-            report["warnings"].append(
-                "section %s already filled by %s; %s is stored but not sectioned"
-                % (sec, by_section[sec][0], name))
+        if sec:
+            # Which candidate fills the section is decided after every artifact
+            # has been read, not by whichever arrived first: see
+            # `_choose_sections` (v3.27.1).
+            candidates.setdefault(sec, []).append((name, pairs, info, disp))
 
         for ln in cites:
             if not any(a <= ln <= b for a, b in keep):
@@ -934,6 +1072,23 @@ def _build_case(case, root, cfg):
                            "record from the engineering log and is never reconstructed "
                            "from that prose")
 
+    by_section, decisions = _choose_sections(
+        candidates, case.get("job_id"), report["warnings"])
+    # Every manifest row says whether it filled its section and why. A case can
+    # declare several artifacts for one section — the 2026-08-29 worked example
+    # declares eight results.csv — and a bundle that shows one of them without
+    # saying that seven others were read is not evidence (v3.27.1).
+    for entry in entries:
+        if entry["artifact_id"] in decisions:
+            chosen, why = decisions[entry["artifact_id"]]
+        elif not entry.get("present"):
+            chosen, why = False, "not readable, so it fills no section"
+        elif not entry.get("section"):
+            chosen, why = False, "this artifact maps to no bundle section"
+        else:
+            chosen, why = False, "no section decision was recorded"
+        entry["sectioned"] = bool(chosen)
+        entry["section_reason"] = why
     sections, sec_missing, sec_source = _build_sections(case, by_section, missing)
     bundle = {
         "bundle_id": _clean_str(case.get("case_id")),
@@ -1009,6 +1164,57 @@ def _build_case(case, root, cfg):
     return payload, report
 
 
+def _choose_sections(candidates, job_id, warnings):
+    """(by_section, decisions) — which artifact fills each section, and why.
+
+    Inventory order decides, as it always has, with one exception. A case can
+    declare several `results.csv` artifacts — the 2026-08-29 worked example
+    declares eight, one per train directory of the recipe — and taking whichever
+    was listed first attributes another run's epoch times to this job, which is
+    the number `walltime_bound` projects with. When the case names a job id and
+    exactly one candidate's name or path carries it, that candidate fills the
+    section; otherwise the first still does and the reason says why. `decisions`
+    maps every candidate artifact to (chosen, reason) so the manifest can state
+    what happened to each one, and a bundle never silently drops the seven it
+    did not use (v3.27.1).
+    """
+    by_section, decisions = {}, {}
+    job = re.sub(r"[^0-9]", "", str(job_id or ""))
+    for sec in sorted(candidates):
+        rows = candidates[sec]
+        pick = 0
+        why = "the first artifact declared for this section"
+        if sec == "results_csv" and len(rows) > 1:
+            hits = [i for i, r in enumerate(rows) if job and job in (r[0] + " " + r[3])]
+            if len(hits) == 1:
+                pick = hits[0]
+                why = ("the only candidate whose name or path carries job id %s"
+                       % job)
+            elif hits:
+                why = ("%d candidates carry job id %s, so the first declared was "
+                       "kept" % (len(hits), job))
+            elif job:
+                why = ("no candidate's name or path carries job id %s, so the "
+                       "first declared was kept and this section may belong to "
+                       "another run of the same recipe" % job)
+            else:
+                why = ("the case records no job id, so the first declared was "
+                       "kept and this section may belong to another run of the "
+                       "same recipe")
+        by_section[sec] = rows[pick][:3]
+        for i, row in enumerate(rows):
+            if i == pick:
+                decisions[row[0]] = (True, "fills section %s: %s" % (sec, why))
+                continue
+            decisions[row[0]] = (
+                False, "stored and citable, but section %s is filled by %s"
+                       % (sec, rows[pick][0]))
+            warnings.append(
+                "section %s is filled by %s; %s is stored but not sectioned"
+                % (sec, rows[pick][0], row[0]))
+    return by_section, decisions
+
+
 def _build_sections(case, by_section, missing):
     """Assemble the 14 bundle sections. Missing ones are null with a reason."""
     sections = {}
@@ -1026,6 +1232,12 @@ def _build_sections(case, by_section, missing):
             else:
                 sections[name] = value
                 sec_source[name] = art_id
+                # A section that another, unreadable artifact of the same case
+                # also mapped to would otherwise carry both a value and a
+                # "not readable" reason. The absence is still on the record: the
+                # artifact manifest lists that artifact with present=false and
+                # its reason, which is what `declared_absent` reads (v3.27.1).
+                sec_missing.pop(name, None)
             continue
         if name in inline:
             sections[name] = inline[name]
@@ -1044,7 +1256,13 @@ def _section_value(name, art_id, pairs, info):
         return {"artifact_id": art_id, "path": info.get("display_path"),
                 "sha256": info["sha256"], "lines": _trim_out_tail(pairs)}, None
     if name == "sacct":
-        return _table_rows(pairs, CAPS["sacct_rows"]), None
+        # (value, reason): an accounting output this reader cannot parse leaves
+        # the section null with the reason, never raw line records that a reader
+        # would mistake for parsed rows (v3.27.1).
+        rows, why = _sacct_rows(pairs, CAPS["sacct_rows"], art_id)
+        if why:
+            return None, why
+        return rows, None
     if name == "results_csv":
         return _results_csv_summary(pairs, info.get("mtime")), None
     if name == "trace":

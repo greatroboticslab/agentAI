@@ -8139,3 +8139,60 @@ defined in code rather than asserted), signals-only, signals-plus-alarm, and fou
 model arms that differ only in what they are shown. Every proportion carries a
 Wilson interval, every comparison prints its minimum detectable difference next to
 it, and every model arm is reported as a margin over the signals arm.
+
+---
+
+## 2026-09-06 — v3.27.1 the corpus and the signals now speak the same shape
+
+The signals were written against the live evidence bundle and the corpus was
+exported by a different reader, so the two agreed on which sections exist and
+disagreed on what a section holds. Run against the frozen worked example, the
+detectors returned `unknown` almost across the board: `walltime_bound` reported
+"no sacct row for job 44727703; no projection is available" on a case whose whole
+point is a walltime kill. Both causes were in the corpus, not in the detectors.
+
+**The `sacct` section held raw text, and the query never asked for the columns.**
+The exporter stored `[{"line": "$ sacct -j …"}, {"line": "JobID JobName …"}, …]`
+while the signals index rows by column name, and the inventory's literal command
+used sacct's default columns, which carry no `Elapsed`, `Timelimit`, `Start` or
+`End`. A detector reading a status field that was never collected cannot fire, and
+said so honestly — the `unknown` severity is what made the gap visible instead of
+scoring as a clean pass.
+
+`corpus.py` now parses both sacct layouts, `-P` delimited and the fixed-width
+default read through its column ruler, locating the header by its `JobID` first
+column so the shell echo of the command and any `[command failed]` line are
+skipped rather than parsed as data. Each row carries its column names, the
+verbatim line, and that line's absolute address, so a finding about a job state
+is quotable. An unparsable artifact leaves the section null with a reason; it is
+never left as raw lines that look parsed.
+
+`inventory_adapter.py` normalises every `sacct` invocation to one canonical
+format — the field list `evidence.py` already uses live, so the archived and the
+live shape cannot drift apart — while keeping the job selection verbatim. `-X` is
+requested deliberately: one row per job is what a signal reasons about, and the
+column it costs (`MaxRSS`) is recorded only on step rows, so asking for it would
+put a permanently empty measurement in the corpus. Section routing also learned
+the `m1_*_seed*.json` recipe files, which had matched no rule at all; strategy
+artifacts went from 0 to 15, which is why `epochs_truncated` and `gate_noop` had
+no recipe to read.
+
+**A defect this created in the benchmark renderer, caught before any model ran.**
+Making sacct rows citable gave them a `lines` back-reference, which made them
+match the renderer's test for a line-addressed artifact, and the scalars-only
+branch withheld such sections whole. `L1_SECTIONS` grants L1 the sacct section by
+name: the arm whose entire claim is that status fields are enough was about to be
+asked that question with the status fields removed, and would have scored as
+blind on evidence the protocol says it receives. The renderer now drops the line
+arrays and renders the remaining fields, and withholds only a section that was
+nothing but raw lines — which is the case the rule was written for. A section
+holding only an artifact id after stripping is treated as such, since an id is
+provenance rather than a status field.
+
+Verified: 21 new acceptance checks assert that the exported bundle fires
+`walltime_bound` at `crit` with an evidence quote that resolves through
+`citations.resolve` to an absolute address, in both sacct layouts; the fixed-width
+case fires with a null value, which is the point of forcing the format. Export is
+byte-identical across two runs. Six brain test files pass, including new renderer
+checks that L1 keeps `State`, `Elapsed` and `Timelimit` while receiving neither
+the verbatim line nor a citable line number.
