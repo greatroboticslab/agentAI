@@ -8590,3 +8590,30 @@ destination `escalation.py`'s E1 family actually produces.
 once per case, the prompt carries the evidence and the instructions, JSON mode is
 requested, the two paths ask the same question, and a factory entry point is
 refused rather than silently scoring zero.
+
+## 2026-09-06 — v3.31.2 the recovery ran, and it changed nothing measurable
+
+`inventory_recover scan` over the real storage tree proposed 52 high-confidence
+artifacts across 40 cases: 50 job logs, one `results.csv`, one trace. Applied and
+re-exported, section presence moved `out_tail` from 98 to 120 and `results_csv`
+from 17 to 18, and **reachability did not move at all** — still 12 of 87 expected
+firings, still `walltime_bound` alone.
+
+This corrects the v3.30.3 entry, which said `results_csv` present in 17 of 162 was
+"not plausible as an archival limit". It is. Of 162 cases, 118 carry a job id and
+78 of those have no surviving artifact that names it: the training run directories
+were cleaned up long ago, and the recipe JSONs, per-source harvest summaries and
+registry snapshots went with them. The listing gap was real and it was small.
+
+So the amendment in the plan stands with a firmer basis. The unreachable
+three-quarters of the corpus is archival, not a bookkeeping failure, and no
+further recovery pass will change it. Six of the twelve checks have no historical
+case they can run on and their value will be measured only on rounds recorded from
+now on, where `evidence.py` builds the bundle and every section is present.
+
+The split was re-frozen after the re-export: membership unchanged at dev 149 /
+test 13, digest `26c14d65` → `3a7e1823`, and `verify` recomputes it.
+
+Recording a measurement that refuted the prediction it was run to confirm is the
+point of running it. The alternative was to publish a recall over 87 while
+believing the denominator was about to improve.

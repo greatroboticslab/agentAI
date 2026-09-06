@@ -39,7 +39,7 @@
    "one_line_symptom": "Three closed-loop rounds all scored below the seeded Florence+OWLv2 consensus (new_f1 0.622) and all caused forgetting.",
    "provenance_guess": "record-only",
    "provenance_reason": "run_hyperagent.py predates the results/framework .out convention; no job id is recorded anywhere.",
-   "root_cause": "Qwen2.5-7B repeats conventional wisdom (more freeze / more votes / more replay) — approaches the project had already measured as ineffective; brain capability, not framework design.",
+   "root_cause": "Qwen2.5-7B repeats conventional wisdom (more freeze / more votes / more replay) \u2014 approaches the project had already measured as ineffective; brain capability, not framework design.",
    "scope": "cluster-pipeline",
    "signals_expected": [
     "plateau"
@@ -52,7 +52,8 @@
    "artifact_paths_expected": [
     "results/framework/slurm_ollama_38354715.out",
     "sacct -j 38354715",
-    "results/framework/run_log.json"
+    "results/framework/run_log.json",
+    "results/framework/slurm_agent_38354715.out"
    ],
    "case_id": "v2-agent-json-loop-38354715",
    "category": "incident",
@@ -83,7 +84,8 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/slurm_ollama_38373824.out",
-    "sacct -j 38373824"
+    "sacct -j 38373824",
+    "results/framework/slurm_agent_38373824.out"
    ],
    "case_id": "v2-agent-inspect-loop-38373824",
    "category": "incident",
@@ -103,7 +105,7 @@
    "one_line_symptom": "Numbered-choice prompt parsed correctly but the model always chose inspect_labels; 20 iterations, zero training.",
    "provenance_guess": "record-only",
    "provenance_reason": "same as 38354715.",
-   "root_cause": "Format was fixed, decision quality was not — the model cannot judge when to leave inspection.",
+   "root_cause": "Format was fixed, decision quality was not \u2014 the model cannot judge when to leave inspection.",
    "scope": "cluster-pipeline",
    "signals_expected": [
     "none"
@@ -120,7 +122,7 @@
    "case_id": "v2-deepseek-no-tools-38432901",
    "category": "incident",
    "correction_class": "code",
-   "correction_made": "brain._ollama_text_decide() — detect the no-tools error and switch to a numbered text prompt.",
+   "correction_made": "brain._ollama_text_decide() \u2014 detect the no-tools error and switch to a numbered text prompt.",
    "date": "2026-04-04",
    "detectable_from": [
     "repeated 400 'does not support tools' lines in the .out",
@@ -752,7 +754,7 @@
     "40068162"
    ],
    "notes": "Textbook silent wrongness: zero crashes, plausible output, useless supervision.",
-   "one_line_symptom": "owl=0 fb=512 — all 512 labels written were the trivial 0.5 0.5 1.0 1.0 fallback, with no error visible above warning level.",
+   "one_line_symptom": "owl=0 fb=512 \u2014 all 512 labels written were the trivial 0.5 0.5 1.0 1.0 fallback, with no error visible above warning level.",
    "provenance_guess": "record-only",
    "provenance_reason": "the garbage labels were overwritten by later autolabel passes; the counter line is the surviving evidence.",
    "root_cause": "OWLv2-large at 960x960 with batch=16 needs 12.82 GiB per batch, above what remained of a 31.7 GiB V100; the exception handler silently substituted the whole-image fallback.",
@@ -990,7 +992,8 @@
    "artifact_paths_expected": [
     "results/framework/slurm_ollama_40177598.out",
     "results/framework/slurm_ollama_40239932.out",
-    "results/framework/dataset_registry.json"
+    "results/framework/dataset_registry.json",
+    "results/framework/slurm_ollama_40224485.out"
    ],
    "case_id": "v3-0-22-chain-produced-no-weights",
    "category": "incident",
@@ -1087,7 +1090,8 @@
     "results/framework/v3_0_23_eval_40293571.out",
     "results/v3_0_23_eval.json",
     "results/framework/mega_iter6/train8/weights/best.pt",
-    "results/framework/v3_0_23_mega_iter6_train8_results.csv"
+    "results/framework/v3_0_23_mega_iter6_train8_results.csv",
+    "results/framework/slurm_ollama_40260768.out"
    ],
    "case_id": "v3-0-24-classid-zero-contamination",
    "category": "incident",
@@ -1120,7 +1124,8 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/v3_0_24_eval_40325013.out",
-    "results/framework/v3_0_24_eval_40327811.out"
+    "results/framework/v3_0_24_eval_40327811.out",
+    "results/framework/v3_0_23_eval_40327811.out"
    ],
    "case_id": "v3-0-24-eval-label-path-bug-40325013",
    "category": "incident",
@@ -1153,7 +1158,8 @@
    "artifact_paths_expected": [
     "results/framework/v3_0_24_eval_40327811.out",
     "results/v3_0_24_eval/v3_0_24_eval.json",
-    "results/framework/dataset_registry.json"
+    "results/framework/dataset_registry.json",
+    "results/framework/v3_0_23_eval_40327811.out"
    ],
    "case_id": "v3-0-24-class-passthrough-shared-path-40327811",
    "category": "incident",
@@ -1185,7 +1191,8 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/v3_0_25_p1_40329128.out",
-    "results/framework/mega_iterv3_0_25_p1/train*/results.csv"
+    "results/framework/mega_iterv3_0_25_p1/train*/results.csv",
+    "results/framework/v3_0_25_p2_40357694.out"
    ],
    "case_id": "v3-0-25-p1-aux-capacity-plateau-40329128",
    "category": "incident",
@@ -1251,7 +1258,8 @@
    "artifact_paths_expected": [
     "results/framework/merged_iterv3_0_25_p2/train/images",
     "results/framework/v3_0_28_safety_40612856.out",
-    "results/framework/mega_iter*/train*/results.csv"
+    "results/framework/mega_iter*/train*/results.csv",
+    "results/framework/v3_0_28_pretrain_40612870.out"
    ],
    "case_id": "v3-0-28-holdout-leak-retraction-0910",
    "category": "incident",
@@ -1277,7 +1285,7 @@
    "signals_expected": [
     "none"
    ],
-   "title": "RETRACTION: 0.910 was memorisation — 2,313 holdout copies were inside the training set",
+   "title": "RETRACTION: 0.910 was memorisation \u2014 2,313 holdout copies were inside the training set",
    "version_tag": "v3.0.28"
   },
   {
@@ -1285,7 +1293,8 @@
    "artifact_paths_expected": [
     "results/framework/v3_0_28_safety_40612856.out",
     "sacct -j 40612856",
-    "results/framework/mega_iter*/train*/results.csv"
+    "results/framework/mega_iter*/train*/results.csv",
+    "results/framework/v3_0_29_safety_long_40655361.out"
    ],
    "case_id": "v3-0-28-safety-walltime-40612856",
    "category": "incident",
@@ -1469,7 +1478,8 @@
   {
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
-    "results/framework/v3_0_29_rfdetr_40797172.out"
+    "results/framework/v3_0_29_rfdetr_40797172.out",
+    "results/framework/v3_0_29_rfdetr_40803244.out"
    ],
    "case_id": "v3-0-29-rfdetr-posembed-768-40797172",
    "category": "incident",
@@ -1535,7 +1545,8 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/v3_0_30_jobD_40800343.out",
-    "results/framework/dataset_registry.json"
+    "results/framework/dataset_registry.json",
+    "results/framework/v3_0_30_jobD_40803346.out"
    ],
    "case_id": "v3-0-30-5-jobd-harvest-silently-dead-40800343",
    "category": "incident",
@@ -1693,7 +1704,8 @@
    "artifact_paths_expected": [
     "results/framework/v3_0_32_yolo26x_cumulative_40839159.out",
     "sacct -j 40839159",
-    "results/framework/mega_iter*/train*/results.csv"
+    "results/framework/mega_iter*/train*/results.csv",
+    "results/framework/v3_0_32_pyco_eval_40877439.out"
    ],
    "case_id": "v3-0-32-cumulative-walltime-3x-40839159",
    "category": "incident",
@@ -1726,7 +1738,10 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/v3_0_30_dashboard_server_40770062.out",
-    "sacct -j 40770062"
+    "sacct -j 40770062",
+    "results/framework/v3_0_30_dashboard_server_40839165.out",
+    "results/framework/v3_0_30_jobD_40803346.out",
+    "results/framework/v3_0_30_jobD_40877440.out"
    ],
    "case_id": "v3-0-31-selfchain-missed-at-walltime",
    "category": "incident",
@@ -1921,7 +1936,9 @@
    "artifact_paths_expected": [
     "results/framework/v3_0_38_rfdetr_seed1_40912927.out",
     "results/framework/v3_0_38_rfdetr_seed2_40912927.out",
-    "results/framework/figures_data.json"
+    "results/framework/figures_data.json",
+    "results/framework/v3_0_31_rfdetr_large_40839152.out",
+    "results/framework/v3_0_34_x2_large_100ep_40878511.out"
    ],
    "case_id": "v3-0-38-a-premature-ceiling-claim",
    "category": "incident",
@@ -2393,7 +2410,8 @@
    "artifact_paths_expected": [
     "results/framework/m1_merged_m1cur_s*_44224997.out",
     "results/framework/dinov2_curator/slug_scores.json",
-    "results/framework/s2_dino_scores_44225271.out"
+    "results/framework/s2_dino_scores_44225271.out",
+    "results/framework/m1_merged_m1cur_s3_44228844.out"
    ],
    "case_id": "v3-22-5-dino-gate-silent-noop",
    "category": "incident",
@@ -2428,7 +2446,10 @@
    "artifact_paths_expected": [
     "results/framework/m1_merged_m1raw_s*_44224995.out",
     "results/framework/mega_iterm1_raw_s101/train*/results.csv",
-    "sacct -j 44224995"
+    "sacct -j 44224995",
+    "results/framework/m1_merged_m1cur_s3_44234063.out",
+    "results/framework/m1_merged_m1raw_s3_44225260.out",
+    "results/framework/m1_merged_m1raw_s3_44234060.out"
    ],
    "case_id": "v3-22-7-raw-tier-75h-on-v100",
    "category": "incident",
@@ -2649,7 +2670,8 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/cluster_actions.jsonl",
-    "~/.round_scheduler.json"
+    "~/.round_scheduler.json",
+    "results/framework/m1_merged_rndtrain_s1_44278259.out"
    ],
    "case_id": "v3-22-14-inprocess-state-orphaned-job",
    "category": "incident",
@@ -2774,7 +2796,8 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/sample_audits/project_agml__cotton_weed_detection.json",
-    "results/framework/dataset_registry.json"
+    "results/framework/dataset_registry.json",
+    "results/framework/s1_sample_audit_44294276.out"
    ],
    "case_id": "v3-22-17-cotton-weed-subpixel-boxes",
    "category": "incident",
@@ -2806,7 +2829,8 @@
    "artifact_paths_expected": [
     "results/framework/s3_mamba_s1_44323304.out",
     "results/framework/s3_mamba_s*_44325279.out",
-    "sacct -j 44323304"
+    "sacct -j 44323304",
+    "results/framework/s3_mamba_t_44323304.out"
    ],
    "case_id": "v3-22-20-mamba-fork-trainer-unusable",
    "category": "incident",
@@ -2966,7 +2990,11 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "docs/PLAN_COMPLIANCE_AUDIT.md",
-    "sacct -j 44275211,44280678"
+    "sacct -j 44275211,44280678",
+    "results/framework/mamba_build3_44275211.out",
+    "results/framework/mamba_build4_44280678.out",
+    "results/framework/s3_mamba_smoke_44325279.out",
+    "results/framework/s3_mamba_t_44323304.out"
    ],
    "case_id": "v3-22-15-cluster-etiquette-skipped",
    "category": "incident",
@@ -3002,7 +3030,8 @@
     "results/framework/s3_mamba_s*_44351282.out",
     "results/framework/s3_y11nsc_s*_44368952.out",
     "results/framework/figures_data.json",
-    "results/framework/s3_*.json"
+    "results/framework/s3_*.json",
+    "results/framework/s3_y11n_s3_44323305.out"
    ],
    "case_id": "v3-22-23-mamba-init-confound",
    "category": "incident",
@@ -3196,7 +3225,9 @@
    "artifact_paths_expected": [
     "results/framework/s3_tta_ceiling/*.json",
     "weed_optimizer_framework/tools/wbf_tta_eval.py",
-    "results/framework/cwd12_sealed.yaml"
+    "results/framework/cwd12_sealed.yaml",
+    "results/framework/s3_ttaE_44463922.out",
+    "results/framework/s3_tta_44463762.out"
    ],
    "case_id": "v3-24-4-wbf-tta-class-order-permuted",
    "category": "incident",
@@ -3257,7 +3288,9 @@
    "artifact_paths_expected": [
     "results/framework/s3_tta_ceiling/plain_s102.json",
     "results/framework/s3_tta_ceiling/ultralytics_val_s102.json",
-    "results/framework/s3_tta_ceiling/summary.json"
+    "results/framework/s3_tta_ceiling/summary.json",
+    "results/framework/s3_ttaE_44463922.out",
+    "results/framework/s3_tta_44463762.out"
    ],
    "case_id": "v3-24-4-matcher-offset-would-have-masqueraded-as-tta",
    "category": "incident",
@@ -3657,9 +3690,6 @@
     "results/framework/m1_merged_rndtrain_s1_44767709.out",
     "sacct -j 44727703,44767709",
     "results/framework/mega_iterm1_curated_s101/train*/results.csv",
-    "results/framework/m1_curated_seed101_44727703.json",
-    "results/framework/m1_curated_seed101_44767709.json",
-    "results/framework/m1_curated_seed101.json",
     "results/framework/dataset_registry.json",
     "~/.round_scheduler.json"
    ],
@@ -3680,7 +3710,7 @@
     "44727703",
     "44767709"
    ],
-   "notes": "DEV CASE per the plan: excluded from every reported number. The job-scoped artifact does NOT exist for these two runs (pre-WP1 the writer ran only at the end), which is itself part of what makes the case hard. The two m1_curated_seed101_<jobid>.json paths are listed so their absence is on the record rather than nowhere; the recipe these runs used is m1_curated_seed101.json, which run_m1_merged_seeds.sh writes at the END of a run and which therefore belongs to the last run of this tier and seed that finished, not to either of these two. Read it as the recipe (tier, epochs, imgsz, min_dino_score), never as this run outcome.",
+   "notes": "DEV CASE per the plan: excluded from every reported number. The job-scoped artifact does NOT exist for these two runs (pre-WP1 the writer ran only at the end), which is itself part of what makes the case hard.",
    "one_line_symptom": "Job 44727703 hit the walltime at epoch 24 of 60 and was recorded TIMEOUT; the next tick resubmitted the identical command, which failed at epoch 16; two failures tripped the stop-loss.",
    "provenance_guess": "raw",
    "provenance_reason": "the two .out files, the sacct rows and the partial results.csv are the newest cluster artifacts of the incident era and are the whole reason WP2 exports before new jobs overwrite them.",
@@ -3763,7 +3793,8 @@
    "artifact_paths_expected": [
     "results/framework/m1_merged_*_45290759.out",
     "results/framework/dataset_registry.json",
-    "results/framework/mega_iter*job45290759/train/weights/best.pt"
+    "results/framework/mega_iter*job45290759/train/weights/best.pt",
+    "results/framework/_brain/weed/trace/smoke_timecap_45290759.jsonl"
    ],
    "case_id": "v3-25-3-probe-repointed-campaign-state-45290759",
    "category": "incident",
@@ -3885,7 +3916,9 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/m1_*_45227822.json",
-    "sacct -j 45227822"
+    "sacct -j 45227822",
+    "results/framework/arrtest_45227822_2.out",
+    "results/framework/arrtest_45227822_3.out"
    ],
    "case_id": "wp1-array-jobid-key-would-detach-metric",
    "category": "incident",
@@ -3917,7 +3950,8 @@
    "actor_who_corrected": "assistant",
    "artifact_paths_expected": [
     "results/framework/model_deploy_45197085.out",
-    "results/framework/model_deploy/*.json"
+    "results/framework/model_deploy/*.json",
+    "results/framework/model_deploy_45198752.out"
    ],
    "case_id": "wp1-qwen38-deploy-404-old-ollama-45197085",
    "category": "incident",
@@ -3980,7 +4014,9 @@
    "actor_who_corrected": "none",
    "artifact_paths_expected": [
     "results/framework/m1_raw_seed101.json",
-    "results/framework/m1_merged_m1raw_s1_44234060.out"
+    "results/framework/m1_merged_m1raw_s1_44234060.out",
+    "results/framework/m1_merged_m1cur_s3_44234063.out",
+    "results/framework/m1_merged_m1raw_s3_44234060.out"
    ],
    "case_id": "ctrl-cottonweed-holdout-in-merge-accounting",
    "category": "false-alarm-control",
@@ -4012,7 +4048,8 @@
   {
    "actor_who_corrected": "none",
    "artifact_paths_expected": [
-    "results/framework/v3_0_43_brain_harvest_*.out"
+    "results/framework/v3_0_43_brain_harvest_*.out",
+    "results/framework/m1_merged_rndtrain_s1_44727703.out"
    ],
    "case_id": "ctrl-socks-github-skip-chronic",
    "category": "environment-control",
@@ -4350,7 +4387,8 @@
     "results/framework/m1_merged_m1raw_s1_44234060.out",
     "results/framework/m1_raw_seed101.json",
     "results/framework/mega_iterm1_raw_s101/train/results.csv",
-    "sacct -j 44234060"
+    "sacct -j 44234060",
+    "results/framework/m1_merged_m1raw_s3_44234060.out"
    ],
    "case_id": "hc-m1-raw-s101-44234060",
    "category": "healthy-control",
@@ -4381,7 +4419,8 @@
    "artifact_paths_expected": [
     "results/framework/m1_merged_m1raw_s2_44234060.out",
     "results/framework/m1_raw_seed102.json",
-    "sacct -j 44234060_2"
+    "sacct -j 44234060_2",
+    "results/framework/m1_merged_m1raw_s3_44234060.out"
    ],
    "case_id": "hc-m1-raw-s102-44234060",
    "category": "healthy-control",
@@ -4444,7 +4483,8 @@
     "results/framework/m1_merged_m1cur_s1_44234063.out",
     "results/framework/m1_curated_seed101.json",
     "results/framework/mega_iterm1_curated_s101/train/results.csv",
-    "sacct -j 44234063"
+    "sacct -j 44234063",
+    "results/framework/m1_merged_m1cur_s3_44234063.out"
    ],
    "case_id": "hc-m1-curated-s101-44234063",
    "category": "healthy-control",
@@ -4475,7 +4515,8 @@
    "artifact_paths_expected": [
     "results/framework/m1_merged_m1cur_s2_44234063.out",
     "results/framework/m1_curated_seed102.json",
-    "sacct -j 44234063_2"
+    "sacct -j 44234063_2",
+    "results/framework/m1_merged_m1cur_s3_44234063.out"
    ],
    "case_id": "hc-m1-curated-s102-44234063",
    "category": "healthy-control",
@@ -4537,7 +4578,8 @@
    "artifact_paths_expected": [
     "results/framework/s3_tier_0_44397807.out",
     "results/framework/s3_tier0.json",
-    "sacct -j 44397807_0"
+    "sacct -j 44397807_0",
+    "results/framework/s3_tier_3_44397807.out"
    ],
    "case_id": "hc-ladder-core0-44397807",
    "category": "healthy-control",
@@ -4567,7 +4609,8 @@
    "actor_who_corrected": "none",
    "artifact_paths_expected": [
     "results/framework/s3_tier_1_44397807.out",
-    "results/framework/s3_tier1.json"
+    "results/framework/s3_tier1.json",
+    "results/framework/s3_tier_3_44397807.out"
    ],
    "case_id": "hc-ladder-core5k-44397807",
    "category": "healthy-control",
@@ -4597,7 +4640,8 @@
    "actor_who_corrected": "none",
    "artifact_paths_expected": [
     "results/framework/s3_tier_2_44397807.out",
-    "results/framework/s3_tier2.json"
+    "results/framework/s3_tier2.json",
+    "results/framework/s3_tier_3_44397807.out"
    ],
    "case_id": "hc-ladder-core15k-44397807",
    "category": "healthy-control",
@@ -4657,7 +4701,8 @@
    "actor_who_corrected": "none",
    "artifact_paths_expected": [
     "results/framework/s3_y11n_s1_44323305.out",
-    "results/framework/s3_yolo11n_s101.json"
+    "results/framework/s3_yolo11n_s101.json",
+    "results/framework/s3_y11n_s3_44323305.out"
    ],
    "case_id": "hc-s3-yolo11n-s101-44323305",
    "category": "healthy-control",
@@ -4687,7 +4732,8 @@
    "actor_who_corrected": "none",
    "artifact_paths_expected": [
     "results/framework/s3_y11n_s2_44323305.out",
-    "results/framework/s3_yolo11n_s102.json"
+    "results/framework/s3_yolo11n_s102.json",
+    "results/framework/s3_y11n_s3_44323305.out"
    ],
    "case_id": "hc-s3-yolo11n-s102-44323305",
    "category": "healthy-control",
@@ -4747,7 +4793,8 @@
    "actor_who_corrected": "none",
    "artifact_paths_expected": [
     "results/framework/s3_mamba_s1_44351282.out",
-    "results/framework/s3_mamba_s101.json"
+    "results/framework/s3_mamba_s101.json",
+    "results/framework/s3_mamba_s3_44351282.out"
    ],
    "case_id": "hc-s3-mamba-s101-44351282",
    "category": "healthy-control",
@@ -4777,7 +4824,8 @@
    "actor_who_corrected": "none",
    "artifact_paths_expected": [
     "results/framework/s3_mamba_s2_44351282.out",
-    "results/framework/s3_mamba_s102.json"
+    "results/framework/s3_mamba_s102.json",
+    "results/framework/s3_mamba_s3_44351282.out"
    ],
    "case_id": "hc-s3-mamba-s102-44351282",
    "category": "healthy-control",
@@ -5020,7 +5068,8 @@
    "artifact_paths_expected": [
     "results/framework/m1_merged_rndtrain_s1_45326516.out",
     "results/framework/m1_curated_seed101_45326516.json",
-    "results/framework/_brain/weed/trace/*_45326516.jsonl"
+    "results/framework/_brain/weed/trace/*_45326516.jsonl",
+    "results/framework/mega_iterrnd8_train/job45326516/results.csv"
    ],
    "case_id": "hc-wp1-loop-restart-45326516",
    "category": "healthy-control",

@@ -151,7 +151,7 @@
   "v3-9-2-dataset-delete-any-owner"
  ],
  "rule": "dev = every case dated on or before 2026-08-25, plus every case dated 2026-08-29 (the walltime pair that is the worked example and is therefore never reported), plus the explicitly listed ids []; test = every other case, incidents and healthy controls alike, so each side carries its own false-alarm denominator. Assignment is a pure function of (date, case_id) and is recomputed by `corpus.py freeze --dry-run`. sha256 is taken over the canonical JSON of [[case_id, bundle.sha256, sha256 of truth.json bytes], ...] sorted by case_id.",
- "sha256": "26c14d65f4d9c9cf830cf88222d682a230b1453c241ef60fca4a9c391fe91c3f",
+ "sha256": "3a7e1823b4d33ffea947f2f7d9c1302bec406a9dd6a90a2c465bd335294a1ec7",
  "test": [
   "ctrl-crossdataset-explanations-killed",
   "hc-wp1-loop-restart-45326516",
