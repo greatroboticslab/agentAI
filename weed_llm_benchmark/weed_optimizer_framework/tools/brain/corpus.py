@@ -357,6 +357,18 @@ def canonical_json(obj):
                       ensure_ascii=True, default=str)
 
 
+def sha256_bytes(b):
+    """sha256 over raw bytes.
+
+    Stored copies are hashed as BYTES, never as text. A job log carries carriage
+    returns from progress bars, and text-mode reading normalises them, so hashing
+    the decoded string made 107 of 390 intact artifacts report as drifted. An
+    integrity check that cries wolf is one people learn to ignore, which is the
+    same failure as having none.
+    """
+    return hashlib.sha256(b if isinstance(b, bytes) else str(b).encode("utf-8")).hexdigest()
+
+
 def sha256_str(s):
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
@@ -871,7 +883,7 @@ def _build_case(case, root, cfg):
                         "read": info["read"], "present": True, "reason": None,
                         "section": sec, "excerpt": excerpt,
                         "stored_bytes": len(text.encode("utf-8")),
-                        "stored_sha256": sha256_str(text)})
+                        "stored_sha256": sha256_bytes(text.encode("utf-8"))})
         if info["lines"] == 0:
             report["warnings"].append("artifact %s is empty (0 lines)" % name)
         report["bytes_original"] += info["bytes"]
@@ -1074,8 +1086,9 @@ def _write_case(out_dir, payload, keep_raw=False):
     for rel, text in sorted(payload["stored"].items()):
         p = d / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        with open(str(p), "w", encoding="utf-8") as f:
-            f.write(text)
+        blob = text.encode("utf-8")
+        with open(str(p), "wb") as f:
+            f.write(blob)
         total += len(text.encode("utf-8"))
     if keep_raw:
         for name, src in sorted(payload["raw_copies"].items()):
@@ -1216,13 +1229,13 @@ def verify(out_dir=None, case=None, root=None):
                 rep["checked"] += 1
                 p = d / a["stored"]
                 try:
-                    with open(str(p), "r", encoding="utf-8") as f:
-                        text = f.read()
+                    with open(str(p), "rb") as f:
+                        blob = f.read()
                 except OSError as exc:
                     entry["problems"].append("%s: stored copy unreadable (%s)"
                                              % (a["artifact_id"], exc))
                     continue
-                if sha256_str(text) != a.get("stored_sha256"):
+                if sha256_bytes(blob) != a.get("stored_sha256"):
                     entry["problems"].append("%s: stored copy has drifted"
                                              % a["artifact_id"])
                 if root:

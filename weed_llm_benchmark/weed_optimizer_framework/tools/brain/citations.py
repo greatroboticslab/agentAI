@@ -98,6 +98,11 @@ TOO_SHORT = "quote_too_short"
 UNRESOLVED = "unresolved"
 MALFORMED = "malformed_finding"
 REJECTION_REASONS = (NO_QUOTE, TOO_SHORT, UNRESOLVED, MALFORMED)
+# reason -> the counter it increments. Written out rather than derived from
+# the reason string, so a new reason has to be given a counter deliberately
+# instead of landing in whichever bucket a name collision picks.
+_REASON_STAT = {NO_QUOTE: "no_quote", TOO_SHORT: "quote_too_short",
+                UNRESOLVED: "unresolved", MALFORMED: "malformed"}
 
 # --- thresholds ------------------------------------------------------------
 # Every number this module decides with lives in this table with the reason it
@@ -174,6 +179,25 @@ def _int_or_none(value):
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def line_number(value):
+    """An absolute line number from a bundle or truth row, or None.
+
+    An int, or a string of digits (a hand-assembled case may carry either, and
+    JSON round-trips through both). A fractional value is refused rather than
+    truncated: an address off by a line sends a reviewer to the wrong line of
+    the file, which is worse than having no address at all.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
 
 
 def thresholds():
@@ -275,7 +299,7 @@ def _rows_of(artifact_id, section_name, obj):
         else:
             skipped += 1
             continue
-        n = _int_or_none(num)
+        n = line_number(num)
         if n is None or n < 1 or not isinstance(text, str):
             skipped += 1
             continue
@@ -378,20 +402,25 @@ def _spans_lines(rows, needle, window):
     trimmed, so two kept lines can sit either side of an omitted range; reporting
     a span across that gap would name a stretch of file the model was never
     shown and could not have quoted.
+
+    Widths are tried shortest first, so the range reported is the smallest one
+    that contains the quote — the two lines a caller has to re-cite, not a
+    window that happens to enclose them.
     """
-    by_artifact = {}
+    groups = {}
     for row in rows:
-        by_artifact.setdefault(row.get("artifact_id"), []).append(row)
-    for _, group in sorted(by_artifact.items(), key=lambda kv: str(kv[0])):
-        group = sorted(group, key=lambda r: int(r.get("line") or 0))
-        for i in range(len(group)):
-            joined = _norm_of(group[i])
-            for j in range(i + 1, min(i + window, len(group))):
-                if int(group[j]["line"]) != int(group[j - 1]["line"]) + 1:
-                    break
-                joined = (joined + " " + _norm_of(group[j])).strip()
-                if needle in joined:
-                    return {"first": _address(group[i]), "last": _address(group[j])}
+        groups.setdefault(row.get("artifact_id"), []).append(row)
+    ordered = [sorted(g, key=lambda r: int(r.get("line") or 0))
+               for _, g in sorted(groups.items(), key=lambda kv: str(kv[0]))]
+    for width in range(2, window + 1):
+        for group in ordered:
+            for i in range(0, len(group) - width + 1):
+                block = group[i:i + width]
+                if any(int(block[k]["line"]) != int(block[k - 1]["line"]) + 1
+                       for k in range(1, width)):
+                    continue
+                if needle in " ".join(_norm_of(r) for r in block).strip():
+                    return {"first": _address(block[0]), "last": _address(block[-1])}
     return None
 
 
@@ -512,7 +541,7 @@ def _load_bearing_set(load_bearing_lines):
             continue
         name = item.get("artifact") if item.get("artifact") is not None \
             else item.get("artifact_id")
-        line = _int_or_none(item.get("line"))
+        line = line_number(item.get("line"))
         if not str(name or "").strip() or line is None or line < 1:
             bad.append("load-bearing entry needs an artifact name and a positive line")
             continue
@@ -541,9 +570,11 @@ def validate_verdict(bundle, verdict, load_bearing_lines=None):
       Collapsing them into a single "bad citations" number hides the third,
       which is the one that looks like success.
 
-    `ok` is True when the verdict is well-shaped and every finding resolved. It
-    says the verdict is checkable, never that it is correct: whether a finding
-    is right is decided against truth by the bench harness, not here.
+    `ok` is True when the verdict is well-shaped, every finding resolved, and
+    the validator itself had nothing to report - an unreadable bundle or a
+    misconfigured threshold makes it False, because a check that could not run
+    is not a pass. It says the verdict is checkable, never that it is correct:
+    whether a finding is right is decided against truth by the bench harness.
 
     `load_bearing_lines` is optional because a live round has no truth labels;
     when it is absent the load-bearing counts are None and `stats` says so,
@@ -609,7 +640,7 @@ def validate_verdict(bundle, verdict, load_bearing_lines=None):
             det = resolve_detail(bundle, quote, lines=rows)
             if not det["ok"]:
                 reason = det["reason"] or UNRESOLVED
-                stats[reason if reason in REJECTION_REASONS else UNRESOLVED] += 1
+                stats[_REASON_STAT.get(reason, "unresolved")] += 1
                 out["rejected"].append({
                     "index": i, "status": REJECTED, "reason": reason,
                     "detail": det["detail"],
@@ -679,7 +710,7 @@ def cited_addresses(verdict):
         for holder in holders:
             name = holder.get("artifact_id") if holder.get("artifact_id") is not None \
                 else holder.get("artifact")
-            line = _int_or_none(holder.get("line"))
+            line = line_number(holder.get("line"))
             if str(name or "").strip() and line is not None and line >= 1:
                 out.add((artifact_key(name), line))
     return out

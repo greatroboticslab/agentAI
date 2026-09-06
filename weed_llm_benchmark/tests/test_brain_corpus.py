@@ -607,4 +607,22 @@ ck("main with no command returns 2", corpus.main([]) == 2)
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)
+
+print("\n-- a stored copy is hashed as bytes, not as decoded text --")
+# A job log carries carriage returns from progress bars. Text-mode reading
+# normalises them, so hashing the decoded string reported 107 of 390 intact
+# artifacts as drifted on the first real export. The check has to survive a log
+# that is not newline-clean, or it is a check nobody will believe.
+_cr = pathlib.Path(_tmp) / "cr_case"
+(_cr / "artifacts").mkdir(parents=True, exist_ok=True)
+_raw = b"     1\tepoch 1/60\r     2\tepoch 2/60\r\n     3\tdone\n"
+_p = _cr / "artifacts" / "progress.out.txt"
+_p.write_bytes(_raw)
+ck("the fixture really is not newline-clean",
+   _raw != _p.read_text(encoding="utf-8").encode("utf-8"))
+ck("bytes hashing is stable across a read-back",
+   corpus.sha256_bytes(_p.read_bytes()) == corpus.sha256_bytes(_raw))
+ck("text hashing is not, which is why it is no longer used for stored copies",
+   corpus.sha256_str(_p.read_text(encoding="utf-8")) != corpus.sha256_bytes(_raw))
+
 print("\nALL PASS")

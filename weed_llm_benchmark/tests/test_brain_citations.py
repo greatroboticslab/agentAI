@@ -54,6 +54,13 @@ _tmp = tempfile.mkdtemp(prefix="brain_citations_")
 # Line numbers are the ones the file itself has. The first kept line is 8118, so
 # any implementation that answered with a position inside the `lines` array
 # would be caught by the very first assertion.
+#
+# The fixture is synthetic - the log text is the real shape but the line numbers
+# are chosen here, so this suite runs on a laptop with no cluster and no corpus.
+# VERIFY (the real case, from the cluster checkout):
+#   grep -n "DUE TO TIME LIMIT" results/framework/m1_merged_rndtrain_s1_44727703.out
+# that absolute line number is the one the inventory's load_bearing_lines must
+# carry for the exported case.
 OUT_ID = "m1_merged_rndtrain_s1_44727703.out"
 TIMEOUT_LINE = (
     "slurmstepd: error: *** JOB 44727703 ON v034 CANCELLED AT "
@@ -134,10 +141,14 @@ ck("sections are walked in the frozen order (out_tail before harvest)",
 bad_rows = citations.index_bundle({"sections": {"out_tail": {
     "artifact_id": "x.out",
     "lines": [[0, "line number zero is not an address"],
-              ["8123", "a string line number is not an address"],
-              [8124, None], "not a row", [8125, "kept"]]}}})
-ck("a row without a positive integer address is skipped",
-   len(bad_rows["lines"]) == 1 and bad_rows["lines"][0]["line"] == 8125)
+              [8124.5, "a fractional line number is not an address"],
+              [8124, None], "not a row",
+              ["8123", "a string of digits is the same address"],
+              [8125, "kept"]]}}})
+ck("a row without an absolute integer address is skipped",
+   [r["line"] for r in bad_rows["lines"]] == [8123, 8125])
+ck("a fractional line number is refused rather than truncated to 8124",
+   all(r["line"] != 8124 for r in bad_rows["lines"]))
 ck("skipped rows are counted with a reason, never silently dropped",
    bad_rows["skipped"] and bad_rows["skipped"][0]["rows"] == 4
    and "positive integer" in bad_rows["skipped"][0]["reason"])
@@ -406,6 +417,41 @@ ck("removing the override restores the pre-registered value",
    and citations.resolve(BUNDLE, POOL_LINE[:40]) is not None)
 ck("every threshold carries its justification",
    all(len(s["why"]) > 80 for s in citations.THRESHOLDS.values()))
+ck("every rejection reason has a counter of its own",
+   sorted(citations._REASON_STAT[r] for r in citations.REJECTION_REASONS)
+   == sorted(set(citations._REASON_STAT.values()))
+   and all(citations._REASON_STAT[r] in
+           citations.validate_verdict(BUNDLE, {"findings": []})["stats"]
+           for r in citations.REJECTION_REASONS))
+
+# The pre-registered thresholds.json is WP3's committed record and may not exist
+# yet; when it does, it must be honoured and a broken one must be reported.
+_pre = os.path.join(_tmp, "thresholds.json")
+citations._THRESHOLD_FILE = pathlib.Path(_pre)
+with open(_pre, "w", encoding="utf-8") as f:
+    json.dump({"citations": {"min_quote_chars": 30}}, f)
+citations._FILE_CACHE.update({"loaded": False, "values": {}, "error": None})
+ck("the pre-registered file overrides the code default",
+   citations.threshold("min_quote_chars") == 30
+   and citations.thresholds()["sources"]["min_quote_chars"] == "thresholds.json")
+os.environ["BRAIN_CITATION_MIN_QUOTE_CHARS"] = "50"
+ck("the environment still wins over the file, and says so",
+   citations.threshold("min_quote_chars") == 50
+   and citations.thresholds()["sources"]["min_quote_chars"].startswith("env:"))
+os.environ.pop("BRAIN_CITATION_MIN_QUOTE_CHARS")
+with open(_pre, "w", encoding="utf-8") as f:
+    f.write("{not json")
+citations._FILE_CACHE.update({"loaded": False, "values": {}, "error": None})
+ck("an unreadable threshold file is reported, not raised",
+   citations.threshold("min_quote_chars") == 20
+   and any("thresholds.json" in e for e in citations.thresholds()["errors"]))
+ck("and a verdict is then not ok, because the check could not run as registered",
+   citations.validate_verdict(BUNDLE, GOOD)["ok"] is False)
+os.remove(_pre)
+citations._FILE_CACHE.update({"loaded": False, "values": {}, "error": None})
+ck("with no file the code default stands",
+   citations.threshold("min_quote_chars") == 20
+   and citations.validate_verdict(BUNDLE, GOOD)["ok"] is True)
 
 
 # ---- the bench bridge sees the same address --------------------------------
@@ -417,6 +463,22 @@ ck("bench and this module agree on the minimum quote length",
    bench.MIN_QUOTE_CHARS == citations.threshold("min_quote_chars"))
 ck("bench rejects the fabricated quote too",
    bench.resolve_quote(BUNDLE, fabricated) is None)
+
+# A retrieval round puts real artifact lines in front of the model that are not
+# in the bundle. bench hands them to this module as `lines`; a validator that
+# ignored them would score every correct L4 citation as a fabrication.
+RETRIEVED = [{"artifact_id": "retrieved.out", "line": 500, "text": fabricated,
+              "section": "retrieved"}]
+ck("caller-supplied lines are searched instead of the bundle",
+   citations.resolve(BUNDLE, fabricated, lines=RETRIEVED)
+   == {"artifact_id": "retrieved.out", "line": 500, "matched": fabricated,
+       "section": "retrieved", "matches": 1, "ambiguous": False})
+ck("bench's retrieval delegation reaches them",
+   bench.resolve_quote(BUNDLE, fabricated,
+                       lines=citations.bundle_lines(BUNDLE) + RETRIEVED)
+   == {"artifact_id": "retrieved.out", "line": 500})
+ck("the pre-registered minimum still applies to a retrieved line",
+   citations.resolve(BUNDLE, fabricated[:10], lines=RETRIEVED) is None)
 
 
 # ---- end to end against a bundle corpus.py actually wrote ------------------

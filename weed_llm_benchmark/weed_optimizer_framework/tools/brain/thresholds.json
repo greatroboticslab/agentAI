@@ -1,0 +1,137 @@
+{
+  "_meta": {
+    "version": "wp3-thresholds/1",
+    "pre_registered": "2026-09-06",
+    "purpose": "Every number the deterministic supervision checks decide with, in one place, each with the reason it has the value it has. signals.py carries no compiled fallbacks: a key that is missing here makes its check report 'unknown' and name the missing key, because two copies of a pre-registered number drift and a drifted threshold silently rescores the whole benchmark.",
+    "read_by": ["weed_optimizer_framework/tools/brain/signals.py (the 'signals' block)", "weed_optimizer_framework/tools/brain/citations.py (the 'citations' block)"],
+    "resolution_order": "this file, then a dict passed to signals.detect(thresholds=...), then the environment (highest). An environment override may only change a key this file already declares; the file is the record of which thresholds exist at all.",
+    "env_convention": "BRAIN_SIGNAL_<KEY>, dots as underscores, upper-cased, value parsed as JSON then as a bare number: pool_growth.growth_fraction -> BRAIN_SIGNAL_POOL_GROWTH_GROWTH_FRACTION. citations.py names its own two overrides explicitly.",
+    "not_in_this_file": "Measurements, as opposed to chosen thresholds: the per-recipe sealed seed standard deviations (domain config 'noise_floor'), the SU envelope and per-round cap (domain config 'budget'), and the recipe parameters themselves (domain config 'round_params'). A threshold can be chosen; a measurement is read from the run that produced it.",
+    "changing_a_value": "Edit here and the next call picks it up (the file is cached on mtime, not on process start). A change after any model arm has been scored invalidates the comparison and must be recorded in the results file, which carries the effective values and their sources for exactly this reason."
+  },
+
+  "signals": {
+    "walltime_bound": {
+      "eta_fraction": {
+        "value": 0.95,
+        "why": "The projected total run time is compared with this fraction of the job's walltime. 0.95 is the value round_scheduler's in-flight check has warned at since v3.25.0, restated here so the live check and the replayed one cannot disagree. The margin absorbs the validation and checkpoint writing at the end of a run, which the per-epoch projection does not model. It is not what decided the case this signal exists for: jobs 44727703 and 44767709 projected about 29 h against a 12 h walltime, i.e. 2.4x."
+      },
+      "min_epoch_records": {
+        "value": 3,
+        "why": "Epoch records needed before the projection is trusted. The first epoch carries the dataset scan, the AMP check and warmup, so its elapsed time overstates every later epoch by minutes on a merged pool; three is the smallest count at which the mean is not dominated by it. At 8,583 iterations per epoch three records still land inside the first hour of a 12 h job, which is the whole point of projecting instead of waiting for the wall."
+      }
+    },
+
+    "epochs_truncated": {
+      "completed_fraction_floor": {
+        "value": 1.0,
+        "why": "Fire when epochs_completed / epochs_requested is below this. 1.0 means any shortfall at all, which is the pre-registered rule: a 60-epoch recipe that ran 24 under a time cap is a different recipe, and its metric does not belong in a table built from the full one. Lower it only for a campaign that deliberately trains to a time budget rather than to an epoch count, and record that in the results file."
+      }
+    },
+
+    "pool_growth": {
+      "growth_fraction": {
+        "value": 0.2,
+        "why": "Iterations per epoch above this fraction of the previous train's count fire the signal. 20 percent is the pre-registered trigger. The growth behind the 2026-08-29 double TIMEOUT was 6,246 to 8,583 iterations per epoch, i.e. 37 percent, so this fires about half a round before the failure it predicts. Much lower and it fires on a round that merely added one dataset, which is the normal state of a collection campaign."
+      },
+      "min_previous_iterations": {
+        "value": 100,
+        "why": "A previous train with fewer iterations per epoch than this is refused as a comparison base rather than divided by. The v3.25.3 walltime-cap smoke (a deliberate one-epoch probe) is the reason: measured against a probe's pool, every real round afterwards reads as thousands of percent of growth, and a signal that fires on everything is one people learn to scroll past."
+      }
+    },
+
+    "gate_noop": {
+      "stale_scores_grace_s": {
+        "value": 0,
+        "why": "How much older than the end of the round's own collect step the slug-score artifact may be before the gate is called stale. 0 is the pre-registered rule as written ('older than the collect End'). Raise it only to absorb skew between the lab's ledger clock and the cluster filesystem, and only knowing that the cost is missing a gate that scored the data of the round before this one."
+      },
+      "kept_fraction_max": {
+        "value": 1.0,
+        "why": "Kept slugs divided by scored slugs at or above this value is a gate that removed nothing. 1.0 is the exact no-op and is a statement about whether the gate ran at all; a value below 1.0 would instead be a judgement about how useful it was, which is a different question and not one an invariant should answer."
+      },
+      "max_unscored_in_merge": {
+        "value": 0,
+        "why": "How many slugs may enter a curated merge with no DINO score. Zero: one unscored slug makes the tier label wrong on every number that round produced, and the tier ladder (curated 0.8636 against raw 0.8599) is the comparison those numbers feed."
+      }
+    },
+
+    "stale_artifact": {
+      "grace_s": {
+        "value": 60,
+        "why": "An artifact may predate its step's start by this many seconds before it is reported. The mtime is written by the cluster filesystem and the step start comes from sacct or from the lab's ledger, which are different clocks; a minute absorbs that skew and Lustre's mtime granularity. It hides nothing real: the failures in this class are hours to weeks old, such as a results.csv from an earlier run or a three-week-old audit verdict read as current."
+      },
+      "sections": {
+        "value": ["results_csv", "slug_scores", "strategy", "registry_diff"],
+        "why": "The bundle sections whose mtime is compared with the step start: the artifacts a metric or a gate decision is actually read out of. 'trace' and 'out_tail' are deliberately absent because they are written as the job goes, so their mtime is the job's own and cannot be stale by construction; including them would add two guaranteed non-findings to every check."
+      }
+    },
+
+    "plateau": {
+      "noise_multiple": {
+        "value": 2.0,
+        "why": "The spread of the last N round metrics is compared with this multiple of the recipe's own sealed seed standard deviation. 2x is the campaign's significance rule (an effect below twice the seed std is noise), applied in the other direction: a spread under it means nothing measurable is moving. The seed stds themselves are measurements and live in each domain's config under noise_floor, never here."
+      },
+      "window": {
+        "value": 3,
+        "why": "How many of the most recent round metrics the spread is taken over. Three is the pre-registered window and the number the campaign has (scripted rounds #1-#3: 0.6019, 0.5919, 0.5951). Two cannot separate a trend from one bad round; four would delay the first possible verdict by a whole round, and a round is a day of cluster time."
+      }
+    },
+
+    "source_degraded": {
+      "min_previous_candidates": {
+        "value": 1,
+        "why": "How many candidates a source must have returned in an earlier round before its zero this round counts as a NEW degradation. One. A source that yielded nothing before cannot have degraded, and that is what keeps the chronic '[net] WARN: SOCKS proxy ... SKIPPING github' line at info: GitHub has been unreachable from the compute nodes since June, the collector is designed to skip it, and it sits inside the 2026-08-29 bundle, so escalating it would be a false alarm on the dev case itself."
+      }
+    },
+
+    "job_unknown": {
+      "max_consecutive_polls": {
+        "value": 3,
+        "why": "Consecutive polls that may return UNKNOWN before the signal fires. The scheduler polls once per 120 s tick, so three is about six minutes: long enough to ride out a slow or throttled sacct, short enough that a job stuck UNKNOWN does not hold its domain open for hours behind a banner that still reads green."
+      }
+    },
+
+    "budget": {
+      "campaign_fraction_warn": {
+        "value": 0.8,
+        "why": "Fraction of the SU envelope at which the campaign's spend is reported at warn. 0.8 leaves the last fifth for the runs already planned, so the signal arrives while re-planning is still possible rather than at the point where a run has to be abandoned mid-flight."
+      },
+      "campaign_fraction_crit": {
+        "value": 1.0,
+        "why": "Fraction of the SU envelope at which the spend is reported at crit. 1.0 is the envelope itself. There is no soft landing past it: service units spent are spent, and the next submission takes the campaign over budget rather than up to it."
+      }
+    },
+
+    "disk_low": {
+      "quota_headroom_warn_gb": {
+        "value": 300,
+        "why": "Project-quota headroom below this many GB is reported at warn. The quota is shared by the whole allocation, so exhausting it breaks every job in it and not only the one that filled it. 300 GB is roughly three rounds of merged copies plus their checkpoints, against about 1.0 TB of headroom measured on 2026-09-04. VERIFY: df -h on the project directory is the binding number; the projects summary reports a different, lower usage figure."
+      },
+      "quota_headroom_crit_gb": {
+        "value": 100,
+        "why": "Project-quota headroom below this many GB is reported at crit: less than one round of headroom, and less than a single large model pull (the deepseek-v3:671b store alone is 376 GB) would need."
+      },
+      "fs_free_warn_tb": {
+        "value": 0.5,
+        "why": "Whole-filesystem free space below this many TB is reported at info and never higher. The filesystem is not the binding number, the project quota is; letting a shared-filesystem figure raise a warning would teach people to ignore the signal that does bind."
+      }
+    },
+
+    "ownership_violation": {
+      "max_divergences": {
+        "value": 0,
+        "why": "How many mirror or supervisory divergences are tolerated. Zero: the staged corrections mirror either hashes to the ledger copy or it does not. Both registry incidents in this campaign were a single field written by a supervisor and reverted by a later writer's stale snapshot, so one is the number that matters."
+      }
+    }
+  },
+
+  "citations": {
+    "min_quote_chars": 20,
+    "span_window_lines": 3,
+    "_shape": "citations.py reads plain scalars from this block (see its THRESHOLDS table for the compiled defaults and the env var names); the reasons live in _why beside them, and keys starting with an underscore are ignored by both readers.",
+    "_why": {
+      "min_quote_chars": "Minimum characters in a quote before the validator will resolve it. A shorter quote resolves by accident: an out_tail section holds a few hundred log lines and fragments such as 'Epoch' or 'train' occur on most of them, so a short quote would ground any claim at all. 20 characters is about three log tokens. bench.py restates it as MIN_QUOTE_CHARS so committed verdicts can be re-scored without this package; the two must agree.",
+      "span_window_lines": "How many consecutive lines are joined when explaining why an unresolved quote did not resolve. A quote spanning lines is still refused (it has no single address), but saying so is worth more than 'not found', because the fix is to send two quotes."
+    }
+  }
+}

@@ -56,7 +56,15 @@ results/framework/llm_infer/
 results/framework/model_deploy/
 # Benchmark cases keep bundle.json + truth.json in git; the raw job artifacts
 # they cite are large and may carry unscrubbed paths, so they stay out.
-results/framework/supervision_bench/cases/*/artifacts/raw/
+# Benchmark cases: the LABELS are the contribution and are tracked
+# (truth.json, split.json, the inventory and the manifest). The bundles and
+# the raw artifacts they cite are 780 MB and live on the cluster filesystem;
+# every one of them is addressed by sha256 from the tracked side, and
+# `corpus.py verify` re-checks them there.
+results/framework/supervision_bench/cases/*/artifacts/
+results/framework/supervision_bench/cases/*/bundle.json
+results/framework/supervision_bench/adapted_commands/
+results/framework/supervision_bench/adapted.json
 results/framework/*.out
 
 # AppleDouble sidecars written when a mac writes to the shared filesystem
