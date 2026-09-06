@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "version": "wp5-su-rates/1",
+    "pre_registered": "2026-09-06",
+    "purpose": "SU accounting rates and the reconciliation tolerance for su_ledger.py, in one place with the reason each number has the value it has -- the same house style as thresholds.json. su_ledger.py carries no compiled rate fallback for a known family: a key this file does not declare makes su_for()/reconcile() name the gap rather than assume a number.",
+    "read_by": [
+      "weed_optimizer_framework/tools/brain/su_ledger.py"
+    ],
+    "resolution_order": "this file, then a dict passed to su_for(overrides=...) / rates(overrides=...), then the environment (BRAIN_SU_RATE_<KEY>, dots as underscores, upper-cased). An environment override may only change a key this file already declares.",
+    "not_in_this_file": "The per-campaign SU envelope and per-round cap (domain config 'budget', read by signals.py's budget check via db.DEFAULT_DOMAIN_CONFIG) -- those are one campaign's negotiated allocation, a measurement, not a hardware rate that applies to every job. su_ledger.remaining() takes that config as a caller-supplied argument rather than reading it from here.",
+    "changing_a_value": "Edit here; rates()/su_for() cache on this file's mtime, so a change is picked up on the next call with no restart. A rate change after an entry was already recorded does not retroactively rewrite that entry's stored SU -- reconcile() then reports the resulting drift against a fresh sacct pull instead of hiding it."
+  },
+  "rates": {
+    "h100": {
+      "su_per_gpu_hour": {
+        "value": 2.0,
+        "why": "Bridges-2 hardware/queue facts as briefed 2026-09-04: H100 nodes (w001-w010, both the whole-node GPU partition and GPU-shared) bill 2 SU per GPU-hour. This is the ground-truth rate the campaign's balance (11,005 SU as of 2026-09-04) is drawn against, restated here rather than compiled into su_ledger.py so the ledger and any operator's manual check read the same pre-registered number."
+      }
+    },
+    "v100": {
+      "su_per_gpu_hour": {
+        "value": 1.0,
+        "why": "Bridges-2 hardware/queue facts as briefed 2026-09-04: V100 allocations bill 1 SU per GPU-hour, half the H100 rate."
+      }
+    },
+    "unknown_gpu_fallback": {
+      "su_per_gpu_hour": {
+        "value": 2.0,
+        "why": "Charged when a GPU allocation carries a family that matches neither h100 nor v100 (a new node type, a typo'd AllocTRES, a family this file has not been updated for). Set to the higher of the two known rates so an unresolved family is never cheaper to record than the most expensive real hardware on the allocation, i.e. it never silently reads as free or discounted compute. su_for() still marks the resulting number unknown_rate:true and reconcile() lists the job by id, so the gap stays visible instead of folding into a total that looks clean."
+      }
+    }
+  },
+  "reconcile": {
+    "tolerance_pct": {
+      "value": 1.0,
+      "why": "The WP5 gate's own bar (docs/TIERED_SUPERVISION_EXECUTION.md): 'SU ledger for the last 20 jobs matches sacct within 1%.' Restated here rather than hardcoded in su_ledger.py so the gate check and an operator's manual reconcile() call are scored against the same pre-registered number. Applies per job, not only to the aggregate: two per-job errors that cancel to a correct-looking total must still fail this bar (TIERED_SUPERVISION_PLAN's reason for a per-job breakdown, not just a total)."
+    }
+  }
+}

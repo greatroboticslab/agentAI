@@ -1,0 +1,798 @@
+{
+  "_meta": {
+    "version": "wp5-policy-actions/1",
+    "pre_registered": "2026-09-06",
+    "purpose": "The catalogue of every action the platform can submit on the shared cluster account or the lab dashboard process, with the data policy.py needs to decide who may request it and at what cost: its risk tier, its parameter bounds, whether it can be undone, its SU-cost formula, its dry-run counterpart (if any) and which actor tiers may even ask. This is DATA, not code: policy.py loads it and never eval()s or exec()s any field in it, including 'template', which is descriptive metadata for a human or an integrator to render, not something this package runs.",
+    "read_by": [
+      "weed_optimizer_framework/tools/brain/policy.py"
+    ],
+    "not_in_this_file": "The risk model itself — what R0..R4 mean, which actor-tier prefixes exist, and the ceiling table (which tier may apply/propose/is refused at which risk) — is CODE in policy.py, the same choice db.py makes for _STEP_ALLOWED_SCRIPTS: 'a project owner patching config over HTTP therefore cannot introduce one.' If the ceiling table lived here, editing this file would be a privilege-escalation path (grant tier0 direct R4 by editing JSON). Only the action catalogue is data. Also not here: the SU-per-GPU-hour rates. They live in su_rates.json, read through su_ledger.su_for, so the price that gates an approval and the price that is later reconciled against sacct are one number.",
+    "action_id_source": "Every entry under 'restart_dashboard' .. 'dinov2_route_classes' is one row of _CLUSTER_ACTIONS in dashboard_server.py (v3.24.11, 30 entries, verified by parsing the dict literal) restated with governance metadata. 'round_collect' / 'round_filter' / 'round_train' are the three job-submitting steps of round_scheduler.py's loop (collect -> filter -> label -> train -> eval; label and eval never call _submit — label is recorded 'autolabel-in-collect', eval is parsed off the train artifact — so they need no submission row). 'quarantine_slug' and 'quarantine_delete_slug' are forward-declared for tools/quarantine.py's real 'mark' verb and its not-yet-built delete-and-purge sibling, because the WP5 spec's own adversarial gate ('a fake tier-1 verdict proposing an R3 quarantine-delete... an R4 dataset delete') names them by function, not by an existing button; corrections.py (a sibling work package) is the intended caller.",
+    "gpu_hours_source": "Every gpu_type/gpu_count/hours literal below was read from the target script's own #SBATCH header (grep on 2026-09-06) or, where a cluster action's sbatch_extra_args override it, from that override. Not guessed: run_v3_0_43_brain_harvest_oneshot.sh, run_s2_dino_scores.sh, run_m1_merged_seeds.sh, run_v3_0_43_download_known_slugs.sh, run_v3_0_43_topic_backfill.sh, run_v3_0_50_owl_preannotate.sh, run_v3_0_99_clean_train.sh, run_v3_0_36_dinov2_curator.sh, run_v3_0_52_dinov2_route.sh all request --gres=gpu:v100-32:1; the round-scheduler's own 'train' step is the one place that overrides to --gres=gpu:h100-80:1 (db.py DEFAULT_DOMAIN_CONFIG['steps']['train'], byte-identical to round_scheduler._WEED_STEPS['train']).",
+    "risk_classification_rule": "Applied uniformly so a reader can re-derive a label rather than trust it: R0 = the call changes no persisted state (a read, a listing, or an explicit dry-run that only counts). R1 = a local, immediately-reversible, no-cluster-cost state change (a cache clear, an idempotent metadata move). R2 = writes or generates a bounded, additive, recoverable artifact — including a routine GPU job up to about half a day — or mutates the authoritative registry in a way that adds or relabels rather than removes. R3 = an external side effect against a scarce or costly third-party resource (Roboflow's free-tier Version-generate quota, ~10/project/month), a job whose declared walltime is far above the routine round budget (clean_train_d's fixed 48 h, 4x a normal train step), an action that changes the shape of the campaign itself (harvest_full_round_e2e bumps the round and widens scope in one click) or the operational restart of the always-on server. R4 = the two calls in the real table whose own code comments say 'APPLY: delete ... files' / 'delete-junk --apply' against the authoritative registry or a hosted third-party store, with no undo path recorded anywhere in this codebase.",
+    "param_bound_types": "int/float bounds always declare both 'min' and 'max' — an undeclared side is not 'unbounded', it is a malformed row, because an unbounded numeric input is exactly the case this table exists to close off. 'enum' bounds declare 'value_type' ('int' or 'str') plus 'values'; the supplied value must match that Python type exactly (a string that reads as a number is refused, never coerced). 'str' bounds declare a 'pattern' the whole value must fullmatch; values are capped at 4096 raw characters before matching regardless of the pattern, as a cheap backstop against a pathological input even though the patterns themselves are simple and fixed.",
+    "est_su_formula_shapes": "{'fixed_su': <number>, 'why': str} for a call this table knows costs a fixed, already-measured amount (0 for anything that never touches a GPU). {'unknown': true, 'why': str} for a call whose SU cost is real but not separately metered by this table — the seven 'needs_cluster' subprocess actions that reach the cluster via an interactive SSH session rather than a dedicated sbatch allocation; claiming a number for these would be a guess, and a guessed SU cost is how a ledger silently stops matching sacct. {'gpu_type': str, 'gpu_count' | 'gpu_count_param': ..., 'hours' | 'hours_param': ..., ['hours_default': number], 'why': str} for a real sbatch job: gpu_count/hours are either a literal number or the name of a key to read out of the params dict passed to estimate_su(); hours_default is used only when hours_param names a key the caller did not supply."
+  },
+  "actions": {
+    "restart_dashboard": {
+      "template": "systemctl --user restart weed-dashboard (lab, current mode); legacy cluster-hosted fallback: sbatch run_v3_0_30_dashboard_server.sh then scancel the job this request is served from",
+      "param_bounds": {},
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A systemd restart of the always-on lab process, or a CPU-only dashboard-server resubmission in the legacy mode; neither requests a GPU."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "human"
+      ],
+      "description": "Interrupts the live process — the round-scheduler thread, any in-flight robot session, every open dashboard tab — for the ~25 s the service takes to come back. Reversible (the service returns on its own) but an operational side effect wide enough that the real handler already gates it on `_is_admin` with no propose path; this table keeps that by restricting allowed_tiers to human rather than only relying on the R3 ceiling, which would otherwise let tier-1/tier-2 queue a restart for approval."
+    },
+    "brain_harvest": {
+      "template": "sbatch --time={time_h}:00:00 --export=ALL,BRAIN_STRICT={strict},BRAIN_MAX_NEW={max_new},BRAIN_MAX_IMGS={max_imgs},BRAIN_DOMAIN={domain},PUSH_CAP=<per-domain cap> run_v3_0_43_brain_harvest_oneshot.sh",
+      "param_bounds": {
+        "time_h": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            1,
+            2,
+            4,
+            6,
+            8
+          ]
+        },
+        "strict": {
+          "type": "int",
+          "min": 0,
+          "max": 1
+        },
+        "max_new": {
+          "type": "int",
+          "min": 1,
+          "max": 50
+        },
+        "max_imgs": {
+          "type": "int",
+          "min": 100,
+          "max": 50000
+        },
+        "domain": {
+          "type": "str",
+          "pattern": "^[a-z0-9_]{1,40}$"
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "time_h",
+        "hours_default": 4.0,
+        "why": "The script's own #SBATCH --time is 04:00:00; the dashboard body may override it to one of the enum values on the CLI."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Finds and downloads NEW datasets into the corpus. Additive and reversible (a bad harvested slug is quarantined, never force-deleted by this action), so R2 rather than R3 despite the real GPU cost; the one-click, wider-scope 'harvest_full_round_e2e' variant that also bumps the round is the R3 sibling."
+    },
+    "download_known_slugs": {
+      "template": "sbatch run_v3_0_43_download_known_slugs.sh",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 4.0,
+        "why": "Script's own #SBATCH --time=04:00:00; the dashboard passes no override for this action."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Downloads every registry slug already marked status=known. Purely additive against already-vetted sources, same risk shape as brain_harvest."
+    },
+    "topic_backfill": {
+      "template": "sbatch run_v3_0_43_topic_backfill.sh",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 0.75,
+        "why": "Script's own #SBATCH --time=00:45:00."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Runs the local ollama model to backfill topic tags on already-downloaded slugs. Overwrites a derived metadata field only, not the underlying images or labels, so it is reversible by re-running."
+    },
+    "refresh_registry": {
+      "template": "clear in-memory registry/class-pool caches; delete results/framework/pool_cache/*.json",
+      "param_bounds": {},
+      "risk": "R1",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local cache invalidation on the dashboard process; no cluster job."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Deletes derived cache files so the next page load rebuilds them from the registry on disk. No source data changes and the cache rebuilds itself on first access afterward, which is the R1 pattern: reversible, in-bounds, no external or compute cost."
+    },
+    "roboflow_sync_cwd12_v1": {
+      "template": "python -m weed_optimizer_framework.tools.roboflow_sync bulk-upload --images downloads/cottonweeddet12/train/images --labels downloads/cottonweeddet12/train/labels --split train --batch green --workers 8 --per-species 50 --project cwd12-multiclass-v1",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A local subprocess against the Roboflow REST API from the dashboard node; no cluster GPU job."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Uploads the frozen cwd12 benchmark split to its dedicated Roboflow project. Fixed argv, no caller-supplied parameters; additive to one specific, already-scoped project."
+    },
+    "roboflow_sync_agent_v1": {
+      "template": "python -m weed_optimizer_framework.tools.roboflow_sync bulk-upload --images downloads/cottonweeddet12/train/images --labels downloads/cottonweeddet12/train/labels --split train --batch green --workers 8 --per-species 50 --project weed-crop-agent-dataset",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local subprocess, no cluster GPU job."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Same upload as roboflow_sync_cwd12_v1, targeted at the agent-harvested pool project instead of the frozen benchmark."
+    },
+    "build_buckets": {
+      "template": "python -m weed_optimizer_framework.tools.bucketer --out results/framework/buckets.json",
+      "param_bounds": {},
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local read-only audit over the existing registry; writes only a report file, no cluster job."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Recomputes an A/B/C bucket coverage report from data already on disk. No registry, corpus or third-party state changes — a report artifact only."
+    },
+    "roboflow_state_audit": {
+      "template": "python -m weed_optimizer_framework.tools.merge_roboflow_projects --out results/framework/roboflow_state.json",
+      "param_bounds": {},
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Read-only Roboflow API listing, written to a local report file."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Reads image/box/version counts per cwd12-<species> Roboflow project. No writes to Roboflow itself."
+    },
+    "owl_preannotate_one": {
+      "template": "sbatch run_v3_0_50_owl_preannotate.sh",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 2.0,
+        "why": "Script's own #SBATCH --time=02:00:00."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Produces OWL red bounding-box proposals for one species from an exemplar config. Writes new proposal files only; nothing existing is overwritten or removed."
+    },
+    "clean_train_d": {
+      "template": "sbatch --export=ALL,CLEAN_EPOCHS={epochs},CLEAN_DINO_MIN={dino_min} run_v3_0_99_clean_train.sh",
+      "param_bounds": {
+        "epochs": {
+          "type": "int",
+          "min": 1,
+          "max": 300
+        },
+        "dino_min": {
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 48.0,
+        "why": "Script's own #SBATCH --time=48:00:00, unaffected by the CLEAN_EPOCHS override (that shortens the recipe, not the walltime reservation)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "The DINO-gated clean-subset training probe. Its declared walltime (48 h on one GPU, 48 SU) is roughly four times the routine round_train step's default, which is the concrete reading of 'SU-heavy' this table uses to place a training job at R3 instead of R2."
+    },
+    "export_owl_exemplars": {
+      "template": "python -m weed_optimizer_framework.tools.export_owl_exemplars --source bank --per-species 5",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "unknown": true,
+        "why": "needs_cluster: True — runs as an interactive subprocess over the existing cluster session (reads object_bank), not a dedicated sbatch allocation, so this table has no declared walltime or GPU reservation to charge against. Reported unknown rather than 0 because the call does touch the cluster."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Writes per-species exemplar JSON configs that OWL pre-annotation consumes, from the existing object_bank. Generates new config files only."
+    },
+    "start_new_round": {
+      "template": "python -m weed_optimizer_framework.tools.rounds start-new",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "unknown": true,
+        "why": "needs_cluster: True, interactive subprocess — no dedicated sbatch walltime to charge against."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Bumps the authoritative registry's current_round and creates the new round's Roboflow project. Additive (a new round counter value plus an empty project); no existing round's data is touched."
+    },
+    "harvest_full_round_e2e": {
+      "template": "sbatch --time=04:00:00 --export=ALL,ROUND_BUMP=1,AUTO_SYNC=1,BRAIN_STRICT=1,BRAIN_STRICT_MIN_LABELS=50,BRAIN_MAX_NEW=8,BRAIN_MAX_IMGS=2000 run_v3_0_43_brain_harvest_oneshot.sh",
+      "param_bounds": {},
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 4.0,
+        "why": "sbatch_extra_args fixes --time=04:00:00 for this action regardless of body."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "One click that bumps the round, harvests for 4 h and auto-syncs survivors into the new round's Roboflow project — three of this table's other actions (start_new_round, brain_harvest, sync_newest_slugs-shaped auto-sync) fired together with no per-step review in between. Wider blast radius than any single one of them, which is why it sits at R3 rather than R2 even though its individual GPU cost matches plain brain_harvest."
+    },
+    "backfill_round_1": {
+      "template": "python -m weed_optimizer_framework.tools.rounds backfill",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "unknown": true,
+        "why": "needs_cluster: True, interactive subprocess — no dedicated sbatch walltime to charge against."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Tags pre-v3.0.74 slugs with harvest_round=1. Idempotent (re-running changes nothing once every slug is tagged) and additive to registry metadata only."
+    },
+    "dinov2_filter_round_1": {
+      "template": "python -m weed_optimizer_framework.tools.dinov2_round_filter --round 1 --threshold 0.6",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "unknown": true,
+        "why": "needs_cluster: True — the torch/DINOv2 scoring runs over the existing cluster session, not a dedicated sbatch allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Scores round 1's un-verified slugs and uploads survivors as a new, separately-versioned Roboflow project. The source slugs and any prior filtered version are untouched."
+    },
+    "train_yolo_round_1": {
+      "template": "python -m weed_optimizer_framework.tools.train_yolo_on_verified --round 1",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "unknown": true,
+        "why": "needs_cluster: True; the code comment marks this a placeholder stub, and even once real, it runs over the existing cluster session rather than a dedicated sbatch job this table can charge a walltime against."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Sends round 1's human-verified subset to the YOLO trainer. Currently a queued stub in the real code; kept at R2 because its intended effect (train a new checkpoint) matches round_train's risk shape, not because it is destructive."
+    },
+    "audit_registry_garbage": {
+      "template": "python -m weed_optimizer_framework.tools.audit_registry_garbage",
+      "param_bounds": {},
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Read-only listing; no --apply flag, no writes."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Lists registry slugs with labeled<100 or classes=0. The two-button design in the real code keeps this list-only call entirely separate from the APPLY variant below."
+    },
+    "audit_registry_garbage_APPLY": {
+      "template": "python -m weed_optimizer_framework.tools.audit_registry_garbage --apply",
+      "param_bounds": {},
+      "risk": "R4",
+      "reversible": false,
+      "est_su": {
+        "unknown": true,
+        "why": "needs_cluster: True; runs over the existing cluster session, and in any case its cost is not the point at R4 — its effect is."
+      },
+      "dry_run_variant": "audit_registry_garbage",
+      "allowed_tiers": [
+        "human"
+      ],
+      "description": "The real code's own comment: '--apply pops slugs from the authoritative registry + deletes disk files.' Nothing in this codebase restores a popped registry entry or a deleted file, so this is the R4 case almost verbatim — destructive, irreversible, human only, never queued for a model to trigger."
+    },
+    "sync_newest_slugs": {
+      "template": "python -m weed_optimizer_framework.tools.roboflow_sync sync-newest-slugs --project weed-crop-agent-dataset --folder weed_crop_agent_dataset --cap-per-slug 100 --skip-baselines",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local subprocess against the Roboflow API; no cluster GPU job."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Uploads the newest brain-harvested slugs (capped at 100 images each, cwd12 baselines excluded) to the agent-dataset Roboflow project. Additive and capped."
+    },
+    "sync_all_to_roboflow": {
+      "template": "python -m weed_optimizer_framework.tools.roboflow_sync sync-newest-slugs --project weed-crop-agent-dataset --folder weed_crop_agent_dataset --cap-per-slug 100",
+      "param_bounds": {
+        "domain": {
+          "type": "str",
+          "pattern": "^[a-z0-9_]{1,40}$"
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local subprocess against the Roboflow API; no cluster GPU job — R3 here is about scope, not compute cost."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "sync_newest_slugs' sibling with '--skip-baselines' removed, so it also pushes the cwd12 baseline images — a strictly wider, harder-to-predict blast radius against Roboflow's storage than the routine sync, which is what separates it from R2."
+    },
+    "owl_upload_proposals": {
+      "template": "python -m weed_optimizer_framework.tools.owl_upload_proposals --species Goosegrass --project weed-crop-agent-dataset --per-species 50",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "unknown": true,
+        "why": "needs_cluster: True — reads OWL proposal files produced on the cluster over the existing session; no dedicated sbatch walltime."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Uploads OWL red-box proposals for one species to Roboflow, tagged batch=red for human review. The real code itself already precision-gates and rejects a low-precision upload by default."
+    },
+    "dinov2_curate_registry": {
+      "template": "sbatch run_v3_0_36_dinov2_curator.sh",
+      "param_bounds": {
+        "domain": {
+          "type": "str",
+          "pattern": "^[a-z0-9_]{1,40}$"
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 4.0,
+        "why": "Script's own #SBATCH --time=04:00:00."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Builds the DINOv2 reference pool, scores every registry slug against it, and writes a ranking report. A scoring pass only — it changes no slug's files, only the derived score attached to it."
+    },
+    "roboflow_list_folders": {
+      "template": "python -m weed_optimizer_framework.tools.roboflow_sync list-folders",
+      "param_bounds": {},
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Read-only Roboflow API listing."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Lists Roboflow Project Folders and their member projects. No writes."
+    },
+    "roboflow_move_agent_to_folder": {
+      "template": "python -m weed_optimizer_framework.tools.roboflow_sync move-to-folder --project weed-crop-agent-dataset --folder weed_crop_agent_dataset",
+      "param_bounds": {},
+      "risk": "R1",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local subprocess against the Roboflow API; no cluster GPU job."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Moves one already-named project into one already-named folder. Idempotent, no images or labels touched, trivially reversible by moving it back — the same shape as refresh_registry, so R1."
+    },
+    "roboflow_generate_versions": {
+      "template": "python -m weed_optimizer_framework.tools.merge_roboflow_projects generate-versions --project weed-crop-agent-dataset",
+      "param_bounds": {},
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local subprocess against the Roboflow API; no cluster GPU job."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Generates a new Roboflow dataset Version. The real code's own comment: 'RATE-LIMITED on free tier (~10/proj/month)' — a scarce, shared external quota is exactly the R3 'external side effects' case, independent of GPU cost."
+    },
+    "roboflow_download_merge": {
+      "template": "python -m weed_optimizer_framework.tools.merge_roboflow_projects download-merge",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local subprocess pulling from the Roboflow API and writing to the cluster disk; no GPU job."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Pulls Roboflow-labeled data back and writes ground truth into the cwd12 multi-class training set on disk. Additive/overwrite-with-newer-labels, not a deletion."
+    },
+    "roboflow_delete_junk_dryrun": {
+      "template": "python -m weed_optimizer_framework.tools.roboflow_sync delete-junk",
+      "param_bounds": {},
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Counts only; no --apply, no deletion."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Counts how many images of verdict=junk datasets would be removed from Roboflow. No delete call is made."
+    },
+    "roboflow_delete_junk_apply": {
+      "template": "python -m weed_optimizer_framework.tools.roboflow_sync delete-junk --apply",
+      "param_bounds": {},
+      "risk": "R4",
+      "reversible": false,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Local subprocess against the Roboflow delete API; no GPU job — R4 here is about the delete's irreversibility, not compute cost."
+      },
+      "dry_run_variant": "roboflow_delete_junk_dryrun",
+      "allowed_tiers": [
+        "human"
+      ],
+      "description": "Removes verdict=junk dataset images from Roboflow to stop paying their monthly storage cost. The real code's comment notes ground truth is already exported to the cluster, but the Roboflow-hosted images themselves have no restore path in this codebase once deleted via the API — human only, matching audit_registry_garbage_APPLY."
+    },
+    "dinov2_route_classes": {
+      "template": "sbatch run_v3_0_52_dinov2_route.sh",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 1.0,
+        "why": "Script's own #SBATCH --time=01:00:00."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "Routes images weed-vs-not-weed and by species classification. Writes derived routing labels only."
+    },
+    "round_collect": {
+      "template": "sbatch --time={collect_time_h}:00:00 --export=ALL,BRAIN_MAX_NEW={max_new} run_v3_0_43_brain_harvest_oneshot.sh",
+      "param_bounds": {
+        "collect_time_h": {
+          "type": "int",
+          "min": 1,
+          "max": 24
+        },
+        "max_new": {
+          "type": "int",
+          "min": 1,
+          "max": 50
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "collect_time_h",
+        "hours_default": 10.0,
+        "why": "db.py DEFAULT_DOMAIN_CONFIG round_params.collect_time_h default is 10; the template has no --gres override so the script's own v100-32:1 default applies."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "The round-scheduler's own collect step — the same script as the brain_harvest dashboard action, rendered from db.py's per-domain 'steps' template instead of a dashboard body. Restricted to round-scheduler (the scripted-policy loop submits it every round with no per-request decision) and human (a manual rerun); a model proposing a harvest uses the brain_harvest row instead, which carries the dashboard's own bounds."
+    },
+    "round_filter": {
+      "template": "sbatch run_s2_dino_scores.sh",
+      "param_bounds": {},
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 8.0,
+        "why": "Script's own #SBATCH --time=08:00:00; the template has no format fields at all, so nothing about this step is caller-configurable."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "The round-scheduler's filter step: refreshes DINOv2 slug scores. Zero parameters by construction — any params dict for this action is refused outright, which is the correct behavior for a template with no {fields}."
+    },
+    "round_train": {
+      "template": "sbatch --array=1-1 --job-name=rndtrain --gres=gpu:h100-80:1 --time={train_time_h}:00:00 --export=ALL,TIER={tier},MIN_DINO_SCORE={min_dino_score},TRAIN_EPOCHS={epochs},TRAIN_TIME_H={train_time_cap_h},IMGSZ={imgsz},PATIENCE={patience},ITER_NAME={iter_name},BRAIN_DOMAIN={domain},BRAIN_TRACE={trace} run_m1_merged_seeds.sh",
+      "param_bounds": {
+        "tier": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "curated",
+            "raw"
+          ]
+        },
+        "min_dino_score": {
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0
+        },
+        "epochs": {
+          "type": "int",
+          "min": 1,
+          "max": 300
+        },
+        "train_time_h": {
+          "type": "int",
+          "min": 1,
+          "max": 24
+        },
+        "train_time_cap_h": {
+          "type": "float",
+          "min": 0.5,
+          "max": 24.0
+        },
+        "imgsz": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            320,
+            416,
+            512,
+            640,
+            768,
+            960,
+            1280
+          ]
+        },
+        "patience": {
+          "type": "int",
+          "min": 1,
+          "max": 100
+        },
+        "iter_name": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9_]{1,64}$"
+        },
+        "domain": {
+          "type": "str",
+          "pattern": "^[a-z0-9_]{1,40}$"
+        },
+        "trace": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9_./-]{0,200}$"
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "h100-80",
+        "gpu_count": 1,
+        "hours_param": "train_time_h",
+        "hours_default": 12.0,
+        "why": "This is the one template that overrides --gres to h100-80:1; db.py DEFAULT_DOMAIN_CONFIG round_params.train_time_h default is 12, the value TRAIN_TIME_CAP_H=10.8 (0.9x) is meant to sit under, per the v3.25.0 walltime-cap fix."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "The round-scheduler's train step — one curated-tier seed of run_m1_merged_seeds.sh against the sealed holdout. Kept at R2 ('train submit' is the WP5 spec's own R2 example) despite being the single most expensive routine step (up to 24 SU on an H100 at the bound ceiling), because it is bounded, additive (a new checkpoint, nothing prior overwritten) and is what the scripted loop already runs unattended every round; clean_train_d, an ad hoc 48 h probe outside the routine cadence, is the R3 comparison."
+    },
+    "quarantine_slug": {
+      "template": "python -m weed_optimizer_framework.tools.quarantine mark {slug} --reason {reason}",
+      "param_bounds": {
+        "slug": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9._-]{1,120}$"
+        },
+        "reason": {
+          "type": "str",
+          "pattern": "^[^;&|`$()<>\\x00-\\x1f]{1,400}$"
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A JSON registry field flip (quarantine.py's own docstring: 'keeps its files and registry entry'); no GPU, no external call."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "quarantine.py 'mark': the merge skips a quarantined source and the UI greys it out, but nothing is deleted and 'unmark' restores it exactly — the WP5 spec's own R2 example ('quarantine with reason'). Forward-declared here for corrections.py, which is expected to call this after a tier-1 artifact-cited verdict."
+    },
+    "quarantine_delete_slug": {
+      "template": "python -m weed_optimizer_framework.tools.quarantine mark {slug} --reason {reason} (then purge the slug's derived caches/embeddings so downstream scores are recomputed rather than served stale)",
+      "param_bounds": {
+        "slug": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9._-]{1,120}$"
+        },
+        "reason": {
+          "type": "str",
+          "pattern": "^[^;&|`$()<>\\x00-\\x1f]{1,400}$"
+        }
+      },
+      "risk": "R3",
+      "reversible": false,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A registry flip plus deleting derived cache files; no GPU, no external call — R3 here is about scope (it forces every downstream consumer of that slug's cached scores to recompute) rather than compute cost."
+      },
+      "dry_run_variant": "quarantine_slug",
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "human"
+      ],
+      "description": "The WP5 gate's own adversarial example: a stronger quarantine that also purges the slug's derived artifacts (DINOv2 embeddings, cached scores), which a plain quarantine_slug leaves in place. Marked reversible: false because purged derived caches are not restored by 'unmark' — they are simply recomputed next time something scores the slug, which is a real cost, not a free undo. This is exactly the case the spec calls out for the approval queue: a fake tier-1 verdict proposing this must land as needs_approval, never apply outright."
+    }
+  }
+}

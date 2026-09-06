@@ -8266,3 +8266,71 @@ one that rewrites every artifact is invisible.
 Verified: scrubbing a real progress line under a relative root now changes
 nothing and counts nothing; a refused prefix rewrites nothing and is reported; a
 genuine repository path is still replaced and still counted.
+
+## 2026-09-06 — v3.29.0 governance, the campaign digest, and the supervisor call path
+
+**`tools/brain/policy.py`** is the single choke point both the web API and the
+scheduler pass through. Its catalogue covers all 30 cluster actions and the three
+job-submitting scheduler steps, enumerated by parsing the live source rather than
+by a hand-kept list, so an action added without a policy row fails a test. The
+risk model itself is code, not data — R0 to R4, the five actor prefixes and the
+tier ceilings — for the same reason the step-script allow-list is code: a project
+owner editing config over HTTP must not be able to introduce a new privilege.
+`authorize` fails closed on an unknown action, an unknown actor, an out-of-bounds
+parameter, a missing bound declaration, or any internal exception; there is no
+default-allow path. An R4 request from a non-human is refused rather than queued,
+because a queued irreversible action is one impatient click from being taken.
+
+**`tools/brain/corrections.py` and `wal.py`** are the append-only correction
+channel: hash-chained records carrying actor, reason and a verbatim quote, with a
+correction from any non-human author refused outright when it has no quote. The
+chain distinguishes five corruption classes — a mutated field, a deleted record,
+a reordered pair, a truncated tail and a torn final line — and names the first bad
+sequence number for each. A truncated tail cannot be seen by a chain walk alone,
+so a small external checkpoint carries the high-water mark; a pending write-ahead
+intent is reported as such rather than as data loss, since one needs recovery and
+the other needs investigation. Single-writer is enforced with a non-blocking lock
+that refuses rather than degrading to writing anyway, and a static test asserts no
+other module opens the mirror for writing.
+
+**`tools/brain/su_ledger.py`** records and reconciles spend. Rates are 2 SU per
+H100 GPU-hour and 1 per V100, stated once. An unknown GPU family is charged at the
+higher known rate and flagged, never at zero; an unknown elapsed time contributes
+`unknown`, never zero; `.batch`, `.extern` and numbered step rows fold into their
+parent so a job is counted once, while array tasks stay separate because they are
+separate allocations. Reconciliation reports every job, not a total, because two
+opposite per-job errors can cancel into a total that looks correct.
+
+**Two duplications introduced by building these in parallel were removed rather
+than left in place.** `su_ledger` had its own copy of the two sacct layouts; it
+now delegates to the exporter's parser, and tests assert it declares no ruler or
+header reader of its own. That duplication is not hypothetical — one copy drifting
+from another is the entire v3.27.1 repair. `policy_actions.json` had its own copy
+of the SU rates; policy now resolves them through the ledger, so the price that
+gates an approval and the price later reconciled against `sacct` are one number,
+and a family the shared table cannot resolve is absent rather than priced at the
+ledger's fallback: understating recorded spend is a reporting error, but approving
+against a guessed price is the failure the gate exists to prevent.
+
+**`tools/brain/digest.py`** compresses a whole campaign for the rarely-consulted
+planner tier. Sections are budgeted and trimmed lowest-priority-first, never by
+cutting the middle out of the text, and whatever is dropped is named. It refuses
+rather than overflowing when the mandatory sections alone exceed the context. It
+is deterministic and reads no clock, so a plan can be reproduced from its inputs.
+A round measured from one seed is labelled as such and never set beside a mean
+and standard deviation as if comparable, and a pair of rounds closer than the
+recipe's sealed noise floor is reported as within noise rather than as a winner.
+`omit_levers` removes the pre-registered menu for the evaluated arm, because a
+planner handed the list of available levers is doing answer-key lookup.
+
+**`tools/brain/supervisor.py`** is the seam between a bundle and a model: endpoint
+discovery from a window heartbeat, treating one older than 180 s as gone; one
+OpenAI-compatible call that serves vLLM and ollama alike; shape checking; and
+citation checking delegated to the existing validator rather than re-implemented.
+Two properties matter for the measurement. The live prompt is built by the
+benchmark's own renderer, so a score describes a prompt production actually sends.
+And a prompt estimated above `num_ctx` is refused rather than sent — a reviewer
+that lets its evidence be silently truncated is committing the defect class it
+was built to detect. A provider outage is returned as a failed review, never
+raised, because an outage is a real supervision outcome and must not vanish from
+the matrix.

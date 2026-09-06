@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "version": "wp6-digest-budget/1",
+    "purpose": "Per-section token budgets and trim priorities for tools/brain/digest.py, pre-registered here so a budget change is a data edit a reviewer can diff, never a silent recompile. digest.py carries no compiled fallback for a section this file does not declare: an undeclared section makes build() refuse rather than guess a size for it.",
+    "priority_convention": "Higher priority number survives longer. When the assembled text does not fit num_ctx, whole non-mandatory sections are dropped lowest-priority-number first; a section marked mandatory is never dropped, only windowed. Two sections never compete for a drop because mandatory sections use a priority band (99-100) that is never read by the drop loop.",
+    "max_tokens_convention": "The size a section's own content is windowed down to (oldest+newest rows kept, the boring middle named and counted in 'omitted') before the whole-section drop loop ever runs. It bounds one section's growth against a long campaign; it does not bound the final digest, which is num_ctx.",
+    "changing_a_value": "A change here answers a different question about the campaign after the fact than it did before, exactly like signals.py's thresholds.json; record the change in the results file that cites a digest built under the new numbers."
+  },
+  "meta": {
+    "prompt_reserve_tokens": 220,
+    "min_head_rows": 1,
+    "min_tail_rows": 2,
+    "why": "prompt_reserve_tokens covers the planner prompt's own instructions and the JSON schema it must answer in, measured the same way evidence.py reserves 1,024 tokens against its (larger) per-step window; a campaign digest's own framing text is smaller, so the reserve is smaller too. min_head_rows=1 keeps the campaign's first recorded row (round 1, the earliest correction, the earliest incident) visible even under the tightest budget, because a planner that cannot see where a campaign started cannot tell a genuine trend from an artifact of when the window opened. min_tail_rows=2 keeps at least the last two rows because a single newest row cannot show a direction, only a value."
+  },
+  "sections": {
+    "identity": {
+      "priority": 100,
+      "mandatory": true,
+      "max_tokens": 380,
+      "why": "The domain, its target metric and the campaign's date range are the frame every other section is read against; a number in the trajectory or resources section is uninterpretable without it, and it cannot be reconstructed from the other sections if it is missing. It is a handful of facts, not a list that grows with the campaign, so its budget is fixed and small."
+    },
+    "state": {
+      "priority": 99,
+      "mandatory": true,
+      "max_tokens": 480,
+      "why": "This is the question the planner is actually being convened to answer. A digest that carries every incident and correction but drops the current state and the open question produces a plan for a problem nobody stated, which is the one failure mode this module exists to make structurally impossible."
+    },
+    "trajectory": {
+      "priority": 5,
+      "mandatory": false,
+      "max_tokens": 3200,
+      "why": "The measured outcome history is the primary evidence a plan is built on. It is ranked above incidents, corrections, recipe changes and resources among the droppable sections because a planner that knows the campaign is flat or improving, and by how much against the sealed noise floor, can still act on qualitative incident and correction summaries; a planner missing the trajectory is planning from anecdote."
+    },
+    "incidents": {
+      "priority": 4,
+      "mandatory": false,
+      "max_tokens": 2600,
+      "why": "Known failure modes (walltime kills, pool growth outrunning the epoch budget, a gate that filtered nothing) recur across a campaign — the 2026-08-29 double TIMEOUT is the case this whole supervision layer is built to have caught early. A planner blind to which signals already fired re-proposes work already shown to fail the same way."
+    },
+    "corrections": {
+      "priority": 3,
+      "mandatory": false,
+      "max_tokens": 2200,
+      "why": "What has already been tried, by whom, and whether the signal it targeted came back. The escalation policy itself treats 'the same signal recurs after two applied corrections' as an event serious enough to hand the domain to tier-2 (a human), so a planner missing this section can spend SU proposing a fix already on record as not holding."
+    },
+    "resources": {
+      "priority": 2,
+      "mandatory": false,
+      "max_tokens": 550,
+      "why": "The SU envelope bounds which of the planner's own proposals are even submittable, so it matters, but the section is a handful of running totals rather than a per-incident narrative and is cheap to render in full. It sits below corrections and incidents in the drop order because, unlike them, its absence does not make the planner repeat a mistake — it only means a first proposal might need a resubmission once the envelope is re-attached."
+    },
+    "recipe_changes": {
+      "priority": 1,
+      "mandatory": false,
+      "max_tokens": 1600,
+      "why": "Which pre-registered parameter moved, from what to what, and on whose write. Ranked as the most droppable of the seven required sections because most of what it reports is already visible, per correction, in the corrections section's target/old/new fields kept at a higher priority; this section adds the rendered-command view and the changes no correction record claims, which is confirmatory rather than the primary evidence."
+    },
+    "levers": {
+      "priority": 0,
+      "mandatory": false,
+      "max_tokens": 900,
+      "why": "The pre-registered menu of parameters a plan may propose changing. Dropped first under real budget pressure because, unlike the other sections, it carries no campaign history — it is a static reference the planner can be handed on its own in a follow-up call, and keeping it at the expense of even one row of the trajectory or the incidents would trade evidence for a fixed reference list. It is never present at all when omit_levers is set: an evaluation that hands a planner the answer key it is being scored on is measuring lookup, not planning."
+    }
+  }
+}
