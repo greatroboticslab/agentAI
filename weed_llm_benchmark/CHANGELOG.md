@@ -8617,3 +8617,28 @@ test 13, digest `26c14d65` → `3a7e1823`, and `verify` recomputes it.
 Recording a measurement that refuted the prediction it was run to confirm is the
 point of running it. The alternative was to publish a recall over 87 while
 believing the denominator was about to improve.
+
+## 2026-09-06 — v3.31.3 `/supervision/{domain}`, the page the routes were for
+
+One page showing everything the layer knows: which checks fired and on what
+evidence, the correction chain and whether it still verifies, compute spent
+against its envelope, which model is wired to each tier, the sealed lever menu
+with each lever's control, plan versions with their simulated flag, experiment
+proposals, the action catalogue with risk tiers, and a merged timeline.
+
+It is read-only for the same reason the routes are, and it says so at the top. A
+store the layer cannot see is written as *not available* with the reason, never
+drawn as an empty table — an empty table where a missing store belongs is the
+silence this layer exists to break. Right now that is most of the page, honestly:
+no tier is wired, no bundle has been built, no ledger written. The catalogue and
+the lever menu are populated because those are configuration, and they are what a
+person needs to answer "what is this thing allowed to do to my cluster account".
+
+Verified in a real browser on the lab, Firefox, as an authenticated admin: eight
+cards render at 1440 and at 390 wide, no console or page errors, nothing left
+loading, the body does not scroll sideways at either width, and an unauthenticated
+request gets 401. Two layout defects were found by looking at the screenshot
+rather than by reasoning about the markup: the 35-row action catalogue stretched
+every card in its row to its own height, and a `nowrap` added to fix the first
+pushed the lever controls out of the card. Long tables now scroll inside their own
+card on both axes, and prose cells wrap.

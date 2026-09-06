@@ -167,5 +167,32 @@ class TestSafety(Base):
         self.assertIn("rows", r)
 
 
+class TestPage(Base):
+    """The page exists so the demo can be driven from a browser and nothing else."""
+
+    def test_the_page_renders_for_a_domain(self):
+        r = A.page_supervision("weed")
+        body = r.body.decode("utf-8")
+        self.assertIn("Supervision", body)
+        self.assertIn('const DOMAIN = "weed"', body)
+
+    def test_the_page_reads_every_route_it_has(self):
+        body = A.page_supervision("weed").body.decode("utf-8")
+        for key in ("signals", "corrections", "su", "roles", "plans",
+                    "experiments", "policy", "timeline"):
+            self.assertIn('"%s"' % key, body, key)
+
+    def test_a_hostile_domain_cannot_break_out_of_the_page(self):
+        for hostile in ("../../etc", '"><script>alert(1)</script>', "we ed"):
+            body = A.page_supervision(hostile).body.decode("utf-8")
+            self.assertNotIn("<script>alert", body)
+            self.assertNotIn("..", body.split("const DOMAIN")[1][:80])
+
+    def test_the_page_says_when_a_store_is_missing_rather_than_drawing_it_empty(self):
+        body = A.page_supervision("weed").body.decode("utf-8")
+        self.assertIn("if(!data.available)", body)
+        self.assertIn("Not available", body)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

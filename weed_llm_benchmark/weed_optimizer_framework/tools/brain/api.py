@@ -324,6 +324,159 @@ def api_brain_timeline(domain: str):
             "sources_unavailable": missing, "checked_ts": time.time()}
 
 
+# --- the page ----------------------------------------------------------------
+
+_PAGE = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Supervision &middot; __DOMAIN__</title>
+<style>
+ body{margin:0;padding:1rem;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+ h1{margin:.2rem 0 .1rem}
+ .sub{opacity:.7;font-size:.85rem;margin-bottom:1rem}
+ .card{border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.9rem 1rem;
+       margin:0 0 1rem;background:rgba(255,255,255,.03)}
+ .card h3{margin:0 0 .5rem;font-size:1rem}
+ /* align-items:start stops one long card from stretching every other card in
+    its row to the same height: the action catalogue is 35 rows and left the
+    rest of the page as tall empty boxes. */
+ .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;
+       align-items:start}
+ table{width:100%;border-collapse:collapse;font-size:.85rem}
+ td,th{text-align:left;padding:.28rem .5rem;border-bottom:1px solid rgba(255,255,255,.08);
+       vertical-align:top}
+ th{opacity:.65;font-weight:600}
+ code{font-size:.8rem;word-break:break-all}
+ .pill{display:inline-block;padding:.05rem .5rem;border-radius:999px;font-size:.72rem;
+       border:1px solid currentColor}
+ .crit{color:#ff6b6b}.warn{color:#ffb454}.info{color:#7fb3ff}
+ .unknown{opacity:.55}.ok{color:#5fd08a}
+ .missing{opacity:.6;font-style:italic}
+ /* A long table scrolls inside its own card rather than growing the page.
+    Both axes: wide rows scroll sideways, long ones scroll down. */
+ .scroll{overflow-x:auto;max-height:22rem;overflow-y:auto}
+ /* Deliberately NOT white-space:nowrap. These cells carry prose -- a lever's
+    control, a check's reason -- and forcing them onto one line pushed the
+    later columns out of the card entirely, which reads as a broken table
+    rather than as a scrollable one. */
+ .scroll th{position:sticky;top:0;background:#0e1626}
+</style></head><body>
+<h1>Supervision &mdash; __DOMAIN__</h1>
+<div class="sub">Everything this layer knows about the campaign, read from the
+platform. Nothing on this page can change anything: corrections are written only
+by the scheduler's single-writer channel, and actions only through the policy
+gate.</div>
+<div class="grid" id="grid"></div>
+<script>
+const DOMAIN = "__DOMAIN__";
+const SECTIONS = [
+  ["signals",     "Deterministic checks"],
+  ["corrections", "Corrections applied"],
+  ["su",          "Compute spent"],
+  ["roles",       "Tiers and levers"],
+  ["plans",       "Plans"],
+  ["experiments", "Experiments"],
+  ["policy",      "What this layer may do"],
+  ["timeline",    "Timeline"]
+];
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function sev(s){return '<span class="pill '+esc(s)+'">'+esc(s)+'</span>';}
+function table(head, rows){
+  if(!rows.length) return '<div class="missing">nothing recorded yet</div>';
+  return '<div class="scroll"><table><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr>'
+    + rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('') + '</table></div>';
+}
+function render(key, data){
+  // A store the layer cannot see is said so, never drawn as an empty one: an
+  // empty table where a missing store belongs is exactly the silence this
+  // layer exists to break.
+  if(!data.available) return '<div class="missing">Not available &mdash; '+esc(data.reason)+'</div>';
+  if(key==="signals"){
+    const rows = (data.rows||[]).map(r=>[sev(r.severity), esc(r.signal),
+      esc(r.reason), (r.evidence&&r.evidence[0]) ?
+        '<code>'+esc(r.evidence[0].artifact_id)+':'+esc(r.evidence[0].line)+'</code>' : '']);
+    return '<div class="sub">'+data.n_fired+' firing, '+data.n_unknown+
+           ' could not run</div>'+table(["severity","check","why","evidence"], rows);
+  }
+  if(key==="corrections"){
+    const head = '<div class="sub">chain '+(data.chain_ok?'<span class="ok">verified</span>'
+      :'<span class="crit">BROKEN at seq '+esc(data.first_bad_seq)+'</span>')+
+      ', '+esc(data.chain_length)+' record(s)</div>';
+    return head + table(["seq","author","kind","target","reason"],
+      (data.rows||[]).map(r=>[esc(r.seq), esc(r.author), esc(r.kind),
+        esc(r.target&&r.target.key), esc(r.reason)]));
+  }
+  if(key==="su"){
+    const t = data.total||{};
+    return table(["measure","value"], [
+      ["spent (SU)", esc(t.su)], ["entries", esc(t.n_entries)],
+      ["unknown cost", esc(t.n_unknown)],
+      ["envelope", esc((data.budget||{}).su_envelope)],
+      ["remaining", esc(JSON.stringify(data.remaining||{}))]]);
+  }
+  if(key==="roles"){
+    const tiers = Object.entries(data.tiers||{}).map(([k,v])=>[esc(k),
+      v?esc(v):'<span class="missing">not wired</span>']);
+    const levers = (data.lever_menu||[]).map(l=>[esc(l.id), esc(l.control), esc(l.risk)]);
+    return '<div class="sub">policy: '+esc(data.policy)+'</div>'
+      + table(["tier","model"], tiers)
+      + '<div class="sub" style="margin-top:.7rem">Sealed levers an experiment may change</div>'
+      + table(["lever","control","risk"], levers);
+  }
+  if(key==="plans"){
+    return table(["version","backend","simulated","experiments"],
+      (data.rows||[]).map(r=>[esc(r.version), esc(r.backend),
+        r.simulated?'<span class="warn">simulated</span>':'no', esc(r.n_experiments)]));
+  }
+  if(key==="experiments"){
+    return table(["lever","status","verdict","n"],
+      (data.rows||[]).map(r=>[esc(r.lever||r.id), esc(r.status),
+        esc(r.verdict), esc(r.n)]));
+  }
+  if(key==="policy"){
+    return '<div class="sub">'+esc(data.n_actions)+' action(s) in the catalogue</div>'
+      + table(["action","risk","reversible","who may ask"],
+        (data.rows||[]).map(r=>[esc(r.action), esc(r.risk),
+          r.reversible?'yes':'<span class="warn">no</span>',
+          esc((r.allowed_tiers||[]).join(", "))]));
+  }
+  if(key==="timeline"){
+    const miss = (data.sources_unavailable||[]).length
+      ? '<div class="missing">not shown: '+esc(data.sources_unavailable.join("; "))+'</div>' : '';
+    return miss + table(["when","source","what"],
+      (data.events||[]).map(e=>[esc(e.ts), esc(e.source),
+        esc(JSON.stringify(e.row).slice(0,160))]));
+  }
+  return '<pre>'+esc(JSON.stringify(data,null,1)).slice(0,2000)+'</pre>';
+}
+const grid = document.getElementById("grid");
+SECTIONS.forEach(([key,title])=>{
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = '<h3>'+title+'</h3><div id="s_'+key+'">loading&hellip;</div>';
+  grid.appendChild(el);
+  fetch("/api/brain/"+encodeURIComponent(DOMAIN)+"/"+key)
+    .then(r=>r.json())
+    .then(d=>{document.getElementById("s_"+key).innerHTML = render(key,d);})
+    .catch(e=>{document.getElementById("s_"+key).innerHTML =
+      '<div class="crit">could not load: '+esc(e)+'</div>';});
+});
+</script></body></html>"""
+
+
+@router.get("/supervision/{domain}")
+def page_supervision(domain: str):
+    """One page showing everything the layer knows, for a browser and nobody else.
+
+    The whole checklist behind this work is that the demo can be driven from a
+    browser with no agent session anywhere: every tier runs as a platform
+    service, every result is a route, and this is the page those routes feed.
+    It is read-only for the same reason the routes are.
+    """
+    from fastapi.responses import HTMLResponse
+    dom = _domain(domain)
+    return HTMLResponse(_PAGE.replace("__DOMAIN__", dom))
+
+
 def mount(app, ctx: dict):
     _CTX.update(ctx)
     app.include_router(router)
