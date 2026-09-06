@@ -8403,3 +8403,34 @@ which sections each signal reads, because a second table would drift from the
 first the way the sacct readers did. The evaluation protocol records the amendment
 and the ceiling it implies — six of the twelve checks have no historical case they
 can run on, so their value is measured only on rounds recorded from now on.
+
+## 2026-09-06 — v3.30.0 when to escalate, and to whom
+
+`tools/brain/escalation.py` decides which tier a situation belongs to, over eleven
+rules in three families: any signal at warn or above, each step end and a periodic
+audit reach tier-1; a signal recurring after two applied corrections, a plateau
+spanning a recipe change, a code or design correction, low confidence on a
+real finding, and a budget breach reach tier-2; an R3 or R4 action, the stop-loss,
+an ownership violation and daily citation validity under 70 percent reach a person.
+
+Every trigger that fired is reported, not only the winning destination: a single
+answer that hides which of eleven rules produced it cannot be audited. A trigger
+whose input is missing returns `unknown` naming what was missing, and never counts
+as checked-and-clean. A missing threshold disables its own trigger and names the
+key rather than silently never firing. `decide` reads no clock, and a test inspects
+the source for clock calls rather than trusting the convention. An internal failure
+escalates to a person, because a broken escalator must fail toward someone rather
+than toward silence.
+
+**An E3 pause suspends tier-1 autonomy and explicitly leaves the deterministic
+signals running.** A supervisor that goes quiet at the moment its authority is
+suspended is how an incident stops being observed.
+
+**One disagreement was found and resolved rather than left.** The module routed a
+code or design correction to tier-2, while the benchmark's frozen scoring rubric
+records the destination for every code, design and plan correction in the campaign
+as a person — and the rubric is right, because in each of those cases a person had
+to act. Both are now true of the same correction and both fire: tier-2 is where
+such a change is asked for, a person is who makes it, and the higher destination
+wins. A test asserts the module and the rubric agree per correction class, so the
+two statements of one fact cannot drift apart.

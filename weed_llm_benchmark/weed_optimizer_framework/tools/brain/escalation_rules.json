@@ -1,0 +1,28 @@
+{
+  "_doc": "Thresholds for brain/escalation.py. Every value carries the reason it has that value, same convention as parallelism_rules.json. There are no compiled fallbacks: a key this file does not declare makes the corresponding trigger `unknown` and names the missing key, rather than falling back to a number nobody can see or audit. Two copies of a governing number drift, which is the reason this file exists instead of a constant in the module.",
+
+  "confidence_floor": {
+    "value": 0.5,
+    "reason": "A verdict less confident than a coin flip on a finding already at warn or above cannot be trusted to stop there: the finding is real by construction (its severity came from an artifact-grounded signal or a graded review, not from the confidence field itself), so a low-confidence read of a real finding needs the stronger tier's second opinion rather than tier-1 sitting on it."
+  },
+
+  "citation_validity_floor_pct": {
+    "value": 70,
+    "reason": "A verdict is only as trustworthy as the citations behind it -- the same reason WP5's correction channel refuses a model-authored override with no verbatim quote. A day where fewer than 7 in 10 of a tier's citations resolve to a real artifact line means that tier's citations can no longer be trusted at face value on any of that day's verdicts, which is a fact a human needs to see directly rather than one more automated tier re-grading them."
+  },
+
+  "recurring_after_corrections": {
+    "value": 2,
+    "reason": "One applied correction is an ordinary fix. A signal that still recurs after two independently-applied corrections means tier-1's authority over that parameter has already been spent twice without closing the issue -- that is the operational definition of a problem tier-1 cannot solve with another parameter edit, not a reason to try a third."
+  },
+
+  "plateau_min_rounds": {
+    "value": 3,
+    "reason": "Matches thresholds.json's plateau.window (3): that is the shortest span signals.py's own plateau check will call a plateau (the campaign's pre-registered window, rounds #1-#3: 0.6019, 0.5919, 0.5951), so this trigger cannot fire on a span shorter than the underlying detector supports. A plateau that also carries a recipe change means the last lever pulled did not move the metric -- a question about the recipe design, which is past tier-1's reach."
+  },
+
+  "periodic_audit_every_steps": {
+    "value": 4,
+    "reason": "Default cadence when a domain does not declare its own. Matches db.py's DEFAULT_DOMAIN_CONFIG brain.periodic_audit_every (4), so enabling periodic audits under a model tier is not a discontinuity from the cadence the scripted loop (policy=scripted) already runs today. A domain's own brain.periodic_audit_every, when given in context, overrides this default -- the file default only fills in the domains that have not set one."
+  }
+}
