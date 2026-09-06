@@ -8374,3 +8374,32 @@ halves. It is illegitimate once results are known. The flag makes which one is
 happening explicit, and the report states whether membership actually held rather
 than asserting that it did — including naming any case that moved and warning that
 a split redrawn after the fact is not a pre-registered split.
+
+## 2026-09-06 — v3.29.2 what the archive can support, measured before anything is scored
+
+Running the deterministic checks over the frozen corpus showed that most of the
+sections they read did not survive as archived artifacts. Across 162 cases:
+`out_tail` present in 98, `sacct` in 36, `results_csv` in 17, `strategy` in 10,
+`trace` in 7, `slug_scores` in 4, and `ledger`, `harvest`, `su`, `resources`,
+`corrections`, `plan` and `registry_diff` empty in every one. Of the 71 cases
+carrying an expected-signal label, 75 expected firings cannot be produced from the
+bundle at all, and only `walltime_bound` fires.
+
+The cause is archival rather than a defect in the rules: a per-round ledger
+snapshot and an SU reading live in the lab database that compute nodes cannot
+reach, a filesystem reading was never captured per job, and the correction channel
+and the plan did not exist when those incidents happened.
+
+Left unmeasured, this would have produced the wrong headline. A detector that
+cannot run answers `unknown`, which is not a miss; a recall computed over the
+expected labels counts it as one, understates the deterministic arm and inflates
+every model arm's margin over it — and that margin is the comparison the whole
+benchmark is for.
+
+`bench.py reachability` now reports both denominators and names every unreachable
+case. A signal counts as reachable exactly when its own detector returns something
+other than `unknown` on that bundle: the detector's answer, not a second table of
+which sections each signal reads, because a second table would drift from the
+first the way the sacct readers did. The evaluation protocol records the amendment
+and the ceiling it implies — six of the twelve checks have no historical case they
+can run on, so their value is measured only on rounds recorded from now on.

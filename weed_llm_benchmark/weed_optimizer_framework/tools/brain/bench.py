@@ -2528,6 +2528,114 @@ def load_model_entry(spec):
     return obj, ""
 
 
+def reachability(root=None):
+    """Which expected signals the ARCHIVE can actually support, case by case.
+
+    `signals_expected` in a case's truth says what a supervisor watching that
+    incident live should have seen. It is a statement about the campaign, not
+    about the corpus. Whether the exported bundle still carries the sections a
+    detector reads is a separate fact, and conflating the two silently rescores
+    the whole benchmark: a detector that cannot run on an archived bundle
+    reports `unknown`, which is not a miss, but a recall computed over the
+    expected labels counts it as one and inflates every model arm's margin over
+    the deterministic arm.
+
+    A signal is REACHABLE on a case when running it over that case's bundle
+    yields any severity other than `unknown`. The definition is deliberately the
+    detector's own answer rather than a second table of which sections each
+    signal reads -- a second table would drift from the first, and the whole
+    v3.27.1 repair was one such drift.
+
+    Returns
+        {"cases", "labelled", "expected", "reachable", "unreachable",
+         "by_signal": {name: {"expected", "reachable"}},
+         "sections": {name: {"present", "empty"}},
+         "unreachable_cases": [[case_id, signal], ...]}
+
+    The number to report alongside any recall is `reachable`: recall over
+    expected says how much of the campaign a detector set covers, recall over
+    reachable says how well it does on the evidence that survives. Both belong
+    in the paper, and neither substitutes for the other.
+    """
+    root = pathlib.Path(str(root or default_root()))
+    out = {"cases": 0, "labelled": 0, "expected": 0, "reachable": 0,
+           "unreachable": 0, "by_signal": {}, "sections": {},
+           "unreachable_cases": [], "errors": []}
+    for d in sorted((root / "cases").glob("*")):
+        bundle_path = d / "bundle.json"
+        if not bundle_path.is_dir() and not bundle_path.exists():
+            continue
+        try:
+            with open(str(bundle_path), "rb") as fh:
+                bundle = json.loads(fh.read().decode("utf-8"))
+        except Exception as e:
+            out["errors"].append("%s: %s" % (d.name, e))
+            continue
+        out["cases"] += 1
+        for name, value in (bundle.get("sections") or {}).items():
+            row = out["sections"].setdefault(name, {"present": 0, "empty": 0})
+            row["empty" if value in (None, [], {}, "") else "present"] += 1
+        try:
+            with open(str(d / "truth.json"), "rb") as fh:
+                truth = json.loads(fh.read().decode("utf-8"))
+        except Exception:
+            continue
+        exp = truth.get("signals_expected")
+        if isinstance(exp, str):
+            exp = [exp]
+        exp = [e for e in (exp or []) if e and e != "none"]
+        if not exp:
+            continue
+        out["labelled"] += 1
+        try:
+            got = {r["signal"]: r.get("severity")
+                   for r in _signals_module().detect_all(bundle)}
+        except Exception as e:
+            out["errors"].append("%s: detect failed: %s" % (d.name, e))
+            continue
+        for name in exp:
+            row = out["by_signal"].setdefault(name, {"expected": 0, "reachable": 0})
+            row["expected"] += 1
+            out["expected"] += 1
+            if got.get(name) not in (None, "unknown"):
+                row["reachable"] += 1
+                out["reachable"] += 1
+            else:
+                out["unreachable"] += 1
+                out["unreachable_cases"].append([d.name, name])
+    return out
+
+
+def _signals_module():
+    from . import signals
+    return signals
+
+
+def cmd_reachability(args):
+    rep = reachability(args.root)
+    print("corpus %s" % args.root)
+    print("  cases with a bundle       %d" % rep["cases"])
+    print("  cases carrying a label    %d" % rep["labelled"])
+    print("  expected signal firings   %d" % rep["expected"])
+    print("  reachable from the archive %d" % rep["reachable"])
+    print("  unreachable                %d" % rep["unreachable"])
+    print()
+    print("  %-22s %8s %10s" % ("signal", "expected", "reachable"))
+    for name in sorted(rep["by_signal"]):
+        row = rep["by_signal"][name]
+        print("  %-22s %8d %10d" % (name, row["expected"], row["reachable"]))
+    print()
+    print("  %-18s %8s %6s" % ("section", "present", "empty"))
+    for name in sorted(rep["sections"]):
+        row = rep["sections"][name]
+        print("  %-18s %8d %6d" % (name, row["present"], row["empty"]))
+    for e in rep["errors"][:10]:
+        print("  ERROR %s" % e)
+    if getattr(args, "json", False):
+        print(json.dumps(rep, sort_keys=True, indent=1))
+    return 0
+
+
 def cmd_list(args):
     corpus = load_corpus(args.root)
     split = load_split(args.root)
@@ -2582,7 +2690,7 @@ def cmd_reproduce(args):
     return 1 if result.get("errors") else 0
 
 
-COMMANDS = ("list", "run", "reproduce")
+COMMANDS = ("list", "run", "reproduce", "reachability")
 
 
 def build_parser():
@@ -2604,6 +2712,8 @@ def build_parser():
         prog="bench", description="score supervision arms over the exported cases")
     sub = p.add_subparsers(dest="cmd")
 
+    sub.add_parser("reachability", parents=[common],
+                   help="how many expected signals the archive can support")
     sub.add_parser("list", parents=[common],
                    help="list the corpus and its split membership")
 
@@ -2658,6 +2768,8 @@ def main(argv=None):
     try:
         argv = _normalise_argv(list(sys.argv[1:] if argv is None else argv))
         args = build_parser().parse_args(argv)
+        if args.cmd == "reachability":
+            return cmd_reachability(args)
         if args.cmd == "list":
             return cmd_list(args)
         if args.cmd == "reproduce":

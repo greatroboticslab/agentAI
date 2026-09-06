@@ -220,6 +220,44 @@ walltime), SU discarded, whether the correction changed the next rendered sbatch
 proposals refused by the gate per tier (adversarial injection of R3/R4 proposals). Baseline row
 states the baseline's own record: 24 h soak passed, then a 6-day silent pause.
 
+## 4.9 Amendment (2026-09-06): recall is reported against two denominators
+
+Running the deterministic checks over the frozen corpus showed that most of the
+sections they read did not survive as archived artifacts. Across 162 exported cases:
+`out_tail` is present in 98, `sacct` in 36, `results_csv` in 17, `strategy` in 10,
+`trace` in 7, `slug_scores` in 4, and `ledger`, `harvest`, `su`, `resources`,
+`corrections`, `plan`, `registry_diff` are empty in **all** of them. Of the 71 cases
+carrying a `signals_expected` label, 75 expected firings are unreachable and only
+`walltime_bound` fires at all.
+
+The cause is archival, not a defect in the rules. A per-round ledger snapshot and
+an SU reading live in the lab database, which compute nodes cannot reach; a `df`
+reading was never captured per job; the correction channel and the plan did not
+exist before this week. `signals_expected` states what a supervisor watching that
+incident live should have seen, which is a claim about the campaign, and it stays
+as written — it is pre-registration.
+
+What changes is the reporting. Every recall is stated against two denominators:
+
+* **over expected** — how much of the campaign's failure record a detector set
+  covers. This is the number that says how far the deterministic arm can go.
+* **over reachable** — the same measure restricted to cases whose archived bundle
+  carries the sections the detector reads. This is the number that compares arms,
+  because an arm cannot be credited or debited for evidence no arm was shown.
+
+Reporting only the first understates the deterministic arm and inflates every model
+arm's margin over it, which is the headline comparison; reporting only the second
+hides how much of the campaign is out of reach. `bench.py reachability` computes
+both and names every unreachable case, and a signal counts as reachable exactly
+when its own detector returns something other than `unknown` on that bundle — the
+detector's answer, not a second table of which sections each signal reads, because
+a second table would drift from the first.
+
+This also sets an honest ceiling for the live layer: six of the twelve checks have
+no historical case they can run on, so their value is asserted from the design and
+will be measured only on rounds recorded from now on, where the bundle is built by
+`evidence.py` and carries every section.
+
 ## 5. Models and serving (cluster facts verified 2026-09-04)
 
 - H100 nodes w001–w010: 8×80 GB HBM, ~2 TB RAM, no local disk; all allocated today, 8 full-node

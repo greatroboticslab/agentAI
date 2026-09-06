@@ -954,6 +954,51 @@ ck("a lines-only section is still fully withheld from L1",
 ck("rendering stays deterministic", bench.render_prompt(_v_l1) == _p_l1)
 
 
+# ---- reachability: what the ARCHIVE can support, not what the campaign saw ---
+# `signals_expected` says what a supervisor watching live should have seen. It is
+# a claim about the campaign, not about the corpus. A detector whose sections did
+# not survive the export answers `unknown`, which is not a miss -- but a recall
+# computed over the expected labels counts it as one, understates the
+# deterministic arm and inflates every model arm's margin over it. Both denominators
+# have to be reported, so both are computed here.
+_rt = pathlib.Path(tempfile.mkdtemp(prefix="bench_reach_")) / "bench"
+(_rt / "cases").mkdir(parents=True)
+
+def _mkcase(cid, expected, sections):
+    d = _rt / "cases" / cid
+    d.mkdir()
+    (d / "truth.json").write_text(json.dumps(
+        {"date": "2026-01-01", "incident": True, "signals_expected": expected}))
+    (d / "bundle.json").write_text(json.dumps({"case_id": cid, "sections": sections}))
+
+# One case whose sacct row survived: walltime_bound can actually run.
+_mkcase("reach-yes", ["walltime_bound"], {
+    "sacct": [{"artifact_id": "s.txt", "JobID": "1", "State": "TIMEOUT",
+               "Elapsed": "12:00:18", "Timelimit": "12:00:00",
+               "raw": "1|rndtrain|TIMEOUT|12:00:18|12:00:00",
+               "lines": [[3, "1|rndtrain|TIMEOUT|12:00:18|12:00:00"]]}]})
+# One case labelled for a signal whose section did not survive.
+_mkcase("reach-no", ["pool_growth"], {"sacct": None, "strategy": None})
+# A healthy control carries no label and must not enter either denominator.
+_mkcase("reach-control", [], {"sacct": None})
+
+_rep = bench.reachability(_rt)
+ck("every exported case is counted", _rep["cases"] == 3)
+ck("only labelled cases enter the denominator", _rep["labelled"] == 2)
+ck("a surviving section makes its signal reachable", _rep["reachable"] == 1)
+ck("a section that did not survive makes it unreachable", _rep["unreachable"] == 1)
+ck("the unreachable case is named, not just counted",
+   ["reach-no", "pool_growth"] in _rep["unreachable_cases"])
+ck("per-signal counts separate expected from reachable",
+   _rep["by_signal"]["walltime_bound"] == {"expected": 1, "reachable": 1}
+   and _rep["by_signal"]["pool_growth"] == {"expected": 1, "reachable": 0})
+ck("section presence is reported so the cause is visible",
+   _rep["sections"]["sacct"]["present"] == 1 and _rep["sections"]["sacct"]["empty"] == 2)
+ck("an unlabelled control contributes no expectation",
+   "reach-control" not in [c for c, _ in _rep["unreachable_cases"]])
+shutil.rmtree(_rt.parent, ignore_errors=True)
+
+
 if _fails:
     print("\nFAILED: %d -> %s" % (len(_fails), _fails))
     shutil.rmtree(TMP, ignore_errors=True)
