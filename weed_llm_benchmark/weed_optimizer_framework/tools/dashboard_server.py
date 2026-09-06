@@ -8106,7 +8106,8 @@ def agent_generic(domain_id: str):
  .steps{{margin:14px 0 0;padding-left:20px;color:#475569;font-size:13.5px;line-height:1.7}}
  a.btn{{display:inline-block;margin-top:18px;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:10px 16px;border-radius:9px}}
 </style></head><body>
- <div class="top"><a class="bc" href="/">&larr; Projects</a><h1>&#129516; {nm}</h1></div>
+ <div class="top"><a class="bc" href="/">&larr; Projects</a><h1>&#129516; {nm}</h1>
+  <a class="bc" href="/supervision/{domain_id}" style="margin-left:auto">Supervision &rarr;</a></div>
  <div class="wrap"><div class="card">
    <span class="badge">&#9679; {st}</span>
    <span class="badge" style="background:#eef2ff;color:#1d4ed8;border-color:#bfdbfe">task: {_task}</span>
