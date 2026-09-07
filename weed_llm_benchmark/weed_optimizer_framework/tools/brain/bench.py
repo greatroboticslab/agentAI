@@ -1399,14 +1399,23 @@ def arm_signals(case, ctx, repeat=0, notify=False):
 
 
 def _estimate_tokens(text):
-    """Characters/4. Crude on purpose: it is a guard, not an accounting.
+    """The same estimate the client refuses on, so the two guards agree.
 
-    The number that matters is the provider's own `tokens_in`, which the
-    callable returns; this estimate exists so a prompt that will be silently
-    truncated is flagged before the call rather than inferred from a bad
-    answer afterwards.
+    They used to disagree -- characters/4 here, characters/3.6 in
+    `supervisor.py` -- which left a band of prompts that the client refused and
+    this side never flagged. Both were optimistic against the ratio the provider
+    actually reported. The number that matters is still the provider's own
+    `tokens_in`; this exists so a prompt that would be silently truncated is
+    flagged before the call rather than inferred from a bad answer after it.
     """
-    return max(1, len(str(text or "")) // 4)
+    try:
+        from . import supervisor as _sup
+        return _sup.estimate_tokens(text)
+    except Exception:
+        # A benchmark that cannot import the client can still score the
+        # deterministic arms; a wrong guard is better than no run at all, and
+        # the arms that need the client will report their own failure.
+        return max(1, int(len(str(text or "")) / 2.76) + 1)
 
 
 _LINE_RE = re.compile(r"^\s*(\d+)\t(.*)$")
@@ -1492,6 +1501,17 @@ def arm_model(case, ctx, arm, repeat=0):
         base_meta["tokens_out"] += int(_num(res.get("tokens_out"), 0) or 0)
         base_meta["latency_s"] += float(_num(res.get("latency_s"), 0.0) or 0.0)
         base_meta["su"] += float(_num(res.get("su"), 0.0) or 0.0)
+        # A client that refuses returns a dict carrying `error`; it does not
+        # raise. Reading only `text` turned every refusal into an empty string,
+        # then into "no JSON object in the reply" -- so 51 context refusals were
+        # reported a second time as 59 parse errors, and the eight failures that
+        # were neither had no name at all. A failure the harness cannot name is
+        # a failure it cannot exclude, and it was scoring them as misses.
+        if res.get("context_overflow"):
+            base_meta["context_overflow"] = True
+        if res.get("error"):
+            base_meta["model_error"] = str(res["error"])[:300]
+            return None
         return str(res.get("text") or "")
 
     view = view_for_arm(case, arm)
@@ -1948,7 +1968,33 @@ METRICS = (
 )
 
 
+def _scorable(row):
+    """Whether this case produced an answer that may enter a denominator.
+
+    A row that could not be produced is not a wrong answer. Three shapes are
+    not answers at all: an arm that could not decide the case from the export,
+    a prompt refused for exceeding the context window, and a call that failed.
+    They were all being counted as misses. On job 45344219 that made A0's
+    149 "cannot run" answers into 116 misses and 33 correct non-alarms, printing
+    a detection recall of 0.000 for a baseline that never ran, and it depressed
+    both model arms while making their false-alarm rate a lower bound over
+    healthy controls that were never shown.
+
+    `parse_error` is deliberately NOT here. A model that answers with something
+    unparseable has failed, and that failure is its own; only a refusal
+    masquerading as a parse error was ever the harness's fault, and that is
+    fixed where the refusal is recorded rather than by excluding it here.
+    """
+    return not (row.get("undecidable") or row.get("context_overflow")
+                or row.get("model_error"))
+
+
 def _in_subset(row, subset):
+    # Cost metrics are means over the calls that happened, so they are scored on
+    # the same set: averaging 149 cases including 59 that were never sent
+    # understated su_per_review and tokens_in by about a third.
+    if not _scorable(row):
+        return False
     if subset == "all":
         return True
     if subset == "incident":
@@ -1992,8 +2038,14 @@ def aggregate(case_rows, arm, model=""):
             st["kind"] = m["kind"]
             stats[m["key"]] = st
         groups[gk] = stats
+    scorable = [r for r in case_rows if _scorable(r)]
     counts = {
         "cases": len(case_rows),
+        # What every proportion below is actually over. Reported beside `cases`
+        # rather than instead of it: "13 of 149 answered" and "13 of 13
+        # answered" are different results and a single n hides which one it is.
+        "scored": len(scorable),
+        "not_scored": len(case_rows) - len(scorable),
         "incidents": sum(1 for r in case_rows if r.get("incident")),
         "healthy": sum(1 for r in case_rows if not r.get("incident")),
         "undecidable": sum(1 for r in case_rows if r.get("undecidable")),

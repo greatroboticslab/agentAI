@@ -8863,3 +8863,46 @@ from `cur`, which `_advance` assigns *further down* than the call site — it wo
 have raised `UnboundLocalError` on every completed step, outside the helper's own
 guard. The helper reads the round itself now, and a test asserts the call site
 references no variable assigned later.
+
+## 2026-09-07 — v3.33.1 a case that could not be answered is not a wrong answer
+
+Job 45344219 reported `detection_recall 0.000` for the scripted baseline. The
+baseline had not run on a single case — it was undecidable on all 149 — and its
+149 non-answers were scored as 116 misses and 33 correct non-alarms. The same
+filter counted the model arms' 59 refused prompts as misses, and computed their
+false-alarm rate over healthy controls that were never shown to a model.
+
+`_scorable` now excludes three shapes from every denominator: an arm that could
+not decide the case from the export, a prompt refused for exceeding the context
+window, and a call that failed. An arm that could not run prints an empty subset
+instead of a fabricated zero. `counts` reports `scored` and `not_scored` beside
+`cases`, because "13 of 149 answered" and "13 of 13 answered" are different
+results and one n hides which. Cost metrics move to the same set: averaging
+`su_per_review` over 149 cases including 59 that were never sent understated it
+by about a third.
+
+**`parse_error` is deliberately not excluded.** A model that answers with
+something unparseable has failed, and that failure is its own. Only a refusal
+wearing a parse error's name was ever the harness's fault — and that is fixed at
+the source rather than by excluding it here.
+
+**The source: `_call` never read the client's `error`.** The client refuses by
+returning a dict, not by raising, so reading only `text` turned every refusal
+into `""`, then into "no JSON object in the reply". That is why 51 context
+refusals were reported a second time as 59 parse errors, and why the eight
+failures that were neither had no name at all. A failure the harness cannot name
+is one it cannot exclude.
+
+**One measured token estimate, shared.** The two guards disagreed — characters/4
+in the harness, characters/3.6 in the client, with a comment in the client
+claiming they were the same number — so a prompt between 117,965 and 131,075
+characters was refused by one and never flagged by the other. Both were
+optimistic: job 45344219's own probe tokenised 48,026 characters into 16,113
+tokens (2.98 chars/token) and pooled 2.763 across its completed calls. The shared
+constant is 2.76, which still admits the two largest prompts that demonstrably
+fitted, at 81,128 and 76,111 characters.
+
+**This changes the published margins, and not necessarily in the layer's favour.**
+Excluding refusals raises the model arms' recall, and recomputing the false-alarm
+rate over answered controls only can move against them. The numbers from job
+45344219 should not be quoted at all until the run is repeated.

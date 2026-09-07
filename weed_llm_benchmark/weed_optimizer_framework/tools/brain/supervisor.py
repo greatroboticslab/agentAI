@@ -58,7 +58,16 @@ DEFAULT_TIMEOUT_S = 600
 DEFAULT_NUM_CTX = 32768
 DEFAULT_TEMPERATURE = 0.3
 HEARTBEAT_MAX_AGE_S = 180.0     # WP4 gate: a window is "configured" only while fresh
-CHARS_PER_TOKEN = 3.6           # conservative; the same ratio bench.py estimates with
+# Measured, not assumed. Job 45344219's own probe tokenised 48,026 chars into
+# 16,113 tokens = 2.98 chars/token, and across its 33 completed calls the pooled
+# ratio was 2.763 with a minimum of 2.257. The old pair of constants -- 3.6 here
+# and 4.0 in bench.py, with a comment in this file claiming they were the same
+# number -- were both optimistic, and they disagreed, so a prompt between
+# 117,965 and 131,075 chars was refused by one guard and never flagged by the
+# other. 2.76 is the pooled measurement: it still admits the two largest prompts
+# that demonstrably fitted (81,128 and 76,111 chars), which a blind 2.26 would
+# have refused.
+CHARS_PER_TOKEN = 2.76
 
 PROMPT_FILENAME = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                "prompts", "supervisor.txt")

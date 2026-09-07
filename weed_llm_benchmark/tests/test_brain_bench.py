@@ -1005,6 +1005,67 @@ ck("an unlabelled control contributes no expectation",
 shutil.rmtree(_rt.parent, ignore_errors=True)
 
 
+# ---- a case that could not be answered is not a wrong answer (v3.33.1) ------
+# Job 45344219 scored A0's 149 "cannot run" answers as 116 misses and 33 correct
+# non-alarms, printing detection_recall 0.000 and escalation_ok 0.221 for a
+# baseline that never ran on a single case. The same filter depressed both model
+# arms, which had 59 of 149 prompts refused, and made their false-alarm rate a
+# lower bound over healthy controls that were never shown to the model.
+_UND = ([{"case_id": "i%d" % i, "class": "config", "incident": True,
+          "undecidable": True, "detected": False, "escalation_ok": True}
+         for i in range(116)]
+        + [{"case_id": "h%d" % i, "class": "control", "incident": False,
+            "undecidable": True, "detected": False, "escalation_ok": True}
+           for i in range(33)])
+_A = bench.aggregate(_UND, "A0")
+ck("an arm that could not run reports no cases scored", _A["counts"]["scored"] == 0)
+ck("and says how many it could not score", _A["counts"]["not_scored"] == 149)
+ck("its recall is empty, not zero",
+   (_A["groups"]["all"]["detection_recall"] or {}).get("p") is None)
+ck("its false-alarm rate is empty, not zero",
+   (_A["groups"]["all"]["false_alarm_rate"] or {}).get("p") is None)
+ck("and escalation_ok no longer scores 33 of 149",
+   (_A["groups"]["all"]["escalation_ok"] or {}).get("n") == 0)
+
+_MIX = ([{"case_id": "a%d" % i, "class": "config", "incident": True,
+          "detected": i % 3 == 0, "su": 0.01} for i in range(90)]
+        + [{"case_id": "r%d" % i, "class": "config", "incident": True,
+            "context_overflow": True, "detected": False, "su": 0.0}
+           for i in range(59)])
+_M = bench.aggregate(_MIX, "L2")
+ck("a refused prompt does not count as a miss",
+   _M["groups"]["all"]["detection_recall"]["n"] == 90)
+ck("the recall is over what was answered",
+   abs(_M["groups"]["all"]["detection_recall"]["p"] - 30.0 / 90.0) < 1e-9)
+ck("both totals are reported so neither can be mistaken for the other",
+   _M["counts"]["cases"] == 149 and _M["counts"]["scored"] == 90)
+ck("cost is averaged over the calls that happened, not over the silence",
+   abs((_M["groups"]["all"]["su_per_review"] or {}).get("mean", 0) - 0.01) < 1e-9)
+
+_ERR = [{"case_id": "e1", "class": "config", "incident": True,
+         "model_error": "HTTP 503", "detected": False}]
+ck("a failed call is not a miss either",
+   bench.aggregate(_ERR, "L2")["groups"]["all"]["detection_recall"]["n"] == 0)
+
+# A model that answers with something unparseable HAS failed, and that failure
+# is its own. Only a refusal wearing a parse error's name was the harness's
+# fault, and that is fixed where the refusal is recorded.
+_PARSE = [{"case_id": "p%d" % i, "class": "config", "incident": True,
+           "parse_error": "no JSON object in the reply", "detected": False}
+          for i in range(10)]
+ck("a genuine parse error still counts against the model",
+   bench.aggregate(_PARSE, "L2")["groups"]["all"]["detection_recall"]["n"] == 10)
+
+# The two guards disagreed: characters/4 here, characters/3.6 in the client, so
+# a prompt between 117,965 and 131,075 chars was refused by one and never
+# flagged by the other.
+from weed_optimizer_framework.tools.brain import supervisor as _sup   # noqa: E402
+ck("the harness and the client estimate tokens the same way",
+   bench._estimate_tokens("x" * 50000) == _sup.estimate_tokens("x" * 50000))
+ck("the estimate admits the largest prompt that demonstrably fitted",
+   _sup.estimate_tokens("x" * 81128) <= 32768)
+
+
 if _fails:
     print("\nFAILED: %d -> %s" % (len(_fails), _fails))
     shutil.rmtree(TMP, ignore_errors=True)
