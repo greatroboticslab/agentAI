@@ -8941,3 +8941,33 @@ resolves them into `corrections` / `corrections_rejected` with their own counts,
 kept separate from the findings block so they cannot move the numbers the
 benchmark is scored on. A change to a running campaign deserves at least the
 grounding a report about it needs.
+
+## 2026-09-07 — v3.34.0 a progress bar is one line, and it was two million characters
+
+A third of the benchmark's prompts could not be shown to a model. The obvious
+reading was that the context window was too small. It was not: raising it to 64K
+would have recovered four of twenty-one, and a million-token window would still
+have left nine out.
+
+Measured across all 162 exported bundles: `out_tail` holds **353 MB** and every
+other section combined holds **139 KB**. The per-section caps were being honoured
+throughout and were never the constraint. One *line* of the largest case is
+**2,002,434 characters** containing **15,204 carriage-return redraws** of a
+training progress bar — `\r\x1b[K  10/200  15.1G  1.065  0/15106  0.7s\r\x1b[K …`
+repeated once per iteration. `CAPS` counts lines. Nothing counted characters.
+
+A terminal shows only the last redraw, and that last redraw is the completed
+state a reader and every check actually want; each earlier one is the same line
+part-drawn. `collapse_progress` keeps the final non-empty segment, strips the
+terminal control codes, and excerpts anything still over `out_tail_line_chars`
+(2000) with the omission stated in the text rather than silently. On the real
+line: 1,113,990 characters to 70, and the 70 are the epoch's final state.
+
+Applied in the exporter's trimmer and in `evidence.py`'s live cap, from the same
+constant, so an archived bundle and a live one show a model the same thing.
+
+**This changes every bundle and the corpus seal.** The stored artifacts, their
+hashes, `corpus 990536664cc4` and the frozen split digest all move on the next
+export, and job 45344219 stops being comparable. That costs nothing here: that run
+is already not reportable — dev split, `repeats 1`, a baseline that could not
+decide a single case, and 40 % of prompts never answered.

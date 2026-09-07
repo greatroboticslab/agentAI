@@ -182,6 +182,13 @@ CITE_CONTEXT_LINES = 10
 CAPS = {
     "out_tail_lines": 400,      # total lines kept in the out_tail section
     "out_tail_tail_lines": 120,  # the last N lines are always kept
+    # Measured 2026-09-07 across all 162 exported bundles: out_tail held 353 MB
+    # and every other section combined held 139 KB. The line cap above was being
+    # honoured and was not the constraint -- one *line* of the largest case was
+    # 2,002,434 characters containing 15,204 carriage-return redraws of a
+    # training progress bar. A terminal shows only the last redraw; the export
+    # was storing every one of them, and then handing them to a model.
+    "out_tail_line_chars": 2000,
     "sacct_rows": 200,
     "trace_records": 50,
 }
@@ -600,8 +607,48 @@ def _pairs(info, keep):
     return out
 
 
+_CR_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def collapse_progress(text, cap=None):
+    """(text, dropped_chars) with carriage-return redraws collapsed to the last.
+
+    A progress bar writes one newline-terminated line and redraws it with `\r`
+    once per iteration, so a single line of a training log can be megabytes of
+    superseded views of itself. A terminal shows only the final redraw, and that
+    final redraw is the completed state the checks and a reader both want; every
+    earlier one is the same line part-drawn.
+
+    Keeping them cost 353 MB across the corpus against 139 KB for every other
+    section combined, and it is why a third of the benchmark's prompts could not
+    be shown to a model at any context size.
+
+    The last non-empty segment wins. If it still exceeds `cap`, the middle is
+    dropped and the omission is stated in the text itself, never silently.
+    """
+    raw = str(text or "")
+    cap = int(cap or CAPS["out_tail_line_chars"])
+    before = len(raw)
+    if "\r" in raw:
+        parts = [seg for seg in raw.split("\r")
+                 if _CR_ANSI_RE.sub("", seg).strip()]
+        if parts:
+            raw = parts[-1]
+    raw = _CR_ANSI_RE.sub("", raw)
+    if len(raw) > cap:
+        head = cap // 2
+        tail = cap - head - 40
+        raw = ("%s … [%d characters omitted] … %s"
+               % (raw[:head], len(raw) - head - tail, raw[-tail:]))
+    return raw, max(0, before - len(raw))
+
+
 def _trim_out_tail(pairs):
-    """WARN/ERROR/TIMEOUT lines plus the tail, capped — WP3's trimmer."""
+    """WARN/ERROR/TIMEOUT lines plus the tail, capped in lines AND in characters.
+
+    The line cap alone was never the binding constraint; see `collapse_progress`
+    and the measurement recorded beside `out_tail_line_chars`.
+    """
     if not pairs:
         return []
     tail_from = pairs[max(0, len(pairs) - CAPS["out_tail_tail_lines"])][0]
@@ -609,7 +656,11 @@ def _trim_out_tail(pairs):
     if len(sel) > CAPS["out_tail_lines"]:
         # Drop the earliest matches, never the tail: a job's failure is at its end.
         sel = sel[-CAPS["out_tail_lines"]:]
-    return sel
+    out = []
+    for num, text in sel:
+        collapsed, _dropped = collapse_progress(text)
+        out.append([num, collapsed])
+    return out
 
 
 def _delimiter(line):

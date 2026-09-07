@@ -123,6 +123,7 @@ DEFAULTS = {
     # a live bundle and an archived one show a model the same amount.
     "out_tail_lines": corpus.CAPS["out_tail_lines"],
     "out_tail_tail_lines": corpus.CAPS["out_tail_tail_lines"],
+    "out_tail_line_chars": corpus.CAPS["out_tail_line_chars"],
     "sacct_rows": corpus.CAPS["sacct_rows"],
     "trace_records": corpus.CAPS["trace_records"],
     # Ring size for matched lines on the remote side. out_tail_lines minus the
@@ -708,11 +709,16 @@ def _cap_out_tail(pairs, cap, tail_n):
     until the trimmer says so.
     """
     if not cap or len(pairs) <= int(cap):
-        return list(pairs)
-    sel = _select_out_tail(pairs, tail_n)
-    if len(sel) > int(cap):
-        sel = sel[-int(cap):]      # the earliest matches go, never the tail
-    return sel
+        sel = list(pairs)
+    else:
+        sel = _select_out_tail(pairs, tail_n)
+        if len(sel) > int(cap):
+            sel = sel[-int(cap):]  # the earliest matches go, never the tail
+    # Collapse carriage-return redraws here too, with the exporter's own cap, so
+    # a live bundle and an archived one show a model the same thing. A single
+    # progress line can be two million characters of superseded views of itself,
+    # and the line cap above never sees it: it counts lines, not characters.
+    return [[n, corpus.collapse_progress(t)[0]] for n, t in sel]
 
 
 def _json_of(block):

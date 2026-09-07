@@ -875,6 +875,49 @@ ck("and warns that this is no longer a pre-registered split",
 shutil.rmtree(_fz.parent, ignore_errors=True)
 
 
+# ---- a progress bar is one line and it can be megabytes (v3.34.0) ----------
+# Measured across all 162 exported bundles: out_tail held 353 MB while every
+# other section combined held 139 KB. The line cap was honoured throughout and
+# was never the constraint -- one LINE of the largest case was 2,002,434
+# characters holding 15,204 carriage-return redraws of a training progress bar.
+# A terminal shows only the last redraw. The export was storing all of them and
+# then handing them to a model, which is why a third of the benchmark's prompts
+# could not be shown at any context size.
+_BAR = "".join("\r\x1b[K     10/200      15.1G      1.065      %d/15106  0.7s" % i
+               for i in range(1, 1501))
+_out, _dropped = corpus.collapse_progress(_BAR)
+ck("a progress line collapses to its final redraw", len(_out) < 200)
+ck("and the kept text is the last state, not the first", "1500/15106" in _out)
+ck("the characters dropped are reported, and they are nearly all of it",
+   _dropped == len(_BAR) - len(_out) and _dropped > 0.99 * len(_BAR))
+ck("the terminal control codes are gone", "\x1b[" not in _out)
+
+ck("a line with no carriage return is untouched",
+   corpus.collapse_progress("slurmstepd: error: JOB CANCELLED")[0]
+   == "slurmstepd: error: JOB CANCELLED")
+ck("and reports nothing dropped",
+   corpus.collapse_progress("slurmstepd: error: JOB CANCELLED")[1] == 0)
+
+_long = "x" * 9000
+_cut, _d2 = corpus.collapse_progress(_long)
+ck("a single enormous line is excerpted, not stored whole",
+   len(_cut) <= corpus.CAPS["out_tail_line_chars"] + 80)
+ck("and the excerpt states what it dropped in the text itself",
+   "characters omitted" in _cut)
+
+# The trimmer must apply it, not just offer it.
+_pairs = [[1, "starting"], [2, _BAR], [3, "slurmstepd: error: TIMEOUT"]]
+_trimmed = corpus._trim_out_tail(_pairs)
+ck("the trimmer collapses what it keeps",
+   all(len(t) < 500 for _, t in _trimmed))
+ck("and it keeps the line numbers it was given",
+   [n for n, _ in _trimmed] == [1, 2, 3])
+ck("the alert line survives untouched",
+   any(t == "slurmstepd: error: TIMEOUT" for _, t in _trimmed))
+ck("the character cap is declared beside the line caps",
+   "out_tail_line_chars" in corpus.CAPS)
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)
