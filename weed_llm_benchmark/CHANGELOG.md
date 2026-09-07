@@ -8776,3 +8776,30 @@ from the artifacts alone, indistinguishable from a job that was never submitted.
 overwrites it at the end, so a walltime kill leaves a record of what was
 attempted instead of leaving silence. The same repair, for the same reason, as
 the per-epoch trace and the job-scoped metric.
+
+## 2026-09-07 — v3.32.5 the accounting could not tell an H100 from a V100
+
+Reading two days of real accounting rows through the ledger, every H100 job came
+back with no GPU family and was priced at the unknown-family fallback. The parser
+was right and the data was thin: SLURM records the family in `AllocTRES` only
+when the job asked for a typed gres, and on this cluster the V100 jobs carry
+`gres/gpu:v100-32=1` while every H100 job carries a bare `gres/gpu=4`.
+
+The totals were correct, and only by luck — the fallback exists to charge the
+higher known rate so nothing reads as free, and the higher known rate is the H100
+rate. What was actually lost is the audit: every H100 job carried
+`unknown_rate: true`, so a ledger built to distinguish a measured cost from an
+assumed one said "assumed" about the ones it could have measured.
+
+The family is in the node name. This cluster runs its H100 nodes as w001–w010 and
+its V100 nodes as v0xx, and that prefix map now sits in `su_rates.json` beside the
+rates it selects, with the measurement that motivated it written next to it. It is
+consulted only when `AllocTRES` named no type, never over one, and each entry
+records `gpu_type_source` — `alloctres`, `nodelist`, or `unresolved` — because a
+rate applied from a node prefix is a weaker fact than one SLURM stated and the
+ledger should not present the two as the same measurement. A job with neither
+stays unresolved and flagged rather than being guessed at.
+
+Verified against the real rows: `45415861_1` on w006 and `45344219` on w002
+resolve to h100 from the node name, `45349139` on v013 still resolves to v100-32
+from its typed gres, and a row with no node and no type stays unresolved.

@@ -403,6 +403,44 @@ ck("the command echo is not parsed as a row",
    all("sacct -j" not in str(r.get("raw", "")) for r in _from_corpus))
 
 
+# ---- the GPU family is in the node name when AllocTRES omits it (v3.32.5) ----
+# Measured on the real accounting rows 2026-09-07: every H100 job carries a bare
+# `gres/gpu=N` with no type, while V100 jobs carry `gres/gpu:v100-32=1`. Without
+# a fallback each H100 job was priced at the unknown-family rate and flagged
+# unknown_rate; the totals were right only because that fallback happens to equal
+# the H100 rate, which is luck, and every H100 job looked unaudited.
+_REAL = [
+    {"JobID": "45415861_1", "State": "COMPLETED", "Elapsed": "05:56:17",
+     "AllocTRES": "billing=5,cpu=5,gres/gpu=1,mem=48G,node=1", "NodeList": "w006"},
+    {"JobID": "45344219", "State": "COMPLETED", "Elapsed": "00:19:28",
+     "AllocTRES": "billing=16,cpu=16,gres/gpu=4,mem=240G,node=1", "NodeList": "w002"},
+    {"JobID": "45349139", "State": "COMPLETED", "Elapsed": "04:57:47",
+     "AllocTRES": "billing=5,cpu=5,gres/gpu:v100-32=1,gres/gpu=1,mem=32G,node=1",
+     "NodeList": "v013"},
+    {"JobID": "77777", "State": "COMPLETED", "Elapsed": "01:00:00",
+     "AllocTRES": "billing=5,gres/gpu=1", "NodeList": "None assigned"},
+]
+_by = {j["jobid"]: j for j in sl.parse_sacct(_REAL)}
+ck("a bare gres on a w-node resolves to h100",
+   _by["45415861_1"]["gpu_type"] == "h100")
+ck("and the ledger records that it came from the node name",
+   _by["45415861_1"]["gpu_type_source"] == "nodelist")
+ck("a typed gres still wins over the node name",
+   _by["45349139"]["gpu_type"] == "v100-32"
+   and _by["45349139"]["gpu_type_source"] == "alloctres")
+ck("a four-GPU H100 job resolves too", _by["45344219"]["gpu_type"] == "h100")
+ck("no node and no type stays unresolved rather than guessing",
+   _by["77777"]["gpu_type"] is None and _by["77777"]["gpu_type_source"] == "unresolved")
+ck("a resolved H100 job is no longer flagged as an unknown rate",
+   sl.su_for(_by["45415861_1"]["gpu_type"], 1, 3600.0)["unknown_rate"] is False)
+ck("an unresolved job still is",
+   sl.su_for(_by["77777"]["gpu_type"], 1, 3600.0)["unknown_rate"] is True)
+ck("the H100 rate is applied, not the fallback by coincidence",
+   sl.su_for("h100", 1, 3600.0)["value"] == 2.0)
+ck("the prefix map is declared with a reason",
+   len(sl.rates()["why"].get("rates.node_prefix_family") or "") > 60)
+
+
 if _fails:
     print("\nFAILED: %d -> %s" % (len(_fails), _fails))
     sys.exit(1)

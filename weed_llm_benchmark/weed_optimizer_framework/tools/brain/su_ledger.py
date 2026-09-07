@@ -450,15 +450,39 @@ def _rows_of(rows):
     return []
 
 
+def _family_from_nodelist(nodelist):
+    """GPU family implied by the node name, or None.
+
+    A last resort, used only when AllocTRES named no type. It is not a guess:
+    this cluster runs its H100 nodes as w001-w010 and its V100 nodes as v0xx,
+    and the prefix map lives in su_rates.json next to the reason it is there.
+    """
+    name = str(nodelist or "").strip().lower()
+    if not name or name in ("none assigned", "none"):
+        return None
+    prefixes = rates()["values"].get("rates.node_prefix_family")
+    if not isinstance(prefixes, dict):
+        return None
+    head = name.lstrip("[(")[:1]
+    fam = prefixes.get(head)
+    return fam if isinstance(fam, str) and fam else None
+
+
 def _canon_row(d):
     jobid = str(_get_ci(d, "JobID") or _get_ci(d, "JobIDRaw") or "").strip()
     state = str(_get_ci(d, "State") or "").strip().upper()
     elapsed_raw = _get_ci(d, "Elapsed")
     tres = _get_ci(d, "AllocTRES") or _get_ci(d, "ReqTRES") or ""
     gpu_count, gpu_type = _gpu_from_tres(tres)
+    source = "alloctres" if gpu_type else None
+    if gpu_count and not gpu_type:
+        # AllocTRES carried a bare `gres/gpu=N`. The family is in the node name.
+        gpu_type = _family_from_nodelist(_get_ci(d, "NodeList"))
+        source = "nodelist" if gpu_type else "unresolved"
     return {"jobid": jobid, "state": state, "elapsed_raw": elapsed_raw,
             "elapsed_s": _elapsed_value(elapsed_raw), "alloc_tres": str(tres),
-            "gpu_count": gpu_count, "gpu_type": gpu_type, "raw": d}
+            "gpu_count": gpu_count, "gpu_type": gpu_type,
+            "gpu_type_source": source, "raw": d}
 
 
 def _parent_id(jobid):
@@ -513,6 +537,11 @@ def parse_sacct(rows):
             "jobid": parent_id, "state": main["state"],
             "elapsed_s": main["elapsed_s"], "elapsed_raw": main["elapsed_raw"],
             "gpu_count": main["gpu_count"], "gpu_type": main["gpu_type"],
+            # How the family was decided: from the typed gres, from the node
+            # name, or not at all. A rate applied from a node prefix is a
+            # weaker fact than one SLURM stated, and the ledger should say so
+            # rather than present both as the same measurement.
+            "gpu_type_source": main.get("gpu_type_source"),
             "alloc_tres": main["alloc_tres"],
             "substep_ids": [s["jobid"] for s in g["substeps"]],
             "source": source, "raw": main["raw"],

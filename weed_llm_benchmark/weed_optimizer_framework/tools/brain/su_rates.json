@@ -28,6 +28,13 @@
         "value": 2.0,
         "why": "Charged when a GPU allocation carries a family that matches neither h100 nor v100 (a new node type, a typo'd AllocTRES, a family this file has not been updated for). Set to the higher of the two known rates so an unresolved family is never cheaper to record than the most expensive real hardware on the allocation, i.e. it never silently reads as free or discounted compute. su_for() still marks the resulting number unknown_rate:true and reconcile() lists the job by id, so the gap stays visible instead of folding into a total that looks clean."
       }
+    },
+    "node_prefix_family": {
+      "value": {
+        "w": "h100",
+        "v": "v100"
+      },
+      "why": "SLURM records the GPU family in AllocTRES only when the job asked for a typed gres. Measured 2026-09-07: the V100 jobs carry `gres/gpu:v100-32=1` and every H100 job carries a bare `gres/gpu=4` with no type at all, so the family is simply not in that field for them. It is in the node name: Bridges-2 runs the H100 nodes as w001-w010 and the V100 nodes as v0xx (executor handbook, hardware facts). Without this fallback every H100 job is priced at the unknown-family rate and flagged unknown_rate -- the total came out right only because that fallback happens to equal the H100 rate, which is luck, and it left every H100 job looking unaudited. The prefix is matched only when AllocTRES gave no type, never over it."
     }
   },
   "reconcile": {
