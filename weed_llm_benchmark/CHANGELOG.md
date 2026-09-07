@@ -8835,3 +8835,31 @@ ended it, and nothing in this bundle says what did."
 The threshold is declared in `thresholds.json` with the measurement that motivated
 it. Verified against the three real round traces: each now names early stopping
 with its own arithmetic, and none of them mentions the cap.
+
+## 2026-09-07 — v3.33.0 the supervision layer gets its first production caller
+
+`evidence.build` had none. It was reached only by its own test and its own
+`main()`; nothing wrote the `latest_bundle.json` that `brain/api.py` reads; and so
+the twelve deterministic checks ran on the archived corpus and never once on a
+live round. Four rounds then ran at roughly half their stated recipe, with the
+metric flat inside its own noise floor, and the layer built to notice exactly
+that was not looking at anything.
+
+`round_scheduler._build_bundle` closes that. It runs on the **COMPLETED** path,
+which is the one that was uncovered: the review path already handles failures,
+and both `epochs_truncated` and `plateau` are findings about runs that *succeeded*.
+It stages the domain config and the last five rounds so the ledger section is
+populated — that section is empty in all 162 archived cases and is what several
+checks need — writes the bundle atomically, and logs every signal at warn or worse
+with its reason.
+
+**It is evidence, not a decision.** Writing a bundle changes nothing the scheduler
+does, so a failure here must never stop a round: a missing evidence module, a
+database that raises, a context with no runner at all, and an unwritable output
+path are each reported and stepped over. Tests assert all four.
+
+One defect was caught before it shipped. The first version passed the round number
+from `cur`, which `_advance` assigns *further down* than the call site — it would
+have raised `UnboundLocalError` on every completed step, outside the helper's own
+guard. The helper reads the round itself now, and a test asserts the call site
+references no variable assigned later.

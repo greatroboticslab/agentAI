@@ -211,6 +211,81 @@ def _policy_ok(actor, action, params):
     return True, ""
 
 
+def _build_bundle(domain, step, jobid, dcfg):
+    """Write the evidence bundle for a finished step. Never raises.
+
+    Until now `evidence.build` had no production caller at all: it was reached
+    only by its own test and its own `main()`, nothing wrote the
+    `latest_bundle.json` that the supervision page reads, and so the twelve
+    deterministic checks ran on the archived corpus and never once on a live
+    round. Four rounds ran at roughly half their stated recipe with the metric
+    flat inside its own noise floor, and the layer built to notice exactly that
+    was not looking.
+
+    It is called on the COMPLETED path deliberately. The review path already
+    covers failures; a round that finishes is precisely the case nothing was
+    watching, and `epochs_truncated` and `plateau` are both findings about runs
+    that succeeded.
+
+    The bundle is evidence, not a decision: writing it changes nothing the
+    scheduler does, so a failure here must never stop a round.
+    """
+    try:
+        from .brain import evidence as _evidence
+    except Exception as e:
+        _log().warning("[rounds] %s: evidence module unavailable (%s)" % (domain, e))
+        return None
+    try:
+        db = _CTX.get("db")
+        rounds, round_num = [], None
+        if db is not None and hasattr(db, "get_rounds"):
+            try:
+                # Read the rounds here rather than taking them from the caller:
+                # `cur` is not yet assigned at the point this is called, and
+                # passing it would have raised UnboundLocalError on every
+                # completed step.
+                rounds = db.get_rounds(domain, 5) or []
+            except Exception as e:
+                _log().warning("[rounds] %s: could not read rounds for the bundle "
+                               "(%s)" % (domain, e))
+        if rounds:
+            round_num = (rounds[0] or {}).get("round_num")
+        if round_num is None and db is not None:
+            try:
+                round_num = ((db.get_current_round(domain) or {})
+                             .get("round_num"))
+            except Exception:
+                round_num = None
+        stage = {"ledger": {"config": dcfg, "rounds": rounds,
+                            "mongo_ok": bool(rounds)}}
+        bundle = _evidence.build(domain, round_num, step, jobid,
+                                 ctx={"slurm_sh": _CTX.get("slurm_sh"),
+                                      "stage": stage, "log": _log()})
+        if not isinstance(bundle, dict):
+            return None
+        out = os.path.join(str(_CTX.get("repo") or "."), "results", "framework",
+                           "_brain", str(domain), "latest_bundle.json")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        tmp = out + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(bundle, fh, sort_keys=True)
+        os.replace(tmp, out)
+        fired = [r for r in (bundle.get("sections") or {}).get("signals") or []
+                 if isinstance(r, dict) and r.get("severity") in ("warn", "crit")]
+        _log().info("[rounds] %s: bundle written for round %s step %s "
+                    "(%d signal(s) at warn or worse)"
+                    % (domain, round_num, step, len(fired)))
+        for r in fired:
+            _log().warning("[rounds] %s: %s %s -- %s"
+                           % (domain, r.get("severity"), r.get("signal"),
+                              str(r.get("reason"))[:200]))
+        return bundle
+    except Exception as e:
+        _log().warning("[rounds] %s: bundle build failed (%s: %s)"
+                       % (domain, type(e).__name__, e))
+        return None
+
+
 def _log_action(action: str, result: dict):
     """Mirror a scheduler submission into the dashboard's cluster-action history.
 
@@ -1087,6 +1162,10 @@ def _advance(domain: str, dcfg: dict):
                 _record(domain, "eval", "done", job=st["job"], metrics=metrics,
                         detail="holdout metric from the train run's results.csv")
             _log().info(f"[rounds] {domain}: step {st['step']} done (job {st['job']})")
+            # Evidence for the step that just finished, before the in-flight
+            # fields are cleared. A round that COMPLETED is exactly the case
+            # nothing was watching.
+            _build_bundle(domain, st["step"], st.get("job"), dcfg)
             # A step that completed has no failure shape any more; leaving the
             # old one would let a later review be corrected on a stale cause.
             (st.get("last_terminal") or {}).pop(st["step"], None)
