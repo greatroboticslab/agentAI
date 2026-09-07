@@ -8971,3 +8971,27 @@ hashes, `corpus 990536664cc4` and the frozen split digest all move on the next
 export, and job 45344219 stops being comparable. That costs nothing here: that run
 is already not reportable — dev split, `repeats 1`, a baseline that could not
 decide a single case, and 40 % of prompts never answered.
+
+## 2026-09-07 — v3.34.1 the corpus re-exported under the character cap, measured
+
+The cap from v3.34.0 applied to all 162 cases.
+
+| | before | after |
+|---|---|---|
+| `cases/` on disk | 1.2 GB | **826 MB** |
+| largest rendered prompt | 48,257,552 chars | **109,784 chars** |
+| median rendered prompt | — | 12,269 chars |
+| prompts over a 32K window | **51 of 149 (34 %)** | **2 of 162 (1.2 %)** |
+
+The 374 MB the export shed is the 353 MB of `out_tail` the measurement predicted,
+which is the strongest evidence the diagnosis was right: nothing else moved.
+
+Two cases still exceed a 32K window — `v3-0-13-owlv2-oom-garbage-fallback-40068162`
+at 109,784 characters and `v3-0-29-ultralytics-augment-noop-40655183` at 92,393 —
+and both fit comfortably at 64K. They are named here rather than trimmed further,
+because the next thing to cut would be evidence rather than repetition.
+
+The split was re-frozen with `--force`: **dev 149 / test 13, the same case ids in
+the same halves**, digest `3a7e1823` → `6ca17e30`, and `verify` recomputes it. The
+diff is one line. As stated in v3.34.0, job 45344219 is no longer comparable
+against this corpus; it was already not reportable.
