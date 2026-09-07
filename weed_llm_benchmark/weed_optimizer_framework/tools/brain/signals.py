@@ -1127,6 +1127,95 @@ def _check_walltime_bound(b):
                          "with no checkpoint and no metric", ev)
 
 
+def _stop_cause(b, req, done):
+    """(cause, sentence, [evidence]) for why a run stopped short of its recipe.
+
+    Three causes are distinguishable from what a bundle already carries, and
+    telling them apart is the whole value of this finding: a run the time cap
+    ended needs a smaller recipe, a run early stopping ended needs a different
+    one, and a run neither explains needs a person to look.
+
+    This function exists because the check used to assert the first of those on
+    the mere presence of a cap key. Rounds 8, 9 and 10 each used about half
+    their time budget and were ended by `patience`, and all three were reported
+    as "a 10.0 h time cap was active, which is what ended it early". The claim
+    was false every time, and it reached an engineering record before anyone
+    checked the elapsed time against the cap it named.
+
+    `cause` is "converged", "time_cap" or "undetermined".
+    """
+    ev = []
+    holders = b.strategy_holders()
+
+    # Early stopping is exact arithmetic, so it is tested first: Ultralytics
+    # stops at best_epoch + patience, and the trace carries both numbers.
+    patience, p_label, p_key = _scan(holders, ("patience",))
+    seen, uniq = set(), []
+    for r in b.trace_records("epoch"):
+        if _num(r.get("map50_95")) is None:
+            continue
+        n = _num(r.get("epoch"))
+        if n is None or n in seen:
+            continue                  # the final re-validation repeats an epoch
+        seen.add(n)
+        uniq.append(r)
+    if patience is not None and uniq and done is not None:
+        best = max(uniq, key=lambda r: _num(r.get("map50_95")))
+        best_ep = _num(best.get("epoch"))
+        if best_ep is not None and best_ep + patience == done:
+            ev.append(_ev_section(p_label, 1, "%s=%s" % (p_key, int(patience))))
+            ev.append(_ev_section("trace", len(uniq), "best epoch=%s map50_95=%s"
+                                  % (int(best_ep), best.get("map50_95"))))
+            return ("converged",
+                    (" It stopped at epoch %d, which is best epoch %d plus patience %d, "
+                     "so early stopping ended it: the metric last improved %d epochs "
+                     "before the end and the remaining %d epochs of the recipe would "
+                     "not have been used."
+                     % (int(done), int(best_ep), int(patience), int(patience),
+                        int(req - done))),
+                    ev)
+
+    cap_h, cap_label, cap_key = _time_cap_h(b)
+    if not cap_h:
+        return ("undetermined",
+                " Nothing in this bundle says what ended the run early.", ev)
+    ev.append(_ev_section(cap_label, 1, "%s=%s" % (cap_key, cap_h)))
+    near = b.th_num("epochs_truncated.cap_attribution_fraction")
+    # The trace carries elapsed on a live round; an archived bundle carries it
+    # in its sacct row instead. Reading only the first made the check answer
+    # "not established" on a run whose elapsed time was sitting in the bundle.
+    elapsed, elapsed_src = None, ""
+    if uniq:
+        elapsed = _num(uniq[-1].get("elapsed_s"))
+        elapsed_src = "trace"
+    if elapsed is None:
+        row = b.sacct_row()
+        if row:
+            elapsed = _num(row.get("elapsed_s"))
+            elapsed_src = "sacct"
+    if near is None:
+        return ("undetermined",
+                (" A %s h time cap was active; whether it ended the run is not "
+                 "established, because the threshold that would decide it is not "
+                 "declared." % cap_h), ev)
+    if elapsed is None:
+        return ("undetermined",
+                (" A %s h time cap was active, but this bundle carries no elapsed "
+                 "time, so whether the cap ended the run is not established." % cap_h),
+                ev)
+    frac = elapsed / (cap_h * 3600.0)
+    ev.append(_ev_section(elapsed_src or "trace", len(uniq) or 1,
+                          "elapsed_s=%s" % elapsed))
+    if frac >= near:
+        return ("time_cap",
+                (" It ran %.2f h of a %s h time cap (%.2f of it), so the cap is what "
+                 "ended it early." % (elapsed / 3600.0, cap_h, frac)), ev)
+    return ("undetermined",
+            (" A %s h time cap was active but the run used only %.2f h of it (%.2f), "
+             "so the cap is not what ended it, and nothing in this bundle says what "
+             "did." % (cap_h, elapsed / 3600.0, frac)), ev)
+
+
 def _check_epochs_truncated(b):
     name = "epochs_truncated"
     floor = b.th_num("epochs_truncated.completed_fraction_floor")
@@ -1140,12 +1229,8 @@ def _check_epochs_truncated(b):
     if frac >= floor:
         return _ok(name, "%d of %d epochs ran (%.2f of the recipe, at or above "
                          "the %.2f floor)" % (done, req, frac, floor))
-    cap_h, cap_label, cap_key = _time_cap_h(b)
-    cap_note = ""
-    if cap_h:
-        ev.append(_ev_section(cap_label, 1, "%s=%s" % (cap_key, cap_h)))
-        cap_note = (" A %s h time cap was active, which is what ended it early."
-                    % cap_h)
+    _cause, cap_note, cev = _stop_cause(b, req, done)
+    ev = ev + cev
     outcome, oev = _run_outcome(b)
     ev = ev + oev
     detail = ("the recipe asked for %d epochs and %d ran (%.2f of it, under the "

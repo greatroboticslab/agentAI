@@ -26,6 +26,10 @@
       "completed_fraction_floor": {
         "value": 1.0,
         "why": "Fire when epochs_completed / epochs_requested is below this. 1.0 means any shortfall at all, which is the pre-registered rule: a 60-epoch recipe that ran 24 under a time cap is a different recipe, and its metric does not belong in a table built from the full one. Lower it only for a campaign that deliberately trains to a time budget rather than to an epoch count, and record that in the results file."
+      },
+      "cap_attribution_fraction": {
+        "value": 0.95,
+        "why": "How close a run must come to its time cap before the cap may be named as what ended it. Measured 2026-09-07 on rounds 8, 9 and 10: they ran 4.84, 8.34 and 5.48 h against a 10.0 h cap, and every one was ended by Ultralytics patience=20 at exactly best_epoch+20 (best at epochs 5, 11, 8; stopped at 25, 31, 28). The check asserted the cap was 'what ended it early' in all three, because it tested only that a cap key existed. A detector that fires correctly and explains wrongly is worse than one that stays silent -- it launders a guess into an evidenced-looking claim, and this one put the wrong cause into an engineering record. 0.95 leaves room for the cap's own end-of-epoch overshoot without admitting a run that finished in half its budget."
       }
     },
     "pool_growth": {

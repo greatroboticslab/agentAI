@@ -747,6 +747,90 @@ ck("the CLI reports a bundle it cannot read instead of raising",
 
 shutil.rmtree(_tmp, ignore_errors=True)
 
+print("\n-- what ended the run is established, never assumed (v3.32.6) --")
+# Measured 2026-09-07 on rounds 8, 9 and 10: each used about half its 10 h time
+# budget and each was ended by Ultralytics patience=20 at exactly best_epoch+20
+# (best at 5, 11, 8; stopped at 25, 31, 28). The check nonetheless reported "a
+# 10.0 h time cap was active, which is what ended it early" on all three, because
+# it tested only that a cap key existed. That sentence reached an engineering
+# record. A detector that fires correctly and explains wrongly is worse than one
+# that stays silent: it launders a guess into an evidenced-looking claim.
+
+def _stop_bundle(done, patience, best_epoch, elapsed_s, cap_h=10.0, req=60,
+                 completed=True):
+    """A run that stopped short, with a trace whose argmax is at `best_epoch`.
+
+    `completed` adds the sacct row that says the job succeeded. Without it the
+    check reports `info` rather than `warn` and says so -- a shortfall on a run
+    the bundle cannot confirm succeeded is not the same finding as one on a run
+    that did, and the severity split is deliberate.
+    """
+    trace = []
+    for n in range(1, done + 1):
+        trace.append({"kind": "epoch", "epoch": n, "elapsed_s": elapsed_s * n / done,
+                      "map50_95": 0.50 + (0.05 if n == best_epoch else 0.0)})
+    sections = {"trace": trace,
+                "strategy": {"epochs_requested": req, "epochs_completed": done,
+                             "patience": patience, "time_h": cap_h,
+                             "tier": "curated"}}
+    if completed:
+        sections["sacct"] = [{"JobID": "45415861", "State": "COMPLETED",
+                              "Elapsed": "05:29:38", "Timelimit": "12:00:00"}]
+    return {"bundle_id": "stop-%d" % done, "job_id": "45415861",
+            "sections": sections}
+
+_R10 = by_name(signals.detect_all(_stop_bundle(28, 20, 8, 19778.0)))["epochs_truncated"]
+ck_eq("round 10's shape fires epochs_truncated", _R10["severity"], "warn")
+ck("it names early stopping, with the arithmetic",
+   "best epoch 8 plus patience 20" in _R10["reason"])
+ck("and it does NOT blame the time cap",
+   "time cap" not in _R10["reason"])
+ck("the patience value is carried as evidence",
+   any("patience=20" in e["quote"] for e in _R10["evidence"]))
+_R10U = by_name(signals.detect_all(
+    _stop_bundle(28, 20, 8, 19778.0, completed=False)))["epochs_truncated"]
+ck("a shortfall on a run the bundle cannot confirm succeeded is info, not warn",
+   _R10U["severity"] == "info")
+ck("and it says it is not claiming the run completed",
+   "does not say whether the run succeeded" in _R10U["reason"])
+
+_CAPPED = by_name(signals.detect_all(
+    _stop_bundle(24, 20, 2, 10.83 * 3600)))["epochs_truncated"]
+ck("a run that really did use its cap says so",
+   "so the cap is what ended it early" in _CAPPED["reason"])
+
+_HALF = by_name(signals.detect_all(
+    _stop_bundle(24, 40, 2, 5.48 * 3600)))["epochs_truncated"]
+ck("a half-used cap is reported as NOT the cause",
+   "the cap is not what ended it" in _HALF["reason"])
+ck("and the check refuses to name a cause it cannot establish",
+   "nothing in this bundle says what did" in _HALF["reason"])
+
+_NOTRACE = by_name(signals.detect_all({"bundle_id": "nt", "sections": {
+    "strategy": {"epochs_requested": 60, "epochs_completed": 24, "time_h": 10.0,
+                 "patience": 20, "tier": "curated"}}}))["epochs_truncated"]
+ck("with no elapsed time anywhere, the cause is not established",
+   "not established" in _NOTRACE["reason"])
+
+# The archived bundles carry elapsed in sacct, not in a trace; reading only the
+# trace made the check answer "not established" on a run whose elapsed time was
+# sitting in the bundle all along.
+_SACCT = by_name(signals.detect_all({"bundle_id": "sa", "sections": {
+    "sacct": [{"JobID": "45301111", "State": "COMPLETED", "Elapsed": "10:49:33",
+               "Timelimit": "12:00:00"}],
+    "strategy": {"epochs_requested": 60, "epochs_completed": 24, "time_h": 10.8,
+                 "patience": 20, "tier": "curated"}}}))["epochs_truncated"]
+ck("elapsed is read from sacct when there is no trace",
+   "so the cap is what ended it early" in _SACCT["reason"])
+
+_TH = signals.thresholds()["values"]
+ck("the attribution threshold is declared",
+   "epochs_truncated.cap_attribution_fraction" in _TH)
+ck("and it carries the measurement that motivated it",
+   "patience" in (signals.thresholds()["why"]
+                  .get("epochs_truncated.cap_attribution_fraction") or ""))
+
+
 if _fails:
     print("\nFAILED: %d -> %s" % (len(_fails), _fails))
     sys.exit(1)

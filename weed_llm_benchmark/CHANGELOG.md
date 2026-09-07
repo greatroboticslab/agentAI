@@ -8803,3 +8803,35 @@ stays unresolved and flagged rather than being guessed at.
 Verified against the real rows: `45415861_1` on w006 and `45344219` on w002
 resolve to h100 from the node name, `45349139` on v013 still resolves to v100-32
 from its typed gres, and a row with no node and no type stays unresolved.
+
+## 2026-09-07 — v3.32.6 a signal that fired correctly and explained wrongly
+
+`epochs_truncated` fired on rounds 8, 9 and 10 — correctly, they ran 25, 31 and
+28 of a 60-epoch recipe — and told every reader the same false thing: *"a 10.0 h
+time cap was active, which is what ended it early."* It tested only that a cap
+key existed in the strategy. The runs used 4.84, 8.34 and 5.48 h of that cap.
+
+What actually ended all three was Ultralytics `patience=20`, at exactly
+`best_epoch + 20`: best at epochs 5, 11 and 8, stopped at 25, 31 and 28. The
+model reaches its best inside eleven epochs on this corpus and then spends twenty
+more not improving. That is a completely different finding from "the recipe is
+too long for its budget", and it points at a completely different fix.
+
+The false sentence was believed. It is the reason this repository's own state
+notes blamed the time cap, and the wrong cause survived long enough to be quoted.
+A detector that fires correctly and explains wrongly is worse than one that stays
+silent, because it launders a guess into an evidenced-looking claim.
+
+`_stop_cause` now establishes the cause instead of assuming it, and reports three
+outcomes. **Converged**: `best_epoch + patience == epochs_completed`, exact
+arithmetic from the trace, and the reason shows it. **Time cap**: the run reached
+at least `cap_attribution_fraction` (0.95) of its cap, measured from the trace or,
+on an archived bundle, from the sacct `Elapsed` — reading only the trace made the
+check answer "not established" about a run whose elapsed time was in the bundle
+all along. **Undetermined**: anything else, said plainly, including the case where
+a cap was active and the run used half of it, which now reads "the cap is not what
+ended it, and nothing in this bundle says what did."
+
+The threshold is declared in `thresholds.json` with the measurement that motivated
+it. Verified against the three real round traces: each now names early stopping
+with its own arithmetic, and none of them mentions the cap.
