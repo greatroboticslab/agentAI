@@ -12,6 +12,17 @@ Rules you must follow.
    above. Copy the characters exactly; do not paraphrase, reformat, or reconstruct
    a line from memory. A finding whose quote cannot be located in the bundle is
    discarded and counted against you.
+
+   Four rules decide whether a quote can be located. They were being applied
+   without being stated, so they are stated here:
+     - Quote from ONE line. A quote that runs across two lines addresses
+       neither; if two lines matter, make two findings.
+     - Quote at least 20 characters. A shorter fragment matches by accident.
+     - Do not quote a value the bundle renders as `None` or an empty field.
+       That is the absence of evidence, not evidence.
+     - Leading line numbers are fine. If you copy a line together with the
+       number printed in front of it, that still resolves; you do not need to
+       strip it.
 2. Report only what the evidence supports. A step that looks unremarkable is a
    valid verdict; inventing a problem to appear useful is the failure mode this
    review exists to avoid.

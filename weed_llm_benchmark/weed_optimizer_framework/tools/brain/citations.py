@@ -424,6 +424,31 @@ def _spans_lines(rows, needle, window):
     return None
 
 
+def strip_rendered_address(quote):
+    """(text, stripped) with the renderer's own line-number prefix removed.
+
+    Prompts show every line-addressed artifact as `%6d\t<text>`, so a model
+    that copies a line verbatim -- which is exactly what it is told to do --
+    copies the address with it. The validator then failed the quote for
+    containing the number the harness itself printed. Four of the 47 findings
+    recovered from job 45344219 failed this way, and none of them was the
+    model's fault.
+
+    Only the leading address is removed, and only when the line begins with
+    one: a number inside the text is part of the evidence.
+    """
+    raw = str(quote or "")
+    out, stripped = [], False
+    for line in raw.splitlines() or [raw]:
+        m = _NUMBERED_RE.match(line)
+        if m:
+            stripped = True
+            out.append(m.group(2))
+        else:
+            out.append(line)
+    return ("\n".join(out) if stripped else raw), stripped
+
+
 def resolve_detail(bundle, quote, lines=None):
     """`resolve` with the reason attached — what the validator records.
 
@@ -455,7 +480,11 @@ def resolve_detail(bundle, quote, lines=None):
             out["reason"] = NO_QUOTE
             out["detail"] = "quote is not a string"
             return out
-        needle = normalize(quote)
+        # A quote that carries the address the renderer printed is still a
+        # verbatim quote of what the model was shown.
+        text, addressed = strip_rendered_address(quote)
+        out["address_stripped"] = bool(addressed)
+        needle = normalize(text)
         out["quote_chars"] = len(needle)
         if not needle:
             out["reason"] = NO_QUOTE
@@ -655,6 +684,7 @@ def validate_verdict(bundle, verdict, load_bearing_lines=None):
                    "line": hit["line"], "matched": hit["matched"],
                    "section": hit["section"], "matches": hit["matches"],
                    "ambiguous": hit["ambiguous"], "load_bearing": None,
+                   "address_stripped": bool(det.get("address_stripped")),
                    "finding": finding}
             if hit["ambiguous"]:
                 stats["ambiguous"] += 1
@@ -669,6 +699,42 @@ def validate_verdict(bundle, verdict, load_bearing_lines=None):
             stats["accepted"] += 1
 
         stats["rejected"] = len(out["rejected"])
+        stats["address_stripped"] = sum(1 for r in out["findings"]
+                                        if r.get("address_stripped"))
+
+        # Corrections carry a quote too, and until now nothing ever resolved it.
+        # Presence is enforced at two gates -- the verdict schema and the
+        # correction channel -- but a correction could be justified by a quote
+        # that would have been rejected outright as a finding, and one in the
+        # recovered set was. A change to a running campaign deserves at least
+        # the grounding a report about it needs. Reported in its own block so it
+        # cannot silently move the finding numbers the benchmark is scored on.
+        cstats = {"corrections": 0, "accepted": 0, "rejected": 0}
+        out["corrections"] = []
+        out["corrections_rejected"] = []
+        craw = verdict.get("corrections")
+        if isinstance(craw, list):
+            for i, corr in enumerate(craw):
+                if not isinstance(corr, dict):
+                    continue
+                cstats["corrections"] += 1
+                cq = corr.get("quote")
+                det = resolve_detail(bundle, cq, lines=rows)
+                if not det["ok"]:
+                    cstats["rejected"] += 1
+                    out["corrections_rejected"].append(
+                        {"index": i, "action": corr.get("action"),
+                         "reason": det["reason"], "detail": det["detail"],
+                         "quote": cq if isinstance(cq, str) else "",
+                         "correction": corr})
+                    continue
+                cstats["accepted"] += 1
+                out["corrections"].append(
+                    {"index": i, "action": corr.get("action"),
+                     "artifact_id": det["hit"]["artifact_id"],
+                     "line": det["hit"]["line"], "correction": corr})
+        stats["corrections"] = cstats
+
         if load_bearing_lines is not None:
             stats["load_bearing_cited"] = len(cited)
             stats["evidence_hit_rate"] = (float(len(cited)) / len(want)) if want else 0.0

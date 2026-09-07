@@ -567,6 +567,69 @@ ck("a missing bundle exits 1",
 ck("no command exits 2", citations.main([]) == 2)
 
 
+# ---- the renderer's own address is not the model's mistake (v3.33.2) -------
+# Prompts print every line-addressed artifact as `%6d\t<text>`, so a model that
+# copies a line verbatim -- exactly what it is told to do -- copies the number
+# with it, and the validator failed it for containing what the harness printed.
+# Four of the 47 findings recovered from job 45344219 failed this way and all
+# four resolve now.
+_LINE = "slurmstepd: error: JOB 44727703 CANCELLED AT 2026-08-29 DUE TO TIME LIMIT"
+_B = {"sections": {"out_tail": {"artifact_id": "train.out", "sha256": "a" * 64,
+                                "lines": [[286, _LINE]]}}}
+ck("a plain verbatim quote still resolves",
+   citations.resolve_detail(_B, _LINE)["ok"])
+_addr = citations.resolve_detail(_B, "   286\t" + _LINE)
+ck("a quote carrying the printed address resolves too", _addr["ok"])
+ck("and it lands on the same line", (_addr.get("hit") or {}).get("line") == 286)
+ck("the row records that the address was stripped", _addr.get("address_stripped") is True)
+ck("a quote with no address is not marked as stripped",
+   citations.resolve_detail(_B, _LINE).get("address_stripped") is False)
+
+_t, _was = citations.strip_rendered_address("   12\tmerged 48,752 images")
+ck("only the leading address is removed", _t == "merged 48,752 images" and _was)
+_t2, _was2 = citations.strip_rendered_address("epoch 24 of 60 at 13.7G")
+ck("a number inside the text is evidence and is kept",
+   _t2 == "epoch 24 of 60 at 13.7G" and not _was2)
+_t3, _was3 = citations.strip_rendered_address("   1\ta\n   2\tb")
+ck("every line of a multi-line quote is unprefixed", _t3 == "a\nb" and _was3)
+
+# ---- a correction's quote is checked too, in its own block ----------------
+# Presence was enforced at two gates and resolvability at none, so a correction
+# could be justified by a quote that would be rejected outright as a finding --
+# and one in the recovered set was. Reported separately so it cannot move the
+# finding numbers the benchmark is scored on.
+_V = {"verdict": "issue",
+      "findings": [{"signal": "walltime_bound", "quote": _LINE,
+                    "diagnosis": "killed at the wall", "severity": "crit"}],
+      "corrections": [
+          {"action": "increase_walltime", "params": {}, "risk": "R2",
+           "reason": "it hit the wall", "quote": _LINE},
+          {"action": "reduce_epochs", "params": {}, "risk": "R1",
+           "reason": "guessing", "quote": "a line that was never in the bundle"}],
+      "escalate": {"to": "none", "reason": ""}, "confidence": 0.9}
+_R = citations.validate_verdict(_B, _V)
+ck("the finding still resolves", len(_R["findings"]) == 1)
+ck("a correction with a resolvable quote is accepted",
+   len(_R["corrections"]) == 1 and _R["corrections"][0]["line"] == 286)
+ck("a correction with an invented quote is rejected",
+   len(_R["corrections_rejected"]) == 1)
+ck("and the rejection names the action it would have taken",
+   _R["corrections_rejected"][0]["action"] == "reduce_epochs")
+ck("correction counts live in their own block",
+   _R["stats"]["corrections"] == {"corrections": 2, "accepted": 1, "rejected": 1})
+ck("and they do not move the finding counts",
+   _R["stats"]["findings"] == 1 and _R["stats"]["accepted"] == 1)
+ck("the stats count how many quotes needed their address stripped",
+   _R["stats"]["address_stripped"] == 0)
+
+# ---- the rules a quote is judged by are stated where the model can read them
+_PROMPT = (pathlib.Path(citations.__file__).resolve().parent
+           / "prompts" / "supervisor.txt").read_text()
+for _rule in ("Quote from ONE line", "at least 20 characters",
+              "renders as `None`", "Leading line numbers are fine"):
+    ck("the prompt states: %s" % _rule, _rule in _PROMPT)
+
+
 if _fails:
     print(f"\nFAILED: {len(_fails)} -> {_fails}")
     sys.exit(1)

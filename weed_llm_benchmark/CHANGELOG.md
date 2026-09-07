@@ -8906,3 +8906,38 @@ fitted, at 81,128 and 76,111 characters.
 Excluding refusals raises the model arms' recall, and recomputing the false-alarm
 rate over answered controls only can move against them. The numbers from job
 45344219 should not be quoted at all until the run is repeated.
+
+## 2026-09-07 — v3.33.2 the rules a quote is judged by, and one the model never broke
+
+Of the 47 findings recovered from job 45344219, four were rejected for carrying
+the line number the prompt itself printed in front of the line. Every
+line-addressed artifact is rendered as `%6d\t<text>`, the model was told to copy
+verbatim, it copied verbatim, and the validator failed it for including the
+harness's own output. `normalize()` collapsed the whitespace but left the
+address, so the needle could never be a substring of the indexed line.
+
+`strip_rendered_address` removes a leading address before matching, on each line
+of a multi-line quote, and only where the line begins with one — a number inside
+the text is evidence and is kept. All four of those findings resolve now, and the
+resolution records `address_stripped` so a reader can tell a quote that needed it
+from one that did not.
+
+**The other rules are now stated where the model can read them.** Nine quotes were
+under the 20-character floor, five ran across two lines, and four were the literal
+string `None`. All three rules lived only in `citations.py`; `prompts/supervisor.txt`
+said "verbatim, from the bundle above" and nothing else. It states all four now,
+including that a copied line number is fine, so the model is not asked to guess at
+a constraint it is scored on. `min_quote_chars` stays at 20 — the median recovered
+quote is 97 characters, so the floor is not what is binding.
+
+The quotes preserve the export's own `<HOME>` and `<REPO>` redaction placeholders,
+which is direct evidence the model is copying rather than reconstructing.
+
+**A correction's quote is resolved for the first time.** Presence was enforced at
+two gates — the verdict schema and the correction channel — and resolvability at
+none, so a correction could be justified by a quote that would have been rejected
+outright as a finding, and one in the recovered set was. `validate_verdict` now
+resolves them into `corrections` / `corrections_rejected` with their own counts,
+kept separate from the findings block so they cannot move the numbers the
+benchmark is scored on. A change to a running campaign deserves at least the
+grounding a report about it needs.
