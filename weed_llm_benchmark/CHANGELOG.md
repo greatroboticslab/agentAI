@@ -8995,3 +8995,34 @@ The split was re-frozen with `--force`: **dev 149 / test 13, the same case ids i
 the same halves**, digest `3a7e1823` → `6ca17e30`, and `verify` recomputes it. The
 diff is one line. As stated in v3.34.0, job 45344219 is no longer comparable
 against this corpus; it was already not reportable.
+
+## 2026-09-08 — v3.35.0 a provider that ignores the context you ask for
+
+Wiring the lab's own 7B model as a reviewer produced, on the first call, exactly
+the failure this campaign exists to study. A 39,515-character prompt (~14,300
+tokens) came back reporting **2,050 input tokens**. ollama's OpenAI-compatible
+endpoint accepts an `options` block and ignores it, applying the model's default
+2048 window instead. The model then answered — fluently, confidently — about a
+CUDA driver error that happened to survive in the tail, and never saw the round
+it was asked to review.
+
+The existing refusal did not catch it. It compares the estimate against the
+window the caller **requests**, which is the right guard against sending too much
+and the wrong one against a provider that quietly sends back less.
+
+**`TRUNCATION_FLOOR`.** Every reply is now checked against what the provider says
+it actually read: below half the estimate the result is returned as an error
+naming both numbers and the ratio. Backend-independent, because the failure is
+not ollama's alone — any provider that truncates instead of refusing produces a
+verdict about a fragment, and a verdict about a fragment reads exactly like a
+considered one.
+
+**An ollama-native mode.** `BRAIN_API=ollama` posts to `/api/chat`, where the same
+`options.num_ctx` field is honoured; measured 6,030 tokens read against 2,050 on
+the compatible endpoint for an identical prompt. The client still serves vLLM and
+ollama through one seam, which is the point of having it.
+
+Verified end to end on the live bundle: the compatible endpoint is refused with
+"the provider read 2050 tokens of an estimated 14318 (0.14)", and the native path
+reads 13,605 tokens in 15.2 s and returns a schema-valid verdict whose single
+finding carries a quote that resolves.

@@ -58,6 +58,16 @@ DEFAULT_TIMEOUT_S = 600
 DEFAULT_NUM_CTX = 32768
 DEFAULT_TEMPERATURE = 0.3
 HEARTBEAT_MAX_AGE_S = 180.0     # WP4 gate: a window is "configured" only while fresh
+# Below this fraction of the estimate, the provider did not read the prompt we
+# sent it. Measured 2026-09-08: a 39,515-character prompt (~14,300 tokens) came
+# back reporting 2,050 input tokens, because ollama's OpenAI-compatible endpoint
+# silently applies the model's default 2048 window and ignores any context the
+# caller asks for. The model then answered confidently about a CUDA driver error
+# from the surviving tail and never saw the round it was asked to review. The
+# refusal above only compares the estimate against the window we REQUESTED; this
+# compares it against what the provider says it actually read, which is the only
+# number that can catch a provider that ignores the request.
+TRUNCATION_FLOOR = 0.5
 # Measured, not assumed. Job 45344219's own probe tokenised 48,026 chars into
 # 16,113 tokens = 2.98 chars/token, and across its 33 completed calls the pooled
 # ratio was 2.763 with a minimum of 2.257. The old pair of constants -- 3.6 here
@@ -143,7 +153,7 @@ class OpenAICompatClient(object):
     """
 
     def __init__(self, endpoint=None, model=None, temperature=None, timeout_s=None,
-                 su_per_hour=None, json_mode=None, opener=None):
+                 su_per_hour=None, json_mode=None, opener=None, api=None):
         self.endpoint = (endpoint or os.environ.get("BRAIN_ENDPOINT") or "").rstrip("/")
         self.model = model or os.environ.get("BRAIN_MODEL") or ""
         self.temperature = float(temperature if temperature is not None
@@ -155,6 +165,11 @@ class OpenAICompatClient(object):
         self.su_per_hour = float(rate) if rate not in (None, "") else None
         jm = json_mode if json_mode is not None else os.environ.get("BRAIN_JSON_MODE", "1")
         self.json_mode = str(jm).strip().lower() not in ("0", "false", "no", "")
+        # "openai" speaks /v1/chat/completions; "ollama" speaks /api/chat.
+        # ollama's own OpenAI-compatible endpoint accepts `options` and then
+        # ignores it, so a caller asking for a 32K window silently gets 2048.
+        # Its native endpoint honours the same field. Measured both ways.
+        self.api = str(api or os.environ.get("BRAIN_API", "openai")).strip().lower()
         self._opener = opener or urllib.request.urlopen
 
     def _post(self, url, payload):
@@ -188,13 +203,24 @@ class OpenAICompatClient(object):
                             "rather than truncated" % (est, int(num_ctx)))
             out["context_overflow"] = True
             return out
-        payload = {"model": model, "temperature": self.temperature,
-                   "messages": [{"role": "user", "content": prompt}]}
-        if self.json_mode:
-            payload["response_format"] = {"type": "json_object"}
+        ctx = int(num_ctx or DEFAULT_NUM_CTX)
+        if self.api == "ollama":
+            url = self.endpoint.rsplit("/v1", 1)[0].rstrip("/") + "/api/chat"
+            payload = {"model": model, "stream": False,
+                       "options": {"num_ctx": ctx, "temperature": self.temperature},
+                       "messages": [{"role": "user", "content": prompt}]}
+            if self.json_mode:
+                payload["format"] = "json"
+        else:
+            url = self.endpoint + "/chat/completions"
+            payload = {"model": model, "temperature": self.temperature,
+                       "messages": [{"role": "user", "content": prompt}]}
+            if self.json_mode:
+                payload["response_format"] = {"type": "json_object"}
+        out["api"] = self.api
         t0 = time.time()
         try:
-            body = self._post(self.endpoint + "/chat/completions", payload)
+            body = self._post(url, payload)
         except urllib.error.HTTPError as e:
             detail = ""
             try:
@@ -209,14 +235,31 @@ class OpenAICompatClient(object):
             out["error"] = "%s: %s" % (type(e).__name__, e)
             return out
         out["latency_s"] = round(time.time() - t0, 3)
-        try:
-            out["text"] = str(body["choices"][0]["message"]["content"] or "")
-        except Exception:
-            out["error"] = "reply carried no message content"
-        usage = body.get("usage") or {}
-        out["tokens_in"] = int(usage.get("prompt_tokens") or 0)
-        out["tokens_out"] = int(usage.get("completion_tokens") or 0)
+        if self.api == "ollama":
+            try:
+                out["text"] = str((body.get("message") or {}).get("content") or "")
+            except Exception:
+                out["error"] = "reply carried no message content"
+            out["tokens_in"] = int(body.get("prompt_eval_count") or 0)
+            out["tokens_out"] = int(body.get("eval_count") or 0)
+        else:
+            try:
+                out["text"] = str(body["choices"][0]["message"]["content"] or "")
+            except Exception:
+                out["error"] = "reply carried no message content"
+            usage = body.get("usage") or {}
+            out["tokens_in"] = int(usage.get("prompt_tokens") or 0)
+            out["tokens_out"] = int(usage.get("completion_tokens") or 0)
         out["model_used"] = str(body.get("model") or model)
+        # The provider says how much it actually read. If that is far below what
+        # we sent, it truncated -- and an answer about the surviving fragment is
+        # worse than no answer, because it reads as a considered verdict.
+        if out["tokens_in"] and est and out["tokens_in"] < est * TRUNCATION_FLOOR:
+            out["truncated"] = True
+            out["error"] = ("the provider read %d tokens of an estimated %d (%.2f); "
+                            "the prompt was truncated, so this reply is about a "
+                            "fragment of the evidence"
+                            % (out["tokens_in"], est, out["tokens_in"] / float(est)))
         if self.su_per_hour is not None:
             out["su"] = round(self.su_per_hour * out["latency_s"] / 3600.0, 6)
         else:
