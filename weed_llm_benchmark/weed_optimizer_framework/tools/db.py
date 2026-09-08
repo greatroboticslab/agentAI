@@ -472,8 +472,18 @@ DEFAULT_DOMAIN_CONFIG = {
     # "scripted" = the deterministic loop, no model decides anything (the
     # baseline). An empty tier id means that tier is not wired, so a missing
     # deployment can never silently promote another model into a review role.
+    # `review` is the shadow reviewer: after a step completes the scheduler builds
+    # an evidence bundle and, if this block is enabled, asks the tier named in
+    # `tiers.fast` what it makes of it. The verdict is written and shown and
+    # NOTHING reads it back -- `policy` stays "scripted", so no decision in the
+    # loop depends on a model. Turning the reviewer off is a config edit, not a
+    # code change, which is the point of it living here.
     "brain": {"policy": "scripted",
               "tiers": {"worker": "", "fast": "", "deep": "", "planner": ""},
+              "review": {"enabled": False, "mode": "shadow",
+                         "endpoint": "http://127.0.0.1:11434/v1",
+                         "api": "ollama", "num_ctx": 32768, "timeout_s": 300,
+                         "steps": ["train", "filter", "collect"]},
               "review_timeout_min": 90, "periodic_audit_every": 4},
     "budget": {"su_envelope": 1500, "daily_cap": 120, "per_round_cap": 60},
     # The sealed menu of things an experiment is allowed to change, and the

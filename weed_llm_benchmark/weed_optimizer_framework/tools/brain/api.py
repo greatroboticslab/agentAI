@@ -324,6 +324,58 @@ def api_brain_timeline(domain: str):
             "sources_unavailable": missing, "checked_ts": time.time()}
 
 
+@router.get("/api/brain/{domain}/reviews")
+def api_brain_reviews(domain: str):
+    """What the reviewer said about recent steps, newest first.
+
+    Every record states `applied: false` and the policy that was in force, so a
+    reader can never mistake an advisory verdict for something the loop acted
+    on. That distinction is the whole meaning of shadow mode and it belongs in
+    the data, not only in a heading.
+    """
+    dom = _domain(domain)
+    d = os.path.join(_brain_dir(dom), "reviews")
+    if not os.path.isdir(d):
+        return _unavailable("no step has been reviewed in this domain yet", path=d)
+    rows, errors = [], []
+    try:
+        for name in sorted(os.listdir(d), reverse=True)[:MAX_ROWS]:
+            if not name.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(d, name), "rb") as fh:
+                    rec = json.loads(fh.read().decode("utf-8"))
+            except Exception as e:
+                errors.append("%s: %s" % (name, e))
+                continue
+            v = rec.get("verdict") or {}
+            rows.append({
+                "file": name, "ts": rec.get("ts"), "round": rec.get("round"),
+                "step": rec.get("step"), "model": rec.get("model"),
+                "ok": bool(rec.get("ok")), "reason": rec.get("reason"),
+                "mode": rec.get("mode"), "applied": bool(rec.get("applied")),
+                "policy_in_force": rec.get("policy_in_force"),
+                "verdict": v.get("verdict"), "confidence": v.get("confidence"),
+                "n_findings": len(v.get("findings") or []),
+                "n_resolved": len(rec.get("accepted_findings") or []),
+                "n_unresolved": rec.get("rejected_unverifiable_count"),
+                "elapsed_s": rec.get("elapsed_s"), "tokens_in": rec.get("tokens_in"),
+                "findings": [
+                    {"signal": f.get("signal"), "severity": f.get("severity"),
+                     "diagnosis": f.get("diagnosis"), "quote": f.get("quote"),
+                     "artifact_id": None, "line": None}
+                    for f in (v.get("findings") or [])[:6]],
+                "resolved": [
+                    {"signal": r.get("signal"), "artifact_id": r.get("artifact_id"),
+                     "line": r.get("line")}
+                    for r in (rec.get("accepted_findings") or [])[:6]],
+            })
+    except Exception as e:
+        return _unavailable("reviews could not be listed: %s" % e)
+    return {"available": True, "domain": dom, "rows": rows, "errors": errors,
+            "applied_any": any(r["applied"] for r in rows)}
+
+
 # --- approvals: the one place a person rules on a queued request -------------
 #
 # This is the exception to the read-only rule above, and it is the exception
@@ -466,6 +518,7 @@ gate.</div>
 <script>
 const DOMAIN = "__DOMAIN__";
 const SECTIONS = [
+  ["reviews",     "What the reviewer said"],
   ["signals",     "Deterministic checks"],
   ["corrections", "Corrections applied"],
   ["su",          "Compute spent"],
@@ -550,6 +603,31 @@ function render(key, data){
   // empty table where a missing store belongs is exactly the silence this
   // layer exists to break.
   if(!data.available) return '<div class="missing">Not available &mdash; '+esc(data.reason)+'</div>';
+  if(key==="reviews"){
+    const rows = data.rows || [];
+    const note = '<div class="sub">Advisory only. Nothing here was applied; the '
+      + 'loop is still run by ' + esc((rows[0]||{}).policy_in_force || "the script")
+      + '.</div>';
+    if(!rows.length) return note + '<div class="missing">nothing reviewed yet</div>';
+    return note + rows.map(r => {
+      const head = '<div style="margin:.5rem 0 .2rem"><b>round ' + esc(r.round)
+        + ' &middot; ' + esc(r.step) + '</b> &mdash; '
+        + (r.ok ? '<span class="' + (r.verdict === "issue" ? "warn" : "ok") + '">'
+                  + esc(r.verdict) + '</span>'
+                : '<span class="crit">no verdict</span>')
+        + ' <span class="missing">' + esc(r.model) + ', ' + esc(r.elapsed_s)
+        + 's, ' + esc(r.tokens_in) + ' tokens read</span></div>';
+      if(!r.ok) return head + '<div class="err">' + esc(r.reason) + '</div>';
+      const body = (r.findings || []).map(f =>
+        '<div style="margin:.2rem 0 .4rem .6rem">' + sev(f.severity || "info")
+        + ' <b>' + esc(f.signal) + '</b><br>' + esc(f.diagnosis)
+        + '<br><code>' + esc(String(f.quote || "").slice(0, 160)) + '</code></div>').join("");
+      const foot = '<div class="sub" style="margin-left:.6rem">'
+        + esc(r.n_resolved) + ' of ' + esc(r.n_findings)
+        + ' quote(s) resolved to a real line' + '</div>';
+      return head + (body || '<div class="missing">no findings</div>') + foot;
+    }).join("<hr style=\'border:0;border-top:1px solid rgba(255,255,255,.08)\'>");
+  }
   if(key==="signals"){
     const rows = (data.rows||[]).map(r=>[sev(r.severity), esc(r.signal),
       esc(r.reason), citeLink(r.evidence && r.evidence[0])]);

@@ -286,6 +286,84 @@ def _build_bundle(domain, step, jobid, dcfg):
         return None
 
 
+def _review_bundle(domain, step, bundle, dcfg):
+    """Ask the configured reviewer what it makes of a finished step. Shadow only.
+
+    This is the first time a model looks at this campaign at all. It is
+    deliberately the weakest possible coupling: the verdict is written to disk
+    and shown on the supervision page, and NOTHING in the loop reads it back.
+    `brain.policy` stays "scripted"; every decision is still made by the same
+    code that made it yesterday. A reviewer that cannot be switched off without
+    a code change is not a shadow.
+
+    Failures are recorded and stepped over. A model is a network call to a box
+    that may be busy, and a round must never wait on one.
+    """
+    review = ((dcfg or {}).get("brain") or {}).get("review") or {}
+    if not review.get("enabled"):
+        return None
+    steps = review.get("steps")
+    if isinstance(steps, list) and steps and step not in steps:
+        return None
+    model = (((dcfg or {}).get("brain") or {}).get("tiers") or {}).get("fast") or ""
+    if not model:
+        _log().warning("[rounds] %s: review is enabled but no fast tier is wired; "
+                       "refusing to guess a model" % domain)
+        return None
+    try:
+        from .brain import supervisor as _sup
+    except Exception as e:
+        _log().warning("[rounds] %s: supervisor unavailable (%s)" % (domain, e))
+        return None
+    started = time.time()
+    try:
+        client = _sup.OpenAICompatClient(
+            endpoint=review.get("endpoint"), model=model,
+            timeout_s=review.get("timeout_s") or 300,
+            api=review.get("api") or "openai")
+        rec = _sup.review(bundle, client=client,
+                          num_ctx=int(review.get("num_ctx") or 32768),
+                          case_id="%s_r%s_%s" % (domain, bundle.get("round"), step))
+    except Exception as e:
+        _log().warning("[rounds] %s: review raised (%s: %s)"
+                       % (domain, type(e).__name__, e))
+        return None
+
+    rec.update({"domain": domain, "step": step, "round": bundle.get("round"),
+                "model": model, "endpoint": review.get("endpoint"),
+                "api": review.get("api"), "ts": started,
+                "elapsed_s": round(time.time() - started, 2),
+                # Stated on the record, not only in the docs: this verdict was
+                # not applied to anything, and the loop's policy is unchanged.
+                "mode": review.get("mode") or "shadow", "applied": False,
+                "policy_in_force": ((dcfg or {}).get("brain") or {}).get("policy")})
+    try:
+        base = os.path.join(str(_CTX.get("repo") or "."), "results", "framework",
+                            "_brain", str(domain))
+        d = os.path.join(base, "reviews")
+        os.makedirs(d, exist_ok=True)
+        name = "%d_r%s_%s.json" % (int(started), bundle.get("round"), step)
+        for path in (os.path.join(d, name), os.path.join(base, "latest_review.json")):
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(rec, fh, sort_keys=True)
+            os.replace(tmp, path)
+    except Exception as e:
+        _log().warning("[rounds] %s: review could not be written (%s)" % (domain, e))
+        return rec
+
+    v = rec.get("verdict") or {}
+    if rec.get("ok"):
+        _log().info("[rounds] %s: reviewer %s says %s (%d finding(s), %d resolved, "
+                    "%.1fs) -- shadow, nothing applied"
+                    % (domain, model, v.get("verdict"), len(v.get("findings") or []),
+                       len(rec.get("accepted_findings") or []), rec["elapsed_s"]))
+    else:
+        _log().warning("[rounds] %s: review did not produce a verdict: %s"
+                       % (domain, str(rec.get("reason"))[:200]))
+    return rec
+
+
 def _log_action(action: str, result: dict):
     """Mirror a scheduler submission into the dashboard's cluster-action history.
 
@@ -1165,7 +1243,9 @@ def _advance(domain: str, dcfg: dict):
             # Evidence for the step that just finished, before the in-flight
             # fields are cleared. A round that COMPLETED is exactly the case
             # nothing was watching.
-            _build_bundle(domain, st["step"], st.get("job"), dcfg)
+            _bundle = _build_bundle(domain, st["step"], st.get("job"), dcfg)
+            if _bundle:
+                _review_bundle(domain, st["step"], _bundle, dcfg)
             # A step that completed has no failure shape any more; leaving the
             # old one would let a later review be corrected on a stale cause.
             (st.get("last_terminal") or {}).pop(st["step"], None)

@@ -322,5 +322,87 @@ class TestServedScript(Base):
             os.unlink(path)
 
 
+class TestShadowReviews(Base):
+    """Shadow means the verdict is shown and nothing acts on it.
+
+    This is the first time a model looks at this campaign, so the distinction
+    between "the reviewer thinks X" and "the loop did X" has to be carried in
+    the data, not just in a heading a reader may not read.
+    """
+
+    def _write(self, **over):
+        d = os.path.join(self.bdir, "reviews")
+        os.makedirs(d, exist_ok=True)
+        rec = {"ts": 1788900000.0, "round": "13", "step": "filter",
+               "model": "qwen2.5-coder:7b", "ok": True, "mode": "shadow",
+               "applied": False, "policy_in_force": "scripted",
+               "elapsed_s": 15.2, "tokens_in": 13605,
+               "rejected_unverifiable_count": 0,
+               "verdict": {"verdict": "issue", "confidence": 0.9, "findings": [
+                   {"signal": "gate_noop", "severity": "warn",
+                    "diagnosis": "the slug scores predate the collect step",
+                    "quote": "slug scores are 38252 s older than the collect step"}]},
+               "accepted_findings": [{"signal": "gate_noop",
+                                      "artifact_id": "s.json", "line": 4}]}
+        rec.update(over)
+        with open(os.path.join(d, "1788900000_r13_filter.json"), "w") as fh:
+            json.dump(rec, fh)
+
+    def test_a_domain_with_no_review_says_so(self):
+        r = A.api_brain_reviews("weed")
+        self.assertFalse(r["available"])
+        self.assertIn("no step has been reviewed", r["reason"])
+
+    def test_a_review_is_reported_with_what_resolved(self):
+        self._write()
+        r = A.api_brain_reviews("weed")
+        self.assertTrue(r["available"])
+        row = r["rows"][0]
+        self.assertEqual(row["verdict"], "issue")
+        self.assertEqual(row["n_findings"], 1)
+        self.assertEqual(row["n_resolved"], 1)
+        self.assertEqual(row["resolved"][0]["line"], 4)
+
+    def test_every_row_states_that_nothing_was_applied(self):
+        self._write()
+        r = A.api_brain_reviews("weed")
+        self.assertFalse(r["applied_any"])
+        self.assertFalse(r["rows"][0]["applied"])
+        self.assertEqual(r["rows"][0]["policy_in_force"], "scripted")
+
+    def test_a_failed_review_is_shown_as_a_failure_not_a_clean_verdict(self):
+        self._write(ok=False, reason="the provider read 2050 tokens of 14318",
+                    verdict=None, accepted_findings=[])
+        row = A.api_brain_reviews("weed")["rows"][0]
+        self.assertFalse(row["ok"])
+        self.assertIn("2050", row["reason"])
+
+    def test_the_page_shows_the_reviewer_first_and_labels_it_advisory(self):
+        body = A.page_supervision("weed").body.decode("utf-8")
+        self.assertIn('"reviews"', body)
+        self.assertIn("What the reviewer said", body)
+        self.assertIn("Advisory only", body)
+        self.assertIn("Nothing here was applied", body)
+
+    def test_nothing_in_the_loop_reads_a_review_back(self):
+        """Shadow is a property of the code, so it is asserted against the code.
+
+        If a decision path ever starts reading latest_review.json or the reviews
+        directory, this fails and someone has to say so out loud.
+        """
+        tools = pathlib.Path(A.__file__).resolve().parents[1]
+        readers = []
+        for path in tools.rglob("*.py"):
+            if path.name in ("api.py",) or "/tests/" in str(path):
+                continue
+            text = path.read_text(errors="replace")
+            if "latest_review.json" in text or '"reviews"' in text:
+                # round_scheduler WRITES them; nothing may READ them.
+                if path.name == "round_scheduler.py" and "json.dump" in text:
+                    continue
+                readers.append(path.name)
+        self.assertEqual(readers, [], "a decision path reads the reviewer: %s" % readers)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -9026,3 +9026,34 @@ Verified end to end on the live bundle: the compatible endpoint is refused with
 "the provider read 2050 tokens of an estimated 14318 (0.14)", and the native path
 reads 13,605 tokens in 15.2 s and returns a schema-valid verdict whose single
 finding carries a quote that resolves.
+
+## 2026-09-08 — v3.36.0 a model reviews the campaign, and changes nothing
+
+The first tier is wired. After a step completes, the scheduler builds the
+evidence bundle it has been building since v3.33.0 and now asks the model named
+in `brain.tiers.fast` what it makes of it. The verdict is written and shown.
+**Nothing reads it back.**
+
+`brain.policy` is still `scripted`. Every decision in the loop is made by the same
+code that made it yesterday, and each stored verdict carries `applied: false`
+alongside the policy that was in force, so the distinction between "the reviewer
+thinks X" and "the loop did X" lives in the data rather than in a heading a reader
+may skip. A test walks the tools tree and fails if any decision path starts
+reading `latest_review.json` or the reviews directory — shadow is a property of
+the code, so it is asserted against the code.
+
+The reviewer is `qwen2.5-coder:7b` on the lab's own RTX 3060: no cluster job, no
+queue, no service units. Enabling or disabling it is a config edit
+(`brain.review.enabled`), never a code change, and a review that is enabled with
+no tier wired refuses rather than guessing a model.
+
+**Its first real verdict, on round 13's filter step.** 11.8 s, 13,609 tokens read,
+`issue` at confidence 0.9, one finding: the run claims the curated tier while the
+slug scores predate its own collect step by 38,252 s, so they cannot describe what
+it collected. The quote resolved to `s2_dino_scores_45546883.out` line 69. It
+reached the same conclusion the deterministic checks did, independently, and
+grounded it in a real line.
+
+A failed review is shown as a failure, never as a clean verdict. Verified in a
+real browser: ten cards, no page errors, the reviewer card first and labelled
+advisory.
