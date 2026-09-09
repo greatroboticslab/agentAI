@@ -256,8 +256,11 @@ def _build_bundle(domain, step, jobid, dcfg):
                              .get("round_num"))
             except Exception:
                 round_num = None
-        stage = {"ledger": {"config": dcfg, "rounds": rounds,
-                            "mongo_ok": bool(rounds)}}
+        # The DOMAIN config, not the scheduler's: `round_params`, `noise_floor`
+        # and `lever_menu` live there, and `plateau` needs the noise floor to
+        # decide anything at all.
+        stage = {"ledger": {"config": _domain_cfg(domain) or dcfg or {},
+                            "rounds": rounds, "mongo_ok": bool(rounds)}}
         bundle = _evidence.build(domain, round_num, step, jobid,
                                  ctx={"slurm_sh": _CTX.get("slurm_sh"),
                                       "stage": stage, "log": _log()})
@@ -286,6 +289,9 @@ def _build_bundle(domain, step, jobid, dcfg):
         return None
 
 
+_REVIEW_OFF_SAID = set()
+
+
 def _review_bundle(domain, step, bundle, dcfg):
     """Ask the configured reviewer what it makes of a finished step. Shadow only.
 
@@ -299,13 +305,31 @@ def _review_bundle(domain, step, bundle, dcfg):
     Failures are recorded and stepped over. A model is a network call to a box
     that may be busy, and a round must never wait on one.
     """
-    review = ((dcfg or {}).get("brain") or {}).get("review") or {}
+    # The `dcfg` the tick loop passes is the SCHEDULER's own config -- which
+    # domains are enabled -- and `brain` does not live there; it lives in the
+    # domain config in the database. Reading the wrong one made this function
+    # return at the very first line, silently, on a real completed step, while
+    # every check said it was configured correctly. Read the right one here.
+    dom_cfg = _domain_cfg(domain) or {}
+    brain = (dom_cfg.get("brain") or {})
+    review = brain.get("review") or {}
     if not review.get("enabled"):
+        # Said once per process, not per tick: "the reviewer is off" is a state
+        # a reader needs, and the earlier silence is what made a wiring mistake
+        # look exactly like a working shadow reviewer with nothing to say.
+        if domain not in _REVIEW_OFF_SAID:
+            _REVIEW_OFF_SAID.add(domain)
+            _log().info("[rounds] %s: no shadow reviewer (brain.review.enabled is "
+                        "%r in the domain config); bundles are still written"
+                        % (domain, review.get("enabled")))
         return None
+    _REVIEW_OFF_SAID.discard(domain)
     steps = review.get("steps")
     if isinstance(steps, list) and steps and step not in steps:
+        _log().info("[rounds] %s: step %s is not in the reviewer's step list %s"
+                    % (domain, step, steps))
         return None
-    model = (((dcfg or {}).get("brain") or {}).get("tiers") or {}).get("fast") or ""
+    model = (brain.get("tiers") or {}).get("fast") or ""
     if not model:
         _log().warning("[rounds] %s: review is enabled but no fast tier is wired; "
                        "refusing to guess a model" % domain)
@@ -336,7 +360,7 @@ def _review_bundle(domain, step, bundle, dcfg):
                 # Stated on the record, not only in the docs: this verdict was
                 # not applied to anything, and the loop's policy is unchanged.
                 "mode": review.get("mode") or "shadow", "applied": False,
-                "policy_in_force": ((dcfg or {}).get("brain") or {}).get("policy")})
+                "policy_in_force": brain.get("policy")})
     try:
         base = os.path.join(str(_CTX.get("repo") or "."), "results", "framework",
                             "_brain", str(domain))

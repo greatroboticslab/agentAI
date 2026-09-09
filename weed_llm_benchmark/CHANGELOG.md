@@ -9057,3 +9057,30 @@ grounded it in a real line.
 A failed review is shown as a failure, never as a clean verdict. Verified in a
 real browser: ten cards, no page errors, the reviewer card first and labelled
 advisory.
+
+## 2026-09-08 — v3.36.1 the reviewer was reading the wrong config, and said nothing about it
+
+Round 13's train step completed, the bundle was written, `epochs_truncated` and
+`gate_noop` both fired at warn — and no review appeared. The model worked when
+called by hand on the same bundle with the same config. The live path produced
+not one line of log, success or failure.
+
+The tick loop passes `_advance` the **scheduler's** config, the one that says
+which domains are enabled. `brain.review` lives in the **domain** config, in the
+database. `_review_bundle` read the first, found no `enabled`, and returned at its
+first line.
+
+**The silent return is what made it invisible.** Every check said the reviewer was
+configured correctly, the page said the fast tier was wired, and a wiring mistake
+looked exactly like a working shadow reviewer with nothing to say. That is the
+same defect this layer was built to find, committed here.
+
+`_review_bundle` reads `_domain_cfg(domain)` now, and announces itself once per
+process when the reviewer is off rather than returning in silence. A step outside
+the configured step list also says so. `_build_bundle` stages the domain config
+too — `round_params`, `noise_floor` and `lever_menu` live there, and `plateau`
+cannot decide anything without the noise floor.
+
+A test encodes the bug's shape: a tick config carrying no `brain` block at all,
+with the reviewer enabled in the database, must still run — and a disabled
+reviewer must say so once and not once per tick.

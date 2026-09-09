@@ -159,6 +159,58 @@ ck("the bundle build reports how many signals fired",
 
 shutil.rmtree(ROOT, ignore_errors=True)
 
+print("\nthe reviewer reads the config that actually holds `brain`")
+# The tick loop passes the SCHEDULER's config -- which domains are enabled -- and
+# `brain` does not live there. Reading it made _review_bundle return at its first
+# line on a real completed step while every check said it was configured
+# correctly, and the silent return is what made that invisible for two hours.
+
+class _ReviewDB(_DB):
+    """A database whose domain config enables the reviewer."""
+
+    def get_domain_config(self, domain):
+        cfg = dict(db.DEFAULT_DOMAIN_CONFIG)
+        brain = dict(cfg["brain"])
+        brain["tiers"] = dict(brain["tiers"], fast="a-model")
+        brain["review"] = dict(brain["review"], enabled=True, api="openai",
+                               endpoint="http://127.0.0.1:1/v1", timeout_s=1)
+        cfg["brain"] = brain
+        return cfg
+
+
+TICK_CFG = {"enabled": True}          # exactly what the tick loop passes: no `brain`
+log6 = _Log()
+rs._CTX.clear()
+rs._CTX.update(_ctx(ROOT, log6, _ReviewDB()))
+_bundle = {"domain": "weed", "round": "13", "step": "train", "sections": {}}
+_rec = rs._review_bundle("weed", "train", _bundle, TICK_CFG)
+ck("the reviewer runs even though the tick config carries no brain block",
+   _rec is not None)
+if _rec:
+    ck("and the record says the verdict was not applied", _rec.get("applied") is False)
+    ck("and names the policy actually in force from the domain config",
+       _rec.get("policy_in_force") == "scripted")
+    ck("an unreachable endpoint is a failed review, not a crash",
+       _rec.get("ok") is False and _rec.get("reason"))
+ck("a failed review is still written to disk so the page can show it",
+   os.path.exists(os.path.join(ROOT, "results", "framework", "_brain", "weed",
+                               "latest_review.json")))
+
+print("\nand when it is off, it says so once instead of nothing")
+log7 = _Log()
+rs._CTX.clear()
+rs._CTX.update(_ctx(ROOT, log7, _DB()))          # default config: review disabled
+rs._REVIEW_OFF_SAID.discard("weed")
+rs._review_bundle("weed", "train", _bundle, TICK_CFG)
+ck("a disabled reviewer announces itself", 
+   any("no shadow reviewer" in str(l) for l in log7.lines))
+_n = len([l for l in log7.lines if "no shadow reviewer" in str(l)])
+rs._review_bundle("weed", "train", _bundle, TICK_CFG)
+rs._review_bundle("weed", "train", _bundle, TICK_CFG)
+ck("and does not repeat it every tick",
+   len([l for l in log7.lines if "no shadow reviewer" in str(l)]) == _n)
+
+
 if _fails:
     print("\nFAILED: %d -> %s" % (len(_fails), _fails))
     sys.exit(1)
