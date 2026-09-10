@@ -329,6 +329,84 @@ mAP 0.5693 → 0.5607). **Over the growing regime the pool and the chain moved t
 neither can be attributed**; only the frozen regime isolates the chain, and there the slope
 is −0.00177/round at t = −2.24.
 
+## 5g. MEASURED: it is the warm-start chain, and it is not the schedule
+
+Four controls, all on **round 15's exact merged directory** (`merged_iterrnd15_train`,
+45,620 train images) and the same 1,977-image / 3,257-instance holdout, `optimizer="auto"`
+held fixed. Jobs `45672628_[1-2]` and `45672672_[1-2]`, all four COMPLETED.
+
+### The campaign recipe's own seed noise, measured for the first time
+
+Round 15's recipe verbatim — warm start from round 14's `best.pt`, `epochs=60`,
+`patience=20`, `time=10.0` — at seeds 101 (= round 15 itself), 102 and 103:
+
+| readout | per seed | mean ± std (n=3) |
+|---|---|---|
+| best epoch | 0.56072 / 0.55915 / 0.55309 | **0.5577 ± 0.0040** |
+| last epoch | 0.55146 / 0.55059 / 0.55017 | 0.5507 ± 0.0007 |
+
+All three peaked at **epoch 5** and all three ran 25 epochs. The 0.005 floor the campaign
+had been borrowing from a different recipe is close to right at best-epoch (0.0040) and six
+times too large at last-epoch (0.0007).
+
+### The two-factor result
+
+| arm | start | schedule | n | best epoch | at | last epoch |
+|---|---|---|---|---|---|---|
+| campaign (r15 recipe) | round 14 `best.pt` | 60 ep / pat 20 / `time=10.0` → ran 25 | 3 | 0.5577 ± 0.0040 | e5 | 0.5507 ± 0.0007 |
+| **A · cold + complete** | `yolo26x.pt` | 30 ep / pat 30, no `time=`, cosine ran to lr 3.8e-4 | 1 | **0.58053** | e10 | 0.55342 |
+| **B · warm + complete** | round 14 `best.pt` | identical to A | 1 | 0.55180 | **e1** | 0.52912 |
+
+A and B differ in **exactly one thing**: the initial weights.
+
+| contrast | what it isolates | best-epoch effect | in units of noise |
+|---|---|---|---|
+| **A − B** | cold vs warm start, schedule held | **+0.0287** | **5.0 σ** |
+| B − campaign | completing the cosine, start held | −0.0059 | −1.5 σ |
+| A − campaign | both changes together | **+0.0229** | **5.7 σ** |
+
+(σ for a difference of two single runs is 0.0040 × √2 = 0.0057; for a single run against the
+n=3 mean it is 0.0040.)
+
+**The warm-start chain is the cause. Completing the schedule is not a fix and if anything
+costs a little.** This settles the question §5d and §5f left open — the two defects are
+separable after all, and only one of them matters.
+
+Two details worth keeping. **Arm B's best epoch is epoch 1**: the chained model's best
+moment is the checkpoint it walked in with, and twenty-nine further epochs with a fully
+annealed cosine took it from 0.5518 down to 0.5291. Under a proper schedule, continuing to
+train the chained model on this data does not merely fail to help — it actively hurts.
+And **arm A's 0.58053 is still below the cold M1 raw runs (0.6032 ± 0.0046)**, which is not
+a contradiction: those trained a different pool (55,690 images) on a 60-epoch horizon, and
+the comparison is not controlled.
+
+**Both arms are n=1.** Repeating A at two more seeds is the obvious next control, and the
+effect would have to be six times smaller than measured for the conclusion to change.
+
+## 5h. The holdout is not leaking, but the split is not group-aware
+
+dHash 8×8 between all 3,671 cwd12 train images and all 1,977 holdout images (SLURM job on
+`RM-shared`; `results/framework/cwd12_split_leakcheck.out`):
+
+- **0** exact hash matches (Hamming 0), **0** filename-stem collisions.
+- **6 of 1,977** holdout images (0.30%) have a train neighbour at Hamming ≤ 6.
+- The histogram's mass sits at Hamming 13–18; the bulk of the two sets is well separated.
+
+Every one of the six is a **consecutive frame from the same capture session**:
+
+| holdout | nearest train image | Hamming |
+|---|---|---|
+| `20210820_iPhoneSE_YL_1424.jpg` | `20210820_iPhoneSE_YL_1422.jpg` | 1 |
+| `20210903_YALAL00_EO_7.jpg` | `20210903_YALAL00_EO_8.jpg` | 1 |
+| `20210903_iPhoneSE_YL_10.jpg` | `20210903_iPhoneSE_YL_9.jpg` | 3 |
+| `20210903_YALAL00_EO_2.jpg` | `20210903_YALAL00_EO_3.jpg` | 4 |
+| `20210910_NIKOND3300_YL_133.jpg` | `20210910_NIKOND3300_YL_134.jpg` | 5 |
+| `20210812_iPhoneSE_YL_743.jpg` | `20210812_iPhoneSE_YL_744.jpg` | 5 |
+
+So the split is random by image rather than grouped by capture session, and burst frames
+land on both sides. At 0.30% the effect on any reported mAP is negligible; the finding is
+the protocol, not the number. Report it, do not re-split before the deadline.
+
 ## 6. What this does and does not establish
 
 **Established.**
