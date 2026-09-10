@@ -248,6 +248,43 @@ comparison of a round-to-round difference against "the 0.005 noise floor" borrow
 from a different recipe. Jobs `45672672_[1-2]` are measuring the round recipe's own seed std
 at seeds 102 and 103, on round 15's exact data and schedule.
 
+## 5e. Round 9's pool anomaly, verified from the merge log and the source
+
+§3 recorded round 9's 62,959-image training scan as unexplained. It is explained, and the
+explanation is a governance defect rather than a curiosity.
+
+The `[Merge]` lines in each train job's own log give the per-slug counts. Rounds 10 and 15
+are identical — **24 slugs, 48,752 unique images**. Round 9 is **26 slugs, 68,019**. The two
+extra slugs are:
+
+| slug | images |
+|---|---|
+| `fvossel__csgo_player_detection` | 4,014 |
+| `rf_bishwarup-halder__crop-health-advisor` | 15,253 |
+
+4,014 + 15,253 = 19,267 = 68,019 − 48,752 exactly. The first is Counter-Strike player
+screenshots. Both were admitted at `MIN_DINO_SCORE=0.50` in round 9 and rejected at the same
+threshold in every other round, without themselves changing.
+
+**Why a fixed threshold is not a fixed decision.** `dinov2_curator.py:371` scores each
+candidate as
+
+```python
+for i, slug in enumerate(slugs):
+    res = score_one_slug(slug, info, model, proc, ref, seed=i)
+```
+
+— the per-slug image sample is seeded by **that slug's index in the candidate listing**. Add
+or remove one dataset anywhere in the registry and every slug after it is re-sampled, so its
+score moves and its pass/fail against a fixed threshold can flip while the dataset is
+untouched. `_sample_images` compounds it: it walks `rglob("*")` and stops at `n * 20`, so the
+pool it samples from is a filesystem-order-dependent prefix of the slug, not the slug.
+
+The metric cost was −0.002, inside noise. The finding is not the cost. It is that a
+video-game dataset entered a weed-detection training corpus, stayed for one round, left
+again — and **no check in the loop said so**. `pool_growth` is one-sided and only looks for
+absence of growth; nothing compares the slug list round to round.
+
 ## 6. What this does and does not establish
 
 **Established.**
