@@ -3,8 +3,16 @@
 *Draft of 2026-09-10. Built by re-reading the artifacts, not by copying the earlier tables.
 Four separate errors in the previously published tables are corrected here and listed in §D.*
 
-**Status:** the two control arms (`45672628_[1-2]`) and the two seed repeats (`45672672_[1-2]`)
-are running; their rows are marked PENDING and must be filled before this is shown to anyone.
+**Status:** the two control arms (`45672628_[1-2]`) and the two seed repeats
+(`45672672_[1-2]`) have completed; their measured values are in §5g of
+[`REGRESSION_DIAGNOSIS.md`](REGRESSION_DIAGNOSIS.md) and in the readable one-page version.
+
+**One-page web version:** `docs/results_page/index.html`, published at
+<https://claude.ai/code/artifact/f13cf654-af80-4101-a615-c9eb24c5df11>. It carries the
+defensible subset — the in-domain baselines, the campaign series at three readouts, the
+control arms, the audit findings, the never-quote-bare list and the gaps — with the evaluator
+band stated above every table. This file stays the exhaustive record; that page is what goes
+in front of a reader.
 
 ---
 

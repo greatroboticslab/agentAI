@@ -1,0 +1,379 @@
+<title>Which Numbers Hold Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#f6f8f5; --raise:#fdfefc; --ink:#17201b; --ink-2:#41504a;
+  --mute:#6f7c76; --rule:#dbe2dc; --rule-2:#c3cec6;
+  --ok:#2c6a4a; --ok-bg:#e6f0e9; --warn:#a2512a; --warn-bg:#f6ebe4;
+  --band:#eef2ee;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#111714; --raise:#182019; --ink:#e6ebe6; --ink-2:#b3c0b8;
+    --mute:#8a978f; --rule:#2a3630; --rule-2:#3b4a42;
+    --ok:#7fc09a; --ok-bg:#1a2b22; --warn:#e0956a; --warn-bg:#2b1f18;
+    --band:#1a221d;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111714; --raise:#182019; --ink:#e6ebe6; --ink-2:#b3c0b8;
+  --mute:#8a978f; --rule:#2a3630; --rule-2:#3b4a42;
+  --ok:#7fc09a; --ok-bg:#1a2b22; --warn:#e0956a; --warn-bg:#2b1f18;
+  --band:#1a221d;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding:56px 28px 104px}
+.col{max-width:70ch}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,4.4vw,46px);
+  line-height:1.08;letter-spacing:-.017em;margin:0 0 14px;text-wrap:balance}
+h2{font-family:var(--serif);font-weight:600;font-size:clamp(21px,2.6vw,27px);
+  line-height:1.2;margin:0 0 6px;letter-spacing:-.011em;text-wrap:balance}
+h3{font-family:var(--sans);font-weight:600;font-size:14px;margin:0 0 8px;
+  letter-spacing:.005em}
+p{margin:0 0 14px;color:var(--ink-2)}
+a{color:var(--ok)}
+.lede{font-family:var(--serif);font-size:19px;line-height:1.55;color:var(--ink-2)}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+.stamp{font-family:var(--mono);font-size:12px;color:var(--mute);
+  border-top:1px solid var(--rule);padding-top:12px;margin-top:26px}
+section{margin-top:56px}
+.note{border-left:2px solid var(--warn);background:var(--warn-bg);
+  padding:16px 20px;margin:22px 0}
+.note p:last-child{margin-bottom:0}
+.note strong{color:var(--ink)}
+
+/* an evaluator band: the page's organising fact, not decoration */
+.band{background:var(--band);border-top:1px solid var(--rule-2);
+  border-bottom:1px solid var(--rule);padding:11px 16px;margin:34px 0 0;
+  display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline}
+.band .who{font-family:var(--mono);font-size:12px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.band .what{font-family:var(--mono);font-size:12px;color:var(--mute)}
+
+.scroll{overflow-x:auto;margin:0 0 6px}
+table{border-collapse:collapse;width:100%;min-width:660px;font-size:13.5px}
+caption{text-align:left;font-family:var(--mono);font-size:11.5px;color:var(--mute);
+  padding:12px 0 8px;letter-spacing:.04em}
+th,td{text-align:left;padding:9px 14px 9px 0;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+thead th{font-family:var(--mono);font-size:11px;letter-spacing:.075em;
+  text-transform:uppercase;color:var(--mute);font-weight:500;
+  border-bottom:1px solid var(--rule-2);padding-bottom:7px}
+tbody tr:last-child td{border-bottom:none}
+td.n,th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;
+  white-space:nowrap;text-align:right;padding-right:22px}
+td.big{font-weight:600;color:var(--ink);font-size:14.5px}
+td.src{font-family:var(--mono);font-size:11.5px;color:var(--mute);
+  word-break:break-word;min-width:210px}
+tr.rule-top td{border-top:1px solid var(--rule-2)}
+.tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  text-transform:uppercase;padding:2px 7px;border-radius:2px;white-space:nowrap}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.no{background:var(--warn-bg);color:var(--warn)}
+
+dl.bare{margin:0;display:grid;grid-template-columns:minmax(120px,auto) 1fr;
+  gap:0 26px;align-items:baseline}
+dl.bare dt{font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-weight:600;color:var(--warn);padding:12px 0 0;font-size:13.5px}
+dl.bare dd{margin:0;padding:12px 0;border-bottom:1px solid var(--rule);
+  color:var(--ink-2);font-size:14px}
+dl.bare dt+dd{border-bottom:1px solid var(--rule)}
+dl.bare dt{border-bottom:1px solid var(--rule);padding-bottom:12px}
+
+ul.plain{margin:0;padding-left:0;list-style:none;display:flex;
+  flex-direction:column;gap:14px}
+ul.plain li{padding-left:22px;position:relative;color:var(--ink-2)}
+ul.plain li::before{content:"";position:absolute;left:0;top:.62em;width:9px;
+  height:1px;background:var(--rule-2)}
+ul.plain b{color:var(--ink);font-weight:600}
+code{font-family:var(--mono);font-size:.9em;color:var(--ink-2)}
+@media (max-width:640px){
+  .wrap{padding:40px 18px 80px}
+  dl.bare{grid-template-columns:1fr;gap:0}
+  dl.bare dt{border-bottom:none;padding-bottom:2px}
+}
+@media (prefers-reduced-motion:no-preference){a{transition:color .15s}}
+</style>
+
+<div class="wrap">
+<header class="col">
+  <p class="eyebrow">CottonWeedDet12 · results ledger · 2026-09-10</p>
+  <h1>Which numbers hold up</h1>
+  <p class="lede">Every figure below was re-read from the <code>results.csv</code> the run
+  itself wrote, not copied from an earlier table. Four numbers in the previously published
+  tables did not survive that pass; they are corrected here and listed at the bottom.</p>
+</header>
+
+<section class="col">
+  <div class="note">
+    <p><strong>Read the band before the number.</strong> Three evaluators are in play and they
+    do not share a scale. The same YOLO11n checkpoint reads <b>0.8794</b> under the Ultralytics
+    validator and <b>0.8554</b> under this project's own WBF matcher — an offset of
+    <b>0.0239</b> from the measuring instrument alone. A number is only comparable to other
+    numbers inside its own band.</p>
+  </div>
+  <div class="note">
+    <p><strong>Nothing here is a held-out test score.</strong> The 1,977-image set is passed to
+    the trainer as its validation set, so it drives early stopping, selects the checkpoint, and
+    is then the number reported. Every figure is a maximum over 21–100 evaluations taken on the
+    set it is reported on. The size of that optimism is measured in the third column and ranges
+    from <b>+0.002</b> to <b>+0.017</b>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>In-domain supervised baselines</h2>
+    <p>Trained on the CottonWeedDet12 train split only. Nothing here touches the harvested
+    corpus. These are the strongest and most defensible numbers in the project.</p>
+  </div>
+
+  <div class="band">
+    <span class="who">Ultralytics validator</span>
+    <span class="what">12 classes · holdout 1,977 images / 3,257 instances · mAP50-95</span>
+  </div>
+  <div class="scroll">
+  <table>
+    <caption>Each cell is 3 seeds (101 / 102 / 103), mean ± sample std.</caption>
+    <thead><tr>
+      <th>Recipe</th><th>Train data</th><th class="n">Best epoch</th>
+      <th class="n">Last epoch</th><th class="n">Optimism</th><th>Source</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td class="big">YOLO11n, COCO-pretrained<br><span style="color:var(--mute);font-weight:400">100 epochs</span></td>
+        <td>3,671 images</td>
+        <td class="n big">0.8755 ± 0.0029</td><td class="n">0.8713 ± 0.0039</td>
+        <td class="n">+0.0047</td>
+        <td class="src">s3_yolo11n/s10{1,2,3}/results.csv</td>
+      </tr>
+      <tr>
+        <td class="big">YOLO11n, random init<br><span style="color:var(--mute);font-weight:400">fairness control</span></td>
+        <td>3,671 images</td>
+        <td class="n big">0.8041 ± 0.0028</td><td class="n">0.8020 ± 0.0027</td>
+        <td class="n">+0.0023</td>
+        <td class="src">s3_yolo11n/scratch_s10{1,2,3}/results.csv</td>
+      </tr>
+      <tr>
+        <td class="big">Mamba-YOLO-T, random init<br><span style="color:var(--mute);font-weight:400">fork ships no weights</span></td>
+        <td>3,671 images</td>
+        <td class="n big">0.8266 ± 0.0064</td><td class="n">0.8258 ± 0.0056</td>
+        <td class="n">+0.0013</td>
+        <td class="src">s3_mamba_t_seed10{1,2,3}.json — single source</td>
+      </tr>
+      <tr class="rule-top">
+        <td colspan="2"><b>What pretraining is worth</b> — pretrained minus random init</td>
+        <td class="n big" style="color:var(--ok)">+0.0714</td>
+        <td class="n">+0.0690</td><td class="n">—</td>
+        <td class="src">derived, 3+3 seeds</td>
+      </tr>
+      <tr>
+        <td colspan="2"><b>What architecture is worth</b> — Mamba-T over YOLO11n, equal init</td>
+        <td class="n big" style="color:var(--ok)">+0.0225</td>
+        <td class="n">+0.0235</td><td class="n">—</td>
+        <td class="src">derived, 3+3 seeds</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="col" style="margin-top:16px"><b>Both conclusions survive the honest readout.</b>
+  How the model is initialised matters roughly three times more than which architecture it is —
+  and both effects are far larger than the seed noise (± 0.003) or the selection optimism
+  (+0.002 to +0.005) that surround them.</p>
+</section>
+
+<section>
+  <div class="col">
+    <h2>The autonomous campaign</h2>
+    <p>Fifteen unattended rounds: harvest the web, filter, train, evaluate, repeat. Same
+    holdout as above, but a 100-class head and a merged corpus, so these figures sit in their
+    own band and must not be compared with the ones above.</p>
+  </div>
+
+  <div class="band">
+    <span class="who">Ultralytics validator</span>
+    <span class="what">100 classes (12 real + 88 unused) · same holdout · merged corpus</span>
+  </div>
+  <div class="scroll">
+  <table>
+    <caption>The 100-class head costs a measured 0.012 against the 12-class runs above.</caption>
+    <thead><tr>
+      <th>Run</th><th>Corpus</th><th class="n">Best epoch</th><th class="n">n</th>
+      <th>Source</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="big">Merged, raw · cold start</td><td>55,690 images</td>
+        <td class="n big">0.6032 ± 0.0046</td><td class="n">3</td>
+        <td class="src">mega_iterm1_raw_s10{1,2,3}/train/results.csv</td></tr>
+      <tr><td class="big">Merged, quality-gated · cold start</td><td>13,309 images</td>
+        <td class="n big">0.5894 ± 0.0025</td><td class="n">3</td>
+        <td class="src">mega_iterm1_curated_s10{1,2,3}/train/results.csv</td></tr>
+      <tr class="rule-top"><td class="big">Round 1 of the campaign</td><td>48,752 images</td>
+        <td class="n big">0.6019</td><td class="n">1</td>
+        <td class="src">mega_iterm1_curated_s101/train2/results.csv</td></tr>
+      <tr><td class="big">Round 15, fifteen rounds later</td><td>48,752 images — the same ones</td>
+        <td class="n big">0.5607</td><td class="n">1</td>
+        <td class="src">mega_iterrnd15_train/job45640207/results.csv</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="col">
+    <h3 style="margin-top:34px">The trend, read three ways</h3>
+    <p>The published series takes each round's best epoch. Two estimators that are not a
+    maximum give the same answer, so the decline is not an artifact of how it was read.</p>
+  </div>
+  <div class="scroll">
+  <table style="min-width:520px">
+    <thead><tr><th>Readout</th><th class="n">Slope / round</th><th class="n">t</th>
+      <th class="n">Round 1 → 15</th></tr></thead>
+    <tbody>
+      <tr><td>Best epoch <span style="color:var(--mute)">(as published)</span></td>
+        <td class="n">−0.00302</td><td class="n">−8.86</td><td class="n">0.6019 → 0.5607</td></tr>
+      <tr><td>Last epoch</td><td class="n">−0.00213</td><td class="n">−5.52</td>
+        <td class="n">0.5775 → 0.5515</td></tr>
+      <tr><td>Mean of last five epochs</td><td class="n">−0.00237</td><td class="n">−7.32</td>
+        <td class="n">0.5837 → 0.5501</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>Cause, isolated</h2>
+    <p>Each round warm-started from the previous round's checkpoint. Four controls on round
+    15's exact dataset separate that from the training schedule. The two arms differ in
+    exactly one thing: the initial weights.</p>
+  </div>
+
+  <div class="band">
+    <span class="who">Ultralytics validator</span>
+    <span class="what">round 15's merged directory · 45,620 train images · seed held or varied as marked</span>
+  </div>
+  <div class="scroll">
+  <table>
+    <caption>Jobs 45672628 (arms) and 45672672 (seed repeats), all completed 2026-09-10.</caption>
+    <thead><tr>
+      <th>Arm</th><th>Start from</th><th>Schedule</th>
+      <th class="n">Best epoch</th><th class="n">at</th><th class="n">n</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="big">The campaign's own recipe</td>
+        <td>previous round</td><td>ends early, never anneals</td>
+        <td class="n big">0.5577 ± 0.0040</td><td class="n">e5</td><td class="n">3</td></tr>
+      <tr><td class="big" style="color:var(--ok)">A · start fresh each round</td>
+        <td>pretrained weights</td><td>runs to completion</td>
+        <td class="n big" style="color:var(--ok)">0.58053</td><td class="n">e10</td><td class="n">1</td></tr>
+      <tr><td class="big">B · keep the chain, fix the schedule</td>
+        <td>previous round</td><td>runs to completion</td>
+        <td class="n big">0.55180</td><td class="n">e1</td><td class="n">1</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="scroll">
+  <table style="min-width:560px">
+    <caption>One standard deviation for a difference of two single runs is 0.0057.</caption>
+    <thead><tr><th>Contrast</th><th>Isolates</th><th class="n">Effect</th><th class="n">In noise</th></tr></thead>
+    <tbody>
+      <tr><td>A − B</td><td>fresh vs chained start, schedule held</td>
+        <td class="n big" style="color:var(--ok)">+0.0287</td><td class="n">5.0 σ</td></tr>
+      <tr><td>B − campaign</td><td>fixing the schedule alone</td>
+        <td class="n">−0.0059</td><td class="n">−1.5 σ</td></tr>
+      <tr><td>A − campaign</td><td>both changes together</td>
+        <td class="n big" style="color:var(--ok)">+0.0229</td><td class="n">5.7 σ</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="col" style="margin-top:16px"><b>The chain is the cause; the schedule is not.</b>
+  Arm B's best moment is epoch 1 — the checkpoint it walked in with. Twenty-nine further
+  epochs of fully annealed training took it down to 0.529. Both arms are single runs; the
+  effect would have to be six times smaller for the conclusion to change.</p>
+</section>
+
+<section>
+  <div class="col">
+    <h2>What the audit found</h2>
+    <p>Each of these came out of the campaign's own logs and source, and each is checkable.</p>
+    <ul class="plain" style="margin-top:20px">
+      <li><b>The training corpus never changed.</b> From round 3 to round 15 the merge produced
+      the same 24 datasets and the same 48,752 unique images, slug for slug. The apparent growth
+      to 69,010 files was one staging directory that was never cleared between rounds.</li>
+      <li><b>Harvest returned nothing, eight rounds running,</b> while reporting success each
+      time — about 22 GPU-hours spent downloading and unpacking datasets that were then
+      discarded. The step's own log configuration discarded every decision it made, so a
+      388 KB log contained no record of what it had rejected or why.</li>
+      <li><b>A Counter-Strike screenshot dataset entered the corpus.</b> 4,014 images passed a
+      fixed 0.50 quality threshold in round 9 and failed the same threshold in every other
+      round, unchanged. The gate seeds each dataset's sample from its position in the registry
+      listing, so adding any dataset re-rolls the verdict on every later one.</li>
+      <li><b>The holdout is not leaking,</b> checked rather than assumed: 0 exact duplicates
+      and 6 of 1,977 images (0.30%) within Hamming distance 6 of a training image — every one a
+      consecutive frame from the same capture session. The split is random by image rather than
+      grouped by session.</li>
+      <li><b>The layer built to notice all of this was itself mis-wired</b> and returned
+      silently for two weeks. The finding that surfaced the empty harvest came from a language
+      model reading the evidence bundle, not from any deterministic check.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>Numbers that must never be quoted bare</h2>
+    <p>Each of these appears in an earlier table or document in a form the artifacts do not
+    support.</p>
+  </div>
+  <div class="col">
+  <dl class="bare">
+    <dt>0.9033</dt>
+    <dd>The best of four runs, not a seed mean. Only one of the four crossed 0.90, and
+    RF-DETR's trainer accepts no seed — its <code>--seed</code> flag is a run label. Quote the
+    four runs individually or not at all.</dd>
+    <dt>0.8974 ± 0.0040</dt>
+    <dd>Published as “n = 4 seeds”. It is 4 unseeded runs across 2 epoch budgets and 3
+    configurations; the spread is GPU non-determinism plus epoch budget, not seed noise. Also a
+    different evaluator from every other number here.</dd>
+    <dt>0.907</dt>
+    <dd>Never measured. It is 0.8830 plus an evaluator offset observed once, on one
+    checkpoint, without test-time augmentation, assumed to compose. It does not belong on a
+    slide.</dd>
+    <dt>0.8554</dt>
+    <dd>The same checkpoint that reads 0.8794 under the Ultralytics validator. Quoting it as
+    “the model's score” understates it by 0.0239.</dd>
+    <dt>“sealed”</dt>
+    <dd>The 1,977-image set has been the selection signal since 2026-03-15 — across every
+    architecture comparison, every threshold sweep and all fifteen rounds. It is a validation
+    set. Call it one.</dd>
+  </dl>
+  </div>
+</section>
+
+<section class="col">
+  <h2>What is still missing</h2>
+  <ul class="plain" style="margin-top:18px">
+    <li><b>A real test split.</b> The fix needs a three-way split and 80–120 GPU-hours of
+    retraining. Not attempted before the deadline; the optimism is measured and disclosed
+    instead.</li>
+    <li><b>Seeds on the control arms.</b> A and B are single runs. Two more seeds of arm A
+    would turn the headline +0.0287 into a proper interval.</li>
+    <li><b>A second evaluation set.</b> Every number on this page comes from one dataset. A
+    second human-labelled cotton-weed set, scored exactly once with the models fixed in advance,
+    is the strongest thing that could still be added.</li>
+    <li><b>Mamba-YOLO-T has one source.</b> Its three values exist only in summary files, with
+    no per-epoch curve behind them, unlike every other row.</li>
+  </ul>
+  <p class="stamp">Regenerated from primary artifacts on 2026-09-10 · CottonWeedDet12 holdout,
+  1,977 images / 3,257 instances across 12 species · Carpetweeds · Crabgrass · Eclipta ·
+  Goosegrass · Morningglory · Nutsedge · Palmer amaranth · Prickly sida · Purslane · Ragweed ·
+  Sicklepod · Spotted spurge</p>
+</section>
+</div>
