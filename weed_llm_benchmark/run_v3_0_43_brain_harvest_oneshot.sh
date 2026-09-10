@@ -107,8 +107,21 @@ echo "[config] BRAIN_MAX_IMGS=${BRAIN_MAX_IMGS:-5000}"
 
 # Run a single harvest_new_datasets round
 python -u - <<'PYEOF' 2>&1 | tee -a $REPO/results/framework/v3_0_43_brain_harvest_oneshot.log
-import os, sys, time, json
+import os, sys, time, json, logging
 sys.path.insert(0, ".")
+
+# Without this the harvest is unobservable. dataset_discovery logs every decision
+# it makes -- its config, which candidate was skipped and why, every strict-mode
+# rejection -- through `logging.getLogger(__name__)`, and this script never
+# configured a handler, so the root logger discarded all of it. Eight consecutive
+# rounds returned "+0 slugs, status ok" and their 400 kB logs contained 3,272
+# lines of Roboflow progress bars and not one line about what the harvest
+# decided. run_m1_merged_seeds.sh has made the same call since v3.25.0, which is
+# why the merge's [Merge] lines are visible and the harvest's [Harvest] lines
+# were not.
+logging.basicConfig(level=logging.INFO, stream=sys.stdout,
+                    format="%(asctime)s %(name)s %(message)s")
+
 from weed_optimizer_framework.tools.dataset_discovery import DatasetDiscovery
 
 print(f"[harvest] start {time.strftime('%H:%M:%S')}")

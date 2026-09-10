@@ -459,6 +459,51 @@ collapsed was the accumulated residue.
   corpus never changed, while the ledger, the dashboard and every round report presented
   each round as new work.**
 
+## 5j. Why the harvest returned +0 for eight rounds, and why nobody could see it
+
+`[harvest] return: {"status": "ok", "strict_topic": true, "queries_tried": 83,
+"candidates_passed_filter": 0, "downloaded": 0, "rejected_strict_garbage": 0, "results": []}`
+— identical in every round, with `[harvest] after: 65 slugs (+0)`.
+
+**The step was unobservable, and that is a defect of its own.** `dataset_discovery` logs
+every decision it makes through `logging.getLogger(__name__)`: its configuration, which
+candidate was skipped and why, every strict-mode rejection.
+`run_v3_0_43_brain_harvest_oneshot.sh` never called `logging.basicConfig`, so the root
+logger had no handler and **all of it was discarded**. Round 15's harvest log is 388 KB of
+3,272 lines and contains **not one `[Harvest]` line** — it is Roboflow progress bars.
+Demonstrated:
+
+```
+$ python3 -c "import logging; logging.getLogger('…dataset_discovery').info('[Harvest] config: …')"
+(no output)
+$ python3 -c "import logging,sys; logging.basicConfig(level=logging.INFO, stream=sys.stdout); …"
+2026-09-10 12:50:52,528 …dataset_discovery [Harvest] config: max_new=3 strict_topic=True
+```
+
+`run_m1_merged_seeds.sh` has made that call since v3.25.0, which is exactly why the
+`[Merge]` lines quoted throughout this document exist and the `[Harvest]` lines do not.
+**Fixed in this commit.**
+
+What the log does show, from the lines that are not the harvest's own logger:
+
+- `[net] WARN: SOCKS proxy via bridges2-login011 failed (compute→login SSH disabled) —
+  SKIPPING github, using Kaggle/HF only`. **The GitHub source has been off for the whole
+  campaign**, leaving Kaggle and HuggingFace.
+- Twelve `loading Roboflow workspace…` / `loading Roboflow project…` cycles, downloading and
+  extracting projects named `Bounding-Box-1` (11,376 files), `New-Drugs-1`, `precision-1`,
+  `Robot-1`. Two hours and forty-four minutes of GPU-share per round spent fetching and
+  unpacking datasets that are not weeds, and registering none of them.
+- `[Dataset] Mongo mirror reported failure (JSON saved, Mongo NOT updated — stores may
+  drift): {'ok': False, 'slugs': 0, ...}` — and the step still returns `status: "ok"`.
+
+Eight rounds × ~2 h 45 m ≈ **22 GPU-share hours**, reported as success each time. The
+`pool_growth` signal is one-sided and only looks for absence of growth, so nothing
+deterministic fired; the shadow reviewer is what surfaced it, from the same `+0` line.
+
+**Not fixed here, and not to be fixed before the deadline:** the GitHub proxy, the Roboflow
+selection, and the `status: "ok"` returned over a failed Mongo mirror. Those are campaign
+behaviour and need a decision, not a patch.
+
 ## 6. What this does and does not establish
 
 **Established.**
