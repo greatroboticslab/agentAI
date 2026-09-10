@@ -162,6 +162,82 @@ Head **nc=100**; backbone lineage yolo26x; **seed 101 in every round → n = 1 p
 
 ---
 
+## A0. The protocol problem, and every number re-read three ways
+
+**There is no dev set anywhere in this project.** The 1,977-image cwd12 test+valid set is
+passed to Ultralytics as `val` (`cwd12_sealed.yaml`; `strategy["val_dataset_root"]` in
+`run_m1_merged_seeds.sh`). It therefore drives `patience`, selects `best.pt`, and is then the
+number reported. Every published figure is a **maximum over 21–100 evaluations taken on the
+set it is reported on**, and that set has been the selection signal since 2026-03-15 across
+S3, M1, the tier ladder, the DINO thresholds, the WBF/TTA sweep and all fifteen campaign
+rounds. Calling it "sealed" is wrong and must stop.
+
+Fixing the protocol needs a three-way split and 80–120 GPU-hours of retraining, which does
+not fit before 2026-09-20. What does fit, at zero GPU cost, is **measuring the size of the
+bias and reporting every row at three readouts**, straight from the `results.csv` files that
+already exist.
+
+| recipe | best epoch (**as published**) | last epoch | mean of last 5 | selection optimism |
+|---|---|---|---|---|
+| YOLO11n COCO-pretrained · cwd12 3,671 · 100 ep | 0.8755 ± 0.0029 | 0.8713 ± 0.0039 | 0.8708 ± 0.0045 | **+0.0047** |
+| YOLO11n random init · cwd12 3,671 · 100 ep | 0.8041 ± 0.0028 | 0.8020 ± 0.0027 | 0.8018 ± 0.0020 | +0.0023 |
+| Mamba-YOLO-T random init · cwd12 3,671 · 100 ep | 0.8266 ± 0.0064 | 0.8258 ± 0.0056 | 0.8253 ± 0.0057 | +0.0013 |
+| M1 merged **raw** · cold · yolo26x | 0.6032 ± 0.0046 | 0.5914 ± 0.0025 | 0.5921 ± 0.0030 | **+0.0111** |
+| M1 merged **curated** · cold · yolo26x | 0.5894 ± 0.0025 | 0.5725 ± 0.0038 | 0.5727 ± 0.0026 | **+0.0167** |
+
+n = 3 seeds in every cell. Source: `results/framework/<run>/results.csv`, full mAP50-95(B)
+column, 41 runs (`scratchpad/diag/probe6.json`).
+
+**The optimism is the same size as, or larger than, the seed noise it is quoted against** —
++0.0047 against ± 0.0029 for the flagship recipe, and +0.0111 / +0.0167 against ± 0.0046 /
+± 0.0025 for the merged recipes. Any effect below about 0.02 that was established by
+comparing best-epoch numbers needs re-reading in this table before it is claimed.
+
+### Which conclusions survive the re-reading
+
+| claim | at best epoch | at mean of last 5 | verdict |
+|---|---|---|---|
+| COCO pretraining is worth more than architecture | +0.0714 | +0.0690 | **survives** |
+| Architecture at equal random init (Mamba-T over YOLO11n) | +0.0225 | +0.0235 | **survives** |
+| The DINO≥0.50 quality gate does not beat raw volume | +0.0138 | +0.0194 | **survives, and grows** |
+
+### The fifteen-round series at three readouts
+
+| round | epochs | best (published) | at epoch | last | mean last 5 | optimism |
+|---|---|---|---|---|---|---|
+| r1 | 21 | 0.60188 | **1** | 0.57746 | 0.58370 | +0.0182 |
+| r2 | 24 | 0.59188 | 4 | 0.57806 | 0.57920 | +0.0127 |
+| r3 | 27 | 0.59511 | 7 | 0.57007 | 0.57191 | +0.0232 |
+| r4 | 28 | 0.58290 | 8 | 0.56467 | 0.56597 | +0.0169 |
+| r5 | 27 | 0.58392 | 7 | 0.56415 | 0.56457 | +0.0193 |
+| r6 | 27 | 0.57385 | 7 | 0.55386 | 0.55818 | +0.0157 |
+| r7 | 27 | 0.56854 | 7 | 0.54677 | 0.55089 | +0.0177 |
+| r8 | 25 | 0.56928 | 5 | 0.55241 | 0.55509 | +0.0142 |
+| r9 | 31 | 0.56723 | 11 | 0.54768 | 0.55355 | +0.0137 |
+| r10 | 28 | 0.57112 | 8 | 0.55501 | 0.55628 | +0.0148 |
+| r11 | 35 | 0.55893 | 15 | 0.54593 | 0.54720 | +0.0117 |
+| r12 | 32 | 0.56646 | 12 | 0.54534 | 0.54793 | +0.0185 |
+| r13 | 21 | 0.55208 | **1** | 0.54687 | 0.54707 | +0.0050 |
+| r14 | 32 | 0.55940 | 12 | 0.54985 | 0.54920 | +0.0102 |
+| r15 | 25 | 0.56072 | 5 | 0.55146 | 0.55011 | +0.0106 |
+
+| readout | slope / round | se | t | r1 → r15 |
+|---|---|---|---|---|
+| best epoch (the published series) | −0.00302 | 0.00034 | −8.86 | 0.6019 → 0.5607 |
+| last epoch | −0.00213 | 0.00039 | −5.52 | 0.5775 → 0.5515 |
+| mean of last 5 | −0.00237 | 0.00032 | −7.32 | 0.5837 → 0.5501 |
+
+**The decline is not a selection artifact.** It survives all three readouts at t = −5.5 to
+−8.9. What the readouts do change is the *magnitude*: the published series overstates the
+level by a mean of +0.0148 per round (range +0.0050 to +0.0232).
+
+Two rounds are worth naming: **r1's and r13's published numbers are epoch 1** — the headline
+for those rounds is the inherited checkpoint after a single epoch of training, not what that
+round's training produced.
+
+
+---
+
 ## D. Numbers that must never be quoted bare
 
 - 0.9033 — best-of-4 RF-DETR runs, not a seed mean. Must always read '0.8974 ± 0.0040 over 4 runs, best 0.9033'; only 1 of 4 runs crossed 0.90, and the runs were unseeded (train_rfdetr.py: --seed is a run label only) across two different epoch budgets (60 and 100).
