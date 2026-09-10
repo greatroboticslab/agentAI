@@ -1419,6 +1419,45 @@ def _advance(domain: str, dcfg: dict):
         _persist_state(domain, st, dcfg)
 
 
+# One compact line per tick, kept beside the snapshot.
+#
+# `scheduler_status.json` answers "is it alive now" and nothing else. It cannot
+# say when the loop stopped, how long the tick before it died was taking, or how
+# many rounds a domain actually advanced yesterday -- every read overwrites the
+# last. The six days the weed loop sat paused in August were invisible partly
+# because no history existed to look back at.
+_ARCHIVE_MAX_BYTES = 4 * 1024 * 1024      # ~40k ticks at ~100 B/line, then rotate
+
+
+def _archive_heartbeat(payload: dict):
+    """Append one line to scheduler_status.jsonl. Never raises."""
+    doms = payload.get("domains") or {}
+    row = {"ts": round(float(payload.get("ts") or 0.0), 1),
+           "dur": payload.get("tick_duration_s"),
+           "mongo": payload.get("mongo_ok"),
+           "cfg": payload.get("config_ok"),
+           "n_dom": payload.get("config_domains_seen"),
+           "d": {k: {"on": bool(v.get("enabled")),
+                     "step": v.get("step") or None,
+                     "job": v.get("job") or None,
+                     "fails": int(v.get("fails") or 0),
+                     "paused": bool(v.get("paused_reason")),
+                     "today": int(v.get("rounds_today") or 0)}
+                 for k, v in doms.items() if isinstance(v, dict)}}
+    p = Path(_repo_root()) / "results" / "framework" / "scheduler_status.jsonl"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    # One rotation, not many: the point is a bounded history, not an archive of
+    # archives. The previous generation is kept so a rotation mid-incident does
+    # not erase the tick that mattered.
+    try:
+        if p.exists() and p.stat().st_size > _ARCHIVE_MAX_BYTES:
+            os.replace(str(p), str(p.with_name(p.name + ".1")))
+    except OSError:
+        pass
+    with p.open("a") as fh:
+        fh.write(json.dumps(row, separators=(",", ":")) + "\n")
+
+
 def _heartbeat(cfg: dict, tick_duration_s: float):
     """Positive proof the scheduler is alive, per tick.
 
@@ -1472,6 +1511,16 @@ def _heartbeat(cfg: dict, tick_duration_s: float):
         tmp = p.with_name(p.name + ".tmp")
         tmp.write_text(json.dumps(payload, indent=1))
         os.replace(str(tmp), str(p))     # a half-written heartbeat reads as crit
+        # Secondary, and deliberately in its own guard: the snapshot is what the
+        # alarm reads, so a broken archive must never be reported as a missing
+        # heartbeat.
+        try:
+            _archive_heartbeat(payload)
+        except Exception as e:
+            try:
+                _log().warning("[rounds] heartbeat archive not appended: %s" % e)
+            except Exception:
+                pass
     except Exception as e:
         try:
             _log().warning("[rounds] heartbeat not written: %s" % e)

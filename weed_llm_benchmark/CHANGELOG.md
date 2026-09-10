@@ -9118,3 +9118,27 @@ one that a module which cannot check itself does not answer ok.
 
 Verified: 413 pytest + 27 script-style test files pass; the three configuration
 cases produce `crit` / `ok (never configured)` / `ok (pre-upgrade)` respectively.
+
+## 2026-09-10 — v3.38.0 the heartbeat keeps a history
+
+`results/framework/scheduler_status.json` is a snapshot: every write erases the
+last one. It can say the loop is alive; it cannot say when it stopped, how long
+the tick before it died was taking, or how many rounds a domain actually advanced
+yesterday. The six days the weed loop sat paused in August were invisible partly
+because there was no history to look back at.
+
+`_archive_heartbeat` appends one compact line per tick to
+`scheduler_status.jsonl` — timestamp, tick duration, whether Mongo was reachable,
+whether the configuration could be read, and per domain: enabled, current step,
+job id, consecutive failures, whether it is paused, rounds advanced today. About
+100 bytes; the file rotates once at 4 MB (~40k ticks) and the previous generation
+is kept, so a rotation mid-incident does not erase the tick that mattered.
+
+**It is in its own guard, deliberately.** The snapshot is what the alarm reads and
+a missing snapshot is the one thing the alarm treats as crit, so a broken archive
+must never be reported as a missing heartbeat. `tests/test_scheduler_archive.py`
+pins exactly that: with the archive path made unwritable, `_heartbeat` still
+writes a complete snapshot, and the archive resumes on its own once the path is
+usable again.
+
+Verified: 413 pytest + 28 script-style test files pass.
