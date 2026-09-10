@@ -185,6 +185,69 @@ Both artifact problems are bookkeeping, not science:
 **Every published mean reproduces from a `results.csv`. None of them should be cited from
 the summary JSONs, which are keyed on tier+seed and have been overwritten.**
 
+## 5d. Corrections to §4, §5 and §5c
+
+An adversarial re-reading of the same evidence overturned four statements made earlier in
+this document. They are corrected here rather than edited away.
+
+**"The warm start destroys the inherited model" — withdrawn.** Round 8's base is
+`mega_iterm1_curated_s101/**train8**/weights/best.pt`, whose own best was **0.56854** — not
+the original M1 curated run (`.../train`, 0.58733). The earlier comparison of round 8's
+epoch-1 value (0.5354) against 0.5894 compared two different runs. Worse, **the inherited
+checkpoint is never validated at epoch 0 in any round**, so its score under this round's own
+eval is unmeasured everywhere; "epoch 1 fell to X" compares a mid-training epoch taken at
+near-peak learning rate against another run's best epoch. And **7 of the 15 links finished
+ABOVE their parent** (train3→train4, train5→train6, train8→r8, r9→r10, r11→r12, r13→r14,
+r14→r15). This is a random walk with a downward drift, not a mechanism that destroys its
+input each time.
+
+**"Every cold run beats every chained run" — false.** The first chained link, train2 at
+0.60188, beats M1 raw seed-102 (0.59788) and all three M1 curated runs. The defensible
+statement is narrower: **no chained run ever exceeded the best cold run (0.60620), and no
+link after the first came within 0.03 of it.**
+
+**"Last epoch worse than best in 8 of 8 rounds" — withdrawn as evidence.** With
+`patience=20` and no round reaching its epoch cap, a run can only end on its best epoch by
+hitting the cap; the pattern is mechanically necessary, not a finding. The reported metric
+is the best epoch, so last-epoch values never entered the series anyway.
+
+**The reported per-round metric is a max-over-epochs statistic taken at high learning rate.**
+Round 15's headline 0.5607 is epoch 5 alone, sitting 0.037 above both of its neighbours
+(e4 = 0.52014, e6 = 0.52322) at 98% of peak LR. Under estimators that are not a max, the
+decline over rounds 8–15 survives but shrinks: post-warmup plateau mean −0.00186 per round
+(t = −2.56), mean of the last five epochs −0.00099 (t = −2.17).
+
+**The schedule mechanism was described wrongly in §5.** `args.yaml` carries `time: 10.0`,
+and `ultralytics/engine/trainer.py` L542-544 recomputes
+`self.epochs = self.args.epochs = ceil(self.args.time * 3600 / mean_epoch_time)` after every
+epoch and rebuilds the scheduler with it. So the cosine horizon is not 60 — it is re-planned
+against a wall clock each epoch, landing near 50, and `patience=20` ends the run at 21–35.
+`close_mosaic=10` fires at horizon − 10 ≈ 40 and therefore **never fired in any of the
+fifteen rounds**. The `lr0` override is also not silent in the log: Ultralytics prints
+`'optimizer=auto' found, ignoring 'lr0=0.001'`. What is silent is `args.yaml`, written in
+`__init__` before `build_optimizer` runs, so the file on disk keeps the discarded value.
+
+**The `+0` harvest has one exception, and it is a governance finding.** Round 9's pool was
+68,019 rather than 48,752 because the DINOv2 gate, at the same fixed `MIN_DINO_SCORE=0.50`,
+admitted two datasets it rejected in every other round: `fvossel__csgo_player_detection`
+(4,014 images — Counter-Strike screenshots) and `rf_bishwarup-halder__crop-health-advisor`
+(15,253). Both were gone again by round 10. The gate seeds each slug's sample from that
+slug's index in registry iteration order, so it is **not deterministic at a fixed
+threshold**. A video-game dataset entered a weed-detection training corpus and left again,
+and no check in the loop said so. It moved the metric by −0.002, inside noise.
+
+**Data cannot be excluded as a cause for rounds 1–7.** The campaign's own tier ladder inside
+this merge pipeline measures 0.5601 / 0.5588 / 0.5455 at +0 / +5k / +15k harvested images —
+added data is not free here. Round 2's pool was 48,208 images against the M1 curated
+recipe's 13,309 one day earlier. Over rounds 1–7 the pool grew **and** the chain ran, so the
+two are confounded and neither can be attributed. The exclusion holds only for rounds 8–15,
+where the pool is byte-identical.
+
+**No per-round error bar exists.** All fifteen rounds ran seed 101, once each. Every
+comparison of a round-to-round difference against "the 0.005 noise floor" borrows a seed std
+from a different recipe. Jobs `45672672_[1-2]` are measuring the round recipe's own seed std
+at seeds 102 and 103, on round 15's exact data and schedule.
+
 ## 6. What this does and does not establish
 
 **Established.**
