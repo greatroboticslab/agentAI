@@ -407,6 +407,58 @@ So the split is random by image rather than grouped by capture session, and burs
 land on both sides. At 0.30% the effect on any reported mAP is negligible; the finding is
 the protocol, not the number. Report it, do not re-split before the deadline.
 
+## 5i. The pool never grew. One directory was never cleared.
+
+§5f recorded rounds 1–6 as a growing pool (47,403 → 69,010 training images) and treated that
+growth as a confound for the early decline. It was not growth.
+
+The `[Merge]` per-slug tables from rounds 6, 7 and 8 are **identical, slug for slug**:
+24 source datasets, **48,752 unique images**, same counts in each
+(`m1_merged_rndtrain_s1_44559658.out`, `m1_merged_m1smoke_s0_45250479.out`,
+`m1_merged_rndtrain_s1_45326516.out`). The same three logs also print the same filter state
+each time — 1,977 holdout stems blocked, 1,977 dHash-guarded, 57 user-flagged slugs skipped,
+59 slugs DINO-scored with 32 below the 0.50 threshold. **The merge produced the same corpus
+every round from round 3 on.**
+
+Meanwhile `train: Scanning` read 54,405 at round 3 and 69,010 at round 6 — up to **20,258
+more files than the merge produced**.
+
+The cause is the staging directory. `mega_trainer.py:891`:
+
+```python
+merged_dir = os.path.join(Config.FRAMEWORK_DIR, f"merged_iter{iteration}")
+```
+
+`iteration` is `ITER_NAME`, and `ITER_NAME` did not exist until v3.25.0 (2026-09-05). Before
+that the launcher's default applied — `m1_${TIER}_s${SEED}` — so **rounds 1 through 7 all
+merged into the same directory, `merged_iterm1_curated_s101`**. `_merge_datasets` only calls
+`os.makedirs(..., exist_ok=True)`; there is no `rmtree` anywhere in the merge path, so the
+directory is never cleared. `_oversample_weak_weed_classes` then writes symlink duplicates
+named `oversample_{class}_{k}_{stem}` into `train/images` on every run, and the number of
+copies per file is recomputed from that round's class deficits.
+
+From round 8 the scheduler passes `ITER_NAME=rnd{N}_train`, each round gets a fresh
+directory, and the scan immediately reads **45,620** — exactly the train split of the 48,752
+the merge reports.
+
+**So the r6 → r8 "collapse" of 23,390 images is not data being removed. It is the switch
+from one shared, never-cleared staging directory to a fresh directory per round.** What
+collapsed was the accumulated residue.
+
+### What this changes
+
+- The "growing pool" confound in §5f is **withdrawn**. Rounds 1–6 did not train on more
+  harvested data; they trained on the same 48,752-image corpus plus a growing pile of
+  oversampled duplicates of the weakest classes.
+- The campaign has **one** data regime, not three: the same 24 slugs and the same 48,752
+  unique images from round 3 to round 15. Harvest contributed nothing over the entire
+  campaign, not just over the last eight rounds.
+- That removes the last competing explanation for the decline and leaves the warm-start
+  chain, which §5g measured directly at +0.0287 (5.0 σ).
+- It is also its own finding: **a fifteen-round autonomous campaign in which the training
+  corpus never changed, while the ledger, the dashboard and every round report presented
+  each round as new work.**
+
 ## 6. What this does and does not establish
 
 **Established.**
