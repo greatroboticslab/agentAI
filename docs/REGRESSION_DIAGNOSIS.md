@@ -128,6 +128,63 @@ reproducible from the artifacts on disk. **Audit before this row goes in front o
 The job-scoped copy `m1_<tier>_seed<seed>_<jobid>.json`, written before training, is where
 the original may survive.
 
+## 5c. The chain is longer than the ledger, and every cold run beats every chained one
+
+The ledger's rounds 1–7 have no `mega_iterrnd*` directories because they were not written
+there. They are `mega_iterm1_curated_s101/train2` … `train8`, and their `results.csv` best
+values match the ledger to the fourth decimal, seven for seven:
+
+| ledger | r1 | r2 | r3 | r4 | r5 | r6 | r7 |
+|---|---|---|---|---|---|---|---|
+| ledger `map50_95` | .6019 | .5919 | .5951 | .5829 | .5839 | .5738 | .5685 |
+| `train2…train8` best | .60188 | .59188 | .59511 | .58290 | .58392 | .57385 | .56854 |
+
+Each `args.yaml` names its predecessor, so the whole history is one chain:
+
+```
+yolo26x.pt (cold)
+  └─ mega_iterm1_raw_s103/train            0.60620   ← the best run this pipeline ever produced
+       └─ …curated_s101/train2   = round 1  0.60188
+            └─ train3            = round 2  0.59188
+                 └─ … train8     = round 7  0.56854
+                      └─ mega_iterrnd8_train … = rounds 8–15, ending 0.5607
+```
+
+**Seventeen consecutive warm restarts, −0.0455 from the cold checkpoint they began at.**
+
+The six original M1 runs were all cold from `yolo26x.pt`, and their `results.csv` files
+reproduce both published rows exactly:
+
+| recipe | seeds | mean ± std |
+|---|---|---|
+| M1 raw, cold | .60553 / .59788 / .60620 | **0.6032 ± 0.0046** |
+| M1 curated, cold | .58733 / .58875 / .59215 | **0.5894 ± 0.0025** |
+
+**The best chained run (0.60188, the first link) never beat the cold run it started from
+(0.60620), and nothing since has come close.**
+
+### This corrects §5
+
+Rounds 1–7 ran the **full 60 epochs** — `train2`…`train8` each have 60 rows in
+`results.csv`, so their cosine completed and their learning rate annealed. They declined
+0.0334 anyway. **Schedule truncation is therefore not the cause of the early decline; the
+warm-start chain alone is.** Truncation is a second defect that appears at round 8, when
+the round scheduler took over and runs began ending at 21–35 epochs.
+
+### The artifact audit resolves in the numbers' favour
+
+Both artifact problems are bookkeeping, not science:
+
+- `m1_curated_seed101.json` and its eight job-scoped copies all describe **round** runs
+  (jobs 45326516 … 45640207). The original M1 seed-101 run survives as
+  `mega_iterm1_curated_s101/train/results.csv`, dated 2026-08-23, best 0.58733.
+- `s3_yolo11n_scratch_seed10{1,2,3}.json` carry the pretrained arm's numbers. The real
+  from-scratch curves are `s3_yolo11n/scratch_s10{1,2,3}/results.csv`: 0.80551 / 0.80089 /
+  0.80587 → **0.8041 ± 0.0028**, which is exactly the published row.
+
+**Every published mean reproduces from a `results.csv`. None of them should be cited from
+the summary JSONs, which are keyed on tier+seed and have been overwritten.**
+
 ## 6. What this does and does not establish
 
 **Established.**
