@@ -9084,3 +9084,37 @@ cannot decide anything without the noise floor.
 A test encodes the bug's shape: a tick config carrying no `brain` block at all,
 with the reviewer enabled in the database, must still run — and a disabled
 reviewer must say so once and not once per tick.
+
+## 2026-09-09 — v3.37.0 the alarm had the same blind spot it exists to close
+
+`_cfg()` swallowed every exception and returned `DEFAULT_CFG` — `{"domains": {}}`.
+The heartbeat then reported no domains. `scheduler_health.verdict()` reads no
+enabled domains as *"no domain is enabled — the loop is idle by configuration"*,
+and calls it **ok**. A truncated, half-written or hand-edited config file and a
+deliberately idle loop painted the identical green page, and the thing that
+paints it is the one check standing between a stopped campaign and a week of
+quiet. `_save_cfg`'s own comment names this failure and had fixed only the
+writing half of it.
+
+`_cfg()` now records how the read went in `_CFG_READ` and still returns a usable
+dict — a tick that raised would stop every domain, so the fallback stays and the
+fact of it is what was missing. Absent is separated from unparseable: no file is
+not a fault (the admin route creates it, so a fresh deploy, a dev box and CI all
+legitimately have none), while a file that exists and will not parse is. The
+heartbeat carries `config_ok`, `config_error`, `config_present` and
+`config_domains_seen`; the verdict turns `config_ok is False` **crit** with the
+parse error quoted, and says the enabled state is *unknown* rather than that the
+loop is idle.
+
+A heartbeat written before these fields existed carries `None`, and keeps its
+old wording and its old level — the same rule `mongo_ok` already followed. Turning
+every not-yet-restarted deploy red is a different way of being wrong.
+
+**The alarm had no tests at all.** `tests/test_scheduler_health.py` is its first:
+18 checks pinning the behaviour it already had (stale heartbeat, Mongo down,
+paused domain with its reason carried verbatim, slow tick as warn not crit, idle
+loop as ok, absent heartbeat as crit), the three new configuration branches, and
+one that a module which cannot check itself does not answer ok.
+
+Verified: 413 pytest + 27 script-style test files pass; the three configuration
+cases produce `crit` / `ok (never configured)` / `ok (pre-upgrade)` respectively.

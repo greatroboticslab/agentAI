@@ -165,6 +165,13 @@ def verdict(now=None):
     # Absent (a pre-v3.25.0 heartbeat) is unknown, not healthy-and-not-checked.
     mongo_ok = st.get("mongo_ok")
     mongo_ok = None if mongo_ok is None else bool(mongo_ok)
+    # A heartbeat written before this field existed carries None, and that must
+    # keep its old behaviour rather than turning every pre-upgrade deploy red --
+    # the same rule mongo_ok above already follows.
+    config_ok = st.get("config_ok")
+    config_ok = None if config_ok is None else bool(config_ok)
+    config_present = st.get("config_present")
+    config_error = str(st.get("config_error") or "")[:200]
     mongo_err_ts = _num(st.get("mongo_last_error_ts"), 0.0)
     stale_after = STALE_AFTER_S
     if not _STALE_ENV and tick_s > 0:
@@ -215,8 +222,22 @@ def verdict(now=None):
     elif tick_dur > TICK_WARN_S:
         level, why = "warn", ("the last tick took %s — every failure detection queues "
                               "behind it" % _human(tick_dur))
+    elif config_ok is False:
+        # Crit for the same reason a missing heartbeat is crit: a loop that
+        # cannot read its own configuration does not know whether any domain is
+        # enabled, and defaulting that to "idle by choice" rebuilds the silence
+        # one level up. A truncated config file and a deliberately idle loop
+        # painted the identical green page until this branch existed.
+        level, why = "crit", ("the scheduler cannot read its own configuration, so "
+                              "whether any domain is enabled is unknown%s"
+                              % ((" (%s)" % config_error) if config_error else ""))
     elif not enabled:
-        level, why = "ok", "no domain is enabled — the loop is idle by configuration"
+        # Absent is not broken: the file is created by the admin route, so a
+        # fresh deploy, a dev box and CI all legitimately have none.
+        why = ("no scheduler configuration exists yet — no domain has ever been "
+               "enabled" if config_present is False
+               else "no domain is enabled — the loop is idle by configuration")
+        level = "ok"
     else:
         level, why = "ok", ("%d domain(s) advancing, last tick %s ago"
                             % (len(enabled), _human(age)))
@@ -233,6 +254,8 @@ def verdict(now=None):
         "heartbeat_age_human": _human(age),
         "tick_s": tick_s or None, "tick_duration_s": tick_dur or None,
         "mongo_ok": mongo_ok, "mongo_last_error_ts": mongo_err_ts or None,
+        "config_ok": config_ok, "config_error": config_error,
+        "config_present": config_present,
         "domains": rows, "enabled_domains": enabled,
         "paused_domains": paused, "reviews_overdue": overdue,
         "thresholds": {"stale_after_s": stale_after,

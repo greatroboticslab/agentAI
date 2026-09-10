@@ -115,10 +115,37 @@ def _repo_root() -> str:
                or os.path.expanduser("~/weed_llm_benchmark"))
 
 
+# How the last read of the scheduler's own config went. The loader has to keep
+# returning a usable dict -- a tick that raised would stop every domain -- so the
+# fact that it fell back is recorded here instead of being lost.
+#
+# It was lost, and that is a hole in the alarm itself: `_cfg` swallowed every
+# exception and returned `{"domains": {}}`, the heartbeat then reported no
+# domains, and `scheduler_health.verdict` reads that as "no domain is enabled --
+# the loop is idle by configuration", which is GREEN. A truncated config file and
+# a deliberately idle loop painted the identical healthy page. `_save_cfg`'s own
+# comment names this failure and fixed only the writing half of it.
+_CFG_READ = {"ok": True, "error": "", "present": None, "n_domains": 0}
+
+
 def _cfg() -> dict:
+    path = Path(_CFG_FILE)
+    if not path.exists():
+        # No file is not a fault. It is created by the admin route, so a fresh
+        # deploy, a dev box and CI all legitimately have none.
+        _CFG_READ.update({"ok": True, "error": "", "present": False,
+                          "n_domains": 0})
+        return json.loads(json.dumps(DEFAULT_CFG))
     try:
-        return json.loads(Path(_CFG_FILE).read_text())
-    except Exception:
+        cfg = json.loads(path.read_text())
+        if not isinstance(cfg, dict):
+            raise ValueError("the configuration is not an object")
+        _CFG_READ.update({"ok": True, "error": "", "present": True,
+                          "n_domains": len(cfg.get("domains") or {})})
+        return cfg
+    except Exception as exc:
+        _CFG_READ.update({"ok": False, "present": True, "n_domains": 0,
+                          "error": "%s: %s" % (type(exc).__name__, exc)})
         return json.loads(json.dumps(DEFAULT_CFG))
 
 
@@ -1432,6 +1459,13 @@ def _heartbeat(cfg: dict, tick_duration_s: float):
                    "tick_duration_s": round(float(tick_duration_s), 3),
                    "mongo_ok": bool(_LEDGER.get("ok", True)),
                    "mongo_last_error_ts": last_err,
+                   # Whether the loop could read its own configuration. Without
+                   # it, "no domain is enabled" cannot be told apart from "the
+                   # config file is unreadable", and the second one is silent.
+                   "config_ok": bool(_CFG_READ.get("ok", True)),
+                   "config_error": str(_CFG_READ.get("error") or ""),
+                   "config_present": _CFG_READ.get("present"),
+                   "config_domains_seen": int(_CFG_READ.get("n_domains") or 0),
                    "domains": domains}
         p = Path(_repo_root()) / "results" / "framework" / "scheduler_status.json"
         p.parent.mkdir(parents=True, exist_ok=True)
