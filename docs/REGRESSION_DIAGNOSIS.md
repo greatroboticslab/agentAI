@@ -165,11 +165,20 @@ reproduce both published rows exactly:
 
 ### This corrects §5
 
-Rounds 1–7 ran the **full 60 epochs** — `train2`…`train8` each have 60 rows in
-`results.csv`, so their cosine completed and their learning rate annealed. They declined
-0.0334 anyway. **Schedule truncation is therefore not the cause of the early decline; the
-warm-start chain alone is.** Truncation is a second defect that appears at round 8, when
-the round scheduler took over and runs began ending at 21–35 epochs.
+Rounds 1–7 ran under a different harness: `data` points at
+`merged_iterm1_curated_s101/data.yaml`, and `args.yaml` records `time: null`, so their
+cosine horizon stayed fixed at 60 rather than being re-planned against a wall clock as
+rounds 8–15 were.
+
+~~They ran the full 60 epochs, so their cosine completed and their learning rate annealed;
+schedule truncation is therefore not the cause of the early decline.~~ **Withdrawn — this
+was my own tooling error.** The probe that produced "60" was reading `epochs:` out of
+`args.yaml` and overwriting the row count with it. Read directly from the files,
+`train2`…`train8` have **21, 24, 27, 28, 27, 27 and 27 rows**. Rounds 1–7 were
+patience-truncated exactly as rounds 8–15 are. The only difference is *what* the cosine was
+scheduled over — a fixed 60 for rounds 1–7, a clock-rewritten ~50 for rounds 8–15 — and in
+both cases `patience=20` ended the run around epoch 25. **Nothing here separates the chain
+from the schedule; both defects are present in every round of the campaign.**
 
 ### The artifact audit resolves in the numbers' favour
 
@@ -284,6 +293,41 @@ The metric cost was −0.002, inside noise. The finding is not the cost. It is t
 video-game dataset entered a weed-detection training corpus, stayed for one round, left
 again — and **no check in the loop said so**. `pool_growth` is one-sided and only looks for
 absence of growth; nothing compares the slug list round to round.
+
+## 5f. Rounds 1–7 recovered: same ruler all the way back, and a pool that grew then collapsed
+
+The eval-set caveat on §2 ("verified for rounds 8–15 only") is retired. The train jobs for
+rounds 1–6 were found by matching each `mega_iterm1_curated_s101/trainN` run directory
+against the 64 candidate logs in `results/framework/`:
+
+| round | run | train images | val images | val instances | log's `all` mAP | ledger |
+|---|---|---|---|---|---|---|
+| 1 | train2 | 47,403 | 1,977 | 3,257 | 0.602 | .6019 |
+| 2 | train3 | 51,057 | 1,977 | 3,257 | 0.592 | .5919 |
+| 3 | train4 | 54,405 | 1,977 | 3,257 | 0.595 | .5951 |
+| 4 | train5 | 57,812 | 1,977 | 3,257 | 0.583 | .5829 |
+| 5 | train6 | 62,315 | 1,977 | 3,257 | 0.584 | .5839 |
+| 6 | train7 | 69,010 | 1,977 | 3,257 | 0.574 | .5738 |
+| 7 | train8 | — | — | — | — | .5685 |
+
+**The ruler is the same 1,977 images / 3,257 instances in every round of the campaign that
+has a log**, and each log's own `all` row reproduces the ledger metric. Round 7's log could
+not be matched — the only candidate naming `train8` is a later smoke run (`m1smoke_s0`,
+job 45250479) — so round 7 stays unevidenced on the eval side.
+
+**The pool did not just grow — it grew and then collapsed.**
+
+```
+r1 47,403 → r2 51,057 → r3 54,405 → r4 57,812 → r5 62,315 → r6 69,010    (+21,607, +46%)
+                                                     ⋯
+r8 … r15   45,620 in every round                                          (−23,390 from r6)
+```
+
+So the campaign has three regimes, not two: a growing pool (r1–r6, mAP 0.6019 → 0.5738), a
+collapse between r6 and r8 that no artifact in hand explains, and a frozen pool (r8–r15,
+mAP 0.5693 → 0.5607). **Over the growing regime the pool and the chain moved together and
+neither can be attributed**; only the frozen regime isolates the chain, and there the slope
+is −0.00177/round at t = −2.24.
 
 ## 6. What this does and does not establish
 
