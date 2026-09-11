@@ -328,6 +328,56 @@ code{font-family:var(--mono);font-size:.9em;color:var(--ink-2)}
 
 <section>
   <div class="col">
+    <h2>The supervision benchmark, before any model runs</h2>
+    <p>A separate corpus of 162 real incidents from this project's own history, used to ask
+    whether a language model reading the evidence catches failures the deterministic checks
+    miss. These are properties of the corpus itself — they bound every number it will ever
+    produce, and they were fixed before any model was run.</p>
+  </div>
+
+  <div class="band">
+    <span class="who">Corpus properties</span>
+    <span class="what">162 cases · no compute · computed from the pre-registered labels</span>
+  </div>
+  <div class="scroll">
+  <table style="min-width:560px">
+    <thead><tr><th>Property</th><th class="n">Count</th><th class="n">Share</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr><td class="big">Incidents</td><td class="n big">127</td><td class="n">78.4%</td>
+        <td>Answering “incident” everywhere scores recall 1.000. Recall means nothing without
+        the false-alarm rate beside it.</td></tr>
+      <tr><td class="big">Controls</td><td class="n">35</td><td class="n">21.6%</td>
+        <td>Cases where the artifact looks wrong and the correct verdict is “nothing here”.</td></tr>
+      <tr><td class="big">Test split</td><td class="n big">13</td><td class="n">8.0%</td>
+        <td>Too small to separate two methods differing by less than about 0.15. Dev results
+        stay labelled as dev results.</td></tr>
+      <tr class="rule-top"><td class="big">Incidents a rule <em>can</em> reach</td>
+        <td class="n big">71</td><td class="n">55.9%</td>
+        <td>The case declares which of the twelve checks should fire on it.</td></tr>
+      <tr><td class="big">Incidents <em>no</em> rule can reach</td>
+        <td class="n big" style="color:var(--warn)">56</td><td class="n">44.1%</td>
+        <td>Outside what any deterministic check can see, by the corpus's own
+        pre-registration.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="col" style="margin-top:16px"><b>A rules-only baseline cannot exceed 0.559
+  detection recall here.</b> That is arithmetic, not a measurement. Any “the model beats the
+  rules by X” figure computed across all 127 incidents is partly reporting this ceiling — so
+  the fair contest is the 71 reachable ones, and the 56 unreachable ones are where a model
+  can contribute something a rule cannot by construction. Both belong on the slide, never one
+  average.</p>
+  <div class="col"><div class="note">
+    <p><strong>No score from this benchmark is quotable yet.</strong> Its one run was
+    withdrawn twice — the scripted baseline was undecidable on every case, a third of the
+    prompts overran the context window and were scored as misses, and the corpus was re-frozen
+    afterwards. A rerun has not been submitted. What is reportable today is the corpus and its
+    limits, which is what this section is.</p>
+  </div></div>
+</section>
+
+<section>
+  <div class="col">
     <h2>Numbers that must never be quoted bare</h2>
     <p>Each of these appears in an earlier table or document in a form the artifacts do not
     support.</p>
