@@ -9245,3 +9245,25 @@ shorter than a 19 GB load off Lustre, so a failure to *arrive* was reported as a
 *answer*. The job now sets `OLLAMA_LOAD_TIMEOUT=30m`, warms the model with a one-token
 generate at a 30-minute client timeout, retries three times, and **refuses to run the review
 at all** if the model never loads. Walltime raised to 2 h. Resubmitted as job 45775879.
+
+## 2026-09-11 — v3.43.0 first cluster review, and the first head-to-head
+
+Job 45775879 is the first review this project has run on a cluster model.
+`run_llm_review.sh` started ollama in its own H100 allocation, spent **10 min 26 s**
+loading `glm-4.7-flash`, and reviewed round 15's train bundle in 147.8 s —
+`ok=True`, verdict `issue`, 2 findings, 20,700 tokens read. The warm-up added in
+v3.42.0 is what made it work; the previous attempt died at the load.
+
+The lab's 7 B had already reviewed the same bundle, so this is a head-to-head on
+identical evidence. **Both returned the same verdict and the same two signals**
+(`epochs_truncated`, `plateau`), both grounded zero findings to a resolvable line,
+and neither said anything the twelve deterministic checks had not. On diagnosis
+quality the 7 B was the more specific of the two: it reproduced the arithmetic
+("25 ran, 0.42 of the recipe… best epoch 5 plus patience 20") and quoted three
+fields, where the 30 B restated the signal and quoted one.
+
+**n = 1.** A single bundle cannot separate two models and this is not reported as
+a benchmark. The five queued jobs run the full 149-case dev split under identical
+conditions and are what will settle it. What this case does establish: the cluster
+path works end to end, a 19 GB model costs about ten minutes to load and ~6× the
+latency to answer, and on a bundle this size that bought nothing visible.

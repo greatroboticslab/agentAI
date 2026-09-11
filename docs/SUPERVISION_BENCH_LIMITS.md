@@ -89,3 +89,50 @@ corpus expects (87), and out of what the bundles actually make reachable (12).
 - The corpus's ground truth was written from this project's own engineering record, by the
   same system that wrote the reviewer prompt. That is a real limitation and belongs on the
   slide, not in a footnote.
+
+---
+
+## 6. First cluster review, and the first head-to-head — n = 1, and it does not favour the big model
+
+Job `45775879` is the first review this project has ever run on a cluster model.
+`run_llm_review.sh` started ollama inside its own H100 allocation, spent **10 min 26 s**
+loading `glm-4.7-flash` off Lustre, and reviewed round 15's train bundle in 147.8 s.
+
+The lab's 7 B model had already reviewed **the same bundle**. Same prompt, same evidence, same
+holdout:
+
+| | `qwen2.5-coder:7b` · lab RTX 3060 | `glm-4.7-flash` · cluster H100 |
+|---|---|---|
+| verdict | issue, confidence 1.0 | issue, confidence 0.9 |
+| findings | 2 | 2 |
+| which signals | `epochs_truncated`, `plateau` | `epochs_truncated`, `plateau` — **the same two** |
+| citations accepted | 0 of 2 | 0 of 2 |
+| tokens read | 23,333 | 20,700 |
+| time to answer | **23.5 s** | 147.8 s (+ 10 min 26 s to load) |
+
+On diagnosis quality the smaller model was **better**, not worse:
+
+> **7 B** — "The recipe asked for 60 epochs and 25 ran (0.42 of it, under the 1.00 floor)… It
+> stopped at epoch 25, which is best epoch 5 plus patience 20, so early stopping ended it: the
+> metric last improved 20 epochs before the end." Quote: `epochs=60 | epochs_completed=25 |
+> patience=20`.
+>
+> **GLM-4.7-flash** — "The training stopped at epoch 25, far short of the requested 60, due to
+> early stopping triggered by the patience parameter." Quote: `epochs=60`.
+
+The 7 B reproduced the arithmetic and quoted three fields; the 30 B restated the signal and
+quoted one. Neither grounded a single finding to a resolvable line, and neither found anything
+the twelve deterministic checks had not already said on this bundle.
+
+**This is one bundle.** It is not a benchmark and must not be reported as one — a single case
+cannot separate two models, and this section exists precisely to say what a single case cannot
+do. The five queued jobs (`45746472` qwen3.8:27b, `45746473` glm-4.7-flash, `45746474`
+qwen3:14b, `45746475` qwen2.5:7b, `45746483` deepseek-v3:671b) run the full 149-case dev split
+under identical conditions and are what will settle it.
+
+What this one case does establish is narrower and still worth having: **the cluster path works
+end to end**, a 19 GB model loads in about ten minutes on an H100 off Lustre, and the cost of
+using it is roughly 6× the latency for no visible gain on a bundle this size. If the benchmark
+agrees, the honest recommendation will be a small model for every step and a large one only
+where the corpus shows the small one failing — which is a result about *where* model capacity
+matters, not an excuse for having used the small one.
