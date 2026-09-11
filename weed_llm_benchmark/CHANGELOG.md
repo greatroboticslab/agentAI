@@ -9142,3 +9142,35 @@ writes a complete snapshot, and the archive resumes on its own once the path is
 usable again.
 
 Verified: 413 pytest + 28 script-style test files pass.
+
+## 2026-09-11 — v3.39.0 the class space is the experiment, and the brain made the call
+
+The 45,508 harvested training images do not carry plant labels. `mega_trainer`'s
+`_aux_class_for_slug` assigns a class id as `md5(slug) % 88` — a hash of the
+dataset the image came from. Measured over the 22 datasets in the merge: 19 of 88
+slots used, two slots shared, **5 datasets colliding onto one id, 14,902 images
+= 33% of the harvested corpus**. Slot 60 alone holds `weed-bqdok`,
+`weed-detection-ycai2` and `imageweeds_weed_detection`, 13,778 images with one
+label between them. The model is being asked which website an image came from,
+not what plant is in it — and for a third of the images even that is wrong.
+
+`run_s3_tier_ladder_b.sh` is the existing tier ladder with **one variable
+changed**: every harvested box is rewritten to a single class instead of its
+hashed one. `nc` stays 100 so the head size is held constant. The core, the
+add-on images (same seed-1234 shuffle, same files), the model, the epoch cap, the
+patience, the seed, the image size and the holdout are byte-identical to arm A;
+`diff` over the two scripts shows only the output names and the label-rewrite
+block.
+
+**The readout is the slope, not any point.** Arm A is already measured —
++0 0.8636, +5k 0.8599, +15k 0.8614, +40k 0.8436 — a ladder that is flat and then
+falls. If the label noise is what makes it fall, arm B's slope should be
+shallower or reversed. Falsified if it is not shallower by more than the seed
+noise. Jobs `45744712_[0-3]`; the +0 rung carries no harvested images and so
+doubles as a check that nothing else in the script changed.
+
+The request was queued and ruled on through the real approval path rather than
+described in prose: `approvals.propose` by `brain:opus-5-acting-as-tier` at risk
+R1 with the reasoning and the falsification condition attached, then
+`approvals.decide` by `human:harry` quoting the approval verbatim. It is the
+first decision in this project's history to go through that chain end to end.
