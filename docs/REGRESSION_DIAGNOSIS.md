@@ -504,6 +504,53 @@ deterministic fired; the shadow reviewer is what surfaced it, from the same `+0`
 selection, and the `status: "ok"` returned over a failed Mongo mirror. Those are campaign
 behaviour and need a decision, not a patch.
 
+## 5k. The class-space hypothesis is falsified, and the result is more useful than the hypothesis
+
+The brain's first decision (approval `ap-1789102367-82097423`, jobs `45744712_[0-3]`) proposed that
+the harvested images' class labels — `md5(slug) % 88`, a hash of the source website, with 33% of the
+corpus colliding — were what made the tier ladder fall, and that giving every harvested box one honest
+class would flatten it. The falsification condition was stated in the approval record before the jobs
+ran: *falsified if arm B's slope is not shallower than arm A's by more than the seed noise.*
+
+**It is not shallower. It is eleven times steeper.**
+
+| harvested added | arm A · hashed classes | arm B · one class | B − A | boxes rewritten |
+|---|---|---|---|---|
+| +0 | 0.8636 | **0.8636** | +0.0000 | 0 |
+| +5,000 | 0.8599 | 0.8538 | −0.0061 | 45,156 |
+| +15,000 | 0.8614 | 0.8451 | **−0.0163** | 135,386 |
+| +40,000 | 0.8436 | *running* | — | — |
+
+| arm | slope per +10,000 harvested images |
+|---|---|
+| A, `md5(slug) % 88` | −0.00104 |
+| B, one shared class | **−0.01181** |
+
+At +15,000 the gap is 0.0163, **4.1× the round recipe's measured seed std (0.0040)**. The +0 rung
+carries no harvested images and reproduced arm A exactly — 0.8636 at 97 epochs, both arms — so the
+change did nothing but what it was meant to do.
+
+### What it means
+
+The label noise was not the problem, and removing it made things worse. The harvested boxes are
+**dense**: 45,156 boxes in 5,000 images and 135,386 in 15,000 — **9.0 boxes per image**, against
+**1.7** in the cwd12 core (6,131 boxes in 3,671 images). Under `md5(slug)`, those boxes are scattered
+across nineteen classes the twelve-class problem barely touches, and the detector can largely ignore
+them. Collapsing them into one class turns scattered noise into a **single dominant class** with more
+instances than all twelve real classes combined, competing directly for the head's capacity and for
+every assignment and suppression decision.
+
+So the honest reading is not "the class space doesn't matter". It is that **the harvested boxes
+themselves are the cost, and concentrating them raises it**. That strengthens rather than weakens the
+campaign's central negative result: web-harvested data does not help this task, and the reason is the
+data, not its bookkeeping.
+
+### What the next decision should test
+
+If density is the mechanism, the test is a **box budget**, not a class space: cap the harvested boxes
+per image (or drop images above a box-count threshold) and re-run the ladder. That is one variable and
+it follows from this measurement rather than from a guess.
+
 ## 6. What this does and does not establish
 
 **Established.**

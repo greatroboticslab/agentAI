@@ -9221,3 +9221,27 @@ The lab cannot reach a cluster model over HTTP, so the bundle is staged with the
 rsync route the platform already uses for training data
 (`byler@data.bridges2.psc.edu`, `SSH_ASKPASS`). First real submission: job
 45765065, round 15's train bundle (14 sections, ~11,187 tokens), glm-4.7-flash.
+
+## 2026-09-11 — v3.42.0 the class-space hypothesis is falsified, and the cluster reviewer needed warming
+
+**Falsified, on its own pre-registered condition.** The first decision routed through the
+approval chain (`ap-1789102367-82097423`) held that the harvested images' hashed class
+ids were what made the tier ladder fall, and that one honest class would flatten it.
+Arm B's slope is **−0.01181 per +10,000 images against arm A's −0.00104** — eleven times
+steeper, in the wrong direction. At +15,000 the gap is 0.0163, 4.1× the measured seed std.
+The +0 rung reproduced arm A exactly (0.8636, 97 epochs, both arms), so nothing else moved.
+
+The reading that survives: the harvested boxes are **9.0 per image** against **1.7** in the
+cwd12 core, so collapsing them into one class creates a single class with more instances
+than all twelve real ones combined. Under `md5(slug)` they scatter over nineteen classes the
+problem barely touches and the detector can ignore them. Density is the cost, not the
+bookkeeping — which strengthens the campaign's negative result rather than weakening it.
+The next test is a box budget, not a class space.
+
+**`run_llm_review.sh` warms the model before reviewing.** Job 45765065 came back
+`HTTP 500 {"error":"timed out waiting for llama-server to start"}` after 304 s with
+`tokens_in=0`. ollama loads a model on its first request and its internal start timeout is
+shorter than a 19 GB load off Lustre, so a failure to *arrive* was reported as a failure to
+*answer*. The job now sets `OLLAMA_LOAD_TIMEOUT=30m`, warms the model with a one-token
+generate at a 30-minute client timeout, retries three times, and **refuses to run the review
+at all** if the model never loads. Walltime raised to 2 h. Resubmitted as job 45775879.

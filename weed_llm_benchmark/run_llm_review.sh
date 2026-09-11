@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:h100-80:1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=80G
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --output=results/framework/llm_review_%j.out
 #
 # Review one evidence bundle with a CLUSTER model.
@@ -84,6 +84,8 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 export OLLAMA_HOST="127.0.0.1:$PORT"
 export OLLAMA_MODELS=/ocean/projects/cis240145p/byler/ollama/models
 export OLLAMA_KEEP_ALIVE=30m
+# A 19 GB load off Lustre outruns the default start timeout; job 45765065 died on it.
+export OLLAMA_LOAD_TIMEOUT=30m
 /ocean/projects/cis240145p/byler/ollama/bin/ollama serve > "results/framework/llm_review_serve_${SLURM_JOB_ID:-0}.log" 2>&1 &
 SERVE_PID=$!
 for i in $(seq 1 60); do
@@ -93,6 +95,31 @@ done
 curl -sf "http://127.0.0.1:$PORT/api/tags" >/dev/null 2>&1 || {
     echo "FATAL: ollama did not come up on port $PORT" >&2; kill $SERVE_PID 2>/dev/null; exit 1; }
 echo "[ollama] serving on $PORT"
+
+# Load the weights BEFORE the review asks anything. ollama loads a model on its
+# first request, and the internal llama-server start timeout is shorter than a
+# 19 GB load from Lustre: job 45765065 spent 304 s and came back
+# `HTTP 500 {"error":"timed out waiting for llama-server to start"}` with
+# tokens_in=0 -- a failure that looks like the model refusing rather than the
+# model never arriving. Warm it with a generous client timeout and a trivial
+# prompt, and refuse to run the review if it never answers.
+echo "[ollama] warming $REVIEW_MODEL (this is the slow part) $(date)"
+WARM_RC=1
+for attempt in 1 2 3; do
+    if curl -sf -m 1800 -X POST "http://127.0.0.1:$PORT/api/generate" \
+         -H 'Content-Type: application/json' \
+         -d "{\"model\":\"$REVIEW_MODEL\",\"prompt\":\"ok\",\"stream\":false,\"options\":{\"num_ctx\":$NUM_CTX,\"num_predict\":1}}" \
+         -o "results/framework/llm_review_warm_${SLURM_JOB_ID:-0}.json" 2>/dev/null; then
+        WARM_RC=0; break
+    fi
+    echo "[ollama] warm attempt $attempt did not answer; retrying $(date)"
+done
+if [ "$WARM_RC" != "0" ]; then
+    echo "FATAL: $REVIEW_MODEL never loaded on this node after 3 attempts" >&2
+    kill $SERVE_PID 2>/dev/null
+    exit 1
+fi
+echo "[ollama] $REVIEW_MODEL loaded $(date)"
 
 BUNDLE="$BUNDLE" TIER="$TIER" DOMAIN="$DOMAIN" PORT="$PORT" REPO="$REPO" \
 REVIEW_MODEL="$REVIEW_MODEL" NUM_CTX="$NUM_CTX" TIMEOUT="$TIMEOUT" \
