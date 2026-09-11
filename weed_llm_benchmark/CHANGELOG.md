@@ -9267,3 +9267,25 @@ a benchmark. The five queued jobs run the full 149-case dev split under identica
 conditions and are what will settle it. What this case does establish: the cluster
 path works end to end, a 19 GB model costs about ten minutes to load and ~6× the
 latency to answer, and on a bundle this size that bought nothing visible.
+
+## 2026-09-11 — v3.44.0 error bars for the two claims that would carry a poster
+
+Two of the campaign's headline claims rest on single runs, and their effects are
+the size of the noise they are quoted against:
+
+- the tier ladder — "+5,000 costs 0.004, +15,000 costs 0.002, +40,000 costs
+  0.020" — is **n = 1 per rung**, against a measured seed std of 0.0040;
+- the cold-versus-warm control — **+0.0287** — is **n = 1 per arm**, quoted
+  against a seed std measured on a different recipe.
+
+Neither can carry a figure a reviewer will read. `run_s3_tier_ladder_seed.sh` and
+`run_ctl_chain_seed.sh` repeat both at seeds 102 and 103. Only the training seed
+changes: the ladder's add-on images are still drawn by `random.Random(1234)`, so
+every seed trains on the same images in the same order at each rung and the
+spread measures training noise rather than a different sample of the corpus.
+
+Submitted: `45790239_[0-3]` and `45790291_[0-3]` (ladder, seeds 102/103, four
+rungs each), `45790292_[1-2]` and `45790293_[1-2]` (cold/warm, seeds 102/103,
+both arms). Twelve runs; the four controls already measured cost 57 SU of 19,800,
+so the budget is not the constraint and was never the reason these were single
+runs.
