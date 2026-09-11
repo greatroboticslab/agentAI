@@ -9289,3 +9289,34 @@ rungs each), `45790292_[1-2]` and `45790293_[1-2]` (cold/warm, seeds 102/103,
 both arms). Twelve runs; the four controls already measured cost 57 SU of 19,800,
 so the budget is not the constraint and was never the reason these were single
 runs.
+
+## 2026-09-11 — v3.45.0 the supervision benchmark has a scored result
+
+Walking every file in `supervision_bench/verdicts/*/` against each case's
+`truth.json` gives the campaign's first scored supervision numbers. Dev split,
+149 cases, 116 incidents and 33 controls. The scorer was written from scratch so
+the definitions are visible; undecidable cases count as misses and are reported
+separately.
+
+| arm | reads | recall | false alarms |
+|---|---|---|---|
+| A0 scripted | status fields | **0.000** (0 of 116) | 0.000 |
+| A0p signals-only | the 12 checks | **0.095** (11 of 116) | 0.061 |
+| L2 deepseek-v4-flash | raw artifacts | 0.388 | 0.091 |
+| L3 deepseek-v4-flash | artifacts + signals | 0.328 | 0.091 |
+| L2 qwen3.8:27b | raw artifacts | 0.841 ⏳ 77/149 | 0.212 ⏳ |
+
+**A0 flags nothing on any case** — `escalate.reason: "no signal fired"` with the
+status fields reporting success, 149 times out of 149. A0p's three directories are
+byte-identical because it is deterministic and ignores the model beside it, which
+is the right behaviour and a useful internal check.
+
+A0p's 0.095 is **17% of the 0.559 ceiling** the corpus fixes for any signals-only
+arm, and the shortfall is the reachability problem: the archived bundles carry 12
+of 87 expected firings.
+
+The qwen3.8:27b row is **52% complete** and carries that mark; the completed
+deepseek-v4-flash row is from the run retracted for context overflow and is a
+floor, not an estimate. Nothing here says bigger models are better — the 284 B
+model scored 0.388 where the 27 B is tracking 0.841, confounded with the overflow
+bug the September fix removed.

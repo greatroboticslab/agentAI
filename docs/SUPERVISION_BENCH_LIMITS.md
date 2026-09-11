@@ -136,3 +136,55 @@ using it is roughly 6× the latency for no visible gain on a bundle this size. I
 agrees, the honest recommendation will be a small model for every step and a large one only
 where the corpus shows the small one failing — which is a result about *where* model capacity
 matters, not an excuse for having used the small one.
+
+---
+
+## 7. The first scored result: what each kind of supervision actually catches
+
+Scored 2026-09-11 by walking every file in `results/framework/supervision_bench/verdicts/*/`
+against each case's `truth.json`. The scorer was written from scratch rather than reused, so the
+definitions are visible: **recall** is over the cases whose truth says `incident`, the
+**false-alarm rate** is over the cases whose truth says control, and a case an arm could not
+decide is counted as a miss and reported separately rather than dropped. Dev split, 149 cases —
+**116 incidents, 33 controls**.
+
+| arm | what it reads | TP | FN | FP | recall | false-alarm rate | cases |
+|---|---|---|---|---|---|---|---|
+| **A0** scripted watchdog | status fields | 0 | 116 | 0 | **0.000** | 0.000 | 149 |
+| **A0p** signals-only | the 12 deterministic checks | 11 | 105 | 2 | **0.095** | 0.061 | 149 |
+| **L2** · deepseek-v4-flash | raw artifact excerpts | 45 | 71 | 3 | **0.388** | 0.091 | 149 |
+| **L3** · deepseek-v4-flash | excerpts + signal list | 38 | 78 | 3 | 0.328 | 0.091 | 149 |
+| **L2** · qwen3.8:27b | raw artifact excerpts | 37 | 7 | 7 | **0.841** ⏳ | 0.212 ⏳ | **77 of 149, still running** |
+
+**A0 flags nothing, on any case.** Its verdict files carry
+`escalate.reason: "no signal fired"` with `signals_n: 11` — the scripted arm reads the status
+fields, the status fields say the step succeeded, and it reports success 149 times out of 149.
+That is the baseline this project's dashboard was for six months.
+
+**A0p is deterministic and its three directories are byte-identical** (`model: ""`,
+`deterministic: true`), which is the correct behaviour and a useful internal check: the
+signals-only arm does not vary with which model is loaded beside it. It catches **11 of 116**
+incidents. §3 of this document fixes its ceiling at **0.559** — 56 of the 127 incidents declare
+no signal that could reach them — so 0.095 is **17 % of what the rules could achieve even in
+principle**, and the shortfall is the reachability problem: the archived bundles carry 12 of 87
+expected signal firings.
+
+**The qwen3.8:27b row is not final.** Job `45746472` is still running; 77 of 149 cases are
+scored (44 incidents, 33 controls) and the remaining 72 may not resemble them. Its 0.841 must
+carry that mark until the job lands. The completed deepseek-v4-flash row at 0.388 is from the
+run retracted on 2026-09-06 for context overflow — a third of its prompts were refused and
+scored as misses — so it is a **floor** for what a model reading artifacts can do, not an
+estimate.
+
+### What can be said now, and what cannot
+
+Sayable: **a scripted watchdog over status fields catches none of 116 real incidents; the
+deterministic signal set catches 11; a model reading the raw artifacts catches several times
+more, at a higher false-alarm rate.** The direction is large and consistent across two
+independent model families.
+
+Not yet sayable: any single number for "the model arm", because the strongest one is 52 %
+complete and the completed one comes from a retracted run. Not sayable at all: that bigger
+models are better at this — `deepseek-v4-flash` (284 B) scored 0.388 where `qwen3.8:27b` is
+tracking 0.841, and the difference is confounded with the context-overflow bug the September fix
+removed.
