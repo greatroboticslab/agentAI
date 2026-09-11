@@ -105,7 +105,7 @@ code{font-family:var(--mono);font-size:.9em;color:var(--ink-2)}
 
 <div class="wrap">
 <header class="col">
-  <p class="eyebrow">CottonWeedDet12 · results ledger · 2026-09-10</p>
+  <p class="eyebrow">CottonWeedDet12 · results ledger · 2026-09-11</p>
   <h1>Which numbers hold up</h1>
   <p class="lede">Every figure below was re-read from the <code>results.csv</code> the run
   itself wrote, not copied from an earlier table. Four numbers in the previously published
@@ -249,6 +249,38 @@ code{font-family:var(--mono);font-size:.9em;color:var(--ink-2)}
 
 <section>
   <div class="col">
+    <h2>Does harvested data help? Now with error bars</h2>
+    <p>Harvested web images added to a clean in-domain core, the same images at every seed
+    (<code>random.Random(1234)</code> picks them), only the training seed varying.</p>
+  </div>
+  <div class="band">
+    <span class="who">Ultralytics validator</span>
+    <span class="what">100 classes · same 1,977-image holdout · YOLO11n, 100-epoch cap</span>
+  </div>
+  <div class="scroll">
+  <table style="min-width:620px">
+    <thead><tr><th>Harvested added</th><th>Train images</th><th class="n">mAP50-95</th>
+      <th class="n">n</th><th class="n">vs core</th></tr></thead>
+    <tbody>
+      <tr><td class="big">none — the clean core</td><td>3,671</td>
+        <td class="n big">0.8637 ± 0.0027</td><td class="n">3</td><td class="n">—</td></tr>
+      <tr><td class="big">+5,000</td><td>8,671</td>
+        <td class="n big">0.8609 ± 0.0036</td><td class="n">3</td><td class="n">−0.0028</td></tr>
+      <tr><td class="big">+15,000</td><td>18,671</td>
+        <td class="n big">0.8580 ± 0.0047</td><td class="n">3</td><td class="n">−0.0057</td></tr>
+      <tr><td class="big">+40,000</td><td>43,671</td>
+        <td class="n big">0.8436 ⏳</td><td class="n">1</td><td class="n">−0.0201</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="col" style="margin-top:16px"><b>Twelve times the training data is flat, then costs.</b>
+  At +5,000 and +15,000 the difference is inside the seed spread (−0.0028 and −0.0057 against a
+  pooled sd of 0.0032 and 0.0039). Only the +40,000 rung is clearly separable, and it is still a
+  single run — its seeds are in flight and it is marked so wherever it appears.</p>
+</section>
+
+<section>
+  <div class="col">
     <h2>Cause, isolated</h2>
     <p>Each round warm-started from the previous round's checkpoint. Four controls on round
     15's exact dataset separate that from the training schedule. The two arms differ in
@@ -324,6 +356,58 @@ code{font-family:var(--mono);font-size:.9em;color:var(--ink-2)}
       model reading the evidence bundle, not from any deterministic check.</li>
     </ul>
   </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>What supervision actually catches</h2>
+    <p>The first scored result this benchmark has produced. Every verdict file walked against its
+    case's ground truth: recall over the 116 incidents, false-alarm rate over the 33 controls, and a
+    case an arm could not decide counted as a miss.</p>
+  </div>
+
+  <div class="band">
+    <span class="who">Own scorer, definitions visible</span>
+    <span class="what">dev split · 149 cases · 116 incidents / 33 controls</span>
+  </div>
+  <div class="scroll">
+  <table>
+    <caption>Scored 2026-09-11 from results/framework/supervision_bench/verdicts/*/.</caption>
+    <thead><tr>
+      <th>Arm</th><th>What it reads</th><th class="n">Caught</th><th class="n">Recall</th>
+      <th class="n">False alarms</th><th class="n">Cases</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="big">Scripted watchdog</td><td>status fields</td>
+        <td class="n">0 of 116</td><td class="n big" style="color:var(--warn)">0.000</td>
+        <td class="n">0.000</td><td class="n">149</td></tr>
+      <tr><td class="big">Deterministic signals</td><td>the 12 pre-registered checks</td>
+        <td class="n">11 of 116</td><td class="n big">0.095</td>
+        <td class="n">0.061</td><td class="n">149</td></tr>
+      <tr class="rule-top"><td class="big">Qwen3-14B</td><td>raw artifact excerpts</td>
+        <td class="n">82 of 116</td><td class="n big">0.707</td>
+        <td class="n big" style="color:var(--warn)">0.636</td><td class="n">149</td></tr>
+      <tr><td class="big" style="color:var(--ok)">Qwen3.8-27B</td><td>raw artifact excerpts</td>
+        <td class="n">93 of 116</td><td class="n big" style="color:var(--ok)">0.802</td>
+        <td class="n">0.212</td><td class="n">149</td></tr>
+      <tr><td class="big">GLM-4.7-Flash</td><td>raw artifact excerpts</td>
+        <td class="n">36 of 45</td><td class="n big">0.800</td>
+        <td class="n">0.152</td><td class="n">78 ⏳</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="col" style="margin-top:16px"><b>The scripted watchdog flags nothing, on any case.</b>
+  Its verdict files read <code>"no signal fired"</code> while the status fields report success —
+  149 times out of 149. That is the baseline this project's dashboard was for six months.</p>
+  <p class="col"><b>Model size is not the axis.</b> Three open models reading the same artifacts all
+  land between 0.70 and 0.80 recall. What separates them is the false-alarm rate — 0.636, 0.212,
+  0.152 — so the choice of model buys precision here, not detection. The 14B reaches its recall by
+  flagging 21 of the 33 control cases, which is exactly what those controls exist to expose.</p>
+  <div class="col"><div class="note">
+    <p><strong>DeepSeek-V4-Flash is deliberately absent.</strong> Its 0.388 comes from the run
+    withdrawn for context overflow, where a third of the prompts were refused and scored as misses.
+    It is a floor for a different setup, not a comparable arm, and it is not shown beside these.</p>
+  </div></div>
 </section>
 
 <section>

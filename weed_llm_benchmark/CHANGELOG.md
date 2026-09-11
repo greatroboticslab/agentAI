@@ -9414,3 +9414,29 @@ earlier figure carried its partial mark and is superseded rather than corrected.
 reaches a similar recall (0.824) at a **0.636 false-alarm rate** — it flags almost
 everything, which is the failure mode the 33 control cases exist to expose, and
 why recall is never reported here without its false-alarm rate.
+
+## 2026-09-11 — v3.49.0 two benchmarks died on the walltime; three ladder rungs got error bars
+
+**`brain_b27` and `brain_bglm` both hit the 4 h walltime** (`CANCELLED ... DUE TO
+TIME LIMIT`). The 27 B job had already written all 149 verdicts before it died, so
+its result stands; the GLM job stopped at 78 of 149 and its 0.800 / 0.152 is
+partial. Both resubmitted with 12 h — GLM was running at ~3.1 min per case, so 149
+needs about eight hours plus the load. Jobs `45810953` and `45810954`.
+`brain_b14` COMPLETED cleanly in 2 h 44 with all 149.
+
+**The ladder's third rung now carries a seed spread.** Three of four rungs are
+n = 3 (seeds 101/102/103, the same images at every seed — only the training seed
+varies):
+
+| harvested added | mAP50-95 | n | vs core |
+|---|---|---|---|
+| none | 0.8637 ± 0.0027 | 3 | — |
+| +5,000 | 0.8609 ± 0.0036 | 3 | −0.0028 |
+| +15,000 | 0.8580 ± 0.0047 | 3 | −0.0057 |
+| +40,000 | 0.8436 | 1 | −0.0201 |
+
+−0.0028 and −0.0057 sit inside pooled seed spreads of 0.0032 and 0.0039, so
+neither is separable; only +40,000 is, and it is still a single run with its seeds
+in flight. The figure marks every n = 1 rung in warning colour.
+
+The results page carries both: <https://claude.ai/code/artifact/f13cf654-af80-4101-a615-c9eb24c5df11>

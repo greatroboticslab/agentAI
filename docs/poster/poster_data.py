@@ -56,7 +56,7 @@ LADDER = {
     # Seeds 102 and 103. The two completed rungs carry their own error bar now;
     # +15,000 and +40,000 are still running and stay PENDING.
     "seeds": {0: [0.8636, 0.8610, 0.8664], 5000: [0.8599, 0.8649, 0.8579],
-              15000: PENDING, 40000: PENDING},
+              15000: [0.8614, 0.8526, 0.8600], 40000: PENDING},
     # Arm B of the class-space experiment, complete: every harvested box rewritten
     # to one shared class instead of a hash of its source dataset.
     "armB": [0.8636, 0.8538, 0.8451, 0.8252],
