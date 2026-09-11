@@ -10864,12 +10864,24 @@ _CWD12 = [
     "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
     "Sicklepod", "SpottedSpurge",
 ]
+# The botanical binomial for each cwd12 class. It replaces the Chinese common
+# names this map used to hold: the pages are shipped product and must be in
+# English, and a Latin name is what a weed-science reader expects beside the
+# dataset's own label anyway. Genus-only where cwd12 pools several species under
+# one label.
 _CWD12_ZH = {
-    "Carpetweeds": "毯草", "Crabgrass": "马唐", "Eclipta": "鳢肠",
-    "Goosegrass": "蟋蟀草", "Morningglory": "牵牛花", "Nutsedge": "莎草",
-    "PalmerAmaranth": "苋菜 / 帕氏苋", "PricklySida": "刺苋",
-    "Purslane": "马齿苋", "Ragweed": "豚草", "Sicklepod": "决明",
-    "SpottedSpurge": "斑地锦",
+    "Carpetweeds": "Mollugo verticillata",
+    "Crabgrass": "Digitaria sanguinalis",
+    "Eclipta": "Eclipta prostrata",
+    "Goosegrass": "Eleusine indica",
+    "Morningglory": "Ipomoea spp.",
+    "Nutsedge": "Cyperus spp.",
+    "PalmerAmaranth": "Amaranthus palmeri",
+    "PricklySida": "Sida spinosa",
+    "Purslane": "Portulaca oleracea",
+    "Ragweed": "Ambrosia artemisiifolia",
+    "Sicklepod": "Senna obtusifolia",
+    "SpottedSpurge": "Euphorbia maculata",
 }
 
 # ----------------- registry class index (canonical -> [(slug, cid, raw)]) ----
@@ -11366,22 +11378,22 @@ def audit_landing():
 
     html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Audit — cwd12 数据 + FLUX 输出</title>
+<title>Audit — cwd12 data and FLUX output</title>
 <style>{_AUDIT_CSS}</style>
 </head><body>
 <header>
-  <h1>🔬 数据审计 — cwd12 真实数据 + FLUX 合成输出</h1>
+  <h1>🔬 Data audit — real cwd12 crops beside FLUX synthetic output</h1>
   <div class="sub">
-    <strong>{total_bank}</strong> 张真实 crop · <strong>{total_flux}</strong> 张 FLUX 合成
-    含目标类 · <strong>{len(_CWD12)}</strong> 个物种
-    · <a href="/audit/method">📘 方法论说明(FLUX 配置 / 训练 / 当前状态)</a>
-    · <a href="/">← dashboard 首页</a>
+    <strong>{total_bank}</strong> real crops · <strong>{total_flux}</strong> FLUX synthetic
+    with a target class · <strong>{len(_CWD12)}</strong> species
+    · <a href="/audit/method">📘 Method — FLUX configuration, training, current status</a>
+    · <a href="/">← Dashboard home</a>
   </div>
 </header>
 <section>
-  <h2>按类浏览</h2>
-  <p class="desc">点任一类卡片进入该类详情:左列是真实 cwd12 crop,右列是 FLUX 合成在该类的输出,
-     底部说明对该类使用的 prompt 和方法。每张图都是原生分辨率,可点击放大。</p>
+  <h2>Browse by class</h2>
+  <p class="desc">Open any class card for its detail view: real cwd12 crops on the left, FLUX output for that class on the right,
+     and the prompt and method used for it at the foot. Every image is at native resolution; click to enlarge.</p>
   <div class="grid-classes">{''.join(cards)}</div>
 </section>
 </body></html>'''
@@ -11400,7 +11412,7 @@ def audit_method():
 
     html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FLUX 方法论 / Methodology</title>
+<title>FLUX methodology</title>
 <style>{_AUDIT_CSS}
   table {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
   th, td {{ padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }}
@@ -11411,69 +11423,70 @@ def audit_method():
 </style>
 </head><body>
 <header>
-  <h1>📘 FLUX 方法论 / 当前状态</h1>
+  <h1>📘 FLUX methodology and current status</h1>
   <div class="sub"><a href="/audit">← back to audit</a></div>
 </header>
 
 <section>
-  <h2>项目 FLUX 阶段汇总</h2>
-  <p class="desc">截至当前所有 FLUX 尝试,以及对应 outcome。诚实记录,不掩盖失败。</p>
+  <h2>Every FLUX attempt in this project</h2>
+  <p class="desc">Every FLUX attempt to date and what came of it. Failures are recorded, not hidden.</p>
   <ul>
-    <li><strong>v3.0.39</strong> vanilla text-to-image 文生图(本页 prompt 列表)—
-        <span class="ko">视觉证伪</span>:文字 prompt 不足以让 FLUX 生成正确的
-        cwd12 物种(Goosegrass 出仙人掌,Ragweed 出粉花等)。</li>
-    <li><strong>v3.0.39.1</strong> 修 CUDA OOM,enable_model_cpu_offload —
-        <span class="ko">速度 5min/张</span>,600 张不可行,killed @ 42 张。</li>
-    <li><strong>v3.0.39.2</strong> BioCLIP 2 backbone 测试 —
-        <span class="ko">分类头准确率 0.615</span>,反而比通用 DINOv2 (0.667) 差,假设证伪。</li>
-    <li><strong>v3.0.39.3</strong> 2× V100 multi-GPU —
-        <span class="ko">9 分钟失败</span>(multi-GPU placement)。</li>
+    <li><strong>v3.0.39</strong> vanilla text-to-image (the prompt list on this page) —
+        <span class="ko">falsified visually</span>: a text prompt is not enough for FLUX to produce the correct
+        cwd12 species — Goosegrass came out as a cactus, Ragweed as pink flowers.</li>
+    <li><strong>v3.0.39.1</strong> CUDA OOM fixed with enable_model_cpu_offload —
+        <span class="ko">5 min per image</span>, so 600 images was not viable; killed at 42.</li>
+    <li><strong>v3.0.39.2</strong> BioCLIP 2 backbone trialled —
+        <span class="ko">classifier-head accuracy 0.615</span>, below general DINOv2 (0.667); hypothesis falsified.</li>
+    <li><strong>v3.0.39.3</strong> 2x V100 multi-GPU —
+        <span class="ko">failed after 9 minutes</span> on multi-GPU placement.</li>
     <li><strong>v3.0.39.4</strong> bank canonical mapping fix —
-        <span class="ok">bank 12 类齐全</span>,但 Goosegrass 视觉仍可疑(用户审计中)。</li>
-    <li><strong>v3.0.41 Phase 0</strong>(当前)bank rebuild SLURM job —
-        <span class="ok">已完成</span>;Phase 1 (LoRA 微调)<strong>等用户审完 bank
-        正确性后再启动</strong>。</li>
+        <span class="ok">all 12 bank classes present</span>, but Goosegrass still looks wrong and is under review.</li>
+    <li><strong>v3.0.41 Phase 0</strong> (current) bank rebuild SLURM job —
+        <span class="ok">complete</span>. Phase 1, the LoRA fine-tune, <strong>waits until the bank
+        has been reviewed for correctness</strong>.</li>
   </ul>
 </section>
 
 <section>
-  <h2>FLUX 当前配置(v3.0.39 系列实际跑过的)</h2>
+  <h2>The FLUX configuration these runs actually used</h2>
   <div class="method-box">
-    <div class="method-row"><span class="k">模型:</span>
-        <span class="v">black-forest-labs/FLUX.1-Fill-dev (bf16, ~24GB)</span></div>
-    <div class="method-row"><span class="k">推理模式:</span>
-        <span class="v">text-to-image with mask(伪 inpainting,mask 区域内重画)</span></div>
-    <div class="method-row"><span class="k">LoRA 微调:</span>
-        <span class="v ko">无(vanilla,即裸模型;这是为什么物种不正确)</span></div>
-    <div class="method-row"><span class="k">分辨率:</span>
-        <span class="v">768 × 768</span></div>
-    <div class="method-row"><span class="k">推理步数:</span>
+    <div class="method-row"><span class="k">Model</span>
+        <span class="v">black-forest-labs/FLUX.1-Fill-dev (bf16, ~24 GB)</span></div>
+    <div class="method-row"><span class="k">Inference mode</span>
+        <span class="v">text-to-image with a mask — pseudo-inpainting, repainting inside the mask</span></div>
+    <div class="method-row"><span class="k">LoRA fine-tune</span>
+        <span class="v ko">none — vanilla weights, which is why the species come out wrong</span></div>
+    <div class="method-row"><span class="k">Resolution</span>
+        <span class="v">768 x 768</span></div>
+    <div class="method-row"><span class="k">Inference steps</span>
         <span class="v">28</span></div>
-    <div class="method-row"><span class="k">guidance_scale:</span>
+    <div class="method-row"><span class="k">guidance_scale</span>
         <span class="v">30.0</span></div>
-    <div class="method-row"><span class="k">类采样:</span>
-        <span class="v">原计划弱类偏置(cwd12_class_counts.json),实测未生效 → 接近均匀</span></div>
+    <div class="method-row"><span class="k">Class sampling</span>
+        <span class="v">intended to favour weak classes (cwd12_class_counts.json); measured as
+        near-uniform, so it did not take effect</span></div>
   </div>
 </section>
 
 <section>
-  <h2>当前每类使用的 prompt</h2>
-  <p class="desc">每个 species 都拼接以下 suffix:<code>{_FLUX_PROMPT_SUFFIX}</code></p>
+  <h2>The prompt used for each class</h2>
+  <p class="desc">Every species prompt is appended with <code>{_FLUX_PROMPT_SUFFIX}</code></p>
   {table}
 </section>
 
 <section>
-  <h2>计划中(Phase 1 LoRA 微调,等用户审计 bank 通过后启动)</h2>
-  <p>FLORA 论文 (arXiv 2508.21712) 的 recipe:</p>
+  <h2>Planned: Phase 1 LoRA fine-tune, once the bank passes review</h2>
+  <p>Following the recipe in the FLORA paper (arXiv 2508.21712):</p>
   <ul>
-    <li>每类 30 张干净 crop 作为 LoRA 训练集</li>
+    <li>30 clean crops per class as the LoRA training set</li>
     <li>rank 32, alpha 16, 5 epochs, attention layers only</li>
-    <li>8-bit AdamW, bfloat16, 512²,gradient checkpointing</li>
-    <li>trigger 词:<code>cwd12-Goosegrass</code> 等(class-specific token)</li>
-    <li>推理:在真实 cwd12 图上 mask 一个真实 bbox,LoRA + FLUX inpaint
-        → 物种正确 + bbox 像素精确</li>
+    <li>8-bit AdamW, bfloat16, 512 squared, gradient checkpointing</li>
+    <li>a class-specific trigger token, e.g. <code>cwd12-Goosegrass</code></li>
+    <li>inference: mask a real bbox in a real cwd12 image and inpaint with LoRA + FLUX,
+        giving both the right species and pixel-accurate boxes</li>
   </ul>
-  <p><em>这一步还没启动,等用户在 /audit 上确认 bank 真实性正确后再做。</em></p>
+  <p><em>Not started. It waits until the bank has been confirmed correct on /audit.</em></p>
 </section>
 </body></html>'''
     return HTMLResponse(html)
@@ -11508,44 +11521,47 @@ def audit_class(cls: str):
 <style>{_AUDIT_CSS}</style>
 </head><body>
 <header>
-  <div class="crumbs"><a href="/audit">← 全部类</a></div>
+  <div class="crumbs"><a href="/audit">← All classes</a></div>
   <h1>{cls} <span style="color:#888;font-size:18px;">/ {zh}</span></h1>
   <div class="sub">
     cwd12 class_id <code>{cid}</code>
-    · <strong>{len(bank)}</strong> 张真实 crop
-    · <strong>{len(flux)}</strong> 张 FLUX 输出含此类
+    · <strong>{len(bank)}</strong> real crops
+    · <strong>{len(flux)}</strong> FLUX outputs containing this class
   </div>
 </header>
 
 <section>
-  <h2>① 原始 cwd12 数据(真实标注 bbox crop)</h2>
-  <p class="desc">从 cwd12 真实标注 bbox 抠出的 {len(bank)} 张本类 crop。
-     这是 LoRA 微调的训练源、分类头的训练源、以及合成对比的"ground truth"参考。
-     点任一张可看原生 PNG。</p>
-  <div class="grid-imgs">{bank_cards or '<p style="color:#888">(尚无该类 crop)</p>'}</div>
+  <h2>1 · Real cwd12 data — crops cut from human-labelled boxes</h2>
+  <p class="desc">{len(bank)} crops of this class, cut from cwd12's own annotated boxes.
+     This is the training source for the LoRA fine-tune and for the classifier head, and the
+     ground-truth reference the synthetic images are judged against.
+     Click any crop for the full-resolution PNG.</p>
+  <div class="grid-imgs">{bank_cards or '<p style="color:#888">No crops for this class yet.</p>'}</div>
 </section>
 
 <section>
-  <h2>② 对 FLUX 做了什么(本类配置)</h2>
+  <h2>2 · What FLUX was asked to do for this class</h2>
   <div class="method-box">
-    <div class="method-row"><span class="k">阶段:</span>
-        <span class="v">v3.0.39 vanilla text-to-image(无 LoRA 微调)</span></div>
-    <div class="method-row"><span class="k">FLUX 知道这个物种吗:</span>
-        <span class="v">通用文生图,<strong>FLUX 没有在 cwd12 上微调过</strong> ——
-        靠 prompt 文字推断。这是 v3.0.39 失败的根因。</span></div>
-    <div class="method-row"><span class="k">所用 prompt:</span></div>
+    <div class="method-row"><span class="k">Stage</span>
+        <span class="v">v3.0.39 vanilla text-to-image, no LoRA fine-tune</span></div>
+    <div class="method-row"><span class="k">Does FLUX know this species?</span>
+        <span class="v">No. This is general text-to-image and
+        <strong>FLUX was never fine-tuned on cwd12</strong> — it is inferring the plant from the
+        prompt text, which is the root cause of v3.0.39's failure.</span></div>
+    <div class="method-row"><span class="k">Prompt used</span></div>
   </div>
   <pre style="background:#f4f4f7;padding:12px 16px;border-radius:6px;font-size:13px;overflow-x:auto;">{prompt}</pre>
-  <p class="desc">下一步(Phase 1)计划:用上面这一段 ① 的真实 crop(30 张)训练
-     class-specific LoRA,trigger token <code>cwd12-{cls}</code>,把 FLUX 教会这个物种。
-     <a href="/audit/method">完整方法论 →</a></p>
+  <p class="desc">Planned next (Phase 1): train a class-specific LoRA on 30 of the real crops in
+     section 1, with the trigger token <code>cwd12-{cls}</code>, to teach FLUX this species.
+     <a href="/audit/method">Full method →</a></p>
 </section>
 
 <section>
-  <h2>③ FLUX 输出(含本类 bbox 的合成图)</h2>
-  <p class="desc">v3.0.39 阶段生成的 42 张合成图中,含 <strong>{cls}</strong> bbox 的有
-     {len(flux)} 张。每张点开是原生分辨率,可视觉判断 FLUX 画出来的是不是真的 {cls}。</p>
-  <div class="grid-imgs">{flux_cards or '<p style="color:#888">(无 FLUX 输出含本类 ——「弱类偏置」配置未生效,导致部分类未覆盖到)</p>'}</div>
+  <h2>3 · FLUX output — synthetic images carrying a box of this class</h2>
+  <p class="desc">Of the 42 synthetic images v3.0.39 produced, <strong>{len(flux)}</strong> carry a
+     <strong>{cls}</strong> box. Each opens at native resolution so you can judge for yourself
+     whether what FLUX drew is really {cls}.</p>
+  <div class="grid-imgs">{flux_cards or '<p style="color:#888">No FLUX output contains this class — the weak-class sampling bias never took effect, so some classes were not covered.</p>'}</div>
 </section>
 </body></html>'''
     return HTMLResponse(html)

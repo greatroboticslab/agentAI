@@ -9174,3 +9174,22 @@ described in prose: `approvals.propose` by `brain:opus-5-acting-as-tier` at risk
 R1 with the reasoning and the falsification condition attached, then
 `approvals.decide` by `human:harry` quoting the approval verbatim. It is the
 first decision in this project's history to go through that chain end to end.
+
+## 2026-09-11 — v3.40.0 the audit pages ship in English, and the species map carries binomials
+
+`/audit`, `/audit/method` and `/audit/class/{name}` rendered their headings, body
+copy and method tables in Chinese to every logged-in user — 65 lines of CJK
+inside returned HTML. The product has been English-only by standing rule since
+2026-05; this was the largest surviving breach of it.
+
+All three templates are rewritten in English. `_CWD12_ZH`, which held the Chinese
+common name shown beside each class, now holds the **botanical binomial**:
+`Goosegrass → Eleusine indica`, `PalmerAmaranth → Amaranthus palmeri`,
+`Morningglory → Ipomoea spp.` and so on, genus-only where cwd12 pools several
+species under one label. That removes the Chinese and replaces it with what a
+weed-science reader expects beside the dataset's own label.
+
+Verified on the live lab server after restart: `/audit`, `/audit/method`,
+`/audit/class/Goosegrass`, `/classes` and `/` all return 200 with **zero CJK
+characters** in the rendered body. The only CJK left in the module is in source
+comments.
