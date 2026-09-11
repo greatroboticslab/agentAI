@@ -54,6 +54,9 @@ LADDER = {
     "rungs": [0, 5000, 15000, 40000],
     "seed101": [0.8636, 0.8599, 0.8614, 0.8436],
     "seed102": PENDING, "seed103": PENDING,
+    # Arm B of the class-space experiment, complete: every harvested box rewritten
+    # to one shared class instead of a hash of its source dataset.
+    "armB": [0.8636, 0.8538, 0.8451, 0.8252],
     "jobs": "44397807_[0-3] (seed 101), 45790239_[0-3] (102), 45790291_[0-3] (103)",
     "src": "results/framework/s3_tier_v2_{0,5000,15000,40000}.json",
     "reading": ("Twelve times the training data is flat to +15,000 and then costs 0.020. "
@@ -90,13 +93,18 @@ SUPERVISION = {
         {"arm": "Deterministic signals", "reads": "12 pre-registered checks",
          "tp": 11, "recall": 0.095, "fa": 0.061, "cases": 149, "partial": False,
          "note": "17% of the 0.559 ceiling the corpus fixes for any signals-only arm"},
-        {"arm": "Open model, raw artifacts", "reads": "artifact excerpts (DeepSeek-V4-Flash)",
+        {"arm": "Open model, raw artifacts", "reads": "DeepSeek-V4-Flash, 284B",
          "tp": 45, "recall": 0.388, "fa": 0.091, "cases": 149, "partial": False,
          "note": "floor, not an estimate: a third of its prompts overran the context window"},
-        {"arm": "Open model, raw artifacts", "reads": "artifact excerpts (Qwen3.8-27B)",
-         "tp": 37, "recall": 0.841, "fa": 0.212, "cases": 107, "partial": True,
-         "note": "job 45746472 still running"},
+        {"arm": "Open model, raw artifacts", "reads": "Qwen3.8-27B",
+         "tp": 93, "recall": 0.802, "fa": 0.212, "cases": 149, "partial": False,
+         "note": "93 of 116 incidents caught, 7 of 33 controls flagged"},
     ],
+    # Reported beside the table, not in it: the 14B reaches a similar recall by
+    # flagging almost everything, which is the failure mode the control cases exist
+    # to expose. Partial at the time of writing and marked as such.
+    "trigger_happy": {"model": "Qwen3-14B", "recall": 0.824, "fa": 0.636,
+                      "cases": 50, "note": "50 of 149 scored, still running"},
     "ceiling": 0.559,
     "ceiling_why": "56 of the 127 incidents declare no deterministic signal that could reach them",
     "src": "results/framework/supervision_bench/verdicts/*/ scored against cases/*/truth.json",

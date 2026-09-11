@@ -519,12 +519,16 @@ ran: *falsified if arm B's slope is not shallower than arm A's by more than the 
 | +0 | 0.8636 | **0.8636** | +0.0000 | 0 |
 | +5,000 | 0.8599 | 0.8538 | −0.0061 | 45,156 |
 | +15,000 | 0.8614 | 0.8451 | **−0.0163** | 135,386 |
-| +40,000 | 0.8436 | *running* | — | — |
+| +40,000 | 0.8436 | **0.8252** | **−0.0184** | 361,236 |
 
-| arm | slope per +10,000 harvested images |
+| arm | slope per +10,000 harvested images (all four rungs) |
 |---|---|
-| A, `md5(slug) % 88` | −0.00104 |
-| B, one shared class | **−0.01181** |
+| A, `md5(slug) % 88` | −0.00487 |
+| B, one shared class | **−0.00907** |
+
+The ladder is complete on both arms now. Arm B is worse at every rung that carries harvested
+images and the gap widens monotonically — −0.0061, −0.0163, −0.0184 — so the slope comparison
+does not rest on the three-rung fit the first reading used.
 
 At +15,000 the gap is 0.0163, **4.1× the round recipe's measured seed std (0.0040)**. The +0 rung
 carries no harvested images and reproduced arm A exactly — 0.8636 at 97 epochs, both arms — so the

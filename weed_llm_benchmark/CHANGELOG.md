@@ -9384,3 +9384,33 @@ Platform totals counted on disk: **2,686 frames, 26 sessions, 2 robots, none
 labelled**. Robot 241 contributes 2,259 frames of which 1,704 are genuinely on
 vegetation or soil. The hero field recording is stored twice under two slugs,
 byte-identical — counting both would inflate the field corpus by 1,013 frames.
+
+## 2026-09-11 — v3.48.0 both experiments complete: the class space, and what supervision catches
+
+**The class-space ladder is complete on both arms.** Arm B's +40,000 rung reads
+**0.8252** against arm A's 0.8436, and arm B is worse at every rung that carries
+harvested images, by a gap that widens monotonically: −0.0061, −0.0163, −0.0184.
+Slope over all four rungs: arm A −0.00487 per +10,000 images, arm B −0.00907.
+The hypothesis that hashed class ids were what made the ladder fall is falsified
+on its own pre-registered condition, and the reading that survives is that the
+harvested boxes are the cost — 9.0 per image against 1.7 in the core — and
+concentrating them into one class raises it.
+
+**The supervision benchmark's strongest arm is complete at 149 of 149 cases.**
+
+| arm | reads | recall | false alarms |
+|---|---|---|---|
+| A0 scripted | status fields | 0.000 (0 of 116) | 0.000 |
+| A0p signals-only | the 12 checks | 0.095 (11 of 116) | 0.061 |
+| L2 DeepSeek-V4-Flash (284B) | raw artifacts | 0.388 (45 of 116) | 0.091 |
+| L3 DeepSeek-V4-Flash | artifacts + signals | 0.328 (38 of 116) | 0.091 |
+| **L2 Qwen3.8-27B** | raw artifacts | **0.802 (93 of 116)** | **0.212 (7 of 33)** |
+
+The 0.841 quoted at 77 of 149 cases settles at **0.802** over the full split; the
+earlier figure carried its partial mark and is superseded rather than corrected.
+
+**Model size is not the axis.** The 284 B model scores 0.388 and the 27 B scores
+0.802 on the same cases. Reported beside the table rather than in it: Qwen3-14B
+reaches a similar recall (0.824) at a **0.636 false-alarm rate** — it flags almost
+everything, which is the failure mode the 33 control cases exist to expose, and
+why recall is never reported here without its false-alarm rate.
