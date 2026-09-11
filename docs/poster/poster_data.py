@@ -53,7 +53,10 @@ LEVERS = [
 LADDER = {
     "rungs": [0, 5000, 15000, 40000],
     "seed101": [0.8636, 0.8599, 0.8614, 0.8436],
-    "seed102": PENDING, "seed103": PENDING,
+    # Seeds 102 and 103. The two completed rungs carry their own error bar now;
+    # +15,000 and +40,000 are still running and stay PENDING.
+    "seeds": {0: [0.8636, 0.8610, 0.8664], 5000: [0.8599, 0.8649, 0.8579],
+              15000: PENDING, 40000: PENDING},
     # Arm B of the class-space experiment, complete: every harvested box rewritten
     # to one shared class instead of a hash of its source dataset.
     "armB": [0.8636, 0.8538, 0.8451, 0.8252],
@@ -93,18 +96,23 @@ SUPERVISION = {
         {"arm": "Deterministic signals", "reads": "12 pre-registered checks",
          "tp": 11, "recall": 0.095, "fa": 0.061, "cases": 149, "partial": False,
          "note": "17% of the 0.559 ceiling the corpus fixes for any signals-only arm"},
-        {"arm": "Open model, raw artifacts", "reads": "DeepSeek-V4-Flash, 284B",
-         "tp": 45, "recall": 0.388, "fa": 0.091, "cases": 149, "partial": False,
-         "note": "floor, not an estimate: a third of its prompts overran the context window"},
-        {"arm": "Open model, raw artifacts", "reads": "Qwen3.8-27B",
+        {"arm": "Qwen3-14B", "reads": "raw artifact excerpts",
+         "tp": 82, "recall": 0.707, "fa": 0.636, "cases": 149, "partial": False,
+         "note": "flags 21 of 33 controls — recall bought by alarming on almost everything"},
+        {"arm": "Qwen3.8-27B", "reads": "raw artifact excerpts",
          "tp": 93, "recall": 0.802, "fa": 0.212, "cases": 149, "partial": False,
-         "note": "93 of 116 incidents caught, 7 of 33 controls flagged"},
+         "note": "93 of 116 incidents, 7 of 33 controls"},
     ],
-    # Reported beside the table, not in it: the 14B reaches a similar recall by
-    # flagging almost everything, which is the failure mode the control cases exist
-    # to expose. Partial at the time of writing and marked as such.
-    "trigger_happy": {"model": "Qwen3-14B", "recall": 0.824, "fa": 0.636,
-                      "cases": 50, "note": "50 of 149 scored, still running"},
+    # DeepSeek-V4-Flash is left off the figure on purpose: its 0.388 comes from the
+    # run retracted for context overflow, where a third of the prompts were refused
+    # and scored as misses. It is a floor for a different setup, not a comparable arm.
+    "excluded": {"model": "DeepSeek-V4-Flash (284B)", "recall": 0.388, "fa": 0.091,
+                 "why": "from the run retracted for context overflow; not comparable"},
+    "in_flight": {"model": "GLM-4.7-Flash (30B)", "recall": 0.800, "fa": 0.152,
+                  "cases": 78, "note": "78 of 149 and the best trade-off so far"},
+    "reading": ("Three open models reading the same artifacts all land between 0.70 and 0.80 "
+                "recall. What separates them is the false-alarm rate — 0.636, 0.212, 0.152 — "
+                "so model choice buys precision here, not detection."),
     "ceiling": 0.559,
     "ceiling_why": "56 of the 127 incidents declare no deterministic signal that could reach them",
     "src": "results/framework/supervision_bench/verdicts/*/ scored against cases/*/truth.json",

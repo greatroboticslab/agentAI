@@ -69,30 +69,43 @@ def f1():
 
 # ---------------------------------------------------------------- F2 ladder
 def f2():
-    fig, ax = plt.subplots(figsize=(9.5, 5.2))
-    x = D.LADDER["rungs"]; y = D.LADDER["seed101"]
-    xs = np.arange(len(x))
-    band = 0.0029
-    ax.fill_between(xs, [v - band for v in y], [v + band for v in y],
-                    color=FADE, zorder=1, label="± measured seed std (0.0029)")
-    ax.plot(xs, y, "-o", color=BLUE, lw=2.6, ms=10, zorder=3, label="seed 101")
-    for i, v in enumerate(y):
-        ax.annotate("%.4f" % v, (xs[i], v), textcoords="offset points",
-                    xytext=(0, 13), ha="center", fontsize=14, fontweight="bold", color=INK)
-    if D.LADDER["seed102"] == D.PENDING:
-        ax.text(0.0, 1.015, "seeds 102 and 103 in flight",
-                transform=ax.transAxes, ha="left", va="bottom", fontsize=11.5,
+    """Rungs that have three seeds get a real error bar; the rest are marked."""
+    import statistics as st
+    fig, ax = plt.subplots(figsize=(9.5, 5.4))
+    L = D.LADDER
+    x = L["rungs"]; xs = np.arange(len(x))
+    seeds = L.get("seeds") or {}
+    means, errs, ns = [], [], []
+    for k, v in zip(x, L["seed101"]):
+        sv = seeds.get(k)
+        if isinstance(sv, list) and len(sv) >= 2:
+            means.append(st.mean(sv)); errs.append(st.stdev(sv)); ns.append(len(sv))
+        else:
+            means.append(v); errs.append(0.0); ns.append(1)
+    ax.errorbar(xs, means, yerr=errs, fmt="-o", color=BLUE, lw=2.6, ms=10,
+                capsize=9, capthick=2, elinewidth=2, zorder=3)
+    for i, (m, e, n) in enumerate(zip(means, errs, ns)):
+        # Offset sideways where an error bar occupies the space above and below.
+        dx = 34 if e else 0
+        ax.annotate("%.4f" % m, (xs[i], m), textcoords="offset points",
+                    xytext=(dx, 10 if e else 14), ha="left" if e else "center",
+                    fontsize=14, fontweight="bold", color=INK)
+        ax.annotate("n = %d" % n, (xs[i], m), textcoords="offset points",
+                    xytext=(dx, -18 if e else -22), ha="left" if e else "center",
+                    fontsize=11, color=(MUTE if n > 1 else WARN))
+    if any(n == 1 for n in ns):
+        ax.text(0.985, 0.035, "seeds still running on the last two rungs",
+                transform=ax.transAxes, ha="right", va="bottom", fontsize=11.5,
                 color=WARN, style="italic")
     ax.set_xticks(xs)
     ax.set_xticklabels(["core\n+0", "+5,000", "+15,000", "+40,000"], fontsize=14)
     ax.set_ylabel("mAP50-95", fontsize=14)
-    ax.set_ylim(0.835, 0.872)
+    ax.set_ylim(0.834, 0.875)
     ax.set_title("Twelve times the harvested data buys nothing", pad=14)
     ax.grid(axis="y", color=RULE, lw=0.7, zorder=0); ax.set_axisbelow(True)
-    for s in ("top", "right"): ax.spines[s].set_visible(False)
-    ax.legend(frameon=False, fontsize=12, loc="lower left")
+    for s_ in ("top", "right"): ax.spines[s_].set_visible(False)
     return save(fig, "f2_ladder",
-                D.LADDER["reading"] + " Source: " + D.LADDER["src"])
+                "Error bars are the seed spread where three seeds exist. Source: " + L["src"])
 
 
 # ---------------------------------------------------------------- F3 the wall
