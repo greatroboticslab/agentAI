@@ -9320,3 +9320,27 @@ deepseek-v4-flash row is from the run retracted for context overflow and is a
 floor, not an estimate. Nothing here says bigger models are better — the 284 B
 model scored 0.388 where the 27 B is tracking 0.841, confounded with the overflow
 bug the September fix removed.
+
+## 2026-09-11 — v3.46.0 the poster, generated from one data file
+
+`docs/poster/` holds three files and nothing hand-edited:
+
+- `poster_data.py` — every number the poster prints, each with the file it came
+  from. A result that is still running carries `PENDING` and renders as a visible
+  placeholder rather than as a blank or a guess.
+- `make_figures.py` — renders the six figures and prints each caption with its
+  source, so the poster text and the figure cannot drift apart.
+- `build_poster.py` — lays out a real 48 × 24 in `.pptx`, the same size as the
+  lab's LaserCar poster, with the same section structure.
+
+Two commands regenerate everything. A number that lands later is a one-line edit.
+
+The four headline tiles are **+0.0714** (what COCO pretraining is worth),
+**0.100** (the same detector on another weed dataset, from 0.873), **0 of 116**
+(real incidents the scripted watchdog caught) and **48,752** (images, unchanged
+for 13 of 15 rounds while the loop reported progress).
+
+Known and deliberate: the platform paragraph and the ladder's seed band are
+PENDING and marked so on the slide. Columns 1 and 2 currently overflow the page
+bottom by a few lines — the content is trimmed once the pending numbers land and
+their real lengths are known, not before.
