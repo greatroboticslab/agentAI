@@ -9344,3 +9344,43 @@ Known and deliberate: the platform paragraph and the ladder's seed band are
 PENDING and marked so on the slide. Columns 1 and 2 currently overflow the page
 bottom by a few lines — the content is trimmed once the pending numbers land and
 their real lengths are known, not before.
+
+## 2026-09-11 — v3.47.0 every GPS track on the platform was a motionless point
+
+The rover logs two GPS fixes. `pi_*` comes from the Pi's own receiver and is
+frozen — across 226 samples of one 234 s drive it held a single coordinate, and
+every session shows the same. `board_*` comes from the board receiver, carries its
+own `board_valid` flag, and genuinely tracks: 171 distinct latitudes over that
+same drive.
+
+`robot_ingest.py` read `pi_lat if pi_lat is not None else board_lat` in both the
+CSV materialiser and the GPS-jump advice rule, so the frozen fix always won.
+**Every derived `gps.csv` on the platform held one motionless point: 17 sessions,
+1,281 rows, 0.0 m of path between them.** The real track was in the raw
+`gps.jsonl` the whole time and nothing read it.
+
+`_gps_fix()` now prefers the board fix when it is present and not explicitly
+invalid, and falls back to the Pi fix otherwise. Five cases pinned by a unit
+check: board wins when valid, Pi wins when `board_valid` is false, either alone
+works, and an empty record yields no fix.
+
+Re-running the recovery over the archive: **200.9 m of real track across the 17
+live sessions** where every one of them previously reported 0.0 m, and **140.7 m
+over 211 fixes in the one field drive** (`ul_4_09test_49ea7a2a`, robot 241,
+2026-08-29, 213 s, 1,013 camera frames, 3,154 IMU samples).
+
+The poster gains that drive as its platform figure — GPS track beside unwrapped
+IMU heading, both from the same recording.
+
+### Also recorded, because the poster premise depended on it
+
+The laser cart **carries no GPS and no IMU**. Its uplink declares five sources —
+`detections, laser, vehicle, system, camera` — and no `gps.*` or `imu.*` file
+exists in any of its eight sessions. The platform's sensor-fusion story is robot
+241 only. Of the cart's 427 frames, **75** are in a field (one session,
+2026-08-29); the rest are indoor bench tests on a blue mat.
+
+Platform totals counted on disk: **2,686 frames, 26 sessions, 2 robots, none
+labelled**. Robot 241 contributes 2,259 frames of which 1,704 are genuinely on
+vegetation or soil. The hero field recording is stored twice under two slugs,
+byte-identical — counting both would inflate the field corpus by 1,013 frames.

@@ -177,20 +177,39 @@ y = body(x, y, COLW,
     "failures that twelve deterministic checks structurally cannot.")
 y += 0.25
 y = head(x, y, COLW, "The platform")
+P = D.PLATFORM
 y = body(x, y, COLW,
     "Two agents run as separate SLURM jobs against one locked registry: a collector that searches, "
     "downloads and pseudo-labels, and a trainer that merges, deduplicates, guards the holdout and "
-    "trains. Field data arrives from three robots driving crop rows — a dual-laser weeding cart, a "
-    "tracked platform (241) and a quadruped — carrying camera, GPS and IMU.")
+    "trains. Field data arrives over a live uplink from two robots driving crop rows.")
 y = body(x, y, COLW,
-    "PLATFORM INVENTORY PENDING — frame counts, dates and GPS/IMU coverage are being read off the "
-    "live platform and will replace this paragraph.", color=WARN)
+    "Counted on disk rather than claimed: %s frames across %s sessions from %d robots, and %s of "
+    "them labelled. Robot 241 contributes %s frames at %s, %s, camera at %.0f Hz, of which %s are "
+    "genuinely on vegetation or soil. The laser cart contributes %s frames, of which %s — one "
+    "session on %s — are in a field; the rest are indoor bench tests. The laser cart carries no GPS "
+    "and no IMU: its uplink declares %s."
+    % ("{:,}".format(P["total_frames"]), P["sessions"], P["robots"], "none" if not P["labelled"] else P["labelled"],
+       "{:,}".format(P["r241_frames"]), P["r241_res"], P["r241_span"], P["r241_hz"],
+       "{:,}".format(P["r241_field_frames"]), P["lasercar_frames"], P["lasercar_field_frames"],
+       P["lasercar_field_date"], ", ".join(P["lasercar_sources"])))
+y += 0.12
+HERO = P["hero"]
+y = pic(os.path.join(FIG, "f7_fielddrive.png"), x, y, COLW) + 0.10
+y = caption(x, y, COLW,
+    "Figure 1.  The platform's one unambiguous field drive: robot 241 on %s, %s. %s camera frames "
+    "at %s over %.0f s, %d GPS fixes and %s IMU samples, %.1f m of track. The trajectory is drawn "
+    "from the board fix — the platform's own derived GPS preferred a receiver frozen to a single "
+    "coordinate, so every track it exposed was a motionless point (17 sessions, 1,281 rows, 0.0 m) "
+    "until that was fixed. Source: uploads/%s/files/."
+    % (HERO["date"], HERO["what"], "{:,}".format(HERO["frames"]), HERO["res"],
+       HERO["seconds"], HERO["gps_fixes"], "{:,}".format(HERO["imu_rows"]),
+       HERO["track_m"], HERO["slug"]))
 y += 0.25
 y = head(x, y, COLW, "Where the harvested data goes")
 y = pic(os.path.join(FIG, "f4_funnel.png"), x, y, COLW) + 0.10
 F = D.FUNNEL
 y = caption(x, y, COLW,
-    "Figure 1.  %s registry-labelled images collapse to %s unique: %s cross-dataset duplicates and "
+    "Figure 2.  %s registry-labelled images collapse to %s unique: %s cross-dataset duplicates and "
     "%s holdout stems removed. Of six audited harvested sources (%s images) exactly one (%s images) "
     "clears the 0.90 label-precision bar; the rest score %s. The audit probe reads 1.000 on "
     "human-labelled cwd12, so the low scores are the data, not the instrument."
@@ -204,14 +223,14 @@ x = cols[1]; y = CY
 y = head(x, y, COLW, "What moves the detector")
 y = pic(os.path.join(FIG, "f1_levers.png"), x, y, COLW) + 0.10
 y = caption(x, y, COLW,
-    "Figure 2.  Three levers on one holdout and one evaluator. Initialisation is worth three times "
+    "Figure 3.  Three levers on one holdout and one evaluator. Initialisation is worth three times "
     "what architecture is worth, and both dwarf the data-collection lever the whole system was built "
     "around. Top two rows n = 3 seeds; bottom row n = 1 with seeds in flight. "
     "Source: results/framework/s3_yolo11n/*/results.csv.")
 y += 0.18
 y = pic(os.path.join(FIG, "f2_ladder.png"), x, y, COLW) + 0.10
 y = caption(x, y, COLW,
-    "Figure 3.  Harvested images added to a clean in-domain core. Flat within the seed band to "
+    "Figure 4.  Harvested images added to a clean in-domain core. Flat within the seed band to "
     "+15,000, then −0.020 at +40,000 — twelve times the training data for nothing, then a cost. "
     "The shaded band is the measured seed std (0.0029), not an assumption. "
     "Source: results/framework/s3_tier_v2_*.json.")
@@ -232,7 +251,7 @@ y = head(x, y, COLW, "The generalisation wall")
 y = pic(os.path.join(FIG, "f3_wall.png"), x, y, COLW) + 0.10
 Wl = D.WALL
 y = caption(x, y, COLW,
-    "Figure 4.  The same three checkpoints, the same matcher on both sides so the evaluator offset "
+    "Figure 5.  The same three checkpoints, the same matcher on both sides so the evaluator offset "
     "cancels: %s in-domain against %s on %s. Best species %s → %s. An in-domain weed detector does "
     "not transfer across imaging domains, and no amount of in-domain data fixes that. "
     "Source: %s." % (Wl["in_domain"], Wl["out_domain"], Wl["target"].split(",")[0],
@@ -242,7 +261,7 @@ y = head(x, y, COLW, "Why the loop looked like it was learning")
 y = pic(os.path.join(FIG, "f6_rounds.png"), x, y, COLW) + 0.10
 R = D.ROUNDS
 y = caption(x, y, COLW,
-    "Figure 5.  Left: fifteen unattended rounds, reported metric and last-epoch metric. The shaded "
+    "Figure 6.  Left: fifteen unattended rounds, reported metric and last-epoch metric. The shaded "
     "region is where the training corpus stopped changing — %s. Right: on round 15's exact dataset, "
     "starting fresh scores %.4f against the chained recipe's %s (n = 3), a gap of %+.4f at %.1f "
     "standard deviations with the schedule held constant. The decline is the chain, not the data."
@@ -254,7 +273,7 @@ y = head(x, y, COLW, "What supervision actually catches")
 y = pic(os.path.join(FIG, "f5_supervision.png"), x, y, COLW) + 0.10
 S = D.SUPERVISION
 y = caption(x, y, COLW,
-    "Figure 6.  A frozen corpus of 162 real incidents from this project's own history, scored on the "
+    "Figure 7.  A frozen corpus of 162 real incidents from this project's own history, scored on the "
     "dev split: %d incidents, %d controls. Bars right of zero are recall, left of zero are false "
     "alarms. The scripted watchdog reads status fields and flags nothing, 149 times out of 149. The "
     "twelve deterministic checks catch 11. A model reading raw artifact excerpts catches four to "
@@ -284,8 +303,9 @@ y = body(x, y, COLW,
     "supervision row is %d of 149 cases and still running. The supervision corpus was labelled from "
     "this project's own engineering record by the same system that wrote the reviewer prompt, and "
     "its test split is 13 cases — too small to separate methods. Robot field frames are collected "
-    "but not yet scored: the 358 stored frames contain no weeds, so they measure false positives "
-    "only." % S["rows"][-1]["cases"], size=13.5, color=MUTE)
+    "but not yet scored, and none of the %s robot frames is labelled. The laser cart carries no GPS "
+    "or IMU, so the platform's sensor-fusion story is robot 241 only."
+    % (S["rows"][-1]["cases"], "{:,}".format(D.PLATFORM["total_frames"])), size=13.5, color=MUTE)
 
 prs.save(OUT)
 print("wrote", OUT)

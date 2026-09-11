@@ -119,9 +119,34 @@ ROUNDS = {
 }
 
 # --- the platform: robots in the field ---------------------------------------
+# Counted off the live platform 2026-09-11, not from any document. Every number
+# here is frames on disk in uploads/, and each is stated as what it is: a frame
+# a robot recorded, none of them labelled.
 PLATFORM = {
-    "lasercar": PENDING, "robot241": PENDING, "unitree": PENDING,
-    "note": "inventory in flight",
+    "total_frames": 2686, "sessions": 26, "robots": 2,
+    "labelled": 0,
+    "r241_frames": 2259, "r241_field_frames": 1704,
+    "r241_span": "2026-08-15 to 2026-09-05", "r241_res": "640 x 360", "r241_hz": 1.0,
+    "lasercar_frames": 427, "lasercar_field_frames": 75,
+    "lasercar_field_date": "2026-08-29",
+    # The premise "GPS and IMU on both robots" does not survive the archive.
+    "lasercar_sources": ["detections", "laser", "vehicle", "system", "camera"],
+    "lasercar_has_gps": False, "lasercar_has_imu": False,
+    "hero": {"slug": "ul_4_09test_49ea7a2a", "robot": "robot241",
+             "date": "2026-08-29", "seconds": 213.1,
+             "frames": 1013, "res": "640 x 360",
+             "gps_fixes": 211, "imu_rows": 3154,
+             "telemetry_rows": 3154, "control_rows": 3154,
+             "track_m": 140.7,
+             "what": "one pass through a crop plot: rows under black plastic mulch, "
+                     "weeds between rows, bare soil, tree line"},
+    "gps_bug": ("robot_ingest.py preferred the Pi fix, which is frozen to a single "
+                "coordinate, over the board fix, which moves. Every trajectory the "
+                "platform exposed was one motionless point: 17 sessions, 1,281 rows, "
+                "0.0 m. Fixed 2026-09-11; 200.9 m of real track recovered across the "
+                "live sessions and 140.7 m in the field drive."),
+    "unitree": "no data on the platform yet",
+    "src": "~/weed_llm_benchmark/uploads/ (26 session directories), counted on disk",
 }
 
 NEVER_PRINT = [

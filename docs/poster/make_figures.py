@@ -237,8 +237,63 @@ def f6():
                 "The corpus never changed; the decline is the warm-start chain. Source: " + R["src"])
 
 
+# ------------------------------------------------------------- F7 field drive
+def f7():
+    """The one unambiguous field drive on the platform: robot 241 through a crop
+    plot. GPS track and IMU heading from the same 213 s recording.
+
+    The track is drawn from the BOARD fix. The platform's own derived gps.csv
+    preferred the Pi fix, which is frozen to a single coordinate, so every
+    trajectory the platform exposed was a motionless point -- 17 sessions,
+    1,281 rows, 0.0 m between them (robot_ingest.py:264, fixed 2026-09-11)."""
+    import json, csv
+    here = os.path.dirname(os.path.abspath(__file__))
+    trk = json.load(open(os.path.join(here, "hero_track.json")))
+    pts = trk["board"]
+    lats = [p[0] for p in pts]; lons = [p[1] for p in pts]
+    lat0 = sum(lats) / len(lats)
+    mx = 111320.0 * np.cos(np.radians(lat0))
+    xs = [(lo - lons[0]) * mx for lo in lons]
+    ys = [(la - lats[0]) * 110540.0 for la in lats]
+
+    rows = list(csv.DictReader(open(os.path.join(here, "hero_imu.csv"))))
+    t0 = float(rows[0]["timestamp"])
+    t = [float(r["timestamp"]) - t0 for r in rows]
+    # Unwrap the compass: a 359 -> 1 step is one degree of turn, not 358, and
+    # drawn raw it reads as vertical noise spikes across the whole trace.
+    raw = [float(r["heading"]) for r in rows]
+    hd = np.degrees(np.unwrap(np.radians(raw)))
+
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(12.6, 5.0),
+                                  gridspec_kw={"width_ratios": [1.05, 1]})
+    ax.plot(xs, ys, "-", color=BLUE, lw=2.0, zorder=3)
+    ax.scatter(xs, ys, s=9, color=BLUE, alpha=0.45, zorder=4)
+    ax.scatter([xs[0]], [ys[0]], s=150, color=GOOD, zorder=5, label="start")
+    ax.scatter([xs[-1]], [ys[-1]], s=150, color=WARN, marker="s", zorder=5, label="end")
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.set_xlabel("metres east", fontsize=13); ax.set_ylabel("metres north", fontsize=13)
+    ax.set_title("GPS track  ·  %.1f m over %.0f s" % (trk["path_m"], trk["seconds"]),
+                 pad=12, loc="left")
+    ax.legend(frameon=False, fontsize=12, loc="lower right")
+    ax.grid(color=RULE, lw=0.7, zorder=0); ax.set_axisbelow(True)
+    for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+
+    ax2.plot(t, hd, "-", color=INK, lw=1.1)
+    ax2.set_xlabel("seconds into the drive", fontsize=13)
+    ax2.set_ylabel("heading, degrees (unwrapped)", fontsize=13)
+    ax2.set_title("IMU heading  ·  %d samples at %.1f Hz" % (len(rows), len(rows) / (t[-1] or 1)),
+                  pad=12, loc="left")
+    ax2.grid(color=RULE, lw=0.7, zorder=0); ax2.set_axisbelow(True)
+    for sp in ("top", "right"): ax2.spines[sp].set_visible(False)
+    fig.tight_layout()
+    return save(fig, "f7_fielddrive",
+                "Robot 241, 2026-08-29, one 213 s pass through a crop plot: 1,013 camera frames "
+                "at 640x360, 211 GPS fixes, 3,154 IMU samples. Source: "
+                "uploads/ul_4_09test_49ea7a2a/files/")
+
+
 if __name__ == "__main__":
     print("rendering into", OUT)
-    for fn in (f1, f2, f3, f4, f5, f6):
+    for fn in (f1, f2, f3, f4, f5, f6, f7):
         fn()
     print("\ndone")

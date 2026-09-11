@@ -187,6 +187,29 @@ def _read_jsonl(path: Path):
     return rows
 
 
+def _gps_fix(g: dict):
+    """(lat, lon, source) for one GPS record, preferring the fix that moves.
+
+    The rover logs two fixes. `pi_*` comes from the Pi's own receiver and is
+    frozen: across 226 samples of one 234 s drive it held a single coordinate,
+    and every session on the platform shows the same. `board_*` comes from the
+    board receiver, carries its own `board_valid` flag, and genuinely tracks --
+    171 distinct latitudes over that same drive.
+
+    This function used to read `pi_lat if pi_lat is not None else board_lat`, so
+    the frozen fix always won and every derived gps.csv on the platform held one
+    motionless point: 17 sessions, 1,281 rows, 0.0 m of path between them. The
+    real track was in the raw gps.jsonl the whole time and nothing read it.
+    """
+    bl, bo = g.get("board_lat"), g.get("board_lon")
+    if bl is not None and bo is not None and g.get("board_valid") is not False:
+        return bl, bo, "board"
+    pl, po = g.get("pi_lat"), g.get("pi_lon")
+    if pl is not None and po is not None:
+        return pl, po, "pi"
+    return None, None, ""
+
+
 def _nearest(ts_list, rows, t, tol):
     """rows sorted by ts; return the row nearest t within tol, else None."""
     if not rows:
@@ -261,8 +284,7 @@ def _materialize(s: dict):
         for r in gps:
             g = r.get("data") or {}
             t = r.get("ts")
-            lat = g.get("pi_lat") if g.get("pi_lat") is not None else g.get("board_lat")
-            lon = g.get("pi_lon") if g.get("pi_lon") is not None else g.get("board_lon")
+            lat, lon, _fix = _gps_fix(g)
             spd = hdg = None
             tr = _nearest(tel_ts, tel, t, 1.0)
             if tr:
@@ -407,8 +429,7 @@ def _advise(s: dict, by_src: dict, dropped_new: int):
                              % (aged[0][1], v), 180)
     for r in (by_src.get("gps") or []):
         d = r.get("data") or {}
-        lat = d.get("pi_lat") if d.get("pi_lat") is not None else d.get("board_lat")
-        lon = d.get("pi_lon") if d.get("pi_lon") is not None else d.get("board_lon")
+        lat, lon, _fix = _gps_fix(d)
         ts = r.get("ts") or now
         if lat is None or lon is None:
             continue
