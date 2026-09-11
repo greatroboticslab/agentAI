@@ -9193,3 +9193,31 @@ Verified on the live lab server after restart: `/audit`, `/audit/method`,
 `/audit/class/Goosegrass`, `/classes` and `/` all return 200 with **zero CJK
 characters** in the rendered body. The only CJK left in the module is in source
 comments.
+
+## 2026-09-11 — v3.41.0 run_llm_review.sh, so a cluster model can review at all
+
+`docs/TIERED_SUPERVISION_PLAN.md` names this file in two places and it was never
+written. Because it did not exist there was **no path by which a cluster model
+could review anything**, so the reviewer was wired to the only endpoint that
+answers synchronously — ollama on the lab's RTX 3060 — and all nine campaign
+reviews were produced by a 7.6 B code model while 458 GB of verified weights sat
+unused on the cluster. Repointing the config alone would have made reviews
+*fail*, not move.
+
+The job starts ollama inside its own allocation on a per-job port (GPU-shared
+nodes host several jobs, and a fixed port silently attaches one job to another's
+server), reviews the bundle named in `REVIEW_BUNDLE`, and writes the verdict in
+the same shape the in-process reviewer writes, plus `place: "cluster"`, the tier
+name and the SLURM job id.
+
+**The model comes from `model_router.resolve("deep_review")`**, not from a tier id
+read raw out of a config block. That router already existed and already declared
+`deep_review → glm-4.7-flash, place: cluster` and
+`hard_reasoning → deepseek-v3:671b, place: cluster`; the supervision code written
+in September never imported it and built a second, parallel routing path instead.
+One component owns placement now.
+
+The lab cannot reach a cluster model over HTTP, so the bundle is staged with the
+rsync route the platform already uses for training data
+(`byler@data.bridges2.psc.edu`, `SSH_ASKPASS`). First real submission: job
+45765065, round 15's train bundle (14 sections, ~11,187 tokens), glm-4.7-flash.
