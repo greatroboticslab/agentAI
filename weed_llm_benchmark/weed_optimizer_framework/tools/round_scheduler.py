@@ -317,6 +317,41 @@ def _build_bundle(domain, step, jobid, dcfg):
 
 
 _REVIEW_OFF_SAID = set()
+_REVIEW_TIER_SAID = set()
+
+
+# Cluster tags that have actually been deployed and verified on Bridges-2. A
+# review produced by anything else is not a cluster review, whatever the config
+# calls it. Kept here rather than imported so a config edit cannot widen it.
+_CLUSTER_TAGS = ("deepseek-v3", "glm-4.7-flash", "qwen3.8:27b", "qwen3:14b",
+                 "gemma4", "qwen2.5:7b")
+
+
+def _review_authority(model: str, endpoint: str) -> dict:
+    """Where a verdict came from, and whether it may be reported as a result.
+
+    The standing rule is that anything which analyses, reviews, decides or plans
+    runs on a cluster model; the lab's single 3060 hosts the guide tier only.
+    Between 2026-09-04 and 09-11 nine campaign reviews were produced by a 4.7 GB
+    model on the lab box, and every one of them was written to disk with a
+    `model` field, an `endpoint` field, `mode: shadow` and `applied: false` --
+    and not one field said the verdict was not fit to report. `applied: false`
+    answers "did the loop act on it", which is a different question.
+
+    So the record now carries the answer to the question that was missing. A
+    verdict from a loopback endpoint is a lab verdict no matter what model name
+    sits beside it, because a compute node has no persistent endpoint to call.
+    """
+    ep = str(endpoint or "").lower()
+    mid = str(model or "").lower()
+    if "127.0.0.1" in ep or "localhost" in ep or "://0.0.0.0" in ep:
+        return {"place": "lab", "authoritative": False,
+                "why": "endpoint is the lab loopback; the 3060 hosts the guide "
+                       "tier only, and a cluster brain is an sbatch job"}
+    if any(t in mid for t in _CLUSTER_TAGS):
+        return {"place": "cluster", "authoritative": True, "why": ""}
+    return {"place": "unknown", "authoritative": False,
+            "why": "model %r is not one of the verified cluster deployments" % model}
 
 
 def _review_bundle(domain, step, bundle, dcfg):
@@ -380,6 +415,7 @@ def _review_bundle(domain, step, bundle, dcfg):
                        % (domain, type(e).__name__, e))
         return None
 
+    auth = _review_authority(model, review.get("endpoint"))
     rec.update({"domain": domain, "step": step, "round": bundle.get("round"),
                 "model": model, "endpoint": review.get("endpoint"),
                 "api": review.get("api"), "ts": started,
@@ -387,7 +423,12 @@ def _review_bundle(domain, step, bundle, dcfg):
                 # Stated on the record, not only in the docs: this verdict was
                 # not applied to anything, and the loop's policy is unchanged.
                 "mode": review.get("mode") or "shadow", "applied": False,
-                "policy_in_force": brain.get("policy")})
+                "policy_in_force": brain.get("policy"),
+                # And the question `applied` does not answer: may this verdict
+                # be reported as a result at all?
+                "tier": "fast", "place": auth["place"],
+                "authoritative": auth["authoritative"],
+                "not_authoritative_why": auth["why"]})
     try:
         base = os.path.join(str(_CTX.get("repo") or "."), "results", "framework",
                             "_brain", str(domain))
@@ -403,12 +444,23 @@ def _review_bundle(domain, step, bundle, dcfg):
         _log().warning("[rounds] %s: review could not be written (%s)" % (domain, e))
         return rec
 
+    if not auth["authoritative"] and domain not in _REVIEW_TIER_SAID:
+        # Once per process, at WARNING: a fast-tier verdict is a draft, and the
+        # log is where a reader finds out before the number reaches a slide.
+        _REVIEW_TIER_SAID.add(domain)
+        _log().warning("[rounds] %s: reviews are coming from the FAST tier (%s at "
+                       "%s) -- %s. Their verdicts are drafts and must not be "
+                       "reported as results; wire a cluster job for anything "
+                       "that is." % (domain, model, review.get("endpoint") or "?",
+                                     auth["why"]))
     v = rec.get("verdict") or {}
     if rec.get("ok"):
         _log().info("[rounds] %s: reviewer %s says %s (%d finding(s), %d resolved, "
-                    "%.1fs) -- shadow, nothing applied"
+                    "%.1fs) -- shadow, nothing applied, %s tier (%s)"
                     % (domain, model, v.get("verdict"), len(v.get("findings") or []),
-                       len(rec.get("accepted_findings") or []), rec["elapsed_s"]))
+                       len(rec.get("accepted_findings") or []), rec["elapsed_s"],
+                       auth["place"],
+                       "reportable" if auth["authoritative"] else "draft only"))
     else:
         _log().warning("[rounds] %s: review did not produce a verdict: %s"
                        % (domain, str(rec.get("reason"))[:200]))

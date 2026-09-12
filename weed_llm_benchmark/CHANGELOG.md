@@ -9725,3 +9725,39 @@ exam and the field fire rate, and the supervision table is replaced wholesale by
 the `bench reproduce` numbers with a note naming the 0.841 → 0.553 correction and
 why the two scorers differ. The stale "no score from this benchmark is quotable
 yet" note is gone — there is a score now, and it is on the page.
+
+---
+
+## 2026-09-12 — v3.53.5 a shadow verdict now says whether it may be reported
+
+`applied: false` answers *"did the loop act on this"*. Nothing on a review record
+answered *"may this be reported as a result"* — which is the question that was
+missing while nine campaign reviews came off a 4.7 GB model on the lab's 3060
+between 2026-09-04 and 09-11. Each of those records carried a model name, an
+endpoint, `mode: shadow` and `applied: false`, and every one of them looked
+exactly like a correctly-wired shadow reviewer.
+
+`_review_authority(model, endpoint)` decides both halves and the answer is written
+onto the record and returned by `/api/brain/reviews/<domain>` as `tier`, `place`,
+`authoritative` and `not_authoritative_why`:
+
+* a **loopback endpoint is a lab verdict** whatever model name sits beside it — a
+  compute node has no persistent endpoint, so a cluster brain is an sbatch job and
+  `127.0.0.1` can only be the lab box;
+* a model outside the verified cluster deployments is `place: unknown`, not
+  `cluster`, so a config edit cannot promote a verdict by renaming a tag;
+* anything not authoritative logs once per process **at WARNING**, naming the
+  model, the endpoint and the reason, so a reader finds out from the log before a
+  number reaches a slide.
+
+Records written before the field existed come back `authoritative: false`, which
+is the correct reading of them. `tests/test_review_authority.py` pins 12 checks
+including that a cluster model name on loopback stays a lab verdict. Deployed and
+verified on the live box: `/api/health/scheduler` 200, and `_review_authority`
+returns `lab / False` for the 2026-09-04 wiring and `cluster / True` for
+`qwen3.8:27b` off a compute node.
+
+This closes the B-item "make the per-step reviewer either a queued cluster job or
+explicitly the small fast tier whose verdicts are never the reported result" on
+the second branch: the reviewer stays fast and local, and now says so in its own
+record.

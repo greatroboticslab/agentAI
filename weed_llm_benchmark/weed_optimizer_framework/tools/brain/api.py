@@ -332,6 +332,13 @@ def api_brain_reviews(domain: str):
     reader can never mistake an advisory verdict for something the loop acted
     on. That distinction is the whole meaning of shadow mode and it belongs in
     the data, not only in a heading.
+
+    It also states `place` and `authoritative`. `applied: false` answers "did the
+    loop act on this"; `authoritative: false` answers "may this be reported as a
+    result", which is what nobody could tell from the nine reviews produced on the
+    lab's 3060 between 2026-09-04 and 09-11. Records written before that field
+    existed come back `authoritative: false`, which is the correct reading of
+    them.
     """
     dom = _domain(domain)
     d = os.path.join(_brain_dir(dom), "reviews")
@@ -355,6 +362,12 @@ def api_brain_reviews(domain: str):
                 "ok": bool(rec.get("ok")), "reason": rec.get("reason"),
                 "mode": rec.get("mode"), "applied": bool(rec.get("applied")),
                 "policy_in_force": rec.get("policy_in_force"),
+                # `applied` says the loop did not act on it. These say whether it
+                # may be reported at all -- a different question, and the one that
+                # was missing while nine reviews came off the lab's 3060.
+                "tier": rec.get("tier"), "place": rec.get("place"),
+                "authoritative": bool(rec.get("authoritative")),
+                "not_authoritative_why": rec.get("not_authoritative_why") or "",
                 "verdict": v.get("verdict"), "confidence": v.get("confidence"),
                 "n_findings": len(v.get("findings") or []),
                 "n_resolved": len(rec.get("accepted_findings") or []),
