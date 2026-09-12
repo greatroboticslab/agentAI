@@ -1,0 +1,101 @@
+{
+ "per_seed": {
+  "A+0": {
+   "iw_class_agnostic": 0.10262242704629898,
+   "iw_ragweed": 1.781669197953306e-05,
+   "holdout_class_agnostic": 0.862163245677948,
+   "holdout_ragweed": 0.0
+  },
+  "A+5000": {
+   "iw_class_agnostic": 0.0725322812795639,
+   "iw_ragweed": 0.006930692587047815,
+   "holdout_class_agnostic": 0.8690915107727051,
+   "holdout_ragweed": 0.0
+  },
+  "A+15000": {
+   "iw_class_agnostic": 0.08254166692495346,
+   "iw_ragweed": 0.0,
+   "holdout_class_agnostic": 0.8679872751235962,
+   "holdout_ragweed": 0.0
+  },
+  "A+40000": {
+   "iw_class_agnostic": 0.07277023047208786,
+   "iw_ragweed": 0.0006930693052709103,
+   "holdout_class_agnostic": 0.8578814268112183,
+   "holdout_ragweed": 0.0
+  },
+  "B+0": {
+   "iw_class_agnostic": 0.10262242704629898,
+   "iw_ragweed": 1.781669197953306e-05,
+   "holdout_class_agnostic": 0.862163245677948,
+   "holdout_ragweed": 0.0
+  },
+  "B+5000": {
+   "iw_class_agnostic": 0.09642823040485382,
+   "iw_ragweed": 0.001228456269018352,
+   "holdout_class_agnostic": 0.8665102124214172,
+   "holdout_ragweed": 0.0
+  },
+  "B+15000": {
+   "iw_class_agnostic": 0.09379983693361282,
+   "iw_ragweed": 0.0019801980815827847,
+   "holdout_class_agnostic": 0.857653796672821,
+   "holdout_ragweed": 0.0
+  },
+  "B+40000": {
+   "iw_class_agnostic": 0.0926709696650505,
+   "iw_ragweed": 0.0,
+   "holdout_class_agnostic": 0.8444660305976868,
+   "holdout_ragweed": 0.0
+  }
+ },
+ "protocol": {
+  "conf": 0.001,
+  "imgsz": 640,
+  "iou_nms": 0.6,
+  "matcher": "wbf_tta_eval.compute_map (101-pt COCO-style)",
+  "iw_class_map_source": "HF dataset card dataset_info, 2026-08-26",
+  "corn_gt_boxes_dropped": 3,
+  "note": "redrootpigweed (A. retroflexus) deliberately NOT mapped to PalmerAmaranth (A. palmeri): same genus, different species"
+ },
+ "summary": {
+  "iw_class_agnostic": {
+   "mean": 0.08949850872159004,
+   "std": 0.011386105866421374,
+   "n": 8
+  },
+  "iw_ragweed": {
+   "mean": 0.001358506203359866,
+   "std": 0.0022130707195475914,
+   "n": 8
+  },
+  "holdout_class_agnostic": {
+   "mean": 0.8609895929694176,
+   "std": 0.007430150867985928,
+   "n": 8
+  },
+  "holdout_ragweed": {
+   "mean": 0.0,
+   "std": 0.0,
+   "n": 8
+  }
+ },
+ "leak_check": {
+  "hamming_threshold": 6,
+  "vs_train": {
+   "<=0": 0,
+   "<=4": 0,
+   "<=6": 0,
+   "<=10": 16
+  },
+  "vs_holdout": {
+   "<=0": 0,
+   "<=4": 0,
+   "<=6": 0,
+   "<=10": 12
+  },
+  "excluded_images": 0,
+  "excluded_names": []
+ },
+ "n_transfer_images": 3208
+}

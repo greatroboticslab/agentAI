@@ -2349,9 +2349,41 @@ def _write_json(path, obj):
         return None, "cannot write %s: %s" % (path, e)
 
 
+def _reusable_verdict(path, case, arm, model, repeat):
+    """A committed verdict for this exact question, or None.
+
+    Resume exists because a walltime-truncated job leaves most of an arm on
+    disk and re-asking a model the same question costs GPU hours for an answer
+    already committed. It is only sound while the question is identical, so the
+    record must name the same case, arm, repeat and model AND carry the same
+    bundle and rubric hashes the scorer would read now. Anything else -- a
+    re-cut bundle, an edited rubric, a different model behind the same tag --
+    makes the old answer an answer to a different question, and it is re-run.
+    """
+    try:
+        with open(str(path), encoding="utf-8") as fh:
+            rec = json.load(fh)
+    except Exception:
+        return None
+    if not isinstance(rec, dict) or not isinstance(rec.get("verdict"), dict):
+        return None
+    if rec.get("case_id") != case.get("case_id") or rec.get("arm") != arm:
+        return None
+    if int(rec.get("repeat", -1)) != int(repeat):
+        return None
+    if str(rec.get("model") or "") != str(model or ""):
+        return None
+    if rec.get("bundle_sha256", "") != case.get("bundle_sha256", ""):
+        return None
+    if rec.get("rubric_sha256", "") != rubric_sha256():
+        return None
+    rec["reused_from_disk"] = True
+    return rec
+
+
 def run(root=None, arms=None, split_name="test", repeats=REPEATS, model_fn=None,
         model="", num_ctx=32768, out_dir=None, corpus=None, split=None,
-        case_ids=None, write=True, temperature=TEMPERATURE):
+        case_ids=None, write=True, temperature=TEMPERATURE, resume=False):
     """Run the arms over a split and score them. Never raises.
 
     Deterministic arms are executed once and their record copied across the
@@ -2380,6 +2412,7 @@ def run(root=None, arms=None, split_name="test", repeats=REPEATS, model_fn=None,
     ctx = {"model_fn": model_fn, "model": model, "num_ctx": num_ctx,
            "temperature": temperature}
     records = []
+    reused = 0
     reps = max(1, int(repeats))
     for arm in arms:
         for cid in case_ids:
@@ -2390,7 +2423,14 @@ def run(root=None, arms=None, split_name="test", repeats=REPEATS, model_fn=None,
                 continue
             first = None
             for rep in range(reps):
-                if is_deterministic(arm) and first is not None:
+                vpath = _verdict_path(out_dir, arm, model, cid, rep)
+                prior = _reusable_verdict(vpath, case, arm, model, rep) if resume else None
+                if prior is not None:
+                    rec = prior
+                    reused += 1
+                    if first is None:
+                        first = rec
+                elif is_deterministic(arm) and first is not None:
                     rec = dict(first)
                     rec["repeat"] = rep
                     rec["copied_from_repeat"] = 0
@@ -2400,7 +2440,7 @@ def run(root=None, arms=None, split_name="test", repeats=REPEATS, model_fn=None,
                         first = rec
                 records.append(rec)
                 if write:
-                    _, err = _write_json(_verdict_path(out_dir, arm, model, cid, rep), rec)
+                    _, err = _write_json(vpath, rec)
                     if err:
                         errors.append(err)
     rows, score_warn = score_all(corpus.get("cases", {}), records)
@@ -2409,9 +2449,15 @@ def run(root=None, arms=None, split_name="test", repeats=REPEATS, model_fn=None,
                   "sha256": split.get("sha256", ""), "sha_ok": split.get("sha_ok"),
                   "n_cases": len(case_ids), "cases": list(case_ids),
                   "missing": missing}
+    # Reused rows are counted in the result, not hidden: a run that answered 71
+    # of 149 cases live and read 78 off disk must not read as a fresh 149.
+    if resume:
+        warnings.append("resume: %d of %d record(s) read from committed verdicts"
+                        % (reused, len(records)))
     meta = {"run_id": time.strftime("%Y%m%dT%H%M%S"), "root": str(root),
             "repeats": reps, "model": model, "num_ctx": num_ctx,
-            "temperature": temperature, "warnings": warnings, "errors": errors}
+            "temperature": temperature, "warnings": warnings, "errors": errors,
+            "resume": bool(resume), "reused_records": reused}
     result = build_result(rows, corpus, split_info, meta)
     if write:
         for err in write_results(result, out_dir):
@@ -2749,6 +2795,7 @@ def cmd_run(args):
     case_ids = [c.strip() for c in str(args.cases or "").split(",") if c.strip()] or None
     result = run(root=args.root, arms=arms, split_name=args.split,
                  repeats=args.repeats, model_fn=model_fn, model=args.model,
+                 resume=bool(getattr(args, "resume", False)),
                  num_ctx=args.num_ctx, out_dir=args.out, case_ids=case_ids,
                  write=not args.no_write, temperature=args.temperature)
     print(render_report(result, group=args.group))
@@ -2795,6 +2842,10 @@ def build_parser():
     r.add_argument("--arms", default="A0,A0p,A0pp")
     r.add_argument("--split", default="test", choices=("test", "dev", "all"))
     r.add_argument("--repeats", type=int, default=REPEATS)
+    r.add_argument("--resume", action="store_true",
+                   help="reuse committed verdicts whose case, arm, repeat, model, "
+                        "bundle hash and rubric hash all match, and only call the "
+                        "model for the rest; the run records how many it reused")
     r.add_argument("--model-entry", default="", dest="model_entry",
                    help="package.module:callable -> (prompt, model_id, num_ctx) "
                         "-> {text, tokens_in, tokens_out, latency_s, su}")

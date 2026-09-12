@@ -262,6 +262,13 @@ if [ "${VERIFY_BENCH:-0}" = "1" ]; then
   BENCH_ARMS="${BENCH_ARMS:-A0,A0p,L2,L3}"
   BENCH_SPLIT="${BENCH_SPLIT:-dev}"
   BENCH_REPEATS="${BENCH_REPEATS:-3}"
+  # A walltime-truncated arm leaves most of its verdicts committed on disk.
+  # BENCH_RESUME=1 reads those back and only calls the model for the rest, which
+  # is what turns a 12 h re-run into a short backfillable one. bench re-runs any
+  # record whose case, arm, repeat, model, bundle hash or rubric hash differs,
+  # and reports how many it reused, so a resumed run cannot read as a fresh one.
+  BENCH_RESUME_FLAG=""
+  [ "${BENCH_RESUME:-0}" = "1" ] && BENCH_RESUME_FLAG="--resume"
   export BRAIN_ENDPOINT="http://127.0.0.1:${PORT}/v1"
   export BRAIN_MODEL="$NAME"
   export BRAIN_NUM_CTX="${BENCH_NUM_CTX:-32768}"
@@ -276,6 +283,7 @@ if [ "${VERIFY_BENCH:-0}" = "1" ]; then
       --arms "$BENCH_ARMS" \
       --split "$BENCH_SPLIT" \
       --repeats "$BENCH_REPEATS" \
+      $BENCH_RESUME_FLAG \
       --model-entry weed_optimizer_framework.tools.brain.supervisor:OpenAICompatClient \
       --model "$NAME" \
       --num-ctx "${BENCH_NUM_CTX:-32768}" 2>&1

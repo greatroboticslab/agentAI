@@ -60,8 +60,17 @@ plt.rcParams.update({
 })
 
 
-def panel(ax, letter, dx=-0.085, dy=1.045):
-    """Lower-case bold panel letter, outside the axes, where a caption points."""
+def panel(ax, letter, dx=-0.085, dy=1.045, inside=False):
+    """Lower-case bold panel letter where a caption can point at it.
+
+    Outside the axes by default. `inside` puts it in the top-left corner of the
+    plotting area instead, which is what a long rotated y-label forces: with
+    bbox="tight" the label owns the space to the left and the letter lands on it.
+    """
+    if inside:
+        ax.text(0.015, 0.985, letter, transform=ax.transAxes, fontsize=13,
+                fontweight="bold", va="top", ha="left", color=INK, zorder=6)
+        return
     ax.text(dx, dy, letter, transform=ax.transAxes, fontsize=13,
             fontweight="bold", va="top", ha="left", color=INK)
 

@@ -55,15 +55,32 @@ LADDER = {
     "seed101": [0.8636, 0.8599, 0.8614, 0.8436],
     # Seeds 102 and 103. The two completed rungs carry their own error bar now;
     # +15,000 and +40,000 are still running and stay PENDING.
+    # Complete: three seeds at every rung, the same images at each seed.
     "seeds": {0: [0.8636, 0.8610, 0.8664], 5000: [0.8599, 0.8649, 0.8579],
-              15000: [0.8614, 0.8526, 0.8600], 40000: PENDING},
+              15000: [0.8614, 0.8526, 0.8600], 40000: [0.8436, 0.8439, 0.8469]},
     # Arm B of the class-space experiment, complete: every harvested box rewritten
     # to one shared class instead of a hash of its source dataset.
     "armB": [0.8636, 0.8538, 0.8451, 0.8252],
     "jobs": "44397807_[0-3] (seed 101), 45790239_[0-3] (102), 45790291_[0-3] (103)",
     "src": "results/framework/s3_tier_v2_{0,5000,15000,40000}.json",
-    "reading": ("Twelve times the training data is flat to +15,000 and then costs 0.020. "
-                "The measured seed std for this family is 0.0029."),
+    "reading": ("Twelve times the training data costs 0.0189 at +40,000 -- 8.2 pooled standard "
+                "deviations, with three seeds at every rung."),
+}
+
+# --- the second exam --------------------------------------------------------
+# The tier ladder is measured on CottonWeedDet12's own holdout, and that metric
+# rewards training data that resembles CottonWeedDet12, so a greenhouse/aerial/
+# three-season corpus can only ever cost. Scoring the SAME eight checkpoints on a
+# second dataset removes that objection. Both exams fall.
+SECOND_EXAM = {
+    "target": "ImageWeeds, 3,208 images, class-agnostic, 0 excluded by the leak check",
+    "armA": {0: 0.1026, 5000: 0.0725, 15000: 0.0825, 40000: 0.0728},
+    "armB": {0: 0.1026, 5000: 0.0964, 15000: 0.0938, 40000: 0.0927},
+    "cwd12_delta": -0.0189, "iw_delta_A": -0.0299, "iw_delta_B": -0.0100,
+    "job": "45817696",
+    "src": "results/framework/s6_crossdataset_ladder.json",
+    "reading": ("Adding harvested data lowers both exams. The narrow metric is not what makes the "
+                "ladder fall -- the data does not help on a broad one either."),
 }
 
 # --- F3 the generalization wall ---------------------------------------------
@@ -85,6 +102,7 @@ FUNNEL = {
     "probe_calibration": "the audit probe reads 1.000 on human-labelled cwd12, so the low scores are the data",
     "src": "figures_data.json -> merge_funnel_2026_08_23, license_sweep_2026_08_23, s1_gate_verdict_2026_08_25",
 }
+import statistics as st
 
 # --- F5 the headline: what each kind of supervision catches ------------------
 SUPERVISION = {
@@ -129,10 +147,31 @@ ROUNDS = {
     "frozen_from": 3,
     "corpus": "24 datasets, 48,752 unique images, identical from round 3 to round 15",
     "collect_zero_rounds": 8,
-    "cold": 0.58053, "warm": 0.55180, "campaign": "0.5577 ± 0.0040",
-    "chain_effect": 0.0287, "chain_sigma": 5.0,
+    # The matched control: same data, same 30 epochs, same complete cosine, seed
+    # 101 both arms. Only the starting weights differ, so the gap between them is
+    # the warm-start chain and nothing else.
+    "cold": 0.58053,            # results/framework/ctl_chain_armA_45672628.json
+    "warm": 0.55180,            # results/framework/ctl_chain_armB_45672628.json
+    # The recipe the campaign actually ran -- warm start, epochs=60, patience=20,
+    # time=10.0 -- repeated over three seeds. Its spread is the only seed-noise
+    # measurement this project owns, so every sigma below is quoted against it.
+    "recipe_seeds": [0.5607, 0.55915, 0.55309],   # seed 101 is round 15 itself
+    "recipe_src": "round 15 + ctl_seed_s102/s103_45672672.json",
     "src": "Mongo round ledger + results/framework/mega_iter*/*/results.csv (41 curves, probe6.json)",
 }
+
+# Derived from the measurements above so the figure, the table and the prose
+# cannot drift apart. sigma is always the round recipe's own seed spread.
+_rs = ROUNDS["recipe_seeds"]
+ROUNDS["recipe_mean"] = st.mean(_rs)
+ROUNDS["recipe_sd"] = st.stdev(_rs)
+# Start effect: two single runs, so the noise on their difference is sd * sqrt(2).
+ROUNDS["chain_effect"] = ROUNDS["cold"] - ROUNDS["warm"]
+ROUNDS["chain_sigma"] = ROUNDS["chain_effect"] / (ROUNDS["recipe_sd"] * 2 ** 0.5)
+# Schedule effect: one run against the mean of three.
+ROUNDS["sched_effect"] = ROUNDS["warm"] - ROUNDS["recipe_mean"]
+ROUNDS["sched_sigma"] = ROUNDS["sched_effect"] / (
+    (ROUNDS["recipe_sd"] ** 2 + (ROUNDS["recipe_sd"] / 3 ** 0.5) ** 2) ** 0.5)
 
 # --- the platform: robots in the field ---------------------------------------
 # Counted off the live platform 2026-09-11, not from any document. Every number

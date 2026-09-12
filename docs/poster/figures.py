@@ -90,41 +90,67 @@ def vlm():
 
 # ---------------------------------------------------------------- c. ladder
 def ladder():
-    L = D.LADDER
+    """Two exams, the same eight checkpoints, side by side.
+
+    Drawing only the CottonWeedDet12 panel invites the obvious objection -- that
+    metric rewards training data resembling CottonWeedDet12, so a greenhouse and
+    aerial corpus can only cost. The second panel answers it in the figure."""
+    L = D.LADDER; X = D.SECOND_EXAM
     seeds = L.get("seeds") or {}
-    x = L["rungs"]; xs = np.arange(len(x))
+    rungs = L["rungs"]; xs = np.arange(len(rungs))
     A, Ae, An = [], [], []
-    for k, v in zip(x, L["seed101"]):
+    for k, v in zip(rungs, L["seed101"]):
         sv = seeds.get(k)
         if isinstance(sv, list) and len(sv) >= 2:
             A.append(st.mean(sv)); Ae.append(st.stdev(sv)); An.append(len(sv))
         else:
             A.append(v); Ae.append(0.0); An.append(1)
     B = L.get("armB")
-    fig, ax = plt.subplots(figsize=(5.2, 2.50))
-    ax.errorbar(xs, A, yerr=Ae, fmt="o-", color=BLUE, capsize=4,
-                elinewidth=1.0, markerfacecolor=BLUE, zorder=3)
+
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(9.4, 2.55))
+    ax.errorbar(xs, A, yerr=Ae, fmt="o-", color=BLUE, capsize=4, elinewidth=1.0, zorder=3)
     if B:
         ax.plot(xs, B, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
-        ax.text(xs[1] + 0.08, B[1] - 0.0016, "one shared class", ha="left",
-                va="top", fontsize=10, color=WARN)
     ax.text(xs[1] + 0.08, A[1] + 0.0022, "class per source dataset", ha="left",
-            va="bottom", fontsize=10, color=BLUE)
-    for i, (m, n) in enumerate(zip(A, An)):
-        ax.annotate("n=%d" % n, (xs[i], 0), xytext=(0, -32),
-                    textcoords="offset points", xycoords=("data", "axes fraction"),
-                    ha="center", fontsize=9, color=MUTE if n > 1 else WARN,
-                    annotation_clip=False)
-    ax.set_xticks(xs)
-    ax.set_xticklabels(["core\nalone", "+5k", "+15k", "+40k"], fontsize=10.5)
-    ax.set_xlabel("harvested images added to a 3,671-image core", labelpad=16)
+            va="bottom", fontsize=9.5, color=BLUE)
+    ax.text(xs[-1] - 0.05, B[-1] + 0.0026, "one shared class", ha="right",
+            va="bottom", fontsize=9.5, color=WARN)
+    ax.annotate("", xy=(3.28, A[0]), xytext=(3.28, A[-1]),
+                arrowprops=dict(arrowstyle="<->", color=INK, lw=0.9))
+    ax.text(3.36, (A[0] + A[-1]) / 2, "−0.0189\n8.2 σ", fontsize=9.5, color=INK,
+            va="center")
+    ax.set_xlim(-0.35, 4.15)
     ax.set_ylabel("mAP$_{50-95}$")
-    ax.set_ylim(0.820, 0.872)
-    despine(ax); hline_grid(ax); panel(ax, "c")
+    ax.text(0.055, 0.985, "CottonWeedDet12 holdout", transform=ax.transAxes,
+            fontsize=10, color=MUTE, va="top")
+    ax.set_ylim(0.818, 0.872)
+
+    a2 = [X["armA"][k] for k in rungs]; b2 = [X["armB"][k] for k in rungs]
+    ax2.plot(xs, a2, "o-", color=BLUE, zorder=3)
+    ax2.plot(xs, b2, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
+    ax2.set_ylabel("mAP$_{50-95}$")
+    ax2.text(0.055, 0.985, "ImageWeeds, class-agnostic", transform=ax2.transAxes,
+             fontsize=10, color=MUTE, va="top")
+    ax2.set_ylim(0.055, 0.118)
+    ax2.set_xlim(-0.35, 3.35)
+
+    for a_, lets in ((ax, "c"), (ax2, "d")):
+        a_.set_xticks(xs)
+        a_.set_xticklabels(["core\nalone", "+5k", "+15k", "+40k"], fontsize=10)
+        despine(a_); hline_grid(a_); panel(a_, lets, inside=True)
+    ax.set_xlabel("harvested images added", labelpad=14)
+    ax2.set_xlabel("harvested images added", labelpad=14)
+    for i, n in enumerate(An):
+        ax.annotate("n=%d" % n, (xs[i], 0), xytext=(0, -30),
+                    textcoords="offset points", xycoords=("data", "axes fraction"),
+                    ha="center", fontsize=8.5, color=MUTE, annotation_clip=False)
+    fig.tight_layout(w_pad=3.0)
     return save(fig, "c_ladder",
-                "Twelve times the training data. Error bars are the seed spread where three seeds "
-                "exist; rungs still at one run are marked. The two class spaces differ only in the "
-                "label a harvested box carries.")
+                "(c) Twelve times the training data costs 0.0189, three seeds at every rung. "
+                "(d) The same eight checkpoints on a second dataset, class-agnostic, nothing "
+                "of which it saw in training and 0 images excluded by the leak check; the "
+                "series labels in (c) apply to (d). Both exams fall, so the narrow metric is "
+                "not what makes the ladder drop.")
 
 
 # ---------------------------------------------------------------- d. the wall
@@ -213,25 +239,42 @@ def rounds():
     ax.set_xlim(0.3, len(xs) + 4.6); ax.set_ylim(0.542, 0.616)
     despine(ax); hline_grid(ax); panel(ax, "f")
 
-    ax2.bar([0, 1], [R["cold"], 0.5577], yerr=[0, 0.0040], width=0.5,
-            color=[GOOD, WARN], capsize=4, error_kw=dict(lw=1.0, ecolor=INK))
-    for i, v in enumerate([R["cold"], 0.5577]):
-        ax2.text(i, v + 0.0032, "%.4f" % v, ha="center", fontsize=11, color=INK)
-    ax2.plot([0, 0, 1, 1], [0.5895, 0.5905, 0.5905, 0.5895], lw=0.9, color=INK)
-    ax2.text(0.5, 0.5912, "+0.0287,  5.0σ", ha="center", fontsize=10.5, color=INK)
-    ax2.set_xticks([0, 1])
-    ax2.set_xticklabels(["fresh\nstart", "warm\nstart"], fontsize=10.5)
-    ax2.set_ylim(0.540, 0.598); ax2.set_ylabel("mAP$_{50-95}$")
+    # Three bars, not two: bar 0 vs bar 1 is the matched pair that isolates the
+    # warm start (same data, same 30 epochs, same complete cosine, same seed), and
+    # bar 2 is the recipe the campaign actually ran, which is the only arm this
+    # project has repeated over seeds. Quoting the gap against a bar drawn from a
+    # different recipe is what the earlier draft of this panel did wrong.
+    vals = [R["cold"], R["warm"], R["recipe_mean"]]
+    errs = [0.0, 0.0, R["recipe_sd"]]
+    ax2.bar([0, 1, 2], vals, yerr=errs, width=0.56,
+            color=[GOOD, WARN, MUTE], capsize=4, error_kw=dict(lw=1.0, ecolor=INK))
+    for i, v in enumerate(vals):
+        ax2.text(i, v + errs[i] + 0.0030, "%.4f" % v, ha="center", fontsize=10.5,
+                 color=INK)
+    ax2.plot([0, 0, 1, 1], [0.5905, 0.5918, 0.5918, 0.5905], lw=0.9, color=INK)
+    ax2.text(0.5, 0.5928, "%+.4f,  %.1f $\\sigma$" % (R["chain_effect"], R["chain_sigma"]),
+             ha="center", fontsize=10, color=INK)
+    ax2.plot([1, 1, 2, 2], [0.5726, 0.5739, 0.5739, 0.5726], lw=0.9, color=MUTE)
+    ax2.text(1.5, 0.5749, "%+.4f,  %.1f $\\sigma$" % (R["sched_effect"], abs(R["sched_sigma"])),
+             ha="center", fontsize=10, color=MUTE)
+    ax2.set_xticks([0, 1, 2])
+    ax2.set_xticklabels(["fresh\nstart", "warm\nstart", "warm start\n+ clock cap"],
+                        fontsize=10)
+    ax2.set_ylim(0.540, 0.600); ax2.set_ylabel("mAP$_{50-95}$")
     # Under the tick labels, not inside the bars, where the fill fought the text.
-    for i, (n, c) in enumerate(((1, WARN), (3, MUTE))):
+    for i, n in enumerate((1, 1, 3)):
         ax2.annotate("n = %d" % n, (i, 0), xytext=(0, -34),
                      textcoords="offset points", xycoords=("data", "axes fraction"),
-                     ha="center", fontsize=9, color=c, annotation_clip=False)
+                     ha="center", fontsize=9, color=MUTE, annotation_clip=False)
     despine(ax2); hline_grid(ax2); panel(ax2, "g", dx=-0.30)
     fig.tight_layout(w_pad=2.4)
     return save(fig, "f_rounds",
-                "(f) Fifteen unattended rounds on a fixed holdout. (g) On round 15's exact dataset "
-                "and schedule, starting fresh instead of from the previous round's weights.")
+                "(f) Fifteen unattended rounds on a fixed holdout. (g) Round 15's exact dataset, "
+                "three ways. Bars 1 and 2 differ only in the starting weights, so their gap is "
+                "the warm-start chain; bar 3 is the recipe the campaign ran, whose wall-clock "
+                "cap truncates the cosine. Sigma throughout is that recipe's own seed spread, "
+                "0.0040 over three seeds, propagated to the difference being quoted. Completing "
+                "the schedule is not the fix -- bar 2 sits below bar 3.")
 
 
 # ---------------------------------------------------------------- h. field drive

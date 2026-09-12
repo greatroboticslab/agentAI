@@ -9502,3 +9502,56 @@ metric that is structurally hostile to the diversity it was built to collect, an
 the ladder's flat-to-negative shape is the exam's, not the data's. If both fall,
 the harvested data is simply not useful and the campaign's negative result stands
 on a second, independent measurement.
+
+---
+
+## 2026-09-12 — v3.52.0 the ladder answers on both exams; resume finishes a truncated benchmark
+
+**The second exam agrees with the first.** Job `45817696` scored all eight ladder
+checkpoints on ImageWeeds, class-agnostic, with 0 images excluded by the leak
+check over 3,208 transfer images. Arm A falls −0.0299 and arm B −0.0100 while the
+CottonWeedDet12 ladder falls −0.0189 across the same checkpoints. Both exams fall,
+so the ladder's shape is not an artefact of a metric that rewards data resembling
+CottonWeedDet12. Figure c/d on the poster draws the two panels side by side.
+
+The ladder is now n = 3 at every rung: 0.8637 ± 0.0027, 0.8609 ± 0.0036,
+0.8580 ± 0.0047, 0.8448 ± 0.0018. Twelve times the training data costs 0.0189,
+8.2 σ of the seed spread.
+
+**A wrong bar, corrected.** The poster's warm-start panel plotted the fresh-start
+control (0.5805) against the campaign recipe's three-seed mean (0.5577) while
+annotating the gap as +0.0287 — the gap between the *matched* pair. The two arms
+in that bracket were not the two bars drawn. The panel now shows all three
+measurements it is built from, each labelled with its own n:
+
+| arm | start | schedule | mAP50-95 | n |
+|---|---|---|---|---|
+| A | `yolo26x.pt` | 30 epochs, complete cosine | 0.58053 | 1 |
+| B | round 14 `best.pt` | 30 epochs, complete cosine | 0.55180 | 1 |
+| round recipe | round 14 `best.pt` | 60 epochs, `patience=20`, `time=10.0` | 0.5576 ± 0.0040 | 3 |
+
+A against B isolates the warm start and nothing else: +0.0287, 5.1 σ. B against
+the recipe isolates the truncated cosine: −0.0058, 1.3 σ, which is the wrong sign
+for "completing the schedule is the fix". Both σ are the recipe's own seed spread
+propagated to the difference being quoted, and `poster_data.py` now derives them
+from the seed list rather than storing them, so the figure and the prose cannot
+drift apart again.
+
+**`bench run --resume`.** A walltime-truncated benchmark leaves most of an arm
+committed on disk — `L2 glm-4.7-flash` stopped at 78 of 149, `L3 qwen3.8-27b` at
+92 — and re-asking a model a question it has already answered costs GPU hours for
+a record that already exists. `--resume` reads those verdicts back, and only where
+the case, arm, repeat, model, **bundle hash and rubric hash** all match: any of
+those differing means the committed answer answers a different question, so it is
+re-run. The run reports `reused_records` and carries a warning naming the count,
+so a resumed run cannot read as a fresh one. Off by default.
+`tests/test_bench_resume.py` pins all six guards, the two malformed-file paths and
+the default.
+
+`submit_bench_resume.sh` and `submit_ctl_seeds.sh` resubmit the four queued jobs
+at walltimes the backfill scheduler can place. GPU-shared was 2,900 jobs deep:
+the 12 h requests had no start estimate at all, while a 4 h request did. Resume
+turns the two benchmark re-runs into 6 h and 5 h jobs, and the seed-101 control
+pair's measured 6:08 / 6:10 sizes the chain repeats at 8 h rather than 12 h.
+`CTL_SEED` is now passed explicitly — the script defaults it to 101, so a
+submission that omitted it would silently re-measure the seed already in hand.
