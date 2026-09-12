@@ -9673,3 +9673,47 @@ Three changes:
 that no cluster role names a lab endpoint, since a cluster brain is an sbatch job
 and not an HTTP call. Verified on the live dashboard after deploy: `/api/health/
 scheduler` 200, and `resolve()` on the lab box returns the table above.
+
+---
+
+## 2026-09-12 — v3.53.4 the results table catches up with the measurements
+
+`docs/RESULTS_TABLE.md` had four blocks reporting numbers that have since been
+superseded by more seeds, a second exam, or a stricter scorer. All four updated;
+nothing deleted without a row saying what it replaced.
+
+**Block C, the tier ladder, is now three seeds at every rung** instead of one, and
+carries both arms. Arm A: 0.8637 ± 0.0027 / 0.8609 ± 0.0036 / 0.8580 ± 0.0047 /
+0.8448 ± 0.0018. The first two steps sit inside the pooled seed spread; only
++40,000 separates, at **−0.0189, 8.2 σ**. Arm B — every harvested box collapsed
+into one shared class — is worse at **every** rung (−0.0071 / −0.0142 / −0.0196)
+and the gap widens with volume, so the pre-registered class-space hypothesis is
+falsified on its own condition. The earlier reading "flat curve, 12× the data buys
+nothing" is retracted with the row that replaces it: with three seeds the top rung
+is not flat, it is down.
+
+**Block E gains the controlled decomposition** as E12–E16. Arms A and B differ only
+in the starting weights, so their gap is the warm-start chain: **+0.0287, 5.1 σ**.
+Arm B against the recipe the campaign ran isolates the truncated cosine:
+**−0.0058, 1.3 σ**, which is the wrong sign for "completing the schedule is the
+fix". σ is the recipe's own three-seed spread of 0.0040 propagated to the
+difference quoted, not the borrowed 0.005.
+
+**Block H gains H4–H5, the second exam.** The ladder's own eight checkpoints
+scored on ImageWeeds (job `45817696`, 0 images excluded by the leak check): arm A
+−0.0299, arm B −0.0100, against cwd12's −0.0189. If the ladder fell because
+cwd12's metric rewards cwd12-like data, ImageWeeds would rise while cwd12 fell.
+**Both fall.**
+
+**Block I gains I2–I3, the field fire rate** over all 2,686 recorded frames rather
+than I1's 358, with the reason I1 undercounted recorded beside it.
+
+**Block L is new: the supervision benchmark**, seven arms with recall, grounded
+recall, false alarms, citation validity, SU per review and case counts. The size
+axis does not move detection — all three models land between 0.55 and 0.82 recall
+— it moves **precision and evidence quality**: false alarms 0.61–0.64 (14 B) →
+0.21–0.24 (27 B), citation validity 0.82–0.86 → 0.95–0.97. The tier axis is the
+new result: a retrieval round over the same artifacts is worth **+0.149** to the
+27 B and **+0.012** to the 14 B. A0 is recorded as having **no rate at all** —
+149 of 149 undecidable — rather than recall 0.000, and the superseded 0.841 is
+recorded as superseded so it is not re-quoted.

@@ -57,18 +57,31 @@ Holdout: same 1,977 images / 3,257 instances (verified: `n_gt` sums to 3,257 in 
 
 ---
 
-### Block C — sealed cwd12 holdout · **nc=100 head** · YOLO11n pretrained · tier ladder v2
-Holdout: same 1,977 images / 3,257 instances. This block is the **bridge** between Block A's clean numbers and the nc=100 pipeline numbers in Blocks D-E.
+### Block C — sealed cwd12 holdout · **nc=100 head** · YOLO11n pretrained · tier ladder, **three seeds at every rung**
+Holdout: same 1,977 images / 3,257 instances. This block is the **bridge** between Block A's clean
+numbers and the nc=100 pipeline numbers in Blocks D-E. **Supersedes the single-seed ladder reported
+2026-08-25** — those were seed 101 of these same runs, not a different experiment.
+
+Two arms, pre-registered before either ran. **Arm A** gives every source dataset its own class; **arm
+B** collapses every harvested box into one shared `weed` class. The question arm B was built to answer
+is whether the ladder's shape is a class-space artefact. It is not: arm B is worse at every rung.
 
 | # | Recipe | Train data | Metric (mAP50-95) | n | Artifact(s) | Q | Caveat |
 |---|---|---|---|---|---|---|---|
-| C1 | Clean core + **0** harvested, nc=100, 100 ep cap | real cwd12 train split, 3,671 (6,131 inst) | **0.8636** (best epoch 77 of 97) — **single run** | single run, seed 101 | `DIAG/probe5.json` → `s3_tiers/v2_run_0/results.csv`; `DIAG/lab/figures_data.json` → `tier_ladder_v2_2026_08_25` | yes | **This row is the measured nc=100 head cost: 0.8636 vs A1's 0.8755 = −0.012.** Quote that offset whenever an nc=100 number is set beside an nc=12 number. |
-| C2 | Core **+5,000** harvested | 8,671 | **0.85988** (Δ −0.004) — single run | single run, seed 101 | `DIAG/probe5.json` → `s3_tiers/v2_run_5000/results.csv` | yes | Δ is inside seed noise (0.003-0.006). |
-| C3 | Core **+15,000** harvested | 18,671 | **0.86143** (Δ −0.002) — single run | single run, seed 101 | `DIAG/probe5.json` → `s3_tiers/v2_run_15000/results.csv` | yes | Δ inside seed noise. |
-| C4 | Core **+40,000** harvested | 43,671 | **0.84362** (Δ −0.020) — single run | single run, seed 101 | `DIAG/probe5.json` → `s3_tiers/v2_run_40000/results.csv`; `figures_data.json` | caveat | **`REPO/docs/DOUBLE_AGENT_SYSTEM.md` §4 still prints "0.8408 *(still training)*" — that table is stale; the completed run's best is 0.8436.** Fix the doc before presenting. Single seed: −0.020 is ~4× the seed bar but rests on one run. |
-| C5 | *Derived*: honest cost of adding harvested data to a clean core | — | **0.00 to −0.02 across +5k…+40k** | 4 single runs | C1-C4 | yes | Supersedes and retracts the earlier "0.27 cost" claim (`DOUBLE_AGENT_SYSTEM.md` §4, retraction dated 2026-08-25). The finding is a **flat curve**: 12× the data buys nothing. |
+| C1 | **Arm A** · clean core + **0** harvested | real cwd12 train split, 3,671 (6,131 inst) | **0.8637 ± 0.0027** | **3 seeds** | `results/framework/s3_tier_ladder*/`; `docs/poster/poster_data.py` → `LADDER.seeds["0"]` | yes | **The measured nc=100 head cost: 0.8637 vs A1's 0.8755 = −0.012.** Quote that offset whenever an nc=100 number sits beside an nc=12 one. |
+| C2 | **Arm A** · core **+5,000** | 8,671 | **0.8609 ± 0.0036** (Δ **−0.0028**) | 3 seeds | same | yes | Δ sits inside the pooled seed spread of 0.0032 — not separable. |
+| C3 | **Arm A** · core **+15,000** | 18,671 | **0.8580 ± 0.0047** (Δ **−0.0057**) | 3 seeds | same | yes | Δ sits inside the pooled seed spread of 0.0039 — not separable. |
+| C4 | **Arm A** · core **+40,000** | 43,671 | **0.8448 ± 0.0018** (Δ **−0.0189**) | 3 seeds | same | yes | **8.2 σ of the seed spread.** The only rung that separates, and it separates downwards. |
+| C5 | **Arm B** · one shared class, +0 / +5k / +15k / +40k | as C1-C4 | **0.8636 / 0.8538 / 0.8451 / 0.8252** | single run per rung, seed 101 | `results/framework/s3_tierb_*`; jobs `45744712_[0-3]` | caveat | Single seed per rung, so each point carries the 0.004 bar. The **shape** is what this arm was for. |
+| C6 | *Derived*: **arm B vs arm A at each rung** | — | **−0.0071 / −0.0142 / −0.0196** at +5k / +15k / +40k | C1-C5 | — | yes | Arm B is worse at **every** rung and the gap **widens** with volume. The pre-registered class-space hypothesis is falsified on its own condition. Surviving reading: harvested images carry **9.0 boxes/image against the core's 1.7**, so collapsing them into one class concentrates that density instead of spreading it. |
+| C7 | *Derived*: honest cost of adding harvested data to a clean core | — | **−0.0189 at 12× the data, 8.2 σ** | 3 seeds/rung (arm A) | C1-C4 | yes | Supersedes and retracts the earlier "0.27 cost" claim (`DOUBLE_AGENT_SYSTEM.md` §4, retraction 2026-08-25) **and** the earlier "flat curve, 12× the data buys nothing" reading: with three seeds the top rung is not flat, it is **down**. |
+
+**Stale doc to fix before presenting:** `REPO/docs/DOUBLE_AGENT_SYSTEM.md` §4 still prints the +40,000
+rung as "0.8408 *(still training)*". The completed run's seed-101 best is 0.8436 and the three-seed
+mean is 0.8448 ± 0.0018.
 
 ---
+
 
 ### Block D — sealed cwd12 holdout · **nc=100 head** · **yolo26x** · merged web corpora (M1 sealed, 2026-08-23)
 Holdout: cwd12 test+valid, **1,977 images**; **instance count is not recorded in the M1 artifacts** (it is 3,257 in every artifact that does record it). Different backbone *and* different head from Blocks A-C.
@@ -107,6 +120,34 @@ Head **nc=100**; backbone lineage yolo26x; **seed 101 in every round → n = 1 p
 
 ---
 
+**The controlled decomposition of the decline (round 15's exact dataset, all three arms).**
+Two factors, held apart. Arms A and B differ **only** in the starting weights — same data, same 30
+epochs, same complete cosine, same seed 101 — so their gap is the warm-start chain and nothing else.
+The third row is the recipe the campaign actually ran, whose `time=10.0` rewrites `self.epochs` every
+epoch and re-plans the cosine against a clock.
+
+| # | Arm | Start | Schedule | mAP50-95 | n | Artifact |
+|---|---|---|---|---|---|---|
+| E12 | **A** cold + complete | `yolo26x.pt` | 30 ep, `patience=30`, no `time=` | **0.58053** | 1 | `results/framework/ctl_chain_armA_45672628.json` |
+| E13 | **B** warm + complete | round 14 `best.pt` | 30 ep, `patience=30`, no `time=` | **0.55180** | 1 | `results/framework/ctl_chain_armB_45672628.json` |
+| E14 | the recipe the campaign ran | round 14 `best.pt` | 60 ep, `patience=20`, `time=10.0` | **0.5576 ± 0.0040** | **3 seeds** | round 15 + `ctl_seed_s102/s103_45672672.json` |
+| E15 | *Derived*: **the start effect** | A vs B | — | **+0.0287, 5.1 σ** | — | E12, E13 |
+| E16 | *Derived*: **the schedule effect** | B vs the recipe | — | **−0.0058, 1.3 σ** | — | E13, E14 |
+
+σ throughout is **E14's own seed spread, 0.0040 over three seeds**, propagated to the difference being
+quoted (√2·sd for two single runs; √(sd² + sd²/3) for a single run against a mean of three). It is the
+only seed-noise measurement this project owns for this recipe — **not the borrowed 0.005**.
+
+**E16 has the wrong sign for the obvious fix.** Completing the truncated cosine does not recover the
+loss; arm B sits *below* the truncated recipe, and not separably. The warm-start chain is the factor
+that carries an effect, and it is 5 σ.
+
+**E12 and E13 are single runs.** Jobs `45824753` / `45824754` repeat both arms at seeds 102 and 103 to
+put an error bar on the gap itself rather than borrowing E14's.
+
+---
+
+
 ### Block F — sealed 1,977-image holdout · nc=12 · **pycocotools (COCO 101-pt) — a third evaluator**
 
 | # | Recipe | Train data | Holdout | Metric | n | Artifact(s) | Q | Caveat |
@@ -139,6 +180,11 @@ Head **nc=100**; backbone lineage yolo26x; **seed 101 in every round → n = 1 p
 
 ---
 
+| H4 | **The tier ladder's own eight checkpoints, on the second exam** | ImageWeeds, 3,208 images, class-agnostic | **arm A −0.0299** and **arm B −0.0100** across +0 → +40,000 | 8 checkpoints, 1 eval each | `results/framework/s6_crossdataset_ladder.json` (job `45817696`); `docs/poster/xds_ladder.json` | yes | Same implementation, same leak check, same matcher, same conf and imgsz as H1-H3 — `crossdataset_eval` now takes its checkpoints from `XDS_WEIGHTS`, so this is not a second evaluation that can drift from the first. **0 images excluded by the leak check.** |
+| H5 | *Derived*: **does the ladder fall because of the exam?** | — | cwd12 **−0.0189**, ImageWeeds **−0.0299 / −0.0100** | H4 + C1-C5 | — | yes | The objection this answers: cwd12's metric rewards training data that looks like cwd12, so a greenhouse/aerial/Latvian corpus could only ever cost. If that were the whole story, the ImageWeeds number would **rise** while cwd12 fell. **Both fall.** The ladder's shape is the data, not the exam. |
+
+
+
 ### Block I — robot frames: **not an accuracy measurement** (no ground truth)
 
 | # | What | Data | Metric | n | Artifact(s) | Q | Caveat |
@@ -146,6 +192,11 @@ Head **nc=100**; backbone lineage yolo26x; **seed 101 in every round → n = 1 p
 | I1 | cwd12-trained YOLO11n s102 over stored robot frames | **358 frames, 8 sessions**, 2 robots (lasercar, 241robot) | **0 detections at conf 0.25 / 0.40 / 0.60; false-positive frame rate 0.000; 3.7 ms/frame** | 358 frames, 1 model | `DIAG/lab/s6_domain_gap.json`; `figures_data.json` → `s6_domain_gap_2026_08_25` | caveat | **These frames contain no weeds** (indoor/bench scenes), so this measures **false-positive behaviour only — it is NOT recall and must never be shown as one.** Recall/precision on robot frames that *do* contain weeds is unmeasured; field accuracy is unknown. |
 
 ---
+
+| I2 | **Same checkpoint, every frame the robots recorded** (supersedes I1's coverage) | **2,686 frames, 26 sessions**, 2 robots; **1,157 frames are >1/3 vegetation** by excess green | **25 frames fire at conf 0.25** (21 of them vegetated), **8 at 0.40**, **2 at 0.60**; one box per firing frame; **24 of the 25 boxes are the same class** (Purslane) | 2,686 frames, 1 model | `results/framework/s6_field_fire.json`; `weed_optimizer_framework/tools/field_fire_sweep.py` | caveat | **No ground truth exists for these frames, so this is a fire rate and NOT a recall.** The vegetation rule is what stops "there was nothing to detect" from accounting for it. I1 measured 358 indoor/bench frames; this walks the whole session tree. |
+| I3 | *Why I1 undercounted* | — | the earlier sweep walked only `<slug>/frames/`, so every bulk-uploaded session was skipped — including the **1,013-frame field drive** that holds **802** of the vegetated frames and **23** of the 25 firings | — | same | yes | Recorded because it is the reason the sweep is now a committed script rather than a heredoc. |
+
+
 
 ### Block J — pre-guard historical rows: **cite as history only, never as results**
 
@@ -169,6 +220,73 @@ Head **nc=100**; backbone lineage yolo26x; **seed 101 in every round → n = 1 p
 
 
 ---
+
+### Block L — **the supervision benchmark: what catches the pipeline failing**
+One frozen corpus of 162 real incidents from this project's own engineering record, scored on the
+**dev split: 149 cases, 116 incidents, 33 controls**. Every number is produced by the project's own
+instrument — `bench reproduce --split dev`, which makes **no model call** and re-reads the committed
+verdict files, so it can be re-run at any time and cannot drift from what was measured.
+
+**Scorer definition, because it is stricter than it looks.** A **detection** counts only when the arm
+returns an `issue` verdict carrying at least one finding **at or above a severity bar**. A case that
+produced no answer — model error, context overflow, undecidable export — **leaves the denominator**
+instead of counting as a miss, which is why the incident denominators read 113 / 114 / 57 and not 116.
+**Grounded** adds one more requirement: the finding must quote a line that resolves in the artifact.
+**Citation validity** is the fraction of quoted lines that resolve, pooled over findings (not
+independent within a case — its interval is optimistic and the renderer says so).
+
+The tiers: **A0** is the scheduler's own watchdog reading status fields; **A0p** is twelve
+pre-registered deterministic checks; **L2** is a model reading raw artifact excerpts; **L3** is the
+same model with a retrieval round over the same artifacts.
+
+| # | Arm | Size | Reads | Recall | Grounded | False alarms | Citation validity | SU / review | Cases |
+|---|---|---|---|---|---|---|---|---|---|
+| L1 | **A0** scripted watchdog | — | status fields | **—** | — | — | — | 0 | 149 |
+| L2 | **A0p** deterministic signals | — | 12 checks | 0.095 | 0.095 | 0.061 | 0.846 | 0 | 149 |
+| L3 | Qwen3-14B · **L2** | 14 B | artifacts | 0.664 | 0.602 | **0.606** | 0.863 | 0.0163 | 149 |
+| L4 | Qwen3-14B · **L3** | 14 B | artifacts + retrieval | 0.675 | 0.614 | **0.636** | 0.820 | 0.0157 | 149 |
+| L5 | Qwen3.8-27B · **L2** | 27 B | artifacts | 0.553 | 0.518 | 0.212 | **0.951** | 0.0298 | 149 |
+| L6 | Qwen3.8-27B · **L3** | 27 B | artifacts + retrieval | **0.702** | **0.702** | 0.242 | **0.968** | 0.0326 | **92** ⏳ |
+| L7 | GLM-4.7-Flash · **L2** | 30 B MoE | artifacts | 0.821 | 0.769 | 0.200 | 0.836 | 0.0508 | **78** ⏳ |
+
+**L1 is not recall 0.000.** All 149 of A0's verdicts score `undecidable`: `escalate.reason: "no signal
+fired"` is not a judgement about the case. 0.000 would read as an arm that looked and found nothing;
+the truth is an arm that never produced a finding to score. This is the baseline the project's
+dashboard ran for six months.
+
+**What the size axis actually moves.** Not detection — all three models land between 0.55 and 0.82
+recall. What tracks size is **precision and evidence quality**: false alarms fall from 0.61–0.64 (14 B)
+to 0.21–0.24 (27 B), and citation validity rises from 0.82–0.86 (14 B) to **0.95–0.97** (27 B). The
+14 B reaches its recall by flagging **21 of the 33 controls**.
+
+**What the tier axis moves.** The retrieval round over the same artifacts is worth **+0.149** recall to
+the 27 B (0.553 → 0.702) at +0.030 false alarms, and **+0.012** to the 14 B (0.664 → 0.675) at +0.030
+false alarms. **Tiering pays where the model can use it and not otherwise** — which is the benchmark's
+one genuinely new result, and the reason the arms are drawn as arrows rather than points.
+
+**Ceiling for any rules-only arm: 0.559** — 56 of the 127 incidents declare no deterministic signal
+that could reach them, so A0p's 0.095 is 17 % of what the rules could achieve even in principle.
+
+**Two rows are partial** (⏳). `L6` stands on 92 of 149 cases and `L7` on 78; jobs `45824752` and
+`45824751` complete them with `bench run --resume`, which re-reads the committed verdicts and calls the
+model only for the remainder. Their recalls may move; their denominators are stated on every row so
+nothing is quoted as complete that is not.
+
+**DeepSeek-V4-Flash is absent by the instrument's own rule**, not by hand: its verdicts predate the
+2026-09-07 split re-cut, so the scorer will not mix them with the current corpus. Its earlier
+0.388 came from the run retracted for context overflow (51 of 149 prompts refused).
+
+**One superseded number, recorded so it is not re-quoted.** `docs/SUPERVISION_BENCH_LIMITS.md` §7
+reported Qwen3.8-27B L2 at **0.841**; that came from a counter written for that table which scored a
+case as detected whenever the arm raised anything. Under the committed scorer the same verdicts read
+**0.553**. §7a of that document records the difference. **One axis, one scorer.**
+
+Artifacts: `results/framework/supervision_rescore/results/run_reproduce-20260912T022035.json`,
+committed as `docs/poster/supervision_table.json`; verdicts under
+`results/framework/supervision_bench/verdicts/<arm>_<model>/`.
+
+---
+
 
 ## A0. The protocol problem, and every number re-read three ways
 
