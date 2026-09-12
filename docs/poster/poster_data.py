@@ -102,38 +102,57 @@ FUNNEL = {
     "probe_calibration": "the audit probe reads 1.000 on human-labelled cwd12, so the low scores are the data",
     "src": "figures_data.json -> merge_funnel_2026_08_23, license_sweep_2026_08_23, s1_gate_verdict_2026_08_25",
 }
+import json
+import os
 import statistics as st
 
 # --- F5 the headline: what each kind of supervision catches ------------------
+# Every number below is read from supervision_table.json, which is the project's
+# own scorer (`bench reproduce`, no model call) re-scoring the committed verdicts
+# on the dev split. An earlier draft of this block used a hand-written counter
+# that scored a case as detected whenever the model raised anything at all; the
+# committed scorer requires the finding to be about the incident, and is between
+# 0.06 and 0.25 stricter per arm. Nothing here is counted twice or by hand.
+_ST = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "supervision_table.json")))
+
+
+def _arm(key, field):
+    a = _ST["arms"].get(key) or {}
+    return (a.get(field) or {}).get("v"), (a.get(field) or {}).get("n"), a.get("counts", {})
+
+
 SUPERVISION = {
     "split": "dev, 149 cases", "incidents": 116, "controls": 33,
-    "rows": [
-        {"arm": "Scripted watchdog", "reads": "status fields",
-         "tp": 0, "recall": 0.000, "fa": 0.000, "cases": 149, "partial": False,
-         "note": "flags nothing on any case: \"no signal fired\", 149 times out of 149"},
-        {"arm": "Deterministic signals", "reads": "12 pre-registered checks",
-         "tp": 11, "recall": 0.095, "fa": 0.061, "cases": 149, "partial": False,
-         "note": "17% of the 0.559 ceiling the corpus fixes for any signals-only arm"},
-        {"arm": "Qwen3-14B", "reads": "raw artifact excerpts",
-         "tp": 82, "recall": 0.707, "fa": 0.636, "cases": 149, "partial": False,
-         "note": "flags 21 of 33 controls — recall bought by alarming on almost everything"},
-        {"arm": "Qwen3.8-27B", "reads": "raw artifact excerpts",
-         "tp": 93, "recall": 0.802, "fa": 0.212, "cases": 149, "partial": False,
-         "note": "93 of 116 incidents, 7 of 33 controls"},
+    "scorer": "bench reproduce, run %s" % _ST["run_id"],
+    # Tiers, in the order the poster reads them:
+    #   A0   the scheduler's own watchdog, reading status fields
+    #   A0p  twelve pre-registered deterministic checks
+    #   L2   a model reading raw artifact excerpts
+    #   L3   the same model, plus a retrieval round over the artifacts
+    "tiers": [
+        {"key": "A0", "label": "Scripted watchdog", "reads": "status fields"},
+        {"key": "A0p", "label": "Deterministic signals", "reads": "12 pre-registered checks"},
     ],
-    # DeepSeek-V4-Flash is left off the figure on purpose: its 0.388 comes from the
-    # run retracted for context overflow, where a third of the prompts were refused
-    # and scored as misses. It is a floor for a different setup, not a comparable arm.
-    "excluded": {"model": "DeepSeek-V4-Flash (284B)", "recall": 0.388, "fa": 0.091,
-                 "why": "from the run retracted for context overflow; not comparable"},
-    "in_flight": {"model": "GLM-4.7-Flash (30B)", "recall": 0.800, "fa": 0.152,
-                  "cases": 78, "note": "78 of 149 and the best trade-off so far"},
-    "reading": ("Three open models reading the same artifacts all land between 0.70 and 0.80 "
-                "recall. What separates them is the false-alarm rate — 0.636, 0.212, 0.152 — "
-                "so model choice buys precision here, not detection."),
+    "models": [
+        {"name": "Qwen3-14B", "l2": "L2@qwen3:14b", "l3": "L3@qwen3:14b"},
+        {"name": "Qwen3.8-27B", "l2": "L2@qwen3.8:27b", "l3": "L3@qwen3.8:27b"},
+        {"name": "GLM-4.7-Flash", "l2": "L2@glm-4.7-flash", "l3": None},
+    ],
+    "table": _ST,
+    # A0 is the one arm the scorer cannot score: "no signal fired" is not a
+    # decision, so all 149 of its verdicts come back undecidable. That is the
+    # finding, not a gap in the measurement -- the arm the pipeline actually ran
+    # never produced a judgement about any of the 116 incidents.
+    "a0_undecidable": _ST["arms"]["A0"]["counts"]["undecidable"],
+    "a0_cases": _ST["arms"]["A0"]["counts"]["cases"],
     "ceiling": 0.559,
     "ceiling_why": "56 of the 127 incidents declare no deterministic signal that could reach them",
-    "src": "results/framework/supervision_bench/verdicts/*/ scored against cases/*/truth.json",
+    "excluded": {"model": "DeepSeek-V4-Flash (284B)",
+                 "why": "its verdicts predate the 2026-09-07 split re-cut, so the scorer "
+                        "drops them rather than mixing two corpora"},
+    "src": "results/framework/supervision_rescore/results/run_reproduce-*.json "
+           "(bench reproduce over results/framework/supervision_bench/verdicts/)",
 }
 
 # --- F6 the fifteen rounds ---------------------------------------------------

@@ -1,0 +1,442 @@
+{
+ "src": "results/framework/supervision_rescore/results/run_reproduce-20260912T022035.json",
+ "run_id": "reproduce-20260912T022035",
+ "split": "dev",
+ "n_cases": 149,
+ "arms": {
+  "A0": {
+   "counts": {
+    "cases": 149,
+    "scored": 0,
+    "not_scored": 149,
+    "undecidable": 149,
+    "incidents": 116,
+    "healthy": 33,
+    "parse_errors": 0,
+    "context_overflow": 0,
+    "model_errors": 0
+   },
+   "detection_recall": {
+    "v": null,
+    "n": 0,
+    "k": 0,
+    "lo": null,
+    "hi": null
+   },
+   "detection_grounded": {
+    "v": null,
+    "n": 0,
+    "k": 0,
+    "lo": null,
+    "hi": null
+   },
+   "false_alarm_rate": {
+    "v": null,
+    "n": 0,
+    "k": 0,
+    "lo": null,
+    "hi": null
+   },
+   "escalation_ok": {
+    "v": null,
+    "n": 0,
+    "k": 0,
+    "lo": null,
+    "hi": null
+   },
+   "citation_validity": {
+    "v": null,
+    "n": 0,
+    "k": 0,
+    "lo": null,
+    "hi": null
+   },
+   "su_per_review": {
+    "v": null,
+    "n": 0,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": null,
+    "n": 0,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  },
+  "A0p": {
+   "counts": {
+    "cases": 149,
+    "scored": 149,
+    "not_scored": 0,
+    "undecidable": 0,
+    "incidents": 116,
+    "healthy": 33,
+    "parse_errors": 0,
+    "context_overflow": 0,
+    "model_errors": 0
+   },
+   "detection_recall": {
+    "v": 0.09482758620689655,
+    "n": 116,
+    "k": 11,
+    "lo": 0.053777363581140936,
+    "hi": 0.16185301237546282
+   },
+   "detection_grounded": {
+    "v": 0.09482758620689655,
+    "n": 116,
+    "k": 11,
+    "lo": 0.053777363581140936,
+    "hi": 0.16185301237546282
+   },
+   "false_alarm_rate": {
+    "v": 0.06060606060606061,
+    "n": 33,
+    "k": 2,
+    "lo": 0.016780883087191875,
+    "hi": 0.1960624480864781
+   },
+   "escalation_ok": {
+    "v": 0.2214765100671141,
+    "n": 149,
+    "k": 33,
+    "lo": 0.16227515219808897,
+    "hi": 0.2946784738637284
+   },
+   "citation_validity": {
+    "v": 0.8461538461538461,
+    "n": 13,
+    "k": 11,
+    "lo": 0.5776536898051745,
+    "hi": 0.9567418216419186
+   },
+   "su_per_review": {
+    "v": 0.0,
+    "n": 149,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": 0.0,
+    "n": 149,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  },
+  "L2@glm-4.7-flash": {
+   "counts": {
+    "cases": 78,
+    "scored": 64,
+    "not_scored": 14,
+    "undecidable": 0,
+    "incidents": 45,
+    "healthy": 33,
+    "parse_errors": 0,
+    "context_overflow": 2,
+    "model_errors": 14
+   },
+   "detection_recall": {
+    "v": 0.8205128205128205,
+    "n": 39,
+    "k": 32,
+    "lo": 0.6733195433811838,
+    "hi": 0.9102273452678089
+   },
+   "detection_grounded": {
+    "v": 0.7692307692307693,
+    "n": 39,
+    "k": 30,
+    "lo": 0.6166374277165825,
+    "hi": 0.8735419587485715
+   },
+   "false_alarm_rate": {
+    "v": 0.2,
+    "n": 25,
+    "k": 5,
+    "lo": 0.08860584686802572,
+    "hi": 0.3913095036954033
+   },
+   "escalation_ok": {
+    "v": 0.46875,
+    "n": 64,
+    "k": 30,
+    "lo": 0.35175987425176036,
+    "hi": 0.5892791294852899
+   },
+   "citation_validity": {
+    "v": 0.8357142857142857,
+    "n": 140,
+    "k": 117,
+    "lo": 0.7655356011205718,
+    "hi": 0.8879616643456796
+   },
+   "su_per_review": {
+    "v": 0.05079329687499999,
+    "n": 64,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": 6895.984375,
+    "n": 64,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  },
+  "L2@qwen3.8:27b": {
+   "counts": {
+    "cases": 149,
+    "scored": 147,
+    "not_scored": 2,
+    "undecidable": 0,
+    "incidents": 116,
+    "healthy": 33,
+    "parse_errors": 0,
+    "context_overflow": 2,
+    "model_errors": 2
+   },
+   "detection_recall": {
+    "v": 0.5526315789473685,
+    "n": 114,
+    "k": 63,
+    "lo": 0.4611256858691398,
+    "hi": 0.640706047377298
+   },
+   "detection_grounded": {
+    "v": 0.5175438596491229,
+    "n": 114,
+    "k": 59,
+    "lo": 0.4267504103946124,
+    "hi": 0.6071935006875335
+   },
+   "false_alarm_rate": {
+    "v": 0.21212121212121213,
+    "n": 33,
+    "k": 7,
+    "lo": 0.10676021533020799,
+    "hi": 0.3775164499215069
+   },
+   "escalation_ok": {
+    "v": 0.41496598639455784,
+    "n": 147,
+    "k": 61,
+    "lo": 0.33847239749527713,
+    "hi": 0.4957906745045927
+   },
+   "citation_validity": {
+    "v": 0.9512195121951219,
+    "n": 369,
+    "k": 351,
+    "lo": 0.9242167316460898,
+    "hi": 0.9689242861293649
+   },
+   "su_per_review": {
+    "v": 0.029765639455782297,
+    "n": 147,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": 6423.680272108843,
+    "n": 147,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  },
+  "L2@qwen3:14b": {
+   "counts": {
+    "cases": 149,
+    "scored": 146,
+    "not_scored": 3,
+    "undecidable": 0,
+    "incidents": 116,
+    "healthy": 33,
+    "parse_errors": 0,
+    "context_overflow": 2,
+    "model_errors": 3
+   },
+   "detection_recall": {
+    "v": 0.6637168141592921,
+    "n": 113,
+    "k": 75,
+    "lo": 0.5725022073633662,
+    "hi": 0.7441662113079593
+   },
+   "detection_grounded": {
+    "v": 0.6017699115044248,
+    "n": 113,
+    "k": 68,
+    "lo": 0.509597946993007,
+    "hi": 0.687249988937817
+   },
+   "false_alarm_rate": {
+    "v": 0.6060606060606061,
+    "n": 33,
+    "k": 20,
+    "lo": 0.43683440819940234,
+    "hi": 0.7531689256552291
+   },
+   "escalation_ok": {
+    "v": 0.23972602739726026,
+    "n": 146,
+    "k": 35,
+    "lo": 0.1777180191299834,
+    "hi": 0.3150792307223126
+   },
+   "citation_validity": {
+    "v": 0.8628318584070797,
+    "n": 226,
+    "k": 195,
+    "lo": 0.8118803602270996,
+    "hi": 0.9016549646941587
+   },
+   "su_per_review": {
+    "v": 0.01631054794520547,
+    "n": 146,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": 6372.993150684932,
+    "n": 146,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  },
+  "L3@qwen3.8:27b": {
+   "counts": {
+    "cases": 92,
+    "scored": 90,
+    "not_scored": 2,
+    "undecidable": 0,
+    "incidents": 59,
+    "healthy": 33,
+    "parse_errors": 0,
+    "context_overflow": 2,
+    "model_errors": 2
+   },
+   "detection_recall": {
+    "v": 0.7017543859649122,
+    "n": 57,
+    "k": 40,
+    "lo": 0.5733571989653998,
+    "hi": 0.8046744992518191
+   },
+   "detection_grounded": {
+    "v": 0.7017543859649122,
+    "n": 57,
+    "k": 40,
+    "lo": 0.5733571989653998,
+    "hi": 0.8046744992518191
+   },
+   "false_alarm_rate": {
+    "v": 0.24242424242424243,
+    "n": 33,
+    "k": 8,
+    "lo": 0.1283171337717501,
+    "hi": 0.4102461982955736
+   },
+   "escalation_ok": {
+    "v": 0.5333333333333333,
+    "n": 90,
+    "k": 48,
+    "lo": 0.4310218745393534,
+    "hi": 0.6329157504230247
+   },
+   "citation_validity": {
+    "v": 0.9682539682539683,
+    "n": 252,
+    "k": 244,
+    "lo": 0.9386185589982706,
+    "hi": 0.9838277133449466
+   },
+   "su_per_review": {
+    "v": 0.03261956666666666,
+    "n": 90,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": 7697.955555555555,
+    "n": 90,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  },
+  "L3@qwen3:14b": {
+   "counts": {
+    "cases": 149,
+    "scored": 147,
+    "not_scored": 2,
+    "undecidable": 0,
+    "incidents": 116,
+    "healthy": 33,
+    "parse_errors": 0,
+    "context_overflow": 2,
+    "model_errors": 2
+   },
+   "detection_recall": {
+    "v": 0.6754385964912281,
+    "n": 114,
+    "k": 77,
+    "lo": 0.5849905731782461,
+    "hi": 0.7544485376432131
+   },
+   "detection_grounded": {
+    "v": 0.6140350877192983,
+    "n": 114,
+    "k": 70,
+    "lo": 0.5223430496028932,
+    "hi": 0.6982923724310551
+   },
+   "false_alarm_rate": {
+    "v": 0.6363636363636364,
+    "n": 33,
+    "k": 21,
+    "lo": 0.466161783022664,
+    "hi": 0.7781282176475764
+   },
+   "escalation_ok": {
+    "v": 0.19047619047619047,
+    "n": 147,
+    "k": 28,
+    "lo": 0.1352002708222827,
+    "hi": 0.2615173112572431
+   },
+   "citation_validity": {
+    "v": 0.8201754385964912,
+    "n": 228,
+    "k": 187,
+    "lo": 0.7651519680067225,
+    "hi": 0.8645887209220693
+   },
+   "su_per_review": {
+    "v": 0.015693972789115652,
+    "n": 147,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": 6394.1292517006805,
+    "n": 147,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  }
+ }
+}

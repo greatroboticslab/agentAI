@@ -189,8 +189,9 @@ y = body(x, y, w,
        "{:,}".format(P["r241_frames"]), P["r241_res"], P["r241_span"],
        "{:,}".format(P["r241_field_frames"]), P["lasercar_frames"], P["lasercar_field_frames"]))
 y += 0.10
-y = figure(x, y, w, "h_drive", "Figure 1.")
-y = figure(x, y, w, "k_funnel", "Figure 2.")
+y = figure(x, y, w, "l_robots", "Figure 1.")
+y = figure(x, y, w, "h_drive", "Figure 2.")
+y = figure(x, y, w, "k_funnel", "Figure 3.")
 y += 0.05
 y = head(x, y, w, "Protocol")
 HD = D.HOLDOUT
@@ -223,7 +224,7 @@ y = head(x, y, w, "Results")
 
 tiles = [("+0.0714", "pretraining over random init", "n = 3 each side"),
          ("0.100", "same detector, another field", "from 0.873, n = 3"),
-         ("0 of 116", "incidents a scripted watchdog caught", "149 cases, none flagged"),
+         ("149 of 149", "cases the watchdog could not decide", "116 incidents among them"),
          ("48,752", "images, unchanged for 13 rounds", "while the loop reported progress")]
 tw = (w - 3 * 0.30) / 4
 for i, (big, lab, note) in enumerate(tiles):
@@ -237,13 +238,13 @@ y += 2.05
 HALF = (w - 0.55) / 2
 ya = sub(x, y, w, "What moves the detector")
 yb = ya
-ya = figure(x, ya, HALF, "a_families", "Figure 3.")
-yb = figure(x + HALF + 0.55, yb, HALF, "b_zeroshot", "Figure 4.")
+ya = figure(x, ya, HALF, "a_families", "Figure 4.")
+yb = figure(x + HALF + 0.55, yb, HALF, "b_zeroshot", "Figure 5.")
 y = max(ya, yb) + 0.10
 
 ya = sub(x, y, w, "Does more harvested data help?")
 yb = ya
-ya = figure(x, ya, HALF, "c_ladder", "Figure 5.")
+ya = figure(x, ya, HALF, "c_ladder", "Figure 6.")
 yb = body(x + HALF + 0.55, yb, HALF,
     "Harvested images added to a clean in-domain core, the same images at every seed. Only the "
     "training seed varies, so the spread is training noise and not a different sample of the corpus.")
@@ -261,34 +262,61 @@ y = max(ya, yb) + 0.10
 
 ya = sub(x, y, w, "What catches the pipeline failing")
 yb = ya
-ya = figure(x, ya, HALF, "e_supervision", "Figure 6.")
+ya = figure(x, ya, HALF, "e_supervision", "Figure 7.")
 S = D.SUPERVISION
+AR = S["table"]["arms"]
+
+
+def scell(key, field):
+    v = (AR[key].get(field) or {}).get("v")
+    return "--" if v is None else "%.3f" % v
+
+
 yb = body(x + HALF + 0.55, yb, HALF,
     "A frozen corpus of 162 real incidents from this project's own engineering record, scored on the "
-    "dev split: %d incidents and %d controls. Recall is over incidents, the false-alarm rate over "
-    "controls, and an arm that cannot decide a case is counted as a miss."
+    "dev split: %d incidents and %d controls. Recall is over incidents and the false-alarm rate over "
+    "controls, both by the project's own scorer re-reading committed verdicts, which requires the "
+    "finding to be about the incident rather than merely that the arm raised something. L2 reads raw "
+    "artifact excerpts; L3 adds a retrieval round over the same artifacts."
     % (S["incidents"], S["controls"]))
+srows = [["Scripted watchdog", "status fields", "--", "--", "%d" % S["a0_cases"]],
+         ["Deterministic signals", "12 checks", scell("A0p", "detection_recall"),
+          scell("A0p", "false_alarm_rate"), "%d" % AR["A0p"]["counts"]["cases"]]]
+for _m in S["models"]:
+    for _tier, _key in (("L2", _m["l2"]), ("L3", _m["l3"])):
+        if not _key:
+            continue
+        srows.append(["%s  %s" % (_m["name"], _tier),
+                      "artifacts + retrieval" if _tier == "L3" else "artifacts",
+                      scell(_key, "detection_recall"), scell(_key, "false_alarm_rate"),
+                      "%d" % AR[_key]["counts"]["cases"]])
 yb = table(x + HALF + 0.55, yb, HALF,
-           ["arm", "recall", "false alarms"],
-           [["Scripted watchdog", "0.000", "0.000"],
-            ["Deterministic signals", "0.095", "0.061"],
-            ["Qwen3-14B", "0.707", "0.636"],
-            ["Qwen3.8-27B", "0.802", "0.212"]],
-           [0.48, 0.26, 0.26], hi=3)
+           ["arm", "reads", "recall", "false alarms", "cases"],
+           srows, [0.30, 0.30, 0.14, 0.16, 0.10], hi=5)
+_d27 = (AR["L3@qwen3.8:27b"]["detection_recall"]["v"]
+        - AR["L2@qwen3.8:27b"]["detection_recall"]["v"])
+_d14 = (AR["L3@qwen3:14b"]["detection_recall"]["v"]
+        - AR["L2@qwen3:14b"]["detection_recall"]["v"])
 yb = body(x + HALF + 0.55, yb, HALF,
-    "Three open models reading the same artifacts all reach 0.70–0.80 recall. What separates them is "
-    "the false-alarm rate. Model choice buys precision here, not detection — the 14B reaches its "
-    "recall by flagging 21 of the 33 controls.", size=12.5, color=MUTE)
+    "The watchdog the pipeline actually ran never produced a decidable verdict about any of the %d "
+    "cases: \u201cno signal fired\u201d is not a judgement. Adding the retrieval tier is worth %+.3f recall to "
+    "the 27B and %+.3f to the 14B, so the tier pays where the model can use it and not otherwise. "
+    "Model choice buys precision, not detection: the 14B reaches its recall by flagging %.0f%% of the "
+    "controls against the 27B's %.0f%%."
+    % (S["a0_cases"], _d27, _d14,
+       100 * AR["L3@qwen3:14b"]["false_alarm_rate"]["v"],
+       100 * AR["L3@qwen3.8:27b"]["false_alarm_rate"]["v"]),
+    size=12.5, color=MUTE)
 y = max(ya, yb) + 0.10
 
 y = sub(x, y, w, "Why the loop looked like it was learning")
-y = figure(x, y, w, "f_rounds", "Figure 7.")
+y = figure(x, y, w, "f_rounds", "Figure 8.")
 
 # ============================================================= RIGHT column
 x, w = COL[2]; y = TOP
 y = head(x, y, w, "Generalisation")
-y = figure(x, y, w, "d_wall", "Figure 8.")
-y = figure(x, y, w, "j_species", "Figure 9.")
+y = figure(x, y, w, "d_wall", "Figure 9.")
+y = figure(x, y, w, "j_species", "Figure 10.")
 y += 0.05
 y = head(x, y, w, "Conclusions")
 for i, s in enumerate([
@@ -299,8 +327,10 @@ for i, s in enumerate([
     "class-agnostic, with the same matcher on both sides.",
     "Web harvest supplies volume, not supervision: one of six audited sources clears a 0.90 "
     "label-precision bar, and 44,750 of 156,521 images are cross-dataset duplicates.",
-    "Retrospective supervision needs the artifacts, not the status fields. A scripted watchdog over "
-    "status fields caught none of 116 real incidents; a model reading the artifacts caught 93.",
+    "Retrospective supervision needs the artifacts, not the status fields. The watchdog reading "
+    "status fields returned no decidable verdict on any of 149 cases, while a model reading the raw "
+    "artifacts reaches 0.70 recall over the 116 incidents; adding a retrieval tier over those same "
+    "artifacts is worth another +0.149 to the 27B and +0.011 to the 14B.",
     "An unattended loop can report success for eight consecutive rounds while collecting nothing. "
     "Absence of a failure signal is not evidence of success.",
 ]):

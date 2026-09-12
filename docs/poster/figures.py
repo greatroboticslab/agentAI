@@ -163,8 +163,9 @@ def wall():
                 capsize=4, elinewidth=1.0, zorder=3)
     ax.annotate("%.4f" % a, (0, a), xytext=(8, 4), textcoords="offset points",
                 fontsize=11.5, color=INK)
-    ax.annotate("%.4f" % b, (1, b), xytext=(-8, 4), textcoords="offset points",
-                ha="right", fontsize=11.5, color=WARN)
+    # Below-left of the endpoint: above it the label sat on its own marker.
+    ax.annotate("%.4f" % b, (1, b), xytext=(-11, -12), textcoords="offset points",
+                ha="right", va="top", fontsize=11.5, color=WARN)
     ax.annotate("", xy=(0.5, a), xytext=(0.5, b),
                 arrowprops=dict(arrowstyle="<->", color=MUTE, lw=0.9))
     ax.text(0.545, (a + b) / 2, "−0.773", fontsize=12, color=INK, va="center")
@@ -182,41 +183,115 @@ def wall():
 
 # ---------------------------------------------------------------- e. supervision
 def supervision():
+    """What each tier of supervision catches, and what the retrieval tier buys.
+
+    Every point is the project's own scorer re-reading committed verdicts, so the
+    arms are comparable to each other and to nothing else. Each model is drawn as
+    an arrow, not a dot: the tail is the tier that reads raw artifact excerpts and
+    the head is the same model given a retrieval round over the same artifacts.
+    That arrow is the only thing on this poster that measures the tiering itself.
+    """
     S = D.SUPERVISION
-    fig, ax = plt.subplots(figsize=(5.2, 2.55))
+    A = S["table"]["arms"]
+
+    def pt(key):
+        a = A[key]
+        return (a["false_alarm_rate"]["v"], a["detection_recall"]["v"],
+                a["detection_recall"]["n"], a["counts"]["cases"])
+
+    fig, ax = plt.subplots(figsize=(5.2, 2.85))
+    ax.plot([0, 0.70], [0, 0.70], color=RULE, lw=0.8, zorder=0)
+    ax.text(0.455, 0.425, "chance", fontsize=9, color=GREY, rotation=33, ha="right")
     ax.axhline(S["ceiling"], color=MUTE, lw=0.9, ls=(0, (4, 3)), zorder=1)
-    ax.text(-0.020, S["ceiling"] + 0.022, "ceiling for any rules-only arm",
-            fontsize=9.5, color=MUTE, ha="left")
-    ax.plot([0, 0.78], [0, 0.78], color=RULE, lw=0.8, zorder=0)
-    ax.text(0.735, 0.700, "chance", fontsize=9, color=GREY, rotation=34, ha="right")
-    # label offsets chosen per point so no two collide
-    place = {
-        "Scripted watchdog":     (GREY, "s", (10, -4), "left"),
-        "Deterministic signals": (MUTE, "^", (10, 10), "left"),
-        "Qwen3-14B":             (WARN, "o", (-11, -8), "right"),
-        "Qwen3.8-27B":           (BLUE, "o", (10, 8), "left"),
-    }
-    for r in S["rows"]:
-        c, mk, off, ha = place.get(r["arm"], (INK, "o", (8, 8), "left"))
-        ax.plot(r["fa"], r["recall"], mk, color=c, ms=9, markerfacecolor=c, zorder=4)
-        ax.annotate(r["arm"], (r["fa"], r["recall"]), textcoords="offset points",
-                    xytext=off, ha=ha, fontsize=10.5, color=c)
-    ex = S.get("in_flight")
-    if ex:
-        ax.plot(ex["fa"], ex["recall"], "o", color=GOOD, ms=9,
-                markerfacecolor=WHITE, markeredgewidth=1.6, zorder=4)
-        # Below the point: to its left is the y-axis label, to its right is the 27B.
-        ax.annotate("%s\n%d of 149" % (ex["model"].split(" (")[0], ex["cases"]),
-                    (ex["fa"], ex["recall"]), textcoords="offset points",
-                    xytext=(-4, -13), ha="right", va="top", fontsize=10, color=GOOD)
-    ax.set_xlim(-0.035, 0.80); ax.set_ylim(-0.05, 1.02)
+    ax.text(-0.020, S["ceiling"] - 0.028, "ceiling for any rules-only arm",
+            fontsize=9.5, color=MUTE, ha="left", va="top")
+
+    fa, rec, _, _ = pt("A0p")
+    ax.plot(fa, rec, "^", color=MUTE, ms=9, zorder=4)
+    ax.annotate("Deterministic signals", (fa, rec), textcoords="offset points",
+                xytext=(11, 6), ha="left", fontsize=10.5, color=MUTE)
+    ax.plot(0, 0, "s", color=GREY, ms=9, zorder=4)
+    ax.annotate("Scripted watchdog\n%d of %d undecidable"
+                % (S["a0_undecidable"], S["a0_cases"]), (0, 0),
+                textcoords="offset points", xytext=(11, -1), ha="left", va="center",
+                fontsize=10.5, color=GREY)
+
+    # Labels are placed in data coordinates, not as offsets from the marker: the
+    # three models sit close enough that offset labels stacked on one another.
+    style = {"Qwen3-14B":     (WARN, (0.621, 0.700), "center", "bottom"),
+             "Qwen3.8-27B":   (BLUE, (0.272, 0.702), "left", "center"),
+             "GLM-4.7-Flash": (GOOD, (0.183, 0.821), "right", "center")}
+    for m in S["models"]:
+        c, (lx, ly), ha, va = style[m["name"]]
+        x2, y2, n2, cases2 = pt(m["l2"])
+        ax.plot(x2, y2, "o", color=c, ms=9, markerfacecolor=WHITE,
+                markeredgewidth=1.7, zorder=4)
+        if m["l3"]:
+            x3, y3, n3, cases3 = pt(m["l3"])
+            ax.annotate("", (x3, y3), xytext=(x2, y2),
+                        arrowprops=dict(arrowstyle="-|>", color=c, lw=1.3,
+                                        shrinkA=7, shrinkB=7), zorder=3)
+            ax.plot(x3, y3, "o", color=c, ms=9, zorder=4)
+            partial = min(cases2, cases3)
+        else:
+            partial = cases2
+        note = "" if partial >= 149 else "\n%d of 149 so far" % partial
+        ax.text(lx, ly, m["name"] + note, ha=ha, va=va, fontsize=10.5, color=c)
+
+    ax.set_xlim(-0.035, 0.72); ax.set_ylim(-0.06, 0.95)
     ax.set_xlabel("false-alarm rate  (33 control cases)")
-    ax.set_ylabel("detection recall  (116 incidents)")
-    despine(ax); hline_grid(ax); panel(ax, "e", dx=-0.13, dy=1.03)
+    ax.set_ylabel("detection recall  (n = 116)")
+    despine(ax); hline_grid(ax); panel(ax, "e", inside=True)
+    d14 = pt("L3@qwen3:14b")[1] - pt("L2@qwen3:14b")[1]
+    d27 = pt("L3@qwen3.8:27b")[1] - pt("L2@qwen3.8:27b")[1]
     return save(fig, "e_supervision",
-                "Every arm on one frozen corpus of 162 real incidents from this project's own "
-                "history. Up and to the left is better. The scripted watchdog sits at the origin: "
-                "it flagged nothing, 149 times out of 149.")
+                "Every arm on one frozen corpus of real incidents from this project's own history "
+                "-- 116 incidents and 33 controls -- scored by the project's own scorer, which "
+                "requires the finding to be about the incident and not merely that the arm raised "
+                "something. Up and to the left is better. Open circle: the model reads raw "
+                "artifact excerpts. Filled: the same model with a retrieval round over the same "
+                "artifacts. The retrieval tier is worth %+.3f recall to the 27B and %+.3f to the "
+                "14B, so tiering pays where the model can use it and not otherwise."
+                % (d27, d14))
+
+
+# ------------------------------------------------------------- l. the robots
+def robots():
+    """Four frames off the platform, as recorded.
+
+    A poster about an autonomous pipeline has to show that the field half is real
+    equipment on real ground, and the honest version of that is frames straight
+    out of the archive -- not a staged photograph and not a rendering. Nothing is
+    enhanced here and nothing is labelled; the boxes in the laser cart's down
+    camera are its own detector drawing on its own video, which is what the cart
+    records while it drives, and they are not ground truth.
+    """
+    P = D.PLATFORM
+    shots = [("r241_row.jpg", "robot 241", "along a mulched crop row"),
+             ("r241_weeds.jpg", "robot 241", "weeds between the rows"),
+             ("lc_down.jpg", "laser cart", "down camera, onboard detector"),
+             ("lc_front.jpg", "laser cart", "forward camera")]
+    fig, axes = plt.subplots(1, 4, figsize=(9.6, 1.95))
+    for ax, (fn, who, what), let in zip(axes, shots, "lmno"):
+        img = plt.imread(os.path.join(HERE, "photos", fn))
+        ax.imshow(img)
+        ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_color(RULE); sp.set_linewidth(0.8)
+        # On a light plate: a bare letter disappears into a sunlit frame.
+        ax.text(0.028, 0.945, let, transform=ax.transAxes, fontsize=12,
+                fontweight="bold", color=INK, va="top", ha="left",
+                bbox=dict(boxstyle="square,pad=0.22", fc=WHITE, ec="none", alpha=0.86))
+        ax.set_xlabel("%s   %s" % (who, what), fontsize=9, color=MUTE, labelpad=5)
+    fig.tight_layout(w_pad=1.1)
+    return save(fig, "l_robots",
+                "Frames as recorded, unenhanced. %d frames across %d sessions and %d robots sit "
+                "on the platform and %d of them are labelled: robot 241 contributes %d at "
+                "%s and %g Hz, the laser cart %d of which %d are in a field. The boxes in (n) "
+                "are the cart's own detector drawing on its own video, not ground truth."
+                % (P["total_frames"], P["sessions"], P["robots"], P["labelled"],
+                   P["r241_frames"], P["r241_res"], P["r241_hz"],
+                   P["lasercar_frames"], P["lasercar_field_frames"]))
 
 
 # ---------------------------------------------------------------- f. rounds
@@ -361,7 +436,8 @@ def funnel():
 
 if __name__ == "__main__":
     print("rendering into", OUT)
-    for fn in (fam, vlm, ladder, wall, supervision, rounds, drive, species, funnel):
+    for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
+               species, funnel):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))

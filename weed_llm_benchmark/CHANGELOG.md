@@ -9555,3 +9555,44 @@ turns the two benchmark re-runs into 6 h and 5 h jobs, and the seed-101 control
 pair's measured 6:08 / 6:10 sizes the chain repeats at 8 h rather than 12 h.
 `CTL_SEED` is now passed explicitly — the script defaults it to 101, so a
 submission that omitted it would silently re-measure the seed already in hand.
+
+---
+
+## 2026-09-12 — v3.52.1 the supervision figure switches to the committed scorer
+
+The poster's supervision numbers came from a counter written for the poster,
+which scored a case as detected whenever the arm raised anything. The project's
+own scorer — `bench reproduce`, no model call, re-reading the committed verdicts
+— requires the finding to be **about the incident**. It is between 0.06 and 0.25
+stricter per arm, and it is the instrument of record, so every number in that
+block now comes from it:
+
+| arm | reads | recall | false alarms | cases |
+|---|---|---|---|---|
+| Scripted watchdog | status fields | — | — | 149 |
+| Deterministic signals | 12 checks | 0.095 | 0.061 | 149 |
+| Qwen3-14B L2 | artifacts | 0.664 | 0.606 | 149 |
+| Qwen3-14B L3 | artifacts + retrieval | 0.675 | 0.636 | 149 |
+| Qwen3.8-27B L2 | artifacts | 0.553 | 0.212 | 149 |
+| Qwen3.8-27B L3 | artifacts + retrieval | 0.702 | 0.242 | 92 |
+| GLM-4.7-Flash L2 | artifacts | 0.821 | 0.200 | 78 |
+
+Two things the earlier version could not show. The watchdog is not at recall
+0.000 — it returns **no decidable verdict on any of the 149 cases**, because "no
+signal fired" is not a judgement; all 149 of its verdicts score `undecidable`.
+And the tier axis is now visible: the retrieval round over the same artifacts is
+worth **+0.149** recall to the 27B and **+0.011** to the 14B, so the tiering pays
+where the model can use it and not otherwise. Figure 7 draws each model as an
+arrow from L2 to L3 rather than as a point.
+
+DeepSeek-V4-Flash drops out on its own: its verdicts predate the 2026-09-07 split
+re-cut, so the scorer will not mix them with the current corpus. That is the
+retraction the earlier note described, now enforced by the instrument.
+
+`docs/poster/supervision_table.json` is the scorer's output, committed beside the
+poster, and `poster_data.SUPERVISION` reads it rather than restating it.
+
+Figure 1 is new: four frames as recorded from the two ground robots — robot 241
+along a mulched crop row and between the rows, and the laser cart's down and
+forward cameras. The boxes in the down-camera frame are the cart's own detector
+drawing on its own video, which the caption says, because they are not labels.
