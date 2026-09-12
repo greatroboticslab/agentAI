@@ -78,7 +78,7 @@ raw volume. The gate's proven value is garbage *exclusion*, not score *lifting*:
 | **YOLO11n, sealed protocol** | cwd12 train split (3,671) | **0.8755 ± 0.0029** (n=3 seeds) | none — sealed 1,977-image holdout as val | jobs 44323305, 2026-08-24 |
 | **Mamba-YOLO-T, from scratch** | cwd12 train split (3,671) | **0.8266 ± 0.0064** (n=3) | none — sealed holdout as val | jobs 44351282, 2026-08-24 |
 | **YOLO11n, from scratch** (fairness control) | cwd12 train split (3,671) | **0.8041 ± 0.0028** (n=3) | none | jobs 44368952, 2026-08-24 |
-| **RF-DETR Large, cwd12-only** | cwd12 alone | **0.8974 ± 0.0040** (n=4 seeds; best 0.9033) | none — `train_rfdetr.py` stages cwd12 directly, holdout stems excluded | v3.0.31/34/38 |
+| **RF-DETR Large, cwd12-only** | cwd12 alone | **0.8974 ± 0.0040** — **4 runs, 3 configs, unseeded**; best 0.9033, and only 1 of the 4 crossed 0.90. **pycocotools scale, not Ultralytics** | none — `train_rfdetr.py` stages cwd12 directly, holdout stems excluded | v3.0.31/34/38 |
 | Naive scale + pseudo-labels | 244,675 harvested imgs | **0.593** ⚠ pre-guard | `mega_trainer` merge | v3.0.26-p2 |
 | Cumulative scale variant | ~150–240K | 0.576 ⚠ pre-guard | `mega_trainer` merge | v3.0.32 |
 | Curated clean subset (cwd12-only staging) | 3,671 | **0.896** | none (zero merge calls; reclassified v3.22.3) | v3.0.28 |
@@ -88,16 +88,32 @@ raw volume. The gate's proven value is garbage *exclusion*, not score *lifting*:
 **The corrected measurement (2026-08-25, jobs 44397807).** Adding web-harvested images to a
 clean in-domain core, same model, same sealed holdout:
 
-| harvested added | train images | holdout mAP50-95 |
-|---|---|---|
-| 0 | 3,671 | **0.8636** |
-| +5,000 | 8,671 | 0.8599 |
-| +15,000 | 18,671 | 0.8614 |
-| +40,000 | 43,671 | 0.8408 *(still training)* |
+| harvested added | train images | holdout mAP50-95 | n |
+|---|---|---|---|
+| 0 | 3,671 | **0.8637 ± 0.0027** | 3 |
+| +5,000 | 8,671 | 0.8609 ± 0.0036 | 3 |
+| +15,000 | 18,671 | 0.8580 ± 0.0047 | 3 |
+| +40,000 | 43,671 | **0.8448 ± 0.0018** | 3 |
 
-**The honest cost of adding harvested data is 0.00–0.02, not 0.27.** It buys nothing either —
-a flat curve is the finding. (`core+0` reads 0.8636 here against 0.8755 in the nc=12 run; the
-~0.012 difference is the 100-class head carrying 88 unused classes, measured rather than assumed.)
+**The honest cost of adding harvested data is −0.0189 at twelve times the data, 8.2 σ of the
+seed spread.** The first two steps sit inside the pooled seed spread and are not separable; the
++40,000 rung is, and it separates downwards. (`core+0` reads 0.8637 here against 0.8755 in the
+nc=12 run; the ~0.012 difference is the 100-class head carrying 88 unused classes, measured
+rather than assumed.)
+
+> **Superseded readings, recorded so they are not re-quoted.** This table used to end
+> `0.8408 *(still training)*` at n = 1, and the paragraph under it used to read "the honest cost
+> is 0.00–0.02 … a flat curve is the finding". Both are retracted here. With three seeds at every
+> rung the curve is not flat at the top: `0.8637 → 0.8448`. The earlier "0.27 cost" claim was
+> retracted separately on 2026-08-25 and is not the same number as either of these.
+>
+> A second arm was pre-registered to ask whether the shape is a class-space artefact — arm B
+> collapses every harvested box into one shared `weed` class. It is **worse at every rung**
+> (0.8636 / 0.8538 / 0.8451 / 0.8252, a gap of −0.0071 / −0.0142 / −0.0196 that widens with
+> volume), so the hypothesis is falsified on its own condition. And the ladder's eight
+> checkpoints were re-scored on a second dataset, ImageWeeds, class-agnostic, 0 images excluded
+> by the leak check: arm A −0.0299, arm B −0.0100. **Both exams fall**, so the shape is the data
+> and not the metric. Full rows in `docs/RESULTS_TABLE.md` Blocks C and H.
 
 ⚠️ **Retracted 2026-08-25.** The apparent ~0.27–0.30 cost of merging harvested data is not
 supported. A zero-harvest control inside the same merge pipeline (tier ladder, core only)

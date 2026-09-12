@@ -9873,3 +9873,33 @@ this poster is a 0.5 m document, and figure type is now matched to that. Moving 
 the 1.5 m tier is a poster-wide change — body 34 pt, captions 20 pt, figure type
 28 pt, and a cut from thirteen figures to about seven — not a `figures.py` change,
 and doing half of it would be worse than doing neither.
+
+---
+
+## 2026-09-12 — v3.55.1 four stale or wrong numbers removed from the documents
+
+`docs/RESULTS_TABLE.md` has carried these as known defects for three weeks. All
+four are now fixed at the source rather than annotated.
+
+**`DOUBLE_AGENT_SYSTEM.md` §4, the tier ladder.** The table ended
+`+40,000 … 0.8408 *(still training)*` at n = 1, and the paragraph under it read
+"the honest cost of adding harvested data is 0.00–0.02 … a flat curve is the
+finding". Both are superseded. It now carries the three-seed ladder — 0.8637 ±
+0.0027 / 0.8609 ± 0.0036 / 0.8580 ± 0.0047 / **0.8448 ± 0.0018** — reads the cost
+as **−0.0189 at twelve times the data, 8.2 σ**, and keeps a block recording what
+it replaced, so the retracted sentences cannot be re-quoted from an old copy. The
+same block now names arm B (worse at every rung, widening) and the second exam
+(both exams fall), with pointers to Blocks C and H of the results table.
+
+**"n = 4 seeds" in three documents.** `train_rfdetr.py` L286-296 records that
+RF-DETR's `train()` accepts no seed and that `--seed` is a run label only, so the
+0.0040 spread is GPU/cuDNN nondeterminism across **4 runs in 3 configurations** —
+two on the default seed, one at 100 epochs against the others' 60. Corrected in
+`DOUBLE_AGENT_SYSTEM.md`, `BEST_MODEL_CARD.md` and `SCIENCE_AUDIT.md`, each of
+which now also carries that the scale is pycocotools and that only 1 of the 4
+runs crossed 0.90.
+
+**`figures_data.json`.** `tier_ladder_v1_RETRACTED_2026_08_25.runs["core+40000"]`
+held the string `"~0.5572 (partial)"` from while the job was running; the
+completed best is 0.5612. The block is retracted, but a retracted block must not
+hold a number that was never final either.

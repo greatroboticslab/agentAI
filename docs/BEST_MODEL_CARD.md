@@ -11,7 +11,7 @@ carried over from training-time logs. Regenerate the numbers with
 
 | question | model | cwd12 holdout mAP50-95 |
 |---|---|---|
-| **Best model we can train** | RF-DETR Large, COCO-pretrained | **0.8974 ± 0.0040** (n=4 seeds) |
+| **Best model we can train** | RF-DETR Large, COCO-pretrained | **0.8974 ± 0.0040** — 4 runs, 3 configs, **unseeded**; pycocotools scale |
 | **Best model we can deploy today** | **YOLO11n, COCO-pretrained** | **0.8759 ± 0.0030** (n=3 seeds) |
 
 RF-DETR scores higher and is the honest headline for accuracy. YOLO11n is the
