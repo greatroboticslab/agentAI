@@ -58,10 +58,26 @@ from weed_optimizer_framework.tools.wbf_tta_eval import (
 REPO = Path(os.environ.get(
     "REPO_ROOT", "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"))
 IW_DIR = REPO / "datasets" / "project_agml__imageweeds_weed_detection"
-SEEDS = (101, 102, 103)
-WEIGHTS = {s: REPO / f"results/framework/s3_yolo11n/s{s}/weights/best.pt"
-           for s in SEEDS}
-OUT = REPO / "results/framework/s6_crossdataset_imageweeds.json"
+# Which checkpoints to transfer. The default is the three sealed cwd12 seeds, the
+# comparison this file was written for. XDS_WEIGHTS overrides it with
+# "label=path,label=path,..." so the same protocol -- same leak check, same
+# matcher, same conf and imgsz on both sides -- can be pointed at any other set of
+# checkpoints without a second implementation drifting away from this one.
+_DEFAULT_SEEDS = (101, 102, 103)
+_env_w = (os.environ.get("XDS_WEIGHTS") or "").strip()
+if _env_w:
+    WEIGHTS = {}
+    for part in _env_w.split(","):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            WEIGHTS[k.strip()] = Path(v.strip())
+    SEEDS = tuple(WEIGHTS)
+else:
+    SEEDS = _DEFAULT_SEEDS
+    WEIGHTS = {s: REPO / f"results/framework/s3_yolo11n/s{s}/weights/best.pt"
+               for s in SEEDS}
+OUT = Path(os.environ.get("XDS_OUT") or
+           (REPO / "results/framework/s6_crossdataset_imageweeds.json"))
 CONF, IMGSZ, IOU_NMS = 0.001, 640, 0.6
 HAMMING_LEAK = 6
 IW_RAGWEED_ID, IW_CORN_ID = 3, 2
@@ -155,8 +171,12 @@ def main():
     for seed in SEEDS:
         model = YOLO(str(WEIGHTS[seed]))
         names = model.names
-        rag_id = next(k for k, v in names.items() if v == "Ragweed")
-        gt_ho_rag = [[(0, b) for c, b in g if c == rag_id] for g in hold_gts]
+        # The class-agnostic arms are the comparison; the per-species arm needs a
+        # head that names Ragweed. A 100-class merged head does, a class-agnostic
+        # one would not, and that must skip the species arm rather than abort.
+        rag_id = next((k for k, v in names.items() if v == "Ragweed"), None)
+        gt_ho_rag = ([[(0, b) for c, b in g if c == rag_id] for g in hold_gts]
+                     if rag_id is not None else [[] for _ in hold_gts])
         t0 = time.time()
         preds = {}
         for tag, imgs in (("iw", iw_imgs), ("holdout", hold_imgs)):
@@ -181,22 +201,27 @@ def main():
         row = {
             "iw_class_agnostic": compute_map(agn(preds["iw"]), gt_iw_agn, 1,
                                              ["weed"])["mAP50_95"],
-            "iw_ragweed": compute_map(only(preds["iw"], rag_id), gt_iw_rag, 1,
-                                      ["Ragweed"])["mAP50_95"],
+            "iw_ragweed": (compute_map(only(preds["iw"], rag_id), gt_iw_rag, 1,
+                                       ["Ragweed"])["mAP50_95"]
+                           if rag_id is not None else None),
             "holdout_class_agnostic": compute_map(agn(preds["holdout"]),
                                                   gt_ho_agn, 1,
                                                   ["weed"])["mAP50_95"],
-            "holdout_ragweed": compute_map(only(preds["holdout"], rag_id),
-                                           gt_ho_rag, 1, ["Ragweed"])["mAP50_95"],
+            "holdout_ragweed": (compute_map(only(preds["holdout"], rag_id),
+                                            gt_ho_rag, 1, ["Ragweed"])["mAP50_95"]
+                                if rag_id is not None else None),
         }
         results["per_seed"][seed] = row
         print(f"[s{seed}] {json.dumps(row)}", flush=True)
 
     keys = list(next(iter(results["per_seed"].values())).keys())
-    results["summary"] = {
-        k: {"mean": float(np.mean([results["per_seed"][s][k] for s in SEEDS])),
-            "std": float(np.std([results["per_seed"][s][k] for s in SEEDS]))}
-        for k in keys}
+    results["summary"] = {}
+    for k in keys:
+        vals = [results["per_seed"][s][k] for s in SEEDS
+                if results["per_seed"][s][k] is not None]
+        if vals:
+            results["summary"][k] = {"mean": float(np.mean(vals)),
+                                     "std": float(np.std(vals)), "n": len(vals)}
     results["leak_check"] = leak
     results["n_transfer_images"] = len(iw_imgs)
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -204,8 +229,11 @@ def main():
         json.dump(results, f, indent=1)
     print("\n=== CROSS-DATASET TRANSFER (mean±std, n=3) ===")
     for k in keys:
-        s = results["summary"][k]
-        print(f"  {k:24s} {s['mean']:.4f} ± {s['std']:.4f}")
+        if k not in results["summary"]:
+            print(f"  {k:24s} (not applicable to these checkpoints)")
+            continue
+        sm = results["summary"][k]
+        print(f"  {k:24s} {sm['mean']:.4f} ± {sm['std']:.4f}  (n={sm['n']})")
     print(f"[done] wrote {OUT}")
 
 

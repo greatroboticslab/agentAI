@@ -9476,3 +9476,29 @@ lying across a data series, and n-labels fighting the bar fill behind them.
 
 `python3 docs/poster/figures.py && python3 docs/poster/build.py` regenerates
 everything from `poster_data.py`.
+
+## 2026-09-11 — v3.51.0 change the exam: the tier ladder, scored on a second dataset
+
+Every number on the tier ladder is measured on CottonWeedDet12's own holdout, and
+that metric rewards training data that looks like CottonWeedDet12. A corpus of
+greenhouse, aerial, Latvian and three-season images can therefore only ever cost
+— which makes "more harvested data does not help" a statement about the exam as
+much as about the data.
+
+`crossdataset_eval` now takes its checkpoints from `XDS_WEIGHTS`
+(`label=path,label=path,…`) and its destination from `XDS_OUT`, defaulting
+unchanged to the three sealed cwd12 seeds. One implementation, one leak check, one
+matcher, the same conf and imgsz on both sides — pointing it at another set of
+checkpoints does not create a second evaluation that can drift from this one. A
+head that does not name Ragweed now skips the per-species arm and reports the
+class-agnostic ones, instead of aborting on a `StopIteration`.
+
+`run_xds_ladder.sh` scores all eight ladder checkpoints — arm A and arm B at
++0 / +5,000 / +15,000 / +40,000 — on ImageWeeds. Job `45817696`.
+
+**What it would mean.** If the ImageWeeds number rises with harvested data while
+the CottonWeedDet12 number falls, then the pipeline has been optimising against a
+metric that is structurally hostile to the diversity it was built to collect, and
+the ladder's flat-to-negative shape is the exam's, not the data's. If both fall,
+the harvested data is simply not useful and the campaign's negative result stands
+on a second, independent measurement.
