@@ -195,6 +195,23 @@ ROUNDS["sched_effect"] = ROUNDS["warm"] - ROUNDS["recipe_mean"]
 ROUNDS["sched_sigma"] = ROUNDS["sched_effect"] / (
     (ROUNDS["recipe_sd"] ** 2 + (ROUNDS["recipe_sd"] / 3 ** 0.5) ** 2) ** 0.5)
 
+# --- the audit, source by source --------------------------------------------
+# The funnel says one of six sources clears the bar. This is which six, and by
+# how much they miss, which is what makes the funnel an audit result rather than
+# an assertion. The probe reads 1.000 on human-labelled CottonWeedDet12, so a
+# source scoring 0.18 is the data and not the instrument.
+SOURCES = {
+    "bar": 0.90,
+    "calibration": 1.000,
+    "rows": [("ImageWeeds \u00b7 weed detection", 1.0000),
+             ("AgML \u00b7 weed / crop detection", 0.7371),
+             ("ImageWeeds \u00b7 aerial", 0.6496),
+             ("Roboflow \u00b7 grass weeds", 0.5775),
+             ("AgML \u00b7 MH weed16", 0.4519),
+             ("Roboflow \u00b7 weed / crop aerial", 0.1845)],
+    "src": "figures_data.json -> s1_gate_verdict_2026_08_25.per_source",
+}
+
 # --- what inference-time compute can buy ------------------------------------
 # All six arms scored by ONE matcher, the plain baseline included, so the numbers
 # are differences within one instrument rather than across two. The seed-noise bar

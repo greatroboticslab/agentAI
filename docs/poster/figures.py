@@ -259,6 +259,41 @@ def supervision():
                 % (d27, d14))
 
 
+# --------------------------------------------- s. the audit, source by source
+def sources():
+    """Label precision per harvested source, against the bar the gate sets.
+
+    The funnel in (k) compresses this to "one of six". Drawn out, the six are not
+    close to the bar and not close to each other, which is the part that makes
+    the gate an audit result rather than a threshold chosen after the fact.
+    """
+    S = D.SOURCES
+    labs = [a for a, _ in S["rows"]]
+    vals = [v for _, v in S["rows"]]
+    ys = np.arange(len(vals))[::-1]
+    fig, ax = plt.subplots(figsize=(5.6, 2.2))
+    ax.barh(ys, vals, height=0.56, zorder=3,
+            color=[GOOD if v >= S["bar"] else WARN for v in vals])
+    ax.axvline(S["bar"], color=INK, lw=1.0, ls=(0, (4, 3)), zorder=4)
+    ax.text(S["bar"] - 0.012, ys[0] + 0.62, "audit bar", fontsize=9.5, color=INK,
+            ha="right", va="center")
+    for y, v in zip(ys, vals):
+        ax.text(v + 0.012, y, "%.3f" % v, va="center", fontsize=10,
+                color=GOOD if v >= S["bar"] else WARN)
+    ax.set_yticks(ys); ax.set_yticklabels(labs, fontsize=10)
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlim(0, 1.12); ax.set_ylim(-0.62, len(vals) - 0.15)
+    ax.set_xlabel("label precision against the audit probe")
+    despine(ax, left=False)
+    fig.text(0.004, 0.985, "s", fontsize=13, fontweight="bold", color=INK, va="top")
+    return save(fig, "s_sources",
+                "The six audited harvested sources. The same probe reads %.3f on human-labelled "
+                "CottonWeedDet12, so a source at %.3f is the data and not the instrument. Only the "
+                "source at the top clears the bar, and it supplies %s of the %s audited images."
+                % (S["calibration"], vals[-1], "{:,}".format(D.FUNNEL["passing_images"]),
+                   "{:,}".format(D.FUNNEL["audited_images"])))
+
+
 # ------------------------------------------------- r. what inference can buy
 def tta():
     """What test-time compute buys, against the noise bar and against its cost.
@@ -290,7 +325,10 @@ def tta():
             color=MUTE, ha="left", va="center")
     ax.set_xlim(-0.0125, 0.0365); ax.set_ylim(-0.60, len(d) - 0.15)
     ax.set_xlabel("change in mAP$_{50-95}$, one matcher throughout")
-    despine(ax, left=False); panel(ax, "r", dx=-0.02, dy=1.16)
+    despine(ax, left=False)
+    # The y labels own the left third of the canvas, so a letter placed against
+    # the axes reads as centred. Anchor it to the figure instead.
+    fig.text(0.004, 0.985, "r", fontsize=13, fontweight="bold", color=INK, va="top")
     return save(fig, "r_tta",
                 "Test-time compute on the deployable checkpoint. Fusion with no extra views is "
                 "nothing; multi-scale with h-flip and a 3-seed ensemble are each worth about "
@@ -517,7 +555,7 @@ def funnel():
 if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
-               species, funnel, field, tta):
+               species, funnel, field, tta, sources):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))

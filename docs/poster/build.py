@@ -193,6 +193,7 @@ y += 0.10
 y = figure(x, y, w, "l_robots", "Figure 1.")
 y = figure(x, y, w, "h_drive", "Figure 2.")
 y = figure(x, y, w, "k_funnel", "Figure 3.")
+y = figure(x, y, w, "s_sources", "Figure 4.")
 y += 0.05
 y = head(x, y, w, "Protocol")
 HD = D.HOLDOUT
@@ -239,13 +240,13 @@ y += 2.05
 HALF = (w - 0.55) / 2
 ya = sub(x, y, w, "What moves the detector")
 yb = ya
-ya = figure(x, ya, HALF, "a_families", "Figure 4.")
-yb = figure(x + HALF + 0.55, yb, HALF, "b_zeroshot", "Figure 5.")
+ya = figure(x, ya, HALF, "a_families", "Figure 5.")
+yb = figure(x + HALF + 0.55, yb, HALF, "b_zeroshot", "Figure 6.")
 y = max(ya, yb) + 0.10
 
 ya = sub(x, y, w, "Does more harvested data help?")
 yb = ya
-ya = figure(x, ya, HALF, "c_ladder", "Figure 6.")
+ya = figure(x, ya, HALF, "c_ladder", "Figure 7.")
 yb = body(x + HALF + 0.55, yb, HALF,
     "Harvested images added to a clean in-domain core, the same images at every seed. Only the "
     "training seed varies, so the spread is training noise and not a different sample of the corpus.")
@@ -265,7 +266,7 @@ y = max(ya, yb) + 0.10
 
 ya = sub(x, y, w, "What catches the pipeline failing")
 yb = ya
-ya = figure(x, ya, HALF, "e_supervision", "Figure 7.")
+ya = figure(x, ya, HALF, "e_supervision", "Figure 8.")
 S = D.SUPERVISION
 AR = S["table"]["arms"]
 
@@ -313,18 +314,18 @@ yb = body(x + HALF + 0.55, yb, HALF,
        100 * AR["L3@qwen3.8:27b"]["false_alarm_rate"]["v"]),
     size=12.5, color=MUTE)
 yb = sub(x + HALF + 0.55, yb + 0.06, HALF, "What inference-time compute can buy")
-yb = figure(x + HALF + 0.55, yb, HALF, "r_tta", "Figure 8.")
+yb = figure(x + HALF + 0.55, yb, HALF, "r_tta", "Figure 9.")
 y = max(ya, yb) + 0.10
 
 y = sub(x, y, w, "Why the loop looked like it was learning")
-y = figure(x, y, w, "f_rounds", "Figure 9.")
+y = figure(x, y, w, "f_rounds", "Figure 10.")
 
 # ============================================================= RIGHT column
 x, w = COL[2]; y = TOP
 y = head(x, y, w, "Generalisation")
-y = figure(x, y, w, "d_wall", "Figure 10.")
-y = figure(x, y, w, "p_field", "Figure 11.")
-y = figure(x, y, w, "j_species", "Figure 12.")
+y = figure(x, y, w, "d_wall", "Figure 11.")
+y = figure(x, y, w, "p_field", "Figure 12.")
+y = figure(x, y, w, "j_species", "Figure 13.")
 y += 0.05
 y = head(x, y, w, "Conclusions")
 for i, s in enumerate([
