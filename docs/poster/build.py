@@ -283,35 +283,41 @@ yb = body(x + HALF + 0.55, yb, HALF,
     "or above a severity bar; \u201cgrounded\u201d additionally requires that finding to quote a line that "
     "resolves in the artifact. L2 reads raw artifact excerpts; L3 adds a retrieval round over them."
     % (S["incidents"], S["controls"]))
-srows = [["Scripted watchdog", "status fields", "--", "--", "--", "%d" % S["a0_cases"]],
+srows = [["Scripted watchdog", "status fields", "--", "--", "--", "--",
+          "%d" % S["a0_cases"]],
          ["Deterministic signals", "12 checks", scell("A0p", "detection_recall"),
           scell("A0p", "detection_grounded"), scell("A0p", "false_alarm_rate"),
+          scell("A0p", "citation_validity"),
           "%d" % AR["A0p"]["counts"]["cases"]]]
 for _m in S["models"]:
     for _tier, _key in (("L2", _m["l2"]), ("L3", _m["l3"])):
         if not _key:
             continue
-        srows.append(["%s  %s" % (_m["name"], _tier),
+        srows.append(["%s  %s" % (_m["size"], _tier),
                       "artifacts + retrieval" if _tier == "L3" else "artifacts",
                       scell(_key, "detection_recall"), scell(_key, "detection_grounded"),
-                      scell(_key, "false_alarm_rate"),
+                      scell(_key, "false_alarm_rate"), scell(_key, "citation_validity"),
                       "%d" % AR[_key]["counts"]["cases"]])
 yb = table(x + HALF + 0.55, yb, HALF,
-           ["arm", "reads", "recall", "grounded", "false alarms", "cases"],
-           srows, [0.26, 0.26, 0.13, 0.14, 0.13, 0.08], hi=5)
+           ["reviewer", "reads", "recall", "grounded", "false alarms",
+            "citations valid", "cases"],
+           srows, [0.17, 0.24, 0.12, 0.13, 0.14, 0.14, 0.06], hi=9)
 _d27 = (AR["L3@qwen3.8:27b"]["detection_recall"]["v"]
         - AR["L2@qwen3.8:27b"]["detection_recall"]["v"])
 _d14 = (AR["L3@qwen3:14b"]["detection_recall"]["v"]
         - AR["L2@qwen3:14b"]["detection_recall"]["v"])
 yb = body(x + HALF + 0.55, yb, HALF,
     "The watchdog the pipeline ran never produced a decidable verdict on any of the %d cases: "
-    "\u201cno signal fired\u201d is not a judgement. The retrieval tier is worth %+.3f recall to the 27B and "
-    "%+.3f to the 14B, so it pays where the model can use it and not otherwise. Model choice buys "
-    "precision, not detection: the 14B reaches its recall by flagging %.0f%% of the controls "
-    "against the 27B's %.0f%%."
-    % (S["a0_cases"], _d27, _d14,
-       100 * AR["L3@qwen3:14b"]["false_alarm_rate"]["v"],
-       100 * AR["L3@qwen3.8:27b"]["false_alarm_rate"]["v"]),
+    "\u201cno signal fired\u201d is not a judgement. Above it, recall does not order the reviewers by size \u2014 "
+    "the 7 B has the highest on the page \u2014 but grounded recall and citation validity do, and they "
+    "do it steeply: %.2f of the 7 B's detections quote a line that does not resolve, against %.2f "
+    "for the 27 B. The size class the campaign's own reviewer ran on for a week would have passed on "
+    "recall alone. The retrieval tier is worth %+.3f to the 27 B and %+.3f to the 14 B, so it pays "
+    "where the model can use it and not otherwise."
+    % (S["a0_cases"],
+       AR["L3@qwen2.5:7b"]["detection_recall"]["v"] - AR["L3@qwen2.5:7b"]["detection_grounded"]["v"],
+       AR["L3@qwen3.8:27b"]["detection_recall"]["v"] - AR["L3@qwen3.8:27b"]["detection_grounded"]["v"],
+       _d27, _d14),
     size=12.5, color=MUTE)
 yb = sub(x + HALF + 0.55, yb + 0.06, HALF, "What inference-time compute can buy")
 yb = figure(x + HALF + 0.55, yb, HALF, "r_tta", "Figure 9.")

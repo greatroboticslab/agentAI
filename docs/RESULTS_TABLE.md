@@ -243,31 +243,53 @@ same model with a retrieval round over the same artifacts.
 |---|---|---|---|---|---|---|---|---|---|
 | L1 | **A0** scripted watchdog | — | status fields | **—** | — | — | — | 0 | 149 |
 | L2 | **A0p** deterministic signals | — | 12 checks | 0.095 | 0.095 | 0.061 | 0.846 | 0 | 149 |
-| L3 | Qwen3-14B · **L2** | 14 B | artifacts | 0.664 | 0.602 | **0.606** | 0.863 | 0.0163 | 149 |
-| L4 | Qwen3-14B · **L3** | 14 B | artifacts + retrieval | 0.675 | 0.614 | **0.636** | 0.820 | 0.0157 | 149 |
-| L5 | Qwen3.8-27B · **L2** | 27 B | artifacts | 0.553 | 0.518 | 0.212 | **0.951** | 0.0298 | 149 |
-| L6 | Qwen3.8-27B · **L3** | 27 B | artifacts + retrieval | **0.702** | **0.702** | 0.242 | **0.968** | 0.0326 | **92** ⏳ |
-| L7 | GLM-4.7-Flash · **L2** | 30 B MoE | artifacts | 0.821 | 0.769 | 0.200 | 0.836 | 0.0508 | **78** ⏳ |
+| L3 | Qwen2.5-7B · **L2** | 7 B | artifacts | 0.777 | **0.223** | 0.152 | **0.304** | 0.0063 | 149 |
+| L4 | Qwen2.5-7B · **L3** | 7 B | artifacts + retrieval | **0.823** | **0.274** | 0.273 | **0.195** | 0.0065 | 149 |
+| L5 | Qwen3-14B · **L2** | 14 B | artifacts | 0.664 | 0.602 | **0.606** | 0.863 | 0.0163 | 149 |
+| L6 | Qwen3-14B · **L3** | 14 B | artifacts + retrieval | 0.675 | 0.614 | **0.636** | 0.820 | 0.0157 | 149 |
+| L7 | Qwen3.8-27B · **L2** | 27 B | artifacts | 0.553 | 0.518 | 0.212 | **0.951** | 0.0298 | 149 |
+| L8 | Qwen3.8-27B · **L3** | 27 B | artifacts + retrieval | 0.702 | **0.702** | 0.242 | **0.968** | 0.0326 | **92** ⏳ |
+| L9 | GLM-4.7-Flash · **L2** | 30 B | artifacts | 0.821 | 0.769 | 0.200 | 0.836 | 0.0508 | **78** ⏳ |
+
 
 **L1 is not recall 0.000.** All 149 of A0's verdicts score `undecidable`: `escalate.reason: "no signal
 fired"` is not a judgement about the case. 0.000 would read as an arm that looked and found nothing;
 the truth is an arm that never produced a finding to score. This is the baseline the project's
 dashboard ran for six months.
 
-**What the size axis actually moves.** Not detection — all three models land between 0.55 and 0.82
-recall. What tracks size is **precision and evidence quality**: false alarms fall from 0.61–0.64 (14 B)
-to 0.21–0.24 (27 B), and citation validity rises from 0.82–0.86 (14 B) to **0.95–0.97** (27 B). The
-14 B reaches its recall by flagging **21 of the 33 controls**.
+**Recall does not order the reviewers by size. Grounded recall does, and it does it steeply.**
+The 7 B has the **highest recall on the table** — 0.823 at L3, above the 27 B's 0.702 — and **0.274**
+of it is grounded. Two thirds of what it "detects" quotes a line that does not resolve in the
+artifact, and its citation validity is **0.195** against the 27 B's **0.968**. Read as a single
+column:
+
+| size | recall | grounded | **unevidenced** | citation validity | SU / review |
+|---|---|---|---|---|---|
+| 7 B | 0.823 | 0.274 | **0.549** | 0.195 | 0.0065 |
+| 14 B | 0.675 | 0.614 | 0.061 | 0.820 | 0.0157 |
+| 27 B | 0.702 | 0.702 | **0.000** | 0.968 | 0.0326 |
+| 30 B (L2) | 0.821 | 0.769 | 0.051 | 0.836 | 0.0508 |
+
+**This is the measured case for the placement rule.** The reviewer this campaign ran on between
+2026-09-04 and 09-11 was a 7 B-class model on the lab's 3060. On recall alone it looks like the best
+arm on the page. It is the grounded column and the citation column that separate it, and neither was
+being reported. Five times the compute per review (0.0065 → 0.0326 SU) buys the difference between
+**55 % unevidenced detections and 0 %**.
+
+False alarms are the other axis and they do not order by size either: the 14 B flags **21 of the 33
+controls** (0.61–0.64), while the 7 B flags 0.15–0.27 and the 27 B 0.21–0.24.
 
 **What the tier axis moves.** The retrieval round over the same artifacts is worth **+0.149** recall to
-the 27 B (0.553 → 0.702) at +0.030 false alarms, and **+0.012** to the 14 B (0.664 → 0.675) at +0.030
-false alarms. **Tiering pays where the model can use it and not otherwise** — which is the benchmark's
-one genuinely new result, and the reason the arms are drawn as arrows rather than points.
+the 27 B (0.553 → 0.702) at +0.030 false alarms, **+0.012** to the 14 B, and **+0.046** to the 7 B —
+but the 7 B's grounded recall moves only +0.051 while its false alarms go up +0.121, so what retrieval
+buys the smallest model is mostly more firing. **Tiering pays where the model can use it and not
+otherwise** — the benchmark's one genuinely new result, and the reason the arms are drawn as arrows
+rather than points.
 
 **Ceiling for any rules-only arm: 0.559** — 56 of the 127 incidents declare no deterministic signal
 that could reach them, so A0p's 0.095 is 17 % of what the rules could achieve even in principle.
 
-**Two rows are partial** (⏳). `L6` stands on 92 of 149 cases and `L7` on 78; jobs `45824752` and
+**Two rows are partial** (⏳). `L8` stands on 92 of 149 cases and `L9` on 78; jobs `45824752` and
 `45824751` complete them with `bench run --resume`, which re-reads the committed verdicts and calls the
 model only for the remainder. Their recalls may move; their denominators are stated on every row so
 nothing is quoted as complete that is not.
@@ -281,7 +303,7 @@ reported Qwen3.8-27B L2 at **0.841**; that came from a counter written for that 
 case as detected whenever the arm raised anything. Under the committed scorer the same verdicts read
 **0.553**. §7a of that document records the difference. **One axis, one scorer.**
 
-Artifacts: `results/framework/supervision_rescore/results/run_reproduce-20260912T022035.json`,
+Artifacts: `results/framework/supervision_rescore/results/run_reproduce-20260912T134625.json`,
 committed as `docs/poster/supervision_table.json`; verdicts under
 `results/framework/supervision_bench/verdicts/<arm>_<model>/`.
 

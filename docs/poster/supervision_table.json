@@ -1,6 +1,6 @@
 {
- "src": "results/framework/supervision_rescore/results/run_reproduce-20260912T022035.json",
- "run_id": "reproduce-20260912T022035",
+ "src": "results/framework/supervision_rescore/results/run_reproduce-20260912T134625.json",
+ "run_id": "reproduce-20260912T134625",
  "split": "dev",
  "n_cases": 149,
  "arms": {
@@ -190,6 +190,68 @@
     "hi": null
    }
   },
+  "L2@qwen2.5:7b": {
+   "counts": {
+    "cases": 149,
+    "scored": 145,
+    "not_scored": 4,
+    "undecidable": 0,
+    "incidents": 116,
+    "healthy": 33,
+    "parse_errors": 2,
+    "context_overflow": 2,
+    "model_errors": 4
+   },
+   "detection_recall": {
+    "v": 0.7767857142857143,
+    "n": 112,
+    "k": 87,
+    "lo": 0.6912259682679223,
+    "hi": 0.8439882860343053
+   },
+   "detection_grounded": {
+    "v": 0.22321428571428573,
+    "n": 112,
+    "k": 25,
+    "lo": 0.15601171396569474,
+    "hi": 0.30877403173207785
+   },
+   "false_alarm_rate": {
+    "v": 0.15151515151515152,
+    "n": 33,
+    "k": 5,
+    "lo": 0.06650457281607568,
+    "hi": 0.3091987588044212
+   },
+   "escalation_ok": {
+    "v": 0.3586206896551724,
+    "n": 145,
+    "k": 52,
+    "lo": 0.2851352202299254,
+    "hi": 0.439403894578189
+   },
+   "citation_validity": {
+    "v": 0.30386740331491713,
+    "n": 181,
+    "k": 55,
+    "lo": 0.24151484708976273,
+    "hi": 0.3743721922520243
+   },
+   "su_per_review": {
+    "v": 0.00634211034482759,
+    "n": 145,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": 6313.986206896552,
+    "n": 145,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  },
   "L2@qwen3.8:27b": {
    "counts": {
     "cases": 149,
@@ -308,6 +370,68 @@
    },
    "tokens_in": {
     "v": 6372.993150684932,
+    "n": 146,
+    "k": null,
+    "lo": null,
+    "hi": null
+   }
+  },
+  "L3@qwen2.5:7b": {
+   "counts": {
+    "cases": 149,
+    "scored": 146,
+    "not_scored": 3,
+    "undecidable": 0,
+    "incidents": 116,
+    "healthy": 33,
+    "parse_errors": 1,
+    "context_overflow": 2,
+    "model_errors": 3
+   },
+   "detection_recall": {
+    "v": 0.8230088495575221,
+    "n": 113,
+    "k": 93,
+    "lo": 0.742375590039561,
+    "hi": 0.8824026413930539
+   },
+   "detection_grounded": {
+    "v": 0.2743362831858407,
+    "n": 113,
+    "k": 31,
+    "lo": 0.2005141227614801,
+    "hi": 0.362996975826693
+   },
+   "false_alarm_rate": {
+    "v": 0.2727272727272727,
+    "n": 33,
+    "k": 9,
+    "lo": 0.1506744088542064,
+    "hi": 0.44217559002872625
+   },
+   "escalation_ok": {
+    "v": 0.3835616438356164,
+    "n": 146,
+    "k": 56,
+    "lo": 0.3086331141071057,
+    "hi": 0.46446039240576364
+   },
+   "citation_validity": {
+    "v": 0.19476744186046513,
+    "n": 344,
+    "k": 67,
+    "lo": 0.15638452090722002,
+    "hi": 0.23989216010724432
+   },
+   "su_per_review": {
+    "v": 0.006472006849315068,
+    "n": 146,
+    "k": null,
+    "lo": null,
+    "hi": null
+   },
+   "tokens_in": {
+    "v": 6338.472602739726,
     "n": 146,
     "k": null,
     "lo": null,

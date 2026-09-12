@@ -185,13 +185,16 @@ def wall():
 
 # ---------------------------------------------------------------- e. supervision
 def supervision():
-    """What each tier of supervision catches, and what the retrieval tier buys.
+    """What each tier of supervision catches, and how much of it is evidenced.
 
-    Every point is the project's own scorer re-reading committed verdicts, so the
-    arms are comparable to each other and to nothing else. Each model is drawn as
-    an arrow, not a dot: the tail is the tier that reads raw artifact excerpts and
-    the head is the same model given a retrieval round over the same artifacts.
-    That arrow is the only thing on this poster that measures the tiering itself.
+    Panel (e) is the contest the benchmark was built for: detection against false
+    alarms, with each model drawn as an arrow from the tier that reads raw
+    artifact excerpts to the same model given a retrieval round over them.
+
+    Panel (f) exists because (e) alone would mislead. The 7 B model has the
+    highest recall on the page, and two thirds of what it "detects" quotes a line
+    that does not resolve in the artifact. That is the size class the campaign's
+    own reviewer ran on for a week, and recall alone would have cleared it.
     """
     S = D.SUPERVISION
     A = S["table"]["arms"]
@@ -199,64 +202,96 @@ def supervision():
     def pt(key):
         a = A[key]
         return (a["false_alarm_rate"]["v"], a["detection_recall"]["v"],
-                a["detection_recall"]["n"], a["counts"]["cases"])
+                a["detection_grounded"]["v"], a["counts"]["cases"])
 
-    fig, ax = plt.subplots(figsize=(5.2, 2.85))
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(9.4, 2.55))
+
+    # ---- (e) detection against false alarms ---------------------------------
     ax.plot([0, 0.70], [0, 0.70], color=RULE, lw=0.8, zorder=0)
     ax.text(0.455, 0.425, "chance", fontsize=9, color=GREY, rotation=33, ha="right")
     ax.axhline(S["ceiling"], color=MUTE, lw=0.9, ls=(0, (4, 3)), zorder=1)
-    ax.text(-0.020, S["ceiling"] - 0.028, "ceiling for any rules-only arm",
-            fontsize=9.5, color=MUTE, ha="left", va="top")
+    ax.text(-0.020, S["ceiling"] - 0.030, "rules-only ceiling", fontsize=9,
+            color=MUTE, ha="left", va="top")
 
     fa, rec, _, _ = pt("A0p")
-    ax.plot(fa, rec, "^", color=MUTE, ms=9, zorder=4)
-    ax.annotate("Deterministic signals", (fa, rec), textcoords="offset points",
-                xytext=(11, 6), ha="left", fontsize=10.5, color=MUTE)
-    ax.plot(0, 0, "s", color=GREY, ms=9, zorder=4)
-    ax.annotate("Scripted watchdog\n%d of %d undecidable"
-                % (S["a0_undecidable"], S["a0_cases"]), (0, 0),
-                textcoords="offset points", xytext=(11, -1), ha="left", va="center",
-                fontsize=10.5, color=GREY)
+    ax.plot(fa, rec, "^", color=MUTE, ms=8, zorder=4)
+    ax.annotate("12 rules", (fa, rec), textcoords="offset points",
+                xytext=(11, 13), ha="left", fontsize=9.5, color=MUTE)
+    ax.plot(0, 0, "s", color=GREY, ms=8, zorder=4)
+    # On a plate: the chance diagonal and the zero grid line both run through
+    # this corner, and a label a reader has to pick out of two rules is a defect.
+    ax.annotate("watchdog\n%d of %d undecidable" % (S["a0_undecidable"], S["a0_cases"]),
+                (0, 0), textcoords="offset points", xytext=(10, 2), ha="left",
+                va="center", fontsize=9.5, color=GREY, zorder=6,
+                bbox=dict(boxstyle="square,pad=0.18", fc=WHITE, ec="none", alpha=0.88))
 
-    # Labels are placed in data coordinates, not as offsets from the marker: the
-    # three models sit close enough that offset labels stacked on one another.
-    style = {"Qwen3-14B":     (WARN, (0.621, 0.700), "center", "bottom"),
-             "Qwen3.8-27B":   (BLUE, (0.272, 0.702), "left", "center"),
-             "GLM-4.7-Flash": (GOOD, (0.183, 0.821), "right", "center")}
+    # colour, label position in data coords, alignment
+    style = {"Qwen2.5-7B":    (WARN, (0.300, 0.880), "left", "center"),
+             "Qwen3-14B":     (BLUE, (0.621, 0.720), "center", "bottom"),
+             "Qwen3.8-27B":   (NAVY, (0.272, 0.690), "left", "center"),
+             "GLM-4.7-Flash": (GOOD, (0.133, 0.688), "right", "center")}
     for m in S["models"]:
         c, (lx, ly), ha, va = style[m["name"]]
-        x2, y2, n2, cases2 = pt(m["l2"])
-        ax.plot(x2, y2, "o", color=c, ms=9, markerfacecolor=WHITE,
-                markeredgewidth=1.7, zorder=4)
+        x2, y2, _, cases2 = pt(m["l2"])
+        ax.plot(x2, y2, "o", color=c, ms=8, markerfacecolor=WHITE,
+                markeredgewidth=1.6, zorder=4)
+        partial = cases2
         if m["l3"]:
-            x3, y3, n3, cases3 = pt(m["l3"])
+            x3, y3, _, cases3 = pt(m["l3"])
             ax.annotate("", (x3, y3), xytext=(x2, y2),
-                        arrowprops=dict(arrowstyle="-|>", color=c, lw=1.3,
-                                        shrinkA=7, shrinkB=7), zorder=3)
-            ax.plot(x3, y3, "o", color=c, ms=9, zorder=4)
+                        arrowprops=dict(arrowstyle="-|>", color=c, lw=1.2,
+                                        shrinkA=6, shrinkB=6), zorder=3)
+            ax.plot(x3, y3, "o", color=c, ms=8, zorder=4)
             partial = min(cases2, cases3)
-        else:
-            partial = cases2
-        note = "" if partial >= 149 else "\n%d of 149 so far" % partial
-        ax.text(lx, ly, m["name"] + note, ha=ha, va=va, fontsize=10.5, color=c)
+        note = "" if partial >= 149 else "\n%d of 149" % partial
+        ax.text(lx, ly, m["size"] + note, ha=ha, va=va, fontsize=10, color=c)
 
     ax.set_xlim(-0.035, 0.72); ax.set_ylim(-0.06, 0.95)
-    ax.set_xlabel("false-alarm rate  (33 control cases)")
+    ax.set_xlabel("false-alarm rate  (33 controls)")
     ax.set_ylabel("detection recall  (n = 116)")
     despine(ax); hline_grid(ax); panel(ax, "e", inside=True)
-    d14 = pt("L3@qwen3:14b")[1] - pt("L2@qwen3:14b")[1]
+
+    # ---- (f) how much of that detection is evidenced ------------------------
+    xs = np.arange(len(S["models"]))
+    for i, m in enumerate(S["models"]):
+        c = style[m["name"]][0]
+        key = m["l3"] or m["l2"]
+        _, r, g, _ = pt(key)
+        ax2.plot([i, i], [g, r], color=c, lw=2.4, solid_capstyle="butt", zorder=3)
+        ax2.plot(i, r, "o", color=c, ms=8, markerfacecolor=WHITE,
+                 markeredgewidth=1.6, zorder=4)
+        ax2.plot(i, g, "o", color=c, ms=8, zorder=4)
+        ax2.text(i + 0.16, (r + g) / 2, "%.2f" % (r - g), fontsize=9.5, color=c,
+                 va="center", ha="left")
+        n = A[key]["counts"]["cases"]
+        if n < 149:
+            ax2.text(i, g - 0.055, "%d of 149" % n, fontsize=8.5, color=MUTE,
+                     ha="center", va="top")
+    # Bottom left: the top of this panel is where the data lives.
+    ax2.text(-0.34, 0.135, "open  = flagged an incident", fontsize=9, color=MUTE)
+    ax2.text(-0.34, 0.065, "solid = and quoted a line that resolves", fontsize=9,
+             color=MUTE)
+    ax2.set_xticks(xs)
+    ax2.set_xticklabels([m["size"] for m in S["models"]], fontsize=10)
+    ax2.set_xlim(-0.45, len(xs) - 0.15); ax2.set_ylim(0.0, 0.96)
+    ax2.set_xlabel("reviewer size")
+    ax2.set_ylabel("detection recall  (n = 116)")
+    despine(ax2); hline_grid(ax2); panel(ax2, "f", inside=True)
+
+    fig.tight_layout(w_pad=2.6)
+    g7 = pt("L3@qwen2.5:7b"); g27 = pt("L3@qwen3.8:27b")
     d27 = pt("L3@qwen3.8:27b")[1] - pt("L2@qwen3.8:27b")[1]
+    d14 = pt("L3@qwen3:14b")[1] - pt("L2@qwen3:14b")[1]
     return save(fig, "e_supervision",
-                "Every arm on one frozen corpus of real incidents from this project's own history "
-                "-- 116 incidents and 33 controls -- scored by the project's own scorer: a "
-                "detection counts only when the arm returns an issue verdict carrying a finding at "
-                "or above a severity bar, and a case that produced no answer leaves the "
-                "denominator rather than counting as a miss. Up and to the left is better. Open "
-                "circle: the model reads raw artifact excerpts. Filled: the same model with a "
-                "retrieval round over the same artifacts. The retrieval tier is worth %+.3f recall "
-                "to the 27B and %+.3f to the 14B, so tiering pays where the model can use it and "
-                "not otherwise."
-                % (d27, d14))
+                "(e) Every arm on one frozen corpus of real incidents from this project's own "
+                "history -- 116 incidents, 33 controls -- scored by the project's own scorer. Open "
+                "circle: the model reads raw artifact excerpts; filled: the same model with a "
+                "retrieval round over them. The retrieval tier is worth %+.3f recall to the 27 B and "
+                "%+.3f to the 14 B. (f) The same arms, asking how much of that detection quotes a "
+                "line that resolves in the artifact. The 7 B has the highest recall on the page and "
+                "%.2f of it is unevidenced; the 27 B's gap is %.2f. Recall alone would have cleared "
+                "the size class the campaign's own reviewer ran on for a week."
+                % (d27, d14, g7[1] - g7[2], g27[1] - g27[2]))
 
 
 # --------------------------------------------- s. the audit, source by source

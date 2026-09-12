@@ -9761,3 +9761,40 @@ This closes the B-item "make the per-step reviewer either a queued cluster job o
 explicitly the small fast tier whose verdicts are never the reported result" on
 the second branch: the reviewer stays fast and local, and now says so in its own
 record.
+
+---
+
+## 2026-09-12 — v3.54.0 the 7 B arm lands, and it changes what the benchmark says
+
+Job `45746475` COMPLETED in 1:33:31, adding **Qwen2.5-7B** to the supervision
+benchmark at both tiers, 149 of 149 cases. It is the size class this campaign's
+own reviewer ran on between 2026-09-04 and 09-11, and it inverts the reading.
+
+| size | recall | grounded | **unevidenced** | citation validity | SU / review |
+|---|---|---|---|---|---|
+| 7 B | **0.823** | 0.274 | **0.549** | **0.195** | 0.0065 |
+| 14 B | 0.675 | 0.614 | 0.061 | 0.820 | 0.0157 |
+| 27 B | 0.702 | **0.702** | **0.000** | **0.968** | 0.0326 |
+| 30 B (L2) | 0.821 | 0.769 | 0.051 | 0.836 | 0.0508 |
+
+**Recall does not order the reviewers by size — grounded recall does, steeply.**
+The 7 B has the highest recall on the page, above the 27 B, and **two thirds of
+what it detects quotes a line that does not resolve in the artifact**. Its
+citation validity is 0.195 against the 27 B's 0.968.
+
+This is the measured case for the placement rule, and it is the first time the
+project has one. On recall alone the lab's 7 B reviewer looks like the best arm
+here. It is the grounded column and the citation column that separate it, and
+**neither was being reported** while it ran. Five times the compute per review —
+0.0065 against 0.0326 SU — buys the difference between 55 % unevidenced
+detections and 0 %.
+
+The retrieval tier reads differently for it too: +0.046 recall, but only +0.051
+grounded against +0.121 false alarms, so what retrieval buys the smallest model
+is mostly more firing.
+
+Landed in three places: `docs/RESULTS_TABLE.md` Block L (rows L1–L9 with the
+unevidenced column), the published web ledger, and the poster — where Figure 8 is
+now two panels, (e) detection against false alarms with four models as arrows and
+(f) the recall-to-grounded drop by reviewer size, which is the panel that makes
+the 7 B's gap visible at a glance.

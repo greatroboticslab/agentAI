@@ -137,10 +137,17 @@ SUPERVISION = {
         {"key": "A0", "label": "Scripted watchdog", "reads": "status fields"},
         {"key": "A0p", "label": "Deterministic signals", "reads": "12 pre-registered checks"},
     ],
+    # Ordered small to large. The 7 B arm is the size class the campaign's own
+    # reviewer ran on for a week, so it is the one that has to be on the figure.
     "models": [
-        {"name": "Qwen3-14B", "l2": "L2@qwen3:14b", "l3": "L3@qwen3:14b"},
-        {"name": "Qwen3.8-27B", "l2": "L2@qwen3.8:27b", "l3": "L3@qwen3.8:27b"},
-        {"name": "GLM-4.7-Flash", "l2": "L2@glm-4.7-flash", "l3": None},
+        {"name": "Qwen2.5-7B", "size": "7 B",
+         "l2": "L2@qwen2.5:7b", "l3": "L3@qwen2.5:7b"},
+        {"name": "Qwen3-14B", "size": "14 B",
+         "l2": "L2@qwen3:14b", "l3": "L3@qwen3:14b"},
+        {"name": "Qwen3.8-27B", "size": "27 B",
+         "l2": "L2@qwen3.8:27b", "l3": "L3@qwen3.8:27b"},
+        {"name": "GLM-4.7-Flash", "size": "30 B",
+         "l2": "L2@glm-4.7-flash", "l3": None},
     ],
     "table": _ST,
     # A0 is the one arm the scorer cannot score: "no signal fired" is not a
