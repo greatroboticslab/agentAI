@@ -9717,3 +9717,11 @@ new result: a retrieval round over the same artifacts is worth **+0.149** to the
 27 B and **+0.012** to the 14 B. A0 is recorded as having **no rate at all** —
 149 of 149 undecidable — rather than recall 0.000, and the superseded 0.841 is
 recorded as superseded so it is not re-quoted.
+
+The published web ledger (artifact `f13cf654`) is updated in place to match: the
+ladder rung reads 0.8448 ± 0.0018 at n = 3 with arm B beside it, the control
+sigmas are recomputed from the measured 0.0040, a new section carries the second
+exam and the field fire rate, and the supervision table is replaced wholesale by
+the `bench reproduce` numbers with a note naming the 0.841 → 0.553 correction and
+why the two scorers differ. The stale "no score from this benchmark is quotable
+yet" note is gone — there is a score now, and it is on the page.
