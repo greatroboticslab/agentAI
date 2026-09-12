@@ -9633,3 +9633,43 @@ smaller than the +0.0714 that initialisation is worth.
 The ladder table now builds itself from `LADDER["seeds"]` rather than restating
 them, so the stale "+40,000 … 0.8436, n = 1" row is gone: it reads
 0.8448 ± 0.0018 at n = 3, like every other rung.
+
+---
+
+## 2026-09-12 — v3.53.3 the placement rule moves out of prose and into the router
+
+`model_router.resolve()` returned `LAB_SMALL` — the 3060's 3 B guide model — for
+**any role the table does not define**, with `ok: False` as the only warning. A
+caller that did not check `ok` got a 3 B model on the lab box for work the role
+table never approved. That is the shape of the 2026-09-04 → 09-11 failure, where
+nine campaign reviews came off a 4.7 GB model while 458 GB of verified weights
+sat on the cluster and nothing in the returned dict said anything was wrong.
+
+Three changes:
+
+1. **An unknown role hands back no model.** `{"model": None, "place": ""}`. A
+   caller asking for a role nobody defined should get nothing, not a small model.
+2. **`planner` exists**, `place: cluster`, `ollama:qwen3.8:27b`, async, falling
+   back to `glm-4.7-flash` then `gemma4`. It was simply absent, so every
+   `resolve("planner")` took the unknown-role path above.
+3. **`judgement` and `authoritative`.** A role whose output analyses, reviews,
+   decides or plans is marked `judgement: True`, and `resolve()` returns
+   `authoritative: place == "cluster"` for those. `interactive_plan` and
+   `analysis_summary` answer a live web request and are still allowed to run
+   small — they are no longer allowed to *look* authoritative. The flag travels
+   with the answer instead of living in a config block.
+
+| role | place | model | authoritative |
+|---|---|---|---|
+| planner | cluster | ollama:qwen3.8:27b | yes |
+| deep_review | cluster | vllm:glm-4.7-flash | yes |
+| hard_reasoning | cluster | vllm:deepseek-v3:671b | yes |
+| harvest_brain | cluster | ollama:gemma4 | yes |
+| curation | cluster | ollama:qwen2.5:7b | yes |
+| interactive_plan | lab | ollama:qwen2.5:3b | **no** |
+| analysis_summary | lab | ollama:qwen2.5:3b | **no** |
+
+`tests/test_model_router_placement.py` pins all of it — 27 checks, including
+that no cluster role names a lab endpoint, since a cluster brain is an sbatch job
+and not an HTTP call. Verified on the live dashboard after deploy: `/api/health/
+scheduler` 200, and `resolve()` on the lab box returns the table above.

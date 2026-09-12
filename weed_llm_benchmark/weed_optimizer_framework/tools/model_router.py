@@ -30,33 +30,47 @@ LAB_SMALL = "ollama:qwen2.5:3b"
 
 # role -> spec. `deep` (lab roles only) is an optional bigger model used ONLY when
 # reachable. `fallbacks` are tried in order when earlier choices are unreachable.
+#
+# `judgement: True` marks a role whose output ANALYSES, REVIEWS, DECIDES or PLANS.
+# The standing rule is that those run on a cluster model; the lab's 3060 hosts the
+# tiny guide only. A judgement role resolved onto the lab is not an error -- the
+# New Project box still has to answer inside a minute -- but its answer is a draft,
+# and `resolve()` says so by returning `authoritative: False`. That flag is the
+# executable form of the rule: it travels with the answer instead of living in a
+# config block nobody re-reads. Between 2026-09-04 and 09-11 every campaign review
+# was produced by a 4.7 GB model on the lab box while 458 GB sat verified on the
+# cluster, and nothing in the returned dict said anything was wrong.
 ROLES: dict = {
     "interactive_plan": {
-        "place": "lab", "model": LAB_SMALL, "latency_budget_s": 60,
+        "judgement": True, "place": "lab", "model": LAB_SMALL, "latency_budget_s": 60,
         "deep": "", "fallbacks": [],
         "desc": "Turn a user's intent into a project + agents plan (New Project)."},
     "analysis_summary": {
-        "place": "lab", "model": LAB_SMALL, "latency_budget_s": 45,
+        "judgement": True, "place": "lab", "model": LAB_SMALL, "latency_budget_s": 45,
         "deep": "", "fallbacks": [],
         "desc": "Summarize dataset EDA and give a training-readiness review."},
     "harvest_brain": {
-        "place": "cluster", "model": "ollama:gemma4", "latency_budget_s": 0,
+        "judgement": True, "place": "cluster", "model": "ollama:gemma4", "latency_budget_s": 0,
         "fallbacks": ["ollama:qwen2.5:7b"],
         "desc": "Decide what datasets to collect next (runs in the harvest job)."},
     "curation": {
-        "place": "cluster", "model": "ollama:qwen2.5:7b", "latency_budget_s": 0,
+        "judgement": True, "place": "cluster", "model": "ollama:qwen2.5:7b", "latency_budget_s": 0,
         "fallbacks": ["ollama:gemma4"],
         "desc": "Judge dataset quality / on-topic-ness during curation."},
     "labeling_vlm": {
         "place": "cluster", "model": "ollama:minicpm-v", "latency_budget_s": 0,
         "fallbacks": ["ollama:llama3.2-vision", "ollama:moondream"],
         "desc": "VLM captioning / label assistance."},
+    "planner": {
+        "judgement": True, "place": "cluster", "model": "ollama:qwen3.8:27b", "latency_budget_s": 0,
+        "is_async": True, "fallbacks": ["vllm:glm-4.7-flash", "ollama:gemma4"],
+        "desc": "Plan the campaign's next step: reads artifacts, decides what to run."},
     "deep_review": {
-        "place": "cluster", "model": "vllm:glm-4.7-flash", "latency_budget_s": 0,
+        "judgement": True, "place": "cluster", "model": "vllm:glm-4.7-flash", "latency_budget_s": 0,
         "is_async": True, "fallbacks": ["ollama:gemma4"],
         "desc": "On-demand deeper review with a bigger cluster model (glm-4.7-flash)."},
     "hard_reasoning": {
-        "place": "cluster", "model": "vllm:deepseek-v3:671b", "latency_budget_s": 0,
+        "judgement": True, "place": "cluster", "model": "vllm:deepseek-v3:671b", "latency_budget_s": 0,
         "is_async": True, "rare": True, "fallbacks": ["vllm:glm-4.7-flash", "ollama:gemma4"],
         "desc": "Rare, genuinely-hard one-off reasoning (deepseek-v3 671B; SU-expensive)."},
 }
@@ -100,8 +114,13 @@ def resolve(role: str, domain_config: dict | None = None,
     """
     spec = ROLES.get(role)
     if not spec:
+        # Deliberately no model. Returning LAB_SMALL here meant a caller that did
+        # not check `ok` silently got the lab's 3B model for work the role table
+        # never approved -- which is how a whole week of reviews came off the 3060.
+        # A caller that asks for a role nobody defined should get nothing.
         return {"ok": False, "role": role, "error": f"unknown role '{role}'",
-                "model": LAB_SMALL, "place": "lab"}
+                "model": None, "place": "", "authoritative": False,
+                "judgement": False}
     place = spec.get("place", "lab")
 
     cands: list = []
@@ -127,7 +146,11 @@ def resolve(role: str, domain_config: dict | None = None,
     if chosen is None:
         chosen, source = str(spec["model"]), "unreachable_default"
 
+    judgement = bool(spec.get("judgement"))
     return {"ok": True, "role": role, "model": chosen, "place": place,
+            "judgement": judgement,
+            # A judgement is authoritative only when it came off the cluster.
+            "authoritative": bool(place == "cluster") if judgement else True,
             "latency_budget_s": spec.get("latency_budget_s", 60),
             "is_async": bool(spec.get("is_async")), "rare": bool(spec.get("rare")),
             "source": source,
@@ -140,6 +163,10 @@ def role_table() -> list:
     out = []
     for r, spec in ROLES.items():
         out.append({"role": r, "place": spec.get("place", "lab"),
+                    "judgement": bool(spec.get("judgement")),
+                    "authoritative": bool(spec.get("judgement")
+                                          and spec.get("place") == "cluster")
+                    or not spec.get("judgement"),
                     "default": spec.get("model", ""), "deep": spec.get("deep", ""),
                     "is_async": bool(spec.get("is_async")), "rare": bool(spec.get("rare")),
                     "latency_budget_s": spec.get("latency_budget_s", 60),
