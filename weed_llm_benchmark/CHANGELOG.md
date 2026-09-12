@@ -9798,3 +9798,78 @@ unevidenced column), the published web ledger, and the poster — where Figure 8
 now two panels, (e) detection against false alarms with four models as arrows and
 (f) the recall-to-grounded drop by reviewer size, which is the panel that makes
 the 7 B's gap visible at a glance.
+
+---
+
+## 2026-09-12 — v3.55.0 the figures, audited against journal convention
+
+Twelve agents: six researched how Nature, Science and PNAS actually set figures,
+the Tufte/Cleveland statistical-graphics tradition, CVPR/ICRA and agricultural-
+engineering practice, large-format poster typography, colour and type craft, and
+what specifically marks a figure as machine-generated; five then read every
+rendered figure against the merged digest; one synthesised. 115 conventions, 91
+tells, 63 findings. Every arithmetic claim below was re-verified before acting.
+
+**The defect that was invisible in the source.** `savefig.bbox="tight"` trims the
+canvas, so `figsize` was never the saved width, and `build.py` was scaling each
+figure by whatever the trim left. Measured: p_field ×3.09, k_funnel ×2.55,
+f_rounds ×2.32, a_families ×2.27, b_zeroshot ×1.97, c_ladder ×1.19. The same
+declared 10.5 pt tick printed at **32.5 pt in one figure and 12.5 pt in another**,
+and a_families and b_zeroshot sat in one row of one column with a 15 % type
+mismatch. p_field landed at 97 ppi. Nothing in the source said so and nothing on
+screen showed it; it would have appeared for the first time at the printer.
+
+`style.PLACED` now records the width `build.py` places each figure at, every
+`figsize` is authored at that width, `bbox` is off with constrained layout on,
+and **both files assert it** — `figures.py` at save, `build.py` at placement.
+All thirteen figures now measure ×1.000 at 300 ppi.
+
+**Two bar charts on truncated baselines became dot plots.** `a_families` drew
+heights 0.0955 / 0.0465 / 0.0241 for data 0.8755 / 0.8266 / 0.8041 — the first
+family at 3.96× the third for a difference of 1.089×, a lie factor near 33, with
+the bottom spine at 0.78 reading as a zero. `f_rounds` panel (g) did the same at
+3.43× for 1.052×, on two arms that are n = 1 with zero-height error bars drawn on
+top. Both are now position encodings, which a cropped scale does not distort, and
+both draw their per-seed replicates behind the mean — the Mamba family's spread is
+twice the others' and contains a low outlier at 0.8203 that the bar hid.
+`a_families` also reads its numbers from `figures_data.json` instead of carrying
+hand-typed literals, and its colour is bound to the claim (initialisation) rather
+than to the row index.
+
+**The supervision panel's n was wrong on every mark.** Both panels declared
+`n = 116` on the axis while the real incident denominators are 112, 113, 114, and
+— for the two arms still running — **57 and 39**. The arrow the caption quotes as
+"+0.149 recall to the 27 B" connected a 114-incident measurement to a 57-incident
+one, which is not a paired comparison. Now: the axis says `detection recall`, each
+mark carries its own n, an arrow is drawn solid **only** where both ends were
+scored on the same cases and dashed with a note where they were not, and every
+proportion carries a 95 % Wilson interval. Those intervals change the reading and
+the caption now says so: **on this corpus the ordering among the model arms is not
+established, and the grounded gap is.** The panel is also square, so the chance
+diagonal reads at its true 45° instead of the 19° that made the 14 B look far
+above a line it is barely above; and the watchdog moved off the plane into the
+margin, because an arm that returned no decision on any of 149 cases has no
+coordinate on two measurement axes.
+
+**Smaller, and real.** `mathtext.fontset` was still matplotlib's DejaVu default,
+so every `mAP₅₀₋₉₅` printed Arial letters with an italic DejaVu subscript — two
+typefaces inside one label, in nine figures. The hyphen in `$_{50-95}$` parsed as
+a binary minus and printed the metric as a subtraction. `pdf.fonttype` was 3, a
+named preflight failure wherever a PDF poster is submitted. One type tier
+(`TICK/AXIS/ANNOT/LETTER`) replaces the seven sizes one figure had reached, four
+of them within 1.5 pt. `sig()` quotes every value to the precision its own
+uncertainty supports and sets the minus as U+2212. Panel letters anchor in figure
+coordinates so they cannot land on a y-label.
+
+**Deliberately not changed**, because the audit found them already right: no
+titles anywhere (the claim lives in the caption), zero legends, marker-and-dash
+redundancy on every line series, n stated on the figure rather than only in the
+caption, effects quoted against a measured noise floor, arrows used only where the
+arrow is the measurement, the missing bracket in `a_families` that refuses the
+confounded comparison, and the in-panel controls in the supervision figure.
+
+**One decision left open for the author.** At 13.5 pt body text and 12 pt captions
+this poster is a 0.5 m document, and figure type is now matched to that. Moving to
+the 1.5 m tier is a poster-wide change — body 34 pt, captions 20 pt, figure type
+28 pt, and a cut from thirteen figures to about seven — not a `figures.py` change,
+and doing half of it would be worse than doing neither.

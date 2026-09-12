@@ -106,6 +106,13 @@ def figure(x, y, w, name, label):
         rect(x, y, w, 2.2, fill=PALE, line=RULE)
         tbox(x + 0.2, y + 1.0, w - 0.4, [("missing " + name, 14, True, WARN)])
         return y + 2.4
+    # The figure must be authored at the width it is placed at, or the layout
+    # scales it and scaling a figure scales its type. style.PLACED is the other
+    # half of this check; this is the half that sees the real placement width.
+    from PIL import Image as _Im
+    _authored = _Im.open(p).size[0] / 300.0
+    assert abs(_authored / w - 1.0) < 0.02, (
+        "%s is %.3f in wide but placed at %.3f in (x%.2f)" % (name, _authored, w, w / _authored))
     ph = slide.shapes.add_picture(p, Inches(x), Inches(y), width=Inches(w))
     y2 = y + ph.height / 914400.0 + 0.10
     cap = "%s  %s" % (label, CAPS.get(name, ""))

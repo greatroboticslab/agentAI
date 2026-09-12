@@ -12,7 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import matplotlib.pyplot as plt
 from style import (INK, NAVY, BLUE, PALE, PALEBLU, RULE, MUTE, WHITE, GOOD, WARN,
-                   GREY, panel, despine, hline_grid)
+                   GREY, panel, despine, hline_grid, PLACED, sig, wilson,
+                   TICK, AXIS, ANNOT, LETTER)
 import poster_data as D
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -23,6 +24,11 @@ CAPS = {}
 
 def save(fig, name, caption):
     p = os.path.join(OUT, name + ".png")
+    w = fig.get_size_inches()[0]
+    placed = PLACED.get(name)
+    assert placed and abs(w / placed - 1.0) < 0.02, (
+        "%s is authored %.3f in wide but build.py places it at %.3f in (x%.2f): "
+        "the layout would scale its type" % (name, w, placed or 0, (placed or w) / w))
     fig.savefig(p)
     plt.close(fig)
     CAPS[name] = caption
@@ -32,32 +38,76 @@ def save(fig, name, caption):
 
 # ---------------------------------------------------------------- a. families
 def fam():
-    rows = [("YOLO11n\nCOCO-pretrained", 0.8755, 0.0029, BLUE),
-            ("Mamba-YOLO-T\nrandom init", 0.8266, 0.0064, MUTE),
-            ("YOLO11n\nrandom init", 0.8041, 0.0028, GREY)]
-    fig, ax = plt.subplots(figsize=(5.2, 2.45))
-    x = np.arange(len(rows))
-    ax.bar(x, [r[1] for r in rows], yerr=[r[2] for r in rows], width=0.56,
-           color=[r[3] for r in rows], capsize=4, error_kw=dict(lw=1.0, ecolor=INK))
-    for i, r in enumerate(rows):
-        ax.text(i, r[1] + r[2] + 0.004, "%.4f" % r[1], ha="center",
-                fontsize=11, color=INK)
-    # the two differences, as brackets
-    def bracket(i, j, y, txt):
-        ax.plot([i, i, j, j], [y - 0.004, y, y, y - 0.004], lw=0.9, color=INK)
-        ax.text((i + j) / 2, y + 0.002, txt, ha="center", fontsize=10.5, color=INK)
-    bracket(0, 2, 0.895, "+0.0714")
-    bracket(1, 2, 0.871, "+0.0225")
-    ax.set_xticks(x); ax.set_xticklabels([r[0] for r in rows], fontsize=10)
-    ax.set_ylim(0.78, 0.915); ax.set_ylabel("mAP$_{50-95}$")
-    despine(ax); hline_grid(ax); panel(ax, "a")
-    for i in x:
-        ax.annotate("n = 3", (i, 0), xytext=(0, -34), textcoords="offset points",
-                    xycoords=("data", "axes fraction"), ha="center",
-                    fontsize=9, color=MUTE, annotation_clip=False)
+    """Three detector families, as positions rather than as bar lengths.
+
+    This was a bar chart on a baseline of 0.78. Bars encode by LENGTH, so a
+    cropped baseline makes the length a lie: the three heights above 0.78 were
+    0.0955 / 0.0465 / 0.0241 for data 0.8755 / 0.8266 / 0.8041, drawing the first
+    family at 3.96x the third for a difference of 1.089x. A dot encodes by
+    POSITION, which a cropped scale does not distort, and the crop is what makes
+    the effect visible at all. The bottom spine goes with the bars: at 0.78 it
+    read as a zero it is not.
+
+    The three per-seed runs are drawn behind each mean. The Mamba family's spread
+    is twice the others' and it is a low outlier at 0.8203 -- a reader who is
+    shown only the mean and one bar cannot see that, and it is the arm the
+    architecture claim rests on.
+    """
+    S = json.load(open(os.path.join(HERE, "figures_data.json")))["s3_families_2026_08_24"]
+    # Colour is bound to the claim, which is about initialisation, not to the
+    # row index: one hue for the pretrained arm, one grey for both random-init
+    # arms, so the figure says what it is about before a label is read.
+    rows = [("YOLO11n, COCO-pretrained", "yolo11n_sealed", BLUE),
+            ("Mamba-YOLO-T, random init", "mamba_yolo_t", GREY),
+            ("YOLO11n, random init", "yolo11n_scratch_control", GREY)]
+    fig, ax = plt.subplots(figsize=(10.925, 2.80))
+    ys = np.arange(len(rows))[::-1]        # first row on top
+    for y, (lab, key, col) in zip(ys, rows):
+        d = S[key]
+        seeds = d["per_seed"]
+        ax.plot(seeds, np.full(len(seeds), y) + np.linspace(-0.16, 0.16, len(seeds)),
+                "o", ms=4.0, mfc="none", mec=GREY, mew=0.9, zorder=2)
+        ax.errorbar(d["mean"], y, xerr=d["std"], fmt="o", ms=8, color=col,
+                    elinewidth=1.3, capsize=0, zorder=4)
+        ax.text(d["mean"] + 0.0055, y, sig(d["mean"], d["std"]), ha="left",
+                va="center", fontsize=ANNOT, color=INK, zorder=5)
+
+    # The two legitimate comparisons, set in the right margin the way a forest
+    # plot sets a contrast. The pretrained-versus-Mamba pair is deliberately
+    # absent: figures_data.json flags it CONFOUND, because one side started from
+    # COCO weights and the other from scratch, so it is not an architecture
+    # result and nothing in this figure should invite reading it as one.
+    def span(ya, yb, x, txt, sub):
+        ax.plot([x, x], [ya, yb], lw=0.8, color=MUTE, zorder=3, clip_on=False)
+        for yy in (ya, yb):
+            ax.plot([x - 0.0022, x], [yy, yy], lw=0.8, color=MUTE, clip_on=False)
+        ax.text(x + 0.0035, (ya + yb) / 2, txt, ha="left", va="bottom",
+                fontsize=ANNOT, color=INK, clip_on=False)
+        ax.text(x + 0.0035, (ya + yb) / 2, sub, ha="left", va="top",
+                fontsize=ANNOT, color=MUTE, clip_on=False)
+    span(ys[0], ys[2], 0.9125, "+0.0714", "pretraining")
+    span(ys[1], ys[2], 0.8865, "+0.0225", "architecture")
+
+    ax.set_yticks(ys)
+    ax.set_yticklabels(["%s   n = %d" % (r[0], S[r[1]]["n_seeds"]) for r in rows],
+                       fontsize=TICK)
+    ax.tick_params(axis="y", length=0)
+    ax.set_ylim(-0.6, len(rows) - 0.35)
+    ax.set_xlim(0.792, 0.955)
+    # Four ticks, not eight: every mean prints its own value beside it, so a
+    # gridline at every 0.01 would be the same fact a third time.
+    ax.set_xticks([0.80, 0.84, 0.88])
+    ax.set_xlabel("mAP$_{50\\mathdefault{-}95}$   on the sealed 1,977-image holdout")
+    despine(ax, left=False)
+    ax.spines["bottom"].set_bounds(0.80, 0.88)
+    panel(ax, "a", figx=0.004)
     return save(fig, "a_families",
-                "Three detector families on the CottonWeedDet12 holdout, three seeds each. How the "
-                "network is initialised is worth three times what the architecture is worth.")
+                "Three detector families on the sealed 1,977-image CottonWeedDet12 holdout. Filled "
+                "mark: the mean over seeds 101/102/103, with 1 s.d.; open marks behind it: the three "
+                "runs themselves. How the network is initialised is worth three times what the "
+                "architecture is worth. The pretrained-versus-Mamba pair carries no bracket on "
+                "purpose -- one side started from COCO weights and the other from scratch, so it is "
+                "not an architecture comparison.")
 
 
 # ---------------------------------------------------------------- b. zero-shot
@@ -66,7 +116,7 @@ def vlm():
     fd = _j.load(open(os.path.join(HERE, "figures_data.json")))
     rows = [r for r in fd["benchmark_cwd12_map50"] if r.get("map50") is not None]
     rows = sorted(rows, key=lambda r: r["map50"])
-    fig, ax = plt.subplots(figsize=(4.8, 2.62))
+    fig, ax = plt.subplots(figsize=(10.925, 4.20))
     y = np.arange(len(rows))
     cols = [BLUE if "fine-tuned" in r["model"] else GREY for r in rows]
     ax.barh(y, [r["map50"] for r in rows], color=cols, height=0.62)
@@ -107,7 +157,7 @@ def ladder():
             A.append(v); Ae.append(0.0); An.append(1)
     B = L.get("armB")
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(9.4, 2.55))
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.925, 3.30))
     ax.errorbar(xs, A, yerr=Ae, fmt="o-", color=BLUE, capsize=4, elinewidth=1.0, zorder=3)
     if B:
         ax.plot(xs, B, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
@@ -120,7 +170,7 @@ def ladder():
     ax.text(3.36, (A[0] + A[-1]) / 2, "−0.0189\n8.2 σ", fontsize=9.5, color=INK,
             va="center")
     ax.set_xlim(-0.35, 4.15)
-    ax.set_ylabel("mAP$_{50-95}$")
+    ax.set_ylabel("mAP$_{50\\mathdefault{-}95}$")
     ax.text(0.055, 0.985, "CottonWeedDet12 holdout", transform=ax.transAxes,
             fontsize=10, color=MUTE, va="top")
     ax.set_ylim(0.818, 0.872)
@@ -128,7 +178,7 @@ def ladder():
     a2 = [X["armA"][k] for k in rungs]; b2 = [X["armB"][k] for k in rungs]
     ax2.plot(xs, a2, "o-", color=BLUE, zorder=3)
     ax2.plot(xs, b2, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
-    ax2.set_ylabel("mAP$_{50-95}$")
+    ax2.set_ylabel("mAP$_{50\\mathdefault{-}95}$")
     ax2.text(0.055, 0.985, "ImageWeeds, class-agnostic", transform=ax2.transAxes,
              fontsize=10, color=MUTE, va="top")
     ax2.set_ylim(0.055, 0.118)
@@ -144,7 +194,6 @@ def ladder():
         ax.annotate("n=%d" % n, (xs[i], 0), xytext=(0, -30),
                     textcoords="offset points", xycoords=("data", "axes fraction"),
                     ha="center", fontsize=8.5, color=MUTE, annotation_clip=False)
-    fig.tight_layout(w_pad=3.0)
     return save(fig, "c_ladder",
                 "(c) Twelve times the training data costs 0.0189, three seeds at every rung. "
                 "(d) The same eight checkpoints on a second dataset, class-agnostic, nothing "
@@ -158,7 +207,7 @@ def wall():
     W = D.WALL
     a = float(W["in_domain"].split("±")[0]); ae = float(W["in_domain"].split("±")[1])
     b = float(W["out_domain"].split("±")[0]); be = float(W["out_domain"].split("±")[1])
-    fig, ax = plt.subplots(figsize=(4.6, 2.80))
+    fig, ax = plt.subplots(figsize=(11.600, 4.20))
     ax.errorbar([0, 1], [a, b], yerr=[ae, be], fmt="o-", color=INK,
                 capsize=4, elinewidth=1.0, zorder=3)
     ax.annotate("%.4f" % a, (0, a), xytext=(8, 4), textcoords="offset points",
@@ -175,7 +224,7 @@ def wall():
     ax.set_xticklabels(["CottonWeedDet12\nheld out", "ImageWeeds\n3,208 images"],
                        fontsize=10)
     ax.set_xlim(-0.42, 1.42); ax.set_ylim(0, 1.0)
-    ax.set_ylabel("mAP$_{50-95}$, class-agnostic")
+    ax.set_ylabel("mAP$_{50\\mathdefault{-}95}$, class-agnostic")
     despine(ax); hline_grid(ax); panel(ax, "d", dx=-0.25)
     ax.annotate("n = 3 both ends", (0.5, 0.045), ha="center", fontsize=9, color=MUTE)
     return save(fig, "d_wall",
@@ -188,110 +237,169 @@ def supervision():
     """What each tier of supervision catches, and how much of it is evidenced.
 
     Panel (e) is the contest the benchmark was built for: detection against false
-    alarms, with each model drawn as an arrow from the tier that reads raw
-    artifact excerpts to the same model given a retrieval round over them.
+    alarms. Panel (f) exists because (e) alone would mislead -- the 7 B model has
+    the highest recall on the page and two thirds of what it "detects" quotes a
+    line that does not resolve in the artifact.
 
-    Panel (f) exists because (e) alone would mislead. The 7 B model has the
-    highest recall on the page, and two thirds of what it "detects" quotes a line
-    that does not resolve in the artifact. That is the size class the campaign's
-    own reviewer ran on for a week, and recall alone would have cleared it.
+    Three things this figure has to get right and an earlier version did not.
+    The DENOMINATOR is per arm, not per figure: two arms are still running and
+    stand on 57 and 39 incidents against the others' 112-114, so a single
+    "n = 116" on the axis was wrong for every mark on it. An ARROW asserts a
+    paired comparison, so it is drawn only where both ends were scored on the
+    same number of incidents. And every mark is a proportion from a few dozen
+    cases, so it carries a Wilson interval: without one, the 14 B's tier gain of
+    a single incident is drawn at the same weight as the 27 B's fourteen.
     """
+    import matplotlib.patheffects as pe
     S = D.SUPERVISION
     A = S["table"]["arms"]
 
     def pt(key):
         a = A[key]
-        return (a["false_alarm_rate"]["v"], a["detection_recall"]["v"],
-                a["detection_grounded"]["v"], a["counts"]["cases"])
+        r = a["detection_recall"]
+        return {"fa": a["false_alarm_rate"]["v"], "r": r["v"],
+                "g": a["detection_grounded"]["v"], "k": r["k"], "n": r["n"],
+                "fa_k": a["false_alarm_rate"]["k"], "fa_n": a["false_alarm_rate"]["n"],
+                "cases": a["counts"]["cases"]}
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(9.4, 2.55))
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.925, 5.40), sharey=True)
 
     # ---- (e) detection against false alarms ---------------------------------
-    ax.plot([0, 0.70], [0, 0.70], color=RULE, lw=0.8, zorder=0)
-    ax.text(0.455, 0.425, "chance", fontsize=9, color=GREY, rotation=33, ha="right")
+    # Square, so the chance diagonal is a true 45 degrees and vertical distance
+    # above it -- the only thing that line exists to show -- can be read. At the
+    # earlier 2.9x compression it sat at 19 degrees and the 14 B looked far above
+    # a line it is barely above.
+    ax.set_box_aspect(0.88)
+    ax.plot([0, 0.95], [0, 0.95], color=MUTE, lw=0.9, zorder=1)
+    ax.text(0.855, 0.865, "chance", fontsize=ANNOT, color=MUTE, rotation=45,
+            ha="center", va="center", rotation_mode="anchor")
     ax.axhline(S["ceiling"], color=MUTE, lw=0.9, ls=(0, (4, 3)), zorder=1)
-    ax.text(-0.020, S["ceiling"] - 0.030, "rules-only ceiling", fontsize=9,
-            color=MUTE, ha="left", va="top")
+    ax.text(0.955, S["ceiling"] - 0.024, "ceiling for a rules-only arm",
+            fontsize=ANNOT, color=MUTE, ha="right", va="top")
 
-    fa, rec, _, _ = pt("A0p")
-    ax.plot(fa, rec, "^", color=MUTE, ms=8, zorder=4)
-    ax.annotate("12 rules", (fa, rec), textcoords="offset points",
-                xytext=(11, 13), ha="left", fontsize=9.5, color=MUTE)
-    ax.plot(0, 0, "s", color=GREY, ms=8, zorder=4)
-    # On a plate: the chance diagonal and the zero grid line both run through
-    # this corner, and a label a reader has to pick out of two rules is a defect.
-    ax.annotate("watchdog\n%d of %d undecidable" % (S["a0_undecidable"], S["a0_cases"]),
-                (0, 0), textcoords="offset points", xytext=(10, 2), ha="left",
-                va="center", fontsize=9.5, color=GREY, zorder=6,
-                bbox=dict(boxstyle="square,pad=0.18", fc=WHITE, ec="none", alpha=0.88))
+    def mark(a, x, y, colour, ms=8, filled=True):
+        lo, hi = wilson(a["k"], a["n"])
+        flo, fhi = wilson(a["fa_k"], a["fa_n"])
+        ax.errorbar(x, y, yerr=[[y - lo], [hi - y]], xerr=[[x - flo], [fhi - x]],
+                    fmt="none", elinewidth=0.8, capsize=0, color=colour,
+                    alpha=0.40, zorder=3)
+        ax.plot(x, y, "o", color=colour, ms=ms,
+                markerfacecolor=colour if filled else WHITE,
+                markeredgewidth=0 if filled else 1.6, zorder=5)
 
-    # colour, label position in data coords, alignment
-    style = {"Qwen2.5-7B":    (WARN, (0.300, 0.880), "left", "center"),
-             "Qwen3-14B":     (BLUE, (0.621, 0.720), "center", "bottom"),
-             "Qwen3.8-27B":   (NAVY, (0.272, 0.690), "left", "center"),
-             "GLM-4.7-Flash": (GOOD, (0.133, 0.688), "right", "center")}
+    a0p = pt("A0p")
+    mark(a0p, a0p["fa"], a0p["r"], MUTE, ms=7)
+    ax.annotate("12 deterministic rules", (a0p["fa"], a0p["r"]),
+                textcoords="offset points", xytext=(12, 6), ha="left",
+                fontsize=ANNOT, color=MUTE)
+    # The watchdog returned no decision on any of 149 cases, so it has no
+    # coordinate on either axis. It sits in the margin rather than at an
+    # arithmetic (0, 0) that would read as a measurement.
+    ax.plot(-0.045, -0.045, "s", color=GREY, ms=7, clip_on=False, zorder=5)
+    ax.annotate("scripted watchdog\nno decision on any of %d" % S["a0_cases"],
+                (-0.045, -0.045), textcoords="offset points", xytext=(13, 0),
+                ha="left", va="center", fontsize=ANNOT, color=GREY,
+                annotation_clip=False,
+                path_effects=[pe.withStroke(linewidth=2.5, foreground=WHITE)])
+
+    # Short labels, placed tight to their own marks. Three of the four arms sit
+    # inside a false-alarm band 0.12 wide, so anything longer than a size and a
+    # denominator collides with a neighbour's interval.
+    style = {"Qwen2.5-7B":    (WARN, (0.430, 0.875), "left", "bottom"),
+             "Qwen3-14B":     (BLUE, (0.660, 0.760), "left", "bottom"),
+             "Qwen3.8-27B":   (NAVY, (0.305, 0.440), "left", "center"),
+             "GLM-4.7-Flash": (GOOD, (0.010, 0.880), "left", "bottom")}
     for m in S["models"]:
         c, (lx, ly), ha, va = style[m["name"]]
-        x2, y2, _, cases2 = pt(m["l2"])
-        ax.plot(x2, y2, "o", color=c, ms=8, markerfacecolor=WHITE,
-                markeredgewidth=1.6, zorder=4)
-        partial = cases2
+        p2 = pt(m["l2"])
+        mark(p2, p2["fa"], p2["r"], c)
+        lab = "%s   n = %d" % (m["size"], p2["n"])
         if m["l3"]:
-            x3, y3, _, cases3 = pt(m["l3"])
-            ax.annotate("", (x3, y3), xytext=(x2, y2),
-                        arrowprops=dict(arrowstyle="-|>", color=c, lw=1.2,
-                                        shrinkA=6, shrinkB=6), zorder=3)
-            ax.plot(x3, y3, "o", color=c, ms=8, zorder=4)
-            partial = min(cases2, cases3)
-        note = "" if partial >= 149 else "\n%d of 149" % partial
-        ax.text(lx, ly, m["size"] + note, ha=ha, va=va, fontsize=10, color=c)
+            p3 = pt(m["l3"])
+            mark(p3, p3["fa"], p3["r"], c)
+            # "Same cases" within the handful that one side failed to score:
+            # 112 against 113 is the same experiment, 114 against 57 is not.
+            paired = abs(p2["n"] - p3["n"]) <= 3
+            if paired:
+                # An arrow asserts the same cases at both ends. Only then.
+                ax.annotate("", (p3["fa"], p3["r"]), xytext=(p2["fa"], p2["r"]),
+                            arrowprops=dict(arrowstyle="-|>", color=c, lw=1.2,
+                                            shrinkA=8, shrinkB=8,
+                                            connectionstyle="arc3,rad=-0.18"),
+                            zorder=4)
+                lab = "%s   n = %d" % (m["size"], p3["n"])
+            else:
+                ax.plot([p2["fa"], p3["fa"]], [p2["r"], p3["r"]], ls=(0, (2, 2)),
+                        lw=1.0, color=c, zorder=4)
+                lab = "%s   n = %d" % (m["size"], p3["n"])
+        ax.text(lx, ly, lab, ha=ha, va=va, fontsize=ANNOT, color=c,
+                linespacing=1.25,
+                path_effects=[pe.withStroke(linewidth=2.2, foreground=WHITE)])
 
-    ax.set_xlim(-0.035, 0.72); ax.set_ylim(-0.06, 0.95)
-    ax.set_xlabel("false-alarm rate  (33 controls)")
-    ax.set_ylabel("detection recall  (n = 116)")
-    despine(ax); hline_grid(ax); panel(ax, "e", inside=True)
+    ax.text(0.955, 0.045, "dashed: the two ends were scored on different cases",
+            fontsize=ANNOT, color=MUTE, ha="right", va="bottom")
+    ax.set_xlim(-0.06, 0.97); ax.set_ylim(-0.06, 0.97)
+    ax.set_xticks([0, 0.25, 0.5, 0.75])
+    ax.set_yticks([0, 0.25, 0.5, 0.75])
+    ax.set_xlabel("false-alarm rate")
+    ax.set_ylabel("detection recall")
+    despine(ax); hline_grid(ax); panel(ax, "e")
+    for sp in ax.spines.values():
+        sp.set_zorder(8)
 
     # ---- (f) how much of that detection is evidenced ------------------------
+    ax2.set_box_aspect(0.88)
     xs = np.arange(len(S["models"]))
     for i, m in enumerate(S["models"]):
         c = style[m["name"]][0]
         key = m["l3"] or m["l2"]
-        _, r, g, _ = pt(key)
-        ax2.plot([i, i], [g, r], color=c, lw=2.4, solid_capstyle="butt", zorder=3)
-        ax2.plot(i, r, "o", color=c, ms=8, markerfacecolor=WHITE,
-                 markeredgewidth=1.6, zorder=4)
-        ax2.plot(i, g, "o", color=c, ms=8, zorder=4)
-        ax2.text(i + 0.16, (r + g) / 2, "%.2f" % (r - g), fontsize=9.5, color=c,
-                 va="center", ha="left")
-        n = A[key]["counts"]["cases"]
-        if n < 149:
-            ax2.text(i, g - 0.055, "%d of 149" % n, fontsize=8.5, color=MUTE,
-                     ha="center", va="top")
-    # Bottom left: the top of this panel is where the data lives.
-    ax2.text(-0.34, 0.135, "open  = flagged an incident", fontsize=9, color=MUTE)
-    ax2.text(-0.34, 0.065, "solid = and quoted a line that resolves", fontsize=9,
-             color=MUTE)
+        a = pt(key)
+        gap = a["r"] - a["g"]
+        if gap < 0.02:
+            # One mark, not two on top of each other: at this marker size a gap
+            # of zero would show a filled dot with the open one hidden beneath,
+            # which reads against the key as "quoted a line without flagging".
+            ax2.plot(i, a["r"], "o", color=c, ms=9, markerfacecolor=WHITE,
+                     markeredgewidth=2.2, zorder=4)
+            ax2.plot(i, a["r"], "o", color=c, ms=4.2, zorder=5)
+            ax2.text(i + 0.17, a["r"], "no gap", fontsize=ANNOT, color=c,
+                     va="center", ha="left")
+        else:
+            ax2.plot([i, i], [a["g"], a["r"]], color=c, lw=2.6,
+                     solid_capstyle="butt", zorder=3)
+            ax2.plot(i, a["r"], "o", color=c, ms=8, markerfacecolor=WHITE,
+                     markeredgewidth=1.6, zorder=4)
+            ax2.plot(i, a["g"], "o", color=c, ms=8, zorder=4)
+            ax2.text(i + 0.17, (a["r"] + a["g"]) / 2,
+                     "%.2f\n%d of %d" % (gap, round(gap * a["n"]), a["n"]),
+                     fontsize=ANNOT, color=c, va="center", ha="left",
+                     linespacing=1.2)
+    ax2.text(-0.42, 0.135, "open   flagged an incident", fontsize=ANNOT, color=MUTE)
+    ax2.text(-0.42, 0.055, "solid   and quoted a line that resolves",
+             fontsize=ANNOT, color=MUTE)
     ax2.set_xticks(xs)
-    ax2.set_xticklabels([m["size"] for m in S["models"]], fontsize=10)
-    ax2.set_xlim(-0.45, len(xs) - 0.15); ax2.set_ylim(0.0, 0.96)
+    ax2.set_xticklabels([m["size"] for m in S["models"]], fontsize=TICK)
+    ax2.set_xlim(-0.5, len(xs) - 0.10)
     ax2.set_xlabel("reviewer size")
-    ax2.set_ylabel("detection recall  (n = 116)")
-    despine(ax2); hline_grid(ax2); panel(ax2, "f", inside=True)
+    despine(ax2); hline_grid(ax2); panel(ax2, "f")
 
-    fig.tight_layout(w_pad=2.6)
     g7 = pt("L3@qwen2.5:7b"); g27 = pt("L3@qwen3.8:27b")
-    d27 = pt("L3@qwen3.8:27b")[1] - pt("L2@qwen3.8:27b")[1]
-    d14 = pt("L3@qwen3:14b")[1] - pt("L2@qwen3:14b")[1]
+    d27 = pt("L3@qwen3.8:27b")["r"] - pt("L2@qwen3.8:27b")["r"]
+    d14 = pt("L3@qwen3:14b")["r"] - pt("L2@qwen3:14b")["r"]
     return save(fig, "e_supervision",
                 "(e) Every arm on one frozen corpus of real incidents from this project's own "
-                "history -- 116 incidents, 33 controls -- scored by the project's own scorer. Open "
-                "circle: the model reads raw artifact excerpts; filled: the same model with a "
-                "retrieval round over them. The retrieval tier is worth %+.3f recall to the 27 B and "
-                "%+.3f to the 14 B. (f) The same arms, asking how much of that detection quotes a "
-                "line that resolves in the artifact. The 7 B has the highest recall on the page and "
-                "%.2f of it is unevidenced; the 27 B's gap is %.2f. Recall alone would have cleared "
-                "the size class the campaign's own reviewer ran on for a week."
-                % (d27, d14, g7[1] - g7[2], g27[1] - g27[2]))
+                "history, scored by the project's own scorer. Each mark carries its own "
+                "denominator: two arms are still running and stand on 57 and 39 incidents against "
+                "the others' 112 to 114, and bars are 95%% Wilson intervals. Open circle: the model "
+                "reads raw artifact excerpts; the arrow runs to the same model given a retrieval "
+                "round over them, and is drawn solid only where both ends were scored on the same "
+                "cases. (f) The same arms, asking how much of that detection quotes a line that "
+                "resolves in the artifact. The 7 B has the highest recall on the page and %.2f of "
+                "it is unevidenced; the 27 B has no gap at all. Recall alone would have cleared the "
+                "size class this campaign's own reviewer ran on for a week. The intervals are "
+                "wide and they overlap: on this corpus the ordering among the model arms is not "
+                "established, and the grounded gap is."
+                % (g7["r"] - g7["g"]))
 
 
 # --------------------------------------------- s. the audit, source by source
@@ -306,7 +414,7 @@ def sources():
     labs = [a for a, _ in S["rows"]]
     vals = [v for _, v in S["rows"]]
     ys = np.arange(len(vals))[::-1]
-    fig, ax = plt.subplots(figsize=(5.6, 2.2))
+    fig, ax = plt.subplots(figsize=(11.600, 3.40))
     ax.barh(ys, vals, height=0.56, zorder=3,
             color=[GOOD if v >= S["bar"] else WARN for v in vals])
     ax.axvline(S["bar"], color=INK, lw=1.0, ls=(0, (4, 3)), zorder=4)
@@ -343,7 +451,7 @@ def tta():
     labs = [a for a, _ in T["arms"]]
     d = [v - T["baseline"] for _, v in T["arms"]]
     ys = np.arange(len(d))[::-1]
-    fig, ax = plt.subplots(figsize=(6.8, 2.05))
+    fig, ax = plt.subplots(figsize=(10.925, 2.90))
     ax.axvspan(-T["seed_noise"], T["seed_noise"], color=PALEBLU, zorder=0)
     ax.barh(ys, d, height=0.52, zorder=3,
             color=[WARN if v < T["seed_noise"] else BLUE for v in d])
@@ -359,7 +467,7 @@ def tta():
     ax.text(T["seed_noise"] + 0.0013, ys[0] + 0.60, "seed noise", fontsize=9,
             color=MUTE, ha="left", va="center")
     ax.set_xlim(-0.0125, 0.0365); ax.set_ylim(-0.60, len(d) - 0.15)
-    ax.set_xlabel("change in mAP$_{50-95}$, one matcher throughout")
+    ax.set_xlabel("change in mAP$_{50\\mathdefault{-}95}$, one matcher throughout")
     despine(ax, left=False)
     # The y labels own the left third of the canvas, so a letter placed against
     # the axes reads as centred. Anchor it to the figure instead.
@@ -389,7 +497,7 @@ def field():
               ("more than a third vegetation", F["vegetated"], BLUE),
               ("detector fires, conf 0.25", F["fired_25"], WARN),
               ("detector fires, conf 0.40", F["fired_40"], WARN)]
-    fig, ax = plt.subplots(figsize=(4.6, 2.10))
+    fig, ax = plt.subplots(figsize=(11.600, 3.00))
     tot = stages[0][1]
     for i, (lab, v, c) in enumerate(stages):
         ax.barh(-i, max(v / tot, 0.0), height=0.42, color=c)
@@ -424,7 +532,7 @@ def robots():
              ("r241_weeds.jpg", "robot 241", "weeds between the rows"),
              ("lc_down.jpg", "laser cart", "down camera, onboard detector"),
              ("lc_front.jpg", "laser cart", "forward camera")]
-    fig, axes = plt.subplots(1, 4, figsize=(9.6, 1.95))
+    fig, axes = plt.subplots(1, 4, figsize=(11.600, 2.30))
     for ax, (fn, who, what), let in zip(axes, shots, "lmno"):
         img = plt.imread(os.path.join(HERE, "photos", fn))
         ax.imshow(img)
@@ -436,7 +544,6 @@ def robots():
                 fontweight="bold", color=INK, va="top", ha="left",
                 bbox=dict(boxstyle="square,pad=0.22", fc=WHITE, ec="none", alpha=0.86))
         ax.set_xlabel("%s   %s" % (who, what), fontsize=9, color=MUTE, labelpad=5)
-    fig.tight_layout(w_pad=1.1)
     return save(fig, "l_robots",
                 "Frames as recorded, unenhanced. %d frames across %d sessions and %d robots sit "
                 "on the platform and %d of them are labelled: robot 241 contributes %d at "
@@ -450,7 +557,7 @@ def robots():
 # ---------------------------------------------------------------- f. rounds
 def rounds():
     R = D.ROUNDS
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(9.8, 2.00),
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(22.400, 4.00),
                                   gridspec_kw={"width_ratios": [1.75, 1]})
     xs = np.arange(1, len(R["map"]) + 1)
     ax.axvspan(R["frozen_from"] - 0.4, len(xs) + 0.4, color=PALEBLU, zorder=0)
@@ -463,8 +570,15 @@ def rounds():
     ax.text(R["frozen_from"] + 0.25, 0.6065,
             "training corpus identical from here on", fontsize=9.5, color=MUTE,
             va="top")
-    ax.set_xlabel("unattended round"); ax.set_ylabel("mAP$_{50-95}$")
+    ax.set_xlabel("unattended round"); ax.set_ylabel("mAP$_{50\\mathdefault{-}95}$")
     ax.set_xlim(0.3, len(xs) + 4.6); ax.set_ylim(0.542, 0.616)
+    # Integer rounds only: the automatic locator labelled this 2.5 / 5.0 / ... /
+    # 17.5, and round 2.5 does not exist while round 17.5 is outside the
+    # experiment. The spine is bounded to the data for the same reason -- the
+    # right-hand gutter exists to hold the two series labels, not to assert that
+    # rounds 16 to 19 were run.
+    ax.set_xticks([1, 5, 10, 15])
+    ax.spines["bottom"].set_bounds(1, len(xs))
     despine(ax); hline_grid(ax); panel(ax, "f")
 
     # Three bars, not two: bar 0 vs bar 1 is the matched pair that isolates the
@@ -472,37 +586,46 @@ def rounds():
     # bar 2 is the recipe the campaign actually ran, which is the only arm this
     # project has repeated over seeds. Quoting the gap against a bar drawn from a
     # different recipe is what the earlier draft of this panel did wrong.
+    # Positions, not bar lengths. Two of these three arms are single runs, and a
+    # bar drawn from a baseline of 0.540 gave the fresh-start arm 3.4x the length
+    # of the warm-start arm for a difference of 1.05x, with a zero-height error
+    # bar sitting on top of it. A dot carries the same value honestly on a
+    # cropped scale, and the crop is what makes a 0.029 effect visible at all.
     vals = [R["cold"], R["warm"], R["recipe_mean"]]
     errs = [0.0, 0.0, R["recipe_sd"]]
-    ax2.bar([0, 1, 2], vals, yerr=errs, width=0.56,
-            color=[GOOD, WARN, MUTE], capsize=4, error_kw=dict(lw=1.0, ecolor=INK))
+    ax2.plot(np.full(len(R["recipe_seeds"]), 2) + np.linspace(-0.10, 0.10, 3),
+             R["recipe_seeds"], "o", ms=4.0, mfc="none", mec=GREY, mew=0.9,
+             zorder=2)
+    ax2.errorbar([0, 1, 2], vals, yerr=errs, fmt="o", ls="none", ms=8, color=INK,
+                 elinewidth=1.3, capsize=0, zorder=4)
     for i, v in enumerate(vals):
-        ax2.text(i, v + errs[i] + 0.0030, "%.4f" % v, ha="center", fontsize=10.5,
-                 color=INK)
-    ax2.plot([0, 0, 1, 1], [0.5905, 0.5918, 0.5918, 0.5905], lw=0.9, color=INK)
-    ax2.text(0.5, 0.5928, "%+.4f,  %.1f $\\sigma$" % (R["chain_effect"], R["chain_sigma"]),
-             ha="center", fontsize=10, color=INK)
-    ax2.plot([1, 1, 2, 2], [0.5726, 0.5739, 0.5739, 0.5726], lw=0.9, color=MUTE)
-    ax2.text(1.5, 0.5749, "%+.4f,  %.1f $\\sigma$" % (R["sched_effect"], abs(R["sched_sigma"])),
-             ha="center", fontsize=10, color=MUTE)
+        ax2.text(i + 0.13, v, sig(v, R["recipe_sd"]), ha="left", va="center",
+                 fontsize=ANNOT, color=INK)
+    ax2.plot([0, 0, 1, 1], [0.5905, 0.5918, 0.5918, 0.5905], lw=0.7, color=MUTE)
+    ax2.text(0.5, 0.5930, "%s,  %.1f \u03c3" % (sig(R["chain_effect"], R["recipe_sd"],
+             signed=True), R["chain_sigma"]), ha="center", fontsize=ANNOT, color=INK)
+    ax2.plot([1, 1, 2, 2], [0.5726, 0.5739, 0.5739, 0.5726], lw=0.7, color=MUTE)
+    ax2.text(1.5, 0.5751, "%s,  %.1f \u03c3" % (sig(R["sched_effect"], R["recipe_sd"],
+             signed=True), abs(R["sched_sigma"])), ha="center", fontsize=ANNOT,
+             color=MUTE)
     ax2.set_xticks([0, 1, 2])
     ax2.set_xticklabels(["fresh\nstart", "warm\nstart", "warm start\n+ clock cap"],
-                        fontsize=10)
-    ax2.set_ylim(0.540, 0.600); ax2.set_ylabel("mAP$_{50-95}$")
+                        fontsize=TICK)
+    ax2.set_xlim(-0.55, 2.55)
+    ax2.set_ylim(0.540, 0.600); ax2.set_ylabel("mAP$_{50\\mathdefault{-}95}$")
     # Under the tick labels, not inside the bars, where the fill fought the text.
     for i, n in enumerate((1, 1, 3)):
-        ax2.annotate("n = %d" % n, (i, 0), xytext=(0, -34),
+        ax2.annotate("n = %d" % n, (i, 0), xytext=(0, -48),
                      textcoords="offset points", xycoords=("data", "axes fraction"),
-                     ha="center", fontsize=9, color=MUTE, annotation_clip=False)
-    despine(ax2); hline_grid(ax2); panel(ax2, "g", dx=-0.30)
-    fig.tight_layout(w_pad=2.4)
+                     ha="center", fontsize=ANNOT, color=MUTE, annotation_clip=False)
+    despine(ax2, bottom=False); hline_grid(ax2); panel(ax2, "g", inside=True)
     return save(fig, "f_rounds",
                 "(f) Fifteen unattended rounds on a fixed holdout. (g) Round 15's exact dataset, "
-                "three ways. Bars 1 and 2 differ only in the starting weights, so their gap is "
-                "the warm-start chain; bar 3 is the recipe the campaign ran, whose wall-clock "
-                "cap truncates the cosine. Sigma throughout is that recipe's own seed spread, "
+                "three ways. The first two marks differ only in the starting weights, so their gap "
+                "is the warm-start chain; the third is the recipe the campaign ran, whose "
+                "wall-clock cap truncates the cosine, with its three seeds drawn behind it. Sigma throughout is that recipe's own seed spread, "
                 "0.0040 over three seeds, propagated to the difference being quoted. Completing "
-                "the schedule is not the fix -- bar 2 sits below bar 3.")
+                "the schedule is not the fix -- the second mark sits below the third.")
 
 
 # ---------------------------------------------------------------- h. field drive
@@ -518,7 +641,7 @@ def drive():
     t = [float(r["timestamp"]) - t0 for r in rows]
     hd = np.degrees(np.unwrap(np.radians([float(r["heading"]) for r in rows])))
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(7.2, 3.05),
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 4.20),
                                   gridspec_kw={"width_ratios": [1.15, 1]})
     ax.plot(xs, ys, "-", color=BLUE, lw=1.2, zorder=3)
     ax.plot(xs, ys, ".", color=BLUE, ms=2.4, alpha=0.5, zorder=4)
@@ -540,7 +663,6 @@ def drive():
     ax2.text(0.97, 0.06, "%s samples, %.0f Hz" % ("{:,}".format(len(rows)),
                                                   len(rows) / (t[-1] or 1)),
              transform=ax2.transAxes, fontsize=10, color=MUTE, ha="right")
-    fig.tight_layout(w_pad=2.2)
     return save(fig, "h_drive",
                 "Robot 241, 2026-08-29: one 213 s pass through a crop plot. (h) GPS track from the "
                 "board fix. (i) IMU heading over the same pass.")
@@ -550,14 +672,14 @@ def drive():
 def species():
     fd = json.load(open(os.path.join(HERE, "figures_data.json")))
     rows = sorted(fd["per_species_yolo11n_val"]["rows"], key=lambda r: r["map50_95"])
-    fig, ax = plt.subplots(figsize=(4.6, 2.62))
+    fig, ax = plt.subplots(figsize=(11.600, 5.20))
     y = np.arange(len(rows))
     ax.barh(y, [r["map50_95"] for r in rows], color=BLUE, height=0.62)
     for i, r in enumerate(rows):
         ax.text(r["map50_95"] - 0.012, i, "%.3f" % r["map50_95"], va="center",
                 ha="right", fontsize=9.5, color=WHITE)
     ax.set_yticks(y); ax.set_yticklabels([r["cls"] for r in rows], fontsize=9.5)
-    ax.set_xlim(0, 1.0); ax.set_xlabel("mAP$_{50-95}$")
+    ax.set_xlim(0, 1.0); ax.set_xlabel("mAP$_{50\\mathdefault{-}95}$")
     despine(ax, left=False); ax.tick_params(axis="y", length=0)
     ax.xaxis.grid(True, color=RULE, lw=0.6); ax.set_axisbelow(True)
     panel(ax, "j", dx=-0.40)
@@ -569,7 +691,7 @@ def species():
 # ---------------------------------------------------------------- k. funnel
 def funnel():
     F = D.FUNNEL
-    fig, ax = plt.subplots(figsize=(5.6, 2.15))
+    fig, ax = plt.subplots(figsize=(11.600, 3.00))
     stages = [("harvested and labelled", F["registry_labelled"], BLUE),
               ("unique after dedup", F["unique"], BLUE),
               ("audited for label quality", F["audited_images"], MUTE),
