@@ -9596,3 +9596,40 @@ Figure 1 is new: four frames as recorded from the two ground robots — robot 24
 along a mulched crop row and between the rows, and the laser cart's down and
 forward cameras. The boxes in the down-camera frame are the cart's own detector
 drawing on its own video, which the caption says, because they are not labels.
+
+---
+
+## 2026-09-12 — v3.53.0 the field fire rate, and what inference-time compute can buy
+
+**`field_fire_sweep.py`.** The cross-dataset wall is measured against another
+*labelled* corpus. This asks the same question of the corpus the platform
+actually holds, which has no labels — so the quantity is the rate at which the
+detector produces a box at all, and it is never called recall. Over the 26
+robot-recorded sessions (2,686 frames, the drive's byte-identical second copy
+dropped), with 1,157 frames more than a third vegetation by excess green:
+
+| confidence | frames that fire |
+|---|---|
+| 0.25 (deployment) | 25, of which 21 are vegetated |
+| 0.40 | 8 |
+| 0.60 | 2 |
+
+24 of the 25 boxes it draws are the same class. The vegetation rule is what stops
+"there was nothing to detect" from accounting for it.
+
+The earlier ad-hoc sweep (`s6_domain_gap_all_sessions.json`) walked only
+`<slug>/frames/`, so it missed every bulk-uploaded session — including the 1,013
+frames of the one real field drive, which is 802 of the vegetated frames and 23
+of the 25 firings. The committed script walks the session tree instead, which is
+why it is a script and not a heredoc.
+
+**Figure 8, the TTA ceiling, reaches the poster.** All six arms under one matcher,
+the plain baseline included: fusion with no extra views is −0.0030 and sits inside
+the 0.006 seed band; multi-scale +0.0099; with h-flip +0.0174; a 3-seed ensemble
++0.0172; stacked +0.0276. At 2.44 s per image against the deployed 3.7 ms this is
+a ceiling on inference-time compute, not a deployment option — and it is still
+smaller than the +0.0714 that initialisation is worth.
+
+The ladder table now builds itself from `LADDER["seeds"]` rather than restating
+them, so the stale "+40,000 … 0.8436, n = 1" row is gone: it reads
+0.8448 ± 0.0018 at n = 3, like every other rung.

@@ -192,6 +192,61 @@ ROUNDS["sched_effect"] = ROUNDS["warm"] - ROUNDS["recipe_mean"]
 ROUNDS["sched_sigma"] = ROUNDS["sched_effect"] / (
     (ROUNDS["recipe_sd"] ** 2 + (ROUNDS["recipe_sd"] / 3 ** 0.5) ** 2) ** 0.5)
 
+# --- what inference-time compute can buy ------------------------------------
+# All six arms scored by ONE matcher, the plain baseline included, so the numbers
+# are differences within one instrument rather than across two. The seed-noise bar
+# is the same 0.006 the rest of the poster uses. The latency is why this is a
+# ceiling and not a recommendation.
+TTA = {
+    "baseline": 0.8554,
+    "arms": [("weighted box fusion alone", 0.8524),
+             ("+ multi-scale", 0.8653),
+             ("+ multi-scale and h-flip", 0.8728),
+             ("3-seed ensemble", 0.8726),
+             ("both, 18 views", 0.8830)],
+    "seed_noise": 0.006,
+    "s_per_image": 2.44, "deployed_ms": 3.7,
+    "matcher": "wbf_tta_eval.compute_map, shared across all arms including the baseline",
+    "src": "figures_data.json -> tta_ceiling_2026_08_26 (jobs 44463762, 44463922)",
+}
+
+# --- the field gap: does the deployed detector fire on our own frames? -------
+# The cross-dataset wall is measured against another labelled corpus. This is the
+# same question asked of the corpus the platform actually holds, which has no
+# labels -- so it measures FIRING, not recall, and the poster says so. The
+# vegetation rule exists so "there was nothing to detect" cannot explain the
+# answer away. Restricted to robot-recorded sessions: the live uplink plus the
+# bulk-uploaded field drive, with the drive's byte-identical second copy dropped.
+_FF = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "s6_field_fire.json")))
+_FF_DUP = "ul_4_09test_c5a52917"
+_FF_ROBOT = {k: v for k, v in _FF["sessions"].items()
+             if (k.startswith("rl_") or k.startswith("ul_4_09test")) and k != _FF_DUP}
+
+
+def _ff_sum(field, conf=None):
+    if conf is None:
+        return sum(v[field] for v in _FF_ROBOT.values())
+    return sum(v["at_conf_%.2f" % conf][field] for v in _FF_ROBOT.values())
+
+
+FIELD = {
+    "model": _FF["model"],
+    "sessions": len(_FF_ROBOT),
+    "frames": _ff_sum("frames"),
+    "vegetated": _ff_sum("vegetated_frames"),
+    "fired_25": _ff_sum("frames_firing", 0.25),
+    "fired_40": _ff_sum("frames_firing", 0.40),
+    "fired_60": _ff_sum("frames_firing", 0.60),
+    "veg_fired_25": _ff_sum("veg_frames_firing", 0.25),
+    "species": {"Purslane": 24, "Sicklepod": 1},
+    "rule": _FF["vegetation_rule"],
+    "caveat": "no ground truth exists for these frames, so this is firing behaviour, "
+              "not recall and not precision",
+    "src": "results/framework/s6_field_fire.json "
+           "(weed_optimizer_framework/tools/field_fire_sweep.py, lab RTX 3060)",
+}
+
 # --- the platform: robots in the field ---------------------------------------
 # Counted off the live platform 2026-09-11, not from any document. Every number
 # here is frames on disk in uploads/, and each is stated as what it is: a frame

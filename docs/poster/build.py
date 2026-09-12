@@ -10,6 +10,7 @@ numbers come from poster_data.py and captions from captions.json, both written b
 the figure pass, so the text beside a figure cannot drift from the figure.
 """
 import os, sys, json
+import statistics as st
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
@@ -248,16 +249,18 @@ ya = figure(x, ya, HALF, "c_ladder", "Figure 6.")
 yb = body(x + HALF + 0.55, yb, HALF,
     "Harvested images added to a clean in-domain core, the same images at every seed. Only the "
     "training seed varies, so the spread is training noise and not a different sample of the corpus.")
+_LD = D.LADDER
+_lrows = []
+for _k, _lab in zip(_LD["rungs"], ["none \u2014 the core", "+5,000", "+15,000", "+40,000"]):
+    _sv = _LD["seeds"][_k]
+    _lrows.append([_lab, "%.4f \u00b1 %.4f" % (st.mean(_sv), st.stdev(_sv)), "%d" % len(_sv)])
 yb = table(x + HALF + 0.55, yb, HALF,
-           ["harvested added", "mAP₅₀₋₉₅", "n"],
-           [["none — the core", "0.8637 ± 0.0027", "3"],
-            ["+5,000", "0.8609 ± 0.0036", "3"],
-            ["+15,000", "0.8580 ± 0.0047", "3"],
-            ["+40,000", "0.8436", "1"]],
-           [0.46, 0.38, 0.16])
+           ["harvested added", "mAP\u2085\u2080\u208b\u2089\u2085", "n"],
+           _lrows, [0.46, 0.38, 0.16])
 yb = body(x + HALF + 0.55, yb, HALF,
-    "−0.0028 and −0.0057 sit inside pooled seed spreads of 0.0032 and 0.0039, so neither is "
-    "separable. Only +40,000 is, and it is still a single run.", size=12.5, color=MUTE)
+    "The first two steps sit inside the pooled seed spread and are not separable. The full "
+    "+40,000 is: \u22120.0189 against the core, 8.2 \u03c3, three seeds at every rung.",
+    size=12.5, color=MUTE)
 y = max(ya, yb) + 0.10
 
 ya = sub(x, y, w, "What catches the pipeline failing")
@@ -274,10 +277,9 @@ def scell(key, field):
 
 yb = body(x + HALF + 0.55, yb, HALF,
     "A frozen corpus of 162 real incidents from this project's own engineering record, scored on the "
-    "dev split: %d incidents and %d controls. Recall is over incidents and the false-alarm rate over "
-    "controls, both by the project's own scorer re-reading committed verdicts, which requires the "
-    "finding to be about the incident rather than merely that the arm raised something. L2 reads raw "
-    "artifact excerpts; L3 adds a retrieval round over the same artifacts."
+    "dev split: %d incidents and %d controls, by the project's own scorer re-reading committed "
+    "verdicts, which requires the finding to be about the incident and not merely that the arm "
+    "raised something. L2 reads raw artifact excerpts; L3 adds a retrieval round over them."
     % (S["incidents"], S["controls"]))
 srows = [["Scripted watchdog", "status fields", "--", "--", "%d" % S["a0_cases"]],
          ["Deterministic signals", "12 checks", scell("A0p", "detection_recall"),
@@ -298,25 +300,28 @@ _d27 = (AR["L3@qwen3.8:27b"]["detection_recall"]["v"]
 _d14 = (AR["L3@qwen3:14b"]["detection_recall"]["v"]
         - AR["L2@qwen3:14b"]["detection_recall"]["v"])
 yb = body(x + HALF + 0.55, yb, HALF,
-    "The watchdog the pipeline actually ran never produced a decidable verdict about any of the %d "
-    "cases: \u201cno signal fired\u201d is not a judgement. Adding the retrieval tier is worth %+.3f recall to "
-    "the 27B and %+.3f to the 14B, so the tier pays where the model can use it and not otherwise. "
-    "Model choice buys precision, not detection: the 14B reaches its recall by flagging %.0f%% of the "
-    "controls against the 27B's %.0f%%."
+    "The watchdog the pipeline ran never produced a decidable verdict on any of the %d cases: "
+    "\u201cno signal fired\u201d is not a judgement. The retrieval tier is worth %+.3f recall to the 27B and "
+    "%+.3f to the 14B, so it pays where the model can use it and not otherwise. Model choice buys "
+    "precision, not detection: the 14B reaches its recall by flagging %.0f%% of the controls "
+    "against the 27B's %.0f%%."
     % (S["a0_cases"], _d27, _d14,
        100 * AR["L3@qwen3:14b"]["false_alarm_rate"]["v"],
        100 * AR["L3@qwen3.8:27b"]["false_alarm_rate"]["v"]),
     size=12.5, color=MUTE)
+yb = sub(x + HALF + 0.55, yb + 0.06, HALF, "What inference-time compute can buy")
+yb = figure(x + HALF + 0.55, yb, HALF, "r_tta", "Figure 8.")
 y = max(ya, yb) + 0.10
 
 y = sub(x, y, w, "Why the loop looked like it was learning")
-y = figure(x, y, w, "f_rounds", "Figure 8.")
+y = figure(x, y, w, "f_rounds", "Figure 9.")
 
 # ============================================================= RIGHT column
 x, w = COL[2]; y = TOP
 y = head(x, y, w, "Generalisation")
-y = figure(x, y, w, "d_wall", "Figure 9.")
-y = figure(x, y, w, "j_species", "Figure 10.")
+y = figure(x, y, w, "d_wall", "Figure 10.")
+y = figure(x, y, w, "p_field", "Figure 11.")
+y = figure(x, y, w, "j_species", "Figure 12.")
 y += 0.05
 y = head(x, y, w, "Conclusions")
 for i, s in enumerate([
@@ -333,6 +338,13 @@ for i, s in enumerate([
     "artifacts is worth another +0.149 to the 27B and +0.011 to the 14B.",
     "An unattended loop can report success for eight consecutive rounds while collecting nothing. "
     "Absence of a failure signal is not evidence of success.",
+    "The gap shows up on our own video too. Over all %s frames the two robots recorded, %s of them "
+    "more than a third vegetation, the deployable checkpoint draws a box on %d frames at the "
+    "deployment threshold and %d at conf 0.40 — and %d of those %d boxes are the same class. These "
+    "frames carry no ground truth, so that is a fire rate and not a recall."
+    % ("{:,}".format(D.FIELD["frames"]), "{:,}".format(D.FIELD["vegetated"]),
+       D.FIELD["fired_25"], D.FIELD["fired_40"],
+       D.FIELD["species"]["Purslane"], D.FIELD["fired_25"]),
 ]):
     y = body(x, y, w, "%d.   %s" % (i + 1, s), size=13, after=8)
 y += 0.10

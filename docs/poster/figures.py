@@ -164,8 +164,10 @@ def wall():
     ax.annotate("%.4f" % a, (0, a), xytext=(8, 4), textcoords="offset points",
                 fontsize=11.5, color=INK)
     # Below-left of the endpoint: above it the label sat on its own marker.
-    ax.annotate("%.4f" % b, (1, b), xytext=(-11, -12), textcoords="offset points",
-                ha="right", va="top", fontsize=11.5, color=WARN)
+    # Right of the endpoint, where the x limit leaves a gutter: above the point
+    # the label sat on its own marker and below it on the tick label.
+    ax.annotate("%.4f" % b, (1, b), xytext=(12, 0), textcoords="offset points",
+                ha="left", va="center", fontsize=11.5, color=WARN)
     ax.annotate("", xy=(0.5, a), xytext=(0.5, b),
                 arrowprops=dict(arrowstyle="<->", color=MUTE, lw=0.9))
     ax.text(0.545, (a + b) / 2, "−0.773", fontsize=12, color=INK, va="center")
@@ -255,6 +257,82 @@ def supervision():
                 % (d27, d14))
 
 
+# ------------------------------------------------- r. what inference can buy
+def tta():
+    """What test-time compute buys, against the noise bar and against its cost.
+
+    Every arm here is scored by the same matcher as the plain baseline, so these
+    are differences inside one instrument. Drawn against the seed-noise band
+    because the first arm -- fusion with no extra views -- sits inside it, and a
+    bar chart without that band would show it as a small gain rather than as
+    nothing.
+    """
+    T = D.TTA
+    labs = [a for a, _ in T["arms"]]
+    d = [v - T["baseline"] for _, v in T["arms"]]
+    ys = np.arange(len(d))[::-1]
+    fig, ax = plt.subplots(figsize=(6.8, 2.05))
+    ax.axvspan(-T["seed_noise"], T["seed_noise"], color=PALEBLU, zorder=0)
+    ax.barh(ys, d, height=0.52, zorder=3,
+            color=[WARN if v < T["seed_noise"] else BLUE for v in d])
+    for y, v in zip(ys, d):
+        ax.text(v + (0.0013 if v > 0 else -0.0013), y, "%+.4f" % v, va="center",
+                ha="left" if v > 0 else "right", fontsize=10,
+                color=BLUE if v >= T["seed_noise"] else WARN)
+    ax.axvline(0, color=INK, lw=0.9, zorder=4)
+    # The arm names are the y axis, not floating text: an earlier version drew
+    # them inside and the negative bar ran straight through its own label.
+    ax.set_yticks(ys); ax.set_yticklabels(labs, fontsize=10)
+    ax.tick_params(axis="y", length=0)
+    ax.text(T["seed_noise"] + 0.0013, ys[0] + 0.60, "seed noise", fontsize=9,
+            color=MUTE, ha="left", va="center")
+    ax.set_xlim(-0.0125, 0.0365); ax.set_ylim(-0.60, len(d) - 0.15)
+    ax.set_xlabel("change in mAP$_{50-95}$, one matcher throughout")
+    despine(ax, left=False); panel(ax, "r", dx=-0.02, dy=1.16)
+    return save(fig, "r_tta",
+                "Test-time compute on the deployable checkpoint. Fusion with no extra views is "
+                "nothing; multi-scale with h-flip and a 3-seed ensemble are each worth about "
+                "+0.017 and stack to +0.028. At %.2f s per image against the deployed %.1f ms "
+                "this is a ceiling on what inference-time compute can buy, not a deployment "
+                "option -- and it is still smaller than the +0.0714 that initialisation is worth."
+                % (T["s_per_image"], T["deployed_ms"]))
+
+
+# ------------------------------------------------------- p. the field fire rate
+def field():
+    """How often the deployed detector fires on the frames our own robots recorded.
+
+    Figure d measures the wall against another labelled corpus. This measures it
+    against the corpus the platform actually holds, which has no labels -- so the
+    quantity is the fire rate, not recall, and the caption says so twice. The
+    vegetation bar is what stops "there was nothing to detect" from explaining the
+    answer: 1,157 of these frames are more than a third green, and the detector
+    produces a box on 21 of them.
+    """
+    F = D.FIELD
+    stages = [("frames the robots recorded", F["frames"], BLUE),
+              ("more than a third vegetation", F["vegetated"], BLUE),
+              ("detector fires, conf 0.25", F["fired_25"], WARN),
+              ("detector fires, conf 0.40", F["fired_40"], WARN)]
+    fig, ax = plt.subplots(figsize=(4.6, 2.10))
+    tot = stages[0][1]
+    for i, (lab, v, c) in enumerate(stages):
+        ax.barh(-i, max(v / tot, 0.0), height=0.42, color=c)
+        ax.text(0.0, -i + 0.40, lab, fontsize=10, color=INK, va="center")
+        ax.text(max(v / tot, 0.0) + 0.012, -i, "{:,}".format(v), va="center",
+                fontsize=11, color=c)
+    ax.set_xlim(0, 1.26); ax.set_ylim(-len(stages) + 0.42, 0.78)
+    ax.axis("off"); panel(ax, "p", dx=-0.02, dy=1.10)
+    return save(fig, "p_field",
+                "The deployable checkpoint over every frame the two robots recorded, at the "
+                "confidence the cart deploys at. There is no ground truth for these frames, so "
+                "this is the rate at which the detector produces a box at all -- not recall and "
+                "not precision. Vegetation is excess green over a thumbnail, so \"nothing to "
+                "detect\" does not account for it: %d frames clear that bar and %d of them draw a "
+                "box. %d of the %d boxes it does draw are the same class."
+                % (F["vegetated"], F["veg_fired_25"], F["species"]["Purslane"], F["fired_25"]))
+
+
 # ------------------------------------------------------------- l. the robots
 def robots():
     """Four frames off the platform, as recorded.
@@ -297,7 +375,7 @@ def robots():
 # ---------------------------------------------------------------- f. rounds
 def rounds():
     R = D.ROUNDS
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(9.0, 2.05),
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(9.8, 2.00),
                                   gridspec_kw={"width_ratios": [1.75, 1]})
     xs = np.arange(1, len(R["map"]) + 1)
     ax.axvspan(R["frozen_from"] - 0.4, len(xs) + 0.4, color=PALEBLU, zorder=0)
@@ -437,7 +515,7 @@ def funnel():
 if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
-               species, funnel):
+               species, funnel, field, tta):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))
