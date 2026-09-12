@@ -1,0 +1,11 @@
+{
+ "a_families": "Three detector families on the CottonWeedDet12 holdout, three seeds each. How the network is initialised is worth three times what the architecture is worth.",
+ "b_zeroshot": "One deterministic pass per model, no repeats. Fifteen zero-shot vision-language models against the fine-tuned detector: the best of them reaches 0.434 against 0.929, and five produce no usable grounding at all.",
+ "c_ladder": "Twelve times the training data. Error bars are the seed spread where three seeds exist; rungs still at one run are marked. The two class spaces differ only in the label a harvested box carries.",
+ "d_wall": "The same three checkpoints and the same matcher on both sides, so the evaluator offset cancels. A detector trained on one field does not transfer to another.",
+ "e_supervision": "Every arm on one frozen corpus of 162 real incidents from this project's own history. Up and to the left is better. The scripted watchdog sits at the origin: it flagged nothing, 149 times out of 149.",
+ "f_rounds": "(f) Fifteen unattended rounds on a fixed holdout. (g) On round 15's exact dataset and schedule, starting fresh instead of from the previous round's weights.",
+ "h_drive": "Robot 241, 2026-08-29: one 213 s pass through a crop plot. (h) GPS track from the board fix. (i) IMU heading over the same pass.",
+ "j_species": "Per-species performance of the deployable checkpoint. The spread across the twelve classes is 0.214, roughly seventy times the seed noise.",
+ "k_funnel": "One of six audited harvested sources clears the label-precision bar. The audit probe reads 1.000 on human-labelled cwd12, so the low scores are the data."
+}

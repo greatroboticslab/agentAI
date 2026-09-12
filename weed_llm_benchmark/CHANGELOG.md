@@ -9440,3 +9440,39 @@ neither is separable; only +40,000 is, and it is still a single run with its see
 in flight. The figure marks every n = 1 rung in warning colour.
 
 The results page carries both: <https://claude.ai/code/artifact/f13cf654-af80-4101-a615-c9eb24c5df11>
+
+## 2026-09-11 — v3.50.0 the poster, rebuilt on the lab's own design system
+
+The first attempt was 48 × 24 in with matplotlib's defaults, and it read as
+generated. Rebuilt against `PPTFinal112.pptx`, which is the lab's house style:
+**48 × 36 in**, Arial throughout, a 4.3 in navy title band over a 0.05 in accent
+rule, three columns at **11.6 / 22.4 / 11.6 in**, and the deck's own palette
+(`#1E293B` ink, `#14314E` navy, `#1C6FB5` accent, `#F4F7FA` and `#EAF2F9` panels,
+`#C2CEDA` rules, `#556575` muted) — all read out of the reference file rather than
+guessed.
+
+`style.py` sets the figure conventions that separate a scientific figure from a
+generated one: no figure carries a title, because the claim belongs in the
+caption; hairline spines with the top and right removed; ticks out; grid only
+where a reader compares across distance; direct labels on the marks instead of
+legends; lower-case bold panel letters outside the axes; and n, error bars and
+the effect size wherever a difference is claimed.
+
+Nine figures in `figures.py`, each returning its own caption so the poster text
+cannot drift from the figure: detector families with the two effect sizes as
+brackets, fifteen zero-shot vision-language models against the fine-tuned
+detector, the tier ladder under two class spaces with seed error bars, the
+cross-domain slope, supervision arms as recall against false-alarm rate with the
+rules-only ceiling drawn in, the fifteen rounds beside the fresh-start control,
+the field drive's GPS track and IMU heading, per-species spread, and the harvest
+funnel.
+
+Every figure's aspect is back-computed from the column width it will occupy: a
+panel drawn at 4.6 × 3.5 in and placed 10.9 in wide renders 8.3 in tall and blows
+the column budget. Four rendering passes fixed real defects found in the rendered
+page — labels sitting on their own error bars, a series label clipped at the
+panel edge, two point labels meeting in the middle of a scatter, an annotation
+lying across a data series, and n-labels fighting the bar fill behind them.
+
+`python3 docs/poster/figures.py && python3 docs/poster/build.py` regenerates
+everything from `poster_data.py`.
