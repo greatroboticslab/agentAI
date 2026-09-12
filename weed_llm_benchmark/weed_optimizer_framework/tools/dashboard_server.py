@@ -410,6 +410,7 @@ _AUTH_EXEMPT_PATHS = {
     # (last-success age, stage name, outcome word), no data and no credentials.
     "/api/health/sync",
     "/api/health/scheduler",         # v3.25.0: same reasoning, unattended loop
+    "/api/health/supervision",       # v3.56.0: is the watcher itself reportable
 }
 _AUTH_EXEMPT_PREFIXES = (
     "/static/",                      # static assets if any
@@ -17265,6 +17266,17 @@ try:
     log.info("[health] scheduler alarm mounted (/api/health/scheduler)")
 except Exception as _e:
     log.error(f"[health] scheduler alarm failed to mount: {_e}")
+
+# v3.56.0 — supervision-layer alarm. scheduler_health answers "is the loop
+# running"; this answers "is the layer that watches it in a state whose output
+# may be reported", which is the question nobody could answer while nine reviews
+# came off the lab's 3060 looking entirely correct on disk.
+try:
+    from .brain import supervision_health as _sup_health
+    _sup_health.mount(app, {"log": log, "repo": str(REPO)})
+    log.info("[health] supervision alarm mounted (/api/health/supervision)")
+except Exception as _e:
+    log.error(f"[health] supervision alarm failed to mount: {_e}")
 
 # v3.31.0 — read-only HTTP surface over the supervision layer. Every part of it
 # has to be readable from the platform itself, by a person with a browser and no

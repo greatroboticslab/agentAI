@@ -9903,3 +9903,46 @@ runs crossed 0.90.
 held the string `"~0.5572 (partial)"` from while the job was running; the
 completed best is 0.5612. The block is retracted, but a retracted block must not
 hold a number that was never final either.
+
+---
+
+## 2026-09-12 — v3.56.0 `supervision_health` — an alarm for the layer that watches the loop
+
+`scheduler_health` answers *is the loop running*. Nothing answered the question
+that sat open while nine campaign reviews were produced by a 4.7 GB model on the
+lab's 3060: **is the layer that watches the loop in a state whose output may be
+reported?** Each of those records carried a model name, an endpoint,
+`mode: shadow` and `applied: false`, and looked entirely correct on disk.
+
+Five checks, each of which was silently wrong at some point in this project's own
+record. `GET /api/health/supervision`, no auth (an external monitor has to reach
+it), no model call — committed artifacts only.
+
+| check | crit / warn when |
+|---|---|
+| placement | the reviewer is enabled and its verdicts come from somewhere the placement rule forbids, **or** the record predates the placement fields, so nothing on it says where it was produced |
+| freshness | a step finished and no review followed it within the review timeout |
+| arm completeness | a benchmark arm stands on fewer cases than the split, and could be read as complete |
+| rubric drift | committed verdicts carry more than one rubric hash, so not every arm answered the same question |
+| score staleness | verdicts were written after the last scoring run, so the published numbers describe a corpus that has moved |
+
+A reviewer that is **switched off is `ok`**, not red. An operator-chosen silence
+is a normal state, and an alarm that is always red is one people learn to scroll
+past — the same failure as having no alarm, reached from the other side.
+
+**Two bugs found by running it rather than by reading it.** The heartbeat writes
+`domains` as a *mapping*; `/api/health/scheduler` renders it as a *list*. The
+first version assumed the list, iterated the mapping's keys and called `.get()`
+on a string — the alarm's own reader was the thing that broke, `http=503`,
+`'str' object has no attribute 'get'`. It now reads either shape and never raises
+out of the route. And an absent benchmark corpus reported "0 arms, all at the
+full split", which is vacuously green: the corpus lives on the cluster and the
+lab box does not carry it. It now says so, and says that nothing here is evidence
+about the arms elsewhere.
+
+**Verified on both machines.** `tests/test_supervision_health.py`, 17 checks,
+passes on the lab box and on Bridges-2. Live route on the lab: `http=200`,
+`level=ok`, "the reviewer is switched off; no verdict is being produced". Against
+the real corpus on the cluster it returns `warn` and names exactly the two arms
+that are partial — `L2_glm-4.7-flash 78 of 149`, `L3_qwen3.8-27b 92 of 149` —
+with no false positives on the other seven.
