@@ -278,23 +278,26 @@ def scell(key, field):
 yb = body(x + HALF + 0.55, yb, HALF,
     "A frozen corpus of 162 real incidents from this project's own engineering record, scored on the "
     "dev split: %d incidents and %d controls, by the project's own scorer re-reading committed "
-    "verdicts, which requires the finding to be about the incident and not merely that the arm "
-    "raised something. L2 reads raw artifact excerpts; L3 adds a retrieval round over them."
+    "verdicts. A detection counts only when the arm returns an issue verdict carrying a finding at "
+    "or above a severity bar; \u201cgrounded\u201d additionally requires that finding to quote a line that "
+    "resolves in the artifact. L2 reads raw artifact excerpts; L3 adds a retrieval round over them."
     % (S["incidents"], S["controls"]))
-srows = [["Scripted watchdog", "status fields", "--", "--", "%d" % S["a0_cases"]],
+srows = [["Scripted watchdog", "status fields", "--", "--", "--", "%d" % S["a0_cases"]],
          ["Deterministic signals", "12 checks", scell("A0p", "detection_recall"),
-          scell("A0p", "false_alarm_rate"), "%d" % AR["A0p"]["counts"]["cases"]]]
+          scell("A0p", "detection_grounded"), scell("A0p", "false_alarm_rate"),
+          "%d" % AR["A0p"]["counts"]["cases"]]]
 for _m in S["models"]:
     for _tier, _key in (("L2", _m["l2"]), ("L3", _m["l3"])):
         if not _key:
             continue
         srows.append(["%s  %s" % (_m["name"], _tier),
                       "artifacts + retrieval" if _tier == "L3" else "artifacts",
-                      scell(_key, "detection_recall"), scell(_key, "false_alarm_rate"),
+                      scell(_key, "detection_recall"), scell(_key, "detection_grounded"),
+                      scell(_key, "false_alarm_rate"),
                       "%d" % AR[_key]["counts"]["cases"]])
 yb = table(x + HALF + 0.55, yb, HALF,
-           ["arm", "reads", "recall", "false alarms", "cases"],
-           srows, [0.30, 0.30, 0.14, 0.16, 0.10], hi=5)
+           ["arm", "reads", "recall", "grounded", "false alarms", "cases"],
+           srows, [0.26, 0.26, 0.13, 0.14, 0.13, 0.08], hi=5)
 _d27 = (AR["L3@qwen3.8:27b"]["detection_recall"]["v"]
         - AR["L2@qwen3.8:27b"]["detection_recall"]["v"])
 _d14 = (AR["L3@qwen3:14b"]["detection_recall"]["v"]
@@ -334,8 +337,9 @@ for i, s in enumerate([
     "label-precision bar, and 44,750 of 156,521 images are cross-dataset duplicates.",
     "Retrospective supervision needs the artifacts, not the status fields. The watchdog reading "
     "status fields returned no decidable verdict on any of 149 cases, while a model reading the raw "
-    "artifacts reaches 0.70 recall over the 116 incidents; adding a retrieval tier over those same "
-    "artifacts is worth another +0.149 to the 27B and +0.011 to the 14B.",
+    "artifacts reaches %.2f recall over the 116 incidents; adding a retrieval tier over those same "
+    "artifacts is worth another %+.3f to the 27B and %+.3f to the 14B."
+    % (AR["L3@qwen3.8:27b"]["detection_recall"]["v"], _d27, _d14),
     "An unattended loop can report success for eight consecutive rounds while collecting nothing. "
     "Absence of a failure signal is not evidence of success.",
     "The gap shows up on our own video too. Over all %s frames the two robots recorded, %s of them "

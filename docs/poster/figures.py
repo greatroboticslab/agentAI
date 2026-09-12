@@ -248,12 +248,14 @@ def supervision():
     d27 = pt("L3@qwen3.8:27b")[1] - pt("L2@qwen3.8:27b")[1]
     return save(fig, "e_supervision",
                 "Every arm on one frozen corpus of real incidents from this project's own history "
-                "-- 116 incidents and 33 controls -- scored by the project's own scorer, which "
-                "requires the finding to be about the incident and not merely that the arm raised "
-                "something. Up and to the left is better. Open circle: the model reads raw "
-                "artifact excerpts. Filled: the same model with a retrieval round over the same "
-                "artifacts. The retrieval tier is worth %+.3f recall to the 27B and %+.3f to the "
-                "14B, so tiering pays where the model can use it and not otherwise."
+                "-- 116 incidents and 33 controls -- scored by the project's own scorer: a "
+                "detection counts only when the arm returns an issue verdict carrying a finding at "
+                "or above a severity bar, and a case that produced no answer leaves the "
+                "denominator rather than counting as a miss. Up and to the left is better. Open "
+                "circle: the model reads raw artifact excerpts. Filled: the same model with a "
+                "retrieval round over the same artifacts. The retrieval tier is worth %+.3f recall "
+                "to the 27B and %+.3f to the 14B, so tiering pays where the model can use it and "
+                "not otherwise."
                 % (d27, d14))
 
 

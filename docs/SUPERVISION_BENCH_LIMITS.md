@@ -188,3 +188,55 @@ complete and the completed one comes from a retracted run. Not sayable at all: t
 models are better at this — `deepseek-v4-flash` (284 B) scored 0.388 where `qwen3.8:27b` is
 tracking 0.841, and the difference is confounded with the context-overflow bug the September fix
 removed.
+
+---
+
+## 7a. §7 superseded: the same verdicts under the committed scorer
+
+§7 was scored by a counter written for that table rather than by `bench`. On
+2026-09-12 the same committed verdicts were re-scored with the project's own
+instrument — `bench reproduce --split dev`, which makes no model call and reads
+the verdict files already on disk — and the numbers move, in one direction, for
+every model arm.
+
+| arm | reads | recall | grounded | false alarms | cases |
+|---|---|---|---|---|---|
+| **A0** scripted watchdog | status fields | — | — | — | 149 |
+| **A0p** deterministic signals | the 12 checks | 0.095 | 0.095 | 0.061 | 149 |
+| **L2** · qwen3:14b | raw artifact excerpts | 0.664 | 0.602 | 0.606 | 149 |
+| **L3** · qwen3:14b | excerpts + retrieval | 0.675 | 0.614 | 0.636 | 149 |
+| **L2** · qwen3.8:27b | raw artifact excerpts | 0.553 | 0.518 | 0.212 | 149 |
+| **L3** · qwen3.8:27b | excerpts + retrieval | 0.702 | 0.702 | 0.242 | 92 |
+| **L2** · glm-4.7-flash | raw artifact excerpts | 0.821 | 0.769 | 0.200 | 78 |
+
+Source: `results/framework/supervision_rescore/results/run_reproduce-20260912T022035.json`,
+committed as `docs/poster/supervision_table.json`.
+
+**Why they differ.** Two definitions, not one:
+
+* `bench` counts a detection only when the verdict is `issue` **and** carries at
+  least one finding at or above a severity bar. The §7 counter counted any flag.
+* A case that produced no answer — a model error, a context overflow, an
+  undecidable export — leaves the denominator in `bench` rather than counting as
+  a miss. That is why the incident denominators read 113, 114 and 57 instead of
+  116.
+
+`detection_grounded` is the same rule with one more requirement: the finding must
+quote a line that resolves in the artifact. It is 0.03–0.06 below recall for every
+model arm, which is the fraction of detections that fire without evidence a reader
+could check.
+
+**What §7 got wrong about A0.** It reported the scripted watchdog at recall 0.000.
+Under the committed scorer A0 has no rate at all: all 149 of its verdicts come
+back `undecidable`, because "no signal fired" is not a judgement about the case.
+The distinction matters — 0.000 reads as an arm that looked and found nothing,
+where the truth is an arm that never produced a finding to score.
+
+**The deepseek-v4-flash rows are gone, and not by hand.** Their verdicts predate
+the 2026-09-07 split re-cut, so the scorer will not mix them with the current
+corpus. The retraction §7 described in prose is now enforced by the instrument.
+
+**Still partial.** `L3 · qwen3.8:27b` stands on 92 of 149 cases and
+`L2 · glm-4.7-flash` on 78; jobs `45824752` and `45824751` complete them with
+`bench run --resume`, which re-reads the committed verdicts and calls the model
+only for the remainder.

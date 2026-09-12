@@ -109,10 +109,13 @@ import statistics as st
 # --- F5 the headline: what each kind of supervision catches ------------------
 # Every number below is read from supervision_table.json, which is the project's
 # own scorer (`bench reproduce`, no model call) re-scoring the committed verdicts
-# on the dev split. An earlier draft of this block used a hand-written counter
-# that scored a case as detected whenever the model raised anything at all; the
-# committed scorer requires the finding to be about the incident, and is between
-# 0.06 and 0.25 stricter per arm. Nothing here is counted twice or by hand.
+# on the dev split. An earlier draft used a counter written for the poster, which
+# scored a case as detected whenever the arm raised anything. The committed scorer
+# differs in two ways that both matter: a detection requires an `issue` verdict
+# carrying a finding AT OR ABOVE A SEVERITY BAR, and a case that produced no
+# answer leaves the denominator instead of counting as a miss. It reads between
+# 0.06 and 0.29 lower per arm. `detection_grounded` is the same thing with the
+# further requirement that the finding quote a line resolving in the artifact.
 _ST = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                   "supervision_table.json")))
 

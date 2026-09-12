@@ -1,0 +1,859 @@
+{
+ "model": "cwd12_yolo11n_s102.pt",
+ "device": "cuda:0",
+ "conf_threshold_swept": [
+  0.25,
+  0.4,
+  0.6
+ ],
+ "measured_at": "2026-09-11T11:59:17",
+ "sessions": {
+  "rl_lasercar-20260817-164718_7b035b8e": {
+   "frames": 39,
+   "robot": "lasercar",
+   "cams": {
+    "untagged": 39
+   },
+   "veg_fraction_mean": 0.0316,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 42.4,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_lasercar-20260817-165556_009706c2": {
+   "frames": 128,
+   "robot": "lasercar",
+   "cams": {
+    "untagged": 128
+   },
+   "veg_fraction_mean": 0.0559,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 4.2,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_lasercar-20260818-220527_401c3bff": {
+   "frames": 7,
+   "robot": "lasercar",
+   "cams": {
+    "untagged": 7
+   },
+   "veg_fraction_mean": 0.033,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 7.8,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_lasercar-20260828-194635_d22d134d": {
+   "frames": 30,
+   "robot": "lasercar",
+   "cams": {
+    "down": 18,
+    "front": 12
+   },
+   "veg_fraction_mean": 0.0115,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 3.9,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_lasercar-20260828-222139_e536b64e": {
+   "frames": 28,
+   "robot": "lasercar",
+   "cams": {
+    "down": 14,
+    "front": 14
+   },
+   "veg_fraction_mean": 0.0102,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 3.7,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_lasercar-20260828-222934_2b4a1e18": {
+   "frames": 72,
+   "robot": "lasercar",
+   "cams": {
+    "down": 36,
+    "front": 36
+   },
+   "veg_fraction_mean": 0.0091,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 4.7,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_lasercar-20260828-224444_4a6ab48c": {
+   "frames": 48,
+   "robot": "lasercar",
+   "cams": {
+    "down": 24,
+    "front": 24
+   },
+   "veg_fraction_mean": 0.0102,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 5.5,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_lasercar-20260829-141602_9f48dd0e": {
+   "frames": 75,
+   "robot": "lasercar",
+   "cams": {
+    "down": 38,
+    "front": 37
+   },
+   "veg_fraction_mean": 0.1937,
+   "frames_vegetation_gt_0.35": 7,
+   "ms_per_frame": 5.7,
+   "at_conf_0.25": {
+    "detections": 1,
+    "frames_with_any_detection": 1,
+    "frame_fire_rate": 0.0133,
+    "species_fired": {
+     "Sicklepod": 1
+    }
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 7,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260815-184033_81e784ce": {
+   "frames": 88,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 88
+   },
+   "veg_fraction_mean": 0.0327,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 5.4,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260816-015421_085f0bc7": {
+   "frames": 8,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 8
+   },
+   "veg_fraction_mean": 0.0055,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 6.4,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260816-015506_d4ad5b8c": {
+   "frames": 9,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 9
+   },
+   "veg_fraction_mean": 0.0066,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 5.9,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260816-163151_c1db2fac": {
+   "frames": 58,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 58
+   },
+   "veg_fraction_mean": 0.4819,
+   "frames_vegetation_gt_0.35": 58,
+   "ms_per_frame": 4.9,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 58,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260828-182515_1e6dff22": {
+   "frames": 209,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 209
+   },
+   "veg_fraction_mean": 0.2625,
+   "frames_vegetation_gt_0.35": 70,
+   "ms_per_frame": 4.9,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 70,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260828-183435_ea4cf6b6": {
+   "frames": 16,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 16
+   },
+   "veg_fraction_mean": 0.0484,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 4.1,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260828-191525_0e2a94fb": {
+   "frames": 11,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 11
+   },
+   "veg_fraction_mean": 0.0291,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 5.1,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260828-191621_6165cf36": {
+   "frames": 9,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 9
+   },
+   "veg_fraction_mean": 0.0248,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 3.2,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260828-192804_69bac9fa": {
+   "frames": 215,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 215
+   },
+   "veg_fraction_mean": 0.1026,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 5.0,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260828-195502_750308f2": {
+   "frames": 13,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 13
+   },
+   "veg_fraction_mean": 0.031,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 4.5,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260828-225149_cf10d884": {
+   "frames": 149,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 149
+   },
+   "veg_fraction_mean": 0.0298,
+   "frames_vegetation_gt_0.35": 2,
+   "ms_per_frame": 4.7,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 2,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260828-225609_2290df51": {
+   "frames": 293,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 293
+   },
+   "veg_fraction_mean": 0.345,
+   "frames_vegetation_gt_0.35": 87,
+   "ms_per_frame": 5.0,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 87,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260829-135613_6a409541": {
+   "frames": 1,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 1
+   },
+   "veg_fraction_mean": 0.4626,
+   "frames_vegetation_gt_0.35": 1,
+   "ms_per_frame": 44.1,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 1,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260829-135623_6dfab273": {
+   "frames": 88,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 88
+   },
+   "veg_fraction_mean": 0.5048,
+   "frames_vegetation_gt_0.35": 88,
+   "ms_per_frame": 5.0,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 88,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_live-20260829-140628_56e3346d": {
+   "frames": 42,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 42
+   },
+   "veg_fraction_mean": 0.5088,
+   "frames_vegetation_gt_0.35": 42,
+   "ms_per_frame": 4.5,
+   "at_conf_0.25": {
+    "detections": 1,
+    "frames_with_any_detection": 1,
+    "frame_fire_rate": 0.0238,
+    "species_fired": {
+     "Purslane": 1
+    }
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 42,
+    "detections_at_0.25": 1,
+    "frames_with_any_detection": 1
+   }
+  },
+  "rl_live-20260905-003208_912e23f4": {
+   "frames": 16,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 16
+   },
+   "veg_fraction_mean": 0.0671,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 3.2,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  },
+  "rl_post-rewire-smoke_a5c6f566": {
+   "frames": 21,
+   "robot": "241robot",
+   "cams": {
+    "untagged": 21
+   },
+   "veg_fraction_mean": 0.0015,
+   "frames_vegetation_gt_0.35": 0,
+   "ms_per_frame": 3.6,
+   "at_conf_0.25": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.40": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "at_conf_0.60": {
+    "detections": 0,
+    "frames_with_any_detection": 0,
+    "frame_fire_rate": 0.0,
+    "species_fired": {}
+   },
+   "vegetation_subset": {
+    "frames": 0,
+    "detections_at_0.25": 0,
+    "frames_with_any_detection": 0
+   }
+  }
+ },
+ "totals": {
+  "sessions": 25,
+  "frames": 1673,
+  "vegetation_frames_gt_0.35": 355,
+  "detections_at_0.25": 2,
+  "frames_with_any_detection_at_0.25": 2,
+  "detections_at_0.40": 0,
+  "frames_with_any_detection_at_0.40": 0,
+  "veg_subset_frames": 355,
+  "veg_subset_frames_with_detection_at_0.25": 1,
+  "ms_per_frame_median": 4.9
+ },
+ "note": "Aggregate statistics only; no frame left the lab machine. vegetation heuristic = fraction of pixels with excess-green 2G-R-B > 0.06 on a 96x54 thumbnail; frame counted vegetation if >0.35. No ground-truth labels exist for these frames, so this measures FIRING BEHAVIOUR (false-positive/fire rate), NOT recall or precision."
+}
