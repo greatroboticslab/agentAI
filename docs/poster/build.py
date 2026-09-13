@@ -163,8 +163,7 @@ for i, (nm, sup) in enumerate(M["authors"]):
     r2.font.size = Pt(20); r2.font.bold = True; r2.font.color.rgb = WHITE
     r2.font.name = FONT; r2.font._rPr.set("baseline", "30000")
 tbox(MARG, 3.05, W - 2 * MARG,
-     [("¹Department of Engineering Technology   ·   ²School of Agriculture   ·   "
-       "Middle Tennessee State University, Murfreesboro, TN, USA", 20, False,
+     [("%s   ·   %s" % (M["affiliations"][0], M["institution"]), 20, False,
        RGBColor(0xC2, 0xCE, 0xDA))])
 
 # ============================================================= LEFT column

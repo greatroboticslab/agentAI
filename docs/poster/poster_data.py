@@ -14,9 +14,10 @@ MEETING = {
     "title": "What Actually Moves a Weed Detector",
     "subtitle": ("Six months of an autonomous data-harvesting pipeline, instrumented and audited: "
                  "which levers move accuracy, and which supervision catches failure"),
-    "authors": [("Hongbo Zhang", "1"), ("Harry He", "1"), ("Song Cui", "2")],
-    "affiliations": ["Department of Engineering Technology",
-                     "School of Agriculture"],
+    # Two authors, one department. Song Cui was on an earlier draft and is not
+    # an author of this work; Harry said so on 2026-09-12 and it is his paper.
+    "authors": [("Harry He", ""), ("Hongbo Zhang", "")],
+    "affiliations": ["Department of Engineering Technology"],
     "institution": "Middle Tennessee State University, Murfreesboro, TN, USA",
     "size_in": (48, 24),
 }
