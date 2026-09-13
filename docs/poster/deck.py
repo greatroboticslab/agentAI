@@ -190,7 +190,7 @@ class Deck(object):
             self.tbox(MTSU_M, y, W - 2 * MTSU_M,
                       [(standfirst, dz["stand"] - 6, False, c["ink"])],
                       spacing=1.20, face=f["body"], align=PP_ALIGN.JUSTIFY)
-            self.top = y + self.h_est(standfirst, W - 2 * MTSU_M, dz["stand"] - 6, 1.20) + 0.46
+            self.top = y + self.h_est(standfirst, W - 2 * MTSU_M, dz["stand"] - 6, 1.20) + 0.30
         elif standfirst and self.look == "journal":
             # An abstract: one measure narrower than the sheet, justified, ruled
             # top and bottom, set a size down from the title's byline. This is
@@ -249,7 +249,7 @@ class Deck(object):
                   align=PP_ALIGN.CENTER, face=f["body"])
         self.tbox(tx, 2.20, tw, [(affil, 20, False, band_sec)], spacing=1.0,
                   align=PP_ALIGN.CENTER, face="Arial")
-        return BAND_H + RULE_H + 0.34
+        return BAND_H + RULE_H + 0.28
 
     def panel_open(self, x, y, w):
         """A white content panel with the template's 0.75 pt hairline.

@@ -114,7 +114,7 @@ PLACED = {
     "a_families": 11.6, "b_zeroshot": 11.6, "c_ladder": 11.6,
     "e_supervision": 11.6, "r_tta": 11.6,
     "f_rounds": 22.4,
-    "v_r241": 11.6, "v_cart": 11.6,
+    "v_vehicles": 46.4,
     "u_detect": 46.4,
     "m_ledger": 22.4, "n_system": 22.4, "t_journey": 46.4, "w_robots": 46.4, "q_projects": 46.4,
 }

@@ -278,7 +278,7 @@
    "id": "ladder",
    "theme": "results",
    "heading": "Twelve times the training data costs 0.0189",
-   "body": "Twelve times the training data costs 0.0189 on our own 1,977-image holdout, three seeds at every rung, which is 8.2 times the seed spread. The same eight checkpoints fall on a second weed dataset too. One of six audited web sources reaches a 0.90 label-precision bar.",
+   "body": "Twelve times the training data costs 0.0189 on our own 1,977-image holdout, three seeds at every rung, and the same eight checkpoints fall on a second weed dataset too.",
    "figure": "c_ladder",
    "status": "built_and_running",
    "width": "column",
@@ -481,18 +481,18 @@
   {
    "id": "r241_frames",
    "theme": "live-collection",
-   "figure": "v_r241",
-   "heading": "Rover sends 640 x 360 frames at 1 Hz from every drive",
+   "figure": "v_vehicles",
+   "heading": "Both vehicles record a range of scenes, not one frame",
    "status": "built_and_running",
-   "body": "A single camera frame says nothing about a robot, so this is nine, one per drive. Robot 241 streams 640 x 360 at 1 Hz alongside GPS and two IMUs, and the platform files each drive as its own dataset the moment the session opens."
+   "body": "Robot 241 streams 640 x 360 at 1 Hz alongside GPS and two IMUs. The laser cart streams two cameras, one forward and one down over the work zone, with laser state, vehicle telemetry and its own detections, and no position at all. The platform files each drive as its own dataset the moment the session opens."
   },
   {
    "id": "cart_frames",
    "theme": "live-collection",
-   "figure": "v_cart",
+   "figure": "none",
    "heading": "Cart sends two cameras and no position at all",
    "status": "built_and_running",
-   "body": "Two cameras: one forward, one down over the work zone. The platform receives laser state, vehicle telemetry and the cart's own detections with every batch. It receives no position at all, which is the gap that stops these frames becoming a map."
+   "body": "Two cameras, one forward and one down over the work zone, arrive with laser state, vehicle telemetry and the cart's own detections. No position arrives at all."
   }
  ]
 }

@@ -447,32 +447,28 @@ def detect_grid():
         "Twelve images from the sealed %s-image holdout, one per species, run through the "
         "deployed checkpoint at the confidence the cart fires at. Every box and every label is "
         "the model's output; no ground truth is drawn. Seed %d scores %.4f mAP50-95 and %.4f "
-        "mAP50 over all %s images on one plain inference pass. The ledger's %s is the three-seed "
-        "mean from each run's best epoch under the Ultralytics validator, on a holdout that was "
-        "also the validation set during training; the %.4f between them is evaluator and epoch "
-        "choice." % ("{:,}".format(P["n_images"]), P["seed"], P["map50_95"], P["map50"],
+        "mAP50 over all %s images on one plain inference pass; the ledger's %s is the three-seed "
+        "mean at each run's best epoch under Ultralytics, on a holdout that doubled as the "
+        "validation set, and the %.4f between them is evaluator and epoch choice." % ("{:,}".format(P["n_images"]), P["seed"], P["map50_95"], P["map50"],
                      "{:,}".format(P["n_images"]), P["ledger_mean"], P["gap"]))
 
 
-def r241_grid():
-    # Count the cells, do not assert them. The plate was nine frames and became
-    # six when a 3x3 at this width cost 6.6 in of a 9.7 in column; the caption
-    # still said nine, in print, under six pictures.
-    n = _cells("m_r241.jpg", 3)
-    return _plate(
-        "v_r241", "m_r241.jpg", 11.6,
-        "Robot 241, %d frames from %d drives. Each is the most vegetated frame in its drive, "
-        "which is a selection rule and is stated as one: the rover also records paved and indoor "
-        "runs. 2,238 frames in all, none labelled." % (n, n))
+def vehicles_grid():
+    """Both vehicles in one strip: six rover frames, then six cart frames.
 
-
-def cart_grid():
-    n = _cells("m_cart.jpg", 3)
+    As two 3 x 2 plates in the columns these cost about thirteen inches of
+    column between them and squeezed the results block off the sheet entirely.
+    One full-width strip costs two, and a reader still sees that a robot
+    records a range of scenes rather than one frame.
+    """
     return _plate(
-        "v_cart", "m_cart.jpg", 11.6,
-        "The laser cart, %d frames from six drives. The rectangle is the cart's fixed work-zone "
-        "overlay: it sits at the same pixels whether the frame is grass or an indoor floor, so it "
-        "is not a detection. 427 frames in all." % n)
+        "v_vehicles", "m_vehicles.jpg", 46.4,
+        "Twelve frames as recorded. The first six are robot 241, one from each of six drives; the "
+        "last six are the laser cart, one from each of six drives. Each is the most vegetated "
+        "frame in its drive, which is a selection rule and is stated as one -- both vehicles also "
+        "record paved and indoor runs. The rectangle on the cart's frames is its fixed work-zone "
+        "overlay, at the same pixels whether the frame is grass or an indoor floor, so it is not "
+        "a detection. 2,238 frames from the rover and 427 from the cart, none labelled.")
 
 
 # ------------------------------------------------------- the four projects
@@ -514,7 +510,7 @@ def _pic(ax, path, box, ax_w_in, ax_h_in, crop=0.5, fallback=None,
                                lw=1.2, zorder=3))
 
 
-FIG_W, FIG_H = 46.4, 5.60
+FIG_W, FIG_H = 46.4, 5.05
 
 
 def projects():
@@ -1130,7 +1126,7 @@ if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
                species, funnel, field, tta, sources, ledger, system,
-               journey, robots_wide, projects, detect_grid, r241_grid, cart_grid):
+               journey, robots_wide, projects, detect_grid, vehicles_grid):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))

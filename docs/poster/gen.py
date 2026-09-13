@@ -31,7 +31,7 @@ from pptx.enum.text import PP_ALIGN                        # noqa: E402
 import styles                                              # noqa: E402
 
 C, L = D.CENSUS, D.LEDGER
-FOOT_H = 2.40
+FOOT_H = 2.20
 
 SLOT_OF_WIDTH = {11.6: "column", 22.4: "centre", 46.4: "full"}
 FIGW = {}
@@ -113,7 +113,7 @@ MTSU_COLUMNS = [
 # about a robot, so each vehicle shows a grid of its own frames. Without a pin
 # the shed loop reaches them every time, because they are expensive and sit
 # second and third in their theme.
-MTSU_PINNED = {"r241_frames", "cart_frames"}
+MTSU_PINNED = {"ladder"}
 
 MTSU_PAD = 0.24            # the template's own panel padding, 0.26, less a hair
 
@@ -133,7 +133,7 @@ class Poster(object):
         # gives up blocks to fit two bands, then removes a band, and either the
         # blocks stay lost or the loop starts over and gives up the same ones
         # again. One band costs about 5.4 in of sheet, which is 21 in of column.
-        self.tail_ids = (["detect_grid"] if getattr(st, "look", "") == "mtsu"
+        self.tail_ids = (["r241_frames", "detect_grid"] if getattr(st, "look", "") == "mtsu"
                          else list(TAIL_BANDS))
         self.d = Deck(TITLE, STAND, style=st)
 
@@ -330,7 +330,7 @@ class Poster(object):
             if s.get("status") == "designed_only":
                 body += " This is the direction, not a description of what runs today."
             hh = (self._head_h(d, cw, s["heading"])
-                  + d.h_est(body, cw, d.dz["body"], 1.22, 12))
+                  + d.h_est(body, cw, d.dz["caption"] + 1, 1.22, 12))
             h = max(h, hh)
         # the footer rule sits 0.25 above the footer text and the closing needs
         # air under it; an earlier estimate left the last two lines off the sheet
@@ -353,7 +353,7 @@ class Poster(object):
             body = s["body"]
             if s.get("status") == "designed_only":
                 body += " This is the direction, not a description of what runs today."
-            ends.append(d.body(x, yy, cw, body, after=10))
+            ends.append(d.body(x, yy, cw, body, size=d.dz["caption"] + 1, after=10))
         return max(ends) + 0.30
 
     def mtsu_kpi(self, y):
@@ -455,7 +455,11 @@ class Poster(object):
         for head, sid in flow:
             hh = self.mtsu_block_h(COL[0][1], sid)
             if head:
-                hh += self._head_h(d, COL[0][1], head)
+                # heading, plus the panel it opens: MTSU_PAD above the first
+                # block and below the last, plus the 0.24 between two panels in
+                # one column. Leaving these out let the packer fill a column to
+                # 24.6 in against a 23.8 in page and report that it fitted.
+                hh += self._head_h(d, COL[0][1], head) + 2 * MTSU_PAD + 0.24
             heights.append(hh)
         # Fill each column, then balance: an even share is only worth having
         # when there is enough content to go round, and capping at one left
@@ -469,14 +473,15 @@ class Poster(object):
             x, w = COL[ci]
             hh = self.mtsu_block_h(w, sid)
             if head:
-                hh += self._head_h(d, w, head)
+                hh += self._head_h(d, w, head) + 2 * MTSU_PAD + 0.24
             if cols[ci] and ci < n - 1 and (y - y0 + hh > target or y + hh > limit):
                 ci += 1
                 x, w = COL[ci]
                 y = y0
                 if not head:
                     head = (carried or "") + " (cont.)"
-                hh = self.mtsu_block_h(w, sid) + self._head_h(d, w, head)
+                hh = (self.mtsu_block_h(w, sid) + self._head_h(d, w, head)
+                      + 2 * MTSU_PAD + 0.24)
             if y + hh > limit and ci == n - 1 and cols[ci]:
                 spilled.append(sid)
                 continue
@@ -612,7 +617,14 @@ class Poster(object):
                 break
 
         self.d = Deck(TITLE, STAND, style=self.st); d = self.d
-        _fits, ends, fig_no, _sp = self._mtsu_layout(flow, n, COL, draw=True)
+        _fits, ends, fig_no, spilled = self._mtsu_layout(flow, n, COL, draw=True)
+        # Whatever still runs off the last column is dropped, and saying so is
+        # the whole point of the manifest. The shed loop can exit with sections
+        # still spilling -- when every theme is down to the one block it may not
+        # lose -- and those were vanishing from the sheet with nothing recorded.
+        for sid in spilled:
+            if sid not in self.dropped:
+                self.dropped.append(sid)
 
         y = self.closing(self.tail_band(max(ends) + 0.50, fig_no))
         y = max(y + 0.40, H - FOOT_H - 0.35)
