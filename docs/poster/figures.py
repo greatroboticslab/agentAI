@@ -63,7 +63,7 @@ def fam():
     rows = [("YOLO11n, COCO-pretrained", "yolo11n_sealed", BLUE),
             ("Mamba-YOLO-T, random init", "mamba_yolo_t", GREY),
             ("YOLO11n, random init", "yolo11n_scratch_control", GREY)]
-    fig, ax = plt.subplots(figsize=(10.925, 3.55))
+    fig, ax = plt.subplots(figsize=(11.600, 3.77))
     ys = np.arange(len(rows))[::-1]        # first row on top
     for y, (lab, key, col) in zip(ys, rows):
         d = S[key]
@@ -119,7 +119,7 @@ def vlm():
     fd = _j.load(open(os.path.join(HERE, "figures_data.json")))
     rows = [r for r in fd["benchmark_cwd12_map50"] if r.get("map50") is not None]
     rows = sorted(rows, key=lambda r: r["map50"])
-    fig, ax = plt.subplots(figsize=(10.925, 5.30))
+    fig, ax = plt.subplots(figsize=(11.600, 5.63))
     y = np.arange(len(rows))
     cols = [BLUE if "fine-tuned" in r["model"] else GREY for r in rows]
     ax.barh(y, [r["map50"] for r in rows], color=cols, height=0.62)
@@ -160,7 +160,7 @@ def ladder():
             A.append(v); Ae.append(0.0); An.append(1)
     B = L.get("armB")
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.925, 4.20))
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 4.46))
     ax.errorbar(xs, A, yerr=Ae, fmt="o-", color=BLUE, capsize=4, elinewidth=1.0, zorder=3)
     if B:
         ax.plot(xs, B, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
@@ -265,7 +265,7 @@ def supervision():
                 "fa_k": a["false_alarm_rate"]["k"], "fa_n": a["false_alarm_rate"]["n"],
                 "cases": a["counts"]["cases"]}
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.925, 6.80), sharey=True)
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 7.22), sharey=True)
 
     # ---- (e) detection against false alarms ---------------------------------
     # Square, so the chance diagonal is a true 45 degrees and vertical distance
@@ -426,6 +426,19 @@ def _plate(name, path, width, caption, aspect=None):
     return save(fig, name, caption)
 
 
+def _cells(path, cols, cell_ar=16.0 / 9.0):
+    """How many cells a mosaic has, read off the file rather than remembered.
+
+    The cells are camera frames at 16:9, not squares, so a row is
+    (width / cols) / 16 * 9 tall. Assuming square cells read a 3 x 2 mosaic as
+    3 x 1 and printed "3 frames" under six pictures.
+    """
+    from PIL import Image
+    w, h = Image.open(os.path.join(HERE, "photos", path)).size
+    rows = int(round(h / ((w / float(cols)) / cell_ar)))
+    return cols * max(1, rows)
+
+
 def detect_grid():
     # Both numbers, and what separates them. A reader who checks one will find
     # the other, and a caption that quotes only the higher one is the kind of
@@ -444,19 +457,24 @@ def detect_grid():
 
 
 def r241_grid():
+    # Count the cells, do not assert them. The plate was nine frames and became
+    # six when a 3x3 at this width cost 6.6 in of a 9.7 in column; the caption
+    # still said nine, in print, under six pictures.
+    n = _cells("m_r241.jpg", 3)
     return _plate(
         "v_r241", "m_r241.jpg", 11.6,
-        "Robot 241, nine frames from nine drives. Each is the most vegetated frame in its drive, "
+        "Robot 241, %d frames from %d drives. Each is the most vegetated frame in its drive, "
         "which is a selection rule and is stated as one: the rover also records paved and indoor "
-        "runs, and the bottom row is what those look like. 2,238 frames in all, none labelled.")
+        "runs. 2,238 frames in all, none labelled." % (n, n))
 
 
 def cart_grid():
+    n = _cells("m_cart.jpg", 3)
     return _plate(
         "v_cart", "m_cart.jpg", 11.6,
-        "The laser cart, nine frames from eight drives. The rectangle is the cart's fixed "
-        "work-zone overlay: it sits at the same pixels whether the frame is grass or an indoor "
-        "floor, so it is not a detection. 427 frames in all.")
+        "The laser cart, %d frames from six drives. The rectangle is the cart's fixed work-zone "
+        "overlay: it sits at the same pixels whether the frame is grass or an indoor floor, so it "
+        "is not a detection. 427 frames in all." % n)
 
 
 # ------------------------------------------------------- the four projects
@@ -743,7 +761,7 @@ def tta():
     labs = [a for a, _ in T["arms"]]
     d = [v - T["baseline"] for _, v in T["arms"]]
     ys = np.arange(len(d))[::-1]
-    fig, ax = plt.subplots(figsize=(10.925, 3.70))
+    fig, ax = plt.subplots(figsize=(11.600, 3.93))
     ax.axvspan(-T["seed_noise"], T["seed_noise"], color=PALEBLU, zorder=0)
     ax.barh(ys, d, height=0.52, zorder=3,
             color=[WARN if v < T["seed_noise"] else BLUE for v in d])

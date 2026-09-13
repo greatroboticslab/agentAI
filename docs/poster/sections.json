@@ -3,8 +3,8 @@
   {
    "id": "platform_idea",
    "theme": "platform-idea",
-   "heading": "One platform for every robot the lab owns",
-   "body": "agentAI is a research-data platform for physical and embodied agents, built at the MTSU Great Robotics Lab. A robot, a drone or a sensor rig is a project. A project owns its keys, its people and a locked dataset registry. Agents on the platform harvest, filter, label and train against that registry. Adding a robot is a configuration, not a migration.",
+   "heading": "agentAI is one platform for every robot the lab owns",
+   "body": "agentAI is a research-data platform for physical and embodied agents, built at the MTSU Great Robotics Lab. A robot, a drone or a sensor rig is a project. A project owns its keys, its people and a locked dataset registry. Agents on the platform harvest, filter, label and train against that registry. Adding a robot is a configuration change.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -13,7 +13,7 @@
   {
    "id": "platform_domains",
    "theme": "platform-idea",
-   "heading": "Any research field is a project",
+   "heading": "Weed detection is one project here, the humanoid is still empty",
    "body": "A lab member opens a project for any data type and any field, uploads images, video or sensor logs, and gets an automatic diagnosis before choosing what to do next. Weed detection is one project on this platform. So are the 241 rover and the laser cart, and so is a humanoid project that is open and still empty.",
    "figure": "none",
    "status": "built_and_running",
@@ -23,7 +23,7 @@
   {
    "id": "system",
    "theme": "platform-idea",
-   "heading": "Inside the platform",
+   "heading": "The whole path has run, from crop row to cluster checkpoint",
    "body": "Every stage from a camera in a crop row to a checkpoint on the cluster has run. The dashboard and registry run on a lab server; GPU jobs queue on PSC Bridges-2. The collector and trainer are paused after a stop-loss on 2026-08-29. The supervisor is advisory and nothing it says is applied.",
    "figure": "n_system",
    "status": "built_and_running",
@@ -33,7 +33,7 @@
   {
    "id": "robots_today",
    "theme": "robots-connected",
-   "heading": "Robots on the platform today",
+   "heading": "Tracked rover and laser cart are the two robots reporting in",
    "body": "Robot 241 is a tracked rover that drives crop rows and streams camera, GPS and two IMUs. The laser cart carries the weeder: a galvanometer laser, a down camera over the work zone and a forward camera. Ten projects sit on the platform and two of them have a robot reporting into them. Between those two vehicles, 2,686 frames in 26 drives.",
    "figure": "none",
    "status": "built_and_running",
@@ -43,7 +43,7 @@
   {
    "id": "vehicles",
    "theme": "robots-connected",
-   "heading": "Four frames, as recorded",
+   "heading": "Nothing is labelled, and that rectangle is a fixed overlay",
    "body": "Nothing here is enhanced and nothing is labelled. The rectangle in the cart's down camera is a fixed work-zone overlay: it sits at the same pixels on frames with no vegetation in them at all.",
    "figure": "l_robots",
    "status": "built_and_running",
@@ -53,7 +53,7 @@
   {
    "id": "vehicles_wide",
    "theme": "robots-connected",
-   "heading": "Frames from both vehicles",
+   "heading": "Both vehicles drive our own crop plots",
    "body": "Four frames off the archive, unenhanced and unlabelled, from the two vehicles that drive our own crop plots.",
    "figure": "w_robots",
    "status": "built_and_running",
@@ -63,7 +63,7 @@
   {
    "id": "future_robots",
    "theme": "robots-connected",
-   "heading": "Adding the next robot",
+   "heading": "Adding the next robot takes a project, a key and a session",
    "body": "A new robot needs a project, an API key and a session start. The ingest contract is the same for every vehicle: open a session, post sensor batches and frames while driving, stop. The platform does not care what the robot is. Empty projects for a mobile robot and a humanoid already sit on it, waiting for a first upload.",
    "figure": "none",
    "status": "built_and_running",
@@ -73,8 +73,8 @@
   {
    "id": "uplink",
    "theme": "live-collection",
-   "heading": "A drive becomes a dataset as it opens",
-   "body": "A vehicle opens a session and the platform registers it as a governed dataset at that moment, not after the drive ends. Frames and sensor batches arrive over one API key. Robot 241 sends camera, GPS and two IMUs; the laser cart sends camera, laser state, vehicle telemetry and its own detections, and no position at all.",
+   "heading": "A drive becomes a dataset the moment it opens",
+   "body": "A vehicle opens a session and the platform registers it as a governed dataset at that moment, while the drive is still running. Frames and sensor batches arrive over one API key. Robot 241 sends camera, GPS and two IMUs; the laser cart sends camera, laser state, vehicle telemetry and its own detections, and no position at all.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -83,7 +83,7 @@
   {
    "id": "census",
    "theme": "live-collection",
-   "heading": "On disk today",
+   "heading": "Two robots have put 2,686 frames on disk, none labelled",
    "body": "Two robots have put 2,686 camera frames and 91,955 telemetry rows across nine streams onto the platform, over 26 drives, with 342 m of GPS track from 1,502 fixes. None of the frames is labelled.",
    "figure": "none",
    "status": "built_and_running",
@@ -93,7 +93,7 @@
   {
    "id": "drive",
    "theme": "live-collection",
-   "heading": "213 seconds in one crop plot",
+   "heading": "Longest pass on the platform: 141 m in 213 seconds",
    "body": "The longest single pass the platform holds: 141 m of track from 211 fixes, with heading from the IMU over the same 213 seconds. The platform holds 18 passes that carry position.",
    "figure": "h_drive",
    "status": "built_and_running",
@@ -103,7 +103,7 @@
   {
    "id": "auto_diag",
    "theme": "live-collection",
-   "heading": "Every drive is diagnosed on arrival",
+   "heading": "Each finished drive is diagnosed without anyone asking",
    "body": "The platform runs a fixed diagnosis over each finished session without being asked: route, noise, cross-sensor correlation, a timeline. It has done that for 26 live robot sessions and written 45 charts. A person reads the diagnosis before deciding whether the drive is worth anything.",
    "figure": "none",
    "status": "built_and_running",
@@ -115,7 +115,7 @@
   {
    "id": "remote_control",
    "theme": "remote-control",
-   "heading": "Driving a robot from a browser",
+   "heading": "Signed-in users drive the rover from a plain browser",
    "body": "A signed-in user opens the 241 project and clicks Drive. The platform reverse-proxies the robot's own console over the lab tailnet, so the rover is driven from a plain browser with no VPN client. 1,389 joystick commands have gone through that path. Two gates sit in front of it: the platform's Google login, then the robot's own password.",
    "figure": "none",
    "status": "built_and_running",
@@ -127,8 +127,8 @@
   {
    "id": "drive_button",
    "theme": "remote-control",
-   "heading": "Only one robot has the button",
-   "body": "The Drive button appears on the 241 project and not on the laser cart's, because the allow-list holds one target. The rover has been dark since 2026-08-28: the platform answers a drive request today with its own offline page. The cart has never been drivable from the platform.",
+   "heading": "Drive appears on the 241 project alone",
+   "body": "The Drive button appears on the 241 project alone, because the allow-list holds one target. The rover has been off the network since 2026-08-28, and the platform answers a drive request today with its own offline page. The cart has never been drivable from the platform.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -137,7 +137,7 @@
   {
    "id": "advice",
    "theme": "remote-control",
-   "heading": "Talking back to a robot",
+   "heading": "Advisory text is the only thing the platform sends a robot",
    "body": "Besides the drive relay, the platform sends a robot exactly one thing: advisory text. The rover polls for it and shows deterministic warnings about battery, current and temperature. That poll has returned 406 times. No platform code path sends an actuation command to any robot.",
    "figure": "none",
    "status": "built_and_running",
@@ -147,7 +147,7 @@
   {
    "id": "laser_control",
    "theme": "remote-control",
-   "heading": "Laser on, never once at a target",
+   "heading": "Laser on in 216 rows, with no target in any",
    "body": "The cart's own operator switched the laser on during three of eight archived sessions. The platform recorded 3379 laser rows and 216 of them have the laser enabled. Every one of those 216 is in OBSERVATION phase, with no target. The laser has never been armed, aimed or fired by the platform.",
    "figure": "none",
    "status": "built_and_running",
@@ -159,7 +159,7 @@
   {
    "id": "analysis_agent",
    "theme": "analysis-agent",
-   "heading": "Ask a dataset what it is good for",
+   "heading": "Any dataset page answers a question asked in plain words",
    "body": "Every dataset page carries a chat box. A user types or speaks a plain question about that dataset. A planner reads the question and the dataset's real column profile, then picks from 14 fixed analysis tools or writes new code. The answer comes back with the chart and the code that produced it.",
    "figure": "none",
    "status": "built_and_running",
@@ -171,7 +171,7 @@
   {
    "id": "analysis_example",
    "theme": "analysis-agent",
-   "heading": "Asked something it had never seen",
+   "heading": "New code on the first attempt, for an unplanned question",
    "body": "Asked to plot a histogram of the heading change rate on the 241 field drive, the agent wrote the code and returned the plot on the first attempt. A fixed template cannot do that, because nothing in the platform knew that question would be asked. Across the platform, 9 datasets carry 92 turns of that conversation.",
    "figure": "none",
    "status": "built_and_running",
@@ -183,8 +183,8 @@
   {
    "id": "analysis_sandbox",
    "theme": "analysis-agent",
-   "heading": "Code the agent writes runs fenced in",
-   "body": "Generated code passes an import whitelist and an AST check before it runs, with no network and no file writes, 15 seconds of CPU, 1.5 GB of memory and a 25 second wall clock. A user can edit the agent's code or paste their own and re-run it in the same fence.",
+   "heading": "Generated code runs fenced in, with no network and no writes",
+   "body": "Generated code passes an import whitelist and an AST check before it runs. It gets no network and no file writes, 15 seconds of CPU, 1.5 GB of memory and a 25 second wall clock. A user can edit the agent's code or paste their own and re-run it in the same fence.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -193,7 +193,7 @@
   {
    "id": "analysis_gap",
    "theme": "analysis-agent",
-   "heading": "Not yet pointed at the drives",
+   "heading": "None of the 92 questions was about a robot drive",
    "body": "The conversational agent has answered 92 questions, and none of them was about a live robot drive. Every one of the 26 live sessions got the fixed diagnosis; not one got a question. Pointing the agent at the drives is the next thing to do and it costs nothing but asking.",
    "figure": "none",
    "status": "built_but_off",
@@ -203,7 +203,7 @@
   {
    "id": "loop",
    "theme": "iterating-agents-brain",
-   "heading": "Left alone for fifteen rounds",
+   "heading": "Accuracy fell through fifteen unattended rounds",
    "body": "Two cluster jobs, one collecting and one training, ran fifteen rounds against the locked registry with nobody in the room. Each round searched public sources, filtered what it found, merged, trained and evaluated. Every round reported success. Accuracy fell for fifteen rounds.",
    "figure": "f_rounds",
    "status": "built_but_off",
@@ -213,7 +213,7 @@
   {
    "id": "brain",
    "theme": "iterating-agents-brain",
-   "heading": "Which decisions a model makes",
+   "heading": "Deciding work runs on the cluster, on open weights",
    "body": "A language model decides what the collector goes after next, judges whether a candidate dataset is on topic, and reviews a finished step. Those run on the cluster, as batch jobs, on open weights. The lab box hosts only the small guide model, and a verdict produced there is marked in its own record as a draft that may not be reported.",
    "figure": "none",
    "status": "built_and_running",
@@ -223,7 +223,7 @@
   {
    "id": "watch",
    "theme": "iterating-agents-brain",
-   "heading": "Who notices when it breaks",
+   "heading": "Our own watchdog returned no decision on 149 dev cases",
    "body": "We froze 162 real failures out of this project's own engineering record and scored every kind of supervision against them. The watchdog the loop was running returned no decision on any of the 149 dev cases. A model reading the raw artifacts reaches 0.70 recall over 116 incidents.",
    "figure": "none",
    "status": "built_and_running",
@@ -245,7 +245,7 @@
   {
    "id": "diagnosis",
    "theme": "iterating-agents-brain",
-   "heading": "Reading the loop's own artifacts",
+   "heading": "Growth stopped at round three; one uncleared directory faked the rest",
    "body": "The corpus stopped growing at round three: the same 24 datasets and 48,752 unique images went in every time, and the apparent growth was one staging directory nobody cleared. Eight rounds collected nothing and reported success. Starting fresh instead of from the previous round's weights is worth +0.0287, 5.1 times this recipe's own seed spread.",
    "figure": "none",
    "status": "built_and_running",
@@ -255,7 +255,7 @@
   {
    "id": "journey",
    "theme": "results",
-   "heading": "Six months, in order",
+   "heading": "Four of these eight turns did not work",
    "body": "Four of these eight turns are things that did not work, and two are numbers this project measured and then withdrew after checking them.",
    "figure": "t_journey",
    "status": "built_and_running",
@@ -265,7 +265,7 @@
   {
    "id": "ledger",
    "theme": "results",
-   "heading": "Everything we trained, ran, or rejected",
+   "heading": "Of 27 distinct models, one is deployed",
    "body": "Thirty rows in four families, which is 27 distinct models. Five detectors trained on our own holdout, two vision models inside the loop, fourteen vision-language models zero-shot, and nine language models as reviewers. One is deployed.",
    "figure": "m_ledger",
    "status": "built_and_running",
@@ -277,7 +277,7 @@
   {
    "id": "ladder",
    "theme": "results",
-   "heading": "More web data, less accuracy",
+   "heading": "Twelve times the training data costs 0.0189",
    "body": "Twelve times the training data costs 0.0189 on our own 1,977-image holdout, three seeds at every rung, which is 8.2 times the seed spread. The same eight checkpoints fall on a second weed dataset too. One of six audited web sources reaches a 0.90 label-precision bar.",
    "figure": "c_ladder",
    "status": "built_and_running",
@@ -287,7 +287,7 @@
   {
    "id": "field",
    "theme": "results",
-   "heading": "Back on our own rows",
+   "heading": "Firing on 25 of 2,686 frames, with no labels to check",
    "body": "The deployable checkpoint draws a box on 25 of the 2,686 frames our robots recorded, and 24 of those 25 boxes are the same class. These frames carry no labels, so that is a firing rate, not recall and not precision.",
    "figure": "p_field",
    "status": "built_and_running",
@@ -359,7 +359,7 @@
   {
    "id": "live_detect",
    "theme": "remote-control",
-   "heading": "Running the detector on a live frame",
+   "heading": "Operators watch the detector run on the newest frame",
    "body": "While a robot is driving, the project page shows its newest frame refreshing every second and a half, and the weed detector can be switched on over that frame in the same process. The operator sees what the model sees, on the drive that is happening.",
    "figure": "none",
    "status": "built_and_running",
@@ -400,7 +400,7 @@
    "id": "projects",
    "theme": "robots-connected",
    "figure": "q_projects",
-   "heading": "Any robot the lab owns joins the same platform",
+   "heading": "Three of four projects have data; the fourth is empty",
    "status": "built_and_running",
    "body": "Each of the four was opened the same way, sends through the same ingest contract, and is trained and evaluated by the same agents. Three have data. The fourth is open and empty, which is what a platform looks like before the next robot arrives."
   },
@@ -408,41 +408,41 @@
    "id": "shared_models",
    "theme": "robots-connected",
    "figure": "d_wall",
-   "heading": "One robot's model on another robot's rows",
+   "heading": "Moving a model between robots is one query on one registry",
    "status": "designed_only",
-   "body": "Because every vehicle writes into one registry through one contract, a model trained on one robot's frames can be evaluated on another's without any new plumbing: the split is a query. We have run that query across datasets rather than across robots, and it is the hard direction. A detector trained on 40,000 harvested images loses 0.0299 on a second weed dataset; the same eight checkpoints fall on both exams. So sharing perception between the rover, the cart and whatever comes next is a measurement problem we have already priced, not a wiring problem."
+   "body": "Because every vehicle writes into one registry through one contract, a model trained on one robot's frames can be evaluated on another's without any new plumbing: the split is a query. So far we have only run that query across datasets, and that is the hard direction. A detector trained on 40,000 harvested images loses 0.0299 on a second weed dataset; the same eight checkpoints fall on both exams. So sharing perception between the rover, the cart and whatever comes next is a measurement problem, and we have already priced it."
   },
   {
    "id": "dispatch",
    "theme": "iterating-agents-brain",
    "figure": "none",
-   "heading": "How many agents, and which models",
+   "heading": "Where a model runs decides whether its verdict counts",
    "status": "built_and_running",
    "big": "27",
    "big_label": "models the router can place",
-   "body": "Nothing on the platform hard-codes a model name. A router maps a role -- collector, judge, reviewer, planner -- onto a model and a place, and the place decides whether the verdict counts: work that analyses, reviews or decides runs as a cluster batch job on open weights, and anything answered by the lab box is marked in its own record as a draft. The scheduler then fans a round out across as many review arms as the round asks for. What it does not yet do is choose that number for itself."
+   "body": "Nothing on the platform hard-codes a model name. A router maps a role -- collector, judge, reviewer, planner -- onto a model and a place, and the place decides whether the verdict counts. Work that analyses, reviews or decides runs as a cluster batch job on open weights, and anything answered by the lab box is marked in its own record as a draft. The scheduler then fans a round out across as many review arms as the round asks for. What it does not yet do is choose that number for itself."
   },
   {
    "id": "vision_platform",
    "theme": "vision",
    "figure": "none",
-   "heading": "Where this goes",
+   "heading": "End state is one platform for any dataset and any robot",
    "status": "designed_only",
-   "body": "The end state is one general platform: any dataset, any research field, any robot. Agents on it run without being asked, iterate on their own output, escalate to a larger model when they are out of their depth, and are fenced in a sandbox while they do it. Every piece of this poster is a step in that direction rather than a one-off experiment."
+   "body": "The end state is one general platform: any dataset, any research field, any robot. Agents on it run without being asked, iterate on their own output, escalate to a larger model when they are out of their depth, and are fenced in a sandbox while they do it. Every piece of this poster is a step in that direction."
   },
   {
    "id": "vision_permanent",
    "theme": "vision",
    "figure": "none",
-   "heading": "Why it is built this way",
+   "heading": "Capabilities land in the platform, so the next student inherits them",
    "status": "built_and_running",
-   "body": "Each capability is added to the platform itself, not to a script somebody ran once. The routing table, the ingest contract, the dataset registry, the sandbox and the scorer are all part of the product, so the next student inherits them working. That is the difference between a lab that has done an experiment and a lab that has built somewhere to do the next one."
+   "body": "Each capability is built into the platform itself and stays there after the experiment that needed it. The routing table, the ingest contract, the dataset registry, the sandbox and the scorer are all part of the product, so the next student inherits them working. That is the difference between a lab that has done an experiment and a lab that has built somewhere to do the next one."
   },
   {
    "id": "families",
    "theme": "results",
    "figure": "a_families",
-   "heading": "Three detector families, one sealed holdout",
+   "heading": "Seeds matter more than architecture across three detector families",
    "status": "built_and_running",
    "body": "Every in-domain number on this sheet is the same 1,977 images, held out of training and scored the same way. Five detectors were trained on it across three families. The deployable one is the smallest that kept its accuracy, at 2.6 M parameters, and the spread between families is smaller than the spread between seeds of one family."
   },
@@ -458,7 +458,7 @@
    "id": "tta",
    "theme": "results",
    "figure": "r_tta",
-   "heading": "What extra compute at test time buys",
+   "heading": "Test-time views buy a little and cost three passes per frame",
    "status": "built_and_running",
    "body": "The deployable checkpoint, unchanged, given more views per image. Fusing without extra views buys nothing. Multi-scale with a horizontal flip buys a little and costs three passes per frame, which a robot running at 1 Hz can afford and a laser cart cannot."
   },
@@ -466,7 +466,7 @@
    "id": "species",
    "theme": "results",
    "figure": "j_species",
-   "heading": "Which weeds it still misses",
+   "heading": "Per-class spread beats every training change we made this year",
    "status": "built_and_running",
    "body": "Per-class performance of the deployable checkpoint across the twelve species. The spread between the best and worst class is larger than every training change we made this year put together, which is why the next labels matter more than the next architecture."
   },
@@ -474,15 +474,15 @@
    "id": "detect_grid",
    "theme": "results",
    "figure": "u_detect",
-   "heading": "What the detector actually draws",
+   "heading": "Twelve species, one held-out image each, boxes as the model drew them",
    "status": "built_and_running",
-   "body": "One checkpoint, sixteen held-out images, all twelve species. Nothing here was cherry-picked for a box: the images were drawn one per class and the model was run at the confidence the cart deploys at. Where it fires twice on one plant, or names a neighbouring species, that is on the plate too."
+   "body": "One checkpoint, twelve held-out images, one for each species in the sealed holdout. The images were drawn one per class before the model ran, and the model ran at the confidence the cart deploys at. Where it fires twice on one plant or names a neighbouring species, that is on the plate too. No ground truth is drawn, so the plate shows what the detector produces and not what it should have produced."
   },
   {
    "id": "r241_frames",
    "theme": "live-collection",
    "figure": "v_r241",
-   "heading": "What the rover records",
+   "heading": "Rover sends 640 x 360 frames at 1 Hz from every drive",
    "status": "built_and_running",
    "body": "A single camera frame says nothing about a robot, so this is nine, one per drive. Robot 241 streams 640 x 360 at 1 Hz alongside GPS and two IMUs, and the platform files each drive as its own dataset the moment the session opens."
   },
@@ -490,7 +490,7 @@
    "id": "cart_frames",
    "theme": "live-collection",
    "figure": "v_cart",
-   "heading": "What the cart records",
+   "heading": "Cart sends two cameras and no position at all",
    "status": "built_and_running",
    "body": "Two cameras: one forward, one down over the work zone. The platform receives laser state, vehicle telemetry and the cart's own detections with every batch. It receives no position at all, which is the gap that stops these frames becoming a map."
   }

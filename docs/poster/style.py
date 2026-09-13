@@ -105,8 +105,14 @@ DASHES  = ["-", "--", "-.", ":", (0, (5, 1, 1, 1)), (0, (1, 1))]
 PLACED = {
     "l_robots": 11.6, "h_drive": 11.6, "k_funnel": 11.6, "s_sources": 11.6,
     "d_wall": 11.6, "p_field": 11.6, "j_species": 11.6,
-    "a_families": 10.925, "b_zeroshot": 10.925, "c_ladder": 10.925,
-    "e_supervision": 10.925, "r_tta": 10.925,
+    # There is no 10.925 width any more. It existed so a four-column grid could
+    # squeeze two narrower middle columns in, and the cost was that a plate
+    # authored at 11.6 landed in a 10.925 column and was silently not drawn --
+    # which is how the rover's and the cart's own frame mosaics went missing
+    # from a sheet whose text still described them. Four columns of 11.6 fit a
+    # 48 in sheet with 0.30 margins and 0.333 gutters.
+    "a_families": 11.6, "b_zeroshot": 11.6, "c_ladder": 11.6,
+    "e_supervision": 11.6, "r_tta": 11.6,
     "f_rounds": 22.4,
     "v_r241": 11.6, "v_cart": 11.6,
     "u_detect": 46.4,

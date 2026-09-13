@@ -8,7 +8,7 @@ one argument LOOKS: the grid, the palette, the type, the title treatment, the
 opening image, and how densely it is set.
 
 Every grid is built from the four widths the figures were authored at, 11.6,
-22.4, 10.925 and 46.4 inches, so a figure never lands in a slot it was not drawn
+22.4 and 46.4 inches, so a figure never lands in a slot it was not drawn
 for. A two-column look is 22.4 + 22.4 with a 1.6 in gutter, not two 22.9 columns.
 """
 import itertools
@@ -46,7 +46,7 @@ GRIDS = {
     "wide-left":  [(0.8, 22.4), (23.6, 11.6), (35.6, 11.6)],
     "wide-right": [(0.8, 11.6), (12.8, 11.6), (24.8, 22.4)],
     "two":        [(0.8, 22.4), (24.8, 22.4)],
-    "four":       [(0.8, 11.6), (12.8, 10.925), (24.125, 10.925), (35.6, 11.6)],
+    "four":       [(0.30, 11.6), (12.233, 11.6), (24.167, 11.6), (36.10, 11.6)],
 }
 
 # ---------------------------------------------------------------- type
