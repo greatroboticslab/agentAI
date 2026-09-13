@@ -430,9 +430,8 @@ PROJECTS = [
     {"key": "humanoid_robot", "name": "Humanoid and Quadruped", "layout": "pair",
      "photo": "humanoid_dog.jpg", "photo2": "team_field.jpg", "crop": 0.5, "w": 11.4,
      "blurb": "A humanoid and a quadruped, both out on the farm with the team. The project is "
-              "already open on the platform and takes the same ingest contract the rover and the "
-              "cart use, so the day either robot starts a session it is a governed dataset like "
-              "any other. Nothing either of them recorded has reached the platform yet."},
+              "open and takes the same ingest contract the rover and the cart use. Nothing "
+              "either of them recorded has reached the platform yet."},
 ]
 
 # --- the deployed checkpoint, re-evaluated ------------------------------------

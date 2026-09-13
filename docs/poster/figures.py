@@ -506,7 +506,7 @@ def _pic(ax, path, box, ax_w_in, ax_h_in, crop=0.5, fallback=None,
                                lw=1.2, zorder=3))
 
 
-FIG_W, FIG_H = 46.4, 4.30
+FIG_W, FIG_H = 46.4, 4.45
 
 
 def projects():
@@ -562,7 +562,7 @@ def projects():
             tx, tw_chars = pw + 0.045, int((cell_w_in * (1 - pw - 0.045) - 0.6) * 72 / (BLURB * 0.50))
             y = ytop - 0.02
         elif lay == "pair":
-            ph = 1.90 / ax_h_in
+            ph = 2.58 / ax_h_in
             half = (1.0 - 0.012) / 2.0
             _pic(ax, pr["photo"], (0.0, ytop - ph, half, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5))
