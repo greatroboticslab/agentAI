@@ -310,6 +310,55 @@ committed as `docs/poster/supervision_table.json`; verdicts under
 ---
 
 
+### Block M — **the platform, counted rather than claimed** (not metrics; what is on disk)
+Walked over `uploads/` on the lab server 2026-09-12. The field drive's byte-identical second copy
+(`ul_4_09test_c5a52917`) is excluded from every number here.
+
+| # | Quantity | Value | How it was counted | Caveat |
+|---|---|---|---|---|
+| M1 | Camera frames, all robot sessions | **2,686** in **26** sessions | walked the session tree, both upload layouts | **0 are labelled.** An earlier count folded a 21-frame post-rewire uplink test into robot 241's total. |
+| M2 | Robot 241 | 2,238 frames, 17 sessions | same | 640 x 360 at 1 Hz |
+| M3 | Laser cart | 427 frames, 8 sessions, **75 in a field** | same | the rest are indoor uplink tests |
+| M4 | Telemetry rows | **91,955** across **9** streams | every `*.jsonl` counted line by line | see the stream table below |
+| M5 | GPS track | **342.0 m** over 1,502 fixes in 18 sessions | haversine over consecutive fixes, board receiver preferred, steps above 25 m dropped as receiver jumps | the longest single pass is 140.9 m (211 fixes) |
+| M6 | Laser cart position and attitude | **none** | the cart's archive declares four streams: detections, laser, system, vehicle | "GPS and IMU on both robots" was a premise and it is false. Sensor fusion on this platform is robot 241 only. |
+| M7 | Down-camera rectangle | **a fixed work-zone overlay, not a detection** | pulled the lowest-vegetation down frame (excess green 0.018, an indoor floor) beside the highest (0.263, grass): same rectangle, same pixels | an earlier caption called it the cart's detector output. It is falsifiable in one click and it was wrong. |
+
+**The nine telemetry streams.**
+
+| stream | rows | sessions |
+|---|---|---|
+| telemetry | 23,884 | 18 |
+| control | 23,884 | 18 |
+| imu | 23,884 | 18 |
+| witimu | 10,055 | 8 |
+| laser | 3,379 | 8 |
+| detections | 3,379 | 8 |
+| vehicle | 1,762 | 8 |
+| gps | 1,502 | 18 |
+| system | 226 | 8 |
+
+---
+
+### Block N — **the model inventory** (breadth, not a ranking)
+27 distinct models in four families, drawn on the poster as the list it counts so the headline
+number cannot disagree with what is under it. One is deployed. Two models appear in two families
+because they do two jobs: OWLv2-large is both the pseudo-labeller and a benchmarked zero-shot
+detector, and Qwen2.5-7B is both a reviewer arm and the curation judge.
+
+| family | models | what they were for | where the numbers live |
+|---|---|---|---|
+| Detectors we trained | 5 | YOLO11n pretrained and scratch, Mamba-YOLO-T, RF-DETR Large, yolo26x | Blocks A, C, E, F |
+| Vision models in the loop | 2 | OWLv2-large pseudo-labels, DINOv2 quality gate | Blocks G, K |
+| Vision-language, zero-shot | 14 | one deterministic pass each on the 848-image split | Block G |
+| Language models as reviewers | 9 | the 162-incident corpus, 149-case dev split | Block L |
+
+Artifact: `docs/poster/poster_data.py` -> `CENSUS` and `LEDGER`, both derived so the printed
+counts cannot drift from the lists behind them.
+
+---
+
+
 ## A0. The protocol problem, and every number re-read three ways
 
 **There is no dev set anywhere in this project.** The 1,977-image cwd12 test+valid set is

@@ -9984,3 +9984,38 @@ Two things the drafts must keep. The author line is Harry He and Hongbo Zhang,
 and the PPTX document properties now say so too. And the negative results stay,
 moved from the spine into the evidence: the ladder, the second exam, the audited
 sources, the firing rate and the supervision benchmark all appear in all three.
+
+---
+
+## 2026-09-12 — v3.57.1 the platform census and the model inventory reach the ledger
+
+The numbers behind the three poster drafts existed only in `poster_data.py`. They
+are measurements like any other and they belong where a reviewer looks for them.
+
+**`docs/RESULTS_TABLE.md` Block M — the platform, counted rather than claimed.**
+Walked over `uploads/` on the lab server, the field drive's byte-identical second
+copy excluded: 2,686 frames in 26 sessions with **0 labelled**; robot 241 at
+2,238 / 17 and the cart at 427 / 8 with 75 of its frames in a field; **91,955
+telemetry rows across nine streams**, counted line by line; **342.0 m of GPS
+track** over 1,502 fixes in 18 sessions, haversine with receiver jumps above 25 m
+dropped, of which the longest single pass is 140.9 m. The cart declares four
+streams and none of them is position or attitude, so "GPS and IMU on both robots"
+was a premise and it is false. And the down-camera rectangle is recorded as what
+it is: a fixed work-zone overlay, established by putting the lowest-vegetation
+down frame on the platform beside the highest and finding the same rectangle at
+the same pixels.
+
+**Block N — the model inventory.** 27 distinct models in four families, one
+deployed, with the two models that appear twice named and why.
+
+Both blocks are also on the published web ledger.
+
+**`tests/test_poster_data.py`, 24 checks.** Three complete poster drafts now read
+one data module, so a silent error there corrupts all three identically — the
+drafts would still agree with each other, which is the worst kind of wrong. The
+test pins that every printed count has a list or a sum behind it: the frame and
+session counts add up, the nine stream row-counts sum to 91,955, the model count
+equals the distinct list, the recipe mean is the mean of its seeds, sigma is the
+measured spread, every ladder rung has three seeds, A0 has no rate rather than a
+rate of zero, grounded recall never exceeds recall on any arm, and every figure
+is authored at the width the layout places it at.
