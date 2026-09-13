@@ -366,6 +366,28 @@ DEPLOYED = {
            "data_yaml cwd12_sealed.yaml); ledger row from s3_yolo11n/s10{1,2,3}/results.csv",
 }
 
+# --- the deployed checkpoint, per species -------------------------------------
+# From the same plain inference pass as DEPLOYED, so the per-class numbers and
+# the detection plate describe one run rather than two. n is ground-truth
+# instances in the sealed holdout and sums to HOLDOUT["instances"]; an earlier
+# version of this figure read a different file and printed a 0.214 spread
+# against this pass's 0.247.
+PER_SPECIES = [
+    ("Morningglory", 0.7154, 349),
+    ("Goosegrass", 0.7530, 320),
+    ("Eclipta", 0.7988, 353),
+    ("SpottedSpurge", 0.8323, 42),
+    ("Nutsedge", 0.8467, 315),
+    ("Sicklepod", 0.8500, 76),
+    ("PalmerAmaranth", 0.8895, 278),
+    ("PricklySida", 0.8946, 180),
+    ("Carpetweeds", 0.9036, 688),
+    ("Crabgrass", 0.9036, 456),
+    ("Purslane", 0.9141, 109),
+    ("Ragweed", 0.9627, 91),
+]
+PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
+
 # --- the four projects a visitor would be shown -------------------------------
 # One row each: the photograph, what has been done, what is being done now, and
 # what is still open. Every count here appears elsewhere in this file or on the

@@ -392,17 +392,12 @@ def supervision():
     return save(fig, "e_supervision",
                 "(e) Every arm on one frozen corpus of real incidents from this project's own "
                 "history, scored by the project's own scorer. Each mark carries its own "
-                "denominator: two arms are still running and stand on 57 and 39 incidents against "
-                "the others' 112 to 114, and bars are 95%% Wilson intervals. Open circle: the model "
-                "reads raw artifact excerpts; the arrow runs to the same model given a retrieval "
-                "round over them, and is drawn solid only where both ends were scored on the same "
-                "cases. (f) The same arms, asking how much of that detection quotes a line that "
-                "resolves in the artifact. The 7 B has the highest recall on the page and %.2f of "
-                "it is unevidenced; the 27 B has no gap at all. Recall alone would have cleared the "
-                "size class this campaign's own reviewer ran on for a week. The intervals are "
-                "wide and they overlap: on this corpus the ordering among the model arms is not "
-                "established, and the grounded gap is."
-                % (g7["r"] - g7["g"]))
+                "denominator, bars are 95% Wilson intervals, and the arrow is drawn solid only "
+                "where both ends were scored on the same cases. (f) The same arms, asking how "
+                "much of each detection quotes a line that resolves in the artifact. The 7 B has "
+                "the highest recall on the page and 0.55 of it is unevidenced; the 27 B has no "
+                "such gap. The intervals overlap, so this corpus orders the arms by grounding "
+                "and not by size.")
 
 
 # --------------------------------------------------- photographic plates
@@ -481,7 +476,7 @@ def projects():
     import textwrap
     P = D.PROJECTS
     n = len(P)
-    H, PHOTO_IN = 4.85, 2.85
+    H, PHOTO_IN = 4.90, 2.52
     fig = plt.figure(figsize=(46.4, H))
     fig.set_layout_engine("none")
     L, R, GAP = 0.006, 0.994, 0.030
@@ -518,7 +513,11 @@ def projects():
         for lab, key in (("Done", "done"), ("Now", "now"), ("Open", "open")):
             ax.text(0, y, lab, fontsize=ANNOT, fontweight="bold",
                     color=WARN if key == "open" else INK, va="top")
-            for ln in textwrap.wrap(pr[key], 70):
+            # The cell is 10.42 in wide and the prose starts 0.85 in in, which
+            # at 13.5 pt Arial is about 100 characters. Wrapping at 70 turned
+            # every row into two lines and pushed "Open" through the bottom of
+            # the plate.
+            for ln in textwrap.wrap(pr[key], 96):
                 ax.text(indent, y, ln, fontsize=ANNOT, color=MUTE, va="top")
                 y -= step
             y -= gap
@@ -1002,22 +1001,43 @@ def drive():
 
 # ---------------------------------------------------------------- j. per species
 def species():
-    fd = json.load(open(os.path.join(HERE, "figures_data.json")))
-    rows = sorted(fd["per_species_yolo11n_val"]["rows"], key=lambda r: r["map50_95"])
+    """Twelve classes, ordered, with the count each score rests on.
+
+    Grey bars with the two ends in the spot colour: twelve saturated bars all
+    the same hue spend colour on nothing, and a reader cannot tell from them
+    which class is the problem. The n beside each bar is the point -- the two
+    weakest classes carry 349 and 320 instances, so neither is a small-sample
+    artefact, and the strongest carries 91, so it partly is.
+    """
+    rows = sorted(D.PER_SPECIES, key=lambda r: r[1])
+    lo, hi = rows[0][1], rows[-1][1]
     fig, ax = plt.subplots(figsize=(11.600, 6.60))
     y = np.arange(len(rows))
-    ax.barh(y, [r["map50_95"] for r in rows], color=BLUE, height=0.62)
-    for i, r in enumerate(rows):
-        ax.text(r["map50_95"] - 0.012, i, "%.3f" % r["map50_95"], va="center",
-                ha="right", fontsize=9.5, color=WHITE)
-    ax.set_yticks(y); ax.set_yticklabels([r["cls"] for r in rows], fontsize=9.5)
-    ax.set_xlim(0, 1.0); ax.set_xlabel("mAP$_{50\\mathdefault{-}95}$")
+    cols = [BLUE if (r[1] == lo or r[1] == hi) else GREY for r in rows]
+    ax.barh(y, [r[1] for r in rows], color=cols, height=0.62)
+    for i, (cls, v, n) in enumerate(rows):
+        ax.text(v - 0.012, i, "%.3f" % v, va="center", ha="right",
+                fontsize=ANNOT - 1.5, color=WHITE)
+        ax.text(v + 0.014, i, "n = %d" % n, va="center", fontsize=ANNOT - 2.5,
+                color=MUTE)
+    ax.set_yticks(y); ax.set_yticklabels([r[0] for r in rows], fontsize=ANNOT - 1)
+    ax.set_xlim(0, 1.14)
+    ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.set_xlabel("mAP$_{50\\mathdefault{-}95}$")
     despine(ax, left=False); ax.tick_params(axis="y", length=0)
     ax.xaxis.grid(True, color=RULE, lw=0.6); ax.set_axisbelow(True)
-    panel(ax, "j", dx=-0.40)
+    ax.annotate("", xy=(1.075, 0), xytext=(1.075, len(rows) - 1),
+                arrowprops=dict(arrowstyle="<->", color=INK, lw=1.1))
+    ax.text(1.092, (len(rows) - 1) / 2.0, "%.3f" % (hi - lo), rotation=90,
+            va="center", ha="left", fontsize=ANNOT - 1, color=INK)
+    panel(ax, "j", figx=0.004)
     return save(fig, "j_species",
-                "Per-species performance of the deployable checkpoint. The spread across the twelve "
-                "classes is 0.214, roughly seventy times the seed noise.")
+                "Per-species mAP50-95 of the deployed checkpoint over the sealed holdout, from the "
+                "same inference pass as the detection plate. n is ground-truth instances and sums "
+                "to %s. The spread between the best and worst class is %.3f, about sixty times the "
+                "0.0040 spread between training seeds; the two weakest classes carry %d and %d "
+                "instances, so neither is a small-sample artefact."
+                % ("{:,}".format(sum(r[2] for r in rows)), hi - lo, rows[0][2], rows[1][2]))
 
 
 # ---------------------------------------------------------------- k. funnel

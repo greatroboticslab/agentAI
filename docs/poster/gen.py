@@ -27,6 +27,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from deck import Deck, D, W, H, MARG                       # noqa: E402
+from pptx.enum.text import PP_ALIGN                        # noqa: E402
 import styles                                              # noqa: E402
 
 C, L = D.CENSUS, D.LEDGER
@@ -89,18 +90,23 @@ FOOTER = ["stands", "made", "withdrew"]
 # / What six months measured" labelled four containers and told them nothing,
 # and two of the four opened with the same word.
 MTSU_COLUMNS = [
+    # Order inside a theme IS its priority: the sheet gives up the last block of
+    # a theme first. Sorting by theme size instead dropped remote control, the
+    # fifteen-round loop and the agent-dispatch block -- three of the things
+    # this poster exists to show -- because the agent theme happened to be the
+    # longest list.
     ("Every robot joins one platform",
      ["platform_idea", "platform_domains", "robots_today", "shared_models",
       "future_robots"]),
     ("Two vehicles, 2,686 frames",
-     ["uplink", "r241_frames", "cart_frames", "census", "drive", "remote_control",
-      "drive_button", "auto_diag", "advice", "laser_control"]),
+     ["uplink", "r241_frames", "cart_frames", "remote_control", "drive",
+      "drive_button", "census", "auto_diag", "advice", "laser_control"]),
     ("Agents plan, code and review",
-     ["analysis_agent", "analysis_example", "analysis_sandbox", "loop", "brain",
-      "dispatch", "watch", "supervisor"]),
+     ["analysis_agent", "loop", "dispatch", "brain", "supervisor",
+      "analysis_example", "watch", "analysis_sandbox"]),
     ("More data made accuracy worse",
-     ["ladder", "field", "families", "species", "zeroshot", "tta",
-      "sources", "ledger"]),
+     ["ladder", "field", "species", "families", "ledger", "sources", "tta",
+      "zeroshot"]),
 ]
 MTSU_PAD = 0.24            # the template's own panel padding, 0.26, less a hair
 
@@ -115,7 +121,13 @@ class Poster(object):
         # Full-width plates, in the order they earn their inches. A sheet that
         # cannot hold them all keeps the ones nearer the front: the detection
         # strip is the evidence the models work, the timeline is context.
-        self.tail_ids = list(TAIL_BANDS)
+        # Decided before the layout runs, not during it. Changing the number of
+        # full-width bands inside the drop loop makes the two fight: the loop
+        # gives up blocks to fit two bands, then removes a band, and either the
+        # blocks stay lost or the loop starts over and gives up the same ones
+        # again. One band costs about 5.4 in of sheet, which is 21 in of column.
+        self.tail_ids = (["detect_grid"] if getattr(st, "look", "") == "mtsu"
+                         else list(TAIL_BANDS))
         self.d = Deck(TITLE, STAND, style=st)
 
     def slot_of(self, sid):
@@ -187,7 +199,10 @@ class Poster(object):
                 ("%.0f m" % C["gps_m"], "of GPS track", "%s fixes over %d drives"
                  % ("{:,}".format(C["gps_fixes"]), C["gps_sessions"])),
                 ("%d" % L["n_models"], "distinct models run", "four families, one deployed"),
-                ("%d" % C["labelled"], "robot frames labelled", "the whole archive, so far")]
+                ("%.4f" % D.DEPLOYED["map50_95"], "mAP50-95, deployed model",
+                 "all %s sealed holdout images, %s instances"
+                 % ("{:,}".format(D.DEPLOYED["n_images"]),
+                    "{:,}".format(D.HOLDOUT["instances"])))]
 
     def census_row(self, y):
         d = self.d
@@ -304,10 +319,15 @@ class Poster(object):
         h = 0.0
         for sid in ids:
             s = self.lib[sid]
-            hh = (d.dz["heading"] / 72.0 * 1.34 + 0.30
-                  + d.h_est(s["body"], cw, d.dz["body"], 1.22, 12))
+            body = s["body"]
+            if s.get("status") == "designed_only":
+                body += " This is the direction, not a description of what runs today."
+            hh = (self._head_h(d, cw, s["heading"])
+                  + d.h_est(body, cw, d.dz["body"], 1.22, 12))
             h = max(h, hh)
-        return h + 0.75
+        # the footer rule sits 0.25 above the footer text and the closing needs
+        # air under it; an earlier estimate left the last two lines off the sheet
+        return h + 1.05
 
     def closing(self, y):
         d = self.d
@@ -328,6 +348,43 @@ class Poster(object):
                 body += " This is the direction, not a description of what runs today."
             ends.append(d.body(x, yy, cw, body, after=10))
         return max(ends) + 0.30
+
+    def mtsu_kpi(self, y):
+        """The template's summary strip, rebuilt from its own measurements.
+
+        slide1.xml: a #C2CEDA hairline 0.014 in tall, the numbers in Arial bold
+        accent centred in equal cells with no gaps, 0.012 in dividers on the
+        cell boundaries, the labels in Arial 13 #4C5A69, a second hairline
+        underneath, 1.294 in overall. Scaled here for a 36 in sheet.
+
+        Every cell carries its denominator. A row of big percentages with no n
+        is the most-named tell in generated decks, and it is unfalsifiable --
+        which is why it is easy to write and useless to read.
+        """
+        d = self.d
+        x0, W0 = d.FULL
+        cells = self.census_cells()
+        n = len(cells)
+        cw = W0 / float(n)
+        NUM, LAB, NOTE = 52, 17, 15
+        d.rect(x0, y, W0, 0.020, fill=d.c["rule"])
+        ytop = y + 0.22
+        bottom = ytop
+        for i, (v, lab, note) in enumerate(cells):
+            cx = x0 + i * cw
+            d.tbox(cx, ytop, cw, [(v, NUM, True, d.c["accent"])], spacing=0.98,
+                   align=PP_ALIGN.CENTER, face="Arial")
+            yy = ytop + NUM / 72.0 * 1.06
+            d.tbox(cx, yy, cw, [(lab, LAB, False, d.c["ink"])], spacing=1.0,
+                   align=PP_ALIGN.CENTER, face="Arial")
+            yy += LAB / 72.0 * 1.42
+            d.tbox(cx, yy, cw, [(note, NOTE, False, d.c["mute"])], spacing=1.10,
+                   align=PP_ALIGN.CENTER, face="Arial")
+            bottom = max(bottom, yy + d.h_est(note, cw, NOTE, 1.10))
+            if i:
+                d.rect(cx, ytop + 0.04, 0.014, bottom - ytop - 0.02, fill=d.c["rule"])
+        d.rect(x0, bottom + 0.14, W0, 0.020, fill=d.c["rule"])
+        return bottom + 0.52
 
     def mtsu_has_plate(self, sid, w):
         f = self.lib[sid].get("figure") or "none"
@@ -390,29 +447,50 @@ class Poster(object):
                     flow.append((head if first else None, sid))
                     first = False
 
+        flow0 = list(flow)
         fig_no = [1]
         while True:
             fig_no[0] = 1
-            y0 = self.band(d.top, fig_no)
+            y0 = self.band(self.mtsu_kpi(d.top), fig_no)
             limit = H - FOOT_H - 0.95 - self.closing_h() - self.tail_band_h()
-            # deal the flow into columns by measured inches
+            # Deal the flow into columns by measured inches, to a TARGET of the
+            # total divided by the column count rather than to the page limit.
+            # Filling each column to the limit before starting the next is how a
+            # flow works and it left the fourth column of one proof holding a
+            # single block while the first ran to the footer.
+            heights = []
+            for head, sid in flow:
+                w = COL[0][1]
+                hh = self.mtsu_block_h(w, sid)
+                if head:
+                    hh += self._head_h(d, w, head)
+                heights.append(hh)
+            # Fill to the larger of an even share and most of the page: an even
+            # share alone cuts every column off early, because one plate is six
+            # inches and a column overshoots its share by a whole block, leaving
+            # the remainder to pile into the last column and spill off the sheet.
+            avail = limit - y0
+            target = max(min(avail, (sum(heights) + 0.5 * n) / float(n)), 0.82 * avail)
             cols = [[] for _ in range(n)]
             ci, y = 0, y0
             spill = []
             carried = None
-            for head, sid in flow:
+            for (head, sid), h0 in zip(flow, heights):
                 x, w = COL[ci]
                 hh = self.mtsu_block_h(w, sid)
                 if head:
                     hh += self._head_h(d, w, head)
-                if y + hh > limit and ci < n - 1 and cols[ci]:
+                # move on once this column has met its share, unless moving on
+                # would leave a later column with nothing to hold
+                remaining = n - 1 - ci
+                if (cols[ci] and remaining > 0
+                        and (y - y0 + hh > target or y + hh > limit)):
                     ci += 1
                     x, w = COL[ci]
                     y = y0
                     if not head:
                         head = (carried or "") + " (cont.)"
-                    hh = self.mtsu_block_h(w, sid)
-                    hh += self._head_h(d, w, head)
+                    hh = self.mtsu_block_h(w, sid) + self._head_h(d, w, head)
                 if y + hh > limit and ci == n - 1 and cols[ci]:
                     spill.append(sid)
                     continue
@@ -447,18 +525,34 @@ class Poster(object):
                 ends.append(yy)
             if not spill:
                 break
-            if len(self.dropped) >= 12 and len(self.tail_ids) > 1:
-                self.tail_ids.pop()
-                self.dropped = []
-                self.d = Deck(TITLE, STAND, style=self.st); d = self.d
-                continue
-            # Give up the last block of the theme that has the most blocks left,
-            # so no theme is reduced to a heading over one sentence.
+            # What to give up. Three rules, in order:
+            #   1. a theme never loses its first block, because that block is
+            #      what its heading asserts;
+            #   2. prose goes before a plate, anywhere on the sheet, not just
+            #      inside the fullest theme -- searching one theme first dropped
+            #      four plates while prose sat untouched two columns away;
+            #   3. among equals, the fullest theme gives up its last block.
             counts = {}
             for head, sid in flow:
                 counts.setdefault(self._theme_of(sid), []).append(sid)
-            worst_theme = max(counts, key=lambda k: len(counts[k]))
-            victim = counts[worst_theme][-1]
+            widths = {w for _, w in COL}
+
+            def plate(sid):
+                return any(self.mtsu_has_plate(sid, w) for w in widths)
+
+            order = {s: i for _, ids in MTSU_COLUMNS for i, s in enumerate(ids)}
+
+            def rank(sid):
+                # Priority first, plate-ness only as a tie-break. Putting prose
+                # unconditionally ahead of plates is too strong: a seven-inch
+                # plate is not worth three two-inch blocks carrying the claims
+                # this poster exists to make, and that rule stripped the sheet
+                # to eight blocks while keeping every picture.
+                return (order.get(sid, 99), 0 if plate(sid) else 1)
+            candidates = [s for th, pool in counts.items() for s in pool[1:]]
+            if not candidates:
+                break
+            victim = max(candidates, key=rank)
             self.dropped.append(victim)
             flow = [(h, s) for h, s in flow if s != victim]
             # a dropped first-of-theme hands its heading to the next block

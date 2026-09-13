@@ -215,13 +215,17 @@ def sample(n, seed=11):
     # feel to be the poster's default, not one option among six, so the deck is
     # weighted rather than the modern look being deleted -- a sheet of thirty-six
     # that shows no alternative is not a comparison.
-    looks = (["journal"] * 3 + ["modern"]) * (n // 4 + 2)
+    looks = (["mtsu"] * 5 + ["journal"] * 2 + ["modern"]) * (n // 8 + 2)
     rnd.shuffle(looks)
     tries = 0
     while len(out) < n and tries < n * 30:
         tries += 1
         look = looks[len(out) % len(looks)]
-        if look == "journal":
+        if look == "mtsu":
+            pick = (deal("g", list(GRIDS)), deal("mp", list(MTSU_PALETTES)),
+                    deal("mt", list(MTSU_TYPES)), deal("mk", list(MTSU_TITLES)),
+                    deal("h", list(HEROES)), deal("d", list(DENSITY)), "mtsu")
+        elif look == "journal":
             pick = (deal("g", list(GRIDS)), deal("jp", list(JOURNAL_PALETTES)),
                     deal("jt", list(JOURNAL_TYPES)), deal("jk", list(JOURNAL_TITLES)),
                     deal("h", list(HEROES)), deal("d", list(DENSITY)), "journal")
