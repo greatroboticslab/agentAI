@@ -510,7 +510,7 @@ def _pic(ax, path, box, ax_w_in, ax_h_in, crop=0.5, fallback=None,
                                lw=1.2, zorder=3))
 
 
-FIG_W, FIG_H = 46.4, 4.15
+FIG_W, FIG_H = 46.4, 4.30
 
 
 def projects():
@@ -531,7 +531,10 @@ def projects():
     total = sum(p["w"] for p in P)
     span = (R - L) - GAP * (len(P) - 1)
     x = L
-    step, gap, indent = 0.30 / FIG_H, 0.16 / FIG_H, 0.075
+    # The introductions are the first prose a visitor reads. At ANNOT+1 they
+    # were the smallest type on the plate, under an inch of empty paper.
+    BLURB = AXIS + 3.5
+    step, indent = 0.345 / (0.980 * FIG_H), 0.075
     for pr in P:
         w = span * pr["w"] / total
         ax = fig.add_axes([x, 0.010, w, 0.980])
@@ -544,42 +547,42 @@ def projects():
         ax_h_in = 0.980 * FIG_H
         lay = pr.get("layout", "top")
 
-        ax.text(0, 0.985, pr["name"], fontsize=AXIS + 4, fontweight="bold",
+        ax.text(0, 0.985, pr["name"], fontsize=AXIS + 6, fontweight="bold",
                 color=INK, va="top")
-        ytop = 1.0 - (0.46 / ax_h_in)
+        ytop = 1.0 - (0.44 / ax_h_in)
 
         if lay == "side":
             # a square, so the machine is not cropped to fit a neighbour's shape
             # A square, capped so the plate stays short enough to leave the
             # columns their inches: a 5.4 in square read the rover whole but
             # cost the sheet two blocks of argument.
-            side_in = min(cell_w_in * 0.40, 3.10, ax_h_in - 0.55)
+            side_in = min(cell_w_in * 0.40, 2.85, ax_h_in - 0.50)
             pw, ph = side_in / cell_w_in, side_in / ax_h_in
             _pic(ax, pr["photo"], (0.0, ytop - ph, pw, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5), pr.get("fallback"))
             if pr.get("photo_note"):
                 ax.text(0.0, ytop - ph - 0.035, pr["photo_note"], fontsize=ANNOT - 2,
                         color=MUTE, style="italic", va="top")
-            tx, tw_chars = pw + 0.045, int((cell_w_in * (1 - pw - 0.045) - 0.7) / 0.098)
+            tx, tw_chars = pw + 0.045, int((cell_w_in * (1 - pw - 0.045) - 0.6) * 72 / (BLURB * 0.50))
             y = ytop - 0.02
         elif lay == "pair":
-            ph = 2.05 / ax_h_in
+            ph = 1.90 / ax_h_in
             half = (1.0 - 0.012) / 2.0
             _pic(ax, pr["photo"], (0.0, ytop - ph, half, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5))
             _pic(ax, pr.get("photo2", ""), (half + 0.012, ytop - ph, half, ph),
                  cell_w_in, ax_h_in, pr.get("crop", 0.5))
-            tx, tw_chars = 0.0, int((cell_w_in - 0.7) / 0.098)
+            tx, tw_chars = 0.0, int((cell_w_in - 0.6) * 72 / (BLURB * 0.50))
             y = ytop - ph - 0.05
         else:
-            ph = 1.95 / ax_h_in
+            ph = 1.70 / ax_h_in
             _pic(ax, pr["photo"], (0.0, ytop - ph, 1.0, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5), pr.get("fallback"))
-            tx, tw_chars = 0.0, int((cell_w_in - 0.7) / 0.098)
+            tx, tw_chars = 0.0, int((cell_w_in - 0.6) * 72 / (BLURB * 0.50))
             y = ytop - ph - 0.05
 
         for ln in textwrap.wrap(pr["blurb"], max(24, tw_chars)):
-            ax.text(tx, y, ln, fontsize=ANNOT + 1, color=INK, va="top")
+            ax.text(tx, y, ln, fontsize=BLURB, color=INK, va="top")
             y -= step
     return save(fig, "q_projects",
                 "Four projects on one platform. Each was opened the same way, sends through the same "
