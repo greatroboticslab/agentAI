@@ -103,7 +103,6 @@ def fam():
     ax.set_xlabel("mAP$_{50\\mathdefault{-}95}$   on the sealed 1,977-image holdout")
     despine(ax, left=False)
     ax.spines["bottom"].set_bounds(0.80, 0.88)
-    panel(ax, "a", figx=0.004)
     return save(fig, "a_families",
                 "Three detector families on the sealed 1,977-image CottonWeedDet12 holdout. Filled "
                 "mark: the mean over seeds 101/102/103, with 1 s.d.; open marks behind it: the three "
@@ -134,7 +133,6 @@ def vlm():
     despine(ax, left=False)
     ax.xaxis.grid(True, color=RULE, lw=0.6); ax.set_axisbelow(True)
     ax.tick_params(axis="y", length=0)
-    panel(ax, "b", dx=-0.46)
     return save(fig, "b_zeroshot",
                 "One deterministic pass per model, no repeats. Fifteen zero-shot vision-language "
                 "models against the fine-tuned detector: the best of them reaches 0.434 against "
@@ -478,72 +476,119 @@ def cart_grid():
 
 
 # ------------------------------------------------------- the four projects
+def _pic(ax, path, box, ax_w_in, ax_h_in, crop=0.5, fallback=None,
+         note="no photograph yet"):
+    """Draw one picture into a box in axes coordinates, cropped to the box.
+
+    The crop aspect is the box's own, so nothing is stretched -- an earlier
+    version cropped to 1.62 and drew at 2.42 and smeared every horizon by half.
+    A missing file draws a ruled empty frame that says so, which is the honest
+    thing for a project nothing has been uploaded to.
+    """
+    x, y, w, h = box
+    p = os.path.join(HERE, "photos", path) if path else ""
+    if (not p or not os.path.exists(p)) and fallback:
+        p = os.path.join(HERE, "photos", fallback)
+    if p and os.path.exists(p):
+        im = plt.imread(p)
+        ih, iw = im.shape[0], im.shape[1]
+        # The aspect the box is DRAWN at, measured from the axes it sits in --
+        # not from the whole figure. Using the figure's 46.4 x 5.6 here cropped
+        # a square box's picture to 3.7:1 and then stretched it back to square.
+        want = (w * ax_w_in) / (h * ax_h_in)
+        keep = int(round(iw / want))
+        if keep < ih:
+            top = int(round((ih - keep) * crop))
+            im = im[top:top + keep]
+        else:
+            keep_w = int(round(ih * want))
+            left = int(round((iw - keep_w) * 0.5))
+            im = im[:, left:left + keep_w]
+        ax.imshow(im, extent=(x, x + w, y, y + h), aspect="auto", zorder=1)
+    else:
+        ax.add_patch(plt.Rectangle((x, y), w, h, facecolor=PALE, edgecolor="none",
+                                   zorder=1))
+        ax.text(x + w / 2, y + h / 2, note, fontsize=ANNOT + 1, color=MUTE,
+                ha="center", va="center", style="italic", zorder=2)
+    ax.add_patch(plt.Rectangle((x, y), w, h, facecolor="none", edgecolor=RULE,
+                               lw=1.2, zorder=3))
+
+
+FIG_W, FIG_H = 46.4, 5.60
+
+
 def projects():
-    """One column per project: the picture, what was done, what runs now.
+    """Four projects, each drawn the shape it needs.
 
-    The humanoid column carries a ruled empty frame instead of a photograph,
-    because nothing has been uploaded to that project. Borrowing a picture of a
-    robot we hold no data from would be the one claim on this poster a visitor
-    could falsify in ten seconds.
-
-    Each photograph is cropped to exactly the aspect it is drawn at -- an
-    earlier version cropped to 1.62 and drew at 2.42, which stretched every
-    field horizontally by 1.5x and turned the cart's horizon into a smear.
-    `crop` biases that crop away from the sky for the two forward cameras.
+    Four identical cards in a row is the layout primitive the poster-design
+    literature names as the generated-deck signature, and forcing it here meant
+    cropping the rover to a letterbox strip to match a detection grid. So: the
+    detection grid stays wide because it is a strip of twelve, the rover gets a
+    square with its text beside it because it is a machine and wants to be seen
+    whole, and the humanoid project gets two pictures because it has two.
     """
     import textwrap
     P = D.PROJECTS
-    n = len(P)
-    H, PHOTO_IN = 4.90, 2.52
-    fig = plt.figure(figsize=(46.4, H))
+    fig = plt.figure(figsize=(FIG_W, FIG_H))
     fig.set_layout_engine("none")
-    L, R, GAP = 0.006, 0.994, 0.030
-    cw = ((R - L) - GAP * (n - 1)) / n
-    cw_in = cw * 46.4
-    y0 = (H - PHOTO_IN) / H                 # bottom of the photo band
-    want = cw_in / PHOTO_IN                 # the aspect the photo is drawn at
-    step, gap, indent = 0.30 / H, 0.17 / H, 0.082
-    for i, pr in enumerate(P):
-        ax = fig.add_axes([L + i * (cw + GAP), 0.010, cw, 0.980])
+    L, R, GAP = 0.004, 0.996, 0.009
+    total = sum(p["w"] for p in P)
+    span = (R - L) - GAP * (len(P) - 1)
+    x = L
+    step, gap, indent = 0.30 / FIG_H, 0.16 / FIG_H, 0.075
+    for pr in P:
+        w = span * pr["w"] / total
+        ax = fig.add_axes([x, 0.010, w, 0.980])
+        x += w + GAP
         ax.set_xticks([]); ax.set_yticks([])
         for sp in ax.spines.values():
             sp.set_visible(False)
         ax.set_xlim(0, 1); ax.set_ylim(0, 1)
-        if pr["photo"]:
-            im = plt.imread(os.path.join(HERE, "photos", pr["photo"]))
-            h, w = im.shape[0], im.shape[1]
-            keep = int(round(w / want))
-            if keep < h:
-                top = int(round((h - keep) * pr.get("crop", 0.5)))
-                im = im[top:top + keep]
-            ax.imshow(im, extent=(0, 1, y0, 1.0), aspect="auto", zorder=1)
-        else:
-            ax.add_patch(plt.Rectangle((0, y0), 1, 1 - y0, facecolor=PALE,
-                                       edgecolor="none", zorder=1))
-            ax.text(0.5, (1 + y0) / 2, "no upload yet", fontsize=ANNOT + 3,
-                    color=MUTE, ha="center", va="center", style="italic", zorder=2)
-        ax.add_patch(plt.Rectangle((0, y0), 1, 1 - y0, facecolor="none",
-                                   edgecolor=RULE, lw=1.2, zorder=3))
-        y = y0 - 0.40 / H
-        ax.text(0, y, pr["name"], fontsize=AXIS + 5, fontweight="bold",
+        cell_w_in = w * FIG_W
+        ax_h_in = 0.980 * FIG_H
+        lay = pr.get("layout", "top")
+
+        ax.text(0, 0.985, pr["name"], fontsize=AXIS + 4, fontweight="bold",
                 color=INK, va="top")
-        y -= 0.46 / H
+        ytop = 1.0 - (0.52 / ax_h_in)
+
+        if lay == "side":
+            # a square, so the machine is not cropped to fit a neighbour's shape
+            # A square, capped so the plate stays short enough to leave the
+            # columns their inches: a 5.4 in square read the rover whole but
+            # cost the sheet two blocks of argument.
+            side_in = min(cell_w_in * 0.40, 3.90, ax_h_in - 0.60)
+            pw, ph = side_in / cell_w_in, side_in / ax_h_in
+            _pic(ax, pr["photo"], (0.0, ytop - ph, pw, ph), cell_w_in, ax_h_in,
+                 pr.get("crop", 0.5), pr.get("fallback"))
+            tx, tw_chars = pw + 0.045, int((cell_w_in * (1 - pw - 0.045) - 0.7) / 0.098)
+            y = ytop - 0.02
+        elif lay == "pair":
+            ph = 2.55 / ax_h_in
+            half = (1.0 - 0.012) / 2.0
+            _pic(ax, pr["photo"], (0.0, ytop - ph, half, ph), cell_w_in, ax_h_in,
+                 pr.get("crop", 0.5))
+            _pic(ax, pr.get("photo2", ""), (half + 0.012, ytop - ph, half, ph),
+                 cell_w_in, ax_h_in, pr.get("crop", 0.5))
+            tx, tw_chars = 0.0, int((cell_w_in - 0.7) / 0.098)
+            y = ytop - ph - 0.05
+        else:
+            ph = 2.30 / ax_h_in
+            _pic(ax, pr["photo"], (0.0, ytop - ph, 1.0, ph), cell_w_in, ax_h_in,
+                 pr.get("crop", 0.5), pr.get("fallback"))
+            tx, tw_chars = 0.0, int((cell_w_in - 0.7) / 0.098)
+            y = ytop - ph - 0.05
+
         for lab, key in (("Done", "done"), ("Now", "now"), ("Open", "open")):
-            ax.text(0, y, lab, fontsize=ANNOT, fontweight="bold",
+            ax.text(tx, y, lab, fontsize=ANNOT, fontweight="bold",
                     color=WARN if key == "open" else INK, va="top")
-            # The cell is 10.42 in wide and the prose starts 0.85 in in, which
-            # at 13.5 pt Arial is about 100 characters. Wrapping at 70 turned
-            # every row into two lines and pushed "Open" through the bottom of
-            # the plate.
-            for ln in textwrap.wrap(pr[key], 96):
-                ax.text(indent, y, ln, fontsize=ANNOT, color=MUTE, va="top")
+            for ln in textwrap.wrap(pr[key], max(24, tw_chars)):
+                ax.text(tx + indent, y, ln, fontsize=ANNOT, color=MUTE, va="top")
                 y -= step
             y -= gap
     return save(fig, "q_projects",
-                "Four projects, one platform. Each was opened the same way, uploads through the "
-                "same contract, and is trained and evaluated by the same agents. Done is measured; "
-                "Open is what the project cannot do yet. The fourth has no photograph because "
-                "nothing has been uploaded to it.")
+                "Four projects on one platform, opened the same way and trained and evaluated by "
+                "the same agents. Done is measured; Open is what the project cannot do yet.")
 
 
 # ------------------------------------------------------------- the model ledger
@@ -815,7 +860,7 @@ def field():
         ax.text(max(v / tot, 0.0) + 0.012, -i, "{:,}".format(v), va="center",
                 fontsize=11, color=c)
     ax.set_xlim(0, 1.26); ax.set_ylim(-len(stages) + 0.42, 0.78)
-    ax.axis("off"); panel(ax, "p", dx=-0.02, dy=1.10)
+    ax.axis("off")
     return save(fig, "p_field",
                 "The deployable checkpoint over every frame the two robots recorded, at the "
                 "confidence the cart deploys at. There is no ground truth for these frames, so "
@@ -1048,7 +1093,6 @@ def species():
                 arrowprops=dict(arrowstyle="<->", color=INK, lw=1.1))
     ax.text(1.092, (len(rows) - 1) / 2.0, "%.3f" % (hi - lo), rotation=90,
             va="center", ha="left", fontsize=ANNOT - 1, color=INK)
-    panel(ax, "j", figx=0.004)
     return save(fig, "j_species",
                 "Per-species mAP50-95 of the deployed checkpoint over the sealed holdout, from the "
                 "same inference pass as the detection plate. n is ground-truth instances and sums "
@@ -1073,7 +1117,7 @@ def funnel():
         ax.text(0.0, -i + 0.40, lab, fontsize=10, color=INK, va="center")
         ax.text(w + 0.012, -i, "{:,}".format(v), va="center", fontsize=11, color=c)
     ax.set_xlim(0, 1.26); ax.set_ylim(-len(stages) + 0.45, 0.75)
-    ax.axis("off"); panel(ax, "k", dx=-0.02, dy=1.10)
+    ax.axis("off")
     return save(fig, "k_funnel",
                 "One of six audited harvested sources clears the label-precision bar. The audit "
                 "probe reads 1.000 on human-labelled cwd12, so the low scores are the data.")
