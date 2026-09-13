@@ -400,7 +400,7 @@
    "id": "projects",
    "theme": "robots-connected",
    "figure": "q_projects",
-   "heading": "Four projects, one platform",
+   "heading": "Any robot the lab owns joins the same platform",
    "status": "built_and_running",
    "body": "Each of the four was opened the same way, sends through the same ingest contract, and is trained and evaluated by the same agents. Three have data. The fourth is open and empty, which is what a platform looks like before the next robot arrives."
   },
@@ -469,6 +469,30 @@
    "heading": "Which weeds it still misses",
    "status": "built_and_running",
    "body": "Per-class performance of the deployable checkpoint across the twelve species. The spread between the best and worst class is larger than every training change we made this year put together, which is why the next labels matter more than the next architecture."
+  },
+  {
+   "id": "detect_grid",
+   "theme": "results",
+   "figure": "u_detect",
+   "heading": "What the detector actually draws",
+   "status": "built_and_running",
+   "body": "One checkpoint, sixteen held-out images, all twelve species. Nothing here was cherry-picked for a box: the images were drawn one per class and the model was run at the confidence the cart deploys at. Where it fires twice on one plant, or names a neighbouring species, that is on the plate too."
+  },
+  {
+   "id": "r241_frames",
+   "theme": "live-collection",
+   "figure": "v_r241",
+   "heading": "What the rover records",
+   "status": "built_and_running",
+   "body": "A single camera frame says nothing about a robot, so this is nine, one per drive. Robot 241 streams 640 x 360 at 1 Hz alongside GPS and two IMUs, and the platform files each drive as its own dataset the moment the session opens."
+  },
+  {
+   "id": "cart_frames",
+   "theme": "live-collection",
+   "figure": "v_cart",
+   "heading": "What the cart records",
+   "status": "built_and_running",
+   "body": "Two cameras: one forward, one down over the work zone. The platform receives laser state, vehicle telemetry and the cart's own detections with every batch. It receives no position at all, which is the gap that stops these frames becoming a map."
   }
  ]
 }

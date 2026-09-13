@@ -104,7 +104,7 @@ def main():
         # figure to be authored at a width the layout does not place it at, and
         # nothing on screen would show it -- the poster would simply print with
         # one plate's type 20 per cent larger than every other plate's.
-        for setname in ("fig", "fig_journal"):
+        for setname in ("fig", "fig_journal", "fig_mtsu"):
             off = []
             for name, placed in style.PLACED.items():
                 p = POSTER / setname / (name + ".png")

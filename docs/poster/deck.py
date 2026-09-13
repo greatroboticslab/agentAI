@@ -49,6 +49,7 @@ FONT  = "Arial"
 
 W, H = 48.0, 36.0
 MARG = 0.8
+MTSU_M = 0.42          # the template's own page margin, measured from slide1.xml
 COL = [(0.8, 11.6), (12.8, 22.4), (35.6, 11.6)]
 FULL = (0.8, 46.4)
 
@@ -147,7 +148,9 @@ class Deck(object):
         self.title_pt = size
         names = "   \u00b7   ".join(n for n, _ in M["authors"])
         affil = "%s   \u00b7   %s" % (M["affiliations"][0], M["institution"])
-        if self.look == "journal":
+        if self.look == "mtsu":
+            y = self._mtsu_title(title, names, affil)
+        elif self.look == "journal":
             y = self._journal_title(title, names, affil, size, kind)
         elif kind == "band":
             self.rect(0, 0, W, self.band, fill=c["band"])
@@ -180,7 +183,15 @@ class Deck(object):
             self.tbox(MARG, 2.70, W - 2 * MARG, [(names, 40, True, c["ink"])], spacing=1.0)
             self.tbox(MARG, 3.40, W - 2 * MARG, [(affil, 24, False, c["mute"])], spacing=1.0)
             y = self.band + 0.42
-        if standfirst and self.look == "journal":
+        if standfirst and self.look == "mtsu":
+            # No abstract rules under the band -- the band is already the rule.
+            # The standfirst runs the full measure in the body serif, one size
+            # under the affiliation line, and the columns start below it.
+            self.tbox(MTSU_M, y, W - 2 * MTSU_M,
+                      [(standfirst, dz["stand"] - 6, False, c["ink"])],
+                      spacing=1.20, face=f["body"], align=PP_ALIGN.JUSTIFY)
+            self.top = y + self.h_est(standfirst, W - 2 * MTSU_M, dz["stand"] - 6, 1.20) + 0.46
+        elif standfirst and self.look == "journal":
             # An abstract: one measure narrower than the sheet, justified, ruled
             # top and bottom, set a size down from the title's byline. This is
             # the single most recognisable thing about an article's first page.
@@ -198,6 +209,62 @@ class Deck(object):
             self.top = y + self.h_est(standfirst, W - 2 * MARG, dz["stand"], 1.16) + 0.55
         else:
             self.top = y + 0.3
+
+    def _mtsu_title(self, title, names, affil):
+        """The lab's own poster header, measured out of MTSU_LaserCar_Poster.pptx.
+
+        Band 3.05 in tall in #14314E, a 0.10 in #1C6FB5 rule under it, the
+        university mark on a 3.94 x 2.66 white plate at (0.60, 0.20) -- the
+        plate is needed because image1.png has no alpha and would otherwise
+        show as a white block -- and title, authors and affiliation centred on
+        the SHEET, not on the space beside the logo: 6.40 + 35.20 + 6.40.
+
+        `pale-band` is the same geometry with the band a tint and the type dark,
+        which is what CMU's Field Robotics Center poster does and what the
+        poster-design literature recommends over reversed white-on-navy.
+        """
+        c, f = self.c, self.f
+        BAND_H, RULE_H = 3.05, 0.10
+        pale = self.style.title_kind == "pale-band"
+        band_fill = RGBColor(0xE4, 0xEC, 0xF5) if pale else c["band"]
+        band_ink = c["ink"] if pale else c["band_ink"]
+        band_sec = c["mute"] if pale else RGBColor(0xD6, 0xE3, 0xF0)
+        self.rect(0, 0, W, BAND_H, fill=band_fill)
+        self.rect(0, BAND_H, W, RULE_H, fill=c["accent"])
+        self.rect(0.60, 0.20, 3.94, 2.66, fill=RGBColor(0xFF, 0xFF, 0xFF))
+        logo = os.path.join(HERE, "photos", "mtsu_logo.png")
+        if os.path.exists(logo):
+            self.slide.shapes.add_picture(logo, Inches(0.77), Inches(0.33),
+                                          width=Inches(3.60), height=Inches(2.3974))
+        tx, tw = 6.40, 35.20
+        em = {"Georgia": 0.62, "Times New Roman": 0.56}.get(f["display"], 0.55)
+        size = 50
+        while size > 34 and len(title) * em * size / 72.0 > tw:
+            size -= 1
+        self.title_pt = size
+        self.tbox(tx, 0.38, tw, [(title, size, True, band_ink)], spacing=0.98,
+                  align=PP_ALIGN.CENTER, face=f["display"])
+        # the template sets the author line in the BODY serif, not the display face
+        self.tbox(tx, 1.55, tw, [(names, 31, False, band_ink)], spacing=1.0,
+                  align=PP_ALIGN.CENTER, face=f["body"])
+        self.tbox(tx, 2.20, tw, [(affil, 20, False, band_sec)], spacing=1.0,
+                  align=PP_ALIGN.CENTER, face="Arial")
+        return BAND_H + RULE_H + 0.34
+
+    def panel_open(self, x, y, w):
+        """A white content panel with the template's 0.75 pt hairline.
+
+        Drawn before the text that sits on it, because python-pptx appends
+        shapes in z-order and a panel drawn afterwards would cover its own
+        column. Its height is corrected by `panel_close` once the column has
+        been laid out.
+        """
+        sh = self.rect(x, y, w, 1.0, fill=self.c.get("panel", WHITE),
+                       line=self.c["rule"], lw=0.75)
+        return sh
+
+    def panel_close(self, sh, ybot):
+        sh.height = Inches(max(0.4, ybot - sh.top / 914400.0))
 
     def _journal_title(self, title, names, affil, size, kind):
         """The first page of a paper: rules, centred type, no coloured ground.
@@ -249,6 +316,33 @@ class Deck(object):
 
     def head(self, x, y, w, s):
         c, f, dz = self.c, self.f, self.dz
+        if self.look == "mtsu":
+            # The template's own three shapes: heading box 0.620 high, a 0.055
+            # accent rule 0.500 below its top, content 0.755 below its top. The
+            # rule is UNDER the heading and there is none above it. Letters are
+            # typed in capitals and tracked 2.6 pt -- there is no cap= attribute
+            # anywhere in slide1.xml, so uppercasing the string is the faithful
+            # reproduction, not a style choice made here.
+            tb = self.tbox(x, y, w, [(s.upper(), dz["heading"], True, c["ink"])],
+                           spacing=1.0, face=f["display"])
+            for par in tb.text_frame.paragraphs:
+                for run in par.runs:
+                    run.font._rPr.set("spc", "260")
+            # The template's 0.500 assumes a one-line heading. A heading that
+            # wraps puts its second line exactly where the rule goes, and the
+            # rule strikes it through -- which is what happened the first time
+            # these headings became sentences. Measure instead.
+            caps = s.upper()
+            # Capitals with 2.6 pt of tracking, not lower case. Arial bold caps
+            # average about 0.72 em and the tracking adds 2.6/30 = 0.087 em on
+            # top, so 0.60 under-measured by a third and every wrapped heading
+            # came out struck through by its own rule.
+            em = {"Georgia": 0.88, "Times New Roman": 0.80}.get(f["display"], 0.81)
+            cpl = max(8, int((w * 72.0) / (dz["heading"] * em)))
+            lines = max(1, -(-len(caps) // cpl))
+            hh = max(0.500, lines * dz["heading"] / 72.0 * 1.12 + 0.12)
+            self.rect(x, y + hh, w, 0.055, fill=c["accent"])
+            return y + hh + 0.255
         if self.look == "journal":
             # Numbered, ruled above, set in the body serif at a size the eye
             # reads as a heading and not as a banner. An article numbers its
@@ -266,6 +360,12 @@ class Deck(object):
         return y + dz["heading"] / 72.0 * 1.30 + 0.36
 
     def sub(self, x, y, w, s):
+        if self.look == "mtsu":
+            # A 0.14 in accent square, then the sub-head in the accent colour.
+            self.rect(x, y + 0.12, 0.135, 0.135, fill=self.c["accent"])
+            self.tbox(x + 0.26, y, w - 0.26, [(s, 21, True, self.c["accent"])],
+                      spacing=1.0, face="Arial")
+            return y + self.h_est(s, w - 0.26, 21, 1.0) + 0.10
         self.tbox(x, y, w, [(s, SUBHEAD, True, self.c["ink"])], spacing=1.0, face=self.f["display"])
         return y + 0.46
 
@@ -276,7 +376,13 @@ class Deck(object):
         # Justified only for running prose, and only in the journal look: a
         # justified two-word label is a line of holes.
         if justify is None:
-            justify = self.look == "journal" and len(s) > 160
+            # Justify only at a measure a reader can follow. Purrington puts the
+            # limit at 45-65 characters; python-pptx cannot switch hyphenation
+            # on, so past that a justified column opens rivers of white.
+            em = {"Times New Roman": 0.442, "Georgia": 0.478,
+                  "Arial Narrow": 0.425}.get(self.f["body"], 0.50)
+            cpl = (w * 72.0) / (size * em)
+            justify = self.look in ("journal", "mtsu") and len(s) > 160 and cpl <= 66
         self.tbox(x, y, w, [(s, size, bold, color, after)], spacing=spacing,
                   align=PP_ALIGN.JUSTIFY if justify else PP_ALIGN.LEFT)
         return y + self.h_est(s, w, size, spacing, after)
@@ -296,10 +402,11 @@ class Deck(object):
         y2 = y + ph.height / 914400.0 + 0.12
         text = caption if caption is not None else CAPS.get(name, "")
         cs = self.dz["caption"]
-        if self.look == "journal":
+        if self.look in ("journal", "mtsu"):
             # "Fig. 4." bold, the caption in the body serif at caption size, both
             # in one paragraph so the lead-in sits on the same line as the text.
-            lead = label.replace("Figure", "Fig.").replace("..", ".")
+            lead = label if self.look == "mtsu" else \
+                label.replace("Figure", "Fig.").replace("..", ".")
             tb = self.slide.shapes.add_textbox(Inches(x), Inches(y2), Inches(w), Inches(0.4))
             tf = tb.text_frame; tf.word_wrap = True
             tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
@@ -308,7 +415,9 @@ class Deck(object):
                                    (text, False, self.c["ink"])):
                 r = par.add_run(); r.text = txt
                 r.font.size = Pt(cs); r.font.bold = bold
-                r.font.color.rgb = col; r.font.name = self.f["body"]
+                r.font.color.rgb = col
+                # the template sets every caption in Arial, body serif or not
+                r.font.name = "Arial" if self.look == "mtsu" else self.f["body"]
             cap = lead + " " + text
             return y2 + self.h_est(cap, w, cs, 1.16) + 0.34
         cap = "%s  %s" % (label, text)

@@ -345,6 +345,27 @@ LEDGER["n_models"] = len({n.lower() for n in _ledger_names()})
 LEDGER["n_deployed"] = 1
 LEDGER["n_groups"] = len(LEDGER["groups"])
 
+# --- the deployed checkpoint, re-evaluated ------------------------------------
+# The ledger's 0.8755 +/- 0.0029 is the three-seed mean read out of Ultralytics'
+# results.csv at each run's best epoch -- and the sealed holdout doubles as the
+# validation set during training, so a best-epoch figure is selected on the same
+# images it is reported on. This is the same checkpoint re-run over all 1,977
+# images as one plain inference pass, which is what the detection plate shows.
+# The two differ by 0.0201, inside the 0.0239 cross-evaluator offset this
+# project measured elsewhere.
+DEPLOYED = {
+    "seed": 102,
+    "weights": "cwd12_yolo11n_s102.pt",
+    "n_images": 1977,
+    "map50": 0.9168,
+    "map50_95": 0.8554,
+    "conf": 0.35,
+    "ledger_mean": "0.8755 \u00b1 0.0029",
+    "gap": 0.0201,
+    "src": "results/framework/s3_tta_ceiling/plain_s102.json (n_images 1977, "
+           "data_yaml cwd12_sealed.yaml); ledger row from s3_yolo11n/s10{1,2,3}/results.csv",
+}
+
 # --- the four projects a visitor would be shown -------------------------------
 # One row each: the photograph, what has been done, what is being done now, and
 # what is still open. Every count here appears elsewhere in this file or on the
@@ -352,12 +373,12 @@ LEDGER["n_groups"] = len(LEDGER["groups"])
 # because nothing has been uploaded to it, and the panel says that rather than
 # borrowing a picture from somewhere else.
 PROJECTS = [
-    {"key": "weed", "name": "Weed Detection", "photo": "yolo_overlay.jpg",
+    {"key": "weed", "name": "Weed Detection", "photo": "u_detect_4.jpg", "crop": 0.5,
      "done": "27 models trained or benchmarked against one sealed 1,977-image "
              "holdout; the smallest that held its accuracy was deployed",
      "now":  "that 2.6 M-parameter checkpoint runs on live robot frames",
      "open": "recall on robot frames, which needs labels we do not have yet"},
-    {"key": "241_robot", "name": "241 Robot", "photo": "r241_row.jpg", "crop": 0.88,
+    {"key": "241_robot", "name": "241 Robot", "photo": "r241_robot.jpg", "crop": 0.42,
      "done": "2,238 frames over 17 drives, 342 m of GPS track, two IMUs at 20 Hz",
      "now":  "driven from a browser through the platform: 1,389 commands so far",
      "open": "the rover has been off the network since 2026-08-28"},

@@ -87,6 +87,50 @@ JOURNAL_TYPES = {
 # hairline: title flush left under a single hairline, byline on the same line.
 JOURNAL_TITLES = ("classic", "masthead", "hairline")
 
+# ------------------------------------------------------------ the house look
+# Lifted, not invented: every value here was read out of the lab's own
+# MTSU_LaserCar_Poster.pptx. #1C6FB5, #C2CEDA and #14314E were already in
+# style.py because both files descend from the same house deck; what the
+# template adds is the near-black navy of the header band, the very pale blue
+# the page sits on, and white content panels with a 0.75 pt #C2CEDA border.
+#
+# The template's own geometry, in inches on a 48 in sheet: band 3.05 high with a
+# 0.10 accent rule under it, logo in a 3.94 x 2.66 white box at (0.60, 0.20),
+# page margin 0.42, gutter 0.34, section heading 0.62 high over a 0.06 rule,
+# panels starting 0.26 below that with 0.26 of padding, sub-heads marked by a
+# 0.14 square.
+MTSU_PALETTES = {
+    "house":  dict(band="#14314E", band_ink="#FFFFFF", accent="#1C6FB5", ink="#16202B",
+                   mute="#4C5A69", rule="#C2CEDA", pale="#EDF3F9", paper="#EDF1F6",
+                   panel="#FFFFFF"),
+    "navy":   dict(band="#14314E", band_ink="#FFFFFF", accent="#1C6FB5", ink="#16202B",
+                   mute="#4C5A69", rule="#C2CEDA", pale="#EDF3F9", paper="#FFFFFF",
+                   panel="#FFFFFF"),
+    "trueblue": dict(band="#1C6FB5", band_ink="#FFFFFF", accent="#14314E", ink="#16202B",
+                   mute="#4C5A69", rule="#C2CEDA", pale="#EDF3F9", paper="#F7F9FC",
+                   panel="#FFFFFF"),
+    "paper":  dict(band="#14314E", band_ink="#FFFFFF", accent="#1C6FB5", ink="#16202B",
+                   mute="#4C5A69", rule="#C2CEDA", pale="#EDF3F9", paper="#FFFFFF",
+                   panel="#FFFFFF"),
+}
+
+MTSU_TYPES = {
+    # The template sets headings in Arial and body in Georgia: 123 Arial runs
+    # against 120 Georgia runs in slide1.xml.
+    "house":   dict(display="Arial", body="Georgia", display_bold=True),
+    "serif":   dict(display="Georgia", body="Georgia", display_bold=True),
+    "sans":    dict(display="Arial", body="Arial", display_bold=True),
+}
+
+# Where the logo sits and what runs beside it.
+# The full-width dark band with reversed white type is the one element the
+# poster-design literature names as the signature of a template: Faulkes lists
+# "large coloured title bars" as the single visual marker of Canva/PowerPoint
+# output, and CMU's own Field Robotics Center poster uses a PALE band with the
+# title in dark type instead. Both are offered here so the choice is made on a
+# comparison rather than by default.
+MTSU_TITLES = ("logo-left", "pale-band", "logo-corner")
+
 # title treatment: how the top of the sheet is set
 TITLE_KINDS = ("band", "rule", "block", "underline")
 
@@ -104,14 +148,16 @@ class Style(object):
     def __init__(self, grid="three", palette="navy", type_="arial", title="band",
                  hero="photos", density="normal", look="modern"):
         self.look = look
-        pals = JOURNAL_PALETTES if look == "journal" else PALETTES
-        typs = JOURNAL_TYPES if look == "journal" else TYPES
+        pals = {"journal": JOURNAL_PALETTES, "mtsu": MTSU_PALETTES}.get(look, PALETTES)
+        typs = {"journal": JOURNAL_TYPES, "mtsu": MTSU_TYPES}.get(look, TYPES)
         if palette not in pals:
             palette = sorted(pals)[0]
         if type_ not in typs:
             type_ = sorted(typs)[0]
         if look == "journal" and title not in JOURNAL_TITLES:
             title = JOURNAL_TITLES[0]
+        if look == "mtsu" and title not in MTSU_TITLES:
+            title = MTSU_TITLES[0]
         self.name = "%s-%s-%s-%s-%s-%s-%s" % (look, grid, palette, type_, title, hero, density)
         self.grid_name, self.palette_name, self.type_name = grid, palette, type_
         self.title_kind, self.hero, self.density_name = title, hero, density
@@ -128,9 +174,15 @@ class Style(object):
             self.d["body"] += 1
             self.d["caption"] += 1
             self.d["heading"] -= 6
+        elif look == "mtsu":
+            # Georgia body, so the same point size reads a size smaller than
+            # Arial. The heading comes down to the template's own 30 pt.
+            self.d["body"] += 1
+            self.d["caption"] += 1
+            self.d["heading"] = 30
         # Which plates this look draws from: the slate-blue set in fig/, or the
         # near-monochrome set rendered with POSTER_LOOK=journal.
-        self.fig_dir = "fig_journal" if look == "journal" else "fig"
+        self.fig_dir = {"journal": "fig_journal", "mtsu": "fig_mtsu"}.get(look, "fig")
 
     def describe(self):
         face = self.f["body"] if self.f["body"] == self.f["display"] else (

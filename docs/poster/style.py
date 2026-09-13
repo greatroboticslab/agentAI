@@ -30,7 +30,29 @@ import os as _os
 
 LOOK = _os.environ.get("POSTER_LOOK", "modern")
 
-if LOOK == "journal":
+if LOOK == "mtsu":
+    # Read out of the lab's own poster (MTSU_LaserCar_Poster.pptx) rather than
+    # chosen: #1C6FB5 and #C2CEDA and #14314E are already this file's BLUE, RULE
+    # and NAVY, because both came from the same house deck. What the template
+    # adds is the near-black navy it sets text and the header band in, and the
+    # rule that colour appears once -- in the band and on the section rules --
+    # and never inside a plate except as the single series that carries the
+    # claim.
+    INK     = "#16202B"
+    NAVY    = "#14314E"
+    BLUE    = "#1C6FB5"   # the one spot colour, and it is the university's
+    PALE    = "#EDF3F9"
+    PALEBLU = "#D6E3F0"
+    RULE    = "#C2CEDA"
+    MUTE    = "#4C5A69"
+    WHITE   = "#FFFFFF"
+    GOOD    = "#7E8794"
+    WARN    = "#5A6470"
+    GREY    = "#A7AEB8"
+    SERIES  = [INK, BLUE, MUTE, GREY, GOOD, WARN]
+    FAMILY  = "Arial"
+    FIGDIR  = "fig_mtsu"
+elif LOOK == "journal":
     INK     = "#111111"   # plate black
     NAVY    = "#111111"
     BLUE    = "#4A4A4A"   # the first grey does the work colour used to do
@@ -86,6 +108,8 @@ PLACED = {
     "a_families": 10.925, "b_zeroshot": 10.925, "c_ladder": 10.925,
     "e_supervision": 10.925, "r_tta": 10.925,
     "f_rounds": 22.4,
+    "v_r241": 11.6, "v_cart": 11.6,
+    "u_detect": 46.4,
     "m_ledger": 22.4, "n_system": 22.4, "t_journey": 46.4, "w_robots": 46.4, "q_projects": 46.4,
 }
 

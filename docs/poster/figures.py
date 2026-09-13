@@ -31,6 +31,9 @@ def save(fig, name, caption):
         "the layout would scale its type" % (name, w, placed or 0, (placed or w) / w))
     fig.savefig(p)
     plt.close(fig)
+    # A caption is printed twice: here, and by python-pptx into the poster. PowerPoint
+    # has no mathtext, so a caption carrying $...$ prints the dollars and the braces.
+    assert "$" not in caption, "%s: caption carries mathtext, which PowerPoint prints raw" % name
     CAPS[name] = caption
     print("%-16s %s" % (name, caption[:118]))
     return p
@@ -402,6 +405,65 @@ def supervision():
                 % (g7["r"] - g7["g"]))
 
 
+# --------------------------------------------------- photographic plates
+def _plate(name, path, width, caption, aspect=None):
+    """A photograph placed at a column width, with nothing drawn over it.
+
+    Authored at the width the layout places it at, like every other plate here,
+    so the assertion in save() applies to photographs too. `aspect` crops the
+    picture to width/height; without it the picture keeps its own.
+    """
+    im = plt.imread(os.path.join(HERE, "photos", path))
+    h, w = im.shape[0], im.shape[1]
+    if aspect:
+        keep = int(round(w / aspect))
+        if keep < h:
+            top = (h - keep) // 2
+            im = im[top:top + keep]
+        h = im.shape[0]
+    fig = plt.figure(figsize=(width, width * h / float(w)))
+    fig.set_layout_engine("none")
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.imshow(im)
+    ax.set_xticks([]); ax.set_yticks([])
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    return save(fig, name, caption)
+
+
+def detect_grid():
+    # Both numbers, and what separates them. A reader who checks one will find
+    # the other, and a caption that quotes only the higher one is the kind of
+    # thing this poster's footer exists to apologise for.
+    P = D.DEPLOYED
+    return _plate(
+        "u_detect", "u_detect.jpg", 46.4,
+        "Twelve images from the sealed %s-image holdout, one per species, run through the "
+        "deployed checkpoint at the confidence the cart fires at. Every box and every label is "
+        "the model's output; no ground truth is drawn. Seed %d scores %.4f mAP50-95 and %.4f "
+        "mAP50 over all %s images on one plain inference pass. The ledger's %s is the three-seed "
+        "mean from each run's best epoch under the Ultralytics validator, on a holdout that was "
+        "also the validation set during training; the %.4f between them is evaluator and epoch "
+        "choice." % ("{:,}".format(P["n_images"]), P["seed"], P["map50_95"], P["map50"],
+                     "{:,}".format(P["n_images"]), P["ledger_mean"], P["gap"]))
+
+
+def r241_grid():
+    return _plate(
+        "v_r241", "m_r241.jpg", 11.6,
+        "Robot 241, nine frames from nine drives. Each is the most vegetated frame in its drive, "
+        "which is a selection rule and is stated as one: the rover also records paved and indoor "
+        "runs, and the bottom row is what those look like. 2,238 frames in all, none labelled.")
+
+
+def cart_grid():
+    return _plate(
+        "v_cart", "m_cart.jpg", 11.6,
+        "The laser cart, nine frames from eight drives. The rectangle is the cart's fixed "
+        "work-zone overlay: it sits at the same pixels whether the frame is grass or an indoor "
+        "floor, so it is not a detection. 427 frames in all.")
+
+
 # ------------------------------------------------------- the four projects
 def projects():
     """One column per project: the picture, what was done, what runs now.
@@ -419,7 +481,7 @@ def projects():
     import textwrap
     P = D.PROJECTS
     n = len(P)
-    H, PHOTO_IN = 5.40, 3.20
+    H, PHOTO_IN = 4.85, 2.85
     fig = plt.figure(figsize=(46.4, H))
     fig.set_layout_engine("none")
     L, R, GAP = 0.006, 0.994, 0.030
@@ -983,7 +1045,7 @@ if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
                species, funnel, field, tta, sources, ledger, system,
-               journey, robots_wide, projects):
+               journey, robots_wide, projects, detect_grid, r241_grid, cart_grid):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))
