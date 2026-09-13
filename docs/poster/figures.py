@@ -561,6 +561,9 @@ def projects():
             pw, ph = side_in / cell_w_in, side_in / ax_h_in
             _pic(ax, pr["photo"], (0.0, ytop - ph, pw, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5), pr.get("fallback"))
+            if pr.get("photo_note"):
+                ax.text(0.0, ytop - ph - 0.035, pr["photo_note"], fontsize=ANNOT - 2,
+                        color=MUTE, style="italic", va="top")
             tx, tw_chars = pw + 0.045, int((cell_w_in * (1 - pw - 0.045) - 0.7) / 0.098)
             y = ytop - 0.02
         elif lay == "pair":

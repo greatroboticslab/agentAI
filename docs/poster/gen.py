@@ -31,7 +31,7 @@ from pptx.enum.text import PP_ALIGN                        # noqa: E402
 import styles                                              # noqa: E402
 
 C, L = D.CENSUS, D.LEDGER
-FOOT_H = 2.05
+FOOT_H = 2.40
 
 SLOT_OF_WIDTH = {11.6: "column", 22.4: "centre", 46.4: "full"}
 FIGW = {}

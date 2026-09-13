@@ -400,7 +400,7 @@
    "id": "projects",
    "theme": "robots-connected",
    "figure": "q_projects",
-   "heading": "Three of four projects have data; the fourth is empty",
+   "heading": "Four projects, one contract; three are sending data",
    "status": "built_and_running",
    "body": "Each of the four was opened the same way, sends through the same ingest contract, and is trained and evaluated by the same agents. Three have data. The fourth is open and empty, which is what a platform looks like before the next robot arrives."
   },
