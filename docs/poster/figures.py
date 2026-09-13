@@ -520,17 +520,22 @@ def field():
 def robots():
     """Four frames off the platform, as recorded.
 
-    A poster about an autonomous pipeline has to show that the field half is real
-    equipment on real ground, and the honest version of that is frames straight
-    out of the archive -- not a staged photograph and not a rendering. Nothing is
-    enhanced here and nothing is labelled; the boxes in the laser cart's down
-    camera are its own detector drawing on its own video, which is what the cart
-    records while it drives, and they are not ground truth.
+    A poster about a field platform has to show that the field half is real
+    equipment on real ground, so these are frames straight out of the archive.
+    Nothing is enhanced and nothing is labelled.
+
+    The rectangle in the cart's down camera is a FIXED WORK-ZONE OVERLAY, not a
+    detection. An earlier version of this caption called it "the cart's own
+    detector drawing on its own video", which a reader could falsify in one
+    click: it sits at the same pixels, at the same size, on frames with no
+    vegetation in them at all. Checked 2026-09-12 by pulling the lowest-
+    vegetation down frame on the platform (excess green 0.018, an indoor floor)
+    beside the highest (0.263, grass) -- same rectangle on both.
     """
     P = D.PLATFORM
     shots = [("r241_row.jpg", "robot 241", "along a mulched crop row"),
              ("r241_weeds.jpg", "robot 241", "weeds between the rows"),
-             ("lc_down.jpg", "laser cart", "down camera, onboard detector"),
+             ("lc_down.jpg", "laser cart", "down camera, work-zone overlay"),
              ("lc_front.jpg", "laser cart", "forward camera")]
     fig, axes = plt.subplots(1, 4, figsize=(11.600, 2.30))
     for ax, (fn, who, what), let in zip(axes, shots, "lmno"):
@@ -545,13 +550,13 @@ def robots():
                 bbox=dict(boxstyle="square,pad=0.22", fc=WHITE, ec="none", alpha=0.86))
         ax.set_xlabel("%s   %s" % (who, what), fontsize=9, color=MUTE, labelpad=5)
     return save(fig, "l_robots",
-                "Frames as recorded, unenhanced. %d frames across %d sessions and %d robots sit "
-                "on the platform and %d of them are labelled: robot 241 contributes %d at "
-                "%s and %g Hz, the laser cart %d of which %d are in a field. The boxes in (n) "
-                "are the cart's own detector drawing on its own video, not ground truth."
-                % (P["total_frames"], P["sessions"], P["robots"], P["labelled"],
-                   P["r241_frames"], P["r241_res"], P["r241_hz"],
-                   P["lasercar_frames"], P["lasercar_field_frames"]))
+                "Frames as recorded, unenhanced. Robot 241 has sent %s frames at %s and %g Hz, "
+                "the laser cart %d, and %d of the cart's were taken in a field. None of the %s is "
+                "labelled. The rectangle in the down camera is the cart's fixed work-zone overlay. "
+                "It is drawn on every frame, including the ones with no vegetation in them."
+                % ("{:,}".format(P["r241_frames"]), P["r241_res"], P["r241_hz"],
+                   P["lasercar_frames"], P["lasercar_field_frames"],
+                   "{:,}".format(P["total_frames"])))
 
 
 # ---------------------------------------------------------------- f. rounds

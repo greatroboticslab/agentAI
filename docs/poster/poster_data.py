@@ -238,6 +238,32 @@ TTA = {
     "src": "figures_data.json -> tta_ceiling_2026_08_26 (jobs 44463762, 44463922)",
 }
 
+# --- the platform census, walked rather than claimed -------------------------
+# Every number here was counted by walking ~/weed_llm_benchmark/uploads on the
+# lab server on 2026-09-12, not read out of a document. The byte-identical
+# second copy of the field drive (ul_4_09test_c5a52917) is excluded everywhere.
+CENSUS = {
+    "frames": 2686, "sessions": 26, "labelled": 0,
+    "r241_frames": 2238, "r241_sessions": 17,
+    "cart_frames": 427, "cart_sessions": 8, "cart_field_frames": 75,
+    "smoke_frames": 21, "smoke_sessions": 1,      # a post-rewire uplink test
+    # Nine telemetry streams, counted line by line across every session.
+    "sensor_rows": 91955,
+    "streams": [("telemetry", 23884, 18), ("control", 23884, 18), ("imu", 23884, 18),
+                ("witimu", 10055, 8), ("laser", 3379, 8), ("detections", 3379, 8),
+                ("vehicle", 1762, 8), ("gps", 1502, 18), ("system", 226, 8)],
+    # Haversine over consecutive fixes, board receiver preferred, steps over 25 m
+    # dropped as receiver jumps.
+    "gps_m": 342.0, "gps_fixes": 1502, "gps_sessions": 18,
+    "hero_m": 140.9, "hero_fixes": 211,
+    # The cart writes four telemetry streams and neither of them is position or
+    # attitude. "GPS and IMU on both robots" was a premise, and it is false.
+    "cart_streams": ["detections", "laser", "system", "vehicle"],
+    "cart_has_gps": False, "cart_has_imu": False,
+    "src": "walked uploads/ on lab-b660m-c 2026-09-12; gps distance recomputed "
+           "from the nested data.board_lat/board_lon fields",
+}
+
 # --- the field gap: does the deployed detector fire on our own frames? -------
 # The cross-dataset wall is measured against another labelled corpus. This is the
 # same question asked of the corpus the platform actually holds, which has no
