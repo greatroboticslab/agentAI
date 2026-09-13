@@ -57,13 +57,26 @@ TABLE_TXT = 17
 
 
 class Deck(object):
-    """One slide, and the handful of marks anything on it is made of."""
+    """One slide, and the handful of marks anything on it is made of.
 
-    def __init__(self, title, standfirst=None, band=4.3):
+    A `Style` (styles.py) decides the grid, the palette, the display face, the
+    title treatment and the density. With no style the deck is the navy
+    three-column look the hand-built drafts used, so those still build.
+    """
+
+    def __init__(self, title, standfirst=None, band=4.3, style=None):
+        if style is None:
+            from styles import Style
+            style = Style()
+        self.style = style
+        self.c, self.f, self.dz = style.c, style.f, style.d
+        self.COL, self.FULL = style.COL, style.FULL
         self.prs = Presentation()
         self.prs.slide_width, self.prs.slide_height = Inches(W), Inches(H)
         self.slide = self.prs.slides.add_slide(self.prs.slide_layouts[6])
         self.band = band
+        # paper colour under everything, so a warm palette is not white
+        self.rect(0, 0, W, H, fill=self.c["paper"])
         self._titleblock(title, standfirst)
 
     # ---- marks ----------------------------------------------------------
@@ -81,7 +94,7 @@ class Deck(object):
             sh.line.color.rgb = line; sh.line.width = Pt(lw)
         return sh
 
-    def tbox(self, x, y, w, runs, align=PP_ALIGN.LEFT, spacing=1.0):
+    def tbox(self, x, y, w, runs, align=PP_ALIGN.LEFT, spacing=1.0, face=None):
         tb = self.slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(0.4))
         tf = tb.text_frame; tf.word_wrap = True
         tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
@@ -94,7 +107,7 @@ class Deck(object):
             p.alignment = align; p.space_after = Pt(after); p.line_spacing = spacing
             run = p.add_run(); run.text = s
             run.font.size = Pt(size); run.font.bold = bold
-            run.font.color.rgb = color; run.font.name = FONT
+            run.font.color.rgb = color; run.font.name = face or self.f["body"]
         return tb
 
     # ---- measurement ----------------------------------------------------
@@ -111,37 +124,70 @@ class Deck(object):
 
     # ---- blocks ---------------------------------------------------------
     def _titleblock(self, title, standfirst):
-        self.rect(0, 0, W, self.band, fill=NAVY)
-        self.rect(0, self.band, W, 0.05, fill=BLUE)
         M = D.MEETING
-        # One line, always. A title that wraps eats the byline, and a poster
-        # whose first act is to collide with itself has lost the reader before
-        # the first number. Arial bold runs about 0.55 em per character.
+        c, f, dz = self.c, self.f, self.dz
+        kind = self.style.title_kind
+        # One line, always: a title that wraps eats the byline. The display face
+        # is measured at ~0.55 em per character for Arial and ~0.50 for the serifs.
+        # Measured against the render, not guessed: Georgia bold runs wide.
+        em = {"Georgia": 0.62, "Times New Roman": 0.56, "Arial Narrow": 0.47}.get(f["display"], 0.55)
         size = TITLE
-        while size > 60 and len(title) * 0.55 * size / 72.0 > (W - 2 * MARG):
+        while size > 56 and len(title) * em * size / 72.0 > (W - 2 * MARG - (2.2 if kind == "block" else 0)):
             size -= 2
         self.title_pt = size
-        self.tbox(MARG, 0.42, W - 2 * MARG, [(title, size, True, WHITE)], spacing=0.95)
-        names = "   ·   ".join(n for n, _ in M["authors"])
-        self.tbox(MARG, 2.32, W - 2 * MARG, [(names, 40, True, WHITE)], spacing=1.0)
-        self.tbox(MARG, 3.02, W - 2 * MARG,
-                  [("%s   ·   %s" % (M["affiliations"][0], M["institution"]),
-                    24, False, RULE)], spacing=1.0)
+        names = "   \u00b7   ".join(n for n, _ in M["authors"])
+        affil = "%s   \u00b7   %s" % (M["affiliations"][0], M["institution"])
+        if kind == "band":
+            self.rect(0, 0, W, self.band, fill=c["band"])
+            self.rect(0, self.band, W, 0.05, fill=c["accent"])
+            self.tbox(MARG, 0.42, W - 2 * MARG, [(title, size, f["display_bold"], c["band_ink"])],
+                      spacing=0.95, face=f["display"])
+            self.tbox(MARG, 2.32, W - 2 * MARG, [(names, 40, True, c["band_ink"])], spacing=1.0)
+            self.tbox(MARG, 3.02, W - 2 * MARG, [(affil, 24, False, c["rule"])], spacing=1.0)
+            y = self.band + 0.42
+        elif kind == "rule":
+            self.tbox(MARG, 0.55, W - 2 * MARG, [(title, size, f["display_bold"], c["ink"])],
+                      spacing=0.95, face=f["display"])
+            self.tbox(MARG, 2.45, W - 2 * MARG, [(names, 40, True, c["ink"])], spacing=1.0)
+            self.tbox(MARG, 3.15, W - 2 * MARG, [(affil, 24, False, c["mute"])], spacing=1.0)
+            self.rect(MARG, self.band - 0.20, W - 2 * MARG, 0.045, fill=c["ink"])
+            y = self.band + 0.42
+        elif kind == "block":
+            # a vertical accent bar and the title set beside it
+            self.rect(MARG, 0.45, 0.42, self.band - 0.9, fill=c["accent"])
+            self.tbox(MARG + 1.1, 0.42, W - 2 * MARG - 1.1, [(title, size, f["display_bold"], c["ink"])],
+                      spacing=0.95, face=f["display"])
+            self.tbox(MARG + 1.1, 2.32, W - 2 * MARG - 1.1, [(names, 40, True, c["ink"])], spacing=1.0)
+            self.tbox(MARG + 1.1, 3.02, W - 2 * MARG - 1.1, [(affil, 24, False, c["mute"])], spacing=1.0)
+            y = self.band + 0.42
+        else:  # underline
+            self.tbox(MARG, 0.55, W - 2 * MARG, [(title, size, f["display_bold"], c["ink"])],
+                      spacing=0.95, face=f["display"])
+            self.rect(MARG, 2.30, min(W - 2 * MARG, len(title) * em * size / 72.0), 0.16,
+                      fill=c["accent"])
+            self.tbox(MARG, 2.70, W - 2 * MARG, [(names, 40, True, c["ink"])], spacing=1.0)
+            self.tbox(MARG, 3.40, W - 2 * MARG, [(affil, 24, False, c["mute"])], spacing=1.0)
+            y = self.band + 0.42
         if standfirst:
-            self.tbox(MARG, self.band + 0.42, W - 2 * MARG,
-                      [(standfirst, STAND, False, INK)], spacing=1.16)
+            self.tbox(MARG, y, W - 2 * MARG, [(standfirst, dz["stand"], False, c["ink"])],
+                      spacing=1.16, face=f["display"] if f["display"] != "Arial Narrow" else "Arial")
+        self.top = y + (self.h_est(standfirst, W - 2 * MARG, dz["stand"], 1.16) + 0.55 if standfirst else 0.3)
 
     def head(self, x, y, w, s):
-        self.tbox(x, y, w, [(s, HEADING, True, NAVY)], spacing=0.95)
-        self.rect(x, y + 0.62, w, 0.030, fill=BLUE)
-        return y + 0.98
+        c, f, dz = self.c, self.f, self.dz
+        self.tbox(x, y, w, [(s, dz["heading"], f["display_bold"], c["band"] if self.style.palette_name != "sand" else c["ink"])],
+                  spacing=0.95, face=f["display"])
+        self.rect(x, y + dz["heading"] / 72.0 * 1.30, w, 0.030, fill=c["accent"])
+        return y + dz["heading"] / 72.0 * 1.30 + 0.36
 
     def sub(self, x, y, w, s):
-        self.tbox(x, y, w, [(s, SUBHEAD, True, INK)], spacing=1.0)
+        self.tbox(x, y, w, [(s, SUBHEAD, True, self.c["ink"])], spacing=1.0, face=self.f["display"])
         return y + 0.46
 
-    def body(self, x, y, w, s, size=BODY, color=INK, after=12, bold=False,
+    def body(self, x, y, w, s, size=None, color=None, after=12, bold=False,
              spacing=1.22):
+        size = size or self.dz["body"]
+        color = color or self.c["ink"]
         self.tbox(x, y, w, [(s, size, bold, color, after)], spacing=spacing)
         return y + self.h_est(s, w, size, spacing, after)
 
@@ -159,38 +205,40 @@ class Deck(object):
         ph = self.slide.shapes.add_picture(p, Inches(x), Inches(y), width=Inches(w))
         y2 = y + ph.height / 914400.0 + 0.12
         cap = "%s  %s" % (label, caption if caption is not None else CAPS.get(name, ""))
-        self.tbox(x, y2, w, [(cap, CAPTION, False, MUTE, 0)], spacing=1.18)
-        return y2 + self.h_est(cap, w, CAPTION, 1.18) + 0.34
+        cs = self.dz["caption"]
+        self.tbox(x, y2, w, [(cap, cs, False, self.c["mute"], 0)], spacing=1.18)
+        return y2 + self.h_est(cap, w, cs, 1.18) + 0.34
 
     def table(self, x, y, w, header, rows, widths, hi=None, size=TABLE_TXT):
         n = len(header)
         cw = [w * f for f in widths]
         xs = [x + sum(cw[:i]) for i in range(n)]
-        self.rect(x, y, w, 0.026, fill=INK)
+        ink, acc, rule = self.c["ink"], self.c["accent"], self.c["rule"]
+        self.rect(x, y, w, 0.026, fill=ink)
         yy = y + 0.13
         for i, hcell in enumerate(header):
-            self.tbox(xs[i], yy, cw[i], [(hcell, size - 1.5, True, INK, 0)], spacing=1.0,
+            self.tbox(xs[i], yy, cw[i], [(hcell, size - 1.5, True, ink, 0)], spacing=1.0,
                       align=PP_ALIGN.RIGHT if i else PP_ALIGN.LEFT)
         yy += 0.40
-        self.rect(x, yy, w, 0.016, fill=RULE)
+        self.rect(x, yy, w, 0.016, fill=rule)
         yy += 0.12
         for ri, row in enumerate(rows):
-            col = BLUE if (hi is not None and ri == hi) else INK
+            col = acc if (hi is not None and ri == hi) else ink
             bold = hi is not None and ri == hi
             for i, cell in enumerate(row):
                 self.tbox(xs[i], yy, cw[i], [(str(cell), size, bold, col, 0)], spacing=1.0,
                           align=PP_ALIGN.RIGHT if i else PP_ALIGN.LEFT)
             yy += 0.44
-        self.rect(x, yy + 0.03, w, 0.026, fill=INK)
+        self.rect(x, yy + 0.03, w, 0.026, fill=ink)
         return yy + 0.32
 
     def bignum(self, x, y, w, value, label, note="", size=60):
         """One measured quantity, set to be read from across a room."""
-        self.tbox(x, y, w, [(value, size, True, BLUE)], spacing=0.95)
+        self.tbox(x, y, w, [(value, size, True, self.c["accent"])], spacing=0.95, face=self.f["display"])
         yy = y + size / 72.0 * 1.02
-        yy = self.body(x, yy, w, label, size=BODY, color=INK, after=2)
+        yy = self.body(x, yy, w, label, after=2)
         if note:
-            yy = self.body(x, yy, w, note, size=CAPTION, color=MUTE, after=0)
+            yy = self.body(x, yy, w, note, size=self.dz["caption"], color=self.c["mute"], after=0)
         return yy
 
     def steps(self, x, y, w, items, gap=0.35):
@@ -211,10 +259,9 @@ class Deck(object):
 
     def note(self, x, y, w, title, s):
         """A quiet ruled block for a caveat that has to ride on the sheet."""
-        self.rect(x, y, 0.030, 0.0, fill=RULE)
-        yy = self.body(x + 0.26, y, w - 0.26, title, size=BODY, bold=True, after=3)
-        yy = self.body(x + 0.26, yy, w - 0.26, s, size=CAPTION, color=MUTE, after=0)
-        self.rect(x, y, 0.030, yy - y, fill=RULE)
+        yy = self.body(x + 0.26, y, w - 0.26, title, bold=True, after=3)
+        yy = self.body(x + 0.26, yy, w - 0.26, s, size=self.dz["caption"], color=self.c["mute"], after=0)
+        self.rect(x, y, 0.030, yy - y, fill=self.c["rule"])
         return yy + 0.22
 
     def save(self, path):

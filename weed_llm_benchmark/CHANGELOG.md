@@ -10101,3 +10101,34 @@ starting with everything.
 forty drafts can be compared on one screen before any one is opened. Smoke-tested
 on an eleven-section stand-in library; the library itself is being written from
 verified claims about the platform and lands next.
+
+---
+
+## 2026-09-13 — v3.58.1 one poster, many looks
+
+Harry's correction, plainly: dozens of posters was meant as dozens of **looks** for
+one argument, not dozens of arguments. And the argument has a name — `agentAI`,
+the MTSU Great Robotics Lab's research-data platform for physical and embodied
+agents, which is what the README calls it.
+
+`gen.py` now holds the content FIXED — title, standfirst, and one spine in
+Harry's order: the platform idea, the robots on it today and how a new one is
+added, live collection, remote control, the agent that analyses a collected
+dataset, the iterating agents and the brain that watches them, the past six
+months, the models, the results as evidence, and the honesty footer — and varies
+only the STYLE. `styles.py` defines six axes: five grids built from the four
+widths the figures were authored at (three-column, wide-left, wide-right, two
+22.4-inch columns, four columns), six palettes (navy, ink, forest, slate, mono,
+sand), four display faces (Arial, Georgia, Times, Arial Narrow), four title
+treatments (dark band, hairline rule, side block, accent underline), four opening
+images (the field photographs, the system diagram, the census row, none) and
+three densities. A dealt sampler uses every axis value about equally, so 36 looks
+cover the space rather than cluster in a corner.
+
+`deck.py` takes a `Style`; every mark reads its colour, face and size from it.
+The three hand-built drafts still build with the default style. The serif
+display faces needed their own width estimate — Georgia bold runs 0.62 em per
+character, and at the Arial figure it wrapped the title onto the byline.
+
+Smoke-tested at eight looks on a stand-in library; the verified section library
+lands next and fills the sheets.
