@@ -50,13 +50,15 @@ PLACED = {
     "a_families": 10.925, "b_zeroshot": 10.925, "c_ladder": 10.925,
     "e_supervision": 10.925, "r_tta": 10.925,
     "f_rounds": 22.4,
+    "m_ledger": 22.4, "n_system": 22.4, "t_journey": 46.4, "w_robots": 46.4,
 }
 
 # Three sizes, named, so a figure cannot drift into seven of them 1.5 pt apart.
 # These are PRINTED points, because every figure is authored at its placed
-# width -- sized just under the poster's own 12 pt caption, so the figures sit
-# with the body text instead of shouting over it.
-TICK, AXIS, ANNOT, LETTER = 11.0, 13.0, 10.5, 16.0
+# width. Matched to the poster's own reading tier -- 20 pt body, 16 pt captions
+# -- so a figure label sits just under its caption instead of shouting over the
+# body text or disappearing under it.
+TICK, AXIS, ANNOT, LETTER = 14.0, 16.0, 13.5, 20.0
 
 plt.rcParams.update({
     "font.family": "Arial",
@@ -75,7 +77,7 @@ plt.rcParams.update({
     "pdf.fonttype": 42, "ps.fonttype": 42, "svg.fonttype": "none",
     "axes.labelcolor": INK,
     "axes.edgecolor": INK,
-    "axes.linewidth": 1.0,
+    "axes.linewidth": 1.2,
     "axes.spines.top": False,
     "axes.spines.right": False,
     "axes.titleweight": "normal",
@@ -83,10 +85,10 @@ plt.rcParams.update({
     "xtick.color": INK, "ytick.color": INK,
     "xtick.labelsize": TICK, "ytick.labelsize": TICK,
     "xtick.direction": "out", "ytick.direction": "out",
-    "xtick.major.size": 3.5, "ytick.major.size": 3.5,
-    "xtick.major.width": 1.0, "ytick.major.width": 1.0,
+    "xtick.major.size": 4.5, "ytick.major.size": 4.5,
+    "xtick.major.width": 1.2, "ytick.major.width": 1.2,
     "legend.frameon": False, "legend.fontsize": TICK,
-    "grid.color": RULE, "grid.linewidth": 0.7,
+    "grid.color": RULE, "grid.linewidth": 0.9,
     "figure.dpi": 300, "savefig.dpi": 300,
     # NOT "tight": trimming the canvas means figsize is no longer the saved
     # width, and then a figure cannot be authored at the width it is placed at.
@@ -98,7 +100,7 @@ plt.rcParams.update({
     "figure.facecolor": WHITE, "savefig.facecolor": WHITE,
     # Data heaviest, annotation middle, grid and spines lightest -- which is
     # the layering this module's docstring claims and did not have.
-    "lines.linewidth": 1.6, "lines.markersize": 6,
+    "lines.linewidth": 2.0, "lines.markersize": 7,
     "errorbar.capsize": 3,
 })
 

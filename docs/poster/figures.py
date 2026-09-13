@@ -60,7 +60,7 @@ def fam():
     rows = [("YOLO11n, COCO-pretrained", "yolo11n_sealed", BLUE),
             ("Mamba-YOLO-T, random init", "mamba_yolo_t", GREY),
             ("YOLO11n, random init", "yolo11n_scratch_control", GREY)]
-    fig, ax = plt.subplots(figsize=(10.925, 2.80))
+    fig, ax = plt.subplots(figsize=(10.925, 3.55))
     ys = np.arange(len(rows))[::-1]        # first row on top
     for y, (lab, key, col) in zip(ys, rows):
         d = S[key]
@@ -116,7 +116,7 @@ def vlm():
     fd = _j.load(open(os.path.join(HERE, "figures_data.json")))
     rows = [r for r in fd["benchmark_cwd12_map50"] if r.get("map50") is not None]
     rows = sorted(rows, key=lambda r: r["map50"])
-    fig, ax = plt.subplots(figsize=(10.925, 4.20))
+    fig, ax = plt.subplots(figsize=(10.925, 5.30))
     y = np.arange(len(rows))
     cols = [BLUE if "fine-tuned" in r["model"] else GREY for r in rows]
     ax.barh(y, [r["map50"] for r in rows], color=cols, height=0.62)
@@ -157,7 +157,7 @@ def ladder():
             A.append(v); Ae.append(0.0); An.append(1)
     B = L.get("armB")
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.925, 3.30))
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.925, 4.20))
     ax.errorbar(xs, A, yerr=Ae, fmt="o-", color=BLUE, capsize=4, elinewidth=1.0, zorder=3)
     if B:
         ax.plot(xs, B, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
@@ -207,7 +207,7 @@ def wall():
     W = D.WALL
     a = float(W["in_domain"].split("±")[0]); ae = float(W["in_domain"].split("±")[1])
     b = float(W["out_domain"].split("±")[0]); be = float(W["out_domain"].split("±")[1])
-    fig, ax = plt.subplots(figsize=(11.600, 4.20))
+    fig, ax = plt.subplots(figsize=(11.600, 5.30))
     ax.errorbar([0, 1], [a, b], yerr=[ae, be], fmt="o-", color=INK,
                 capsize=4, elinewidth=1.0, zorder=3)
     ax.annotate("%.4f" % a, (0, a), xytext=(8, 4), textcoords="offset points",
@@ -262,7 +262,7 @@ def supervision():
                 "fa_k": a["false_alarm_rate"]["k"], "fa_n": a["false_alarm_rate"]["n"],
                 "cases": a["counts"]["cases"]}
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.925, 5.40), sharey=True)
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.925, 6.80), sharey=True)
 
     # ---- (e) detection against false alarms ---------------------------------
     # Square, so the chance diagonal is a true 45 degrees and vertical distance
@@ -402,6 +402,166 @@ def supervision():
                 % (g7["r"] - g7["g"]))
 
 
+# ------------------------------------------------------------- the model ledger
+def ledger():
+    """Every model this project trained, ran in the loop, or rejected.
+
+    Drawn as the list it counts, so the headline number on the poster is whatever
+    the list is. Four families in four columns, ordered by what each family was
+    for rather than by score: a reader should be able to see the shape of the
+    search before reading a single number.
+    """
+    import textwrap
+    L = D.LEDGER
+    fig = plt.figure(figsize=(22.4, 4.10))
+    ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off")
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    n = len(L["groups"])
+    gw = 1.0 / n
+    # One pitch for every column, set by the fullest one, so the four families
+    # share a baseline grid instead of each finding its own.
+    tallest = max(sum(1 + (1 if r[3] else 0) + r[0].count("\n")
+                      for r in g["rows"]) for g in L["groups"])
+    top, bottom = 0.735, 0.035
+    pitch = (top - bottom) / tallest
+    for gi, g in enumerate(L["groups"]):
+        x0 = gi * gw + 0.008
+        w = gw - 0.024
+        ax.plot([x0, x0 + w], [0.975, 0.975], color=INK, lw=1.8,
+                transform=ax.transAxes, clip_on=False)
+        for k, ln in enumerate(textwrap.wrap(g["group"], 34)[:2]):
+            ax.text(x0, 0.945 - k * 0.048, ln, fontsize=14, color=INK,
+                    fontweight="bold", va="top")
+        for k, ln in enumerate(textwrap.wrap(g["note"], 44)[:2]):
+            ax.text(x0, 0.845 - k * 0.040, ln, fontsize=11.5, color=MUTE, va="top")
+        y = top
+        for name, score, n_, outcome in g["rows"]:
+            nl = name.count("\n") + 1
+            ax.text(x0, y, name, fontsize=12.5, color=INK, va="top")
+            ax.text(x0 + w, y, score, fontsize=12.5, color=BLUE, va="top", ha="right")
+            y -= pitch * nl
+            if outcome:
+                ax.text(x0, y + pitch * 0.10, outcome, fontsize=11, color=MUTE, va="top")
+                y -= pitch
+            ax.plot([x0, x0 + w], [y + pitch * 0.18, y + pitch * 0.18], color=RULE,
+                    lw=0.7, transform=ax.transAxes, clip_on=False)
+    return save(fig, "m_ledger",
+                "%d distinct models, in four families, on one holdout or one incident corpus. One "
+                "of them is deployed. The zero-shot column is a single deterministic pass per "
+                "model with no repeats; the reviewer column is the 149-case dev split, and two of "
+                "its arms are still running."
+                % L["n_models"])
+
+
+# -------------------------------------------------------- the platform, drawn
+def system():
+    """What the platform is, as five stages a reader can follow left to right.
+
+    Annotated with what runs unattended and what does not, because a system
+    diagram that does not say which boxes are switched off is a wish.
+    """
+    C = D.CENSUS
+    stages = [
+        ("Two ground robots", [
+            "robot 241  %s frames, %d drives" % ("{:,}".format(C["r241_frames"]),
+                                                 C["r241_sessions"]),
+            "laser cart  %d frames, %d drives" % (C["cart_frames"], C["cart_sessions"]),
+            "%s telemetry rows, 9 streams" % "{:,}".format(C["sensor_rows"]),
+            "%.0f m of GPS track" % C["gps_m"]], BLUE, "runs"),
+        ("Live uplink", [
+            "one API key per project",
+            "JPEG frames and sensor batches",
+            "a drive becomes a dataset as it",
+            "opens, not after it ends"], BLUE, "runs"),
+        ("Locked registry", [
+            "every dataset versioned and owned",
+            "holdout stems excluded at merge",
+            "content-hash duplicate guard",
+            "%s images, %s unique" % ("{:,}".format(D.FUNNEL["registry_labelled"]),
+                                      "{:,}".format(D.FUNNEL["unique"]))], BLUE, "runs"),
+        ("Collector and trainer", [
+            "collect \u2192 filter \u2192 merge \u2192 train \u2192 evaluate",
+            "two SLURM jobs, no person in the loop",
+            "15 rounds run this way",
+            "paused since 2026-08-29"], WARN, "paused"),
+        ("Supervision", [
+            "a model reads the run's own artifacts",
+            "162 real incidents, frozen as a corpus",
+            "27 models scored against it",
+            "advisory only, nothing is applied"], MUTE, "shadow"),
+    ]
+    fig = plt.figure(figsize=(22.4, 3.70))
+    ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off")
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    n = len(stages)
+    gap = 0.022
+    w = (1.0 - gap * (n - 1)) / n
+    for i, (title, lines, col, state) in enumerate(stages):
+        x0 = i * (w + gap)
+        ax.add_patch(plt.Rectangle((x0, 0.06), w, 0.86, transform=ax.transAxes,
+                                   facecolor=WHITE, edgecolor=RULE, lw=1.2, zorder=1))
+        ax.add_patch(plt.Rectangle((x0, 0.875), w, 0.045, transform=ax.transAxes,
+                                   facecolor=col, edgecolor="none", zorder=2))
+        ax.text(x0 + 0.014, 0.835, title, fontsize=15, color=INK, fontweight="bold",
+                va="top", zorder=3)
+        ax.text(x0 + w - 0.014, 0.835, state, fontsize=12, color=col, va="top",
+                ha="right", zorder=3)
+        y = 0.660
+        for ln in lines:
+            ax.text(x0 + 0.014, y, ln, fontsize=12.5, color=MUTE, va="top", zorder=3)
+            y -= 0.150
+        if i < n - 1:
+            ax.annotate("", (x0 + w + gap - 0.004, 0.50), xytext=(x0 + w + 0.004, 0.50),
+                        arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.6), zorder=4)
+    return save(fig, "n_system",
+                "The path from a camera in a crop row to a checkpoint on the cluster. Every stage "
+                "is built and has run. Two are not running today: the collector and trainer are "
+                "paused after a stop-loss on 2026-08-29, and the supervisor is advisory, so "
+                "nothing it says is applied to the loop.")
+
+
+# ---------------------------------------------------------- six months, in order
+def journey():
+    """Eight turns, each dated, each with what it changed.
+
+    The wrong turns are the point. Four of these eight are things that did not
+    work, and two are numbers this project withdrew after checking them.
+    """
+    import textwrap
+    J = D.JOURNEY
+    fig = plt.figure(figsize=(46.4, 3.30))
+    ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off")
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    n = len(J)
+    gap = 0.011
+    w = (1.0 - gap * (n - 1)) / n
+    ax.plot([0, 1], [0.845, 0.845], color=RULE, lw=1.4, transform=ax.transAxes,
+            clip_on=False)
+    for i, (month, title, what, learned) in enumerate(J):
+        x0 = i * (w + gap)
+        ax.plot(x0 + 0.004, 0.845, "o", color=BLUE, ms=9, transform=ax.transAxes,
+                clip_on=False, zorder=3)
+        ax.text(x0 + 0.018, 0.860, month, fontsize=13, color=BLUE, fontweight="bold",
+                va="center")
+        # matplotlib does not wrap text inside an axes the way a text box does,
+        # so the wrapping is done here against the real column width: 46.4 in
+        # over eight stations is 5.8 in, which is about 46 characters at 12.5 pt.
+        ax.text(x0, 0.760, title, fontsize=15.5, color=INK, fontweight="bold",
+                va="top")
+        y = 0.640
+        for ln in textwrap.wrap(what, 46):
+            ax.text(x0, y, ln, fontsize=12.5, color=MUTE, va="top")
+            y -= 0.094
+        y = min(y - 0.050, 0.215)
+        for ln in textwrap.wrap(learned, 44):
+            ax.text(x0, y, ln, fontsize=12.5, color=INK, va="top", style="italic")
+            y -= 0.094
+    return save(fig, "t_journey",
+                "Six months. Four of these eight turns are things that did not work, and two are "
+                "numbers this project measured, published internally and then withdrew after "
+                "checking them.")
+
+
 # --------------------------------------------- s. the audit, source by source
 def sources():
     """Label precision per harvested source, against the bar the gate sets.
@@ -414,7 +574,7 @@ def sources():
     labs = [a for a, _ in S["rows"]]
     vals = [v for _, v in S["rows"]]
     ys = np.arange(len(vals))[::-1]
-    fig, ax = plt.subplots(figsize=(11.600, 3.40))
+    fig, ax = plt.subplots(figsize=(11.600, 4.30))
     ax.barh(ys, vals, height=0.56, zorder=3,
             color=[GOOD if v >= S["bar"] else WARN for v in vals])
     ax.axvline(S["bar"], color=INK, lw=1.0, ls=(0, (4, 3)), zorder=4)
@@ -451,7 +611,7 @@ def tta():
     labs = [a for a, _ in T["arms"]]
     d = [v - T["baseline"] for _, v in T["arms"]]
     ys = np.arange(len(d))[::-1]
-    fig, ax = plt.subplots(figsize=(10.925, 2.90))
+    fig, ax = plt.subplots(figsize=(10.925, 3.70))
     ax.axvspan(-T["seed_noise"], T["seed_noise"], color=PALEBLU, zorder=0)
     ax.barh(ys, d, height=0.52, zorder=3,
             color=[WARN if v < T["seed_noise"] else BLUE for v in d])
@@ -497,7 +657,7 @@ def field():
               ("more than a third vegetation", F["vegetated"], BLUE),
               ("detector fires, conf 0.25", F["fired_25"], WARN),
               ("detector fires, conf 0.40", F["fired_40"], WARN)]
-    fig, ax = plt.subplots(figsize=(11.600, 3.00))
+    fig, ax = plt.subplots(figsize=(11.600, 2.70))
     tot = stages[0][1]
     for i, (lab, v, c) in enumerate(stages):
         ax.barh(-i, max(v / tot, 0.0), height=0.42, color=c)
@@ -517,6 +677,40 @@ def field():
 
 
 # ------------------------------------------------------------- l. the robots
+def robots_wide():
+    """The same four frames, printed full-width as an opening image.
+
+    A data-led layout wants the field to be the first thing a reader meets, at a
+    size where the crop rows and the mulch film are legible from two metres.
+    """
+    # Cropped to 2.35:1 so four frames fill the full width without the bands of
+    # white that a 16:9 frame leaves when it is laid out four across 46 inches.
+    fig, axes = plt.subplots(1, 4, figsize=(46.4, 4.40))
+    shots = [("r241_row.jpg", "robot 241", "along a mulched crop row"),
+             ("r241_weeds.jpg", "robot 241", "weeds between the rows"),
+             ("lc_down.jpg", "laser cart", "down camera, work-zone overlay"),
+             ("lc_front.jpg", "laser cart", "forward camera")]
+    for ax, (fn, who, what), let in zip(axes, shots, "abcd"):
+        im = plt.imread(os.path.join(HERE, "photos", fn))
+        h, wpx = im.shape[0], im.shape[1]
+        keep = int(round(wpx / 2.35))
+        if keep < h:
+            top = (h - keep) // 2
+            im = im[top:top + keep]
+        ax.imshow(im)
+        ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_color(RULE); sp.set_linewidth(1.2)
+        ax.text(0.022, 0.950, let, transform=ax.transAxes, fontsize=22,
+                fontweight="bold", color=INK, va="top", ha="left",
+                bbox=dict(boxstyle="square,pad=0.24", fc=WHITE, ec="none", alpha=0.88))
+        ax.set_xlabel("%s   %s" % (who, what), fontsize=17, color=MUTE, labelpad=8)
+    return save(fig, "w_robots",
+                "Four frames as recorded, unenhanced and unlabelled. The rectangle in (c) is the "
+                "cart's fixed work-zone overlay. It is drawn on every frame, including the ones "
+                "with no vegetation in them.")
+
+
 def robots():
     """Four frames off the platform, as recorded.
 
@@ -537,7 +731,7 @@ def robots():
              ("r241_weeds.jpg", "robot 241", "weeds between the rows"),
              ("lc_down.jpg", "laser cart", "down camera, work-zone overlay"),
              ("lc_front.jpg", "laser cart", "forward camera")]
-    fig, axes = plt.subplots(1, 4, figsize=(11.600, 2.30))
+    fig, axes = plt.subplots(1, 4, figsize=(11.600, 2.60))
     for ax, (fn, who, what), let in zip(axes, shots, "lmno"):
         img = plt.imread(os.path.join(HERE, "photos", fn))
         ax.imshow(img)
@@ -562,7 +756,7 @@ def robots():
 # ---------------------------------------------------------------- f. rounds
 def rounds():
     R = D.ROUNDS
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(22.400, 4.00),
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(22.400, 5.10),
                                   gridspec_kw={"width_ratios": [1.75, 1]})
     xs = np.arange(1, len(R["map"]) + 1)
     ax.axvspan(R["frozen_from"] - 0.4, len(xs) + 0.4, color=PALEBLU, zorder=0)
@@ -646,7 +840,7 @@ def drive():
     t = [float(r["timestamp"]) - t0 for r in rows]
     hd = np.degrees(np.unwrap(np.radians([float(r["heading"]) for r in rows])))
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 4.20),
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 4.40),
                                   gridspec_kw={"width_ratios": [1.15, 1]})
     ax.plot(xs, ys, "-", color=BLUE, lw=1.2, zorder=3)
     ax.plot(xs, ys, ".", color=BLUE, ms=2.4, alpha=0.5, zorder=4)
@@ -677,7 +871,7 @@ def drive():
 def species():
     fd = json.load(open(os.path.join(HERE, "figures_data.json")))
     rows = sorted(fd["per_species_yolo11n_val"]["rows"], key=lambda r: r["map50_95"])
-    fig, ax = plt.subplots(figsize=(11.600, 5.20))
+    fig, ax = plt.subplots(figsize=(11.600, 6.60))
     y = np.arange(len(rows))
     ax.barh(y, [r["map50_95"] for r in rows], color=BLUE, height=0.62)
     for i, r in enumerate(rows):
@@ -696,7 +890,7 @@ def species():
 # ---------------------------------------------------------------- k. funnel
 def funnel():
     F = D.FUNNEL
-    fig, ax = plt.subplots(figsize=(11.600, 3.00))
+    fig, ax = plt.subplots(figsize=(11.600, 3.80))
     stages = [("harvested and labelled", F["registry_labelled"], BLUE),
               ("unique after dedup", F["unique"], BLUE),
               ("audited for label quality", F["audited_images"], MUTE),
@@ -717,7 +911,8 @@ def funnel():
 if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
-               species, funnel, field, tta, sources):
+               species, funnel, field, tta, sources, ledger, system,
+               journey, robots_wide):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))

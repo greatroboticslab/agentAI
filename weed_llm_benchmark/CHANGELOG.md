@@ -9946,3 +9946,41 @@ passes on the lab box and on Bridges-2. Live route on the lab: `http=200`,
 the real corpus on the cluster it returns `warn` and names exactly the two arms
 that are partial — `L2_glm-4.7-flash 78 of 149`, `L3_qwen3.8-27b 92 of 149` —
 with no false positives on the other seven.
+
+---
+
+## 2026-09-12 — v3.57.0 three poster drafts, one set of numbers
+
+The previous poster argued "we audited ourselves and most levers did not work".
+That is true, it is rigorous, and it is the wrong spine: a reader meets it and
+learns what failed without ever seeing what was built. Rebuilt as three complete
+drafts that differ in argument and in nothing else.
+
+`deck.py` holds the shared furniture — palette, grid, type scale, and the
+measured blocks. Every draft imports it and `poster_data`, so if two drafts
+disagreed about a number the comparison between them would be a comparison of
+bugs. Type moves to a one-metre reading tier: 20 pt body, 16 pt captions, 34 pt
+heads, and figure labels at 14 pt to sit just under the caption.
+
+**Draft A, the machine.** Leads with the platform as five stages a reader
+follows left to right, annotated with which are running and which are not. The
+measurements are evidence that the shape is right.
+
+**Draft B, the road.** Leads with the six months as eight dated turns. Four of
+them are things that did not work and two are numbers this project withdrew. The
+platform is what the road produced.
+
+**Draft C, the field.** Leads with four field frames printed across the full
+width and a five-cell census under them. The argument is that we own the path
+from soil to checkpoint, which is the one thing a public dataset cannot supply.
+
+Four new figures, all drawing data that already exists: `n_system` (the five
+stages), `m_ledger` (every model, drawn as the list it counts, so the headline
+count cannot be wrong — 27 distinct models in four families, one deployed),
+`t_journey` (the eight turns), and `w_robots` (the field frames at full width,
+cropped to 2.35:1 so four fill the sheet).
+
+Two things the drafts must keep. The author line is Harry He and Hongbo Zhang,
+and the PPTX document properties now say so too. And the negative results stay,
+moved from the spine into the evidence: the ladder, the second exam, the audited
+sources, the firing rate and the supervision benchmark all appear in all three.

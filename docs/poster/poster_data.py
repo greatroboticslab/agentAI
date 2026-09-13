@@ -238,6 +238,111 @@ TTA = {
     "src": "figures_data.json -> tta_ceiling_2026_08_26 (jobs 44463762, 44463922)",
 }
 
+# --- the six months, in order -----------------------------------------------
+# Eight turns, each dated from the CHANGELOG entry that records it. A project
+# with no wrong turns in it is not a project, and the wrong turns here are the
+# part a professor can learn something from.
+JOURNEY = [
+    ("Mar", "Prompt a vision model", "Twelve open vision-language models, asked to "
+     "box weeds. The best, Florence-2-base, reached 0.434 where a fine-tuned "
+     "YOLO11n reached 0.929.", "Fine-tune. Do not prompt."),
+    ("Mar", "Fix the forgetting", "Accuracy on unseen species fell from F1 0.830 "
+     "to 0.606. Every anti-forgetting method we tried left it there. 27.4% of the "
+     "pseudo-labels were false positives.",
+     "The labels were wrong, not the optimiser."),
+    ("Apr", "Harvest the web", "An agent searching Kaggle, Hugging Face, GitHub and "
+     "Roboflow, aiming at hundreds of thousands of images. Accuracy went down.",
+     "Volume is not supervision."),
+    ("May", "Withdraw 0.910", "Pretrain on 244,000 then fine-tune, and the holdout "
+     "read 0.910. 2,313 of 141,397 training images were near-duplicates of it.",
+     "Build the content-level guard, then measure everything again."),
+    ("May", "Buy the last 0.005", "Five ways to lift 0.8877 to 0.90: ensembles, "
+     "test-time augmentation, weighted box fusion. All five negative.",
+     "The ceiling was seed noise. Stop tuning the number."),
+    ("Jun", "Build the platform", "Robots, an uplink, a dataset registry, a "
+     "dashboard, roles and keys. Then an audit of our own artifacts.",
+     "The dashboards were green while the harvest collected nothing."),
+    ("Aug", "Run the control on our own thesis", "Fifteen unattended rounds, "
+     "accuracy falling the whole time. The training corpus never grew after round "
+     "three, and starting fresh instead of from the last round is worth +0.0287.",
+     "We had been measuring a chain, not a curve."),
+    ("Sep", "Build the supervisor", "A benchmark of 162 real failures out of this "
+     "project's own record. The watchdog we had been running returned no decision "
+     "on any of 149 cases.", "Status fields cannot see this. Artifacts can."),
+]
+
+# --- the model ledger: everything that was trained, run or rejected ---------
+# The figure draws this list, so the count on the poster is whatever the list is
+# and cannot be wrong. Each row: name, what it did here, what it scored, and the
+# outcome. Every score comes from a block of docs/RESULTS_TABLE.md named in src.
+LEDGER = {
+    "groups": [
+        {"group": "Detectors we trained on our own holdout",
+         "note": "sealed 1,977-image CottonWeedDet12 holdout",
+         "rows": [
+             ("YOLO11n, COCO-pretrained", "0.8755 \u00b1 0.0029", "3 seeds", "deployed"),
+             ("Mamba-YOLO-T, from scratch", "0.8266 \u00b1 0.0064", "3 seeds", "measured"),
+             ("YOLO11n, from scratch", "0.8041 \u00b1 0.0028", "3 seeds", "control"),
+             ("RF-DETR Large, pretrained", "0.8974 \u00b1 0.0040", "4 runs, unseeded", "other scale"),
+             ("yolo26x", "0.6019 \u2192 0.5607", "15 rounds", "campaign backbone"),
+         ]},
+        {"group": "Vision models inside the pipeline",
+         "note": "not scored as detectors; they do a job in the loop",
+         "rows": [
+             ("OWLv2-large", "recall 0.943, precision 0.194", "single pass", "pseudo-labeller"),
+             ("DINOv2", "quality gate at 0.50", "per dataset", "collection filter"),
+         ]},
+        {"group": "Vision-language models, zero-shot on the same images",
+         "note": "one deterministic pass each, no repeats, 848-image split",
+         "rows": [
+             ("Florence-2-base", "0.434", "mAP50", "best of the zero-shot set"),
+             ("Florence-2-large", "0.329", "mAP50", ""),
+             ("InternVL2-8B", "0.208", "mAP50", ""),
+             ("Qwen2.5-VL-3B", "0.196", "mAP50", ""),
+             ("MiniCPM-V-4.5", "0.192", "mAP50", ""),
+             ("OWLv2-large", "0.184", "mAP50", "high recall, low precision"),
+             ("Qwen2.5-VL-7B", "0.176", "mAP50", ""),
+             ("InternVL2-2B", "0.002", "mAP50", ""),
+             ("InternVL2.5-8B", "0.000", "mAP50", ""),
+             ("G-DINO, Molmo, Llama-Vision,\nMoondream, LLaVA", "\u2248 0.000", "5 models", "no usable grounding"),
+         ]},
+        {"group": "Language models we ran as reviewers",
+         "note": "162 real incidents from this project's own history",
+         "rows": [
+             ("Qwen2.5-7B", "0.823 recall, 0.274 grounded", "149 cases", "the lab tier"),
+             ("Qwen3-14B", "0.675 recall, 0.614 grounded", "149 cases", ""),
+             ("Qwen3.8-27B", "0.702 recall, 0.702 grounded", "92 of 149", "best evidenced"),
+             ("GLM-4.7-Flash", "0.821 recall, 0.769 grounded", "78 of 149", "still running"),
+             ("DeepSeek-V4-Flash", "retracted", "context overflow", "withdrawn"),
+             ("DeepSeek-V3-671B", "queued", "\u2014", "not yet run"),
+             ("Gemma 4", "\u2014", "harvest decisions", "in the loop"),
+             ("Qwen2.5-7B (curation)", "\u2014", "dataset judgements", "in the loop"),
+             ("Qwen2.5-3B", "\u2014", "lab guide tier", "not authoritative"),
+         ]},
+    ],
+    "src": "docs/RESULTS_TABLE.md blocks A, C, F, G and L; figures_data.json",
+}
+# Derived so the headline count cannot disagree with the list under it. Two
+# models do two jobs here -- OWLv2-large is both the pseudo-labeller and a
+# benchmarked zero-shot detector, and Qwen2.5-7B is both a reviewer arm and the
+# curation judge -- so the distinct count is lower than the row count and the
+# poster prints the distinct one.
+def _ledger_names():
+    seen = []
+    for g in LEDGER["groups"]:
+        for r in g["rows"]:
+            if "5 models" in r[2]:
+                seen += [n.strip() for n in r[0].replace("\n", " ").split(",")]
+            else:
+                seen.append(r[0].split(" (")[0].split(",")[0].strip())
+    return seen
+
+
+LEDGER["n_rows"] = sum(len(g["rows"]) for g in LEDGER["groups"])
+LEDGER["n_models"] = len({n.lower() for n in _ledger_names()})
+LEDGER["n_deployed"] = 1
+LEDGER["n_groups"] = len(LEDGER["groups"])
+
 # --- the platform census, walked rather than claimed -------------------------
 # Every number here was counted by walking ~/weed_llm_benchmark/uploads on the
 # lab server on 2026-09-12, not read out of a document. The byte-identical
