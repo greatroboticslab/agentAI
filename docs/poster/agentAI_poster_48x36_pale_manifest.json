@@ -1,7 +1,8 @@
 {
  "style": "mtsu-four-house-house-pale-band-census-normal",
- "type_scale": 1.0,
- "body_pt": 21.0,
+ "type_scale": 1.16,
+ "body_pt": 24.4,
+ "heading_pt": 34.8,
  "kept": [
   "platform_idea",
   "platform_domains",
@@ -26,8 +27,8 @@
   "field",
   "uplink",
   "brain",
-  "families",
   "sources",
+  "families",
   "dispatch",
   "escalate",
   "control"

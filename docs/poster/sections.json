@@ -4,7 +4,7 @@
    "id": "platform_idea",
    "theme": "platform-idea",
    "heading": "agentAI is one platform for every robot the lab owns",
-   "body": "agentAI is a research-data platform for physical and embodied agents, built at the MTSU Great Robotics Lab. A robot, a drone or a sensor rig is a project. A project owns its keys, its people and a locked dataset registry. Agents on the platform harvest, filter, label and train against that registry. Adding a robot is a configuration change.",
+   "body": "A robot, a drone or a sensor rig is a project. It owns its keys, its people and a locked dataset registry, and the agents harvest, filter, label and train against that registry. Adding a robot is a configuration change.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -14,7 +14,7 @@
    "id": "platform_domains",
    "theme": "platform-idea",
    "heading": "Weed detection is one project here, the humanoid is still empty",
-   "body": "A lab member opens a project for any data type and any field, uploads images, video or sensor logs, and gets an automatic diagnosis before choosing what to do next. Weed detection is one project on this platform. So are the 241 rover and the laser cart, and so is a humanoid project that is open and still empty.",
+   "body": "Open a project for any data type and any field, upload, and get an automatic diagnosis before choosing what to do next. Weed detection is one project here; so are the rover and the cart.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -34,7 +34,7 @@
    "id": "robots_today",
    "theme": "robots-connected",
    "heading": "Tracked rover and laser cart are the two robots reporting in",
-   "body": "Robot 241 is a tracked rover that drives crop rows and streams camera, GPS and two IMUs. The laser cart carries the weeder: a galvanometer laser, a down camera over the work zone and a forward camera. Ten projects sit on the platform and two of them have a robot reporting in.",
+   "body": "Robot 241 is a tracked rover that streams camera, GPS and two IMUs. The laser cart carries a galvanometer laser, a down camera over the work zone and a forward camera.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -104,7 +104,7 @@
    "id": "auto_diag",
    "theme": "live-collection",
    "heading": "Each finished drive is diagnosed without anyone asking",
-   "body": "The platform runs a fixed diagnosis over each finished session without being asked: route, noise, cross-sensor correlation, a timeline. It has done that for 26 live robot sessions and written 45 charts. A person reads the diagnosis before deciding whether the drive is worth anything.",
+   "body": "Every finished drive is diagnosed without being asked -- route, noise, cross-sensor correlation, a timeline -- for 26 live robot sessions and 45 charts so far.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -203,8 +203,8 @@
   {
    "id": "loop",
    "theme": "iterating-agents-brain",
-   "heading": "Accuracy fell through fifteen unattended rounds",
-   "body": "Two cluster jobs, one collecting and one training, ran fifteen rounds against the locked registry with nobody in the room. Each round searched public sources, filtered what it found, merged, trained and evaluated. Every round reported success. Accuracy fell for fifteen rounds.",
+   "heading": "Fifteen rounds ran with nobody in the room",
+   "body": "Two cluster jobs, one collecting and one training, ran fifteen rounds against the locked registry with nobody in the room. Every round reported success.",
    "figure": "f_rounds",
    "status": "built_but_off",
    "width": "centre",
@@ -236,7 +236,7 @@
    "id": "supervisor",
    "theme": "iterating-agents-brain",
    "heading": "Grounded recall separates the reviewers",
-   "body": "Escalating is worth it, and the reason is grounding rather than size: the retrieval tier is worth +0.149 recall to the 27 B and +0.012 to the 14 B.",
+   "body": "Escalating is worth it, and the reason is grounding rather than size: retrieval is worth +0.149 recall to the 27 B and +0.012 to the 14 B.",
    "figure": "e_supervision",
    "status": "built_but_off",
    "width": "centre",
@@ -245,8 +245,8 @@
   {
    "id": "diagnosis",
    "theme": "iterating-agents-brain",
-   "heading": "Growth stopped at round three; one uncleared directory faked the rest",
-   "body": "The corpus stopped growing at round three: the same 24 datasets and 48,752 unique images went in every time, and the apparent growth was one staging directory nobody cleared. Eight rounds collected nothing and reported success. Starting fresh instead of from the previous round's weights is worth +0.0287, 5.1 times this recipe's own seed spread.",
+   "heading": "The corpus stopped growing at round three",
+   "body": "The corpus stopped growing at round three: the same 24 datasets went in every time, and the apparent growth was one staging directory nobody cleared.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -277,8 +277,8 @@
   {
    "id": "ladder",
    "theme": "results",
-   "heading": "Twelve times the training data costs 0.0189",
-   "body": "Twelve times the training data costs 0.0189 on our own 1,977-image holdout, three seeds at every rung, and the same eight checkpoints fall on a second weed dataset too.",
+   "heading": "More harvested data cost accuracy, and we measured how much",
+   "body": "Starting fresh instead of from the last round's weights recovers +0.0287, 5.1 times this recipe's seed spread. That is the change the next campaign makes.",
    "figure": "c_ladder",
    "status": "built_and_running",
    "width": "column",
@@ -420,7 +420,7 @@
    "status": "built_and_running",
    "big": "27",
    "big_label": "models the router can place",
-   "body": "Nothing on the platform hard-codes a model name. A router maps a role -- collector, judge, reviewer, planner -- onto a model and a place, and the place decides whether the verdict counts. Work that analyses, reviews or decides runs as a cluster batch job on open weights, and anything answered by the lab box is marked in its own record as a draft. The scheduler then fans a round out across as many review arms as the round asks for. What it does not yet do is choose that number for itself."
+   "body": "A router maps a role -- collector, judge, reviewer, planner -- onto a model and a place, and the place decides whether the verdict counts. Deciding work runs on the cluster, on open weights; the lab box hosts only the small guide."
   },
   {
    "id": "vision_platform",
@@ -499,8 +499,8 @@
    "theme": "results",
    "figure": "none",
    "status": "built_and_running",
-   "heading": "Finishing the schedule was not the fix; the chain was",
-   "body": "Two things could explain the fall, and both were run as controls on round 15's exact data and seeds. Starting fresh instead of from the previous round's weights is worth +0.0287, 5.1 times this recipe's own seed spread of 0.0040. Letting the cosine schedule finish instead of stopping at a wall clock is worth -0.0058 at 1.3 sigma, which is inside the noise. The chain is the cause; the schedule is not."
+   "heading": "One hypothesis held, the other was ruled out",
+   "body": "Both hypotheses were run as controls on round 15's exact data and seeds. The chain holds at 5.1 sigma; finishing the cosine schedule is worth -0.0058 at 1.3 sigma, inside the noise."
   },
   {
    "id": "escalate",
@@ -508,7 +508,7 @@
    "figure": "none",
    "status": "built_and_running",
    "heading": "A cheap reviewer, and a bigger one above it when it is stuck",
-   "body": "Review runs in tiers: a scripted watchdog, twelve pre-registered deterministic checks, a model reading the raw artifacts, and the same model given retrieval over them. Against 149 frozen cases from this project's own engineering record the scripted watchdog returned no decision at all. The tier that escalates correctly most often is the 27 B with retrieval, on 48 of 90 cases. What the loop does not yet do is decide for itself when to ask upward."
+   "body": "Review runs in tiers: a scripted watchdog, twelve deterministic checks, a model reading the raw artifacts, then the same model given retrieval. On 149 frozen cases the scripted watchdog returned no decision at all."
   }
  ]
 }

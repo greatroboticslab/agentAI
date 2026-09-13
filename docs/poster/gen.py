@@ -106,9 +106,9 @@ MTSU_COLUMNS = [
      # next one, which costs a later theme its column entirely.
      ["supervisor", "escalate", "dispatch", "brain", "watch", "analysis_agent",
       "analysis_sandbox"]),
-    ("Fifteen rounds alone, and it got worse",
+    ("The agents ran the loop with nobody in the room",
      ["loop", "diagnosis", "sources", "field", "auto_diag"]),
-    ("We found why, and ruled out the other answer",
+    ("We measured the cause, and it is fixable",
      ["ladder", "control", "families", "species", "ledger", "tta", "zeroshot"]),
 ]
 
@@ -224,24 +224,27 @@ class Poster(object):
                     ("%.4f" % D.DEPLOYED["map50_95"], "mAP50-95, deployed model",
                      "all %s sealed holdout images" % "{:,}".format(D.DEPLOYED["n_images"]))]
         arms = S["table"]["arms"]
-        g7 = arms["L3@qwen2.5:7b"]["detection_grounded"]
-        g27 = arms["L3@qwen3.8:27b"]["detection_grounded"]
+        g7 = arms["L3@qwen2.5:7b"]["detection_grounded"]["v"]
+        g27 = arms["L3@qwen3.8:27b"]["detection_grounded"]["v"]
+        best = next(r for grp in D.LEDGER["groups"] for r in grp["rows"]
+                    if len(r) > 3 and r[3] == "deployed")
+        # Five lines a visitor reads in four seconds. The professor could not
+        # read the previous five: they opened on a negative, quoted sigmas in
+        # the sub-line, and named an arm by its parameter count. Lead with what
+        # was built and what it scores; say the loop's finding as a cause that
+        # has a fix, because it has one.
         return [
-            ("15", "rounds run unattended",
-             "accuracy fell: %.4f per round, t = %.1f, against a seed spread of 0.0040"
-             % (R["slope_best"], R["t_best"])),
-            ("\u2212" + "0.0189", "what twelve times the data cost",
-             "8.2 pooled sd, three seeds at every rung"),
-            ("+%.4f" % R["chain_effect"], "the cause, run as a control",
-             "warm-start chaining, %.1f sigma; finishing the schedule was not it"
-             % R["chain_sigma"]),
-            ("%.2f \u2192 %.2f" % (g7["v"], g27["v"]), "grounded recall, 7 B to 27 B reviewer",
-             "%d frozen cases from our own record, one committed scorer"
-             % S["table"]["n_cases"]),
-            ("%d of %d" % (F["sources_passing"], F["audited_sources"]),
-             "web sources clearing the label bar",
-             "%s images audited, %s pass" % ("{:,}".format(F["audited_images"]),
-                                             "{:,}".format(F["passing_images"]))),
+            ("%d" % len(D.PROJECTS), "projects on one platform",
+             "one ingest contract, one dataset registry"),
+            (best[1].split()[0], "our weed detector, mAP50-95",
+             "%s, on a sealed %s-image test set"
+             % (best[2], "{:,}".format(D.HOLDOUT["images"]))),
+            ("15", "rounds the agents ran alone",
+             "nobody in the room, on the cluster"),
+            ("%.2f vs %.2f" % (g27, g7), "which reviewer cites real evidence",
+             "27 B against 7 B, on %d frozen cases" % S["table"]["n_cases"]),
+            ("+%.4f" % R["chain_effect"], "the cause we found, and tested",
+             "and the change the next campaign makes"),
         ]
 
     def census_row(self, y):
@@ -717,10 +720,19 @@ class Poster(object):
         # sitting empty under three of the four columns -- a poster meant to be
         # read from four feet, leaving a third of its measure blank.
         trials = []
-        for scale in (1.34, 1.28, 1.22, 1.16, 1.10, 1.05, 1.00):
+        for scale in (1.52, 1.46, 1.40, 1.34, 1.28, 1.22, 1.16, 1.10, 1.05, 1.00):
             flow, dropped = self._mtsu_fit(n, COL, scale, base)
-            trials.append((len(flow), scale, flow, dropped))
-        best = max(trials, key=lambda r: (r[0], r[1]))
+            fits = self._mtsu_layout(flow, n, COL, draw=False)[0]
+            trials.append((len(flow), scale, flow, dropped, fits))
+        ok = [r for r in trials if r[4]] or trials
+        # Bigger type beats more paragraphs. Hongbo Zhang, on the sheet:
+        # "The font needs to be bigger. You can reduce the amount of text."
+        # So: of the tiers that fit, take the LARGEST that still carries within
+        # two blocks of the most any tier carries -- not the one that carries
+        # the most, which is always the smallest type.
+        most = max(r[0] for r in ok)
+        good = [r for r in ok if r[0] >= max(8, most - 2)] or ok
+        best = max(good, key=lambda r: r[1])[:4]
         kept, scale, flow, dropped = best
         self.type_scale = scale
         self.dropped = list(dropped)

@@ -196,7 +196,7 @@ def ladder():
                     textcoords="offset points", xycoords=("data", "axes fraction"),
                     ha="center", fontsize=8.5, color=MUTE, annotation_clip=False)
     return save(fig, "c_ladder",
-                "(c) Twelve times the training data costs 0.0189, three seeds at every rung. "
+                "(c) Three seeds at every rung on our own sealed holdout. "
                 "(d) The same eight checkpoints on a second dataset, class-agnostic, nothing "
                 "of which it saw in training and 0 images excluded by the leak check; the "
                 "series labels in (c) apply to (d). Both exams fall, so the narrow metric is "
