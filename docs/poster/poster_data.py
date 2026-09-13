@@ -345,6 +345,29 @@ LEDGER["n_models"] = len({n.lower() for n in _ledger_names()})
 LEDGER["n_deployed"] = 1
 LEDGER["n_groups"] = len(LEDGER["groups"])
 
+# --- what the platform itself does, counted on the live box ------------------
+# Measured on lab-b660m-c 2026-09-13 by reading the service journal, the upload
+# archive and the analysis artifacts. Where a mining pass and a direct count
+# disagreed, the direct count is what is here: the joystick total is 1,389 from
+# the journal since 2026-08-01, not the 1,327 a narrower window gave.
+AGENT = {
+    # remote control -- real, and dark today
+    "drive_cmds": 1389, "drive_robot": "robot 241", "drive_last": "2026-08-28",
+    "drive_targets_241": 1, "drive_targets_cart": 0,
+    "advice_polls": 406,
+    # the laser: switched on, never once with a target
+    "laser_rows": 3379, "laser_sessions": 8, "laser_on_rows": 216,
+    "laser_phases_when_on": {"OBSERVATION": 216},
+    # the analysis agent
+    "tools": 14, "chat_datasets": 9, "chat_turns": 92,
+    "auto_eda_sessions": 26, "auto_eda_plots": 45,
+    "agent_turns_on_robot_sessions": 0,
+    "sandbox_cpu_s": 15, "sandbox_ram_gb": 1.5, "sandbox_timeout_s": 25,
+    "deep_turns": 1, "byok_turns": 1,
+    "src": "lab journal + uploads/rl_lasercar-*/laser.csv + "
+           "results/framework/dataset_analysis/ ; counted 2026-09-13",
+}
+
 # --- the platform census, walked rather than claimed -------------------------
 # Every number here was counted by walking ~/weed_llm_benchmark/uploads on the
 # lab server on 2026-09-12, not read out of a document. The byte-identical

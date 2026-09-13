@@ -1,0 +1,324 @@
+{
+ "sections": [
+  {
+   "id": "platform_idea",
+   "theme": "platform-idea",
+   "heading": "One platform for every robot the lab owns",
+   "body": "agentAI is a research-data platform for physical and embodied agents, built at the MTSU Great Robotics Lab. A robot, a drone or a sensor rig is a project. A project owns its keys, its people and a locked dataset registry. Agents on the platform harvest, filter, label and train against that registry. Adding a robot is a configuration, not a migration.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "README"
+  },
+  {
+   "id": "platform_domains",
+   "theme": "platform-idea",
+   "heading": "Any research field is a project",
+   "body": "A lab member opens a project for any data type and any field, uploads images, video or sensor logs, and gets an automatic diagnosis before choosing what to do next. Weed detection is one project on this platform. The 241 rover, the laser cart and a Unitree humanoid each have their own.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "README, live dashboard"
+  },
+  {
+   "id": "system",
+   "theme": "platform-idea",
+   "heading": "Inside the platform",
+   "body": "Every stage from a camera in a crop row to a checkpoint on the cluster has run. The dashboard and registry run on a lab server; GPU jobs queue on PSC Bridges-2. The collector and trainer are paused after a stop-loss on 2026-08-29. The supervisor is advisory and nothing it says is applied.",
+   "figure": "n_system",
+   "status": "built_and_running",
+   "width": "centre",
+   "numbers": "CENSUS, README"
+  },
+  {
+   "id": "robots_today",
+   "theme": "robots-connected",
+   "heading": "Robots on the platform today",
+   "body": "Robot 241 is a tracked rover that drives crop rows and streams camera, GPS and two IMUs. The laser cart carries the weeder: a galvanometer laser, a down camera over the work zone and a forward camera. A Unitree humanoid has a project and has uploaded nothing yet. Between them the two ground vehicles have recorded 2,686 frames in 26 drives.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "CENSUS"
+  },
+  {
+   "id": "vehicles",
+   "theme": "robots-connected",
+   "heading": "Four frames, as recorded",
+   "body": "Nothing here is enhanced and nothing is labelled. The rectangle in the cart's down camera is a fixed work-zone overlay: it sits at the same pixels on frames with no vegetation in them at all.",
+   "figure": "l_robots",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "CENSUS"
+  },
+  {
+   "id": "vehicles_wide",
+   "theme": "robots-connected",
+   "heading": "Frames from both vehicles",
+   "body": "Four frames off the archive, unenhanced and unlabelled, from the two vehicles that drive our own crop plots.",
+   "figure": "w_robots",
+   "status": "built_and_running",
+   "width": "full",
+   "numbers": "CENSUS"
+  },
+  {
+   "id": "future_robots",
+   "theme": "robots-connected",
+   "heading": "Adding the next robot",
+   "body": "A new robot needs a project, an API key and a session start. The ingest contract is the same for every vehicle: start a session, post sensor batches and frames while driving, stop. The platform does not care what the robot is. The Unitree humanoid's project exists on this basis and is waiting on its first upload.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "robot_ingest.py routes"
+  },
+  {
+   "id": "uplink",
+   "theme": "live-collection",
+   "heading": "A drive becomes a dataset as it opens",
+   "body": "A vehicle opens a session and the platform registers it as a governed dataset at that moment, not after the drive ends. Frames and sensor batches arrive over one API key. Robot 241 sends camera, GPS and two IMUs; the laser cart sends camera, laser state, vehicle telemetry and its own detections, and no position at all.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "robot_ingest.py, CENSUS"
+  },
+  {
+   "id": "census",
+   "theme": "live-collection",
+   "heading": "On disk today",
+   "body": "Two robots have put 2,686 camera frames and 91,955 telemetry rows across nine streams onto the platform, over 26 drives, with 342 m of GPS track from 1,502 fixes. None of the frames is labelled.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "centre",
+   "numbers": "CENSUS"
+  },
+  {
+   "id": "drive",
+   "theme": "live-collection",
+   "heading": "213 seconds in one crop plot",
+   "body": "The longest single pass the platform holds: 141 m of track from 211 fixes, with heading from the IMU over the same 213 seconds. The platform holds 18 passes that carry position.",
+   "figure": "h_drive",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "CENSUS"
+  },
+  {
+   "id": "auto_diag",
+   "theme": "live-collection",
+   "heading": "Every drive is diagnosed on arrival",
+   "body": "The platform runs a fixed diagnosis over each finished session without being asked: route, noise, cross-sensor correlation, a timeline. It has done that for 26 live robot sessions and written 45 charts. A person reads the diagnosis before deciding whether the drive is worth anything.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "remote_control",
+   "theme": "remote-control",
+   "heading": "Driving a robot from a browser",
+   "body": "A signed-in user opens the 241 project and clicks Drive. The platform reverse-proxies the robot's own console over the lab tailnet, so the rover is driven from a plain browser with no VPN client. 1,389 joystick commands have gone through that path. Two gates sit in front of it: the platform's Google login, then the robot's own password.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "drive_button",
+   "theme": "remote-control",
+   "heading": "Only one robot has the button",
+   "body": "The Drive button appears on the 241 project and not on the laser cart's, because the allow-list holds one target. The rover has been dark since 2026-08-28: the platform answers a drive request today with its own offline page. The cart has never been drivable from the platform.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "advice",
+   "theme": "remote-control",
+   "heading": "Talking back to a robot",
+   "body": "Besides the drive relay, the platform sends a robot exactly one thing: advisory text. The rover polls for it and shows deterministic warnings about battery, current and temperature. That poll has returned 406 times. No platform code path sends an actuation command to any robot.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "laser_control",
+   "theme": "remote-control",
+   "heading": "Laser on, never once at a target",
+   "body": "The cart's own operator switched the laser on during three of eight archived sessions. The platform recorded 3379 laser rows and 216 of them have the laser enabled. Every one of those 216 is in OBSERVATION phase, with no target. The laser has never been armed, aimed or fired by the platform.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "analysis_agent",
+   "theme": "analysis-agent",
+   "heading": "Ask a dataset what it is good for",
+   "body": "Every dataset page carries a chat box. A user types or speaks a plain question about that dataset. A planner reads the question and the dataset's real column profile, then picks from 14 fixed analysis tools or writes new code. The answer comes back with the chart and the code that produced it.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "analysis_example",
+   "theme": "analysis-agent",
+   "heading": "Asked something it had never seen",
+   "body": "Asked to plot a histogram of the heading change rate on the 241 field drive, the agent wrote the code and returned the plot on the first attempt. A fixed template cannot do that, because nothing in the platform knew that question would be asked. Across the platform, 9 datasets carry 92 turns of that conversation.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "analysis_sandbox",
+   "theme": "analysis-agent",
+   "heading": "Code the agent writes runs fenced in",
+   "body": "Generated code passes an import whitelist and an AST check before it runs, with no network and no file writes, 15 seconds of CPU, 1.5 GB of memory and a 25 second wall clock. A user can edit the agent's code or paste their own and re-run it in the same fence.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "analysis_gap",
+   "theme": "analysis-agent",
+   "heading": "Not yet pointed at the drives",
+   "body": "The conversational agent has answered 92 questions, and none of them was about a live robot drive. Every one of the 26 live sessions got the fixed diagnosis; not one got a question. Pointing the agent at the drives is the next thing to do and it costs nothing but asking.",
+   "figure": "none",
+   "status": "built_but_off",
+   "width": "column",
+   "numbers": "AGENT"
+  },
+  {
+   "id": "loop",
+   "theme": "iterating-agents-brain",
+   "heading": "Left alone for fifteen rounds",
+   "body": "Two cluster jobs, one collecting and one training, ran fifteen rounds against the locked registry with nobody in the room. Each round searched public sources, filtered what it found, merged, trained and evaluated. Every round reported success. Accuracy fell for fifteen rounds.",
+   "figure": "f_rounds",
+   "status": "built_but_off",
+   "width": "centre",
+   "numbers": "ROUNDS"
+  },
+  {
+   "id": "brain",
+   "theme": "iterating-agents-brain",
+   "heading": "Which decisions a model makes",
+   "body": "A language model decides what the collector goes after next, judges whether a candidate dataset is on topic, and reviews a finished step. Those run on the cluster, as batch jobs, on open weights. The lab box hosts only the small guide model, and a verdict produced there is marked in its own record as a draft that may not be reported.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "model_router.py, review records"
+  },
+  {
+   "id": "watch",
+   "theme": "iterating-agents-brain",
+   "heading": "Who notices when it breaks",
+   "body": "We froze 162 real failures out of this project's own engineering record and scored every kind of supervision against them. The watchdog the loop was running returned no decision on any of the 149 dev cases. A model reading the raw artifacts reaches 0.70 recall over 116 incidents.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "SUPERVISION"
+  },
+  {
+   "id": "supervisor",
+   "theme": "iterating-agents-brain",
+   "heading": "Grounded recall separates the reviewers",
+   "body": "A 7 B model has the highest recall on the page and two thirds of what it reports quotes a line that does not exist. The 27 B leaves no such gap. The retrieval tier is worth +0.149 recall to the 27 B and +0.012 to the 14 B, so tiering pays where the model can use it.",
+   "figure": "e_supervision",
+   "status": "built_but_off",
+   "width": "centre",
+   "numbers": "SUPERVISION"
+  },
+  {
+   "id": "diagnosis",
+   "theme": "iterating-agents-brain",
+   "heading": "Reading the loop's own artifacts",
+   "body": "The corpus stopped growing at round three: the same 24 datasets and 48,752 unique images went in every time, and the apparent growth was one staging directory nobody cleared. Eight rounds collected nothing and reported success. Starting fresh instead of from the previous round's weights is worth +0.0287, 5.1 times this recipe's own seed spread.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "ROUNDS"
+  },
+  {
+   "id": "journey",
+   "theme": "results",
+   "heading": "Six months, in order",
+   "body": "Four of these eight turns are things that did not work, and two are numbers this project measured and then withdrew after checking them.",
+   "figure": "t_journey",
+   "status": "built_and_running",
+   "width": "full",
+   "numbers": "JOURNEY"
+  },
+  {
+   "id": "ledger",
+   "theme": "results",
+   "heading": "Everything we trained, ran, or rejected",
+   "body": "Thirty rows in four families, which is 27 distinct models. Five detectors trained on our own holdout, two vision models inside the loop, fourteen vision-language models zero-shot, and nine language models as reviewers. One is deployed.",
+   "figure": "m_ledger",
+   "status": "built_and_running",
+   "width": "centre",
+   "numbers": "LEDGER"
+  },
+  {
+   "id": "ladder",
+   "theme": "results",
+   "heading": "More web data, less accuracy",
+   "body": "Twelve times the training data costs 0.0189 on our own 1,977-image holdout, three seeds at every rung, which is 8.2 times the seed spread. The same eight checkpoints fall on a second weed dataset too. One of six audited web sources reaches a 0.90 label-precision bar.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "LADDER, SOURCES"
+  },
+  {
+   "id": "field",
+   "theme": "results",
+   "heading": "Back on our own rows",
+   "body": "The deployable checkpoint draws a box on 25 of the 2,686 frames our robots recorded, and 24 of those 25 boxes are the same class. These frames carry no labels, so that is a firing rate, not recall and not precision.",
+   "figure": "p_field",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "FIELD, CENSUS"
+  },
+  {
+   "id": "sources",
+   "theme": "results",
+   "heading": "Auditing six web sources",
+   "body": "The same probe reads 1.000 on human-labelled CottonWeedDet12, so a source at 0.184 is the data and not the instrument. Only the top source clears the bar, and it supplies 3,208 of the 13,527 audited images.",
+   "figure": "s_sources",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "SOURCES"
+  },
+  {
+   "id": "stands",
+   "theme": "honesty",
+   "heading": "Standing today",
+   "body": "The collector and trainer are paused after a stop-loss on 2026-08-29. The rover has been off the tailnet since then and the platform answers a drive request with its offline page. The supervisor is advisory. None of the 2,686 frames is labelled.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "CENSUS, AGENT"
+  },
+  {
+   "id": "made",
+   "theme": "honesty",
+   "heading": "How the numbers were made",
+   "body": "Most in-domain numbers are mAP50-95 on the same 1,977 images under Ultralytics. RF-DETR is pycocotools and the zero-shot column is mAP50 on the 848-image split; neither is differenced against the rest. That holdout is also the validation set during training, so every mAP here is a run's best epoch.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "RESULTS_TABLE A0"
+  },
+  {
+   "id": "withdrew",
+   "theme": "honesty",
+   "heading": "Numbers we withdrew",
+   "body": "0.910 was a data leak, found by a content-level check we built after publishing it. 0.9033 is the best of four unseeded runs and only one of the four crossed 0.90. An earlier reading of the ladder as a flat curve is retracted.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "RESULTS_TABLE D"
+  }
+ ]
+}

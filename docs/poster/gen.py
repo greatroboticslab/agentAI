@@ -48,13 +48,14 @@ STAND = ("Built at the MTSU Great Robotics Lab. Every robot the lab owns reports
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
 SPINE = [
-    ("platform-idea",           ["platform_idea", "platform_domains", "system"]),
-    ("robots-connected",        ["robots_today", "vehicles", "unitree", "future_robots"]),
-    ("live-collection",         ["uplink", "drive", "census"]),
-    ("remote-control",          ["remote_control", "drive_button", "laser_control"]),
-    ("analysis-agent",          ["analysis_agent", "analysis_example", "analysis_sandbox"]),
-    ("iterating-agents-brain",  ["loop", "brain", "supervisor", "watch"]),
-    ("results",                 ["journey", "ledger", "ladder", "field"]),
+    ("platform-idea",           ["platform_idea", "system", "platform_domains"]),
+    ("robots-connected",        ["robots_today", "vehicles", "future_robots"]),
+    ("live-collection",         ["uplink", "census", "drive", "auto_diag"]),
+    ("remote-control",          ["remote_control", "drive_button", "advice", "laser_control"]),
+    ("analysis-agent",          ["analysis_agent", "analysis_example", "analysis_sandbox",
+                                 "analysis_gap"]),
+    ("iterating-agents-brain",  ["loop", "brain", "diagnosis", "watch", "supervisor"]),
+    ("results",                 ["ledger", "ladder", "field", "sources", "journey"]),
 ]
 FOOTER = ["stands", "made", "withdrew"]
 
@@ -132,8 +133,17 @@ class Poster(object):
         n = len(COL)
         slots = [SLOT_OF_WIDTH.get(round(w, 3), "column") for _, w in COL]
 
-        # assign every section of the spine to a column whose slot fits its figure
-        ordered = [sid for _, ids in SPINE for sid in ids if sid in self.lib]
+        # Interleave by round, not by theme: the first section of every theme,
+        # then the second of every theme, and so on. Overflow drops from the end,
+        # so what a crowded sheet loses is each theme's third and fourth section
+        # rather than the whole of the last theme. Theme-order dropping cost the
+        # results block on every sheet.
+        rounds = max(len(ids) for _, ids in SPINE)
+        ordered = []
+        for r in range(rounds):
+            for _theme, ids in SPINE:
+                if r < len(ids) and ids[r] in self.lib:
+                    ordered.append(ids[r])
         cols = [[] for _ in range(n)]
         for sid in ordered:
             want = self.slot_of(sid)

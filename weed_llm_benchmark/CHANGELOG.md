@@ -10132,3 +10132,51 @@ character, and at the Arial figure it wrapped the title onto the byline.
 
 Smoke-tested at eight looks on a stand-in library; the verified section library
 lands next and fills the sheets.
+
+---
+
+## 2026-09-13 — v3.59.0 the section library, and 36 looks built from it
+
+Two mining passes died in their verify fan-out (122 claims, one agent each, twice
+out of budget). The mined claims were cached, so the third pass read them out of
+the journal instead of re-running: 122 claims across six areas, 65 verdicts
+recovered, 53 of those kept. Every number that reached a section was then counted
+again by hand on the live box, and three of them moved.
+
+**Remote control is real and was absent from every earlier draft.** A signed-in
+user opens the 241 project, clicks Drive, and the platform reverse-proxies the
+rover's own console over the lab tailnet, so the robot is driven from a plain
+browser with no VPN client. The journal holds **1,389** joystick commands through
+that path since 2026-08-01 — the mining pass said 1,327 from a narrower window.
+Two gates sit in front of it, the platform's Google login and then the robot's own
+password. The rover has been dark since 2026-08-28 and the platform answers a
+drive request today with its own offline page. The cart has never been drivable:
+the allow-list holds one target.
+
+**The laser, exactly.** The cart's own operator switched it on during three of
+eight archived sessions: **216 of 3,379 laser rows carry `enabled=True`, and every
+one of the 216 is in OBSERVATION phase, with no target.** No platform code path
+sends an actuation command to any robot. "The laser has never fired" is true and
+this is the precise form of it.
+
+**The analysis agent is richer than the poster said, and pointed at the wrong
+things.** Every dataset page carries a chat box; a planner reads the question and
+the dataset's real column profile and picks from 14 fixed tools or writes new code
+that runs behind an import whitelist and an AST check with no network, 15 s of
+CPU and a 25 s wall clock. Counted on the box: **9 datasets, 92 turns** — not the
+72 the mining pass reported. And the split matters: the platform has run its fixed
+diagnosis over **26 live robot sessions** and written 45 charts, while **0 of the
+92 conversational turns is about a live drive**. That is a section of its own.
+
+`sections.json` holds **32 sections across eight themes**, every heading starting
+with a different word and none starting with "What", every body under the five
+writing rules, every section carrying whether the thing it describes is running,
+switched off, or a design. `poster_data.AGENT` holds the new numbers so the
+library cannot drift from them.
+
+`gen.py` now interleaves the spine by round rather than by theme: the first
+section of every theme, then the second, and so on. Overflow drops from the end,
+so a crowded sheet loses each theme's fourth section instead of the whole results
+block, which is what theme-order dropping did on all 36 sheets. Built 36 looks
+from one argument; each keeps 16 to 31 sections depending on how much its grid
+and density hold.

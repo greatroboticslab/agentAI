@@ -1,0 +1,644 @@
+[
+ {
+  "name": "v01",
+  "style": "two-ink-arial-rule-none-airy",
+  "describe": "grid two \u00b7 palette ink \u00b7 display Arial \u00b7 title rule \u00b7 opens with none \u00b7 airy",
+  "dropped": [
+   "watch",
+   "laser_control",
+   "supervisor",
+   "diagnosis",
+   "analysis_gap",
+   "advice",
+   "auto_diag",
+   "platform_domains",
+   "analysis_sandbox",
+   "brain",
+   "future_robots"
+  ],
+  "pptx": "variants/v01.pptx"
+ },
+ {
+  "name": "v02",
+  "style": "four-mono-serif-band-system-dense",
+  "describe": "grid four \u00b7 palette mono \u00b7 display Georgia \u00b7 title band \u00b7 opens with system \u00b7 dense",
+  "dropped": [
+   "supervisor"
+  ],
+  "pptx": "variants/v02.pptx"
+ },
+ {
+  "name": "v03",
+  "style": "wide-left-slate-times-block-photos-normal",
+  "describe": "grid wide-left \u00b7 palette slate \u00b7 display Times New Roman \u00b7 title block \u00b7 opens with photos \u00b7 normal",
+  "dropped": [
+   "supervisor",
+   "watch",
+   "sources",
+   "auto_diag",
+   "analysis_sandbox",
+   "analysis_gap",
+   "future_robots",
+   "laser_control",
+   "field",
+   "system",
+   "diagnosis",
+   "drive",
+   "ledger",
+   "advice"
+  ],
+  "pptx": "variants/v03.pptx"
+ },
+ {
+  "name": "v04",
+  "style": "three-forest-narrow-underline-census-airy",
+  "describe": "grid three \u00b7 palette forest \u00b7 display Arial Narrow \u00b7 title underline \u00b7 opens with census \u00b7 airy",
+  "dropped": [
+   "sources",
+   "supervisor",
+   "analysis_gap",
+   "laser_control",
+   "field",
+   "diagnosis",
+   "advice",
+   "watch",
+   "system",
+   "drive",
+   "auto_diag"
+  ],
+  "pptx": "variants/v04.pptx"
+ },
+ {
+  "name": "v05",
+  "style": "wide-right-navy-arial-rule-none-dense",
+  "describe": "grid wide-right \u00b7 palette navy \u00b7 display Arial \u00b7 title rule \u00b7 opens with none \u00b7 dense",
+  "dropped": [
+   "supervisor",
+   "sources",
+   "analysis_gap",
+   "watch",
+   "auto_diag",
+   "field",
+   "advice",
+   "platform_domains",
+   "laser_control"
+  ],
+  "pptx": "variants/v05.pptx"
+ },
+ {
+  "name": "v06",
+  "style": "four-sand-narrow-block-system-normal",
+  "describe": "grid four \u00b7 palette sand \u00b7 display Arial Narrow \u00b7 title block \u00b7 opens with system \u00b7 normal",
+  "dropped": [
+   "supervisor"
+  ],
+  "pptx": "variants/v06.pptx"
+ },
+ {
+  "name": "v07",
+  "style": "wide-left-sand-times-band-census-normal",
+  "describe": "grid wide-left \u00b7 palette sand \u00b7 display Times New Roman \u00b7 title band \u00b7 opens with census \u00b7 normal",
+  "dropped": [
+   "supervisor",
+   "watch",
+   "sources",
+   "auto_diag",
+   "analysis_sandbox",
+   "analysis_gap",
+   "future_robots",
+   "laser_control",
+   "field",
+   "system",
+   "diagnosis"
+  ],
+  "pptx": "variants/v07.pptx"
+ },
+ {
+  "name": "v08",
+  "style": "wide-right-forest-serif-underline-photos-airy",
+  "describe": "grid wide-right \u00b7 palette forest \u00b7 display Georgia \u00b7 title underline \u00b7 opens with photos \u00b7 airy",
+  "dropped": [
+   "supervisor",
+   "sources",
+   "watch",
+   "analysis_gap",
+   "field",
+   "auto_diag",
+   "advice",
+   "laser_control",
+   "platform_domains",
+   "diagnosis",
+   "analysis_sandbox",
+   "system",
+   "drive",
+   "future_robots",
+   "brain",
+   "ledger"
+  ],
+  "pptx": "variants/v08.pptx"
+ },
+ {
+  "name": "v09",
+  "style": "three-slate-narrow-block-census-dense",
+  "describe": "grid three \u00b7 palette slate \u00b7 display Arial Narrow \u00b7 title block \u00b7 opens with census \u00b7 dense",
+  "dropped": [
+   "sources",
+   "supervisor",
+   "analysis_gap",
+   "laser_control",
+   "field",
+   "diagnosis",
+   "advice",
+   "system",
+   "drive"
+  ],
+  "pptx": "variants/v09.pptx"
+ },
+ {
+  "name": "v10",
+  "style": "two-navy-times-rule-photos-airy",
+  "describe": "grid two \u00b7 palette navy \u00b7 display Times New Roman \u00b7 title rule \u00b7 opens with photos \u00b7 airy",
+  "dropped": [
+   "watch",
+   "laser_control",
+   "supervisor",
+   "diagnosis",
+   "analysis_gap",
+   "advice",
+   "auto_diag",
+   "platform_domains",
+   "analysis_sandbox",
+   "brain",
+   "future_robots",
+   "drive_button",
+   "ladder",
+   "system",
+   "analysis_example",
+   "census"
+  ],
+  "pptx": "variants/v10.pptx"
+ },
+ {
+  "name": "v11",
+  "style": "two-mono-arial-band-none-dense",
+  "describe": "grid two \u00b7 palette mono \u00b7 display Arial \u00b7 title band \u00b7 opens with none \u00b7 dense",
+  "dropped": [
+   "watch",
+   "laser_control",
+   "supervisor",
+   "diagnosis",
+   "analysis_gap",
+   "advice",
+   "auto_diag"
+  ],
+  "pptx": "variants/v11.pptx"
+ },
+ {
+  "name": "v12",
+  "style": "three-ink-serif-underline-system-normal",
+  "describe": "grid three \u00b7 palette ink \u00b7 display Georgia \u00b7 title underline \u00b7 opens with system \u00b7 normal",
+  "dropped": [
+   "sources",
+   "supervisor",
+   "analysis_gap",
+   "laser_control",
+   "field",
+   "diagnosis",
+   "advice",
+   "system",
+   "watch",
+   "drive",
+   "auto_diag"
+  ],
+  "pptx": "variants/v12.pptx"
+ },
+ {
+  "name": "v13",
+  "style": "wide-left-navy-arial-underline-system-normal",
+  "describe": "grid wide-left \u00b7 palette navy \u00b7 display Arial \u00b7 title underline \u00b7 opens with system \u00b7 normal",
+  "dropped": [
+   "supervisor",
+   "watch",
+   "sources",
+   "auto_diag",
+   "analysis_sandbox",
+   "analysis_gap",
+   "future_robots",
+   "laser_control",
+   "field",
+   "system",
+   "diagnosis",
+   "drive",
+   "ledger",
+   "advice"
+  ],
+  "pptx": "variants/v13.pptx"
+ },
+ {
+  "name": "v14",
+  "style": "wide-right-sand-serif-rule-census-dense",
+  "describe": "grid wide-right \u00b7 palette sand \u00b7 display Georgia \u00b7 title rule \u00b7 opens with census \u00b7 dense",
+  "dropped": [
+   "supervisor",
+   "sources",
+   "analysis_gap",
+   "watch",
+   "auto_diag",
+   "field",
+   "advice",
+   "platform_domains",
+   "laser_control",
+   "system"
+  ],
+  "pptx": "variants/v14.pptx"
+ },
+ {
+  "name": "v15",
+  "style": "four-mono-times-band-none-airy",
+  "describe": "grid four \u00b7 palette mono \u00b7 display Times New Roman \u00b7 title band \u00b7 opens with none \u00b7 airy",
+  "dropped": [
+   "supervisor"
+  ],
+  "pptx": "variants/v15.pptx"
+ },
+ {
+  "name": "v16",
+  "style": "wide-right-slate-narrow-block-photos-dense",
+  "describe": "grid wide-right \u00b7 palette slate \u00b7 display Arial Narrow \u00b7 title block \u00b7 opens with photos \u00b7 dense",
+  "dropped": [
+   "supervisor",
+   "sources",
+   "analysis_gap",
+   "watch",
+   "auto_diag",
+   "field",
+   "advice",
+   "platform_domains",
+   "laser_control",
+   "system",
+   "diagnosis",
+   "analysis_sandbox",
+   "drive",
+   "future_robots"
+  ],
+  "pptx": "variants/v16.pptx"
+ },
+ {
+  "name": "v17",
+  "style": "four-forest-serif-band-none-airy",
+  "describe": "grid four \u00b7 palette forest \u00b7 display Georgia \u00b7 title band \u00b7 opens with none \u00b7 airy",
+  "dropped": [
+   "supervisor"
+  ],
+  "pptx": "variants/v17.pptx"
+ },
+ {
+  "name": "v18",
+  "style": "three-ink-times-underline-photos-normal",
+  "describe": "grid three \u00b7 palette ink \u00b7 display Times New Roman \u00b7 title underline \u00b7 opens with photos \u00b7 normal",
+  "dropped": [
+   "sources",
+   "supervisor",
+   "analysis_gap",
+   "laser_control",
+   "field",
+   "diagnosis",
+   "advice",
+   "system",
+   "watch",
+   "drive",
+   "auto_diag",
+   "ledger",
+   "analysis_sandbox"
+  ],
+  "pptx": "variants/v18.pptx"
+ },
+ {
+  "name": "v19",
+  "style": "wide-left-slate-arial-rule-census-normal",
+  "describe": "grid wide-left \u00b7 palette slate \u00b7 display Arial \u00b7 title rule \u00b7 opens with census \u00b7 normal",
+  "dropped": [
+   "supervisor",
+   "watch",
+   "sources",
+   "auto_diag",
+   "analysis_sandbox",
+   "analysis_gap",
+   "future_robots",
+   "laser_control",
+   "field",
+   "system",
+   "diagnosis"
+  ],
+  "pptx": "variants/v19.pptx"
+ },
+ {
+  "name": "v20",
+  "style": "two-mono-narrow-block-system-airy",
+  "describe": "grid two \u00b7 palette mono \u00b7 display Arial Narrow \u00b7 title block \u00b7 opens with system \u00b7 airy",
+  "dropped": [
+   "watch",
+   "laser_control",
+   "supervisor",
+   "diagnosis",
+   "analysis_gap",
+   "advice",
+   "auto_diag",
+   "platform_domains",
+   "analysis_sandbox",
+   "brain",
+   "future_robots",
+   "drive_button",
+   "ladder",
+   "system",
+   "analysis_example"
+  ],
+  "pptx": "variants/v20.pptx"
+ },
+ {
+  "name": "v21",
+  "style": "three-ink-arial-band-none-dense",
+  "describe": "grid three \u00b7 palette ink \u00b7 display Arial \u00b7 title band \u00b7 opens with none \u00b7 dense",
+  "dropped": [
+   "sources",
+   "supervisor",
+   "analysis_gap",
+   "laser_control",
+   "field",
+   "diagnosis",
+   "advice",
+   "system"
+  ],
+  "pptx": "variants/v21.pptx"
+ },
+ {
+  "name": "v22",
+  "style": "two-forest-serif-underline-census-dense",
+  "describe": "grid two \u00b7 palette forest \u00b7 display Georgia \u00b7 title underline \u00b7 opens with census \u00b7 dense",
+  "dropped": [
+   "watch",
+   "laser_control",
+   "supervisor",
+   "diagnosis",
+   "analysis_gap",
+   "advice",
+   "auto_diag",
+   "platform_domains",
+   "analysis_sandbox"
+  ],
+  "pptx": "variants/v22.pptx"
+ },
+ {
+  "name": "v23",
+  "style": "wide-left-navy-times-block-photos-airy",
+  "describe": "grid wide-left \u00b7 palette navy \u00b7 display Times New Roman \u00b7 title block \u00b7 opens with photos \u00b7 airy",
+  "dropped": [
+   "supervisor",
+   "watch",
+   "sources",
+   "auto_diag",
+   "analysis_sandbox",
+   "analysis_gap",
+   "future_robots",
+   "laser_control",
+   "field",
+   "system",
+   "diagnosis",
+   "drive",
+   "advice",
+   "ledger",
+   "platform_domains"
+  ],
+  "pptx": "variants/v23.pptx"
+ },
+ {
+  "name": "v24",
+  "style": "four-sand-narrow-rule-system-normal",
+  "describe": "grid four \u00b7 palette sand \u00b7 display Arial Narrow \u00b7 title rule \u00b7 opens with system \u00b7 normal",
+  "dropped": [
+   "supervisor"
+  ],
+  "pptx": "variants/v24.pptx"
+ },
+ {
+  "name": "v25",
+  "style": "wide-right-ink-times-band-system-normal",
+  "describe": "grid wide-right \u00b7 palette ink \u00b7 display Times New Roman \u00b7 title band \u00b7 opens with system \u00b7 normal",
+  "dropped": [
+   "supervisor",
+   "sources",
+   "watch",
+   "analysis_gap",
+   "auto_diag",
+   "field",
+   "advice",
+   "laser_control",
+   "platform_domains",
+   "diagnosis",
+   "system",
+   "analysis_sandbox",
+   "drive",
+   "future_robots"
+  ],
+  "pptx": "variants/v25.pptx"
+ },
+ {
+  "name": "v26",
+  "style": "wide-left-slate-serif-underline-photos-airy",
+  "describe": "grid wide-left \u00b7 palette slate \u00b7 display Georgia \u00b7 title underline \u00b7 opens with photos \u00b7 airy",
+  "dropped": [
+   "supervisor",
+   "watch",
+   "sources",
+   "auto_diag",
+   "analysis_sandbox",
+   "analysis_gap",
+   "future_robots",
+   "laser_control",
+   "field",
+   "system",
+   "diagnosis",
+   "drive",
+   "advice",
+   "ledger",
+   "platform_domains"
+  ],
+  "pptx": "variants/v26.pptx"
+ },
+ {
+  "name": "v27",
+  "style": "two-forest-arial-block-none-dense",
+  "describe": "grid two \u00b7 palette forest \u00b7 display Arial \u00b7 title block \u00b7 opens with none \u00b7 dense",
+  "dropped": [
+   "watch",
+   "laser_control",
+   "supervisor",
+   "diagnosis",
+   "analysis_gap",
+   "advice",
+   "auto_diag"
+  ],
+  "pptx": "variants/v27.pptx"
+ },
+ {
+  "name": "v28",
+  "style": "wide-right-navy-narrow-rule-census-normal",
+  "describe": "grid wide-right \u00b7 palette navy \u00b7 display Arial Narrow \u00b7 title rule \u00b7 opens with census \u00b7 normal",
+  "dropped": [
+   "supervisor",
+   "sources",
+   "watch",
+   "analysis_gap",
+   "auto_diag",
+   "field",
+   "advice",
+   "laser_control",
+   "platform_domains",
+   "diagnosis",
+   "system",
+   "analysis_sandbox"
+  ],
+  "pptx": "variants/v28.pptx"
+ },
+ {
+  "name": "v29",
+  "style": "three-sand-serif-rule-system-dense",
+  "describe": "grid three \u00b7 palette sand \u00b7 display Georgia \u00b7 title rule \u00b7 opens with system \u00b7 dense",
+  "dropped": [
+   "sources",
+   "supervisor",
+   "analysis_gap",
+   "laser_control",
+   "field",
+   "diagnosis",
+   "advice",
+   "system",
+   "drive",
+   "watch"
+  ],
+  "pptx": "variants/v29.pptx"
+ },
+ {
+  "name": "v30",
+  "style": "four-mono-narrow-block-census-airy",
+  "describe": "grid four \u00b7 palette mono \u00b7 display Arial Narrow \u00b7 title block \u00b7 opens with census \u00b7 airy",
+  "dropped": [
+   "supervisor"
+  ],
+  "pptx": "variants/v30.pptx"
+ },
+ {
+  "name": "v31",
+  "style": "two-slate-arial-band-photos-airy",
+  "describe": "grid two \u00b7 palette slate \u00b7 display Arial \u00b7 title band \u00b7 opens with photos \u00b7 airy",
+  "dropped": [
+   "watch",
+   "laser_control",
+   "supervisor",
+   "diagnosis",
+   "analysis_gap",
+   "advice",
+   "auto_diag",
+   "platform_domains",
+   "analysis_sandbox",
+   "brain",
+   "future_robots",
+   "drive_button",
+   "ladder",
+   "system",
+   "analysis_example",
+   "census"
+  ],
+  "pptx": "variants/v31.pptx"
+ },
+ {
+  "name": "v32",
+  "style": "four-navy-times-underline-none-normal",
+  "describe": "grid four \u00b7 palette navy \u00b7 display Times New Roman \u00b7 title underline \u00b7 opens with none \u00b7 normal",
+  "dropped": [
+   "supervisor"
+  ],
+  "pptx": "variants/v32.pptx"
+ },
+ {
+  "name": "v33",
+  "style": "wide-right-mono-serif-block-census-dense",
+  "describe": "grid wide-right \u00b7 palette mono \u00b7 display Georgia \u00b7 title block \u00b7 opens with census \u00b7 dense",
+  "dropped": [
+   "supervisor",
+   "sources",
+   "analysis_gap",
+   "watch",
+   "auto_diag",
+   "field",
+   "advice",
+   "platform_domains",
+   "laser_control",
+   "system"
+  ],
+  "pptx": "variants/v33.pptx"
+ },
+ {
+  "name": "v34",
+  "style": "three-sand-times-rule-none-airy",
+  "describe": "grid three \u00b7 palette sand \u00b7 display Times New Roman \u00b7 title rule \u00b7 opens with none \u00b7 airy",
+  "dropped": [
+   "sources",
+   "supervisor",
+   "analysis_gap",
+   "laser_control",
+   "field",
+   "diagnosis",
+   "advice",
+   "watch",
+   "system",
+   "drive",
+   "auto_diag"
+  ],
+  "pptx": "variants/v34.pptx"
+ },
+ {
+  "name": "v35",
+  "style": "wide-left-forest-narrow-underline-photos-dense",
+  "describe": "grid wide-left \u00b7 palette forest \u00b7 display Arial Narrow \u00b7 title underline \u00b7 opens with photos \u00b7 dense",
+  "dropped": [
+   "supervisor",
+   "watch",
+   "sources",
+   "auto_diag",
+   "analysis_sandbox",
+   "analysis_gap",
+   "future_robots",
+   "system",
+   "field",
+   "laser_control",
+   "diagnosis",
+   "drive",
+   "ledger",
+   "advice"
+  ],
+  "pptx": "variants/v35.pptx"
+ },
+ {
+  "name": "v36",
+  "style": "wide-left-ink-arial-band-system-normal",
+  "describe": "grid wide-left \u00b7 palette ink \u00b7 display Arial \u00b7 title band \u00b7 opens with system \u00b7 normal",
+  "dropped": [
+   "supervisor",
+   "watch",
+   "sources",
+   "auto_diag",
+   "analysis_sandbox",
+   "analysis_gap",
+   "future_robots",
+   "laser_control",
+   "field",
+   "system",
+   "diagnosis",
+   "drive",
+   "ledger",
+   "advice"
+  ],
+  "pptx": "variants/v36.pptx"
+ }
+]
