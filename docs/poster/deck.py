@@ -363,9 +363,10 @@ class Deck(object):
         if self.look == "mtsu":
             # A 0.14 in accent square, then the sub-head in the accent colour.
             self.rect(x, y + 0.12, 0.135, 0.135, fill=self.c["accent"])
-            self.tbox(x + 0.26, y, w - 0.26, [(s, 21, True, self.c["accent"])],
+            sz = self.dz.get("sub", 21)
+            self.tbox(x + 0.26, y, w - 0.26, [(s, sz, True, self.c["accent"])],
                       spacing=1.0, face="Arial")
-            return y + self.h_est(s, w - 0.26, 21, 1.0) + 0.10
+            return y + self.h_est(s, w - 0.26, sz, 1.0) + 0.10
         self.tbox(x, y, w, [(s, SUBHEAD, True, self.c["ink"])], spacing=1.0, face=self.f["display"])
         return y + 0.46
 

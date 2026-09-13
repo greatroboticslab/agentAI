@@ -510,7 +510,7 @@ def _pic(ax, path, box, ax_w_in, ax_h_in, crop=0.5, fallback=None,
                                lw=1.2, zorder=3))
 
 
-FIG_W, FIG_H = 46.4, 5.05
+FIG_W, FIG_H = 46.4, 4.15
 
 
 def projects():
@@ -546,14 +546,14 @@ def projects():
 
         ax.text(0, 0.985, pr["name"], fontsize=AXIS + 4, fontweight="bold",
                 color=INK, va="top")
-        ytop = 1.0 - (0.52 / ax_h_in)
+        ytop = 1.0 - (0.46 / ax_h_in)
 
         if lay == "side":
             # a square, so the machine is not cropped to fit a neighbour's shape
             # A square, capped so the plate stays short enough to leave the
             # columns their inches: a 5.4 in square read the rover whole but
             # cost the sheet two blocks of argument.
-            side_in = min(cell_w_in * 0.40, 3.90, ax_h_in - 0.60)
+            side_in = min(cell_w_in * 0.40, 3.10, ax_h_in - 0.55)
             pw, ph = side_in / cell_w_in, side_in / ax_h_in
             _pic(ax, pr["photo"], (0.0, ytop - ph, pw, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5), pr.get("fallback"))
@@ -563,7 +563,7 @@ def projects():
             tx, tw_chars = pw + 0.045, int((cell_w_in * (1 - pw - 0.045) - 0.7) / 0.098)
             y = ytop - 0.02
         elif lay == "pair":
-            ph = 2.55 / ax_h_in
+            ph = 2.05 / ax_h_in
             half = (1.0 - 0.012) / 2.0
             _pic(ax, pr["photo"], (0.0, ytop - ph, half, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5))
@@ -572,7 +572,7 @@ def projects():
             tx, tw_chars = 0.0, int((cell_w_in - 0.7) / 0.098)
             y = ytop - ph - 0.05
         else:
-            ph = 2.30 / ax_h_in
+            ph = 1.95 / ax_h_in
             _pic(ax, pr["photo"], (0.0, ytop - ph, 1.0, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5), pr.get("fallback"))
             tx, tw_chars = 0.0, int((cell_w_in - 0.7) / 0.098)

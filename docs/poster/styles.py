@@ -176,10 +176,12 @@ class Style(object):
             self.d["heading"] -= 6
         elif look == "mtsu":
             # Georgia body, so the same point size reads a size smaller than
-            # Arial. The heading comes down to the template's own 30 pt.
+            # Arial. The heading comes down to the template's own 30 pt, and the
+            # sub-head to its 21. gen.py scales all four to fill the sheet.
             self.d["body"] += 1
             self.d["caption"] += 1
             self.d["heading"] = 30
+            self.d["sub"] = 21
         # Which plates this look draws from: the slate-blue set in fig/, or the
         # near-monochrome set rendered with POSTER_LOOK=journal.
         self.fig_dir = {"journal": "fig_journal", "mtsu": "fig_mtsu"}.get(look, "fig")
