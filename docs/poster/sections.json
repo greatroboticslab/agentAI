@@ -34,7 +34,7 @@
    "id": "robots_today",
    "theme": "robots-connected",
    "heading": "Robots on the platform today",
-   "body": "Robot 241 is a tracked rover that drives crop rows and streams camera, GPS and two IMUs. The laser cart carries the weeder: a galvanometer laser, a down camera over the work zone and a forward camera. A Unitree humanoid has a project and has uploaded nothing yet. Between them the two ground vehicles have recorded 2,686 frames in 26 drives.",
+   "body": "Robot 241 is a tracked rover that drives crop rows and streams camera, GPS and two IMUs. The laser cart carries the weeder: a galvanometer laser, a down camera over the work zone and a forward camera. Ten projects sit on the platform and two of them have a robot reporting into them. Between those two vehicles, 2,686 frames in 26 drives.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -64,7 +64,7 @@
    "id": "future_robots",
    "theme": "robots-connected",
    "heading": "Adding the next robot",
-   "body": "A new robot needs a project, an API key and a session start. The ingest contract is the same for every vehicle: start a session, post sensor batches and frames while driving, stop. The platform does not care what the robot is. The Unitree humanoid's project exists on this basis and is waiting on its first upload.",
+   "body": "A new robot needs a project, an API key and a session start. The ingest contract is the same for every vehicle: open a session, post sensor batches and frames while driving, stop. The platform does not care what the robot is. Empty projects for a mobile robot and a humanoid already sit on it, waiting for a first upload.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -108,7 +108,9 @@
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
-   "numbers": "AGENT"
+   "numbers": "AGENT",
+   "big": "26",
+   "big_label": "live drives diagnosed without being asked"
   },
   {
    "id": "remote_control",
@@ -118,7 +120,9 @@
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
-   "numbers": "AGENT"
+   "numbers": "AGENT",
+   "big": "1,389",
+   "big_label": "joystick commands through the platform"
   },
   {
    "id": "drive_button",
@@ -148,7 +152,9 @@
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
-   "numbers": "AGENT"
+   "numbers": "AGENT",
+   "big": "0",
+   "big_label": "times the laser has been fired by the platform"
   },
   {
    "id": "analysis_agent",
@@ -158,7 +164,9 @@
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
-   "numbers": "AGENT"
+   "numbers": "AGENT",
+   "big": "14",
+   "big_label": "analysis tools the planner can choose from"
   },
   {
    "id": "analysis_example",
@@ -168,7 +176,9 @@
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
-   "numbers": "AGENT"
+   "numbers": "AGENT",
+   "big": "92",
+   "big_label": "questions asked of a dataset so far"
   },
   {
    "id": "analysis_sandbox",
@@ -218,7 +228,9 @@
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
-   "numbers": "SUPERVISION"
+   "numbers": "SUPERVISION",
+   "big": "162",
+   "big_label": "real failures frozen as a benchmark"
   },
   {
    "id": "supervisor",
@@ -258,7 +270,9 @@
    "figure": "m_ledger",
    "status": "built_and_running",
    "width": "centre",
-   "numbers": "LEDGER"
+   "numbers": "LEDGER",
+   "big": "27",
+   "big_label": "distinct models trained, run, or rejected"
   },
   {
    "id": "ladder",
@@ -319,6 +333,68 @@
    "status": "built_and_running",
    "width": "column",
    "numbers": "RESULTS_TABLE D"
+  },
+  {
+   "id": "platform_scale",
+   "theme": "platform-idea",
+   "heading": "Size of the thing",
+   "body": "One FastAPI service on a lab server carries 151 routes in its main module plus more in mounted modules. 29 people sign in with a Google account, under two roles, with a per-user grant for cluster GPU. 10 projects sit on it and two of them have a robot reporting into them.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "AGENT, live count 2026-09-13",
+   "big": "10",
+   "big_label": "projects, two of them with a robot on the other end"
+  },
+  {
+   "id": "agent_builder",
+   "theme": "platform-idea",
+   "heading": "Building an agent by saying what you want",
+   "body": "A member types one sentence on the home page, or speaks it. A model proposes a project name, a modality and a set of agent components, the member edits what it got wrong, and the project exists. Speech goes through a Whisper model hosted on the lab's own GPU, not a cloud service.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "/api/agent/create, /api/voice/transcribe"
+  },
+  {
+   "id": "live_detect",
+   "theme": "remote-control",
+   "heading": "Running the detector on a live frame",
+   "body": "While a robot is driving, the project page shows its newest frame refreshing every second and a half, and the weed detector can be switched on over that frame in the same process. The operator sees what the model sees, on the drive that is happening.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "/api/detect/frame/{sid}.jpg"
+  },
+  {
+   "id": "rates",
+   "theme": "live-collection",
+   "heading": "Rates the platform holds",
+   "body": "Robot 241 samples its two IMUs, its telemetry and its control stream at 20 Hz and its GPS at 1 Hz, and sends camera frames at one per second. The laser cart streams its own detections and laser state at 5 Hz and vehicle state at 2 Hz. Telemetry travels as one gzip batch per second with a sequence number, and the platform dedupes on it.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "robot_ingest.py"
+  },
+  {
+   "id": "labelling",
+   "theme": "live-collection",
+   "heading": "Where a human labels",
+   "body": "A member pushes a dataset's images to one of four allow-listed Roboflow projects under a per-project image budget, labels there, and pulls the labels back into the registry. Mongo holds the registry and is the source of truth; Roboflow is the labelling surface and nothing else.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "registry + Roboflow allow-list"
+  },
+  {
+   "id": "gps_bug",
+   "theme": "honesty",
+   "heading": "Bugs this platform found in itself",
+   "body": "Until 2026-09-11 every derived GPS file on the platform was one motionless point, because the materialiser preferred the Pi's frozen fix over the board's. Reading the artifacts rather than the dashboard is what surfaced it, and 200.9 m of real track came back.",
+   "figure": "none",
+   "status": "built_and_running",
+   "width": "column",
+   "numbers": "CENSUS, RESULTS_TABLE"
   }
  ]
 }

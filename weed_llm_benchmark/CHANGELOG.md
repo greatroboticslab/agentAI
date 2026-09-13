@@ -10180,3 +10180,37 @@ so a crowded sheet loses each theme's fourth section instead of the whole result
 block, which is what theme-order dropping did on all 36 sheets. Built 36 looks
 from one argument; each keeps 16 to 31 sections depending on how much its grid
 and density hold.
+
+---
+
+## 2026-09-13 — v3.59.1 six sections added, one false claim removed, big numbers on the two named themes
+
+**A claim about a robot we do not have.** Two sections said a Unitree humanoid has
+a project on the platform and is waiting on its first upload. The live Mongo
+`domains` collection has no `unitree` document and the repository does not contain
+the string. What exists is an empty `humanoid_robot` project beside an empty
+`mobile_robot` one. Both sections now say that instead, which is a better sentence
+anyway: the ingest contract is the same for every vehicle, and two empty projects
+are sitting on it waiting for a first upload.
+
+Counted on the live box while checking: **10 projects**, two of them with a robot
+reporting in; **29 users**; **151 routes** in the dashboard's main module; **37**
+robot session starts since 2026-08-01.
+
+**Six sections added**, all from claims verified against the running service:
+the platform's size; building an agent by saying one sentence, with speech going
+through a Whisper model on the lab's own GPU; running the weed detector over a
+live robot frame while the robot is driving; the sample rates the uplink holds;
+Roboflow as the labelling surface with Mongo as the source of truth; and, in the
+honesty footer, the GPS materialiser that preferred a frozen Pi fix until
+2026-09-11 and hid 200.9 m of real track.
+
+**The two themes Harry named first now carry a number set to be read across a
+room.** A section may declare `big`, and the generator sets it at 62 pt above the
+heading: 1,389 joystick commands through the platform, 14 analysis tools, 92
+questions asked of a dataset, 26 live drives diagnosed unasked, 0 times the laser
+has been fired by the platform, 10 projects, 162 real failures frozen as a
+benchmark, 27 distinct models.
+
+The library is 38 sections across eight themes, still with no two headings
+starting with the same word. Rebuilt 36 looks; each keeps 20 to 37 of them.

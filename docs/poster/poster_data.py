@@ -364,8 +364,13 @@ AGENT = {
     "agent_turns_on_robot_sessions": 0,
     "sandbox_cpu_s": 15, "sandbox_ram_gb": 1.5, "sandbox_timeout_s": 25,
     "deep_turns": 1, "byok_turns": 1,
+    # the platform as a product, counted on the live Mongo 2026-09-13
+    "projects": 10, "projects_with_a_robot": 2, "users": 29,
+    "session_starts": 37,
     "src": "lab journal + uploads/rl_lasercar-*/laser.csv + "
-           "results/framework/dataset_analysis/ ; counted 2026-09-13",
+           "results/framework/dataset_analysis/ + live Mongo domains/users; "
+           "counted 2026-09-13. There is NO unitree project: the humanoid one is "
+           "called humanoid_robot and is empty.",
 }
 
 # --- the platform census, walked rather than claimed -------------------------

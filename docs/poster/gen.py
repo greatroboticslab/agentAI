@@ -75,6 +75,16 @@ class Poster(object):
 
     def section(self, x, y, w, sid, slot, fig_no):
         s, d = self.lib[sid], self.d
+        # A section may carry one number set to be read from across a room. The
+        # two themes Harry named first -- remote control and the analysis agent --
+        # are where these sit, so a reader who only scans the sheet still meets
+        # them.
+        if s.get("big"):
+            d.tbox(x, y, w, [(s["big"], 62, True, d.c["accent"])], spacing=0.95,
+                   face=d.f["display"])
+            y += 62 / 72.0 * 1.02
+            y = d.body(x, y, w, s["big_label"], size=d.dz["caption"],
+                       color=d.c["mute"], after=6) + 0.16
         y = d.head(x, y, w, s["heading"])
         f = s.get("figure") or "none"
         if f != "none" and not f.startswith("NEW") and FIGW.get(f) == slot:
