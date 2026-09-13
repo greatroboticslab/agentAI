@@ -10075,3 +10075,29 @@ thirty rows, twenty-seven models, and names the two that do two jobs.
 Draft C carries the fewest remaining defects, entirely because it uses `w_robots`
 and reads every count from `CENSUS`, so it never had the 2,238-against-2,259
 collision to begin with.
+
+---
+
+## 2026-09-13 — v3.58.0 `gen.py`: many posters from one library and one set of numbers
+
+Three drafts were too few to choose a direction from. `docs/poster/gen.py`
+composes posters from a **section library** (a JSON of self-contained blocks:
+heading, 40–80 words, the figure it wants, its theme, and whether the thing it
+describes is built and running, built but off, or a design) and the one data
+module every draft already reads.
+
+A spec is a title, a standfirst, a hero (the field photographs, the system
+diagram, the six-month strip, or the census row) and three columns of section
+ids. The engine flows each column, places every figure only in a slot matching
+the width it was authored at, appends a plain sentence to any section whose
+subject is switched off or unbuilt, and if a column overflows the sheet it drops
+that column's last section and records which. The footer is the honesty
+sections, pinned at the foot. Every spec starts with the whole library ordered by
+a shuffled theme priority, so what survives on a given poster is what its order
+put first: variation comes from title × standfirst × hero × order, fullness from
+starting with everything.
+
+`--render` converts every PPTX to PNG and tiles them into a contact sheet, so
+forty drafts can be compared on one screen before any one is opened. Smoke-tested
+on an eleven-section stand-in library; the library itself is being written from
+verified claims about the platform and lands next.
