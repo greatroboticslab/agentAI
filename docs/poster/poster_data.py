@@ -243,9 +243,10 @@ TTA = {
 # with no wrong turns in it is not a project, and the wrong turns here are the
 # part a professor can learn something from.
 JOURNEY = [
-    ("Mar", "Prompt a vision model", "Twelve open vision-language models, asked to "
-     "box weeds. The best, Florence-2-base, reached 0.434 where a fine-tuned "
-     "YOLO11n reached 0.929.", "Fine-tune. Do not prompt."),
+    ("Mar", "Prompt a vision model", "Twelve open vision-language models shortlisted and "
+     "asked to box weeds; fourteen were benchmarked in the end. The best, "
+     "Florence-2-base, reached 0.434 where a fine-tuned YOLO11n reached 0.929.",
+     "Fine-tune. Do not prompt."),
     ("Mar", "Fix the forgetting", "Accuracy on unseen species fell from F1 0.830 "
      "to 0.606. Every anti-forgetting method we tried left it there. 27.4% of the "
      "pseudo-labels were false positives.",
@@ -256,7 +257,7 @@ JOURNEY = [
     ("May", "Withdraw 0.910", "Pretrain on 244,000 then fine-tune, and the holdout "
      "read 0.910. 2,313 of 141,397 training images were near-duplicates of it.",
      "Build the content-level guard, then measure everything again."),
-    ("May", "Buy the last 0.005", "Five ways to lift 0.8877 to 0.90: ensembles, "
+    ("May", "Buy the last 0.012", "Five ways to lift 0.8877 to 0.90: ensembles, "
      "test-time augmentation, weighted box fusion. All five negative.",
      "The ceiling was seed noise. Stop tuning the number."),
     ("Jun", "Build the platform", "Robots, an uplink, a dataset registry, a "
@@ -283,7 +284,8 @@ LEDGER = {
              ("YOLO11n, COCO-pretrained", "0.8755 \u00b1 0.0029", "3 seeds", "deployed"),
              ("Mamba-YOLO-T, from scratch", "0.8266 \u00b1 0.0064", "3 seeds", "measured"),
              ("YOLO11n, from scratch", "0.8041 \u00b1 0.0028", "3 seeds", "control"),
-             ("RF-DETR Large, pretrained", "0.8974 \u00b1 0.0040", "4 runs, unseeded", "other scale"),
+             ("RF-DETR Large, pretrained", "0.8974 \u00b1 0.0040", "4 runs, unseeded",
+              "pycocotools, not the scale above"),
              ("yolo26x", "0.6019 \u2192 0.5607", "15 rounds", "campaign backbone"),
          ]},
         {"group": "Vision models inside the pipeline",
@@ -360,6 +362,7 @@ CENSUS = {
     # Haversine over consecutive fixes, board receiver preferred, steps over 25 m
     # dropped as receiver jumps.
     "gps_m": 342.0, "gps_fixes": 1502, "gps_sessions": 18,
+    "r241_res": "640 x 360", "r241_hz": 1.0,
     "hero_m": 140.9, "hero_fixes": 211,
     # The cart writes four telemetry streams and neither of them is position or
     # attitude. "GPS and IMU on both robots" was a premise, and it is false.
@@ -413,7 +416,9 @@ FIELD = {
 PLATFORM = {
     "total_frames": 2686, "sessions": 26, "robots": 2,
     "labelled": 0,
-    "r241_frames": 2259, "r241_field_frames": 1704,
+    # r241_frames lived here and was superseded by CENSUS on 2026-09-12: it folded a
+    # 21-frame uplink test into the robot's own total. Read CENSUS.
+    "r241_field_frames": 1704,
     "r241_span": "2026-08-15 to 2026-09-05", "r241_res": "640 x 360", "r241_hz": 1.0,
     "lasercar_frames": 427, "lasercar_field_frames": 75,
     "lasercar_field_date": "2026-08-29",

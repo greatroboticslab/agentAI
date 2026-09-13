@@ -13,9 +13,9 @@ from deck import Deck, D, COL, FULL, CAPTION, HERE, MUTE, RULE, BLUE
 C, R, L = D.CENSUS, D.ROUNDS, D.LEDGER
 
 d = Deck("Robot-Collected Field Data and Agent-Run Training for Laser Weeding",
-         "Two ground vehicles drive our own cotton plots and a pair of agents turn what they "
-         "record into trained models. This is what the machines saw, what the agents did with it, "
-         "and where the path breaks.")
+         "Two ground vehicles drive our own crop plots while a pair of agents collect, filter and "
+         "train on the cluster with nobody in the room. This is what the machines recorded, what "
+         "the agents did, and the one link between them we have not closed.")
 
 TOP = 6.15
 
@@ -101,12 +101,12 @@ yl = d.body(COL[0][0], yl, COL[0][1],
     "instrument.", size=CAPTION, color=MUTE)
 
 yr = d.head(COL[2][0], y, COL[2][1], "Who notices when it breaks")
-yr = d.table(COL[2][0], yr, COL[2][1], ["reviewer", "recall", "grounded"],
-             [["scripted watchdog", "no decision", "—"],
-              ["12 rules", "0.095", "0.095"],
-              ["Qwen2.5-7B", "0.823", "0.274"],
-              ["Qwen3-14B", "0.675", "0.614"],
-              ["Qwen3.8-27B", "0.702", "0.702"]], [0.46, 0.27, 0.27], hi=4)
+yr = d.table(COL[2][0], yr, COL[2][1], ["reviewer", "recall", "grounded", "incidents"],
+             [["scripted watchdog", "no decision", "\u2014", "\u2014"],
+              ["12 rules", "0.095", "0.095", "116"],
+              ["Qwen2.5-7B", "0.823", "0.274", "113"],
+              ["Qwen3-14B", "0.675", "0.614", "114"],
+              ["Qwen3.8-27B", "0.702", "0.702", "57"]], [0.38, 0.21, 0.21, 0.20])
 yr = d.body(COL[2][0], yr, COL[2][1],
     "162 real failures out of this project's own record, frozen as a corpus. The watchdog the "
     "loop was running returned no decision on any of the 149 dev cases. Recall does not order "
@@ -121,10 +121,11 @@ d.body(FULL[0], y, fw,
     "2026-08-29 and the last field drive was the same day. The supervisor is advisory. The laser "
     "has never fired at a weed under our control.", size=CAPTION, color=MUTE)
 d.body(FULL[0] + fw + 0.5, y, fw,
-    "How the numbers were made. Every in-domain number is mAP50-95 on the same 1,977 images under "
-    "one evaluator, and that set is also the validation set during training, so each figure is a "
-    "maximum over many evaluations. We measured that optimism at +0.002 to +0.017.",
-    size=CAPTION, color=MUTE)
+    "How the numbers were made. Most in-domain numbers are mAP50-95 on the same 1,977 images "
+    "under Ultralytics. RF-DETR is pycocotools and the zero-shot column is mAP50 on the "
+    "848-image test split; neither is ever differenced against the rest. That holdout is also "
+    "the validation set during training, so every mAP here is a run's best epoch, a maximum over "
+    "21 to 100 evaluations on the set it is reported on.", size=CAPTION, color=MUTE)
 d.body(FULL[0] + 2 * (fw + 0.5), y, fw,
     "Numbers we withdrew. 0.910 was a data leak, found by a check we built after publishing it. "
     "0.9033 is the best of four unseeded runs. An earlier reading of the ladder as a flat curve "

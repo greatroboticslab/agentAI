@@ -14,7 +14,7 @@ C, R = D.CENSUS, D.ROUNDS
 L = D.LEDGER
 
 d = Deck("How Much of This Pipeline Can the Agents Run by Themselves?",
-         "We spent six months finding out, on our own robots and our own cluster. The answer is "
+         "We spent six months finding out, on our own robots and on PSC Bridges-2. The answer is "
          "that collection and training run alone, and judging does not.")
 
 TOP = 6.15
@@ -29,7 +29,7 @@ x, w = COL[0]
 y0 = d.head(x, y, w, "What we collect now")
 y0 = d.figure(x, y0, w, "l_robots", "Figure 2.")
 y0 = d.body(x, y0, w,
-    "Two ground vehicles drive our own cotton plots. Robot 241 streams frames, position and "
+    "Two ground vehicles drive our own crop plots. Robot 241 streams frames, position and "
     "attitude; the laser cart carries the weeder and two cameras. %s frames in %d drives, "
     "%s telemetry rows across nine streams, %.0f m of GPS track. None of it is labelled, and "
     "the cart writes no position at all."
@@ -63,12 +63,12 @@ y2 = d.body(x, y2, w,
     "Judging does not run alone yet. We froze 162 real failures out of this project's own "
     "engineering record and scored every kind of supervision we had. The watchdog the loop was "
     "running returned no decision on any of the 149 dev cases.", after=24)
-y2 = d.table(x, y2, w, ["reviewer", "recall", "grounded"],
-             [["scripted watchdog", "no decision", "—"],
-              ["12 rules", "0.095", "0.095"],
-              ["Qwen2.5-7B", "0.823", "0.274"],
-              ["Qwen3-14B", "0.675", "0.614"],
-              ["Qwen3.8-27B", "0.702", "0.702"]], [0.46, 0.27, 0.27], hi=4)
+y2 = d.table(x, y2, w, ["reviewer", "recall", "grounded", "incidents"],
+             [["scripted watchdog", "no decision", "\u2014", "\u2014"],
+              ["12 rules", "0.095", "0.095", "116"],
+              ["Qwen2.5-7B", "0.823", "0.274", "113"],
+              ["Qwen3-14B", "0.675", "0.614", "114"],
+              ["Qwen3.8-27B", "0.702", "0.702", "57"]], [0.38, 0.21, 0.21, 0.20])
 y2 = d.body(x, y2, w,
     "Recall does not order the reviewers by size. Evidence does. The 7 B has the highest recall "
     "on the table and two thirds of what it reports quotes a line that does not exist. That is "
@@ -105,13 +105,16 @@ d.body(FULL[0], y, cw,
     "control, and none of the %s frames is labelled." % "{:,}".format(C["frames"]),
     size=CAPTION, color=MUTE)
 d.body(FULL[0] + cw + 0.5, y, cw,
-    "What we ran. %d distinct models in four families: five detectors trained on our own holdout, "
+    "What we ran. Thirty model runs in four families: five detectors trained on our own holdout, "
     "two vision models inside the loop, fourteen vision-language models zero-shot, and nine "
-    "language models as reviewers. One is deployed." % L["n_models"], size=CAPTION, color=MUTE)
+    "language models as reviewers. That is %d distinct models, because OWLv2-large and Qwen2.5-7B "
+    "each do two of those jobs. One is deployed." % L["n_models"], size=CAPTION, color=MUTE)
 d.body(FULL[0] + 2 * (cw + 0.5), y, cw,
-    "Numbers we withdrew. 0.910 was a data leak, found by a check we built after publishing it. "
-    "0.9033 is the best of four unseeded runs. An earlier reading of the ladder as a flat curve "
-    "is retracted.", size=CAPTION, color=MUTE)
+    "How the numbers were made. The 1,977-image holdout was also the validation set during "
+    "training, so every mAP here is a run's best epoch, a maximum over 21 to 100 evaluations on "
+    "the set it is reported on. Numbers we withdrew: 0.910 was a data leak found by a check we "
+    "built after publishing it, 0.9033 is the best of four unseeded runs, and an earlier reading "
+    "of the ladder as a flat curve is retracted.", size=CAPTION, color=MUTE)
 
 print("  row1 %.2f | row2 %.2f | end %.2f" % (max(y0,y1,y2), max(yl,yc,yr), y + 1.6))
 d.save(os.path.join(HERE, "draft_B_journey.pptx"))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draft A — the machine.
 
-Leads with the system as built: two robots in a Tennessee cotton plot, a live
+Leads with the system as built: two robots in a Tennessee crop plot, a live
 uplink, a governed registry, two agents on an HPC allocation, and a supervisor
 reading the run's own artifacts. The measurements are evidence that the shape is
 right; they are not the argument.
@@ -18,8 +18,9 @@ LD = D.LADDER
 
 d = Deck("Two Field Robots and an Agent Platform for Laser Weeding",
          "Anyone can download a weed dataset this afternoon. Nobody can download the path from a "
-         "robot in a Tennessee crop row to a trained checkpoint, so we built it, ran it "
-         "unattended, and measured where it breaks.")
+         "robot in a Tennessee crop row to a trained checkpoint. We built that path, ran it "
+         "unattended for fifteen rounds, and measured every stage of it, including the last one "
+         "we have not closed.")
 
 TOP = 6.15
 
@@ -30,7 +31,7 @@ hero_bottom = y
 yl = d.head(COL[0][0], TOP, COL[0][1], "The two vehicles")
 yl = d.figure(COL[0][0], yl, COL[0][1], "l_robots", "Figure 2.")
 yl = d.body(COL[0][0], yl, COL[0][1],
-    "Robot 241 is a tracked rover that drives cotton rows and streams frames, position and "
+    "Robot 241 is a tracked rover that drives crop rows and streams frames, position and "
     "attitude over a cellular link. The laser cart carries the weeder itself: a galvanometer "
     "laser, a down camera over the work zone and a forward camera. Between them they have "
     "recorded %s frames in %d drives. None is labelled."
@@ -116,13 +117,14 @@ yr = d.body(COL[2][0], yr, COL[2][1],
     "deterministic checks reach 0.095. A model reading the raw artifacts reaches 0.70, and what "
     "separates the models is not size but evidence. The 7 B leaves 55% of its findings "
     "unevidenced and the 27 B leaves none.", after=22)
+yr += 0.34
 yr = d.table(COL[2][0], yr, COL[2][1],
-             ["reviewer", "recall", "grounded"],
-             [["scripted watchdog", "no decision", "\u2014"],
-              ["12 rules", "0.095", "0.095"],
-              ["Qwen2.5-7B", "0.823", "0.274"],
-              ["Qwen3-14B", "0.675", "0.614"],
-              ["Qwen3.8-27B", "0.702", "0.702"]], [0.46, 0.27, 0.27], hi=4)
+             ["reviewer", "recall", "grounded", "incidents"],
+             [["scripted watchdog", "no decision", "\u2014", "\u2014"],
+              ["12 rules", "0.095", "0.095", "116"],
+              ["Qwen2.5-7B", "0.823", "0.274", "113"],
+              ["Qwen3-14B", "0.675", "0.614", "114"],
+              ["Qwen3.8-27B", "0.702", "0.702", "57"]], [0.38, 0.21, 0.21, 0.20])
 
 # -------------------------------------------------------------------- footer
 # No journey strip here on purpose. This draft argues that the machine is the
@@ -138,11 +140,12 @@ d.body(FULL[0], y, cw,
     "frames is labelled."
     % "{:,}".format(C["frames"]), size=CAPTION, color=MUTE)
 d.body(FULL[0] + cw + 0.5, y, cw,
-    "How the numbers were made. Every in-domain number is mAP50-95 on the same 1,977 images of "
-    "CottonWeedDet12 under one evaluator, and that set is also the validation set during "
-    "training, so each figure is a maximum over many evaluations. We measured that optimism at "
-    "+0.002 to +0.017 rather than hiding it, and every conclusion here survives re-reading at "
-    "last epoch.", size=CAPTION, color=MUTE)
+    "How the numbers were made. Most in-domain numbers are mAP50-95 on the same 1,977 images "
+    "under Ultralytics. RF-DETR is pycocotools and the zero-shot column is mAP50 on the "
+    "848-image test split, and neither is ever differenced against the rest. That holdout is "
+    "also the validation set during training, so every mAP here is that run's best epoch, a "
+    "maximum over 21 to 100 evaluations on the set it is reported on. We measured that optimism "
+    "at +0.002 to +0.017 rather than hiding it.", size=CAPTION, color=MUTE)
 d.body(FULL[0] + 2 * (cw + 0.5), y, cw,
     "Numbers we withdrew. 0.910 was a data leak, found by a content-level check we built after "
     "publishing it. 0.9033 is the best of four unseeded runs and only one of the four crossed "

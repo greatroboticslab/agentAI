@@ -440,17 +440,21 @@ def ledger():
             ax.text(x0, y, name, fontsize=12.5, color=INK, va="top")
             ax.text(x0 + w, y, score, fontsize=12.5, color=BLUE, va="top", ha="right")
             y -= pitch * nl
-            if outcome:
-                ax.text(x0, y + pitch * 0.10, outcome, fontsize=11, color=MUTE, va="top")
+            tag = "  \u00b7  ".join(x for x in (outcome, n_) if x)
+            if tag:
+                ax.text(x0, y + pitch * 0.10, tag, fontsize=11, color=MUTE, va="top")
                 y -= pitch
             ax.plot([x0, x0 + w], [y + pitch * 0.18, y + pitch * 0.18], color=RULE,
                     lw=0.7, transform=ax.transAxes, clip_on=False)
     return save(fig, "m_ledger",
-                "%d distinct models, in four families, on one holdout or one incident corpus. One "
-                "of them is deployed. The zero-shot column is a single deterministic pass per "
-                "model with no repeats; the reviewer column is the 149-case dev split, and two of "
-                "its arms are still running."
-                % L["n_models"])
+                "%d rows in four families, which is %d distinct models: OWLv2-large and Qwen2.5-7B "
+                "each appear twice because each does two jobs here. One model is deployed. The "
+                "zero-shot column is a single deterministic pass per model with no repeats, scored "
+                "as mAP50 on the 848-image split; the reviewer column is the 149-case dev split, "
+                "and two of its arms are still running. RF-DETR's score is on a third scale and "
+                "is never differenced against the rows above it: the one measured offset between "
+                "two of our evaluators, 0.0239, is larger than the gap on display."
+                % (L["n_rows"] + 4, L["n_models"]))
 
 
 # -------------------------------------------------------- the platform, drawn
@@ -466,6 +470,7 @@ def system():
             "robot 241  %s frames, %d drives" % ("{:,}".format(C["r241_frames"]),
                                                  C["r241_sessions"]),
             "laser cart  %d frames, %d drives" % (C["cart_frames"], C["cart_sessions"]),
+            "uplink test  %d frames, %d drive" % (C["smoke_frames"], C["smoke_sessions"]),
             "%s telemetry rows, 9 streams" % "{:,}".format(C["sensor_rows"]),
             "%.0f m of GPS track" % C["gps_m"]], BLUE, "runs"),
         ("Live uplink", [
@@ -487,7 +492,7 @@ def system():
         ("Supervision", [
             "a model reads the run's own artifacts",
             "162 real incidents, frozen as a corpus",
-            "27 models scored against it",
+            "%d models scored against it" % len(D.SUPERVISION["models"]),
             "advisory only, nothing is applied"], MUTE, "shadow"),
     ]
     fig = plt.figure(figsize=(22.4, 3.70))
@@ -506,18 +511,19 @@ def system():
                 va="top", zorder=3)
         ax.text(x0 + w - 0.014, 0.835, state, fontsize=12, color=col, va="top",
                 ha="right", zorder=3)
-        y = 0.660
+        y = 0.700
         for ln in lines:
             ax.text(x0 + 0.014, y, ln, fontsize=12.5, color=MUTE, va="top", zorder=3)
-            y -= 0.150
+            y -= 0.132
         if i < n - 1:
             ax.annotate("", (x0 + w + gap - 0.004, 0.50), xytext=(x0 + w + 0.004, 0.50),
                         arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.6), zorder=4)
     return save(fig, "n_system",
-                "The path from a camera in a crop row to a checkpoint on the cluster. Every stage "
-                "is built and has run. Two are not running today: the collector and trainer are "
-                "paused after a stop-loss on 2026-08-29, and the supervisor is advisory, so "
-                "nothing it says is applied to the loop.")
+                "The path as built, from a camera in a crop row to a checkpoint on the cluster. "
+                "Every stage has run. Three qualifications ride on it. The collector and trainer "
+                "are paused after a stop-loss on 2026-08-29. The supervisor is advisory and "
+                "nothing it says is applied. And the last link is not closed: no robot frame has "
+                "entered training, because none of them is labelled yet.")
 
 
 # ---------------------------------------------------------- six months, in order
@@ -726,7 +732,7 @@ def robots():
     vegetation down frame on the platform (excess green 0.018, an indoor floor)
     beside the highest (0.263, grass) -- same rectangle on both.
     """
-    P = D.PLATFORM
+    P = D.CENSUS
     shots = [("r241_row.jpg", "robot 241", "along a mulched crop row"),
              ("r241_weeds.jpg", "robot 241", "weeds between the rows"),
              ("lc_down.jpg", "laser cart", "down camera, work-zone overlay"),
@@ -749,8 +755,8 @@ def robots():
                 "labelled. The rectangle in the down camera is the cart's fixed work-zone overlay. "
                 "It is drawn on every frame, including the ones with no vegetation in them."
                 % ("{:,}".format(P["r241_frames"]), P["r241_res"], P["r241_hz"],
-                   P["lasercar_frames"], P["lasercar_field_frames"],
-                   "{:,}".format(P["total_frames"])))
+                   P["cart_frames"], P["cart_field_frames"],
+                   "{:,}".format(P["frames"])))
 
 
 # ---------------------------------------------------------------- f. rounds

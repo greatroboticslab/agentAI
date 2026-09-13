@@ -10019,3 +10019,59 @@ equals the distinct list, the recipe mean is the mean of its seeds, sigma is the
 measured spread, every ladder rung has three seeds, A0 has no rate rather than a
 rate of zero, grounded recall never exceeds recall on any arm, and every figure
 is authored at the width the layout places it at.
+
+---
+
+## 2026-09-13 — v3.57.2 the three drafts, audited adversarially and corrected
+
+105 agents: four audited the drafts against the repository, every finding was then
+handed to a skeptic told to refute it and to default to refuted when unconvinced,
+and one synthesised what survived. 100 findings raised, **74 survived refutation**.
+Every one acted on below was re-verified by hand first.
+
+**Six things on the sheet were false or contradicted another number on the same
+sheet.**
+
+* `n_system` printed "27 models scored against it" directly under "162 real
+  incidents". **Four** models ran that benchmark; 27 is the whole-project
+  inventory, and the five-row table on the same sheet says four.
+* `l_robots` still read `PLATFORM["r241_frames"]` and printed **2,259** — the
+  count `RESULTS_TABLE` Block M records as withdrawn — a few inches from the
+  corrected 2,238, on a sheet whose footer is headed "Numbers we withdrew". The
+  figure now reads `CENSUS`, and the superseded key is deleted rather than left
+  to be picked up again.
+* The first box of `n_system` summed to 2,665 frames in 25 drives against the
+  2,686 in 26 printed inches away. The 21-frame post-rewire uplink test is now a
+  line of its own.
+* `ledger()` unpacked `n_` and never drew it, so ten zero-shot rows printed bare
+  numbers with no metric named and **RF-DETR's 0.8974 sat in one column, one
+  colour and one format beside YOLO11n's 0.8755** under a header naming one
+  holdout. The measured cross-evaluator offset is 0.0239, *larger* than the
+  0.0219 gap on display. Every row now carries its n, RF-DETR's says
+  "pycocotools, not the scale above", and the caption says the difference must
+  not be taken.
+* The methods footer claimed "every in-domain number is mAP50-95 on the same
+  1,977 images under one evaluator", which the ledger two feet above it falsifies.
+* Draft C's standfirst said a pair of agents "turn what they record into trained
+  models". **No robot frame has entered training** — none of the 2,686 is
+  labelled, and the census cell one figure below says so. Both standfirsts are
+  rewritten and `n_system`'s caption now names the open link.
+
+**Three smaller corrections of fact.** "cotton rows" appeared in all three drafts
+and **nowhere else in the repository**; every line written from the archive says
+crop plot, and the photographs above the sentence show plastic mulch. Draft B
+called Bridges-2 "our own cluster" — it is PSC's, and PSC is CMU's own joint
+centre with Pitt, so that sentence was wrong in front of exactly the wrong
+audience. And the journey strip priced the last push as "the last 0.005" when
+0.90 − 0.8877 is 0.0123.
+
+**Two places where a reader would have done arithmetic we had not.** The reviewer
+table bolded the row standing on **57** incidents against the others' 113 and 114,
+under a sentence naming "the 149 dev cases"; it now carries an `incidents` column
+and no bold, because there is no winner at that n. And the four family counts
+5 + 2 + 14 + 9 = 30 sat under a headline of 27 distinct models; the sheet now says
+thirty rows, twenty-seven models, and names the two that do two jobs.
+
+Draft C carries the fewest remaining defects, entirely because it uses `w_robots`
+and reads every count from `CENSUS`, so it never had the 2,238-against-2,259
+collision to begin with.
