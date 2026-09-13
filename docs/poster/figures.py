@@ -263,7 +263,7 @@ def supervision():
                 "fa_k": a["false_alarm_rate"]["k"], "fa_n": a["false_alarm_rate"]["n"],
                 "cases": a["counts"]["cases"]}
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 7.22), sharey=True)
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 5.00), sharey=True)
 
     # ---- (e) detection against false alarms ---------------------------------
     # Square, so the chance diagonal is a true 45 degrees and vertical distance
@@ -388,14 +388,10 @@ def supervision():
     d27 = pt("L3@qwen3.8:27b")["r"] - pt("L2@qwen3.8:27b")["r"]
     d14 = pt("L3@qwen3:14b")["r"] - pt("L2@qwen3:14b")["r"]
     return save(fig, "e_supervision",
-                "(e) Every arm on one frozen corpus of real incidents from this project's own "
-                "history, scored by the project's own scorer. Each mark carries its own "
-                "denominator, bars are 95% Wilson intervals, and the arrow is drawn solid only "
-                "where both ends were scored on the same cases. (f) The same arms, asking how "
-                "much of each detection quotes a line that resolves in the artifact. The 7 B has "
-                "the highest recall on the page and 0.55 of it is unevidenced; the 27 B has no "
-                "such gap. The intervals overlap, so this corpus orders the arms by grounding "
-                "and not by size.")
+                "(e) Recall and (f) grounded recall on one frozen corpus of real incidents from "
+                "this project's own record, scored by the project's own scorer. Each mark carries "
+                "its own denominator and bars are 95% Wilson intervals. The 7 B has the highest "
+                "recall on the page and 0.55 of it quotes nothing; the 27 B has no such gap.")
 
 
 # --------------------------------------------------- photographic plates

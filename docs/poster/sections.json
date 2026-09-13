@@ -34,7 +34,7 @@
    "id": "robots_today",
    "theme": "robots-connected",
    "heading": "Tracked rover and laser cart are the two robots reporting in",
-   "body": "Robot 241 is a tracked rover that drives crop rows and streams camera, GPS and two IMUs. The laser cart carries the weeder: a galvanometer laser, a down camera over the work zone and a forward camera. Ten projects sit on the platform and two of them have a robot reporting into them. Between those two vehicles, 2,686 frames in 26 drives.",
+   "body": "Robot 241 is a tracked rover that drives crop rows and streams camera, GPS and two IMUs. The laser cart carries the weeder: a galvanometer laser, a down camera over the work zone and a forward camera. Ten projects sit on the platform and two of them have a robot reporting in.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -236,7 +236,7 @@
    "id": "supervisor",
    "theme": "iterating-agents-brain",
    "heading": "Grounded recall separates the reviewers",
-   "body": "A 7 B model has the highest recall on the page and two thirds of what it reports quotes a line that does not exist. The 27 B leaves no such gap. The retrieval tier is worth +0.149 recall to the 27 B and +0.012 to the 14 B, so tiering pays where the model can use it.",
+   "body": "Escalating is worth it, and the reason is grounding rather than size: the retrieval tier is worth +0.149 recall to the 27 B and +0.012 to the 14 B.",
    "figure": "e_supervision",
    "status": "built_but_off",
    "width": "centre",
@@ -493,6 +493,22 @@
    "heading": "Cart sends two cameras and no position at all",
    "status": "built_and_running",
    "body": "Two cameras, one forward and one down over the work zone, arrive with laser state, vehicle telemetry and the cart's own detections. No position arrives at all."
+  },
+  {
+   "id": "control",
+   "theme": "results",
+   "figure": "none",
+   "status": "built_and_running",
+   "heading": "Finishing the schedule was not the fix; the chain was",
+   "body": "Two things could explain the fall, and both were run as controls on round 15's exact data and seeds. Starting fresh instead of from the previous round's weights is worth +0.0287, 5.1 times this recipe's own seed spread of 0.0040. Letting the cosine schedule finish instead of stopping at a wall clock is worth -0.0058 at 1.3 sigma, which is inside the noise. The chain is the cause; the schedule is not."
+  },
+  {
+   "id": "escalate",
+   "theme": "iterating-agents-brain",
+   "figure": "none",
+   "status": "built_and_running",
+   "heading": "A cheap reviewer, and a bigger one above it when it is stuck",
+   "body": "Review runs in tiers: a scripted watchdog, twelve pre-registered deterministic checks, a model reading the raw artifacts, and the same model given retrieval over them. Against 149 frozen cases from this project's own engineering record the scripted watchdog returned no decision at all. The tier that escalates correctly most often is the 27 B with retrieval, on 48 of 90 cases. What the loop does not yet do is decide for itself when to ask upward."
   }
  ]
 }

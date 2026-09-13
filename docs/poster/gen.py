@@ -30,7 +30,8 @@ from deck import Deck, D, W, H, MARG                       # noqa: E402
 from pptx.enum.text import PP_ALIGN                        # noqa: E402
 import styles                                              # noqa: E402
 
-C, L = D.CENSUS, D.LEDGER
+C, L2 = D.CENSUS, D.LEDGER
+L = L2
 FOOT_H = 2.55
 
 SLOT_OF_WIDTH = {11.6: "column", 22.4: "centre", 46.4: "full"}
@@ -90,30 +91,33 @@ FOOTER = ["stands", "made", "withdrew"]
 # / What six months measured" labelled four containers and told them nothing,
 # and two of the four opened with the same word.
 MTSU_COLUMNS = [
-    # Order inside a theme IS its priority: the sheet gives up the last block of
-    # a theme first. Sorting by theme size instead dropped remote control, the
-    # fifteen-round loop and the agent-dispatch block -- three of the things
-    # this poster exists to show -- because the agent theme happened to be the
-    # longest list.
-    ("Every robot joins one platform",
-     ["platform_idea", "platform_domains", "robots_today", "shared_models",
-      "future_robots"]),
-    ("Two vehicles, 2,686 frames",
-     ["uplink", "r241_frames", "cart_frames", "remote_control", "drive",
-      "drive_button", "census", "auto_diag", "advice", "laser_control"]),
-    ("Agents plan, code and review",
-     ["analysis_agent", "loop", "dispatch", "brain", "supervisor",
-      "analysis_example", "watch", "analysis_sandbox"]),
-    ("More data made accuracy worse",
-     ["ladder", "field", "species", "families", "ledger", "sources", "tta",
-      "zeroshot"]),
+    # The argument, not the inventory. "Two vehicles, 2,686 frames" headed a
+    # column with a logging report under it: how much was collected, which is a
+    # question anyone with a robot and an afternoon can answer. The robots
+    # appear once, in the project plate, as evidence the hardware is real.
+    # Order inside a theme is its priority: the sheet gives up the last block
+    # of a theme first.
+    ("One platform, any robot, any dataset",
+     ["platform_idea", "platform_domains", "robots_today", "uplink",
+      "future_robots", "shared_models", "remote_control"]),
+    ("A brain that gets stuck and asks upward",
+     # The plate leads its theme so it lands at the top of a fresh column. A
+     # ten-inch block placed last in an eleven-inch column carries over into the
+     # next one, which costs a later theme its column entirely.
+     ["supervisor", "escalate", "dispatch", "brain", "watch", "analysis_agent",
+      "analysis_sandbox"]),
+    ("Fifteen rounds alone, and it got worse",
+     ["loop", "diagnosis", "sources", "field", "auto_diag"]),
+    ("We found why, and ruled out the other answer",
+     ["ladder", "control", "families", "species", "ledger", "tta", "zeroshot"]),
 ]
-# Blocks that are never shed, whatever the fit costs elsewhere. These are the
-# ones the poster was asked for by name: a single camera frame says nothing
-# about a robot, so each vehicle shows a grid of its own frames. Without a pin
-# the shed loop reaches them every time, because they are expensive and sit
-# second and third in their theme.
-MTSU_PINNED = {"ladder"}
+
+# The two plates that ARE the evidence for the two headline claims: what more
+# data cost, with error bars and three seeds at every rung, and what separates
+# a cheap reviewer from an expensive one. A research poster whose columns carry
+# no plot has asserted its findings and shown none of them.
+MTSU_PINNED = {"ladder", "supervisor"}
+MTSU_KEEP_FIGURE = {"ladder", "supervisor"}
 
 MTSU_PAD = 0.24            # the template's own panel padding, 0.26, less a hair
 
@@ -200,16 +204,45 @@ class Poster(object):
         return y + d.dz["sec_gap"]
 
     def census_cells(self):
-        return [("{:,}".format(C["frames"]), "camera frames", "%d drives, 2 robots, %d labelled"
-                 % (C["sessions"], C["labelled"])),
-                ("{:,}".format(C["sensor_rows"]), "telemetry rows", "nine streams, counted line by line"),
-                ("%.0f m" % C["gps_m"], "of GPS track", "%s fixes over %d drives"
-                 % ("{:,}".format(C["gps_fixes"]), C["gps_sessions"])),
-                ("%d" % L["n_models"], "distinct models run", "four families, one deployed"),
-                ("%.4f" % D.DEPLOYED["map50_95"], "mAP50-95, deployed model",
-                 "all %s sealed holdout images, %s instances"
-                 % ("{:,}".format(D.DEPLOYED["n_images"]),
-                    "{:,}".format(D.HOLDOUT["instances"])))]
+        """The five quantities set large enough to read from across a room.
+
+        Frames, telemetry rows and metres of track answer "how much did you
+        collect", which anyone with a robot and an afternoon can answer, and
+        every one of them appeared again in the body anyway. These five are
+        findings: what the loop did on its own, what it cost, what caused it,
+        what separates a cheap reviewer from an expensive one, and how much of
+        the harvested web survives an audit.
+        """
+        R, L, S, F = D.ROUNDS, D.LADDER, D.SUPERVISION, D.FUNNEL
+        if self.d.look != "mtsu":
+            return [("{:,}".format(C["frames"]), "camera frames", "%d drives, 2 robots, %d labelled"
+                     % (C["sessions"], C["labelled"])),
+                    ("{:,}".format(C["sensor_rows"]), "telemetry rows", "nine streams, counted line by line"),
+                    ("%.0f m" % C["gps_m"], "of GPS track", "%s fixes over %d drives"
+                     % ("{:,}".format(C["gps_fixes"]), C["gps_sessions"])),
+                    ("%d" % L2["n_models"], "distinct models run", "four families, one deployed"),
+                    ("%.4f" % D.DEPLOYED["map50_95"], "mAP50-95, deployed model",
+                     "all %s sealed holdout images" % "{:,}".format(D.DEPLOYED["n_images"]))]
+        arms = S["table"]["arms"]
+        g7 = arms["L3@qwen2.5:7b"]["detection_grounded"]
+        g27 = arms["L3@qwen3.8:27b"]["detection_grounded"]
+        return [
+            ("15", "rounds run unattended",
+             "accuracy fell: %.4f per round, t = %.1f, against a seed spread of 0.0040"
+             % (R["slope_best"], R["t_best"])),
+            ("\u2212" + "0.0189", "what twelve times the data cost",
+             "8.2 pooled sd, three seeds at every rung"),
+            ("+%.4f" % R["chain_effect"], "the cause, run as a control",
+             "warm-start chaining, %.1f sigma; finishing the schedule was not it"
+             % R["chain_sigma"]),
+            ("%.2f \u2192 %.2f" % (g7["v"], g27["v"]), "grounded recall, 7 B to 27 B reviewer",
+             "%d frozen cases from our own record, one committed scorer"
+             % S["table"]["n_cases"]),
+            ("%d of %d" % (F["sources_passing"], F["audited_sources"]),
+             "web sources clearing the label bar",
+             "%s images audited, %s pass" % ("{:,}".format(F["audited_images"]),
+                                             "{:,}".format(F["passing_images"]))),
+        ]
 
     def census_row(self, y):
         d = self.d
@@ -629,7 +662,8 @@ class Poster(object):
                 # up the PLATE and keep the claim: a theme reduced to a heading
                 # over nothing is worse than a finding stated without its chart.
                 _f, _e, _n, sp = self._mtsu_layout(flow, n, COL, draw=False)
-                off = [s for s in sp if self.mtsu_has_plate(s, COL[0][1])]
+                off = [s for s in sp if self.mtsu_has_plate(s, COL[0][1])
+                       and s not in MTSU_KEEP_FIGURE]
                 if off:
                     self._fig_off = set(getattr(self, "_fig_off", set())) | {off[0]}
                     continue
