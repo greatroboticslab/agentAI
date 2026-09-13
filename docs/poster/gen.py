@@ -31,7 +31,7 @@ from pptx.enum.text import PP_ALIGN                        # noqa: E402
 import styles                                              # noqa: E402
 
 C, L = D.CENSUS, D.LEDGER
-FOOT_H = 2.20
+FOOT_H = 2.55
 
 SLOT_OF_WIDTH = {11.6: "column", 22.4: "centre", 46.4: "full"}
 FIGW = {}
@@ -113,7 +113,7 @@ MTSU_COLUMNS = [
 # about a robot, so each vehicle shows a grid of its own frames. Without a pin
 # the shed loop reaches them every time, because they are expensive and sit
 # second and third in their theme.
-MTSU_PINNED = {"ladder"}
+MTSU_PINNED = {"ladder", "r241_frames", "cart_frames"}
 
 MTSU_PAD = 0.24            # the template's own panel padding, 0.26, less a hair
 
@@ -133,7 +133,7 @@ class Poster(object):
         # gives up blocks to fit two bands, then removes a band, and either the
         # blocks stay lost or the loop starts over and gives up the same ones
         # again. One band costs about 5.4 in of sheet, which is 21 in of column.
-        self.tail_ids = (["r241_frames", "detect_grid"] if getattr(st, "look", "") == "mtsu"
+        self.tail_ids = ([] if getattr(st, "look", "") == "mtsu"
                          else list(TAIL_BANDS))
         self.d = Deck(TITLE, STAND, style=st)
 

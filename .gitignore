@@ -81,3 +81,6 @@ docs/poster/variants/
 docs/poster/agentAI_poster_48x36_*.pptx
 docs/poster/agentAI_poster_48x36_*.pdf
 docs/poster/agentAI_poster_48x36_*.png
+
+# PowerPoint lock files, which appear while Harry has a deck open
+~$*

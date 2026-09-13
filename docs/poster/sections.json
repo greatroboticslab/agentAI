@@ -481,15 +481,15 @@
   {
    "id": "r241_frames",
    "theme": "live-collection",
-   "figure": "v_vehicles",
-   "heading": "Both vehicles record a range of scenes, not one frame",
+   "figure": "v_r241",
+   "heading": "Rover sends 640 x 360 frames at 1 Hz from every drive",
    "status": "built_and_running",
-   "body": "Robot 241 streams 640 x 360 at 1 Hz alongside GPS and two IMUs. The laser cart streams two cameras, one forward and one down over the work zone, with laser state, vehicle telemetry and its own detections, and no position at all. The platform files each drive as its own dataset the moment the session opens."
+   "body": "A single camera frame says nothing about a robot, so this is six, one per drive. Robot 241 streams 640 x 360 at 1 Hz alongside GPS and two IMUs, and the platform files each drive as its own dataset the moment the session opens."
   },
   {
    "id": "cart_frames",
    "theme": "live-collection",
-   "figure": "none",
+   "figure": "v_cart",
    "heading": "Cart sends two cameras and no position at all",
    "status": "built_and_running",
    "body": "Two cameras, one forward and one down over the work zone, arrive with laser state, vehicle telemetry and the cart's own detections. No position arrives at all."

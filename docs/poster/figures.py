@@ -453,22 +453,22 @@ def detect_grid():
                      "{:,}".format(P["n_images"]), P["ledger_mean"], P["gap"]))
 
 
-def vehicles_grid():
-    """Both vehicles in one strip: six rover frames, then six cart frames.
-
-    As two 3 x 2 plates in the columns these cost about thirteen inches of
-    column between them and squeezed the results block off the sheet entirely.
-    One full-width strip costs two, and a reader still sees that a robot
-    records a range of scenes rather than one frame.
-    """
+def r241_grid():
+    n = _cells("m_r241.jpg", 3)
     return _plate(
-        "v_vehicles", "m_vehicles.jpg", 46.4,
-        "Twelve frames as recorded. The first six are robot 241, one from each of six drives; the "
-        "last six are the laser cart, one from each of six drives. Each is the most vegetated "
-        "frame in its drive, which is a selection rule and is stated as one -- both vehicles also "
-        "record paved and indoor runs. The rectangle on the cart's frames is its fixed work-zone "
-        "overlay, at the same pixels whether the frame is grass or an indoor floor, so it is not "
-        "a detection. 2,238 frames from the rover and 427 from the cart, none labelled.")
+        "v_r241", "m_r241.jpg", 11.6,
+        "Robot 241, %d frames from %d drives. Each is the most vegetated frame in its drive, which "
+        "is a selection rule and is stated as one: the rover also records paved and indoor runs. "
+        "2,238 frames in all, none labelled." % (n, n))
+
+
+def cart_grid():
+    n = _cells("m_cart.jpg", 3)
+    return _plate(
+        "v_cart", "m_cart.jpg", 11.6,
+        "The laser cart, %d frames from six drives. The rectangle is the cart's fixed work-zone "
+        "overlay: it sits at the same pixels whether the frame is grass or an indoor floor, so it "
+        "is not a detection. 427 frames in all." % n)
 
 
 # ------------------------------------------------------- the four projects
@@ -578,16 +578,12 @@ def projects():
             tx, tw_chars = 0.0, int((cell_w_in - 0.7) / 0.098)
             y = ytop - ph - 0.05
 
-        for lab, key in (("Done", "done"), ("Now", "now"), ("Open", "open")):
-            ax.text(tx, y, lab, fontsize=ANNOT, fontweight="bold",
-                    color=WARN if key == "open" else INK, va="top")
-            for ln in textwrap.wrap(pr[key], max(24, tw_chars)):
-                ax.text(tx + indent, y, ln, fontsize=ANNOT, color=MUTE, va="top")
-                y -= step
-            y -= gap
+        for ln in textwrap.wrap(pr["blurb"], max(24, tw_chars)):
+            ax.text(tx, y, ln, fontsize=ANNOT + 1, color=INK, va="top")
+            y -= step
     return save(fig, "q_projects",
-                "Four projects on one platform, opened the same way and trained and evaluated by "
-                "the same agents. Done is measured; Open is what the project cannot do yet.")
+                "Four projects on one platform. Each was opened the same way, sends through the same "
+                "ingest contract, and is trained and evaluated by the same agents.")
 
 
 # ------------------------------------------------------------- the model ledger
@@ -1126,7 +1122,7 @@ if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
                species, funnel, field, tta, sources, ledger, system,
-               journey, robots_wide, projects, detect_grid, vehicles_grid):
+               journey, robots_wide, projects, detect_grid, r241_grid, cart_grid):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))

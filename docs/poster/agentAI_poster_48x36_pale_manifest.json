@@ -1,9 +1,22 @@
 {
- "style": "mtsu-four-house-house-pale-band-photos-normal",
- "type_scale": 1.1,
- "body_pt": 23.1,
- "heading_pt": 33.0,
- "figures_suppressed": [],
+ "style": "mtsu-four-house-house-pale-band-census-normal",
+ "type_scale": 1.0,
+ "body_pt": 21.0,
+ "kept": [
+  "platform_idea",
+  "platform_domains",
+  "robots_today",
+  "future_robots",
+  "uplink",
+  "r241_frames",
+  "cart_frames",
+  "remote_control",
+  "drive_button",
+  "analysis_agent",
+  "loop",
+  "ladder",
+  "ledger"
+ ],
  "dropped": [
   "laser_control",
   "advice",
@@ -15,18 +28,13 @@
   "census",
   "sources",
   "analysis_example",
-  "drive_button",
   "supervisor",
   "drive",
-  "future_robots",
-  "ledger",
   "shared_models",
   "families",
-  "remote_control",
   "brain",
   "species",
   "dispatch",
-  "robots_today",
   "field"
  ]
 }
