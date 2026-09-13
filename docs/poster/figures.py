@@ -13,11 +13,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from style import (INK, NAVY, BLUE, PALE, PALEBLU, RULE, MUTE, WHITE, GOOD, WARN,
                    GREY, panel, despine, hline_grid, PLACED, sig, wilson,
-                   TICK, AXIS, ANNOT, LETTER)
+                   TICK, AXIS, ANNOT, LETTER, FIGDIR, LOOK, SERIES)
 import poster_data as D
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "fig")
+OUT = os.path.join(HERE, FIGDIR)
 os.makedirs(OUT, exist_ok=True)
 CAPS = {}
 
@@ -400,6 +400,71 @@ def supervision():
                 "wide and they overlap: on this corpus the ordering among the model arms is not "
                 "established, and the grounded gap is."
                 % (g7["r"] - g7["g"]))
+
+
+# ------------------------------------------------------- the four projects
+def projects():
+    """One column per project: the picture, what was done, what runs now.
+
+    The humanoid column carries a ruled empty frame instead of a photograph,
+    because nothing has been uploaded to that project. Borrowing a picture of a
+    robot we hold no data from would be the one claim on this poster a visitor
+    could falsify in ten seconds.
+
+    Each photograph is cropped to exactly the aspect it is drawn at -- an
+    earlier version cropped to 1.62 and drew at 2.42, which stretched every
+    field horizontally by 1.5x and turned the cart's horizon into a smear.
+    `crop` biases that crop away from the sky for the two forward cameras.
+    """
+    import textwrap
+    P = D.PROJECTS
+    n = len(P)
+    H, PHOTO_IN = 5.40, 3.20
+    fig = plt.figure(figsize=(46.4, H))
+    fig.set_layout_engine("none")
+    L, R, GAP = 0.006, 0.994, 0.030
+    cw = ((R - L) - GAP * (n - 1)) / n
+    cw_in = cw * 46.4
+    y0 = (H - PHOTO_IN) / H                 # bottom of the photo band
+    want = cw_in / PHOTO_IN                 # the aspect the photo is drawn at
+    step, gap, indent = 0.30 / H, 0.17 / H, 0.082
+    for i, pr in enumerate(P):
+        ax = fig.add_axes([L + i * (cw + GAP), 0.010, cw, 0.980])
+        ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_visible(False)
+        ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+        if pr["photo"]:
+            im = plt.imread(os.path.join(HERE, "photos", pr["photo"]))
+            h, w = im.shape[0], im.shape[1]
+            keep = int(round(w / want))
+            if keep < h:
+                top = int(round((h - keep) * pr.get("crop", 0.5)))
+                im = im[top:top + keep]
+            ax.imshow(im, extent=(0, 1, y0, 1.0), aspect="auto", zorder=1)
+        else:
+            ax.add_patch(plt.Rectangle((0, y0), 1, 1 - y0, facecolor=PALE,
+                                       edgecolor="none", zorder=1))
+            ax.text(0.5, (1 + y0) / 2, "no upload yet", fontsize=ANNOT + 3,
+                    color=MUTE, ha="center", va="center", style="italic", zorder=2)
+        ax.add_patch(plt.Rectangle((0, y0), 1, 1 - y0, facecolor="none",
+                                   edgecolor=RULE, lw=1.2, zorder=3))
+        y = y0 - 0.40 / H
+        ax.text(0, y, pr["name"], fontsize=AXIS + 5, fontweight="bold",
+                color=INK, va="top")
+        y -= 0.46 / H
+        for lab, key in (("Done", "done"), ("Now", "now"), ("Open", "open")):
+            ax.text(0, y, lab, fontsize=ANNOT, fontweight="bold",
+                    color=WARN if key == "open" else INK, va="top")
+            for ln in textwrap.wrap(pr[key], 70):
+                ax.text(indent, y, ln, fontsize=ANNOT, color=MUTE, va="top")
+                y -= step
+            y -= gap
+    return save(fig, "q_projects",
+                "Four projects, one platform. Each was opened the same way, uploads through the "
+                "same contract, and is trained and evaluated by the same agents. Done is measured; "
+                "Open is what the project cannot do yet. The fourth has no photograph because "
+                "nothing has been uploaded to it.")
 
 
 # ------------------------------------------------------------- the model ledger
@@ -918,7 +983,7 @@ if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
                species, funnel, field, tta, sources, ledger, system,
-               journey, robots_wide):
+               journey, robots_wide, projects):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))

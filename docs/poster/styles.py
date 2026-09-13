@@ -57,6 +57,36 @@ TYPES = {
     "narrow":  dict(display="Arial Narrow", body="Arial", display_bold=True),
 }
 
+# ------------------------------------------------- the old-journal look
+# A second visual world, not a sixth palette. An offset-printed article from
+# before colour separations were cheap: paper, black ink, and one spot colour
+# that the press ran as a second pass, so colour is spent once and never on
+# decoration. The typographic consequences are what actually remove the
+# generated-poster flavour -- serif body, justified measure, hairline column
+# rules, sections numbered like an article, captions that open "Fig. 4." --
+# and those live in deck.py behind `style.look`.
+JOURNAL_PALETTES = {
+    "plate":  dict(band="#FFFFFF", band_ink="#111111", accent="#8C3A1E", ink="#111111",
+                   mute="#5C5A55", rule="#BFBDB8", pale="#F2F1EE", paper="#FFFFFF"),
+    "offset": dict(band="#FFFFFF", band_ink="#1A1A1A", accent="#1F3A5F", ink="#1A1A1A",
+                   mute="#5E5E5E", rule="#C4C4C4", pale="#F4F4F2", paper="#FFFFFF"),
+    "laid":   dict(band="#FDFBF6", band_ink="#20201C", accent="#7A3B12", ink="#20201C",
+                   mute="#5F5B51", rule="#C9C3B4", pale="#F4F0E6", paper="#FDFBF6"),
+    "proof":  dict(band="#FFFFFF", band_ink="#111111", accent="#3F5E43", ink="#111111",
+                   mute="#585856", rule="#C6C6C2", pale="#F3F3F0", paper="#FFFFFF"),
+}
+
+JOURNAL_TYPES = {
+    "times":   dict(display="Times New Roman", body="Times New Roman", display_bold=True),
+    "georgia": dict(display="Georgia", body="Georgia", display_bold=True),
+    "mixed":   dict(display="Arial Narrow", body="Times New Roman", display_bold=True),
+}
+
+# classic: centred title between two rules, the way a paper opens.
+# masthead: a ruled eyebrow above, title and byline centred under it.
+# hairline: title flush left under a single hairline, byline on the same line.
+JOURNAL_TITLES = ("classic", "masthead", "hairline")
+
 # title treatment: how the top of the sheet is set
 TITLE_KINDS = ("band", "rule", "block", "underline")
 
@@ -72,22 +102,43 @@ DENSITY = {
 
 class Style(object):
     def __init__(self, grid="three", palette="navy", type_="arial", title="band",
-                 hero="photos", density="normal"):
-        self.name = "%s-%s-%s-%s-%s-%s" % (grid, palette, type_, title, hero, density)
+                 hero="photos", density="normal", look="modern"):
+        self.look = look
+        pals = JOURNAL_PALETTES if look == "journal" else PALETTES
+        typs = JOURNAL_TYPES if look == "journal" else TYPES
+        if palette not in pals:
+            palette = sorted(pals)[0]
+        if type_ not in typs:
+            type_ = sorted(typs)[0]
+        if look == "journal" and title not in JOURNAL_TITLES:
+            title = JOURNAL_TITLES[0]
+        self.name = "%s-%s-%s-%s-%s-%s-%s" % (look, grid, palette, type_, title, hero, density)
         self.grid_name, self.palette_name, self.type_name = grid, palette, type_
         self.title_kind, self.hero, self.density_name = title, hero, density
         self.COL = GRIDS[grid]
         self.FULL = (0.8, 46.4)
-        p = PALETTES[palette]
-        self.c = {k: _rgb(v) for k, v in p.items()}
-        self.f = TYPES[type_]
-        self.d = DENSITY[density]
+        self.c = {k: _rgb(v) for k, v in pals[palette].items()}
+        self.f = typs[type_]
+        self.d = dict(DENSITY[density])
+        # A serif at the same nominal size reads smaller than Arial -- Times has
+        # an x-height of 0.448 em against Arial's 0.519. Matching the apparent
+        # size means adding a point, not keeping the number. The heading comes
+        # down instead: an article head is a label, not a banner.
+        if look == "journal":
+            self.d["body"] += 1
+            self.d["caption"] += 1
+            self.d["heading"] -= 6
+        # Which plates this look draws from: the slate-blue set in fig/, or the
+        # near-monochrome set rendered with POSTER_LOOK=journal.
+        self.fig_dir = "fig_journal" if look == "journal" else "fig"
 
     def describe(self):
-        return ("grid %s · palette %s · display %s · title %s · opens with %s · %s"
-                % (self.grid_name, self.palette_name, self.f["display"], self.title_kind,
-                   self.hero, self.density_name))
-
+        face = self.f["body"] if self.f["body"] == self.f["display"] else (
+            "%s / %s" % (self.f["display"], self.f["body"]))
+        bits = [self.look, "grid " + self.grid_name, "palette " + self.palette_name,
+                face, "title " + self.title_kind, "opens with " + self.hero,
+                self.density_name]
+        return (u" \u00b7 ").join(bits)
 
 def sample(n, seed=11):
     """N styles, every axis value used about equally, no two alike.
@@ -99,20 +150,33 @@ def sample(n, seed=11):
     treatment to every sample.)
     """
     rnd = random.Random(seed)
-    axes = [list(GRIDS), list(PALETTES), list(TYPES), list(TITLE_KINDS), list(HEROES), list(DENSITY)]
-    decks = [[] for _ in axes]
-
-    def deal(i):
-        if not decks[i]:
-            decks[i] = axes[i][:]
-            rnd.shuffle(decks[i])
-        return decks[i].pop()
-
     out, seen = [], set()
+    decks = {}
+
+    def deal(key, values):
+        if not decks.get(key):
+            decks[key] = values[:]
+            rnd.shuffle(decks[key])
+        return decks[key].pop()
+
+    # Three journal looks for every modern one. Harry asked for the old-journal
+    # feel to be the poster's default, not one option among six, so the deck is
+    # weighted rather than the modern look being deleted -- a sheet of thirty-six
+    # that shows no alternative is not a comparison.
+    looks = (["journal"] * 3 + ["modern"]) * (n // 4 + 2)
+    rnd.shuffle(looks)
     tries = 0
-    while len(out) < n and tries < n * 20:
+    while len(out) < n and tries < n * 30:
         tries += 1
-        pick = tuple(deal(i) for i in range(len(axes)))
+        look = looks[len(out) % len(looks)]
+        if look == "journal":
+            pick = (deal("g", list(GRIDS)), deal("jp", list(JOURNAL_PALETTES)),
+                    deal("jt", list(JOURNAL_TYPES)), deal("jk", list(JOURNAL_TITLES)),
+                    deal("h", list(HEROES)), deal("d", list(DENSITY)), "journal")
+        else:
+            pick = (deal("g", list(GRIDS)), deal("p", list(PALETTES)),
+                    deal("t", list(TYPES)), deal("k", list(TITLE_KINDS)),
+                    deal("h", list(HEROES)), deal("d", list(DENSITY)), "modern")
         if pick in seen:
             continue
         seen.add(pick)

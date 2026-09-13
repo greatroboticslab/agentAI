@@ -98,17 +98,24 @@ def main():
     try:
         from PIL import Image
         import style
-        off = []
-        for name, placed in style.PLACED.items():
-            p = POSTER / "fig" / (name + ".png")
-            if not p.exists():
-                off.append("%s missing" % name)
-                continue
-            authored = Image.open(p).size[0] / 300.0
-            if abs(authored / placed - 1.0) >= 0.02:
-                off.append("%s authored %.2f placed %.2f" % (name, authored, placed))
-        check("every figure is authored at the width it is placed at", not off,
-              "; ".join(off[:4]))
+        # Both plate sets, not just the default one. There are now two: fig/ is
+        # the slate-blue set and fig_journal/ the near-monochrome one the
+        # old-journal looks draw from. A second set is a second chance for a
+        # figure to be authored at a width the layout does not place it at, and
+        # nothing on screen would show it -- the poster would simply print with
+        # one plate's type 20 per cent larger than every other plate's.
+        for setname in ("fig", "fig_journal"):
+            off = []
+            for name, placed in style.PLACED.items():
+                p = POSTER / setname / (name + ".png")
+                if not p.exists():
+                    off.append("%s missing" % name)
+                    continue
+                authored = Image.open(p).size[0] / 300.0
+                if abs(authored / placed - 1.0) >= 0.02:
+                    off.append("%s authored %.2f placed %.2f" % (name, authored, placed))
+            check("%s/: every figure is authored at the width it is placed at" % setname,
+                  not off, "; ".join(off[:4]))
     except ImportError:
         print("  skip  PIL or style unavailable")
 

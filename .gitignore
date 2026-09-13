@@ -69,3 +69,9 @@ results/framework/*.out
 
 # AppleDouble sidecars written when a mac writes to the shared filesystem
 ._*
+
+# Poster variants are regenerable: python3 docs/poster/gen.py sections.json --n 36 --out variants --render
+# 36 sheets is ~290 MB per regeneration, which does not belong in history.
+docs/poster/variants/
+!docs/poster/variants/contact_sheet.png
+!docs/poster/variants/manifest.json

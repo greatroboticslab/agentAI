@@ -17,21 +17,57 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# straight from the reference deck
-INK     = "#1E293B"
-NAVY    = "#14314E"
-BLUE    = "#1C6FB5"
-PALE    = "#F4F7FA"
-PALEBLU = "#EAF2F9"
-RULE    = "#C2CEDA"
-MUTE    = "#556575"
-WHITE   = "#FFFFFF"
-# two more, chosen to sit in the same family rather than fight it
-GOOD    = "#1B7A55"
-WARN    = "#B5502A"
-GREY    = "#8D99A6"
+# Two looks, one set of names. `POSTER_LOOK=journal` gives the figures the
+# palette an offset-printed journal plate had: black ink, three greys, and one
+# muted spot colour that the press ran as a second pass. Colour there is
+# expensive, so it is spent once. The default look is the reference deck's
+# slate-blue system.
+#
+# The switch is an environment variable rather than an argument because every
+# figure function imports these names at module scope; threading a palette
+# through seventeen signatures would be the same change written seventeen times.
+import os as _os
 
-SERIES = [BLUE, INK, GOOD, WARN, MUTE, GREY]
+LOOK = _os.environ.get("POSTER_LOOK", "modern")
+
+if LOOK == "journal":
+    INK     = "#111111"   # plate black
+    NAVY    = "#111111"
+    BLUE    = "#4A4A4A"   # the first grey does the work colour used to do
+    PALE    = "#F2F1EE"
+    PALEBLU = "#E8E6E1"
+    RULE    = "#BFBDB8"
+    MUTE    = "#5C5A55"
+    WHITE   = "#FFFFFF"
+    GOOD    = "#8A8A8A"
+    WARN    = "#8C3A1E"   # the one spot colour, a dull brick
+    GREY    = "#A8A6A1"
+    SERIES  = [INK, BLUE, WARN, GREY, MUTE, GOOD]
+    FAMILY  = "Times New Roman"
+    FIGDIR  = "fig_journal"
+else:
+    # straight from the reference deck
+    INK     = "#1E293B"
+    NAVY    = "#14314E"
+    BLUE    = "#1C6FB5"
+    PALE    = "#F4F7FA"
+    PALEBLU = "#EAF2F9"
+    RULE    = "#C2CEDA"
+    MUTE    = "#556575"
+    WHITE   = "#FFFFFF"
+    # two more, chosen to sit in the same family rather than fight it
+    GOOD    = "#1B7A55"
+    WARN    = "#B5502A"
+    GREY    = "#8D99A6"
+    SERIES  = [BLUE, INK, GOOD, WARN, MUTE, GREY]
+    FAMILY  = "Arial"
+    FIGDIR  = "fig"
+
+# In the journal look every series colour is a grey except one, so a reader
+# separating two lines is reading shape and dash, not hue -- which is what the
+# note below has always asked for and what colour figures rarely deliver.
+MARKERS = ["o", "s", "^", "D", "v", "P"]
+DASHES  = ["-", "--", "-.", ":", (0, (5, 1, 1, 1)), (0, (1, 1))]
 
 # BLUE 0.150 / WARN 0.157 / GOOD 0.148 relative luminance -- within 0.01 of one
 # another. Any two of them are ONE mark in a photocopy or a phone photo, so
@@ -50,7 +86,7 @@ PLACED = {
     "a_families": 10.925, "b_zeroshot": 10.925, "c_ladder": 10.925,
     "e_supervision": 10.925, "r_tta": 10.925,
     "f_rounds": 22.4,
-    "m_ledger": 22.4, "n_system": 22.4, "t_journey": 46.4, "w_robots": 46.4,
+    "m_ledger": 22.4, "n_system": 22.4, "t_journey": 46.4, "w_robots": 46.4, "q_projects": 46.4,
 }
 
 # Three sizes, named, so a figure cannot drift into seven of them 1.5 pt apart.
@@ -61,7 +97,7 @@ PLACED = {
 TICK, AXIS, ANNOT, LETTER = 14.0, 16.0, 13.5, 20.0
 
 plt.rcParams.update({
-    "font.family": "Arial",
+    "font.family": FAMILY,
     "font.size": TICK,
     "axes.titlesize": TICK,
     "axes.labelsize": AXIS,
@@ -69,9 +105,9 @@ plt.rcParams.update({
     # `mAP$_{50-95}$` printed Arial letters with a DejaVu subscript, two
     # typefaces inside one label.
     "mathtext.fontset": "custom",
-    "mathtext.rm": "Arial",
-    "mathtext.it": "Arial:italic",
-    "mathtext.bf": "Arial:bold",
+    "mathtext.rm": FAMILY,
+    "mathtext.it": FAMILY + ":italic",
+    "mathtext.bf": FAMILY + ":bold",
     "mathtext.default": "regular",
     # Type 3 is a named preflight failure wherever a PDF poster is submitted.
     "pdf.fonttype": 42, "ps.fonttype": 42, "svg.fonttype": "none",

@@ -345,6 +345,34 @@ LEDGER["n_models"] = len({n.lower() for n in _ledger_names()})
 LEDGER["n_deployed"] = 1
 LEDGER["n_groups"] = len(LEDGER["groups"])
 
+# --- the four projects a visitor would be shown -------------------------------
+# One row each: the photograph, what has been done, what is being done now, and
+# what is still open. Every count here appears elsewhere in this file or on the
+# live platform; nothing new is asserted. The humanoid row has no photograph
+# because nothing has been uploaded to it, and the panel says that rather than
+# borrowing a picture from somewhere else.
+PROJECTS = [
+    {"key": "weed", "name": "Weed Detection", "photo": "yolo_overlay.jpg",
+     "done": "27 models trained or benchmarked against one sealed 1,977-image "
+             "holdout; the smallest that held its accuracy was deployed",
+     "now":  "that 2.6 M-parameter checkpoint runs on live robot frames",
+     "open": "recall on robot frames, which needs labels we do not have yet"},
+    {"key": "241_robot", "name": "241 Robot", "photo": "r241_row.jpg", "crop": 0.88,
+     "done": "2,238 frames over 17 drives, 342 m of GPS track, two IMUs at 20 Hz",
+     "now":  "driven from a browser through the platform: 1,389 commands so far",
+     "open": "the rover has been off the network since 2026-08-28"},
+    {"key": "laser_cart", "name": "Laser Cart", "photo": "lc_front.jpg", "crop": 1.00,
+     "done": "427 frames over 8 drives with laser, vehicle and detection telemetry",
+     "now":  "the platform records the cart; its own operator drives it",
+     "open": "no drive relay, no position sensor, and the platform has never "
+             "fired the laser"},
+    {"key": "humanoid_robot", "name": "Humanoid Robot", "photo": "",
+     "done": "the project is open on the platform and takes the same ingest "
+             "contract the other two robots use",
+     "now":  "waiting on its first upload",
+     "open": "no client, no data"},
+]
+
 # --- what the platform itself does, counted on the live box ------------------
 # Measured on lab-b660m-c 2026-09-13 by reading the service journal, the upload
 # archive and the analysis artifacts. Where a mining pass and a direct count

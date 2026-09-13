@@ -14,7 +14,7 @@
    "id": "platform_domains",
    "theme": "platform-idea",
    "heading": "Any research field is a project",
-   "body": "A lab member opens a project for any data type and any field, uploads images, video or sensor logs, and gets an automatic diagnosis before choosing what to do next. Weed detection is one project on this platform. The 241 rover, the laser cart and a Unitree humanoid each have their own.",
+   "body": "A lab member opens a project for any data type and any field, uploads images, video or sensor logs, and gets an automatic diagnosis before choosing what to do next. Weed detection is one project on this platform. So are the 241 rover and the laser cart, and so is a humanoid project that is open and still empty.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -279,7 +279,7 @@
    "theme": "results",
    "heading": "More web data, less accuracy",
    "body": "Twelve times the training data costs 0.0189 on our own 1,977-image holdout, three seeds at every rung, which is 8.2 times the seed spread. The same eight checkpoints fall on a second weed dataset too. One of six audited web sources reaches a 0.90 label-precision bar.",
-   "figure": "none",
+   "figure": "c_ladder",
    "status": "built_and_running",
    "width": "column",
    "numbers": "LADDER, SOURCES"
@@ -395,6 +395,80 @@
    "status": "built_and_running",
    "width": "column",
    "numbers": "CENSUS, RESULTS_TABLE"
+  },
+  {
+   "id": "projects",
+   "theme": "robots-connected",
+   "figure": "q_projects",
+   "heading": "Four projects, one platform",
+   "status": "built_and_running",
+   "body": "Each of the four was opened the same way, sends through the same ingest contract, and is trained and evaluated by the same agents. Three have data. The fourth is open and empty, which is what a platform looks like before the next robot arrives."
+  },
+  {
+   "id": "shared_models",
+   "theme": "robots-connected",
+   "figure": "d_wall",
+   "heading": "One robot's model on another robot's rows",
+   "status": "designed_only",
+   "body": "Because every vehicle writes into one registry through one contract, a model trained on one robot's frames can be evaluated on another's without any new plumbing: the split is a query. We have run that query across datasets rather than across robots, and it is the hard direction. A detector trained on 40,000 harvested images loses 0.0299 on a second weed dataset; the same eight checkpoints fall on both exams. So sharing perception between the rover, the cart and whatever comes next is a measurement problem we have already priced, not a wiring problem."
+  },
+  {
+   "id": "dispatch",
+   "theme": "iterating-agents-brain",
+   "figure": "none",
+   "heading": "How many agents, and which models",
+   "status": "built_and_running",
+   "big": "27",
+   "big_label": "models the router can place",
+   "body": "Nothing on the platform hard-codes a model name. A router maps a role -- collector, judge, reviewer, planner -- onto a model and a place, and the place decides whether the verdict counts: work that analyses, reviews or decides runs as a cluster batch job on open weights, and anything answered by the lab box is marked in its own record as a draft. The scheduler then fans a round out across as many review arms as the round asks for. What it does not yet do is choose that number for itself."
+  },
+  {
+   "id": "vision_platform",
+   "theme": "vision",
+   "figure": "none",
+   "heading": "Where this goes",
+   "status": "designed_only",
+   "body": "The end state is one general platform: any dataset, any research field, any robot. Agents on it run without being asked, iterate on their own output, escalate to a larger model when they are out of their depth, and are fenced in a sandbox while they do it. Every piece of this poster is a step in that direction rather than a one-off experiment."
+  },
+  {
+   "id": "vision_permanent",
+   "theme": "vision",
+   "figure": "none",
+   "heading": "Why it is built this way",
+   "status": "built_and_running",
+   "body": "Each capability is added to the platform itself, not to a script somebody ran once. The routing table, the ingest contract, the dataset registry, the sandbox and the scorer are all part of the product, so the next student inherits them working. That is the difference between a lab that has done an experiment and a lab that has built somewhere to do the next one."
+  },
+  {
+   "id": "families",
+   "theme": "results",
+   "figure": "a_families",
+   "heading": "Three detector families, one sealed holdout",
+   "status": "built_and_running",
+   "body": "Every in-domain number on this sheet is the same 1,977 images, held out of training and scored the same way. Five detectors were trained on it across three families. The deployable one is the smallest that kept its accuracy, at 2.6 M parameters, and the spread between families is smaller than the spread between seeds of one family."
+  },
+  {
+   "id": "zeroshot",
+   "theme": "results",
+   "figure": "b_zeroshot",
+   "heading": "Fifteen models that were never trained on weeds",
+   "status": "built_and_running",
+   "body": "One deterministic pass each, no repeats, on the same images. The best open vision-language model reaches a fraction of the fine-tuned detector. This is the measurement that decides where a language model belongs on this platform: judging and reviewing, not detecting."
+  },
+  {
+   "id": "tta",
+   "theme": "results",
+   "figure": "r_tta",
+   "heading": "What extra compute at test time buys",
+   "status": "built_and_running",
+   "body": "The deployable checkpoint, unchanged, given more views per image. Fusing without extra views buys nothing. Multi-scale with a horizontal flip buys a little and costs three passes per frame, which a robot running at 1 Hz can afford and a laser cart cannot."
+  },
+  {
+   "id": "species",
+   "theme": "results",
+   "figure": "j_species",
+   "heading": "Which weeds it still misses",
+   "status": "built_and_running",
+   "body": "Per-class performance of the deployable checkpoint across the twelve species. The spread between the best and worst class is larger than every training change we made this year put together, which is why the next labels matter more than the next architecture."
   }
  ]
 }

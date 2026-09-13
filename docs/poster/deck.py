@@ -71,6 +71,9 @@ class Deck(object):
         self.style = style
         self.c, self.f, self.dz = style.c, style.f, style.d
         self.COL, self.FULL = style.COL, style.FULL
+        self.look = getattr(style, "look", "modern")
+        self.FIG = os.path.join(HERE, getattr(style, "fig_dir", "fig"))
+        self.sec_no = 0
         self.prs = Presentation()
         self.prs.slide_width, self.prs.slide_height = Inches(W), Inches(H)
         self.slide = self.prs.slides.add_slide(self.prs.slide_layouts[6])
@@ -111,10 +114,17 @@ class Deck(object):
         return tb
 
     # ---- measurement ----------------------------------------------------
-    @staticmethod
-    def h_est(s, w, size, spacing=1.22, after=0.0):
-        """Conservative: Arial averages about 0.50 em per character here."""
-        cpl = max(14, int((w * 72.0) / (size * 0.50)))
+    def h_est(self, s, w, size, spacing=1.22, after=0.0):
+        """Characters per line, from the face actually being set.
+
+        Arial runs about 0.50 em per character at these sizes; Times runs 0.44
+        and Georgia 0.48. Estimating a Times column at Arial's width predicts
+        12 per cent more lines than the render has, which on a 36 in sheet is
+        two inches of phantom height and a section dropped that would have fit.
+        """
+        em = {"Times New Roman": 0.442, "Georgia": 0.478,
+              "Arial Narrow": 0.425}.get(self.f["body"], 0.50)
+        cpl = max(14, int((w * 72.0) / (size * em)))
         lines = sum(max(1, -(-len(p) // cpl)) for p in s.split("\n"))
         return lines * size * spacing / 72.0 + after / 72.0
 
@@ -137,7 +147,9 @@ class Deck(object):
         self.title_pt = size
         names = "   \u00b7   ".join(n for n, _ in M["authors"])
         affil = "%s   \u00b7   %s" % (M["affiliations"][0], M["institution"])
-        if kind == "band":
+        if self.look == "journal":
+            y = self._journal_title(title, names, affil, size, kind)
+        elif kind == "band":
             self.rect(0, 0, W, self.band, fill=c["band"])
             self.rect(0, self.band, W, 0.05, fill=c["accent"])
             self.tbox(MARG, 0.42, W - 2 * MARG, [(title, size, f["display_bold"], c["band_ink"])],
@@ -168,13 +180,86 @@ class Deck(object):
             self.tbox(MARG, 2.70, W - 2 * MARG, [(names, 40, True, c["ink"])], spacing=1.0)
             self.tbox(MARG, 3.40, W - 2 * MARG, [(affil, 24, False, c["mute"])], spacing=1.0)
             y = self.band + 0.42
-        if standfirst:
+        if standfirst and self.look == "journal":
+            # An abstract: one measure narrower than the sheet, justified, ruled
+            # top and bottom, set a size down from the title's byline. This is
+            # the single most recognisable thing about an article's first page.
+            aw = (W - 2 * MARG) * 0.86
+            ax = MARG + (W - 2 * MARG - aw) / 2.0
+            self.rect(ax, y, aw, 0.022, fill=c["rule"])
+            self.tbox(ax, y + 0.26, aw, [(standfirst, dz["stand"] - 4, False, c["ink"])],
+                      spacing=1.20, face=f["body"], align=PP_ALIGN.JUSTIFY)
+            hh = self.h_est(standfirst, aw, dz["stand"] - 4, 1.20)
+            self.rect(ax, y + 0.26 + hh + 0.18, aw, 0.022, fill=c["rule"])
+            self.top = y + 0.26 + hh + 0.18 + 0.62
+        elif standfirst:
             self.tbox(MARG, y, W - 2 * MARG, [(standfirst, dz["stand"], False, c["ink"])],
                       spacing=1.16, face=f["display"] if f["display"] != "Arial Narrow" else "Arial")
-        self.top = y + (self.h_est(standfirst, W - 2 * MARG, dz["stand"], 1.16) + 0.55 if standfirst else 0.3)
+            self.top = y + self.h_est(standfirst, W - 2 * MARG, dz["stand"], 1.16) + 0.55
+        else:
+            self.top = y + 0.3
+
+    def _journal_title(self, title, names, affil, size, kind):
+        """The first page of a paper: rules, centred type, no coloured ground.
+
+        The three treatments differ in where the rules go, not in whether there
+        is a band -- a filled colour band across the head of a sheet is the one
+        mark that says poster-template loudest, and none of the three has one.
+        """
+        c, f = self.c, self.f
+        tw = W - 2 * MARG
+        size = min(size, 96)                 # a serif at 120 pt over 48 in shouts
+        if kind == "masthead":
+            eyebrow = "%s   \u00b7   %s" % (D.MEETING["institution"], D.MEETING["venue"]) \
+                if D.MEETING.get("venue") else D.MEETING["institution"]
+            self.rect(MARG, 0.55, tw, 0.020, fill=c["ink"])
+            self.tbox(MARG, 0.70, tw, [(eyebrow.upper(), 22, False, c["mute"])],
+                      spacing=1.0, align=PP_ALIGN.CENTER, face=f["body"])
+            self.rect(MARG, 1.16, tw, 0.020, fill=c["ink"])
+            self.tbox(MARG, 1.40, tw, [(title, size, True, c["ink"])], spacing=0.98,
+                      align=PP_ALIGN.CENTER, face=f["display"])
+            yy = 1.40 + size / 72.0 * 1.14
+            self.tbox(MARG, yy, tw, [(names, 36, False, c["ink"])], spacing=1.0,
+                      align=PP_ALIGN.CENTER, face=f["body"])
+            self.tbox(MARG, yy + 0.58, tw, [(affil, 22, False, c["mute"])], spacing=1.0,
+                      align=PP_ALIGN.CENTER, face=f["body"])
+            return yy + 1.28
+        if kind == "hairline":
+            self.rect(MARG, 0.62, tw, 0.020, fill=c["rule"])
+            self.tbox(MARG, 0.86, tw, [(title, size, True, c["ink"])], spacing=0.98,
+                      face=f["display"])
+            yy = 0.86 + size / 72.0 * 1.14
+            self.tbox(MARG, yy, tw * 0.62, [(names, 34, False, c["ink"])], spacing=1.0,
+                      face=f["body"])
+            self.tbox(MARG + tw * 0.62, yy, tw * 0.38, [(affil, 22, False, c["mute"])],
+                      spacing=1.0, align=PP_ALIGN.RIGHT, face=f["body"])
+            self.rect(MARG, yy + 0.72, tw, 0.045, fill=c["ink"])
+            return yy + 1.16
+        # classic: centred between a thick rule and a thin one
+        self.rect(MARG, 0.58, tw, 0.048, fill=c["ink"])
+        self.tbox(MARG, 0.86, tw, [(title, size, True, c["ink"])], spacing=0.98,
+                  align=PP_ALIGN.CENTER, face=f["display"])
+        yy = 0.86 + size / 72.0 * 1.14
+        self.tbox(MARG, yy, tw, [(names, 36, False, c["ink"])], spacing=1.0,
+                  align=PP_ALIGN.CENTER, face=f["body"])
+        self.tbox(MARG, yy + 0.58, tw, [(affil, 22, False, c["mute"])], spacing=1.0,
+                  align=PP_ALIGN.CENTER, face=f["body"])
+        self.rect(MARG, yy + 1.16, tw, 0.020, fill=c["ink"])
+        return yy + 1.44
 
     def head(self, x, y, w, s):
         c, f, dz = self.c, self.f, self.dz
+        if self.look == "journal":
+            # Numbered, ruled above, set in the body serif at a size the eye
+            # reads as a heading and not as a banner. An article numbers its
+            # sections because the argument has an order; so does this sheet.
+            self.sec_no += 1
+            self.rect(x, y, w, 0.020, fill=c["rule"])
+            self.tbox(x, y + 0.20, w, [("%d.  %s" % (self.sec_no, s),
+                                        dz["heading"], True, c["ink"])],
+                      spacing=1.0, face=f["display"])
+            return y + 0.20 + self.h_est("%d.  %s" % (self.sec_no, s), w,
+                                         dz["heading"], 1.0) + 0.22
         self.tbox(x, y, w, [(s, dz["heading"], f["display_bold"], c["band"] if self.style.palette_name != "sand" else c["ink"])],
                   spacing=0.95, face=f["display"])
         self.rect(x, y + dz["heading"] / 72.0 * 1.30, w, 0.030, fill=c["accent"])
@@ -185,15 +270,20 @@ class Deck(object):
         return y + 0.46
 
     def body(self, x, y, w, s, size=None, color=None, after=12, bold=False,
-             spacing=1.22):
+             spacing=1.22, justify=None):
         size = size or self.dz["body"]
         color = color or self.c["ink"]
-        self.tbox(x, y, w, [(s, size, bold, color, after)], spacing=spacing)
+        # Justified only for running prose, and only in the journal look: a
+        # justified two-word label is a line of holes.
+        if justify is None:
+            justify = self.look == "journal" and len(s) > 160
+        self.tbox(x, y, w, [(s, size, bold, color, after)], spacing=spacing,
+                  align=PP_ALIGN.JUSTIFY if justify else PP_ALIGN.LEFT)
         return y + self.h_est(s, w, size, spacing, after)
 
     def figure(self, x, y, w, name, label, caption=None):
         """Image, then its caption. Returns the new y."""
-        p = os.path.join(FIG, name + ".png")
+        p = os.path.join(self.FIG, name + ".png")
         if not os.path.exists(p):
             self.rect(x, y, w, 2.2, fill=PALE, line=RULE)
             self.tbox(x + 0.2, y + 1.0, w - 0.4, [("missing " + name, 18, True, WARN)])
@@ -204,8 +294,24 @@ class Deck(object):
             % (name, authored, w, w / authored))
         ph = self.slide.shapes.add_picture(p, Inches(x), Inches(y), width=Inches(w))
         y2 = y + ph.height / 914400.0 + 0.12
-        cap = "%s  %s" % (label, caption if caption is not None else CAPS.get(name, ""))
+        text = caption if caption is not None else CAPS.get(name, "")
         cs = self.dz["caption"]
+        if self.look == "journal":
+            # "Fig. 4." bold, the caption in the body serif at caption size, both
+            # in one paragraph so the lead-in sits on the same line as the text.
+            lead = label.replace("Figure", "Fig.").replace("..", ".")
+            tb = self.slide.shapes.add_textbox(Inches(x), Inches(y2), Inches(w), Inches(0.4))
+            tf = tb.text_frame; tf.word_wrap = True
+            tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+            par = tf.paragraphs[0]; par.line_spacing = 1.16
+            for txt, bold, col in ((lead + " ", True, self.c["ink"]),
+                                   (text, False, self.c["ink"])):
+                r = par.add_run(); r.text = txt
+                r.font.size = Pt(cs); r.font.bold = bold
+                r.font.color.rgb = col; r.font.name = self.f["body"]
+            cap = lead + " " + text
+            return y2 + self.h_est(cap, w, cs, 1.16) + 0.34
+        cap = "%s  %s" % (label, text)
         self.tbox(x, y2, w, [(cap, cs, False, self.c["mute"], 0)], spacing=1.18)
         return y2 + self.h_est(cap, w, cs, 1.18) + 0.34
 
@@ -233,8 +339,18 @@ class Deck(object):
         return yy + 0.32
 
     def bignum(self, x, y, w, value, label, note="", size=60):
-        """One measured quantity, set to be read from across a room."""
-        self.tbox(x, y, w, [(value, size, True, self.c["accent"])], spacing=0.95, face=self.f["display"])
+        """One measured quantity, set to be read from across a room.
+
+        In the journal look it is set in the text ink, not the spot colour, and
+        a size down. One colour ran in a second pass on those presses, so it
+        appears once on a page and never on a numeral -- a 62 pt brick-red
+        figure floating in a column is the single most template-looking mark a
+        sheet like this can carry.
+        """
+        if self.look == "journal":
+            size = min(size, 38)
+        col = self.c["ink"] if self.look == "journal" else self.c["accent"]
+        self.tbox(x, y, w, [(value, size, True, col)], spacing=0.95, face=self.f["display"])
         yy = y + size / 72.0 * 1.02
         yy = self.body(x, yy, w, label, after=2)
         if note:
