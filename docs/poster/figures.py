@@ -163,25 +163,25 @@ def ladder():
     if B:
         ax.plot(xs, B, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
     ax.text(xs[1] + 0.08, A[1] + 0.0022, "class per source dataset", ha="left",
-            va="bottom", fontsize=9.5, color=BLUE)
-    ax.text(xs[-1] - 0.05, B[-1] + 0.0026, "one shared class", ha="right",
-            va="bottom", fontsize=9.5, color=WARN)
+            va="bottom", fontsize=TICK - 2, color=BLUE)
+    ax.text(xs[-1] - 0.05, B[-1] - 0.0030, "one shared class", ha="right",
+            va="top", fontsize=TICK - 2, color=WARN)
     ax.annotate("", xy=(3.28, A[0]), xytext=(3.28, A[-1]),
                 arrowprops=dict(arrowstyle="<->", color=INK, lw=0.9))
     ax.text(3.36, (A[0] + A[-1]) / 2, "−0.0189\n8.2 σ", fontsize=9.5, color=INK,
             va="center")
     ax.set_xlim(-0.35, 4.15)
     ax.set_ylabel("mAP$_{50\\mathdefault{-}95}$")
-    ax.text(0.055, 0.985, "CottonWeedDet12 holdout", transform=ax.transAxes,
-            fontsize=10, color=MUTE, va="top")
+    ax.text(0.0, 1.035, "CottonWeedDet12 holdout", transform=ax.transAxes,
+            fontsize=TICK - 1.5, color=MUTE, va="bottom", ha="left")
     ax.set_ylim(0.818, 0.872)
 
     a2 = [X["armA"][k] for k in rungs]; b2 = [X["armB"][k] for k in rungs]
     ax2.plot(xs, a2, "o-", color=BLUE, zorder=3)
     ax2.plot(xs, b2, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
     ax2.set_ylabel("mAP$_{50\\mathdefault{-}95}$")
-    ax2.text(0.055, 0.985, "ImageWeeds, class-agnostic", transform=ax2.transAxes,
-             fontsize=10, color=MUTE, va="top")
+    ax2.text(0.0, 1.035, "ImageWeeds, class-agnostic", transform=ax2.transAxes,
+             fontsize=TICK - 1.5, color=MUTE, va="bottom", ha="left")
     ax2.set_ylim(0.055, 0.118)
     ax2.set_xlim(-0.35, 3.35)
 
@@ -192,9 +192,10 @@ def ladder():
     ax.set_xlabel("harvested images added", labelpad=14)
     ax2.set_xlabel("harvested images added", labelpad=14)
     for i, n in enumerate(An):
-        ax.annotate("n=%d" % n, (xs[i], 0), xytext=(0, -30),
+        ax.annotate("n = %d" % n, (xs[i], 0), xytext=(0, -42),
                     textcoords="offset points", xycoords=("data", "axes fraction"),
-                    ha="center", fontsize=8.5, color=MUTE, annotation_clip=False)
+                    ha="center", fontsize=TICK - 3, color=MUTE,
+                    annotation_clip=False)
     return save(fig, "c_ladder",
                 "(c) Three seeds at every rung on our own sealed holdout. (d) The same eight "
                 "checkpoints on a second weed dataset they never saw. Both exams fall, so the "
@@ -273,8 +274,7 @@ def supervision():
     ax.text(0.855, 0.865, "chance", fontsize=ANNOT, color=MUTE, rotation=45,
             ha="center", va="center", rotation_mode="anchor")
     ax.axhline(S["ceiling"], color=MUTE, lw=0.9, ls=(0, (4, 3)), zorder=1)
-    ax.text(0.955, S["ceiling"] - 0.024, "ceiling for a rules-only arm",
-            fontsize=ANNOT, color=MUTE, ha="right", va="top")
+    # the dashed rule is named in the caption, not on top of the data
 
     def mark(a, x, y, colour, ms=8, filled=True):
         lo, hi = wilson(a["k"], a["n"])
@@ -289,14 +289,14 @@ def supervision():
     a0p = pt("A0p")
     mark(a0p, a0p["fa"], a0p["r"], MUTE, ms=7)
     ax.annotate("12 deterministic rules", (a0p["fa"], a0p["r"]),
-                textcoords="offset points", xytext=(12, 6), ha="left",
-                fontsize=ANNOT, color=MUTE)
+                textcoords="offset points", xytext=(12, -13), ha="left",
+                va="top", fontsize=ANNOT, color=MUTE)
     # The watchdog returned no decision on any of 149 cases, so it has no
     # coordinate on either axis. It sits in the margin rather than at an
     # arithmetic (0, 0) that would read as a measurement.
     ax.plot(-0.045, -0.045, "s", color=GREY, ms=7, clip_on=False, zorder=5)
-    ax.annotate("scripted watchdog\nno decision on any of %d" % S["a0_cases"],
-                (-0.045, -0.045), textcoords="offset points", xytext=(13, 0),
+    ax.annotate("scripted watchdog",
+                (-0.045, -0.045), textcoords="offset points", xytext=(13, 1),
                 ha="left", va="center", fontsize=ANNOT, color=GREY,
                 annotation_clip=False,
                 path_effects=[pe.withStroke(linewidth=2.5, foreground=WHITE)])
@@ -305,10 +305,10 @@ def supervision():
     # can check against anything, and a figure in a journal names the thing it
     # measured. The name goes on its own line so the label stays narrow: three
     # of the four arms sit inside a false-alarm band 0.12 wide.
-    style = {"Qwen2.5-7B":    (WARN, (0.430, 0.875), "left", "bottom"),
-             "Qwen3-14B":     (BLUE, (0.660, 0.760), "left", "bottom"),
-             "Qwen3.8-27B":   (NAVY, (0.305, 0.440), "left", "center"),
-             "GLM-4.7-Flash": (GOOD, (0.010, 0.880), "left", "bottom")}
+    style = {"GLM-4.7-Flash": (GOOD, (0.010, 0.995), "left", "top"),
+             "Qwen2.5-7B":    (WARN, (0.345, 0.995), "left", "top"),
+             "Qwen3.8-27B":   (NAVY, (0.010, 0.430), "left", "top"),
+             "Qwen3-14B":     (BLUE, (0.560, 0.545), "left", "top")}
     for m in S["models"]:
         c, (lx, ly), ha, va = style[m["name"]]
         p2 = pt(m["l2"])
@@ -336,8 +336,6 @@ def supervision():
                 linespacing=1.25,
                 path_effects=[pe.withStroke(linewidth=2.2, foreground=WHITE)])
 
-    ax.text(0.955, 0.045, "dashed: the two ends were scored on different cases",
-            fontsize=ANNOT, color=MUTE, ha="right", va="bottom")
     ax.set_xlim(-0.06, 0.97); ax.set_ylim(-0.06, 0.97)
     ax.set_xticks([0, 0.25, 0.5, 0.75])
     ax.set_yticks([0, 0.25, 0.5, 0.75])
@@ -390,8 +388,11 @@ def supervision():
     return save(fig, "e_supervision",
                 "(e) Recall and (f) grounded recall on one frozen corpus of real incidents from "
                 "this project's own record, scored by the project's own scorer. Each mark carries "
-                "its own denominator and bars are 95% Wilson intervals. The 7 B has the highest "
-                "recall on the page and 0.55 of it quotes nothing; the 27 B has no such gap.")
+                "its own denominator and bars are 95%% Wilson intervals; the dashed rule in (e) is "
+                "the ceiling a rules-only arm can reach, and an arrow is dotted where its two ends "
+                "were scored on different cases. The scripted watchdog returned no decision on any "
+                "of %d. Qwen2.5-7B has the highest recall on the page and 0.55 of it quotes "
+                "nothing; Qwen3.8-27B has no such gap." % S["a0_cases"])
 
 
 # --------------------------------------------------- photographic plates
@@ -469,188 +470,127 @@ def cart_grid():
 
 # ----------------------------------------------------------- the algorithm
 def algorithm():
-    """One round, drawn the way Nature Methods draws an overview figure.
+    """The loop the agent runs to answer a need, drawn as a loop.
 
-    The rules are Bang Wong's, from "The overview figure" (Nat. Methods 8, 365,
-    2011), and the first version of this plate broke every one of them:
+    Harry, on the version before this one: "我们的agent会按照我们人体的去做一个
+    闭环的loop解决我们的需求 … 你为什么又开始说多少的数字 … 然后你又说什么日
+    20260829 这些有何意义". He is right twice over. A schematic that is read in
+    four seconds cannot carry counts and dates -- Bang Wong's rule is that an
+    overview figure conveys concepts and that research data inside one is
+    disconcerting -- and a figure that is called an algorithm has to be shaped
+    like the algorithm. The earlier draft was a row of states with a return
+    edge underneath, which reads as a pipeline that happens to repeat.
 
-      * "adopt an 'A to B' structure in which A and B are states connected by
-        an action. The states are often depicted graphically, and the action is
-        text describing the transformation."  -- so the columns are STATES of
-        the corpus, drawn, and the actions are the headers above them. The
-        first version drew five empty boxes each labelled with a verb.
-      * "redraw the elements from the previous step highlighting only the
-        effective change" -- every column redraws the same field of tiles and
-        changes only what that action changed, so the eye can follow one thing
-        across the figure instead of reading five unrelated boxes.
-      * "I designed the overview ... without intervening arrows and used the
-        action labels as headers to save space."  -- there are no arrows
-        between the columns. The single arrowhead on the plate is the return
-        path, where direction IS the meaning.
-      * "symbols have minimal overlapping meanings" -- arrowheads mean sequence
-        and nothing else; labels hang off leaders, which are lines without
-        heads.
-      * "overview figures are intended to convey general concepts and not to
-        present data ... Research data in the context of an overview figure are
-        disconcerting."  -- the measured numbers that were inside the first
-        version (0.702, 0.518, 0.095) are gone. They live in Figure 3, where
-        they have axes and intervals.
-
-    Colour appears once, on the one tier that closes its evidence gap; rank is
-    carried by position and state by texture, which is what the column on
-    avoiding colour asks for.
+    So: a racetrack. Five stations on the outward run, the way a person would
+    work the problem -- a need arrives, work out what data would answer it, go
+    and get it, train on what survives, read the result and decide what is
+    next. The return run carries the decision back to the need, and it is
+    DASHED, because that is the edge the platform has not closed: the verdict
+    is written into the round's record and nothing reads it back. The
+    escalation ladder sits inside the loop, where the negative space already
+    was. No counts, no dates, no measured values -- those are Figures 3 and 4,
+    which have axes.
     """
-    from matplotlib.patches import Rectangle
-    # Sized to be read from two metres, not from a laptop. The first draft set
-    # its headers at 17 pt against a 22 pt body and its tiles at 0.30 in, so the
-    # one diagram on the sheet was also the smallest type on it.
-    W, H = 46.4, 6.35
-    HEAD, NOTE, RUNG, LEAD = 24.0, 17.0, 18.0, 17.0
+    from matplotlib.patches import FancyBboxPatch, Rectangle, FancyArrowPatch
+    W, H = 46.4, 5.60
+    STN, SUB, LAD, EDGE = 21.0, 16.0, 17.0, 18.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    NCOL, CW, GAP, X0 = 5, 7.60, 1.90, 0.55
-    TOP = H - 0.45                     # baseline the action labels sit on
-    FIELD = TOP - 0.80                 # top of the drawn state
-    BASE = 2.95                        # floor of the drawn state
-    SIZE, PAD, COLS = 0.50, 0.08, 9
+    TOPY, BOTY = H - 1.25, 0.78          # the two runs of the loop
+    L, R = 1.05, W - 1.05
 
-    def colx(i):
-        return X0 + i * (CW + GAP)
-
-    def action(i, text, note=""):
-        x = colx(i)
-        ax.text(x, TOP, text, fontsize=HEAD, fontweight="bold", color=INK,
-                ha="left", va="baseline")
-        ax.plot([x, x + CW], [TOP - 0.26, TOP - 0.26], color=INK, lw=1.4)
-        if note:
-            ax.text(x, BASE - 0.34, note, fontsize=NOTE, color=MUTE,
-                    ha="left", va="top")
-
-    def tiles(i, n_our, n_web, kept=None, our_hatch=None, cols=COLS):
-        """Redraw the same field; only the change is new.
-
-        Outlined tiles are the ones the audit removed, so between one column
-        and the next the eye has exactly one difference to find.
-        """
-        x0, y0 = colx(i), FIELD - SIZE
-        for k in range(n_our + n_web):
-            cx = x0 + (k % cols) * (SIZE + PAD)
-            cy = y0 - (k // cols) * (SIZE + PAD)
-            ours = k < n_our
-            if ours:
-                fc, ec, hh, lw = WHITE, INK, our_hatch, 1.6
-            elif kept is None or (k - n_our) < kept:
-                fc, ec, hh, lw = GREY, MUTE, None, 1.0
-            else:
-                fc, ec, hh, lw = WHITE, RULE, None, 0.9
-            ax.add_patch(Rectangle((cx, cy), SIZE, SIZE, facecolor=fc,
-                                   edgecolor=ec, lw=lw, hatch=hh, zorder=2))
-        return y0 - ((n_our + n_web - 1) // cols) * (SIZE + PAD)
-
-    def leader(x1, y1, x2, y2, text, fs=LEAD, color=INK):
-        ax.plot([x1, x2], [y1, y2], color=color, lw=1.1, zorder=3)
-        ax.text(x2 + 0.14, y2, text, fontsize=fs, color=color, ha="left",
-                va="center", zorder=3)
-
-    # a -- what a drive leaves behind ----------------------------------------
-    action(0, "A drive opens a session",
-           "the tiles are schematic; the archive holds 2,686 frames\nand not one of them is labelled")
-    tiles(0, 9, 0)
-
-    # b -- the same nine, and what the collector brought back ------------------
-    action(1, "The collector harvests",
-           "the same nine frames, and what six public sources returned")
-    tiles(1, 9, 27)
-
-    # c -- only the change: most of the harvest is struck out -----------------
-    action(2, "The audit keeps one source in six",
-           "outlined tiles failed the label-precision bar and are never trained on")
-    y = tiles(2, 9, 27, kept=5)
-    leader(colx(2) + 2.90, y + 0.26, colx(2) + 4.00, y + 0.90,
-           "one source clears it")
-
-    # d -- what is left becomes a checkpoint ----------------------------------
-    action(3, "The trainer runs the round",
-           "hatched: paused by a stop-loss taken on 2026-08-29")
-    tiles(3, 9, 5, our_hatch="////", cols=7)
-    bx, by = colx(3) + 4.60, FIELD - 1.32
-    ax.add_patch(Rectangle((bx, by), 2.55, 1.32, facecolor=WHITE,
-                           edgecolor=INK, lw=1.8, zorder=2))
-    ax.text(bx + 1.28, by + 0.80, "one", ha="center", va="center",
-            fontsize=RUNG, color=INK, zorder=3)
-    ax.text(bx + 1.28, by + 0.40, "checkpoint", ha="center", va="center",
-            fontsize=RUNG, fontweight="bold", color=INK, zorder=3)
-
-    # e -- review: rank is position, not colour --------------------------------
-    action(4, "Review, and escalation when it is stuck",
-           "each rung reads the one below it and may overrule it")
-    rungs = ["scripted watchdog", "deterministic checks",
-             "a model reads the artifacts", "the same model, given retrieval"]
-    rx, rw, rh, step, rise = colx(4), 6.05, 0.50, 0.38, 0.72
-    for k, name in enumerate(rungs):
-        y = BASE + k * rise
-        top_rung = k == len(rungs) - 1
-        ax.add_patch(Rectangle((rx + k * step, y), rw, rh,
-                               facecolor=BLUE if top_rung else WHITE,
-                               edgecolor=BLUE if top_rung else INK,
-                               lw=2.0 if top_rung else 1.3, zorder=2))
-        # the label lives inside its rung: outside, the top one ran off the
-        # right edge of the sheet, because a staircase steps right as it rises
-        ax.text(rx + k * step + 0.22, y + rh / 2, name, fontsize=RUNG,
-                va="center", ha="left", color=WHITE if top_rung else INK,
-                fontweight="bold" if top_rung else "normal", zorder=3)
-    ax.annotate("", xy=(rx - 0.44, BASE + 3 * rise + rh), xytext=(rx - 0.44, BASE),
-                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.7,
-                                shrinkA=0, shrinkB=0))
-    ax.text(rx - 0.72, BASE + 1.15, "stuck", rotation=90, fontsize=RUNG,
-            color=INK, ha="center", va="center")
-
-    # the two return paths -- the loop, and where it is not closed ----------
-    # A single return edge said "the next round starts from the last round's
-    # weights", which is the warm-start chain this project MEASURED as the
-    # cause of the decline -- a bug, not the architecture. The platform has two
-    # return edges and they are in different states, and drawing only the
-    # connected one hid the thing the poster is actually about.
-    def ret(y, x_from, x_to, text, dashed, note=""):
-        ls = (0, (7, 5)) if dashed else "-"
-        # the stubs start BELOW the notes; run up to the field they crossed
-        # two lines of text in every column
-        ax.plot([x_from, x_from], [BASE - 1.02, y], color=INK, lw=1.5,
-                linestyle=ls, zorder=4)
-        ax.plot([x_from, x_to], [y, y], color=INK, lw=1.5, linestyle=ls, zorder=4)
-        ax.annotate("", xy=(x_to, BASE - 1.02), xytext=(x_to, y),
-                    arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5,
+    def arrowhead(x, y, dx, color=INK, lw=1.6, ls="-"):
+        ax.annotate("", xy=(x + dx, y), xytext=(x, y),
+                    arrowprops=dict(arrowstyle="-|>", color=color, lw=lw,
                                     linestyle=ls, shrinkA=0, shrinkB=0))
-        ax.text((x_from + x_to) / 2, y + 0.13, text, fontsize=NOTE + 1,
-                color=INK, ha="center", va="bottom")
-        if note:
-            ax.text((x_from + x_to) / 2, y - 0.12, note, fontsize=NOTE,
-                    color=MUTE, ha="center", va="top")
 
-    # closed: the checkpoint's weights carry into the next round
-    ret(BASE - 1.62, colx(3) + 5.85, colx(1) + 0.55,
-        "the next round starts from these weights", dashed=False)
-    # open: the verdict is recorded and is not applied
-    ret(BASE - 2.52, colx(4) + 2.60, colx(1) + 3.30,
-        "and what the collector goes after next", dashed=True,
-        note="advisory today: the verdict is written into the round's record, "
-             "and nothing reads it back")
+    # the loop itself: solid on the way out, dashed on the way back ----------
+    ax.add_patch(FancyBboxPatch((L, BOTY), R - L, TOPY - BOTY,
+                                boxstyle="round,pad=0,rounding_size=0.55",
+                                facecolor="none", edgecolor=RULE, lw=1.6,
+                                zorder=1))
+    ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=1.8,
+            linestyle=(0, (8, 5)), zorder=2)
+    arrowhead(L + 3.0, BOTY, -0.9, lw=1.8, ls=(0, (8, 5)))
+
+    # five stations on the outward run ---------------------------------------
+    stations = [
+        ("A need arrives", "a detector that works in our own rows"),
+        ("Work out what would answer it", "the agent reads the registry and names what is missing"),
+        ("Go and get it", "harvest from public sources, then audit what came back"),
+        ("Train on what survived", "and score it against a holdout it never saw"),
+        ("Read the result, decide what is next", "and when it cannot decide, ask a larger model"),
+    ]
+    bw, bh = 7.55, 1.05
+    xs = [L + 0.35 + i * ((R - L - 0.70 - bw) / (len(stations) - 1))
+          for i in range(len(stations))]
+    for i, ((title, sub), x) in enumerate(zip(stations, xs)):
+        ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
+                               edgecolor=INK, lw=1.5, zorder=3))
+        ax.text(x + bw / 2, TOPY + 0.20, title, ha="center", va="center",
+                fontsize=STN, fontweight="bold", color=INK, zorder=4)
+        for k, line in enumerate(_wrap(sub, 46)):
+            ax.text(x + bw / 2, TOPY - 0.12 - k * 0.30, line, ha="center",
+                    va="center", fontsize=SUB, color=MUTE, zorder=4)
+        if i:
+            mid = (xs[i - 1] + bw + x) / 2
+            arrowhead(mid - 0.32, TOPY, 0.64)
+
+    # the escalation ladder, inside the loop ---------------------------------
+    rungs = ["a scripted watchdog", "deterministic checks",
+             "a model reads the artifacts", "the same model, given retrieval"]
+    rw, rh, rise, stepx = 7.10, 0.52, 0.60, 0.44
+    # centred in the interior. Hung under the last station it sat on top of
+    # that station's own box and left the left two thirds of the loop empty.
+    rx = L + (R - L) * 0.575
+    for k, name in enumerate(rungs):
+        y = 1.30 + k * rise
+        top = k == len(rungs) - 1
+        ax.add_patch(Rectangle((rx - k * stepx, y), rw, rh,
+                               facecolor=BLUE if top else WHITE,
+                               edgecolor=BLUE if top else INK,
+                               lw=2.0 if top else 1.3, zorder=3))
+        ax.text(rx - k * stepx + 0.24, y + rh / 2, name, fontsize=LAD,
+                va="center", ha="left", color=WHITE if top else INK,
+                fontweight="bold" if top else "normal", zorder=4)
+    ladder_top = 1.30 + 3 * rise + rh
+    # below the station row, not over it: a positive rad on a right-to-left
+    # arrow bulges upward and this one arced across the station before it
+    ax.add_patch(FancyArrowPatch((xs[-1] + 1.10, TOPY - bh / 2 - 0.04),
+                                 (rx - 3 * stepx + rw - 0.60, ladder_top + 0.08),
+                                 arrowstyle="-|>", mutation_scale=18, lw=1.7,
+                                 color=INK, zorder=4,
+                                 connectionstyle="arc3,rad=-0.28"))
+    ax.text(rx + rw + 0.35, 1.30 + 1.5 * rise + rh / 2, "escalate\nwhile stuck",
+            fontsize=LAD, color=INK, ha="left", va="center",
+            fontweight="bold", linespacing=1.25)
+
+    # what the dashed run means ----------------------------------------------
+    ax.text(L + (R - L) * 0.24, BOTY + 0.30,
+            "what the agent decided goes back to what it asks for next",
+            fontsize=EDGE, color=INK, ha="center", va="bottom")
+    ax.text(L + (R - L) * 0.24, BOTY - 0.26,
+            "dashed: today that decision is written into the round's record "
+            "and nothing reads it back. Closing this edge is the work.",
+            fontsize=SUB, color=MUTE, ha="center", va="top")
 
     return save(fig, "x_algorithm",
-                "One round, as states: each column redraws the field of the column before it and "
-                "changes only what that step changed -- nine of the robot's own frames, then what "
-                "the collector harvested, then the same field with everything that failed the "
-                "label-precision audit left as an outline, then what is left becoming a "
-                "checkpoint. Review is a staircase because rank is the point: each rung reads the "
-                "one below it and may overrule it. The loop closes on weights, drawn solid: the "
-                "next round starts from the last round's, which is the chain this project "
-                "measured as the cause of its own decline. It does NOT close on judgement, drawn "
-                "dashed: the verdict is written into the round's record and nothing reads it "
-                "back. Closing that edge is the work. The collector and the trainer are hatched "
-                "because a stop-loss paused them on 2026-08-29.")
+                "The loop an agent runs to answer a need, drawn as a loop. A need arrives, the "
+                "agent works out what data would answer it, goes and gets it, trains on what "
+                "survives the audit and scores it, then reads its own result and decides what to "
+                "ask for next. When it cannot decide it climbs the ladder inside the loop, each "
+                "rung reading the one below it and free to overrule it. The outward run is solid "
+                "because it runs unattended today. The return run is dashed because it is the one "
+                "edge the platform has not closed: the decision is recorded and nothing reads it "
+                "back, and closing it is the work this poster is about.")
+
+
+def _wrap(text, n):
+    import textwrap
+    return textwrap.wrap(text, n)
 
 
 # ------------------------------------------------------- the four projects
@@ -748,7 +688,7 @@ def projects():
             tx, tw_chars = pw + 0.045, int((cell_w_in * (1 - pw - 0.045) - 0.6) * 72 / (BLURB * 0.50))
             y = ytop - 0.02
         elif lay == "pair":
-            ph = 2.58 / ax_h_in
+            ph = 2.30 / ax_h_in
             half = (1.0 - 0.012) / 2.0
             _pic(ax, pr["photo"], (0.0, ytop - ph, half, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5))
@@ -767,8 +707,8 @@ def projects():
             ax.text(tx, y, ln, fontsize=BLURB, color=INK, va="top")
             y -= step
     return save(fig, "q_projects",
-                "Four projects on one platform. Each was opened the same way, sends through the same "
-                "ingest contract, and is trained and evaluated by the same agents.")
+                "Every project on the platform was opened the same way, sends through the same ingest "
+                "contract, and is trained and evaluated by the same agents.")
 
 
 # ------------------------------------------------------------- the model ledger

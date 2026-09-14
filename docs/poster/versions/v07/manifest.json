@@ -1,0 +1,83 @@
+{
+ "version": "v07",
+ "note": "project blurbs say what each thing is; algorithm is a loop with no counts or dates; six label collisions fixed",
+ "commit": "0debb4f",
+ "decks": [
+  {
+   "look": "navy",
+   "pptx": "v07_navy.pptx",
+   "small": "v07_navy_small.pptx",
+   "body_pt": 24.4,
+   "heading_pt": 34.8,
+   "type_scale": 1.16,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "sources",
+    "families",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  },
+  {
+   "look": "pale",
+   "pptx": "v07_pale.pptx",
+   "small": "v07_pale_small.pptx",
+   "body_pt": 24.4,
+   "heading_pt": 34.8,
+   "type_scale": 1.16,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "sources",
+    "families",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  }
+ ]
+}

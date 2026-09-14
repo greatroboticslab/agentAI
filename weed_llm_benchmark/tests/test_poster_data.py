@@ -94,6 +94,20 @@ def main():
             check("%s: grounded recall does not exceed recall" % key, g <= r + 1e-9,
                   "%.3f > %.3f" % (g, r))
 
+    # A duplicated top-level name in poster_data. Three separate edits to this
+    # file have appended a second PROJECTS block above the first, and Python
+    # keeps the LAST one, so the poster silently kept printing the old text
+    # while the source showed the new. Nothing on screen says which one won.
+    try:
+        import re
+        src = (POSTER / "poster_data.py").read_text()
+        names = re.findall(r"^([A-Z_][A-Z0-9_]*)\s*=\s*[\[{]", src, re.M)
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        check("no top-level name in poster_data.py is defined twice", not dupes,
+              ", ".join(dupes))
+    except Exception as exc:
+        print("  skip  duplicate-name check (%s)" % exc)
+
     # The defect that is invisible until it is printed.
     try:
         from PIL import Image

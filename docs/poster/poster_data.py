@@ -395,129 +395,47 @@ PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
 # because nothing has been uploaded to it, and the panel says that rather than
 # borrowing a picture from somewhere else.
 PROJECTS = [
-    # An introduction, not a status board. Done / Now / Open was a
-    # project-management table: three labels down the side of a picture,
-    # repeated four times, telling a visitor nothing about what the thing IS.
-    # A poster introduces. Every caveat the table carried is still here, in the
-    # sentence where it belongs.
+    # What each project IS and what it is FOR. Counts are not an introduction:
+    # a holdout size and a parameter count tell a visitor nothing about why the
+    # work exists, and a rover described by how many frames it has filed is a
+    # rover nobody has explained. The one count kept is the size of the weed
+    # corpus, because the scale of the collection IS the claim there.
     #   top   picture across the top, text under it
     #   side  square picture on the left, text beside it
     #   pair  two pictures across the top, text under them
     {"key": "weed", "name": "Weed Detection", "layout": "top",
      "photo": "u_detect_4.jpg", "crop": 0.5, "w": 10.2,
-     "blurb": "A detector for twelve weed species in cotton. Twenty-seven models were trained or "
-              "benchmarked against one sealed 1,977-image holdout, and the smallest that held its "
-              "accuracy is the one the robots carry: 2.6 M parameters, running on live frames. "
-              "What it cannot do yet is report recall on those frames, because none of them is "
-              "labelled."},
+     "blurb": "Two agents work the same corpus without being asked. One goes out to public "
+              "sources, brings weed imagery back and audits what it brought; the other trains a "
+              "detector on whatever survives the audit and scores it. The registry behind them "
+              "holds more than 150,000 labelled weed images, and the detector that comes out is "
+              "small enough to ride on the robots themselves."},
 
     {"key": "241_robot", "name": "241 Robot", "layout": "side",
      "photo": "r241_robot.jpg", "crop": 0.50, "w": 12.4,
-     "blurb": "A tracked rover that drives crop rows and streams 640 x 360 camera, GPS and two "
-              "IMUs straight into the platform: 2,238 frames over 17 drives and 342 m of track. A "
-              "signed-in user opens its project and drives it from a plain browser, and 1,389 "
-              "joystick commands have gone through that path. It has been off the network since "
-              "2026-08-28, and the platform answers a drive request today with its offline page."},
+     "blurb": "A tracked rover built for the row: narrow enough to turn inside one and tough "
+              "enough to cross the beds between them, so it can reach parts of a field a tractor "
+              "cannot. It carries a camera, GPS and two inertial units and streams all of them "
+              "live into the platform. That stream is what an autonomous-driving model for the "
+              "field is trained on, and a signed-in user drives the rover from a plain browser."},
 
     {"key": "laser_cart", "name": "Laser Cart", "layout": "side",
      "photo": "lasercar_field.jpg", "fallback": "lc_front.jpg", "crop": 0.5, "w": 12.4,
-     "blurb": "A galvanometer laser on a wheeled frame, with one camera down over the work zone "
-              "and one looking forward. It has sent 427 frames over 8 drives, each batch carrying "
-              "laser state, vehicle telemetry and the cart's own detections. The platform records "
-              "the cart; its own operator drives it. There is no drive relay, no position sensor, "
-              "and the platform has never fired the laser."},
+     "blurb": "A twin-laser weeder. A YOLO detector finds the weed in the frame, the two "
+              "galvanometer lasers are aimed at it and fired, and the weed is killed where it "
+              "stands -- no chemical, and nothing touches the crop beside it. One camera looks "
+              "down over the work zone and one looks forward, and both stream into the platform "
+              "while the cart's own operator drives and fires it."},
 
     {"key": "humanoid_robot", "name": "Humanoid and Quadruped", "layout": "pair",
      "photo": "humanoid_dog.jpg", "photo2": "team_field.jpg", "crop": 0.5, "w": 11.4,
-     "blurb": "A humanoid and a quadruped, both out on the farm with the team. The project is "
-              "open and takes the same ingest contract the rover and the cart use. Nothing "
-              "either of them recorded has reached the platform yet."},
-]
-
-# --- the deployed checkpoint, re-evaluated ------------------------------------
-# The ledger's 0.8755 +/- 0.0029 is the three-seed mean read out of Ultralytics'
-# results.csv at each run's best epoch -- and the sealed holdout doubles as the
-# validation set during training, so a best-epoch figure is selected on the same
-# images it is reported on. This is the same checkpoint re-run over all 1,977
-# images as one plain inference pass, which is what the detection plate shows.
-# The two differ by 0.0201, inside the 0.0239 cross-evaluator offset this
-# project measured elsewhere.
-DEPLOYED = {
-    "seed": 102,
-    "weights": "cwd12_yolo11n_s102.pt",
-    "n_images": 1977,
-    "map50": 0.9168,
-    "map50_95": 0.8554,
-    "conf": 0.35,
-    "ledger_mean": "0.8755 \u00b1 0.0029",
-    "gap": 0.0201,
-    "src": "results/framework/s3_tta_ceiling/plain_s102.json (n_images 1977, "
-           "data_yaml cwd12_sealed.yaml); ledger row from s3_yolo11n/s10{1,2,3}/results.csv",
-}
-
-# --- the deployed checkpoint, per species -------------------------------------
-# From the same plain inference pass as DEPLOYED, so the per-class numbers and
-# the detection plate describe one run rather than two. n is ground-truth
-# instances in the sealed holdout and sums to HOLDOUT["instances"]; an earlier
-# version of this figure read a different file and printed a 0.214 spread
-# against this pass's 0.247.
-PER_SPECIES = [
-    ("Morningglory", 0.7154, 349),
-    ("Goosegrass", 0.7530, 320),
-    ("Eclipta", 0.7988, 353),
-    ("SpottedSpurge", 0.8323, 42),
-    ("Nutsedge", 0.8467, 315),
-    ("Sicklepod", 0.8500, 76),
-    ("PalmerAmaranth", 0.8895, 278),
-    ("PricklySida", 0.8946, 180),
-    ("Carpetweeds", 0.9036, 688),
-    ("Crabgrass", 0.9036, 456),
-    ("Purslane", 0.9141, 109),
-    ("Ragweed", 0.9627, 91),
+     "blurb": "A humanoid and a quadruped, taken out to the farm to record where wheels do not "
+              "go. Their project is already open and takes the same ingest contract the rover and "
+              "the cart use, so the day either of them opens a session it is a governed dataset "
+              "like any other."},
 ]
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
-
-# --- the deployed checkpoint, re-evaluated ------------------------------------
-# The ledger's 0.8755 +/- 0.0029 is the three-seed mean read out of Ultralytics'
-# results.csv at each run's best epoch -- and the sealed holdout doubles as the
-# validation set during training, so a best-epoch figure is selected on the same
-# images it is reported on. This is the same checkpoint re-run over all 1,977
-# images as one plain inference pass, which is what the detection plate shows.
-# The two differ by 0.0201, inside the 0.0239 cross-evaluator offset this
-# project measured elsewhere.
-DEPLOYED = {
-    "seed": 102,
-    "weights": "cwd12_yolo11n_s102.pt",
-    "n_images": 1977,
-    "map50": 0.9168,
-    "map50_95": 0.8554,
-    "conf": 0.35,
-    "ledger_mean": "0.8755 \u00b1 0.0029",
-    "gap": 0.0201,
-    "src": "results/framework/s3_tta_ceiling/plain_s102.json (n_images 1977, "
-           "data_yaml cwd12_sealed.yaml); ledger row from s3_yolo11n/s10{1,2,3}/results.csv",
-}
-
-# --- the deployed checkpoint, per species -------------------------------------
-# From the same plain inference pass as DEPLOYED, so the per-class numbers and
-# the detection plate describe one run rather than two. n is ground-truth
-# instances in the sealed holdout and sums to HOLDOUT["instances"]; an earlier
-# version of this figure read a different file and printed a 0.214 spread
-# against this pass's 0.247.
-PER_SPECIES = [
-    ("Morningglory", 0.7154, 349),
-    ("Goosegrass", 0.7530, 320),
-    ("Eclipta", 0.7988, 353),
-    ("SpottedSpurge", 0.8323, 42),
-    ("Nutsedge", 0.8467, 315),
-    ("Sicklepod", 0.8500, 76),
-    ("PalmerAmaranth", 0.8895, 278),
-    ("PricklySida", 0.8946, 180),
-    ("Carpetweeds", 0.9036, 688),
-    ("Crabgrass", 0.9036, 456),
-    ("Purslane", 0.9141, 109),
-    ("Ragweed", 0.9627, 91),
-]
+PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
 
 # --- what the platform itself does, counted on the live box ------------------
