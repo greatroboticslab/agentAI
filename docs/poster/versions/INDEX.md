@@ -10,3 +10,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v06** (0debb4f) — projects say what each is and what it is for; algorithm redrawn as a loop with no counts or dates — body 24.4 pt, 8 blocks
 - **v07** (0debb4f) — project blurbs say what each thing is; algorithm is a loop with no counts or dates; six label collisions fixed — body 24.4 pt, 8 blocks
 - **v08** (d65cacd) — algorithm fills its frame at 24 pt; audit fixes: wrong denominator, arrow reading backwards, five strikethroughs, a lost ledger row — body 25.6 pt, 8 blocks
+- **v09** (56f175c) — footer no longer runs off the sheet: caption height is measured, not a constant — body 22.1 pt, 9 blocks

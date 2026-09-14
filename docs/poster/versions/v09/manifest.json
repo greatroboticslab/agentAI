@@ -1,0 +1,83 @@
+{
+ "version": "v09",
+ "note": "footer no longer runs off the sheet: caption height is measured, not a constant",
+ "commit": "56f175c",
+ "decks": [
+  {
+   "look": "navy",
+   "pptx": "v09_navy.pptx",
+   "small": "v09_navy_small.pptx",
+   "body_pt": 22.1,
+   "heading_pt": 31.5,
+   "type_scale": 1.05,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder",
+    "control"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate"
+   ]
+  },
+  {
+   "look": "pale",
+   "pptx": "v09_pale.pptx",
+   "small": "v09_pale_small.pptx",
+   "body_pt": 22.1,
+   "heading_pt": 31.5,
+   "type_scale": 1.05,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder",
+    "control"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate"
+   ]
+  }
+ ]
+}

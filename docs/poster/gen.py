@@ -26,13 +26,13 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from deck import Deck, D, W, H, MARG                       # noqa: E402
+from deck import Deck, D, W, H, MARG, CAPS                 # noqa: E402
 from pptx.enum.text import PP_ALIGN                        # noqa: E402
 import styles                                              # noqa: E402
 
 C, L2 = D.CENSUS, D.LEDGER
 L = L2
-FOOT_H = 2.55
+FOOT_H = 2.55          # only a floor now; foot_h() measures the real thing
 
 SLOT_OF_WIDTH = {11.6: "column", 22.4: "centre", 46.4: "full"}
 FIGW = {}
@@ -364,6 +364,23 @@ class Poster(object):
             y += d.dz["sec_gap"] * 0.5
         return y
 
+    def foot_h(self):
+        """How tall the footer actually is at this type tier.
+
+        It was a constant, and the type tier is not: at body 25.6 pt the three
+        caveat blocks needed more than the 2.55 in reserved for them and ran
+        off the bottom of the sheet, with only their first line printed.
+        """
+        d = self.d
+        ids = [f for f in FOOTER if f in self.lib][:3]
+        if not ids:
+            return FOOT_H
+        fw = (d.FULL[1] - 1.0) / 3.0
+        size = d.dz["caption"]
+        h = max(d.h_est("%s. %s" % (self.lib[s]["heading"], self.lib[s]["body"]),
+                        fw, size, 1.22) for s in ids)
+        return max(FOOT_H, h + 0.70)
+
     def closing_h(self):
         """How tall the closing block will be, so the columns can stop above it."""
         d = self.d
@@ -490,7 +507,14 @@ class Poster(object):
             fp = os.path.join(d.FIG, f + ".png")
             if os.path.exists(fp):
                 im = Image.open(fp)
-                h += w * im.size[1] / float(im.size[0]) + 0.76
+                # Measure the caption. A flat 0.76 in allowance was two and a
+                # half inches short once e_supervision's caption grew to five
+                # lines, so the column was estimated at 28.8 and drawn at 31.2
+                # and the footer went off the bottom of the sheet.
+                cap = CAPS.get(f, "")
+                cs = d.dz["caption"]
+                cap_h = d.h_est("Figure 9.  " + cap, w, cs, 1.18) + 0.40
+                h += w * im.size[1] / float(im.size[0]) + max(0.76, cap_h)
         return h + d.h_est(s["body"], tw, d.dz["body"], 1.22, 10)
 
     def _mtsu_layout(self, flow, n, COL, draw):
@@ -507,7 +531,7 @@ class Poster(object):
         # off the finished sheet.
         y0 = (self.band(self.mtsu_kpi(d.top), fig_no) if draw
               else self._mtsu_top_real())
-        limit = H - FOOT_H - 0.95 - self.closing_h() - self.tail_band_h()
+        limit = H - self.foot_h() - 0.95 - self.closing_h() - self.tail_band_h()
         avail = limit - y0
 
         heights = []
@@ -800,7 +824,7 @@ class Poster(object):
                 self.dropped.append(sid)
 
         y = self.closing(self.tail_band(max(ends) + 0.50, fig_no))
-        y = max(y + 0.40, H - FOOT_H - 0.35)
+        y = max(y + 0.40, H - self.foot_h() - 0.35)
         d.rect(FULL[0], y - 0.25, FULL[1], 0.022, fill=d.c["rule"])
         fw = (FULL[1] - 1.0) / 3.0
         for i, sid in enumerate([f for f in FOOTER if f in self.lib][:3]):
@@ -886,7 +910,7 @@ class Poster(object):
             cols, self.figless = assign(live)
             fig_no[0] = 1
             y0 = self.band(self.hero(fig_no), fig_no)
-            limit = H - FOOT_H - 0.95 - self.closing_h() - self.tail_band_h()
+            limit = H - self.foot_h() - 0.95 - self.closing_h() - self.tail_band_h()
             ends = []
             for ci, ids in enumerate(cols):
                 x, w = COL[ci]
@@ -957,7 +981,7 @@ class Poster(object):
                 break
 
         y = self.closing(self.tail_band(max(ends) + 0.55, fig_no))
-        y = max(y + 0.45, H - FOOT_H - 0.35)
+        y = max(y + 0.45, H - self.foot_h() - 0.35)
         d.rect(FULL[0], y - 0.25, FULL[1], 0.022, fill=d.c["rule"])
         fw = (FULL[1] - 1.0) / 3.0
         for i, sid in enumerate([f for f in FOOTER if f in self.lib][:3]):
