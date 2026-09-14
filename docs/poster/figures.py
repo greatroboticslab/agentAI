@@ -404,8 +404,10 @@ def supervision():
     d14 = pt("L3@qwen3:14b")["r"] - pt("L2@qwen3:14b")["r"]
     return save(fig, "e_supervision",
                 "(e) Recall and (f) grounded recall on one frozen corpus of real incidents from "
-                "our own record, scored by our own scorer. Tail: model on raw artifacts; head: "
-                "same model with retrieval. Dotted arrow: ends scored on different cases.")
+                "our own record, scored by our own scorer. Tail: the model on the artifacts with "
+                "the twelve checks' findings removed; head: the same model handed them. The dotted "
+                "line, no arrowhead, marks a pair whose ends were scored on different cases -- the "
+                "27 B's head stands on 57 incidents against its tail's 114.")
 
 
 # --------------------------------------------------- photographic plates
@@ -632,7 +634,7 @@ def algorithm():
     rungs = [("a scripted watchdog", "shield"),
              ("deterministic checks", "checks"),
              ("a model reads the artifacts", "read"),
-             ("the same model, given retrieval", "retrieve")]
+             ("the same model, handed those checks", "retrieve")]
     rw, rh, rise, stepx = 6.50, 0.74, 0.30, 5.55
     rx0, ry0 = 19.90, 0.52
     for k, (name, icon) in enumerate(rungs):

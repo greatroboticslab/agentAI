@@ -34,7 +34,7 @@
    "id": "robots_today",
    "theme": "robots-connected",
    "heading": "The Rover and the laser robot both report in",
-   "body": "The Rover runs on tracks and streams camera, GPS and two IMUs. The Laser Weed Control Robot carries a galvanometer laser, a down camera over the work zone and a forward camera.",
+   "body": "The Rover is a four-wheel skid-steer streaming camera, GPS and two inertial units. The Laser Weed Control Robot carries two galvanometer lasers on independent channels, a down camera over the work zone and a forward camera.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -236,7 +236,7 @@
    "id": "supervisor",
    "theme": "iterating-agents-brain",
    "heading": "Grounded recall separates the reviewers",
-   "body": "Escalating is worth it, and the reason is grounding rather than size: retrieval is worth +0.149 recall to the 27 B and +0.012 to the 14 B.",
+   "body": "Escalating is worth it, and what it buys is grounding rather than size: handing the cheap tier's own findings to the model is worth +0.149 recall to the 27 B and +0.012 to the 14 B.",
    "figure": "e_supervision",
    "status": "built_but_off",
    "width": "centre",
@@ -507,7 +507,7 @@
    "figure": "none",
    "status": "built_and_running",
    "heading": "A cheap reviewer, and a bigger one above it when it is stuck",
-   "body": "Review runs in tiers: a scripted watchdog, twelve deterministic checks, a model reading the raw artifacts, then the same model given retrieval. On 149 frozen cases the scripted watchdog returned no decision at all."
+   "body": "Review runs in tiers: a scripted watchdog, twelve deterministic checks, a model reading the artifacts with those checks hidden, then the same model handed them. On 149 frozen cases the scripted watchdog returned no decision at all."
   },
   {
    "id": "algorithm",

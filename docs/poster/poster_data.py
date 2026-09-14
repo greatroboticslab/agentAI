@@ -411,7 +411,7 @@ PROJECTS = [
     {"key": "241_robot", "name": "Rover", "layout": "side",
      "photo": "r241_robot.jpg", "crop": 0.50, "w": 12.4,
      "blurb": 
-              "A tracked rover narrow enough to turn inside a row and reach where a tractor cannot. Camera, GPS and two inertial units stream live; the stream trains a driving model."},
+              "A four-wheel skid-steer the width of a crop row, carrying a Jetson, a Raspberry Pi and its own battery. Camera, GPS and two inertial units stream live over one API key."},
 
     {"key": "laser_cart", "name": "Laser Weed Control Robot", "layout": "side",
      "photo": "lasercar_field.jpg", "fallback": "lc_front.jpg", "crop": 0.5, "w": 12.4,
