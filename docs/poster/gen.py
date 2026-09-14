@@ -516,6 +516,37 @@ class Poster(object):
         f = self.lib[sid].get("figure") or "none"
         return f != "none" and abs(FIGW_IN.get(f, 0) - w) < 0.02
 
+    # The platform is reachable from outside the lab -- Tailscale Funnel is on
+    # for lab-b660m-c, verified with `tailscale funnel status` and by resolving
+    # the name against a public resolver. The code points at /login rather than
+    # at / because / answers an anonymous request with a JSON 401, and a visitor
+    # who scans a poster and gets `{"error":"unauthorized"}` is worse served
+    # than one who scans nothing. /login is a real page: it names the platform,
+    # says what it does, and says what signing in needs.
+    QR_URL  = "lab-b660m-c.tailfa6424.ts.net"
+    QR_FILE = "qr_platform.png"
+
+    def qr_card(self, x, y, w):
+        """The code, and what a stranger gets for scanning it. Returns the height."""
+        import os
+        from pptx.util import Inches
+        d = self.d
+        p = os.path.join(HERE, "photos", self.QR_FILE)
+        if not os.path.exists(p):
+            self.dropped.append("qr_card:missing-" + self.QR_FILE)
+            return 0.0
+        pad = MTSU_PAD
+        side = 2.45
+        d.slide.shapes.add_picture(p, Inches(x + pad), Inches(y),
+                                   width=Inches(side), height=Inches(side))
+        tx = x + pad + side + 0.34
+        tw = w - pad - (tx - x)
+        yy = d.sub(tx, y + 0.08, tw, "The platform is live; scan to open it")
+        yy = d.body(tx, yy, tw, self.QR_URL, after=4)
+        d.body(tx, yy, tw, "Signing in needs an institutional Google account.",
+               size=d.dz["caption"], color=d.c["mute"], after=0)
+        return side
+
     def mtsu_block(self, x, y, w, sid, fig_no):
         """One sub-headed block inside a column panel.
 
@@ -970,6 +1001,15 @@ class Poster(object):
         for sid in spilled:
             if sid not in self.dropped:
                 self.dropped.append(sid)
+
+        # The corner the columns leave empty is where the code goes -- it is the
+        # one place on the sheet a reader can take the platform away with them.
+        foot = max(ends)
+        free = foot - ends[0]
+        if free >= 3.00:
+            self.qr_card(COL[0][0], ends[0] + 0.34, COL[0][1])
+        elif free > 0:
+            self.dropped.append("qr_card:only-%.2f-in-free" % free)
 
         y = self.closing(self.tail_band(max(ends) + 0.50, fig_no))
         foot_ids = [f for f in FOOTER if f in self.lib][:3]
