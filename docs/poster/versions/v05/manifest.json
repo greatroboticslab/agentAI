@@ -1,0 +1,83 @@
+{
+ "version": "v05",
+ "note": "full model names on every figure; algorithm shows the loop closed on weights and open on judgement",
+ "commit": "a7ced1b",
+ "decks": [
+  {
+   "look": "navy",
+   "pptx": "v05_navy.pptx",
+   "small": "v05_navy_small.pptx",
+   "body_pt": 22.1,
+   "heading_pt": 31.5,
+   "type_scale": 1.05,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  },
+  {
+   "look": "pale",
+   "pptx": "v05_pale.pptx",
+   "small": "v05_pale_small.pptx",
+   "body_pt": 22.1,
+   "heading_pt": 31.5,
+   "type_scale": 1.05,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  }
+ ]
+}

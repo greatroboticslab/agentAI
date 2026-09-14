@@ -129,7 +129,7 @@ def vlm():
     ax.set_yticklabels([r["model"].replace(" / ", "/").replace(
         "G-DINO/Molmo/Llama-Vision/Moondream/LLaVA", "5 models with no grounding")
         for r in rows], fontsize=9.5)
-    ax.set_xlim(0, 1.04); ax.set_xlabel("mAP$_{50}$, 848-image cwd12 test split")
+    ax.set_xlim(0, 1.04); ax.set_xlabel("mAP$_{50}$, 848-image CottonWeedDet12 test split")
     despine(ax, left=False)
     ax.xaxis.grid(True, color=RULE, lw=0.6); ax.set_axisbelow(True)
     ax.tick_params(axis="y", length=0)
@@ -301,9 +301,10 @@ def supervision():
                 annotation_clip=False,
                 path_effects=[pe.withStroke(linewidth=2.5, foreground=WHITE)])
 
-    # Short labels, placed tight to their own marks. Three of the four arms sit
-    # inside a false-alarm band 0.12 wide, so anything longer than a size and a
-    # denominator collides with a neighbour's interval.
+    # Full model names, not parameter counts. "27 B" is not something a reader
+    # can check against anything, and a figure in a journal names the thing it
+    # measured. The name goes on its own line so the label stays narrow: three
+    # of the four arms sit inside a false-alarm band 0.12 wide.
     style = {"Qwen2.5-7B":    (WARN, (0.430, 0.875), "left", "bottom"),
              "Qwen3-14B":     (BLUE, (0.660, 0.760), "left", "bottom"),
              "Qwen3.8-27B":   (NAVY, (0.305, 0.440), "left", "center"),
@@ -312,7 +313,7 @@ def supervision():
         c, (lx, ly), ha, va = style[m["name"]]
         p2 = pt(m["l2"])
         mark(p2, p2["fa"], p2["r"], c)
-        lab = "%s   n = %d" % (m["size"], p2["n"])
+        lab = "%s\nn = %d" % (m["name"], p2["n"])
         if m["l3"]:
             p3 = pt(m["l3"])
             mark(p3, p3["fa"], p3["r"], c)
@@ -326,11 +327,11 @@ def supervision():
                                             shrinkA=8, shrinkB=8,
                                             connectionstyle="arc3,rad=-0.18"),
                             zorder=4)
-                lab = "%s   n = %d" % (m["size"], p3["n"])
+                lab = "%s\nn = %d" % (m["name"], p3["n"])
             else:
                 ax.plot([p2["fa"], p3["fa"]], [p2["r"], p3["r"]], ls=(0, (2, 2)),
                         lw=1.0, color=c, zorder=4)
-                lab = "%s   n = %d" % (m["size"], p3["n"])
+                lab = "%s\nn = %d" % (m["name"], p3["n"])
         ax.text(lx, ly, lab, ha=ha, va=va, fontsize=ANNOT, color=c,
                 linespacing=1.25,
                 path_effects=[pe.withStroke(linewidth=2.2, foreground=WHITE)])
@@ -377,9 +378,10 @@ def supervision():
     ax2.text(-0.42, 0.055, "solid   and quoted a line that resolves",
              fontsize=ANNOT, color=MUTE)
     ax2.set_xticks(xs)
-    ax2.set_xticklabels([m["size"] for m in S["models"]], fontsize=TICK)
+    ax2.set_xticklabels([m["name"] for m in S["models"]], fontsize=TICK - 1.5,
+                        rotation=18, ha="right")
     ax2.set_xlim(-0.5, len(xs) - 0.10)
-    ax2.set_xlabel("reviewer size")
+    ax2.set_xlabel("reviewer")
     despine(ax2); hline_grid(ax2); panel(ax2, "f")
 
     g7 = pt("L3@qwen2.5:7b"); g27 = pt("L3@qwen3.8:27b")
@@ -502,7 +504,7 @@ def algorithm():
     # Sized to be read from two metres, not from a laptop. The first draft set
     # its headers at 17 pt against a 22 pt body and its tiles at 0.30 in, so the
     # one diagram on the sheet was also the smallest type on it.
-    W, H = 46.4, 5.70
+    W, H = 46.4, 6.35
     HEAD, NOTE, RUNG, LEAD = 24.0, 17.0, 18.0, 17.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
@@ -512,7 +514,7 @@ def algorithm():
     NCOL, CW, GAP, X0 = 5, 7.60, 1.90, 0.55
     TOP = H - 0.45                     # baseline the action labels sit on
     FIELD = TOP - 0.80                 # top of the drawn state
-    BASE = 2.15                        # floor of the drawn state
+    BASE = 2.95                        # floor of the drawn state
     SIZE, PAD, COLS = 0.50, 0.08, 9
 
     def colx(i):
@@ -606,29 +608,49 @@ def algorithm():
     ax.text(rx - 0.72, BASE + 1.15, "stuck", rotation=90, fontsize=RUNG,
             color=INK, ha="center", va="center")
 
-    # the one arrowhead on the plate: the return path -------------------------
-    # A bracket around the outside of the columns. Run between them it crossed
-    # the notes under the first column.
-    ay = 0.42
-    xr, xl = W - 0.22, 0.22
-    ax.plot([xr, xr], [BASE + 0.30, ay], color=INK, lw=1.5, zorder=4)
-    ax.plot([xr, xl], [ay, ay], color=INK, lw=1.5, zorder=4)
-    ax.annotate("", xy=(xl, BASE + 0.30), xytext=(xl, ay),
-                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5,
-                                shrinkA=0, shrinkB=0))
-    ax.text(W / 2, ay + 0.16,
-            "the next round starts from the last round's weights",
-            fontsize=NOTE + 1, color=INK, ha="center", va="bottom")
+    # the two return paths -- the loop, and where it is not closed ----------
+    # A single return edge said "the next round starts from the last round's
+    # weights", which is the warm-start chain this project MEASURED as the
+    # cause of the decline -- a bug, not the architecture. The platform has two
+    # return edges and they are in different states, and drawing only the
+    # connected one hid the thing the poster is actually about.
+    def ret(y, x_from, x_to, text, dashed, note=""):
+        ls = (0, (7, 5)) if dashed else "-"
+        # the stubs start BELOW the notes; run up to the field they crossed
+        # two lines of text in every column
+        ax.plot([x_from, x_from], [BASE - 1.02, y], color=INK, lw=1.5,
+                linestyle=ls, zorder=4)
+        ax.plot([x_from, x_to], [y, y], color=INK, lw=1.5, linestyle=ls, zorder=4)
+        ax.annotate("", xy=(x_to, BASE - 1.02), xytext=(x_to, y),
+                    arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5,
+                                    linestyle=ls, shrinkA=0, shrinkB=0))
+        ax.text((x_from + x_to) / 2, y + 0.13, text, fontsize=NOTE + 1,
+                color=INK, ha="center", va="bottom")
+        if note:
+            ax.text((x_from + x_to) / 2, y - 0.12, note, fontsize=NOTE,
+                    color=MUTE, ha="center", va="top")
+
+    # closed: the checkpoint's weights carry into the next round
+    ret(BASE - 1.62, colx(3) + 5.85, colx(1) + 0.55,
+        "the next round starts from these weights", dashed=False)
+    # open: the verdict is recorded and is not applied
+    ret(BASE - 2.52, colx(4) + 2.60, colx(1) + 3.30,
+        "and what the collector goes after next", dashed=True,
+        note="advisory today: the verdict is written into the round's record, "
+             "and nothing reads it back")
 
     return save(fig, "x_algorithm",
-                "One round, as states. Each column redraws the field of the column before it and "
-                "changes only what that step changed: nine of the robot's own frames, then what "
+                "One round, as states: each column redraws the field of the column before it and "
+                "changes only what that step changed -- nine of the robot's own frames, then what "
                 "the collector harvested, then the same field with everything that failed the "
-                "label-precision audit left as an outline, then the round that turns what is left "
-                "into a checkpoint. Review is a staircase because rank is the point -- each rung "
-                "reads the one below it. Every stage has run; the collector and the trainer are "
-                "hatched because a stop-loss paused them on 2026-08-29, and what the loop does "
-                "not yet do is decide for itself when to climb.")
+                "label-precision audit left as an outline, then what is left becoming a "
+                "checkpoint. Review is a staircase because rank is the point: each rung reads the "
+                "one below it and may overrule it. The loop closes on weights, drawn solid: the "
+                "next round starts from the last round's, which is the chain this project "
+                "measured as the cause of its own decline. It does NOT close on judgement, drawn "
+                "dashed: the verdict is written into the round's record and nothing reads it "
+                "back. Closing that edge is the work. The collector and the trainer are hatched "
+                "because a stop-loss paused them on 2026-08-29.")
 
 
 # ------------------------------------------------------- the four projects
@@ -1278,7 +1300,7 @@ def funnel():
     ax.axis("off")
     return save(fig, "k_funnel",
                 "One of six audited harvested sources clears the label-precision bar. The audit "
-                "probe reads 1.000 on human-labelled cwd12, so the low scores are the data.")
+                "probe reads 1.000 on human-labelled CottonWeedDet12, so the low scores are the data.")
 
 
 if __name__ == "__main__":
