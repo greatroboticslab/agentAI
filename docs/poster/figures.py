@@ -192,8 +192,10 @@ def ladder():
         a_.set_xticks(xs)
         a_.set_xticklabels(["core\nalone", "+5k", "+15k", "+40k"], fontsize=10)
         despine(a_); hline_grid(a_); panel(a_, lets, inside=True)
-    ax.set_xlabel("harvested images added", labelpad=14)
-    ax2.set_xlabel("harvested images added", labelpad=14)
+    # Below the n row, not through it. At labelpad 14 the axis label sat at the
+    # same height as the per-rung n annotations and the "+40k" one crossed it.
+    ax.set_xlabel("harvested images added", labelpad=36)
+    ax2.set_xlabel("harvested images added", labelpad=36)
     for i, n in enumerate(An):
         ax.annotate("n = %d" % n, (xs[i], 0), xytext=(0, -42),
                     textcoords="offset points", xycoords=("data", "axes fraction"),

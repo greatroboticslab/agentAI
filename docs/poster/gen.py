@@ -530,12 +530,14 @@ class Poster(object):
             f = "none"
         if f != "none" and not f.startswith("NEW") and abs(FIGW_IN.get(f, 0) - w) < 0.02:
             y = d.figure(x, y + 0.04, w, f, "Figure %d." % fig_no[0]); fig_no[0] += 1
-        body = s["body"]
-        if s.get("status") == "designed_only":
-            body += " This part is a design and has not been built."
-        elif s.get("status") == "built_but_off":
-            body += " This part is built and is switched off today."
-        y = d.body(tx, y, tw, body, after=10)
+        # No status stamp. It appended the SAME eleven words to every block
+        # marked built_but_off, so the sheet carried one sentence twice in one
+        # reading -- a template, not prose -- and on a block that had just shown
+        # a measured result it read as though the result no longer counted. It
+        # was also invisible to mtsu_block_h, which measured the body without
+        # it and under-counted the block by up to a line. What is true about a
+        # block is written into that block, once, in its own words.
+        y = d.body(tx, y, tw, s["body"], after=10)
         return y + 0.26
 
     def mtsu_block_h(self, w, sid):

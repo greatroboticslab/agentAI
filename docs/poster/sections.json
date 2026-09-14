@@ -204,7 +204,7 @@
    "id": "loop",
    "theme": "iterating-agents-brain",
    "heading": "Fifteen rounds ran with nobody in the room",
-   "body": "Two cluster jobs, one collecting and one training, ran against the locked registry. Every round reported success.",
+   "body": "Two cluster jobs, one collecting and one training, ran against the locked registry. Every round reported success. The loop has been switched off since 2026-09-10.",
    "figure": "f_rounds",
    "status": "built_but_off",
    "width": "centre",
