@@ -20,3 +20,5 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v16** (6e99d9b) — dispatch fits the reviewer column; no orphan word in the platform sub-head — body 28.1 pt, 12 blocks
 - **v17** (4d1d503) — professor: Agent Work Flow Diagram titled below, icons in the diagram, bigger band captions, closing band folded into the opening lede — body 28.1 pt, 12 blocks
 - **v18** (591d814) — figure 1 titled like figure 2; footer and closing folded into one lede above the first plate — body 28.1 pt, 14 blocks
+- **v19** (9297a72) — your cut kept, with one reading-the-numbers line put back above the columns — body 29.4 pt, 12 blocks
+- **v20** (9297a72) — sub-heads measured as Arial bold, so a two-line one is not drawn over — body 29.4 pt, 12 blocks

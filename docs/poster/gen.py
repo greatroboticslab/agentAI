@@ -74,6 +74,15 @@ BAND = "projects"
 # good looking diagram is fine." -- Hongbo Zhang.
 BANDS = ["projects", "algorithm"]
 
+# The one rider that applies to every number in the columns below it, set on
+# the line above them instead of in a block of its own. It is not a result and
+# it is not decoration: without it the sheet presents best-epoch-on-validation
+# numbers as clean test numbers, which is the first thing a reviewer finds and
+# the worst way for them to find it.
+RIDER = ("Reading the numbers: every in-domain mAP here is a run's best epoch on a holdout "
+         "that also served as its validation set. Two numbers are withdrawn -- 0.910 leaked, "
+         "and 0.9033 was the best of four runs.")
+
 # A second full-width strip, drawn just above the closing when its plate has no
 # column of its width in this grid -- which is every grid, because it is 46.4 in
 # wide. Six months in order is an article's timeline, and it was the one plate
@@ -359,6 +368,10 @@ class Poster(object):
             if s.get("body"):
                 y = d.body(x, y, w, s["body"], after=10)
             y += d.dz["sec_gap"] * 0.6
+        if RIDER:
+            y = d.body(x, y, w, RIDER, size=d.dz["caption"] + 3,
+                       color=d.c["mute"], after=8)
+            y += 0.10
         return y
 
     def _full_bands(self):
@@ -530,7 +543,9 @@ class Poster(object):
         s, d = self.lib[sid], self.d
         pad = MTSU_PAD
         tw = w - 2 * pad
-        h = d.h_est(s["heading"], tw, d.dz["body"], 1.0) + 0.10 + 0.26
+        # the sub-head is Arial bold at the sub size, not Georgia at body size
+        h = d.h_est(s["heading"], tw - 0.26, d.dz.get("sub", 21), 1.0,
+                    em=d.SUB_EM) + 0.10 + 0.26
         f = s.get("figure") or "none"
         if sid in getattr(self, "_fig_off", ()):
             f = "none"

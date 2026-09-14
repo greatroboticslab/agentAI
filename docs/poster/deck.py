@@ -115,7 +115,7 @@ class Deck(object):
         return tb
 
     # ---- measurement ----------------------------------------------------
-    def h_est(self, s, w, size, spacing=1.22, after=0.0):
+    def h_est(self, s, w, size, spacing=1.22, after=0.0, em=None):
         """Characters per line, from the face actually being set.
 
         Arial runs about 0.50 em per character at these sizes; Times runs 0.44
@@ -123,8 +123,13 @@ class Deck(object):
         12 per cent more lines than the render has, which on a 36 in sheet is
         two inches of phantom height and a section dropped that would have fit.
         """
-        em = {"Times New Roman": 0.442, "Georgia": 0.478,
-              "Arial Narrow": 0.425}.get(self.f["body"], 0.50)
+        # `em` overrides the body face when the text is set in something else.
+        # A sub-head is Arial BOLD at about 0.55 em; measuring it as Georgia at
+        # 0.478 under-counts its lines, and a sub-head that wraps to two was
+        # drawn over by its own paragraph.
+        if em is None:
+            em = {"Times New Roman": 0.442, "Georgia": 0.478,
+                  "Arial Narrow": 0.425}.get(self.f["body"], 0.50)
         cpl = max(14, int((w * 72.0) / (size * em)))
         lines = sum(max(1, -(-len(p) // cpl)) for p in s.split("\n"))
         return lines * size * spacing / 72.0 + after / 72.0
@@ -359,6 +364,9 @@ class Deck(object):
         self.rect(x, y + dz["heading"] / 72.0 * 1.30, w, 0.030, fill=c["accent"])
         return y + dz["heading"] / 72.0 * 1.30 + 0.36
 
+    # Arial bold, measured off the rendered sheet rather than assumed.
+    SUB_EM = 0.55
+
     def sub(self, x, y, w, s):
         if self.look == "mtsu":
             # A 0.14 in accent square, then the sub-head in the accent colour.
@@ -366,7 +374,7 @@ class Deck(object):
             sz = self.dz.get("sub", 21)
             self.tbox(x + 0.26, y, w - 0.26, [(s, sz, True, self.c["accent"])],
                       spacing=1.0, face="Arial")
-            return y + self.h_est(s, w - 0.26, sz, 1.0) + 0.10
+            return y + self.h_est(s, w - 0.26, sz, 1.0, em=self.SUB_EM) + 0.10
         self.tbox(x, y, w, [(s, SUBHEAD, True, self.c["ink"])], spacing=1.0, face=self.f["display"])
         return y + 0.46
 
