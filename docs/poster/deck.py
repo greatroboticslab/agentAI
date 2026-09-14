@@ -388,8 +388,18 @@ class Deck(object):
                   align=PP_ALIGN.JUSTIFY if justify else PP_ALIGN.LEFT)
         return y + self.h_est(s, w, size, spacing, after)
 
-    def figure(self, x, y, w, name, label, caption=None):
-        """Image, then its caption. Returns the new y."""
+    def figure(self, x, y, w, name, label, caption=None, title=None,
+               cap_size=None):
+        """Image, then an optional title line, then its caption.
+
+        `title` sets the plate's name UNDER the drawing, the way a journal
+        titles a figure, instead of as a section heading above it -- which is
+        what a diagram wants and a photographic band does not.
+
+        `cap_size` overrides the caption size. A caption set across 46 inches
+        at the column caption size is a hairline at reading distance; the
+        full-width bands set theirs five points larger.
+        """
         p = os.path.join(self.FIG, name + ".png")
         if not os.path.exists(p):
             self.rect(x, y, w, 2.2, fill=PALE, line=RULE)
@@ -402,7 +412,13 @@ class Deck(object):
         ph = self.slide.shapes.add_picture(p, Inches(x), Inches(y), width=Inches(w))
         y2 = y + ph.height / 914400.0 + 0.12
         text = caption if caption is not None else CAPS.get(name, "")
-        cs = self.dz["caption"]
+        cs = cap_size or self.dz["caption"]
+        if title:
+            ts = cs + 8
+            self.tbox(x, y2 + 0.10, w,
+                      [(title, ts, True, self.c["ink"], 0)], spacing=1.10,
+                      align=PP_ALIGN.CENTER)
+            y2 += self.h_est(title, w, ts, 1.10) + 0.34
         if self.look in ("journal", "mtsu"):
             # "Fig. 4." bold, the caption in the body serif at caption size, both
             # in one paragraph so the lead-in sits on the same line as the text.

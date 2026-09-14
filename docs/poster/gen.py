@@ -87,7 +87,10 @@ TAIL_BANDS = ["detect_grid", "journey"]
 # and twice the lines, for 2.6 in of a 36 in sheet the columns were
 # shedding sections for want of. The second block's claim is inside the
 # first one's paragraph.
-CLOSING = ["vision_platform"]
+# No closing band. It restated the title, the stand-first and the first
+# column's heading a fourth time, in the future tense, for 2.5 in of a 36 in
+# sheet. Its one idea is now the opening band's lede, where it is read.
+CLOSING = []
 
 FOOTER = ["stands", "made", "withdrew"]
 
@@ -340,8 +343,16 @@ class Poster(object):
             f = s.get("figure") or "none"
             if abs(FIGW_IN.get(f, 0) - w) > 0.02:
                 continue
-            y = d.head(x, y, w, s["heading"])
-            y = d.figure(x, y, w, f, "Figure %d." % fig_no[0]); fig_no[0] += 1
+            # A band either carries a section heading above its plate, or it is
+            # a figure with its title underneath, which is what a diagram wants.
+            if not s.get("title_below"):
+                y = d.head(x, y, w, s["heading"])
+                if s.get("lede"):
+                    y = d.body(x, y, w, s["lede"], after=8)
+            y = d.figure(x, y, w, f, "Figure %d." % fig_no[0],
+                         title=(s["heading"] if s.get("title_below") else None),
+                         cap_size=d.dz["caption"] + 5)
+            fig_no[0] += 1
             if s.get("body"):
                 y = d.body(x, y, w, s["body"], after=10)
             y += d.dz["sec_gap"] * 0.6
@@ -702,9 +713,14 @@ class Poster(object):
             fp = os.path.join(d.FIG, f + ".png")
             if abs(FIGW_IN.get(f, 0) - d.FULL[1]) > 0.02 or not os.path.exists(fp):
                 continue
-            y += self._head_h(d, d.FULL[1], s["heading"])
+            if not s.get("title_below"):
+                y += self._head_h(d, d.FULL[1], s["heading"])
+                if s.get("lede"):
+                    y += d.h_est(s["lede"], d.FULL[1], d.dz["body"], 1.22, 8)
             im = Image.open(fp)
             y += d.FULL[1] * im.size[1] / float(im.size[0]) + 0.70
+            if s.get("title_below"):
+                y += (d.dz["caption"] + 13) / 72.0 * 1.10 + 0.44
             if s.get("body"):
                 y += d.h_est(s["body"], d.FULL[1], d.dz["body"], 1.22, 10)
             y += d.dz["sec_gap"] * 0.6

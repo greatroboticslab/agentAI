@@ -478,6 +478,69 @@ def cart_grid():
 
 
 # ----------------------------------------------------------- the algorithm
+def _glyph(ax, kind, cx, cy, s, color=INK, lw=2.4, accent=None):
+    """One line-drawn icon, centred on (cx, cy) inside a square of side s.
+
+    Hongbo Zhang, on the diagram: "Within diagram, 需要用图标加上文字."
+    Drawn rather than imported: an icon font would not survive the PNG round
+    trip at 300 dpi, and these are five shapes each. Everything is stroked at
+    one weight so the row reads as one set.
+    """
+    from matplotlib.patches import Circle, Polygon
+    def L(pts, w=lw, col=None):
+        xs = [cx + px * s for px, _py in pts]
+        ys = [cy + py * s for _px, py in pts]
+        ax.plot(xs, ys, color=col or color, lw=w, solid_capstyle="round",
+                solid_joinstyle="round", zorder=6)
+    def C(px, py, r, fill=False, col=None):
+        ax.add_patch(Circle((cx + px * s, cy + py * s), r * s,
+                            facecolor=(col or color) if fill else "none",
+                            edgecolor=col or color, lw=lw, zorder=6))
+
+    if kind == "need":                      # a need arrives -- a target
+        C(0, 0, 0.46); C(0, 0, 0.26); C(0, 0, 0.09, fill=True)
+    elif kind == "plan":                    # work out what would answer it
+        C(-0.10, 0.10, 0.30)
+        L([(0.12, -0.12), (0.44, -0.44)], w=lw * 1.15)
+        L([(-0.44, -0.30), (-0.30, -0.30)])
+        L([(-0.44, -0.46), (-0.02, -0.46)])
+    elif kind == "fetch":                   # go and get it -- into the tray
+        L([(0, 0.48), (0, -0.04)])
+        L([(-0.20, 0.16), (0, -0.06), (0.20, 0.16)])
+        L([(-0.44, -0.20), (-0.44, -0.44), (0.44, -0.44), (0.44, -0.20)])
+    elif kind == "train":                   # train on what survived
+        L([(-0.46, -0.44), (0.46, -0.44)])
+        L([(-0.28, -0.44), (-0.28, -0.08)])
+        L([(0.00, -0.44), (0.00, 0.16)])
+        L([(0.28, -0.44), (0.28, 0.44)])
+    elif kind == "decide":                  # read the result and decide
+        L([(-0.34, 0.46), (0.34, 0.46), (0.34, -0.46), (-0.34, -0.46), (-0.34, 0.46)])
+        L([(-0.18, 0.04), (-0.04, -0.14), (0.20, 0.22)], w=lw * 1.15,
+          col=accent or color)
+    elif kind == "shield":                  # a scripted watchdog
+        L([(-0.32, 0.40), (0.32, 0.40), (0.32, -0.04), (0, -0.44),
+           (-0.32, -0.04), (-0.32, 0.40)])
+    elif kind == "checks":                  # deterministic checks
+        for k, y in enumerate((0.30, 0.00, -0.30)):
+            L([(-0.44, y + 0.04), (-0.32, y - 0.08), (-0.10, y + 0.18)])
+            L([(0.06, y), (0.44, y)])
+    elif kind == "read":                    # a model reads the artifacts
+        L([(-0.30, 0.44), (0.14, 0.44), (0.30, 0.26), (0.30, -0.44),
+           (-0.30, -0.44), (-0.30, 0.44)])
+        L([(-0.14, 0.12), (0.14, 0.12)])
+        L([(-0.14, -0.10), (0.14, -0.10)])
+        L([(-0.14, -0.30), (0.02, -0.30)])
+    elif kind == "retrieve":                # the same model, given retrieval
+        L([(-0.46, -0.42), (-0.46, 0.34)])
+        L([(-0.26, -0.42), (-0.26, 0.34)])
+        L([(-0.06, -0.42), (-0.06, 0.34)])
+        L([(-0.46, -0.42), (0.04, -0.42)])
+        C(0.22, 0.14, 0.22)
+        L([(0.38, -0.02), (0.48, -0.16)])
+    else:
+        raise ValueError("no glyph named %r" % kind)
+
+
 def algorithm():
     """The loop the agent runs to answer a need, drawn as a loop.
 
@@ -501,16 +564,16 @@ def algorithm():
     were shedding sections for want of it.
     """
     from matplotlib.patches import FancyBboxPatch, Rectangle
-    W, H = 46.4, 4.15
+    W, H = 46.4, 4.95
     STN, SUB, LAD, EDGE = 34.0, 24.0, 24.0, 25.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    TOPY, BOTY = 3.22, 0.40
+    TOPY, BOTY = 3.62, 0.40
     L, R = 0.85, W - 0.85
-    bw, bh = 8.05, 1.52
+    bw, bh = 8.05, 2.44
 
     def arrowhead(x, y, dx, color=INK, lw=1.9, ls="-"):
         ax.annotate("", xy=(x + dx, y), xytext=(x, y),
@@ -526,28 +589,30 @@ def algorithm():
     arrowhead(L + 3.2, BOTY, -1.0, lw=2.2, ls=(0, (8, 5)))
 
     stations = [
-        ("A need arrives", "a detector that works in our own rows"),
-        ("Work out what would answer it", "the agent reads the registry and names what is missing"),
-        ("Go and get it", "harvest from public sources, then audit what came back"),
-        ("Train on what survived", "scored against a holdout it never saw"),
-        ("Read the result and decide", "what to ask for next"),
+        ("A need arrives", "a detector that works in our own rows", "need"),
+        ("Work out what would answer it", "the agent reads the registry and names what is missing", "plan"),
+        ("Go and get it", "harvest from public sources, then audit what came back", "fetch"),
+        ("Train on what survived", "scored against a holdout it never saw", "train"),
+        ("Read the result and decide", "what to ask for next", "decide"),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
     fit = int(bw * 72 / (STN * 0.55))
-    over = [t for t, _s in stations if len(t) > fit]
+    over = [t for t, _s, _i in stations if len(t) > fit]
     assert not over, ("station title wider than its box at %g pt (max %d chars): %s"
                       % (STN, fit, over))
     # Two sub-lines is what the box holds; a third prints below its own rule.
-    deep = [t for t, sb in stations if len(_wrap(sb, 40)) > 2]
+    deep = [t for t, sb, _i in stations if len(_wrap(sb, 40)) > 2]
     assert not deep, "station sub-line runs past the box: %s" % deep
-    for i, ((title, sub), x) in enumerate(zip(stations, xs)):
+    top = TOPY + bh / 2
+    for i, ((title, sub, icon), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
                                edgecolor=INK, lw=1.7, zorder=3))
-        ax.text(x + bw / 2, TOPY + 0.31, title, ha="center", va="center",
+        _glyph(ax, icon, x + bw / 2, top - 0.60, 0.92, lw=2.8, accent=BLUE)
+        ax.text(x + bw / 2, top - 1.32, title, ha="center", va="center",
                 fontsize=STN, fontweight="bold", color=INK, zorder=4)
         for k, line in enumerate(_wrap(sub, 40)):
-            ax.text(x + bw / 2, TOPY - 0.14 - k * 0.38, line, ha="center",
+            ax.text(x + bw / 2, top - 1.76 - k * 0.38, line, ha="center",
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
@@ -560,19 +625,23 @@ def algorithm():
     # An arrow from the station into the TOP rung, which is what the first
     # version drew, says the opposite -- that being stuck summons the most
     # expensive reviewer.
-    rungs = ["a scripted watchdog", "deterministic checks",
-             "a model reads the artifacts", "the same model, given retrieval"]
-    rw, rh, rise, stepx = 6.10, 0.56, 0.26, 5.40
-    rx0, ry0 = 20.40, 0.58
-    for k, name in enumerate(rungs):
+    rungs = [("a scripted watchdog", "shield"),
+             ("deterministic checks", "checks"),
+             ("a model reads the artifacts", "read"),
+             ("the same model, given retrieval", "retrieve")]
+    rw, rh, rise, stepx = 6.50, 0.74, 0.30, 5.55
+    rx0, ry0 = 19.90, 0.52
+    for k, (name, icon) in enumerate(rungs):
         x, y = rx0 + k * stepx, ry0 + k * rise
         top = k == len(rungs) - 1
+        ink = WHITE if top else INK
         ax.add_patch(Rectangle((x, y), rw, rh,
                                facecolor=BLUE if top else WHITE,
                                edgecolor=BLUE if top else INK,
                                lw=2.2 if top else 1.5, zorder=3))
-        ax.text(x + rw / 2, y + rh / 2, name, fontsize=LAD,
-                va="center", ha="center", color=WHITE if top else INK,
+        _glyph(ax, icon, x + 0.48, y + rh / 2, 0.50, color=ink, lw=2.1)
+        ax.text(x + 0.88, y + rh / 2, name, fontsize=LAD,
+                va="center", ha="left", color=ink,
                 fontweight="bold" if top else "normal", zorder=4)
     arrowhead(rx0 - 0.95, ry0 + rh / 2, 0.80)
     ax.text(rx0 - 1.20, ry0 + rh / 2, "escalate\nwhile stuck",
@@ -590,7 +659,7 @@ def algorithm():
     # drawing: four lines of prose inside a schematic is a paragraph wearing a
     # figure's clothes.
     lx = L + 8.6
-    ax.text(lx, ry0 + 1.20, "the decision becomes the next need",
+    ax.text(lx, ry0 + 1.30, "the decision becomes the next need",
             fontsize=EDGE, color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",

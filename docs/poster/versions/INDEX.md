@@ -18,3 +18,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v14** (6e99d9b) — professor's note: half the words, 28 pt body; Rover and Laser Weed Control Robot — body 28.1 pt, 11 blocks
 - **v15** (6e99d9b) — captions regenerated from source; all 22 plates redrawn at the new type — body 28.1 pt, 11 blocks
 - **v16** (6e99d9b) — dispatch fits the reviewer column; no orphan word in the platform sub-head — body 28.1 pt, 12 blocks
+- **v17** (4d1d503) — professor: Agent Work Flow Diagram titled below, icons in the diagram, bigger band captions, closing band folded into the opening lede — body 28.1 pt, 12 blocks

@@ -402,7 +402,8 @@
    "figure": "q_projects",
    "heading": "What each project is, and what it is for",
    "status": "built_and_running",
-   "body": ""
+   "body": "",
+   "lede": "One platform, any dataset, any robot. Each capability stays in the platform after the experiment that needed it, so the next student inherits it working."
   },
   {
    "id": "shared_models",
@@ -513,8 +514,9 @@
    "theme": "platform-idea",
    "figure": "x_algorithm",
    "status": "built_and_running",
-   "heading": "How a round runs, and what it does when it is stuck",
-   "body": ""
+   "heading": "Agent Work Flow Diagram",
+   "body": "",
+   "title_below": true
   },
   {
    "id": "label_ceiling",
