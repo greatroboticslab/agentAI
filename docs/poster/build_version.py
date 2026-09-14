@@ -39,7 +39,7 @@ def main():
         p = gen.Poster(st, lib)
         pptx = os.path.join(out, "%s_%s.pptx" % (tag, label))
         dropped = p.build(pptx)
-        kept = [s for _, ids in gen.MTSU_COLUMNS for s in ids
+        kept = [s for _, ids, _k in gen.MTSU_COLUMNS for s in ids
                 if s in p.lib and s not in dropped]
         small = pptx.replace(".pptx", "_small.pptx")
         subprocess.run([sys.executable, os.path.join(HERE, "shrink_pptx.py"), pptx, small],
@@ -47,7 +47,8 @@ def main():
         made.append({"look": label, "pptx": os.path.basename(pptx),
                      "small": os.path.basename(small),
                      "body_pt": p.st.d["body"], "heading_pt": p.st.d["heading"],
-                     "type_scale": p.type_scale, "kept": kept, "dropped": dropped})
+                     "type_scale": p.type_scale, "kept": kept, "dropped": dropped,
+                     "offsheet": getattr(p, "offsheet", [])})
         if label == "navy":
             subprocess.run(["soffice", "--headless", "--convert-to", "pdf",
                             "--outdir", out, pptx], capture_output=True)

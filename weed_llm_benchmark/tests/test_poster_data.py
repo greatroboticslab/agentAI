@@ -133,6 +133,39 @@ def main():
     except ImportError:
         print("  skip  PIL or style unavailable")
 
+    # What the sheet actually carries. Two silent failures live here and
+    # neither shows on screen: a theme can be stripped past the number of
+    # blocks it declared it may not lose, and a section can be in the library
+    # but in no theme, in which case it is never drawn and never recorded as
+    # dropped -- it simply is not there.
+    try:
+        import json as _json
+        import tempfile
+        import styles as _styles
+        import gen as _gen
+        _lib = _json.load(open(POSTER / "sections.json"))["sections"]
+        _st = _styles.Style("four", "house", "house", "logo-left", "none",
+                            "normal", "mtsu")
+        _p = _gen.Poster(_st, _lib)
+        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as fh:
+            out = fh.name
+        _dropped = _p.build(out)
+        os.unlink(out)
+        kept = [s for _h, ids, _k in _gen.MTSU_COLUMNS for s in ids
+                if s in _p.lib and s not in _dropped]
+        must = [s for _h, ids, k in _gen.MTSU_COLUMNS for s in ids[:k]]
+        check("every block a theme may not lose is on the sheet",
+              all(m in kept for m in must),
+              ", ".join(m for m in must if m not in kept))
+        seen = (set(kept) | set(_dropped) | set(getattr(_p, "offsheet", []))
+                | set(_gen.BANDS) | set(_gen.TAIL_BANDS) | set(_gen.CLOSING)
+                | set(_gen.FOOTER))
+        lost = [s["id"] for s in _lib if s["id"] not in seen]
+        check("no section leaves the library without being accounted for",
+              not lost, ", ".join(lost[:6]))
+    except Exception as exc:
+        print("  skip  sheet-accounting check (%s)" % exc)
+
     print("%d failure(s)" % len(FAILURES))
     return 1 if FAILURES else 0
 

@@ -64,7 +64,7 @@
    "id": "future_robots",
    "theme": "robots-connected",
    "heading": "Adding the next robot takes a project, a key and a session",
-   "body": "A new robot needs a project, an API key and a session start. The ingest contract is the same for every vehicle: open a session, post sensor batches and frames while driving, stop. The platform does not care what the robot is. Empty projects for a mobile robot and a humanoid already sit on it, waiting for a first upload.",
+   "body": "A new robot needs a project, an API key and a session start. The ingest contract is the same for every vehicle and the platform does not care what the robot is. Empty projects for a mobile robot and a humanoid already sit on it, waiting for a first upload.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -276,7 +276,7 @@
   },
   {
    "id": "ladder",
-   "theme": "results",
+   "theme": "label-quality",
    "heading": "More harvested data cost accuracy, and we measured how much",
    "body": "Starting fresh instead of from the last round's weights recovers +0.0287, 5.1 times this recipe's seed spread. That is the change the next campaign makes.",
    "figure": "c_ladder",
@@ -296,9 +296,9 @@
   },
   {
    "id": "sources",
-   "theme": "results",
-   "heading": "Auditing six web sources",
-   "body": "The same probe reads 1.000 on human-labelled CottonWeedDet12, so a source at 0.184 is the data and not the instrument. Only the top source clears the bar, and it supplies 3,208 of the 13,527 audited images.",
+   "theme": "label-quality",
+   "heading": "We measured label quality per source instead of arguing about it",
+   "body": "A detector that finds almost every real weed and gets four boxes in five wrong is useless as ground truth and excellent as a probe: where it sees nothing, a label claiming an object there is suspect. The same probe reads 1.000 on human-labelled CottonWeedDet12, so a source reading 0.184 is the data and not the instrument. One of six web sources clears the bar, and it supplies 3,208 of the 13,527 audited images.",
    "figure": "s_sources",
    "status": "built_and_running",
    "width": "column",
@@ -426,9 +426,9 @@
    "id": "vision_platform",
    "theme": "vision",
    "figure": "none",
-   "heading": "End state is one platform for any dataset and any robot",
+   "heading": "Where this goes: one platform for any dataset, any field, any robot",
    "status": "designed_only",
-   "body": "The end state is one general platform: any dataset, any research field, any robot. Agents on it run without being asked, iterate on their own output, escalate to a larger model when they are out of their depth, and are fenced in a sandbox while they do it. Every piece of this poster is a step in that direction."
+   "body": "The end state is one general platform. Agents on it run without being asked, iterate on their own output, escalate to a larger model when they are out of their depth, and are fenced in a sandbox while they do it. Every capability stays in the platform after the experiment that needed it -- the routing table, the ingest contract, the dataset registry, the sandbox, the scorer -- so the next student inherits them working. That is the difference between a lab that has run an experiment and a lab that has built somewhere to run the next one."
   },
   {
    "id": "vision_permanent",
@@ -464,7 +464,7 @@
   },
   {
    "id": "species",
-   "theme": "results",
+   "theme": "label-quality",
    "figure": "j_species",
    "heading": "Per-class spread beats every training change we made this year",
    "status": "built_and_running",
@@ -517,6 +517,51 @@
    "status": "built_and_running",
    "heading": "How a round runs, and what it does when it is stuck",
    "body": ""
+  },
+  {
+   "id": "label_ceiling",
+   "theme": "label-quality",
+   "heading": "More data stopped helping, and the training recipe was not the reason",
+   "body": "More data kept arriving and the detector kept not improving on it. The training recipe was the first suspect: augmentation, replaying the species the model already knew, completing the missing labels. Each left the same gap, and what the elimination left standing was the data -- the boxes our own auto-labeller writes.",
+   "figure": "none",
+   "status": "built_and_running",
+   "numbers": "RESEARCH_LOG sessions 12-14"
+  },
+  {
+   "id": "label_curator",
+   "theme": "label-quality",
+   "heading": "A vision model decides whether a dataset belongs, and a chat model cannot",
+   "body": "Professor Zhang's rule: have the system compare what it collected against what we already trust, and discard what sits too far away. The comparison is DINOv2 geometry, not a chat model: Gemma 4 asked to draw the box scores 0.012 F1, and shown a candidate crop it rejects none of the false ones. Fifty-one off-domain datasets were flagged out, the corpus was retrained, and the accuracy did not come back.",
+   "figure": "none",
+   "status": "built_and_running",
+   "numbers": "CHANGELOG v3.0.35-37"
+  },
+  {
+   "id": "label_unit",
+   "theme": "label-quality",
+   "heading": "The unit of curation has to match the unit of noise",
+   "body": "An auto-label error is one wrong box inside an image that is otherwise fine, so a filter reading a whole dataset cannot see it. The per-box tools are written -- crop every box, score the crop against an object-level reference, flag a box whose picture disagrees with its class -- and neither has been re-measured since the bug that made their first run score nothing. That is the open front.",
+   "figure": "none",
+   "status": "built_and_running",
+   "numbers": "RESEARCH_LOG L969-974"
+  },
+  {
+   "id": "label_agent",
+   "theme": "label-quality",
+   "heading": "A brain filed a falsifiable hypothesis, and it was wrong",
+   "body": "The harvested images carry no plant label: the merge gives every box a class derived from the website it came from. A brain tier proposed that this was what made the curve fall, wrote the condition that would falsify it before any job ran, and filed it for approval. A human approved it and four runs falsified it on that condition. What they exposed instead is density: nine boxes on a harvested image against under two on a clean one.",
+   "figure": "none",
+   "status": "built_and_running",
+   "numbers": "approval ap-1789102367-82097423"
+  },
+  {
+   "id": "label_sealed",
+   "theme": "label-quality",
+   "heading": "Under seal, the quality gate lost to raw volume",
+   "body": "The gate was registered against its own control before the runs, same recipe and three seeds a side, curated tier against raw tier, and the raw tier won by 0.0138. The curated tier was also four times smaller, so quality and quantity moved together and this test cannot separate them. It is on the sheet because it is the result we got.",
+   "figure": "none",
+   "status": "built_and_running",
+   "numbers": "M1 sealed measurement"
   }
  ]
 }

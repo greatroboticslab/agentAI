@@ -489,42 +489,38 @@ def cart_grid():
 def algorithm():
     """The loop the agent runs to answer a need, drawn as a loop.
 
-    Harry, on the version before this one: "我们的agent会按照我们人体的去做一个
-    闭环的loop解决我们的需求 … 你为什么又开始说多少的数字 … 然后你又说什么日
-    20260829 这些有何意义". He is right twice over. A schematic that is read in
-    four seconds cannot carry counts and dates -- Bang Wong's rule is that an
-    overview figure conveys concepts and that research data inside one is
-    disconcerting -- and a figure that is called an algorithm has to be shaped
-    like the algorithm. The earlier draft was a row of states with a return
-    edge underneath, which reads as a pipeline that happens to repeat.
+    A schematic that is read in four seconds cannot carry counts and dates --
+    Bang Wong's rule is that an overview figure conveys concepts, and that
+    research data inside one is disconcerting -- and a figure called an
+    algorithm has to be shaped like the algorithm. So: a racetrack. Five
+    stations on the outward run, the way a person works a problem. A need
+    arrives, work out what data would answer it, go and get it, train on what
+    survives, read the result and decide what is next. The return run carries
+    the decision back to the need, and it is DASHED, because that is the edge
+    the platform has not closed. The escalation ladder climbs inside the loop,
+    left to right, in the negative space the outward run leaves behind.
 
-    So: a racetrack. Five stations on the outward run, the way a person would
-    work the problem -- a need arrives, work out what data would answer it, go
-    and get it, train on what survives, read the result and decide what is
-    next. The return run carries the decision back to the need, and it is
-    DASHED, because that is the edge the platform has not closed: the verdict
-    is written into the round's record and nothing reads it back. The
-    escalation ladder sits inside the loop, where the negative space already
-    was. No counts, no dates, no measured values -- those are Figures 3 and 4,
-    which have axes.
+    Sized for a reader four feet away. The first version spent 5.1 in of a
+    36 in sheet, put its content in the top half, and set its stations at
+    24 pt against 22 pt body text -- a full-width figure whose type was the
+    size of the paragraphs beside it. This one is a full inch shorter, the
+    stations are half again as large, and the ladder runs across the empty
+    middle instead of stacking into it. The inch goes to the columns, which
+    were shedding sections for want of it.
     """
-    from matplotlib.patches import FancyBboxPatch, Rectangle, FancyArrowPatch
-    # The frame is 5.1 in of a 36 in sheet and the first version used the top
-    # half of it. Type up, ladder under the station it hangs off, and the spur
-    # short and near-vertical: curved across the interior it landed on the top
-    # rung it was pointing at.
-    W, H = 46.4, 5.10
-    STN, SUB, LAD, EDGE = 24.0, 18.0, 19.0, 19.0
+    from matplotlib.patches import FancyBboxPatch, Rectangle
+    W, H = 46.4, 4.15
+    STN, SUB, LAD, EDGE = 30.0, 21.0, 21.0, 22.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    TOPY, BOTY = 4.02, 0.45
+    TOPY, BOTY = 3.22, 0.40
     L, R = 0.85, W - 0.85
-    bw, bh = 8.05, 1.48
+    bw, bh = 8.05, 1.52
 
-    def arrowhead(x, y, dx, color=INK, lw=1.7, ls="-"):
+    def arrowhead(x, y, dx, color=INK, lw=1.9, ls="-"):
         ax.annotate("", xy=(x + dx, y), xytext=(x, y),
                     arrowprops=dict(arrowstyle="-|>", color=color, lw=lw,
                                     linestyle=ls, shrinkA=0, shrinkB=0))
@@ -533,69 +529,72 @@ def algorithm():
                                 boxstyle="round,pad=0,rounding_size=0.55",
                                 facecolor="none", edgecolor=RULE, lw=1.8,
                                 zorder=1))
-    ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=2.0,
+    ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=2.2,
             linestyle=(0, (8, 5)), zorder=2)
-    arrowhead(L + 3.2, BOTY, -1.0, lw=2.0, ls=(0, (8, 5)))
+    arrowhead(L + 3.2, BOTY, -1.0, lw=2.2, ls=(0, (8, 5)))
 
     stations = [
         ("A need arrives", "a detector that works in our own rows"),
         ("Work out what would answer it", "the agent reads the registry and names what is missing"),
         ("Go and get it", "harvest from public sources, then audit what came back"),
-        ("Train on what survived", "and score it against a holdout it never saw"),
+        ("Train on what survived", "scored against a holdout it never saw"),
         ("Read the result, decide what is next", "and when it cannot, it asks upward"),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
     for i, ((title, sub), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
-                               edgecolor=INK, lw=1.6, zorder=3))
-        ax.text(x + bw / 2, TOPY + 0.26, title, ha="center", va="center",
+                               edgecolor=INK, lw=1.7, zorder=3))
+        ax.text(x + bw / 2, TOPY + 0.31, title, ha="center", va="center",
                 fontsize=STN, fontweight="bold", color=INK, zorder=4)
-        for k, line in enumerate(_wrap(sub, 44)):
-            ax.text(x + bw / 2, TOPY - 0.14 - k * 0.34, line, ha="center",
+        for k, line in enumerate(_wrap(sub, 40)):
+            ax.text(x + bw / 2, TOPY - 0.14 - k * 0.38, line, ha="center",
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
-            arrowhead(mid - 0.36, TOPY, 0.72)
+            arrowhead(mid - 0.40, TOPY, 0.80)
 
-    # the ladder, hung under the station it belongs to -----------------------
+    # the ladder, climbing left to right under the outward run --------------
+    # Entered at the cheap end and read upward: the escalation goes to the
+    # scripted watchdog first, each rung reads the one below it, and only the
+    # verdict that survives the climb returns to the station that got stuck.
+    # An arrow from the station into the TOP rung, which is what the first
+    # version drew, says the opposite -- that being stuck summons the most
+    # expensive reviewer.
     rungs = ["a scripted watchdog", "deterministic checks",
              "a model reads the artifacts", "the same model, given retrieval"]
-    rw, rh, rise, stepx = 7.40, 0.50, 0.54, 0.46
-    rx = xs[4] - 1.15
+    rw, rh, rise, stepx = 6.10, 0.56, 0.26, 5.40
+    rx0, ry0 = 20.40, 0.58
     for k, name in enumerate(rungs):
-        y = 0.92 + k * rise
+        x, y = rx0 + k * stepx, ry0 + k * rise
         top = k == len(rungs) - 1
-        ax.add_patch(Rectangle((rx - k * stepx, y), rw, rh,
+        ax.add_patch(Rectangle((x, y), rw, rh,
                                facecolor=BLUE if top else WHITE,
                                edgecolor=BLUE if top else INK,
-                               lw=2.1 if top else 1.4, zorder=3))
-        ax.text(rx - k * stepx + 0.26, y + rh / 2, name, fontsize=LAD,
-                va="center", ha="left", color=WHITE if top else INK,
+                               lw=2.2 if top else 1.5, zorder=3))
+        ax.text(x + rw / 2, y + rh / 2, name, fontsize=LAD,
+                va="center", ha="center", color=WHITE if top else INK,
                 fontweight="bold" if top else "normal", zorder=4)
-    ladder_top = 0.92 + 3 * rise + rh
-    sx = rx - 3 * stepx + rw * 0.62
-    ax.annotate("", xy=(sx, ladder_top + 0.05), xytext=(sx + 0.45, TOPY - bh / 2 - 0.02),
-                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.8,
-                                shrinkA=0, shrinkB=0))
-    # left of the ladder, where the interior is empty. To the right of the
-    # spur it ran into the station's own second line.
-    ax.text(rx - 3 * stepx - 0.35, ladder_top - 0.60, "escalate\nwhile stuck",
+    arrowhead(rx0 - 0.95, ry0 + rh / 2, 0.80)
+    ax.text(rx0 - 1.20, ry0 + rh / 2, "escalate\nwhile stuck",
             fontsize=LAD, color=INK, ha="right", va="center",
-            fontweight="bold", linespacing=1.25)
+            fontweight="bold", linespacing=1.22)
+    # and the verdict that survives the climb comes back up to the station
+    tx = rx0 + 3 * stepx + rw * 0.50
+    ty = ry0 + 3 * rise + rh
+    ax.annotate("", xy=(tx, TOPY - bh / 2 - 0.03), xytext=(tx, ty + 0.04),
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.9,
+                                shrinkA=0, shrinkB=0))
 
-    # what the dashed run means, inside the loop where the space already was --
-    lx = L + (R - L) * 0.26
-    ax.text(lx, BOTY + 2.05, "what the agent decided goes back to",
+    # what the dashed run means, inside the loop where the space already was.
+    # The explanation of WHY it is dashed belongs in the caption, not in the
+    # drawing: four lines of prose inside a schematic is a paragraph wearing a
+    # figure's clothes.
+    lx = L + 8.6
+    ax.text(lx, ry0 + 1.46, "what the agent decided goes back to",
             fontsize=EDGE, color=INK, ha="center", va="center")
-    ax.text(lx, BOTY + 1.69, "what it asks for next",
+    ax.text(lx, ry0 + 1.04, "what it asks for next",
             fontsize=EDGE, color=INK, ha="center", va="center")
-    ax.text(lx, BOTY + 1.20,
-            "dashed: today that decision is written into the round's record",
-            fontsize=SUB, color=MUTE, ha="center", va="center")
-    ax.text(lx, BOTY + 0.88,
-            "and nothing reads it back. Closing this edge is the work.",
-            fontsize=SUB, color=MUTE, ha="center", va="center")
 
     return save(fig, "x_algorithm",
                 "The loop an agent runs to answer a need, drawn as a loop. A need arrives, the "
@@ -604,8 +603,8 @@ def algorithm():
                 "ask for next. When it cannot decide it climbs the ladder inside the loop, each "
                 "rung reading the one below it and free to overrule it. The outward run is solid "
                 "because it runs unattended today. The return run is dashed because it is the one "
-                "edge the platform has not closed: the decision is recorded and nothing reads it "
-                "back, and closing it is the work this poster is about.")
+                "edge the platform has not closed: the decision is written into the round's record "
+                "and nothing reads it back, and closing that edge is the work this poster is about.")
 
 
 def _wrap(text, n):

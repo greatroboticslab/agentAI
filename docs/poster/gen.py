@@ -81,7 +81,11 @@ TAIL_BANDS = ["detect_grid", "journey"]
 # Drawn last, across the sheet, above the footer. The vision belongs at the end
 # of the argument and not at the top of it: a reader should meet what the
 # platform is and what it has done before being told where it goes.
-CLOSING = ["vision_platform", "vision_permanent"]
+# One closing block, not two. Two half-width blocks cost two 30 pt headings
+# and twice the lines, for 2.6 in of a 36 in sheet the columns were
+# shedding sections for want of. The second block's claim is inside the
+# first one's paragraph.
+CLOSING = ["vision_platform"]
 
 FOOTER = ["stands", "made", "withdrew"]
 
@@ -94,26 +98,39 @@ FOOTER = ["stands", "made", "withdrew"]
 # measured. "The platform / Collecting in the field / What the agents do with it
 # / What six months measured" labelled four containers and told them nothing,
 # and two of the four opened with the same word.
+# (heading, sections in shed order, how many of them the sheet may not give up)
+#
+# The last number is the editorial decision the packer cannot make. Without it
+# a theme's share of the sheet is whatever is left when the themes before it
+# have taken theirs, and the label campaign -- the longest theme and the reason
+# this poster exists -- came off the sheet with one block standing. The counts
+# say: two blocks for what the platform is, two for the reviewer, one for the
+# unattended loop, five for the campaign. Everything past the count is slack
+# that a short column may take and a crowded one gives up first.
 MTSU_COLUMNS = [
     # The argument, not the inventory. "Two vehicles, 2,686 frames" headed a
     # column with a logging report under it: how much was collected, which is a
     # question anyone with a robot and an afternoon can answer. The robots
     # appear once, in the project plate, as evidence the hardware is real.
-    # Order inside a theme is its priority: the sheet gives up the last block
-    # of a theme first.
     ("One platform, any robot, any dataset",
-     ["platform_idea", "platform_domains", "robots_today", "uplink",
-      "future_robots", "shared_models", "remote_control"]),
+     ["platform_idea", "platform_domains", "future_robots",
+      "robots_today", "uplink", "remote_control", "shared_models"], 2),
     ("A brain that gets stuck and asks upward",
      # The plate leads its theme so it lands at the top of a fresh column. A
      # ten-inch block placed last in an eleven-inch column carries over into the
      # next one, which costs a later theme its column entirely.
-     ["supervisor", "escalate", "dispatch", "brain", "watch", "analysis_agent",
-      "analysis_sandbox"]),
+     ["supervisor", "escalate", "dispatch",
+      "watch", "brain", "analysis_agent", "analysis_sandbox"], 2),
     ("The agents ran the loop with nobody in the room",
-     ["loop", "diagnosis", "sources", "field", "auto_diag"]),
-    ("We measured the cause, and it is fixable",
-     ["ladder", "control", "families", "species", "ledger", "tta", "zeroshot"]),
+     ["loop", "diagnosis", "auto_diag", "field", "control"], 1),
+    # The label-quality campaign. The loop could not raise accuracy; the
+    # suspicion moved from the recipe to the labels by elimination; the sheet
+    # then says what was tried against the labels and what each attempt cost.
+    # The ablations this displaced -- tta, zeroshot, families -- are training
+    # variations, and a reviewer learns more from the campaign than from them.
+    ("More data stopped helping, so we went after the labels",
+     ["ladder", "label_ceiling", "label_curator", "label_unit", "label_agent",
+      "sources", "label_sealed", "species", "ledger"], 5),
 ]
 
 # The two plates that ARE the evidence for the two headline claims: what more
@@ -517,7 +534,7 @@ class Poster(object):
                 h += w * im.size[1] / float(im.size[0]) + max(0.76, cap_h)
         return h + d.h_est(s["body"], tw, d.dz["body"], 1.22, 10)
 
-    def _mtsu_layout(self, flow, n, COL, draw):
+    def _mtsu_layout(self, flow, n, COL, draw, demand=None):
         """Lay the flow out once. Returns (fits, ends, fig_no, spilled).
 
         With draw=False nothing is added to the slide, so a trial fit costs
@@ -531,7 +548,11 @@ class Poster(object):
         # off the finished sheet.
         y0 = (self.band(self.mtsu_kpi(d.top), fig_no) if draw
               else self._mtsu_top_real())
-        limit = H - self.foot_h() - 0.95 - self.closing_h() - self.tail_band_h()
+        # 0.55 of clearance under the last column, not 0.95. closing_h() and
+        # foot_h() both measure their own blocks now, so the constant is
+        # clearance and nothing else, and every tenth of it is four tenths
+        # of column across the sheet.
+        limit = H - self.foot_h() - 0.55 - self.closing_h() - self.tail_band_h()
         avail = limit - y0
 
         heights = []
@@ -547,7 +568,14 @@ class Poster(object):
         # Fill each column, then balance: an even share is only worth having
         # when there is enough content to go round, and capping at one left
         # every column three inches short while blocks spilled off the sheet.
-        share = (sum(heights) + 0.5 * n) / float(n)
+        #
+        # Balance against what the LIBRARY wants, not against what is left after
+        # shedding. Measuring the share off the shed flow is circular: shed
+        # enough and the share drops below the column, the 0.82 cap engages, and
+        # every column stops two inches short -- eight inches of sheet held back
+        # from sections that were dropped for want of room. Demand is taken once,
+        # from the flow before anything is given up.
+        share = ((sum(heights) if demand is None else demand) + 0.5 * n) / float(n)
         target = avail if share > avail else max(share, 0.82 * avail)
 
         # Which themes are still to come, so a theme can claim a fresh column
@@ -701,13 +729,35 @@ class Poster(object):
         d = self.d
         skip = set(TAIL_BANDS) | set(BANDS) | set(CLOSING) | set(self.tail_ids)
         flow = []
-        for head, ids in MTSU_COLUMNS:
+        for head, ids, _keep in MTSU_COLUMNS:
             first = True
             for sid in ids:
                 if sid in self.lib and sid not in skip:
                     flow.append((head if first else None, sid))
                     first = False
-        order = {s: i for _, ids in MTSU_COLUMNS for i, s in enumerate(ids)}
+        order = {s: i for _, ids, _k in MTSU_COLUMNS for i, s in enumerate(ids)}
+        # What the sheet gives up first, across all four themes at once. Ranking
+        # by position within a theme alone amputates the LONGEST theme: with
+        # seven blocks in one theme and ten in another, every one of the ten
+        # ranks above the seven and the long theme is stripped to its first
+        # block before the short one loses anything. The label campaign, which
+        # is the longest theme and the reason for the poster, came off the sheet
+        # entirely that way. Shedding goes round the themes instead: every
+        # theme's seventh block, then every theme's sixth, and so on.
+        shed = {s: i * 100 + t
+                for t, (_h, ids, _k) in enumerate(MTSU_COLUMNS)
+                for i, s in enumerate(ids)}
+        # The blocks a theme may not be stripped of, by the count it declares,
+        # and -- when even those will not pack -- the order in which the counts
+        # themselves give way. That order is PROPORTIONAL: a theme that claims
+        # six blocks gives up its sixth before a theme that claims three gives
+        # up its third, so a short theme is not quietly held whole while the
+        # long one is cut to the bone.
+        keep, hard_rank = set(), {}
+        for t, (_h, ids, k) in enumerate(MTSU_COLUMNS):
+            keep |= set(ids[:k])
+            for i, sid in enumerate(ids[:k]):
+                hard_rank[sid] = (i / float(max(1, k))) * 1000 + t
 
         def reheaded(seq):
             out_, seen = [], set()
@@ -717,28 +767,55 @@ class Poster(object):
                 seen.add(th)
             return out_
 
+        def demand_of(seq):
+            tot = 0.0
+            for head, sid in seq:
+                tot += self.mtsu_block_h(COL[0][1], sid)
+                if head:
+                    tot += self._head_h(d, COL[0][1], head) + 2 * MTSU_PAD + 0.24
+            return tot
+
+        self._demand = demand_of(flow)
+        dem = self._demand
+
         dropped = []
         while True:
-            if self._mtsu_layout(flow, n, COL, draw=False)[0]:
+            if self._mtsu_layout(flow, n, COL, draw=False, demand=dem)[0]:
                 break
             counts = {}
             for _h, sid in flow:
                 counts.setdefault(self._theme_of(sid), []).append(sid)
             cands = [s for pool in counts.values() for s in pool[1:]
-                     if s not in MTSU_PINNED]
+                     if s not in MTSU_PINNED and s not in keep]
             if not cands:
                 # Nothing left to give up but blocks a theme may not lose. If
                 # one of them is spilling because of the plate it carries, give
                 # up the PLATE and keep the claim: a theme reduced to a heading
                 # over nothing is worse than a finding stated without its chart.
-                _f, _e, _n, sp = self._mtsu_layout(flow, n, COL, draw=False)
+                _f, _e, _n, sp = self._mtsu_layout(flow, n, COL, draw=False,
+                                                   demand=dem)
                 off = [s for s in sp if self.mtsu_has_plate(s, COL[0][1])
                        and s not in MTSU_KEEP_FIGURE]
                 if off:
                     self._fig_off = set(getattr(self, "_fig_off", set())) | {off[0]}
                     continue
+                # Nothing left but the counts themselves. Give one up rather
+                # than spill: a block that runs off the bottom of the last
+                # column is not on the poster either, and it leaves the sheet
+                # thinking it is. Fourteen protected blocks would not pack into
+                # four columns even when their inches fitted -- a column breaks
+                # early when the next block is a plate taller than its
+                # remainder -- and the sheet was printing that as success.
+                hard = [sid for _h, sid in flow
+                        if sid in keep and sid not in MTSU_PINNED]
+                if hard:
+                    victim = max(hard, key=lambda s: (
+                        hard_rank.get(s, 0), self.mtsu_block_h(COL[0][1], s)))
+                    dropped.append(victim)
+                    flow = reheaded([(h, s) for h, s in flow if s != victim])
+                    continue
                 break
-            victim = max(cands, key=lambda s: (order.get(s, 99),
+            victim = max(cands, key=lambda s: (shed.get(s, 9999),
                                                self.mtsu_block_h(COL[0][1], s)))
             dropped.append(victim)
             flow = reheaded([(h, s) for h, s in flow if s != victim])
@@ -746,7 +823,13 @@ class Poster(object):
 
         for _ in range(12):
             placed = False
-            for take in sorted(dropped, key=lambda s: order.get(s, 99)):
+            # A block a theme declared it may not lose comes back before any
+            # block that is slack, whatever theme the slack belongs to.
+            # Sorting by shed rank alone let three spare paragraphs from the
+            # first theme take the gaps that the campaign's own blocks were
+            # waiting for.
+            for take in sorted(dropped, key=lambda s: (s not in keep,
+                                                       shed.get(s, 9999))):
                 th = self._theme_of(take)
                 same = [k for k, (_h, sid) in enumerate(flow)
                         if self._theme_of(sid) == th]
@@ -756,7 +839,7 @@ class Poster(object):
                          if order.get(flow[k][1], 99) > order.get(take, 99)]
                 idx = after[0] if after else same[-1] + 1
                 trial = reheaded(flow[:idx] + [(None, take)] + flow[idx:])
-                if self._mtsu_layout(trial, n, COL, draw=False)[0]:
+                if self._mtsu_layout(trial, n, COL, draw=False, demand=dem)[0]:
                     flow = trial
                     dropped.remove(take)
                     placed = True
@@ -777,6 +860,17 @@ class Poster(object):
         n = len(COL)
         base = dict(self.st.d)
 
+        # A section in the library but in no theme never enters the flow, so it
+        # is neither drawn nor counted as dropped -- it just is not there, and
+        # nothing said so. Record it: leaving a section off the sheet is a
+        # decision, and a decision that leaves no trace is indistinguishable
+        # from a bug.
+        themed = set(s for _h, ids, _k in MTSU_COLUMNS for s in ids)
+        reserved = (set(BANDS) | set(TAIL_BANDS) | set(CLOSING)
+                    | set(FOOTER) | set(self.tail_ids))
+        self.offsheet = sorted(s for s in self.lib
+                               if s not in themed and s not in reserved)
+
         # Fill the sheet with type rather than with air. Nine inches of column
         # were sitting empty under the last block of three of the four columns,
         # which is a poster asking to be read from four feet and leaving a third
@@ -786,26 +880,41 @@ class Poster(object):
         # two carry the same, take the larger type. Nine inches of column were
         # sitting empty under three of the four columns -- a poster meant to be
         # read from four feet, leaving a third of its measure blank.
+        keepset = set()
+        for _h, ids, k in MTSU_COLUMNS:
+            keepset |= set(ids[:k])
         trials = []
-        for scale in (1.70, 1.62, 1.52, 1.46, 1.40, 1.34, 1.28, 1.22, 1.16, 1.10, 1.05, 1.00):
+        for scale in (1.70, 1.62, 1.52, 1.46, 1.40, 1.34, 1.28, 1.22, 1.16,
+                      1.10, 1.05, 1.00, 0.96, 0.92, 0.88, 0.84):
             flow, dropped, figoff = self._mtsu_fit(n, COL, scale, base)
-            fits = self._mtsu_layout(flow, n, COL, draw=False)[0]
-            trials.append((len(flow), scale, flow, dropped, fits, figoff))
+            fits = self._mtsu_layout(flow, n, COL, draw=False,
+                                     demand=self._demand)[0]
+            demand = self._demand
+            n_keep = len([sid for _h, sid in flow if sid in keepset])
+            trials.append((len(flow), scale, flow, dropped, fits, figoff, demand,
+                           n_keep))
         ok = [r for r in trials if r[4]] or trials
         # Bigger type beats more paragraphs. Hongbo Zhang, on the sheet:
         # "The font needs to be bigger. You can reduce the amount of text."
         # So: of the tiers that fit, take the LARGEST that still carries within
         # two blocks of the most any tier carries -- not the one that carries
         # the most, which is always the smallest type.
-        most = max(r[0] for r in ok)
-        # Six blocks at 26 pt beats eight at 21. "The font needs to be bigger.
-        # You can reduce the amount of text."
-        good = [r for r in ok if r[0] >= max(6, most - 3)] or ok
-        best = max(good, key=lambda r: r[1])
+        # Carry the argument first, then set it as large as will fit. Choosing
+        # by block COUNT picks whichever tier fits the most paragraphs, and
+        # paragraphs are not equal: the tier that carried the most blocks
+        # carried them by filling the gaps with spare notes from the first
+        # theme while the label campaign, which is what the poster is for, sat
+        # in the dropped list. So: maximise the blocks a theme declared it may
+        # not lose; among tiers that carry the same number of those, take the
+        # largest type; and only then prefer more blocks.
+        most_keep = max(r[7] for r in ok)
+        good = [r for r in ok if r[7] >= most_keep] or ok
+        best = max(good, key=lambda r: (r[1], r[0]))
         # Restore the suppressed-figure set that BELONGS to the chosen tier.
         # It is per-trial state, and carrying the last trial's set into the
         # final draw silently dropped a plate the chosen tier had room for.
         self._fig_off = set(best[5])
+        self._demand = best[6]
         best = best[:4]
         kept, scale, flow, dropped = best
         self.type_scale = scale
@@ -814,7 +923,8 @@ class Poster(object):
         d = self.d
 
         self.d = Deck(TITLE, STAND, style=self.st); d = self.d
-        _fits, ends, fig_no, spilled = self._mtsu_layout(flow, n, COL, draw=True)
+        _fits, ends, fig_no, spilled = self._mtsu_layout(flow, n, COL, draw=True,
+                                                         demand=self._demand)
         # Whatever still runs off the last column is dropped, and saying so is
         # the whole point of the manifest. The shed loop can exit with sections
         # still spilling -- when every theme is down to the one block it may not
@@ -842,7 +952,7 @@ class Poster(object):
         return max(0.500, lines * d.dz["heading"] / 72.0 * 1.12 + 0.12) + 0.255
 
     def _theme_of(self, sid):
-        for head, ids in MTSU_COLUMNS:
+        for head, ids, _keep in MTSU_COLUMNS:
             if sid in ids:
                 return head
         return ""

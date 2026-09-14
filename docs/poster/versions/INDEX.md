@@ -11,3 +11,7 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v07** (0debb4f) — project blurbs say what each thing is; algorithm is a loop with no counts or dates; six label collisions fixed — body 24.4 pt, 8 blocks
 - **v08** (d65cacd) — algorithm fills its frame at 24 pt; audit fixes: wrong denominator, arrow reading backwards, five strikethroughs, a lost ledger row — body 25.6 pt, 8 blocks
 - **v09** (56f175c) — footer no longer runs off the sheet: caption height is measured, not a constant — body 22.1 pt, 9 blocks
+- **v10** (b1e9f04) — the label-quality campaign on the sheet: the ceiling, the curator, the unit-of-noise lesson, the falsified agent hypothesis — body 22.1 pt, 9 blocks
+- **v11** (b1e9f04) — label campaign on the sheet; shed goes round the themes; each theme declares what it may not lose; algorithm figure an inch shorter with bigger type — body 19.3 pt, 17 blocks
+- **v12** (b1e9f04) — campaign complete at 21 pt: shorter blocks, protected-coverage tier choice, one closing band — body 21.0 pt, 13 blocks
+- **v13** (b1e9f04) — campaign reads clean: falsifiable-hypothesis heading, no false off-switch note, no orphan word in the loop figure — body 21.0 pt, 13 blocks
