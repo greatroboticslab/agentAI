@@ -35,7 +35,7 @@ def main():
                          capture_output=True, text=True).stdout.strip()
     made = []
     for kind, label in (("logo-left", "navy"), ("pale-band", "pale")):
-        st = styles.Style("four", "house", "house", kind, "census", "normal", "mtsu")
+        st = styles.Style("four", "house", "house", kind, "none", "normal", "mtsu")
         p = gen.Poster(st, lib)
         pptx = os.path.join(out, "%s_%s.pptx" % (tag, label))
         dropped = p.build(pptx)

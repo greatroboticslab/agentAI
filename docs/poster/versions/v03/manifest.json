@@ -1,0 +1,83 @@
+{
+ "version": "v03",
+ "note": "number strip removed; algorithm diagram enlarged and set at 24 pt headers; body 24.4 pt",
+ "commit": "d1971b2",
+ "decks": [
+  {
+   "look": "navy",
+   "pptx": "v03_navy.pptx",
+   "small": "v03_navy_small.pptx",
+   "body_pt": 24.4,
+   "heading_pt": 34.8,
+   "type_scale": 1.16,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "sources",
+    "families",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  },
+  {
+   "look": "pale",
+   "pptx": "v03_pale.pptx",
+   "small": "v03_pale_small.pptx",
+   "body_pt": 24.4,
+   "heading_pt": 34.8,
+   "type_scale": 1.16,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "sources",
+    "families",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  }
+ ]
+}

@@ -763,7 +763,7 @@ class Poster(object):
         # sitting empty under three of the four columns -- a poster meant to be
         # read from four feet, leaving a third of its measure blank.
         trials = []
-        for scale in (1.52, 1.46, 1.40, 1.34, 1.28, 1.22, 1.16, 1.10, 1.05, 1.00):
+        for scale in (1.70, 1.62, 1.52, 1.46, 1.40, 1.34, 1.28, 1.22, 1.16, 1.10, 1.05, 1.00):
             flow, dropped, figoff = self._mtsu_fit(n, COL, scale, base)
             fits = self._mtsu_layout(flow, n, COL, draw=False)[0]
             trials.append((len(flow), scale, flow, dropped, fits, figoff))

@@ -1,0 +1,83 @@
+{
+ "version": "v04",
+ "note": "algorithm: the nine frames redrawn in the same place across columns",
+ "commit": "d1971b2",
+ "decks": [
+  {
+   "look": "navy",
+   "pptx": "v04_navy.pptx",
+   "small": "v04_navy_small.pptx",
+   "body_pt": 24.4,
+   "heading_pt": 34.8,
+   "type_scale": 1.16,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "sources",
+    "families",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  },
+  {
+   "look": "pale",
+   "pptx": "v04_pale.pptx",
+   "small": "v04_pale_small.pptx",
+   "body_pt": 24.4,
+   "heading_pt": 34.8,
+   "type_scale": 1.16,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "sources",
+    "families",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  }
+ ]
+}

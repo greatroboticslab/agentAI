@@ -158,7 +158,7 @@ def ladder():
             A.append(v); Ae.append(0.0); An.append(1)
     B = L.get("armB")
 
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 4.46))
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.600, 3.60))
     ax.errorbar(xs, A, yerr=Ae, fmt="o-", color=BLUE, capsize=4, elinewidth=1.0, zorder=3)
     if B:
         ax.plot(xs, B, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
@@ -196,11 +196,9 @@ def ladder():
                     textcoords="offset points", xycoords=("data", "axes fraction"),
                     ha="center", fontsize=8.5, color=MUTE, annotation_clip=False)
     return save(fig, "c_ladder",
-                "(c) Three seeds at every rung on our own sealed holdout. "
-                "(d) The same eight checkpoints on a second dataset, class-agnostic, nothing "
-                "of which it saw in training and 0 images excluded by the leak check; the "
-                "series labels in (c) apply to (d). Both exams fall, so the narrow metric is "
-                "not what makes the ladder drop.")
+                "(c) Three seeds at every rung on our own sealed holdout. (d) The same eight "
+                "checkpoints on a second weed dataset they never saw. Both exams fall, so the "
+                "narrow metric is not what makes the ladder drop.")
 
 
 # ---------------------------------------------------------------- d. the wall
@@ -500,123 +498,127 @@ def algorithm():
     carried by position and state by texture, which is what the column on
     avoiding colour asks for.
     """
-    from matplotlib.patches import Rectangle, FancyArrowPatch
-    W, H = 46.4, 4.45
+    from matplotlib.patches import Rectangle
+    # Sized to be read from two metres, not from a laptop. The first draft set
+    # its headers at 17 pt against a 22 pt body and its tiles at 0.30 in, so the
+    # one diagram on the sheet was also the smallest type on it.
+    W, H = 46.4, 5.70
+    HEAD, NOTE, RUNG, LEAD = 24.0, 17.0, 18.0, 17.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    NCOL, CW, GAP, X0 = 5, 7.30, 2.05, 1.15
-    TOP = H - 0.42                     # baseline the action labels sit on
-    FIELD = TOP - 0.45                 # top of the drawn state
-    BASE = 1.40                        # floor of the drawn state
+    NCOL, CW, GAP, X0 = 5, 7.60, 1.90, 0.55
+    TOP = H - 0.45                     # baseline the action labels sit on
+    FIELD = TOP - 0.80                 # top of the drawn state
+    BASE = 2.15                        # floor of the drawn state
+    SIZE, PAD, COLS = 0.50, 0.08, 9
 
     def colx(i):
         return X0 + i * (CW + GAP)
 
     def action(i, text, note=""):
         x = colx(i)
-        ax.text(x, TOP, text, fontsize=17, fontweight="bold", color=INK,
+        ax.text(x, TOP, text, fontsize=HEAD, fontweight="bold", color=INK,
                 ha="left", va="baseline")
-        ax.plot([x, x + CW], [TOP - 0.20, TOP - 0.20], color=INK, lw=1.1)
+        ax.plot([x, x + CW], [TOP - 0.26, TOP - 0.26], color=INK, lw=1.4)
         if note:
-            ax.text(x, BASE - 0.28, note, fontsize=13, color=MUTE,
+            ax.text(x, BASE - 0.34, note, fontsize=NOTE, color=MUTE,
                     ha="left", va="top")
 
-    def tiles(i, n_our, n_web, kept=None, our_hatch=None, cols=10, size=0.30,
-              pad=0.055):
-        """Redraw the same field: our frames first, then harvested ones.
+    def tiles(i, n_our, n_web, kept=None, our_hatch=None, cols=COLS):
+        """Redraw the same field; only the change is new.
 
-        `kept` is the number of harvested tiles that survive; the rest are
-        drawn as hairline outlines, so the removal is the only change the eye
-        has to find between this column and the last.
+        Outlined tiles are the ones the audit removed, so between one column
+        and the next the eye has exactly one difference to find.
         """
-        x0, y0 = colx(i), FIELD - size
+        x0, y0 = colx(i), FIELD - SIZE
         for k in range(n_our + n_web):
-            cx = x0 + (k % cols) * (size + pad)
-            cy = y0 - (k // cols) * (size + pad)
+            cx = x0 + (k % cols) * (SIZE + PAD)
+            cy = y0 - (k // cols) * (SIZE + PAD)
             ours = k < n_our
             if ours:
-                fc, ec, hh, lw = WHITE, INK, our_hatch, 1.1
+                fc, ec, hh, lw = WHITE, INK, our_hatch, 1.6
             elif kept is None or (k - n_our) < kept:
-                fc, ec, hh, lw = GREY, MUTE, None, 0.8
+                fc, ec, hh, lw = GREY, MUTE, None, 1.0
             else:
-                fc, ec, hh, lw = WHITE, RULE, None, 0.6
-            ax.add_patch(Rectangle((cx, cy), size, size, facecolor=fc,
+                fc, ec, hh, lw = WHITE, RULE, None, 0.9
+            ax.add_patch(Rectangle((cx, cy), SIZE, SIZE, facecolor=fc,
                                    edgecolor=ec, lw=lw, hatch=hh, zorder=2))
-        return y0 - ((n_our + n_web - 1) // cols) * (size + pad)
+        return y0 - ((n_our + n_web - 1) // cols) * (SIZE + PAD)
 
-    def leader(x1, y1, x2, y2, text, ha="left", fs=13.5, color=MUTE):
-        ax.plot([x1, x2], [y1, y2], color=color, lw=0.9, zorder=3)
-        ax.text(x2 + (0.10 if ha == "left" else -0.10), y2, text, fontsize=fs,
-                color=color, ha=ha, va="center", zorder=3)
+    def leader(x1, y1, x2, y2, text, fs=LEAD, color=INK):
+        ax.plot([x1, x2], [y1, y2], color=color, lw=1.1, zorder=3)
+        ax.text(x2 + 0.14, y2, text, fontsize=fs, color=color, ha="left",
+                va="center", zorder=3)
 
-    # a -- the state a drive leaves behind ----------------------------------
+    # a -- what a drive leaves behind ----------------------------------------
     action(0, "A drive opens a session",
-           "9 frames drawn of 2,686; none of them is labelled")
-    tiles(0, 9, 0, cols=3)
+           "the tiles are schematic; the archive holds 2,686 frames\nand not one of them is labelled")
+    tiles(0, 9, 0)
 
-    # b -- the same nine, plus what the collector harvested ------------------
+    # b -- the same nine, and what the collector brought back ------------------
     action(1, "The collector harvests",
-           "the same nine frames, and what six web sources returned")
-    tiles(1, 9, 47)
+           "the same nine frames, and what six public sources returned")
+    tiles(1, 9, 27)
 
-    # c -- only the change: most of the harvest is struck out ----------------
+    # c -- only the change: most of the harvest is struck out -----------------
     action(2, "The audit keeps one source in six",
-           "outlined tiles failed the label-precision bar and are not trained on")
-    y = tiles(2, 9, 47, kept=8)
-    leader(colx(2) + 3.50, y + 0.16, colx(2) + 4.45, y + 0.62,
-           "one source clears it", ha="left", fs=13, color=INK)
+           "outlined tiles failed the label-precision bar and are never trained on")
+    y = tiles(2, 9, 27, kept=5)
+    leader(colx(2) + 2.90, y + 0.26, colx(2) + 4.00, y + 0.90,
+           "one source clears it")
 
-    # d -- the corpus becomes a checkpoint ------------------------------------
+    # d -- what is left becomes a checkpoint ----------------------------------
     action(3, "The trainer runs the round",
            "hatched: paused by a stop-loss taken on 2026-08-29")
-    tiles(3, 9, 8, our_hatch="////")
-    ax.add_patch(Rectangle((colx(3) + 4.30, FIELD - 1.05), 2.20, 1.05,
-                           facecolor=WHITE, edgecolor=INK, lw=1.3, zorder=2))
-    ax.text(colx(3) + 5.40, FIELD - 0.40, "one", ha="center", va="center",
-            fontsize=14.5, color=INK, zorder=3)
-    ax.text(colx(3) + 5.40, FIELD - 0.74, "checkpoint", ha="center", va="center",
-            fontsize=14.5, fontweight="bold", color=INK, zorder=3)
+    tiles(3, 9, 5, our_hatch="////", cols=7)
+    bx, by = colx(3) + 4.60, FIELD - 1.32
+    ax.add_patch(Rectangle((bx, by), 2.55, 1.32, facecolor=WHITE,
+                           edgecolor=INK, lw=1.8, zorder=2))
+    ax.text(bx + 1.28, by + 0.80, "one", ha="center", va="center",
+            fontsize=RUNG, color=INK, zorder=3)
+    ax.text(bx + 1.28, by + 0.40, "checkpoint", ha="center", va="center",
+            fontsize=RUNG, fontweight="bold", color=INK, zorder=3)
 
-    # e -- review, drawn as a staircase: rank is position ---------------------
+    # e -- review: rank is position, not colour --------------------------------
     action(4, "Review, and escalation when it is stuck",
            "each rung reads the one below it and may overrule it")
     rungs = ["scripted watchdog", "deterministic checks",
-             "a model reads the artifacts", "and the same model, given retrieval"]
-    rx, rw, rh = colx(4), 2.75, 0.28
+             "a model reads the artifacts", "the same model, given retrieval"]
+    rx, rw, rh, step, rise = colx(4), 6.05, 0.50, 0.38, 0.72
     for k, name in enumerate(rungs):
-        y = BASE + k * 0.50
+        y = BASE + k * rise
         top_rung = k == len(rungs) - 1
-        ax.add_patch(Rectangle((rx + k * 0.36, y), rw, rh,
+        ax.add_patch(Rectangle((rx + k * step, y), rw, rh,
                                facecolor=BLUE if top_rung else WHITE,
                                edgecolor=BLUE if top_rung else INK,
-                               lw=1.6 if top_rung else 1.0, zorder=2))
-        ax.text(rx + k * 0.36 + rw + 0.16, y + rh / 2, name, fontsize=13,
-                va="center", color=INK if top_rung else MUTE,
+                               lw=2.0 if top_rung else 1.3, zorder=2))
+        # the label lives inside its rung: outside, the top one ran off the
+        # right edge of the sheet, because a staircase steps right as it rises
+        ax.text(rx + k * step + 0.22, y + rh / 2, name, fontsize=RUNG,
+                va="center", ha="left", color=WHITE if top_rung else INK,
                 fontweight="bold" if top_rung else "normal", zorder=3)
-    ax.annotate("", xy=(rx - 0.30, BASE + 3 * 0.50 + rh),
-                xytext=(rx - 0.30, BASE),
-                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.4,
+    ax.annotate("", xy=(rx - 0.44, BASE + 3 * rise + rh), xytext=(rx - 0.44, BASE),
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.7,
                                 shrinkA=0, shrinkB=0))
-    ax.text(rx - 0.52, BASE + 0.80, "stuck", rotation=90, fontsize=13.5,
+    ax.text(rx - 0.72, BASE + 1.15, "stuck", rotation=90, fontsize=RUNG,
             color=INK, ha="center", va="center")
 
-    # the one arrowhead on the plate: the return path ------------------------
-    # The one arrowhead on the plate. Drawn as three straight segments rather
-    # than a shallow arc: an arc that long reads as two stray diagonals at the
-    # bottom of the sheet, and a right-angled return is the older convention.
-    ay = BASE - 0.92
-    xr, xl = colx(4) + 1.00, colx(0) + 1.05
-    ax.plot([xr, xr], [BASE - 0.22, ay], color=INK, lw=1.3, zorder=4)
-    ax.plot([xr, xl], [ay, ay], color=INK, lw=1.3, zorder=4)
-    ax.annotate("", xy=(xl, BASE - 0.22), xytext=(xl, ay),
-                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.3,
+    # the one arrowhead on the plate: the return path -------------------------
+    # A bracket around the outside of the columns. Run between them it crossed
+    # the notes under the first column.
+    ay = 0.42
+    xr, xl = W - 0.22, 0.22
+    ax.plot([xr, xr], [BASE + 0.30, ay], color=INK, lw=1.5, zorder=4)
+    ax.plot([xr, xl], [ay, ay], color=INK, lw=1.5, zorder=4)
+    ax.annotate("", xy=(xl, BASE + 0.30), xytext=(xl, ay),
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5,
                                 shrinkA=0, shrinkB=0))
-    ax.text((xl + xr) / 2, ay - 0.14,
+    ax.text(W / 2, ay + 0.16,
             "the next round starts from the last round's weights",
-            fontsize=14, color=INK, ha="center", va="top")
+            fontsize=NOTE + 1, color=INK, ha="center", va="bottom")
 
     return save(fig, "x_algorithm",
                 "One round, as states. Each column redraws the field of the column before it and "
