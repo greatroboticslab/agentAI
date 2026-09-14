@@ -469,139 +469,164 @@ def cart_grid():
 
 # ----------------------------------------------------------- the algorithm
 def algorithm():
-    """How a round runs, and what happens when it is stuck.
+    """One round, drawn the way Nature Methods draws an overview figure.
 
-    One diagram, because a poster that argues for a tiered self-supervised loop
-    and draws nothing has asked the reader to take the architecture on trust.
-    Every number on it is measured: the four tiers are the arms of the
-    supervision benchmark and the figure beside each is its grounded recall on
-    the same frozen cases.
+    The rules are Bang Wong's, from "The overview figure" (Nat. Methods 8, 365,
+    2011), and the first version of this plate broke every one of them:
 
-    Node shape carries meaning, which a chain of identical rectangles cannot do:
-    a rounded store holds data, a square box is work, a diamond is the gate that
-    decides whether a verdict counts, and hatching is a stage switched off today.
+      * "adopt an 'A to B' structure in which A and B are states connected by
+        an action. The states are often depicted graphically, and the action is
+        text describing the transformation."  -- so the columns are STATES of
+        the corpus, drawn, and the actions are the headers above them. The
+        first version drew five empty boxes each labelled with a verb.
+      * "redraw the elements from the previous step highlighting only the
+        effective change" -- every column redraws the same field of tiles and
+        changes only what that action changed, so the eye can follow one thing
+        across the figure instead of reading five unrelated boxes.
+      * "I designed the overview ... without intervening arrows and used the
+        action labels as headers to save space."  -- there are no arrows
+        between the columns. The single arrowhead on the plate is the return
+        path, where direction IS the meaning.
+      * "symbols have minimal overlapping meanings" -- arrowheads mean sequence
+        and nothing else; labels hang off leaders, which are lines without
+        heads.
+      * "overview figures are intended to convey general concepts and not to
+        present data ... Research data in the context of an overview figure are
+        disconcerting."  -- the measured numbers that were inside the first
+        version (0.702, 0.518, 0.095) are gone. They live in Figure 3, where
+        they have axes and intervals.
+
+    Colour appears once, on the one tier that closes its evidence gap; rank is
+    carried by position and state by texture, which is what the column on
+    avoiding colour asks for.
     """
-    from matplotlib.patches import FancyBboxPatch, Rectangle, Polygon, FancyArrowPatch
-    A = D.SUPERVISION["table"]["arms"]
-    N = D.SUPERVISION["table"]["n_cases"]
-    W, H = 46.4, 4.15
+    from matplotlib.patches import Rectangle, FancyArrowPatch
+    W, H = 46.4, 4.45
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
-    MID = 1.72                                     # the spine every stage sits on
 
-    def box(x, y, w, h, label, sub="", fill=PALE, edge=RULE, hatch=None, lw=1.4, fs=15.5):
-        ax.add_patch(Rectangle((x, y), w, h, facecolor=fill, edgecolor=edge,
-                               lw=lw, hatch=hatch, zorder=2))
-        ax.text(x + w / 2, y + h / 2 + (0.13 if sub else 0), label, ha="center",
-                va="center", fontsize=fs, fontweight="bold", color=INK, zorder=3)
-        if sub:
-            ax.text(x + w / 2, y + h / 2 - 0.19, sub, ha="center", va="center",
-                    fontsize=fs - 3.0, color=MUTE, zorder=3)
+    NCOL, CW, GAP, X0 = 5, 7.30, 2.05, 1.15
+    TOP = H - 0.42                     # baseline the action labels sit on
+    FIELD = TOP - 0.45                 # top of the drawn state
+    BASE = 1.40                        # floor of the drawn state
 
-    def arrow(x1, y1, x2, y2, color=INK, lw=1.6, rad=0.0):
-        ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>",
-                                     mutation_scale=17, lw=lw, color=color, zorder=4,
-                                     connectionstyle="arc3,rad=%g" % rad))
+    def colx(i):
+        return X0 + i * (CW + GAP)
 
-    def stage(x, w, title):
-        ax.text(x, H - 0.26, title, fontsize=17, fontweight="bold", color=BLUE,
-                ha="left", va="top")
-        ax.plot([x, x + w], [H - 0.62, H - 0.62], color=BLUE, lw=2.0)
+    def action(i, text, note=""):
+        x = colx(i)
+        ax.text(x, TOP, text, fontsize=17, fontweight="bold", color=INK,
+                ha="left", va="baseline")
+        ax.plot([x, x + CW], [TOP - 0.20, TOP - 0.20], color=INK, lw=1.1)
+        if note:
+            ax.text(x, BASE - 0.28, note, fontsize=13, color=MUTE,
+                    ha="left", va="top")
 
-    # 1 -- any robot becomes a project ---------------------------------------
-    stage(0.30, 9.1, "1  Any robot becomes a project")
-    for i, (nm, sb, off) in enumerate((("Robot 241", "camera, GPS, 2 IMU", False),
-                                       ("Laser cart", "2 cameras, laser state", False),
-                                       ("Humanoid", "no upload yet", True))):
-        y = MID + 0.72 - i * 0.72
-        box(0.30, y, 3.60, 0.66, nm, sb, fill=WHITE,
-            hatch="////" if off else None, fs=14.5)
-        arrow(3.95, y + 0.33, 5.10, MID + 0.33, rad=-0.10 if i != 1 else 0)
-    ax.add_patch(FancyBboxPatch((5.20, MID - 0.16), 4.00, 0.98,
-                                boxstyle="round,pad=0,rounding_size=0.16",
-                                facecolor=WHITE, edgecolor=INK, lw=1.8, zorder=2))
-    ax.text(7.20, MID + 0.47, "One project", ha="center", va="center",
-            fontsize=16.5, fontweight="bold", color=INK, zorder=3)
-    ax.text(7.20, MID + 0.13, "keys, people, locked registry", ha="center",
-            va="center", fontsize=13, color=MUTE, zorder=3)
-    arrow(9.25, MID + 0.33, 10.15, MID + 0.33)
+    def tiles(i, n_our, n_web, kept=None, our_hatch=None, cols=10, size=0.30,
+              pad=0.055):
+        """Redraw the same field: our frames first, then harvested ones.
 
-    # 2 -- one round ----------------------------------------------------------
-    stage(10.20, 12.9, "2  One round, unattended")
-    steps = [("collect", True), ("filter", False), ("merge", False),
-             ("train", True), ("evaluate", False)]
-    bw, bg, x0 = 2.30, 0.36, 10.20
-    for i, (nm, paused) in enumerate(steps):
-        x = x0 + i * (bw + bg)
-        box(x, MID, bw, 0.78, nm, fill=WHITE if paused else PALE,
-            hatch="////" if paused else None, fs=15)
-        if i < len(steps) - 1:
-            arrow(x + bw, MID + 0.39, x + bw + bg, MID + 0.39)
-    xe = x0 + 4 * (bw + bg) + bw
-    # the loop back, under the row where it belongs
-    # bowed DOWNWARD, under the row. A positive rad on a right-to-left arrow
-    # bows it up and over the boxes it is supposed to run beneath.
-    ax.add_patch(FancyArrowPatch((xe - 1.1, MID - 0.04), (x0 + 1.1, MID - 0.04),
-                                 arrowstyle="-|>", mutation_scale=17, lw=1.9,
-                                 color=BLUE, zorder=4,
-                                 connectionstyle="arc3,rad=-0.30"))
-    ax.text((x0 + xe) / 2, MID - 1.12, "the next round starts from the last round's weights",
-            fontsize=13.5, color=BLUE, ha="center", va="center")
-    ax.text(x0, MID - 1.44, "hatched: paused by a stop-loss on 2026-08-29",
-            fontsize=12.5, color=MUTE, ha="left", va="center")
-    arrow(xe, MID + 0.39, xe + 0.90, MID + 0.39)
+        `kept` is the number of harvested tiles that survive; the rest are
+        drawn as hairline outlines, so the removal is the only change the eye
+        has to find between this column and the last.
+        """
+        x0, y0 = colx(i), FIELD - size
+        for k in range(n_our + n_web):
+            cx = x0 + (k % cols) * (size + pad)
+            cy = y0 - (k // cols) * (size + pad)
+            ours = k < n_our
+            if ours:
+                fc, ec, hh, lw = WHITE, INK, our_hatch, 1.1
+            elif kept is None or (k - n_our) < kept:
+                fc, ec, hh, lw = GREY, MUTE, None, 0.8
+            else:
+                fc, ec, hh, lw = WHITE, RULE, None, 0.6
+            ax.add_patch(Rectangle((cx, cy), size, size, facecolor=fc,
+                                   edgecolor=ec, lw=lw, hatch=hh, zorder=2))
+        return y0 - ((n_our + n_web - 1) // cols) * (size + pad)
 
-    # 3 -- review and escalation ---------------------------------------------
-    sx = xe + 0.95
-    stage(sx, 12.4, "3  Review, and escalation when it is stuck")
-    tiers = [("Scripted watchdog", "no decision on %d of %d" % (N, N), None),
-             ("12 deterministic checks", "%.3f grounded" % A["A0p"]["detection_grounded"]["v"], None),
-             ("Model reads the artifacts", "%.3f" % A["L2@qwen3.8:27b"]["detection_grounded"]["v"], None),
-             ("Model + retrieval over them", "%.3f" % A["L3@qwen3.8:27b"]["detection_grounded"]["v"], BLUE)]
-    tx, tw, th, gap = sx + 1.50, 8.00, 0.54, 0.12
-    for i, (nm, val, hi) in enumerate(tiers):
-        ty = MID - 0.78 + i * (th + gap)
-        box(tx, ty, tw, th, nm, fill=PALEBLU if hi else WHITE,
-            edge=hi or RULE, lw=2.0 if hi else 1.4, fs=15)
-        ax.text(tx + tw + 0.20, ty + th / 2, val, fontsize=14.5, va="center",
-                color=hi or MUTE, fontweight="bold" if hi else "normal")
-    top = MID - 0.78 + 3 * (th + gap) + th / 2
-    arrow(tx - 0.50, MID - 0.78 + th / 2, tx - 0.50, top, color=BLUE, lw=2.2)
-    ax.text(tx - 0.74, (MID - 0.95 + th / 2 + top) / 2, "stuck \u2192 ask upward",
-            rotation=90, fontsize=14, color=BLUE, ha="center", va="center",
-            fontweight="bold")
-    ax.text(tx, MID - 1.44, "grounded recall on the same %d frozen cases from this "
-            "project's own record" % N, fontsize=12.5, color=MUTE, va="center")
+    def leader(x1, y1, x2, y2, text, ha="left", fs=13.5, color=MUTE):
+        ax.plot([x1, x2], [y1, y2], color=color, lw=0.9, zorder=3)
+        ax.text(x2 + (0.10 if ha == "left" else -0.10), y2, text, fontsize=fs,
+                color=color, ha=ha, va="center", zorder=3)
 
-    # 4 -- the gate -----------------------------------------------------------
-    gx = tx + tw + 4.05
-    stage(gx - 1.60, 8.6, "4  Where it ran decides whether it counts")
-    arrow(gx - 2.45, MID + 0.33, gx - 1.60, MID + 0.33)
-    cx, cy = gx, MID + 0.33
-    ax.add_patch(Polygon([(cx, cy + 0.70), (cx + 1.50, cy), (cx, cy - 0.70),
-                          (cx - 1.50, cy)], facecolor=PALE, edgecolor=INK,
-                         lw=1.8, zorder=2))
-    ax.text(cx, cy + 0.13, "ran on the", ha="center", va="center", fontsize=14.5,
-            color=INK, zorder=3)
-    ax.text(cx, cy - 0.17, "cluster?", ha="center", va="center", fontsize=14.5,
-            fontweight="bold", color=INK, zorder=3)
-    arrow(cx + 1.55, cy + 0.26, cx + 2.25, cy + 0.60, color=BLUE, lw=1.8)
-    box(cx + 2.30, cy + 0.30, 3.3, 0.66, "the verdict counts", fill=PALEBLU,
-        edge=BLUE, lw=2.0, fs=15)
-    arrow(cx + 1.55, cy - 0.26, cx + 2.25, cy - 0.60)
-    box(cx + 2.30, cy - 0.96, 3.3, 0.66, "marked a draft", fill=WHITE, fs=15)
-    ax.text(cx - 1.50, MID - 1.44, "deciding work runs on open weights, as a batch job",
-            fontsize=12.5, color=MUTE, ha="left", va="center")
+    # a -- the state a drive leaves behind ----------------------------------
+    action(0, "A drive opens a session",
+           "9 frames drawn of 2,686; none of them is labelled")
+    tiles(0, 9, 0, cols=3)
+
+    # b -- the same nine, plus what the collector harvested ------------------
+    action(1, "The collector harvests",
+           "the same nine frames, and what six web sources returned")
+    tiles(1, 9, 47)
+
+    # c -- only the change: most of the harvest is struck out ----------------
+    action(2, "The audit keeps one source in six",
+           "outlined tiles failed the label-precision bar and are not trained on")
+    y = tiles(2, 9, 47, kept=8)
+    leader(colx(2) + 3.50, y + 0.16, colx(2) + 4.45, y + 0.62,
+           "one source clears it", ha="left", fs=13, color=INK)
+
+    # d -- the corpus becomes a checkpoint ------------------------------------
+    action(3, "The trainer runs the round",
+           "hatched: paused by a stop-loss taken on 2026-08-29")
+    tiles(3, 9, 8, our_hatch="////")
+    ax.add_patch(Rectangle((colx(3) + 4.30, FIELD - 1.05), 2.20, 1.05,
+                           facecolor=WHITE, edgecolor=INK, lw=1.3, zorder=2))
+    ax.text(colx(3) + 5.40, FIELD - 0.40, "one", ha="center", va="center",
+            fontsize=14.5, color=INK, zorder=3)
+    ax.text(colx(3) + 5.40, FIELD - 0.74, "checkpoint", ha="center", va="center",
+            fontsize=14.5, fontweight="bold", color=INK, zorder=3)
+
+    # e -- review, drawn as a staircase: rank is position ---------------------
+    action(4, "Review, and escalation when it is stuck",
+           "each rung reads the one below it and may overrule it")
+    rungs = ["scripted watchdog", "deterministic checks",
+             "a model reads the artifacts", "and the same model, given retrieval"]
+    rx, rw, rh = colx(4), 2.75, 0.28
+    for k, name in enumerate(rungs):
+        y = BASE + k * 0.50
+        top_rung = k == len(rungs) - 1
+        ax.add_patch(Rectangle((rx + k * 0.36, y), rw, rh,
+                               facecolor=BLUE if top_rung else WHITE,
+                               edgecolor=BLUE if top_rung else INK,
+                               lw=1.6 if top_rung else 1.0, zorder=2))
+        ax.text(rx + k * 0.36 + rw + 0.16, y + rh / 2, name, fontsize=13,
+                va="center", color=INK if top_rung else MUTE,
+                fontweight="bold" if top_rung else "normal", zorder=3)
+    ax.annotate("", xy=(rx - 0.30, BASE + 3 * 0.50 + rh),
+                xytext=(rx - 0.30, BASE),
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.4,
+                                shrinkA=0, shrinkB=0))
+    ax.text(rx - 0.52, BASE + 0.80, "stuck", rotation=90, fontsize=13.5,
+            color=INK, ha="center", va="center")
+
+    # the one arrowhead on the plate: the return path ------------------------
+    # The one arrowhead on the plate. Drawn as three straight segments rather
+    # than a shallow arc: an arc that long reads as two stray diagonals at the
+    # bottom of the sheet, and a right-angled return is the older convention.
+    ay = BASE - 0.92
+    xr, xl = colx(4) + 1.00, colx(0) + 1.05
+    ax.plot([xr, xr], [BASE - 0.22, ay], color=INK, lw=1.3, zorder=4)
+    ax.plot([xr, xl], [ay, ay], color=INK, lw=1.3, zorder=4)
+    ax.annotate("", xy=(xl, BASE - 0.22), xytext=(xl, ay),
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.3,
+                                shrinkA=0, shrinkB=0))
+    ax.text((xl + xr) / 2, ay - 0.14,
+            "the next round starts from the last round's weights",
+            fontsize=14, color=INK, ha="center", va="top")
 
     return save(fig, "x_algorithm",
-                "How one round runs, and what happens when it is stuck. Every stage has run; the "
-                "collector and the trainer are paused by a stop-loss taken on 2026-08-29. The four "
-                "review tiers are the arms of the supervision benchmark and the figure beside each "
-                "is its grounded recall on the same %d frozen cases, so the ladder is measured "
-                "rather than asserted. What the loop does not yet do is choose for itself when to "
-                "climb it." % N)
+                "One round, as states. Each column redraws the field of the column before it and "
+                "changes only what that step changed: nine of the robot's own frames, then what "
+                "the collector harvested, then the same field with everything that failed the "
+                "label-precision audit left as an outline, then the round that turns what is left "
+                "into a checkpoint. Review is a staircase because rank is the point -- each rung "
+                "reads the one below it. Every stage has run; the collector and the trainer are "
+                "hatched because a stop-loss paused them on 2026-08-29, and what the loop does "
+                "not yet do is decide for itself when to climb.")
 
 
 # ------------------------------------------------------- the four projects

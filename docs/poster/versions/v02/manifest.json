@@ -1,0 +1,83 @@
+{
+ "version": "v02",
+ "note": "algorithm diagram redrawn to Nature Methods overview-figure rules (states redrawn, actions as headers, no intervening arrows, no data inside)",
+ "commit": "226df19",
+ "decks": [
+  {
+   "look": "navy",
+   "pptx": "v02_navy.pptx",
+   "small": "v02_navy_small.pptx",
+   "body_pt": 22.1,
+   "heading_pt": 31.5,
+   "type_scale": 1.05,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  },
+  {
+   "look": "pale",
+   "pptx": "v02_pale.pptx",
+   "small": "v02_pale_small.pptx",
+   "body_pt": 22.1,
+   "heading_pt": 31.5,
+   "type_scale": 1.05,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  }
+ ]
+}
