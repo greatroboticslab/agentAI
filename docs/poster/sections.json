@@ -3,8 +3,8 @@
   {
    "id": "platform_idea",
    "theme": "platform-idea",
-   "heading": "agentAI is one platform for every robot the lab owns",
-   "body": "A robot, a drone or a sensor rig is a project. It owns its keys, its people and a locked dataset registry, and the agents harvest, filter, label and train against that registry. Adding a robot is a configuration change.",
+   "heading": "agentAI is one platform for every lab robot",
+   "body": "A robot, drone or sensor rig is a project with its own keys, people and locked dataset registry. Agents harvest, filter, label and train against it. Adding a robot is a configuration change.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -13,8 +13,8 @@
   {
    "id": "platform_domains",
    "theme": "platform-idea",
-   "heading": "Weed detection is one project here, the humanoid is still empty",
-   "body": "Open a project for any data type and any field, upload, and get an automatic diagnosis before choosing what to do next. Weed detection is one project here; so are the rover and the cart.",
+   "heading": "Any data type, any field, one project each",
+   "body": "Open a project, upload, and get an automatic diagnosis before choosing what to do next. Weed detection is one project here; so are the Rover and the laser robot.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -33,8 +33,8 @@
   {
    "id": "robots_today",
    "theme": "robots-connected",
-   "heading": "Tracked rover and laser cart are the two robots reporting in",
-   "body": "Robot 241 is a tracked rover that streams camera, GPS and two IMUs. The laser cart carries a galvanometer laser, a down camera over the work zone and a forward camera.",
+   "heading": "The Rover and the laser robot both report in",
+   "body": "The Rover runs on tracks and streams camera, GPS and two IMUs. The Laser Weed Control Robot carries a galvanometer laser, a down camera over the work zone and a forward camera.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -44,7 +44,7 @@
    "id": "vehicles",
    "theme": "robots-connected",
    "heading": "Nothing is labelled, and that rectangle is a fixed overlay",
-   "body": "Nothing here is enhanced and nothing is labelled. The rectangle in the cart's down camera is a fixed work-zone overlay: it sits at the same pixels on frames with no vegetation in them at all.",
+   "body": "Nothing here is enhanced and nothing is labelled. The rectangle in the laser robot's down camera is a fixed work-zone overlay: it sits at the same pixels on frames with no vegetation in them at all.",
    "figure": "l_robots",
    "status": "built_and_running",
    "width": "column",
@@ -73,8 +73,8 @@
   {
    "id": "uplink",
    "theme": "live-collection",
-   "heading": "A drive becomes a dataset the moment it opens",
-   "body": "A vehicle opens a session and the platform registers it as a governed dataset at that moment, while the drive is still running. Frames and sensor batches arrive over one API key. Robot 241 sends camera, GPS and two IMUs; the laser cart sends camera, laser state, vehicle telemetry and its own detections, and no position at all.",
+   "heading": "A drive becomes a dataset as it opens",
+   "body": "The platform registers a vehicle's session as a governed dataset while the drive runs. Frames and sensor batches arrive over one API key. The laser robot sends no position.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -116,7 +116,7 @@
    "id": "remote_control",
    "theme": "remote-control",
    "heading": "Signed-in users drive the rover from a plain browser",
-   "body": "A signed-in user opens the 241 project and clicks Drive. The platform reverse-proxies the robot's own console over the lab tailnet, so the rover is driven from a plain browser with no VPN client. 1,389 joystick commands have gone through that path. Two gates sit in front of it: the platform's Google login, then the robot's own password.",
+   "body": "A signed-in user opens the Rover project and clicks Drive. The platform reverse-proxies the robot's own console over the lab tailnet, so the rover is driven from a plain browser with no VPN client. 1,389 joystick commands have gone through that path. Two gates sit in front of it: the platform's Google login, then the robot's own password.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -127,8 +127,8 @@
   {
    "id": "drive_button",
    "theme": "remote-control",
-   "heading": "Drive appears on the 241 project alone",
-   "body": "The Drive button appears on the 241 project alone, because the allow-list holds one target. The rover has been off the network since 2026-08-28, and the platform answers a drive request today with its own offline page. The cart has never been drivable from the platform.",
+   "heading": "Drive appears on the Rover project alone",
+   "body": "The Drive button appears on the Rover project alone, because the allow-list holds one target. The rover has been off the network since 2026-08-28, and the platform answers a drive request today with its own offline page. The laser robot has never been drivable from the platform.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -148,7 +148,7 @@
    "id": "laser_control",
    "theme": "remote-control",
    "heading": "Laser on in 216 rows, with no target in any",
-   "body": "The cart's own operator switched the laser on during three of eight archived sessions. The platform recorded 3379 laser rows and 216 of them have the laser enabled. Every one of those 216 is in OBSERVATION phase, with no target. The laser has never been armed, aimed or fired by the platform.",
+   "body": "The laser robot's own operator switched the laser on during three of eight archived sessions. The platform recorded 3379 laser rows and 216 of them have the laser enabled. Every one of those 216 is in OBSERVATION phase, with no target. The laser has never been armed, aimed or fired by the platform.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -172,7 +172,7 @@
    "id": "analysis_example",
    "theme": "analysis-agent",
    "heading": "New code on the first attempt, for an unplanned question",
-   "body": "Asked to plot a histogram of the heading change rate on the 241 field drive, the agent wrote the code and returned the plot on the first attempt. A fixed template cannot do that, because nothing in the platform knew that question would be asked. Across the platform, 9 datasets carry 92 turns of that conversation.",
+   "body": "Asked to plot a histogram of the heading change rate on the Rover's field drive, the agent wrote the code and returned the plot on the first attempt. A fixed template cannot do that, because nothing in the platform knew that question would be asked. Across the platform, 9 datasets carry 92 turns of that conversation.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -204,7 +204,7 @@
    "id": "loop",
    "theme": "iterating-agents-brain",
    "heading": "Fifteen rounds ran with nobody in the room",
-   "body": "Two cluster jobs, one collecting and one training, ran fifteen rounds against the locked registry with nobody in the room. Every round reported success.",
+   "body": "Two cluster jobs, one collecting and one training, ran against the locked registry. Every round reported success.",
    "figure": "f_rounds",
    "status": "built_but_off",
    "width": "centre",
@@ -277,7 +277,7 @@
   {
    "id": "ladder",
    "theme": "label-quality",
-   "heading": "More harvested data cost accuracy, and we measured how much",
+   "heading": "More harvested data cost accuracy; we measured it",
    "body": "Starting fresh instead of from the last round's weights recovers +0.0287, 5.1 times this recipe's seed spread. That is the change the next campaign makes.",
    "figure": "c_ladder",
    "status": "built_and_running",
@@ -307,8 +307,8 @@
   {
    "id": "stands",
    "theme": "honesty",
-   "heading": "Standing today",
-   "body": "The collector and trainer are paused after a stop-loss on 2026-08-29. The rover has been off the tailnet since then and the platform answers a drive request with its offline page. The supervisor is advisory. None of the 2,686 frames is labelled.",
+   "heading": "Paused since 2026-08-29",
+   "body": "A stop-loss paused the collector and trainer. The Rover is off the tailnet. The supervisor is advisory. None of the 2,686 frames is labelled.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -317,8 +317,8 @@
   {
    "id": "made",
    "theme": "honesty",
-   "heading": "How the numbers were made",
-   "body": "Most in-domain numbers are mAP50-95 on the same 1,977 images under Ultralytics. RF-DETR is pycocotools and the zero-shot column is mAP50 on the 848-image split; neither is differenced against the rest. That holdout is also the validation set during training, so every mAP here is a run's best epoch.",
+   "heading": "Every mAP is a best epoch",
+   "body": "Most in-domain numbers are mAP50-95 on the same 1,977 images. That holdout is also the validation set during training, so every mAP here is a run's best epoch.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -328,7 +328,7 @@
    "id": "withdrew",
    "theme": "honesty",
    "heading": "Numbers we withdrew",
-   "body": "0.910 was a data leak, found by a content-level check we built after publishing it. 0.9033 is the best of four unseeded runs and only one of the four crossed 0.90. An earlier reading of the ladder as a flat curve is retracted.",
+   "body": "0.910 was a data leak. 0.9033 is the best of four unseeded runs; only one of the four crossed 0.90. Reading the ladder as flat is retracted.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -370,7 +370,7 @@
    "id": "rates",
    "theme": "live-collection",
    "heading": "Rates the platform holds",
-   "body": "Robot 241 samples its two IMUs, its telemetry and its control stream at 20 Hz and its GPS at 1 Hz, and sends camera frames at one per second. The laser cart streams its own detections and laser state at 5 Hz and vehicle state at 2 Hz. Telemetry travels as one gzip batch per second with a sequence number, and the platform dedupes on it.",
+   "body": "The Rover samples its two IMUs, its telemetry and its control stream at 20 Hz and its GPS at 1 Hz, and sends camera frames at one per second. The Laser Weed Control Robot streams its own detections and laser state at 5 Hz and vehicle state at 2 Hz. Telemetry travels as one gzip batch per second with a sequence number, and the platform dedupes on it.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -410,7 +410,7 @@
    "figure": "d_wall",
    "heading": "Moving a model between robots is one query on one registry",
    "status": "designed_only",
-   "body": "Because every vehicle writes into one registry through one contract, a model trained on one robot's frames can be evaluated on another's without any new plumbing: the split is a query. So far we have only run that query across datasets, and that is the hard direction. A detector trained on 40,000 harvested images loses 0.0299 on a second weed dataset; the same eight checkpoints fall on both exams. So sharing perception between the rover, the cart and whatever comes next is a measurement problem, and we have already priced it."
+   "body": "Because every vehicle writes into one registry through one contract, a model trained on one robot's frames can be evaluated on another's without any new plumbing: the split is a query. So far we have only run that query across datasets, and that is the hard direction. A detector trained on 40,000 harvested images loses 0.0299 on a second weed dataset; the same eight checkpoints fall on both exams. So sharing perception between the Rover, the laser robot and whatever comes next is a measurement problem, and we have already priced it."
   },
   {
    "id": "dispatch",
@@ -418,17 +418,15 @@
    "figure": "none",
    "heading": "Where a model runs decides whether its verdict counts",
    "status": "built_and_running",
-   "big": "27",
-   "big_label": "models the router can place",
-   "body": "A router maps a role -- collector, judge, reviewer, planner -- onto a model and a place, and the place decides whether the verdict counts. Deciding work runs on the cluster, on open weights; the lab box hosts only the small guide."
+   "body": "A router maps a role -- collector, judge, reviewer, planner -- onto a model and a place, and the place decides whether the verdict counts. Deciding work runs on the cluster."
   },
   {
    "id": "vision_platform",
    "theme": "vision",
    "figure": "none",
-   "heading": "Where this goes: one platform for any dataset, any field, any robot",
+   "heading": "Where this goes: one platform, any dataset, any robot",
    "status": "designed_only",
-   "body": "The end state is one general platform. Agents on it run without being asked, iterate on their own output, escalate to a larger model when they are out of their depth, and are fenced in a sandbox while they do it. Every capability stays in the platform after the experiment that needed it -- the routing table, the ingest contract, the dataset registry, the sandbox, the scorer -- so the next student inherits them working. That is the difference between a lab that has run an experiment and a lab that has built somewhere to run the next one."
+   "body": "Agents will run unasked, iterate on their own output, escalate to a larger model when out of their depth, all inside a sandbox. Every capability stays in the platform after its experiment, so the next student inherits it working."
   },
   {
    "id": "vision_permanent",
@@ -460,7 +458,7 @@
    "figure": "r_tta",
    "heading": "Test-time views buy a little and cost three passes per frame",
    "status": "built_and_running",
-   "body": "The deployable checkpoint, unchanged, given more views per image. Fusing without extra views buys nothing. Multi-scale with a horizontal flip buys a little and costs three passes per frame, which a robot running at 1 Hz can afford and a laser cart cannot."
+   "body": "The deployable checkpoint, unchanged, given more views per image. Fusing without extra views buys nothing. Multi-scale with a horizontal flip buys a little and costs three passes per frame, which a robot running at 1 Hz can afford and a laser robot cannot."
   },
   {
    "id": "species",
@@ -476,7 +474,7 @@
    "figure": "u_detect",
    "heading": "Twelve species, one held-out image each, boxes as the model drew them",
    "status": "built_and_running",
-   "body": "One checkpoint, twelve held-out images, one for each species in the sealed holdout. The images were drawn one per class before the model ran, and the model ran at the confidence the cart deploys at. Where it fires twice on one plant or names a neighbouring species, that is on the plate too. No ground truth is drawn, so the plate shows what the detector produces and not what it should have produced."
+   "body": "One checkpoint, twelve held-out images, one for each species in the sealed holdout. The images were drawn one per class before the model ran, and the model ran at the confidence the laser robot deploys at. Where it fires twice on one plant or names a neighbouring species, that is on the plate too. No ground truth is drawn, so the plate shows what the detector produces and not what it should have produced."
   },
   {
    "id": "r241_frames",
@@ -484,15 +482,15 @@
    "figure": "none",
    "heading": "Rover sends 640 x 360 frames at 1 Hz from every drive",
    "status": "built_and_running",
-   "body": "Robot 241 streams 640 x 360 at 1 Hz alongside GPS and two IMUs, and the platform files each drive as its own dataset the moment the session opens. 2,238 frames over 17 drives so far, none of them labelled."
+   "body": "The Rover streams 640 x 360 at 1 Hz alongside GPS and two IMUs, and the platform files each drive as its own dataset the moment the session opens. 2,238 frames over 17 drives so far, none of them labelled."
   },
   {
    "id": "cart_frames",
    "theme": "live-collection",
    "figure": "none",
-   "heading": "Cart sends two cameras and no position at all",
+   "heading": "The laser robot sends two cameras and no position at all",
    "status": "built_and_running",
-   "body": "Two cameras, one forward and one down over the work zone, arrive with laser state, vehicle telemetry and the cart's own detections. No position arrives at all."
+   "body": "Two cameras, one forward and one down over the work zone, arrive with laser state, vehicle telemetry and the laser robot's own detections. No position arrives at all."
   },
   {
    "id": "control",
@@ -521,8 +519,8 @@
   {
    "id": "label_ceiling",
    "theme": "label-quality",
-   "heading": "More data stopped helping, and the training recipe was not the reason",
-   "body": "More data kept arriving and the detector kept not improving on it. The training recipe was the first suspect: augmentation, replaying the species the model already knew, completing the missing labels. Each left the same gap, and what the elimination left standing was the data -- the boxes our own auto-labeller writes.",
+   "heading": "The recipe was not why more data stopped helping",
+   "body": "More data arrived; the detector did not improve. Augmentation, replaying known species, completing labels: each left the same gap. What stood was our auto-labeller's boxes.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "RESEARCH_LOG sessions 12-14"
@@ -530,8 +528,8 @@
   {
    "id": "label_curator",
    "theme": "label-quality",
-   "heading": "A vision model decides whether a dataset belongs, and a chat model cannot",
-   "body": "Professor Zhang's rule: have the system compare what it collected against what we already trust, and discard what sits too far away. The comparison is DINOv2 geometry, not a chat model: Gemma 4 asked to draw the box scores 0.012 F1, and shown a candidate crop it rejects none of the false ones. Fifty-one off-domain datasets were flagged out, the corpus was retrained, and the accuracy did not come back.",
+   "heading": "A vision model can judge a dataset; a chat model cannot",
+   "body": "Professor Zhang's rule: discard what sits too far from data we trust. Shown a candidate box, Gemma 4 rejects none of the false ones, so the test is DINOv2 geometry. Fifty-one datasets out, retrained, accuracy did not come back.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "CHANGELOG v3.0.35-37"
@@ -540,7 +538,7 @@
    "id": "label_unit",
    "theme": "label-quality",
    "heading": "The unit of curation has to match the unit of noise",
-   "body": "An auto-label error is one wrong box inside an image that is otherwise fine, so a filter reading a whole dataset cannot see it. The per-box tools are written -- crop every box, score the crop against an object-level reference, flag a box whose picture disagrees with its class -- and neither has been re-measured since the bug that made their first run score nothing. That is the open front.",
+   "body": "An auto-label error is one wrong box in an otherwise fine image, so a dataset-level filter cannot see it. The per-box tools are written, not re-measured. That is the open front.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "RESEARCH_LOG L969-974"
@@ -548,8 +546,8 @@
   {
    "id": "label_agent",
    "theme": "label-quality",
-   "heading": "A brain filed a falsifiable hypothesis, and it was wrong",
-   "body": "The harvested images carry no plant label: the merge gives every box a class derived from the website it came from. A brain tier proposed that this was what made the curve fall, wrote the condition that would falsify it before any job ran, and filed it for approval. A human approved it and four runs falsified it on that condition. What they exposed instead is density: nine boxes on a harvested image against under two on a clean one.",
+   "heading": "A brain's falsifiable hypothesis, and it was wrong",
+   "body": "Harvested boxes carry a class taken from the website they came from. A brain blamed that, wrote its falsifying condition first, and a human approved. Four runs falsified it. The real cost was density: nine boxes an image against under two.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "approval ap-1789102367-82097423"

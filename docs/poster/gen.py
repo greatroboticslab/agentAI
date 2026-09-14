@@ -32,7 +32,11 @@ import styles                                              # noqa: E402
 
 C, L2 = D.CENSUS, D.LEDGER
 L = L2
-FOOT_H = 2.55          # only a floor now; foot_h() measures the real thing
+FOOT_H = 1.45          # only a floor now; foot_h() measures the real thing.
+                       # It was 2.55, which is what the footer needed when the
+                       # three caveats ran to five lines each. A floor that high
+                       # kept charging the columns for footer inches after the
+                       # footer gave them back.
 
 SLOT_OF_WIDTH = {11.6: "column", 22.4: "centre", 46.4: "full"}
 FIGW = {}
@@ -45,21 +49,19 @@ except Exception:
     pass
 
 TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
-STAND = ("Built at the MTSU Great Robotics Lab. Every robot the lab owns reports into one platform; "
-         "agents on it harvest, filter, label and train; a third agent watches the other two. This is "
-         "what runs today, what the robots have recorded, and what six months of running it taught us.")
+STAND = ("Every robot the MTSU Great Robotics Lab owns reports into one platform. Agents on it harvest, filter, label and train; a third watches those two. This is what six months of running it taught us.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
 SPINE = [
-    ("platform-idea",           ["platform_idea", "system", "platform_domains"]),
+    ("One platform takes any robot, any dataset",           ["platform_idea", "system", "platform_domains"]),
     ("robots-connected",        ["robots_today", "shared_models", "future_robots"]),
     ("live-collection",         ["uplink", "r241_frames", "cart_frames", "census",
                                  "drive", "auto_diag"]),
     ("remote-control",          ["remote_control", "drive_button", "advice", "laser_control"]),
     ("analysis-agent",          ["analysis_agent", "analysis_example", "analysis_sandbox",
                                  "analysis_gap"]),
-    ("iterating-agents-brain",  ["loop", "brain", "dispatch", "watch", "supervisor"]),
+    ("Agents ran the loop, nobody in the room",  ["loop", "brain", "dispatch", "watch", "supervisor"]),
     ("results",                 ["detect_grid", "ladder", "field", "families", "species",
                                  "zeroshot", "tta", "sources", "ledger", "journey"]),
 ]
@@ -104,31 +106,30 @@ FOOTER = ["stands", "made", "withdrew"]
 # a theme's share of the sheet is whatever is left when the themes before it
 # have taken theirs, and the label campaign -- the longest theme and the reason
 # this poster exists -- came off the sheet with one block standing. The counts
-# say: two blocks for what the platform is, two for the reviewer, one for the
-# unattended loop, five for the campaign. Everything past the count is slack
+# say: two blocks for what the platform is, one for the reviewer, one for the
+# unattended loop, five for the campaign -- nine in all. Nine blocks at 26 pt
+# is a poster; fourteen at 19 pt is a page pinned to a board. Everything past the count is slack
 # that a short column may take and a crowded one gives up first.
 MTSU_COLUMNS = [
-    # The argument, not the inventory. "Two vehicles, 2,686 frames" headed a
-    # column with a logging report under it: how much was collected, which is a
-    # question anyone with a robot and an afternoon can answer. The robots
-    # appear once, in the project plate, as evidence the hardware is real.
-    ("One platform, any robot, any dataset",
-     ["platform_idea", "platform_domains", "future_robots",
-      "robots_today", "uplink", "remote_control", "shared_models"], 2),
-    ("A brain that gets stuck and asks upward",
+    # The argument, not the inventory. The robots appear once in the project
+    # plate, as evidence the hardware is real, and once here as what they send.
+    ("One platform takes any robot, any dataset",
+     ["platform_idea", "robots_today", "uplink", "platform_domains",
+      "future_robots", "remote_control", "shared_models"], 2),
+    ("The brain gets stuck and asks upward",
      # The plate leads its theme so it lands at the top of a fresh column. A
      # ten-inch block placed last in an eleven-inch column carries over into the
      # next one, which costs a later theme its column entirely.
      ["supervisor", "escalate", "dispatch",
-      "watch", "brain", "analysis_agent", "analysis_sandbox"], 2),
-    ("The agents ran the loop with nobody in the room",
+      "watch", "brain", "analysis_agent", "analysis_sandbox"], 1),
+    ("Agents ran the loop, nobody in the room",
      ["loop", "diagnosis", "auto_diag", "field", "control"], 1),
     # The label-quality campaign. The loop could not raise accuracy; the
     # suspicion moved from the recipe to the labels by elimination; the sheet
     # then says what was tried against the labels and what each attempt cost.
     # The ablations this displaced -- tta, zeroshot, families -- are training
     # variations, and a reviewer learns more from the campaign than from them.
-    ("More data stopped helping, so we went after the labels",
+    ("More data stopped helping",
      ["ladder", "label_ceiling", "label_curator", "label_unit", "label_agent",
       "sources", "label_sealed", "species", "ledger"], 5),
 ]

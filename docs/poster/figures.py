@@ -205,10 +205,8 @@ def ladder():
                      ha="center", fontsize=TICK - 3, color=MUTE,
                      annotation_clip=False)
     return save(fig, "c_ladder",
-                "(c) Three seeds at every rung on our own sealed holdout, marks are the mean "
-                "with 1 s.d. (d) The same eight checkpoints on a second weed dataset they never "
-                "saw, one seed per rung, so it carries no interval. Both exams fall, so the "
-                "narrow metric is not what makes the ladder drop.")
+                
+                "(c) Three seeds per rung, mean and 1 s.d., on our sealed holdout. (d) Same eight checkpoints, unseen weed dataset, one seed per rung. Both exams fall.")
 
 
 # ---------------------------------------------------------------- d. the wall
@@ -402,14 +400,8 @@ def supervision():
     d14 = pt("L3@qwen3:14b")["r"] - pt("L2@qwen3:14b")["r"]
     return save(fig, "e_supervision",
                 "(e) Recall and (f) grounded recall on one frozen corpus of real incidents from "
-                "this project's own record, scored by the project's own scorer. Each mark carries "
-                "its own denominator and bars are 95%% Wilson intervals. In (e) a pair's tail is "
-                "the model reading raw artifacts and its head is the same model given retrieval "
-                "over them; the dashed rule is "
-                "the ceiling a rules-only arm can reach, and an arrow is dotted where its two ends "
-                "were scored on different cases. The scripted watchdog returned no decision on any "
-                "of %d. Qwen2.5-7B has the highest recall on the page and 0.55 of it quotes "
-                "nothing; Qwen3.8-27B has no such gap." % S["a0_cases"])
+                "our own record, scored by our own scorer. Tail: model on raw artifacts; head: "
+                "same model with retrieval. Dotted arrow: ends scored on different cases.")
 
 
 # --------------------------------------------------- photographic plates
@@ -459,7 +451,7 @@ def detect_grid():
     return _plate(
         "u_detect", "u_detect.jpg", 46.4,
         "Twelve images from the sealed %s-image holdout, one per species, run through the "
-        "deployed checkpoint at the confidence the cart fires at. Every box and every label is "
+        "deployed checkpoint at the confidence the laser robot fires at. Every box and every label is "
         "the model's output; no ground truth is drawn. Seed %d scores %.4f mAP50-95 and %.4f "
         "mAP50 over all %s images on one plain inference pass; the ledger's %s is the three-seed "
         "mean at each run's best epoch under Ultralytics, on a holdout that doubled as the "
@@ -471,7 +463,7 @@ def r241_grid():
     n = _cells("m_r241.jpg", 3)
     return _plate(
         "v_r241", "m_r241.jpg", 11.6,
-        "Robot 241, %d frames from %d drives. Each is the most vegetated frame in its drive, which "
+        "The Rover, %d frames from %d drives. Each is the most vegetated frame in its drive, which "
         "is a selection rule and is stated as one: the rover also records paved and indoor runs. "
         "2,238 frames in all, none labelled." % (n, n))
 
@@ -480,7 +472,7 @@ def cart_grid():
     n = _cells("m_cart.jpg", 3)
     return _plate(
         "v_cart", "m_cart.jpg", 11.6,
-        "The laser cart, %d frames from six drives. The rectangle is the cart's fixed work-zone "
+        "The laser robot, %d frames from six drives. The rectangle is the laser robot's fixed work-zone "
         "overlay: it sits at the same pixels whether the frame is grass or an indoor floor, so it "
         "is not a detection. 427 frames in all." % n)
 
@@ -510,7 +502,7 @@ def algorithm():
     """
     from matplotlib.patches import FancyBboxPatch, Rectangle
     W, H = 46.4, 4.15
-    STN, SUB, LAD, EDGE = 30.0, 21.0, 21.0, 22.0
+    STN, SUB, LAD, EDGE = 34.0, 24.0, 24.0, 25.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
@@ -538,10 +530,17 @@ def algorithm():
         ("Work out what would answer it", "the agent reads the registry and names what is missing"),
         ("Go and get it", "harvest from public sources, then audit what came back"),
         ("Train on what survived", "scored against a holdout it never saw"),
-        ("Read the result, decide what is next", "and when it cannot, it asks upward"),
+        ("Read the result and decide", "what to ask for next"),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
+    fit = int(bw * 72 / (STN * 0.55))
+    over = [t for t, _s in stations if len(t) > fit]
+    assert not over, ("station title wider than its box at %g pt (max %d chars): %s"
+                      % (STN, fit, over))
+    # Two sub-lines is what the box holds; a third prints below its own rule.
+    deep = [t for t, sb in stations if len(_wrap(sb, 40)) > 2]
+    assert not deep, "station sub-line runs past the box: %s" % deep
     for i, ((title, sub), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
                                edgecolor=INK, lw=1.7, zorder=3))
@@ -591,20 +590,12 @@ def algorithm():
     # drawing: four lines of prose inside a schematic is a paragraph wearing a
     # figure's clothes.
     lx = L + 8.6
-    ax.text(lx, ry0 + 1.46, "what the agent decided goes back to",
-            fontsize=EDGE, color=INK, ha="center", va="center")
-    ax.text(lx, ry0 + 1.04, "what it asks for next",
+    ax.text(lx, ry0 + 1.20, "the decision becomes the next need",
             fontsize=EDGE, color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",
-                "The loop an agent runs to answer a need, drawn as a loop. A need arrives, the "
-                "agent works out what data would answer it, goes and gets it, trains on what "
-                "survives the audit and scores it, then reads its own result and decides what to "
-                "ask for next. When it cannot decide it climbs the ladder inside the loop, each "
-                "rung reading the one below it and free to overrule it. The outward run is solid "
-                "because it runs unattended today. The return run is dashed because it is the one "
-                "edge the platform has not closed: the decision is written into the round's record "
-                "and nothing reads it back, and closing that edge is the work this poster is about.")
+                
+                "A need arrives, the agent works out what data would answer it, fetches it, trains on what survives the audit, scores, decides what to ask next. Stuck, it climbs the ladder. Dashed: the decision is recorded, nothing reads it back.")
 
 
 def _wrap(text, n):
@@ -651,7 +642,7 @@ def _pic(ax, path, box, ax_w_in, ax_h_in, crop=0.5, fallback=None,
                                lw=1.2, zorder=3))
 
 
-FIG_W, FIG_H = 46.4, 4.45
+FIG_W, FIG_H = 46.4, 3.90
 
 
 def projects():
@@ -672,10 +663,13 @@ def projects():
     total = sum(p["w"] for p in P)
     span = (R - L) - GAP * (len(P) - 1)
     x = L
-    # The introductions are the first prose a visitor reads. At ANNOT+1 they
-    # were the smallest type on the plate, under an inch of empty paper.
-    BLURB = AXIS + 3.5
-    step, indent = 0.345 / (0.980 * FIG_H), 0.075
+    # The introductions are the first prose a visitor reads, and at ANNOT+1 they
+    # were the smallest type on the sheet -- under a professor's note that the
+    # font is too small. They are set larger than the column body now, and the
+    # plate pays for it by being shorter: the picture takes whatever height the
+    # text leaves, instead of a fixed height the text then overruns.
+    BLURB, NAME = AXIS + 9, AXIS + 12
+    step_in = BLURB * 1.25 / 72.0
     for pr in P:
         w = span * pr["w"] / total
         ax = fig.add_axes([x, 0.010, w, 0.980])
@@ -686,48 +680,63 @@ def projects():
         ax.set_xlim(0, 1); ax.set_ylim(0, 1)
         cell_w_in = w * FIG_W
         ax_h_in = 0.980 * FIG_H
+        step = step_in / ax_h_in
         lay = pr.get("layout", "top")
+        name_in = NAME * 1.30 / 72.0
 
-        ax.text(0, 0.985, pr["name"], fontsize=AXIS + 6, fontweight="bold",
+        ax.text(0, 0.985, pr["name"], fontsize=NAME, fontweight="bold",
                 color=INK, va="top")
-        ytop = 1.0 - (0.44 / ax_h_in)
+        ytop = 1.0 - (name_in / ax_h_in)
+
+        def wrapped(width_in):
+            n = max(24, int((width_in - 0.55) * 72 / (BLURB * 0.50)))
+            return textwrap.wrap(pr["blurb"], n)
 
         if lay == "side":
             # a square, so the machine is not cropped to fit a neighbour's shape
-            # A square, capped so the plate stays short enough to leave the
-            # columns their inches: a 5.4 in square read the rover whole but
-            # cost the sheet two blocks of argument.
-            side_in = min(cell_w_in * 0.40, 2.85, ax_h_in - 0.50)
+            side_in = min(cell_w_in * 0.40, 2.75, ax_h_in - name_in - 0.18)
             pw, ph = side_in / cell_w_in, side_in / ax_h_in
             _pic(ax, pr["photo"], (0.0, ytop - ph, pw, ph), cell_w_in, ax_h_in,
                  pr.get("crop", 0.5), pr.get("fallback"))
             if pr.get("photo_note"):
                 ax.text(0.0, ytop - ph - 0.035, pr["photo_note"], fontsize=ANNOT - 2,
                         color=MUTE, style="italic", va="top")
-            tx, tw_chars = pw + 0.045, int((cell_w_in * (1 - pw - 0.045) - 0.6) * 72 / (BLURB * 0.50))
+            tw_in = cell_w_in * (1 - pw - 0.045)
+            lines = wrapped(tw_in)
+            tx = pw + 0.045
             y = ytop - 0.02
-        elif lay == "pair":
-            ph = 2.30 / ax_h_in
-            half = (1.0 - 0.012) / 2.0
-            _pic(ax, pr["photo"], (0.0, ytop - ph, half, ph), cell_w_in, ax_h_in,
-                 pr.get("crop", 0.5))
-            _pic(ax, pr.get("photo2", ""), (half + 0.012, ytop - ph, half, ph),
-                 cell_w_in, ax_h_in, pr.get("crop", 0.5))
-            tx, tw_chars = 0.0, int((cell_w_in - 0.6) * 72 / (BLURB * 0.50))
-            y = ytop - ph - 0.05
         else:
-            ph = 1.70 / ax_h_in
-            _pic(ax, pr["photo"], (0.0, ytop - ph, 1.0, ph), cell_w_in, ax_h_in,
-                 pr.get("crop", 0.5), pr.get("fallback"))
-            tx, tw_chars = 0.0, int((cell_w_in - 0.6) * 72 / (BLURB * 0.50))
-            y = ytop - ph - 0.05
+            lines = wrapped(cell_w_in if lay == "top" else cell_w_in)
+            # the picture takes what the text leaves, within reason
+            free = ax_h_in - name_in - 0.16 - len(lines) * step_in
+            lo, hi = (1.15, 2.20) if lay == "top" else (1.30, 2.55)
+            pic_in = max(lo, min(hi, free))
+            ph = pic_in / ax_h_in
+            if lay == "pair":
+                half = (1.0 - 0.012) / 2.0
+                _pic(ax, pr["photo"], (0.0, ytop - ph, half, ph), cell_w_in,
+                     ax_h_in, pr.get("crop", 0.5))
+                _pic(ax, pr.get("photo2", ""), (half + 0.012, ytop - ph, half, ph),
+                     cell_w_in, ax_h_in, pr.get("crop", 0.5))
+            else:
+                _pic(ax, pr["photo"], (0.0, ytop - ph, 1.0, ph), cell_w_in,
+                     ax_h_in, pr.get("crop", 0.5), pr.get("fallback"))
+            tx = 0.0
+            y = ytop - ph - 0.045
 
-        for ln in textwrap.wrap(pr["blurb"], max(24, tw_chars)):
+        for ln in lines:
             ax.text(tx, y, ln, fontsize=BLURB, color=INK, va="top")
             y -= step
+        # Text past the bottom of the plate is invisible in the PNG thumbnail
+        # and obvious at 48 inches. The blurb budget is what keeps this true,
+        # so the plate refuses to be built when a blurb outgrows it.
+        if y < -0.035:
+            raise AssertionError(
+                "%s: blurb overruns the plate by %.2f in -- shorten it or raise FIG_H"
+                % (pr["name"], -y * ax_h_in))
     return save(fig, "q_projects",
-                "Every project on the platform was opened the same way, sends through the same ingest "
-                "contract, and is trained and evaluated by the same agents.")
+                
+                "Every project on the platform opened the same way, same ingest contract, same agents train and evaluate it.")
 
 
 # ------------------------------------------------------------- the model ledger
@@ -799,9 +808,9 @@ def system():
     C = D.CENSUS
     stages = [
         ("Two ground robots", [
-            "robot 241  %s frames, %d drives" % ("{:,}".format(C["r241_frames"]),
+            "Rover  %s frames, %d drives" % ("{:,}".format(C["r241_frames"]),
                                                  C["r241_sessions"]),
-            "laser cart  %d frames, %d drives" % (C["cart_frames"], C["cart_sessions"]),
+            "laser robot  %d frames, %d drives" % (C["cart_frames"], C["cart_sessions"]),
             "uplink test  %d frames, %d drive" % (C["smoke_frames"], C["smoke_sessions"]),
             "%s telemetry rows, 9 streams" % "{:,}".format(C["sensor_rows"]),
             "%.0f m of GPS track" % C["gps_m"]], BLUE, "runs"),
@@ -1006,7 +1015,7 @@ def field():
     ax.axis("off")
     return save(fig, "p_field",
                 "The deployable checkpoint over every frame the two robots recorded, at the "
-                "confidence the cart deploys at. There is no ground truth for these frames, so "
+                "confidence the laser robot deploys at. There is no ground truth for these frames, so "
                 "this is the rate at which the detector produces a box at all -- not recall and "
                 "not precision. Vegetation is excess green over a thumbnail, so \"nothing to "
                 "detect\" does not account for it: %d frames clear that bar and %d of them draw a "
@@ -1024,10 +1033,10 @@ def robots_wide():
     # Cropped to 2.35:1 so four frames fill the full width without the bands of
     # white that a 16:9 frame leaves when it is laid out four across 46 inches.
     fig, axes = plt.subplots(1, 4, figsize=(46.4, 4.40))
-    shots = [("r241_row.jpg", "robot 241", "along a mulched crop row"),
-             ("r241_weeds.jpg", "robot 241", "weeds between the rows"),
-             ("lc_down.jpg", "laser cart", "down camera, work-zone overlay"),
-             ("lc_front.jpg", "laser cart", "forward camera")]
+    shots = [("r241_row.jpg", "Rover", "along a mulched crop row"),
+             ("r241_weeds.jpg", "Rover", "weeds between the rows"),
+             ("lc_down.jpg", "laser robot", "down camera, work-zone overlay"),
+             ("lc_front.jpg", "laser robot", "forward camera")]
     for ax, (fn, who, what), let in zip(axes, shots, "abcd"):
         im = plt.imread(os.path.join(HERE, "photos", fn))
         h, wpx = im.shape[0], im.shape[1]
@@ -1056,8 +1065,8 @@ def robots():
     equipment on real ground, so these are frames straight out of the archive.
     Nothing is enhanced and nothing is labelled.
 
-    The rectangle in the cart's down camera is a FIXED WORK-ZONE OVERLAY, not a
-    detection. An earlier version of this caption called it "the cart's own
+    The rectangle in the laser robot's down camera is a FIXED WORK-ZONE OVERLAY, not a
+    detection. An earlier version of this caption called it "the machine's own
     detector drawing on its own video", which a reader could falsify in one
     click: it sits at the same pixels, at the same size, on frames with no
     vegetation in them at all. Checked 2026-09-12 by pulling the lowest-
@@ -1065,10 +1074,10 @@ def robots():
     beside the highest (0.263, grass) -- same rectangle on both.
     """
     P = D.CENSUS
-    shots = [("r241_row.jpg", "robot 241", "along a mulched crop row"),
-             ("r241_weeds.jpg", "robot 241", "weeds between the rows"),
-             ("lc_down.jpg", "laser cart", "down camera, work-zone overlay"),
-             ("lc_front.jpg", "laser cart", "forward camera")]
+    shots = [("r241_row.jpg", "Rover", "along a mulched crop row"),
+             ("r241_weeds.jpg", "Rover", "weeds between the rows"),
+             ("lc_down.jpg", "laser robot", "down camera, work-zone overlay"),
+             ("lc_front.jpg", "laser robot", "forward camera")]
     fig, axes = plt.subplots(1, 4, figsize=(11.600, 2.60))
     for ax, (fn, who, what), let in zip(axes, shots, "lmno"):
         img = plt.imread(os.path.join(HERE, "photos", fn))
@@ -1082,9 +1091,9 @@ def robots():
                 bbox=dict(boxstyle="square,pad=0.22", fc=WHITE, ec="none", alpha=0.86))
         ax.set_xlabel("%s   %s" % (who, what), fontsize=9, color=MUTE, labelpad=5)
     return save(fig, "l_robots",
-                "Frames as recorded, unenhanced. Robot 241 has sent %s frames at %s and %g Hz, "
-                "the laser cart %d, and %d of the cart's were taken in a field. None of the %s is "
-                "labelled. The rectangle in the down camera is the cart's fixed work-zone overlay. "
+                "Frames as recorded, unenhanced. The Rover has sent %s frames at %s and %g Hz, "
+                "the laser robot %d, and %d of its were taken in a field. None of the %s is "
+                "labelled. The rectangle in the down camera is the laser robot's fixed work-zone overlay. "
                 "It is drawn on every frame, including the ones with no vegetation in them."
                 % ("{:,}".format(P["r241_frames"]), P["r241_res"], P["r241_hz"],
                    P["cart_frames"], P["cart_field_frames"],
@@ -1201,7 +1210,7 @@ def drive():
                                                   len(rows) / (t[-1] or 1)),
              transform=ax2.transAxes, fontsize=10, color=MUTE, ha="right")
     return save(fig, "h_drive",
-                "Robot 241, 2026-08-29: one 213 s pass through a crop plot. (h) GPS track from the "
+                "The Rover, 2026-08-29: one 213 s pass through a crop plot. (h) GPS track from the "
                 "board fix. (i) IMU heading over the same pass.")
 
 

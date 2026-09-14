@@ -15,3 +15,6 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v11** (b1e9f04) — label campaign on the sheet; shed goes round the themes; each theme declares what it may not lose; algorithm figure an inch shorter with bigger type — body 19.3 pt, 17 blocks
 - **v12** (b1e9f04) — campaign complete at 21 pt: shorter blocks, protected-coverage tier choice, one closing band — body 21.0 pt, 13 blocks
 - **v13** (b1e9f04) — campaign reads clean: falsifiable-hypothesis heading, no false off-switch note, no orphan word in the loop figure — body 21.0 pt, 13 blocks
+- **v14** (6e99d9b) — professor's note: half the words, 28 pt body; Rover and Laser Weed Control Robot — body 28.1 pt, 11 blocks
+- **v15** (6e99d9b) — captions regenerated from source; all 22 plates redrawn at the new type — body 28.1 pt, 11 blocks
+- **v16** (6e99d9b) — dispatch fits the reviewer column; no orphan word in the platform sub-head — body 28.1 pt, 12 blocks

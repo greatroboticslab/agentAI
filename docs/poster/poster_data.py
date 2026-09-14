@@ -405,34 +405,23 @@ PROJECTS = [
     #   pair  two pictures across the top, text under them
     {"key": "weed", "name": "Weed Detection", "layout": "top",
      "photo": "u_detect_4.jpg", "crop": 0.5, "w": 10.2,
-     "blurb": "Two agents work the same corpus without being asked. One goes out to public "
-              "sources, brings weed imagery back and audits what it brought; the other trains a "
-              "detector on whatever survives the audit and scores it. The registry behind them "
-              "holds more than 150,000 labelled weed images, and the detector that comes out is "
-              "small enough to ride on the robots themselves."},
+     "blurb": 
+              "Two agents work the corpus unasked: one harvests imagery and audits it, the other trains a detector small enough to ride the robots. More than 150,000 labelled images."},
 
-    {"key": "241_robot", "name": "241 Robot", "layout": "side",
+    {"key": "241_robot", "name": "Rover", "layout": "side",
      "photo": "r241_robot.jpg", "crop": 0.50, "w": 12.4,
-     "blurb": "A tracked rover built for the row: narrow enough to turn inside one and tough "
-              "enough to cross the beds between them, so it can reach parts of a field a tractor "
-              "cannot. It carries a camera, GPS and two inertial units and streams all of them "
-              "live into the platform. That stream is what an autonomous-driving model for the "
-              "field is trained on, and a signed-in user drives the rover from a plain browser."},
+     "blurb": 
+              "A tracked rover narrow enough to turn inside a row and reach where a tractor cannot. Camera, GPS and two inertial units stream live; the stream trains a driving model."},
 
-    {"key": "laser_cart", "name": "Laser Cart", "layout": "side",
+    {"key": "laser_cart", "name": "Laser Weed Control Robot", "layout": "side",
      "photo": "lasercar_field.jpg", "fallback": "lc_front.jpg", "crop": 0.5, "w": 12.4,
-     "blurb": "A twin-laser weeder. A YOLO detector finds the weed in the frame, the two "
-              "galvanometer lasers are aimed at it and fired, and the weed is killed where it "
-              "stands -- no chemical, and nothing touches the crop beside it. One camera looks "
-              "down over the work zone and one looks forward, and both stream into the platform "
-              "while the cart's own operator drives and fires it."},
+     "blurb": 
+              "A twin-laser weeder. A YOLO detector finds the weed; two galvanometer lasers aim and fire, and it dies where it stands. No chemical, nothing touches the crop beside it."},
 
     {"key": "humanoid_robot", "name": "Humanoid and Quadruped", "layout": "pair",
      "photo": "humanoid_dog.jpg", "photo2": "team_field.jpg", "crop": 0.5, "w": 11.4,
-     "blurb": "A humanoid and a quadruped, taken out to the farm to record where wheels do not "
-              "go. Their project is already open and takes the same ingest contract the rover and "
-              "the cart use, so the day either of them opens a session it is a governed dataset "
-              "like any other."},
+     "blurb": 
+              "A humanoid and a quadruped, out on the farm to record where wheels do not go. Their project takes the ingest contract the Rover uses; any session they open is governed."},
 ]
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
