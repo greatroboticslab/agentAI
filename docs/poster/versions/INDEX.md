@@ -24,3 +24,5 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v20** (9297a72) — sub-heads measured as Arial bold, so a two-line one is not drawn over — body 29.4 pt, 12 blocks
 - **v21** (19a4747) — rider dropped: it caveated numbers the sheet does not print; the live clause moved into figure 4's caption — body 29.4 pt, 12 blocks
 - **v22** (56cd93c) — x label below the n row; no repeated status stamp — body 29.4 pt, 12 blocks
+- **v23** (472b948) — the sheet says what it is for: compounding as the premise, open weights as the position — body 29.4 pt, 12 blocks
+- **v24** (472b948) — column two states the position that explains it: open weights, and a ladder — body 29.4 pt, 12 blocks

@@ -49,7 +49,9 @@ except Exception:
     pass
 
 TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
-STAND = ("Every robot the MTSU Great Robotics Lab owns reports into one platform. Agents on it harvest, filter, label and train; a third watches those two. This is what six months of running it taught us.")
+STAND = ("One platform where agents collect their own data and train on it, month after month, "
+         "so the model compounds while nobody is watching. We built it, ran it unattended for "
+         "fifteen rounds, and it got worse. This is why.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
@@ -130,7 +132,7 @@ MTSU_COLUMNS = [
     ("One platform takes any robot, any dataset",
      ["platform_idea", "robots_today", "uplink", "platform_domains",
       "future_robots", "remote_control", "shared_models"], 2),
-    ("The brain gets stuck and asks upward",
+    ("Open weights, and a ladder when stuck",
      # The plate leads its theme so it lands at the top of a fresh column. A
      # ten-inch block placed last in an eleven-inch column carries over into the
      # next one, which costs a later theme its column entirely.
