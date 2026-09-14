@@ -28,3 +28,5 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v24** (472b948) — column two states the position that explains it: open weights, and a ladder — body 29.4 pt, 12 blocks
 - **v25** (f715d39) — four wheels not tracks, two galvanometers not one, and the supervision arm is signals handed up, not retrieval — body 29.4 pt, 12 blocks
 - **v26** (63942d3) — the stand-first states the finding, not the disappointment — body 29.4 pt, 12 blocks
+- **v27** (c6292c8) — no title on figure 1; the bar printed; the corpus that never changed; a chat model rubber-stamps a box — body 29.4 pt, 13 blocks
+- **v28** (c6292c8) — line height measured, not assumed: every block was a fifth short — body 28.1 pt, 12 blocks

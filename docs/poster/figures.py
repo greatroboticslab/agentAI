@@ -635,7 +635,7 @@ def algorithm():
              ("deterministic checks", "checks"),
              ("a model reads the artifacts", "read"),
              ("the same model, handed those checks", "retrieve")]
-    rw, rh, rise, stepx = 6.50, 0.74, 0.30, 5.55
+    rw, rh, rise, stepx = 7.05, 0.74, 0.30, 5.55
     rx0, ry0 = 19.90, 0.52
     for k, (name, icon) in enumerate(rungs):
         x, y = rx0 + k * stepx, ry0 + k * rise
@@ -649,6 +649,10 @@ def algorithm():
         ax.text(x + 0.88, y + rh / 2, name, fontsize=LAD,
                 va="center", ha="left", color=ink,
                 fontweight="bold" if top else "normal", zorder=4)
+    # a rung whose label is wider than its box is clipped, and the clip is
+    # invisible at thumbnail size -- the top rung printed "handed those chec".
+    wide = [n for n, _i in rungs if 0.88 + len(n) * LAD * 0.50 / 72.0 > rw]
+    assert not wide, "ladder rung label wider than its box: %s" % wide
     arrowhead(rx0 - 0.95, ry0 + rh / 2, 0.80)
     ax.text(rx0 - 1.20, ry0 + rh / 2, "escalate\nwhile stuck",
             fontsize=LAD, color=INK, ha="right", va="center",

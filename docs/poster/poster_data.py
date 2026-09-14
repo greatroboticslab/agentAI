@@ -185,7 +185,10 @@ ROUNDS = {
     # The recipe the campaign actually ran -- warm start, epochs=60, patience=20,
     # time=10.0 -- repeated over three seeds. Its spread is the only seed-noise
     # measurement this project owns, so every sigma below is quoted against it.
-    "recipe_seeds": [0.5607, 0.55915, 0.55309],   # seed 101 is round 15 itself
+    # the artifact digits, not the rounded ones: 0.5607 instead of 0.56072
+    # shifts the seed spread enough to print 5.1 sigma where the diagnosis
+    # document prints 5.0, and the two are read side by side.
+    "recipe_seeds": [0.56072, 0.55915, 0.55309],  # seed 101 is round 15 itself
     "recipe_src": "round 15 + ctl_seed_s102/s103_45672672.json",
     "src": "Mongo round ledger + results/framework/mega_iter*/*/results.csv (41 curves, probe6.json)",
 }

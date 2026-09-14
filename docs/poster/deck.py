@@ -54,6 +54,16 @@ COL = [(0.8, 11.6), (12.8, 22.4), (35.6, 11.6)]
 FULL = (0.8, 46.4)
 
 BODY, CAPTION, HEADING, SUBHEAD, TITLE, STAND = 20, 16, 34, 24, 120, 34
+
+# A renderer applies `line_spacing` as a multiple of the FONT's natural line
+# height, not of the point size, so a paragraph set at 1.22 does not occupy
+# lines x size x 1.22 / 72 inches. Measured rather than assumed: a 29.4 pt
+# Georgia paragraph at spacing 1.22 renders a 0.5958 in pitch against a
+# nominal 0.4982, and a 29.4 pt Arial paragraph at spacing 1.00 renders
+# 0.4896 against 0.4083 -- 1.196 and 1.199. Without this factor every block
+# on the sheet is measured a fifth short, which is why text has run past the
+# bottom of its panel and off the foot of the sheet.
+LINE_H = 1.20
 TABLE_TXT = 17
 
 
@@ -132,7 +142,7 @@ class Deck(object):
                   "Arial Narrow": 0.425}.get(self.f["body"], 0.50)
         cpl = max(14, int((w * 72.0) / (size * em)))
         lines = sum(max(1, -(-len(p) // cpl)) for p in s.split("\n"))
-        return lines * size * spacing / 72.0 + after / 72.0
+        return lines * size * spacing * LINE_H / 72.0 + after / 72.0
 
     @staticmethod
     def words(*strings):
