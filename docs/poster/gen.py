@@ -67,6 +67,10 @@ SPINE = [
 # Drawn full width, straight under the opening, because four photographs in a
 # row is the one thing a visitor reads before any prose.
 BAND = "projects"
+# The full-width plates that open the sheet, in order: the four projects, then
+# the algorithm. "We do not have algorithm diagrams for the agent poster. One
+# good looking diagram is fine." -- Hongbo Zhang.
+BANDS = ["projects", "algorithm"]
 
 # A second full-width strip, drawn just above the closing when its plate has no
 # column of its width in this grid -- which is every grid, because it is 46.4 in
@@ -137,7 +141,12 @@ class Poster(object):
         # gives up blocks to fit two bands, then removes a band, and either the
         # blocks stay lost or the loop starts over and gives up the same ones
         # again. One band costs about 5.4 in of sheet, which is 21 in of column.
-        self.tail_ids = (["detect_grid"] if getattr(st, "look", "") == "mtsu"
+        # One full-width diagram, not three full-width bands. "We do not have
+        # algorithm diagrams for the agent poster. One good looking diagram is
+        # fine." The twelve-species strip cost 5.6 in and showed that the
+        # detector fires, which the weed cell of the project plate already
+        # shows; the algorithm is what this poster is about.
+        self.tail_ids = ([] if getattr(st, "look", "") == "mtsu"
                          else list(TAIL_BANDS))
         self.d = Deck(TITLE, STAND, style=st)
 
@@ -303,22 +312,25 @@ class Poster(object):
         return y + 0.36
 
     def band(self, y, fig_no):
-        """The four-project strip, full width."""
+        """The full-width plates that open the sheet, in order."""
         d = self.d
-        sid = BAND
-        if sid not in self.lib or "q_projects" not in FIGW:
-            return y
-        s = self.lib[sid]
         x, w = d.FULL
-        y = d.head(x, y, w, s["heading"])
-        y = d.figure(x, y, w, "q_projects", "Figure %d." % fig_no[0]); fig_no[0] += 1
-        # No body text under this one: the caption and the four columns of the
-        # plate itself already carry every sentence the section had, and printing
-        # both put the same claim on the sheet twice, four inches apart.
-        return y + d.dz["sec_gap"] * 0.6
+        for sid in BANDS:
+            s = self.lib.get(sid)
+            if not s:
+                continue
+            f = s.get("figure") or "none"
+            if abs(FIGW_IN.get(f, 0) - w) > 0.02:
+                continue
+            y = d.head(x, y, w, s["heading"])
+            y = d.figure(x, y, w, f, "Figure %d." % fig_no[0]); fig_no[0] += 1
+            if s.get("body"):
+                y = d.body(x, y, w, s["body"], after=10)
+            y += d.dz["sec_gap"] * 0.6
+        return y
 
     def _full_bands(self):
-        """The sections whose plate is 46.4 in wide: they can only run full width."""
+        """Sections whose plate is 46.4 in wide: they can only run full width."""
         out = []
         for sid in self.tail_ids:
             s = self.lib.get(sid)
@@ -338,7 +350,7 @@ class Poster(object):
             if not os.path.exists(fp):
                 continue
             im = Image.open(fp)
-            h += (d.dz["heading"] / 72.0 * 1.34 + 0.30
+            h += (self._head_h(d, d.FULL[1], self.lib[sid]["heading"])
                   + d.FULL[1] * im.size[1] / float(im.size[0]) + 0.95)
         return h
 
@@ -489,7 +501,12 @@ class Poster(object):
         """
         d = self.d
         fig_no = [1]
-        y0 = self.band(self.mtsu_kpi(d.top), fig_no) if draw else self._mtsu_top()
+        # The same y0 either way. A trial that used an ESTIMATE of where the
+        # columns start while the draw used the real position thought it had
+        # room it did not, and a pinned plate that fitted in every trial fell
+        # off the finished sheet.
+        y0 = (self.band(self.mtsu_kpi(d.top), fig_no) if draw
+              else self._mtsu_top_real())
         limit = H - FOOT_H - 0.95 - self.closing_h() - self.tail_band_h()
         avail = limit - y0
 
@@ -595,6 +612,25 @@ class Poster(object):
                 d.panel_close(sh, foot)
         return (not spilled and max(ends) <= limit + 0.05), ends, fig_no, spilled
 
+    def _mtsu_top_real(self):
+        """Where the columns start, measured by drawing into a scratch deck.
+
+        Cached per type tier, because it only depends on the tier and on the
+        two opening plates.
+        """
+        key = round(self.st.d["body"], 2)
+        cache = getattr(self, "_y0_cache", None)
+        if cache is None:
+            cache = self._y0_cache = {}
+        if key not in cache:
+            real = self.d
+            try:
+                self.d = Deck(TITLE, STAND, style=self.st)
+                cache[key] = self.band(self.mtsu_kpi(self.d.top), [1])
+            finally:
+                self.d = real
+        return cache[key]
+
     def _mtsu_top(self):
         """Where the columns start, without drawing anything."""
         d = self.d
@@ -605,13 +641,19 @@ class Poster(object):
             cw = d.FULL[1] / float(len(cells))
             note_h = max(d.h_est(c[2], cw, 15, 1.10) for c in cells)
             y += 0.22 + 52 / 72.0 * 1.06 + 17 / 72.0 * 1.42 + note_h + 0.52
-        s = self.lib.get(BAND)
-        if s:
-            fp = os.path.join(d.FIG, "q_projects.png")
+        for sid in BANDS:
+            s = self.lib.get(sid)
+            if not s:
+                continue
+            f = s.get("figure") or "none"
+            fp = os.path.join(d.FIG, f + ".png")
+            if abs(FIGW_IN.get(f, 0) - d.FULL[1]) > 0.02 or not os.path.exists(fp):
+                continue
             y += self._head_h(d, d.FULL[1], s["heading"])
-            if os.path.exists(fp):
-                im = Image.open(fp)
-                y += d.FULL[1] * im.size[1] / float(im.size[0]) + 0.70
+            im = Image.open(fp)
+            y += d.FULL[1] * im.size[1] / float(im.size[0]) + 0.70
+            if s.get("body"):
+                y += d.h_est(s["body"], d.FULL[1], d.dz["body"], 1.22, 10)
             y += d.dz["sec_gap"] * 0.6
         return y
 
@@ -624,6 +666,7 @@ class Poster(object):
             if k in base:
                 self.st.d[k] = round(base[k] * scale, 1)
         self.st.d["sec_gap"] = base["sec_gap"] * scale
+        self._y0_cache = {}
         self.d = Deck(TITLE, STAND, style=self.st)
         return self.d
 
@@ -632,7 +675,7 @@ class Poster(object):
         self._set_scale(base, scale)
         self._fig_off = set()
         d = self.d
-        skip = set(TAIL_BANDS) | {BAND} | set(CLOSING) | set(self.tail_ids)
+        skip = set(TAIL_BANDS) | set(BANDS) | set(CLOSING) | set(self.tail_ids)
         flow = []
         for head, ids in MTSU_COLUMNS:
             first = True
@@ -696,7 +739,7 @@ class Poster(object):
                     break
             if not placed:
                 break
-        return flow, dropped
+        return flow, dropped, set(self._fig_off)
 
     def build_mtsu(self, out):
         """Four themes flowed across the columns, not bolted one per column.
@@ -721,9 +764,9 @@ class Poster(object):
         # read from four feet, leaving a third of its measure blank.
         trials = []
         for scale in (1.52, 1.46, 1.40, 1.34, 1.28, 1.22, 1.16, 1.10, 1.05, 1.00):
-            flow, dropped = self._mtsu_fit(n, COL, scale, base)
+            flow, dropped, figoff = self._mtsu_fit(n, COL, scale, base)
             fits = self._mtsu_layout(flow, n, COL, draw=False)[0]
-            trials.append((len(flow), scale, flow, dropped, fits))
+            trials.append((len(flow), scale, flow, dropped, fits, figoff))
         ok = [r for r in trials if r[4]] or trials
         # Bigger type beats more paragraphs. Hongbo Zhang, on the sheet:
         # "The font needs to be bigger. You can reduce the amount of text."
@@ -731,8 +774,15 @@ class Poster(object):
         # two blocks of the most any tier carries -- not the one that carries
         # the most, which is always the smallest type.
         most = max(r[0] for r in ok)
-        good = [r for r in ok if r[0] >= max(8, most - 2)] or ok
-        best = max(good, key=lambda r: r[1])[:4]
+        # Six blocks at 26 pt beats eight at 21. "The font needs to be bigger.
+        # You can reduce the amount of text."
+        good = [r for r in ok if r[0] >= max(6, most - 3)] or ok
+        best = max(good, key=lambda r: r[1])
+        # Restore the suppressed-figure set that BELONGS to the chosen tier.
+        # It is per-trial state, and carrying the last trial's set into the
+        # final draw silently dropped a plate the chosen tier had room for.
+        self._fig_off = set(best[5])
+        best = best[:4]
         kept, scale, flow, dropped = best
         self.type_scale = scale
         self.dropped = list(dropped)

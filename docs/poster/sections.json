@@ -402,7 +402,7 @@
    "figure": "q_projects",
    "heading": "Four projects, one contract; three are sending data",
    "status": "built_and_running",
-   "body": "Each of the four was opened the same way, sends through the same ingest contract, and is trained and evaluated by the same agents. Three have data. The fourth is open and empty, which is what a platform looks like before the next robot arrives."
+   "body": ""
   },
   {
    "id": "shared_models",
@@ -509,6 +509,14 @@
    "status": "built_and_running",
    "heading": "A cheap reviewer, and a bigger one above it when it is stuck",
    "body": "Review runs in tiers: a scripted watchdog, twelve deterministic checks, a model reading the raw artifacts, then the same model given retrieval. On 149 frozen cases the scripted watchdog returned no decision at all."
+  },
+  {
+   "id": "algorithm",
+   "theme": "platform-idea",
+   "figure": "x_algorithm",
+   "status": "built_and_running",
+   "heading": "How a round runs, and what it does when it is stuck",
+   "body": ""
   }
  ]
 }

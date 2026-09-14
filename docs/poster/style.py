@@ -117,6 +117,7 @@ PLACED = {
     "v_r241": 11.6, "v_cart": 11.6,
     "u_detect": 46.4,
     "m_ledger": 22.4, "n_system": 22.4, "t_journey": 46.4, "w_robots": 46.4, "q_projects": 46.4,
+    "x_algorithm": 46.4,
 }
 
 # Three sizes, named, so a figure cannot drift into seven of them 1.5 pt apart.

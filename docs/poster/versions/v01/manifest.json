@@ -1,0 +1,83 @@
+{
+ "version": "v01",
+ "note": "algorithm diagram added; bigger type; bands = projects + algorithm",
+ "commit": "f9a8445",
+ "decks": [
+  {
+   "look": "navy",
+   "pptx": "v01_navy.pptx",
+   "small": "v01_navy_small.pptx",
+   "body_pt": 23.1,
+   "heading_pt": 33.0,
+   "type_scale": 1.1,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  },
+  {
+   "look": "pale",
+   "pptx": "v01_pale.pptx",
+   "small": "v01_pale_small.pptx",
+   "body_pt": 23.1,
+   "heading_pt": 33.0,
+   "type_scale": 1.1,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  }
+ ]
+}

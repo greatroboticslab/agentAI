@@ -467,6 +467,143 @@ def cart_grid():
         "is not a detection. 427 frames in all." % n)
 
 
+# ----------------------------------------------------------- the algorithm
+def algorithm():
+    """How a round runs, and what happens when it is stuck.
+
+    One diagram, because a poster that argues for a tiered self-supervised loop
+    and draws nothing has asked the reader to take the architecture on trust.
+    Every number on it is measured: the four tiers are the arms of the
+    supervision benchmark and the figure beside each is its grounded recall on
+    the same frozen cases.
+
+    Node shape carries meaning, which a chain of identical rectangles cannot do:
+    a rounded store holds data, a square box is work, a diamond is the gate that
+    decides whether a verdict counts, and hatching is a stage switched off today.
+    """
+    from matplotlib.patches import FancyBboxPatch, Rectangle, Polygon, FancyArrowPatch
+    A = D.SUPERVISION["table"]["arms"]
+    N = D.SUPERVISION["table"]["n_cases"]
+    W, H = 46.4, 4.15
+    fig = plt.figure(figsize=(W, H))
+    fig.set_layout_engine("none")
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
+    MID = 1.72                                     # the spine every stage sits on
+
+    def box(x, y, w, h, label, sub="", fill=PALE, edge=RULE, hatch=None, lw=1.4, fs=15.5):
+        ax.add_patch(Rectangle((x, y), w, h, facecolor=fill, edgecolor=edge,
+                               lw=lw, hatch=hatch, zorder=2))
+        ax.text(x + w / 2, y + h / 2 + (0.13 if sub else 0), label, ha="center",
+                va="center", fontsize=fs, fontweight="bold", color=INK, zorder=3)
+        if sub:
+            ax.text(x + w / 2, y + h / 2 - 0.19, sub, ha="center", va="center",
+                    fontsize=fs - 3.0, color=MUTE, zorder=3)
+
+    def arrow(x1, y1, x2, y2, color=INK, lw=1.6, rad=0.0):
+        ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>",
+                                     mutation_scale=17, lw=lw, color=color, zorder=4,
+                                     connectionstyle="arc3,rad=%g" % rad))
+
+    def stage(x, w, title):
+        ax.text(x, H - 0.26, title, fontsize=17, fontweight="bold", color=BLUE,
+                ha="left", va="top")
+        ax.plot([x, x + w], [H - 0.62, H - 0.62], color=BLUE, lw=2.0)
+
+    # 1 -- any robot becomes a project ---------------------------------------
+    stage(0.30, 9.1, "1  Any robot becomes a project")
+    for i, (nm, sb, off) in enumerate((("Robot 241", "camera, GPS, 2 IMU", False),
+                                       ("Laser cart", "2 cameras, laser state", False),
+                                       ("Humanoid", "no upload yet", True))):
+        y = MID + 0.72 - i * 0.72
+        box(0.30, y, 3.60, 0.66, nm, sb, fill=WHITE,
+            hatch="////" if off else None, fs=14.5)
+        arrow(3.95, y + 0.33, 5.10, MID + 0.33, rad=-0.10 if i != 1 else 0)
+    ax.add_patch(FancyBboxPatch((5.20, MID - 0.16), 4.00, 0.98,
+                                boxstyle="round,pad=0,rounding_size=0.16",
+                                facecolor=WHITE, edgecolor=INK, lw=1.8, zorder=2))
+    ax.text(7.20, MID + 0.47, "One project", ha="center", va="center",
+            fontsize=16.5, fontweight="bold", color=INK, zorder=3)
+    ax.text(7.20, MID + 0.13, "keys, people, locked registry", ha="center",
+            va="center", fontsize=13, color=MUTE, zorder=3)
+    arrow(9.25, MID + 0.33, 10.15, MID + 0.33)
+
+    # 2 -- one round ----------------------------------------------------------
+    stage(10.20, 12.9, "2  One round, unattended")
+    steps = [("collect", True), ("filter", False), ("merge", False),
+             ("train", True), ("evaluate", False)]
+    bw, bg, x0 = 2.30, 0.36, 10.20
+    for i, (nm, paused) in enumerate(steps):
+        x = x0 + i * (bw + bg)
+        box(x, MID, bw, 0.78, nm, fill=WHITE if paused else PALE,
+            hatch="////" if paused else None, fs=15)
+        if i < len(steps) - 1:
+            arrow(x + bw, MID + 0.39, x + bw + bg, MID + 0.39)
+    xe = x0 + 4 * (bw + bg) + bw
+    # the loop back, under the row where it belongs
+    # bowed DOWNWARD, under the row. A positive rad on a right-to-left arrow
+    # bows it up and over the boxes it is supposed to run beneath.
+    ax.add_patch(FancyArrowPatch((xe - 1.1, MID - 0.04), (x0 + 1.1, MID - 0.04),
+                                 arrowstyle="-|>", mutation_scale=17, lw=1.9,
+                                 color=BLUE, zorder=4,
+                                 connectionstyle="arc3,rad=-0.30"))
+    ax.text((x0 + xe) / 2, MID - 1.12, "the next round starts from the last round's weights",
+            fontsize=13.5, color=BLUE, ha="center", va="center")
+    ax.text(x0, MID - 1.44, "hatched: paused by a stop-loss on 2026-08-29",
+            fontsize=12.5, color=MUTE, ha="left", va="center")
+    arrow(xe, MID + 0.39, xe + 0.90, MID + 0.39)
+
+    # 3 -- review and escalation ---------------------------------------------
+    sx = xe + 0.95
+    stage(sx, 12.4, "3  Review, and escalation when it is stuck")
+    tiers = [("Scripted watchdog", "no decision on %d of %d" % (N, N), None),
+             ("12 deterministic checks", "%.3f grounded" % A["A0p"]["detection_grounded"]["v"], None),
+             ("Model reads the artifacts", "%.3f" % A["L2@qwen3.8:27b"]["detection_grounded"]["v"], None),
+             ("Model + retrieval over them", "%.3f" % A["L3@qwen3.8:27b"]["detection_grounded"]["v"], BLUE)]
+    tx, tw, th, gap = sx + 1.50, 8.00, 0.54, 0.12
+    for i, (nm, val, hi) in enumerate(tiers):
+        ty = MID - 0.78 + i * (th + gap)
+        box(tx, ty, tw, th, nm, fill=PALEBLU if hi else WHITE,
+            edge=hi or RULE, lw=2.0 if hi else 1.4, fs=15)
+        ax.text(tx + tw + 0.20, ty + th / 2, val, fontsize=14.5, va="center",
+                color=hi or MUTE, fontweight="bold" if hi else "normal")
+    top = MID - 0.78 + 3 * (th + gap) + th / 2
+    arrow(tx - 0.50, MID - 0.78 + th / 2, tx - 0.50, top, color=BLUE, lw=2.2)
+    ax.text(tx - 0.74, (MID - 0.95 + th / 2 + top) / 2, "stuck \u2192 ask upward",
+            rotation=90, fontsize=14, color=BLUE, ha="center", va="center",
+            fontweight="bold")
+    ax.text(tx, MID - 1.44, "grounded recall on the same %d frozen cases from this "
+            "project's own record" % N, fontsize=12.5, color=MUTE, va="center")
+
+    # 4 -- the gate -----------------------------------------------------------
+    gx = tx + tw + 4.05
+    stage(gx - 1.60, 8.6, "4  Where it ran decides whether it counts")
+    arrow(gx - 2.45, MID + 0.33, gx - 1.60, MID + 0.33)
+    cx, cy = gx, MID + 0.33
+    ax.add_patch(Polygon([(cx, cy + 0.70), (cx + 1.50, cy), (cx, cy - 0.70),
+                          (cx - 1.50, cy)], facecolor=PALE, edgecolor=INK,
+                         lw=1.8, zorder=2))
+    ax.text(cx, cy + 0.13, "ran on the", ha="center", va="center", fontsize=14.5,
+            color=INK, zorder=3)
+    ax.text(cx, cy - 0.17, "cluster?", ha="center", va="center", fontsize=14.5,
+            fontweight="bold", color=INK, zorder=3)
+    arrow(cx + 1.55, cy + 0.26, cx + 2.25, cy + 0.60, color=BLUE, lw=1.8)
+    box(cx + 2.30, cy + 0.30, 3.3, 0.66, "the verdict counts", fill=PALEBLU,
+        edge=BLUE, lw=2.0, fs=15)
+    arrow(cx + 1.55, cy - 0.26, cx + 2.25, cy - 0.60)
+    box(cx + 2.30, cy - 0.96, 3.3, 0.66, "marked a draft", fill=WHITE, fs=15)
+    ax.text(cx - 1.50, MID - 1.44, "deciding work runs on open weights, as a batch job",
+            fontsize=12.5, color=MUTE, ha="left", va="center")
+
+    return save(fig, "x_algorithm",
+                "How one round runs, and what happens when it is stuck. Every stage has run; the "
+                "collector and the trainer are paused by a stop-loss taken on 2026-08-29. The four "
+                "review tiers are the arms of the supervision benchmark and the figure beside each "
+                "is its grounded recall on the same %d frozen cases, so the ladder is measured "
+                "rather than asserted. What the loop does not yet do is choose for itself when to "
+                "climb it." % N)
+
+
 # ------------------------------------------------------- the four projects
 def _pic(ax, path, box, ax_w_in, ax_h_in, crop=0.5, fallback=None,
          note="no photograph yet"):
@@ -1121,7 +1258,7 @@ if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
                species, funnel, field, tta, sources, ledger, system,
-               journey, robots_wide, projects, detect_grid, r241_grid, cart_grid):
+               journey, robots_wide, projects, detect_grid, r241_grid, cart_grid, algorithm):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))

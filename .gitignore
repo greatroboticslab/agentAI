@@ -84,3 +84,6 @@ docs/poster/agentAI_poster_48x36_*.png
 
 # PowerPoint lock files, which appear while Harry has a deck open
 ~$*
+
+# poster version folders: the deck is rebuilt by build_version.py
+docs/poster/versions/*/*.pptx
