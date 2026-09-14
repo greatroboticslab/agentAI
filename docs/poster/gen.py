@@ -50,8 +50,8 @@ except Exception:
 
 TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
 STAND = ("One platform where agents collect their own data and train on it, month after month, "
-         "so the model compounds while nobody is watching. We built it, ran it unattended for "
-         "fifteen rounds, and it got worse. This is why.")
+         "so the model compounds without anyone in the room. We built it, ran it unattended for "
+         "fifteen rounds, and measured what each part of that loop is actually worth.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
