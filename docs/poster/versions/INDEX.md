@@ -22,3 +22,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v18** (591d814) — figure 1 titled like figure 2; footer and closing folded into one lede above the first plate — body 28.1 pt, 14 blocks
 - **v19** (9297a72) — your cut kept, with one reading-the-numbers line put back above the columns — body 29.4 pt, 12 blocks
 - **v20** (9297a72) — sub-heads measured as Arial bold, so a two-line one is not drawn over — body 29.4 pt, 12 blocks
+- **v21** (19a4747) — rider dropped: it caveated numbers the sheet does not print; the live clause moved into figure 4's caption — body 29.4 pt, 12 blocks

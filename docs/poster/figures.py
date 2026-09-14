@@ -206,7 +206,9 @@ def ladder():
                      annotation_clip=False)
     return save(fig, "c_ladder",
                 
-                "(c) Three seeds per rung, mean and 1 s.d., on our sealed holdout. (d) Same eight checkpoints, unseen weed dataset, one seed per rung. Both exams fall.")
+                "(c) Three seeds per rung, mean and 1 s.d., on the 1,977-image holdout -- which is also "
+                "each run's validation set, so each mark is that run's best epoch. (d) Same eight "
+                "checkpoints, unseen weed dataset, one seed per rung. Both exams fall.")
 
 
 # ---------------------------------------------------------------- d. the wall

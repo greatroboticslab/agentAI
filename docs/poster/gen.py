@@ -74,14 +74,13 @@ BAND = "projects"
 # good looking diagram is fine." -- Hongbo Zhang.
 BANDS = ["projects", "algorithm"]
 
-# The one rider that applies to every number in the columns below it, set on
-# the line above them instead of in a block of its own. It is not a result and
-# it is not decoration: without it the sheet presents best-epoch-on-validation
-# numbers as clean test numbers, which is the first thing a reviewer finds and
-# the worst way for them to find it.
-RIDER = ("Reading the numbers: every in-domain mAP here is a run's best epoch on a holdout "
-         "that also served as its validation set. Two numbers are withdrawn -- 0.910 leaked, "
-         "and 0.9033 was the best of four runs.")
+# No rider line. It caveated numbers the sheet does not print: after the census
+# strip and the ledger came off, no absolute mAP is printed anywhere in the
+# prose, and it retracted 0.910 and 0.9033, which appear nowhere either -- a
+# retraction of numbers the reader never saw is noise. The one clause that is
+# still load-bearing went where the numbers actually are, into Figure 4's
+# caption, which is the only place an mAP can be read off this sheet.
+RIDER = ""
 
 # A second full-width strip, drawn just above the closing when its plate has no
 # column of its width in this grid -- which is every grid, because it is 46.4 in
