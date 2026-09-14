@@ -9,3 +9,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v05** (a7ced1b) — full model names on every figure; algorithm shows the loop closed on weights and open on judgement — body 22.1 pt, 8 blocks
 - **v06** (0debb4f) — projects say what each is and what it is for; algorithm redrawn as a loop with no counts or dates — body 24.4 pt, 8 blocks
 - **v07** (0debb4f) — project blurbs say what each thing is; algorithm is a loop with no counts or dates; six label collisions fixed — body 24.4 pt, 8 blocks
+- **v08** (d65cacd) — algorithm fills its frame at 24 pt; audit fixes: wrong denominator, arrow reading backwards, five strikethroughs, a lost ledger row — body 25.6 pt, 8 blocks

@@ -164,8 +164,10 @@ def ladder():
         ax.plot(xs, B, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
     ax.text(xs[1] + 0.08, A[1] + 0.0022, "class per source dataset", ha="left",
             va="bottom", fontsize=TICK - 2, color=BLUE)
-    ax.text(xs[-1] - 0.05, B[-1] - 0.0030, "one shared class", ha="right",
-            va="top", fontsize=TICK - 2, color=WARN)
+    # between two rules, not on one. Above the series it sat on the line it
+    # names; below it, it sat on the 0.820 gridline.
+    ax.text(2.20, 0.8355, "one shared class", ha="right", va="center",
+            fontsize=TICK - 2, color=WARN)
     ax.annotate("", xy=(3.28, A[0]), xytext=(3.28, A[-1]),
                 arrowprops=dict(arrowstyle="<->", color=INK, lw=0.9))
     ax.text(3.36, (A[0] + A[-1]) / 2, "−0.0189\n8.2 σ", fontsize=9.5, color=INK,
@@ -180,8 +182,9 @@ def ladder():
     ax2.plot(xs, a2, "o-", color=BLUE, zorder=3)
     ax2.plot(xs, b2, "s--", color=WARN, markerfacecolor=WHITE, zorder=3)
     ax2.set_ylabel("mAP$_{50\\mathdefault{-}95}$")
-    ax2.text(0.0, 1.035, "ImageWeeds, class-agnostic", transform=ax2.transAxes,
-             fontsize=TICK - 1.5, color=MUTE, va="bottom", ha="left")
+    ax2.text(0.0, 1.035, "ImageWeeds, 3,208 images, class-agnostic",
+             transform=ax2.transAxes, fontsize=TICK - 1.5, color=MUTE,
+             va="bottom", ha="left")
     ax2.set_ylim(0.055, 0.118)
     ax2.set_xlim(-0.35, 3.35)
 
@@ -196,9 +199,15 @@ def ladder():
                     textcoords="offset points", xycoords=("data", "axes fraction"),
                     ha="center", fontsize=TICK - 3, color=MUTE,
                     annotation_clip=False)
+    for i in range(4):
+        ax2.annotate("n = 1", (i, 0), xytext=(0, -42),
+                     textcoords="offset points", xycoords=("data", "axes fraction"),
+                     ha="center", fontsize=TICK - 3, color=MUTE,
+                     annotation_clip=False)
     return save(fig, "c_ladder",
-                "(c) Three seeds at every rung on our own sealed holdout. (d) The same eight "
-                "checkpoints on a second weed dataset they never saw. Both exams fall, so the "
+                "(c) Three seeds at every rung on our own sealed holdout, marks are the mean "
+                "with 1 s.d. (d) The same eight checkpoints on a second weed dataset they never "
+                "saw, one seed per rung, so it carries no interval. Both exams fall, so the "
                 "narrow metric is not what makes the ladder drop.")
 
 
@@ -271,8 +280,8 @@ def supervision():
     # a line it is barely above.
     ax.set_box_aspect(0.88)
     ax.plot([0, 0.95], [0, 0.95], color=MUTE, lw=0.9, zorder=1)
-    ax.text(0.855, 0.865, "chance", fontsize=ANNOT, color=MUTE, rotation=45,
-            ha="center", va="center", rotation_mode="anchor")
+    ax.text(0.885, 0.835, "chance", fontsize=ANNOT, color=MUTE, rotation=45,
+            ha="center", va="top", rotation_mode="anchor")
     ax.axhline(S["ceiling"], color=MUTE, lw=0.9, ls=(0, (4, 3)), zorder=1)
     # the dashed rule is named in the caption, not on top of the data
 
@@ -288,8 +297,8 @@ def supervision():
 
     a0p = pt("A0p")
     mark(a0p, a0p["fa"], a0p["r"], MUTE, ms=7)
-    ax.annotate("12 deterministic rules", (a0p["fa"], a0p["r"]),
-                textcoords="offset points", xytext=(12, -13), ha="left",
+    ax.annotate("12 deterministic rules, n = %d" % a0p["n"], (a0p["fa"], a0p["r"]),
+                textcoords="offset points", xytext=(13, -6), ha="left",
                 va="top", fontsize=ANNOT, color=MUTE)
     # The watchdog returned no decision on any of 149 cases, so it has no
     # coordinate on either axis. It sits in the margin rather than at an
@@ -297,7 +306,7 @@ def supervision():
     ax.plot(-0.045, -0.045, "s", color=GREY, ms=7, clip_on=False, zorder=5)
     ax.annotate("scripted watchdog",
                 (-0.045, -0.045), textcoords="offset points", xytext=(13, 1),
-                ha="left", va="center", fontsize=ANNOT, color=GREY,
+                ha="left", va="center", fontsize=ANNOT, color=MUTE,
                 annotation_clip=False,
                 path_effects=[pe.withStroke(linewidth=2.5, foreground=WHITE)])
 
@@ -325,13 +334,18 @@ def supervision():
                 ax.annotate("", (p3["fa"], p3["r"]), xytext=(p2["fa"], p2["r"]),
                             arrowprops=dict(arrowstyle="-|>", color=c, lw=1.2,
                                             shrinkA=8, shrinkB=8,
-                                            connectionstyle="arc3,rad=-0.18"),
+                                            connectionstyle="arc3,rad=0.18"),
                             zorder=4)
-                lab = "%s\nn = %d" % (m["name"], p3["n"])
+                lab = "%s\nn = %d" % (m["name"], p2["n"])
             else:
                 ax.plot([p2["fa"], p3["fa"]], [p2["r"], p3["r"]], ls=(0, (2, 2)),
                         lw=1.0, color=c, zorder=4)
-                lab = "%s\nn = %d" % (m["name"], p3["n"])
+                lab = "%s\nn = %d" % (m["name"], p2["n"])
+                ax.annotate("n = %d" % p3["n"], (p3["fa"], p3["r"]),
+                            textcoords="offset points", xytext=(13, 4),
+                            ha="left", fontsize=ANNOT, color=c,
+                            path_effects=[pe.withStroke(linewidth=2.2,
+                                                        foreground=WHITE)])
         ax.text(lx, ly, lab, ha=ha, va=va, fontsize=ANNOT, color=c,
                 linespacing=1.25,
                 path_effects=[pe.withStroke(linewidth=2.2, foreground=WHITE)])
@@ -380,6 +394,7 @@ def supervision():
                         rotation=18, ha="right")
     ax2.set_xlim(-0.5, len(xs) - 0.10)
     ax2.set_xlabel("reviewer")
+    ax2.tick_params(labelleft=True)
     despine(ax2); hline_grid(ax2); panel(ax2, "f")
 
     g7 = pt("L3@qwen2.5:7b"); g27 = pt("L3@qwen3.8:27b")
@@ -388,7 +403,9 @@ def supervision():
     return save(fig, "e_supervision",
                 "(e) Recall and (f) grounded recall on one frozen corpus of real incidents from "
                 "this project's own record, scored by the project's own scorer. Each mark carries "
-                "its own denominator and bars are 95%% Wilson intervals; the dashed rule in (e) is "
+                "its own denominator and bars are 95%% Wilson intervals. In (e) a pair's tail is "
+                "the model reading raw artifacts and its head is the same model given retrieval "
+                "over them; the dashed rule is "
                 "the ceiling a rules-only arm can reach, and an arrow is dotted where its two ends "
                 "were scored on different cases. The scripted watchdog returned no decision on any "
                 "of %d. Qwen2.5-7B has the highest recall on the page and 0.55 of it quotes "
@@ -492,90 +509,93 @@ def algorithm():
     which have axes.
     """
     from matplotlib.patches import FancyBboxPatch, Rectangle, FancyArrowPatch
-    W, H = 46.4, 5.60
-    STN, SUB, LAD, EDGE = 21.0, 16.0, 17.0, 18.0
+    # The frame is 5.1 in of a 36 in sheet and the first version used the top
+    # half of it. Type up, ladder under the station it hangs off, and the spur
+    # short and near-vertical: curved across the interior it landed on the top
+    # rung it was pointing at.
+    W, H = 46.4, 5.10
+    STN, SUB, LAD, EDGE = 24.0, 18.0, 19.0, 19.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    TOPY, BOTY = H - 1.25, 0.78          # the two runs of the loop
-    L, R = 1.05, W - 1.05
+    TOPY, BOTY = 4.02, 0.45
+    L, R = 0.85, W - 0.85
+    bw, bh = 8.05, 1.48
 
-    def arrowhead(x, y, dx, color=INK, lw=1.6, ls="-"):
+    def arrowhead(x, y, dx, color=INK, lw=1.7, ls="-"):
         ax.annotate("", xy=(x + dx, y), xytext=(x, y),
                     arrowprops=dict(arrowstyle="-|>", color=color, lw=lw,
                                     linestyle=ls, shrinkA=0, shrinkB=0))
 
-    # the loop itself: solid on the way out, dashed on the way back ----------
     ax.add_patch(FancyBboxPatch((L, BOTY), R - L, TOPY - BOTY,
                                 boxstyle="round,pad=0,rounding_size=0.55",
-                                facecolor="none", edgecolor=RULE, lw=1.6,
+                                facecolor="none", edgecolor=RULE, lw=1.8,
                                 zorder=1))
-    ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=1.8,
+    ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=2.0,
             linestyle=(0, (8, 5)), zorder=2)
-    arrowhead(L + 3.0, BOTY, -0.9, lw=1.8, ls=(0, (8, 5)))
+    arrowhead(L + 3.2, BOTY, -1.0, lw=2.0, ls=(0, (8, 5)))
 
-    # five stations on the outward run ---------------------------------------
     stations = [
         ("A need arrives", "a detector that works in our own rows"),
         ("Work out what would answer it", "the agent reads the registry and names what is missing"),
         ("Go and get it", "harvest from public sources, then audit what came back"),
         ("Train on what survived", "and score it against a holdout it never saw"),
-        ("Read the result, decide what is next", "and when it cannot decide, ask a larger model"),
+        ("Read the result, decide what is next", "and when it cannot, it asks upward"),
     ]
-    bw, bh = 7.55, 1.05
-    xs = [L + 0.35 + i * ((R - L - 0.70 - bw) / (len(stations) - 1))
+    xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
     for i, ((title, sub), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
-                               edgecolor=INK, lw=1.5, zorder=3))
-        ax.text(x + bw / 2, TOPY + 0.20, title, ha="center", va="center",
+                               edgecolor=INK, lw=1.6, zorder=3))
+        ax.text(x + bw / 2, TOPY + 0.26, title, ha="center", va="center",
                 fontsize=STN, fontweight="bold", color=INK, zorder=4)
-        for k, line in enumerate(_wrap(sub, 46)):
-            ax.text(x + bw / 2, TOPY - 0.12 - k * 0.30, line, ha="center",
+        for k, line in enumerate(_wrap(sub, 44)):
+            ax.text(x + bw / 2, TOPY - 0.14 - k * 0.34, line, ha="center",
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
-            arrowhead(mid - 0.32, TOPY, 0.64)
+            arrowhead(mid - 0.36, TOPY, 0.72)
 
-    # the escalation ladder, inside the loop ---------------------------------
+    # the ladder, hung under the station it belongs to -----------------------
     rungs = ["a scripted watchdog", "deterministic checks",
              "a model reads the artifacts", "the same model, given retrieval"]
-    rw, rh, rise, stepx = 7.10, 0.52, 0.60, 0.44
-    # centred in the interior. Hung under the last station it sat on top of
-    # that station's own box and left the left two thirds of the loop empty.
-    rx = L + (R - L) * 0.575
+    rw, rh, rise, stepx = 7.40, 0.50, 0.54, 0.46
+    rx = xs[4] - 1.15
     for k, name in enumerate(rungs):
-        y = 1.30 + k * rise
+        y = 0.92 + k * rise
         top = k == len(rungs) - 1
         ax.add_patch(Rectangle((rx - k * stepx, y), rw, rh,
                                facecolor=BLUE if top else WHITE,
                                edgecolor=BLUE if top else INK,
-                               lw=2.0 if top else 1.3, zorder=3))
-        ax.text(rx - k * stepx + 0.24, y + rh / 2, name, fontsize=LAD,
+                               lw=2.1 if top else 1.4, zorder=3))
+        ax.text(rx - k * stepx + 0.26, y + rh / 2, name, fontsize=LAD,
                 va="center", ha="left", color=WHITE if top else INK,
                 fontweight="bold" if top else "normal", zorder=4)
-    ladder_top = 1.30 + 3 * rise + rh
-    # below the station row, not over it: a positive rad on a right-to-left
-    # arrow bulges upward and this one arced across the station before it
-    ax.add_patch(FancyArrowPatch((xs[-1] + 1.10, TOPY - bh / 2 - 0.04),
-                                 (rx - 3 * stepx + rw - 0.60, ladder_top + 0.08),
-                                 arrowstyle="-|>", mutation_scale=18, lw=1.7,
-                                 color=INK, zorder=4,
-                                 connectionstyle="arc3,rad=-0.28"))
-    ax.text(rx + rw + 0.35, 1.30 + 1.5 * rise + rh / 2, "escalate\nwhile stuck",
-            fontsize=LAD, color=INK, ha="left", va="center",
+    ladder_top = 0.92 + 3 * rise + rh
+    sx = rx - 3 * stepx + rw * 0.62
+    ax.annotate("", xy=(sx, ladder_top + 0.05), xytext=(sx + 0.45, TOPY - bh / 2 - 0.02),
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.8,
+                                shrinkA=0, shrinkB=0))
+    # left of the ladder, where the interior is empty. To the right of the
+    # spur it ran into the station's own second line.
+    ax.text(rx - 3 * stepx - 0.35, ladder_top - 0.60, "escalate\nwhile stuck",
+            fontsize=LAD, color=INK, ha="right", va="center",
             fontweight="bold", linespacing=1.25)
 
-    # what the dashed run means ----------------------------------------------
-    ax.text(L + (R - L) * 0.24, BOTY + 0.30,
-            "what the agent decided goes back to what it asks for next",
-            fontsize=EDGE, color=INK, ha="center", va="bottom")
-    ax.text(L + (R - L) * 0.24, BOTY - 0.26,
-            "dashed: today that decision is written into the round's record "
+    # what the dashed run means, inside the loop where the space already was --
+    lx = L + (R - L) * 0.26
+    ax.text(lx, BOTY + 2.05, "what the agent decided goes back to",
+            fontsize=EDGE, color=INK, ha="center", va="center")
+    ax.text(lx, BOTY + 1.69, "what it asks for next",
+            fontsize=EDGE, color=INK, ha="center", va="center")
+    ax.text(lx, BOTY + 1.20,
+            "dashed: today that decision is written into the round's record",
+            fontsize=SUB, color=MUTE, ha="center", va="center")
+    ax.text(lx, BOTY + 0.88,
             "and nothing reads it back. Closing this edge is the work.",
-            fontsize=SUB, color=MUTE, ha="center", va="top")
+            fontsize=SUB, color=MUTE, ha="center", va="center")
 
     return save(fig, "x_algorithm",
                 "The loop an agent runs to answer a need, drawn as a loop. A need arrives, the "
@@ -722,14 +742,18 @@ def ledger():
     """
     import textwrap
     L = D.LEDGER
-    fig = plt.figure(figsize=(22.4, 4.10))
+    fig = plt.figure(figsize=(22.4, 6.60))
     ax = fig.add_axes([0, 0, 1, 1]); ax.axis("off")
     ax.set_xlim(0, 1); ax.set_ylim(0, 1)
     n = len(L["groups"])
     gw = 1.0 / n
     # One pitch for every column, set by the fullest one, so the four families
     # share a baseline grid instead of each finding its own.
-    tallest = max(sum(1 + (1 if r[3] else 0) + r[0].count("\n")
+    # Count the tag line the way it is DRAWN. The tag prints when either the
+    # outcome or the n is set, but this counted only the outcome, so the
+    # zero-shot column reserved ten lines for twenty and its last row -- five
+    # models that returned nothing -- ran off the bottom and was never seen.
+    tallest = max(sum(1 + (1 if (r[3] or r[2]) else 0) + r[0].count("\n")
                       for r in g["rows"]) for g in L["groups"])
     top, bottom = 0.735, 0.035
     pitch = (top - bottom) / tallest

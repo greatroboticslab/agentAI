@@ -1,0 +1,83 @@
+{
+ "version": "v08",
+ "note": "algorithm fills its frame at 24 pt; audit fixes: wrong denominator, arrow reading backwards, five strikethroughs, a lost ledger row",
+ "commit": "d65cacd",
+ "decks": [
+  {
+   "look": "navy",
+   "pptx": "v08_navy.pptx",
+   "small": "v08_navy_small.pptx",
+   "body_pt": 25.6,
+   "heading_pt": 36.6,
+   "type_scale": 1.22,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  },
+  {
+   "look": "pale",
+   "pptx": "v08_pale.pptx",
+   "small": "v08_pale_small.pptx",
+   "body_pt": 25.6,
+   "heading_pt": 36.6,
+   "type_scale": 1.22,
+   "kept": [
+    "platform_idea",
+    "platform_domains",
+    "robots_today",
+    "supervisor",
+    "loop",
+    "diagnosis",
+    "auto_diag",
+    "ladder"
+   ],
+   "dropped": [
+    "zeroshot",
+    "remote_control",
+    "analysis_sandbox",
+    "shared_models",
+    "tta",
+    "analysis_agent",
+    "future_robots",
+    "watch",
+    "ledger",
+    "species",
+    "field",
+    "uplink",
+    "brain",
+    "families",
+    "sources",
+    "dispatch",
+    "escalate",
+    "control"
+   ]
+  }
+ ]
+}
