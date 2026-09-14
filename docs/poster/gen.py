@@ -92,7 +92,10 @@ TAIL_BANDS = ["detect_grid", "journey"]
 # sheet. Its one idea is now the opening band's lede, where it is read.
 CLOSING = []
 
-FOOTER = ["stands", "made", "withdrew"]
+# No footer band. Three columns of caveat type across the foot of the sheet is
+# where a reader arrives last and squints; the live ones are the opening band's
+# lede now, at body size, above the first plate.
+FOOTER = []
 
 # The house look does not run twenty numbered sections down a sheet. The lab's
 # own poster puts ONE all-caps heading over ONE white panel per column and
@@ -347,8 +350,8 @@ class Poster(object):
             # a figure with its title underneath, which is what a diagram wants.
             if not s.get("title_below"):
                 y = d.head(x, y, w, s["heading"])
-                if s.get("lede"):
-                    y = d.body(x, y, w, s["lede"], after=8)
+            if s.get("lede"):
+                y = d.body(x, y, w, s["lede"], after=10)
             y = d.figure(x, y, w, f, "Figure %d." % fig_no[0],
                          title=(s["heading"] if s.get("title_below") else None),
                          cap_size=d.dz["caption"] + 5)
@@ -403,7 +406,7 @@ class Poster(object):
         d = self.d
         ids = [f for f in FOOTER if f in self.lib][:3]
         if not ids:
-            return FOOT_H
+            return 0.0
         fw = (d.FULL[1] - 1.0) / 3.0
         size = d.dz["caption"]
         h = max(d.h_est("%s. %s" % (self.lib[s]["heading"], self.lib[s]["body"]),
@@ -715,8 +718,8 @@ class Poster(object):
                 continue
             if not s.get("title_below"):
                 y += self._head_h(d, d.FULL[1], s["heading"])
-                if s.get("lede"):
-                    y += d.h_est(s["lede"], d.FULL[1], d.dz["body"], 1.22, 8)
+            if s.get("lede"):
+                y += d.h_est(s["lede"], d.FULL[1], d.dz["body"], 1.22, 10)
             im = Image.open(fp)
             y += d.FULL[1] * im.size[1] / float(im.size[0]) + 0.70
             if s.get("title_below"):
@@ -951,10 +954,14 @@ class Poster(object):
                 self.dropped.append(sid)
 
         y = self.closing(self.tail_band(max(ends) + 0.50, fig_no))
+        foot_ids = [f for f in FOOTER if f in self.lib][:3]
+        if not foot_ids:
+            d.save(out)
+            return self.dropped
         y = max(y + 0.40, H - self.foot_h() - 0.35)
         d.rect(FULL[0], y - 0.25, FULL[1], 0.022, fill=d.c["rule"])
         fw = (FULL[1] - 1.0) / 3.0
-        for i, sid in enumerate([f for f in FOOTER if f in self.lib][:3]):
+        for i, sid in enumerate(foot_ids):
             s = self.lib[sid]
             d.body(FULL[0] + i * (fw + 0.5), y, fw,
                    "%s. %s" % (s["heading"], s["body"]),

@@ -19,3 +19,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v15** (6e99d9b) — captions regenerated from source; all 22 plates redrawn at the new type — body 28.1 pt, 11 blocks
 - **v16** (6e99d9b) — dispatch fits the reviewer column; no orphan word in the platform sub-head — body 28.1 pt, 12 blocks
 - **v17** (4d1d503) — professor: Agent Work Flow Diagram titled below, icons in the diagram, bigger band captions, closing band folded into the opening lede — body 28.1 pt, 12 blocks
+- **v18** (591d814) — figure 1 titled like figure 2; footer and closing folded into one lede above the first plate — body 28.1 pt, 14 blocks

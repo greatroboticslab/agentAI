@@ -400,10 +400,11 @@
    "id": "projects",
    "theme": "robots-connected",
    "figure": "q_projects",
-   "heading": "What each project is, and what it is for",
+   "heading": "What Each Project Is, and What It Is For",
    "status": "built_and_running",
    "body": "",
-   "lede": "One platform, any dataset, any robot. Each capability stays in the platform after the experiment that needed it, so the next student inherits it working."
+   "lede": "One platform, any dataset, any robot: every capability stays in the platform after the experiment that needed it, so the next student inherits it working. The collector and trainer are switched off today, and none of the 2,686 robot frames is labelled.\nHow to read the numbers: every in-domain mAP here is a run's best epoch on a 1,977-image holdout that also served as that run's validation set. Two numbers are withdrawn -- 0.910 was a data leak, and 0.9033 was the best of four unseeded runs.",
+   "title_below": true
   },
   {
    "id": "shared_models",
