@@ -34,7 +34,7 @@
    "id": "robots_today",
    "theme": "robots-connected",
    "heading": "Both the Rover and the laser robot transmit data",
-   "body": "The Rover is a four-wheel skid-steer streaming camera, GPS and two inertial measurement units (IMUs). The Laser Weed Control Robot carries two galvanometer lasers on independent channels, a downward camera over the work zone and a forward camera.",
+   "body": "The Rover is a four-wheel skid-steer streaming camera, GPS and two inertial measurement units. The Laser Weed Control Robot carries two galvanometer lasers on independent channels and two cameras, one over the work zone and one forward.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -204,8 +204,8 @@
    "id": "loop",
    "theme": "iterating-agents-brain",
    "heading": "Compounding was the premise of the unattended loop",
-   "body": "One agent collects and one trains, so each round's model should exceed the last. Fifteen rounds ran unattended. The training corpus did not change after round three, yet the ledger and every round report recorded each round as new work.",
-   "figure": "f_rounds",
+   "body": "One agent collects and one trains, and each runs without an operator. Fifteen rounds ran that way. The training corpus did not change after round three, yet the ledger and every round report recorded each round as new work.",
+   "figure": "none",
    "status": "built_but_off",
    "width": "centre",
    "numbers": "ROUNDS"
@@ -297,8 +297,8 @@
   {
    "id": "sources",
    "theme": "label-quality",
-   "heading": "We measured label quality per source instead of arguing about it",
-   "body": "A detector that finds almost every real weed and gets four boxes in five wrong is useless as ground truth and excellent as a probe: where it sees nothing, a label claiming an object there is suspect. The same probe reads 1.000 on human-labelled CottonWeedDet12, so a source reading 0.184 is the data and not the instrument. One of six web sources clears the bar, and it supplies 3,208 of the 13,527 audited images.",
+   "heading": "One audited source in six clears the bar",
+   "body": "Label precision is measured per source against a calibrated probe. The probe reads 1.000 on the human-labelled reference set, so a source reading 0.184 is the data and not the instrument.",
    "figure": "s_sources",
    "status": "built_and_running",
    "width": "column",
@@ -416,10 +416,10 @@
   {
    "id": "dispatch",
    "theme": "iterating-agents-brain",
-   "figure": "none",
-   "heading": "Where a model runs decides whether its verdict counts",
+   "figure": "g_router",
+   "heading": "A judgement counts only where it was produced",
    "status": "built_and_running",
-   "body": "A router maps a role -- collector, judge, reviewer, planner -- onto a model and a place, and the place decides whether the verdict counts. Deciding work runs on the cluster."
+   "body": "A router places each role on a model and a machine. Judgement produced on the cluster is returned authoritative; the same judgement produced on the laboratory box is returned marked a draft, so the rule travels with the answer."
   },
   {
    "id": "vision_platform",
@@ -507,7 +507,7 @@
    "figure": "none",
    "status": "built_and_running",
    "heading": "Tiered review is invoked at the end of every step",
-   "body": "The tiers are a scripted watchdog, twelve deterministic checks, a language model reading the artifacts with those checks withheld, then the same model supplied with them. On 149 frozen cases the scripted watchdog returned no decision."
+   "body": "The tiers are a scripted watchdog, twelve deterministic checks, a language model reading the artifacts with those checks withheld, then the same model supplied with them. On 149 frozen cases the scripted watchdog returned no decision at all."
   },
   {
    "id": "algorithm",
@@ -521,8 +521,8 @@
   {
    "id": "label_ceiling",
    "theme": "label-quality",
-   "heading": "Training configuration was not the limiting factor",
-   "body": "Data continued to arrive; the detector did not improve. Augmentation, replaying known species and completing labels each left the same gap. The explanation that remains is the automatic labeller's boxes.",
+   "heading": "The training configuration was not the constraint",
+   "body": "Augmentation, replaying known species and completing labels were each tried and each left the same gap. What remains is the automatic labeller's boxes, and the audit above measures them.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "RESEARCH_LOG sessions 12-14"
@@ -531,7 +531,7 @@
    "id": "label_curator",
    "theme": "label-quality",
    "heading": "Geometry rejects boxes the language model accepts",
-   "body": "The rule discards boxes lying too far from the trusted data. Presented with a candidate box, Gemma 4 rejects none of the false boxes, so the criterion is DINOv2 geometry. Fifty-one datasets were removed; retraining did not restore accuracy.",
+   "body": "The rule discards boxes lying too far from the trusted data. Presented with a candidate box, Gemma 4 rejects none of the false boxes, so the criterion is DINOv2 feature geometry rather than a language model, and fifty-one datasets were removed on it.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "CHANGELOG v3.0.35-37"
@@ -562,6 +562,15 @@
    "figure": "none",
    "status": "built_and_running",
    "numbers": "M1 sealed measurement"
+  },
+  {
+   "id": "funnel",
+   "theme": "outputs",
+   "figure": "none",
+   "status": "built_and_running",
+   "numbers": "FUNNEL",
+   "heading": "What the collection produced, gate by gate",
+   "body": "Automatic labelling wrote 156,521 images; cross-dataset deduplication leaves 59,134 distinct ones; of the 13,527 audited for label precision, 3,208 clear the bar. The probe reads 1.000 on the human-labelled reference set, so a source that scores low is the data and not the instrument."
   }
  ]
 }

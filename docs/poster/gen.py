@@ -49,7 +49,9 @@ except Exception:
     pass
 
 TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
-STAND = ("On one platform, agents collect their own data and train on it, month after month, so the model compounds without human intervention. The system ran for fifteen unattended rounds, and each stage's contribution was measured.")
+STAND = ("On one platform, agents collect their own data, review one another's work and train "
+         "without an operator. The system ran for fifteen unattended rounds; this sheet reports how "
+         "the agents coordinate and what the collection produced.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
@@ -125,35 +127,29 @@ FOOTER = []
 # is a poster; fourteen at 19 pt is a page pinned to a board. Everything past the count is slack
 # that a short column may take and a crowded one gives up first.
 MTSU_COLUMNS = [
-    # The argument, not the inventory. The robots appear once in the project
-    # plate, as evidence the hardware is real, and once here as what they send.
+    # (heading, sections in shed order, how many the sheet may not give up)
+    #
+    # No accuracy plate. The presenting author's instruction is that the
+    # detector's accuracy is not shown for now, so the tier ladder and the
+    # round curve are off the sheet and the argument is carried by the two
+    # things that are not accuracy: how the agents coordinate, and what the
+    # collection actually produced.
     ("One platform supports any robot or dataset",
-     ["platform_idea", "robots_today", "uplink", "platform_domains",
-      "future_robots", "remote_control", "shared_models"], 2),
+     ["platform_idea", "robots_today", "uplink", "platform_domains"], 2),
     ("Open-weight models review in tiers",
-     # The plate leads its theme so it lands at the top of a fresh column. A
-     # ten-inch block placed last in an eleven-inch column carries over into the
-     # next one, which costs a later theme its column entirely.
-     ["supervisor", "escalate", "dispatch",
-      "watch", "brain", "analysis_agent", "analysis_sandbox"], 1),
-    ("Agents ran the loop without an operator",
-     ["loop", "diagnosis", "auto_diag", "field", "control"], 1),
-    # The label-quality campaign. The loop could not raise accuracy; the
-    # suspicion moved from the recipe to the labels by elimination; the sheet
-    # then says what was tried against the labels and what each attempt cost.
-    # The ablations this displaced -- tta, zeroshot, families -- are training
-    # variations, and a reviewer learns more from the campaign than from them.
-    ("More data no longer improved the model",
-     ["ladder", "label_ceiling", "label_curator", "label_unit", "label_agent",
-      "sources", "label_sealed", "species", "ledger"], 5),
+     ["supervisor", "escalate"], 1),
+    ("A judgement counts only where it runs",
+     ["dispatch", "label_agent", "loop", "diagnosis"], 3),
+    ("What the collection produced",
+     ["funnel", "label_curator", "label_unit", "label_ceiling", "sources"], 3),
 ]
 
 # The two plates that ARE the evidence for the two headline claims: what more
 # data cost, with error bars and three seeds at every rung, and what separates
 # a cheap reviewer from an expensive one. A research poster whose columns carry
 # no plot has asserted its findings and shown none of them.
-MTSU_PINNED = {"ladder", "supervisor"}
-MTSU_KEEP_FIGURE = {"ladder", "supervisor"}
+MTSU_PINNED = {"supervisor", "dispatch"}
+MTSU_KEEP_FIGURE = {"supervisor", "dispatch"}
 
 MTSU_PAD = 0.24            # the template's own panel padding, 0.26, less a hair
 

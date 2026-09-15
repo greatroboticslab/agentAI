@@ -480,6 +480,74 @@ def cart_grid():
 
 
 # ----------------------------------------------------------- the algorithm
+def router():
+    """Where each role runs, and whether its answer counts.
+
+    Every row is read out of `weed_optimizer_framework/tools/model_router.py`:
+    the eight roles, their place, their model, and whether the role exercises
+    judgement. The rule the figure exists to show is one line of that file --
+    `"authoritative": bool(place == "cluster") if judgement else True` -- so a
+    judgement produced on the lab box returns marked as a draft. The flag
+    travels with the answer instead of sitting in a configuration block, which
+    is the difference between a rule and a note.
+    """
+    from matplotlib.patches import Rectangle
+    W, H = 11.6, 5.72
+    fig = plt.figure(figsize=(W, H)); fig.set_layout_engine("none")
+    ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
+
+    CLUSTER = [("plan the next step", "qwen3.8 27B", True),
+               ("review in depth", "glm-4.7-flash", True),
+               ("hard one-off reasoning", "deepseek-v3 671B", True),
+               ("decide what to collect", "gemma 4", True),
+               ("judge dataset quality", "qwen2.5 7B", True),
+               ("label assistance", "minicpm-v", False)]
+    LAB = [("turn intent into a project", "qwen2.5 3B", True),
+           ("summarise a dataset", "qwen2.5 3B", True)]
+
+    ROW, GAP, HEAD = 0.445, 0.30, 0.60
+    x0, xm = 0.30, 6.65          # role column, model column
+    y = H - 0.30
+
+    def band(title, note, rows, y, tint):
+        ax.text(x0, y, title, fontsize=22.0, fontweight="bold",
+                color=INK, va="top", ha="left")
+        ax.text(W - 0.30, y, note, fontsize=17.5, color=MUTE,
+                va="top", ha="right", style="italic")
+        y -= HEAD
+        top = y + 0.10
+        for name, model, judge in rows:
+            ax.add_patch(Rectangle((x0 - 0.16, y - ROW + 0.10), W - 2 * x0 + 0.32,
+                                   ROW - 0.08, facecolor=tint, edgecolor="none",
+                                   zorder=1))
+            if judge:
+                ax.add_patch(Rectangle((x0 - 0.02, y - 0.265), 0.135, 0.135,
+                                       facecolor=BLUE, edgecolor="none", zorder=3))
+            ax.text(x0 + 0.26, y - 0.20, name, fontsize=19.5, color=INK,
+                    va="center", ha="left", zorder=3)
+            ax.text(xm, y - 0.20, model, fontsize=18.0, color=MUTE,
+                    va="center", ha="left", zorder=3)
+            y -= ROW
+        ax.plot([x0 - 0.16, W - x0 + 0.16], [top, top], color=RULE, lw=1.4)
+        return y
+
+    y = band("On the cluster", "the answer is authoritative", CLUSTER, y, PALE)
+    y -= GAP
+    y = band("On the lab box", "the answer returns marked a draft", LAB, y, "#F3E9E2")
+    ax.text(x0, y - 0.04, "filled square: the role exercises judgement",
+            fontsize=16.0, color=MUTE, va="top", ha="left")
+    assert y - 0.22 >= 0, ("the router table runs off its canvas by %.2f in -- "
+                           "raise H or lower ROW" % (0.22 - y))
+    return save(fig, "g_router",
+                "The eight roles the router places, read from its own table. A judgement is "
+                "authoritative only when it was produced on the cluster; the same judgement "
+                "produced on the laboratory box returns flagged as a draft, so the placement "
+                "rule travels with the answer rather than living in a configuration block. "
+                "The flag exists because nine campaign reviews were once produced by a 4.7 GB "
+                "model on the laboratory box while 458 GB of verified weights sat unused on "
+                "the cluster, and nothing in the returned result said so.")
+
+
 def _glyph(ax, kind, cx, cy, s, color=INK, lw=2.4, accent=None):
     """One line-drawn icon, centred on (cx, cy) inside a square of side s.
 
@@ -1101,7 +1169,7 @@ def field():
     tot = stages[0][1]
     for i, (lab, v, c) in enumerate(stages):
         ax.barh(-i, max(v / tot, 0.0), height=0.42, color=c)
-        ax.text(0.0, -i + 0.40, lab, fontsize=10, color=INK, va="center")
+        ax.text(0.0, -i + 0.44, lab, fontsize=18.5, color=INK, va="center")
         ax.text(max(v / tot, 0.0) + 0.012, -i, "{:,}".format(v), va="center",
                 fontsize=11, color=c)
     ax.set_xlim(0, 1.26); ax.set_ylim(-len(stages) + 0.42, 0.78)
@@ -1350,7 +1418,7 @@ def species():
 # ---------------------------------------------------------------- k. funnel
 def funnel():
     F = D.FUNNEL
-    fig, ax = plt.subplots(figsize=(11.600, 3.80))
+    fig, ax = plt.subplots(figsize=(11.600, 4.15))
     stages = [("harvested and labelled", F["registry_labelled"], BLUE),
               ("unique after dedup", F["unique"], BLUE),
               ("audited for label quality", F["audited_images"], MUTE),
@@ -1358,9 +1426,9 @@ def funnel():
     tot = stages[0][1]
     for i, (lab, v, c) in enumerate(stages):
         w = v / tot
-        ax.barh(-i, w, height=0.42, color=c)
-        ax.text(0.0, -i + 0.40, lab, fontsize=10, color=INK, va="center")
-        ax.text(w + 0.012, -i, "{:,}".format(v), va="center", fontsize=11, color=c)
+        ax.barh(-i, w, height=0.40, color=c)
+        ax.text(0.0, -i + 0.44, lab, fontsize=18.5, color=INK, va="center")
+        ax.text(w + 0.015, -i, "{:,}".format(v), va="center", fontsize=19.5, color=c)
     ax.set_xlim(0, 1.26); ax.set_ylim(-len(stages) + 0.45, 0.75)
     ax.axis("off")
     return save(fig, "k_funnel",
@@ -1372,7 +1440,8 @@ if __name__ == "__main__":
     print("rendering into", OUT)
     for fn in (fam, vlm, ladder, wall, supervision, rounds, robots, drive,
                species, funnel, field, tta, sources, ledger, system,
-               journey, robots_wide, projects, detect_grid, r241_grid, cart_grid, algorithm):
+               journey, robots_wide, projects, detect_grid, r241_grid, cart_grid, algorithm,
+               router):
         fn()
     json.dump(CAPS, open(os.path.join(HERE, "captions.json"), "w"), indent=1)
     print("\n%d figures" % len(CAPS))

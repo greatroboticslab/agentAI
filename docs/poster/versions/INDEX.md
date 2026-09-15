@@ -38,3 +38,9 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v34** (fd07fd0) — ragged right everywhere, including the stand-first — body 26.9 pt, 12 blocks
 - **v35** (fd07fd0) — ragged right, and widows reported每 build — body 26.9 pt, 12 blocks
 - **v36** (95827eb) — numerals set in a lining face: Georgia's own are old-style — body 26.9 pt, 12 blocks
+- **v37** (67d93ac) — no accuracy plate: coordination and outputs carry the sheet — body 21.0 pt, 16 blocks
+- **v38** (67d93ac) — coordination and outputs, at a readable size — body 17.6 pt, 13 blocks
+- **v39** (67d93ac) — coordination and outputs: three plates, nine blocks, 25.6 pt — body 25.6 pt, 12 blocks
+- **v40** (67d93ac) — coordination and outputs at reading size — body 22.1 pt, 12 blocks
+- **v41** (67d93ac) — coordination and outputs carry the sheet; no accuracy plate — body 25.6 pt, 12 blocks
+- **v42** (67d93ac) — no widow in the curator block — body 25.6 pt, 12 blocks

@@ -103,6 +103,7 @@ DASHES  = ["-", "--", "-.", ":", (0, (5, 1, 1, 1)), (0, (1, 1))]
 # 2.6x typographic spread across one sheet, invisible in the source because
 # every figure said font.size=11. `save()` asserts against it.
 PLACED = {
+    "g_router": 11.6,
     "l_robots": 11.6, "h_drive": 11.6, "k_funnel": 11.6, "s_sources": 11.6,
     "d_wall": 11.6, "p_field": 11.6, "j_species": 11.6,
     # There is no 10.925 width any more. It existed so a four-column grid could
