@@ -33,3 +33,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v29** (c953a6f) — a QR to the live platform in the corner the columns leave empty — body 28.1 pt, 12 blocks
 - **v30** (eb2f906) — academic register across the sheet, and the diagram states what the code does — body 26.9 pt, 12 blocks
 - **v31** (eb2f906) — the two column headings the regex missed, and a QR that sizes itself to its corner — body 26.9 pt, 12 blocks
+- **v32** (95efcc2) — rung labels no longer run under the rung drawn on top of them — body 26.9 pt, 12 blocks

@@ -636,8 +636,8 @@ def algorithm():
              ("deterministic checks", "checks"),
              ("the language model reads artifacts", "read"),
              ("the same model, given check findings", "retrieve")]
-    rw, rh, rise, stepx = 8.70, 1.00, 0.28, 7.10
-    rx0, ry0 = 13.90, 0.52
+    rw, rh, rise, stepx = 8.70, 1.00, 0.28, 8.05
+    rx0, ry0 = 12.10, 0.52
     for k, (name, icon) in enumerate(rungs):
         x, y = rx0 + k * stepx, ry0 + k * rise
         top = k == len(rungs) - 1
@@ -652,8 +652,19 @@ def algorithm():
                 fontweight="bold" if top else "normal", zorder=4)
     # a rung whose label is wider than its box is clipped, and the clip is
     # invisible at thumbnail size -- the top rung printed "handed those chec".
-    wide = [n for n, _i in rungs if 1.05 + len(n) * LAD * 0.50 / 72.0 > rw]
+    # Two ways a rung label can be lost, and both are invisible at thumbnail
+    # size. It can be wider than its own box, and -- for every rung but the
+    # last -- it can run under the rung drawn on top of it, which is what
+    # covered the tail of "reads artifacts".
+    _w = lambda n: 1.05 + len(n) * LAD * 0.50 / 72.0
+    wide = [n for n, _i in rungs if _w(n) > rw]
     assert not wide, "ladder rung label wider than its box: %s" % wide
+    under = [n for n, _i in rungs[:-1] if _w(n) + 0.12 > stepx]
+    assert not under, ("ladder rung label runs under the rung above it "
+                       "(needs stepx >= %.2f): %s"
+                       % (max(_w(n) for n, _i in rungs[:-1]) + 0.12, under))
+    last = rx0 + (len(rungs) - 1) * stepx + rw
+    assert last <= R - 0.40, "the ladder runs past the loop: %.2f > %.2f" % (last, R - 0.40)
     arrowhead(rx0 - 0.95, ry0 + rh / 2, 0.80)
     ax.text(rx0 - 1.20, ry0 + rh / 2, "at the end of\nevery step",
             fontsize=LAD, color=INK, ha="right", va="center",
@@ -669,7 +680,7 @@ def algorithm():
     # The explanation of WHY it is dashed belongs in the caption, not in the
     # drawing: four lines of prose inside a schematic is a paragraph wearing a
     # figure's clothes.
-    lx = L + 5.35
+    lx = L + 3.60
     ax.text(lx, BOTY + 0.42, "results are recorded but never read",
             fontsize=EDGE, color=INK, ha="center", va="center")
 
