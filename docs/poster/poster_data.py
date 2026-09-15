@@ -409,22 +409,26 @@ PROJECTS = [
     {"key": "weed", "name": "Weed Detection", "layout": "top",
      "photo": "u_detect_4.jpg", "crop": 0.5, "w": 10.2,
      "blurb": 
-              "Two agents work the corpus unasked: one harvests imagery and audits it, the other trains a detector small enough to ride the robots. More than 150,000 labelled images."},
+              
+              "The corpus exceeds 150,000 labelled images. Two agents operate on it unprompted: one harvests and audits imagery, the other trains a detector small enough for the robots."},
 
     {"key": "241_robot", "name": "Rover", "layout": "side",
      "photo": "r241_robot.jpg", "crop": 0.50, "w": 12.4,
      "blurb": 
-              "A four-wheel skid-steer the width of a crop row, carrying a Jetson, a Raspberry Pi and its own battery. Camera, GPS and two inertial units stream live over one API key."},
+              
+              "A four-wheel skid-steer the width of a crop row carries a Jetson, a Raspberry Pi and its own battery. Camera, GPS and two IMUs stream live over one API key."},
 
     {"key": "laser_cart", "name": "Laser Weed Control Robot", "layout": "side",
      "photo": "lasercar_field.jpg", "fallback": "lc_front.jpg", "crop": 0.5, "w": 12.4,
      "blurb": 
-              "A twin-laser weeder. A YOLO detector finds the weed; two galvanometer lasers aim and fire, and it dies where it stands. No chemical, nothing touches the crop beside it."},
+              
+              "A YOLO detector localises each weed; two galvanometer lasers aim and fire, destroying it in place. No chemical is applied and nothing contacts the adjacent crop."},
 
     {"key": "humanoid_robot", "name": "Humanoid and Quadruped", "layout": "pair",
      "photo": "humanoid_dog.jpg", "photo2": "team_field.jpg", "crop": 0.5, "w": 11.4,
      "blurb": 
-              "A humanoid and a quadruped, out on the farm to record where wheels do not go. Their project takes the ingest contract the Rover uses; any session they open is governed."},
+              
+              "This project pairs a humanoid with a quadruped to record terrain that wheels do not reach. It adopts the Rover's ingest contract, so every session the robots open is governed."},
 ]
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"

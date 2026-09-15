@@ -31,3 +31,5 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v27** (c6292c8) — no title on figure 1; the bar printed; the corpus that never changed; a chat model rubber-stamps a box — body 29.4 pt, 13 blocks
 - **v28** (c6292c8) — line height measured, not assumed: every block was a fifth short — body 28.1 pt, 12 blocks
 - **v29** (c953a6f) — a QR to the live platform in the corner the columns leave empty — body 28.1 pt, 12 blocks
+- **v30** (eb2f906) — academic register across the sheet, and the diagram states what the code does — body 26.9 pt, 12 blocks
+- **v31** (eb2f906) — the two column headings the regex missed, and a QR that sizes itself to its corner — body 26.9 pt, 12 blocks

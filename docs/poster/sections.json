@@ -3,8 +3,8 @@
   {
    "id": "platform_idea",
    "theme": "platform-idea",
-   "heading": "agentAI is one platform for every lab robot",
-   "body": "A robot, drone or sensor rig is a project with its own keys, people and locked dataset registry. Agents harvest, filter, label and train against it. Adding a robot is a configuration change.",
+   "heading": "agentAI is one platform for every laboratory robot",
+   "body": "A robot, drone or sensor rig is a project with its own keys, members and access-controlled dataset registry. Agents harvest, filter, label and train against that registry. Adding a robot is a configuration change.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -13,8 +13,8 @@
   {
    "id": "platform_domains",
    "theme": "platform-idea",
-   "heading": "Any data type, any field, one project each",
-   "body": "Open a project, upload, and get an automatic diagnosis before choosing what to do next. Weed detection is one project here; so are the Rover and the laser robot.",
+   "heading": "Every data type and domain forms its own project",
+   "body": "On upload, a project returns an automatic diagnosis of the data before the next step is chosen. Weed detection is one project on the platform; the Rover and the laser robot are two others.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -33,8 +33,8 @@
   {
    "id": "robots_today",
    "theme": "robots-connected",
-   "heading": "The Rover and the laser robot both report in",
-   "body": "The Rover is a four-wheel skid-steer streaming camera, GPS and two inertial units. The Laser Weed Control Robot carries two galvanometer lasers on independent channels, a down camera over the work zone and a forward camera.",
+   "heading": "Both the Rover and the laser robot transmit data",
+   "body": "The Rover is a four-wheel skid-steer streaming camera, GPS and two inertial measurement units (IMUs). The Laser Weed Control Robot carries two galvanometer lasers on independent channels, a downward camera over the work zone and a forward camera.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -73,8 +73,8 @@
   {
    "id": "uplink",
    "theme": "live-collection",
-   "heading": "A drive becomes a dataset as it opens",
-   "body": "The platform registers a vehicle's session as a governed dataset while the drive runs. Frames and sensor batches arrive over one API key. The laser robot sends no position.",
+   "heading": "Each drive becomes a dataset at its start",
+   "body": "The platform registers a vehicle session as a governed dataset during the drive. Frames and sensor batches arrive over one API key. The laser robot transmits no position.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",
@@ -203,8 +203,8 @@
   {
    "id": "loop",
    "theme": "iterating-agents-brain",
-   "heading": "The premise was compounding, and we ran it unattended",
-   "body": "One agent collects, one trains, and next month's model should beat this month's. Fifteen rounds ran with nobody in the room -- and the training corpus never changed after round three, while the ledger, the dashboard and every round report presented each round as new work.",
+   "heading": "Compounding was the premise of the unattended loop",
+   "body": "One agent collects and one trains, so each round's model should exceed the last. Fifteen rounds ran unattended. The training corpus did not change after round three, yet the ledger, the dashboard and every round report recorded each as new work.",
    "figure": "f_rounds",
    "status": "built_but_off",
    "width": "centre",
@@ -235,8 +235,8 @@
   {
    "id": "supervisor",
    "theme": "iterating-agents-brain",
-   "heading": "Grounded recall separates the reviewers",
-   "body": "Every reviewer here is an open-weight model on our own cluster. What escalating buys is grounding, not size: handing the cheap tier's own findings up is worth +0.149 recall to the 27 B and +0.012 to the 14 B.",
+   "heading": "Grounded recall distinguishes the reviewers",
+   "body": "Every reviewer is an open-weight model served from a self-hosted cluster. The higher tier adds grounding, not parameter count: supplying the deterministic tier's findings to the model yields +0.149 recall at 27 B and +0.012 at 14 B.",
    "figure": "e_supervision",
    "status": "built_but_off",
    "width": "centre",
@@ -277,8 +277,8 @@
   {
    "id": "ladder",
    "theme": "label-quality",
-   "heading": "More harvested data cost accuracy; we measured it",
-   "body": "The bar is 0.90 mAP50-95, above the 0.869 published for this class of task. Starting fresh instead of from the last round's weights recovers +0.0287, five times this recipe's seed spread.",
+   "heading": "More harvested data measurably reduced accuracy",
+   "body": "The target is 0.90 mAP50-95, above the 0.869 published for this class of task. Re-initialising training rather than resuming from the previous round's weights recovers +0.0287, five times the seed spread of this recipe.",
    "figure": "c_ladder",
    "status": "built_and_running",
    "width": "column",
@@ -506,23 +506,23 @@
    "theme": "iterating-agents-brain",
    "figure": "none",
    "status": "built_and_running",
-   "heading": "A cheap reviewer, and a bigger one above it when it is stuck",
-   "body": "Review runs in tiers: a scripted watchdog, twelve deterministic checks, a model reading the artifacts with those checks hidden, then the same model handed them. On 149 frozen cases the scripted watchdog returned no decision at all."
+   "heading": "Tiered review is invoked at the end of every step",
+   "body": "The tiers are a scripted watchdog, twelve deterministic checks, a language model reading the artifacts with those checks withheld, then the same model supplied with them. On 149 frozen cases the scripted watchdog returned no decision."
   },
   {
    "id": "algorithm",
    "theme": "platform-idea",
    "figure": "x_algorithm",
    "status": "built_and_running",
-   "heading": "Agent Work Flow Diagram",
+   "heading": "Agent Workflow Diagram",
    "body": "",
    "title_below": true
   },
   {
    "id": "label_ceiling",
    "theme": "label-quality",
-   "heading": "The recipe was not why more data stopped helping",
-   "body": "More data arrived; the detector did not improve. Augmentation, replaying known species, completing labels: each left the same gap. What stood was our auto-labeller's boxes.",
+   "heading": "Training configuration was not the limiting factor",
+   "body": "Data continued to arrive; the detector did not improve. Augmentation, replaying known species and completing labels each left the same gap. The explanation that remains is the automatic labeller's boxes.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "RESEARCH_LOG sessions 12-14"
@@ -530,8 +530,8 @@
   {
    "id": "label_curator",
    "theme": "label-quality",
-   "heading": "A chat model rubber-stamps a box; geometry does not",
-   "body": "The rule: discard what sits too far from the data we trust. Shown a candidate box, Gemma 4 rejects none of the false ones, so the test is DINOv2 geometry. Fifty-one datasets out, retrained, accuracy did not come back.",
+   "heading": "Geometry rejects boxes the language model accepts",
+   "body": "The rule discards boxes lying too far from the trusted data. Presented with a candidate box, Gemma 4 rejects none of the false boxes, so the criterion is DINOv2 geometry. Fifty-one datasets were removed; retraining did not restore accuracy.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "CHANGELOG v3.0.35-37"
@@ -539,8 +539,8 @@
   {
    "id": "label_unit",
    "theme": "label-quality",
-   "heading": "The unit of curation has to match the unit of noise",
-   "body": "An auto-label error is one wrong box in an otherwise fine image, so a dataset-level filter cannot see it. The per-box tools are written, not re-measured. That is the open front.",
+   "heading": "The unit of curation must match the unit of noise",
+   "body": "An automatic-labelling error is a single incorrect box in an otherwise acceptable image, so a dataset-level filter cannot detect it. The per-box tools are implemented but not re-measured. That remains an open question.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "RESEARCH_LOG L969-974"
@@ -548,8 +548,8 @@
   {
    "id": "label_agent",
    "theme": "label-quality",
-   "heading": "A brain's falsifiable hypothesis, and it was wrong",
-   "body": "Harvested boxes carry a class taken from the website they came from. A brain blamed that, wrote its falsifying condition first, and a human approved. Four runs falsified it. The real cost was density: nine boxes an image against under two.",
+   "heading": "A language model's falsifiable hypothesis was false",
+   "body": "Harvested boxes take their class from the source website. A language model proposed that as the cause, stated its falsifying condition first, and a human approved. Four runs falsified it. The cost was density: nine boxes per image against under two.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "approval ap-1789102367-82097423"

@@ -49,21 +49,19 @@ except Exception:
     pass
 
 TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
-STAND = ("One platform where agents collect their own data and train on it, month after month, "
-         "so the model compounds without anyone in the room. We built it, ran it unattended for "
-         "fifteen rounds, and measured what each part of that loop is actually worth.")
+STAND = ("On one platform, agents collect their own data and train on it, month after month, so the model compounds without human intervention. The system ran for fifteen unattended rounds, and each stage's contribution was measured.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
 SPINE = [
-    ("One platform takes any robot, any dataset",           ["platform_idea", "system", "platform_domains"]),
+    ("One platform supports any robot or dataset",           ["platform_idea", "system", "platform_domains"]),
     ("robots-connected",        ["robots_today", "shared_models", "future_robots"]),
     ("live-collection",         ["uplink", "r241_frames", "cart_frames", "census",
                                  "drive", "auto_diag"]),
     ("remote-control",          ["remote_control", "drive_button", "advice", "laser_control"]),
     ("analysis-agent",          ["analysis_agent", "analysis_example", "analysis_sandbox",
                                  "analysis_gap"]),
-    ("Agents ran the loop, nobody in the room",  ["loop", "brain", "dispatch", "watch", "supervisor"]),
+    ("Agents ran the loop with nobody in the room",  ["loop", "brain", "dispatch", "watch", "supervisor"]),
     ("results",                 ["detect_grid", "ladder", "field", "families", "species",
                                  "zeroshot", "tta", "sources", "ledger", "journey"]),
 ]
@@ -129,23 +127,23 @@ FOOTER = []
 MTSU_COLUMNS = [
     # The argument, not the inventory. The robots appear once in the project
     # plate, as evidence the hardware is real, and once here as what they send.
-    ("One platform takes any robot, any dataset",
+    ("One platform supports any robot or dataset",
      ["platform_idea", "robots_today", "uplink", "platform_domains",
       "future_robots", "remote_control", "shared_models"], 2),
-    ("Open weights, and a ladder when stuck",
+    ("Open-weight models review in tiers",
      # The plate leads its theme so it lands at the top of a fresh column. A
      # ten-inch block placed last in an eleven-inch column carries over into the
      # next one, which costs a later theme its column entirely.
      ["supervisor", "escalate", "dispatch",
       "watch", "brain", "analysis_agent", "analysis_sandbox"], 1),
-    ("Agents ran the loop, nobody in the room",
+    ("Agents ran the loop without an operator",
      ["loop", "diagnosis", "auto_diag", "field", "control"], 1),
     # The label-quality campaign. The loop could not raise accuracy; the
     # suspicion moved from the recipe to the labels by elimination; the sheet
     # then says what was tried against the labels and what each attempt cost.
     # The ablations this displaced -- tta, zeroshot, families -- are training
     # variations, and a reviewer learns more from the campaign than from them.
-    ("More data stopped helping",
+    ("More data no longer improved the model",
      ["ladder", "label_ceiling", "label_curator", "label_unit", "label_agent",
       "sources", "label_sealed", "species", "ledger"], 5),
 ]
@@ -526,7 +524,7 @@ class Poster(object):
     QR_URL  = "lab-b660m-c.tailfa6424.ts.net"
     QR_FILE = "qr_platform.png"
 
-    def qr_card(self, x, y, w):
+    def qr_card(self, x, y, w, free=3.2):
         """The code, and what a stranger gets for scanning it. Returns the height."""
         import os
         from pptx.util import Inches
@@ -536,14 +534,16 @@ class Poster(object):
             self.dropped.append("qr_card:missing-" + self.QR_FILE)
             return 0.0
         pad = MTSU_PAD
-        side = 2.45
+        # the code sizes itself to the corner it is given. Decoded from the
+        # built PDF at 2.6, 2.2, 1.8 and 1.4 in, so 1.55 is still legible.
+        side = max(1.55, min(2.45, free - 0.62))
         d.slide.shapes.add_picture(p, Inches(x + pad), Inches(y),
                                    width=Inches(side), height=Inches(side))
         tx = x + pad + side + 0.34
         tw = w - pad - (tx - x)
-        yy = d.sub(tx, y + 0.08, tw, "The platform is live; scan to open it")
+        yy = d.sub(tx, y + 0.08, tw, "The platform is live; the QR code links to it")
         yy = d.body(tx, yy, tw, self.QR_URL, after=4)
-        d.body(tx, yy, tw, "Signing in needs an institutional Google account.",
+        d.body(tx, yy, tw, "Authentication requires an institutional Google account.",
                size=d.dz["caption"], color=d.c["mute"], after=0)
         return side
 
@@ -1006,8 +1006,8 @@ class Poster(object):
         # one place on the sheet a reader can take the platform away with them.
         foot = max(ends)
         free = foot - ends[0]
-        if free >= 3.00:
-            self.qr_card(COL[0][0], ends[0] + 0.34, COL[0][1])
+        if free >= 1.95:
+            self.qr_card(COL[0][0], ends[0] + 0.30, COL[0][1], free)
         elif free > 0:
             self.dropped.append("qr_card:only-%.2f-in-free" % free)
 

@@ -208,9 +208,8 @@ def ladder():
                      annotation_clip=False)
     return save(fig, "c_ladder",
                 
-                "(c) Three seeds per rung, mean and 1 s.d., on the 1,977-image holdout -- which is also "
-                "each run's validation set, so each mark is that run's best epoch. (d) Same eight "
-                "checkpoints, unseen weed dataset, one seed per rung. Both exams fall.")
+                
+                "(c) Three seeds at each level, mean and 1 s.d., on the 1,977-image holdout, which is also each run's validation set, so every mark is that run's best epoch. (d) The same eight checkpoints on an unseen weed dataset, one seed per level. Both panels decline.")
 
 
 # ---------------------------------------------------------------- d. the wall
@@ -403,11 +402,8 @@ def supervision():
     d27 = pt("L3@qwen3.8:27b")["r"] - pt("L2@qwen3.8:27b")["r"]
     d14 = pt("L3@qwen3:14b")["r"] - pt("L2@qwen3:14b")["r"]
     return save(fig, "e_supervision",
-                "(e) Recall and (f) grounded recall on one frozen corpus of real incidents from "
-                "our own record, scored by our own scorer. Tail: the model on the artifacts with "
-                "the twelve checks' findings removed; head: the same model handed them. The dotted "
-                "line, no arrowhead, marks a pair whose ends were scored on different cases -- the "
-                "27 B's head stands on 57 incidents against its tail's 114.")
+                
+                "(e) Recall and (f) grounded recall on one frozen corpus of real incidents from this project's record, scored by its own scorer. Each tail is the language model on artifacts with the twelve checks' findings withheld; each head is the same model supplied with them. The dotted line has no arrowhead: its ends were scored on different cases, the 27 B head on 57 incidents and its tail on 114.")
 
 
 # --------------------------------------------------- photographic plates
@@ -570,16 +566,16 @@ def algorithm():
     were shedding sections for want of it.
     """
     from matplotlib.patches import FancyBboxPatch, Rectangle
-    W, H = 46.4, 4.95
-    STN, SUB, LAD, EDGE = 34.0, 24.0, 24.0, 25.0
+    W, H = 46.4, 5.10
+    STN, SUB, LAD, EDGE = 34.0, 24.0, 29.0, 25.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    TOPY, BOTY = 3.62, 0.40
+    TOPY, BOTY = 3.85, 0.38
     L, R = 0.85, W - 0.85
-    bw, bh = 8.05, 2.44
+    bw, bh = 8.05, 1.95
 
     def arrowhead(x, y, dx, color=INK, lw=1.9, ls="-"):
         ax.annotate("", xy=(x + dx, y), xytext=(x, y),
@@ -595,30 +591,35 @@ def algorithm():
     arrowhead(L + 3.2, BOTY, -1.0, lw=2.2, ls=(0, (8, 5)))
 
     stations = [
-        ("A need arrives", "a detector that works in our own rows", "need"),
-        ("Work out what would answer it", "the agent reads the registry and names what is missing", "plan"),
-        ("Go and get it", "harvest from public sources, then audit what came back", "fetch"),
-        ("Train on what survived", "scored against a holdout it never saw", "train"),
-        ("Read the result and decide", "what to ask for next", "decide"),
+        ("Requirement definition", "a detector effective in the local rows", "need"),
+        ("Queries from a fixed list", "registry entries mark sources to skip", "plan"),
+        ("Public acquisition and audit", "no new dataset in the last eight rounds", "fetch"),
+        ("Training on retained data", "the holdout is also the validation set", "train"),
+        ("Evaluation without decision", "the next round submits identical commands", "decide"),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
+    # one number for the sub-line measure, used by the wrap AND by the
+    # assertion that guards it. They were 40 and 44, so a 41-character
+    # sub-line passed the check and printed on two lines, the second of
+    # them below its own box.
+    SUB_WRAP = 46
     fit = int(bw * 72 / (STN * 0.55))
     over = [t for t, _s, _i in stations if len(t) > fit]
     assert not over, ("station title wider than its box at %g pt (max %d chars): %s"
                       % (STN, fit, over))
     # Two sub-lines is what the box holds; a third prints below its own rule.
-    deep = [t for t, sb, _i in stations if len(_wrap(sb, 40)) > 2]
-    assert not deep, "station sub-line runs past the box: %s" % deep
+    deep = [t for t, sb, _i in stations if len(_wrap(sb, SUB_WRAP)) > 1]
+    assert not deep, "station sub-line no longer fits one line: %s" % deep
     top = TOPY + bh / 2
     for i, ((title, sub, icon), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
                                edgecolor=INK, lw=1.7, zorder=3))
-        _glyph(ax, icon, x + bw / 2, top - 0.60, 0.92, lw=2.8, accent=BLUE)
-        ax.text(x + bw / 2, top - 1.32, title, ha="center", va="center",
+        _glyph(ax, icon, x + bw / 2, top - 0.55, 0.85, lw=2.8, accent=BLUE)
+        ax.text(x + bw / 2, top - 1.22, title, ha="center", va="center",
                 fontsize=STN, fontweight="bold", color=INK, zorder=4)
-        for k, line in enumerate(_wrap(sub, 40)):
-            ax.text(x + bw / 2, top - 1.76 - k * 0.38, line, ha="center",
+        for k, line in enumerate(_wrap(sub, SUB_WRAP)):
+            ax.text(x + bw / 2, top - 1.63 - k * 0.38, line, ha="center",
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
@@ -631,12 +632,12 @@ def algorithm():
     # An arrow from the station into the TOP rung, which is what the first
     # version drew, says the opposite -- that being stuck summons the most
     # expensive reviewer.
-    rungs = [("a scripted watchdog", "shield"),
+    rungs = [("scripted watchdog", "shield"),
              ("deterministic checks", "checks"),
-             ("a model reads the artifacts", "read"),
-             ("the same model, handed those checks", "retrieve")]
-    rw, rh, rise, stepx = 7.05, 0.74, 0.30, 5.55
-    rx0, ry0 = 19.90, 0.52
+             ("the language model reads artifacts", "read"),
+             ("the same model, given check findings", "retrieve")]
+    rw, rh, rise, stepx = 8.70, 1.00, 0.28, 7.10
+    rx0, ry0 = 13.90, 0.52
     for k, (name, icon) in enumerate(rungs):
         x, y = rx0 + k * stepx, ry0 + k * rise
         top = k == len(rungs) - 1
@@ -645,16 +646,16 @@ def algorithm():
                                facecolor=BLUE if top else WHITE,
                                edgecolor=BLUE if top else INK,
                                lw=2.2 if top else 1.5, zorder=3))
-        _glyph(ax, icon, x + 0.48, y + rh / 2, 0.50, color=ink, lw=2.1)
-        ax.text(x + 0.88, y + rh / 2, name, fontsize=LAD,
+        _glyph(ax, icon, x + 0.55, y + rh / 2, 0.62, color=ink, lw=2.4)
+        ax.text(x + 1.05, y + rh / 2, name, fontsize=LAD,
                 va="center", ha="left", color=ink,
                 fontweight="bold" if top else "normal", zorder=4)
     # a rung whose label is wider than its box is clipped, and the clip is
     # invisible at thumbnail size -- the top rung printed "handed those chec".
-    wide = [n for n, _i in rungs if 0.88 + len(n) * LAD * 0.50 / 72.0 > rw]
+    wide = [n for n, _i in rungs if 1.05 + len(n) * LAD * 0.50 / 72.0 > rw]
     assert not wide, "ladder rung label wider than its box: %s" % wide
     arrowhead(rx0 - 0.95, ry0 + rh / 2, 0.80)
-    ax.text(rx0 - 1.20, ry0 + rh / 2, "escalate\nwhile stuck",
+    ax.text(rx0 - 1.20, ry0 + rh / 2, "at the end of\nevery step",
             fontsize=LAD, color=INK, ha="right", va="center",
             fontweight="bold", linespacing=1.22)
     # and the verdict that survives the climb comes back up to the station
@@ -668,13 +669,14 @@ def algorithm():
     # The explanation of WHY it is dashed belongs in the caption, not in the
     # drawing: four lines of prose inside a schematic is a paragraph wearing a
     # figure's clothes.
-    lx = L + 8.6
-    ax.text(lx, ry0 + 1.30, "the decision becomes the next need",
+    lx = L + 5.35
+    ax.text(lx, BOTY + 0.42, "results are recorded but never read",
             fontsize=EDGE, color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",
                 
-                "A need arrives, the agent works out what data would answer it, fetches it, trains on what survives the audit, scores, decides what to ask next. Stuck, it climbs the ladder. Dashed: the decision is recorded, nothing reads it back.")
+                
+                "A requirement enters. The harvest issues fixed queries without gap analysis. Audited data train the model; the holdout is also the validation set and selects the reported epoch. Evaluation parses a metric; no decision follows. The reviewer runs after every step; the dashed edge is unimplemented.")
 
 
 def _wrap(text, n):
@@ -815,7 +817,8 @@ def projects():
                 % (pr["name"], -y * ax_h_in))
     return save(fig, "q_projects",
                 
-                "Every project on the platform opened the same way, same ingest contract, same agents train and evaluate it.")
+                
+                "Every project on the platform is created by the same procedure and registers its data under one ingest contract. The harvesting and training agents have so far run on one of them.")
 
 
 # ------------------------------------------------------------- the model ledger
