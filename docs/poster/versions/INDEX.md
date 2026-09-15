@@ -37,3 +37,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v33** (fd07fd0) — ragged right: a justified line without hyphenation stretches its spaces to 1.75x — body 26.9 pt, 12 blocks
 - **v34** (fd07fd0) — ragged right everywhere, including the stand-first — body 26.9 pt, 12 blocks
 - **v35** (fd07fd0) — ragged right, and widows reported每 build — body 26.9 pt, 12 blocks
+- **v36** (95827eb) — numerals set in a lining face: Georgia's own are old-style — body 26.9 pt, 12 blocks

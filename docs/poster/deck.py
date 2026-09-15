@@ -18,6 +18,7 @@ holds roughly 950 words of prose. A sentence that does not fit is cut, not shrun
 """
 import json
 import os
+import re
 import sys
 
 from PIL import Image
@@ -65,6 +66,20 @@ BODY, CAPTION, HEADING, SUBHEAD, TITLE, STAND = 20, 16, 34, 24, 120, 34
 # bottom of its panel and off the foot of the sheet.
 LINE_H = 1.20
 TABLE_TXT = 17
+
+
+# Faces whose default numerals are OLD-STYLE -- varying height, some sitting
+# below the baseline. Measured at 200 pt: Georgia's ten digits span 37 px at the
+# top and 36 px at the baseline, against 2 px for Times New Roman and Arial. In
+# running prose that reads as character; in a sheet where nearly every claim is
+# a number it reads as wobble, and it is the first thing a reader notices about
+# a figure. Numerals in these faces are set in FIGURE_FACE instead, which has
+# lining figures at the same cap height and ships on every platform this deck
+# is opened on.
+OLDSTYLE_FIGURES = {"Georgia", "Charter", "Baskerville", "Hoefler Text",
+                    "Athelas", "Didot", "Palatino"}
+FIGURE_FACE = "Times New Roman"
+_NUMBER = re.compile(r"([+-]?\d[\d,]*(?:\.\d+)?)")
 
 
 class Deck(object):
@@ -119,9 +134,17 @@ class Deck(object):
             p = tf.paragraphs[0] if first else tf.add_paragraph()
             first = False
             p.alignment = align; p.space_after = Pt(after); p.line_spacing = spacing
-            run = p.add_run(); run.text = s
-            run.font.size = Pt(size); run.font.bold = bold
-            run.font.color.rgb = color; run.font.name = face or self.f["body"]
+            fname = face or self.f["body"]
+            parts = _NUMBER.split(s) if fname in OLDSTYLE_FIGURES else [s]
+            for seg in parts:
+                if not seg:
+                    continue
+                run = p.add_run(); run.text = seg
+                run.font.size = Pt(size); run.font.bold = bold
+                run.font.color.rgb = color
+                run.font.name = (FIGURE_FACE
+                                 if fname in OLDSTYLE_FIGURES and _NUMBER.fullmatch(seg)
+                                 else fname)
         return tb
 
     # ---- measurement ----------------------------------------------------
