@@ -204,7 +204,7 @@ class Deck(object):
             # under the affiliation line, and the columns start below it.
             self.tbox(MTSU_M, y, W - 2 * MTSU_M,
                       [(standfirst, dz["stand"] - 6, False, c["ink"])],
-                      spacing=1.20, face=f["body"], align=PP_ALIGN.JUSTIFY)
+                      spacing=1.20, face=f["body"], align=PP_ALIGN.LEFT)
             self.top = y + self.h_est(standfirst, W - 2 * MTSU_M, dz["stand"] - 6, 1.20) + 0.30
         elif standfirst and self.look == "journal":
             # An abstract: one measure narrower than the sheet, justified, ruled
@@ -395,13 +395,14 @@ class Deck(object):
         # Justified only for running prose, and only in the journal look: a
         # justified two-word label is a line of holes.
         if justify is None:
-            # Justify only at a measure a reader can follow. Purrington puts the
-            # limit at 45-65 characters; python-pptx cannot switch hyphenation
-            # on, so past that a justified column opens rivers of white.
-            em = {"Times New Roman": 0.442, "Georgia": 0.478,
-                  "Arial Narrow": 0.425}.get(self.f["body"], 0.50)
-            cpl = (w * 72.0) / (size * em)
-            justify = self.look in ("journal", "mtsu") and len(s) > 160 and cpl <= 66
+            # Ragged right, always. python-pptx cannot switch hyphenation on, so
+            # a justified line has only the word spaces to stretch: measured off
+            # the built PDF at 300 dpi, a natural space in this column is 0.095 in
+            # and the widest stretched one is 0.167 -- 1.75x, and several on one
+            # line read as a river. Poster practice is ragged right for exactly
+            # this reason; an uneven right edge is not a defect, a stretched line
+            # is.
+            justify = False
         self.tbox(x, y, w, [(s, size, bold, color, after)], spacing=spacing,
                   align=PP_ALIGN.JUSTIFY if justify else PP_ALIGN.LEFT)
         return y + self.h_est(s, w, size, spacing, after)

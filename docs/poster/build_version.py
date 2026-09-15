@@ -48,7 +48,8 @@ def main():
                      "small": os.path.basename(small),
                      "body_pt": p.st.d["body"], "heading_pt": p.st.d["heading"],
                      "type_scale": p.type_scale, "kept": kept, "dropped": dropped,
-                     "offsheet": getattr(p, "offsheet", [])})
+                     "offsheet": getattr(p, "offsheet", []),
+                     "widows": getattr(p, "widows", [])})
         if label == "navy":
             subprocess.run(["soffice", "--headless", "--convert-to", "pdf",
                             "--outdir", out, pptx], capture_output=True)

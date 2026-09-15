@@ -34,3 +34,6 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v30** (eb2f906) — academic register across the sheet, and the diagram states what the code does — body 26.9 pt, 12 blocks
 - **v31** (eb2f906) — the two column headings the regex missed, and a QR that sizes itself to its corner — body 26.9 pt, 12 blocks
 - **v32** (95efcc2) — rung labels no longer run under the rung drawn on top of them — body 26.9 pt, 12 blocks
+- **v33** (fd07fd0) — ragged right: a justified line without hyphenation stretches its spaces to 1.75x — body 26.9 pt, 12 blocks
+- **v34** (fd07fd0) — ragged right everywhere, including the stand-first — body 26.9 pt, 12 blocks
+- **v35** (fd07fd0) — ragged right, and widows reported每 build — body 26.9 pt, 12 blocks

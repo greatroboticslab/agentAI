@@ -573,6 +573,34 @@ class Poster(object):
         y = d.body(tx, y, tw, s["body"], after=10)
         return y + 0.26
 
+    def widow(self, w, sid):
+        """A last line carrying one or two words, which is a typographic defect.
+
+        Not an assertion: a widow is a quality fault, not a broken build, and
+        the type tier moves under it. Reported per build instead, so it cannot
+        sit on the sheet unnoticed the way the justified rivers did.
+        """
+        d = self.d
+        tw = w - 2 * MTSU_PAD
+        em = {"Times New Roman": 0.442, "Georgia": 0.478,
+              "Arial Narrow": 0.425}.get(d.f["body"], 0.50)
+        cpl = max(14, int((tw * 72.0) / (d.dz["body"] * em)))
+        lines, cur = [], ""
+        for word in self.lib[sid]["body"].split():
+            t = word if not cur else cur + " " + word
+            if len(t) <= cpl:
+                cur = t
+            else:
+                lines.append(cur); cur = word
+        if cur:
+            lines.append(cur)
+        if len(lines) < 2:
+            return None
+        last = lines[-1]
+        if len(last.split()) <= 2 or len(last) / float(cpl) < 0.22:
+            return "%s: last line is %r" % (sid, last)
+        return None
+
     def mtsu_block_h(self, w, sid):
         s, d = self.lib[sid], self.d
         pad = MTSU_PAD
@@ -1001,6 +1029,8 @@ class Poster(object):
         for sid in spilled:
             if sid not in self.dropped:
                 self.dropped.append(sid)
+        self.widows = [msg for _h, sid in flow
+                       for msg in [self.widow(COL[0][1], sid)] if msg]
 
         # The corner the columns leave empty is where the code goes -- it is the
         # one place on the sheet a reader can take the platform away with them.
