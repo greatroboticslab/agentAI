@@ -203,8 +203,8 @@
   {
    "id": "loop",
    "theme": "iterating-agents-brain",
-   "heading": "Compounding was the premise of the unattended loop",
-   "body": "One agent collects and one trains, and each runs without an operator. Fifteen rounds ran that way. The training corpus did not change after round three, yet the ledger and every round report recorded each round as new work.",
+   "heading": "The search ran dry after round three",
+   "body": "Two programs ran on the cluster unwatched, one searching for data, one training on it. They completed fifteen rounds. After the third the search found nothing new and the training set never changed, though the ledger and each round report logged new work.",
    "figure": "none",
    "status": "built_but_off",
    "width": "centre",
@@ -235,8 +235,8 @@
   {
    "id": "supervisor",
    "theme": "iterating-agents-brain",
-   "heading": "Grounded recall distinguishes the reviewers",
-   "body": "Every reviewer is an open-weight model served from a self-hosted cluster. The higher tier adds grounding, not parameter count: supplying the deterministic tier's findings to the model yields +0.149 recall at 27 B and +0.012 at 14 B.",
+   "heading": "Citing evidence beats model size",
+   "body": "We froze 149 real failures from our own history and asked open-weight models to find them. Good reviewers cite their evidence; size matters less. Handed the twelve checks' findings, a 27-billion model found 0.149 more, a 14-billion one 0.012.",
    "figure": "e_supervision",
    "status": "built_but_off",
    "width": "centre",
@@ -417,9 +417,9 @@
    "id": "dispatch",
    "theme": "iterating-agents-brain",
    "figure": "g_router",
-   "heading": "A judgement counts only where it was produced",
+   "heading": "What the lab model says stays a draft",
    "status": "built_and_running",
-   "body": "A router places each role on a model and a machine. Judgement produced on the cluster is returned authoritative; the same judgement produced on the laboratory box is returned marked a draft, so the rule travels with the answer."
+   "body": "Eight jobs need a model. Most run on the cluster; two run in the lab on a 3B model, because a person is waiting. A lab answer is marked so it cannot count as a decision. Nine campaign reviews predate the mark: a 4.7 GB model wrote them while 458 GB sat idle."
   },
   {
    "id": "vision_platform",
@@ -506,8 +506,8 @@
    "theme": "iterating-agents-brain",
    "figure": "none",
    "status": "built_and_running",
-   "heading": "Tiered review is invoked at the end of every step",
-   "body": "The tiers are a scripted watchdog, twelve deterministic checks, a language model reading the artifacts with those checks withheld, then the same model supplied with them. On 149 frozen cases the scripted watchdog returned no decision at all."
+   "heading": "Review runs even when nothing looks wrong",
+   "body": "Review follows every step: failures here announced themselves as successes. Four levels by cost: the running watchdog, twelve fixed checks, a model reading files, then that model given the findings. The watchdog returned nothing on 149 frozen failures."
   },
   {
    "id": "algorithm",
@@ -530,8 +530,8 @@
   {
    "id": "label_curator",
    "theme": "label-quality",
-   "heading": "Geometry rejects boxes the language model accepts",
-   "body": "The rule discards boxes lying too far from the trusted data. Presented with a candidate box, Gemma 4 rejects none of the false boxes, so the criterion is DINOv2 feature geometry rather than a language model, and fifty-one datasets were removed on it.",
+   "heading": "Gemma 4 said yes to every box",
+   "body": "We cropped each box out and asked Gemma 4, a vision model, whether it held a weed. It said yes every time, wrong ones included, so it cannot serve as a check. Distance from trusted examples, on DINOv2 features, does the work. Fifty-one datasets were cut.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "CHANGELOG v3.0.35-37"
@@ -539,8 +539,8 @@
   {
    "id": "label_unit",
    "theme": "label-quality",
-   "heading": "The unit of curation must match the unit of noise",
-   "body": "An automatic-labelling error is a single incorrect box in an otherwise acceptable image, so a dataset-level filter cannot detect it. The per-box tools are implemented but not re-measured. That remains an open question.",
+   "heading": "One bad box hides from a dataset filter",
+   "body": "A labelling mistake is usually one bad box in an otherwise sound picture, invisible to a whole-dataset filter. The check must run box by box. We built those tools; their one run died on a bookkeeping bug and was never repeated, so we cannot say they work.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "RESEARCH_LOG L969-974"
@@ -548,8 +548,8 @@
   {
    "id": "label_agent",
    "theme": "label-quality",
-   "heading": "A language model's falsifiable hypothesis was false",
-   "body": "Harvested boxes take their class from the source website. A language model proposed that as the cause, stated its falsifying condition first, and a human approved. Four runs falsified it. The cost was density: nine boxes per image against under two.",
+   "heading": "The model's explanation failed its own test",
+   "body": "Downloads carry no plant name, so every box from a site gets the same invented label. A model blamed that and wrote down first what would disprove it. A human approved; four runs disproved it. Web pictures average nine boxes, ours under two.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "approval ap-1789102367-82097423"
@@ -569,8 +569,8 @@
    "figure": "none",
    "status": "built_and_running",
    "numbers": "FUNNEL",
-   "heading": "What the collection produced, gate by gate",
-   "body": "Automatic labelling wrote 156,521 images; cross-dataset deduplication leaves 59,134 distinct ones; of the 13,527 audited for label precision, 3,208 clear the bar. The probe reads 1.000 on the human-labelled reference set, so a source that scores low is the data and not the instrument."
+   "heading": "156,521 labelled by machine, 3,208 kept",
+   "body": "A machine labelled 156,521 pictures; 59,134 remain once duplicate downloads are removed. We audited 13,527 of them, and only 3,208 came from a source worth keeping. The checker scores 1.000 on hand-labelled pictures, so a low score means the source is poor."
   }
  ]
 }

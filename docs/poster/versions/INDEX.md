@@ -44,3 +44,10 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v40** (67d93ac) — coordination and outputs at reading size — body 22.1 pt, 12 blocks
 - **v41** (67d93ac) — coordination and outputs carry the sheet; no accuracy plate — body 25.6 pt, 12 blocks
 - **v42** (67d93ac) — no widow in the curator block — body 25.6 pt, 12 blocks
+- **v43** (e9d2f84) — no note — body 25.6 pt, 12 blocks
+- **v44** (e9d2f84) — no note — body 24.4 pt, 12 blocks
+- **v45** (e9d2f84) — no note — body 25.6 pt, 12 blocks
+- **v46** (e9d2f84) — no note — body 25.6 pt, 12 blocks
+- **v47** (e9d2f84) — no note — body 25.6 pt, 12 blocks
+- **v48** (e9d2f84) — no note — body 25.6 pt, 12 blocks
+- **v49** (e9d2f84) — no note — body 25.6 pt, 12 blocks

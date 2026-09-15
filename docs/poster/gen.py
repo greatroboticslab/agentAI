@@ -138,7 +138,11 @@ MTSU_COLUMNS = [
      ["platform_idea", "robots_today", "uplink", "platform_domains"], 2),
     ("Open-weight models review in tiers",
      ["supervisor", "escalate"], 1),
-    ("A judgement counts only where it runs",
+    # Renamed from "A judgement counts only where it runs", which was true of
+    # dispatch and of nothing else in the column. When the theme spilled, the
+    # continuation heading sat over the unattended-loop block and described
+    # something the block does not say. The heading now covers all three.
+    ("What the agents decided on their own",
      ["dispatch", "label_agent", "loop", "diagnosis"], 3),
     ("What the collection produced",
      ["funnel", "label_curator", "label_unit", "label_ceiling", "sources"], 3),

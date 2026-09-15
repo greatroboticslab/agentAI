@@ -403,7 +403,7 @@ def supervision():
     d14 = pt("L3@qwen3:14b")["r"] - pt("L2@qwen3:14b")["r"]
     return save(fig, "e_supervision",
                 
-                "(e) Recall and (f) grounded recall on one frozen corpus of real incidents from this project's record, scored by its own scorer. Each tail is the language model on artifacts with the twelve checks' findings withheld; each head is the same model supplied with them. The dotted line has no arrowhead: its ends were scored on different cases, the 27 B head on 57 incidents and its tail on 114.")
+                "(e) Recall and (f) grounded recall on 149 frozen failures taken from this project's own record, scored by the project's own scorer. Each arrow runs from the model reading the raw files to the same model handed the twelve checks' findings. Grounded counts only the cases where the model also quoted a line that resolves the failure. The dotted arrow carries no head: its two ends were scored on different cases, 57 against 114.")
 
 
 # --------------------------------------------------- photographic plates
@@ -539,13 +539,7 @@ def router():
     assert y - 0.22 >= 0, ("the router table runs off its canvas by %.2f in -- "
                            "raise H or lower ROW" % (0.22 - y))
     return save(fig, "g_router",
-                "The eight roles the router places, read from its own table. A judgement is "
-                "authoritative only when it was produced on the cluster; the same judgement "
-                "produced on the laboratory box returns flagged as a draft, so the placement "
-                "rule travels with the answer rather than living in a configuration block. "
-                "The flag exists because nine campaign reviews were once produced by a 4.7 GB "
-                "model on the laboratory box while 458 GB of verified weights sat unused on "
-                "the cluster, and nothing in the returned result said so.")
+                "The eight jobs that need a model, and the model each one was given, read from the router's own table. A filled square marks a job that exercises judgement. The six on the cluster come back authoritative; the two in the lab come back marked a draft.")
 
 
 def _glyph(ax, kind, cx, cy, s, color=INK, lw=2.4, accent=None):
@@ -658,12 +652,19 @@ def algorithm():
             linestyle=(0, (8, 5)), zorder=2)
     arrowhead(L + 3.2, BOTY, -1.0, lw=2.2, ls=(0, (8, 5)))
 
+    # Each station names what that step does. Every station used to be
+    # captioned with its own defect -- "no new dataset in the last eight
+    # rounds", "the next round submits identical commands" -- so the diagram
+    # read as five confessions and a reader could not tell what the loop was
+    # for. The defects are not dropped: they are stated once in the caption,
+    # and the one that has a shape in the drawing is stated on the dashed
+    # edge it explains.
     stations = [
-        ("Requirement definition", "a detector effective in the local rows", "need"),
-        ("Queries from a fixed list", "registry entries mark sources to skip", "plan"),
-        ("Public acquisition and audit", "no new dataset in the last eight rounds", "fetch"),
-        ("Training on retained data", "the holdout is also the validation set", "train"),
-        ("Evaluation without decision", "the next round submits identical commands", "decide"),
+        ("Requirement definition", "a detector that works in the local rows", "need"),
+        ("Source search", "public repositories are searched by keyword", "plan"),
+        ("Public acquisition and audit", "what arrives is audited before it is kept", "fetch"),
+        ("Training on retained data", "trained on what survives the audit", "train"),
+        ("Evaluation and reporting", "each round is scored and written up", "decide"),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
@@ -749,13 +750,13 @@ def algorithm():
     # drawing: four lines of prose inside a schematic is a paragraph wearing a
     # figure's clothes.
     lx = L + 3.60
-    ax.text(lx, BOTY + 0.42, "results are recorded but never read",
+    ax.text(lx, BOTY + 0.42, "results are recorded, not yet read back",
             fontsize=EDGE, color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",
                 
                 
-                "A requirement enters. The harvest issues fixed queries without gap analysis. Audited data train the model; the holdout is also the validation set and selects the reported epoch. Evaluation parses a metric; no decision follows. The reviewer runs after every step; the dashed edge is unimplemented.")
+                "The loop an agent runs unattended. A need arrives; the agent searches public repositories by keyword, audits what comes back, trains on what survives and scores it. The pictures that score the model also choose which epoch is reported. Review runs after every step, not only when something looks wrong, and the return edge is dashed because nothing reads the result back yet.")
 
 
 def _wrap(text, n):
