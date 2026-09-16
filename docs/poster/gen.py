@@ -558,7 +558,13 @@ class Poster(object):
         tw = w - pad - (tx - x)
         yy = d.sub(tx, y + 0.08, tw, "The platform is live; the QR code links to it")
         yy = d.body(tx, yy, tw, self.QR_URL, after=4)
-        d.body(tx, yy, tw, "Authentication requires an institutional Google account.",
+        # Was "Authentication requires an institutional Google account", which is
+        # the login page's own wording and is not what the server does:
+        # google_start() sends no `hd=` parameter and google_callback() reads the
+        # address without a domain check or an allow-list (dashboard_server.py
+        # :7940-8010), so any Google account signs in. The sheet says what is
+        # true instead of repeating the page's copy.
+        d.body(tx, yy, tw, "Sign in with a Google account to open it.",
                size=d.dz["caption"], color=d.c["mute"], after=0)
         return side
 
