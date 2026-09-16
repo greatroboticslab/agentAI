@@ -2496,7 +2496,13 @@ async def api_project_agent_remove(request: Request):
 # ===========================================================================
 _UPLOAD_DIR = REPO / "uploads"
 _MANUAL_UPLOADS_FILE = REPO / "results" / "framework" / "manual_uploads.json"
-_MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024   # 2 GB
+# v3.55: was 2 GB, which a single phone video clears. A 1.9 GB field clip
+# sat 4% under the cap; the next one would have been refused with a 413 and
+# nothing about the message would have told the student the limit was the
+# problem rather than the content. Both upload paths stream to disk in 1 MB
+# chunks (never whole-file in RAM), so the only real constraint is free
+# space on the box, not memory.
+_MAX_UPLOAD_BYTES = 32 * 1024 * 1024 * 1024  # 32 GB
 _MAX_UPLOAD_FILES = 60000
 _UPLOAD_IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 # v3.0.137: per-modality accepted file extensions so non-image agents (video /
@@ -5347,6 +5353,8 @@ async def api_dataset_upload(request: Request):
     accept_ext = set().union(*[_MODALITY_EXT[m] for m in proj_mods])
 
     n_img = n_lbl = n_file = n_skipped = n_vid = 0
+    adopted_mods = set()      # modalities that arrived but were not declared
+    unknown_ext = {}          # extension -> count, for an error a human can act on
     data_yaml_bytes = None
     for nm, src in _members():
         if nm.startswith("/") or ".." in Path(nm).parts:    # path-traversal guard
@@ -5404,15 +5412,62 @@ async def api_dataset_upload(request: Request):
             except Exception:
                 n_skipped += 1
         else:
-            n_skipped += 1
+            # v3.55: INGEST FIRST, CLASSIFY AFTER. accept_ext used to be fixed by
+            # whatever modality the project happened to declare at creation time,
+            # and every project is created modality=["image"] unless someone says
+            # otherwise (:2158, :8036). So dropping a video into a new project got
+            # "no recognized image files" and the file was thrown away -- the exact
+            # opposite of this module's own stated intent ("nothing gets rejected",
+            # :2501). A collection platform's job is to take what arrives and work
+            # out what it is, not to refuse it because of a default chosen before
+            # the data existed. If the extension belongs to ANY modality we know,
+            # keep it and remember which, so the project can be widened below.
+            _mod_of = next((m for m, exts in _MODALITY_EXT.items() if ext in exts), None)
+            if _mod_of:
+                files_dir.mkdir(exist_ok=True)
+                try:
+                    outp = files_dir / rel
+                    outp.parent.mkdir(parents=True, exist_ok=True)
+                    with open(outp, "wb") as out:
+                        shutil.copyfileobj(src, out, length=1024 * 1024)
+                    n_file += 1
+                    adopted_mods.add(_mod_of)
+                    if _mod_of == "video":
+                        n_vid += 1
+                except Exception:
+                    n_skipped += 1
+            else:
+                n_skipped += 1
+                unknown_ext[ext or "(no extension)"] = unknown_ext.get(ext or "(no extension)", 0) + 1
 
     _cleanup_archive()
 
+    # v3.55: widen the project to whatever actually turned up, so the next upload
+    # takes the same files through the normal path and the dataset page knows what
+    # it is holding. Recorded, not guessed: only modalities we actually stored.
+    if adopted_mods:
+        try:
+            from . import db as _dbw
+            _cur = list(((_dbw.get_domain(domain) or {}).get("modality")) or ["image"])
+            _new = _cur + [m for m in sorted(adopted_mods) if m not in _cur]
+            if _new != _cur:
+                _dbw.update_domain(domain, {"modality": _new})
+                log.info("[upload] %s widened modality %s -> %s (from the files sent)"
+                         % (domain, _cur, _new))
+        except Exception as exc:
+            log.warning("[upload] could not widen modality for %s: %s" % (domain, exc))
+
     if n_img == 0 and n_file == 0:
         shutil.rmtree(dest, ignore_errors=True)
-        _hint = ", ".join(sorted(accept_ext))
-        raise HTTPException(400, f"no recognized {modality} files in the upload "
-                                 f"(accepted: {_hint})")
+        # v3.55: say what ARRIVED, not only what is allowed. "no recognized image
+        # files (accepted: .bmp, .jpeg, ...)" left a student staring at a list that
+        # did not mention the kind of file they had just sent.
+        _got = ", ".join("%s x%d" % (e, n) for e, n in
+                         sorted(unknown_ext.items(), key=lambda kv: -kv[1])[:6])
+        raise HTTPException(400, "nothing in this upload could be stored. It held: "
+                                 + (_got or "no files at all")
+                                 + ". Handled types: images, video, sensor logs, "
+                                   "point clouds, audio and text.")
 
     class_names = []
     detected_fmt = ""

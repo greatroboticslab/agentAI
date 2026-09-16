@@ -422,7 +422,7 @@ PROJECTS = [
      "photo": "lasercar_field.jpg", "fallback": "lc_front.jpg", "crop": 0.5, "w": 12.4,
      "blurb": 
               
-              "A YOLO detector localises each weed; two galvanometer lasers aim and fire, destroying it in place. No chemical is applied and nothing contacts the adjacent crop."},
+              "A YOLO detector localises each weed; two galvanometer lasers aim and fire, destroying it in place. No chemical, and nothing touches the crop beside it. This is the end use the platform collects for."},
 
     {"key": "humanoid_robot", "name": "Humanoid and Quadruped", "layout": "pair",
      "photo": "humanoid_dog.jpg", "photo2": "team_field.jpg", "crop": 0.5, "w": 11.4,
