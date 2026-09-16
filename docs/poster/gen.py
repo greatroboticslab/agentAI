@@ -49,9 +49,19 @@ except Exception:
     pass
 
 TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
+# The stand-first used to open with "ran for fifteen unattended rounds", which
+# framed the whole sheet as a fifteen-round experiment. Fifteen is what has run
+# so far, not what the loop is for. Checked in round_scheduler.py: the only
+# bounds on the loop are max_rounds_per_day (a RATE, clamped 1..6 at :1642) and
+# the stop-loss, which pauses a domain after two consecutive failed rounds
+# (:1376) -- a brake, not a finish line. There is no total round cap anywhere,
+# and no implemented stop condition at all, so the sentence says the loop is
+# MEANT to stop on a reviewer's judgement rather than claiming it does. The
+# count keeps its place in the loop block, next to what those rounds did.
 STAND = ("On one platform, agents collect their own data, review one another's work and train "
-         "without an operator. The system ran for fifteen unattended rounds; this sheet reports how "
-         "the agents coordinate and what the collection produced.")
+         "without an operator. Nothing sets the number of rounds: the loop is meant to stop when "
+         "the reviewer above it judges there is nothing further to be gained. This sheet reports "
+         "how the agents coordinate and what the collection produced.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
