@@ -4,7 +4,7 @@
    "id": "platform_idea",
    "theme": "platform-idea",
    "heading": "agentAI is one platform for every laboratory robot",
-   "body": "A robot, drone or sensor rig is a project with its own keys, members and access-controlled dataset registry. Agents harvest, filter, label and train against that registry. Adding a robot is a configuration change.",
+   "body": "A robot, drone or sensor rig is a project: its own dataset registry, its own agents, and an owner who controls both. Agents harvest, filter, label and train against that registry. Adding a robot is a configuration change.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",

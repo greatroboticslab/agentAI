@@ -108,6 +108,31 @@ def main():
     except Exception as exc:
         print("  skip  duplicate-name check (%s)" % exc)
 
+    # Figure 4's caption says its table is "read from the router's own table".
+    # It used to be hand-typed literals that merely happened to agree, so a role
+    # added to model_router.py, or a model swapped inside it, would have left the
+    # printed table wrong with nothing on the sheet or in the build to say so.
+    # figures.router() now builds its rows from ROLES; these pin the two together
+    # and pin the one rule the figure exists to show.
+    try:
+        import figures as _F
+        roles = _F._router_roles()
+        check("model_router declares the eight roles Figure 4 prints",
+              len(roles) == 8,
+              "the router now declares %d; the figure and the dispatch block both say eight"
+              % len(roles))
+        lab = sorted(r for r, s in roles.items() if s["place"] == "lab")
+        check("exactly the two lab roles the sheet names run on the lab box",
+              lab == ["analysis_summary", "interactive_plan"],
+              "the sheet says two jobs run in the lab; the router says %s" % lab)
+        wrong = [r for r, s in roles.items()
+                 if s.get("judgement") and s["place"] == "lab"
+                 and (bool(s["place"] == "cluster") is not False)]
+        check("a judgement role on the lab box is not authoritative", not wrong,
+              "Figure 4's whole point is that these come back marked a draft: %s" % wrong)
+    except Exception as exc:
+        print("  skip  router/figure sync check (%s)" % exc)
+
     # The defect that is invisible until it is printed.
     try:
         from PIL import Image

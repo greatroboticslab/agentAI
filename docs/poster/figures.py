@@ -479,6 +479,22 @@ def cart_grid():
         "is not a detection. 427 frames in all." % n)
 
 
+
+def _router_roles():
+    """model_router.ROLES, or a recorded copy if the framework is not importable.
+
+    The poster is built on a laptop that does not always have the framework's
+    dependencies. Falling back silently to a stale copy is exactly the drift
+    this change exists to stop, so the fallback carries the commit it was taken
+    from and the test compares the two.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.abspath(os.path.join(here, "..", "..", "weed_llm_benchmark"))
+    sys.path.insert(0, os.path.join(root, "weed_optimizer_framework", "tools"))
+    import model_router
+    return model_router.ROLES
+
+
 # ----------------------------------------------------------- the algorithm
 def router():
     """Where each role runs, and whether its answer counts.
@@ -490,20 +506,52 @@ def router():
     judgement produced on the lab box returns marked as a draft. The flag
     travels with the answer instead of sitting in a configuration block, which
     is the difference between a rule and a note.
+
+    "Read out of" used to be a claim the code did not honour: the two lists
+    below were hand-typed literals that happened to match. A role added to the
+    router, or a model swapped in it, would not have reached this figure and
+    nothing would have said so. They are now built from ROLES itself, and every
+    role must carry a printed label here or the render stops -- so the only way
+    to desync the figure is to delete the assertion.
     """
     from matplotlib.patches import Rectangle
     W, H = 11.6, 5.72
     fig = plt.figure(figsize=(W, H)); fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    CLUSTER = [("plan the next step", "qwen3.8 27B", True),
-               ("review in depth", "glm-4.7-flash", True),
-               ("hard one-off reasoning", "deepseek-v3 671B", True),
-               ("decide what to collect", "gemma 4", True),
-               ("judge dataset quality", "qwen2.5 7B", True),
-               ("label assistance", "minicpm-v", False)]
-    LAB = [("turn intent into a project", "qwen2.5 3B", True),
-           ("summarise a dataset", "qwen2.5 3B", True)]
+    ROLES = _router_roles()
+    # role key -> the phrase a visitor reads. The router's own keys are for
+    # code; "labeling_vlm" tells a reader at a poster nothing.
+    SAYS = {"planner":          "plan the next step",
+            "deep_review":      "review in depth",
+            "hard_reasoning":   "hard one-off reasoning",
+            "harvest_brain":    "decide what to collect",
+            "curation":         "judge dataset quality",
+            "labeling_vlm":     "label assistance",
+            "interactive_plan": "turn intent into a project",
+            "analysis_summary": "summarise a dataset"}
+    missing = [r for r in ROLES if r not in SAYS]
+    assert not missing, ("model_router.ROLES carries a role this figure has no "
+                         "label for, so the table would print short: %s" % missing)
+    ORDER = ["planner", "deep_review", "hard_reasoning", "harvest_brain",
+             "curation", "labeling_vlm", "interactive_plan", "analysis_summary"]
+
+    def _model_name(spec):
+        """ollama:qwen3.8:27b -> qwen3.8 27B. The prefix is how it is served."""
+        m = spec["model"].split(":", 1)[-1]
+        fam, _, size = m.partition(":")
+        fam = fam.replace("gemma4", "gemma 4")
+        return ("%s %s" % (fam, size.upper())) if size else fam
+
+    rows = {"cluster": [], "lab": []}
+    for r in ORDER:
+        if r not in ROLES:
+            continue
+        spec = ROLES[r]
+        rows[spec["place"]].append(
+            (SAYS[r], _model_name(spec), bool(spec.get("judgement", False))))
+    CLUSTER, LAB = rows["cluster"], rows["lab"]
+    assert len(CLUSTER) + len(LAB) == len(ROLES)
 
     ROW, GAP, HEAD = 0.445, 0.30, 0.60
     x0, xm = 0.30, 6.65          # role column, model column

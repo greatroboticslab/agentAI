@@ -55,13 +55,18 @@ TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
 # bounds on the loop are max_rounds_per_day (a RATE, clamped 1..6 at :1642) and
 # the stop-loss, which pauses a domain after two consecutive failed rounds
 # (:1376) -- a brake, not a finish line. There is no total round cap anywhere,
-# and no implemented stop condition at all, so the sentence says the loop is
-# MEANT to stop on a reviewer's judgement rather than claiming it does. The
-# count keeps its place in the loop block, next to what those rounds did.
+# and no implemented stop condition at all. An earlier revision of this line
+# said "Nothing sets the number of rounds", which is true of round_scheduler.py
+# but NOT of the chain that actually produced the fifteen: those rounds came
+# from orchestrator.py's mega_round loop (REGRESSION_DIAGNOSIS.md:150 maps
+# mega_iterrnd8_train to rounds 8-15), and that loop carries a 30-round safety
+# cap (:1110, :1153) and stops on a plateau test. So the line no longer claims
+# anything about limits; it states the stop the work is aimed at, as an aim.
+# The count keeps its place in the loop block, next to what those rounds did.
 STAND = ("On one platform, agents collect their own data, review one another's work and train "
-         "without an operator. Nothing sets the number of rounds: the loop is meant to stop when "
-         "the reviewer above it judges there is nothing further to be gained. This sheet reports "
-         "how the agents coordinate and what the collection produced.")
+         "without an operator. The loop is built to run without a fixed end; the stop we are "
+         "working towards is a reviewer judging that nothing further is to be gained. This sheet "
+         "reports how the agents coordinate and what the collection produced.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
