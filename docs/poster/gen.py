@@ -61,8 +61,15 @@ TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
 # -- harvested, streamed off a robot mid-drive, or uploaded by hand. Sentence 3
 # is why the rest of the sheet exists: with no operator, the loop's own report
 # is the only account of it there is, and ours reported success through rounds
-# in which the training set never changed. The last sentence says what the
-# reader gets.
+# in which the training set never changed. That admission has been taken back
+# out of the opening: it appeared in four places on one sheet -- here, on the
+# dashed edge, in the figure caption and in the whole loop block -- which made
+# one campaign's failure the sheet's subject rather than one of its findings.
+# The design is the subject: a loop that collects and trains round after round
+# with no one watching. Sentence 3 keeps the general principle, which is why
+# every review tier on this sheet exists; the campaign that demonstrates it
+# stays in the loop block, where the evidence for it is. The last sentence says
+# what the reader gets.
 #
 # Two earlier openings are recorded because both failed in ways worth not
 # repeating. "The system ran for fifteen unattended rounds" made the sheet look
@@ -76,9 +83,9 @@ TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
 # stops the campaign on a reviewer's judgement. The line no longer claims it.
 STAND = ("A researcher states a goal; a planning model proposes the project and its agents, and "
          "the researcher corrects it. They then run in a sandbox, on data they harvest, take from "
-         "a robot as it drives, or receive by upload. Unattended, a loop is only as good as what it "
-         "reports about itself -- ours reported success through rounds in which nothing changed. "
-         "This sheet is that coordination, and the review that makes it checkable.")
+         "a robot as it drives, or receive by upload, and train on it round after round "
+         "unwatched. A loop like that is only as good as what it reports about itself. This sheet "
+         "is that coordination, and the review that makes it checkable.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
