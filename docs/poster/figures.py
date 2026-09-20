@@ -691,15 +691,15 @@ def algorithm():
     """
     from matplotlib.patches import FancyBboxPatch, Rectangle
     W, H = 46.4, 5.10
-    STN, SUB, LAD, EDGE, ART = 34.0, 23.0, 21.0, 23.0, 21.0
+    STN, SUB, LAD, EDGE, ART = 34.0, 24.0, 29.0, 25.0, 22.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    TOPY, BOTY = 4.00, 0.34
+    TOPY, BOTY = 3.85, 0.38
     L, R = 0.85, W - 0.85
-    bw, bh = 7.00, 1.30
+    bw, bh = 7.40, 1.55
 
     def arrowhead(x, y, dx, color=INK, lw=1.9, ls="-"):
         ax.annotate("", xy=(x + dx, y), xytext=(x, y),
@@ -718,7 +718,7 @@ def algorithm():
     stations = [
         ("Requirement definition", "a detector that works in the local rows", "a goal"),
         ("Source search", "public repositories are searched by keyword", "candidates"),
-        ("Acquisition and audit", "what arrives is audited before it is kept", "retained images"),
+        ("Acquisition and audit", "what arrives is audited before it is kept", "kept images"),
         ("Training on retained data", "trained on what survives the audit", "a checkpoint"),
         ("Evaluation and reporting", "each round is scored and written up", None),
     ]
@@ -744,10 +744,10 @@ def algorithm():
     for i, ((title, sub, art), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
                                edgecolor=INK, lw=1.7, zorder=3))
-        ax.text(x + bw / 2, ytop - 0.50, title, ha="center", va="center",
+        ax.text(x + bw / 2, ytop - 0.62, title, ha="center", va="center",
                 fontsize=STN, fontweight="bold", color=INK, zorder=4)
         for k, line in enumerate(_wrap(sub, SUB_WRAP)):
-            ax.text(x + bw / 2, ytop - 0.92 - k * 0.36, line, ha="center",
+            ax.text(x + bw / 2, ytop - 1.10 - k * 0.38, line, ha="center",
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
@@ -759,40 +759,42 @@ def algorithm():
 
     # the review tiers, as a staircase: same left edge, each bar longer and
     # higher than the one below it, so cost is legible as shape.
-    rungs = [("scripted watchdog", 4.30),
-             ("deterministic checks", 5.70),
-             ("the language model reads artifacts", 7.40),
-             ("the same model, given check findings", 8.80)]
-    # The lower strip is 2.66 in between the dashed return and the station row,
-    # and four bars with air between them is what fits in it -- an attempt to
-    # lift the staircase clear of the return edge put its top through the
-    # stations and the assertion below caught it. Placed left of the last
-    # station instead, so the plate is not a row of boxes over an empty half.
-    # Bars kept shallow on purpose. At 0.54 in the staircase topped out 0.21 in
-    # under the station row, and the arrow carrying the verdict back into the
-    # loop was too short to read as an arrow -- a tick against the box. At 0.46
-    # it has half an inch to travel and reads as a connection.
-    rx0, ry0, rh, rgap = 30.20, 0.60, 0.46, 0.10
-    for k, (name, rlen) in enumerate(rungs):
-        y = ry0 + k * (rh + rgap)
+    rungs = ["scripted watchdog",
+             "deterministic checks",
+             "the language model reads artifacts",
+             "the same model, given check findings"]
+    # The tiers climb to the RIGHT rather than stacking. Stacked, four bars share
+    # the 2.5 in between the dashed return and the station row, which forces
+    # 0.46 in bars at 21 pt -- small enough on a 48 in sheet that the component
+    # carrying the contribution reads as a footnote. Taking the width instead
+    # keeps them at 0.90 in and 29 pt. The rise is 0.42 against the 0.28 the
+    # first version used: at 0.28 four overlapping bars read as a second
+    # pipeline beside the first rather than as an escalation.
+    rw, rh, rise, stepx = 8.70, 0.90, 0.42, 8.05
+    rx0, ry0 = 12.10, 0.45
+    for k, name in enumerate(rungs):
+        x, y = rx0 + k * stepx, ry0 + k * rise
         top = k == len(rungs) - 1
         ink = WHITE if top else INK
-        ax.add_patch(Rectangle((rx0, y), rlen, rh,
+        ax.add_patch(Rectangle((x, y), rw, rh,
                                facecolor=BLUE if top else WHITE,
                                edgecolor=BLUE if top else INK,
-                               lw=2.0 if top else 1.4, zorder=3))
-        ax.text(rx0 + 0.26, y + rh / 2, name, fontsize=LAD,
+                               lw=2.2 if top else 1.5, zorder=3))
+        ax.text(x + 0.30, y + rh / 2, name, fontsize=LAD,
                 va="center", ha="left", color=ink,
                 fontweight="bold" if top else "normal", zorder=4)
-    _w = lambda n: 0.26 + len(n) * LAD * 0.50 / 72.0 + 0.18
-    tight = [n for n, rl in rungs if _w(n) > rl]
-    assert not tight, "tier label wider than its bar: %s" % tight
-    rises = [rl for _n, rl in rungs]
-    assert rises == sorted(rises), "the staircase no longer climbs: %s" % rises
-    ytopbar = ry0 + (len(rungs) - 1) * (rh + rgap) + rh
+    _w = lambda n: 0.30 + len(n) * LAD * 0.50 / 72.0 + 0.18
+    wide = [n for n in rungs if _w(n) > rw]
+    assert not wide, "tier label wider than its bar: %s" % wide
+    under = [n for n in rungs[:-1] if _w(n) + 0.12 > stepx]
+    assert not under, ("a tier label runs under the bar above it "
+                       "(needs stepx >= %.2f): %s"
+                       % (max(_w(n) for n in rungs[:-1]) + 0.12, under))
+    assert rise > 0.35, "the tiers no longer climb enough to read as a climb"
+    assert rx0 + (len(rungs) - 1) * stepx + rw <= R - 0.40, "the tiers run past the loop"
+    ytopbar = ry0 + (len(rungs) - 1) * rise + rh
     assert ytopbar < TOPY - bh / 2 - 0.10, (
         "the staircase reaches the station row: %.2f" % ytopbar)
-    assert rx0 + max(rises) <= R - 0.40, "the staircase runs past the loop"
 
     # in at the cheap end, out at the top -- the verdict that survives the
     # climb is what returns. An arrow into the TOP bar would say the opposite,
@@ -803,7 +805,7 @@ def algorithm():
     # The verdict that survives the climb returns to the loop. The arrow has to
     # land INSIDE a station: at one point it rose into the gap between two of
     # them and pointed at nothing, which is invisible at thumbnail size.
-    tx = rx0 + rungs[-1][1] - 0.40
+    tx = rx0 + (len(rungs) - 1) * stepx + rw * 0.55
     inside = [i for i, x in enumerate(xs) if x + 0.3 <= tx <= x + bw - 0.3]
     assert inside, ("the tier arrow rises into the gap between stations at "
                     "x=%.2f; stations start at %s" % (tx, [round(x, 1) for x in xs]))
@@ -811,7 +813,18 @@ def algorithm():
                 arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.9,
                                 shrinkA=0, shrinkB=0))
 
-    ax.text(L + 12.0, BOTY + 0.40, "a decision, recorded but not read back",
+    # The return edge's artifact label and the ladder's entry label share the
+    # left of the plate, and the first draft of this layout printed one over the
+    # other. Both are measured here and the clearance is asserted, because
+    # overlapping type at 25 pt is legible as a smudge at thumbnail size and
+    # reads as a rendering fault to anyone who notices it at full size.
+    dec = "a decision, not read back"
+    dec_w = len(dec) * EDGE * 0.50 / 72.0
+    dec_cx = L + 0.30 + dec_w / 2.0
+    ent_w = len("after every step") * LAD * 0.50 / 72.0
+    assert dec_cx + dec_w / 2.0 + 0.40 <= (rx0 - 1.25) - ent_w, (
+        "the return-edge label runs into the ladder's entry label")
+    ax.text(dec_cx, BOTY + 0.42, dec,
             fontsize=EDGE, style="italic", color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",
