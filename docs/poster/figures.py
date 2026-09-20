@@ -954,7 +954,7 @@ def projects():
     return save(fig, "q_projects",
                 
                 
-                "Every project on the platform is created by the same procedure and registers its data under one ingest contract. The harvesting and training agents have so far run on one of them.")
+                "Four projects, one platform. Each was opened the same way and registers its data the same way, whether it arrives as a harvest, a robot's drive or an upload. The harvesting and training agents have so far run on the first of them.")
 
 
 # ------------------------------------------------------------- the model ledger
