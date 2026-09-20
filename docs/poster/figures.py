@@ -707,11 +707,11 @@ def algorithm():
     # for. The defects are not dropped: they are stated once in the caption,
     # and the one with a shape in the drawing is stated on the edge it explains.
     stations = [
-        ("Requirement definition", "a detector that works in the local rows", "need"),
+        ("Requirement definition", "a researcher's goal, planned out by a model", "need"),
         ("Source search", "public repositories are searched by keyword", "plan"),
         ("Acquisition and audit", "what arrives is audited before it is kept", "fetch"),
         ("Training on retained data", "trained on what survives the audit", "train"),
-        ("Evaluation and reporting", "each round is scored and written up", "decide"),
+        ("Evaluation and reporting", "scored; a plateau test ends the run", "decide"),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
@@ -803,7 +803,7 @@ def algorithm():
     return save(fig, "x_algorithm",
                 
                 
-                "The loop an agent runs unattended. A requirement is turned into keyword queries, what they return is audited, what survives is trained on, and the round is scored. The pictures that score the model also choose which epoch is reported. Review follows every step, not only when something looks wrong, and the return edge is dashed because nothing reads the decision back yet.")
+                "The harvest-and-train loop, as it runs unattended. A researcher's goal is planned into keyword queries, what they return is audited, what survives is trained on, and the round is scored. The pictures that score the model also choose which epoch is reported, and the run ends on a plateau test rather than on a reviewer's judgement. Review follows every step, and the return edge is dashed because nothing reads the decision back yet.")
 
 # " -- " is how a sentence break is typed in the sources, which are kept ASCII.
 # deck.py sets it as an em dash on the way into PowerPoint, but the text drawn
