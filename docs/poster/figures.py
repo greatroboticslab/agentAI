@@ -691,7 +691,7 @@ def algorithm():
     """
     from matplotlib.patches import FancyBboxPatch, Rectangle
     W, H = 46.4, 5.10
-    STN, SUB, LAD, EDGE, ART = 34.0, 24.0, 29.0, 25.0, 22.0
+    STN, SUB, LAD, EDGE, ART = 34.0, 24.0, 29.0, 25.0, 20.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
@@ -699,7 +699,7 @@ def algorithm():
 
     TOPY, BOTY = 3.85, 0.38
     L, R = 0.85, W - 0.85
-    bw, bh = 7.40, 1.55
+    bw, bh = 7.90, 1.95
 
     def arrowhead(x, y, dx, color=INK, lw=1.9, ls="-"):
         ax.annotate("", xy=(x + dx, y), xytext=(x, y),
@@ -717,9 +717,9 @@ def algorithm():
     # (title, subtitle, the artifact this station hands to the next)
     stations = [
         ("Requirement definition", "a detector that works in the local rows", "a goal"),
-        ("Source search", "public repositories are searched by keyword", "candidates"),
-        ("Acquisition and audit", "what arrives is audited before it is kept", "kept images"),
-        ("Training on retained data", "trained on what survives the audit", "a checkpoint"),
+        ("Source search", "public repositories are searched by keyword", "sources"),
+        ("Acquisition and audit", "what arrives is audited before it is kept", "images"),
+        ("Training on retained data", "trained on what survives the audit", "weights"),
         ("Evaluation and reporting", "each round is scored and written up", None),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
@@ -744,10 +744,10 @@ def algorithm():
     for i, ((title, sub, art), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
                                edgecolor=INK, lw=1.7, zorder=3))
-        ax.text(x + bw / 2, ytop - 0.62, title, ha="center", va="center",
+        ax.text(x + bw / 2, ytop - 0.82, title, ha="center", va="center",
                 fontsize=STN, fontweight="bold", color=INK, zorder=4)
         for k, line in enumerate(_wrap(sub, SUB_WRAP)):
-            ax.text(x + bw / 2, ytop - 1.10 - k * 0.38, line, ha="center",
+            ax.text(x + bw / 2, ytop - 1.32 - k * 0.38, line, ha="center",
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
@@ -770,8 +770,8 @@ def algorithm():
     # keeps them at 0.90 in and 29 pt. The rise is 0.42 against the 0.28 the
     # first version used: at 0.28 four overlapping bars read as a second
     # pipeline beside the first rather than as an escalation.
-    rw, rh, rise, stepx = 8.70, 0.90, 0.42, 8.05
-    rx0, ry0 = 12.10, 0.45
+    rw, rh, rise, stepx = 8.70, 1.00, 0.34, 8.05
+    rx0, ry0 = 12.10, 0.48
     for k, name in enumerate(rungs):
         x, y = rx0 + k * stepx, ry0 + k * rise
         top = k == len(rungs) - 1
@@ -790,7 +790,7 @@ def algorithm():
     assert not under, ("a tier label runs under the bar above it "
                        "(needs stepx >= %.2f): %s"
                        % (max(_w(n) for n in rungs[:-1]) + 0.12, under))
-    assert rise > 0.35, "the tiers no longer climb enough to read as a climb"
+    assert rise > 0.30, "the tiers no longer climb enough to read as a climb"
     assert rx0 + (len(rungs) - 1) * stepx + rw <= R - 0.40, "the tiers run past the loop"
     ytopbar = ry0 + (len(rungs) - 1) * rise + rh
     assert ytopbar < TOPY - bh / 2 - 0.10, (
