@@ -7,7 +7,7 @@ No figure carries a title — the claim belongs in the caption, which is set in 
 poster beside it. Each function returns (filename, caption) and the captions are
 printed so the poster text cannot drift from the figure.
 """
-import os, sys, json, csv, statistics as st
+import os, sys, json, csv, re, statistics as st
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import matplotlib.pyplot as plt
@@ -807,9 +807,17 @@ def algorithm():
                 "The loop an agent runs unattended. A need arrives; the agent searches public repositories by keyword, audits what comes back, trains on what survives and scores it. The pictures that score the model also choose which epoch is reported. Review runs after every step, not only when something looks wrong, and the return edge is dashed because nothing reads the result back yet.")
 
 
+# " -- " is how a sentence break is typed in the sources, which are kept ASCII.
+# deck.py sets it as an em dash on the way into PowerPoint, but the text drawn
+# INSIDE a plate never goes that way -- matplotlib draws it -- so the laser
+# panel printed two hyphens on the sheet. Same substitution, same place in the
+# pipeline: the last moment before the text is measured and set.
+_DASH = re.compile(r"\s+--\s+")
+
+
 def _wrap(text, n):
     import textwrap
-    return textwrap.wrap(text, n)
+    return textwrap.wrap(_DASH.sub("\u2014", text), n)
 
 
 # ------------------------------------------------------- the four projects
@@ -899,7 +907,7 @@ def projects():
 
         def wrapped(width_in):
             n = max(24, int((width_in - 0.55) * 72 / (BLURB * 0.50)))
-            return textwrap.wrap(pr["blurb"], n)
+            return textwrap.wrap(_DASH.sub("\u2014", pr["blurb"]), n)
 
         if lay == "side":
             # a square, so the machine is not cropped to fit a neighbour's shape
