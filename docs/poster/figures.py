@@ -654,38 +654,52 @@ def _glyph(ax, kind, cx, cy, s, color=INK, lw=2.4, accent=None):
 
 
 def algorithm():
-    """The loop the agent runs to answer a need, drawn as a loop.
+    """The loop the agent runs, drawn the way a journal draws an algorithm.
 
-    A schematic that is read in four seconds cannot carry counts and dates --
-    Bang Wong's rule is that an overview figure conveys concepts, and that
-    research data inside one is disconcerting -- and a figure called an
-    algorithm has to be shaped like the algorithm. So: a racetrack. Five
-    stations on the outward run, the way a person works a problem. A need
-    arrives, work out what data would answer it, go and get it, train on what
-    survives, read the result and decide what is next. The return run carries
-    the decision back to the need, and it is DASHED, because that is the edge
-    the platform has not closed. The escalation ladder climbs inside the loop,
-    left to right, in the negative space the outward run leaves behind.
+    Four conventions separate a figure in a paper from a flow chart in a deck,
+    and the first version of this plate observed none of them.
 
-    Sized for a reader four feet away. The first version spent 5.1 in of a
-    36 in sheet, put its content in the top half, and set its stations at
-    24 pt against 22 pt body text -- a full-width figure whose type was the
-    size of the paragraphs beside it. This one is a full inch shorter, the
-    stations are half again as large, and the ladder runs across the empty
-    middle instead of stacking into it. The inch goes to the columns, which
-    were shedding sections for want of it.
+    NO ICONS IN THE PROCESS BOXES. A magnifying glass over "Source search"
+    tells a reader nothing the two words do not, and decoration inside a
+    process box is the single loudest signal that a diagram came out of a
+    slide template. Dropping them also bought 0.65 in of height -- the glyph
+    and its clearance were most of a 1.95 in box -- which is what pays for the
+    ladder below without making the plate taller and shedding a column block.
+
+    THE EDGES CARRY WHAT FLOWS. This is what makes a drawing an ALGORITHM
+    figure rather than a narration of a process: between two operations there
+    is an object, and naming it (a goal, candidates, retained images, a
+    checkpoint) lets a reader follow the data rather than the prose. They are
+    set in italic, a size under the station subtitles, because they are of a
+    different kind from the boxes and must not compete with them.
+
+    TWO KINDS OF THING LOOK LIKE TWO KINDS OF THING. Operations are boxed;
+    artifacts are unboxed italic on the edge. Nothing else on the plate is
+    boxed, so the boxes mean something.
+
+    ORDER IS VISIBLE IN THE GEOMETRY. The review tiers were four boxes in a
+    row, which reads as a second pipeline running alongside the first. They
+    are now a staircase: same left edge, each bar longer and higher than the
+    one below, so "more expensive than the one under it" is a fact about the
+    shape and needs no legend. The blue is spent once, on the top tier, which
+    is the one the supervision benchmark is about.
+
+    The dashed return edge is the one edge the platform has not closed, and it
+    is the only dashed line on the plate, so the convention reads without a
+    key. Why it is dashed belongs in the caption; four lines of prose inside a
+    schematic is a paragraph wearing a figure's clothes.
     """
     from matplotlib.patches import FancyBboxPatch, Rectangle
     W, H = 46.4, 5.10
-    STN, SUB, LAD, EDGE = 34.0, 24.0, 29.0, 25.0
+    STN, SUB, LAD, EDGE, ART = 34.0, 23.0, 21.0, 23.0, 21.0
     fig = plt.figure(figsize=(W, H))
     fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
-    TOPY, BOTY = 3.85, 0.38
+    TOPY, BOTY = 4.00, 0.34
     L, R = 0.85, W - 0.85
-    bw, bh = 8.05, 1.95
+    bw, bh = 7.00, 1.30
 
     def arrowhead(x, y, dx, color=INK, lw=1.9, ls="-"):
         ax.annotate("", xy=(x + dx, y), xytext=(x, y),
@@ -694,117 +708,119 @@ def algorithm():
 
     ax.add_patch(FancyBboxPatch((L, BOTY), R - L, TOPY - BOTY,
                                 boxstyle="round,pad=0,rounding_size=0.55",
-                                facecolor="none", edgecolor=RULE, lw=1.8,
+                                facecolor="none", edgecolor=RULE, lw=1.5,
                                 zorder=1))
-    ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=2.2,
+    ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=2.0,
             linestyle=(0, (8, 5)), zorder=2)
-    arrowhead(L + 3.2, BOTY, -1.0, lw=2.2, ls=(0, (8, 5)))
+    arrowhead(L + 3.2, BOTY, -1.0, lw=2.0, ls=(0, (8, 5)))
 
-    # Each station names what that step does. Every station used to be
-    # captioned with its own defect -- "no new dataset in the last eight
-    # rounds", "the next round submits identical commands" -- so the diagram
-    # read as five confessions and a reader could not tell what the loop was
-    # for. The defects are not dropped: they are stated once in the caption,
-    # and the one that has a shape in the drawing is stated on the dashed
-    # edge it explains.
+    # (title, subtitle, the artifact this station hands to the next)
     stations = [
-        ("Requirement definition", "a detector that works in the local rows", "need"),
-        ("Source search", "public repositories are searched by keyword", "plan"),
-        ("Public acquisition and audit", "what arrives is audited before it is kept", "fetch"),
-        ("Training on retained data", "trained on what survives the audit", "train"),
-        ("Evaluation and reporting", "each round is scored and written up", "decide"),
+        ("Requirement definition", "a detector that works in the local rows", "a goal"),
+        ("Source search", "public repositories are searched by keyword", "candidates"),
+        ("Acquisition and audit", "what arrives is audited before it is kept", "retained images"),
+        ("Training on retained data", "trained on what survives the audit", "a checkpoint"),
+        ("Evaluation and reporting", "each round is scored and written up", None),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
-    # one number for the sub-line measure, used by the wrap AND by the
-    # assertion that guards it. They were 40 and 44, so a 41-character
-    # sub-line passed the check and printed on two lines, the second of
-    # them below its own box.
+    gap = xs[1] - (xs[0] + bw)
+
     SUB_WRAP = 46
     fit = int(bw * 72 / (STN * 0.55))
-    over = [t for t, _s, _i in stations if len(t) > fit]
+    over = [t for t, _s, _a in stations if len(t) > fit]
     assert not over, ("station title wider than its box at %g pt (max %d chars): %s"
                       % (STN, fit, over))
-    # Two sub-lines is what the box holds; a third prints below its own rule.
-    deep = [t for t, sb, _i in stations if len(_wrap(sb, SUB_WRAP)) > 1]
+    deep = [t for t, sb, _a in stations if len(_wrap(sb, SUB_WRAP)) > 1]
     assert not deep, "station sub-line no longer fits one line: %s" % deep
-    top = TOPY + bh / 2
-    for i, ((title, sub, icon), x) in enumerate(zip(stations, xs)):
+    # An edge label wider than the gap it sits in runs under the boxes either
+    # side of it, and at thumbnail size that reads as part of the subtitle.
+    afit = int(gap * 72 / (ART * 0.45))
+    wide = [a for _t, _s, a in stations if a and len(a) > afit]
+    assert not wide, ("edge label wider than the %.2f in gap (max %d chars): %s"
+                      % (gap, afit, wide))
+
+    ytop = TOPY + bh / 2
+    for i, ((title, sub, art), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
                                edgecolor=INK, lw=1.7, zorder=3))
-        _glyph(ax, icon, x + bw / 2, top - 0.55, 0.85, lw=2.8, accent=BLUE)
-        ax.text(x + bw / 2, top - 1.22, title, ha="center", va="center",
+        ax.text(x + bw / 2, ytop - 0.50, title, ha="center", va="center",
                 fontsize=STN, fontweight="bold", color=INK, zorder=4)
         for k, line in enumerate(_wrap(sub, SUB_WRAP)):
-            ax.text(x + bw / 2, top - 1.63 - k * 0.38, line, ha="center",
+            ax.text(x + bw / 2, ytop - 0.92 - k * 0.36, line, ha="center",
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
-            arrowhead(mid - 0.40, TOPY, 0.80)
+            arrowhead(mid - 0.42, TOPY, 0.84)
+            prev = stations[i - 1][2]
+            if prev:
+                ax.text(mid, TOPY + 0.42, prev, fontsize=ART, style="italic",
+                        color=INK, ha="center", va="center", zorder=4)
 
-    # the ladder, climbing left to right under the outward run --------------
-    # Entered at the cheap end and read upward: the escalation goes to the
-    # scripted watchdog first, each rung reads the one below it, and only the
-    # verdict that survives the climb returns to the station that got stuck.
-    # An arrow from the station into the TOP rung, which is what the first
-    # version drew, says the opposite -- that being stuck summons the most
-    # expensive reviewer.
-    rungs = [("scripted watchdog", "shield"),
-             ("deterministic checks", "checks"),
-             ("the language model reads artifacts", "read"),
-             ("the same model, given check findings", "retrieve")]
-    rw, rh, rise, stepx = 8.70, 1.00, 0.28, 8.05
-    rx0, ry0 = 12.10, 0.52
-    for k, (name, icon) in enumerate(rungs):
-        x, y = rx0 + k * stepx, ry0 + k * rise
+    # the review tiers, as a staircase: same left edge, each bar longer and
+    # higher than the one below it, so cost is legible as shape.
+    rungs = [("scripted watchdog", 4.30),
+             ("deterministic checks", 5.70),
+             ("the language model reads artifacts", 7.40),
+             ("the same model, given check findings", 8.80)]
+    # The lower strip is 2.66 in between the dashed return and the station row,
+    # and four bars with air between them is what fits in it -- an attempt to
+    # lift the staircase clear of the return edge put its top through the
+    # stations and the assertion below caught it. Placed left of the last
+    # station instead, so the plate is not a row of boxes over an empty half.
+    # Bars kept shallow on purpose. At 0.54 in the staircase topped out 0.21 in
+    # under the station row, and the arrow carrying the verdict back into the
+    # loop was too short to read as an arrow -- a tick against the box. At 0.46
+    # it has half an inch to travel and reads as a connection.
+    rx0, ry0, rh, rgap = 30.20, 0.60, 0.46, 0.10
+    for k, (name, rlen) in enumerate(rungs):
+        y = ry0 + k * (rh + rgap)
         top = k == len(rungs) - 1
         ink = WHITE if top else INK
-        ax.add_patch(Rectangle((x, y), rw, rh,
+        ax.add_patch(Rectangle((rx0, y), rlen, rh,
                                facecolor=BLUE if top else WHITE,
                                edgecolor=BLUE if top else INK,
-                               lw=2.2 if top else 1.5, zorder=3))
-        _glyph(ax, icon, x + 0.55, y + rh / 2, 0.62, color=ink, lw=2.4)
-        ax.text(x + 1.05, y + rh / 2, name, fontsize=LAD,
+                               lw=2.0 if top else 1.4, zorder=3))
+        ax.text(rx0 + 0.26, y + rh / 2, name, fontsize=LAD,
                 va="center", ha="left", color=ink,
                 fontweight="bold" if top else "normal", zorder=4)
-    # a rung whose label is wider than its box is clipped, and the clip is
-    # invisible at thumbnail size -- the top rung printed "handed those chec".
-    # Two ways a rung label can be lost, and both are invisible at thumbnail
-    # size. It can be wider than its own box, and -- for every rung but the
-    # last -- it can run under the rung drawn on top of it, which is what
-    # covered the tail of "reads artifacts".
-    _w = lambda n: 1.05 + len(n) * LAD * 0.50 / 72.0
-    wide = [n for n, _i in rungs if _w(n) > rw]
-    assert not wide, "ladder rung label wider than its box: %s" % wide
-    under = [n for n, _i in rungs[:-1] if _w(n) + 0.12 > stepx]
-    assert not under, ("ladder rung label runs under the rung above it "
-                       "(needs stepx >= %.2f): %s"
-                       % (max(_w(n) for n, _i in rungs[:-1]) + 0.12, under))
-    last = rx0 + (len(rungs) - 1) * stepx + rw
-    assert last <= R - 0.40, "the ladder runs past the loop: %.2f > %.2f" % (last, R - 0.40)
-    arrowhead(rx0 - 0.95, ry0 + rh / 2, 0.80)
-    ax.text(rx0 - 1.20, ry0 + rh / 2, "at the end of\nevery step",
-            fontsize=LAD, color=INK, ha="right", va="center",
-            fontweight="bold", linespacing=1.22)
-    # and the verdict that survives the climb comes back up to the station
-    tx = rx0 + 3 * stepx + rw * 0.50
-    ty = ry0 + 3 * rise + rh
-    ax.annotate("", xy=(tx, TOPY - bh / 2 - 0.03), xytext=(tx, ty + 0.04),
+    _w = lambda n: 0.26 + len(n) * LAD * 0.50 / 72.0 + 0.18
+    tight = [n for n, rl in rungs if _w(n) > rl]
+    assert not tight, "tier label wider than its bar: %s" % tight
+    rises = [rl for _n, rl in rungs]
+    assert rises == sorted(rises), "the staircase no longer climbs: %s" % rises
+    ytopbar = ry0 + (len(rungs) - 1) * (rh + rgap) + rh
+    assert ytopbar < TOPY - bh / 2 - 0.10, (
+        "the staircase reaches the station row: %.2f" % ytopbar)
+    assert rx0 + max(rises) <= R - 0.40, "the staircase runs past the loop"
+
+    # in at the cheap end, out at the top -- the verdict that survives the
+    # climb is what returns. An arrow into the TOP bar would say the opposite,
+    # that being stuck summons the most expensive reviewer first.
+    arrowhead(rx0 - 1.00, ry0 + rh / 2, 0.84)
+    ax.text(rx0 - 1.25, ry0 + rh / 2, "after every step",
+            fontsize=LAD, color=INK, ha="right", va="center", fontweight="bold")
+    # The verdict that survives the climb returns to the loop. The arrow has to
+    # land INSIDE a station: at one point it rose into the gap between two of
+    # them and pointed at nothing, which is invisible at thumbnail size.
+    tx = rx0 + rungs[-1][1] - 0.40
+    inside = [i for i, x in enumerate(xs) if x + 0.3 <= tx <= x + bw - 0.3]
+    assert inside, ("the tier arrow rises into the gap between stations at "
+                    "x=%.2f; stations start at %s" % (tx, [round(x, 1) for x in xs]))
+    ax.annotate("", xy=(tx, TOPY - bh / 2 - 0.03), xytext=(tx, ytopbar + 0.08),
                 arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.9,
                                 shrinkA=0, shrinkB=0))
 
-    # what the dashed run means, inside the loop where the space already was.
-    # The explanation of WHY it is dashed belongs in the caption, not in the
-    # drawing: four lines of prose inside a schematic is a paragraph wearing a
-    # figure's clothes.
-    lx = L + 3.60
-    ax.text(lx, BOTY + 0.42, "results are recorded, not yet read back",
-            fontsize=EDGE, color=INK, ha="center", va="center")
+    ax.text(L + 12.0, BOTY + 0.40, "a decision, recorded but not read back",
+            fontsize=EDGE, style="italic", color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",
-                
-                
-                "The loop an agent runs unattended. A need arrives; the agent searches public repositories by keyword, audits what comes back, trains on what survives and scores it. The pictures that score the model also choose which epoch is reported. Review runs after every step, not only when something looks wrong, and the return edge is dashed because nothing reads the result back yet.")
+                "The loop an agent runs unattended, with the object each step hands to the next. "
+                "A requirement is turned into keyword queries, what they return is audited, what "
+                "survives is trained on, and the round is scored. The pictures that score the "
+                "model also choose which epoch is reported. Review follows every step, climbing "
+                "the tiers only while it is stuck, and the return edge is dashed because nothing "
+                "reads the decision back yet.")
 
 
 # " -- " is how a sentence break is typed in the sources, which are kept ASCII.
