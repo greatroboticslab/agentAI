@@ -50,14 +50,19 @@ except Exception:
 
 TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
 # The stand-first carries the argument, so it names the thing, the obstacle and
-# the answer in that order. Sentence 1 is the platform as it is meant to be
-# used: a member states an intent, a model turns it into a project and its
-# agents (sections agent_builder), those agents run fenced (analysis_sandbox),
+# the answer in that order. Sentences 1-2 are the platform as it is meant to be
+# used. "A user says what they want" was both too plain for the room and an
+# under-description: agent_builder is a negotiation, not a command -- the model
+# PROPOSES a project name, a modality and a set of agent components, and the
+# member corrects what it got wrong before the project exists. That exchange is
+# the specification step and is now what the line opens on. The agents then run
+# fenced (analysis_sandbox: import whitelist, AST check, no network, no writes)
 # and the data they work on arrives any of the three ways the platform accepts
-# -- harvested, streamed off a robot mid-drive, or uploaded by hand. Sentence 2
+# -- harvested, streamed off a robot mid-drive, or uploaded by hand. Sentence 3
 # is why the rest of the sheet exists: with no operator, the loop's own report
 # is the only account of it there is, and ours reported success through rounds
-# in which the training set never changed. Sentence 3 says what the reader gets.
+# in which the training set never changed. The last sentence says what the
+# reader gets.
 #
 # Two earlier openings are recorded because both failed in ways worth not
 # repeating. "The system ran for fifteen unattended rounds" made the sheet look
@@ -69,11 +74,11 @@ TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
 # (stop-loss, :1376), and the chain that produced the fifteen carried a 30-round
 # safety cap and a plateau test (orchestrator.py:1110, :1153). Nothing anywhere
 # stops the campaign on a reviewer's judgement. The line no longer claims it.
-STAND = ("A user says what they want; the platform opens the project and sandboxes its agents, "
-         "which harvest on their own, take a robot's drive as it runs, or work on what a person "
-         "uploads. A loop that runs unattended is only as good as what it reports about itself -- "
-         "ours reported success through rounds in which nothing changed. This sheet is the "
-         "coordination that runs the loop, and the review that makes its report checkable.")
+STAND = ("A researcher states a goal; a planning model proposes the project and its agents, and "
+         "the researcher corrects it. They then run in a sandbox, on data they harvest, take from "
+         "a robot as it drives, or receive by upload. Unattended, a loop is only as good as what it "
+         "reports about itself -- ours reported success through rounds in which nothing changed. "
+         "This sheet is that coordination, and the review that makes it checkable.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.

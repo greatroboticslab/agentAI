@@ -60,3 +60,6 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v56** (4c19be2) — no note — body 25.6 pt, 12 blocks
 - **v57** (d2b4c1c) — no note — body 25.6 pt, 12 blocks
 - **v58** (d2b4c1c) — no note — body 25.6 pt, 12 blocks
+- **v59** (787b9c9) — no note — body 25.6 pt, 12 blocks
+- **v60** (787b9c9) — no note — body 25.6 pt, 12 blocks
+- **v61** (787b9c9) — no note — body 25.6 pt, 12 blocks
