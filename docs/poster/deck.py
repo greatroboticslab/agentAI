@@ -79,6 +79,9 @@ TABLE_TXT = 17
 OLDSTYLE_FIGURES = {"Georgia", "Charter", "Baskerville", "Hoefler Text",
                     "Athelas", "Didot", "Palatino"}
 FIGURE_FACE = "Times New Roman"
+# " -- " as typed in the sources; an em dash as printed. Spaces around it
+# go with it, which is US convention and what the measure wants at this size.
+_DASH = re.compile(r"\s+--\s+")
 _NUMBER = re.compile(r"([+-]?\d[\d,]*(?:\.\d+)?)")
 
 
@@ -130,6 +133,13 @@ class Deck(object):
         first = True
         for r in runs:
             s, size, bold, color = r[0], r[1], r[2], r[3]
+            # The sources are written in ASCII, so a break in a sentence is typed
+            # as " -- ". Nothing converted it, so every one of them printed as two
+            # hyphens: at 28 pt across a 48 in sheet that reads as a typing error,
+            # not as punctuation. Six of them were on the sheet. Set as an em dash
+            # where it belongs, at the point the text reaches PowerPoint, so the
+            # sources stay ASCII and no author has to remember to type U+2014.
+            s = _DASH.sub("\u2014", s)
             after = r[4] if len(r) > 4 else 0
             p = tf.paragraphs[0] if first else tf.add_paragraph()
             first = False

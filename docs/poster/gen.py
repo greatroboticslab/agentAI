@@ -49,24 +49,31 @@ except Exception:
     pass
 
 TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
-# The stand-first used to open with "ran for fifteen unattended rounds", which
-# framed the whole sheet as a fifteen-round experiment. Fifteen is what has run
-# so far, not what the loop is for. Checked in round_scheduler.py: the only
-# bounds on the loop are max_rounds_per_day (a RATE, clamped 1..6 at :1642) and
-# the stop-loss, which pauses a domain after two consecutive failed rounds
-# (:1376) -- a brake, not a finish line. There is no total round cap anywhere,
-# and no implemented stop condition at all. An earlier revision of this line
-# said "Nothing sets the number of rounds", which is true of round_scheduler.py
-# but NOT of the chain that actually produced the fifteen: those rounds came
-# from orchestrator.py's mega_round loop (REGRESSION_DIAGNOSIS.md:150 maps
-# mega_iterrnd8_train to rounds 8-15), and that loop carries a 30-round safety
-# cap (:1110, :1153) and stops on a plateau test. So the line no longer claims
-# anything about limits; it states the stop the work is aimed at, as an aim.
-# The count keeps its place in the loop block, next to what those rounds did.
-STAND = ("On one platform, agents collect their own data, review one another's work and train "
-         "without an operator. The loop is built to run without a fixed end; the stop we are "
-         "working towards is a reviewer judging that nothing further is to be gained. This sheet "
-         "reports how the agents coordinate and what the collection produced.")
+# The stand-first carries the argument, so it names the thing, the obstacle and
+# the answer in that order. Sentence 1 is the platform as it is meant to be
+# used: a member states an intent, a model turns it into a project and its
+# agents (sections agent_builder), those agents run fenced (analysis_sandbox),
+# and the data they work on arrives any of the three ways the platform accepts
+# -- harvested, streamed off a robot mid-drive, or uploaded by hand. Sentence 2
+# is why the rest of the sheet exists: with no operator, the loop's own report
+# is the only account of it there is, and ours reported success through rounds
+# in which the training set never changed. Sentence 3 says what the reader gets.
+#
+# Two earlier openings are recorded because both failed in ways worth not
+# repeating. "The system ran for fifteen unattended rounds" made the sheet look
+# like a fifteen-round experiment; fifteen is what has run, not what the loop is
+# for, and it now sits in the loop block next to what those rounds did. Its
+# replacement spent a third of the line on "the stop we are working towards",
+# an aim with no implementation behind it -- round_scheduler.py bounds only the
+# RATE (max_rounds_per_day, clamped 1..6 at :1642) and brakes on failure
+# (stop-loss, :1376), and the chain that produced the fifteen carried a 30-round
+# safety cap and a plateau test (orchestrator.py:1110, :1153). Nothing anywhere
+# stops the campaign on a reviewer's judgement. The line no longer claims it.
+STAND = ("A user says what they want; the platform opens the project and sandboxes its agents, "
+         "which harvest on their own, take a robot's drive as it runs, or work on what a person "
+         "uploads. A loop that runs unattended is only as good as what it reports about itself -- "
+         "ours reported success through rounds in which nothing changed. This sheet is the "
+         "coordination that runs the loop, and the review that makes its report checkable.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
