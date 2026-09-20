@@ -512,8 +512,11 @@ class Deck(object):
             tf = tb.text_frame; tf.word_wrap = True
             tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
             par = tf.paragraphs[0]; par.line_spacing = 1.16
-            for txt, bold, col in ((lead + " ", True, self.c["ink"]),
-                                   (text, False, self.c["ink"])):
+            # A band that is not a numbered figure passes an empty label. Without
+            # this the caption opened on a bold space, which sets a visible indent.
+            runs = ([(lead + " ", True, self.c["ink"])] if lead else []) \
+                + [(text, False, self.c["ink"])]
+            for txt, bold, col in runs:
                 r = par.add_run(); r.text = txt
                 r.font.size = Pt(cs); r.font.bold = bold
                 r.font.color.rgb = col

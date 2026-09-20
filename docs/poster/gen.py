@@ -387,10 +387,17 @@ class Poster(object):
                 y = d.head(x, y, w, s["heading"])
             if s.get("lede"):
                 y = d.body(x, y, w, s["lede"], after=10)
-            y = d.figure(x, y, w, f, "Figure %d." % fig_no[0],
+            # The project strip introduces the four projects; it carries no
+            # claim and nothing on the sheet refers back to it, so it is not a
+            # numbered figure. Numbering it pushed the workflow diagram -- the
+            # first plate that actually argues something -- to Figure 2, and a
+            # reader looking for Figure 1 found a row of photographs.
+            numbered = not s.get("unnumbered")
+            y = d.figure(x, y, w, f, ("Figure %d." % fig_no[0]) if numbered else "",
                          title=(s["heading"] if s.get("title_below") else None),
                          cap_size=d.dz["caption"] + 5)
-            fig_no[0] += 1
+            if numbered:
+                fig_no[0] += 1
             if s.get("body"):
                 y = d.body(x, y, w, s["body"], after=10)
             y += d.dz["sec_gap"] * 0.6

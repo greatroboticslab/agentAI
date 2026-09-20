@@ -428,7 +428,7 @@ PROJECTS = [
      "photo": "humanoid_dog.jpg", "photo2": "team_field.jpg", "crop": 0.5, "w": 11.4,
      "blurb": 
               
-              "Legs reach ground wheels cannot, and in the field this one crossed it faster than the cart. A wide stance and a level gait hold the camera steady, which is what a collector needs. Its project is open and has yet to record."},
+              "Legs reach ground wheels cannot, and in the field this one crossed it faster than the cart. A wide stance and a level gait hold the camera steady, which is what a collector needs."},
 ]
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
