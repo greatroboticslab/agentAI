@@ -797,7 +797,7 @@ def algorithm():
     # drawing: four lines of prose inside a schematic is a paragraph wearing a
     # figure's clothes.
     lx = L + 3.60
-    ax.text(lx, BOTY + 0.42, "results are recorded, not yet read back",
+    ax.text(lx, BOTY + 0.42, "written down; the next round does not read it",
             fontsize=EDGE, color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",
