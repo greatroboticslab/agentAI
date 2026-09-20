@@ -954,7 +954,7 @@ def projects():
     return save(fig, "q_projects",
                 
                 
-                "Four projects, one platform. Each was opened by the same procedure, and its data is registered the same way whether it was harvested, driven in by a robot, or uploaded. The harvesting and training agents have so far run on the first of them.")
+                "Four projects, one platform. Each was opened by the same procedure, and its data is registered the same way whether it was harvested, driven in by a robot, or uploaded.")
 
 
 # ------------------------------------------------------------- the model ledger
