@@ -235,10 +235,42 @@ class Deck(object):
             # No abstract rules under the band -- the band is already the rule.
             # The standfirst runs the full measure in the body serif, one size
             # under the affiliation line, and the columns start below it.
-            self.tbox(MTSU_M, y, W - 2 * MTSU_M,
+            #
+            # It sits on the same white panel the column blocks sit on, with the
+            # same padding and the same hairline. Before this it was type laid
+            # straight onto the page tint, so the one paragraph carrying the
+            # argument was the only text on the sheet with no card under it and
+            # read as a caption to the title rather than as the sheet's opening.
+            # The panel is drawn BEFORE its text: python-pptx appends shapes in
+            # z-order, so a panel added afterwards covers the words on it.
+            pad = 0.24
+            tw = W - 2 * MTSU_M - 2 * pad
+            # h_est's table calls Georgia 0.478 em. Measured off this sheet's own
+            # render, the standfirst sets 218 characters to the line at 35.49 pt
+            # over a 46.68 in measure, which is 0.434 -- so the estimate predicted
+            # three lines where the page sets two and the panel was drawn a whole
+            # line too tall. 0.44 is used rather than the measured 0.434 because
+            # the failure modes are not symmetric: a shade too wide leaves a
+            # little air under the last line, a shade too narrow runs the text
+            # off the bottom of its own card.
+            hh = self.h_est(standfirst, tw, dz["stand"] - 6, 1.20, em=0.44)
+            # The column cards all set their first ink 0.273 in below the card's
+            # top edge -- measured off the render, and it is the template's own
+            # figure. A text box does not start its ink at its own top: at this
+            # size Georgia leaves 0.325 em of leading above the first line, so
+            # placing the box at the padding put the standfirst's first line
+            # 0.400 in down and the card read heavier than the four under it.
+            # The box is lifted by that leading so the INK lands where the
+            # modules' ink lands.
+            TOPGAP = 0.273
+            lead = 0.325 * (dz["stand"] - 6) / 72.0
+            ty = y + TOPGAP - lead
+            sh = self.panel_open(MTSU_M, y, W - 2 * MTSU_M)
+            self.tbox(MTSU_M + pad, ty, tw,
                       [(standfirst, dz["stand"] - 6, False, c["ink"])],
                       spacing=1.20, face=f["body"], align=PP_ALIGN.LEFT)
-            self.top = y + self.h_est(standfirst, W - 2 * MTSU_M, dz["stand"] - 6, 1.20) + 0.30
+            self.panel_close(sh, ty + hh + TOPGAP)
+            self.top = ty + hh + TOPGAP + 0.30
         elif standfirst and self.look == "journal":
             # An abstract: one measure narrower than the sheet, justified, ruled
             # top and bottom, set a size down from the title's byline. This is
