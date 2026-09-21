@@ -168,8 +168,16 @@ MTSU_COLUMNS = [
     # round curve are off the sheet and the argument is carried by the two
     # things that are not accuracy: how the agents coordinate, and what the
     # collection actually produced.
+    # Column 1 used to restate the project strip above it: the Rover's sensors,
+    # the laser's galvanometers, the drive becoming a dataset over one key --
+    # all printed ten inches higher. Two of its four blocks were a reprint on a
+    # sheet already shedding three sections for space. They are replaced by the
+    # two capabilities the stand-first's first sentence rests on and that no
+    # block supported: a planning model proposing the project and its agents
+    # (agent_builder), and agents running fenced (analysis_agent, whose code is
+    # the code the sandbox fences).
     ("One platform supports any robot or dataset",
-     ["platform_idea", "robots_today", "uplink", "platform_domains"], 2),
+     ["platform_idea", "agent_builder", "analysis_agent", "platform_domains"], 2),
     ("Open-weight models review in tiers",
      ["supervisor", "escalate"], 1),
     # Renamed from "A judgement counts only where it runs", which was true of
