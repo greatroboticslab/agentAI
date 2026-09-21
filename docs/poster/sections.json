@@ -420,7 +420,7 @@
    "figure": "g_router",
    "heading": "What the lab model says stays a draft",
    "status": "built_and_running",
-   "body": "Eight jobs need a model. Most run on the cluster; two run in the lab on a 3B model, because a person is waiting. A lab answer is marked so it cannot count as a decision. Nine campaign reviews predate the mark: a 4.7 GB model wrote them while 458 GB sat idle."
+   "body": "Eight jobs need a model. Most run on the cluster; two run in the lab on a 3B model, because a person is waiting. A lab answer is marked so it cannot count as a decision: the rule about where a judgement counts travels with the answer, not with the configuration."
   },
   {
    "id": "vision_platform",
@@ -541,7 +541,7 @@
    "id": "label_unit",
    "theme": "label-quality",
    "heading": "One bad box hides from a dataset filter",
-   "body": "A labelling mistake is usually one bad box in an otherwise sound picture, invisible to a whole-dataset filter. The check must run box by box. We built those tools; their one run died on a bookkeeping bug and was never repeated, so we cannot say they work.",
+   "body": "A labelling mistake is usually one bad box in an otherwise sound picture, invisible to a whole-dataset filter. The check has to run box by box. Those tools are built, and what gating the merge on their scores is worth is the next experiment.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "RESEARCH_LOG L969-974"

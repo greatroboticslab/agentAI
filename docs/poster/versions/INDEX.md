@@ -89,3 +89,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v85** (56241eb) — no note — body 25.6 pt, 12 blocks
 - **v86** (b4330a1) — no note — body 25.6 pt, 12 blocks
 - **v87** (b4330a1) — no note — body 25.6 pt, 12 blocks
+- **v88** (0611c6d) — no note — body 25.6 pt, 12 blocks
