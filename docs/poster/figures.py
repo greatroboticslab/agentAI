@@ -692,9 +692,16 @@ def algorithm():
                     arrowprops=dict(arrowstyle="-|>", color=color, lw=lw,
                                     linestyle=ls, shrinkA=0, shrinkB=0))
 
+    # Phase grounds. The stations were five identical boxes on an empty field,
+    # which says nothing about which of them belong together. A tinted ground
+    # per phase with the phase named on it is the device the reference figures
+    # in this literature use, and it costs no height and no type size: the
+    # boxes, their font and their spacing are untouched, the ground goes
+    # behind them.
+    PHASES = [("COLLECTION", 0, 2), ("TRAINING AND EVALUATION", 3, 4)]
     ax.add_patch(FancyBboxPatch((L, BOTY), R - L, TOPY - BOTY,
                                 boxstyle="round,pad=0,rounding_size=0.55",
-                                facecolor="none", edgecolor=RULE, lw=1.8,
+                                facecolor="none", edgecolor=RULE, lw=1.3,
                                 zorder=1))
     ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=2.2,
             linestyle=(0, (8, 5)), zorder=2)
@@ -727,6 +734,22 @@ def algorithm():
     # Two sub-lines is what the box holds; a third prints below its own rule.
     deep = [t for t, sb, _i in stations if len(_wrap(sb, SUB_WRAP)) > 1]
     assert not deep, "station sub-line no longer fits one line: %s" % deep
+    # drawn before the stations so the boxes sit ON the ground, not under it
+    # The plate is 5.10 in and the boxes top out at 4.83, so there is no room
+    # above them for a phase name. It goes in the empty band BETWEEN the station
+    # row and the ladder, which the drawing was wasting anyway.
+    PH_Y0, PH_Y1 = TOPY - bh / 2 - 0.52, min(H - 0.14, TOPY + bh / 2 + 0.16)
+    for pi, (pname, a, b) in enumerate(PHASES):
+        x0 = xs[a] - 0.34
+        x1 = xs[b] + bw + 0.34
+        ax.add_patch(FancyBboxPatch((x0, PH_Y0), x1 - x0, PH_Y1 - PH_Y0,
+                                    boxstyle="round,pad=0,rounding_size=0.22",
+                                    facecolor=PALE if pi % 2 == 0 else PALEBLU,
+                                    edgecolor="none", zorder=1))
+        ax.text(x0 + 0.34, PH_Y0 + 0.24, pname, fontsize=SUB - 1,
+                fontweight="bold", color=NAVY, ha="left", va="center",
+                zorder=2)
+
     top = TOPY + bh / 2
     for i, ((title, sub, icon), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
@@ -739,7 +762,21 @@ def algorithm():
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
-            arrowhead(mid - 0.40, TOPY, 0.80)
+            arrowhead(mid - 0.40, TOPY, 0.80, color=BLUE, lw=2.4)
+
+    # A third phase ground, under the station row, for the review tiers. The
+    # reference figures in this literature stack their stages as tinted bands;
+    # this is the third band, and it is the one that runs across every step
+    # rather than being a step itself. It stops short of the dashed return
+    # edge, which is not part of it.
+    RV_X0, RV_X1, RV_Y0, RV_Y1 = 11.30, R - 0.25, 0.42, TOPY - bh / 2 - 0.58
+    ax.add_patch(FancyBboxPatch((RV_X0, RV_Y0), RV_X1 - RV_X0, RV_Y1 - RV_Y0,
+                                boxstyle="round,pad=0,rounding_size=0.22",
+                                facecolor="#F7FAFD", edgecolor="none", zorder=1))
+    # The band name goes at its RIGHT edge: the left is where the entry label
+    # sits, and at the left the two printed over one another.
+    ax.text(RV_X1 - 0.30, RV_Y0 + 0.22, "REVIEW", fontsize=SUB - 1,
+            fontweight="bold", color=NAVY, ha="right", va="center", zorder=2)
 
     # the ladder, climbing left to right under the outward run --------------
     # Entered at the cheap end and read upward: the escalation goes to the
@@ -758,8 +795,13 @@ def algorithm():
         x, y = rx0 + k * stepx, ry0 + k * rise
         top = k == len(rungs) - 1
         ink = WHITE if top else INK
+        # Cost rises with the rung, and the fill rises with it: the reference
+        # figures grade a sequence by tone rather than leaving it to the reader
+        # to infer from position alone. White, then two tints, then the solid
+        # blue that the supervision benchmark is actually about.
+        FILLS = [WHITE, PALE, PALEBLU, BLUE]   # band is lighter than all four
         ax.add_patch(Rectangle((x, y), rw, rh,
-                               facecolor=BLUE if top else WHITE,
+                               facecolor=FILLS[k],
                                edgecolor=BLUE if top else INK,
                                lw=2.2 if top else 1.5, zorder=3))
         _glyph(ax, icon, x + 0.55, y + rh / 2, 0.62, color=ink, lw=2.4)
