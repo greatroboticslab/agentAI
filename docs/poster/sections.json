@@ -203,8 +203,8 @@
   {
    "id": "loop",
    "theme": "iterating-agents-brain",
-   "heading": "The search ran dry after round three",
-   "body": "Two programs ran on the cluster unwatched, one searching for data, one training on it. They completed fifteen rounds. After the third the search found nothing new and the training set never changed, though the ledger and each round report logged new work.",
+   "heading": "Why a loop's own report cannot count",
+   "body": "Two programs ran unattended on the cluster, one collecting and one training, for fifteen rounds. After the third the training set never changed, yet each round was logged as new work: a job that finished was recorded as progress, whatever it produced.",
    "figure": "none",
    "status": "built_but_off",
    "width": "centre",
@@ -549,8 +549,8 @@
   {
    "id": "label_agent",
    "theme": "label-quality",
-   "heading": "The model's explanation failed its own test",
-   "body": "Downloads carry no plant name, so every box from a site gets the same invented label. A model blamed that and wrote down first what would disprove it. A human approved; four runs disproved it. Web pictures average nine boxes, ours under two.",
+   "heading": "A model's idea was tested before it was used",
+   "body": "Downloads carry no plant name, so every box from a site shares one invented label. A model named that as the cause and wrote down first what would disprove it; a human approved, the first decision to pass the full approval chain. Four runs disproved it.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "approval ap-1789102367-82097423"

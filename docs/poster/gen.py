@@ -184,11 +184,17 @@ MTSU_COLUMNS = [
      ["platform_idea", "live_detect", "analysis_agent", "platform_domains"], 2),
     ("Open-weight models review in tiers",
      ["supervisor", "escalate"], 1),
-    # Renamed from "A judgement counts only where it runs", which was true of
-    # dispatch and of nothing else in the column. When the theme spilled, the
-    # continuation heading sat over the unattended-loop block and described
-    # something the block does not say. The heading now covers all three.
-    ("What the agents decided on their own",
+    # Twice renamed. "A judgement counts only where it runs" was true of
+    # dispatch alone. "What the agents decided on their own" was true of none of
+    # the three: dispatch is a rule WE set that stops a lab answer from counting
+    # as a decision; in label_agent a model proposed and a human decided; and in
+    # the loop nothing was decided at all -- every round submits the same
+    # commands and nothing reads the result, which is the dashed edge on Figure
+    # 1. A reader coming from that figure to this heading met a contradiction.
+    # What the three share is the condition under which a model's judgement is
+    # allowed to count: where it ran, whether it passed a test it set itself,
+    # and whether anything checked what it reported.
+    ("When a model's judgement counts",
      ["dispatch", "label_agent", "loop", "diagnosis"], 3),
     ("What the collection produced",
      ["funnel", "label_curator", "label_unit", "label_ceiling", "sources"], 3),
