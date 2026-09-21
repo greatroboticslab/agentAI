@@ -675,7 +675,7 @@ def algorithm():
     middle instead of stacking into it. The inch goes to the columns, which
     were shedding sections for want of it.
     """
-    from matplotlib.patches import FancyBboxPatch, Rectangle, Circle
+    from matplotlib.patches import FancyBboxPatch, Rectangle
     W, H = 46.4, 5.10
     STN, SUB, LAD, EDGE = 34.0, 24.0, 29.0, 25.0
     fig = plt.figure(figsize=(W, H))
@@ -692,16 +692,9 @@ def algorithm():
                     arrowprops=dict(arrowstyle="-|>", color=color, lw=lw,
                                     linestyle=ls, shrinkA=0, shrinkB=0))
 
-    # Phase grounds. The stations were five identical boxes on an empty field,
-    # which says nothing about which of them belong together. A tinted ground
-    # per phase with the phase named on it is the device the reference figures
-    # in this literature use, and it costs no height and no type size: the
-    # boxes, their font and their spacing are untouched, the ground goes
-    # behind them.
-    PHASES = [("COLLECTION", 0, 2), ("TRAINING AND EVALUATION", 3, 4)]
     ax.add_patch(FancyBboxPatch((L, BOTY), R - L, TOPY - BOTY,
                                 boxstyle="round,pad=0,rounding_size=0.55",
-                                facecolor="none", edgecolor=RULE, lw=1.3,
+                                facecolor="none", edgecolor=RULE, lw=1.8,
                                 zorder=1))
     ax.plot([L + 0.55, R - 0.55], [BOTY, BOTY], color=INK, lw=2.2,
             linestyle=(0, (8, 5)), zorder=2)
@@ -734,43 +727,11 @@ def algorithm():
     # Two sub-lines is what the box holds; a third prints below its own rule.
     deep = [t for t, sb, _i in stations if len(_wrap(sb, SUB_WRAP)) > 1]
     assert not deep, "station sub-line no longer fits one line: %s" % deep
-    # drawn before the stations so the boxes sit ON the ground, not under it
-    # The plate is 5.10 in and the boxes top out at 4.83, so there is no room
-    # above them for a phase name. It goes in the empty band BETWEEN the station
-    # row and the ladder, which the drawing was wasting anyway.
-    PH_Y0, PH_Y1 = TOPY - bh / 2 - 0.52, min(H - 0.14, TOPY + bh / 2 + 0.16)
-    for pi, (pname, a, b) in enumerate(PHASES):
-        x0 = xs[a] - 0.34
-        x1 = xs[b] + bw + 0.34
-        ax.add_patch(FancyBboxPatch((x0, PH_Y0), x1 - x0, PH_Y1 - PH_Y0,
-                                    boxstyle="round,pad=0,rounding_size=0.22",
-                                    facecolor=PALEBLU if pi % 2 == 0 else "#C3D6EA",
-                                    edgecolor="none", zorder=1))
-        # A solid tab rather than type on the tint. The reference figures in
-        # this literature set a stage's name in a filled bar, which is what
-        # makes the stage read as a stage and not as a caption that happens to
-        # be sitting there.
-        tw = 0.46 + len(pname) * (SUB - 1) * 0.56 / 72.0
-        ax.add_patch(FancyBboxPatch((x0 + 0.16, PH_Y0 + 0.08), tw, 0.46,
-                                    boxstyle="round,pad=0,rounding_size=0.10",
-                                    facecolor=NAVY, edgecolor="none", zorder=2))
-        ax.text(x0 + 0.16 + tw / 2, PH_Y0 + 0.31, pname, fontsize=SUB - 1,
-                fontweight="bold", color=WHITE, ha="center", va="center",
-                zorder=3)
-
     top = TOPY + bh / 2
     for i, ((title, sub, icon), x) in enumerate(zip(stations, xs)):
         ax.add_patch(Rectangle((x, TOPY - bh / 2), bw, bh, facecolor=WHITE,
                                edgecolor=INK, lw=1.7, zorder=3))
-        # A numbered marker instead of a line glyph. A magnifier over "Source
-        # search" carries nothing the two words do not; a number carries the
-        # one thing the row does not otherwise state, which is its order. Thin
-        # generic line icons are also the clearest tell of a slide template.
-        ax.add_patch(Circle((x + bw / 2, top - 0.52), 0.30,
-                            facecolor=NAVY, edgecolor="none", zorder=4))
-        ax.text(x + bw / 2, top - 0.52, str(i + 1), fontsize=SUB + 1,
-                fontweight="bold", color=WHITE, ha="center", va="center",
-                zorder=5)
+        _glyph(ax, icon, x + bw / 2, top - 0.55, 0.85, lw=2.8, accent=BLUE)
         ax.text(x + bw / 2, top - 1.22, title, ha="center", va="center",
                 fontsize=STN, fontweight="bold", color=INK, zorder=4)
         for k, line in enumerate(_wrap(sub, SUB_WRAP)):
@@ -778,25 +739,7 @@ def algorithm():
                     va="center", fontsize=SUB, color=MUTE, zorder=4)
         if i:
             mid = (xs[i - 1] + bw + x) / 2
-            arrowhead(mid - 0.40, TOPY, 0.80, color=BLUE, lw=2.4)
-
-    # A third phase ground, under the station row, for the review tiers. The
-    # reference figures in this literature stack their stages as tinted bands;
-    # this is the third band, and it is the one that runs across every step
-    # rather than being a step itself. It stops short of the dashed return
-    # edge, which is not part of it.
-    RV_X0, RV_X1, RV_Y0, RV_Y1 = 11.30, R - 0.25, 0.42, TOPY - bh / 2 - 0.58
-    ax.add_patch(FancyBboxPatch((RV_X0, RV_Y0), RV_X1 - RV_X0, RV_Y1 - RV_Y0,
-                                boxstyle="round,pad=0,rounding_size=0.22",
-                                facecolor="#F7FAFD", edgecolor="none", zorder=1))
-    # The band name goes at its RIGHT edge: the left is where the entry label
-    # sits, and at the left the two printed over one another.
-    _rw = 0.46 + len("REVIEW") * (SUB - 1) * 0.56 / 72.0
-    ax.add_patch(FancyBboxPatch((RV_X1 - 0.16 - _rw, RV_Y0 + 0.08), _rw, 0.46,
-                                boxstyle="round,pad=0,rounding_size=0.10",
-                                facecolor=NAVY, edgecolor="none", zorder=2))
-    ax.text(RV_X1 - 0.16 - _rw / 2, RV_Y0 + 0.31, "REVIEW", fontsize=SUB - 1,
-            fontweight="bold", color=WHITE, ha="center", va="center", zorder=3)
+            arrowhead(mid - 0.40, TOPY, 0.80)
 
     # the ladder, climbing left to right under the outward run --------------
     # Entered at the cheap end and read upward: the escalation goes to the
@@ -815,19 +758,12 @@ def algorithm():
         x, y = rx0 + k * stepx, ry0 + k * rise
         top = k == len(rungs) - 1
         ink = WHITE if top else INK
-        # Cost rises with the rung, and the fill rises with it: the reference
-        # figures grade a sequence by tone rather than leaving it to the reader
-        # to infer from position alone. White, then two tints, then the solid
-        # blue that the supervision benchmark is actually about.
-        FILLS = [WHITE, PALE, PALEBLU, BLUE]   # band is lighter than all four
         ax.add_patch(Rectangle((x, y), rw, rh,
-                               facecolor=FILLS[k],
+                               facecolor=BLUE if top else WHITE,
                                edgecolor=BLUE if top else INK,
                                lw=2.2 if top else 1.5, zorder=3))
-        # No glyph. The stations carry numbers now and the tiers carry tone;
-        # a shield and a checklist beside them would be a third alphabet, and
-        # a generic line icon is the tell this plate is being kept clear of.
-        ax.text(x + 0.42, y + rh / 2, name, fontsize=LAD,
+        _glyph(ax, icon, x + 0.55, y + rh / 2, 0.62, color=ink, lw=2.4)
+        ax.text(x + 1.05, y + rh / 2, name, fontsize=LAD,
                 va="center", ha="left", color=ink,
                 fontweight="bold" if top else "normal", zorder=4)
     # a rung whose label is wider than its box is clipped, and the clip is
@@ -836,7 +772,7 @@ def algorithm():
     # size. It can be wider than its own box, and -- for every rung but the
     # last -- it can run under the rung drawn on top of it, which is what
     # covered the tail of "reads artifacts".
-    _w = lambda n: 0.42 + len(n) * LAD * 0.50 / 72.0
+    _w = lambda n: 1.05 + len(n) * LAD * 0.50 / 72.0
     wide = [n for n, _i in rungs if _w(n) > rw]
     assert not wide, "ladder rung label wider than its box: %s" % wide
     under = [n for n, _i in rungs[:-1] if _w(n) + 0.12 > stepx]
@@ -846,7 +782,7 @@ def algorithm():
     last = rx0 + (len(rungs) - 1) * stepx + rw
     assert last <= R - 0.40, "the ladder runs past the loop: %.2f > %.2f" % (last, R - 0.40)
     arrowhead(rx0 - 0.95, ry0 + rh / 2, 0.80)
-    ax.text(rx0 - 1.20, ry0 + rh / 2, "after every step,\ncheapest first",
+    ax.text(rx0 - 1.20, ry0 + rh / 2, "at the end of\nevery step",
             fontsize=LAD, color=INK, ha="right", va="center",
             fontweight="bold", linespacing=1.22)
     # and the verdict that survives the climb comes back up to the station
@@ -861,7 +797,7 @@ def algorithm():
     # drawing: four lines of prose inside a schematic is a paragraph wearing a
     # figure's clothes.
     lx = L + 3.60
-    ax.text(lx, BOTY + 0.42, "the loop reads its result",
+    ax.text(lx, BOTY + 0.42, "the loop reads its own result",
             fontsize=EDGE, color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",
