@@ -359,8 +359,8 @@
   {
    "id": "live_detect",
    "theme": "remote-control",
-   "heading": "Operators watch the detector run on the newest frame",
-   "body": "While a robot is driving, the project page shows its newest frame refreshing every second and a half, and the weed detector can be switched on over that frame in the same process. The operator sees what the model sees, on the drive that is happening.",
+   "heading": "The weed detector runs on a robot's live view",
+   "body": "While a robot drives, its project page shows the newest camera frame every second and a half. One switch runs the campaign's own weed detector over that frame, so the operator sees what the model sees, on the drive that is happening.",
    "figure": "none",
    "status": "built_and_running",
    "width": "column",

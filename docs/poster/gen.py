@@ -172,12 +172,16 @@ MTSU_COLUMNS = [
     # the laser's galvanometers, the drive becoming a dataset over one key --
     # all printed ten inches higher. Two of its four blocks were a reprint on a
     # sheet already shedding three sections for space. They are replaced by the
-    # two capabilities the stand-first's first sentence rests on and that no
-    # block supported: a planning model proposing the project and its agents
-    # (agent_builder), and agents running fenced (analysis_agent, whose code is
-    # the code the sandbox fences).
+    # two capabilities no block on the sheet showed. agent_builder was tried in
+    # the first of those slots and taken out again: it restated the stand-first
+    # sentence for sentence -- a researcher states a goal, a model proposes the
+    # project, the researcher corrects it -- and a restatement twenty inches
+    # below is repetition, not evidence. live_detect takes the slot instead: it
+    # is the one place the weed project's own detector runs on a robot's live
+    # frame, which is the link between the strip's first panel and its robots.
+    # analysis_agent stays; its generated code is the code the sandbox fences.
     ("One platform supports any robot or dataset",
-     ["platform_idea", "agent_builder", "analysis_agent", "platform_domains"], 2),
+     ["platform_idea", "live_detect", "analysis_agent", "platform_domains"], 2),
     ("Open-weight models review in tiers",
      ["supervisor", "escalate"], 1),
     # Renamed from "A judgement counts only where it runs", which was true of
