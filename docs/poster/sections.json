@@ -532,7 +532,7 @@
    "id": "label_curator",
    "theme": "label-quality",
    "heading": "A quality gate decides what the trainer sees",
-   "body": "Past a certain scale more data stopped helping, and the cause was the data. So a dataset is kept only if it resembles trusted weed images in DINOv2 features; a vision model asked the same question said yes to every box. Fifty-one datasets were cut.",
+   "body": "A dataset joins the training pool only if its images resemble trusted weed data in DINOv2 features, which keeps off-topic sets out; fifty-one were held back. A vision model asked the same question said yes to every box.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "CHANGELOG v3.0.35-37"
@@ -575,7 +575,7 @@
    "id": "double_agent",
    "theme": "collection",
    "heading": "Two agents collect and train side by side",
-   "body": "A collector searches public sources, labels what it finds by machine and registers it; a trainer beside it takes each new dataset in between rounds. So far it has labelled 156,521 images, 59,134 of them distinct.",
+   "body": "A collector searches Kaggle, Hugging Face, GitHub and Roboflow on its own; a trainer beside it takes each new dataset in between rounds. It has brought in over 600,000 images, and its detection pool holds 179,989 across 63 datasets.",
    "figure": "none"
   },
   {
@@ -584,8 +584,8 @@
    "figure": "none",
    "status": "built_and_running",
    "numbers": "FUNNEL",
-   "heading": "Every source is audited before training",
-   "body": "An auditor scores each source the collector drew from. It reads 1.000 on hand-labelled data, so a source's score is the source's own; of 13,527 images audited, the one source that cleared it supplied 3,208."
+   "heading": "Every image is checked on the way in",
+   "body": "Mirrored copies are caught by image content, 65,007 in one pass; no test-set image can reach training; each source is registered with its licence; and boxes are drawn by machine where a dataset had none, 156,521 images so far."
   }
  ]
 }
