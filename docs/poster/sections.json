@@ -565,6 +565,13 @@
    "numbers": "M1 sealed measurement"
   },
   {
+   "id": "double_agent",
+   "theme": "collection",
+   "heading": "Two agents collect and train side by side",
+   "body": "A collector finds, labels and registers new datasets while a trainer beside it takes each one in between rounds. Past a certain scale more data stopped helping, and the cause was the data: now a dataset is kept only if it resembles trusted weed images.",
+   "figure": "none"
+  },
+  {
    "id": "funnel",
    "theme": "outputs",
    "figure": "none",

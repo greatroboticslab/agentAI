@@ -196,8 +196,20 @@ MTSU_COLUMNS = [
     # and whether anything checked what it reported.
     ("When a model's judgement counts",
      ["dispatch", "label_agent", "loop", "diagnosis"], 3),
+    # The double-agent system -- a collector and a trainer running concurrently
+    # on one locked registry, new data hot-loaded between the trainer's
+    # mini-rounds (docs/DOUBLE_AGENT_SYSTEM.md §1) -- is the project's longest
+    # piece of work and was on the sheet only in fragments: a funnel of counts,
+    # a filter, a per-box check, with nothing saying what produced them or why
+    # the filter exists. double_agent opens the column with that arc. It says
+    # the cause of the plateau was the data and does not say who found it: the
+    # compare-against-trusted-data direction was Hongbo Zhang's (2026-05-16,
+    # dinov2_curator.py header), and TIERED_SUPERVISION_PLAN §0 records
+    # agent-originated campaign decisions as zero. It says "resembles trusted
+    # weed images", not "a trained DINOv2": the backbone is frozen and scores a
+    # dataset by cosine similarity to a reference pool of trusted weed sets.
     ("What the collection produced",
-     ["funnel", "label_curator", "label_unit", "label_ceiling", "sources"], 3),
+     ["double_agent", "funnel", "label_curator", "label_unit", "label_ceiling", "sources"], 3),
 ]
 
 # The two plates that ARE the evidence for the two headline claims: what more
