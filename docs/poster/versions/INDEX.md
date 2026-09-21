@@ -106,3 +106,4 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v100** (9e30f4e) — no note — body 25.6 pt, 12 blocks
 - **v100** (9e30f4e) — no note — body 25.6 pt, 12 blocks
 - **v101** (9e30f4e) — no note — body 25.6 pt, 12 blocks
+- **v102** (f22ccf0) — no note — body 25.6 pt, 12 blocks

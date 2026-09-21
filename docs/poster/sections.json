@@ -203,8 +203,8 @@
   {
    "id": "loop",
    "theme": "iterating-agents-brain",
-   "heading": "Why a loop's own report cannot count",
-   "body": "Two programs ran unattended on the cluster, one collecting and one training, for fifteen rounds. After the third the training set never changed, yet each round was logged as new work: a job that finished was recorded as progress, whatever it produced.",
+   "heading": "Review reads what a job made, not what it reports",
+   "body": "Two programs collected and trained unattended for fifteen rounds. After the third the training set never changed, yet every finished job was logged as progress. The checks look for exactly that: output older than its step, a filter that kept everything, a plateau.",
    "figure": "none",
    "status": "built_but_off",
    "width": "centre",
