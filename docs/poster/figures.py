@@ -408,7 +408,7 @@ def supervision():
     d14 = pt("L3@qwen3:14b")["r"] - pt("L2@qwen3:14b")["r"]
     return save(fig, "e_supervision",
                 
-                "(e) Recall and (f) grounded recall on 149 frozen failures taken from this project's own record, scored by the project's own scorer. Each arrow runs from the model reading the raw files to the same model handed the twelve checks' findings. Grounded counts only the cases where the model also quoted a line that resolves the failure. The dotted arrow carries no head: its two ends were scored on different cases, 57 against 114.")
+                "(e) Recall and (f) grounded recall on 149 frozen failures from this project's own record; each arrow runs from a model on raw files to the same model given the checks' findings. A dotted arrow's ends were scored on different cases, 57 against 114.")
 
 
 # --------------------------------------------------- photographic plates
@@ -520,7 +520,7 @@ def router():
     to desync the figure is to delete the assertion.
     """
     from matplotlib.patches import Rectangle
-    W, H = 11.6, 6.36
+    W, H = 11.6, 5.90
     fig = plt.figure(figsize=(W, H)); fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
@@ -558,7 +558,7 @@ def router():
     CLUSTER, LAB = rows["cluster"], rows["lab"]
     assert len(CLUSTER) + len(LAB) == len(ROLES)
 
-    ROW, GAP, HEAD = 0.35, 0.20, 0.50
+    ROW, GAP, HEAD = 0.33, 0.18, 0.46
     x0, xm = 0.30, 6.65          # role column, model column
     y = H - 0.30
 
@@ -631,7 +631,7 @@ def router():
     assert y - 0.22 >= 0, ("the router table runs off its canvas by %.2f in -- "
                            "raise H or lower ROW" % (0.22 - y))
     return save(fig, "g_router",
-                "The eight jobs that need a model and the model each was given, read from the router's own table; a filled square marks a job that exercises judgement. The dashed band is the escalation above them.")
+                "Each job that needs a model, and the model it was given, from the router's own table; a filled square marks judgement, and the dashed band is the escalation above.")
 
 
 def _glyph(ax, kind, cx, cy, s, color=INK, lw=2.4, accent=None):

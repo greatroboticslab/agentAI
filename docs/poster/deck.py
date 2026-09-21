@@ -171,7 +171,14 @@ class Deck(object):
         # 0.478 under-counts its lines, and a sub-head that wraps to two was
         # drawn over by its own paragraph.
         if em is None:
-            em = {"Times New Roman": 0.442, "Georgia": 0.478,
+            # Georgia was 0.478. Measured off this sheet's own render it sets
+            # at 0.434 (218 characters to the line at 35.49 pt over 46.68 in),
+            # so every Georgia block was estimated about a tenth taller than it
+            # sets. The packer believed it, chose smaller type than the page
+            # needed, and pushed blocks into the next column that fitted where
+            # they were. 0.44 rather than 0.434: too narrow an estimate runs text
+            # off the bottom of its own card, too wide only leaves air.
+            em = {"Times New Roman": 0.442, "Georgia": 0.44,
                   "Arial Narrow": 0.425}.get(self.f["body"], 0.50)
         cpl = max(14, int((w * 72.0) / (size * em)))
         lines = sum(max(1, -(-len(p) // cpl)) for p in s.split("\n"))

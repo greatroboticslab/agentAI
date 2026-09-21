@@ -236,7 +236,7 @@
    "id": "supervisor",
    "theme": "iterating-agents-brain",
    "heading": "Citing evidence beats model size",
-   "body": "We froze 149 real failures from our own history and asked open-weight models to find them. Good reviewers cite their evidence; size matters less. Handed the twelve checks' findings, a 27-billion model found 0.149 more, a 14-billion one 0.012.",
+   "body": "Handed the twelve checks' findings, a 27-billion model found 0.149 more of the failures and a 14-billion one 0.012.",
    "figure": "e_supervision",
    "status": "built_but_off",
    "width": "centre",
@@ -420,7 +420,7 @@
    "figure": "g_router",
    "heading": "What the lab model says stays a draft",
    "status": "built_and_running",
-   "body": "Eight jobs need a model. Most run on the cluster; two run in the lab on a 3B model, because a person is waiting. A lab answer is marked so it cannot count as a decision: the rule about where a judgement counts travels with the answer, not with the configuration."
+   "body": "Two jobs run in the lab because a person is waiting; their answers are marked, so none can count as a decision."
   },
   {
    "id": "vision_platform",
@@ -508,7 +508,7 @@
    "figure": "none",
    "status": "built_and_running",
    "heading": "Review runs even when nothing looks wrong",
-   "body": "Review follows every step: failures here announced themselves as successes. Four levels by cost: the running watchdog, twelve fixed checks, a model reading files, then that model given the findings. The watchdog returned nothing on 149 frozen failures."
+   "body": "Review follows every step, because failures here announced themselves as successes. Four levels, by cost: the running watchdog, twelve fixed checks, a model reading raw files, then that model given the checks' findings."
   },
   {
    "id": "algorithm",
@@ -547,6 +547,13 @@
    "numbers": "RESEARCH_LOG L969-974"
   },
   {
+   "id": "risk_tiers",
+   "theme": "judgement",
+   "heading": "What a model may do without asking",
+   "body": "Every action carries a risk grade: a reviewer may change a setting, or submit a job if it cites evidence; costly steps wait for approval; deletion is a person's alone. The first to pass was a model's hypothesis, tested and disproved.",
+   "figure": "none"
+  },
+  {
    "id": "label_agent",
    "theme": "label-quality",
    "heading": "A model's idea was tested before it was used",
@@ -568,7 +575,7 @@
    "id": "double_agent",
    "theme": "collection",
    "heading": "Two agents collect and train side by side",
-   "body": "A collector searches public sources, labels what it finds by machine and registers it; a trainer beside it takes each new dataset in between rounds. The collector has labelled 156,521 images this way, 59,134 of them distinct.",
+   "body": "A collector searches public sources, labels what it finds by machine and registers it; a trainer beside it takes each new dataset in between rounds. So far it has labelled 156,521 images, 59,134 of them distinct.",
    "figure": "none"
   },
   {
@@ -577,8 +584,8 @@
    "figure": "none",
    "status": "built_and_running",
    "numbers": "FUNNEL",
-   "heading": "156,521 labelled by machine, 3,208 kept",
-   "body": "A machine labelled 156,521 pictures; 59,134 remain once duplicate downloads are removed. We audited 13,527 of them, and only 3,208 came from a source worth keeping. The checker scores 1.000 on hand-labelled pictures, so a low score means the source is poor."
+   "heading": "Every source is audited before training",
+   "body": "An auditor scores each source the collector drew from. It reads 1.000 on hand-labelled data, so a source's score is the source's own; of 13,527 images audited, the one source that cleared it supplied 3,208."
   }
  ]
 }

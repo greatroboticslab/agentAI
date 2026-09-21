@@ -164,61 +164,34 @@ MTSU_COLUMNS = [
     # (heading, sections in shed order, how many the sheet may not give up)
     #
     # No accuracy plate. The presenting author's instruction is that the
-    # detector's accuracy is not shown for now, so the tier ladder and the
-    # round curve are off the sheet and the argument is carried by the two
-    # things that are not accuracy: how the agents coordinate, and what the
-    # collection actually produced.
-    # Column 1 used to restate the project strip above it: the Rover's sensors,
-    # the laser's galvanometers, the drive becoming a dataset over one key --
-    # all printed ten inches higher. Two of its four blocks were a reprint on a
-    # sheet already shedding three sections for space. They are replaced by the
-    # two capabilities no block on the sheet showed. agent_builder was tried in
-    # the first of those slots and taken out again: it restated the stand-first
-    # sentence for sentence -- a researcher states a goal, a model proposes the
-    # project, the researcher corrects it -- and a restatement twenty inches
-    # below is repetition, not evidence. live_detect takes the slot instead: it
-    # is the one place the weed project's own detector runs on a robot's live
-    # frame, which is the link between the strip's first panel and its robots.
-    # analysis_agent stays; its generated code is the code the sandbox fences.
+    # detector's accuracy is not shown for now, so the argument is carried by
+    # how the agents coordinate and what the collection produced.
+    #
+    # One theme per column, and every block in a column is protected: the
+    # packer can then only answer a crowded sheet by changing the type size.
+    # It cannot quietly drop a block, and it cannot fill a short column with a
+    # spare note that repeats one already printed -- which is what happened
+    # when the collection column was shortened and the packer refilled it with
+    # the funnel and label_ceiling blocks the merge had just folded in.
     ("One platform supports any robot or dataset",
-     ["platform_idea", "live_detect", "analysis_agent", "platform_domains"], 4),
+     ["platform_idea", "live_detect", "analysis_agent"], 3),
     ("Open-weight models review in tiers",
      ["supervisor", "escalate"], 2),
-    # Twice renamed. "A judgement counts only where it runs" was true of
-    # dispatch alone. "What the agents decided on their own" was true of none of
-    # the three: dispatch is a rule WE set that stops a lab answer from counting
-    # as a decision; in label_agent a model proposed and a human decided; and in
-    # the loop nothing was decided at all -- every round submits the same
-    # commands and nothing reads the result, which is the dashed edge on Figure
-    # 1. A reader coming from that figure to this heading met a contradiction.
-    # What the three share is the condition under which a model's judgement is
-    # allowed to count: where it ran, whether it passed a test it set itself,
-    # and whether anything checked what it reported.
-    # loop is off the sheet. It was the third place saying two programs
-    # collect and train (after double_agent and column 2's escalate block) and
-    # the second saying the checks catch it, and it carried its column onto a
-    # "(cont.)" heading of its own. diagnosis goes too: its claim about a
-    # staging directory could not be traced to anything in the repository.
+    # loop and diagnosis are off. loop was the third statement on the sheet
+    # that two programs collect and train, and the second that the checks
+    # catch a finished job logged as progress; diagnosis's staging-directory
+    # claim never traced to anything in the repository. risk_tiers takes the
+    # place: it is what the column's heading asks -- the grade of action a
+    # model may take on its own, enforced in brain/policy.py and called from
+    # both round_scheduler and the dashboard's action endpoint.
     ("When a model's judgement counts",
-     ["dispatch", "label_agent"], 2),
-    # The double-agent system -- a collector and a trainer running concurrently
-    # on one locked registry, new data hot-loaded between the trainer's
-    # mini-rounds (docs/DOUBLE_AGENT_SYSTEM.md §1) -- is the project's longest
-    # piece of work and was on the sheet only in fragments: a funnel of counts,
-    # a filter, a per-box check, with nothing saying what produced them or why
-    # the filter exists. double_agent opens the column with that arc. It says
-    # the cause of the plateau was the data and does not say who found it: the
-    # compare-against-trusted-data direction was Hongbo Zhang's (2026-05-16,
-    # dinov2_curator.py header), and TIERED_SUPERVISION_PLAN §0 records
-    # agent-originated campaign decisions as zero. It says "resembles trusted
-    # weed images", not "a trained DINOv2": the backbone is frozen and scores a
-    # dataset by cosine similarity to a reference pool of trusted weed sets.
+     ["dispatch", "risk_tiers"], 2),
     ("What the collection produced",
-     # funnel and label_ceiling are off the column: double_agent now carries the
-     # funnel's scale figures, and label_curator carries "more data stopped
-     # helping". Left in as slack, the packer filled the room the merge freed
-     # with exactly the repetition the merge was made to remove.
-     ["double_agent", "label_curator", "label_unit"], 2),
+     # double_agent carries the collector's scale figures now, so funnel is
+     # not a second block saying how much was gathered. label_unit -- the
+     # per-box check, the next experiment -- is the block that gives way to
+     # larger type.
+     ["double_agent", "funnel", "label_curator", "label_unit"], 4),
 ]
 
 # The two plates that ARE the evidence for the two headline claims: what more
@@ -784,16 +757,12 @@ class Poster(object):
                     y = y0
                     hh = (self.mtsu_block_h(w, sid) + self._head_h(d, w, head)
                           + 2 * MTSU_PAD + 0.24)
-            # The soft target balances column heights, and it used to apply to
-            # every block. When there are no more columns left than themes left,
-            # this column belongs to the current theme and the rest belong to
-            # the themes still to come -- so pushing one of this theme's own
-            # blocks onward on the target alone steals a later theme's column,
-            # and the overflow cascades to the last column and drops something.
-            # It dropped escalate: column 2's plate plus escalate exceeded the
-            # 82 % target while fitting the page with room to spare, and the
-            # sheet fell from 25.6 to 22.1 pt to get it back. A continuation
-            # block in an owned column now moves only when the PAGE runs out.
+            # With no more columns left than themes left, this column belongs
+            # to the current theme; pushing one of its own blocks onward on the
+            # soft target alone steals a later theme's column and cascades to
+            # a drop at the last one. It dropped escalate once and took the
+            # sheet from 25.6 to 22.1 pt. A continuation block in an owned
+            # column moves only when the page runs out.
             _th = self._theme_of(sid)
             _owns = (len(theme_seq) - theme_seq.index(_th)) >= n - ci
             _soft = (y - y0 + hh > target) and not (_owns and not head)
