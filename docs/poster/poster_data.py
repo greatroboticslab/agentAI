@@ -410,13 +410,13 @@ PROJECTS = [
      "photo": "u_detect_4.jpg", "crop": 0.5, "w": 10.2,
      "blurb": 
               
-              "The corpus exists to train the weed detector the laser robot needs. Two agents work it unprompted: one harvests and audits public imagery, the other trains. Over 150,000 labelled images."},
+              "The corpus exists to train the weed detector the laser robot needs. Two agents work it on their own: one harvests and audits public imagery, the other trains. Over 150,000 labelled images."},
 
     {"key": "241_robot", "name": "Rover", "layout": "side",
      "photo": "r241_robot.jpg", "crop": 0.50, "w": 12.4,
      "blurb": 
               
-              "A four-wheel skid-steer narrow enough for a crop row, carrying its own battery and compute. Every drive it opens becomes a governed dataset as it runs: camera, GPS and two inertial units, over one API key."},
+              "A four-wheel skid-steer narrow enough for a crop row, carrying its own battery and compute. Each drive is registered as a dataset while it runs: camera, GPS and two inertial units, over one API key."},
 
     {"key": "laser_cart", "name": "Laser Weed Control Robot", "layout": "side",
      "photo": "lasercar_field.jpg", "fallback": "lc_front.jpg", "crop": 0.5, "w": 12.4,
@@ -428,7 +428,7 @@ PROJECTS = [
      "photo": "humanoid_dog.jpg", "photo2": "team_field.jpg", "crop": 0.5, "w": 11.4,
      "blurb": 
               
-              "Legs reach ground wheels cannot, and in the field this one crossed it faster than the cart. A wide stance and a level gait hold the camera steady, which is what a collector needs."},
+              "Legs cross ground that slows wheels, and in the field this one outpaced the laser robot. A wide stance and a level gait hold a collector's camera steady."},
 ]
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"
 PER_SPECIES_SRC = "results/framework/s3_tta_ceiling/plain_s102.json per_class"

@@ -82,10 +82,10 @@ TITLE = "agentAI: A Research-Data Platform for Physical and Embodied Agents"
 # safety cap and a plateau test (orchestrator.py:1110, :1153). Nothing anywhere
 # stops the campaign on a reviewer's judgement. The line no longer claims it.
 STAND = ("A researcher states a goal; a planning model proposes the project and its agents, and "
-         "the researcher corrects it. They then run in a sandbox, on data they harvest, take from "
-         "a robot as it drives, or receive by upload, and train on it round after round "
-         "unwatched. A loop like that is only as good as what it reports about itself. This sheet "
-         "is that coordination, and the review that makes it checkable.")
+         "the researcher corrects it. The agents then work on data they harvest, take from a "
+         "robot as it drives, or receive by upload, and train on it round after round unwatched, so "
+         "the loop's own report is the only account of what it did. This sheet shows that loop and "
+         "the review that checks its report.")
 
 # The one argument, in Harry's order. Section ids come from the library; a
 # missing id is skipped, so this order can name sections before they exist.
@@ -595,7 +595,7 @@ class Poster(object):
                                    width=Inches(side), height=Inches(side))
         tx = x + pad + side + 0.34
         tw = w - pad - (tx - x)
-        yy = d.sub(tx, y + 0.08, tw, "The platform is live; the QR code links to it")
+        yy = d.sub(tx, y + 0.08, tw, "Scan to open the live platform")
         yy = d.body(tx, yy, tw, self.QR_URL, after=4)
         # Was "Authentication requires an institutional Google account", which is
         # the login page's own wording and is not what the server does:

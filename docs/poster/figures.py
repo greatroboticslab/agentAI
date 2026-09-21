@@ -408,7 +408,7 @@ def supervision():
     d14 = pt("L3@qwen3:14b")["r"] - pt("L2@qwen3:14b")["r"]
     return save(fig, "e_supervision",
                 
-                "(e) Recall and (f) grounded recall on 149 frozen failures from this project's own record; each arrow runs from a model on raw files to the same model given the checks' findings. A dotted arrow's ends were scored on different cases, 57 against 114.")
+                "(e) Recall and (f) grounded recall on 149 frozen cases, 116 of them failures; each arrow runs from a model on raw files to the same model given the checks' findings. A dotted arrow's ends were scored on different cases, 57 against 114.")
 
 
 # --------------------------------------------------- photographic plates
@@ -631,7 +631,7 @@ def router():
     assert y - 0.22 >= 0, ("the router table runs off its canvas by %.2f in -- "
                            "raise H or lower ROW" % (0.22 - y))
     return save(fig, "g_router",
-                "Each job that needs a model, and the model it was given, from the router's own table; a filled square marks judgement, and the dashed band is the escalation above.")
+                "Each job that needs a model and the model it was given, from the router's table; a filled square marks judgement. The dashed band is designed above it.")
 
 
 def _glyph(ax, kind, cx, cy, s, color=INK, lw=2.4, accent=None):
@@ -755,7 +755,7 @@ def algorithm():
         ("Source search", "public repositories are searched by keyword", "plan"),
         ("Acquisition and audit", "what arrives is audited before it is kept", "fetch"),
         ("Training on retained data", "trained on what survives the audit", "train"),
-        ("Evaluation and reporting", "scored; a plateau test ends the run", "decide"),
+        ("Evaluation and reporting", "scored; a plateau is flagged", "decide"),
     ]
     xs = [L + 0.30 + i * ((R - L - 0.60 - bw) / (len(stations) - 1))
           for i in range(len(stations))]
@@ -847,7 +847,7 @@ def algorithm():
     return save(fig, "x_algorithm",
                 
                 
-                "The harvest-and-train loop, as it runs unattended. A researcher's goal is planned into keyword queries, what they return is audited, what survives is trained on, and the round is scored. The stopping rule is a plateau test today and a reviewer's judgement by design. Review follows every step.")
+                "The harvest-and-train loop, as it runs unattended. A plateau is flagged today; stopping on it is a reviewer's judgement by design.")
 
 # " -- " is how a sentence break is typed in the sources, which are kept ASCII.
 # deck.py sets it as an em dash on the way into PowerPoint, but the text drawn
