@@ -207,6 +207,7 @@ MTSU_COLUMNS = [
 MTSU_PINNED = {"supervisor", "dispatch"}
 MTSU_KEEP_FIGURE = {"supervisor", "dispatch"}
 
+QR_ROOM = 2.00            # room column 1 must keep below its blocks for the QR card
 MTSU_PAD = 0.24            # the template's own panel padding, 0.26, less a hair
 
 
@@ -815,8 +816,22 @@ class Poster(object):
         # different length are honest -- content does not come in equal amounts
         # -- but three panels stopping at three different heights above a
         # full-width strip reads as unfinished rather than as considered.
+        #
+        # Column 1 carries the QR card in the room it leaves under its own
+        # blocks, and that room used to be measured against the LONGEST OTHER
+        # column: shorten any column and the baseline rose, the room under
+        # column 1 shrank, and the code was silently dropped. It happened -- a
+        # caption in column 3 lost a sentence and the QR fell off the sheet with
+        # 1.89 in to spare against 1.95 needed, while the page had 2.91 in
+        # below. The shared baseline now drops as far as the QR needs, within
+        # the page, so every panel still ends on one line and the code is on
+        # the sheet whenever the page can hold it.
         if draw and last_panels:
-            foot = max(ends) - 0.10
+            base = max(ends)
+            if ends:
+                base = min(limit, max(base, ends[0] + QR_ROOM))
+            self._mtsu_base = base
+            foot = base - 0.10
             for sh in last_panels:
                 d.panel_close(sh, foot)
         return (not spilled and max(ends) <= limit + 0.05), ends, fig_no, spilled
@@ -1099,7 +1114,7 @@ class Poster(object):
 
         # The corner the columns leave empty is where the code goes -- it is the
         # one place on the sheet a reader can take the platform away with them.
-        foot = max(ends)
+        foot = getattr(self, "_mtsu_base", max(ends))
         free = foot - ends[0]
         if free >= 1.95:
             self.qr_card(COL[0][0], ends[0] + 0.30, COL[0][1], free)

@@ -188,6 +188,13 @@ def main():
         lost = [s["id"] for s in _lib if s["id"] not in seen]
         check("no section leaves the library without being accounted for",
               not lost, ", ".join(lost[:6]))
+        # The QR card sits in the room column 1 leaves under its blocks. That
+        # room was once measured against the longest OTHER column, so trimming
+        # a caption in column 3 dropped the code from the sheet with nothing
+        # but a manifest line to say so. It is the one thing a visitor can
+        # take away; losing it has to fail the build, not pass it quietly.
+        qr_lost = [x for x in _dropped if str(x).startswith("qr_card")]
+        check("the QR card is on the sheet", not qr_lost, ", ".join(qr_lost))
     except Exception as exc:
         print("  skip  sheet-accounting check (%s)" % exc)
 

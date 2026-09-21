@@ -301,12 +301,13 @@ def supervision():
     ax.annotate("12 deterministic rules, n = %d" % a0p["n"], (a0p["fa"], a0p["r"]),
                 textcoords="offset points", xytext=(13, -6), ha="left",
                 va="top", fontsize=ANNOT, color=MUTE)
+    LO = -0.09      # lower limit of both axes of panel (e); see set_ylim below
     # The watchdog returned no decision on any of 149 cases, so it has no
     # coordinate on either axis. It sits in the margin rather than at an
     # arithmetic (0, 0) that would read as a measurement.
-    ax.plot(-0.045, -0.045, "s", color=GREY, ms=7, clip_on=False, zorder=5)
+    ax.plot(LO / 2, LO / 2, "s", color=GREY, ms=7, clip_on=False, zorder=5)
     ax.annotate("scripted watchdog",
-                (-0.045, -0.045), textcoords="offset points", xytext=(13, 1),
+                (LO / 2, LO / 2), textcoords="offset points", xytext=(13, 0),
                 ha="left", va="center", fontsize=ANNOT, color=MUTE,
                 annotation_clip=False,
                 path_effects=[pe.withStroke(linewidth=2.5, foreground=WHITE)])
@@ -351,7 +352,11 @@ def supervision():
                 linespacing=1.25,
                 path_effects=[pe.withStroke(linewidth=2.2, foreground=WHITE)])
 
-    ax.set_xlim(-0.06, 0.97); ax.set_ylim(-0.06, 0.97)
+    # The margin under y = 0 holds the watchdog's label, and at -0.06 it was
+    # narrower than the label is tall: at any offset the text touched either
+    # the x-axis below it or the zero gridline above it. The margin is widened
+    # on both axes together, so the chance diagonal stays at 45 degrees.
+    ax.set_xlim(LO, 0.97); ax.set_ylim(LO, 0.97)
     ax.set_xticks([0, 0.25, 0.5, 0.75])
     ax.set_yticks([0, 0.25, 0.5, 0.75])
     ax.set_xlabel("false-alarm rate")
@@ -557,11 +562,15 @@ def router():
     x0, xm = 0.30, 6.65          # role column, model column
     y = H - 0.30
 
-    def band(title, note, rows, y, tint):
+    def band(title, rows, y, tint):
+        # The bands used to carry a note at the right -- "the answer is
+        # authoritative", "the answer returns marked a draft". The same fact
+        # was on the sheet three more times: the block's heading, the caption
+        # and the body. Four statements of one rule is not emphasis, and
+        # "authoritative" is the word a reader stumbled on. The band title says
+        # where the job runs; the heading above says what that means.
         ax.text(x0, y, title, fontsize=22.0, fontweight="bold",
                 color=INK, va="top", ha="left")
-        ax.text(W - 0.30, y, note, fontsize=17.5, color=MUTE,
-                va="top", ha="right", style="italic")
         y -= HEAD
         top = y + 0.10
         for name, model, judge in rows:
@@ -579,15 +588,15 @@ def router():
         ax.plot([x0 - 0.16, W - x0 + 0.16], [top, top], color=RULE, lw=1.4)
         return y
 
-    y = band("On the cluster", "the answer is authoritative", CLUSTER, y, PALE)
+    y = band("On the cluster", CLUSTER, y, PALE)
     y -= GAP
-    y = band("On the lab box", "the answer returns marked a draft", LAB, y, "#F3E9E2")
+    y = band("On the lab box", LAB, y, "#F3E9E2")
     ax.text(x0, y - 0.04, "filled square: the role exercises judgement",
             fontsize=16.0, color=MUTE, va="top", ha="left")
     assert y - 0.22 >= 0, ("the router table runs off its canvas by %.2f in -- "
                            "raise H or lower ROW" % (0.22 - y))
     return save(fig, "g_router",
-                "The eight jobs that need a model, and the model each one was given, read from the router's own table. A filled square marks a job that exercises judgement. The six on the cluster come back authoritative; the two in the lab come back marked a draft.")
+                "The eight jobs that need a model, and the model each one was given, read from the router's own table. A filled square marks a job that exercises judgement.")
 
 
 def _glyph(ax, kind, cx, cy, s, color=INK, lw=2.4, accent=None):

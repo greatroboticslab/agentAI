@@ -98,3 +98,6 @@ Newest last. Each folder holds both looks, a PDF, a PNG and a manifest naming ev
 - **v94** (367ae26) — no note — body 25.6 pt, 12 blocks
 - **v95** (7a1deaf) — no note — body 25.6 pt, 12 blocks
 - **v96** (7a1deaf) — no note — body 25.6 pt, 12 blocks
+- **v97** (039bc18) — no note — body 25.6 pt, 12 blocks
+- **v98** (039bc18) — no note — body 25.6 pt, 12 blocks
+- **v99** (039bc18) — no note — body 25.6 pt, 12 blocks

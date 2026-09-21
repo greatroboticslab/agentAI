@@ -21,5 +21,5 @@
  "v_r241": "The Rover, 6 frames from 6 drives. Each is the most vegetated frame in its drive, which is a selection rule and is stated as one: the rover also records paved and indoor runs. 2,238 frames in all, none labelled.",
  "v_cart": "The laser robot, 6 frames from six drives. The rectangle is the laser robot's fixed work-zone overlay: it sits at the same pixels whether the frame is grass or an indoor floor, so it is not a detection. 427 frames in all.",
  "x_algorithm": "The harvest-and-train loop, as it runs unattended. A researcher's goal is planned into keyword queries, what they return is audited, what survives is trained on, and the round is scored. The stopping rule is a plateau test today and a reviewer's judgement by design. Review follows every step.",
- "g_router": "The eight jobs that need a model, and the model each one was given, read from the router's own table. A filled square marks a job that exercises judgement. The six on the cluster come back authoritative; the two in the lab come back marked a draft."
+ "g_router": "The eight jobs that need a model, and the model each one was given, read from the router's own table. A filled square marks a job that exercises judgement."
 }
