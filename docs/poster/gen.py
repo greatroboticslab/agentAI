@@ -181,9 +181,9 @@ MTSU_COLUMNS = [
     # frame, which is the link between the strip's first panel and its robots.
     # analysis_agent stays; its generated code is the code the sandbox fences.
     ("One platform supports any robot or dataset",
-     ["platform_idea", "live_detect", "analysis_agent", "platform_domains"], 2),
+     ["platform_idea", "live_detect", "analysis_agent", "platform_domains"], 4),
     ("Open-weight models review in tiers",
-     ["supervisor", "escalate"], 1),
+     ["supervisor", "escalate"], 2),
     # Twice renamed. "A judgement counts only where it runs" was true of
     # dispatch alone. "What the agents decided on their own" was true of none of
     # the three: dispatch is a rule WE set that stops a lab answer from counting
@@ -194,8 +194,13 @@ MTSU_COLUMNS = [
     # What the three share is the condition under which a model's judgement is
     # allowed to count: where it ran, whether it passed a test it set itself,
     # and whether anything checked what it reported.
+    # loop is off the sheet. It was the third place saying two programs
+    # collect and train (after double_agent and column 2's escalate block) and
+    # the second saying the checks catch it, and it carried its column onto a
+    # "(cont.)" heading of its own. diagnosis goes too: its claim about a
+    # staging directory could not be traced to anything in the repository.
     ("When a model's judgement counts",
-     ["dispatch", "label_agent", "loop", "diagnosis"], 3),
+     ["dispatch", "label_agent"], 2),
     # The double-agent system -- a collector and a trainer running concurrently
     # on one locked registry, new data hot-loaded between the trainer's
     # mini-rounds (docs/DOUBLE_AGENT_SYSTEM.md §1) -- is the project's longest
@@ -209,7 +214,11 @@ MTSU_COLUMNS = [
     # weed images", not "a trained DINOv2": the backbone is frozen and scores a
     # dataset by cosine similarity to a reference pool of trusted weed sets.
     ("What the collection produced",
-     ["double_agent", "funnel", "label_curator", "label_unit", "label_ceiling", "sources"], 3),
+     # funnel and label_ceiling are off the column: double_agent now carries the
+     # funnel's scale figures, and label_curator carries "more data stopped
+     # helping". Left in as slack, the packer filled the room the merge freed
+     # with exactly the repetition the merge was made to remove.
+     ["double_agent", "label_curator", "label_unit"], 2),
 ]
 
 # The two plates that ARE the evidence for the two headline claims: what more
@@ -775,7 +784,20 @@ class Poster(object):
                     y = y0
                     hh = (self.mtsu_block_h(w, sid) + self._head_h(d, w, head)
                           + 2 * MTSU_PAD + 0.24)
-            if cols[ci] and ci < n - 1 and (y - y0 + hh > target or y + hh > limit):
+            # The soft target balances column heights, and it used to apply to
+            # every block. When there are no more columns left than themes left,
+            # this column belongs to the current theme and the rest belong to
+            # the themes still to come -- so pushing one of this theme's own
+            # blocks onward on the target alone steals a later theme's column,
+            # and the overflow cascades to the last column and drops something.
+            # It dropped escalate: column 2's plate plus escalate exceeded the
+            # 82 % target while fitting the page with room to spare, and the
+            # sheet fell from 25.6 to 22.1 pt to get it back. A continuation
+            # block in an owned column now moves only when the PAGE runs out.
+            _th = self._theme_of(sid)
+            _owns = (len(theme_seq) - theme_seq.index(_th)) >= n - ci
+            _soft = (y - y0 + hh > target) and not (_owns and not head)
+            if cols[ci] and ci < n - 1 and (_soft or y + hh > limit):
                 ci += 1
                 x, w = COL[ci]
                 y = y0

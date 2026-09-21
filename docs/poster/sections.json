@@ -531,8 +531,8 @@
   {
    "id": "label_curator",
    "theme": "label-quality",
-   "heading": "Gemma 4 said yes to every box",
-   "body": "We cropped each box out and asked Gemma 4, a vision model, whether it held a weed. It said yes every time, wrong ones included, so it cannot serve as a check. Distance from trusted examples, on DINOv2 features, does the work. Fifty-one datasets were cut.",
+   "heading": "A quality gate decides what the trainer sees",
+   "body": "Past a certain scale more data stopped helping, and the cause was the data. So a dataset is kept only if it resembles trusted weed images in DINOv2 features; a vision model asked the same question said yes to every box. Fifty-one datasets were cut.",
    "figure": "none",
    "status": "built_and_running",
    "numbers": "CHANGELOG v3.0.35-37"
@@ -568,7 +568,7 @@
    "id": "double_agent",
    "theme": "collection",
    "heading": "Two agents collect and train side by side",
-   "body": "A collector finds, labels and registers new datasets while a trainer beside it takes each one in between rounds. Past a certain scale more data stopped helping, and the cause was the data: now a dataset is kept only if it resembles trusted weed images.",
+   "body": "A collector searches public sources, labels what it finds by machine and registers it; a trainer beside it takes each new dataset in between rounds. The collector has labelled 156,521 images this way, 59,134 of them distinct.",
    "figure": "none"
   },
   {
