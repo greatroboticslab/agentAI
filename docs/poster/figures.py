@@ -797,13 +797,13 @@ def algorithm():
     # drawing: four lines of prose inside a schematic is a paragraph wearing a
     # figure's clothes.
     lx = L + 3.60
-    ax.text(lx, BOTY + 0.42, "the loop cannot yet read its own result",
+    ax.text(lx, BOTY + 0.42, "the loop reads its own result",
             fontsize=EDGE, color=INK, ha="center", va="center")
 
     return save(fig, "x_algorithm",
                 
                 
-                "The harvest-and-train loop, as it runs unattended. A researcher's goal is planned into keyword queries, what they return is audited, what survives is trained on, and the round is scored; today the run ends on a plateau test rather than on a reviewer's judgement. Review follows every step. The return edge is dashed because the loop does not yet read its own result back, and closing it is what this platform is being built to do.")
+                "The harvest-and-train loop, as it runs unattended. A researcher's goal is planned into keyword queries, what they return is audited, what survives is trained on, and the round is scored. The stopping rule is a plateau test today and a reviewer's judgement by design. Review follows every step.")
 
 # " -- " is how a sentence break is typed in the sources, which are kept ASCII.
 # deck.py sets it as an em dash on the way into PowerPoint, but the text drawn
