@@ -520,7 +520,7 @@ def router():
     to desync the figure is to delete the assertion.
     """
     from matplotlib.patches import Rectangle
-    W, H = 11.6, 5.72
+    W, H = 11.6, 6.36
     fig = plt.figure(figsize=(W, H)); fig.set_layout_engine("none")
     ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, W); ax.set_ylim(0, H); ax.axis("off")
 
@@ -558,11 +558,11 @@ def router():
     CLUSTER, LAB = rows["cluster"], rows["lab"]
     assert len(CLUSTER) + len(LAB) == len(ROLES)
 
-    ROW, GAP, HEAD = 0.445, 0.30, 0.60
+    ROW, GAP, HEAD = 0.35, 0.20, 0.50
     x0, xm = 0.30, 6.65          # role column, model column
     y = H - 0.30
 
-    def band(title, rows, y, tint):
+    def band(title, rows, y, tint, planned=False):
         # The bands used to carry a note at the right -- "the answer is
         # authoritative", "the answer returns marked a draft". The same fact
         # was on the sheet three more times: the block's heading, the caption
@@ -573,30 +573,65 @@ def router():
                 color=INK, va="top", ha="left")
         y -= HEAD
         top = y + 0.10
+        first = y
         for name, model, judge in rows:
-            ax.add_patch(Rectangle((x0 - 0.16, y - ROW + 0.10), W - 2 * x0 + 0.32,
-                                   ROW - 0.08, facecolor=tint, edgecolor="none",
-                                   zorder=1))
+            ry0, rh = y - ROW + 0.10, ROW - 0.08
+            cy = ry0 + rh / 2            # text and marker sit on the row's centre
+            if not planned:
+                ax.add_patch(Rectangle((x0 - 0.16, ry0), W - 2 * x0 + 0.32, rh,
+                                       facecolor=tint, edgecolor="none", zorder=1))
             if judge:
-                ax.add_patch(Rectangle((x0 - 0.02, y - 0.265), 0.135, 0.135,
+                ax.add_patch(Rectangle((x0 - 0.02, cy - 0.0675), 0.135, 0.135,
                                        facecolor=BLUE, edgecolor="none", zorder=3))
-            ax.text(x0 + 0.26, y - 0.20, name, fontsize=19.5, color=INK,
+            ax.text(x0 + 0.26, cy, name, fontsize=19.5, color=INK,
                     va="center", ha="left", zorder=3)
-            ax.text(xm, y - 0.20, model, fontsize=18.0, color=MUTE,
+            ax.text(xm, cy, model, fontsize=18.0, color=MUTE,
                     va="center", ha="left", zorder=3)
             y -= ROW
+        if planned:
+            # One dashed frame round the group, not one per row. A per-row dashed
+            # edge at this row height ran along the type's own baseline and read
+            # as the words being struck through.
+            fy0 = y + 0.10 - 0.04
+            ax.add_patch(Rectangle((x0 - 0.16, fy0), W - 2 * x0 + 0.32,
+                                   first + 0.06 - fy0, facecolor="none",
+                                   edgecolor=MUTE, lw=1.3, linestyle=(0, (5, 3)),
+                                   zorder=2))
         ax.plot([x0 - 0.16, W - x0 + 0.16], [top, top], color=RULE, lw=1.4)
         return y
 
     y = band("On the cluster", CLUSTER, y, PALE)
     y -= GAP
     y = band("On the lab box", LAB, y, "#F3E9E2")
-    ax.text(x0, y - 0.04, "filled square: the role exercises judgement",
-            fontsize=16.0, color=MUTE, va="top", ha="left")
+    y -= GAP
+    # The tiers the design puts above the eight, drawn dashed -- the same
+    # convention as the return edge on Figure 1 -- because they are designed
+    # and not yet routed: TIERED_SUPERVISION_PLAN.md §5 schedules Kimi K2.6 for
+    # multi-node serving after the milestone (K3 does not fit one node), and §3
+    # gives the tier-2 planner a `byok` backend, the researcher's own
+    # commercial key. llm_providers already speaks anthropic:claude-*;
+    # planner.py's BACKENDS does not yet include byok. These rows are NOT read
+    # from model_router.ROLES, which is why the caption separates them.
+    # The frontier model sits at the PLANNING tier, not the review tier: every
+    # reviewer stays open-weight, which is what column 2's heading says.
+    # Ordered by escalation. Opus 5 is not hypothetical: it has already acted
+    # as a tier in this project, through Claude Code sessions rather than
+    # through the router -- CHANGELOG.md:9173 records the first decision to go
+    # through the full approval chain as proposed by brain:opus-5-acting-as-tier.
+    # Kimi K3 is the target, not K2.6. TIERED_SUPERVISION_PLAN.md §5 took K2.6
+    # as the benchmark arm because K3 (2.8T, 1,561 GB) does not fit one node,
+    # and schedules multi-node serving after the milestone. This band shows
+    # where the design is going, so it names the model it is going to.
+    PLANNED = [("the hardest open problems", "Kimi K3, largest open", True),
+               ("check and correct a campaign", "Claude Opus 5, via Claude Code", True),
+               ("plan the next experiments", "Claude Fable 5.1, own key", True)]
+    y = band("The tiers above them", PLANNED, y, WHITE, planned=True)
+    # The legend line that used to sit here ("filled square: the role
+    # exercises judgement") said what the caption says, one line apart.
     assert y - 0.22 >= 0, ("the router table runs off its canvas by %.2f in -- "
                            "raise H or lower ROW" % (0.22 - y))
     return save(fig, "g_router",
-                "The eight jobs that need a model, and the model each one was given, read from the router's own table. A filled square marks a job that exercises judgement.")
+                "The eight jobs that need a model and the model each was given, read from the router's own table; a filled square marks a job that exercises judgement. The dashed band is the escalation above them.")
 
 
 def _glyph(ax, kind, cx, cy, s, color=INK, lw=2.4, accent=None):

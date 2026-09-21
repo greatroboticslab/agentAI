@@ -16,8 +16,12 @@ sys.path.insert(0, HERE)
 
 
 def next_n():
-    ns = [int(d[1:3]) for d in os.listdir(VER)
-          if d.startswith("v") and d[1:3].isdigit()]
+    # All the digits after the "v", not the first two. Reading d[1:3] parsed
+    # "v100" as 10, so past v99 the maximum stayed 99, the next number stayed
+    # 100, and every build overwrote the same directory -- the version history
+    # this module exists to keep was silently being written over.
+    ns = [int(d[1:]) for d in os.listdir(VER)
+          if d.startswith("v") and d[1:].isdigit()]
     return max(ns) + 1 if ns else 1
 
 
