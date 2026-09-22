@@ -45,6 +45,18 @@ def _registry():
     return json.load(open(REG))
 
 
+def _prompt_class_names(slug, info):
+    """Class names to prompt OWLv2 with. v3.60.0: cwd12 copies are prompted
+    with the species of each label-file id (their stored class_names are the
+    legacy labels, e.g. "Crabgrass" for morning glory). Any other slug's
+    names are real names and are used as stored."""
+    from .cwd12_species import CWD12_COMMON, CWD12_ID_SPACE
+    space = CWD12_ID_SPACE.get(slug)
+    if space is not None:
+        return [CWD12_COMMON[sp] for sp in space]
+    return list(info.get("class_names") or [])
+
+
 def _label_pairs(root, cap=4000):
     """(image, label) pairs under a dataset root, bounded, images-dir-safe."""
     labels = {}
@@ -142,7 +154,7 @@ def audit(slug, n=25, montage=True):
         core = nm.split()[-1] if nm.split() else nm
         return len(core) >= 3 and any(ch.isalpha() for ch in core) and not core.isdigit()
 
-    names = [str(c).strip() for c in (info.get("class_names") or []) if _usable(c)]
+    names = [str(c).strip() for c in _prompt_class_names(slug, info) if _usable(c)]
     generic = ["a photo of a weed", "a photo of a weed plant",
                "a photo of a crop plant", "a photo of a plant leaf"]
     prompt = [(["a photo of a " + nm for nm in names[:10]] + generic[:2])

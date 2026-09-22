@@ -9,6 +9,15 @@ seven-dimension audit), `RESEARCH_LOG.md`, on-disk artifacts.*
 
 ## 1. Claim-by-claim verdicts
 
+> **Correction 2026-09-21 (v3.60.0).** Rows 3 and 4b: the 0.5601 zero-harvest control and
+> the retraction stand. The stated mechanism, dedup and holdout-stem filters starving the
+> rare classes ("Goosegrass 44"), is unconfirmed. The same merge read `cottonweed_holdout`
+> through a four-name list that its twelve-id labels do not follow, and "Goosegrass" there
+> is a slot label, meaning Spotted spurge. Row 5: the leave-4-out "new species" are cwd12
+> ids 2-5, meaning **Purslane, Spotted spurge, Carpetweed and Ragweed**, not the Eclipta,
+> Goosegrass, Morningglory and Nutsedge of the old labels. The split was by id, so the
+> numbers stand. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 rows 9-10.
+
 | # | Claim | Evidence | Verdict | Required action |
 |---|---|---|---|---|
 | 1 | VLM benchmark: 15 models on CottonWeedDet12; best VLM (Florence-2) 0.434 mAP@0.5 vs fine-tuned YOLO11n 0.929 | verified runs, per-model table, fixed eval protocol (2026-03) | **DEFENSIBLE** | none — strongest standalone result |
@@ -46,6 +55,11 @@ rule (raw at epochs 29/32/37, curated at 37/44/46) rather than reaching the 60-e
 cap; the rule was identical across tiers, so the comparison stands.
 
 ## 3. Threats to validity a strong reviewer will raise (and our answers)
+
+> **Correction 2026-09-21 (v3.60.0).** Item 7: the leave-4-out transfer held out cwd12 ids
+> 2-5, meaning Purslane, Spotted spurge, Carpetweed and Ragweed (see [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 row 10). The
+> one cross-dataset species measurement, ImageWeeds "ragweed" at 0.0006, is an artifact of
+> the class-name bug (row 3 there).
 
 1. **Holdout integrity** — raised and fixed (content-level dHash guard, v3.1.0);
    the re-measurement in §2 is the outstanding proof. Until then: leakage risk applies

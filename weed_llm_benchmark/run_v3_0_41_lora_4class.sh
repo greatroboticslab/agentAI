@@ -24,7 +24,10 @@ cd "$REPO"
 export PYTHONPATH=.:$PYTHONPATH
 export REPO_ROOT="$REPO"
 
-CLASSES=(Carpetweeds Crabgrass PalmerAmaranth PricklySida)
+# v3.60.0: species, not legacy labels. The four bank folders first chosen
+# (Carpetweeds Crabgrass PalmerAmaranth PricklySida) held these plants;
+# flux_lora_train refuses a legacy-only label.
+CLASSES=(Waterhemp MorningGlory Eclipta PricklySida)
 IDX=$((${SLURM_ARRAY_TASK_ID:-1} - 1))
 CLS=${CLASSES[$IDX]}
 SEED=$((300 + IDX))
@@ -42,4 +45,4 @@ python -m weed_optimizer_framework.tools.flux_lora_train \
 
 EXIT=$?
 echo "=== $CLS exit=$EXIT $(date) ==="
-ls -la $REPO/results/framework/flux_lora/$CLS/ 2>/dev/null
+ls -la $REPO/results/framework/flux_lora_species/$CLS/ 2>/dev/null

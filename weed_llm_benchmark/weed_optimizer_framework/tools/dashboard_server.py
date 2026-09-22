@@ -57,9 +57,18 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 FLAGS_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 NEVER_TRAIN = {"cottonweeddet12", "weedsense", "francesco__weed_crop_aerial"}
-CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-                "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-                "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
+
+# v3.60.0: the cwd12 class ids are named by species (cwd12_species). The
+# legacy labels are read only where the source is known to be legacy: cwd12
+# copies by id, whole legacy lists, and our uploads into the legacy Roboflow
+# projects. The unused legacy CANONICAL_12 slot list is gone.
+from weed_optimizer_framework.tools.cwd12_species import (  # noqa: E402
+    CWD12_SPECIES, CWD12_LEGACY_LABELS, CWD12_COMMON, CWD12_BINOMIAL,
+    CWD12_ID_SPACE, LEGACY_ROBOFLOW_PROJECTS,
+    class_species, is_legacy_label_list, legacy_to_species, species_names_for,
+    species_of, species_to_legacy, uploaded_label_species,
+    bank_in_use, bank_folder_for, bank_vocabulary,
+)
 
 # Reuse the static HTML generator's slug helpers
 from weed_optimizer_framework.tools.dashboard_generator import (  # noqa: E402
@@ -5767,12 +5776,35 @@ def _dhash64(pil_img) -> int:
 from .dataset_eda import analyze_nonimage as _analyze_nonimage  # noqa: E402
 
 
+def _species_analysis(slug: str, res: dict) -> dict:
+    """v3.60.0: name a cwd12 copy's cached YOLO class counts by species. An
+    analysis cached before v3.60.0 keyed them by its data.yaml names (the
+    legacy labels) or by "class N" where it had none; the cache file is left
+    as it is and translated on read."""
+    ann = (res or {}).get("annotations") or {}
+    space = CWD12_ID_SPACE.get(slug)
+    if space is None or ann.get("type") != "yolo" or ann.get("names_vocab") == "species":
+        return res
+
+    def tr(k):
+        m = re.match(r"^class (\d+)$", str(k))
+        if m:
+            i = int(m.group(1))
+            return space[i] if i < len(space) else k
+        return legacy_to_species(k) if k in CWD12_LEGACY_LABELS else k
+
+    ann = dict(ann, names_vocab="species",
+               classes=[tr(k) for k in ann.get("classes") or []],
+               per_class={tr(k): v for k, v in (ann.get("per_class") or {}).items()})
+    return dict(res, annotations=ann)
+
+
 def _analyze_dataset(slug: str, refresh: bool = False) -> dict:
     from collections import Counter
     cache = _DATASET_ANALYSIS_DIR / f"{slug}.json"
     if not refresh and cache.is_file():
         try:
-            return json.load(open(cache))
+            return _species_analysis(slug, json.load(open(cache)))
         except Exception:
             pass
     root = _resolve_slug_dir(slug)
@@ -5851,15 +5883,26 @@ def _analyze_dataset(slug: str, refresh: bool = False) -> dict:
                 pass
             if got:
                 labeled += 1
+        # v3.60.0: an old data.yaml carries the legacy labels; a cwd12 copy is
+        # named by the species of each id in its label files.
+        if names:
+            names = species_names_for(names)
+
         def cname(cid):
             try:
-                return names[int(cid)] if names and int(cid) < len(names) else f"class {cid}"
+                i = int(cid)
             except Exception:
                 return f"class {cid}"
+            if slug in CWD12_ID_SPACE:
+                sp = class_species(slug, i)
+                if sp:
+                    return sp
+            return names[i] if names and 0 <= i < len(names) else f"class {cid}"
         ann = {"type": "yolo",
                "classes": [cname(k) for k, _ in inst.most_common()],
                "per_class": {cname(k): v for k, v in inst.most_common()},
-               "labeled_images": labeled, "count_kind": "boxes"}
+               "labeled_images": labeled, "count_kind": "boxes",
+               "names_vocab": "species"}
     else:
         # classification by folder: images under <split>/<class>/ or <class>/
         cls = Counter()
@@ -6289,8 +6332,10 @@ async def api_dataset_analyze_goal(request: Request):
                 out["_plot_id"] = _mont_pid
             if _r.get("kind") == "suspicious" and _r.get("worst"):
                 _st = _label_verdict_state(slug)   # show prior human verdicts in chat
+                _cm = _label_class_map(slug)       # v3.60.0: class id -> name, by id
                 for _w in _r["worst"]:
                     _w["verdict"] = _st.get(_w.get("file"))
+                    _w["class_name"] = _cm.get(str(_w.get("class")), "")
     except Exception:
         pass
     out["model"] = model
@@ -6617,12 +6662,37 @@ def _label_verdict_state(slug: str) -> dict:
     return st
 
 
+def _label_class_map(slug: str) -> dict:
+    """v3.60.0: {class id (str): class name} for one dataset's label files, the
+    name being the one /classes uses (_slug_class_entries: a cwd12 copy by its
+    id space, a legacy list by species, any other slug by its real names).
+    Unnamed ids ("class N" placeholders) are left out."""
+    try:
+        info = (_get_cached_registry().get("datasets") or {}).get(slug) or {}
+    except Exception:
+        info = {}
+    names = info.get("class_names") or []
+    if not names and slug not in CWD12_ID_SPACE:
+        try:
+            root = _resolve_slug_dir(slug)
+            names = _current_class_names(Path(root)) if root else []
+        except Exception:
+            names = []
+    out = {}
+    for canon, cid, raw in _slug_class_entries(slug, names):
+        if canon and not re.match(r"^class \d+$", str(raw)):
+            out[str(cid)] = canon
+    return out
+
+
 @app.post("/api/dataset/label_verdict")
 async def api_dataset_label_verdict(request: Request):
     """v3.8.2 — one-click human verdict on a flagged label, straight from the chat
-    montage. POST {slug, file, verdict: keep|bad|clear, cls?}. 'bad' is ALSO
+    montage. POST {slug, file, verdict: keep|bad|clear, cid?}. 'bad' is ALSO
     forwarded into the existing per-class exemplar store (verdict 'bad') so the
-    established curation loop (/classes, round filter) sees it."""
+    established curation loop (/classes, round filter) sees it.
+    v3.60.0: the class is resolved here from the box's class id (cid); a class
+    name sent by the client is not trusted."""
     actor = _actor_from_request(request)
     try:
         body = await request.json()
@@ -6639,16 +6709,14 @@ async def api_dataset_label_verdict(request: Request):
         f.write(json.dumps({"file": fstem, "verdict": verdict, "by": actor,
                             "ts": time.strftime("%Y-%m-%d %H:%M:%S")}) + "\n")
     forwarded = False
-    cls = str(body.get("cls") or "").strip()
+    cid = body.get("cid")
+    cls = _label_class_map(slug).get(str(cid), "") if verdict == "bad" and cid is not None else ""
     if verdict == "bad" and cls and _cls_ok(cls):
         try:  # feed the established curation store (latest-wins jsonl)
-            fp = _exemplar_file(cls)
-            fp.parent.mkdir(parents=True, exist_ok=True)
-            with open(fp, "a") as f:
-                f.write(_json.dumps({"img": f"{slug}/{fstem}", "verdict": "bad",
-                                     "ts": _time_cls.time(),
-                                     "ts_h": _time_cls.strftime(
-                                         "%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())}) + "\n")
+            _exemplar_append(cls, [{"img": f"{slug}/{fstem}", "verdict": "bad",
+                                    "ts": _time_cls.time(),
+                                    "ts_h": _time_cls.strftime(
+                                        "%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())}])
             forwarded = True
         except Exception as e:
             log.warning(f"[label_verdict] exemplar forward failed: {e}")
@@ -6776,7 +6844,13 @@ def _ai_review_prepare(slug: str, refresh: bool = False) -> dict:
     cache = _DATASET_ANALYSIS_DIR / f"{slug}.ai.json"
     if not refresh and cache.is_file():
         try:
-            return {"cached": json.load(open(cache))}
+            cached = json.load(open(cache))
+            # v3.60.0: a cwd12 copy's review written before v3.60.0 names the
+            # legacy labels as species ("Carpetweeds are 16x ..."), beside the
+            # species-named counts of _species_analysis; regenerate it.
+            if (slug not in CWD12_ID_SPACE
+                    or (isinstance(cached, dict) and cached.get("names_vocab") == "species")):
+                return {"cached": cached}
         except Exception:
             pass
     a = _analyze_dataset(slug)
@@ -6983,6 +7057,7 @@ def _ai_review_merge(prep: dict, model_text: str, model: str = None,
                              f"{ann.get('type')} labels, {len(issues)} issue(s) flagged.")
         result.setdefault("recommendations",
                           [i["detail"] for i in issues] or ["Dataset looks basically fine — try a training run."])
+    result.setdefault("names_vocab", "species")   # v3.60.0: see _ai_review_prepare
     try:
         _DATASET_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
         json.dump(result, open(_DATASET_ANALYSIS_DIR / f"{prep['base']['slug']}.ai.json", "w"), indent=2)
@@ -9340,14 +9415,19 @@ async function loadRoboflow(){
       + `</div>`;
     // CWD12 per-class breakdown
     if(master && master.boxes_per_class){
-      const cwd12 = ["Carpetweeds","Crabgrass","Eclipta","Goosegrass","Morningglory","Nutsedge",
-        "PalmerAmaranth","PricklySida","Purslane","Ragweed","Sicklepod","SpottedSpurge"];
-      const cls = master.boxes_per_class || {};
-      const max = Math.max(...Object.values(cls).concat([1]));
-      const cwd12html = cwd12.map(sp => {
-        const n = cls[sp]||0; const pct = (100*n/max).toFixed(0);
+      // v3.60.0: tiles are the cwd12 species; the gold project still names
+      // them with the legacy labels, shown second.
+      const cwd12 = d.cwd12_species || [];
+      const perSp = {};
+      for(const c of (master.class_labels||[])){
+        if(c.species) perSp[c.species] = (perSp[c.species]||0) + (c.count||0);
+      }
+      const max = Math.max(...Object.values(perSp).concat([1]));
+      const cwd12html = cwd12.map(row => {
+        const n = perSp[row.key]||0; const pct = (100*n/max).toFixed(0);
         return `<div style="background:#fff;border:1px solid #eee;border-radius:6px;padding:6px 10px;font-size:11px">
-                  <div style="font-weight:600">${sp}</div>
+                  <div style="font-weight:600">${row.common}</div>
+                  <div style="color:#999">Roboflow label: ${row.legacy}</div>
                   <div style="color:#666">${n} boxes</div>
                   <div style="background:#e0e0e6;height:4px;border-radius:2px;margin-top:4px">
                     <div style="background:#38a169;width:${pct}%;height:100%;border-radius:2px"></div>
@@ -9390,8 +9470,10 @@ async function loadPerSpecies(){
     const d = await r.json();
     const per = d.per_species || {};
     const totals = d.totals || {};
-    const cwd12 = ["Carpetweeds","Crabgrass","Eclipta","Goosegrass","Morningglory","Nutsedge",
-                   "PalmerAmaranth","PricklySida","Purslane","Ragweed","Sicklepod","SpottedSpurge"];
+    // v3.60.0: rows are the cwd12 species, in cwd12 id order, from the API
+    const cwd12 = (d.species || []).map(r => r.key);
+    const common = {};
+    for(const r of (d.species || [])) common[r.key] = r.common;
     // Find max for bar scaling
     const allVals = [];
     for(const sp of cwd12){
@@ -9419,7 +9501,7 @@ async function loadPerSpecies(){
     for(const sp of cwd12){
       const r = per[sp] || {gold:0,auto:0,unlabeled:0,owl:0,exemplars:0};
       html += `<tr style="border-top:1px solid #eee">
-        <td style="padding:5px 10px;font-weight:600;color:#333">${sp}</td>
+        <td style="padding:5px 10px;font-weight:600;color:#333">${common[sp]||sp}</td>
         <td style="padding:5px 10px">${bar(r.gold||0,'#38a169')}</td>
         <td style="padding:5px 10px">${bar(r.auto||0,'#3b82f6')}</td>
         <td style="padding:5px 10px">${bar(r.unlabeled||0,'#9ca3af')}</td>
@@ -9564,8 +9646,11 @@ def api_sample(slug: str, filename: str):
     if not re.match(r"^[A-Za-z0-9_. -]+\.(jpg|jpeg|png|JPG|JPEG|PNG)$", filename):
         raise HTTPException(400, "bad filename")
 
-    # Cache key includes slug + filename so updates don't collide
-    key = hashlib.sha1(f"{slug}/{filename}".encode()).hexdigest()
+    # Cache key includes slug + filename so updates don't collide.
+    # v3.60.0: a cwd12 copy's key also names its species labelling, so thumbs
+    # drawn with the legacy names are not served again.
+    key_src = f"{slug}/{filename}" + ("#species" if slug in CWD12_ID_SPACE else "")
+    key = hashlib.sha1(key_src.encode()).hexdigest()
     cache_p = CACHE_DIR / f"{key}.jpg"
     if cache_p.is_file():
         # Serve from cache; cluster-side TTL via mtime check could be added later
@@ -9585,13 +9670,13 @@ def api_sample(slug: str, filename: str):
         info = reg["datasets"].get(slug, {})
     except Exception:
         info = {}
-    if slug in ("cottonweed_sp8", "cottonweed_holdout", "cottonweeddet12"):
-        class_names = ["Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass",
-                       "Morningglory", "Nutsedge", "PalmerAmaranth",
-                       "PricklySida", "Purslane", "Ragweed", "Sicklepod",
-                       "SpottedSpurge"]
+    # v3.60.0: a cwd12 copy is labelled by the species of each id in ITS label
+    # files (cottonweed_sp8 uses local ids 0-7); a whole legacy list becomes
+    # species; any other slug keeps its own real names.
+    if slug in CWD12_ID_SPACE:
+        class_names = [CWD12_COMMON.get(sp, sp) for sp in CWD12_ID_SPACE[slug]]
     else:
-        class_names = info.get("class_names") or ["target"]
+        class_names = species_names_for(info.get("class_names") or ["target"])
 
     ok = render_with_bbox(img_path, label_path, cache_p, slug,
                           max_width=600, class_names=class_names)
@@ -10102,8 +10187,8 @@ function runUserCode(eid){
      log.scrollTop=log.scrollHeight; })
    .catch(function(e){ wait.remove(); log.insertAdjacentHTML("beforeend",'<div style="color:#dc2626">error: '+esc(String(e))+'</div>'); });
 }
-function labelVerdict(file,verdict,cls){
-  fetch("/api/dataset/label_verdict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,file:file,verdict:verdict,cls:cls||""})})
+function labelVerdict(file,verdict,cid){
+  fetch("/api/dataset/label_verdict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({slug:SLUG,file:file,verdict:verdict,cid:(cid==null||cid==="")?null:String(cid)})})
    .then(function(r){return r.json();}).then(function(d){
      var td=document.getElementById("lv_"+file);
      if(td&&d&&d.ok){ td.innerHTML=(verdict==="keep")?'<span style="color:#059669;font-weight:700">kept</span>':'<span style="color:#dc2626;font-weight:700">marked bad'+(d.forwarded?' &rarr; curation':'')+'</span>'; }
@@ -10320,14 +10405,14 @@ function renderAgentResult(r){
   if(k==="coverage")return '<div class="muted" style="margin-top:4px">labeled: '+esc(r.labeled_images)+'/'+esc(r.n_images)+' ('+esc(r.pct_labeled)+'%), type '+esc(r.annotation_type)+', near-duplicates '+esc(r.near_duplicates)+'</div>';
   if(k==="box_stats"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var bpi=r.boxes_per_image||{}; return '<div class="muted" style="margin-top:4px">'+esc(r.label_files)+' label files, '+esc(r.total_boxes)+' boxes &middot; per image '+esc(bpi.min)+'/'+esc(bpi.mean)+'/'+esc(bpi.max)+' (min/mean/max)<br>empty label files: '+esc(r.empty_label_files)+', tiny boxes (&lt;1% area): '+esc(r.tiny_boxes)+'</div>'; }
   if(k==="suspicious"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>';
-    var clsNames=((EDAD&&EDAD.annotations&&EDAD.annotations.classes)||[]);
     var rows=(r.worst||[]).map(function(w){
-      var cn=(w.class!=null&&clsNames[parseInt(w.class)]!=null)?clsNames[parseInt(w.class)]:(w.class==null?"":String(w.class));
+      var cid=(w.class==null)?"":String(w.class);
+      var cn=w.class_name||(cid?("class "+cid):"");
       var vid="lv_"+esc(w.file);
       var badge=w.verdict==="keep"?'<span style="color:#059669;font-weight:700">kept</span>':(w.verdict==="bad"?'<span style="color:#dc2626;font-weight:700">marked bad</span>':"");
       return '<tr><td>'+esc(w.file)+'</td><td>'+esc(cn||'—')+'</td><td>'+esc(w.why)+'</td>'
-        +'<td id="'+vid+'" style="white-space:nowrap">'+(badge||('<button onclick="labelVerdict(&quot;'+esc(w.file)+'&quot;,&quot;keep&quot;,&quot;'+esc(cn)+'&quot;)" title="Label is fine" style="border:1px solid #86efac;background:#f0fdf4;border-radius:6px;padding:2px 8px;cursor:pointer">&#10003;</button> '
-        +'<button onclick="labelVerdict(&quot;'+esc(w.file)+'&quot;,&quot;bad&quot;,&quot;'+esc(cn)+'&quot;)" title="Bad label - exclude/fix" style="border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;padding:2px 8px;cursor:pointer">&#10007;</button>'))+'</td></tr>';}).join("");
+        +'<td id="'+vid+'" style="white-space:nowrap">'+(badge||('<button onclick="labelVerdict(&quot;'+esc(w.file)+'&quot;,&quot;keep&quot;,&quot;'+esc(cid)+'&quot;)" title="Label is fine" style="border:1px solid #86efac;background:#f0fdf4;border-radius:6px;padding:2px 8px;cursor:pointer">&#10003;</button> '
+        +'<button onclick="labelVerdict(&quot;'+esc(w.file)+'&quot;,&quot;bad&quot;,&quot;'+esc(cid)+'&quot;)" title="Bad label - exclude/fix" style="border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;padding:2px 8px;cursor:pointer">&#10007;</button>'))+'</td></tr>';}).join("");
     return '<div class="muted" style="margin-top:4px"><b>'+esc(r.n_flagged)+'</b> flagged of '+esc(r.n_boxes_scanned)+' scanned (montage above, red box = the label) &middot; your &#10003;/&#10007; verdicts feed the curation loop</div>'+(rows?('<table class="mini" style="margin-top:4px"><tr><td><b>image</b></td><td><b>class</b></td><td><b>why suspicious</b></td><td><b>verdict</b></td></tr>'+rows+'</table>'):""); }
   if(k==="duplicates"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var gs=(r.groups||[]).map(function(g){return "["+g.map(esc).join(", ")+"]";}).join("<br>"); return '<div class="muted" style="margin-top:4px">scanned '+esc(r.scanned)+' images &middot; '+esc(r.n_groups)+' duplicate group(s), '+esc(r.n_duplicate_images)+' redundant'+(gs?'<br>'+gs:"")+'</div>'; }
   if(k==="img_quality"){ if(r.note)return '<div class="muted" style="margin-top:4px">'+esc(r.note)+'</div>'; var ls=(r.least_sharp||[]).map(function(x){return esc(x.file)+" ("+esc(x.sharpness)+(x.flagged?", soft":"")+")";}).join(", "); return '<div class="muted" style="margin-top:4px">sampled '+esc(r.sampled)+' images &middot; median sharpness '+esc(r.median_sharpness)+' (lower = softer, relative to content), median brightness '+esc(r.median_brightness)+'/255<br><b>'+esc(r.n_soft)+'</b> notably softer than the median (candidates for blur), '+esc(r.n_dark)+' dark, '+esc(r.n_overexposed)+' overexposed'+(ls?'<br>least sharp: '+ls:"")+(r.soft_caveat?'<br><span style="font-size:11px">'+esc(r.soft_caveat)+'</span>':"")+'</div>'; }
@@ -10736,6 +10821,10 @@ _imgs.forEach(function(im){{
 _SYNTH_KINDS = {
     "flux":      REPO / "results" / "framework" / "synth_diffusion" / "images",
     "cutpaste":  REPO / "results" / "framework" / "synth_cutpaste"  / "images",
+    # v3.60.0: species-era output (label ids are cwd12 ids named by species);
+    # the two dirs above hold legacy-vocabulary output.
+    "flux_species":     REPO / "results" / "framework" / "synth_diffusion_species" / "images",
+    "cutpaste_species": REPO / "results" / "framework" / "synth_cutpaste" / "composed_species" / "images",
 }
 
 
@@ -10915,49 +11004,53 @@ def _cls_ok(cls: str) -> bool:
     """Validate a class-name path param (allows spaces; bars separators/HTML)."""
     return bool(cls) and _RE_CLS_OK.match(cls) is not None
 
-_CWD12 = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-]
-# The botanical binomial for each cwd12 class. It replaces the Chinese common
-# names this map used to hold: the pages are shipped product and must be in
-# English, and a Latin name is what a weed-science reader expects beside the
-# dataset's own label anyway. Genus-only where cwd12 pools several species under
-# one label.
-_CWD12_ZH = {
-    "Carpetweeds": "Mollugo verticillata",
-    "Crabgrass": "Digitaria sanguinalis",
-    "Eclipta": "Eclipta prostrata",
-    "Goosegrass": "Eleusine indica",
-    "Morningglory": "Ipomoea spp.",
-    "Nutsedge": "Cyperus spp.",
-    "PalmerAmaranth": "Amaranthus palmeri",
-    "PricklySida": "Sida spinosa",
-    "Purslane": "Portulaca oleracea",
-    "Ragweed": "Ambrosia artemisiifolia",
-    "Sicklepod": "Senna obtusifolia",
-    "SpottedSpurge": "Euphorbia maculata",
-}
+# v3.60.0: the cwd12 classes are the twelve species, in cwd12 id order. The
+# legacy labels this list used to hold named the ids alphabetically and were
+# wrong for every id except PricklySida; /classes, /audit and the stats panels
+# joined other datasets' real names onto them, so e.g. real ragweed shared a
+# page with cwd12 Sicklepod boxes.
+_CWD12 = list(CWD12_SPECIES)
+# The botanical binomial for each cwd12 species, shown beside the class name.
+_CWD12_BINOMIAL = dict(CWD12_BINOMIAL)
+# Legacy labels that are not themselves a species key. As a /classes URL they
+# can only be an old dashboard link to a cwd12 class, so they redirect to that
+# species when no registered class carries the name.
+_LEGACY_ONLY_LABELS = {lab: legacy_to_species(lab) for lab in CWD12_LEGACY_LABELS
+                       if lab not in CWD12_SPECIES}
+
+
+def _species_label(sp: str, legacy: str = "") -> str:
+    """Human-facing name of a cwd12 species, with the legacy label secondary."""
+    name = CWD12_COMMON.get(sp, sp)
+    if legacy and legacy != sp:
+        return f"{name} (legacy label: {legacy})"
+    return name
+
 
 # ----------------- registry class index (canonical -> [(slug, cid, raw)]) ----
 import re as _re_canon
 
 # v3.0.113: explicit same-species synonyms (alnum-lowercased key → canonical
 # class). Consolidates near-duplicates the harvester created from differently
-# worded source labels, e.g. "Carpet weed" vs CWD12 "Carpetweeds". Keep this
-# list HIGH-CONFIDENCE only (true same species), not fuzzy guesses.
+# worded source labels. Keep this list HIGH-CONFIDENCE only (true same
+# species), not fuzzy guesses.
+# v3.60.0: cwd12 species are matched by species_of (which already folds
+# "Carpet weed" into Carpetweed), so the carpetweed entry is gone. Crabgrass
+# and nutsedge are not cwd12 species; their spellings used to merge through the
+# legacy list and now merge here.
 _CLASS_SYNONYMS = {
-    "carpetweed": "Carpetweeds",          # → CWD12 canonical
     "weeds": "Weed",                       # generic plural → generic singular
     "grassweedsv2release": "GrassWeeds",   # Roboflow version-suffix leaked into name
     "partheniumhysterophorous": "Parthenium",
+    "crabgrass": "Crabgrass",
+    "nutsedge": "Nutsedge",
 }
 
 
 def _canon_class(raw: str) -> str:
-    """Normalize species name from registry to canonical form.
-    Matches CWD12 case+punctuation-insensitive; else PascalCase the input."""
+    """Normalize a REAL class name from the registry to its canonical form: a
+    cwd12 species via species_of, else PascalCase of the input. A cwd12 copy's
+    classes never pass through here; _slug_class_entries names them by id."""
     if not isinstance(raw, str) or not raw.strip():
         return ""
     alnum = _re_canon.sub(r'[^A-Za-z0-9]', '', raw).lower()
@@ -10965,11 +11058,28 @@ def _canon_class(raw: str) -> str:
         return ""
     if alnum in _CLASS_SYNONYMS:           # v3.0.113 same-species merge
         return _CLASS_SYNONYMS[alnum]
-    for c12 in _CWD12:
-        if _re_canon.sub(r'[^A-Za-z0-9]', '', c12).lower() == alnum:
-            return c12
+    sp = species_of(raw)                   # v3.60.0: species, not legacy label
+    if sp:
+        return sp
     parts = _re_canon.split(r'[^A-Za-z0-9]+', raw)
     return "".join(p[:1].upper() + p[1:].lower() for p in parts if p)
+
+
+def _slug_class_entries(slug: str, class_names) -> list:
+    """[(canon, cid, raw)] for one registry slug, cid being the id IN ITS LABEL
+    FILES. v3.60.0: a cwd12 copy is named by its id space (its stored
+    class_names are ignored: cottonweed_holdout held four names over twelve-id
+    files); a whole legacy list by the species of each id; any other slug by
+    its real names."""
+    space = CWD12_ID_SPACE.get(slug)
+    if space is not None:
+        return [(sp, cid, sp) for cid, sp in enumerate(space)]
+    names = list(class_names or [])
+    out = []
+    for cid, raw in enumerate(names):
+        canon = class_species(slug, cid, names) or _canon_class(raw)
+        out.append((canon, cid, raw))
+    return out
 
 
 # v3.0.43.23 (user request): pseudo-classes that are NOT real species —
@@ -11038,14 +11148,13 @@ def _load_registry_index(domain: str = "weed") -> dict:
         cn = info.get("class_names") or []
         lp = info.get("local_path") or ""
         has_local = bool(lp and os.path.isdir(lp))
-        if not cn:
+        if not cn and slug not in CWD12_ID_SPACE:
             if has_local:
                 empty.append(slug)
             continue
         if not has_local:
             continue
-        for cid, raw in enumerate(cn):
-            canon = _canon_class(raw)
+        for canon, cid, raw in _slug_class_entries(slug, cn):
             if not canon:
                 continue
             if _is_junk_class(canon):   # v3.0.43.23: hide non-species pseudo-classes
@@ -11061,6 +11170,10 @@ def _registry_empty_slugs(domain: str = "weed") -> list:
 
 
 _pool_cache_dir = REPO / "results" / "framework" / "cache" / "class_pool"
+# v3.60.0: pools written before the index was keyed by species hold legacy-
+# label classes (a pool named Ragweed held cwd12 Sicklepod boxes); entries
+# without this marker are rebuilt instead of served.
+_POOL_KEY_SPACE = "species"
 _pool_cache_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -11202,7 +11315,8 @@ def _reg_pool_for_class(cls: str, per_slug_cap: int = 200,
     if cache_fp.is_file():
         try:
             cached = json.loads(cache_fp.read_text())
-            if cached.get("reg_mtime") == reg_mtime and cached.get("cap") == per_slug_cap:
+            if (cached.get("reg_mtime") == reg_mtime and cached.get("cap") == per_slug_cap
+                    and cached.get("key_space") == _POOL_KEY_SPACE):
                 return cached.get("entries", [])
         except Exception:
             pass
@@ -11268,7 +11382,8 @@ def _reg_pool_for_class(cls: str, per_slug_cap: int = 200,
             log.warning(f"reg pool walk fail {slug}/{cls}: {e}")
     try:
         cache_fp.write_text(json.dumps({
-            "reg_mtime": reg_mtime, "cap": per_slug_cap, "entries": out
+            "reg_mtime": reg_mtime, "cap": per_slug_cap, "entries": out,
+            "key_space": _POOL_KEY_SPACE,
         }))
     except Exception:
         pass
@@ -11276,6 +11391,9 @@ def _reg_pool_for_class(cls: str, per_slug_cap: int = 200,
 
 # FLUX setup as actually used in v3.0.39 (vanilla text-to-image).
 # Mirrors weed_optimizer_framework/tools/synth_diffusion.SPECIES_PROMPT.
+# v3.60.0: kept as a record, keyed by the legacy label each prompt was written
+# for. The images were labelled with that label's position, which is the cwd12
+# id of a different species for 11 of the 12 prompts.
 _FLUX_SPECIES_PROMPT = {
     "Carpetweeds":    "a carpetweed plant, small green sprawling weed",
     "Crabgrass":      "a crabgrass plant, spreading grassy weed",
@@ -11292,15 +11410,73 @@ _FLUX_SPECIES_PROMPT = {
 }
 _FLUX_PROMPT_SUFFIX = (", top-down view, cotton field soil background, daylight, "
                        "photorealistic, sharp focus")
+_AUDIT_LEGACY_NOTE = (
+    "The crop-bank folders and the FLUX prompts were named with the legacy cwd12 labels, "
+    "an alphabetical list that is right only for Prickly sida. Each class here is the "
+    "species of a cwd12 id, shown with the legacy label its folder and prompt carry. "
+    "Bank crops were filed by name from several datasets, so a folder can also hold "
+    "crops of other species.")
 
 # Filesystem roots
 _BANK_DIR = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
+_SPECIES_BANK_DIR = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank_species"
 _FLUX_IMG_DIR = REPO / "results" / "framework" / "synth_diffusion" / "images"
 _FLUX_LBL_DIR = REPO / "results" / "framework" / "synth_diffusion" / "labels"
+_FLUX_SP_IMG_DIR = REPO / "results" / "framework" / "synth_diffusion_species" / "images"
+_FLUX_SP_LBL_DIR = REPO / "results" / "framework" / "synth_diffusion_species" / "labels"
+_FLUX_SPECIES_PREFIX = "fluxsp_"   # synth_diffusion.FLUX_SPECIES_PREFIX
+
+
+# v3.60.0: the dashboard shows the bank the pipeline reads
+# (synth_cutpaste.default_bank_dir: the species bank once it is marked, else
+# the legacy one). Its crops are keyed 'banksp/<species>/<fn>'; 'bank/...'
+# always names the legacy object_bank/, so no key is read against the wrong
+# bank (crop file names repeat across the two).
+def _bank_root() -> Path:
+    return bank_in_use(_BANK_DIR, _SPECIES_BANK_DIR)
+
+
+def _bank_kind(root: Optional[Path] = None) -> str:
+    root = _bank_root() if root is None else root
+    return "banksp" if Path(root) == _SPECIES_BANK_DIR else "bank"
+
+
+def _bank_root_for_kind(kind: str) -> Path:
+    return _SPECIES_BANK_DIR if kind == "banksp" else _BANK_DIR
+
+
+def _flux_img_path(fn: str) -> Path:
+    """Species-era FLUX files carry _FLUX_SPECIES_PREFIX (v3.60.0)."""
+    if fn.startswith(_FLUX_SPECIES_PREFIX):
+        return _FLUX_SP_IMG_DIR / fn
+    return _FLUX_IMG_DIR / fn
+
+
+def _bank_dir_name(cls: str):
+    """Folder of the bank in use that holds `cls`, or None. v3.60.0: the
+    legacy bank's folders are legacy labels, so a species reads its legacy
+    folder there and its own name in the species bank. A legacy-only label
+    (Crabgrass, Nutsedge, ...) as a real class name gets no folder: its legacy
+    folder holds crops of the species it translates to."""
+    root = _bank_root()
+    if cls in CWD12_SPECIES:
+        return bank_folder_for(root, cls)
+    if bank_vocabulary(root) == "species":
+        return None
+    return None if cls in _LEGACY_ONLY_LABELS else cls
+
+
+def _flux_cid(cls: str):
+    """Label id FLUX images use for `cls` (the cwd12 id), or None."""
+    return CWD12_SPECIES.index(cls) if cls in CWD12_SPECIES else None
 
 
 def _bank_files(cls: str) -> _List_audit[str]:
-    d = _BANK_DIR / cls
+    bdir = _bank_dir_name(cls)
+    if bdir is None:
+        return []
+    root = _bank_root()
+    d = root / bdir
     if not d.is_dir():
         return []
     return sorted(p.name for p in d.iterdir()
@@ -11309,11 +11485,14 @@ def _bank_files(cls: str) -> _List_audit[str]:
 
 def _flux_files_for_class(cls: str) -> _List_audit[_Tuple_audit[str, list]]:
     """List of (filename, [list of (cx,cy,bw,bh) bboxes of this class])."""
-    if cls not in _CWD12 or not _FLUX_LBL_DIR.is_dir():
+    cid = _flux_cid(cls)
+    if cid is None:
         return []
-    cid = _CWD12.index(cls)
     out = []
-    for lbl in sorted(_FLUX_LBL_DIR.glob("*.txt")):
+    # v3.60.0: legacy and species-era output; file names do not collide
+    lbls = [lb for d in (_FLUX_LBL_DIR, _FLUX_SP_LBL_DIR) if d.is_dir()
+            for lb in sorted(d.glob("*.txt"))]
+    for lbl in lbls:
         try:
             content = lbl.read_text().splitlines()
         except Exception:
@@ -11332,19 +11511,29 @@ def _flux_files_for_class(cls: str) -> _List_audit[_Tuple_audit[str, list]]:
                 boxes.append((cx, cy, bw, bh))
         if boxes:
             img_name = lbl.stem + ".jpg"
-            if (_FLUX_IMG_DIR / img_name).is_file():
+            if (lbl.parent.parent / "images" / img_name).is_file():
                 out.append((img_name, boxes))
     return out
 
 
 # ---------------------------------------------------------------- raw serving
+@app.get("/audit/raw/banksp/{cls}/{filename}")
+def audit_raw_banksp(cls: str, filename: str):
+    """v3.60.0: a crop of the species bank (object_bank_species/)."""
+    return _serve_bank_crop(_SPECIES_BANK_DIR, cls, filename)
+
+
 @app.get("/audit/raw/bank/{cls}/{filename}")
 def audit_raw_bank(cls: str, filename: str):
+    return _serve_bank_crop(_BANK_DIR, cls, filename)
+
+
+def _serve_bank_crop(root: Path, cls: str, filename: str):
     if not _cls_ok(cls):
         raise HTTPException(400, "bad class name")
     if not _re_audit.match(r"^[A-Za-z0-9_.-]+\.(png|jpg|jpeg|PNG|JPG|JPEG)$", filename):
         raise HTTPException(400, "bad filename")
-    p = _BANK_DIR / cls / filename
+    p = root / cls / filename
     if not p.is_file():
         raise HTTPException(404)
     ext = p.suffix.lower()
@@ -11356,7 +11545,7 @@ def audit_raw_bank(cls: str, filename: str):
 def audit_raw_flux(filename: str):
     if not _re_audit.match(r"^[A-Za-z0-9_.-]+\.(jpg|jpeg|JPG|JPEG)$", filename):
         raise HTTPException(400, "bad filename")
-    p = _FLUX_IMG_DIR / filename
+    p = _flux_img_path(filename)
     if not p.is_file():
         raise HTTPException(404)
     return FileResponse(str(p), media_type="image/jpeg")
@@ -11416,19 +11605,20 @@ def audit_landing():
     for cls in _CWD12:
         bank = _bank_files(cls)
         flux = _flux_files_for_class(cls)
+        bdir = _bank_dir_name(cls)
         total_bank += len(bank)
         total_flux += len(flux)
         # thumbnail = first bank image if available, else placeholder
         if bank:
-            thumb = f"/audit/raw/bank/{cls}/{bank[0]}"
+            thumb = f"/audit/raw/{_bank_kind()}/{bdir}/{bank[0]}"
         else:
             thumb = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='160'%3E%3Crect width='220' height='160' fill='%23ccc'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23666' font-size='14'%3Eno samples%3C/text%3E%3C/svg%3E"
-        zh = _CWD12_ZH.get(cls, "")
+        zh = _CWD12_BINOMIAL.get(cls, "")
         cards.append(f'''
         <a class="class-card" href="/audit/class/{cls}">
           <img src="{thumb}" alt="{cls}" loading="lazy"/>
-          <div class="name">{cls}</div>
-          <div class="zh">{zh}</div>
+          <div class="name">{_species_label(cls)}</div>
+          <div class="zh">{zh} · legacy label {bdir}</div>
           <div class="counts">bank {len(bank)}  ·  flux {len(flux)}</div>
         </a>''')
 
@@ -11450,6 +11640,7 @@ def audit_landing():
   <h2>Browse by class</h2>
   <p class="desc">Open any class card for its detail view: real cwd12 crops on the left, FLUX output for that class on the right,
      and the prompt and method used for it at the foot. Every image is at native resolution; click to enlarge.</p>
+  <p class="desc">{_AUDIT_LEGACY_NOTE}</p>
   <div class="grid-classes">{''.join(cards)}</div>
 </section>
 </body></html>'''
@@ -11460,11 +11651,15 @@ def audit_landing():
 @app.get("/audit/method", response_class=HTMLResponse)
 def audit_method():
     rows = []
-    for cls in _CWD12:
-        prompt = _FLUX_SPECIES_PROMPT.get(cls, "") + _FLUX_PROMPT_SUFFIX
-        rows.append(f"<tr><td><strong>{cls}</strong> ({_CWD12_ZH.get(cls,'')})</td>"
+    for cid, cls in enumerate(_CWD12):
+        legacy = species_to_legacy(cls)
+        prompt = _FLUX_SPECIES_PROMPT.get(legacy, "") + _FLUX_PROMPT_SUFFIX
+        rows.append(f"<tr><td>{cid}</td><td><strong>{_species_label(cls)}</strong> "
+                    f"({_CWD12_BINOMIAL.get(cls,'')})</td><td>{legacy}</td>"
                     f"<td><code>{prompt}</code></td></tr>")
-    table = "<table>" + "".join(rows) + "</table>"
+    table = ("<table><tr><th>cwd12 id</th><th>species of the id</th>"
+             "<th>legacy label the prompt was written for</th><th>prompt</th></tr>"
+             + "".join(rows) + "</table>")
 
     html = f'''<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11497,7 +11692,8 @@ def audit_method():
     <li><strong>v3.0.39.3</strong> 2x V100 multi-GPU —
         <span class="ko">failed after 9 minutes</span> on multi-GPU placement.</li>
     <li><strong>v3.0.39.4</strong> bank canonical mapping fix —
-        <span class="ok">all 12 bank classes present</span>, but Goosegrass still looks wrong and is under review.</li>
+        <span class="ok">all 12 bank classes present</span>, but Goosegrass still looks wrong and is under review.
+        (The folder is named with the legacy label Goosegrass, cwd12 id 3, which is Spotted spurge.)</li>
     <li><strong>v3.0.41 Phase 0</strong> (current) bank rebuild SLURM job —
         <span class="ok">complete</span>. Phase 1, the LoRA fine-tune, <strong>waits until the bank
         has been reviewed for correctness</strong>.</li>
@@ -11528,6 +11724,9 @@ def audit_method():
 <section>
   <h2>The prompt used for each class</h2>
   <p class="desc">Every species prompt is appended with <code>{_FLUX_PROMPT_SUFFIX}</code></p>
+  <p class="desc">{_AUDIT_LEGACY_NOTE} Each prompt names the plant of its legacy label, while its box
+     carries the cwd12 id, so prompt and label disagree for every row except Prickly sida.
+     The v3.0.39 synthetic set is mislabelled by construction and must not be reused.</p>
   {table}
 </section>
 
@@ -11552,16 +11751,23 @@ def audit_method():
 @app.get("/audit/class/{cls}", response_class=HTMLResponse)
 def audit_class(cls: str):
     if cls not in _CWD12:
+        # v3.60.0: an old link names the legacy label; follow it when the label
+        # is not itself a species key.
+        if cls in _LEGACY_ONLY_LABELS:
+            return RedirectResponse(url=f"/audit/class/{_LEGACY_ONLY_LABELS[cls]}")
         raise HTTPException(404, f"unknown cwd12 class {cls!r}")
     bank = _bank_files(cls)
     flux = _flux_files_for_class(cls)
     cid = _CWD12.index(cls)
-    zh = _CWD12_ZH.get(cls, "")
-    prompt = _FLUX_SPECIES_PROMPT.get(cls, "") + _FLUX_PROMPT_SUFFIX
+    zh = _CWD12_BINOMIAL.get(cls, "")
+    legacy = species_to_legacy(cls)
+    bdir = _bank_dir_name(cls)
+    prompt = _FLUX_SPECIES_PROMPT.get(legacy, "") + _FLUX_PROMPT_SUFFIX
 
+    bkind = _bank_kind()
     bank_cards = "".join(
-        f'<div class="img-card"><a href="/audit/raw/bank/{cls}/{fn}" target="_blank">'
-        f'<img src="/audit/raw/bank/{cls}/{fn}" loading="lazy"/></a>'
+        f'<div class="img-card"><a href="/audit/raw/{bkind}/{bdir}/{fn}" target="_blank">'
+        f'<img src="/audit/raw/{bkind}/{bdir}/{fn}" loading="lazy"/></a>'
         f'<div class="meta">{fn}</div></div>'
         for fn in bank)
 
@@ -11578,9 +11784,10 @@ def audit_class(cls: str):
 </head><body>
 <header>
   <div class="crumbs"><a href="/audit">← All classes</a></div>
-  <h1>{cls} <span style="color:#888;font-size:18px;">/ {zh}</span></h1>
+  <h1>{_species_label(cls)} <span style="color:#888;font-size:18px;">/ {zh}</span></h1>
   <div class="sub">
     cwd12 class_id <code>{cid}</code>
+    · legacy label <code>{legacy}</code>
     · <strong>{len(bank)}</strong> real crops
     · <strong>{len(flux)}</strong> FLUX outputs containing this class
   </div>
@@ -11604,11 +11811,14 @@ def audit_class(cls: str):
         <span class="v">No. This is general text-to-image and
         <strong>FLUX was never fine-tuned on cwd12</strong> — it is inferring the plant from the
         prompt text, which is the root cause of v3.0.39's failure.</span></div>
-    <div class="method-row"><span class="k">Prompt used</span></div>
+    <div class="method-row"><span class="k">Prompt used</span>
+        <span class="v">written for the legacy label {legacy}; the boxes carry id {cid}, which is
+        {_species_label(cls)}</span></div>
   </div>
   <pre style="background:#f4f4f7;padding:12px 16px;border-radius:6px;font-size:13px;overflow-x:auto;">{prompt}</pre>
   <p class="desc">Planned next (Phase 1): train a class-specific LoRA on 30 of the real crops in
      section 1, with the trigger token <code>cwd12-{cls}</code>, to teach FLUX this species.
+     {_AUDIT_LEGACY_NOTE}
      <a href="/audit/method">Full method →</a></p>
 </section>
 
@@ -11616,7 +11826,7 @@ def audit_class(cls: str):
   <h2>3 · FLUX output — synthetic images carrying a box of this class</h2>
   <p class="desc">Of the 42 synthetic images v3.0.39 produced, <strong>{len(flux)}</strong> carry a
      <strong>{cls}</strong> box. Each opens at native resolution so you can judge for yourself
-     whether what FLUX drew is really {cls}.</p>
+     whether what FLUX drew is really {_species_label(cls)}.</p>
   <div class="grid-imgs">{flux_cards or '<p style="color:#888">No FLUX output contains this class — the weak-class sampling bias never took effect, so some classes were not covered.</p>'}</div>
 </section>
 </body></html>'''
@@ -11695,14 +11905,15 @@ def _thumb_path_for(kind: str, cls: str, fname: str, w: int) -> Path:
 
 def _source_for(kind: str, cls: str, fname: str) -> Optional[Path]:
     """Resolve the underlying source file for a thumbnail request.
-    kind = 'bank'  → synth_cutpaste/object_bank/{cls}/{fname}
-    kind = 'flux'  → synth_diffusion/images/{fname}  (cls ignored — just locates file)
+    kind = 'bank'   → synth_cutpaste/object_bank/{cls}/{fname}
+    kind = 'banksp' → synth_cutpaste/object_bank_species/{cls}/{fname} (v3.60.0)
+    kind = 'flux'  → synth_diffusion[_species]/images/{fname}  (cls ignored — just locates file)
     """
-    if kind == "bank":
-        p = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls / fname
+    if kind in ("bank", "banksp"):
+        p = _bank_root_for_kind(kind) / cls / fname
         return p if p.is_file() else None
     if kind == "flux":
-        p = REPO / "results" / "framework" / "synth_diffusion" / "images" / fname
+        p = _flux_img_path(fname)
         return p if p.is_file() else None
     return None
 
@@ -11711,7 +11922,7 @@ def _source_for(kind: str, cls: str, fname: str) -> Optional[Path]:
 def thumb_serve(kind: str, cls: str, filename: str, w: int = 256):
     """Serve a cached small thumbnail (default 256px). Huge speedup vs raw on
     /ocean. Cache key includes mtime so source changes invalidate."""
-    if kind not in ("bank", "flux"):
+    if kind not in ("bank", "banksp", "flux"):
         raise HTTPException(400)
     if not _cls_ok(cls):
         raise HTTPException(400)
@@ -11797,7 +12008,10 @@ def thumb_reg_serve(slug: str, cls: str, filename: str, w: int = 256):
     if found is None:
         raise HTTPException(404, "image not found")
     img_path, local_p = found
-    safe = _re_cls.sub(r'[^A-Za-z0-9_.-]', '_', f"reg__{slug}__{cls}__{filename}_{w}")
+    # v3.60.0: the target id is part of the key, so a thumb cached when this
+    # class name meant another id is never served for the new one.
+    safe = _re_cls.sub(r'[^A-Za-z0-9_.-]', '_',
+                       f"reg__{slug}__{cls}__c{target_cid}__{filename}_{w}")
     cache = _THUMB_DIR / (safe + ".jpg")
     if (not cache.is_file()) or (cache.stat().st_mtime < img_path.stat().st_mtime):
         lbl = find_label_for_image(img_path, local_p)
@@ -11831,7 +12045,8 @@ def raw_reg_serve(slug: str, cls: str, filename: str):
     lbl = find_label_for_image(img_path, local_p)
     out_dir = REPO / "results" / "framework" / "cache" / "reg_full"
     out_dir.mkdir(parents=True, exist_ok=True)
-    safe = _re_cls.sub(r'[^A-Za-z0-9_.-]', '_', f"{slug}__{cls}__{filename}")
+    safe = _re_cls.sub(r'[^A-Za-z0-9_.-]', '_',
+                       f"{slug}__{cls}__c{target_cid}__{filename}")   # v3.60.0: id in key
     out = out_dir / (safe + ".jpg")
     if (not out.is_file()) or (out.stat().st_mtime < img_path.stat().st_mtime):
         ok = _render_class_thumb(img_path, lbl, target_cid, out, max_width=1600)
@@ -11841,31 +12056,123 @@ def raw_reg_serve(slug: str, cls: str, filename: str):
 
 
 # ---------------------------------------------------------------- exemplar log
+# v3.60.0: the logs are not rewritten. A log written before v3.60.0 is named by
+# the class its /classes page had then (a legacy label for the cwd12 group,
+# which mixed species) and its events record only {img, verdict, ts}; each such
+# event is re-keyed at read time by the species of its source. Events written
+# since record "class" and are taken as they are.
+_HOLDOUT_LEGACY_NAMES = list(CWD12_LEGACY_LABELS[2:6])
+# ^ the four names cottonweed_holdout was registered with before v3.60.0; the
+#   old pool picked holdout boxes by their position (ids 0-3 of the files).
+
+
 def _exemplar_file(cls: str) -> Path:
     return _CLS_EXEMPLAR_DIR / f"{cls}.jsonl"
 
 
-def _exemplar_state(cls: str) -> _Dict_cls[str, str]:
-    """Replay the jsonl log -> {img_key: latest verdict}."""
-    p = _exemplar_file(cls)
-    state: dict[str, str] = {}
-    if not p.is_file():
-        return state
+def _legacy_entry_class(logged_as: str, img_key: str) -> str:
+    """Class of an exemplar event that records no "class": the species of its
+    source when that is a cwd12 class, else the name it was logged under."""
+    parts = str(img_key).split("/")
+    kind = parts[0]
+    legacy = logged_as in CWD12_LEGACY_LABELS
+    if kind == "banksp" and len(parts) >= 3 and parts[1] in CWD12_SPECIES:
+        return parts[1]   # species bank folders are species
+    if kind in ("bank", "flux"):
+        # bank folders and FLUX label ids use the legacy vocabulary
+        if kind == "bank" and len(parts) >= 3 and parts[1] in CWD12_LEGACY_LABELS:
+            return legacy_to_species(parts[1])
+        return legacy_to_species(logged_as) if legacy else logged_as
+    slug = parts[1] if kind == "reg" and len(parts) >= 3 else kind
+    if slug == "cottonweed_holdout" and logged_as in _HOLDOUT_LEGACY_NAMES:
+        return CWD12_ID_SPACE[slug][_HOLDOUT_LEGACY_NAMES.index(logged_as)]
+    if legacy and slug in CWD12_ID_SPACE:
+        return legacy_to_species(logged_as)
+    if legacy:
+        try:
+            info = (_get_cached_registry().get("datasets") or {}).get(slug) or {}
+        except Exception:
+            info = {}
+        if is_legacy_label_list(info.get("class_names") or []):
+            return legacy_to_species(logged_as)
+    # any other slug: the log name was a real name folded onto a legacy label
+    return species_of(logged_as) or logged_as
+
+
+_exemplar_index_cache: dict = {"sig": None, "index": {}}
+
+
+def _exemplar_index() -> dict:
+    """{class: {img_key: (latest verdict, log file stem)}} over every log,
+    replayed in time order. Cached until a log file changes."""
     try:
-        with open(p) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    ev = _json.loads(line)
-                    if "img" in ev and "verdict" in ev:
-                        state[ev["img"]] = ev["verdict"]
-                except Exception:
-                    continue
+        files = sorted(_CLS_EXEMPLAR_DIR.glob("*.jsonl"))
+        sig = tuple((f.name, f.stat().st_mtime_ns, f.stat().st_size) for f in files)
     except Exception:
-        pass
-    return state
+        return _exemplar_index_cache["index"]
+    if sig == _exemplar_index_cache["sig"]:
+        return _exemplar_index_cache["index"]
+    events = []
+    memo: dict = {}
+    for fi, fp in enumerate(files):
+        logged_as = fp.stem
+        try:
+            with open(fp) as f:
+                for n, line in enumerate(f):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        ev = _json.loads(line)
+                    except Exception:
+                        continue
+                    if "img" not in ev or "verdict" not in ev:
+                        continue
+                    img = ev["img"]
+                    k = ev.get("class")
+                    if not k:
+                        mk = (logged_as, str(img).split("/", 2)[0],
+                              str(img).split("/", 2)[1] if str(img).count("/") >= 2 else "")
+                        if mk not in memo:
+                            memo[mk] = _legacy_entry_class(logged_as, img)
+                        k = memo[mk]
+                    try:
+                        ts = float(ev.get("ts") or 0)
+                    except Exception:
+                        ts = 0.0
+                    events.append((ts, fi, n, k, img, ev["verdict"], logged_as))
+        except Exception:
+            continue
+    events.sort(key=lambda e: (e[0], e[1], e[2]))
+    idx: dict = {}
+    for _ts, _fi, _n, k, img, verdict, logged_as in events:
+        idx.setdefault(k, {})[img] = (verdict, logged_as)
+    _exemplar_index_cache["sig"] = sig
+    _exemplar_index_cache["index"] = idx
+    return idx
+
+
+def _exemplar_state(cls: str) -> _Dict_cls[str, str]:
+    """Replay the logs -> {img_key: latest verdict} for class `cls`."""
+    return {img: v for img, (v, _la) in _exemplar_index().get(cls, {}).items()}
+
+
+def _exemplar_append(cls: str, events: list) -> int:
+    """Append verdict events for `cls` to its log. v3.60.0: every event records
+    "class", so the read side never has to guess its vocabulary. A legacy-only
+    label (a page opened before v3.60.0) is refused rather than logged as a
+    class of its own."""
+    if cls in _LEGACY_ONLY_LABELS and cls not in _load_registry_index():
+        raise HTTPException(409, f"class {cls!r} is now {_LEGACY_ONLY_LABELS[cls]!r}; "
+                                 f"reload /classes/{_LEGACY_ONLY_LABELS[cls]}")
+    fp = _exemplar_file(cls)
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    n = 0
+    with open(fp, "a") as f:
+        for ev in events:
+            f.write(_json.dumps({**ev, "class": cls}) + "\n")
+            n += 1
+    return n
 
 
 @app.get("/api/exemplar/{cls}")
@@ -11892,10 +12199,7 @@ async def api_exemplar_post(cls: str, payload: dict = Body(...)):
         "ts": _time_cls.time(),
         "ts_h": _time_cls.strftime("%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime()),
     }
-    fp = _exemplar_file(cls)
-    fp.parent.mkdir(parents=True, exist_ok=True)
-    with open(fp, "a") as f:
-        f.write(_json.dumps(ev) + "\n")
+    _exemplar_append(cls, [ev])
     return JSONResponse({"ok": True, **ev})
 
 
@@ -11916,18 +12220,14 @@ async def api_exemplar_bulk(cls: str, payload: dict = Body(...)):
         raise HTTPException(400, "too many imgs")
     ts = _time_cls.time()
     tsh = _time_cls.strftime("%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())
-    fp = _exemplar_file(cls)
-    fp.parent.mkdir(parents=True, exist_ok=True)
-    n = 0
-    with open(fp, "a") as f:
-        for img in imgs:
-            if not isinstance(img, str) or not img:
-                continue
-            if "/" in img and not _re_cls.match(r'^[A-Za-z0-9_./-]+$', img):
-                continue
-            f.write(_json.dumps({"img": img, "verdict": verdict,
-                                 "ts": ts, "ts_h": tsh}) + "\n")
-            n += 1
+    evs = []
+    for img in imgs:
+        if not isinstance(img, str) or not img:
+            continue
+        if "/" in img and not _re_cls.match(r'^[A-Za-z0-9_./-]+$', img):
+            continue
+        evs.append({"img": img, "verdict": verdict, "ts": ts, "ts_h": tsh})
+    n = _exemplar_append(cls, evs)
     return JSONResponse({"ok": True, "verdict": verdict, "count": n})
 
 
@@ -11947,56 +12247,61 @@ async def api_exemplar_markall(cls: str, payload: dict = Body(...)):
     pool = _class_image_pool(cls)
     ts = _time_cls.time()
     tsh = _time_cls.strftime("%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())
-    fp = _exemplar_file(cls)
-    fp.parent.mkdir(parents=True, exist_ok=True)
-    n = 0
-    with open(fp, "a") as f:
-        for entry in pool:
-            try:
-                key = _pool_entry_urls(entry, cls)[0]
-            except Exception:
-                key = None
-            if not key or not isinstance(key, str):
-                continue
-            f.write(_json.dumps({"img": key, "verdict": verdict,
-                                 "ts": ts, "ts_h": tsh}) + "\n")
-            n += 1
+    evs = []
+    for entry in pool:
+        try:
+            key = _pool_entry_urls(entry, cls)[0]
+        except Exception:
+            key = None
+        if not key or not isinstance(key, str):
+            continue
+        evs.append({"img": key, "verdict": verdict, "ts": ts, "ts_h": tsh})
+    n = _exemplar_append(cls, evs)
     return JSONResponse({"ok": True, "verdict": verdict, "count": n})
 
 
 # ---- exemplar EXPORT: closes the human-in-loop circle ----
 # Human ✓ marks → exportable manifest → downstream LoRA / curator training.
 
-def _exemplar_export_entry(cls: str, img_key: str) -> dict:
+def _exemplar_export_entry(cls: str, img_key: str, logged_as: str = "") -> dict:
     """Resolve an exemplar key into a usable training entry.
     img_key formats:
       'bank/{cls}/{fname}'      → cropped object on transparent bg
       'flux/{fname}'            → FLUX synthetic full scene
       'reg/{slug}/{fname}'      → full real-bbox image
     Returns dict with kind, source_path (absolute), bbox_class_id (if reg),
-    and direct URLs for the dashboard."""
+    and direct URLs for the dashboard.
+
+    v3.60.0: every entry carries "species" (the cwd12 species of `cls`, or
+    None) and "logged_as" (the log file the verdict sits in), so a consumer
+    can see where an old log's name differs from the species it now counts
+    for."""
+    tag = {"species": cls if cls in CWD12_SPECIES else None,
+           "logged_as": logged_as or cls}
     parts = img_key.split("/", 2)
     if len(parts) < 2:
-        return {"key": img_key, "error": "malformed_key"}
+        return {"key": img_key, "error": "malformed_key", **tag}
     kind = parts[0]
-    if kind == "bank" and len(parts) == 3:
+    if kind in ("bank", "banksp") and len(parts) == 3:
         fn = parts[2]
-        p = (REPO / "results" / "framework" / "synth_cutpaste" /
-             "object_bank" / cls / fn)
+        # 'bank': legacy object_bank folder (legacy label); 'banksp': species
+        bdir = parts[1]
+        p = _bank_root_for_kind(kind) / bdir / fn
         return {
             "key": img_key, "kind": "bank", "class": cls, "fname": fn,
+            "bank": "species" if kind == "banksp" else "legacy",
             "path": str(p) if p.is_file() else None,
-            "thumb_url": f"/thumb/bank/{cls}/{fn}?w=256",
-            "raw_url": f"/audit/raw/bank/{cls}/{fn}",
+            "thumb_url": f"/thumb/{kind}/{bdir}/{fn}?w=256",
+            "raw_url": f"/audit/raw/{kind}/{bdir}/{fn}", **tag,
         }
     if kind == "flux" and len(parts) >= 2:
         fn = parts[1] if len(parts) == 2 else parts[2]
-        p = REPO / "results" / "framework" / "synth_diffusion" / "images" / fn
+        p = _flux_img_path(fn)
         return {
             "key": img_key, "kind": "flux", "class": cls, "fname": fn,
             "path": str(p) if p.is_file() else None,
             "thumb_url": f"/thumb/flux/{cls}/{fn}?w=256",
-            "raw_url": f"/audit/raw/flux/{fn}",
+            "raw_url": f"/audit/raw/flux/{fn}", **tag,
         }
     if kind == "reg" and len(parts) == 3:
         slug = parts[1]
@@ -12009,9 +12314,9 @@ def _exemplar_export_entry(cls: str, img_key: str) -> dict:
             "key": img_key, "kind": "reg", "class": cls,
             "slug": slug, "fname": fn, "class_id_in_slug": cid,
             "thumb_url": f"/thumb_reg/{slug}/{cls}/{fn}?w=256",
-            "raw_url": f"/raw_reg/{slug}/{cls}/{fn}",
+            "raw_url": f"/raw_reg/{slug}/{cls}/{fn}", **tag,
         }
-    return {"key": img_key, "error": "unknown_kind", "raw_kind": kind}
+    return {"key": img_key, "error": "unknown_kind", "raw_kind": kind, **tag}
 
 
 @app.get("/api/exemplars_export/{cls}")
@@ -12019,13 +12324,15 @@ def api_exemplars_export_class(cls: str):
     """Return all ✓ exemplar entries for a class as a usable manifest."""
     if not _cls_ok(cls):
         raise HTTPException(400)
-    state = _exemplar_state(cls)
+    logged = _exemplar_index().get(cls, {})
+    state = {k: v for k, (v, _la) in logged.items()}
     entries = [
-        _exemplar_export_entry(cls, k)
+        _exemplar_export_entry(cls, k, logged[k][1])
         for k, v in state.items() if v == "exemplar"
     ]
     return JSONResponse({
         "class": cls,
+        "species": cls if cls in CWD12_SPECIES else None,
         "n_exemplars": len(entries),
         "n_bad": sum(1 for v in state.values() if v == "bad"),
         "n_rebox": sum(1 for v in state.values() if v == "rebox"),
@@ -12041,14 +12348,16 @@ def api_exemplars_export_all():
     out: dict = {"by_class": {}, "total_exemplars": 0,
                  "exported_at": _time_cls.strftime(
                      "%Y-%m-%d %H:%M:%S UTC", _time_cls.gmtime())}
-    for cls in _all_known_classes():
-        state = _exemplar_state(cls)
-        ex_keys = [k for k, v in state.items() if v == "exemplar"]
+    # v3.60.0: iterate the re-keyed log index, so a class that has verdicts
+    # but no longer appears in the registry is still exported.
+    for cls, logged in sorted(_exemplar_index().items()):
+        ex_keys = [k for k, (v, _la) in logged.items() if v == "exemplar"]
         if not ex_keys:
             continue
         out["by_class"][cls] = {
+            "species": cls if cls in CWD12_SPECIES else None,
             "n_exemplars": len(ex_keys),
-            "entries": [_exemplar_export_entry(cls, k) for k in ex_keys],
+            "entries": [_exemplar_export_entry(cls, k, logged[k][1]) for k in ex_keys],
         }
         out["total_exemplars"] += len(ex_keys)
     out["n_classes_with_exemplars"] = len(out["by_class"])
@@ -12627,14 +12936,9 @@ def api_cluster_status():
     try:
         n_ex = 0; n_bad = 0
         if _CLS_EXEMPLAR_DIR.is_dir():
-            for fp in _CLS_EXEMPLAR_DIR.glob("*.jsonl"):
-                try:
-                    cls = fp.stem
-                    st = _exemplar_state(cls)
-                    n_ex += sum(1 for v in st.values() if v == "exemplar")
-                    n_bad += sum(1 for v in st.values() if v == "bad")
-                except Exception:
-                    pass
+            for logged in _exemplar_index().values():
+                n_ex += sum(1 for v, _la in logged.values() if v == "exemplar")
+                n_bad += sum(1 for v, _la in logged.values() if v == "bad")
         out["exemplars"] = {"n_keep": n_ex, "n_bad": n_bad}
     except Exception:
         out["exemplars"] = {"n_keep": 0, "n_bad": 0}
@@ -12894,22 +13198,28 @@ _CLUSTER_ACTIONS = {
         "label": "🚀 Sync ALL (incl. cwd12 baselines) → Roboflow for fast review (~10min/slug)",
     },
     # v3.0.71.3: OWL red proposals → Roboflow upload.
-    # OWL only ran on Goosegrass against cottonweed_holdout/test/images; its
-    # output is 50 .txt files in results/framework/owl_red_proposals/Goosegrass/.
+    # OWL first ran against cottonweed_holdout/test/images under the legacy
+    # label Goosegrass (cwd12 id 3 = SpottedSpurge); those 50 .txt files in
+    # results/framework/owl_red_proposals/Goosegrass/ carry no species
+    # manifest and must be regenerated with owl_preannotate_one before upload.
     # We upload the source images + OWL-proposed labels via bulk-upload to
     # weed-crop-agent-dataset, tagged batch=red so human reviewer sees them.
+    # v3.60.0: --species is a cwd12 species and matches owl_preannotate_one's
+    # default (SpottedSpurge -> owl_red_proposals_species/SpottedSpurge/; the
+    # legacy root is not reused because 8 names are both a label and a
+    # species). --images defaults to the manifest's target_dir.
     "owl_upload_proposals": {
         "type": "subprocess",
         "needs_cluster": True,  # v3.0.99.49: reads OWL proposals produced on cluster
         "argv": [
             "python", "-u", "-m",
             "weed_optimizer_framework.tools.owl_upload_proposals",
-            "--species", "Goosegrass",
+            "--species", "SpottedSpurge",
             "--project", "weed-crop-agent-dataset",
             "--per-species", "50",
         ],
         "env_secret_files": {"ROBOFLOW_API_KEY": _ROBOFLOW_KEY_FILE},
-        "label": "Upload OWL red proposals → weed-crop-agent-dataset (precision-gated; rejects upload below threshold, OWL_UPLOAD_FORCE=1 to force)",
+        "label": "Upload OWL red proposals (Spotted spurge, from owl_preannotate_one) → weed-crop-agent-dataset (precision-gated; rejects upload below threshold, OWL_UPLOAD_FORCE=1 to force)",
     },
     # v3.0.71: DINOv2 dataset-quality curator (full pipeline as one button)
     "dinov2_curate_registry": {
@@ -13627,18 +13937,22 @@ def api_refresh_registry():
 
 # ---------------------------------------------------------------- /classes
 def _all_known_classes(domain: str = "weed") -> _List_cls[str]:
-    """Class names for `domain`. For weed (default): CANONICAL_12 + bank folders
+    """Class names for `domain`. For weed (default): the cwd12 species + bank folders
     + weed registry class_names (unchanged). For another domain: ONLY that
     domain's registered class_names (CWD12 + object_bank are weed-specific).
     v3.0.109: domain-scoped."""
     out: set = set()
     if domain == "weed":
         out |= set(_CWD12)
-        bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
+        bd = _bank_root()
         if bd.is_dir():
             for d in bd.iterdir():
                 if d.is_dir():
-                    out.add(d.name)
+                    # v3.60.0: legacy bank folders carry legacy labels
+                    sp = (d.name if bank_vocabulary(bd) == "species"
+                          else legacy_to_species(d.name)
+                          if d.name in CWD12_LEGACY_LABELS else d.name)
+                    out.add(sp)
     for c in _load_registry_index(domain).keys():
         out.add(c)
     return sorted(out)
@@ -13648,25 +13962,29 @@ def _class_image_pool(cls: str) -> _List_cls[dict]:
     """Return [{kind, slug, fname, cid}, ...] for all images claimed to be `cls`.
     Cross-source: bank crops + FLUX outputs + registered real-bbox datasets."""
     pool: list = []
-    # 1) bank
-    bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls
-    if bd.is_dir():
+    # 1) bank in use (v3.60.0: legacy bank folders are legacy labels; its
+    #    crops keep kind 'bank', species-bank crops are 'banksp')
+    bdir = _bank_dir_name(cls)
+    broot = _bank_root()
+    bd = broot / bdir if bdir is not None else None
+    if bd is not None and bd.is_dir():
         for p in sorted(bd.iterdir()):
             if p.suffix.lower() in (".png", ".jpg", ".jpeg"):
-                pool.append({"kind": "bank", "slug": None, "fname": p.name, "cid": None})
-    # 2) flux (only if cls is in CANONICAL_12 — labels encode that integer)
-    if cls in _CWD12:
-        cid = _CWD12.index(cls)
-        ld = REPO / "results" / "framework" / "synth_diffusion" / "labels"
-        if ld.is_dir():
+                pool.append({"kind": _bank_kind(broot), "slug": None,
+                             "fname": p.name, "cid": None, "dir": bdir})
+    # 2) flux (only for a cwd12 species — labels encode its cwd12 id)
+    cid = _flux_cid(cls)
+    if cid is not None:
+        for ld in (_FLUX_LBL_DIR, _FLUX_SP_LBL_DIR):
+            if not ld.is_dir():
+                continue
             for lbl in sorted(ld.glob("*.txt")):
                 try:
                     for line in lbl.read_text().splitlines():
                         parts = line.split()
                         if parts and parts[0].isdigit() and int(parts[0]) == cid:
                             img_name = lbl.stem + ".jpg"
-                            if ((REPO / "results" / "framework" / "synth_diffusion" /
-                                 "images" / img_name)).is_file():
+                            if (ld.parent / "images" / img_name).is_file():
                                 pool.append({"kind": "flux", "slug": None,
                                              "fname": img_name, "cid": cid})
                             break
@@ -13826,26 +14144,30 @@ def _class_summary_landing(cls: str, domain: str = "weed") -> dict:
     out = {"n_bank": 0, "n_flux": 0, "n_reg_est": 0, "n_reg_slugs": 0,
            "first_thumb": "", "first_thumb_data": ""}
     # bank — cheap iterdir
-    bd = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls
+    bdir = _bank_dir_name(cls)
+    broot = _bank_root()
+    bd = broot / bdir if bdir is not None else None
     first_src = None
-    if bd.is_dir():
+    if bd is not None and bd.is_dir():
         try:
             imgs = [p for p in sorted(bd.iterdir())
                     if p.suffix.lower() in (".png", ".jpg", ".jpeg")]
             out["n_bank"] = len(imgs)
             if imgs:
-                out["first_thumb"] = f"/thumb/bank/{cls}/{imgs[0].name}?w=256"
+                out["first_thumb"] = (f"/thumb/{_bank_kind(broot)}/{bdir}/"
+                                      f"{imgs[0].name}?w=256")
                 first_src = imgs[0]
         except Exception:
             pass
-    # flux — small (60-100 imgs total), walk is fine
-    if cls in _CWD12:
-        cid = _CWD12.index(cls)
-        ld = REPO / "results" / "framework" / "synth_diffusion" / "labels"
-        if ld.is_dir():
+    # flux — small (60-100 imgs total), walk is fine (legacy + species dirs)
+    cid = _flux_cid(cls)
+    if cid is not None:
+        lbl_files = [lb for ld in (_FLUX_LBL_DIR, _FLUX_SP_LBL_DIR) if ld.is_dir()
+                     for lb in sorted(ld.glob("*.txt"))]
+        if lbl_files:
             n = 0
             first_flux = ""
-            for lbl in sorted(ld.glob("*.txt")):
+            for lbl in lbl_files:
                 try:
                     for line in lbl.read_text().splitlines():
                         p = line.split()
@@ -13859,7 +14181,7 @@ def _class_summary_landing(cls: str, domain: str = "weed") -> dict:
             out["n_flux"] = n
             if not out["first_thumb"] and first_flux:
                 out["first_thumb"] = f"/thumb/flux/{cls}/{first_flux}?w=256"
-                ffp = REPO / "results" / "framework" / "synth_diffusion" / "images" / first_flux
+                ffp = _flux_img_path(first_flux)
                 if ffp.is_file():
                     first_src = ffp
     # reg — DO NOT walk labels. Use cap × #slugs as estimate.
@@ -14090,10 +14412,11 @@ def _pool_entry_urls(entry: dict, cls: str) -> tuple:
     kind = entry["kind"]
     fn = entry["fname"]
     slug = entry.get("slug")
-    if kind == "bank":
-        return (f"bank/{cls}/{fn}",
-                f"/thumb/bank/{cls}/{fn}?w=256",
-                f"/audit/raw/bank/{cls}/{fn}",
+    if kind in ("bank", "banksp"):
+        bdir = entry.get("dir") or _bank_dir_name(cls)
+        return (f"{kind}/{bdir}/{fn}",
+                f"/thumb/{kind}/{bdir}/{fn}?w=256",
+                f"/audit/raw/{kind}/{bdir}/{fn}",
                 "bank")
     if kind == "flux":
         return (f"flux/{fn}",
@@ -14179,41 +14502,45 @@ _CLASSES_CSS = """
 # placeholders / generic / CWD12-mappable / unlabeled, and the recommended
 # action. Answers "how do I label this messy data, and what's in v2/v3/v4".
 # ====================================================================
-_CWD12_NORM = {"".join(c for c in s.lower() if c.isalnum()): s for s in _CWD12}
-for _a, _c in {"morningglory": "Morningglory", "morning glory": "Morningglory",
-               "carpetweed": "Carpetweeds", "palmeramaranth": "PalmerAmaranth",
-               "palmer amaranth": "PalmerAmaranth", "spottedspurge": "SpottedSpurge",
-               "spurge": "SpottedSpurge", "pricklysida": "PricklySida",
-               "eleusineindica": "Goosegrass", "cyperus": "Nutsedge",
-               "cyperusrotundus": "Nutsedge", "ipomoea": "Morningglory"}.items():
-    _CWD12_NORM.setdefault("".join(c for c in _a.lower() if c.isalnum()), _c)
+# v3.60.0: a class counts as cwd12 only when it names one of the twelve
+# species (species_of; a cwd12 copy by its id space). The old name map was
+# built on the legacy labels plus aliases, so real Cyperus, Digitaria and
+# Ipomoea were reported as the cwd12 classes that hold other species.
+_CWD12_LIST_TEXT = ", ".join(CWD12_COMMON[sp] for sp in CWD12_SPECIES)
 
 
 def _norm_cls_name(s):
     return "".join(c for c in str(s).lower() if c.isalnum())
 
 
-def _classify_dataset_classes(class_names):
+def _classify_dataset_classes(class_names, slug: str = ""):
     """Return {type, cwd12, action} for an annotation-guidance row."""
+    if slug in CWD12_ID_SPACE:
+        return {"type": "cwd12", "cwd12": sorted(set(CWD12_ID_SPACE[slug])),
+                "action": "cwd12 copy, labelled by class id → verify the boxes; its stored "
+                          "class names are not used"}
     cn = [str(c) for c in (class_names or []) if str(c).strip()]
     if not cn:
         return {"type": "unlabeled", "cwd12": [],
                 "action": "No labels → annotate every image in Roboflow (draw boxes + assign species)"}
     numeric = [c for c in cn if c.strip().lstrip("-").isdigit()]
     named = [c for c in cn if not c.strip().lstrip("-").isdigit()]
-    cwd12 = sorted({_CWD12_NORM[_norm_cls_name(c)] for c in named
-                    if _norm_cls_name(c) in _CWD12_NORM})
+    if is_legacy_label_list(cn):
+        cwd12 = sorted({legacy_to_species(c) for c in named if c in CWD12_LEGACY_LABELS})
+    else:
+        cwd12 = sorted({species_of(c) for c in named if species_of(c)})
     if not named:
         return {"type": "numeric", "cwd12": [],
                 "action": "Numeric placeholders (0/1/2…) → re-upload with real names (uploader is fixed), then verify"}
     if cwd12 and len(cwd12) == len(set(named)):
         return {"type": "cwd12", "cwd12": cwd12,
-                "action": "Real names, all CWD12 species → just verify the boxes are accurate in Roboflow"}
+                "action": "Real names, all cwd12 species → just verify the boxes are accurate in Roboflow"}
     if cwd12:
         return {"type": "mixed", "cwd12": cwd12,
                 "action": "Some CWD12 + some generic/numeric → verify the CWD12 ones; judge or drop the rest per box"}
     return {"type": "generic", "cwd12": [],
-            "action": "Real but generic names (weed/crop/grass) → judge the actual species per box, map to CWD12"}
+            "action": "Real but generic or non-cwd12 names → judge the actual species per box; "
+                      f"map to a cwd12 species ({_CWD12_LIST_TEXT}) only when it is one"}
 
 
 @app.get("/api/annotation_status")
@@ -14234,7 +14561,7 @@ def api_annotation_status():
         if info.get("status") != "downloaded":
             continue
         cn = info.get("class_names") or []
-        c = _classify_dataset_classes(cn)
+        c = _classify_dataset_classes(cn, slug)
         summary[c["type"]] = summary.get(c["type"], 0) + 1
         rows.append({
             "slug": slug,
@@ -14292,7 +14619,7 @@ def annotate_page():
  <div class="pipe">Pipeline: <strong>Browse Data → Datasets → Labeling Guide (you are here) → Labeling Console</strong>. Read the recommended action per dataset below, then push &amp; label in the <a href="/labeling">🎯 Labeling Console</a>.</div>
  <div id="stats">loading…</div>
  <div class="legend">
-  <span class="lg"><span class="badge cwd12">CWD12</span> real names + all 12 species → just verify</span>
+  <span class="lg"><span class="badge cwd12">CWD12</span> every class is a cwd12 species (Crabgrass and Nutsedge are not) → just verify</span>
   <span class="lg"><span class="badge mixed">MIXED</span> some CWD12 + others → verify + judge the rest</span>
   <span class="lg"><span class="badge generic">GENERIC</span> generic (weed/crop) → judge species per box</span>
   <span class="lg"><span class="badge numeric">NUMERIC</span> numeric placeholders → re-upload with real names, then verify</span>
@@ -14572,6 +14899,56 @@ load();setInterval(load,15000);
     return HTMLResponse(html)
 
 
+def _rf_class_labels(project: str, classes: dict) -> list:
+    """v3.60.0: each Roboflow class of `project` with the cwd12 species it
+    counts for and the name to show. The legacy projects keep their legacy
+    class names (renaming them is a human decision), so a person sees the
+    species first and the Roboflow label second."""
+    out = []
+    if not isinstance(classes, dict):
+        return out
+    for name, n in sorted(classes.items(), key=lambda kv: -(kv[1] or 0)):
+        sp, sp_other = _rf_class_species(project, name)
+        if sp and sp_other and sp_other != sp:
+            disp = (f"{CWD12_COMMON.get(sp, sp)} on cwd12 photographs, "
+                    f"{CWD12_COMMON.get(sp_other, sp_other)} on others "
+                    f"(Roboflow label: {name})")
+        elif sp and project in LEGACY_ROBOFLOW_PROJECTS:
+            disp = f"{CWD12_COMMON.get(sp, sp)} (Roboflow label: {name})"
+        else:
+            disp = name
+        out.append({"name": name, "count": n, "species": sp,
+                    "species_other_photos": sp_other, "display": disp})
+    return out
+
+
+def _rf_class_species(project: str, name: str):
+    """(species on cwd12 photographs, species on other photographs) of a
+    Roboflow class.
+
+    v3.60.0: in a legacy project a legacy-label class holds our uploader's
+    cwd12 boxes (legacy reading) AND boxes on non-cwd12 photographs, which
+    roboflow_sync._real_class_name and a person drawing there both name by
+    their real reading ('Carpetweeds' = carpetweed). A class total cannot be
+    split, so both readings are returned and the second is set only when it
+    differs. A class that is not a legacy label ('Waterhemp') exists there
+    only for non-cwd12 photographs and is read as a real name."""
+    if project not in LEGACY_ROBOFLOW_PROJECTS:
+        return species_of(name), None
+    if name not in CWD12_LEGACY_LABELS:
+        return species_of(name), None
+    sp = uploaded_label_species(project, name)
+    other = species_of(name)
+    return sp, (other if other != sp else None)
+
+
+def _cwd12_species_rows() -> list:
+    """The twelve species in cwd12 id order, for pages that list them."""
+    return [{"key": sp, "common": CWD12_COMMON.get(sp, sp),
+             "binomial": CWD12_BINOMIAL.get(sp, ""), "legacy": species_to_legacy(sp)}
+            for sp in CWD12_SPECIES]
+
+
 @app.get("/api/roboflow_status")
 def api_roboflow_status():
     """v3.0.60 — read-only Roboflow workspace audit for the /roboflow page.
@@ -14655,6 +15032,7 @@ def api_roboflow_status():
                 "n_classes": len(classes),
                 "boxes_total": sum(classes.values()) if isinstance(classes, dict) else 0,
                 "boxes_per_class": classes,
+                "class_labels": _rf_class_labels(slug, classes),   # v3.60.0
                 "versions": len(d.get("versions") or []),
                 "url": f"https://app.roboflow.com/{workspace}/{slug}",
             })
@@ -14685,6 +15063,7 @@ def api_roboflow_status():
         "n_projects": len(detail),
         "totals": totals,
         "projects": detail,
+        "cwd12_species": _cwd12_species_rows(),   # v3.60.0
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
     })
 
@@ -14794,9 +15173,12 @@ async function loadStatus(){
     }
     const ann = p.annotated||0, tot = p.total||0, pend = p.pending||0;
     const pct = Math.max(0,Math.min(100,p.annotated_pct||0));
+    // v3.60.0: class_labels names a legacy project's classes by species first
     const cls = p.boxes_per_class || {};
-    const clsRows = Object.entries(cls).sort((a,b)=>b[1]-a[1])
-      .map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${v}</td></tr>`).join('');
+    const lbls = p.class_labels || Object.entries(cls).sort((a,b)=>b[1]-a[1])
+      .map(([k,v])=>({name:k, count:v, display:k}));
+    const clsRows = lbls
+      .map(c=>`<tr><td>${esc(c.display||c.name)}</td><td class="n">${c.count}</td></tr>`).join('');
     return `<div class="proj">
       <h2><a href="${esc(p.url)}" target="_blank">${esc(p.slug)}</a>
           <span class="role ${esc(p.role)}">${esc(p.role)}</span></h2>
@@ -15769,7 +16151,7 @@ def classes_landing(domain: str = "weed"):
                     n_total_est = actual
             except Exception:
                 pass
-        zh = _CWD12_ZH.get(cls, "")
+        zh = _CWD12_BINOMIAL.get(cls, "")
         # v3.0.43.2: prefer inline data URI (works even with network blocking
         # subrequests); fall back to /thumb/ URL.
         thumb_inline = summary.get("first_thumb_data", "")
@@ -15803,6 +16185,7 @@ def classes_landing(domain: str = "weed"):
             {(f'<span class="badge exemplar">✓ {n_ex}</span>' if n_ex else '')}
             {(f'<span class="badge bad">✗ {n_bad}</span>' if n_bad else '')}
           </div>
+          {(f'<div class="counts"><em>{zh}</em></div>' if zh else '')}
           <div class="counts">bank {n_bank} · flux {n_flux} · real ≤{n_reg_est} ({n_reg_slugs} slugs)</div>
           <div style="height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin:5px 0">
             <div style="height:100%;width:{min(100, round(100*(n_ex+n_bad)/max(1,n_total_est)))}%;background:{'#16a34a' if (n_ex+n_bad) else '#cbd5e1'}"></div>
@@ -15988,9 +16371,26 @@ if (initParams.get('q')) {{
 def classes_detail(cls: str):
     if not _cls_ok(cls):
         raise HTTPException(400)
+    # v3.60.0: an old link may name a legacy label that no dataset uses as a
+    # real name (Carpetweeds, Morningglory); it meant the cwd12 class, so follow
+    # it to the species. Crabgrass and Nutsedge are also real names in other
+    # datasets; while one carries them they keep their own page.
+    if cls in _LEGACY_ONLY_LABELS and cls not in _load_registry_index():
+        return RedirectResponse(url=f"/classes/{_LEGACY_ONLY_LABELS[cls]}")
     pool = _class_image_pool(cls)
     if not pool and cls not in _CWD12:
         raise HTTPException(404, f"unknown class {cls!r}")
+    legacy_note = ""
+    if cls in CWD12_LEGACY_LABELS and legacy_to_species(cls) != cls:
+        _sp = legacy_to_species(cls)
+        legacy_note = (f'<div class="help">Until v3.60.0 this dashboard also used '
+                       f'<strong>{cls}</strong> as the legacy label of cwd12 id '
+                       f'{CWD12_LEGACY_LABELS.index(cls)}, which is '
+                       f'<a href="/classes/{_sp}">{_species_label(_sp)}</a>. '
+                       + (f'This page now holds {_species_label(cls)}: cwd12 boxes with its id '
+                          f'and other datasets\' boxes under that name.</div>' if cls in _CWD12 else
+                          f'The images here carry the name {cls} in their own dataset; it is not '
+                          f'a cwd12 species.</div>'))
     state = _exemplar_state(cls)
     # v3.0.111: removed the all-classes sidebar (cluttered + it ran
     # _class_summary_landing for every class on every detail load = slow).
@@ -16058,7 +16458,7 @@ def classes_detail(cls: str):
 </head><body>
 <header>
   <div class="backbar"><a class="backbtn" href="/classes">&larr; Back to Browse Data</a></div>
-  <h1>📋 Class audit · {cls}</h1>
+  <h1>📋 Class audit · {_species_label(cls) if cls in _CWD12 else cls}{(f' <span style="color:#888;font-size:15px"><em>{_CWD12_BINOMIAL[cls]}</em></span>' if cls in _CWD12_BINOMIAL else '')}</h1>
   <div class="sub">
     <strong>{len(pool)}</strong> candidates ({src_summary}) ·
     <span class="badge exemplar">✓ exemplar {n_ex}</span>
@@ -16072,6 +16472,7 @@ def classes_detail(cls: str):
   Click a thumbnail to open the full image in a new window. Filter by status below.
 </div>
 <main>
+    {legacy_note}
     {cap_note}
     <div class="bulk">
       <button class="bulk-ex" id="markall-ex" style="font-size:14px">✓ Mark ALL {len(pool)} in class as exemplar</button>
@@ -16242,12 +16643,17 @@ def api_per_species_stats():
               local YOLO .txt files matched to images on disk, primary species
               parsed from first non-empty line).
       - unlabeled: registry-known images with no labels on disk.
-      - owl: OWL red proposals (results/framework/owl_red_proposals/<species>/
-             *.txt count).
+      - owl: OWL red proposals (results/framework/owl_red_proposals_species/
+             <species>/ and the legacy owl_red_proposals/<label>/, *.txt count).
       - exemplars: bank exemplar count per species (object_bank/<sp>/).
 
     Returns per-species dict. Used by the dashboard's per-species stats panel
-    (Phase D of overnight loop)."""
+    (Phase D of overnight loop).
+
+    v3.60.0: rows are keyed by cwd12 species. Gold reads the legacy project's
+    labels through uploaded_label_species; a slug's label ids go through
+    class_species (a cwd12 copy by its id space, any other slug by its real
+    names); bank folders and pre-v3.60.0 OWL dirs are legacy-named."""
     out = {sp: {"gold": 0, "auto": 0, "unlabeled": 0,
                 "owl": 0, "exemplars": 0} for sp in _CWD12}
 
@@ -16270,8 +16676,13 @@ def api_per_species_stats():
             with urllib.request.urlopen(url, timeout=15) as r:
                 d = json.load(r)
             cls = (d.get("project", {}) or {}).get("classes", {}) or {}
-            for sp in _CWD12:
-                out[sp]["gold"] = int(cls.get(sp, 0))
+            for name, n in cls.items():
+                # v3.60.0: the gold project holds cwd12 photographs, so a
+                # legacy class reads as its legacy species; a non-legacy
+                # class ('Waterhemp') is read as its real name.
+                sp = _rf_class_species("cwd12-multiclass-v1", name)[0]
+                if sp in out:
+                    out[sp]["gold"] += int(n or 0)
     except Exception as e:
         log.warning(f"[per_species_stats] gold fetch failed: {e!r}")
 
@@ -16314,11 +16725,10 @@ def api_per_species_stats():
                     try:
                         first_line = txt_p.read_text().split("\n")[0]
                         cid = int(first_line.split()[0])
-                        if 0 <= cid < len(class_names):
-                            cname = class_names[cid]
-                            if cname in sp_counts:
-                                sp_counts[cname] += 1
-                                continue
+                        cname = class_species(slug, cid, class_names)
+                        if cname in sp_counts:
+                            sp_counts[cname] += 1
+                            continue
                         # Unknown class index — count as auto-labeled to "other"
                     except Exception:
                         pass
@@ -16333,28 +16743,46 @@ def api_per_species_stats():
             # exactly one entry; otherwise drop to "unlabeled" aggregate.
             if n_unlabeled and info.get("class_names"):
                 cn = info.get("class_names", [])
-                if len(cn) == 1 and cn[0] in out:
-                    out[cn[0]]["unlabeled"] += n_unlabeled
+                sp1 = class_species(slug, 0, cn) if len(cn) == 1 else None
+                if sp1 in out:
+                    out[sp1]["unlabeled"] += n_unlabeled
     except Exception as e:
         log.warning(f"[per_species_stats] registry walk failed: {e!r}")
 
-    # OWL proposals: count .txt files in results/framework/owl_red_proposals/<sp>/
-    owl_root = REPO / "results" / "framework" / "owl_red_proposals"
-    if owl_root.is_dir():
-        for sp in _CWD12:
-            d = owl_root / sp
-            if d.is_dir():
-                out[sp]["owl"] = sum(1 for p in d.iterdir()
-                                     if p.suffix == ".txt"
-                                     and p.stat().st_size > 0)
+    # OWL proposals: count .txt files per proposals dir
+    # v3.60.0: a dir stamped by owl_preannotate's manifest names its species;
+    # an unstamped dir is named with the legacy label it was run under.
+    # Species-era runs write to owl_red_proposals_species/<species>/, whose
+    # dirs are read only through their manifest.
+    for owl_root, legacy_root in (
+            (REPO / "results" / "framework" / "owl_red_proposals", True),
+            (REPO / "results" / "framework" / "owl_red_proposals_species", False)):
+        if not owl_root.is_dir():
+            continue
+        for d in _scandir_subdirs(owl_root, cap=200):
+            sp = None
+            try:
+                man = json.load(open(d / "_owl_proposals.json"))
+                if man.get("vocabulary") == "species":
+                    sp = man.get("species")
+            except Exception:
+                if legacy_root and d.name in CWD12_LEGACY_LABELS:
+                    sp = legacy_to_species(d.name)
+            if sp in out:
+                out[sp]["owl"] += sum(1 for p in d.iterdir()
+                                      if p.suffix == ".txt"
+                                      and p.stat().st_size > 0)
 
     # exemplars: object_bank/<sp>/* count
     # v3.0.86 (P2) fix: was REPO/"object_bank" (wrong path → always 0). The real
     # bank is results/framework/synth_cutpaste/object_bank (= _BANK_DIR).
-    bank_root = _BANK_DIR
+    # v3.60.0: the bank the pipeline reads (_bank_root). Crops the pipeline
+    # rejects (synth_cutpaste.bank_crop_usable) are still counted: that check
+    # needs mega_trainer, which the dashboard does not import.
+    bank_root = _bank_root()
     if bank_root.is_dir():
         for sp in _CWD12:
-            d = bank_root / sp
+            d = bank_root / _bank_dir_name(sp)
             if d.is_dir():
                 out[sp]["exemplars"] = sum(
                     1 for p in d.rglob("*")
@@ -16365,6 +16793,7 @@ def api_per_species_stats():
     agg = {k: sum(out[sp][k] for sp in _CWD12)
            for k in ("gold", "auto", "unlabeled", "owl", "exemplars")}
     return JSONResponse({"per_species": out, "totals": agg,
+                          "species": _cwd12_species_rows(),   # v3.60.0
                           "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S")})
 
 
@@ -16520,9 +16949,12 @@ collection matures. The dataset is the lever that lifts the overall number.</p>
 </ul>
 <p><b>⚠️ Known gaps (being worked):</b></p>
 <ul>
-  <li><b>Only 8 of 12 weed species have training data</b> — Eclipta, Goosegrass, Morningglory,
-      Nutsedge currently exist only in the eval holdout (zero train data). Closing this is the
-      data priority.</li>
+  <li><b>Four species reached the merged training set mislabelled before v3.60.0</b> — Purslane,
+      Spotted spurge, Carpetweed and Ragweed (cwd12 ids 2-5, legacy labels Eclipta, Goosegrass,
+      Morningglory, Nutsedge) are absent from cottonweed_sp8. Their cwd12 train boxes
+      (639 / 636 / 613 / 581) are in the cottonweed_holdout copy, which the merge read through a
+      stale four-name class list (0 of 3,113 boxes in the right slot). v3.60.0 maps that copy by
+      its label ids; the fix applies from the next merge.</li>
   <li><b>~5,928 real weed-bbox vs a 50K target</b> (gap ~44K) — needs more harvesting biased to weeds.</li>
   <li><b>OWL auto-label</b> was over-proposing (~600 boxes/img, precision ≈0); fixed with NMS +
       per-image top-k (re-verification pending).</li>
@@ -16703,7 +17135,7 @@ with one-click triggers.</p>
       <td>OWLv2-large image-conditioned detection. Reads exemplars +
           target images, writes YOLO .txt labels marked
           <code>red conf=… src=owlv2</code> in
-          <code>results/framework/owl_red_proposals/&lt;sp&gt;/</code>.</td></tr>
+          <code>results/framework/owl_red_proposals_species/&lt;sp&gt;/</code>.</td></tr>
   <tr><td class="btn-name">owl_upload_proposals</td><td><span class="badge sub">subprocess ~5min</span></td>
       <td>Upload OWL-proposed (image, .txt) pairs to Roboflow tagged
           <code>batch=red</code> for human review.</td></tr>

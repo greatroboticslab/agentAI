@@ -44,13 +44,21 @@ class Config:
     LABELED_DIR = os.path.join(BASE_DIR, "llm_labeled")
 
     # --- Species ---
+    # cwd12 id -> species (tools/cwd12_species.py has the evidence). Until
+    # v3.60.0 these ids carried an invented alphabetical list, kept below only
+    # for reading files written with it.
     ALL_CLASSES = {
+        0: "Waterhemp", 1: "MorningGlory", 2: "Purslane", 3: "SpottedSpurge",
+        4: "Carpetweed", 5: "Ragweed", 6: "Eclipta", 7: "PricklySida",
+        8: "PalmerAmaranth", 9: "Sicklepod", 10: "Goosegrass", 11: "CutleafGroundcherry",
+    }
+    LEGACY_ALL_CLASSES = {
         0: "Carpetweeds", 1: "Crabgrass", 2: "Eclipta", 3: "Goosegrass",
         4: "Morningglory", 5: "Nutsedge", 6: "PalmerAmaranth", 7: "PricklySida",
         8: "Purslane", 9: "Ragweed", 10: "Sicklepod", 11: "SpottedSpurge",
     }
     TRAIN_SPECIES_IDS = {0, 1, 6, 7, 8, 9, 10, 11}  # 8 species YOLO was trained on
-    HOLDOUT_SPECIES_IDS = {2, 3, 4, 5}                 # 4 unseen species
+    HOLDOUT_SPECIES_IDS = {2, 3, 4, 5}                 # 4 unseen species: Purslane, SpottedSpurge, Carpetweed, Ragweed
     NOVEL_CLASS_ID = 8  # class id used for novel weed detections in pseudo-labels
 
     # --- VLM Model Registry (read-only, never fine-tuned) ---

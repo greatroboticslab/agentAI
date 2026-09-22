@@ -26,9 +26,15 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-                "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-                "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
+try:
+    from .cwd12_species import CWD12_ID_SPACE, TRAINER_SLOT_SPECIES
+except ImportError:  # run as a plain script
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from cwd12_species import CWD12_ID_SPACE, TRAINER_SLOT_SPECIES
+
+# v3.60.0: the species held by trainer slots 0-11 (was the legacy slot labels).
+CANONICAL_12 = list(TRAINER_SLOT_SPECIES)
 
 IMG_EXTS = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
 
@@ -156,12 +162,11 @@ def main():
         is_ai = (ann == "yolo_autolabel")
         is_real = ann in ("bbox", "yolo", "bbox+segmentation")
         box_color = (0, 200, 0) if is_real else (0, 140, 240) if is_ai else (160, 160, 160)
-        # class names: cottonweed slugs use canonical 12; autolabel uses single "weed"
-        if slug in ("cottonweed_sp8", "cottonweed_holdout", "cottonweeddet12"):
-            class_names = ["Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass",
-                           "Morningglory", "Nutsedge", "PalmerAmaranth",
-                           "PricklySida", "Purslane", "Ragweed", "Sicklepod",
-                           "SpottedSpurge"]  # cwd12 original order
+        # class names: cwd12 copies name each label-file id by its species
+        # (v3.60.0; cottonweed_sp8 files use their own 0-7 ids, the others
+        # the original cwd12 ids); autolabel uses single "weed"
+        if slug in CWD12_ID_SPACE:
+            class_names = list(CWD12_ID_SPACE[slug])
         else:
             class_names = info.get("class_names") or ["target"]
 

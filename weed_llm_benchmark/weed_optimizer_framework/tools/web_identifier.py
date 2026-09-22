@@ -36,6 +36,8 @@ COMMON_WEEDS = {
     "thistle", "cirsium", "bindweed", "convolvulus", "foxtail", "setaria",
     "johnsongrass", "sorghum halepense", "bermudagrass", "cynodon",
     "horseweed", "erigeron", "nightshade", "solanum",
+    # v3.60.0: the two cwd12 species the list lacked
+    "waterhemp", "amaranthus tuberculatus", "groundcherry", "physalis",
 }
 
 
@@ -210,6 +212,8 @@ class WebIdentifier:
             "ragweed": "Ambrosia artemisiifolia",
             "sicklepod": "Senna obtusifolia",
             "spottedspurge": "Euphorbia maculata",
+            "waterhemp": "Amaranthus tuberculatus",
+            "cutleafgroundcherry": "Physalis angulata",
         }
 
         for key, species in species_map.items():

@@ -24,20 +24,36 @@ from typing import Optional, Tuple
 from .class_topic_store import (
     VALID_TOPICS, load_overrides, save_override,
 )
+from .cwd12_species import species_of
 
 logger = logging.getLogger(__name__)
 
 
 # ---------- Keyword tables (same as dashboard_server.py's heuristic) ----------
-_CWD12 = {
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-}
+# v3.60.0: the cwd12 topic is decided by species (cwd12_species.species_of),
+# not by exact membership in the legacy label list. Every alias of a cwd12
+# species now counts ("Amaranthus palmeri", "Ipomoea", "Carpet weed"), so
+# Layer 0 of classify() tags them cwd12 ahead of any stored override, and an
+# override tagging any other name "cwd12" (e.g. "Crabgrass", from the legacy
+# list) is not honoured. The names are read as real names: a caller holding a
+# cwd12 copy's stored legacy labels resolves them by id (class_species) first.
+
+
+def _is_cwd12(cls: str) -> bool:
+    return species_of(cls) is not None
+
+
+def _usable_override(cls: str, overrides: dict) -> Optional[str]:
+    """The stored topic for `cls`, unless it is a stale legacy "cwd12" tag."""
+    t = overrides.get(cls)
+    if t == "cwd12" and not _is_cwd12(cls):
+        return None
+    return t
+
 _WEED_KEYWORDS = (
     "weed", "grass", "purslane", "amaranth", "morningglory", "ragweed",
     "sicklepod", "spurge", "nutsedge", "lantana", "parthenium", "carpetweed",
-    "crabgrass", "goosegrass", "eclipta", "sida", "siamweed", "snakeweed",
+    "crabgrass", "goosegrass", "eclipta", "sida", "waterhemp", "groundcherry", "siamweed", "snakeweed",
     "pigweed", "smartweed", "chickweed", "fathen", "mayweed", "shepherd",
     "cranesbill", "knotweed", "silkybent", "blackgrass", "cleavers",
     "charlock", "kochia", "buttercup", "thistle", "nightshade",
@@ -70,7 +86,7 @@ _CROP_KEYWORDS = (
 def classify_keyword(cls: str) -> Tuple[str, float]:
     """Returns (topic, confidence_0_to_1) from keyword matching only.
     confidence is 1.0 if hit, 0.0 if 'other' fallback."""
-    if cls in _CWD12:
+    if _is_cwd12(cls):
         return ("cwd12", 1.0)
     cl = cls.lower()
     if any(k in cl for k in _WEED_KEYWORDS):
@@ -151,15 +167,15 @@ def classify(cls: str, use_llm: bool = True,
 
     # Layer 0 (v3.0.43.16): CWD12 inviolable — never override these 12 species
     # to 'weed' just because LLM said so. They have their own UI filter tab.
-    if cls in _CWD12:
+    if _is_cwd12(cls):
         out.update({"topic": "cwd12", "source": "cwd12_canonical",
                     "confidence": 1.0})
         return out
 
     # Layer 1: existing override (already classified before)
-    overrides = load_overrides()
-    if cls in overrides:
-        out.update({"topic": overrides[cls], "source": "override",
+    ov = _usable_override(cls, load_overrides())
+    if ov is not None:
+        out.update({"topic": ov, "source": "override",
                     "confidence": 1.0})
         return out
 
@@ -204,9 +220,10 @@ def classify_batch(class_names: list, use_llm: bool = True,
     overrides = load_overrides()
     results = []
     for cls in class_names:
-        if cls in overrides:
+        ov = None if _is_cwd12(cls) else _usable_override(cls, overrides)
+        if ov is not None:
             results.append({
-                "cls": cls, "topic": overrides[cls], "source": "override",
+                "cls": cls, "topic": ov, "source": "override",
                 "confidence": 1.0, "keyword_topic": None, "llm_topic": None,
             })
             continue

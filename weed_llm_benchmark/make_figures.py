@@ -28,6 +28,28 @@ OUT = ROOT / "results" / "figures"
 _JOB_SCOPED_ARTIFACT = re.compile(r"_seed\d+_\w+\.json$")
 
 
+def species_rows(rows):
+    """Per-species rows named by the species they measure.
+
+    v3.60.0: the per-class blocks of figures_data.json were written under the
+    project's old cwd12 labels (only PricklySida is the species; see
+    docs/CWD12_SPECIES.md). The whole list is translated at once, and a list
+    that already names species passes through unchanged. The source label is
+    kept beside the species so each row can still be found in its anchor.
+    Returns (rows, translated)."""
+    from weed_optimizer_framework.tools.cwd12_species import (
+        CWD12_COMMON, species_names_for)
+    labels = [r["cls"] for r in rows]
+    species = species_names_for(labels)
+    out = []
+    for r, label, sp in zip(rows, labels, species):
+        row = dict(r)
+        row["species"] = CWD12_COMMON.get(sp, sp)
+        row["label"] = label
+        out.append(row)
+    return out, species != labels
+
+
 def load():
     d = json.loads(DATA.read_text())
     # fill pending quality-vs-scale points from M1 artifacts when they exist
@@ -154,10 +176,13 @@ def main():
                    ["#", "Model", "Params", "mAP@0.5", "mAP50-95", "Note"]))
 
     ps = d["per_species_yolo11n_val"]
+    rows, translated = species_rows(ps["rows"])
     (OUT / "per_species.md").write_text(
         "# Per-species validation — YOLO11n baseline\n\n*%s*\n\n" % ps["anchor"]
-        + md_table(ps["rows"], ["cls", "map50", "map50_95"],
-                   ["Species", "mAP@0.5", "mAP50-95"]))
+        + md_table(rows, ["species", "label", "map50", "map50_95"],
+                   ["Species", "Label in source", "mAP@0.5", "mAP50-95"])
+        + ("\nThe source recorded the old cwd12 labels; each is translated to the "
+           "species of its class id (docs/CWD12_SPECIES.md).\n" if translated else ""))
 
     sd = d["rfdetr_seeds"]
     (OUT / "rfdetr_seeds.md").write_text(

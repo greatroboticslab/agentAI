@@ -25,7 +25,8 @@ HC(){ curl -s -o /dev/null -w '%{http_code}' --max-time 40 "$@"; }
 BA="-u $U:$P"
 
 echo "AgentAI smoke test → $BASE"
-CLS=$(curl -s $BA --max-time 25 "$BASE/api/annotation_status" | python3 -c "import json,sys;d=json.load(sys.stdin);print((d['rows'][0]['cwd12'] or ['Crabgrass'])[0])" 2>/dev/null || echo Crabgrass)
+# v3.60.0: the fallback class is a cwd12 species (Crabgrass is not one)
+CLS=$(curl -s $BA --max-time 25 "$BASE/api/annotation_status" | python3 -c "import json,sys;d=json.load(sys.stdin);print((d['rows'][0]['cwd12'] or ['MorningGlory'])[0])" 2>/dev/null || echo MorningGlory)
 SLUG=$(curl -s $BA --max-time 25 "$BASE/api/annotation_status" | python3 -c "import json,sys;print(json.load(sys.stdin)['rows'][0]['slug'])" 2>/dev/null || echo cottonweed_sp8)
 echo "(class=$CLS slug=$SLUG)"
 

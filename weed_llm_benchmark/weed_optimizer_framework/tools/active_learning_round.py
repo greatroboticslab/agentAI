@@ -57,20 +57,31 @@ REPO = Path(os.environ.get(
     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark",
 ))
 
-CWD12 = (
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
+sys.path.insert(0, str(REPO))
+from weed_optimizer_framework.tools.cwd12_species import (  # noqa: E402
+    CWD12_SPECIES, species_of,
 )
-BANK_DIR = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
-ROUND_DIR = REPO / "results" / "framework" / "active_learning_rounds"
+
+# v3.60.0: a round is per cwd12 species (the legacy label list named ids 1 and 5
+# "Crabgrass" and "Nutsedge", neither of which cwd12 holds). Exemplars come from
+# the object bank through synth_cutpaste.bank_class_dirs, which reads the legacy
+# folder names as species. Rounds scheduled before sit under legacy names in
+# active_learning_rounds/; new ones go to their own directory.
+CWD12 = tuple(CWD12_SPECIES)
+ROUND_DIR = REPO / "results" / "framework" / "active_learning_rounds_species"
+
+
+def species_arg(name: str) -> Optional[str]:
+    """The cwd12 species a CLI name refers to (species key or any alias)."""
+    return name if name in CWD12 else species_of(name)
 
 
 def gather_green_exemplars(species: str, max_per_species: int = 10) -> list:
     """Read existing green exemplars (confirmed gold) for this species.
 
     Source order (most-trusted first):
-      1. results/framework/synth_cutpaste/object_bank/<species>/*  (CWD12 cut-paste bank)
+      1. the synth_cutpaste object bank (species bank, else the legacy bank
+         read through bank_class_dirs; unusable crops filtered out)
       2. results/framework/exemplar_sets/<species>/*  (user ✓-marked in /classes UI)
       3. (future) human-uploaded approved boxes from cwd12-<species> Roboflow project.
 
@@ -79,15 +90,19 @@ def gather_green_exemplars(species: str, max_per_species: int = 10) -> list:
     1.0, 1.0] (whole crop = the object). For real-image exemplars with
     bbox metadata, those should pass through unchanged.
     """
+    from weed_optimizer_framework.tools import synth_cutpaste as _sc
     out = []
-    # object_bank/<species>/<crop>.jpg — each file is a tight crop
-    bank_sp = BANK_DIR / species
-    if bank_sp.is_dir():
-        for p in sorted(bank_sp.iterdir()):
-            if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
-                out.append({"image": str(p), "bbox_yolo": [0.5, 0.5, 1.0, 1.0]})
+    # bank folder(s) of this species — each file is a tight crop
+    root = _sc.default_bank_dir()
+    for sp, d in _sc.bank_class_dirs(root):
+        if sp != species:
+            continue
+        for p in sorted(d.iterdir()):
             if len(out) >= max_per_species:
                 break
+            if (p.suffix.lower() in (".jpg", ".jpeg", ".png")
+                    and _sc.bank_crop_usable(root, p)):
+                out.append({"image": str(p), "bbox_yolo": [0.5, 0.5, 1.0, 1.0]})
     # TODO: read from exemplar_sets/<species> when E2/E3 lands
     # TODO: pull human-approved bboxes from Roboflow cwd12-<species>
     return out
@@ -97,7 +112,9 @@ def write_exemplar_config(species: str, exemplars: list, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     cfg_path = out_dir / f"{species}.json"
     with open(cfg_path, "w") as f:
-        json.dump({"species": species, "exemplars": exemplars,
+        # owl_preannotate accepts only a config that declares its vocabulary
+        json.dump({"species": species, "vocabulary": "species",
+                   "exemplars": exemplars,
                    "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S")},
                    f, indent=2)
     return cfg_path
@@ -230,7 +247,7 @@ def run_round_one_species(species: str, target_dir: Path, round_n: int,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("species", help="species name (CWD12) or 'all'")
+    ap.add_argument("species", help="a cwd12 species (e.g. Waterhemp) or 'all'")
     ap.add_argument("--target-dir", required=True,
                     help="dir of unlabeled images to annotate this round")
     ap.add_argument("--round", type=int, default=1,
@@ -244,11 +261,15 @@ def main():
         print(f"FATAL: target-dir not found: {target_dir}", file=sys.stderr)
         sys.exit(2)
 
-    targets = list(CWD12) if args.species.lower() == "all" else [args.species]
-    for sp in targets:
-        if sp not in CWD12:
-            print(f"FATAL: {sp} not in CWD12", file=sys.stderr)
+    if args.species.lower() == "all":
+        targets = list(CWD12)
+    else:
+        sp = species_arg(args.species)
+        if sp is None:
+            print(f"FATAL: {args.species} is not a cwd12 species "
+                  f"({', '.join(CWD12)})", file=sys.stderr)
             sys.exit(2)
+        targets = [sp]
 
     print(f"=== active-learning round {args.round} ({len(targets)} species) ===")
     print(f"  target: {target_dir}")

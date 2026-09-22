@@ -16,6 +16,11 @@ from pathlib import Path
 from ..config import Config
 from .dataset_discovery import DatasetDiscovery, REGISTRY_PATH
 from .registry_lock import update_registry
+from .cwd12_species import (species_of, legacy_to_species, is_legacy_label_list,
+                            CWD12_LEGACY_LABELS, TRAINER_SLOT_LEGACY,
+                            TRAINER_SLOT_SPECIES, CWD12_ID_TO_SLOT)
+from .near_dup import (NEAR_DUP_BITS, HOLDOUT_NEAR_DUP_BITS,
+                       NearHashIndex as _NearHashIndex)
 
 logger = logging.getLogger(__name__)
 
@@ -130,20 +135,37 @@ def _find_label_for_image(img_path, dataset_root):
 # v3.0.25: canonical 12-class cottonweed system, NEVER_TRAIN holdout, slot-based
 # class assignment for autolabel data so they don't pollute the 12 weed classes.
 
-CANONICAL_12_NAMES = [
-    "Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-    "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-    "Eclipta", "Goosegrass", "Morningglory", "Nutsedge",
-]
+# The LEGACY labels of the trainer slots and of the original cwd12 ids (the
+# tables live in cwd12_species). Kept for reading old checkpoints and reports;
+# nothing joins through them.
+CANONICAL_12_NAMES = list(TRAINER_SLOT_LEGACY)
 
 # Original cottonweeddet12 class order (different from CANONICAL — this is what
 # leave4out's data uses). Maps original_id -> canonical_id.
-CWD12_ORIGINAL_NAMES = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass",
-    "Morningglory", "Nutsedge", "PalmerAmaranth", "PricklySida",
-    "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-]
+CWD12_ORIGINAL_NAMES = list(CWD12_LEGACY_LABELS)
 CWD12_ORIG_TO_CANON = {i: CANONICAL_12_NAMES.index(n) for i, n in enumerate(CWD12_ORIGINAL_NAMES)}
+assert CWD12_ORIG_TO_CANON == CWD12_ID_TO_SLOT
+
+# v3.60.0: the two lists above are labels, not species (see cwd12_species: only
+# PricklySida is right, and cwd12 has no Crabgrass or Nutsedge). The slot ids are
+# unchanged so existing checkpoints stay valid; CANONICAL_12_SPECIES is what each
+# slot actually holds, and it is the only thing an external class name may be
+# joined through. Joining through the labels put 3SeasonWeedDet10's Purslane
+# into the PalmerAmaranth slot, its Ragweed into Sicklepod, and deleted its
+# Waterhemp, Carpetweed and MorningGlory boxes outright.
+CANONICAL_12_SPECIES = list(TRAINER_SLOT_SPECIES)
+
+# cwd12-derived copies under results/leave4out/. Their label files do not follow
+# the class_names the registry holds for them, so they are mapped by id space:
+# dataset_8species writes slot ids 0-7 directly; dataset_holdout keeps the
+# original cwd12 ids 0-11, while its registry entry lists four names -- a name
+# lookup read its id 0 (Waterhemp) as "Eclipta" and deleted ids 4-11. Both maps
+# are re-checked against cwd12's own train labels on every merge
+# (_verify_cwd12_copy); a copy that disagrees is left out of the merge.
+CWD12_COPY_ID_MAPS = {
+    "cottonweed_sp8": {i: i for i in range(8)},
+    "cottonweed_holdout": dict(CWD12_ORIG_TO_CANON),
+}
 
 # Datasets that share results/leave4out/data physical path. Both registry entries
 # point to the same images, so we pick ONE (cottonweed_sp8) as primary and use
@@ -157,6 +179,10 @@ NEVER_TRAIN_SLUGS = {
     "cottonweeddet12",
     "weedsense",
     "francesco__weed_crop_aerial",
+    # v3.60.0: the out-of-domain test set of crossdataset_eval (S6). It was
+    # harvested and merged like any other slug, so a merged head had already
+    # trained on the images it was then said to transfer to.
+    "project_agml__imageweeds_weed_detection",
 }
 
 # v3.0.28: stem-level defence. Even for SLUGS that are legitimately merge-eligible
@@ -169,6 +195,10 @@ NEVER_TRAIN_SLUGS = {
 # harvested image that collides with a holdout image is reported as a leak
 # (skipped_holdout_hash) rather than a benign cross-dataset duplicate.
 HOLDOUT_HASH_SENTINEL = "__HOLDOUT__"
+
+# v3.60.0: re-encoded copies (a few dHash bits apart) are the same photograph;
+# near_dup.py has the numbers. Only the holdout guard and the verified cwd12
+# copies use the near test (_dedup_verdict); other dedup stays exact.
 
 
 def _holdout_image_dirs():
@@ -216,6 +246,81 @@ def _load_holdout_dhashes():
             hashes[h] = HOLDOUT_HASH_SENTINEL
     return hashes
 
+
+def _dedup_verdict(hits, ds_name):
+    """Whether an image already in the index blocks this one: ("holdout", bits),
+    ("duplicate", 0), ("near_cwd12", bits) or None. `hits` is
+    NearHashIndex.matches() -- every stored (owner, bits) within NEAR_DUP_BITS
+    (HOLDOUT_NEAR_DUP_BITS for a holdout hash; near_dup.is_holdout_owner),
+    nearest first, owner = (dataset, image).
+
+    Near matches count only against the sealed holdout and the verified cwd12
+    copies (natural field photos); against anything else only an exact hash is a
+    duplicate, because different padded or studio images also land within a few
+    bits (near_dup.py)."""
+    for (owner_ds, _img), bits in hits:
+        if owner_ds == HOLDOUT_HASH_SENTINEL:
+            return "holdout", bits
+    for (_owner_ds, _img), bits in hits:
+        if bits == 0:
+            return "duplicate", 0
+    if ds_name not in CWD12_COPY_ID_MAPS:
+        for (owner_ds, _img), bits in hits:
+            if owner_ds in CWD12_COPY_ID_MAPS:
+                return "near_cwd12", bits
+    return None
+
+
+def _cwd12_train_label_dir():
+    for c in (Path("downloads/cottonweeddet12/train/labels"),
+              Path("/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark")
+              / "downloads/cottonweeddet12/train/labels"):
+        if c.is_dir():
+            return c
+    return None
+
+
+def _read_yolo_boxes(path):
+    out = []
+    try:
+        for ln in open(path):
+            t = ln.split()
+            if len(t) >= 5:
+                out.append((int(float(t[0])),) + tuple(float(x) for x in t[1:5]))
+    except (OSError, ValueError):
+        pass
+    return out
+
+
+def _verify_cwd12_copy(local_path, ds_map, files_per_split=200, tol=0.02):
+    """Box-match a cwd12 copy's label files against cwd12's own train labels.
+
+    For every box whose coordinates match a cwd12 box (within `tol`), check that
+    ds_map sends it to the slot cwd12's id belongs in. Returns (agree, matched);
+    (0, 0) when the reference labels are not on this machine. Reads at most
+    3 x files_per_split small label files by name -- no tree walk."""
+    ref = _cwd12_train_label_dir()
+    if ref is None:
+        return 0, 0
+    agree = matched = 0
+    for split in ("train", "valid", "test"):
+        d = Path(local_path) / split / "labels"
+        if not d.is_dir():
+            continue
+        for name in sorted(os.listdir(d))[:files_per_split]:
+            theirs = _read_yolo_boxes(ref / name)
+            if not theirs:
+                continue
+            for box in _read_yolo_boxes(d / name):
+                m = next((t for t in theirs
+                          if all(abs(a - b) < tol for a, b in zip(box[1:], t[1:]))), None)
+                if m is None:
+                    continue
+                matched += 1
+                if ds_map.get(box[0]) == CWD12_ORIG_TO_CANON.get(m[0]):
+                    agree += 1
+    return agree, matched
+
 # Reserve class IDs:
 #   0-11  : 12 canonical weed species (cottonweeddet12)
 #   12-99 : auxiliary plant/non-weed classes (autolabeled). Slot assigned by
@@ -234,30 +339,40 @@ def _aux_class_for_slug(slug):
 
 
 def _is_cottonweed_dataset(slug, info):
-    """Heuristic: does this dataset use the cottonweeddet12 12-class system?"""
+    """Heuristic: does this dataset name at least 4 of the cwd12 species?"""
     if slug in COTTONWEED_LEAVE4OUT_SLUGS:
         return True
     names = info.get("class_names") or []
-    overlap = sum(1 for n in names if n in CANONICAL_12_NAMES)
-    return overlap >= 4  # at least 4 of 12 weed names → likely a cottonweed source
+    overlap = {species_of(n) for n in names} - {None}
+    return len(overlap) >= 4
+
+
+def _species_class_map(slug, names):
+    """source id -> slot, joining each class name through the species it names.
+    A name that is not a cwd12 species gets an auxiliary slot of its own rather
+    than being dropped: a dropped box leaves its plant in the image as
+    background, which teaches the detector that the plant is not there.
+    A whole legacy label list (a copy of our own cwd12 export) is read as
+    legacy labels, never as real names."""
+    legacy = is_legacy_label_list(names)
+    ds_map = {}
+    for i, n in enumerate(names):
+        sp = (legacy_to_species(n) if (legacy and n in CWD12_LEGACY_LABELS)
+              else None if legacy else species_of(n))
+        ds_map[i] = (CANONICAL_12_SPECIES.index(sp) if sp is not None
+                     else _aux_class_for_slug(slug + "_" + n))
+    return ds_map
 
 
 def _build_canonical_class_map(slug, info):
     """Return (ds_class_map, names_added).
     ds_class_map: dict mapping source_class_id -> canonical_id.
     """
+    if slug in CWD12_COPY_ID_MAPS:
+        return dict(CWD12_COPY_ID_MAPS[slug]), []
+
     if _is_cottonweed_dataset(slug, info):
-        # Use the source's class_names list to map by NAME into CANONICAL_12_NAMES.
-        names = info.get("class_names") or []
-        if not names:
-            # Common case: cottonweed_sp8 / cottonweed_holdout share leave4out data
-            # which uses CWD12_ORIGINAL_NAMES order. Default to that.
-            return dict(CWD12_ORIG_TO_CANON), []
-        ds_map = {}
-        for i, n in enumerate(names):
-            if n in CANONICAL_12_NAMES:
-                ds_map[i] = CANONICAL_12_NAMES.index(n)
-        return ds_map, []
+        return _species_class_map(slug, info.get("class_names") or []), []
 
     if info.get("annotation") == "yolo_autolabel":
         # Auxiliary plant/disease/pest data — assign a single auxiliary class
@@ -266,19 +381,11 @@ def _build_canonical_class_map(slug, info):
         aux = _aux_class_for_slug(slug)
         return {0: aux}, []
 
-    # Other real-bbox datasets with class_names: try name-match into canonical
-    # weed classes; otherwise assign each unique name to a fresh aux slot.
+    # Other real-bbox datasets with class_names: a name that is a cwd12 species
+    # joins its slot; any other name (crops, pests) gets an aux slot.
     names = info.get("class_names") or []
     if names:
-        ds_map = {}
-        for i, n in enumerate(names):
-            if n in CANONICAL_12_NAMES:
-                ds_map[i] = CANONICAL_12_NAMES.index(n)
-            else:
-                # Off-target real-bbox dataset (e.g., crops, pests). Bucket into one
-                # aux slot per dataset to keep the class set bounded.
-                ds_map[i] = _aux_class_for_slug(slug + "_" + n)
-        return ds_map, []
+        return _species_class_map(slug, names), []
 
     # No class_names registered. Don't drop the data; map every source class id
     # found in actual label files to a single aux slot for this dataset.
@@ -324,10 +431,11 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
              "skipped_duplicates": 0, "unique_hashes": 0,
              "skipped_autolabel": 0, "skipped_never_train": 0,
              "skipped_holdout_stem": 0, "skipped_holdout_hash": 0,
+             "skipped_holdout_near": 0, "skipped_near_cwd12": 0,
              "skipped_user_flag": 0,
              "skipped_low_dino": 0,
-             "weed_class_instances": {n: 0 for n in CANONICAL_12_NAMES}}
-    seen_hashes = {}
+             "weed_class_instances": {n: 0 for n in CANONICAL_12_SPECIES}}
+    seen_hashes = _NearHashIndex()
 
     # v3.0.28: load cwd12 holdout stems to block alias contamination at the
     # per-image level. See NEVER_TRAIN_SLUGS comment above for rationale.
@@ -342,9 +450,11 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     # NEVER_TRAIN slug list are the ONLY guards, and both are filename-based — a
     # Roboflow/Kaggle re-upload of cwd12 test images leaks straight into training
     # and silently inflates the 'never-train' holdout mAP.
-    seen_hashes.update(_load_holdout_dhashes())
+    for _h, _who in _load_holdout_dhashes().items():
+        seen_hashes.add(_h, (_who, None))
     logger.info(f"[Merge] holdout dHash guard active: {len(seen_hashes)} holdout "
-                f"image hashes pre-seeded (renamed holdout copies now blocked)")
+                f"image hashes pre-seeded; copies within {HOLDOUT_NEAR_DUP_BITS} bits blocked "
+                f"(other near matches: {NEAR_DUP_BITS} bits)")
 
     # v3.0.30.1: user-driven REQ-3 quality feedback — slugs the user marked
     # as garbage via the dashboard get skipped here. The flags file is
@@ -399,7 +509,11 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     if include_autolabel:
         valid_annotations.add("yolo_autolabel")
 
-    for ds_name, info in registry.items():
+    # v3.60.0: the verified cwd12 copies go first, so when a re-upload of the same
+    # photograph appears later (rf_agrobot is all of CottonWeedDet12 again) it is
+    # the copy with checked labels that keeps them. Otherwise registry order.
+    for ds_name, info in sorted(registry.items(),
+                                key=lambda kv: kv[0] not in CWD12_COPY_ID_MAPS):
         # v3.0.25: NEVER_TRAIN protection — even if Brain ever asks to ingest
         # these slugs, the merge skips them outright.
         if ds_name in NEVER_TRAIN_SLUGS:
@@ -450,6 +564,23 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
         # v3.0.25: CANONICAL class mapping replaces the old per-merge-order map.
         ds_class_map, _ = _build_canonical_class_map(ds_name, info)
 
+        # v3.60.0: a cwd12 copy carries the core species; its id map is checked
+        # against cwd12's own labels before any of it trains. A copy that no
+        # longer agrees (re-exported, re-split, relabelled) is left out loudly.
+        if ds_name in CWD12_COPY_ID_MAPS:
+            agree, matched = _verify_cwd12_copy(local_path, ds_class_map)
+            stats.setdefault("cwd12_copy_check", {})[ds_name] = {
+                "agree": agree, "matched_boxes": matched}
+            if matched == 0:
+                logger.warning(f"[Merge] {ds_name}: cwd12 train labels not found "
+                               f"here -- id map used unchecked")
+            elif agree < 0.98 * matched:
+                stats["skipped_class_map_mismatch"] = stats.get(
+                    "skipped_class_map_mismatch", 0) + 1
+                logger.error(f"[Merge] {ds_name}: only {agree}/{matched} boxes land "
+                             f"in cwd12's slot -- copy left out of this merge")
+                continue
+
         # v3.0.19: load dHash cache for this dataset if present. First run writes
         # the cache; subsequent rounds skip the 2-3ms-per-image hash compute
         # (185K images × 2ms = 6min saved per round; with auto-chain this
@@ -483,19 +614,34 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                     cache[rel_key] = h
                     cache_updated = True
             if h is not None:
-                if h in seen_hashes:
-                    if seen_hashes[h] == HOLDOUT_HASH_SENTINEL:
+                verdict = _dedup_verdict(seen_hashes.matches(h), ds_name)
+                if verdict is not None:
+                    kind, bits = verdict
+                    if kind == "holdout":
                         # v3.1: this harvested image is a content-match for a cwd12
                         # holdout image (renamed copy that slipped past the stem
                         # filter). Dropping it is what keeps the eval set out of
                         # training. Tracked separately so leakage is observable.
-                        stats["skipped_holdout_hash"] += 1
-                    else:
+                        # v3.60.0: a re-encoded copy (bits > 0) counts too.
+                        stats["skipped_holdout_hash" if bits == 0
+                              else "skipped_holdout_near"] += 1
+                        if bits:
+                            _near = stats.setdefault("holdout_near_by_dataset", {})
+                            _near[ds_name] = _near.get(ds_name, 0) + 1
+                    elif kind == "duplicate":
                         # Already saw an identical image from another dataset
                         stats["skipped_duplicates"] += 1
                         ds_dup_count += 1
+                    else:
+                        # v3.60.0: a re-encoded copy of a cwd12 train photograph
+                        # that a verified copy already contributed with checked
+                        # labels (rf_agrobot re-uploads all of cwd12 with none).
+                        stats["skipped_near_cwd12"] += 1
+                        ds_dup_count += 1
+                        _nc = stats.setdefault("near_cwd12_by_dataset", {})
+                        _nc[ds_name] = _nc.get(ds_name, 0) + 1
                     continue
-                seen_hashes[h] = ds_name
+                seen_hashes.add(h, (ds_name, rel_key))
 
             # v3.0.25: STRICT class remap — drop any line whose src_cls is not
             # in ds_class_map. Previously fallback `ds_class_map.get(src_cls, src_cls)`
@@ -528,7 +674,7 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                     # No mapping → drop bbox.
                     continue
                 if 0 <= new_cls < 12:
-                    name = CANONICAL_12_NAMES[new_cls]
+                    name = CANONICAL_12_SPECIES[new_cls]
                     stats["weed_class_instances"][name] += 1
                 remapped.append(" ".join([str(new_cls)] + parts[1:]))
             if not remapped:
@@ -594,7 +740,10 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     # v3.0.25: fixed nc=TOTAL_NC (100) so head structure is stable across
     # mini-rounds even as new aux classes appear. names_list has the 12 weed
     # names in slots 0-11, then "aux_<slug>" placeholders for slots 12-99.
-    names_list = list(CANONICAL_12_NAMES) + [f"aux_{i}" for i in range(AUX_CLASS_START, AUX_CLASS_END)]
+    # v3.60.0: slots 0-11 are written with the species they hold, so a new
+    # checkpoint's model.names is true; older checkpoints carry the legacy
+    # labels and are read through cwd12_species.species_names_for().
+    names_list = list(CANONICAL_12_SPECIES) + [f"aux_{i}" for i in range(AUX_CLASS_START, AUX_CLASS_END)]
     assert len(names_list) == TOTAL_NC
 
     # v3.0.25: if `val_dataset_root` provided (e.g., the cottonweeddet12 holdout
@@ -693,7 +842,7 @@ def _oversample_weak_weed_classes(out_dir, target_min, stats):
 
     stats["oversample"] = {}
     counts = stats["weed_class_instances"]
-    for cid, name in enumerate(CANONICAL_12_NAMES):
+    for cid, name in enumerate(CANONICAL_12_SPECIES):
         cur = counts.get(name, 0)
         if cur >= target_min or not cls_to_files[cid]:
             stats["oversample"][name] = {"before": cur, "after": cur, "copies": 0}

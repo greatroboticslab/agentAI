@@ -51,6 +51,12 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageFilter
 
+from weed_optimizer_framework.tools.cwd12_species import (
+    CWD12_SPECIES, class_species,
+    BANK_VOCAB_FILE as _BANK_VOCAB_FILE, bank_vocabulary, bank_folder_species,
+    bank_in_use,
+)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -65,17 +71,29 @@ REPO = Path(os.environ.get(
 REGISTRY_PATH = REPO / "results" / "framework" / "dataset_registry.json"
 SYNTH_DIR     = REPO / "results" / "framework" / "synth_cutpaste"
 BANK_DIR      = SYNTH_DIR / "object_bank"
-BG_DIR        = SYNTH_DIR / "backgrounds"
-OUT_IMG_DIR   = SYNTH_DIR / "images"
-OUT_LBL_DIR   = SYNTH_DIR / "labels"
+# v3.60.0: object_bank/ holds folders named with the legacy cwd12 labels
+# ("Crabgrass" = morning glory). It is kept as it is and read through
+# bank_class_dirs(); a bank built from now on is keyed by species and goes to
+# its own directory, marked by BANK_VOCAB_FILE, so no directory mixes the two
+# vocabularies ("Ragweed" is a folder name in both).
+SPECIES_BANK_DIR = SYNTH_DIR / "object_bank_species"
+BANK_VOCAB_FILE  = _BANK_VOCAB_FILE
+# v3.60.0: backgrounds/ was filled before any holdout filter (cwd12 weedImages,
+# the cottonweed_* test splits) and records no provenance, so its bg_NNNN.jpg
+# may be sealed eval photographs. Guarded backgrounds go to their own dir and
+# are used only once BG_GUARD_FILE marks a finished guarded run.
+LEGACY_BG_DIR = SYNTH_DIR / "backgrounds"
+BG_DIR        = SYNTH_DIR / "backgrounds_guarded"
+BG_GUARD_FILE = ".holdout_guarded"
+# v3.60.0: compose writes cwd12 ids named by species; images/ and labels/
+# hold earlier output whose ids index the sorted legacy folder names, so new
+# output goes to composed_species/.
+OUT_IMG_DIR   = SYNTH_DIR / "composed_species" / "images"
+OUT_LBL_DIR   = SYNTH_DIR / "composed_species" / "labels"
 
-# Canonical 12 cottonweed classes — kept identical to mega_trainer.CANONICAL_12
-# so synthetic labels share the detector's class space.
-CANONICAL_12 = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass",
-    "Morningglory", "Nutsedge", "PalmerAmaranth", "PricklySida",
-    "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-]
+# The 12 cwd12 species in cwd12 label-id order (v3.60.0: species, not the
+# legacy labels). Synthetic label ids are cwd12 ids.
+CANONICAL_12 = list(CWD12_SPECIES)
 
 # Trusted real-bbox slugs whose GT boxes seed the object bank. Identical
 # to dinov2_curator.TRUSTED_SLUGS — these are the verified anchors.
@@ -163,26 +181,14 @@ def _exg_mask(rgb: np.ndarray) -> np.ndarray:
 
 
 # ----------------------------------------------------------------------------
-# Canonical 12-class resolution (v3.0.39.4 bug fix)
+# Canonical 12-class resolution
 # ----------------------------------------------------------------------------
-# Bug found 2026-05-24: Goosegrass / Crabgrass bank crops were broadleaf
-# plants (not grasses) — because build_bank trusted `info["class_names"][cid]`
-# blindly, but some slugs' class_names list is mis-ordered vs the actual
-# label-file class IDs (the same bug mega_trainer fixed in v3.0.25 via
-# CANONICAL_12 name-matching). Side effect: the linear head was trained on
-# mislabeled crops, so its 0.667 held-out accuracy is partly noise.
-#
-# Resolution: only accept a bank crop if its (slug, src_cid) maps to one of
-# the CANONICAL_12 names via NAME-matching (fall back to the well-known
-# original cwd12 ordering only for cottonweed_* slugs that lack class_names).
-# Anything that doesn't map gets dropped — keeps the bank clean by design.
-
-# cwd12's original published class ordering (5648-image release):
-_CWD12_ORIG = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-]
+# v3.0.39.4 found Goosegrass / Crabgrass bank crops that were broadleaf plants.
+# The cause was the name table: the legacy label "Goosegrass" is cwd12 id 3
+# (spotted spurge) and "Crabgrass" is id 1 (morning glory). v3.60.0 resolves
+# every crop to its species: cwd12 copies by label-file id, other slugs by the
+# real name of the class (cwd12_species.class_species). Anything else is
+# dropped: better to lose a crop than to bank it under the wrong species.
 
 
 def _norm(s: str) -> str:
@@ -190,45 +196,148 @@ def _norm(s: str) -> str:
     return "".join(ch for ch in str(s).lower() if ch.isalnum())
 
 
-_CANON_NORM = {_norm(c): c for c in CANONICAL_12}
-
-
 def _canon_name_for_label(slug: str, info: dict, src_cid: int) -> str | None:
-    """Map (slug, src_class_id) -> a CANONICAL_12 name, or None to skip.
-
-    1. If the slug has class_names registered, name-match into CANONICAL_12
-       (case/punct-insensitive). Drops anything that doesn't match — better
-       to lose a crop than to bank it under the wrong species.
-    2. If class_names absent AND slug is cottonweed-related, fall back to
-       the published cwd12 ordering (_CWD12_ORIG).
-    3. Otherwise return None.
-    """
+    """Map (slug, src_class_id) -> a cwd12 species, or None to skip."""
     names = info.get("class_names") if isinstance(info, dict) else None
-    if names and 0 <= src_cid < len(names):
-        return _CANON_NORM.get(_norm(names[src_cid]))
-    if "cottonweed" in slug.lower() and 0 <= src_cid < len(_CWD12_ORIG):
-        return _CWD12_ORIG[src_cid]
-    return None
+    return class_species(slug, src_cid, names or [])
+
+
+# bank_vocabulary / bank_folder_species live in cwd12_species (v3.60.0) so the
+# dashboard, which does not import this module, reads banks the same way.
+
+
+# v3.60.0: the eval holdout never feeds the bank. NEVER_TRAIN slugs are not
+# cropped at all (cottonweeddet12 ships its test+valid split beside train), and
+# from the other slugs a photograph that is a cwd12 test/valid image (same stem,
+# or a dHash within HOLDOUT_NEAR_DUP_BITS) is skipped: the same guard mega_trainer
+# applies at merge time, since composed images are training images.
+_HOLDOUT_GUARD: dict = {}
+
+
+def _holdout_images() -> list[Path]:
+    """cwd12 test+valid images (the sealed eval set), under REPO and wherever
+    mega_trainer looks for them."""
+    from weed_optimizer_framework.tools import mega_trainer as _mt
+    dirs = [REPO / "downloads" / "cottonweeddet12" / s / "images"
+            for s in ("test", "valid")] + list(_mt._holdout_image_dirs())
+    seen: dict[str, Path] = {}
+    for d in dirs:
+        if not d.is_dir():
+            continue
+        for p in d.iterdir():
+            if p.suffix.lower() in IMG_EXTS:
+                seen.setdefault(str(p.resolve()), p)
+    return list(seen.values())
+
+
+def _holdout_guard(with_hashes: bool = False) -> dict:
+    """{"never": NEVER_TRAIN slugs, "stems": holdout stems[, "hashes":
+    NearHashIndex of holdout dHashes]}, loaded once."""
+    g = _HOLDOUT_GUARD
+    if "stems" not in g:
+        from weed_optimizer_framework.tools import mega_trainer as _mt
+        imgs = _holdout_images()
+        g["never"] = frozenset(_mt.NEVER_TRAIN_SLUGS)
+        g["stems"] = frozenset(p.stem for p in imgs)
+        g["_imgs"] = imgs
+        if not imgs:
+            # v3.60.0: fail closed, as merge_roboflow_projects.cwd12_photo_index
+            # does; an empty guard would let eval photographs into training.
+            raise RuntimeError(
+                "cwd12 test/valid images not found under REPO or mega_trainer's "
+                "holdout dirs; refusing to build training images without the "
+                "holdout guard")
+        if len(imgs) < 1977:
+            log.warning(f"holdout guard: only {len(imgs)} cwd12 test/valid "
+                        f"images found (expected 1,977)")
+    if with_hashes and "hashes" not in g:
+        from weed_optimizer_framework.tools import mega_trainer as _mt
+        from weed_optimizer_framework.tools.near_dup import NearHashIndex
+        idx = NearHashIndex()
+        for p in g["_imgs"]:
+            h = _mt._dhash(p)
+            if h is not None:
+                idx.add(h, "holdout")
+        g["hashes"] = idx
+    return g
+
+
+def _is_holdout_photo(img_path: Path, guard: dict) -> bool:
+    if img_path.stem in guard["stems"]:
+        return True
+    if "hashes" in guard:
+        from weed_optimizer_framework.tools import mega_trainer as _mt
+        h = _mt._dhash(img_path)
+        return h is not None and guard["hashes"].find(h) is not None
+    return False
+
+
+def _crop_source(name: str) -> tuple[str | None, str]:
+    """(slug, photo stem) of a bank crop named '<slug>_<stem>_<idx>.png'."""
+    stem = Path(name).stem
+    for slug in sorted(TRUSTED_SLUGS, key=len, reverse=True):
+        if stem.startswith(slug + "_"):
+            return slug, stem[len(slug) + 1:].rsplit("_", 1)[0]
+    return None, stem
+
+
+def bank_crop_usable(root: Path, path: Path) -> bool:
+    """False for a crop that must not be used: one cut from a NEVER_TRAIN
+    slug or from a cwd12 test/valid photograph (a bank built before v3.60.0
+    did not filter either), and, in a legacy bank, any cottonweed_holdout
+    crop, because those were filed through its four-name class list although
+    its label files use all twelve ids."""
+    slug, stem = _crop_source(Path(path).name)
+    guard = _holdout_guard()
+    if slug in guard["never"] or stem in guard["stems"]:
+        return False
+    return not (bank_vocabulary(root) == "legacy" and slug == "cottonweed_holdout")
+
+
+def bank_class_dirs(root: Path) -> list[tuple[str, Path]]:
+    """[(species, folder)] for the cwd12 classes of a bank, either vocabulary."""
+    root = Path(root)
+    out: list[tuple[str, Path]] = []
+    if not root.is_dir():
+        return out
+    for d in sorted(root.iterdir()):
+        if d.is_dir():
+            sp = bank_folder_species(root, d.name)
+            if sp is not None:
+                out.append((sp, d))
+    return out
+
+
+def default_bank_dir() -> Path:
+    """The species bank once it exists, else the legacy object_bank/."""
+    return bank_in_use(BANK_DIR, SPECIES_BANK_DIR)
 
 
 # ----------------------------------------------------------------------------
 # Stage 1: object bank
 # ----------------------------------------------------------------------------
 def build_bank(max_per_class: int = 400, margin: float = 0.06):
-    """Crop every GT bbox from trusted slugs into object_bank/<class>/.
+    """Crop every GT bbox from trusted slugs into object_bank_species/<species>/.
 
-    v3.0.39.4: class names are resolved through CANONICAL_12 (via
-    _canon_name_for_label). Crops whose label cannot be mapped to one of the
-    12 canonical cwd12 species are DROPPED, not banked under a slug name.
+    Class ids are resolved to species by _canon_name_for_label. Crops whose
+    label cannot be mapped to one of the 12 cwd12 species are DROPPED, not
+    banked under a slug name. NEVER_TRAIN slugs and cwd12 test/valid
+    photographs are not cropped (_holdout_guard).
     """
-    BANK_DIR.mkdir(parents=True, exist_ok=True)
+    SPECIES_BANK_DIR.mkdir(parents=True, exist_ok=True)
+    (SPECIES_BANK_DIR / BANK_VOCAB_FILE).write_text("species\n")
     reg = _load_registry()
     per_class: dict[str, int] = {}
     skipped_unmapped: dict[str, int] = {}
     total = 0
     t0 = time.time()
 
+    guard = _holdout_guard(with_hashes=True)
+    skipped_holdout: dict[str, int] = {}
     for slug in TRUSTED_SLUGS:
+        if slug in guard["never"]:
+            log.info(f"  [{slug}] NEVER_TRAIN — skipped")
+            continue
         slug_dir = _resolve_slug_dir(slug, reg.get(slug, {}))
         if slug_dir is None:
             log.warning(f"  [{slug}] no local path — skipped")
@@ -236,9 +345,13 @@ def build_bank(max_per_class: int = 400, margin: float = 0.06):
         info = reg.get(slug, {})
         n_slug = 0
         n_drop = 0
+        n_hold = 0
         for img_path in _iter_images(slug_dir, cap=4000):
             lbl = _find_label(img_path, slug_dir)
             if lbl is None:
+                continue
+            if _is_holdout_photo(img_path, guard):
+                n_hold += 1
                 continue
             try:
                 im = Image.open(img_path).convert("RGB")
@@ -269,7 +382,7 @@ def build_bank(max_per_class: int = 400, margin: float = 0.06):
                 if x2 - x1 < 12 or y2 - y1 < 12:
                     continue
                 crop = im.crop((x1, y1, x2, y2))
-                cdir = BANK_DIR / cname
+                cdir = SPECIES_BANK_DIR / cname
                 cdir.mkdir(parents=True, exist_ok=True)
                 idx = per_class.get(cname, 0)
                 crop.save(cdir / f"{slug}_{img_path.stem}_{idx:04d}.png")
@@ -277,17 +390,22 @@ def build_bank(max_per_class: int = 400, margin: float = 0.06):
                 n_slug += 1
                 total += 1
         skipped_unmapped[slug] = n_drop
+        skipped_holdout[slug] = n_hold
         log.info(f"  [{slug}] cropped {n_slug} canonical objects "
-                 f"(skipped {n_drop} unmappable)")
+                 f"(skipped {n_drop} unmappable, {n_hold} holdout photos)")
 
     meta = {
         "built_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "bank_dir": str(SPECIES_BANK_DIR),
+        "vocabulary": "species",
         "total_objects": total,
         "per_class": per_class,
         "skipped_unmapped_per_slug": skipped_unmapped,
+        "skipped_holdout_photos_per_slug": skipped_holdout,
+        "never_train_skipped": sorted(guard["never"] & set(TRUSTED_SLUGS)),
         "max_per_class": max_per_class,
     }
-    with open(SYNTH_DIR / "bank_meta.json", "w") as f:
+    with open(SPECIES_BANK_DIR / "bank_meta.json", "w") as f:
         json.dump(meta, f, indent=2)
     log.info(f"=== object bank: {total} objects, {len(per_class)} classes, "
              f"{(time.time()-t0)/60:.1f} min ===")
@@ -297,16 +415,35 @@ def build_bank(max_per_class: int = 400, margin: float = 0.06):
 # ----------------------------------------------------------------------------
 # Stage 2: backgrounds
 # ----------------------------------------------------------------------------
+def guarded_backgrounds() -> list[Path]:
+    """Background images from a finished holdout-guarded collect_backgrounds
+    run, else [] (v3.60.0: an unmarked dir may hold eval photographs)."""
+    if not (BG_DIR / BG_GUARD_FILE).is_file():
+        return []
+    return sorted(BG_DIR.glob("*.jpg"))
+
+
 def collect_backgrounds(n: int = 300, size: int = 640):
     """Sample field backgrounds from trusted images (downscaled full scenes)."""
     BG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        (BG_DIR / BG_GUARD_FILE).unlink()
+    except FileNotFoundError:
+        pass
+    for old in BG_DIR.glob("bg_*.jpg"):
+        old.unlink()
     reg = _load_registry()
     pool: list[Path] = []
+    # v3.60.0: no eval photograph as a background (stem here, dHash below)
+    guard = _holdout_guard(with_hashes=True)
     for slug in TRUSTED_SLUGS:
+        if slug in guard["never"]:
+            continue
         slug_dir = _resolve_slug_dir(slug, reg.get(slug, {}))
         if slug_dir is None:
             continue
-        pool.extend(list(_iter_images(slug_dir, cap=1500)))
+        pool.extend(p for p in _iter_images(slug_dir, cap=1500)
+                    if p.stem not in guard["stems"])
     if not pool:
         log.error("no trusted images found for backgrounds")
         return 0
@@ -316,6 +453,8 @@ def collect_backgrounds(n: int = 300, size: int = 640):
     for p in pool:
         if saved >= n:
             break
+        if _is_holdout_photo(p, guard):
+            continue
         try:
             im = Image.open(p).convert("RGB")
         except Exception:
@@ -329,6 +468,9 @@ def collect_backgrounds(n: int = 300, size: int = 640):
         im = im.filter(ImageFilter.GaussianBlur(radius=1.2))
         im.save(BG_DIR / f"bg_{saved:04d}.jpg", quality=88)
         saved += 1
+    if saved:
+        (BG_DIR / BG_GUARD_FILE).write_text(
+            f"holdout-guarded {time.strftime('%Y-%m-%dT%H:%M:%S')}\n")
     log.info(f"=== backgrounds: {saved} saved to {BG_DIR} ===")
     return saved
 
@@ -383,23 +525,26 @@ def compose(n_images: int = 2000, canvas_size: int = 640,
     OUT_IMG_DIR.mkdir(parents=True, exist_ok=True)
     OUT_LBL_DIR.mkdir(parents=True, exist_ok=True)
 
-    bg_files = sorted(BG_DIR.glob("*.jpg"))
+    bg_files = guarded_backgrounds()
     if not bg_files:
-        log.error("no backgrounds — run `backgrounds` first")
+        log.error(f"no holdout-guarded backgrounds in {BG_DIR} — run "
+                  f"`backgrounds` first")
         sys.exit(1)
-    # object bank, keyed by class dir name
-    class_dirs = [d for d in sorted(BANK_DIR.iterdir()) if d.is_dir()]
+    # object bank, keyed by species (v3.60.0: legacy folder names are
+    # translated; label ids are cwd12 ids, not positions in a sorted list)
+    bank_root = default_bank_dir()
+    class_dirs = bank_class_dirs(bank_root)
     if not class_dirs:
         log.error("empty object bank — run `bank` first")
         sys.exit(1)
     bank: dict[str, list[Path]] = {}
-    for d in class_dirs:
-        objs = [p for p in d.iterdir() if p.suffix.lower() in IMG_EXTS]
+    for sp, d in class_dirs:
+        objs = [p for p in d.iterdir() if p.suffix.lower() in IMG_EXTS
+                and bank_crop_usable(bank_root, p)]
         if objs:
-            bank[d.name] = objs
-    # synthetic label space = the class-dir names (sorted, stable)
+            bank.setdefault(sp, []).extend(objs)
     classnames = sorted(bank.keys())
-    cls_to_id = {c: i for i, c in enumerate(classnames)}
+    cls_to_id = {c: CWD12_SPECIES.index(c) for c in classnames}
     log.info(f"compose: {len(bg_files)} bgs, {len(classnames)} classes, "
              f"{sum(len(v) for v in bank.values())} objects")
 
@@ -447,7 +592,7 @@ def compose(n_images: int = 2000, canvas_size: int = 640,
         if (i + 1) % 500 == 0:
             log.info(f"  composed {i+1}/{n_images}")
 
-    with open(SYNTH_DIR / "_annotations.coco.json", "w") as f:
+    with open(OUT_IMG_DIR.parent / "_annotations.coco.json", "w") as f:
         json.dump(coco, f)
     log.info(f"=== compose: {len(coco['images'])} images, "
              f"{len(coco['annotations'])} objects, "

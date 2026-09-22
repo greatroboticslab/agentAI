@@ -7,8 +7,14 @@ Loads `mega_iter6/train8/weights/best.pt` and runs `model.val()` against:
 
 Class IDs differ between original cottonweeddet12 and our v3.0.23 model
 (both have 12 classes, but ordering differs). Script remaps the test
-labels in-place to v3.0.23 order before running val. Outputs JSON with
-mAP50, mAP50-95, P, R, per-class mAP50-95.
+labels to the trainer slot order before running val. Outputs JSON with
+mAP50, mAP50-95, P, R, per-class mAP50-95 keyed by species.
+
+v3.60.0: the remap is the id permutation cwd12_species.CWD12_ID_TO_SLOT, not a
+join of data.yaml names to slot names, so it does not depend on which names
+either file carries. Staged data.yaml names and per-class keys are the species
+of each slot (TRAINER_SLOT_SPECIES); the legacy slot labels were wrong for all
+but PricklySida.
 """
 
 import json
@@ -21,17 +27,62 @@ import yaml
 from ultralytics import YOLO
 
 REPO = "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark"
+
+try:
+    from weed_optimizer_framework.tools.cwd12_species import (
+        CWD12_ID_TO_SLOT, CWD12_SPECIES, TRAINER_SLOT_LEGACY, TRAINER_SLOT_SPECIES,
+        species_names_for, species_of)
+except ImportError:
+    # v3.60.0: an outer package copy that predates cwd12_species.py; load the
+    # stdlib-only module by file (git-tracked nested copy first).
+    import importlib.util
+    for _p in (Path(__file__).resolve().parent
+               / "weed_optimizer_framework/tools/cwd12_species.py",
+               Path(REPO) / "weed_llm_benchmark/weed_optimizer_framework/tools/cwd12_species.py"):
+        if _p.exists():
+            _spec = importlib.util.spec_from_file_location("cwd12_species", _p)
+            _cs = importlib.util.module_from_spec(_spec)
+            _spec.loader.exec_module(_cs)
+            break
+    else:
+        raise
+    CWD12_ID_TO_SLOT, CWD12_SPECIES = _cs.CWD12_ID_TO_SLOT, _cs.CWD12_SPECIES
+    TRAINER_SLOT_LEGACY, TRAINER_SLOT_SPECIES = _cs.TRAINER_SLOT_LEGACY, _cs.TRAINER_SLOT_SPECIES
+    species_names_for, species_of = _cs.species_names_for, _cs.species_of
 BEST_PT = os.environ.get(
     "BEST_PT", f"{REPO}/results/framework/mega_iter6/train8/weights/best.pt")
 OUT = f"{REPO}/results/v3_0_23_eval"
 os.makedirs(OUT, exist_ok=True)
 
-# v3.0.23 class order from merged_iter6/data.yaml
-V3_NAMES = [
-    "Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-    "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-    "Eclipta", "Goosegrass", "Morningglory", "Nutsedge",
-]
+# v3.0.23 class order from merged_iter6/data.yaml (trainer slots 0-11), as the
+# legacy labels it was written with. Kept to read old reports, never to join.
+V3_NAMES = list(TRAINER_SLOT_LEGACY)
+# v3.60.0: the species each slot holds; staged yaml names and per-class keys.
+SLOT_SPECIES = list(TRAINER_SLOT_SPECIES)
+
+
+def check_cwd12_names(src_names):
+    """Species per cwd12 id that disagree with `src_names`, as (id, name) pairs.
+
+    The label files are cwd12 ids whatever the yaml calls them; this only reports
+    a yaml whose names read as some other class list (a whole legacy list is
+    translated, other names are read as real names)."""
+    translated = list(species_names_for(list(src_names)))
+    bad = []
+    for i, sp in enumerate(CWD12_SPECIES):
+        nm = translated[i] if i < len(translated) else None
+        got = nm if nm in CWD12_SPECIES else (species_of(nm) if nm else None)
+        if got != sp:
+            bad.append((i, src_names[i] if i < len(src_names) else None))
+    return bad
+
+
+def check_slot_head(model_names):
+    """True when a head's first 12 classes are the trainer slots (legacy labels
+    or species; aux classes after them are allowed)."""
+    seq = ([model_names[k] for k in sorted(model_names)]
+           if isinstance(model_names, dict) else list(model_names))
+    return list(species_names_for(seq))[:12] == SLOT_SPECIES
 
 
 def build_eval_dataset(name, src_yaml_path, split_field):
@@ -43,15 +94,13 @@ def build_eval_dataset(name, src_yaml_path, split_field):
     else:
         src_names = list(raw_names)
 
-    mapping = {}
-    dropped = []
-    for i, nm in enumerate(src_names):
-        if nm in V3_NAMES:
-            mapping[i] = V3_NAMES.index(nm)
-        else:
-            dropped.append(nm)
-    if dropped:
-        print(f"  [{name}] WARN: classes dropped (not in v3.0.23): {dropped}")
+    # v3.60.0: cwd12 id -> trainer slot by the fixed permutation; the names are
+    # only checked, never joined.
+    mapping = dict(CWD12_ID_TO_SLOT)
+    bad = check_cwd12_names(src_names)
+    if bad:
+        print(f"  [{name}] WARN: {src_yaml_path} names do not read as the cwd12 "
+              f"species at ids {bad}; labels are remapped by cwd12 id regardless")
 
     src_dir = Path(src_yaml_path).parent
     split_val = src_yaml.get(split_field, split_field)
@@ -117,8 +166,8 @@ def build_eval_dataset(name, src_yaml_path, split_field):
         {
             "train": str(img_dir),
             "val": str(img_dir),
-            "nc": len(V3_NAMES),
-            "names": V3_NAMES,
+            "nc": len(SLOT_SPECIES),
+            "names": SLOT_SPECIES,
         },
         open(yaml_out, "w"),
     )
@@ -148,8 +197,10 @@ def run_val(yaml_path, name, model):
         "precision": float(box.mp),
         "recall": float(box.mr),
         "per_class_mAP50_95": {
-            V3_NAMES[i]: float(box.maps[i]) for i in range(len(V3_NAMES)) if i < len(box.maps)
+            SLOT_SPECIES[i]: float(box.maps[i])
+            for i in range(len(SLOT_SPECIES)) if i < len(box.maps)
         },
+        "per_class_keys": "species by trainer slot (cwd12_species.TRAINER_SLOT_SPECIES)",
     }
     print(f"  mAP50 = {metrics['mAP50']:.4f}, mAP50-95 = {metrics['mAP50_95']:.4f}")
     print(f"  P = {metrics['precision']:.4f}, R = {metrics['recall']:.4f}")
@@ -163,6 +214,10 @@ def main():
 
     model = YOLO(BEST_PT)
     print(f"Loaded best.pt: {BEST_PT}")
+    if not check_slot_head(model.names):
+        print("WARN: the checkpoint's first 12 classes are not the trainer slots "
+              f"({dict(list(model.names.items())[:12])}); val matches by id, so "
+              "the numbers below compare classes that may differ")
 
     cwd12_yaml = f"{REPO}/downloads/cottonweeddet12/data.yaml"
     if not os.path.exists(cwd12_yaml):

@@ -32,9 +32,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-                "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-                "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
+from .cwd12_species import CWD12_COMMON, TRAINER_SLOT_LEGACY, TRAINER_SLOT_SPECIES
+
+# v3.60.0: the trainer's 12 slots named by the species each holds. The pycoco
+# GT category ids are these slots; the legacy slot names (TRAINER_SLOT_LEGACY)
+# named them alphabetically and were wrong for every slot but PricklySida.
+CANONICAL_12 = list(TRAINER_SLOT_SPECIES)
 
 # Source detection from slug prefix
 def slug_source(slug: str) -> str:
@@ -436,8 +439,9 @@ def build_categories(state: dict) -> str:
 
     twelve = state.get("twelve_class_gt", {})
     twelve_rows = "".join(
-        f"<tr><td>{html_lib.escape(c)}</td><td>{n}</td></tr>"
-        for c in CANONICAL_12 for n in [twelve.get(c, 0)]
+        f"<tr><td>{i}</td><td>{html_lib.escape(CWD12_COMMON.get(c, c))}</td>"
+        f"<td>{html_lib.escape(TRAINER_SLOT_LEGACY[i])}</td><td>{n}</td></tr>"
+        for i, c in enumerate(CANONICAL_12) for n in [twelve.get(c, 0)]
     )
 
     body = f"""
@@ -451,7 +455,7 @@ def build_categories(state: dict) -> str:
 <table><thead><tr><th>Source</th><th>#slugs</th></tr></thead><tbody>{source_rows}</tbody></table>
 
 <h2>12 cottonweed classes — ground-truth count in cwd12 holdout (1977 imgs)</h2>
-<table><thead><tr><th>Class</th><th>#instances</th></tr></thead><tbody>{twelve_rows}</tbody></table>
+<table><thead><tr><th>Slot</th><th>Species</th><th>Legacy label</th><th>#instances</th></tr></thead><tbody>{twelve_rows}</tbody></table>
 """
     return page_template("Categories", body, nav_active="categories")
 
@@ -721,8 +725,9 @@ def main():
         try:
             with open(gt_paths[0]) as f:
                 gt = json.load(f)
-            for c in gt.get("categories", []):
-                twelve_class_gt[c["name"]] = 0
+            # v3.60.0: keyed by slot species; the GT file's own category
+            # names are the legacy slot labels and are not used.
+            twelve_class_gt = {c: 0 for c in CANONICAL_12}
             for a in gt.get("annotations", []):
                 cid = a["category_id"]
                 if 0 <= cid < len(CANONICAL_12):

@@ -24,6 +24,8 @@ Approach:
   where <species> ∈ CWD12 (or `not_weed` for negative class). The
   existing object_bank/ at results/framework/synth_cutpaste/object_bank/
   is the natural source — each CWD12 species has 50-400 cut-paste crops.
+  Its folders carry the legacy cwd12 labels; they are read as species
+  (synth_cutpaste.bank_folder_species), so every label written is a species.
 - For each target image: compute embedding, cosine vs every exemplar,
   return top-K hits + the dominant species label.
 
@@ -31,11 +33,11 @@ Outputs to --out JSON:
   {
     "exemplar_species": [...],
     "results": [
-      {"image": "/abs/path", "top": [{"species": "Goosegrass",
+      {"image": "/abs/path", "top": [{"species": "SpottedSpurge",
                                        "exemplar": "g0042.jpg",
                                        "cosine": 0.84},
                                       ...K hits],
-                  "best_species": "Goosegrass", "best_cosine": 0.84,
+                  "best_species": "SpottedSpurge", "best_cosine": 0.84,
                   "is_cwd12_match": true},
       ...
     ]
@@ -62,16 +64,15 @@ import sys
 import time
 from pathlib import Path
 
+from weed_optimizer_framework.tools.cwd12_species import CWD12_SPECIES
+
 REPO = Path(os.environ.get(
     "REPO_ROOT",
     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark",
 ))
 
-CWD12 = (
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-)
+# v3.60.0: the species of each cwd12 id (was the legacy label list).
+CWD12 = tuple(CWD12_SPECIES)
 
 
 def _load_dinov2(model_id: str = "facebook/dinov2-base"):
@@ -122,17 +123,24 @@ def _process_batch(imgs, paths, processor, model, device):
 
 
 def build_exemplar_bank(exemplar_root: Path, max_per_species: int = 50):
-    """Walk exemplar tree and return [(species, path), ...]."""
+    """Walk exemplar tree and return [(species, path), ...].
+
+    v3.60.0: cwd12 folders are named by species whatever vocabulary the bank
+    was written in; other folders (e.g. not_weed) keep their name."""
+    from weed_optimizer_framework.tools.synth_cutpaste import (
+        bank_crop_usable, bank_folder_species,
+    )
     bank: list = []
     if not exemplar_root.is_dir():
         return bank
     for sp_dir in sorted(exemplar_root.iterdir()):
         if not sp_dir.is_dir():
             continue
-        species = sp_dir.name
+        species = bank_folder_species(exemplar_root, sp_dir.name) or sp_dir.name
         imgs = []
         for p in sp_dir.iterdir():
-            if p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+            if (p.suffix.lower() in (".jpg", ".jpeg", ".png")
+                    and bank_crop_usable(exemplar_root, p)):
                 imgs.append(p)
             if len(imgs) >= max_per_species:
                 break
@@ -143,6 +151,9 @@ def build_exemplar_bank(exemplar_root: Path, max_per_species: int = 50):
 
 def route(args):
     target_dir = Path(args.target_dir)
+    if args.exemplar_root is None:
+        from weed_optimizer_framework.tools.synth_cutpaste import default_bank_dir
+        args.exemplar_root = str(default_bank_dir())
     exemplar_root = Path(args.exemplar_root)
     out_path = Path(args.out)
 
@@ -240,8 +251,9 @@ def route(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-dir", required=True)
-    ap.add_argument("--exemplar-root",
-                    default=str(REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"))
+    # v3.60.0: default = the bank the pipeline reads
+    # (synth_cutpaste.default_bank_dir: object_bank_species once built)
+    ap.add_argument("--exemplar-root", default=None)
     ap.add_argument("--out",
                     default=str(REPO / "results" / "framework" / "dinov2_routing.json"))
     ap.add_argument("--top-k", type=int, default=5)

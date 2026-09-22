@@ -5,7 +5,7 @@ Per FLORA (arXiv 2508.21712, Aug 2025):
   - 30 real object crops per class
   - per-class LoRA, rank 32, alpha 16, 5 epochs
   - 8-bit AdamW, bfloat16, 512x512
-  - trigger format: `{dataset}-{class}` (e.g. "cwd12-Goosegrass")
+  - trigger format: `{dataset}-{species}` (e.g. "cwd12-Goosegrass")
   - attention layers only
 
 Why per-class LoRA (not one multi-class): FLORA shows class-specialised
@@ -16,8 +16,11 @@ visually similar species risks averaging features away.
 We run one slug at a time:
   python flux_lora_train.py --class-name Goosegrass --epochs 5
 
+--class-name is a cwd12 species (v3.60.0); crops come from the object bank
+through synth_cutpaste.bank_class_dirs, which reads either bank vocabulary.
+
 Outputs:
-  results/framework/flux_lora/{class_name}/
+  results/framework/flux_lora_species/{species}/
     pytorch_lora_weights.safetensors   (just the LoRA delta)
     train_meta.json                    (config + training loss)
 """
@@ -43,28 +46,41 @@ REPO = Path(os.environ.get(
     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark",
 )).resolve()
 
-BANK_DIR = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
-LORA_DIR = REPO / "results" / "framework" / "flux_lora"
+# v3.60.0: flux_lora/ holds LoRAs named by the legacy labels (flux_lora/
+# Crabgrass was trained on morning glory crops); new ones are named by species
+# and go to their own directory, since several names exist in both vocabularies.
+LORA_DIR = REPO / "results" / "framework" / "flux_lora_species"
 FLUX_MODEL = os.environ.get("FLUX_FILL_MODEL",
                             "black-forest-labs/FLUX.1-Fill-dev")
 
-CANONICAL_12 = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-]
+sys.path.insert(0, str(REPO))
+from weed_optimizer_framework.tools.cwd12_species import (  # noqa: E402
+    CWD12_SPECIES, cli_species,
+)
+
+CANONICAL_12 = list(CWD12_SPECIES)
+
+
+def _species_arg(name: str) -> str | None:
+    """The cwd12 species a --class-name names (species key or any alias).
+    v3.60.0: a legacy-only label (Carpetweeds, ...) is refused (cli_species)."""
+    return cli_species(name)
 
 
 def _load_class_crops(class_name: str, max_n: int = 30, min_px: int = 80,
                       seed: int = 0):
-    """Sample at most `max_n` high-quality crops for the given class."""
-    cdir = BANK_DIR / class_name
-    if not cdir.is_dir():
-        raise FileNotFoundError(f"no bank dir for class {class_name}: {cdir}")
+    """Sample at most `max_n` high-quality crops of species `class_name`."""
+    from weed_optimizer_framework.tools import synth_cutpaste as _sc
+    root = _sc.default_bank_dir()
+    cdirs = [d for sp, d in _sc.bank_class_dirs(root) if sp == class_name]
+    if not cdirs:
+        raise FileNotFoundError(f"no bank dir for species {class_name} in {root}")
     from PIL import Image
     candidates = []
-    for p in sorted(cdir.iterdir()):
+    for p in sorted(p for d in cdirs for p in d.iterdir()):
         if p.suffix.lower() not in (".jpg", ".jpeg", ".png", ".bmp"):
+            continue
+        if not _sc.bank_crop_usable(root, p):
             continue
         try:
             with Image.open(p) as im:
@@ -85,8 +101,11 @@ def train_one_class(class_name: str, *,
                     batch_size: int = 1, grad_accum: int = 4,
                     resolution: int = 512, seed: int = 42):
     """Train a single per-class LoRA on the cleaned cwd12 bank crops."""
-    if class_name not in CANONICAL_12:
-        log.warning(f"{class_name} is not in CANONICAL_12 — proceeding anyway")
+    species = _species_arg(class_name)
+    if species is None:
+        log.error(f"{class_name} is not a cwd12 species ({', '.join(CANONICAL_12)})")
+        sys.exit(2)
+    class_name = species
     try:
         import torch
         from diffusers import FluxTransformer2DModel, FluxFillPipeline
@@ -107,7 +126,7 @@ def train_one_class(class_name: str, *,
     if len(crops) < 5:
         log.error(f"insufficient crops for {class_name}: {len(crops)} (need >=5)")
         sys.exit(1)
-    log.info(f"using {len(crops)} crops from {BANK_DIR / class_name}")
+    log.info(f"using {len(crops)} {class_name} crops from the object bank")
 
     trigger = f"cwd12-{class_name}"
 
@@ -269,7 +288,7 @@ def train_one_class(class_name: str, *,
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--class-name", required=True,
-                    help="one of CANONICAL_12 (Carpetweeds, Crabgrass, …)")
+                    help="a cwd12 species (Waterhemp, MorningGlory, …)")
     ap.add_argument("--rank", type=int, default=32)
     ap.add_argument("--alpha", type=int, default=16)
     ap.add_argument("--epochs", type=int, default=5)

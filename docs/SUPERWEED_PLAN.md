@@ -166,6 +166,13 @@ its metric says.
 
 ## 5. Status
 
+> **Correction 2026-09-21 (v3.60.0).** The cwd12 species names quoted in this table are the
+> project's old class labels, not the species. In S6, "a Morningglory detection (0.7324)"
+> is a **Carpetweed** detection and "a Ragweed one (0.9767)" is a **Sicklepod** one. The
+> reliability mechanism is unaffected. The S1/S3 reading that harvested data is worth
+> 0.00-0.02 rests on add-ons labelled by the pre-v3.60.0 merge, which joined class names by
+> those labels, so it is confounded (see [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 rows 8 and 14).
+
 | Phase | State | Closed on |
 |---|---|---|
 | S0 | **CLOSED** — audit+backup ✅ tokens ✅ requirements.lock ✅ M1 sealed re-measurement published (raw 0.6032±0.0046, curated 0.5894±0.0025, guard verified, RESEARCH_LOG 2026-08-23) | 2026-08-23 |

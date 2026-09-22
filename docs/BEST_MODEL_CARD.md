@@ -38,6 +38,28 @@ and only about the size of the architecture effect measured in §4.
 
 ## 3. Where it is strong, and where it is not
 
+> **Correction 2026-09-21 (v3.60.0).** The species column below uses the project's old
+> cwd12 labels (`run_s3_bestmodel_eval.sh:24` at `420a449`), and only PricklySida
+> among them is the species. Each value belongs to the right class id. Read the rows as follows:
+>
+> | label below | species | mAP50-95 |
+> |---|---|---|
+> | Ragweed | Sicklepod | 0.9767 ± 0.0021 |
+> | Purslane | Palmer amaranth | 0.9276 ± 0.0093 |
+> | PalmerAmaranth | Eclipta | 0.9163 ± 0.0088 |
+> | Crabgrass | Morning glory | 0.9157 ± 0.0067 |
+> | Carpetweeds | Waterhemp | 0.9151 ± 0.0053 |
+> | PricklySida | Prickly sida | 0.9118 ± 0.0016 |
+> | SpottedSpurge | Cutleaf groundcherry | 0.8818 ± 0.0130 |
+> | Nutsedge | Ragweed | 0.8585 ± 0.0071 |
+> | Sicklepod | Goosegrass | 0.8555 ± 0.0098 |
+> | Eclipta | Purslane | 0.8219 ± 0.0085 |
+> | Goosegrass | Spotted spurge | 0.7973 ± 0.0023 |
+> | Morningglory | Carpetweed | 0.7324 ± 0.0052 |
+>
+> The three to watch are therefore **Carpetweed, Spotted spurge and Purslane**, and the
+> strongest class is Sicklepod. The spread of 0.244 is unchanged. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md).
+
 | species | mAP50-95 (mean ± std, n=3) |
 |---|---|
 | Ragweed | 0.9767 ± 0.0021 |
@@ -62,6 +84,12 @@ the open follow-up (`CHANGELOG` L1944-1961: mAP 0.87 → 0.40 on small-box subse
 
 ## 4. What actually produced this number
 
+> **Correction 2026-09-21 (v3.60.0).** The −0.020 harvested-data row and the "not a lever"
+> reading rest on add-ons labelled by the pre-v3.60.0 merge. That merge joined external
+> class names to slots by the old cwd12 labels, so boxes landed in the wrong slots or were
+> deleted. The cost is confounded by that label noise, and by how much is not measured.
+> See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 row 8.
+
 Measured on this task, ranked (see `RESEARCH_LOG.md` 2026-08-25):
 
 | lever | effect on mAP50-95 |
@@ -76,6 +104,16 @@ first, and **more harvested data is not a lever at all** on this task — the ti
 is flat from 3,671 to 43,671 training images.
 
 ## 5. Honest limits
+
+> **Correction 2026-09-21 (v3.60.0).** In limit 1 the class-agnostic numbers (0.1003 ± 0.0053
+> vs 0.8730 ± 0.0011) stand. **The ragweed pair (0.0006 vs 0.9604) is an artifact of the
+> class-name bug.** The class scored was the one labelled "Ragweed", which is id 9,
+> **Sicklepod**, so the comparison sets Sicklepod predictions against ImageWeeds' ragweed.
+> The class that holds ragweed is cwd12 id 5 (label "Nutsedge", 0.8585 in-domain above).
+> Its transfer was never measured. The "wrong species" reading was made against the same
+> id, and the montage draws no class labels, so it is unsupported. The ImageWeeds slug had
+> been in the training pool of merged heads (not of this cwd12-only model). It is now in
+> `NEVER_TRAIN_SLUGS`. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 rows 3-5.
 
 1. **Cross-dataset generalisation: measured 2026-08-26, and it collapses.** Zero-shot on
    `project_agml/imageweeds_weed_detection` — the one harvested source that passed the

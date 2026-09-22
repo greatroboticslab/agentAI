@@ -52,7 +52,8 @@ import numpy as np
 from PIL import Image, ImageFilter
 
 from weed_optimizer_framework.tools.synth_cutpaste import (
-    REPO, SYNTH_DIR, BG_DIR, CANONICAL_12, _exg_mask, collect_backgrounds,
+    REPO, SYNTH_DIR, CANONICAL_12, _exg_mask, collect_backgrounds,
+    guarded_backgrounds,
 )
 
 logging.basicConfig(
@@ -61,7 +62,13 @@ logging.basicConfig(
 )
 log = logging.getLogger("synth_diffusion")
 
-DIFF_DIR    = REPO / "results" / "framework" / "synth_diffusion"
+# v3.60.0: output is keyed by species and label ids are cwd12 ids. Images in
+# synth_diffusion/ were prompted with the legacy label as if it were the
+# species ("a crabgrass plant") and labelled with that label's id, so their
+# ids do not name the plant drawn; new output goes to its own directory.
+DIFF_DIR    = REPO / "results" / "framework" / "synth_diffusion_species"
+LEGACY_DIFF_DIR = REPO / "results" / "framework" / "synth_diffusion"
+FLUX_SPECIES_PREFIX = "fluxsp_"
 OUT_IMG_DIR = DIFF_DIR / "images"
 OUT_LBL_DIR = DIFF_DIR / "labels"
 MONTAGE     = DIFF_DIR / "sample_montage.jpg"
@@ -72,22 +79,22 @@ MONTAGE     = DIFF_DIR / "sample_montage.jpg"
 FLUX_FILL_MODEL = os.environ.get("FLUX_FILL_MODEL",
                                  "black-forest-labs/FLUX.1-Fill-dev")
 
-# Per-species prompt fragments. cwd12's 12 cottonweed species; the prompt
-# describes a single plant in a top-down agricultural photo so FLUX fills
-# the masked box with an in-domain object.
+# Per-species prompt fragments, keyed by the cwd12 species (CANONICAL_12);
+# the prompt describes a single plant in a top-down agricultural photo so
+# FLUX fills the masked box with an in-domain object.
 SPECIES_PROMPT = {
-    "Carpetweeds":    "a carpetweed plant, small green sprawling weed",
-    "Crabgrass":      "a crabgrass plant, spreading grassy weed",
-    "Eclipta":        "an eclipta weed plant, green leaves",
-    "Goosegrass":     "a goosegrass plant, flat rosette grassy weed",
-    "Morningglory":   "a morningglory weed, heart-shaped leaves vine",
-    "Nutsedge":       "a nutsedge plant, upright grass-like weed",
-    "PalmerAmaranth": "a palmer amaranth pigweed plant, broadleaf weed",
-    "PricklySida":    "a prickly sida weed plant, broadleaf",
-    "Purslane":       "a purslane plant, fleshy red-stemmed weed",
-    "Ragweed":        "a ragweed plant, lobed green leaves",
-    "Sicklepod":      "a sicklepod weed plant, paired oval leaflets",
-    "SpottedSpurge":  "a spotted spurge plant, low mat-forming weed",
+    "Waterhemp":           "a waterhemp pigweed plant, narrow glossy leaves",
+    "MorningGlory":        "a morningglory weed, heart-shaped leaves vine",
+    "Purslane":            "a purslane plant, fleshy red-stemmed weed",
+    "SpottedSpurge":       "a spotted spurge plant, low mat-forming weed",
+    "Carpetweed":          "a carpetweed plant, small green sprawling weed",
+    "Ragweed":             "a ragweed plant, lobed green leaves",
+    "Eclipta":             "an eclipta weed plant, green leaves",
+    "PricklySida":         "a prickly sida weed plant, broadleaf",
+    "PalmerAmaranth":      "a palmer amaranth pigweed plant, broadleaf weed",
+    "Sicklepod":           "a sicklepod weed plant, paired oval leaflets",
+    "Goosegrass":          "a goosegrass plant, flat rosette grassy weed",
+    "CutleafGroundcherry": "a cutleaf groundcherry weed plant, toothed leaves",
 }
 PROMPT_SUFFIX = ", top-down view, cotton field soil background, daylight, " \
                 "photorealistic, sharp focus"
@@ -168,7 +175,7 @@ def _load_flux():
 def _weak_class_weights():
     """Bias species sampling toward weak cwd12 classes if a count file exists.
 
-    results/framework/cwd12_class_counts.json (optional) maps class->instances.
+    results/framework/cwd12_class_counts.json (optional) maps species->instances.
     Rarer classes get proportionally higher sampling weight so synthetic
     augmentation concentrates where it actually helps.
     """
@@ -248,11 +255,12 @@ def generate(n_images: int = 600, steps: int = 28, guidance: float = 30.0,
     OUT_IMG_DIR.mkdir(parents=True, exist_ok=True)
     OUT_LBL_DIR.mkdir(parents=True, exist_ok=True)
 
-    bgs = sorted(BG_DIR.glob("*.jpg"))
+    # v3.60.0: only holdout-guarded backgrounds (synth_cutpaste.BG_GUARD_FILE)
+    bgs = guarded_backgrounds()
     if not bgs:
-        log.info("no backgrounds — collecting them now...")
+        log.info("no holdout-guarded backgrounds — collecting them now...")
         collect_backgrounds(n=300)
-        bgs = sorted(BG_DIR.glob("*.jpg"))
+        bgs = guarded_backgrounds()
     if not bgs:
         log.error("could not collect backgrounds (no trusted images?)")
         sys.exit(1)
@@ -281,8 +289,13 @@ def generate(n_images: int = 600, steps: int = 28, guidance: float = 30.0,
     made = 0
 
     # Disambiguate filenames per force_class so array tasks don't overwrite
-    # each other (each writes fluxsynth_<class>_NNNNNN.jpg).
-    name_prefix = f"fluxsynth_{force_class}_" if force_class else "fluxsynth_"
+    # each other (each writes fluxsp_<species>_NNNNNN.jpg).
+    # v3.60.0: 'fluxsp_', not the legacy 'fluxsynth_': 8 class names are both
+    # a legacy label and a species, so the old prefix would reproduce legacy
+    # filenames (fluxsynth_Ragweed_000000.jpg) that the dashboard and the
+    # exemplar exporter must tell apart from species-era ones.
+    name_prefix = f"{FLUX_SPECIES_PREFIX}{force_class}_" if force_class \
+        else FLUX_SPECIES_PREFIX
 
     # Find a starting index that doesn't collide with anything already there
     existing = sorted(OUT_IMG_DIR.glob(f"{name_prefix}*.jpg"))

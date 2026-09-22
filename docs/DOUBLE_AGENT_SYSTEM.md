@@ -127,6 +127,14 @@ per-species table in `RESEARCH_LOG.md` (§2026-07 entries), anti-forgetting roun
 (round-3 zero-forgetting, CHANGELOG L685-691), and the small-object failure analysis
 (mAP 0.87 → 0.40 on small-box subsets, CHANGELOG L1944-1961).
 
+> **Correction 2026-09-21 (v3.60.0).** The 0.5601 zero-harvest control and the retraction
+> stand. The stated mechanism, dedup and holdout-stem filters starving the in-domain core
+> ("Goosegrass 44"), is unconfirmed: the same merge read `cottonweed_holdout` through a
+> four-name list that its twelve-id labels do not follow, and "Goosegrass" there is a slot
+> label, meaning Spotted spurge. The ImageWeeds ladder exam above may be partly trained on,
+> because ImageWeeds was harvested into the merged pool. See
+> [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 rows 7 and 9.
+
 **Which numbers are quotable today** (see `SCIENCE_AUDIT.md` §1): everything in the table
 except the two ⚠ pre-guard rows — and those may be cited as history alongside their
 sealed replacements (the M1 rows), which confirmed the pre-guard values were not

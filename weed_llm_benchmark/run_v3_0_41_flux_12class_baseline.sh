@@ -21,8 +21,12 @@
 # ~3-5 min per 768² image → ~15-25 min per task). Total wall clock if all
 # parallel: ~25 min. If serialised on one GPU: ~5 h.
 #
-# Output filenames are prefixed with species (fluxsynth_Goosegrass_000000.jpg
+# Output filenames are prefixed with species (fluxsp_Goosegrass_000000.jpg
 # etc.) so array tasks don't collide.
+#
+# v3.60.0: the array runs over the 12 cwd12 species in cwd12 id order
+# (cwd12_species.CWD12_SPECIES); synth_diffusion refuses a legacy label, and
+# output goes to synth_diffusion_species/.
 
 set -e
 eval "$(conda shell.bash hook)"
@@ -39,8 +43,8 @@ export PYTHONPATH=.:$PYTHONPATH
 export REPO_ROOT="$REPO"
 
 # Map array index to species
-CANONICAL_12=(Carpetweeds Crabgrass Eclipta Goosegrass Morningglory Nutsedge \
-              PalmerAmaranth PricklySida Purslane Ragweed Sicklepod SpottedSpurge)
+CANONICAL_12=(Waterhemp MorningGlory Purslane SpottedSpurge Carpetweed Ragweed \
+              Eclipta PricklySida PalmerAmaranth Sicklepod Goosegrass CutleafGroundcherry)
 IDX=$((${SLURM_ARRAY_TASK_ID:-1} - 1))
 if [ "$IDX" -lt 0 ] || [ "$IDX" -ge 12 ]; then
     echo "FATAL: SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID} out of range 1..12"
@@ -64,4 +68,4 @@ python -m weed_optimizer_framework.tools.synth_diffusion generate \
 EXIT=$?
 echo "=== Done $CLS (exit=$EXIT) ==="
 echo "Date: $(date)"
-ls -la $REPO/results/framework/synth_diffusion/images/fluxsynth_${CLS}_*.jpg 2>/dev/null | head -10
+ls -la $REPO/results/framework/synth_diffusion_species/images/fluxsp_${CLS}_*.jpg 2>/dev/null | head -10

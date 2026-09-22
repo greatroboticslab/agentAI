@@ -19,9 +19,32 @@ import os
 import sys
 from pathlib import Path
 
-CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-                "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-                "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
+try:
+    from .cwd12_species import (
+        CWD12_SPECIES, TRAINER_SLOT_SPECIES, is_legacy_label_list, species_names_for,
+    )
+except ImportError:  # run as a plain script
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from cwd12_species import (
+        CWD12_SPECIES, TRAINER_SLOT_SPECIES, is_legacy_label_list, species_names_for,
+    )
+
+# v3.60.0: the species held by trainer slots 0-11 (was the legacy slot labels).
+CANONICAL_12 = list(TRAINER_SLOT_SPECIES)
+
+
+def _category_species(coco_gt) -> list:
+    """Per-category species of a GT file: its own category names when they
+    are a whole legacy list (translated) or already species, else the
+    trainer slot order."""
+    cats = {c.get("id"): c.get("name") for c in coco_gt.dataset.get("categories", [])}
+    if cats and set(cats) == set(range(len(cats))):
+        names = [cats[i] for i in range(len(cats))]
+        if is_legacy_label_list(names):
+            return list(species_names_for(names))
+        if all(n in CWD12_SPECIES for n in names):
+            return names
+    return CANONICAL_12
 
 
 def per_class_ap_from_pycoco(gt_path: Path, pred_path: Path,
@@ -37,6 +60,7 @@ def per_class_ap_from_pycoco(gt_path: Path, pred_path: Path,
         print(f"[meta] loadRes failed: {e}")
         return {}
 
+    cat_names = _category_species(coco_gt)
     per_class = {}
     for cid in cat_ids:
         ev = COCOeval(coco_gt, coco_dt, iouType="bbox")
@@ -52,7 +76,7 @@ def per_class_ap_from_pycoco(gt_path: Path, pred_path: Path,
         s = ev.stats
         gt_count = sum(1 for a in coco_gt.dataset["annotations"]
                        if a["category_id"] == cid)
-        name = CANONICAL_12[cid] if cid < len(CANONICAL_12) else f"cls{cid}"
+        name = cat_names[cid] if cid < len(cat_names) else f"cls{cid}"
         per_class[name] = {
             "AP50_95": float(s[0]) if s[0] >= 0 else 0.0,
             "AP50":    float(s[1]) if s[1] >= 0 else 0.0,

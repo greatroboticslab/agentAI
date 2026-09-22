@@ -31,13 +31,19 @@ from ensemble_boxes import weighted_boxes_fusion
 from PIL import Image
 from ultralytics import YOLO
 
-# v3.24.4: this list is NOT the sealed protocol's class order. cwd12_sealed.yaml
-# orders the 12 species alphabetically; this one does not, so using it to name
-# per-class APs silently attributes every species' score to a different weed
-# (id 2 is Eclipta in the data, PalmerAmaranth here). Overall mAP is unaffected —
-# it averages over ids — which is exactly why the error is easy to miss. Class
-# names now come from the dataset yaml via --data-yaml; this remains only so old
-# invocations keep working, and it is never the default when a yaml is given.
+from .cwd12_species import species_names_for
+
+# v3.24.4: this list is NOT the sealed protocol's class order. It is the trainer
+# slot order (mega_trainer slots 0-11); cwd12_sealed.yaml is in cwd12 label-id
+# order. Using it to name the sealed per-class APs attributed each score to a
+# different id. Overall mAP is unaffected, since it averages over ids, which is
+# why the error is easy to miss. Class names now come from the dataset yaml via
+# --data-yaml; this remains only so old invocations keep working, and it is never
+# the default when a yaml is given.
+# v3.60.0: both lists are legacy labels (only PricklySida is the right species),
+# so per-class results are named through cwd12_species.species_names_for, which
+# replaces a whole legacy list by the species of each id (cwd12_species.
+# CWD12_SPECIES for the sealed yaml) and passes a species list through unchanged.
 _LEGACY_CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
                         "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
                         "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
@@ -143,7 +149,8 @@ def compute_map(per_image_preds, per_image_gts, n_classes, names=None):
 
     per_image_preds[i] = (xyxy, scores, classes) lists for image i.
     per_image_gts[i]   = list of (class, [xyxy]) for image i.
-    names              = class-id -> species name, from the dataset yaml.
+    names              = class-id -> species name (the dataset yaml's names
+                         after species_names_for).
 
     Returns: dict with mAP50, mAP50-95, per-class AP for each threshold.
     """
@@ -244,7 +251,8 @@ def _resolve_holdout(data_yaml):
     """Val image dirs + class names, straight from the dataset yaml.
 
     The sealed protocol's `val` is a LIST (test/images + valid/images = the 1,977
-    holdout), and its class order is alphabetical. Reading both from the yaml the
+    holdout), and its names are the legacy label list in cwd12 id order (the
+    names are returned as stored; callers translate). Reading both from the yaml the
     training run actually used is the only way this evaluation and that run agree
     on what class 2 means.
     """
@@ -306,9 +314,13 @@ def main():
     elif args.val_imgs:
         val_dirs, names = [Path(args.val_imgs)], _LEGACY_CANONICAL_12
         print("[wbf-tta] WARNING: no --data-yaml; per-class names fall back to the "
-              "legacy order, which does NOT match cwd12_sealed.yaml")
+              "trainer slot order, which does NOT match cwd12_sealed.yaml")
     else:
         raise SystemExit("need --data-yaml (preferred) or --val-imgs")
+    # v3.60.0: per-class results are named by species; the stored names are
+    # kept in the output as names_as_read.
+    names_as_read = list(names)
+    names = list(species_names_for(names))
     n_classes = args.n_classes or len(names)
 
     print(f"[wbf-tta] arm={args.label or '(unnamed)'}")
@@ -372,6 +384,7 @@ def main():
            "imgszs": args.imgszs, "hflip": args.hflip, "wbf": not args.no_wbf,
            "wbf_iou": args.wbf_iou, "data_yaml": args.data_yaml,
            "n_images": len(pairs), "names": names,
+           "names_as_read": names_as_read,
            "seconds": round(time.time() - t0, 1), **res}
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as f:

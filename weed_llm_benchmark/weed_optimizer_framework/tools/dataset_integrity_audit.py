@@ -21,12 +21,12 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 from pathlib import Path
 from collections import defaultdict
 
 from .registry_lock import safe_read_json
+from .cwd12_species import CWD12_ID_SPACE, CWD12_SPECIES, class_species
 
 REPO = Path(os.environ.get(
     "REPO_ROOT",
@@ -36,12 +36,10 @@ if not REPO.exists():
     REPO = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = REPO / "results" / "framework" / "dataset_registry.json"
 
-_CWD12 = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-]
-_CWD12_ALNUM = {re.sub(r'[^A-Za-z0-9]', '', c).lower(): c for c in _CWD12}
+# v3.60.0: the twelve cwd12 species (cwd12_species). The legacy alphabetical
+# list joined other datasets' real names to the wrong slot ("Ragweed" counted
+# as the Sicklepod id; Waterhemp and Carpetweed counted as nothing).
+_CWD12 = list(CWD12_SPECIES)
 _IMG_EXTS = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
 _HOLDOUT_HINTS = ("holdout",)
 
@@ -51,12 +49,6 @@ _HOLDOUT_STEM_DIRS = [
     REPO / "results" / "leave4out" / "dataset_holdout" / "test" / "images",
     REPO / "results" / "leave4out" / "dataset_holdout" / "valid" / "images",
 ]
-
-
-def _canon(raw: str) -> str:
-    if not isinstance(raw, str) or not raw.strip():
-        return ""
-    return _CWD12_ALNUM.get(re.sub(r'[^A-Za-z0-9]', '', raw).lower(), "")
 
 
 def _is_holdout(slug: str, info: dict) -> bool:
@@ -105,9 +97,11 @@ def audit(max_labels_per_slug: int = 6000) -> dict:
         if not sd or not sd.is_dir():
             continue
         cn = info.get("class_names") or []
-        if not cn:
+        # v3.60.0: a cwd12 copy by its id space, any other slug by real name
+        n_ids = len(CWD12_ID_SPACE.get(slug) or cn)
+        if not n_ids:
             continue
-        cid_canon = {i: _canon(c) for i, c in enumerate(cn)}
+        cid_canon = {i: class_species(slug, i, cn) for i in range(n_ids)}
         if not any(cid_canon.values()):
             continue
         n_scanned = 0

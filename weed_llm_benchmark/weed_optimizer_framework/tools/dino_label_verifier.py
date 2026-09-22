@@ -11,7 +11,7 @@ WHY a classifier, on top of the curators:
   - dinov2_object_curator (v3.0.38-B, per-bbox similarity) catches
     "this BOX doesn't look like a real weed object".
   - Neither can catch "this box IS a weed, but labelled the WRONG
-    species" — a PalmerAmaranth crop tagged Crabgrass still looks like a
+    species" — a PalmerAmaranth crop tagged Waterhemp still looks like a
     weed, so it passes every similarity gate. Catching a class swap needs
     a SUPERVISED classifier: predict the species, compare to the claimed
     label. (This is the cleanlab / Confident-Learning "swapped label"
@@ -62,8 +62,11 @@ from weed_optimizer_framework.tools.dinov2_object_curator import (
     _embed_crops, _crop_boxes,
 )
 from weed_optimizer_framework.tools.synth_cutpaste import (
-    BANK_DIR as SYNTH_BANK_DIR, CANONICAL_12, IMG_EXTS,
-    _find_label, _iter_images,
+    IMG_EXTS, _find_label, _iter_images,
+    bank_class_dirs, bank_crop_usable, default_bank_dir,
+)
+from weed_optimizer_framework.tools.cwd12_species import (
+    CWD12_ID_SPACE, CWD12_SPECIES, class_species,
 )
 
 logging.basicConfig(
@@ -84,20 +87,6 @@ MAX_BOXES_PER_SLUG = 600
 IMAGES_PER_SLUG    = 80
 
 VERIFIER_DIR.mkdir(parents=True, exist_ok=True)
-
-
-# ----------------------------------------------------------------------------
-# Canonical class-name matching
-# ----------------------------------------------------------------------------
-def _canon(name: str) -> str | None:
-    """Map an arbitrary class-name string to one of the canonical 12, or None."""
-    if not name:
-        return None
-    key = "".join(c for c in str(name).lower() if c.isalnum())
-    for c in CANONICAL_12:
-        if "".join(ch for ch in c.lower() if ch.isalnum()) == key:
-            return c
-    return None
 
 
 # ----------------------------------------------------------------------------
@@ -147,20 +136,18 @@ def _normalize(x: np.ndarray) -> np.ndarray:
 # ----------------------------------------------------------------------------
 def train_head():
     """Fit the linear head on synthetic-bank object crops (reliable labels)."""
-    if not SYNTH_BANK_DIR.is_dir():
-        log.error(f"synthetic object bank not found at {SYNTH_BANK_DIR} — "
+    bank_dir = default_bank_dir()
+    if not bank_dir.is_dir():
+        log.error(f"synthetic object bank not found at {bank_dir} — "
                   f"run `synth_cutpaste bank` first")
         sys.exit(1)
 
-    # gather crops grouped by canonical class
+    # gather crops grouped by species (v3.60.0: legacy bank folder names are
+    # translated by synth_cutpaste.bank_class_dirs; non-cwd12 folders skipped)
     per_class: dict[str, list[Path]] = {}
-    for d in sorted(SYNTH_BANK_DIR.iterdir()):
-        if not d.is_dir():
-            continue
-        canon = _canon(d.name)
-        if canon is None:
-            continue  # non-canonical bank class — skip (curators handle those)
-        crops = [p for p in d.iterdir() if p.suffix.lower() in IMG_EXTS]
+    for canon, d in bank_class_dirs(bank_dir):
+        crops = [p for p in d.iterdir() if p.suffix.lower() in IMG_EXTS
+                 and bank_crop_usable(bank_dir, p)]
         if crops:
             per_class.setdefault(canon, []).extend(crops)
 
@@ -205,9 +192,11 @@ def train_head():
         m = y[te] == i
         per_cls_acc[c] = float((pred_te[m] == i).mean()) if m.any() else None
 
-    np.savez(HEAD_PATH, W=W, b=b, classes=np.array(classes))
+    np.savez(HEAD_PATH, W=W, b=b, classes=np.array(classes),
+             vocabulary=np.array("species"))
     meta = {
         "trained_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "bank_dir": str(bank_dir), "vocabulary": "species",
         "n_train": int(len(tr)), "n_test": int(len(te)),
         "n_classes": len(classes), "classes": classes,
         "heldout_accuracy": acc, "per_class_heldout_accuracy": per_cls_acc,
@@ -224,14 +213,14 @@ def train_head():
 # ----------------------------------------------------------------------------
 # verify
 # ----------------------------------------------------------------------------
-def _slug_canon_map(info: dict) -> dict[int, str] | None:
-    """Map a slug's source class-id -> canonical name, via class_names."""
-    names = info.get("class_names") if isinstance(info, dict) else None
-    if not names:
-        return None
+def _slug_canon_map(slug: str, info: dict) -> dict[int, str] | None:
+    """Map a slug's source class-id -> cwd12 species. v3.60.0: cwd12 copies
+    by label-file id, every other slug by the real name of the class."""
+    names = (info.get("class_names") if isinstance(info, dict) else None) or []
+    n = len(CWD12_ID_SPACE.get(slug) or names)
     m = {}
-    for i, n in enumerate(names):
-        c = _canon(n)
+    for i in range(n):
+        c = class_species(slug, i, names)
         if c is not None:
             m[i] = c
     return m or None
@@ -243,7 +232,13 @@ def verify_slugs():
         log.error("head not found — run `train` first")
         sys.exit(1)
     d = np.load(HEAD_PATH, allow_pickle=True)
-    W, b, classes = d["W"], d["b"], list(d["classes"])
+    W, b, classes = d["W"], d["b"], [str(c) for c in d["classes"]]
+    # v3.60.0: a head saved before then was trained on legacy bank folder
+    # names; its classes cannot be compared with species.
+    if "vocabulary" not in d.files or str(d["vocabulary"]) != "species" \
+            or not set(classes) <= set(CWD12_SPECIES):
+        log.error("head predates the species-keyed bank — run `train` again")
+        sys.exit(1)
     cls_to_id = {c: i for i, c in enumerate(classes)}
     log.info(f"loaded head: {len(classes)} classes")
 
@@ -256,7 +251,7 @@ def verify_slugs():
     scores = {}
 
     for slug, info in reg.items():
-        cmap = _slug_canon_map(info)
+        cmap = _slug_canon_map(slug, info)
         if cmap is None:
             scores[slug] = {"slug": slug, "status": "unmappable_classes"}
             continue

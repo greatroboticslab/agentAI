@@ -13,6 +13,83 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-09-21 — v3.60.0: the cwd12 class names were wrong, and one headline result goes with them
+
+The twelve cwd12 class ids had been named, since the first commit that staged the dataset
+(`a5d67c8`, the `setup_and_train.sh` heredoc), with an alphabetical list that is not
+CottonWeedDet12's. The list matches the first twelve CottonWeedID15 names. cwd12 has no
+Crabgrass and no Nutsedge, and it has Waterhemp and Cutleaf groundcherry. The real
+id → species table was established two independent ways. The dataset's own VGG
+annotations, paired with the YOLO boxes in file order over the 3,661 train images whose
+region count equals the YOLO line count (every train image has a VGG file; 10 differ in
+count), give 6,090 boxes, each id 100 % one species. AgML 3SeasonWeedDet10 shares 2,904
+photographs with the train split and gives 4,849 boxes at 100 % agreement. Only PricklySida was named correctly. The full table, its evidence and the status
+of every finding it touches are in `docs/CWD12_SPECIES.md`.
+
+**What survives.** Labels on disk were never wrong. Only the names attached to the ids
+were. Every overall mAP in this log keeps its value (0.8755 ± 0.0029, 0.8974 ± 0.0040, the
+M1 points, the tier ladder, all fifteen campaign rounds), because mAP averages over ids.
+So do the class-agnostic transfer numbers, **0.1003 ± 0.0053** on ImageWeeds against
+**0.8730 ± 0.0011** in-domain.
+
+**What only needs its names translated.** The per-species results were written under the
+old labels, but each value belongs to the right id:
+- The model card's best class, legacy "Ragweed" 0.9767, is **Sicklepod**.
+- Its weak three are **Carpetweed 0.7324, Spotted spurge 0.7973 and Purslane 0.8219**,
+  not Morningglory, Goosegrass and Eclipta.
+- The leave-4-out experiment of 2026-03-19 held out ids 2-5, meaning **Purslane, Spotted
+  spurge, Carpetweed and Ragweed**.
+- The four near-zero classes of Session 36 (2026-04-24, v3.0.23) are the same four.
+- The robot fire sweep's "Purslane" is Palmer amaranth.
+
+**What does not survive.** The 2026-08-26 entry reports ImageWeeds "ragweed, the same-name
+class it scores 0.9604 on at home", transferring at **0.0006**. `crossdataset_eval.py:177` (as run, commit `420a449`)
+picked the model's class by its label "Ragweed", which is id 9, **Sicklepod**. The 0.9604
+is Sicklepod's in-domain AP, and the 0.0006 scores a Sicklepod class against real ragweed,
+which would be near zero for any model. The class that holds ragweed is cwd12 id 5 (old
+label "Nutsedge", 0.8585 in-domain on the card), and its transfer has not been measured.
+The "wrong species where it localises" reading was made against the same id, and the
+montage it cites draws no class labels, so it is withdrawn with the number.
+
+**What is now uncertain.** Two earlier conclusions rest on the pre-v3.60.0 merge, which
+joined external class names to slots by the old labels.
+- *The tier ladder's harvested-data cost (−0.0189 at +40,000).* The core is correct. The
+  add-ons carry that merge's label noise, of unmeasured size.
+- *The 2026-08-25 retraction's mechanism* ("dedup and holdout-stem filters starve the
+  core; Goosegrass down to 44"). The same merge read `cottonweed_holdout` through a
+  four-name list its twelve-id files do not follow, and "Goosegrass" there means Spotted
+  spurge. The 0.5601 control and the retraction itself stand.
+
+Separately, `project_agml__imageweeds_weed_detection` had been harvested and used for
+training (registry: `used_for_training`, harvest round 4). The cwd12-only checkpoints
+behind the 0.1003 never saw it. Whether the ladder's merged add-ons included it is
+recorded only on the cluster. It is now in `NEVER_TRAIN_SLUGS`.
+
+**What the trainer was fed.** Run on the lab registry, the merge as it stood put 1,657
+cwd12 train boxes in the wrong slot and deleted 648 more (the whole `cottonweed_holdout`
+copy was misread: 0 of its 3,113 boxes landed right), sent 3SeasonWeedDet10's Purslane,
+Ragweed and Spotted spurge to other species' slots, and let at least 366 re-encoded copies
+of sealed holdout photographs into training, because the holdout guard compared dHashes
+for equality. With the v3.60.0 merge the same registry gives 6,121 of 6,121 cwd12 boxes in
+the right slot, blocks 435 near copies of holdout photographs, and has no merged image
+within 6 bits of one.
+
+**The labeler agent's first experiment.** Phase A of the semi-supervised labeler hides the
+cwd12 train labels and asks how much of them frozen embeddings plus a small human budget
+recover (Bridges-2, three seeds). BioCLIP-2 separates the twelve species far better than
+DINOv2: a linear probe holding out whole capture sessions reaches 0.983 (DINOv2-L CLS
+0.964), HDBSCAN leaves 12 % of crops unclustered (DINOv2-L 32 %), and naming 61 cluster
+medoids — about five crops a species — labels the other 99 % at 0.986 (balanced 0.980),
+against 0.957 for 61 random picks. This is one domain with hand-drawn boxes and an oracle
+labeler, so it is the best case; Phase B puts the same pipeline on harvested boxes, where
+it can also check every name join by what the crops look like.
+
+**Next.** Re-run the ImageWeeds species arm with the class chosen by species (cwd12 id 5),
+and rebuild the ladder add-ons from a merge that uses the species join, the 6-bit
+near-duplicate holdout guard and the ImageWeeds exclusion before quoting the harvested-data
+cost again. Earlier entries in this log are left as written. Their per-species names are
+translated by the table in `docs/CWD12_SPECIES.md`.
+
 ## 2026-08-26 (later) — the inference ceiling and the domain wall
 
 The model card's two open limits became measurements today, and they point in opposite

@@ -15,8 +15,9 @@ memory/project_roboflow_pipeline_plan.md):
     5. Iterate; auto-label precision tracked as paper metric.
 
 This module = step 2 only. Read-only on the target dir; writes YOLO txt
-labels to --out-dir/<image>.txt. Does NOT upload to Roboflow (the sync
-step is separate, via roboflow_sync.py species-upload with batch=red).
+labels to --out-dir/<image>.txt plus --out-dir/_owl_proposals.json (which
+species the files hold). Does NOT upload to Roboflow (the sync step is
+separate, via owl_upload_proposals.py).
 
 SECURITY: no secrets used. Read-only on inputs.
 
@@ -30,14 +31,15 @@ Usage:
     python -m weed_optimizer_framework.tools.owl_preannotate \\
         --target-dir <unlabeled imgs> \\
         --exemplar-config <species exemplars json> \\
-        --species Goosegrass \\
+        --species SpottedSpurge \\
         --out-dir <labels output> \\
         --conf-threshold 0.3 \\
         --max-images 100
 
 Exemplar-config JSON format (one species per file, or aggregated):
     {
-      "species": "Goosegrass",
+      "species": "SpottedSpurge",
+      "vocabulary": "species",
       "exemplars": [
         {"image": "/abs/path.jpg", "bbox_yolo": [0.5, 0.5, 0.2, 0.3]},
         ...   # 3-10 examples ideal
@@ -58,12 +60,70 @@ REPO = Path(os.environ.get(
     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark",
 ))
 
-# CWD12 schema (mirrors roboflow_sync.CWD12)
-CWD12 = (
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-)
+from .cwd12_species import CWD12_SPECIES, cli_species
+
+# v3.60.0: --species and the config's "species" are cwd12 species
+# (CWD12_SPECIES). Configs and proposal dirs written before carry a legacy
+# label under the same key ("Goosegrass" meant SpottedSpurge), so only a
+# config that says "vocabulary": "species" is accepted, and the proposals
+# are stamped with the species they hold (PROPOSALS_MANIFEST).
+PROPOSALS_MANIFEST = "_owl_proposals.json"
+# v3.60.0: species-era proposals live under their own root. Eight names are
+# both a legacy label and a species, so owl_red_proposals/Goosegrass/ (which
+# holds the pre-v3.60.0 SpottedSpurge run) would otherwise be reused for real
+# Goosegrass and stamped with its manifest over the legacy files.
+LEGACY_PROPOSALS_ROOT = REPO / "results" / "framework" / "owl_red_proposals"
+PROPOSALS_ROOT = REPO / "results" / "framework" / "owl_red_proposals_species"
+
+
+def default_proposals_dir(species):
+    return PROPOSALS_ROOT / species
+
+
+def read_manifest(prop_dir):
+    """The proposals manifest of `prop_dir`, or {} when it has none."""
+    try:
+        with open(Path(prop_dir) / PROPOSALS_MANIFEST) as f:
+            m = json.load(f)
+        return m if isinstance(m, dict) else {}
+    except Exception:
+        return {}
+
+
+def out_dir_conflict(out_dir, species, target_dir):
+    """Why `out_dir` must not receive a run for (species, target_dir), or None.
+
+    v3.60.0: a dir that already holds proposal .txt files is reused only when
+    its manifest names the same species and the same target dir; otherwise the
+    new manifest would vouch for files another run wrote."""
+    out_dir = Path(out_dir)
+    if not out_dir.is_dir() or not any(p.suffix == ".txt" for p in out_dir.iterdir()):
+        return None
+    m = read_manifest(out_dir)
+    if m.get("vocabulary") != "species" or m.get("species") != species:
+        return (f"{out_dir} already holds proposal files for "
+                f"{m.get('species')!r} (vocabulary {m.get('vocabulary')!r})")
+    if str(m.get("target_dir")) != str(target_dir):
+        return (f"{out_dir} already holds {species} proposals for target dir "
+                f"{m.get('target_dir')}, not {target_dir}")
+    return None
+
+
+def species_arg(name):
+    """argparse type: a cwd12 species (common spellings accepted)."""
+    sp = cli_species(name)   # v3.60.0: no legacy-only label
+    if sp is None:
+        raise argparse.ArgumentTypeError(
+            f"{name!r} is not a cwd12 species ({', '.join(CWD12_SPECIES)})")
+    return sp
+
+
+def config_species(cfg):
+    """The species an exemplar config holds, or None for a config without
+    "vocabulary": "species" (written before v3.60.0 under a legacy label)."""
+    if not isinstance(cfg, dict) or cfg.get("vocabulary") != "species":
+        return None
+    return cfg.get("species") if cfg.get("species") in CWD12_SPECIES else None
 
 
 def _crop_yolo_box(img, box_yolo):
@@ -189,8 +249,8 @@ def main():
                     help="dir of unlabeled images to pre-annotate")
     ap.add_argument("--exemplar-config", required=True,
                     help="JSON with {species, exemplars:[{image, bbox_yolo}, ...]}")
-    ap.add_argument("--species", required=True, choices=list(CWD12),
-                    help="canonical CWD12 species name (must match config)")
+    ap.add_argument("--species", required=True, type=species_arg,
+                    help="cwd12 species, e.g. SpottedSpurge (must match config)")
     ap.add_argument("--out-dir", required=True,
                     help="output dir for YOLO .txt label files (red proposals)")
     ap.add_argument("--conf-threshold", type=float, default=0.3)
@@ -219,7 +279,12 @@ def main():
 
     with open(cfg_path) as f:
         cfg = json.load(f)
-    if cfg.get("species") != args.species:
+    if config_species(cfg) is None:
+        print(f"FATAL: {cfg_path} does not declare \"vocabulary\": \"species\"; "
+              f"its species {cfg.get('species')!r} is a legacy label. Regenerate "
+              f"it with export_owl_exemplars.", file=sys.stderr)
+        sys.exit(2)
+    if config_species(cfg) != args.species:
         print(f"FATAL: config species {cfg.get('species')} != "
               f"--species {args.species}", file=sys.stderr)
         sys.exit(2)
@@ -233,7 +298,7 @@ def main():
     if args.max_images:
         target_imgs = target_imgs[: args.max_images]
 
-    print(f"=== OWL pre-annotate ===")
+    print("=== OWL pre-annotate ===")
     print(f"  species:       {args.species}")
     print(f"  exemplars:     {len(exemplars)} from {cfg_path}")
     print(f"  target images: {len(target_imgs)} in {target_dir}")
@@ -241,6 +306,9 @@ def main():
     print(f"  threshold:     {args.conf_threshold}")
     print(f"  model:         {args.model_id}")
     if args.dry_run:
+        conflict = out_dir_conflict(out_dir, args.species, target_dir)
+        if conflict:
+            print(f"[dry-run] would refuse: {conflict}")
         print("[dry-run] not loading model. exiting.")
         return
 
@@ -262,8 +330,18 @@ def main():
         sys.exit(2)
     print(f"[owl] {len(exemplar_crops)} exemplar crops ready")
 
+    conflict = out_dir_conflict(out_dir, args.species, target_dir)
+    if conflict:
+        print(f"FATAL: {conflict}. Use an empty --out-dir (default "
+              f"{default_proposals_dir(args.species)}).", file=sys.stderr)
+        sys.exit(2)
     processor, model, device = _load_owl(args.model_id)
     out_dir.mkdir(parents=True, exist_ok=True)
+    with open(out_dir / PROPOSALS_MANIFEST, "w") as f:
+        json.dump({"species": args.species, "vocabulary": "species",
+                   "class_id_0": args.species, "exemplar_config": str(cfg_path),
+                   "target_dir": str(target_dir),
+                   "written_at": time.strftime("%Y-%m-%dT%H:%M:%S")}, f, indent=2)
 
     t0 = time.time(); n_ok = 0; n_props = 0
     for img_path, yolo_lines in _process_targets(
@@ -281,8 +359,7 @@ def main():
     print(f"DONE: {n_ok} images annotated, {n_props} proposed boxes "
           f"in {time.time()-t0:.0f}s")
     print(f"      out: {out_dir}/<img>.txt")
-    print(f"      next: upload with roboflow_sync.py species-upload "
-          f"--batch red")
+    print(f"      next: owl_upload_proposals --species {args.species}")
 
 
 if __name__ == "__main__":

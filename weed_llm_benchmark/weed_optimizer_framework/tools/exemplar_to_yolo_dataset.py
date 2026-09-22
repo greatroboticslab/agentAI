@@ -4,17 +4,22 @@ Closes the human-in-loop circle:
    human ✓ in /classes/{cls}
      → results/framework/class_exemplars/{cls}.jsonl
      → THIS SCRIPT
-     → results/framework/exemplar_yolo/{train,val}/{images,labels}/
-     → YOLO data.yaml (12 cwd12 species, canonical class_ids)
+     → results/framework/exemplar_yolo_species/{train,val}/{images,labels}/
+     → YOLO data.yaml (12 cwd12 species, label id = cwd12 id)
      → consumed by mega_trainer / RF-DETR training jobs
+
+v3.60.0: every log is read and each event is keyed by the species it records
+("class"; older events are re-keyed by their source, as the dashboard does).
+Nothing from a NEVER_TRAIN slug or a cwd12 test/valid photograph is written.
 
 For each ✓ entry, we emit one (image, label) pair:
   - kind='bank' (synth_cutpaste crop on transparent bg)
         → label = single bbox covering 80% of center (it's a tight crop)
   - kind='flux' (full FLUX synthetic scene with bbox label)
-        → label = preserved from synth_diffusion/labels/
+        → label = preserved from synth_diffusion_species/labels/ (the older
+          synth_diffusion/ output is skipped: its ids do not name the plant)
   - kind='reg' (real harvested image, multi-class label)
-        → label = ONLY the bboxes whose class_id maps to canonical cwd12.
+        → label = ONLY the bboxes whose class is this species.
           Other-class bboxes dropped because the verifier said THIS species
           is correct; non-target boxes weren't verified.
 
@@ -22,7 +27,7 @@ Output filenames are content-hashed to avoid collisions across sources.
 
 Run on cluster (where exemplar JSONLs and bank/flux/reg images live):
   python -m weed_optimizer_framework.tools.exemplar_to_yolo_dataset \\
-      --out results/framework/exemplar_yolo \\
+      --out results/framework/exemplar_yolo_species \\
       --val-frac 0.15
 """
 from __future__ import annotations
@@ -42,16 +47,29 @@ REPO = Path(os.environ.get(
 ))
 sys.path.insert(0, str(REPO))
 
-# Canonical 12-class encoding (matches dashboard, mega_trainer, etc.)
-CWD12 = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-]
+from weed_optimizer_framework.tools.cwd12_species import (  # noqa: E402
+    CWD12_ID_SPACE, CWD12_LEGACY_LABELS, CWD12_SPECIES, class_species,
+    is_legacy_label_list, legacy_to_species, species_of,
+)
+
+# v3.60.0: classes are the 12 cwd12 species and label ids are cwd12 ids
+# (CWD12_SPECIES order), not positions in the legacy label list, which put
+# e.g. SpottedSpurge at id 11 (CutleafGroundcherry).
+CWD12 = list(CWD12_SPECIES)
 CWD12_TO_ID = {n: i for i, n in enumerate(CWD12)}
 
 EXEMPLAR_DIR = REPO / "results" / "framework" / "class_exemplars"
 REGISTRY_PATH = REPO / "results" / "framework" / "dataset_registry.json"
+BANK_DIR = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank"
+# v3.60.0: crops of the species bank are keyed 'banksp/<species>/<fn>' (the
+# dashboard marks whichever bank synth_cutpaste.default_bank_dir() selects);
+# 'bank/<folder>/<fn>' always names the legacy object_bank/.
+SPECIES_BANK_DIR = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank_species"
+FLUX_SPECIES_PREFIX = "fluxsp_"   # synth_diffusion.FLUX_SPECIES_PREFIX
+FLUX_LEGACY_DIR = REPO / "results" / "framework" / "synth_diffusion"
+FLUX_SPECIES_DIR = REPO / "results" / "framework" / "synth_diffusion_species"
+# the four names cottonweed_holdout was registered with before v3.60.0
+_HOLDOUT_LEGACY_NAMES = list(CWD12_LEGACY_LABELS[2:6])
 
 
 def _content_hash(p: Path) -> str:
@@ -66,73 +84,140 @@ def _content_hash(p: Path) -> str:
     return h.hexdigest()[:16]
 
 
-def _read_exemplars(cls: str) -> list:
-    """Replay the exemplar log → list of dicts with verdict='exemplar'."""
-    fp = EXEMPLAR_DIR / f"{cls}.jsonl"
-    if not fp.is_file(): return []
-    state: dict = {}
-    try:
-        for line in fp.read_text().splitlines():
+def _legacy_entry_class(logged_as: str, img_key: str, registry: dict) -> str:
+    """Class of an exemplar event that records no "class" (written before
+    v3.60.0, when a log was named by its /classes page, a legacy label for the
+    cwd12 group): the species of its source when that is a cwd12 class, else
+    the name it was logged under. Same rule as dashboard_server's reader."""
+    parts = str(img_key).split("/")
+    kind = parts[0]
+    legacy = logged_as in CWD12_LEGACY_LABELS
+    if kind == "banksp" and len(parts) >= 3 and parts[1] in CWD12_SPECIES:
+        return parts[1]
+    if kind in ("bank", "flux"):
+        if kind == "bank" and len(parts) >= 3 and parts[1] in CWD12_LEGACY_LABELS:
+            return legacy_to_species(parts[1])
+        return legacy_to_species(logged_as) if legacy else logged_as
+    slug = parts[1] if kind == "reg" and len(parts) >= 3 else kind
+    if slug == "cottonweed_holdout" and logged_as in _HOLDOUT_LEGACY_NAMES:
+        return CWD12_ID_SPACE[slug][_HOLDOUT_LEGACY_NAMES.index(logged_as)]
+    if legacy and slug in CWD12_ID_SPACE:
+        return legacy_to_species(logged_as)
+    if legacy:
+        info = (registry.get("datasets") or {}).get(slug) or {}
+        if is_legacy_label_list(info.get("class_names") or []):
+            return legacy_to_species(logged_as)
+    return species_of(logged_as) or logged_as
+
+
+def _read_all_exemplars(registry: dict) -> dict:
+    """Replay every exemplar log in time order -> {species: [event]} with the
+    latest verdict 'exemplar'. v3.60.0: an event is keyed by its "class" field
+    (or, for an older event, _legacy_entry_class), never by the log file name
+    alone, since a legacy-named log mixed species."""
+    events = []
+    if not EXEMPLAR_DIR.is_dir():
+        return {}
+    for fi, fp in enumerate(sorted(EXEMPLAR_DIR.glob("*.jsonl"))):
+        try:
+            lines = fp.read_text().splitlines()
+        except Exception as e:
+            print(f"WARN: read {fp}: {e}", file=sys.stderr)
+            continue
+        for n, line in enumerate(lines):
             if not line.strip(): continue
-            ev = json.loads(line)
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
             img_key = ev.get("img", ""); v = ev.get("verdict", "")
             if not img_key or not v: continue
-            if v == "clear":
-                state.pop(img_key, None)
-            else:
-                state[img_key] = ev
-    except Exception as e:
-        print(f"WARN: read {fp}: {e}", file=sys.stderr)
-    return [v for v in state.values() if v.get("verdict") == "exemplar"]
+            cls = ev.get("class") or _legacy_entry_class(fp.stem, img_key, registry)
+            try:
+                ts = float(ev.get("ts") or 0)
+            except Exception:
+                ts = 0.0
+            events.append((ts, fi, n, cls, img_key, ev))
+    events.sort(key=lambda e: (e[0], e[1], e[2]))
+    state: dict = {}
+    for _ts, _fi, _n, cls, img_key, ev in events:
+        if ev.get("verdict") == "clear":
+            state.get(cls, {}).pop(img_key, None)
+        else:
+            state.setdefault(cls, {})[img_key] = ev
+    return {cls: [e for e in d.values() if e.get("verdict") == "exemplar"]
+            for cls, d in state.items()}
 
 
-def _resolve_source(cls: str, img_key: str, registry: dict):
-    """Resolve an exemplar img_key to (kind, abs_img_path, label_lines).
-    Returns None if the source can't be located on disk."""
+def _holdout_guard():
+    """(synth_cutpaste module, guard): NEVER_TRAIN slugs + cwd12 test/valid
+    stems and dHashes, the filter mega_trainer applies before training."""
+    from weed_optimizer_framework.tools import synth_cutpaste as _sc
+    return _sc, _sc._holdout_guard(with_hashes=True)
+
+
+def _resolve_source(cls: str, img_key: str, registry: dict, guard=None):
+    """Resolve an exemplar img_key to (kind, abs_img_path, label_lines), or
+    (None, reason) when it can't be used."""
     parts = img_key.split("/", 2)
     if not parts:
-        return None
+        return None, "unknown_kind"
     kind = parts[0]
     cid_canonical = CWD12_TO_ID.get(cls)
+    if cid_canonical is None:
+        return None, "non_cwd12"
+    sc, g = guard if guard is not None else _holdout_guard()
 
-    if kind == "bank" and len(parts) == 3:
-        fn = parts[2]
-        src = REPO / "results" / "framework" / "synth_cutpaste" / "object_bank" / cls / fn
-        if not src.is_file(): return None
+    if kind in ("bank", "banksp") and len(parts) == 3:
+        folder, fn = parts[1], parts[2]
+        # 'bank' = the legacy object_bank (folders named by legacy label),
+        # 'banksp' = object_bank_species (bank_folder_species reads both)
+        root = SPECIES_BANK_DIR if kind == "banksp" else BANK_DIR
+        src = root / folder / fn
+        if not src.is_file(): return None, "bank_missing"
+        if sc.bank_folder_species(root, folder) != cls:
+            return None, "bank_other_species"
+        if not sc.bank_crop_usable(root, src):
+            return None, "holdout"
         # Bank crops are tight; emit a single near-full-image bbox.
-        # Since canonical class id for cls is required, skip non-cwd12 classes.
-        if cid_canonical is None:
-            return None
-        lines = [f"{cid_canonical} 0.5 0.5 0.95 0.95"]
-        return ("bank", src, lines)
+        return ("bank", src, [f"{cid_canonical} 0.5 0.5 0.95 0.95"]), None
 
     if kind == "flux" and len(parts) >= 2:
         fn = parts[1] if len(parts) == 2 else parts[2]
-        src = REPO / "results" / "framework" / "synth_diffusion" / "images" / fn
-        lbl_p = REPO / "results" / "framework" / "synth_diffusion" / "labels" / (
-            Path(fn).stem + ".txt")
-        if not src.is_file(): return None
-        # FLUX labels already use canonical cwd12 ids — use as-is.
+        # v3.60.0: images in synth_diffusion/ were prompted with a legacy label
+        # as if it were the species and labelled with that label's id, so the
+        # id does not name the plant drawn; only species-era output is used.
+        # Species-era files carry FLUX_SPECIES_PREFIX, so a legacy file of
+        # the same class name never shadows one.
+        if not fn.startswith(FLUX_SPECIES_PREFIX):
+            if (FLUX_LEGACY_DIR / "images" / fn).is_file():
+                return None, "flux_legacy_ids"
+            return None, "flux_missing"
+        src = FLUX_SPECIES_DIR / "images" / fn
+        lbl_p = FLUX_SPECIES_DIR / "labels" / (Path(fn).stem + ".txt")
+        if not src.is_file(): return None, "flux_missing"
         lines = []
         if lbl_p.is_file():
             try: lines = [l for l in lbl_p.read_text().splitlines() if l.strip()]
             except Exception: pass
-        return ("flux", src, lines)
+        return ("flux", src, lines), None
 
     if kind == "reg" and len(parts) == 3:
         slug = parts[1]; fn = parts[2]
-        if cid_canonical is None:
-            return None
+        if slug in g["never"]:
+            return None, "holdout"
         # Find the image inside slug's local_path
         info = (registry.get("datasets") or {}).get(slug)
         if not info or not info.get("local_path"):
-            return None
+            return None, "reg_no_local"
         lp = Path(info["local_path"])
-        if not lp.is_dir(): return None
+        if not lp.is_dir(): return None, "reg_no_local"
         # Resolve filename (may live deeper)
         matches = list(lp.rglob(fn))
-        if not matches: return None
+        if not matches: return None, "reg_no_local"
         src = matches[0]
+        if sc._is_holdout_photo(src, g):
+            return None, "holdout"
         # Find label file via standard images→labels swap
         lbl_p = None
         try_paths = [
@@ -142,34 +227,50 @@ def _resolve_source(cls: str, img_key: str, registry: dict):
         for cand in try_paths:
             if cand.is_file():
                 lbl_p = cand; break
-        # Map this slug's class_id_in_slug for `cls` → canonical cwd12 id
+        # Keep only bboxes whose slug class is species `cls` (cwd12 copies by
+        # label-file id, other slugs by the real name); remap to its cwd12 id
         cn_in_slug = info.get("class_names") or []
-        slug_cid = None
-        for i, n in enumerate(cn_in_slug):
-            if n == cls or n.lower() == cls.lower():
-                slug_cid = i; break
-        if slug_cid is None: return None
-        # Keep only bboxes whose slug-internal cid == slug_cid; remap to canonical
         lines: list = []
         if lbl_p:
             try:
                 for line in lbl_p.read_text().splitlines():
                     parts2 = line.split()
                     if len(parts2) >= 5 and parts2[0].isdigit():
-                        if int(parts2[0]) == slug_cid:
+                        if class_species(slug, int(parts2[0]), cn_in_slug) == cls:
                             new_line = " ".join([str(cid_canonical)] + parts2[1:])
                             lines.append(new_line)
             except Exception: pass
         if not lines:
-            return None  # nothing to put in label — skip
-        return ("reg", src, lines)
+            return None, "reg_no_label_match"
+        return ("reg", src, lines), None
 
-    return None
+    return None, "unknown_kind"
+
+
+def _out_dir_conflict(out_root: Path):
+    """Why `out_root` must not be written, or None. Label files are added to
+    whatever is there, so a directory holding output in another class space
+    (a data.yaml whose names are not the species) would end up mixing ids."""
+    dy = out_root / "data.yaml"
+    if not dy.is_file():
+        return None
+    try:
+        for line in dy.read_text().splitlines():
+            if line.startswith("names:"):
+                if json.loads(line.split(":", 1)[1].strip()) == CWD12:
+                    return None
+                break
+    except Exception:
+        pass
+    return (f"{dy} is not in the species class space (written before v3.60.0?); "
+            f"pass another --out")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=str(REPO / "results" / "framework" / "exemplar_yolo"))
+    # v3.60.0: exemplar_yolo/ holds output in the legacy label ids; species
+    # output goes to its own directory (see _out_dir_conflict)
+    ap.add_argument("--out", default=str(REPO / "results" / "framework" / "exemplar_yolo_species"))
     ap.add_argument("--val-frac", type=float, default=0.15)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--dry-run", action="store_true",
@@ -184,24 +285,27 @@ def main():
 
     # Resolve all ✓ entries across CWD12 classes
     resolved: list = []
-    skipped: dict = {"bank_missing": 0, "flux_missing": 0,
+    skipped: dict = {"bank_missing": 0, "bank_other_species": 0,
+                     "flux_missing": 0, "flux_legacy_ids": 0,
                      "reg_no_local": 0, "reg_no_label_match": 0,
-                     "non_cwd12": 0, "unknown_kind": 0}
+                     "holdout": 0, "non_cwd12": 0, "unknown_kind": 0}
     by_class: dict = {}
-    by_kind: dict = {"bank": 0, "flux": 0, "reg": 0}
+    by_kind: dict = {"bank": 0, "flux": 0, "reg": 0}   # banksp counts as bank
 
     if not EXEMPLAR_DIR.is_dir():
         print(f"WARN: no exemplar dir {EXEMPLAR_DIR} — no ✓ marks yet")
 
-    for cls in CWD12:
-        for ev in _read_exemplars(cls):
+    guard = _holdout_guard()
+    exemplars = _read_all_exemplars(registry)
+    for cls, evs in sorted(exemplars.items()):
+        if cls not in CWD12_TO_ID:
+            skipped["non_cwd12"] += len(evs)
+            continue
+        for ev in evs:
             img_key = ev.get("img", "")
-            res = _resolve_source(cls, img_key, registry)
+            res, why = _resolve_source(cls, img_key, registry, guard)
             if res is None:
-                if img_key.startswith("bank/"): skipped["bank_missing"] += 1
-                elif img_key.startswith("flux/"): skipped["flux_missing"] += 1
-                elif img_key.startswith("reg/"): skipped["reg_no_local"] += 1
-                else: skipped["unknown_kind"] += 1
+                skipped[why] = skipped.get(why, 0) + 1
                 continue
             kind, src, lines = res
             resolved.append({
@@ -235,6 +339,10 @@ def main():
         sys.exit(0)
 
     out_root = Path(args.out)
+    conflict = _out_dir_conflict(out_root)
+    if conflict:
+        print(f"FATAL: {conflict}", file=sys.stderr)
+        sys.exit(2)
     for split in ("train", "val"):
         for sub in ("images", "labels"):
             (out_root / split / sub).mkdir(parents=True, exist_ok=True)
@@ -257,10 +365,10 @@ def main():
         except Exception as e:
             print(f"WARN: copy {src} → {img_out}: {e}", file=sys.stderr)
 
-    # data.yaml — canonical CWD12
+    # data.yaml — the cwd12 species by cwd12 id
     data_yaml = out_root / "data.yaml"
     data_yaml.write_text(
-        f"# Auto-generated by exemplar_to_yolo_dataset v3.0.43\n"
+        f"# Auto-generated by exemplar_to_yolo_dataset v3.60.0\n"
         f"# Source: human ✓ marks from /classes UI exemplar JSONLs.\n"
         f"# Generated: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}\n"
         f"path: {out_root}\n"

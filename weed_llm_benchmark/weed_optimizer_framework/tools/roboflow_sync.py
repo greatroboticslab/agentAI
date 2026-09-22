@@ -32,25 +32,135 @@ import sys
 import time
 from pathlib import Path
 
-CWD12 = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-]
-# v3.0.99.20: normalized CWD12 names + aliases, for --require-cwd12 filtering
-# (sync only the clean datasets whose class names actually map to CWD12 species).
-_CWD12_NORM = {"".join(c for c in s.lower() if c.isalnum()) for s in CWD12}
-for _a in ("morningglory", "carpetweed", "palmeramaranth", "spottedspurge",
-           "spurge", "pricklysida", "eleusineindica", "cyperus", "ipomoea"):
-    _CWD12_NORM.add(_a)
+try:
+    from .cwd12_species import (CWD12_SPECIES, CWD12_LEGACY_LABELS,
+                                CWD12_ID_SPACE, LEGACY_ROBOFLOW_PROJECTS,
+                                species_to_legacy, class_species, name_key,
+                                species_of)
+except ImportError:  # run as a plain script from tools/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cwd12_species import (CWD12_SPECIES, CWD12_LEGACY_LABELS,
+                               CWD12_ID_SPACE, LEGACY_ROBOFLOW_PROJECTS,
+                               species_to_legacy, class_species, name_key,
+                               species_of)
+
+# v3.60.0: cwd12 label ids are species (cwd12_species.CWD12_SPECIES). The old
+# CWD12 list here was the invented alphabetical names; a project created from
+# those uploads (LEGACY_ROBOFLOW_PROJECTS) keeps that vocabulary, so a new
+# upload into it writes the same class names it already has, and every other
+# project gets the species.
 
 
-def _slug_has_cwd12(class_names):
-    """True if ≥1 of the slug's class names maps to a CWD12 species."""
-    for c in (class_names or []):
-        if "".join(ch for ch in str(c).lower() if ch.isalnum()) in _CWD12_NORM:
-            return True
-    return False
+def _project_name(species, project):
+    """How `species` is written in Roboflow `project` (class, batch, tag)."""
+    if project in LEGACY_ROBOFLOW_PROJECTS:
+        return species_to_legacy(species)
+    return species
+
+
+def _real_class_name(species, project):
+    """How `species` is written on a photograph that is not a cwd12 photograph.
+    v3.60.0: download-merge reads every box on such a photograph as a real name
+    (species_of), in the legacy projects too, so the name written must read
+    back as `species`; species_to_legacy would turn harvested waterhemp into
+    'Carpetweeds' = carpetweed. In a legacy project the existing class whose
+    real-name reading is `species` is reused ('Carpetweeds' for carpetweed,
+    'Morningglory' for morning glory), as a person drawing there would."""
+    if project in LEGACY_ROBOFLOW_PROJECTS:
+        for lb in CWD12_LEGACY_LABELS:
+            if species_of(lb) == species:
+                return lb
+    return species
+
+
+def _class_name(species, project, cwd12_photos):
+    """Legacy vocabulary only for cwd12 photographs (never read back for
+    training); a real name that round-trips through species_of otherwise."""
+    if cwd12_photos:
+        return _project_name(species, project)
+    return _real_class_name(species, project)
+
+
+def _cwd12_labelmap(project, cwd12_photos=True):
+    """{cwd12 id: class name in `project`} for label files in cwd12 id space."""
+    return {i: _class_name(sp, project, cwd12_photos)
+            for i, sp in enumerate(CWD12_SPECIES)}
+
+
+_LEGACY_KEYS = {name_key(n) for n in CWD12_LEGACY_LABELS}
+
+
+def _name_list(class_names):
+    if isinstance(class_names, dict):
+        return [class_names[k] for k in sorted(class_names)]
+    return list(class_names or [])
+
+
+def _clean_real_name(name):
+    """A non-cwd12 class name as uploaded: whitespace and underscores collapsed,
+    so 'crab_grass ' and 'crab grass' are one Roboflow class. Case is kept."""
+    return " ".join(str(name).replace("_", " ").split())
+
+
+def _registry_labelmap(slug, info, project):
+    """{label-file id: Roboflow class name} for registry slug `slug` uploaded
+    into `project`. Each class is resolved to its species first (cwd12 copies
+    by id, anything else by its real name); a species is written with
+    _class_name (legacy vocabulary only for a cwd12 copy, whose photographs
+    are cwd12 photographs), any other name as its cleaned real name. Numeric
+    placeholder names are left out."""
+    names = _name_list(info.get("class_names"))
+    space = CWD12_ID_SPACE.get(slug)
+    n_ids = len(space) if space is not None else len(names)
+    legacy = project in LEGACY_ROBOFLOW_PROJECTS
+    lm = {}
+    for i in range(n_ids):
+        sp = class_species(slug, i, names)
+        if sp is not None:
+            lm[i] = _class_name(sp, project, space is not None)
+            continue
+        if i >= len(names):
+            continue
+        n = _clean_real_name(names[i])
+        if not n or n.isdigit():
+            continue
+        if legacy and name_key(n) in _LEGACY_KEYS:
+            # A real 'Crabgrass' or 'Nutsedge' would merge into the legacy
+            # class of the same name, which holds another plant on the cwd12
+            # photographs (download-merge drops it either way).
+            n = f"{n} (non-cwd12)"
+        lm[i] = n
+    return lm
+
+
+def _never_upload_slugs():
+    """NEVER_TRAIN slugs whose photographs download-merge cannot recognise.
+
+    v3.60.0: download-merge drops only cwd12 photographs (by dHash), and an
+    uploaded file name carries no slug, so a box drawn in Roboflow on a
+    NEVER_TRAIN image (weedsense, francesco, the S6 ImageWeeds test set) would
+    come back as training data. Those slugs are never uploaded. cwd12 copies
+    (CWD12_ID_SPACE) stay uploadable: their photographs are the ones the
+    download-merge guard recognises."""
+    try:
+        from weed_optimizer_framework.tools.mega_trainer import NEVER_TRAIN_SLUGS
+    except ImportError:  # run as a plain script from tools/
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from weed_optimizer_framework.tools.mega_trainer import NEVER_TRAIN_SLUGS
+    return frozenset(s for s in NEVER_TRAIN_SLUGS if s not in CWD12_ID_SPACE)
+
+
+def _slug_has_cwd12(class_names, slug=None):
+    """True if >=1 of the slug's classes is a cwd12 species.
+    v3.60.0: resolved per class through class_species (id space for cwd12
+    copies, real name otherwise), so real crabgrass or nutsedge no longer
+    counts and waterhemp or cutleaf groundcherry does."""
+    if slug in CWD12_ID_SPACE:
+        return True
+    names = _name_list(class_names)
+    return any(class_species(slug, i, names) is not None for i in range(len(names)))
+
+
 # v3.0.58 (2026-05-30): project name configurable. Defaults to
 # 'cwd12-weeds' for backward compat with personal workspace
 # (research-lhi4x). Override via env ROBOFLOW_PROJECT or per-call
@@ -290,9 +400,12 @@ def cmd_sync_newest_slugs(args):
     skip_baselines = (getattr(args, "skip_baselines", False)
                       or os.environ.get("SYNC_SKIP_BASELINES") == "1")
 
+    never_upload = _never_upload_slugs()   # v3.60.0
     pending = []
     for slug, info in ds.items():
         if info.get("status") != "downloaded":
+            continue
+        if slug in never_upload:
             continue
         if skip_baselines and slug in CWD12_BASELINES:
             continue
@@ -302,7 +415,7 @@ def cmd_sync_newest_slugs(args):
             continue
         if info.get("roboflow_synced"):
             continue
-        if require_cwd12 and not _slug_has_cwd12(info.get("class_names")):
+        if require_cwd12 and not _slug_has_cwd12(info.get("class_names"), slug):
             continue
         if _sync_domain and (info.get("domain") or "weed").strip().lower() != _sync_domain:
             continue                     # v3.0.174: only this domain's slugs
@@ -434,12 +547,9 @@ def cmd_sync_newest_slugs(args):
         # With per-slug names the project gets distinct real classes the human can
         # actually review. Slug name itself is prepended so cross-dataset same-name
         # classes (generic "weed") stay traceable to their source.
-        _cn = info.get("class_names") or []
-        labelmap = {}
-        for _i, _n in enumerate(_cn):
-            _n = str(_n).strip()
-            if _n and not _n.isdigit():        # skip placeholder-numeric names
-                labelmap[_i] = _n
+        # v3.60.0: resolved by species (cwd12 copies by id, not by their stored
+        # names) and written in the target project's vocabulary.
+        labelmap = _registry_labelmap(slug, info, slug_proj_name)
         ok = 0
         fail = 0
         # v3.0.75.2: progress logging every 10 imgs so silent hangs are
@@ -573,8 +683,8 @@ def cmd_upload(args):
             )
             if has_ann:
                 kw["annotation_path"] = str(lbl)
-                # YOLO txt needs the class index→name map
-                kw["annotation_labelmap"] = {i: n for i, n in enumerate(CWD12)}
+                # YOLO txt needs the class index→name map (cwd12 ids)
+                kw["annotation_labelmap"] = _cwd12_labelmap(PROJECT_NAME)
             proj.single_upload(**kw)
             ok += 1
         except Exception as e:
@@ -588,8 +698,8 @@ def cmd_upload(args):
 
 
 def _primary_species(lbl: Path):
-    """Read a YOLO .txt and return the CWD12 name of its most-frequent class.
-    None if no valid boxes."""
+    """Read a YOLO .txt (cwd12 ids) and return the species of its most-frequent
+    class. None if no valid boxes."""
     try:
         lines = lbl.read_text(errors="ignore").splitlines()
     except Exception:
@@ -600,11 +710,19 @@ def _primary_species(lbl: Path):
         p = ln.split()
         if p and p[0].lstrip("-").isdigit():
             cid = int(p[0])
-            if 0 <= cid < len(CWD12):
+            if 0 <= cid < len(CWD12_SPECIES):
                 c[cid] += 1
     if not c:
         return None
-    return CWD12[c.most_common(1)[0][0]]
+    return CWD12_SPECIES[c.most_common(1)[0][0]]
+
+
+def _has_box(lbl: Path) -> bool:
+    try:
+        return any(ln.split() and ln.split()[0].lstrip("-").isdigit()
+                   for ln in lbl.read_text(errors="ignore").splitlines())
+    except Exception:
+        return False
 
 
 def cmd_bulk_upload(args):
@@ -614,7 +732,16 @@ def cmd_bulk_upload(args):
     One project (cwd12-weeds), but batch_name = green-<species> so the
     Annotate view groups/filters by species. Parallel workers measure
     whether 57s/img was per-call overhead (parallel helps) or global
-    free-tier rate limiting (parallel won't help → wait for paid tier)."""
+    free-tier rate limiting (parallel won't help → wait for paid tier).
+
+    v3.60.0: labels are read as cwd12 ids and uploaded under the target
+    project's names (_cwd12_labelmap). --single-species SPECIES is for
+    single-species files whose only id is 0 (OWL proposals): id 0 is uploaded
+    as SPECIES, where the 12-class map used to name it after cwd12 id 0.
+    --photos says whether the images are cwd12 photographs: only those are
+    written in a legacy project's legacy vocabulary; boxes on any other
+    photograph are read back by download-merge as real names, so they are
+    written as real names (_class_name)."""
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -622,12 +749,26 @@ def cmd_bulk_upload(args):
     labels = Path(args.labels)
     exts = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
     all_imgs = sorted(p for p in images.iterdir() if p.suffix in exts)
+    proj_name = _resolve_project(args)
+    single = getattr(args, "single_species", None)
+    cwd12_photos = getattr(args, "photos", "cwd12") == "cwd12"
+    if single:
+        if single not in CWD12_SPECIES:
+            print(f"FATAL: --single-species {single!r} is not a cwd12 species "
+                  f"({', '.join(CWD12_SPECIES)})", file=sys.stderr)
+            sys.exit(2)
+        labelmap = {0: _class_name(single, proj_name, cwd12_photos)}
+    else:
+        labelmap = _cwd12_labelmap(proj_name, cwd12_photos)
 
     # group by primary species; cap per species for testing via --per-species
     by_sp: dict = {}
     for img in all_imgs:
         lbl = labels / (img.stem + ".txt")
-        sp = _primary_species(lbl) if lbl.is_file() else None
+        if single:
+            sp = single if lbl.is_file() and _has_box(lbl) else None
+        else:
+            sp = _primary_species(lbl) if lbl.is_file() else None
         sp = sp or "Unlabeled"
         by_sp.setdefault(sp, []).append((img, lbl if lbl.is_file() else None))
     # build work list with per-species cap
@@ -641,20 +782,20 @@ def cmd_bulk_upload(args):
           f"workers={args.workers}")
 
     ws = _workspace()
-    proj_name = _resolve_project(args)
     proj = ws.project(proj_name)
-    print(f"target project: {proj_name}")
+    print(f"target project: {proj_name}  labelmap: {labelmap}")
     lock = threading.Lock()
     counters = {"ok": 0, "fail": 0}
-    labelmap = {i: n for i, n in enumerate(CWD12)}
 
     def _one(task):
         sp, img, lbl = task
         t0 = time.time()
+        # batch / tag names follow the project's class vocabulary
+        tag = sp if sp == "Unlabeled" else _class_name(sp, proj_name, cwd12_photos)
         try:
             kw = dict(image_path=str(img), split=args.split,
-                      batch_name=f"{args.batch}-{sp}",
-                      tag_names=[args.batch, sp], num_retry_uploads=1)
+                      batch_name=f"{args.batch}-{tag}",
+                      tag_names=[args.batch, tag], num_retry_uploads=1)
             if lbl is not None:
                 kw["annotation_path"] = str(lbl)
                 kw["annotation_labelmap"] = labelmap
@@ -690,9 +831,10 @@ def cmd_create_species_projects(args):
     """v3.0.44.2 — user feedback: Roboflow has NO folders within a project,
     only filters. To literally separate species, create ONE project per
     species (`cwd12-<species>`). Workspace home then shows 12 distinct
-    project tiles = the 'different folders' UX the user wants."""
+    project tiles = the 'different folders' UX the user wants.
+    v3.60.0: named by species (the legacy-named ones were deleted 2026-05-30)."""
     ws = _workspace()
-    for sp in CWD12:
+    for sp in CWD12_SPECIES:
         name = f"cwd12-{sp.lower()}"
         try:
             proj = ws.create_project(
@@ -728,11 +870,11 @@ def cmd_species_upload(args):
         if sp is None:
             continue
         by_sp.setdefault(sp, []).append((img, lbl))
-    sp2id = {sp: i for i, sp in enumerate(CWD12)}
+    sp2id = {sp: i for i, sp in enumerate(CWD12_SPECIES)}
     print(f"species available: { {k: len(v) for k, v in sorted(by_sp.items())} }")
 
     ws = _workspace()
-    for sp in CWD12:
+    for sp in CWD12_SPECIES:
         items = by_sp.get(sp, [])
         if args.per_species:
             items = items[: args.per_species]
@@ -914,13 +1056,11 @@ def _find_slug_image_dir(lp):
     return max(counts.items(), key=lambda kv: kv[1])[0] if counts else None
 
 
-def _labelmap_for(info):
-    lm = {}
-    for i, n in enumerate(info.get("class_names") or []):
-        n = str(n).strip()
-        if n and not n.isdigit():
-            lm[i] = n
-    return lm
+def _labelmap_for(info, slug=None, project=None):
+    """v3.60.0: species-resolved, in the target project's vocabulary
+    (_registry_labelmap), so a cwd12 copy is not pushed under its stored names
+    and 'Carpet weed' / 'Morning glory' land in the species' one class."""
+    return _registry_labelmap(slug, info, project)
 
 
 def _registry():
@@ -961,6 +1101,10 @@ def cmd_push_slug(args):
     if slug not in ds:
         print(f"FATAL: {slug} not in registry"); return 2
     info = ds[slug]
+    if slug in _never_upload_slugs():   # v3.60.0: see _never_upload_slugs
+        print(f"REFUSED: {slug} is NEVER_TRAIN; its images must not be labelled "
+              f"into a project that download-merge reads back.")
+        return 2
     # v3.0.99.27 (C): hard-refuse threshold lowered 0.45→0.20 on EVIDENCE from the
     # 45-slug DINOv2 ranking (job 41290114): off-topic garbage separates cleanly at
     # the very bottom (generic-agriculture 0.084, coconut-disease 0.122, beehive
@@ -992,7 +1136,7 @@ def cmd_push_slug(args):
         picked = [imgs[int(i * step)] for i in range(n)]
     else:
         picked = imgs
-    labelmap = _labelmap_for(info)
+    labelmap = _labelmap_for(info, slug, project)
     ws = _workspace()
     try:
         proj = ws.project(project)
@@ -1108,6 +1252,13 @@ def main():
                     help="cap images per species (0=all). For testing.")
     bu.add_argument("--project", default=None,
                     help="project name (overrides env ROBOFLOW_PROJECT)")
+    bu.add_argument("--single-species", default=None,
+                    help="v3.60.0: label files hold one species as id 0 (OWL "
+                         "proposals); upload id 0 as this cwd12 species")
+    bu.add_argument("--photos", choices=["cwd12", "other"], default="cwd12",
+                    help="v3.60.0: 'cwd12' when the images are cwd12 photographs "
+                         "(legacy projects keep their legacy labels); 'other' "
+                         "writes real names, which download-merge reads back")
     dj = sub.add_parser("delete-junk")
     dj.add_argument("--apply", action="store_true",
                     help="actually delete (default: dry-run = just count)")

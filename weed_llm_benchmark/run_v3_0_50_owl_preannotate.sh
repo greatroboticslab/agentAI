@@ -40,10 +40,15 @@ if [ -d "$REPO/weed_llm_benchmark/weed_optimizer_framework" ]; then
 fi
 
 # --- Defaults (override via env) ---
-OWL_SPECIES="${OWL_SPECIES:-Goosegrass}"
+# v3.60.0: OWL_SPECIES is a cwd12 species. The old default 'Goosegrass' was the
+# legacy label of cwd12 id 3, so it ran on SpottedSpurge crops; the default
+# names that species now. Exemplar configs and proposal dirs are keyed by it.
+OWL_SPECIES="${OWL_SPECIES:-SpottedSpurge}"
 OWL_TARGET_DIR="${OWL_TARGET_DIR:-$REPO/downloads/cottonweeddet12/valid/images}"
 OWL_EXEMPLAR_CONFIG="${OWL_EXEMPLAR_CONFIG:-$REPO/results/framework/owl_exemplars/${OWL_SPECIES}.json}"
-OWL_OUT_DIR="${OWL_OUT_DIR:-$REPO/results/framework/owl_red_proposals/${OWL_SPECIES}}"
+# v3.60.0: species-era proposals get their own root (owl_red_proposals/<name>
+# holds legacy-labelled runs, and 8 names are both a label and a species).
+OWL_OUT_DIR="${OWL_OUT_DIR:-$REPO/results/framework/owl_red_proposals_species/${OWL_SPECIES}}"
 # v3.0.99: retune for PRECISION. The 0.30/top30 config over-proposed (~30 boxes/img,
 # precision 0.002). Tighten: high conf + tiny top_k so OWL only fires when confident.
 OWL_CONF="${OWL_CONF:-0.50}"
@@ -67,7 +72,8 @@ echo "  max-images: $OWL_MAX"
 if [ ! -f "$OWL_EXEMPLAR_CONFIG" ]; then
     echo "FATAL: exemplar config not found: $OWL_EXEMPLAR_CONFIG"
     echo "       Create one with the structure:"
-    echo "       {\"species\":\"$OWL_SPECIES\",\"exemplars\":[{\"image\":\"/abs/path.jpg\",\"bbox_yolo\":[cx,cy,w,h]}, ...]}"
+    echo "       {\"species\":\"$OWL_SPECIES\",\"vocabulary\":\"species\",\"exemplars\":[{\"image\":\"/abs/path.jpg\",\"bbox_yolo\":[cx,cy,w,h]}, ...]}"
+    echo "       or run: python -m weed_optimizer_framework.tools.export_owl_exemplars --species $OWL_SPECIES"
     exit 2
 fi
 

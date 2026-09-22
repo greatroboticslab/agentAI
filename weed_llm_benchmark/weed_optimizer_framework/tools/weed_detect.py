@@ -16,8 +16,12 @@ Deliberate properties:
   * inference never blocks the event loop — it runs in a threadpool.
   * per-species reliability from the model card travels **with the predictions**: the
     three weak species are flagged in every response, because a detection of
-    Morningglory (0.7324 mAP50-95) does not mean what a detection of Ragweed (0.9767)
+    Carpetweed (0.7324 mAP50-95) does not mean what a detection of Sicklepod (0.9767)
     means, and a laser-weeding system downstream should be able to tell.
+  * detections name the species. The served checkpoint was trained with this
+    project's legacy cwd12 labels (model.names 'Nutsedge' is ragweed, 'Ragweed' is
+    sicklepod); they are translated once at load, in memory, and the .pt is left
+    as it is.
   * the frame endpoint degrades to the plain frame if inference fails, so the live
     view keeps working when detection does not.
 """
@@ -31,10 +35,14 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
+from .cwd12_species import (CWD12_SPECIES, is_legacy_label_list, legacy_to_species,
+                            species_names_for)
+
 router = APIRouter()
 _CTX = {}
 _LOCK = threading.Lock()
-_MODEL = {"obj": None, "err": None, "loaded_at": None, "device": None}
+_MODEL = {"obj": None, "err": None, "loaded_at": None, "device": None,
+          "names": None, "legacy_names": None, "card": False}
 
 WEIGHTS = os.path.expanduser(
     os.environ.get("WEED_MODEL", "~/models/cwd12_yolo11n_s102.pt"))
@@ -42,13 +50,20 @@ CONF = float(os.environ.get("WEED_CONF", "0.25"))
 IMGSZ = int(os.environ.get("WEED_IMGSZ", "640"))
 
 # From docs/BEST_MODEL_CARD.md — independent re-evaluation, job 44454237, n=3 seeds.
-PER_SPECIES = {
+# v3.60.0: the card measured each class id and named it with the legacy cwd12
+# label; the numbers stay, the keys are translated to the species of that id.
+_CARD_PER_LEGACY_LABEL = {
     "Ragweed": 0.9767, "Purslane": 0.9276, "PalmerAmaranth": 0.9163,
     "Crabgrass": 0.9157, "Carpetweeds": 0.9151, "PricklySida": 0.9118,
     "SpottedSpurge": 0.8818, "Nutsedge": 0.8585, "Sicklepod": 0.8555,
     "Eclipta": 0.8219, "Goosegrass": 0.7973, "Morningglory": 0.7324,
 }
+PER_SPECIES = {legacy_to_species(k): v for k, v in _CARD_PER_LEGACY_LABEL.items()}
 WEAK = [k for k, v in PER_SPECIES.items() if v < 0.83]      # the card's three
+# v3.60.0: the card measured one checkpoint. Its figures are attached only when
+# that checkpoint is served and its head names the twelve cwd12 species by id;
+# any other weights get null reliability rather than borrowed numbers.
+CARD_CHECKPOINT = "cwd12_yolo11n_s102.pt"
 MODEL_META = {
     "name": "cwd12 YOLO11n (COCO-pretrained, seed 102)",
     "holdout_map50_95": 0.8759, "holdout_std": 0.0030, "n_seeds": 3,
@@ -58,11 +73,16 @@ MODEL_META = {
     "domain_gap_warning": ("trained on close-range handheld field photography. "
                            "Measured 2026-08-26: zero-shot transfer to a clean "
                            "greenhouse-seedling weed dataset collapses (class-agnostic "
-                           "mAP50-95 0.873 in-domain -> 0.100; same-name best species "
-                           "0.960 -> ~0.000) -- treat any new camera/domain as "
-                           "unmeasured until evaluated in it; robot-frame recall is "
-                           "still pending an outdoor run"),
+                           "mAP50-95 0.873 in-domain -> 0.100) -- treat any new "
+                           "camera/domain as unmeasured until evaluated in it; "
+                           "robot-frame recall is still pending an outdoor run"),
 }
+
+
+def _card_applies(names):
+    """True when the model card's per-species figures describe the loaded model."""
+    return (os.path.basename(WEIGHTS) == CARD_CHECKPOINT
+            and dict(names) == dict(enumerate(CWD12_SPECIES)))
 
 
 def _load():
@@ -78,10 +98,19 @@ def _load():
             from ultralytics import YOLO
             import torch
             m = YOLO(WEIGHTS)
+            # v3.60.0: legacy-labelled checkpoints name species through the
+            # whole-list translation; set on the model before the first predict
+            # so res.plot() draws the species too. Species lists pass through.
+            raw = dict(m.names) if isinstance(m.names, dict) else dict(enumerate(m.names))
+            names = species_names_for(raw)
+            if names != raw:
+                m.model.names = names
             dev = 0 if torch.cuda.is_available() else "cpu"
             m.predict(imgsz=IMGSZ, device=dev, verbose=False,
                       source=__import__("numpy").zeros((IMGSZ, IMGSZ, 3), dtype="uint8"))
-            _MODEL.update(obj=m, device=str(dev), loaded_at=time.time())
+            _MODEL.update(obj=m, device=str(dev), loaded_at=time.time(), names=names,
+                          legacy_names=raw if is_legacy_label_list(raw) else None,
+                          card=_card_applies(names))
             _CTX["log"].info("[detect] model loaded from %s on device %s"
                              % (WEIGHTS, dev))
         except Exception as e:
@@ -99,16 +128,22 @@ def _predict(img_bytes, annotate):
     im = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     res = m["obj"].predict(np.array(im), imgsz=IMGSZ, conf=CONF,
                            device=m["device"], verbose=False)[0]
-    names = m["obj"].names
+    names = m["names"] or m["obj"].names
+    legacy = m["legacy_names"]
+    card = m["card"]
     dets = []
     if res.boxes is not None and len(res.boxes):
         for b, c, s in zip(res.boxes.xyxy.tolist(), res.boxes.cls.tolist(),
                            res.boxes.conf.tolist()):
             sp = names[int(c)]
-            dets.append({"species": sp, "conf": round(float(s), 3),
-                         "box_xyxy": [round(float(v), 1) for v in b],
-                         "species_holdout_map50_95": PER_SPECIES.get(sp),
-                         "low_reliability_species": sp in WEAK})
+            d = {"species": sp, "conf": round(float(s), 3),
+                 "box_xyxy": [round(float(v), 1) for v in b],
+                 "species_holdout_map50_95": PER_SPECIES.get(sp) if card else None,
+                 "low_reliability_species": card and sp in WEAK}
+            if legacy:
+                # v3.60.0: the checkpoint's own label, for clients still keyed by it.
+                d["legacy_label"] = legacy.get(int(c))
+            dets.append(d)
     out = None
     if annotate:
         buf = io.BytesIO()
@@ -123,7 +158,11 @@ def detect_model(request: Request):
     m = _load()
     return JSONResponse({"ok": m["obj"] is not None, "error": m["err"],
                          "weights": WEIGHTS, "device": m["device"],
-                         "conf": CONF, "imgsz": IMGSZ, **MODEL_META})
+                         "class_names": m["names"],
+                         "checkpoint_labels_legacy": m["legacy_names"] is not None,
+                         "conf": CONF, "imgsz": IMGSZ, **MODEL_META,
+                         "card_applies": m["card"],
+                         "known_weak_species": WEAK if m["card"] else []})
 
 
 @router.post("/api/detect")
@@ -140,7 +179,7 @@ async def detect_post(request: Request):
     return JSONResponse({"ok": True, "detections": dets, "n": len(dets),
                          "ms": round((time.time() - t0) * 1000, 1),
                          "model": MODEL_META["name"],
-                         "known_weak_species": WEAK})
+                         "known_weak_species": WEAK if _MODEL["card"] else []})
 
 
 @router.get("/api/detect/frame/{sid}.jpg")

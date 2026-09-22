@@ -18,6 +18,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from ..config import Config
+from .cwd12_species import CWD12_BINOMIAL, CWD12_COMMON, CWD12_SPECIES
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,21 @@ def _blacklist_hf_id(hf_id: str, reason: str):
         os.replace(tmp, HF_SCHEMA_BLACKLIST_PATH)
     except Exception as e:
         logger.warning(f"[HF blacklist] write fail: {e}")
+
+
+def _cwd12_species_queries() -> list:
+    """Harvest queries for the twelve cwd12 species: common name, common name
+    + 'weed' (unless the name already ends in weed/grass), and binomial
+    (genus alone for 'Ipomoea spp.')."""
+    out: list = []
+    for sp in CWD12_SPECIES:
+        common = CWD12_COMMON[sp].lower()
+        binom = CWD12_BINOMIAL[sp].replace(" spp.", "").lower()
+        weedy = common if common.endswith(("weed", "grass")) else f"{common} weed"
+        for q in (common, weedy, binom):
+            if q not in out:
+                out.append(q)
+    return out
 
 
 class DatasetDiscovery:
@@ -206,7 +222,7 @@ class DatasetDiscovery:
 
         # Auto-register existing leave4out splits so mega_trainer has something to train on
         # even if HF downloads haven't happened yet
-        def _register_local(key, root_dir, class_names, desc):
+        def _register_local(key, root_dir, class_names, desc, id_space):
             if not os.path.isdir(root_dir):
                 return
             n = sum(1 for f in Path(root_dir).rglob("*") if f.suffix.lower() in
@@ -221,21 +237,31 @@ class DatasetDiscovery:
                 "description": desc,
                 "status": "downloaded", "local_path": root_dir, "local_images": n,
                 "class_names": class_names,
+                "id_space": id_space,
                 "downloaded_at": entry.get("downloaded_at"),
                 "used_for_training": entry.get("used_for_training", False),
                 "training_runs": entry.get("training_runs", []),
             })
             registry["datasets"][key] = entry
 
+        # v3.60.0: class_names are the species of the ids IN THE LABEL FILES.
+        # dataset_8species writes local ids 0-7 (cwd12 ids 0,1,6-11 in order);
+        # dataset_holdout keeps all twelve original ids, so it gets all twelve
+        # names -- it used to be registered with the four held-out names, which
+        # every class_names[cid] reader then applied to the wrong ids.
+        from .cwd12_species import CWD12_ID_SPACE
         _register_local(
             "cottonweed_sp8", Config.SP8_DIR,
-            [Config.ALL_CLASSES[i] for i in sorted(Config.TRAIN_SPECIES_IDS)],
-            "CottonWeedDet12 8-species train split (pre-existing, YOLO format)"
+            list(CWD12_ID_SPACE["cottonweed_sp8"]),
+            "CottonWeedDet12 photos without the 4 leave-out species; labels in local ids 0-7",
+            "cwd12_sp8_local",
         )
         _register_local(
             "cottonweed_holdout", Config.HOLDOUT_DIR,
-            [Config.ALL_CLASSES[i] for i in sorted(Config.HOLDOUT_SPECIES_IDS)],
-            "CottonWeedDet12 4-species holdout split (pre-existing, YOLO format)"
+            list(CWD12_ID_SPACE["cottonweed_holdout"]),
+            "CottonWeedDet12 photos containing the 4 leave-out species (Purslane, SpottedSpurge, "
+            "Carpetweed, Ragweed); labels in the original 12 ids",
+            "cwd12",
         )
 
         registry["total_downloaded"] = sum(
@@ -883,14 +909,14 @@ class DatasetDiscovery:
         # v3.0.77 (2026-06-01): expanded to find more datasets after
         # earlier rounds exhausted basic terms. Round 2/3 needs fresh
         # candidates. These are species-specific + technique-specific.
-        "amaranth", "ragweed", "morningglory dataset", "carpetweed",
-        "crabgrass", "purslane plant", "sicklepod", "goosegrass",
-        "palmer amaranth", "spurge weed", "nutsedge plant",
-        # v3.0.99.6 (2026-06-08): bias to the 4 CWD12 species still missing data
-        # (Eclipta/Goosegrass/Morningglory/Nutsedge). Eclipta had NO query before.
-        "eclipta", "eclipta prostrata", "eclipta weed", "false daisy weed",
-        "goosegrass detection", "eleusine indica", "nutsedge detection",
-        "cyperus weed", "morning glory weed detection", "ipomoea weed",
+        # v3.60.0: the species-specific queries are derived from the species
+        # cwd12 really holds. They used to target the legacy labels, so they
+        # searched for crabgrass and nutsedge (not in cwd12) and never for
+        # waterhemp or cutleaf groundcherry.
+        "amaranth", "morningglory dataset", "purslane plant", "spurge weed",
+        *_cwd12_species_queries(),
+        "false daisy weed", "goosegrass detection",
+        "morning glory weed detection", "ipomoea weed",
         # Generic detection-relevant for plants
         "plant detection yolo", "leaf detection bbox", "field scene yolo",
         "agriculture object detection", "crop health detection",

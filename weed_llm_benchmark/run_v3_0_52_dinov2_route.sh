@@ -23,7 +23,14 @@ export REPO_ROOT="$REPO"
 
 # Defaults — override via env
 DINOV2_TARGET_DIR="${DINOV2_TARGET_DIR:-$REPO/downloads/cottonweeddet12/valid/images}"
-DINOV2_EXEMPLAR_ROOT="${DINOV2_EXEMPLAR_ROOT:-$REPO/results/framework/synth_cutpaste/object_bank}"
+# v3.60.0: the species bank once it is built (marked .vocabulary), else legacy
+if [ -z "$DINOV2_EXEMPLAR_ROOT" ]; then
+    if [ "$(cat "$REPO/results/framework/synth_cutpaste/object_bank_species/.vocabulary" 2>/dev/null)" = "species" ]; then
+        DINOV2_EXEMPLAR_ROOT="$REPO/results/framework/synth_cutpaste/object_bank_species"
+    else
+        DINOV2_EXEMPLAR_ROOT="$REPO/results/framework/synth_cutpaste/object_bank"
+    fi
+fi
 DINOV2_OUT="${DINOV2_OUT:-$REPO/results/framework/dinov2_routing.json}"
 DINOV2_MODEL="${DINOV2_MODEL:-facebook/dinov2-base}"
 DINOV2_TOP_K="${DINOV2_TOP_K:-5}"

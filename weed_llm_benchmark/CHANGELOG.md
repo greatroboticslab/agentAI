@@ -10214,3 +10214,212 @@ benchmark, 27 distinct models.
 
 The library is 38 sections across eight themes, still with no two headings
 starting with the same word. Rebuilt 36 looks; each keeps 20 to 37 of them.
+
+---
+
+## 2026-09-21 — v3.60.0 the twelve cwd12 ids get their real species; the trainer joins species, the holdout guard catches re-encoded copies, and the labeler agent's first experiment
+
+**What the twelve cwd12 ids are.** The alphabetical list in
+`downloads/cottonweeddet12/data.yaml` — and every list copied from it
+(`CANONICAL_12_NAMES`, `CWD12_ORIGINAL_NAMES`, `Config.ALL_CLASSES`,
+`train_from_roboflow.V3_NAMES`, the reports built on them) — is not
+CottonWeedDet12's class list. It is the first twelve CottonWeedID15 names, typed
+into `setup_and_train.sh` in commit `a5d67c8` (2026-03-15) over the dataset's
+own label ids. The dataset has no Crabgrass and no Nutsedge; it has Waterhemp and
+Cutleaf groundcherry. Id order: Waterhemp, MorningGlory, Purslane, SpottedSpurge,
+Carpetweed, Ragweed, Eclipta, PricklySida, PalmerAmaranth, Sicklepod, Goosegrass,
+CutleafGroundcherry. Only PricklySida was named correctly. Established three ways
+on the train split: the dataset's own VGG annotations paired in file order
+(6,090 boxes over the 3,661 images whose region count equals the label count)
+and, separately, by coordinates (6,118 of 6,131 boxes within 0.02) — every id
+100 % one species; and AgML's 3SeasonWeedDet10, which shares 2,904 photographs
+with the cwd12 train split and names its own boxes (4,849 boxes, 100 %, none
+unmatched). The ids and label files were never wrong, so numbers computed over
+ids (overall mAP, per-id AP, class-agnostic scores) keep their values; every
+sentence that names a species from the old labels names the wrong plant, and
+every join of another dataset's names against them put boxes in the wrong slot.
+`docs/CWD12_SPECIES.md` has the table, the evidence and the status of each past
+finding.
+
+**What the merge did with the wrong names.** `mega_trainer` joined external class
+names to slots by string against those labels, and read one cwd12 copy by a name
+list its files do not follow. Counted on the lab registry:
+
+- `cottonweed_holdout` (`results/leave4out/dataset_holdout`, 1,458 of the 3,671
+  cwd12 train photographs) keeps the original ids 0-11, while its registry entry
+  listed four names. Box-matched against cwd12's own labels: **0 of 3,113** boxes
+  landed in the right slot — ids 0-3 went to the wrong species, ids 4-11 were
+  deleted, leaving those plants in the image as background.
+- 3SeasonWeedDet10 (5,000 images): Purslane into the slot that holds Palmer
+  amaranth, Ragweed into Sicklepod, SpottedSpurge into Cutleaf groundcherry;
+  Waterhemp, Carpetweed and MorningGlory (4,556 boxes) deleted because the strings
+  did not match.
+- A CottonWeedID15 copy's real Crabgrass and Nutsedge into the MorningGlory and
+  Ragweed slots; AgML's Ragweed into Sicklepod.
+
+All of these datasets are `used_for_training` and appear in rounds rnd13-15.
+
+**The holdout guard missed re-encoded copies.** It compared dHashes for exact
+equality. `rf_agrobot-weed-workspace__weed-detection-sd89f` is all of
+CottonWeedDet12 again (5,648 images: train, test and valid) with no class names;
+3SeasonWeedDet10 and two Roboflow sets also contain cwd12 photographs. A resize or
+re-encode moves a few bits, so those copies passed: the merged training set held
+**at least 366** images within 6 bits of a sealed holdout image (89,850 of its
+113,429 images could be traced to a registry hash; the rest were not checked).
+Two of them are Roboflow re-exports 4 and 5 bits from a test photograph and 15+
+bits from every train photograph.
+
+**ImageWeeds was in training.** `project_agml__imageweeds_weed_detection`, the
+out-of-domain test set of `crossdataset_eval` (S6), had been harvested and merged
+like any other slug. It is now in `NEVER_TRAIN_SLUGS`.
+
+**The cross-dataset "same-species collapse" is an artifact.** The species arm of
+`crossdataset_eval` picked the model class whose name was "Ragweed" — the id that
+holds Sicklepod — scored it against ImageWeeds' real ragweed, and filtered the
+holdout GT with that same id. The published 0.9604 → 0.0006 is a Sicklepod detector
+scored on ragweed; the id that holds ragweed (cwd12 5, legacy "Nutsedge") was never
+measured. The class-agnostic arms (0.873 → 0.100) do not depend on names and stand.
+The old artifact is kept; a rerun writes `s6_crossdataset_imageweeds_species.json`.
+
+**Changed — the core.**
+
+- `tools/cwd12_species.py` (new, stdlib only): the species table, legacy labels,
+  trainer slot tables, common names and binomials, and the provenance rules. A
+  string alone never says which vocabulary it is in ("Ragweed" is Sicklepod as a
+  legacy label, ragweed as a real name, and a CottonWeedID15 copy uses "Crabgrass"
+  for real crabgrass), so legacy labels are read only where the source is known:
+  a whole legacy list (`species_names_for`, idempotent, so a checkpoint that
+  already names species is never translated twice; old 12- and 100-class heads
+  and 8+novel leave-4-out heads are recognised), a cwd12 copy by the ids in its
+  label files (`class_species` / `CWD12_ID_SPACE`; stored class_names ignored), and
+  the three legacy Roboflow projects (below). `species_of` matches real names by
+  normalised alias only.
+- `tools/near_dup.py` (new): a pigeonhole block index over 64-bit dHashes. Holdout
+  hashes block copies within 6 bits; verified cwd12 photographs block copies
+  within 3; everything else deduplicates exactly, because images sharing a large
+  uniform region (black letterbox padding, one studio wall) fall within 3 bits
+  while showing different plants (checked by eye on the lab registry).
+- `mega_trainer`: slot ids unchanged, so existing checkpoints stay valid;
+  `CANONICAL_12_SPECIES` records what each slot holds and is the only thing an
+  external name joins through; a name that is no cwd12 species gets an aux slot
+  instead of being deleted; a whole legacy list is read as legacy labels; the two
+  cwd12 copies are mapped by id space and re-checked against cwd12's own labels on
+  every merge (a copy under 98 % agreement is left out); the verified copies merge
+  first so their labels win deduplication; new checkpoints' `data.yaml` names and
+  the merge stats are written in species.
+- `Config.ALL_CLASSES` holds the species by cwd12 id (`LEGACY_ALL_CLASSES` keeps
+  the old list); `dataset_discovery` registers the two copies with the species of
+  their label-file ids and an `id_space` field, and derives its species-biased
+  search terms from the true twelve.
+
+**Changed — the rest of the platform.**
+
+- Dashboard: `/classes` is keyed by species — before, each cwd12 class page mixed
+  a cwd12 species with a different real species from harvested sets (the
+  "Ragweed" page held Sicklepod boxes beside real ragweed). Human exemplar logs
+  are not rewritten; each entry is re-keyed by the species of its source when read
+  or exported, and new entries record the species. Binomials, per-species stats,
+  annotation guidance, dataset analysis, sample thumbnails, the console and the
+  Roboflow cards name species, with a legacy label shown second where one still
+  exists. Legacy-only URLs (`/classes/Nutsedge`, ...) redirect.
+- Detection API (`weed_detect`, robot overlay): the served checkpoint's legacy
+  names are translated once at load; the per-species reliability table and weak
+  list are re-keyed by species and applied only to the checkpoint they were
+  measured on; the "same-name best species" clause is removed.
+- Evaluators: the cross-dataset species arm resolves classes by species in one id
+  space and records the label space it detected; `eval_v3_0_23` maps the holdout by
+  the id permutation instead of by names; per-class tables of `wbf_tta_eval`,
+  `pycoco_eval`, `run_s3_bestmodel_eval.sh` and `train_rfdetr` name species;
+  `run_eval_generic.sh` warns when a model's and a dataset's species disagree per
+  id. Historical artifacts are not overwritten.
+- Roboflow and OWL: upload labelmaps resolve each class through its species and
+  write it in the target project's vocabulary — legacy labels for our uploader's
+  boxes on cwd12 photographs in `cwd12-multiclass-v1`, `weed-crop-agent-dataset`
+  and `cwd12-weeds`, species everywhere else. Download-merge and
+  `train_from_roboflow` drop every cwd12 photograph (its labels come from the
+  verified copies; holdout photographs must not train) and read person-drawn boxes
+  as real names. NEVER_TRAIN slugs are never uploaded. OWL proposals are
+  single-species with a manifest, live in `owl_red_proposals_species/`, and upload
+  under their own species (they used to upload as "Carpetweeds").
+- Synthetic data and banks: the object bank, cut-paste compositions, FLUX outputs
+  and LoRA runs are written to species-keyed directories beside the legacy ones;
+  bank crops from NEVER_TRAIN slugs or holdout photographs are rejected;
+  backgrounds are rebuilt under a holdout guard; the synthetic holdout guard fails
+  closed when it finds no holdout images.
+- The remaining consumers (bucketer, topic classifier, sample audit, DINOv2 route
+  and verifier, exemplar export, Mongo backfill, integrity audit, verified-round
+  manifest, which now excludes NEVER_TRAIN slugs) resolve species the same way.
+
+**Verified.** 43 test files: 41 pass, and the two that fail
+(`test_brain_api.py`, `test_domain_config.py`) failed identically before this
+change. Seven new ones pin the species behaviour (`test_cwd12_species.py`,
+`test_species_{dash,detect,docs,eval,misc,robo}.py`). `_merge_datasets` was run on
+the lab registry twice — the package at HEAD and the changed one, registry writes
+stubbed, output under `/tmp`:
+
+| | HEAD | v3.60.0 |
+|---|---|---|
+| cwd12 train boxes in the right slot / wrong slot / deleted | 3,018 / 1,657 / 648 | 6,121 / 0 / 0 |
+| holdout copies blocked, exact / within 6 bits | 3,375 / 0 | 3,375 / 435 |
+| re-encoded copies of cwd12 train photos blocked | — | 808 |
+| boxes in the twelve species slots | 9,562 | 15,112 |
+| merged images | 113,429 | 110,427 |
+| merged images within 6 bits of a holdout image | ≥ 366 | 0 |
+
+The per-merge copy check passed (228/228 and 231/231 boxes); on the cluster
+registry the same two copies verify at 3,018/3,018 and 3,113/3,113, and the same
+nine datasets change mapping. The guard now removes six cwd12 train images
+(two within 3 bits of a holdout image, four at 5-6 bits), which is why 6,121
+rather than 6,128 cwd12 boxes remain.
+
+**Before the next run.** The weed scheduler is disabled and stays so until this
+code is on the cluster. New directories must be produced before their consumers
+run: `synth_cutpaste bank` (object_bank_species/), `synth_cutpaste backgrounds`
+(backgrounds_guarded/), OWL proposals under `owl_red_proposals_species/`, and the
+DINOv2 verifier head retrained in species vocabulary. Cached AI reviews of the
+cwd12 copies regenerate on first view. Not done here: renaming the classes of the
+three legacy Roboflow projects (a human decision; until then a harvested box
+written there shares a class string with our uploader's legacy boxes, which the
+dashboard shows as two readings); in `mega_trainer`, an image whose dHash fails
+still skips the holdout hash check, an empty holdout guard does not stop a merge,
+and the round's val set is the sealed holdout, so best.pt is chosen on it.
+
+**The labeler agent, Phase A** (`tools/semisup_labeler.py`,
+`run_semisup_phaseA.sh`). Before a semi-supervised labeler may name harvested
+boxes, it is scored where the answers are held: the cwd12 train split, labels
+hidden. One square crop per box; frozen DINOv2-B/14 and -L/14 (CLS and patch mean)
+and BioCLIP-2 embeddings; then (1) a supervised ceiling, k-NN and a linear probe,
+5-fold CV grouped by photograph and again by capture session (date, camera,
+photographer; 35 in the split), (2) discovery, PCA → HDBSCAN and k-means, (3) a
+label budget of 1, 2, 5 and 10 %, random vs cluster medoids vs medoids plus
+uncertainty sampling, propagated by label spreading and scored on the crops nobody
+named, three seeds. The sealed holdout is guarded by stem and dHash; species names
+are re-derived from the VGG annotations on every run. Run on Bridges-2 (job
+46725979, V100, 74 min): 6,128 crops from 3,669 images, 2 train images dropped as
+near a holdout image. Results in `results/framework/semisup/phaseA/`.
+
+| features | linear, by photo | linear, by session (balanced) | HDBSCAN mcs 15: purity / NMI / noise |
+|---|---|---|---|
+| DINOv2-B CLS | 0.969 ± 0.005 | 0.960 ± 0.009 (0.931) | 0.993 / 0.967 / 0.50 |
+| DINOv2-B patch mean | 0.963 ± 0.004 | 0.926 ± 0.015 (0.868) | 0.193 / 0.047 / 0.36 |
+| DINOv2-L CLS | 0.973 ± 0.003 | 0.964 ± 0.011 (0.937) | 0.946 / 0.939 / 0.32 |
+| DINOv2-L patch mean | 0.970 ± 0.004 | 0.941 ± 0.015 (0.885) | 0.666 / 0.639 / 0.65 |
+| BioCLIP-2 | **0.987 ± 0.002** | **0.983 ± 0.009 (0.958)** | 0.957 / 0.960 / **0.12** |
+
+Label budget, accuracy (balanced) on the crops nobody named, three seeds:
+
+| named | DINOv2-L CLS, random | DINOv2-L CLS, medoids | BioCLIP-2, random | BioCLIP-2, medoids | BioCLIP-2, medoids + uncertainty |
+|---|---|---|---|---|---|
+| 1 % (61) | 0.905 (0.861) | 0.946 (0.946) | 0.957 (0.907) | **0.986 (0.980)** | 0.986 (0.979) |
+| 10 % (613) | 0.954 (0.950) | 0.968 (0.963) | 0.986 (0.981) | 0.990 (0.986) | **0.996 (0.993)** |
+
+Read: a biology-trained encoder is the lever — BioCLIP-2 separates the twelve
+species with the fewest unclustered crops, and 61 medoid exemplars (about five a
+species) name the other 99 % at 0.986. Which crops a person names matters more
+than how many at small budgets; uncertainty sampling pays from 5 % up. CLS beats
+the patch mean, so the fine-detail argument for patch tokens does not hold here.
+Holding out whole field days costs about one point. A laptop run of the DINOv2
+arms (Apple MPS) matched within 0.003. Limits: one domain (all cwd12), crops cut
+from hand-drawn boxes rather than detector boxes, and an oracle that answers with
+the truth; Phase B tests on harvested data, where the name joins above can also
+be audited by what the crops look like.

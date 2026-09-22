@@ -10,9 +10,9 @@ precision = #proposal boxes that match a GT box of the target species (IoU≥thr
             / #proposal boxes
 recall    = #GT boxes of the target species matched / #GT boxes
 
-Default: Goosegrass proposals vs cwd12 holdout test GT.
+Default: SpottedSpurge proposals vs cwd12 holdout valid GT.
 
-    python -m weed_optimizer_framework.tools.owl_precision --species Goosegrass
+    python -m weed_optimizer_framework.tools.owl_precision --species SpottedSpurge
 """
 from __future__ import annotations
 
@@ -27,12 +27,11 @@ REPO = Path(os.environ.get(
 if not REPO.exists():
     REPO = Path(__file__).resolve().parents[2]
 
-# cwd12 holdout GT uses the ORIGINAL cottonweeddet12 class order.
-CWD12_ORIGINAL = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-]
+from .cwd12_species import CWD12_SPECIES, cli_species, species_of
+
+# cwd12 holdout GT uses the ORIGINAL cottonweeddet12 class ids.
+# v3.60.0: the GT id is the species' cwd12 id (CWD12_SPECIES); it was the
+# index of the legacy label, so "Goosegrass" scored against SpottedSpurge GT.
 
 
 def _read_yolo(path: Path, only_cid=None):
@@ -65,7 +64,12 @@ def _iou(a, b):
 
 
 def evaluate(species: str, prop_dir: Path, gt_dir: Path, iou_thr: float = 0.5) -> dict:
-    gt_cid = CWD12_ORIGINAL.index(species) if species in CWD12_ORIGINAL else None
+    sp = species_of(species)
+    if sp is None:
+        raise ValueError(f"{species!r} is not a cwd12 species "
+                         f"({', '.join(CWD12_SPECIES)})")
+    species = sp
+    gt_cid = CWD12_SPECIES.index(sp)
     n_prop = n_prop_matched = n_gt = n_gt_matched = 0
     files_with_props = files_with_gt = 0
     n_files = 0
@@ -116,16 +120,23 @@ def evaluate(species: str, prop_dir: Path, gt_dir: Path, iou_thr: float = 0.5) -
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="OWL auto-label precision vs holdout GT")
-    ap.add_argument("--species", default="Goosegrass")
+    ap.add_argument("--species", default="SpottedSpurge",
+                    help="cwd12 species (v3.60.0: species, not legacy label)")
     ap.add_argument("--prop-dir", default=None,
-                    help="default results/framework/owl_red_proposals/<species>")
+                    help="default results/framework/owl_red_proposals_species/<species>")
     ap.add_argument("--gt-dir", default=None,
                     help="default downloads/cottonweeddet12/valid/labels "
                          "(matches owl_preannotate default target valid/images)")
     ap.add_argument("--iou", type=float, default=0.5)
     args = ap.parse_args()
+    if cli_species(args.species) is None:   # v3.60.0: no legacy-only label
+        ap.error(f"--species {args.species!r} is not a cwd12 species "
+                 f"({', '.join(CWD12_SPECIES)})")
+    args.species = cli_species(args.species)
+    # v3.60.0: species-era proposals live under owl_red_proposals_species/.
+    from .owl_preannotate import default_proposals_dir
     prop_dir = Path(args.prop_dir) if args.prop_dir else \
-        REPO / "results" / "framework" / "owl_red_proposals" / args.species
+        default_proposals_dir(args.species)
     gt_dir = Path(args.gt_dir) if args.gt_dir else \
         REPO / "downloads" / "cottonweeddet12" / "valid" / "labels"
     print(f"[owl-precision] species={args.species}")

@@ -204,6 +204,8 @@ better when the data is off-target.** Path to fix: domain-filtered merge,
 class-balanced sampling, higher imgsz, longer training, pretrain → fine-tune
 staged training. See `results/v3_0_23_eval.json` for full breakdown.
 
+> The cwd12 species names above are the project's old class labels. Those ids hold Purslane, Spotted spurge, Carpetweed and Ragweed; the full id → species table is in [`docs/CWD12_SPECIES.md`](../docs/CWD12_SPECIES.md).
+
 **Key modules:**
 - `weed_optimizer_framework/brain.py` — Ollama+function-calling agent (20 tools, Gemma 4 default)
 - `weed_optimizer_framework/orchestrator.py` — DATA GATE + guardrails (auto-reroute mega→autolabel when needs_autolabel exists; per-round image cap; repeat-call guard)

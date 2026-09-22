@@ -50,32 +50,24 @@ DEFAULT_OUT = REPO / "results" / "framework" / "roboflow_state.json"
 # v3.0.59 (2026-05-30): workspace env-configurable. School account active
 # (a-test-of-will); personal (research-lhi4x) kept as snapshot.
 WORKSPACE = os.environ.get("ROBOFLOW_WORKSPACE", "a-test-of-will")
-CWD12 = (
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-)
+
+try:
+    from .cwd12_species import (CWD12_SPECIES, CWD12_LEGACY_LABELS,
+                                species_of, legacy_to_species,
+                                uploaded_label_species)
+except ImportError:  # run as a plain script from tools/
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cwd12_species import (CWD12_SPECIES, CWD12_LEGACY_LABELS,
+                               species_of, legacy_to_species,
+                               uploaded_label_species)
+
+# v3.60.0: the merged set is written in cwd12 id space, named by species. The
+# old table joined each Roboflow class name to the invented alphabetical list
+# by string, so a person's real 'Ragweed' box went to id 9 (Sicklepod),
+# 'Crabgrass' to id 1 (MorningGlory) and waterhemp was dropped.
 
 
-def _norm_cls(name: str) -> str:
-    """Normalize a class name for matching: lowercase, alphanumerics only."""
-    return "".join(ch for ch in str(name).lower() if ch.isalnum())
-
-
-# normalized class name → CWD12 canonical index (+ a few common aliases).
-_CWD12_NORM = {_norm_cls(sp): i for i, sp in enumerate(CWD12)}
-for _alias, _canon in {
-    "carpetweed": "Carpetweeds", "morning glory": "Morningglory",
-    "palmer amaranth": "PalmerAmaranth", "prickly sida": "PricklySida",
-    "spotted spurge": "SpottedSpurge", "spurge": "SpottedSpurge",
-}.items():
-    _CWD12_NORM.setdefault(_norm_cls(_alias), CWD12.index(_canon))
-
-
-def _build_multiclass_remap(loc: Path):
-    """Read a downloaded Roboflow yolov8 data.yaml `names` and map each project
-    class-id → CWD12 canonical index by normalized name. Returns
-    (remap {src_cid:cwd12_idx}, names list, unmapped names list)."""
+def _read_yaml_names(loc: Path) -> list:
     names = []
     dy = loc / "data.yaml"
     if dy.is_file():
@@ -89,14 +81,157 @@ def _build_multiclass_remap(loc: Path):
                 names = nm
         except Exception:
             pass
-    remap, unknown = {}, []
+    return names
+
+
+def _multiclass_remap(names):
+    """{project class id: cwd12 id} for the boxes a person drew, and
+    {unmapped name: class id}. v3.60.0: every name is read as a real name
+    (species_of), in legacy projects too: the boxes that carry legacy labels
+    are the ones our uploader wrote on cwd12 photographs, and those images
+    are dropped before this map is used (cwd12_photo_index). On any other
+    photograph roboflow_sync writes names that read back through species_of
+    (roboflow_sync._class_name). A name that is not a cwd12 species is not
+    joined to any id."""
+    remap, unknown = {}, {}
     for cid, nm in enumerate(names):
-        idx = _CWD12_NORM.get(_norm_cls(nm))
-        if idx is None:
-            unknown.append(nm)
+        sp = species_of(nm)
+        if sp is None:
+            unknown[str(nm)] = cid
         else:
-            remap[cid] = idx
-    return remap, names, unknown
+            remap[cid] = CWD12_SPECIES.index(sp)
+    return remap, unknown
+
+
+def _build_multiclass_remap(loc: Path):
+    """Read a downloaded Roboflow yolov8 data.yaml `names` and map each project
+    class-id → cwd12 id by species. Returns (remap {src_cid: cwd12 id},
+    names list, unmapped names list)."""
+    names = _read_yaml_names(loc)
+    remap, unknown = _multiclass_remap(names)
+    return remap, names, list(unknown)
+
+
+# ---------------------------------------------------------------------------
+# v3.60.0: cwd12 photographs never come back from Roboflow. The holdout must
+# never train, and a cwd12 train photograph's labels come from the verified
+# cwd12 copies (boxes our uploader wrote on it carry legacy labels, which a
+# name lookup would read as other plants). A downloaded image within
+# near_dup.NEAR_DUP_BITS of either (HOLDOUT_NEAR_DUP_BITS of a holdout image)
+# is dropped, by mega_trainer._dhash.
+# ---------------------------------------------------------------------------
+_CWD12_ROOTS = (REPO / "downloads" / "cottonweeddet12",
+                Path("downloads") / "cottonweeddet12")
+_DHASH_CACHE = REPO / "results" / "framework" / "roboflow_cwd12_dhash_cache.json"
+
+
+def _cwd12_ref_images():
+    """(kind, path) for every cwd12 holdout and train image on this machine;
+    kind is 'holdout' or 'cwd12_train'. Deduplicated by resolved path."""
+    from .mega_trainer import _iter_holdout_images, _cwd12_train_label_dir
+    seen = set()
+
+    def _take(kind, p):
+        rp = str(p.resolve())
+        if rp in seen:
+            return None
+        seen.add(rp)
+        return kind, p
+
+    exts = ("*.jpg", "*.JPG", "*.jpeg", "*.png")
+    for p in _iter_holdout_images():
+        t = _take("holdout", p)
+        if t:
+            yield t
+    for root in _CWD12_ROOTS:
+        for split in ("test", "valid"):
+            d = root / split / "images"
+            if d.is_dir():
+                for ext in exts:
+                    for p in d.glob(ext):
+                        t = _take("holdout", p)
+                        if t:
+                            yield t
+    train_dirs = [root / "train" / "images" for root in _CWD12_ROOTS]
+    ld = _cwd12_train_label_dir()
+    if ld is not None:
+        train_dirs.append(ld.parent / "images")
+    for d in train_dirs:
+        if d.is_dir():
+            for ext in exts:
+                for p in d.glob(ext):
+                    t = _take("cwd12_train", p)
+                    if t:
+                        yield t
+
+
+def cwd12_photo_index(cache_path: Path = _DHASH_CACHE):
+    """NearHashIndex of every cwd12 holdout + train photograph (owner = kind).
+
+    Raises RuntimeError when no holdout or no train image is found: without
+    them nothing stops a holdout photograph from reaching training. Hashes are
+    cached by (path, size, mtime) in `cache_path`."""
+    from .mega_trainer import _dhash
+    from .near_dup import NearHashIndex
+    cache = {}
+    try:
+        cache = json.load(open(cache_path))
+    except Exception:
+        cache = {}
+    idx = NearHashIndex()
+    counts = {"holdout": 0, "cwd12_train": 0}
+    dirty = False
+    for kind, p in _cwd12_ref_images():
+        try:
+            st = p.stat()
+        except OSError:
+            continue
+        key = str(p.resolve())
+        sig = [st.st_size, int(st.st_mtime)]
+        rec = cache.get(key)
+        if isinstance(rec, list) and len(rec) == 3 and rec[:2] == sig:
+            h = rec[2]
+        else:
+            h = _dhash(p)
+            if h is None:
+                continue
+            cache[key] = sig + [h]
+            dirty = True
+        idx.add(h, kind)
+        counts[kind] += 1
+    if not counts["holdout"] or not counts["cwd12_train"]:
+        raise RuntimeError(
+            f"cwd12 photographs not found (holdout={counts['holdout']}, "
+            f"train={counts['cwd12_train']}; looked under "
+            f"{[str(r) for r in _CWD12_ROOTS]}). Refusing to build a training "
+            f"set that cannot be checked for holdout photographs.")
+    if dirty:
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cache_path.with_suffix(".tmp")
+            with open(tmp, "w") as f:
+                json.dump(cache, f)
+            os.replace(tmp, cache_path)
+        except Exception:
+            pass
+    print(f"[cwd12-guard] {counts['holdout']} holdout + {counts['cwd12_train']} "
+          f"train photographs indexed (near = within NEAR_DUP_BITS, "
+          f"HOLDOUT_NEAR_DUP_BITS for holdout)")
+    return idx
+
+
+def cwd12_photo_kind(index, img_path):
+    """'holdout' / 'cwd12_train' when img_path is a cwd12 photograph, else None.
+    An image that cannot be hashed counts as 'unhashable' and is dropped too."""
+    from .mega_trainer import _dhash
+    h = _dhash(img_path)
+    if h is None:
+        return "unhashable"
+    hits = index.matches(h)
+    if not hits:
+        return None
+    kinds = {k for k, _bits in hits}
+    return "holdout" if "holdout" in kinds else "cwd12_train"
 
 # v3.0.91: OUR-projects ALLOW-LIST. The workspace contains many unrelated
 # projects (drone/hardhat/demo/…). The dashboard must show ONLY our pipeline's
@@ -191,7 +326,9 @@ def audit_all_species(key: str) -> dict:
     # v3.0.91: keep ONLY our pipeline's projects (allow-list). Unrelated
     # workspace projects (drone/hardhat/demo/…) are dropped before querying.
     allow = our_projects()
-    cwd12_species_lower = {sp.lower() for sp in CWD12}
+    # v3.60.0: per-species projects are cwd12-<species> (create-species-projects);
+    # the legacy-named ones were deleted 2026-05-30.
+    cwd12_species_lower = {sp.lower(): sp for sp in CWD12_SPECIES}
 
     for p in projs:
         slug_full = p.get("id", "")
@@ -208,8 +345,7 @@ def audit_all_species(key: str) -> dict:
             species = None
         elif slug.startswith("cwd12-") and slug.split("-", 1)[1] in cwd12_species_lower:
             role = "cwd12_species"
-            sp_lower = slug.split("-", 1)[1]
-            species = next((sp for sp in CWD12 if sp.lower() == sp_lower), None)
+            species = cwd12_species_lower[slug.split("-", 1)[1]]
         else:
             role = "other"
             species = None
@@ -234,6 +370,17 @@ def audit_all_species(key: str) -> dict:
                 "boxes_per_class": classes if isinstance(classes, dict) else None,
                 "versions": len(r["raw"].get("versions") or []),
             })
+            # v3.60.0: species of each class name as our uploader wrote it
+            # (legacy labels in LEGACY_ROBOFLOW_PROJECTS). A class a person
+            # created or drew into may hold another plant; counts only.
+            if isinstance(classes, dict):
+                cs = {c: uploaded_label_species(slug, c) for c in classes}
+                row["class_species"] = cs
+                bps = {}
+                for c, n in classes.items():
+                    if cs[c] is not None:
+                        bps[cs[c]] = bps.get(cs[c], 0) + (n or 0)
+                row["boxes_per_species"] = bps
             # v3.0.91: all kept rows are ours (allow-listed) → count all.
             totals["images"] += row["images"]
             totals["boxes"] += row["boxes_total"]
@@ -293,9 +440,10 @@ def cmd_generate_versions(args):
     if args.project:
         targets = [args.project]
     elif args.species:
-        targets = [f"cwd12-{args.species.lower()}"]
+        targets = [_species_project(_species_arg(args.species))]
     elif args.legacy_per_species:
-        targets = [f"cwd12-{sp.lower()}" for sp in CWD12]
+        # the deleted per-species projects were named by the legacy labels
+        targets = [f"cwd12-{lb.lower()}" for lb in CWD12_LEGACY_LABELS]
     else:
         targets = ["cwd12-multiclass-v1"]
     species_filter = targets  # naming kept for compat below
@@ -351,16 +499,105 @@ def cmd_generate_versions(args):
     print(f"\nWROTE: {out_path}")
 
 
+def _species_arg(name):
+    """--species takes a cwd12 species (v3.60.0), e.g. SpottedSpurge."""
+    sp = species_of(name)
+    if sp is None:
+        print(f"FATAL: --species {name!r} is not a cwd12 species "
+              f"({', '.join(CWD12_SPECIES)})", file=sys.stderr)
+        sys.exit(2)
+    return sp
+
+
+def _species_project(sp):
+    """`cwd12-<species>` for --species. v3.60.0: the per-species projects made
+    before v3.60.0 were named by the legacy labels, and 10 of those slugs are
+    the slug of a different species now (cwd12-goosegrass held SpottedSpurge).
+    Such a project is refused; --legacy-per-species reads them by label."""
+    proj = f"cwd12-{sp.lower()}"
+    for i, lb in enumerate(CWD12_LEGACY_LABELS):
+        if f"cwd12-{lb.lower()}" == proj and CWD12_SPECIES[i] != sp:
+            print(f"FATAL: --species {sp} resolves to {proj}, which before "
+                  f"v3.60.0 was the per-species project of {CWD12_SPECIES[i]} "
+                  f"(legacy label {lb}). Pass --project {proj} if it was created "
+                  f"after v3.60.0, or --legacy-per-species for the old projects.",
+                  file=sys.stderr)
+            sys.exit(2)
+    return proj
+
+
+def merge_project_dir(loc: Path, proj_name: str, remap: dict, names: list,
+                      photo_kind, img_dir: Path, lbl_dir: Path) -> dict:
+    """Copy one downloaded project's images into the merged set with labels
+    remapped to cwd12 ids. `photo_kind(img)` says whether an image is a cwd12
+    photograph ('holdout' / 'cwd12_train' / 'unhashable') or not (None); such
+    images are dropped whole. Returns counts, with each reason separate."""
+    import shutil
+    st = {"images": 0, "boxes": 0, "dropped_oov_boxes": 0,
+          "dropped_oov_by_name": {}, "dropped_cwd12_photos": 0,
+          "dropped_cwd12_by_kind": {}, "dropped_no_cwd12_box": 0}
+    for split in ("train", "valid", "test"):
+        si = loc / split / "images"
+        sl = loc / split / "labels"
+        if not si.is_dir() or not sl.is_dir():
+            continue
+        for img in si.iterdir():
+            if img.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+                continue
+            kind = photo_kind(img)
+            if kind is not None:
+                st["dropped_cwd12_photos"] += 1
+                st["dropped_cwd12_by_kind"][kind] = \
+                    st["dropped_cwd12_by_kind"].get(kind, 0) + 1
+                continue
+            lbl = sl / (img.stem + ".txt")
+            lines_out = []
+            if lbl.is_file():
+                try:
+                    for line in lbl.read_text(errors="ignore").splitlines():
+                        p = line.split()
+                        if not p or not p[0].lstrip("-").isdigit():
+                            continue
+                        src = int(p[0])
+                        if src not in remap:
+                            st["dropped_oov_boxes"] += 1
+                            nm = str(names[src]) if 0 <= src < len(names) else f"id{src}"
+                            st["dropped_oov_by_name"][nm] = \
+                                st["dropped_oov_by_name"].get(nm, 0) + 1
+                            continue
+                        p[0] = str(remap[src])
+                        lines_out.append(" ".join(p))
+                except Exception:
+                    pass
+            # keep only images with ≥1 box of a cwd12 species
+            if not lines_out:
+                st["dropped_no_cwd12_box"] += 1
+                continue
+            new_stem = f"{proj_name}_{img.stem}"
+            try:
+                shutil.copy2(img, img_dir / (new_stem + img.suffix))
+            except Exception:
+                continue
+            with open(lbl_dir / (new_stem + ".txt"), "w") as f:
+                f.write("\n".join(lines_out) + "\n")  # trailing NL: clean cat/tools
+            st["images"] += 1
+            st["boxes"] += len(lines_out)
+    return st
+
+
 def _resolve_dl_targets(args):
     """Decide which Roboflow projects to pull and how to remap each.
     Returns list of (project_name, ('multiclass', None) | ('species', sp)).
     Default = allow-list MULTI-CLASS projects (our_projects); the legacy
-    per-species `cwd12-<sp>` projects were deleted 2026-05-30."""
+    per-species `cwd12-<sp>` projects were deleted 2026-05-30.
+    v3.60.0: `sp` is the species. The legacy per-species projects were named
+    and labelled by our uploader with the legacy labels."""
     if getattr(args, "species", ""):
-        sp = args.species
-        return [(f"cwd12-{sp.lower()}", ("species", sp))]
+        sp = _species_arg(args.species)
+        return [(_species_project(sp), ("species", sp))]
     if getattr(args, "legacy_per_species", False):
-        return [(f"cwd12-{sp.lower()}", ("species", sp)) for sp in CWD12]
+        return [(f"cwd12-{lb.lower()}", ("species", legacy_to_species(lb)))
+                for lb in CWD12_LEGACY_LABELS]
     if getattr(args, "project", ""):
         return [(args.project, ("multiclass", None))]
     return [(p, ("multiclass", None)) for p in sorted(our_projects())]
@@ -383,6 +620,11 @@ def cmd_download_merge(args):
       <out-dir>/data.yaml
     Everything goes to TRAIN; eval uses untouched cottonweeddet12/valid+test
     holdout so the active-learning loop never contaminates evaluation.
+
+    v3.60.0: ids and data.yaml names are cwd12 ids named by species
+    (CWD12_SPECIES). cwd12 photographs are dropped (cwd12_photo_index), the
+    rest are resolved by species (_multiclass_remap), and each dropped box or
+    image is counted with its reason in _merge_summary.json.
     """
     key = _key()
     from roboflow import Roboflow
@@ -395,9 +637,8 @@ def cmd_download_merge(args):
     img_dir.mkdir(parents=True, exist_ok=True)
     lbl_dir.mkdir(parents=True, exist_ok=True)
 
-    import shutil
-    cwd12_index = {sp: i for i, sp in enumerate(CWD12)}
     targets = _resolve_dl_targets(args)
+    photo_index = cwd12_photo_index()
     print(f"[download-merge] {len(targets)} target project(s): "
           f"{[t[0] for t in targets]}")
 
@@ -437,67 +678,38 @@ def cmd_download_merge(args):
                                            "error": "no_location"})
             continue
 
-        # Per-project cid → CWD12-index remap.
+        # Per-project cid → cwd12-id remap, by species.
+        names = _read_yaml_names(loc)
         if mode[0] == "species":
-            remap, unknown = {0: cwd12_index[mode[1]]}, []
+            remap, unknown = {0: CWD12_SPECIES.index(mode[1])}, {}
+            names = names or [mode[1]]
         else:
-            remap, _names, unknown = _build_multiclass_remap(loc)
+            remap, unknown = _multiclass_remap(names)
             if not remap:
-                print(f"  [WARN] {proj_name}: no class names matched CWD12 "
-                      f"(names={_names}) — 0 boxes will be kept")
+                print(f"  [WARN] {proj_name}: no class name is a cwd12 species "
+                      f"(names={names}) — 0 boxes will be kept")
 
-        n_imgs = 0; n_boxes = 0; n_dropped = 0
-        for split in ("train", "valid", "test"):
-            si = loc / split / "images"
-            sl = loc / split / "labels"
-            if not si.is_dir() or not sl.is_dir():
-                continue
-            for img in si.iterdir():
-                if img.suffix.lower() not in (".jpg", ".jpeg", ".png"):
-                    continue
-                lbl = sl / (img.stem + ".txt")
-                lines_out = []
-                if lbl.is_file():
-                    try:
-                        for line in lbl.read_text(errors="ignore").splitlines():
-                            p = line.split()
-                            if not p or not p[0].lstrip("-").isdigit():
-                                continue
-                            src = int(p[0])
-                            if src not in remap:
-                                n_dropped += 1
-                                continue
-                            p[0] = str(remap[src])
-                            lines_out.append(" ".join(p))
-                    except Exception:
-                        pass
-                # keep only images with ≥1 in-vocab CWD12 box
-                if not lines_out:
-                    continue
-                new_stem = f"{proj_name}_{img.stem}"
-                try:
-                    shutil.copy2(img, img_dir / (new_stem + img.suffix))
-                except Exception:
-                    continue
-                with open(lbl_dir / (new_stem + ".txt"), "w") as f:
-                    f.write("\n".join(lines_out) + "\n")  # trailing NL: clean cat/tools
-                n_imgs += 1; n_boxes += len(lines_out)
-
+        st = merge_project_dir(
+            loc, proj_name, remap, names,
+            lambda p: cwd12_photo_kind(photo_index, p), img_dir, lbl_dir)
+        n_imgs, n_boxes = st["images"], st["boxes"]
         print(f"  [{proj_name}] images={n_imgs} boxes={n_boxes} "
-              f"dropped_oov_boxes={n_dropped}")
+              f"dropped_oov_boxes={st['dropped_oov_boxes']} "
+              f"dropped_cwd12_photos={st['dropped_cwd12_photos']}")
         tot_imgs += n_imgs; tot_lbls += n_imgs; tot_boxes += n_boxes
         rec = {"project": proj_name, "ok": True, "mode": mode[0],
-               "images": n_imgs, "boxes": n_boxes, "dropped_oov_boxes": n_dropped}
+               "label_vocabulary": "real names (species_of); cwd12 photographs dropped"}
+        rec.update(st)
         if mode[0] == "multiclass" and unknown:
-            rec["unmapped_class_names"] = unknown
+            rec["unmapped_class_names"] = sorted(unknown)
         summary["per_project"].append(rec)
 
     # Write data.yaml
     data_yaml = out_root / "data.yaml"
     with open(data_yaml, "w") as f:
         f.write("# auto-generated by merge_roboflow_projects download-merge\n")
-        f.write(f"nc: {len(CWD12)}\n")
-        f.write("names: [" + ", ".join(repr(c) for c in CWD12) + "]\n")
+        f.write(f"nc: {len(CWD12_SPECIES)}\n")
+        f.write("names: [" + ", ".join(repr(c) for c in CWD12_SPECIES) + "]\n")
         f.write("train: train/images\n")
         f.write("val: train/images   # placeholder — real eval uses cottonweeddet12/valid\n")
 
@@ -524,7 +736,8 @@ def main():
     p_gen.add_argument("--project", default="",
                         help="single project name (e.g. cwd12-multiclass-v1)")
     p_gen.add_argument("--species", default="",
-                        help="legacy: a single CWD12 species → cwd12-<species>")
+                        help="a single cwd12 species (e.g. PricklySida) → cwd12-<species>; "
+                             "refused where that slug was a legacy project of another species")
     p_gen.add_argument("--legacy-per-species", action="store_true",
                         help="legacy: iterate all 12 cwd12-<species> projects (deleted 2026-05-30)")
     p_gen.add_argument("--force", action="store_true",
@@ -537,7 +750,8 @@ def main():
     p_dl.add_argument("--project", default="",
                        help="single project to pull (default: allow-list multi-class projects)")
     p_dl.add_argument("--species", default="",
-                       help="legacy: single CWD12 species → cwd12-<species> (single-class)")
+                       help="single cwd12 species (e.g. PricklySida) → cwd12-<species> (single-class); "
+                            "refused where that slug was a legacy project of another species")
     p_dl.add_argument("--legacy-per-species", action="store_true",
                        help="legacy: iterate 12 cwd12-<species> projects (deleted 2026-05-30)")
     p_dl.add_argument("--out-dir",

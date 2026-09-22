@@ -27,6 +27,8 @@ import os
 import pathlib
 import time
 
+from .cwd12_species import is_legacy_label_list, species_names_for
+
 IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 VEG_BAR = 0.35
 THUMB = (96, 54)
@@ -93,12 +95,17 @@ def main():
 
     confs = [float(c) for c in args.conf.split(",") if c.strip()]
     model = YOLO(args.weights)
-    names = model.names if isinstance(model.names, dict) else dict(enumerate(model.names))
+    raw_names = model.names if isinstance(model.names, dict) else dict(enumerate(model.names))
+    # v3.60.0: count per species; a legacy-labelled checkpoint is translated as a
+    # whole list, a checkpoint that already names species passes through.
+    names = species_names_for(dict(raw_names))
 
     up = pathlib.Path(os.path.expanduser(args.uploads))
     sessions = sorted([d for d in up.iterdir() if d.is_dir()])
     out = {"model": os.path.basename(args.weights), "imgsz": args.imgsz,
            "conf_threshold_swept": confs,
+           "class_names": names,
+           "checkpoint_labels_legacy": is_legacy_label_list(raw_names),
            "measured_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
            "vegetation_rule": "excess green 2G-R-B > 0.06 on a %dx%d thumbnail; "
                               "frame counts as vegetated above %.2f"

@@ -35,10 +35,22 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install light deps
-        run: pip install pymongo numpy pillow
+        run: pip install pymongo numpy pillow pyyaml
       - name: Domain-config + registry + EDA tests
         working-directory: weed_llm_benchmark
         run: python tests/test_domain_config.py
+      # The cwd12 species tables and every join that goes through them. The
+      # dashboard and detection-API species tests need FastAPI / OpenCV and run
+      # locally only.
+      - name: cwd12 species tests
+        if: always()
+        working-directory: weed_llm_benchmark
+        run: |
+          python tests/test_cwd12_species.py
+          python tests/test_species_eval.py
+          python tests/test_species_robo.py
+          python tests/test_species_misc.py
+          python tests/test_species_docs.py
 
   lint:
     name: Lint (informational, non-blocking)

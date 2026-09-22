@@ -74,6 +74,49 @@ mkdir -p "$RESDIR"
 EVAL_TASK="$TASK" EVAL_MODEL="$MODEL" EVAL_DATA="$DATA" \
 EVAL_DOMAIN="$DOMAIN" EVAL_JOBTAG="$JOBTAG" OUTDIR="$OUTDIR" RESDIR="$RESDIR" python - <<'PYEOF'
 import os, json, time
+
+
+def _load_cwd12_species():
+    # stdlib-only module, loaded by file so the check never pulls in the
+    # package __init__; None when it is missing (the check is then skipped).
+    import importlib.util
+    for p in ("weed_llm_benchmark/weed_optimizer_framework/tools/cwd12_species.py",
+              "weed_optimizer_framework/tools/cwd12_species.py"):
+        if os.path.exists(p):
+            spec = importlib.util.spec_from_file_location("cwd12_species", p)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    return None
+
+
+def _species_key(cs, name):
+    """A class name as a comparable key: its cwd12 species when it is one,
+    else the normalised name."""
+    if name in cs.CWD12_SPECIES:
+        return name
+    return cs.species_of(name) or cs.name_key(name)
+
+
+def class_mismatches(cs, model_names, data_names, slug=None):
+    """(id, model class, dataset class) for every dataset id whose class is not
+    the model's class of the same id. Both sides are read as species: a whole
+    legacy list through species_names_for, a cwd12 copy by its id space
+    (CWD12_ID_SPACE, since its stored names may be stale), anything else as
+    real names."""
+    def seq(n):
+        return [n[k] for k in sorted(n)] if isinstance(n, dict) else list(n or [])
+    m = list(cs.species_names_for(seq(model_names)))
+    d = (list(cs.CWD12_ID_SPACE[slug]) if slug in cs.CWD12_ID_SPACE
+         else list(cs.species_names_for(seq(data_names))))
+    out = []
+    for i, dn in enumerate(d):
+        mn = m[i] if i < len(m) else None
+        if mn is None or _species_key(cs, mn) != _species_key(cs, dn):
+            out.append((i, mn, dn))
+    return out
+
+
 res = {"domain": os.environ["EVAL_DOMAIN"], "task": os.environ["EVAL_TASK"],
        "model": os.environ["EVAL_MODEL"], "jobtag": os.environ["EVAL_JOBTAG"],
        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -82,6 +125,27 @@ try:
     from ultralytics import YOLO
     task = os.environ["EVAL_TASK"]
     model = YOLO(os.environ["EVAL_MODEL"])
+    # v3.60.0: val matches classes by id only. Warn (do not refuse) when the
+    # model's class at an id is not the dataset's class at that id.
+    if task != "classify" and not res["baseline"]:
+        try:
+            import yaml
+            cs = _load_cwd12_species()
+            dpath = os.environ["EVAL_DATA"]
+            dy = yaml.safe_load(open(dpath)) if os.path.isfile(dpath) else None
+            if cs is not None and isinstance(dy, dict) and dy.get("names"):
+                slug = next((x for x in (os.path.basename(os.path.dirname(dpath)),
+                                         os.path.splitext(os.path.basename(dpath))[0])
+                             if x in cs.CWD12_ID_SPACE), None)
+                mm = class_mismatches(cs, model.names, dy["names"], slug)
+                if mm:
+                    res["class_mismatch"] = [list(x) for x in mm[:50]]
+                    print(f"WARNING: model and dataset disagree on {len(mm)} class "
+                          f"id(s); matching is by id only, so per-class and overall "
+                          f"numbers compare different classes there. "
+                          f"(id, model, dataset): {mm[:12]}")
+        except Exception as e:
+            print(f"class check skipped: {type(e).__name__}: {e}")
     r = model.val(task=task, data=os.environ["EVAL_DATA"], imgsz=640,
                   project=os.environ["OUTDIR"], name="run", exist_ok=True, verbose=True)
     rd = getattr(r, "results_dict", {}) or {}

@@ -54,13 +54,15 @@ def _patch_supervision_for_rfdetr():
 # sees a Detections class that won't crash inside predict().
 _patch_supervision_for_rfdetr()
 
-CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-                "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-                "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
-CWD12_ORIG = ["Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass",
-              "Morningglory", "Nutsedge", "PalmerAmaranth", "PricklySida",
-              "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge"]
-ORIG_TO_CANON = {i: CANONICAL_12.index(n) for i, n in enumerate(CWD12_ORIG)}
+# v3.60.0: the slot order and the id permutation are unchanged; the names are
+# the species each slot holds (cwd12_species), not the invented legacy labels,
+# so the COCO categories of a new staging name the right plants.
+from weed_optimizer_framework.tools.cwd12_species import (  # noqa: E402
+    CWD12_ID_TO_SLOT, CWD12_SPECIES, TRAINER_SLOT_SPECIES,
+)
+CANONICAL_12 = list(TRAINER_SLOT_SPECIES)
+CWD12_ORIG = list(CWD12_SPECIES)
+ORIG_TO_CANON = dict(CWD12_ID_TO_SLOT)
 
 
 def yolo_to_coco_xywh(cx, cy, bw, bh, w, h):

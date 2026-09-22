@@ -27,6 +27,8 @@ in front of a reader.
 ---
 
 ### Block A — sealed cwd12 holdout · nc=12 · **Ultralytics matcher**
+> **Correction 2026-09-21 (v3.60.0).** The per-species names in A8 are the project's old cwd12 labels and not the species. The values belong to the right ids. Legacy Ragweed 0.9767 is **Sicklepod** and legacy Morningglory 0.7324 is **Carpetweed**, and the spread of 0.2443 stands. Overall mAP is unaffected. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 row 2.
+
 Holdout for every row: cwd12 test+valid, **1,977 images / 3,257 instances**, `cwd12_sealed.yaml`, NEVER_TRAIN.
 
 | # | Recipe | Train data | Metric (mAP50-95) | n | Artifact(s) | Q | Caveat |
@@ -58,6 +60,8 @@ Holdout: same 1,977 images / 3,257 instances (verified: `n_gt` sums to 3,257 in 
 ---
 
 ### Block C — sealed cwd12 holdout · **nc=100 head** · YOLO11n pretrained · tier ladder, **three seeds at every rung**
+> **Correction 2026-09-21 (v3.60.0).** The core is remapped by id and is correct. The harvested add-ons carry labels from the pre-v3.60.0 merge, which joined external class names to slots by the old cwd12 labels and so put boxes of several species into the wrong slots or deleted them. How much of the C4/C7 cost (−0.0189) is label noise from that join is not measured, so treat the cost as confounded. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 row 8.
+
 Holdout: same 1,977 images / 3,257 instances. This block is the **bridge** between Block A's clean
 numbers and the nc=100 pipeline numbers in Blocks D-E. **Supersedes the single-seed ladder reported
 2026-08-25** — those were seed 101 of these same runs, not a different experiment.
@@ -84,6 +88,8 @@ mean is 0.8448 ± 0.0018.
 
 
 ### Block D — sealed cwd12 holdout · **nc=100 head** · **yolo26x** · merged web corpora (M1 sealed, 2026-08-23)
+> **Correction 2026-09-21 (v3.60.0).** The numbers stand. The mechanism in the D1 and D4 caveats (dedup and holdout-stem filters starving the core) has a competing explanation that no control rules out. The same merge read `cottonweed_holdout` through a four-name list its twelve-id label files do not follow: 0 of 3,113 of its boxes landed in the right slot on the live registry. "Goosegrass 44" is a slot label, meaning Spotted spurge. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 row 9.
+
 Holdout: cwd12 test+valid, **1,977 images**; **instance count is not recorded in the M1 artifacts** (it is 3,257 in every artifact that does record it). Different backbone *and* different head from Blocks A-C.
 
 | # | Recipe | Train data | Metric (mAP50-95) | n | Artifact(s) | Q | Caveat |
@@ -96,6 +102,8 @@ Holdout: cwd12 test+valid, **1,977 images**; **instance count is not recorded in
 ---
 
 ### Block E — the 15-round autonomous campaign (collect → DINO filter → train → eval)
+> **Correction 2026-09-21 (v3.60.0).** E11: a per-class comparison must be re-keyed by **species**, not by the legacy name. Slot 2 ("PalmerAmaranth") is Eclipta, and cwd12 id 2 ("Eclipta") is Purslane. The overall-mAP rows are unaffected. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §1.
+
 Head **nc=100**; backbone lineage yolo26x; **seed 101 in every round → n = 1 per round, no per-round error bar**. Holdout for rounds 8-15 verified as **1,977 images / 3,257 instances** in all 8 `results.csv`/args records; rounds 1-7 have `results.csv` only (no args.yaml, no curve, no image counts).
 
 **Series (holdout mAP50-95, one run each, each value = that run's best epoch — verified to 4 dp against the recomputed curve in 8/8 surviving rounds):**
@@ -171,6 +179,8 @@ put an error bar on the gap itself rather than borrowing E14's.
 ---
 
 ### Block H — **cross-dataset transfer: a different dataset entirely** (custom WBF matcher, class-agnostic)
+> **Correction 2026-09-21 (v3.60.0).** **H3 is an artifact of the class-name bug.** `crossdataset_eval.py:177` (as run, commit `420a449`) chose the model's id labelled "Ragweed", which is id 9, **Sicklepod**. The 0.9604 is therefore Sicklepod's in-domain AP, and the 0.0006 scores a Sicklepod class against ImageWeeds' ragweed. The class that holds ragweed is cwd12 id 5 (old label "Nutsedge"), and its transfer was never measured. H1-H2 (class-agnostic, cwd12-only checkpoints) stand. H4-H5 are class-agnostic, but `project_agml__imageweeds_weed_detection` had been used for training (now in `NEVER_TRAIN_SLUGS`), and whether its images were among the ladder's add-ons is not recorded outside the cluster. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 rows 3-7.
+
 
 | # | Recipe | Eval data | Metric | n | Artifact(s) | Q | Caveat |
 |---|---|---|---|---|---|---|---|
@@ -186,6 +196,8 @@ put an error bar on the gap itself rather than borrowing E14's.
 
 
 ### Block I — robot frames: **not an accuracy measurement** (no ground truth)
+> **Correction 2026-09-21 (v3.60.0).** I2's "Purslane" is the served checkpoint's old label for id 8, meaning **Palmer amaranth**. The fire rates are unaffected. See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5 row 13.
+
 
 | # | What | Data | Metric | n | Artifact(s) | Q | Caveat |
 |---|---|---|---|---|---|---|---|
@@ -436,6 +448,8 @@ round's training produced.
 ---
 
 ## D. Numbers that must never be quoted bare
+> **Correction 2026-09-21 (v3.60.0).** Add to this list: **0.9604 → 0.0006 ("same-name ragweed")**. It compares a Sicklepod class with real ragweed and must not be quoted at all. The 0.5601 entry keeps its number, but its "stripped by the pipeline's own filters" cause is unconfirmed (Block D note). See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §5.
+
 
 - 0.9033 — best-of-4 RF-DETR runs, not a seed mean. Must always read '0.8974 ± 0.0040 over 4 runs, best 0.9033'; only 1 of 4 runs crossed 0.90, and the runs were unseeded (train_rfdetr.py: --seed is a run label only) across two different epoch budgets (60 and 100).
 - 0.8974 ± 0.0040 'n=4 seeds' — **corrected in the source documents 2026-09-12**; DOUBLE_AGENT_SYSTEM.md §4, BEST_MODEL_CARD.md and SCIENCE_AUDIT.md §1 row 4 now all read "4 runs, 3 configs, unseeded". The phrase was factually wrong in all three. It is 4 runs / 3 configs / no seed control; variance is GPU-cuDNN nondeterminism. Also pycocotools, not Ultralytics.
@@ -462,6 +476,8 @@ round's training produced.
 ---
 
 ## E. What is missing
+> **Correction 2026-09-21 (v3.60.0).** The ImageWeeds entry below understates the problem. Beyond the unstated *Ambrosia* species, the model-side class in the 0.9604 → 0.0006 comparison was Sicklepod. The missing measurement is the transfer of cwd12 id 5 (ragweed). See [`CWD12_SPECIES.md`](CWD12_SPECIES.md) §6.
+
 
 - Path key for every provenance string: DIAG/ = /private/tmp/claude-501/-Users-xiaogui-Desktop-2026spring-research-weed-llm-benchmark/1ae39708-9141-44c7-bd5c-13a7f37399e7/scratchpad/diag/ ; REPO/ = /Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/
 - Rounds 1-7 have only results.csv best/last values (DIAG/probe5.json, mega_iterm1_curated_s101/train2..train8). Missing: args.yaml, per-epoch curves, val image/instance counts, and merged pool sizes. These 7 rounds carry 81% of the campaign decline, so the headline slope rests on the least documented half.

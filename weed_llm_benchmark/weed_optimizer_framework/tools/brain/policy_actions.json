@@ -447,7 +447,7 @@
       "description": "sync_newest_slugs' sibling with '--skip-baselines' removed, so it also pushes the cwd12 baseline images — a strictly wider, harder-to-predict blast radius against Roboflow's storage than the routine sync, which is what separates it from R2."
     },
     "owl_upload_proposals": {
-      "template": "python -m weed_optimizer_framework.tools.owl_upload_proposals --species Goosegrass --project weed-crop-agent-dataset --per-species 50",
+      "template": "python -m weed_optimizer_framework.tools.owl_upload_proposals --species SpottedSpurge --project weed-crop-agent-dataset --per-species 50",
       "param_bounds": {},
       "risk": "R2",
       "reversible": true,

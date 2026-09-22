@@ -26,9 +26,14 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from ultralytics import YOLO
 
-CANONICAL_12 = ["Carpetweeds", "Crabgrass", "PalmerAmaranth", "PricklySida",
-                "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge",
-                "Eclipta", "Goosegrass", "Morningglory", "Nutsedge"]
+from .cwd12_species import TRAINER_SLOT_SPECIES
+
+# Category names of the GT JSON, by trainer slot id (the labels this runs on are
+# the merged slot-space staging, e.g. mega_iterv3_0_28_safety). Matching is by
+# category id; the names only label the categories.
+# v3.60.0: the species of each slot, not the legacy labels the slots were first
+# written with (cwd12_species.TRAINER_SLOT_LEGACY).
+CANONICAL_12 = list(TRAINER_SLOT_SPECIES)
 
 
 def yolo_norm_to_coco_xywh(cx, cy, bw, bh, w, h):

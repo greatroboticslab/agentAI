@@ -32,6 +32,12 @@ import sys
 import time
 from pathlib import Path
 
+try:
+    from .cwd12_species import CWD12_SPECIES
+except ImportError:  # run as a plain script
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from cwd12_species import CWD12_SPECIES
+
 REPO = Path(os.environ.get(
     "REPO_ROOT",
     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark",
@@ -76,7 +82,18 @@ def _verified_slugs(round_n: int) -> tuple[set, dict]:
     for baseline in ("cottonweed_holdout", "cottonweed_sp8"):
         if baseline in reg.get("datasets", {}):
             verified.add(baseline)
-    return verified, reg
+    # v3.60.0: a ✓ keep never lists a NEVER_TRAIN slug (mega_trainer's list:
+    # the eval sets, incl. the S6 ImageWeeds transfer set) in a train manifest.
+    return verified - _never_train_slugs(), reg
+
+
+def _never_train_slugs() -> frozenset:
+    try:
+        from .mega_trainer import NEVER_TRAIN_SLUGS
+    except ImportError:  # run as a plain script from tools/
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from weed_optimizer_framework.tools.mega_trainer import NEVER_TRAIN_SLUGS
+    return frozenset(NEVER_TRAIN_SLUGS)
 
 
 def run(round_n: int, dry_run: bool = False) -> dict:
@@ -97,11 +114,11 @@ def run(round_n: int, dry_run: bool = False) -> dict:
         "",
         "names:",  # placeholder — real should derive from class_names
     ]
-    # CWD12 12-class default
-    cwd12 = ["Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass",
-             "Morningglory", "Nutsedge", "PalmerAmaranth", "PricklySida",
-             "Purslane", "Ragweed", "Sicklepod", "SpottedSpurge"]
-    for i, n in enumerate(cwd12):
+    # CWD12 12-class default. v3.60.0: the species of each cwd12 label id
+    # (was the legacy label list). The train dirs below are listed raw, so
+    # only slugs whose files use cwd12 ids agree with these names; a real
+    # run must go through mega_trainer's species merge.
+    for i, n in enumerate(CWD12_SPECIES):
         yaml_lines.append(f"  {i}: {n}")
     yaml_lines.extend(["", "train:"])
     for slug in sorted(verified):

@@ -35,6 +35,10 @@ import sys
 from pathlib import Path
 
 from .registry_lock import safe_read_json
+from .cwd12_species import (
+    CWD12_BINOMIAL, CWD12_COMMON, CWD12_ID_SPACE, CWD12_SPECIES,
+    class_species, species_of,
+)
 
 # --- paths (match dashboard_server / db.py) ---------------------------------
 REPO = Path(os.environ.get(
@@ -73,22 +77,11 @@ DOMAINS_SEED = {
     #          "target_metric":{...},"harvest_queries":[...],"status":"planned"},
 }
 
-# --- canonical CWD12 (mirror of dashboard_server._CWD12 / _CWD12_ZH) --------
-# After this backfill the Mongo `classes` collection becomes the single source
-# of truth; this literal exists only to seed it. Keep in sync until then.
-_CWD12 = [
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-]
-_CWD12_ZH = {
-    "Carpetweeds": "毯草", "Crabgrass": "马唐", "Eclipta": "鳢肠",
-    "Goosegrass": "蟋蟀草", "Morningglory": "牵牛花", "Nutsedge": "莎草",
-    "PalmerAmaranth": "苋菜 / 帕氏苋", "PricklySida": "刺苋",
-    "Purslane": "马齿苋", "Ragweed": "豚草", "Sicklepod": "决明",
-    "SpottedSpurge": "斑地锦",
-}
-_CWD12_ALNUM = {re.sub(r'[^A-Za-z0-9]', '', c).lower(): c for c in _CWD12}
+# --- canonical CWD12 ---------------------------------------------------------
+# v3.60.0: the cwd12 taxonomy is seeded from the species of the cwd12 class ids
+# (cwd12_species), not the legacy label list, which named ids 1 and 5
+# "Crabgrass" and "Nutsedge" although cwd12 holds neither plant.
+_CWD12 = list(CWD12_SPECIES)
 
 # bbox-ish signals on a slug's annotation/format fields
 _BBOX_ANNOT = ("bbox", "detection", "segmentation")
@@ -100,15 +93,29 @@ _HOLDOUT_HINTS = ("holdout", "cottonweed_holdout")
 
 
 def _canon(raw: str) -> str:
+    """A real class name -> the cwd12 species it names (species_of), else the
+    name in CamelCase. Only for real names: cwd12 copies go through
+    _slug_classes, which resolves them by id."""
     if not isinstance(raw, str) or not raw.strip():
         return ""
     alnum = re.sub(r'[^A-Za-z0-9]', '', raw).lower()
     if not alnum:
         return ""
-    if alnum in _CWD12_ALNUM:
-        return _CWD12_ALNUM[alnum]
+    sp = species_of(raw)
+    if sp:
+        return sp
     parts = re.split(r'[^A-Za-z0-9]+', raw)
     return "".join(p[:1].upper() + p[1:].lower() for p in parts if p)
+
+
+def _slug_classes(slug: str, info: dict) -> list:
+    """Canonical class names of a slug. v3.60.0: cwd12 copies are named by the
+    species of their label-file ids (their stored names are legacy labels),
+    a whole legacy list by its species, anything else by _canon."""
+    if slug in CWD12_ID_SPACE:
+        return list(CWD12_ID_SPACE[slug])
+    names = list(info.get("class_names") or [])
+    return [class_species(slug, i, names) or _canon(cn) for i, cn in enumerate(names)]
 
 
 def _is_bbox(info: dict) -> bool:
@@ -153,8 +160,8 @@ def audit() -> dict:
         topic = str(info.get("topic") or "unknown").lower()
         # effective topic: registry field, else override of any class, else unknown
         if topic in ("unknown", "", "none"):
-            for cn in (info.get("class_names") or []):
-                ov = overrides.get(_canon(cn)) or overrides.get(cn)
+            for cn in _slug_classes(slug, info):
+                ov = overrides.get(cn)
                 if ov:
                     topic = ov
                     break
@@ -168,7 +175,7 @@ def audit() -> dict:
             holdout_imgs += n
         if bbox and weedish and not hold and n > 0:
             weed_bbox_imgs += n
-            cns = [c for c in (_canon(c) for c in (info.get("class_names") or [])) if c]
+            cns = [c for c in _slug_classes(slug, info) if c]
             species.update(cns)
             weed_bbox_slugs.append({
                 "slug": slug, "topic": topic, "images": n,
@@ -261,23 +268,32 @@ def apply() -> dict:
     classes: dict = {}
     for i, c in enumerate(_CWD12):
         classes[c] = {"_id": c, "topic": "cwd12", "is_cwd12": True,
-                      "cwd12_index": i, "cn_zh": _CWD12_ZH.get(c, ""),
+                      "cwd12_index": i, "display_name": CWD12_COMMON[c],
+                      "binomial": CWD12_BINOMIAL[c],
                       "domain": "weed",
                       "taxonomies": [{"taxonomy": "cwd12", "index": i}]}
-    for info in ds.values():
-        for cn in (info.get("class_names") or []):
-            canon = _canon(cn)
+    for slug, info in ds.items():
+        for canon in _slug_classes(slug, info):
             if not canon or canon in classes:
                 continue
             classes[canon] = {"_id": canon, "is_cwd12": False, "domain": "weed"}
-    # apply topic overrides on top
+    # apply topic overrides on top. v3.60.0: topic "cwd12" belongs to the
+    # species alone; an override that tags another name "cwd12" dates from
+    # the legacy list (e.g. "Crabgrass") and is not applied.
     for cls, topic in overrides.items():
         canon = _canon(cls) or cls
         classes.setdefault(canon, {"_id": canon, "is_cwd12": canon in _CWD12})
-        classes[canon]["topic"] = topic
+        if canon not in _CWD12 and topic != "cwd12":
+            classes[canon]["topic"] = topic
     n_classes = 0
     for canon, doc in classes.items():
-        dbh[_db.COLL_CLASSES].update_one({"_id": canon}, {"$set": doc}, upsert=True)
+        upd = {"$set": doc}
+        if not doc.get("is_cwd12"):
+            # a doc this script writes as non-cwd12 carries no cwd12 index
+            # (the legacy seed gave "Crabgrass" and "Nutsedge" one)
+            upd["$unset"] = {"cwd12_index": ""}
+            upd["$pull"] = {"taxonomies": {"taxonomy": "cwd12"}}
+        dbh[_db.COLL_CLASSES].update_one({"_id": canon}, upd, upsert=True)
         n_classes += 1
 
     # --- registry_meta singleton (so db.get_registry reconstructs disc/total) ---

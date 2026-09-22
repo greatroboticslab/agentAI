@@ -29,8 +29,10 @@
 #   - NEVER_TRAIN (cottonweeddet12/weedsense/francesco) + per-image holdout-stem
 #       filter stay active → zero eval leakage.
 #
-# KNOWN CAVEAT (P1): the quality core covers ~8/12 CWD12 species; Eclipta/
-# Goosegrass/Morningglory/Nutsedge have no clean train data yet → their per-class
+# KNOWN CAVEAT (P1): the quality core covers ~8/12 CWD12 species; Purslane/
+# SpottedSpurge/Carpetweed/Ragweed (the leave-4-out ids 2-5, v3.60.0 names;
+# the old labels were Eclipta/Goosegrass/Morningglory/Nutsedge) have no clean
+# train data yet → their per-class
 # mAP will be ~0 and drag the 12-species mean. Report per-species + the 8-covered
 # mean alongside the 12-mean so the quality signal isn't masked by coverage.
 #

@@ -45,11 +45,19 @@ REGISTRY_PATH = REPO / "results" / "framework" / "dataset_registry.json"
 DEFAULT_OUT = REPO / "results" / "framework" / "buckets.json"
 
 
-CWD12 = (
-    "Carpetweeds", "Crabgrass", "Eclipta", "Goosegrass", "Morningglory",
-    "Nutsedge", "PalmerAmaranth", "PricklySida", "Purslane", "Ragweed",
-    "Sicklepod", "SpottedSpurge",
-)
+# v3.60.0: coverage is reported by the species each cwd12 id really holds
+# (cwd12_species). The old tuple was the legacy label list, matched by string
+# against every slug's names, so a real "Ragweed" dataset counted toward the
+# slot that holds Sicklepod and "Crabgrass"/"Nutsedge" (not cwd12 species)
+# were reported as missing.
+try:
+    from .cwd12_species import CWD12_ID_SPACE, CWD12_SPECIES, class_species
+except ImportError:  # run as a plain script
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from weed_optimizer_framework.tools.cwd12_species import (
+        CWD12_ID_SPACE, CWD12_SPECIES, class_species)
+
+CWD12 = tuple(CWD12_SPECIES)
 
 
 def _find_label_dirs(local_p: Path, max_dirs: int = 64) -> list:
@@ -105,24 +113,28 @@ def _has_yolo_txt(label_dirs: list, max_scan: int = 50) -> bool:
     return False
 
 
+def _slug_cid_species(slug: str, class_names: list) -> dict:
+    """cid -> cwd12 species for one slug. cwd12 copies resolve by id (their
+    stored names are ignored), other slugs by the real name of each class."""
+    n = len(CWD12_ID_SPACE.get(slug) or class_names or [])
+    out: dict = {}
+    for cid in range(n):
+        sp = class_species(slug, cid, class_names)
+        if sp is not None:
+            out[cid] = sp
+    return out
+
+
 def _scan_bucket_a_species(local_p: Path, label_dirs: list,
                             class_names: list,
-                            per_slug_max_files: int = 4000) -> Counter:
-    """For an A-bucket slug, count images per cwd12 species (if its
-    class_names overlap CWD12). Bounded label scan."""
+                            per_slug_max_files: int = 4000,
+                            slug: str = "") -> Counter:
+    """For an A-bucket slug, count images per cwd12 species (if any of its
+    classes is one). Bounded label scan."""
     counts: Counter = Counter()
     n_scanned = 0
-    cwd12_index_by_canon = {c.lower(): i for i, c in enumerate(CWD12)}
 
-    # build a mapping from this slug's cid → CWD12 canonical (if match)
-    cid_to_cwd12: dict = {}
-    for cid, raw in enumerate(class_names):
-        key = "".join(ch for ch in str(raw).lower() if ch.isalnum())
-        # try direct CWD12 match
-        for sp_canon, sp_idx in cwd12_index_by_canon.items():
-            if "".join(ch for ch in sp_canon if ch.isalnum()) == key:
-                cid_to_cwd12[cid] = CWD12[sp_idx]
-                break
+    cid_to_cwd12 = _slug_cid_species(slug, class_names)
 
     if not cid_to_cwd12:
         return counts
@@ -212,7 +224,8 @@ def main():
             slug = row["slug"]
             lp = row["local_path"]
             label_dirs = _find_label_dirs(Path(lp))
-            counts = _scan_bucket_a_species(Path(lp), label_dirs, row["class_names"])
+            counts = _scan_bucket_a_species(Path(lp), label_dirs, row["class_names"],
+                                            slug=slug)
             species_per_slug[slug] = dict(counts)
             for sp, c in counts.items():
                 cwd12_species_imgs[sp] += c
