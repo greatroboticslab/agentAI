@@ -34,6 +34,10 @@ from weed_optimizer_framework.tools import owl_preannotate as PA  # noqa: E402
 from weed_optimizer_framework.tools import owl_upload_proposals as OU  # noqa: E402
 from weed_optimizer_framework.tools import export_owl_exemplars as EX  # noqa: E402
 from weed_optimizer_framework.tools import mega_trainer as M  # noqa: E402
+# Hermetic: mega_trainer also looks for the sealed holdout at its absolute
+# cluster path. On the cluster that is the real set, which these tests must
+# neither read nor depend on; everywhere else the lookup is already empty.
+M._holdout_image_dirs = lambda: []
 
 FAILURES = []
 
@@ -457,11 +461,17 @@ def test_owl():
         # The holdout guard fails closed without cwd12 test/valid images, so
         # this fake repository seeds it with an empty stem set.
         from weed_optimizer_framework.tools import synth_cutpaste as SC
+        orig_sc_repo = SC.REPO
+        # An empty repository: SC.REPO's default is the cluster repo, whose
+        # real holdout would keep the guard from failing closed.
+        SC.REPO = pathlib.Path(tempfile.mkdtemp(prefix="empty_repo_"))
         try:
             SC._holdout_guard()
             check("holdout guard fails closed without holdout images", False)
         except RuntimeError:
             check("holdout guard fails closed without holdout images", True)
+        finally:
+            SC.REPO = orig_sc_repo
         SC._HOLDOUT_GUARD.update(never=frozenset(M.NEVER_TRAIN_SLUGS),
                                  stems=frozenset(), _imgs=[])
         bank = td / "bank"

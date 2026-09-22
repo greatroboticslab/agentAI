@@ -22,6 +22,13 @@ os.environ["REPO_ROOT"] = TMP      # modules that mkdir under REPO at import
 os.environ["CLASS_TOPIC_OVERRIDES_FILE"] = os.path.join(TMP, "class_topic_overrides.json")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
+from weed_optimizer_framework.tools import mega_trainer as _MT  # noqa: E402
+# Hermetic: mega_trainer also looks for the sealed holdout at its absolute
+# cluster path. On the cluster that is the real set (1,977 photos on Lustre),
+# which these tests must neither read nor depend on; the fake repository's own
+# downloads/ tree is what the guards under test see.
+_MT._holdout_image_dirs = lambda: []
+
 from weed_optimizer_framework.tools import cwd12_species as S  # noqa: E402
 
 FAILURES = []
