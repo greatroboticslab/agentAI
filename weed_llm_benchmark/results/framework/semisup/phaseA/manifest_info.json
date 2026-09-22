@@ -1,0 +1,21 @@
+{
+ "crops": 6128,
+ "images": 3669,
+ "dropped_holdout_images": 2,
+ "dropped_small_boxes": 0,
+ "names_verified_boxes": 452,
+ "per_class": {
+  "Waterhemp": 1271,
+  "MorningGlory": 888,
+  "Purslane": 637,
+  "SpottedSpurge": 636,
+  "Carpetweed": 613,
+  "Ragweed": 580,
+  "Eclipta": 587,
+  "PricklySida": 306,
+  "PalmerAmaranth": 239,
+  "Sicklepod": 152,
+  "Goosegrass": 138,
+  "CutleafGroundcherry": 81
+ }
+}

@@ -1,0 +1,27 @@
+{
+ "dinov2b_cls": {
+  "dim": 768,
+  "seconds": 656.2,
+  "device": "cuda"
+ },
+ "dinov2b_mean": {
+  "dim": 768,
+  "seconds": 656.2,
+  "device": "cuda"
+ },
+ "dinov2l_cls": {
+  "dim": 1024,
+  "seconds": 700.3,
+  "device": "cuda"
+ },
+ "dinov2l_mean": {
+  "dim": 1024,
+  "seconds": 700.3,
+  "device": "cuda"
+ },
+ "bioclip2": {
+  "dim": 768,
+  "seconds": 653.0,
+  "device": "cuda"
+ }
+}
