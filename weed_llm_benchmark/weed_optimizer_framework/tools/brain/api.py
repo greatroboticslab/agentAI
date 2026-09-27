@@ -526,7 +526,8 @@ _PAGE = """<!doctype html><html><head><meta charset="utf-8">
 <div class="sub">Everything this layer knows about the campaign, read from the
 platform. Nothing on this page can change anything: corrections are written only
 by the scheduler's single-writer channel, and actions only through the policy
-gate.</div>
+gate. The incremental-training campaign has its own page:
+<a href="/inc">INC campaign &rarr;</a></div>
 <div class="grid" id="grid"></div>
 <script>
 const DOMAIN = "__DOMAIN__";

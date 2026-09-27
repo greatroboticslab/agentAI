@@ -1580,6 +1580,56 @@ def _heartbeat(cfg: dict, tick_duration_s: float):
             pass
 
 
+# INC autopilot campaigns (docs/INC_AUTOPILOT.md, component 6). Every
+# CAMPAIGN_EVERY-th tick (600 s, the INC driver's WATCH_INTERVAL) one campaign
+# tick runs on its own daemon thread. The rounds loop never waits on it: a
+# campaign tick makes one ssh that may take minutes (its snapshot verb's timeout
+# is 600 s), longer than the heartbeat's 360 s staleness alarm allows a tick,
+# and nothing it raises reaches this loop. A tick still running skips the next.
+CAMPAIGN_EVERY = 5
+_CAMPAIGN = {"ticks": 0, "thread": None}
+
+
+def _campaign_run():
+    try:
+        from .inc_autopilot import campaign
+        # The dashboard's tree (REPO_ROOT), where its approval queue and the
+        # /inc page read; None when that is the package's own tree.
+        campaign.tick(slurm_sh=_CTX.get("slurm_sh"), log=_log(), db=_CTX.get("db"),
+                      log_action=_CTX.get("log_action"),
+                      lab_repo=campaign.lab_repo_arg(_CTX.get("repo")))
+    except Exception as e:
+        try:
+            _log().warning("[rounds] INC campaign tick failed: %s" % e)
+        except Exception:
+            pass
+
+
+def _campaign_tick(cfg):
+    """Start one INC campaign tick every CAMPAIGN_EVERY-th call. Never raises;
+    returns the thread it started, else None."""
+    try:
+        _CAMPAIGN["ticks"] += 1
+        if _CAMPAIGN["ticks"] % CAMPAIGN_EVERY:
+            return None
+        if not isinstance(cfg, dict) or not cfg.get("campaigns"):
+            return None
+        th = _CAMPAIGN.get("thread")
+        if th is not None and th.is_alive():
+            _log().warning("[rounds] INC campaign tick still running; this one is skipped")
+            return None
+        th = threading.Thread(target=_campaign_run, name="inc-campaign-tick", daemon=True)
+        _CAMPAIGN["thread"] = th
+        th.start()
+        return th
+    except Exception as e:
+        try:
+            _log().warning("[rounds] INC campaign tick not started: %s" % e)
+        except Exception:
+            pass
+        return None
+
+
 def _loop():
     while True:
         time.sleep(TICK_S)
@@ -1611,6 +1661,7 @@ def _loop():
         except Exception:
             pass
         _heartbeat(c if c else _cfg(), dur)
+        _campaign_tick(c)
 
 
 @router.get("/api/rounds/scheduler")

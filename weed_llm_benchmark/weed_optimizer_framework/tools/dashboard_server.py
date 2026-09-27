@@ -420,6 +420,7 @@ _AUTH_EXEMPT_PATHS = {
     "/api/health/sync",
     "/api/health/scheduler",         # v3.25.0: same reasoning, unattended loop
     "/api/health/supervision",       # v3.56.0: is the watcher itself reportable
+    "/api/health/inc",               # v3.61.0: is an INC campaign paused, stale or alarming
 }
 _AUTH_EXEMPT_PREFIXES = (
     "/static/",                      # static assets if any
@@ -2555,9 +2556,14 @@ def _require_trainable_modality(dd: dict, verb: str = "Training") -> str:
     return m
 
 
-def _actor_from_request(request) -> str:
+def _actor_from_request(request, trust_x_user: bool = True) -> str:
     """Best-effort uploader identity: the signed Google session user if present,
-    else an X-User header, the Basic-auth user, or 'admin'."""
+    else an X-User header, the Basic-auth user, or 'admin'.
+
+    v3.61.0: `trust_x_user=False` skips the X-User header. The header is the
+    client's own claim, so anyone holding the shared operator password could
+    act in any person's name; the INC routes record R3 execution, autonomy
+    grants and pauses in a person's name and ask for this stricter form."""
     try:
         su = _session_user(request)
         if su and su.get("uid"):
@@ -2571,7 +2577,7 @@ def _actor_from_request(request) -> str:
     except Exception:
         pass
     try:
-        xu = (request.headers.get("x-user") or "").strip()
+        xu = (request.headers.get("x-user") or "").strip() if trust_x_user else ""
         if xu:
             return xu[:80]
         h = request.headers.get("authorization", "")
@@ -8238,7 +8244,7 @@ def agent_generic(domain_id: str):
  a.btn{{display:inline-block;margin-top:18px;text-decoration:none;background:#2563eb;color:#fff;font-weight:600;font-size:13px;padding:10px 16px;border-radius:9px}}
 </style></head><body>
  <div class="top"><a class="bc" href="/">&larr; Projects</a><h1>&#129516; {nm}</h1>
-  <a class="bc" href="/supervision/{domain_id}" style="margin-left:auto">Supervision &rarr;</a></div>
+  <a class="bc" href="/supervision/{domain_id}" style="margin-left:auto">Supervision &rarr;</a>{'<a class="bc" href="/inc">INC campaign &rarr;</a>' if domain_id == "weed" else ''}</div>
  <div class="wrap"><div class="card">
    <span class="badge">&#9679; {st}</span>
    <span class="badge" style="background:#eef2ff;color:#1d4ed8;border-color:#bfdbfe">task: {_task}</span>
@@ -12514,8 +12520,17 @@ def _slurm(cmd: list, timeout: int = 15) -> dict:
     return _shell(_ssh_cluster_prefix() + [remote], timeout=max(timeout + 20, 35))
 
 
+# v3.61.0: the Slurm names of an INC experiment's own runs and build (the
+# driver's inc_<exp>_NNNN arrays, run_inc_build.sh's inc_build_<exp>;
+# remote.exp_job_re). Stopping those is scancel of an experiment, R3
+# (docs/INC_AUTOPILOT.md (d)): it goes through the policy gate and the
+# executor (POST /api/inc/action/cancel), never through the route below.
+_INC_EXP_JOB_RE = _re_cls.compile(
+    r"^inc_(build_[A-Za-z0-9][A-Za-z0-9_-]{0,63}|[A-Za-z0-9][A-Za-z0-9_-]{0,63}_[0-9]{4})$")
+
+
 @app.post("/api/cancel_job/{jobid}")
-def api_cancel_job(jobid: str):
+def api_cancel_job(jobid: str, request: Request):
     """Cancel a SLURM job by ID. Only allow cancelling job names we recognize
     as 'safe to interrupt' (agent jobs, not the dashboard itself)."""
     if not _re_cls.match(r'^[0-9]+$', jobid):
@@ -12532,15 +12547,34 @@ def api_cancel_job(jobid: str):
     # ran the full 12 h into a TIMEOUT that was diagnosable at epoch 3 and there
     # was no way to cancel them short of a shell on the cluster. A supervisor
     # that can detect a doomed step must be able to end it.
+    # v3.61.0: the INC jobs too (inc_audit_<exp>, inc_relevance, inc_verify,
+    # inc_plan), from a person with cluster access, recorded with their name.
+    # An experiment's own runs and build are refused here: that is scancel of
+    # an experiment (R3), which goes through the executor (_INC_EXP_JOB_RE).
     SAFE_PREFIXES = ("dl_known", "brain_hrv", "topic_bf", "smoke", "lora_",
                      "s2_dino", "rndtrain", "m1_merged", "brain_", "llm_",
-                     "supervisor_", "vllm_")
+                     "supervisor_", "vllm_", "inc_")
     if not any(name.startswith(p) for p in SAFE_PREFIXES):
         return JSONResponse({"ok": False, "msg":
             f"refuse to cancel {name!r} — only agent jobs cancellable from UI"})
+    actor = None
+    if name.startswith("inc_"):
+        actor = _actor_from_request(request, trust_x_user=False)
+        if not _can_use_cluster(actor):
+            return JSONResponse({"ok": False, "msg":
+                "cancelling an INC job needs cluster access"}, status_code=403)
+        if _INC_EXP_JOB_RE.match(name):
+            return JSONResponse({"ok": False, "msg":
+                f"{name!r} is a run or the build of an INC experiment: stopping it is "
+                f"scancel of an experiment (R3), which goes through the policy gate and "
+                f"is recorded. Use the INC page's 'Pause and kill' (POST "
+                f"/api/inc/action/cancel)."}, status_code=409)
     r = _slurm(["scancel", jobid], timeout=8)
-    return JSONResponse({"ok": r["ok"], "jobid": jobid, "name": name,
-                          "msg": r["stdout"] or r["stderr"] or "cancelled"})
+    out = {"ok": r["ok"], "jobid": jobid, "name": name,
+           "msg": r["stdout"] or r["stderr"] or "cancelled"}
+    if actor is not None:
+        _log_action("cancel_job", dict(out, actor=actor))
+    return JSONResponse(out)
 
 
 # Cluster-actions history log (append-only)
@@ -12603,18 +12637,41 @@ def _batch_sacct(jobids: list) -> dict:
     if not r["ok"]:
         return {}
     out: dict = {}
+    seen: set = set()
+    tasks: dict = {}      # array base id -> [status or None per task row]
     for ln in r["stdout"].splitlines():
         parts = ln.split("|")
         if len(parts) < 2:
             continue
         jid = parts[0].split(".")[0].strip()   # main step (drop .batch/.extern)
-        if jid in out:
+        if not jid or jid in seen:
             continue
+        seen.add(jid)
         state = parts[1].strip().upper().split()[0] if parts[1].strip() else ""
-        if state in _SACCT_TERMINAL:
-            out[jid] = _SACCT_TERMINAL[state]
-        elif state in _SACCT_ACTIVE:
-            out[jid] = "running"
+        st = (_SACCT_TERMINAL.get(state) or
+              ("running" if state in _SACCT_ACTIVE else None))
+        if st:
+            out[jid] = st
+        # v3.61.0: an array job is printed per task, "<id>_<task>" (a pending
+        # range as "<id>_[2-9%2]"), never as the bare id that "Submitted batch
+        # job N" names, so an array stayed "launched" for ever. Fold the tasks
+        # into the base id: running while any task runs or waits, failed when
+        # any failed, succeeded only when every task did; a task whose state is
+        # neither leaves the whole array unresolved.
+        base, sep, _task = jid.partition("_")
+        if sep and base:
+            tasks.setdefault(base, []).append(st)
+    for base, sts in tasks.items():
+        if base in out:
+            continue
+        if "running" in sts:
+            out[base] = "running"
+        elif None in sts:
+            continue
+        elif "failed" in sts:
+            out[base] = "failed"
+        else:
+            out[base] = "succeeded"
     return out
 
 
@@ -13323,12 +13380,18 @@ def api_job_log(jobid: str, tail: int = 200, around: int = 0, context: int = 20)
     line 286 of a 40,000-line log. `context` lines are returned either side, and
     the response says which absolute line each returned line is, so the citation
     can be checked rather than taken on trust."""
-    if not _re_cls.match(r'^[0-9_]+$', jobid):
+    # v3.61.0: a job id, or one array task "<id>_<task>"; no leading zero (a
+    # zero-padded "0007" matched the _NNNN step suffix of every INC run array).
+    if not _re_cls.match(r'^[1-9][0-9]*(_[0-9]+)?$', jobid):
         raise HTTPException(400, "bad jobid chars")
     if not 1 <= tail <= 2000:
         tail = 200
     around = around if isinstance(around, int) and around > 0 else 0
     context = context if isinstance(context, int) and 0 < context <= 200 else 20
+    # An INC log name ends with the job id, then at most one "_<task>": the run
+    # arrays are %x_%A_%a = inc_<exp>_NNNN_<id>_<task>.out, so a bare
+    # "*_<id>_*" would also match an experiment named e.g. pilot_12345.
+    inc_log_re = _re_cls.compile(r"_%s(_[0-9]+)?[.]out$" % _re_cls.escape(jobid))
 
     # v3.0.99.40: lab-control mode → the .out lives on the cluster; find newest
     # matching file there + tail it over SSH.
@@ -13344,8 +13407,22 @@ def api_job_log(jobid: str, tail: int = 200, around: int = 0, context: int = 20)
                     f'sed -n "{lo},{hi}p" "$f"')
         else:
             body = f'tail -n {tail} "$f"'
-        script = (f"f=$(ls -t results/framework/*_{jobid}.out "
-                  f"results/*_{jobid}.out logs/*{jobid}*.out 2>/dev/null | head -1); "
+        # v3.61.0: the INC jobs log under results/framework/inc/: logs/ (builds,
+        # audits), <exp>/logs/ (the driver's run arrays, %x_%A_%a), step1/logs/
+        # (relevance, verify) and _campaign/plans/logs/ (the research brain).
+        # "_{jobid}.out" is one job or one array task; "_{jobid}_<task>.out" is
+        # a task of an array (the newest is shown). The globs are wide and the
+        # grep keeps only names that END in the id and at most one task number:
+        # job 1234 never opens job 12345's log, and job 12345 never opens the
+        # log of an experiment named pilot_12345. The older locations come
+        # first and keep their own patterns.
+        inc = "results/framework/inc"
+        script = (f"f=$({{ ls -t results/framework/*_{jobid}.out "
+                  f"results/*_{jobid}.out logs/*{jobid}*.out 2>/dev/null; "
+                  f"ls -t {inc}/logs/*_{jobid}.out {inc}/logs/*_{jobid}_*.out "
+                  f"{inc}/*/logs/*_{jobid}.out {inc}/*/logs/*_{jobid}_*.out "
+                  f"{inc}/_campaign/plans/logs/*_{jobid}.out 2>/dev/null "
+                  f"| grep -E '_{jobid}(_[0-9]+)?[.]out$'; }} | head -1); "
                   f'if [ -z "$f" ]; then echo __NOFILE__; '
                   f'else echo "__FILE__:$f"; {body}; fi')
         r = _slurm(["bash", "-lc", script], timeout=45)
@@ -13397,6 +13474,17 @@ def api_job_log(jobid: str, tail: int = 200, around: int = 0, context: int = 20)
             candidates.extend(d.glob(f"*_{jobid}.out"))
             candidates.extend(d.glob(f"*_{jobid}.log"))
             candidates.extend(d.glob(f"*{jobid}*.out"))
+    # v3.61.0: INC logs, the same places as the lab-mode branch above. Each
+    # level is listed explicitly: an experiment directory holds a runs/ tree
+    # that must never be walked.
+    inc_root = REPO / "results" / "framework" / "inc"
+    if inc_root.is_dir():
+        inc_dirs = [inc_root / "logs", inc_root / "_campaign" / "plans" / "logs"]
+        inc_dirs += [p / "logs" for p in inc_root.iterdir() if p.is_dir()]
+        for d in inc_dirs:
+            if d.is_dir():
+                candidates.extend(p for p in d.glob(f"*_{jobid}*.out")
+                                  if inc_log_re.search(p.name))
 
     # De-dup + sort by mtime
     seen: set = set()
@@ -17786,3 +17874,29 @@ try:
     log.info("[brain] supervision API mounted (/api/brain/{domain}/...)")
 except Exception as _e:
     log.error(f"[brain] supervision API failed to mount: {_e}")
+
+# v3.61.0 — the INC campaign surface (docs/INC_AUTOPILOT.md (e)): the /inc page,
+# lab-local reads of what the campaign ticker (inc_autopilot/campaign.py, run by
+# the round scheduler) records (no ssh per request), the admin campaign settings
+# through campaign.configure / pause / set_goal, and manual actions, which go
+# through inc_autopilot.executor as the signed-in person. /api/health/inc is the
+# alarm. The ticker writes under model.LAB_REPO; the page says so when REPO is
+# another tree.
+try:
+    from . import inc_dashboard as _inc_dashboard
+    from . import db as _inc_db
+    _inc_dashboard.mount(app, {
+        "log": log, "repo": str(REPO), "db": _inc_db,
+        # Identity comes from the session / key / Basic login, never the body,
+        # and not from the X-User header either: these routes execute R3,
+        # grant autonomy and pause in a person's name.
+        "actor_of": lambda request: _actor_from_request(request, trust_x_user=False),
+        "is_admin": _is_admin,
+        "can_use_cluster": _can_use_cluster,
+        # The executor's one batched remote call per request; reads never get it.
+        "slurm_sh": (lambda s, timeout=60: _slurm(["bash", "-lc", s], timeout)),
+        "log_action": _log_action,
+    })
+    log.info("[inc] campaign page mounted (/inc, /api/inc/*, /api/health/inc)")
+except Exception as _e:
+    log.error(f"[inc] campaign page failed to mount: {_e}")

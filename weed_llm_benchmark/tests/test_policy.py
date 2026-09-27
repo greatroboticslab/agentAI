@@ -404,6 +404,49 @@ def test_cli_table_and_explain_do_not_raise():
     assert policy.main(["explain", "round_train"]) == 0
 
 
+# ============================================================================
+# INC autopilot rows (docs/INC_AUTOPILOT.md, step (g)6). The full authorize
+# matrix and the executor's use of these rows are in
+# tests/test_inc_ap_governance.py; this pins the rows in the table itself.
+# ============================================================================
+_INC_RISKS = {"inc_snapshot": "R0", "inc_report": "R0", "inc_lit_fetch": "R0",
+              "inc_advance": "R1", "inc_relevance_build": "R2", "inc_label_audit": "R2",
+              "inc_unblock_transient": "R2", "inc_build_pilot": "R3",
+              "inc_build_realloop": "R3", "inc_build_baseline": "R3",
+              "inc_cancel_exp": "R3", "inc_sync_outer": "R3"}
+
+
+def test_inc_rows_exist_with_the_contract_risk_tiers():
+    assert {a: policy.risk_of(a) for a in _INC_RISKS} == _INC_RISKS
+
+
+def test_inc_builds_go_to_approval_for_the_autopilot_and_brain():
+    p = {"exp": "pilot_v2", "replay_mode": "full", "est_gpu_hours": 40.0}
+    auto = policy.authorize("round-scheduler:inc-autopilot", "inc_build_pilot", p)
+    brain = policy.authorize("tier2:qwen3", "inc_build_pilot", p)
+    human = policy.authorize("human:harry", "inc_build_pilot", p)
+    assert not auto["allowed"]                       # no R3 cell: the executor files it
+    assert brain["allowed"] and brain["needs_approval"]
+    assert human["allowed"] and not human["needs_approval"]
+
+
+def test_inc_autopilot_runs_r0_to_r2_directly_and_never_cancel():
+    auto = "round-scheduler:inc-autopilot"
+    assert policy.authorize(auto, "inc_advance", {"exp": "pilot_v1"})["allowed"]
+    d = policy.authorize(auto, "inc_unblock_transient",
+                         {"exp": "pilot_v1", "unit": "truth", "cause": "transient"})
+    assert d["allowed"] and not d["needs_approval"]
+    assert not policy.authorize(auto, "inc_cancel_exp", {"exp": "pilot_v1"})["allowed"]
+
+
+def test_inc_build_estimate_is_bounded_and_has_no_default():
+    ok = {"exp": "pilot_v2", "replay_mode": "full"}
+    assert policy.estimate_su("inc_build_pilot", ok)["su"] is None
+    assert policy.estimate_su("inc_build_pilot", dict(ok, est_gpu_hours=40.0))["su"] == 40.0
+    assert not policy.authorize("human:harry", "inc_build_pilot",
+                                dict(ok, est_gpu_hours=200.5))["allowed"]
+
+
 if __name__ == "__main__":
     import pytest as _pytest
     raise SystemExit(_pytest.main([__file__, "-q"]))

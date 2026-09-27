@@ -1,0 +1,36 @@
+{
+ "cases": {
+  "R1": "pass",
+  "R2": "skip",
+  "R3": "pass",
+  "R4a": "pass",
+  "R4b": "skip",
+  "R5": "pass",
+  "R6": "pass",
+  "R7": "pass",
+  "R8": "pass",
+  "earliest_fire": "pass",
+  "governance": "pass",
+  "negative_controls": "pass",
+  "test_blindness": "pass"
+ },
+ "code_hash": "5e7b67ae77aa0949e6df0bbb8e7c102d56997f670de8f93a0534bb49f5d575cb",
+ "detail": {
+  "notes": [],
+  "runs": {
+   "governance": {
+    "rc": 0,
+    "stderr_tail": "",
+    "tail": "part\n  ok     a brain may not advance through it\n  ok     a paused campaign reads but does not advance\n  ok   preamble: the action fails and is not charged\n  ok     the envelope does not keep its estimate\n  ok   raise: the action fails and is not charged\n  ok     the envelope does not keep its estimate\n  ok   silent: the action fails and is charged (it may have run)\n  ok     the envelope keeps its estimate\n  ok   no slurm_sh hook: refused\n  ok   an unreachable cluster refuses before any call\n  ok   mongo down: R1 is refused by the policy's resource check, R0 still reads\n  ok   a lab action with no hook is refused\n  ok   a lab action runs its hook with the checked parameters\n  ok   every call left one line in executions.jsonl\nat most one automatic unblock per unit\n  ok   the first automatic unblock of a unit runs\n  ok   a second one of the same unit is refused\n  ok   another unit may still be unblocked\n  ok   a person is not limited by the executor's count\nSU ledger writer from report.gpu_hours\n  ok   pilot_v1's report is recorded unit by unit\n  ok     its SU equal its GPU-hours at the V100 rate\n  ok     the writer read only exp, done, done_utc and gpu_hours\n  ok   recording it again updates, never double-bills\n  ok   test / ood values changed: the recorded spend is identical\n  ok   a report that is not done is refused\n  ok   a report with no valid experiment name is refused\napprovals.py keeps its semantics\n  ok   a request filed without context has no context key\n  ok   propose refuses a context that is not an object\n  ok   decide still refuses tier0:g\n  ok   decide still refuses tier2:c\n  ok   decide still refuses round-scheduler\n  ok   decide still refuses round-scheduler:inc-autopilot\n  ok   a forged grant by a non-grantee is not applied\n  ok   a grant line by the grantee on a non-INC item another tier filed is not applied\n  ok   an execution of an unapproved item is not applied\n  ok   awaiting_execution lists the approved, unexecuted item\n\n0 failure(s)\nALL PASS\n"
+   },
+   "replay": {
+    "rc": 0,
+    "stderr_tail": "",
+    "tail": "osed without Step 1: L2 is deferred\ntest blindness (metamorphic)\n  ok   pilot_v1: the perturbation touched a file\n  ok   pilot_v1: diagnoses byte-identical\n  ok   pilot_v1: proposals, cards and argv byte-identical\n  ok   pilot_v1: canonical evidence bytes identical\n  ok   pilot_v2: the perturbation touched a file\n  ok   pilot_v2: diagnoses byte-identical\n  ok   pilot_v2: proposals, cards and argv byte-identical\n  ok   pilot_v2: canonical evidence bytes identical\n  ok   pilot_v2 (whole tree): the perturbed run still gives R5 (D15 -> L9)\n  ok   pilot_v3: the perturbation touched a file\n  ok   pilot_v3: diagnoses byte-identical\n  ok   pilot_v3: proposals, cards and argv byte-identical\n  ok   pilot_v3: canonical evidence bytes identical\n  ok   pilot_v3 (whole tree): the perturbed run still gives R6 (D1 not blocking, D4 ready on full)\n  ok   b0_v1: diagnoses byte-identical\n  ok   b0_v1: proposals, cards and argv byte-identical\n  ok   b0_v1: canonical evidence bytes identical\n  ok   synthetic: the perturbation touched a file\n  ok   synthetic: diagnoses byte-identical\n  ok   synthetic: proposals, cards and argv byte-identical\n  ok   synthetic: canonical evidence bytes identical\n  ok   a perturbed dev value does change the diagnoses (the comparison has teeth)\nthe live path: remote.py's snapshot of the same files gives the same decisions\n  ok   remote.snapshot is ok and ships report.json without its final table\n  ok   the same diagnoses from the INCAP record as from the files\n  ok   the same proposals and argv\n  ok   pilot_v2 through remote.snapshot: the same diagnoses (D15 read off the shipped ledger)\n  ok     and the same L9\nearliest fire (pilot_v1 ledger prefixes)\n  ok   D1 fires by the end of the ledger\n  info D1 first fires at ledger line 12 (gate/freeze/2), after 4 of 21 gate entries and 7 of 7 truth steps;\n  info the rest of pilot_v1 then cost about 6.1 of its 17.3 GPU-hours (estimate from the report's per-arm hours)\n\n0 failure(s), 2 skipped: R2, R4b committed record\n"
+   }
+  }
+ },
+ "recorded_utc": "2026-09-27T19:18:31Z",
+ "status": "pass",
+ "writer": "inc_autopilot.executor"
+}

@@ -1,0 +1,551 @@
+{
+ "blocked_by": null,
+ "case": "R4b",
+ "decided_utc": "2026-09-27T11:50:24Z",
+ "diagnosis": {
+  "cites": [
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/0/chains/freeze/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/0/chains/full/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/freeze/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/full/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/lora/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/freeze/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/full/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/lora/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/freeze/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/full/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/lora/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/freeze/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/full/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/lora/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/freeze/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/full/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/lora/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/freeze/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/full/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/lora/p_recipe",
+    "value": 0.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/0/chains/freeze/null_mean",
+    "value": 0.7237282352825837
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/0/chains/freeze/inc",
+    "value": 0.7281636942174425
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/0/chains/full/null_mean",
+    "value": 0.7133580423849617
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/0/chains/full/inc",
+    "value": 0.7281636942174425
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/freeze/null_mean",
+    "value": 0.7178143159138779
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/freeze/inc",
+    "value": 0.7305126363516768
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/full/null_mean",
+    "value": 0.7133580423849617
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/full/inc",
+    "value": 0.7281636942174425
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/lora/null_mean",
+    "value": 0.7289718371549229
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/lora/inc",
+    "value": 0.734131549778974
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/freeze/null_mean",
+    "value": 0.7178143159138779
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/freeze/inc",
+    "value": 0.7305126363516768
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/full/null_mean",
+    "value": 0.7133580423849617
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/full/inc",
+    "value": 0.7281636942174425
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/lora/null_mean",
+    "value": 0.7289718371549229
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/2/chains/lora/inc",
+    "value": 0.734131549778974
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/freeze/null_mean",
+    "value": 0.7178143159138779
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/freeze/inc",
+    "value": 0.7305126363516768
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/full/null_mean",
+    "value": 0.7133580423849617
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/full/inc",
+    "value": 0.7281636942174425
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/lora/null_mean",
+    "value": 0.7289718371549229
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/lora/inc",
+    "value": 0.734131549778974
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/freeze/null_mean",
+    "value": 0.7178143159138779
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/freeze/inc",
+    "value": 0.7305126363516768
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/full/null_mean",
+    "value": 0.7133580423849617
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/full/inc",
+    "value": 0.7281636942174425
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/lora/null_mean",
+    "value": 0.7289718371549229
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/4/chains/lora/inc",
+    "value": 0.734131549778974
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/freeze/null_mean",
+    "value": 0.7178143159138779
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/freeze/inc",
+    "value": 0.7305126363516768
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/full/null_mean",
+    "value": 0.7133580423849617
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/full/inc",
+    "value": 0.7281636942174425
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/lora/null_mean",
+    "value": 0.7289718371549229
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/5/chains/lora/inc",
+    "value": 0.734131549778974
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/freeze/null_mean",
+    "value": 0.7178143159138779
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/freeze/inc",
+    "value": 0.7305126363516768
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/full/null_mean",
+    "value": 0.7133580423849617
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/full/inc",
+    "value": 0.7281636942174425
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/lora/null_mean",
+    "value": 0.7289718371549229
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/lora/inc",
+    "value": 0.734131549778974
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/truth/verdict",
+    "value": "helps"
+   },
+   {
+    "artifact": "pilot_v2/exp.json",
+    "line": null,
+    "pointer": "/steps/1/clean",
+    "value": true
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/truth/verdict",
+    "value": "helps"
+   },
+   {
+    "artifact": "pilot_v2/exp.json",
+    "line": null,
+    "pointer": "/steps/3/clean",
+    "value": true
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/truth/verdict",
+    "value": "helps"
+   },
+   {
+    "artifact": "pilot_v2/exp.json",
+    "line": null,
+    "pointer": "/steps/6/clean",
+    "value": true
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/freeze/verdict",
+    "value": "REJECT"
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/full/verdict",
+    "value": "REJECT"
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/lora/verdict",
+    "value": "REJECT"
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/freeze/verdict",
+    "value": "REJECT"
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/full/verdict",
+    "value": "REJECT"
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/3/chains/lora/verdict",
+    "value": "REJECT"
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/freeze/verdict",
+    "value": "REJECT"
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/lora/verdict",
+    "value": "REJECT"
+   },
+   {
+    "artifact": "pilot_v2/exp.json",
+    "line": null,
+    "pointer": "/replay_mode",
+    "value": "full"
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/freeze/p_data",
+    "value": 1.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/freeze/guards/flips",
+    "value": false
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/freeze/guards/regression",
+    "value": false
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/freeze/guards/species",
+    "value": false
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/lora/p_data",
+    "value": 1.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/lora/guards/flips",
+    "value": false
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/lora/guards/regression",
+    "value": true
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/1/chains/lora/guards/species",
+    "value": false
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/lora/p_data",
+    "value": 1.0
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/lora/guards/flips",
+    "value": false
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/lora/guards/regression",
+    "value": true
+   },
+   {
+    "artifact": "pilot_v2/report.json",
+    "line": null,
+    "pointer": "/steps/6/chains/lora/guards/species",
+    "value": false
+   }
+  ],
+  "detail": {},
+  "exp": "pilot_v2",
+  "fired": false,
+  "id": "D4",
+  "levers": [],
+  "name": "decision_slot_ready",
+  "severity": "info",
+  "summary": "D1 fired on the full-replay pilot pilot_v2: the recipe itself forgets (X1); no recipe choice is made"
+ },
+ "exp": "pilot_v2",
+ "format": "inc-autopilot/prospective-d4/1",
+ "gate_flips_mode": null,
+ "levers": [],
+ "outcome": "silent",
+ "ready": false,
+ "recipes": null,
+ "replay_mode": null,
+ "report_sha256": "031f54ccc2538ecc4631b869d3e67d3c43fc8b3973113cdf63d35ef1f8874576",
+ "rule": "docs/INC_AUTOPILOT.md (b) D4: best agreement rate, ties by fewer non-ACCEPT on truth-helps steps, then |final dev(chain) - dev(T_final)|, then chain GPU-hours; ready at >= 5/7, and not ready while D1 fires on the pilot (or D15 blocks D1 there), or while protocol v2 is refuted on the gate the pilot was decided with (D16); a pilot decided on protocol v2 is recorded only once its v2_check is final",
+ "thresholds_sha256": "4dea1bbd185bd91acc65c702a920ef0fca2deec78a1ebfac0ee1ec07233c9196",
+ "v2_check": null
+}

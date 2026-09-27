@@ -1,0 +1,2366 @@
+{
+ "boxes": 670818,
+ "boxes_per_class": {
+  "Carpetweed": 89,
+  "CutleafGroundcherry": 0,
+  "Eclipta": 15,
+  "Goosegrass": 72,
+  "MorningGlory": 291,
+  "OtherPlant": 663530,
+  "PalmerAmaranth": 755,
+  "PricklySida": 0,
+  "Purslane": 0,
+  "Ragweed": 3029,
+  "Sicklepod": 150,
+  "SpottedSpurge": 307,
+  "Waterhemp": 2580
+ },
+ "built_utc": "2026-09-27T05:21:40Z",
+ "calibration_only_slugs": [
+  "cottonweed_holdout",
+  "cottonweed_sp8"
+ ],
+ "copies_sha256": "21f7af1fec8870167a9a68b27ef2395bb8b85d80a287dfc337b6c8a0e61f8f63",
+ "cwd12_copies": {
+  "images": 8769,
+  "per_slug": {
+   "cottonweed_holdout": 1180,
+   "cottonweed_sp8": 1869,
+   "project_agml__mh_weed16_weed_detection": 1,
+   "project_agml__three_season_weed_detection": 2576,
+   "rf_agrobot-weed-workspace__weed-detection-sd89f": 2846,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 200,
+   "rf_project-5nvic__weed-detection-0tfsj": 2,
+   "rf_test-8qezo__weed-detection-ycai2": 2,
+   "rf_university-of-peradeniya__weed-detection-ekr8i": 7,
+   "rf_vitif246x__weed-oqamx": 2,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 84
+  }
+ },
+ "dropped": {
+  "cwd12_copy": 8769,
+  "exact_dup": 44845,
+  "near_eval": 8465,
+  "no_boxes": 3506
+ },
+ "flags": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/dataset_flags.json",
+ "images": 102920,
+ "label_files_written": 111689,
+ "lock": {
+  "locked": true,
+  "nevertrain_locked": true,
+  "nevertrain_sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e",
+  "train_core_sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+ },
+ "near_dup_bits_train_core": 6,
+ "never_train_index": {
+  "entries": 9501,
+  "matches_lock": true,
+  "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+  "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+ },
+ "per_slug": {
+  "cottonweed_holdout": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": true,
+   "clipped_boxes": 29,
+   "cwd12_copies": 1180,
+   "dropped": {
+    "cwd12_copy": 1180,
+    "near_eval": 1026
+   },
+   "images_listed": 2206,
+   "join": {
+    "0": [
+     "Eclipta",
+     "Waterhemp"
+    ],
+    "1": [
+     "Goosegrass",
+     "MorningGlory"
+    ],
+    "10": [
+     "",
+     "Goosegrass"
+    ],
+    "11": [
+     "",
+     "CutleafGroundcherry"
+    ],
+    "2": [
+     "Morningglory",
+     "Purslane"
+    ],
+    "3": [
+     "Nutsedge",
+     "SpottedSpurge"
+    ],
+    "4": [
+     "",
+     "Carpetweed"
+    ],
+    "5": [
+     "",
+     "Ragweed"
+    ],
+    "6": [
+     "",
+     "Eclipta"
+    ],
+    "7": [
+     "",
+     "PricklySida"
+    ],
+    "8": [
+     "",
+     "PalmerAmaranth"
+    ],
+    "9": [
+     "",
+     "Sicklepod"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "dev": 274,
+    "test": 752
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "Purslane",
+    "1": "SpottedSpurge",
+    "2": "Carpetweed",
+    "3": "Ragweed"
+   }
+  },
+  "cottonweed_sp8": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": true,
+   "clipped_boxes": 11,
+   "cwd12_copies": 1869,
+   "dropped": {
+    "cwd12_copy": 1869,
+    "near_eval": 1573
+   },
+   "images_listed": 3442,
+   "join": {
+    "0": [
+     "Carpetweeds",
+     "Waterhemp"
+    ],
+    "1": [
+     "Crabgrass",
+     "MorningGlory"
+    ],
+    "2": [
+     "PalmerAmaranth",
+     "Eclipta"
+    ],
+    "3": [
+     "PricklySida",
+     "PricklySida"
+    ],
+    "4": [
+     "Purslane",
+     "PalmerAmaranth"
+    ],
+    "5": [
+     "Ragweed",
+     "Sicklepod"
+    ],
+    "6": [
+     "Sicklepod",
+     "Goosegrass"
+    ],
+    "7": [
+     "SpottedSpurge",
+     "CutleafGroundcherry"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "dev": 343,
+    "test": 1230
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "Waterhemp",
+    "1": "MorningGlory",
+    "2": "Eclipta",
+    "3": "PricklySida",
+    "4": "PalmerAmaranth",
+    "5": "Sicklepod",
+    "6": "Goosegrass",
+    "7": "CutleafGroundcherry"
+   }
+  },
+  "francesco__grass_weeds": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 6800
+   },
+   "calibration_only": false,
+   "clipped_boxes": 425,
+   "cwd12_copies": 0,
+   "dropped": {
+    "no_boxes": 7
+   },
+   "images_listed": 2486,
+   "join": {
+    "0": [
+     "grass-weeds",
+     "OtherPlant"
+    ],
+    "1": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 2479,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "fvossel__csgo_player_detection": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 9839
+   },
+   "calibration_only": false,
+   "clipped_boxes": 173,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 3,
+    "near_eval": 2,
+    "no_boxes": 983
+   },
+   "images_listed": 5000,
+   "join": {
+    "*": [
+     null,
+     "OtherPlant"
+    ]
+   },
+   "kept": 4012,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {
+    "ood23": 2
+   },
+   "old_join": {
+    "*": "OtherPlant"
+   }
+  },
+  "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 1486
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 283,
+    "no_boxes": 20
+   },
+   "images_listed": 737,
+   "join": {
+    "*": [
+     null,
+     "OtherPlant"
+    ]
+   },
+   "kept": 434,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "OtherPlant"
+   }
+  },
+  "project_agml__crop_weed_detection_latvia": {
+   "bad_label_lines": 1,
+   "boxes": {
+    "OtherPlant": 7654
+   },
+   "calibration_only": false,
+   "clipped_boxes": 3,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 70,
+    "near_eval": 4
+   },
+   "images_listed": 1176,
+   "join": {
+    "0": [
+     "weed",
+     "OtherPlant"
+    ],
+    "1": [
+     "crop",
+     "OtherPlant"
+    ]
+   },
+   "kept": 1102,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {
+    "ood23": 4
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "project_agml__greenhouse_crop_weed_detection": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 8334,
+    "PalmerAmaranth": 755,
+    "Ragweed": 963,
+    "Waterhemp": 1140
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {},
+   "images_listed": 200,
+   "join": {
+    "0": [
+     "Blackbean",
+     "OtherPlant"
+    ],
+    "1": [
+     "Canola",
+     "OtherPlant"
+    ],
+    "10": [
+     "Redroot Pigweed",
+     "OtherPlant"
+    ],
+    "11": [
+     "Soybean",
+     "OtherPlant"
+    ],
+    "12": [
+     "Sugar beet",
+     "OtherPlant"
+    ],
+    "13": [
+     "Waterhemp",
+     "Waterhemp"
+    ],
+    "2": [
+     "Corn",
+     "OtherPlant"
+    ],
+    "3": [
+     "Field Pea",
+     "OtherPlant"
+    ],
+    "4": [
+     "Flax",
+     "OtherPlant"
+    ],
+    "5": [
+     "Horseweed",
+     "OtherPlant"
+    ],
+    "6": [
+     "Kochia",
+     "OtherPlant"
+    ],
+    "7": [
+     "Lentil",
+     "OtherPlant"
+    ],
+    "8": [
+     "Palmer Amaranth",
+     "PalmerAmaranth"
+    ],
+    "9": [
+     "Ragweed",
+     "Ragweed"
+    ]
+   },
+   "kept": 200,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "10": "OtherPlant",
+    "11": "OtherPlant",
+    "12": "OtherPlant",
+    "13": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant",
+    "5": "OtherPlant",
+    "6": "OtherPlant",
+    "7": "OtherPlant",
+    "8": "OtherPlant",
+    "9": "Sicklepod"
+   }
+  },
+  "project_agml__imageweeds_aerial_weed_detection": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 1202,
+    "Ragweed": 587,
+    "Waterhemp": 402
+   },
+   "calibration_only": false,
+   "clipped_boxes": 1,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 68
+   },
+   "images_listed": 551,
+   "join": {
+    "0": [
+     "ragweed",
+     "Ragweed"
+    ],
+    "1": [
+     "waterhemp",
+     "Waterhemp"
+    ],
+    "2": [
+     "horseweed",
+     "OtherPlant"
+    ],
+    "3": [
+     "redrootpigweed",
+     "OtherPlant"
+    ],
+    "4": [
+     "kochia",
+     "OtherPlant"
+    ]
+   },
+   "kept": 483,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant"
+   }
+  },
+  "project_agml__maize_weed_detection": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 5178
+   },
+   "calibration_only": false,
+   "clipped_boxes": 565,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 49
+   },
+   "images_listed": 500,
+   "join": {
+    "0": [
+     "maize",
+     "OtherPlant"
+    ],
+    "1": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 451,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "project_agml__mh_weed16_weed_detection": {
+   "bad_label_lines": 3,
+   "boxes": {
+    "OtherPlant": 46837
+   },
+   "calibration_only": false,
+   "clipped_boxes": 753,
+   "cwd12_copies": 1,
+   "dropped": {
+    "cwd12_copy": 1,
+    "exact_dup": 1,
+    "no_boxes": 7
+   },
+   "images_listed": 5000,
+   "join": {
+    "0": [
+     "0",
+     "OtherPlant"
+    ],
+    "1": [
+     "1",
+     "OtherPlant"
+    ],
+    "10": [
+     "10",
+     "OtherPlant"
+    ],
+    "11": [
+     "11",
+     "OtherPlant"
+    ],
+    "12": [
+     "12",
+     "OtherPlant"
+    ],
+    "13": [
+     "13",
+     "OtherPlant"
+    ],
+    "14": [
+     "14",
+     "OtherPlant"
+    ],
+    "2": [
+     "2",
+     "OtherPlant"
+    ],
+    "3": [
+     "3",
+     "OtherPlant"
+    ],
+    "4": [
+     "4",
+     "OtherPlant"
+    ],
+    "5": [
+     "5",
+     "OtherPlant"
+    ],
+    "6": [
+     "6",
+     "OtherPlant"
+    ],
+    "7": [
+     "7",
+     "OtherPlant"
+    ],
+    "8": [
+     "8",
+     "OtherPlant"
+    ],
+    "9": [
+     "9",
+     "OtherPlant"
+    ]
+   },
+   "kept": 4991,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "10": "OtherPlant",
+    "11": "OtherPlant",
+    "12": "OtherPlant",
+    "13": "OtherPlant",
+    "14": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant",
+    "5": "OtherPlant",
+    "6": "OtherPlant",
+    "7": "OtherPlant",
+    "8": "OtherPlant",
+    "9": "OtherPlant"
+   }
+  },
+  "project_agml__three_season_weed_detection": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 108,
+   "cwd12_copies": 2576,
+   "dropped": {
+    "cwd12_copy": 2576,
+    "near_eval": 2424
+   },
+   "images_listed": 5000,
+   "join": {
+    "0": [
+     "Carpetweed",
+     "Carpetweed"
+    ],
+    "1": [
+     "Eclipta",
+     "Eclipta"
+    ],
+    "2": [
+     "Goosegrass",
+     "Goosegrass"
+    ],
+    "3": [
+     "Lambsquarters",
+     "OtherPlant"
+    ],
+    "4": [
+     "MorningGlory",
+     "MorningGlory"
+    ],
+    "5": [
+     "PalmerAmaranth",
+     "PalmerAmaranth"
+    ],
+    "6": [
+     "Purslane",
+     "Purslane"
+    ],
+    "7": [
+     "Ragweed",
+     "Ragweed"
+    ],
+    "8": [
+     "SpottedSpurge",
+     "SpottedSpurge"
+    ],
+    "9": [
+     "Waterhemp",
+     "Waterhemp"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {
+    "dev": 511,
+    "ood22": 266,
+    "test": 1647
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "deleted",
+    "1": "Purslane",
+    "2": "SpottedSpurge",
+    "3": "deleted",
+    "4": "deleted",
+    "5": "Eclipta",
+    "6": "PalmerAmaranth",
+    "7": "Sicklepod",
+    "8": "CutleafGroundcherry",
+    "9": "deleted"
+   }
+  },
+  "project_agml__weed_crop_detection": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 15912,
+    "Ragweed": 1086,
+    "Waterhemp": 695
+   },
+   "calibration_only": false,
+   "clipped_boxes": 280,
+   "cwd12_copies": 0,
+   "dropped": {},
+   "images_listed": 1120,
+   "join": {
+    "0": [
+     "Blackbean",
+     "OtherPlant"
+    ],
+    "1": [
+     "Canola",
+     "OtherPlant"
+    ],
+    "10": [
+     "Soybean",
+     "OtherPlant"
+    ],
+    "11": [
+     "Sugar beet",
+     "OtherPlant"
+    ],
+    "12": [
+     "Waterhemp",
+     "Waterhemp"
+    ],
+    "2": [
+     "Corn",
+     "OtherPlant"
+    ],
+    "3": [
+     "Field Pea",
+     "OtherPlant"
+    ],
+    "4": [
+     "Flax",
+     "OtherPlant"
+    ],
+    "5": [
+     "Horseweed",
+     "OtherPlant"
+    ],
+    "6": [
+     "Kochia",
+     "OtherPlant"
+    ],
+    "7": [
+     "Lentil",
+     "OtherPlant"
+    ],
+    "8": [
+     "Ragweed",
+     "Ragweed"
+    ],
+    "9": [
+     "Redroot Pigweed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 1120,
+   "layout": [
+    "."
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "10": "OtherPlant",
+    "11": "OtherPlant",
+    "12": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant",
+    "5": "OtherPlant",
+    "6": "OtherPlant",
+    "7": "OtherPlant",
+    "8": "Sicklepod",
+    "9": "OtherPlant"
+   }
+  },
+  "rf_1111-gzfxi__weed-chilling": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 7147
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 27,
+    "no_boxes": 3
+   },
+   "images_listed": 2063,
+   "join": {
+    "0": [
+     "chilli",
+     "OtherPlant"
+    ],
+    "1": [
+     "others",
+     "OtherPlant"
+    ]
+   },
+   "kept": 2033,
+   "layout": [
+    "train",
+    "valid"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_agrobot-weed-workspace__weed-detection-sd89f": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 2846,
+   "dropped": {
+    "cwd12_copy": 2846,
+    "near_eval": 2458,
+    "no_boxes": 344
+   },
+   "images_listed": 5648,
+   "join": {
+    "*": [
+     null,
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "dev": 598,
+    "test": 1860
+   },
+   "old_join": {
+    "*": "OtherPlant"
+   }
+  },
+  "rf_bishwarup-halder__crop-health-advisor": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 29250
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 55,
+    "near_eval": 2
+   },
+   "images_listed": 15174,
+   "join": {
+    "*": [
+     null,
+     "OtherPlant"
+    ]
+   },
+   "kept": 15117,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "ood23": 2
+   },
+   "old_join": {
+    "*": "OtherPlant"
+   }
+  },
+  "rf_chaitali-5f9xc__weed-detection-n0dy9": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1655,
+    "no_boxes": 6
+   },
+   "images_listed": 1661,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 3229
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1921,
+    "no_boxes": 32
+   },
+   "images_listed": 3240,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 1287,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 6316
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 308,
+    "no_boxes": 7
+   },
+   "images_listed": 2866,
+   "join": {
+    "0": [
+     "cotton",
+     "OtherPlant"
+    ],
+    "1": [
+     "grass weeds",
+     "OtherPlant"
+    ]
+   },
+   "kept": 2551,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_detection-lztth__weed-detection-8bdyy": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1655,
+    "no_boxes": 6
+   },
+   "images_listed": 1661,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_fyp-oof0h__smart-agriculture-miw1m": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 860
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 258
+   },
+   "images_listed": 922,
+   "join": {
+    "0": [
+     "cercospora",
+     "OtherPlant"
+    ],
+    "1": [
+     "healthy",
+     "OtherPlant"
+    ],
+    "2": [
+     "leaf curl",
+     "OtherPlant"
+    ],
+    "3": [
+     "mosaic",
+     "OtherPlant"
+    ],
+    "4": [
+     "xanthomonas",
+     "OtherPlant"
+    ]
+   },
+   "kept": 664,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant"
+   }
+  },
+  "rf_indian-institute-of-technology-roorkee-rlcww__weed-xeamn": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1655,
+    "no_boxes": 6
+   },
+   "images_listed": 1661,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_itmo-mp0nn__grass-detection-4": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 5220
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "near_eval": 1
+   },
+   "images_listed": 787,
+   "join": {
+    "0": [
+     "Achillea_millefolium",
+     "OtherPlant"
+    ],
+    "1": [
+     "Dry_grass",
+     "OtherPlant"
+    ],
+    "10": [
+     "Taraxacum_officinale",
+     "OtherPlant"
+    ],
+    "11": [
+     "Trifolium_pratense",
+     "OtherPlant"
+    ],
+    "2": [
+     "Glechoma_hederacea",
+     "OtherPlant"
+    ],
+    "3": [
+     "Musor",
+     "OtherPlant"
+    ],
+    "4": [
+     "Plantago_major",
+     "OtherPlant"
+    ],
+    "5": [
+     "Poa_pratensis",
+     "OtherPlant"
+    ],
+    "6": [
+     "Poa_trivialis",
+     "OtherPlant"
+    ],
+    "7": [
+     "Potentilla_anserina",
+     "OtherPlant"
+    ],
+    "8": [
+     "Propleshina",
+     "OtherPlant"
+    ],
+    "9": [
+     "Ranunculus_repens",
+     "OtherPlant"
+    ]
+   },
+   "kept": 786,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "ood23": 1
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "10": "OtherPlant",
+    "11": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant",
+    "5": "OtherPlant",
+    "6": "OtherPlant",
+    "7": "OtherPlant",
+    "8": "OtherPlant",
+    "9": "OtherPlant"
+   }
+  },
+  "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "MorningGlory": 1,
+    "OtherPlant": 737,
+    "Sicklepod": 150,
+    "SpottedSpurge": 307,
+    "Waterhemp": 343
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 200,
+   "dropped": {
+    "cwd12_copy": 200,
+    "exact_dup": 4,
+    "near_eval": 134,
+    "no_boxes": 2
+   },
+   "images_listed": 1800,
+   "join": {
+    "0": [
+     "morningglory",
+     "MorningGlory"
+    ],
+    "1": [
+     "sicklepod",
+     "Sicklepod"
+    ],
+    "2": [
+     "spottedspurge",
+     "SpottedSpurge"
+    ],
+    "3": [
+     "spurredanoda",
+     "OtherPlant"
+    ],
+    "4": [
+     "swinecress",
+     "OtherPlant"
+    ],
+    "5": [
+     "waterhemp",
+     "Waterhemp"
+    ]
+   },
+   "kept": 1460,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "dev": 12,
+    "imageweeds": 2,
+    "test": 120
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant",
+    "5": "OtherPlant"
+   }
+  },
+  "rf_kinjj__weed-avnag": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 1014
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "no_boxes": 1
+   },
+   "images_listed": 87,
+   "join": {
+    "0": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 86,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_lemong__agriculture-xi7us": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 1499
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "no_boxes": 48
+   },
+   "images_listed": 607,
+   "join": {
+    "0": [
+     "ginseng",
+     "OtherPlant"
+    ],
+    "1": [
+     "greenhouse",
+     "OtherPlant"
+    ],
+    "2": [
+     "hut",
+     "OtherPlant"
+    ],
+    "3": [
+     "mushroom",
+     "OtherPlant"
+    ],
+    "4": [
+     "pave",
+     "OtherPlant"
+    ],
+    "5": [
+     "shed",
+     "OtherPlant"
+    ],
+    "6": [
+     "solar",
+     "OtherPlant"
+    ],
+    "7": [
+     "tresh",
+     "OtherPlant"
+    ]
+   },
+   "kept": 559,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant",
+    "5": "OtherPlant",
+    "6": "OtherPlant",
+    "7": "OtherPlant"
+   }
+  },
+  "rf_leopard-ai__weed-detection-8h4kx": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 1922
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 109
+   },
+   "images_listed": 1300,
+   "join": {
+    "0": [
+     "crop",
+     "OtherPlant"
+    ],
+    "1": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 1191,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 3531
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 3,
+    "no_boxes": 1
+   },
+   "images_listed": 957,
+   "join": {
+    "0": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 953,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_mrunal-ramanna-5c9iq__weed-detection-r67fp": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1655,
+    "no_boxes": 6
+   },
+   "images_listed": 1661,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_new-workspace-zbm50__weeds-qftz4": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 2691
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "near_eval": 2,
+    "no_boxes": 1
+   },
+   "images_listed": 1977,
+   "join": {
+    "0": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 1974,
+   "layout": [
+    "train",
+    "valid"
+   ],
+   "near_eval_by_split": {
+    "ood22": 1,
+    "ood23": 1
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_project-5nvic__weed-detection-0tfsj": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 11826
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 2,
+   "dropped": {
+    "cwd12_copy": 2,
+    "exact_dup": 191,
+    "near_eval": 150
+   },
+   "images_listed": 2561,
+   "join": {
+    "0": [
+     "crop",
+     "OtherPlant"
+    ],
+    "1": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 2218,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "ood23": 150
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_project-gfw5f__weed-detection-oxdom": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1655,
+    "no_boxes": 6
+   },
+   "images_listed": 1661,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_python-lec__weed-detection-5bf1l": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1655,
+    "no_boxes": 6
+   },
+   "images_listed": 1661,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_robtica-unileon-gluqm__farming-robotics": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 17288
+   },
+   "calibration_only": false,
+   "clipped_boxes": 314,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 93,
+    "no_boxes": 13
+   },
+   "images_listed": 2053,
+   "join": {
+    "0": [
+     "corn",
+     "OtherPlant"
+    ]
+   },
+   "kept": 1947,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_school-5ult5__weed-6a90d": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 3894
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 7
+   },
+   "images_listed": 2071,
+   "join": {
+    "0": [
+     "0",
+     "OtherPlant"
+    ]
+   },
+   "kept": 2064,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 130421
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 3,
+    "near_eval": 4,
+    "no_boxes": 4
+   },
+   "images_listed": 6552,
+   "join": {
+    "0": [
+     "crop",
+     "OtherPlant"
+    ],
+    "1": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 6541,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "imageweeds": 2,
+    "ood23": 2
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_srec-dthh0__crop-weed-poxtn": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 5145
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 2267
+   },
+   "images_listed": 5172,
+   "join": {
+    "0": [
+     "0",
+     "OtherPlant"
+    ],
+    "1": [
+     "1",
+     "OtherPlant"
+    ],
+    "2": [
+     "2",
+     "OtherPlant"
+    ],
+    "3": [
+     "3",
+     "OtherPlant"
+    ]
+   },
+   "kept": 2905,
+   "layout": [
+    "train"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant"
+   }
+  },
+  "rf_test-8qezo__weed-detection-ycai2": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 584
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 2,
+   "dropped": {
+    "cwd12_copy": 2,
+    "exact_dup": 2599,
+    "near_eval": 142,
+    "no_boxes": 1
+   },
+   "images_listed": 2823,
+   "join": {
+    "0": [
+     "0",
+     "OtherPlant"
+    ],
+    "1": [
+     "1",
+     "OtherPlant"
+    ]
+   },
+   "kept": 79,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "ood23": 142
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_test-gzc3r__crop-mfete": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 20365
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 781
+   },
+   "images_listed": 10040,
+   "join": {
+    "*": [
+     null,
+     "OtherPlant"
+    ]
+   },
+   "kept": 9259,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "OtherPlant"
+   }
+  },
+  "rf_tuf__weed-3434e": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 6691
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 656,
+    "near_eval": 13,
+    "no_boxes": 1843
+   },
+   "images_listed": 8700,
+   "join": {
+    "*": [
+     null,
+     "OtherPlant"
+    ]
+   },
+   "kept": 6188,
+   "layout": [
+    "train",
+    "valid"
+   ],
+   "near_eval_by_split": {
+    "ood22": 3,
+    "ood23": 10
+   },
+   "old_join": {
+    "*": "OtherPlant"
+   }
+  },
+  "rf_uav-qnoms__uav-wqshy": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 6760
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 655,
+    "near_eval": 1,
+    "no_boxes": 7
+   },
+   "images_listed": 7004,
+   "join": {
+    "*": [
+     null,
+     "OtherPlant"
+    ]
+   },
+   "kept": 6341,
+   "layout": [
+    "train"
+   ],
+   "near_eval_by_split": {
+    "ood22": 1
+   },
+   "old_join": {
+    "*": "OtherPlant"
+   }
+  },
+  "rf_unitec-qdvgo__weed-detection-in-grass": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 2479
+   },
+   "images_listed": 2479,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_university-of-peradeniya__weed-detection-ekr8i": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 10273
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 7,
+   "dropped": {
+    "cwd12_copy": 7,
+    "exact_dup": 5009,
+    "near_eval": 337,
+    "no_boxes": 3
+   },
+   "images_listed": 6987,
+   "join": {
+    "0": [
+     "crop",
+     "OtherPlant"
+    ],
+    "1": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 1631,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "ood23": 337
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_vitif246x__weed-oqamx": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 2,
+   "dropped": {
+    "cwd12_copy": 2,
+    "exact_dup": 2587,
+    "near_eval": 132
+   },
+   "images_listed": 2721,
+   "join": {
+    "0": [
+     "crop",
+     "OtherPlant"
+    ],
+    "1": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "ood23": 132
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_vizerion__weed-detection-5ell6": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 7234
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1948,
+    "no_boxes": 45
+   },
+   "images_listed": 4888,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 2895,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 3688
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 2473,
+    "no_boxes": 17
+   },
+   "images_listed": 3941,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ],
+    "1": [
+     "weeds",
+     "OtherPlant"
+    ]
+   },
+   "kept": 1451,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant"
+   }
+  },
+  "rf_weed-detection-pfrni__weed-detection-twqao": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1655,
+    "no_boxes": 6
+   },
+   "images_listed": 1661,
+   "join": {
+    "0": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 9006,
+    "Ragweed": 393
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 41,
+    "no_boxes": 15
+   },
+   "images_listed": 4649,
+   "join": {
+    "0": [
+     "Alternanthera pungens",
+     "OtherPlant"
+    ],
+    "1": [
+     "Arachius",
+     "OtherPlant"
+    ],
+    "10": [
+     "broadleaf plantain",
+     "OtherPlant"
+    ],
+    "11": [
+     "parthenium hysterophorous",
+     "OtherPlant"
+    ],
+    "12": [
+     "phhyllanthus",
+     "OtherPlant"
+    ],
+    "13": [
+     "ragweed",
+     "Ragweed"
+    ],
+    "2": [
+     "Chenopodium",
+     "OtherPlant"
+    ],
+    "3": [
+     "Crab Grass",
+     "OtherPlant"
+    ],
+    "4": [
+     "Crop",
+     "OtherPlant"
+    ],
+    "5": [
+     "Dry leaf",
+     "OtherPlant"
+    ],
+    "6": [
+     "Euphorbia Prostata",
+     "OtherPlant"
+    ],
+    "7": [
+     "Grass",
+     "OtherPlant"
+    ],
+    "8": [
+     "Leptadenia reticulata",
+     "OtherPlant"
+    ],
+    "9": [
+     "Spermacoce hispida",
+     "OtherPlant"
+    ]
+   },
+   "kept": 4593,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "10": "OtherPlant",
+    "11": "OtherPlant",
+    "12": "OtherPlant",
+    "13": "OtherPlant",
+    "2": "OtherPlant",
+    "3": "OtherPlant",
+    "4": "OtherPlant",
+    "5": "OtherPlant",
+    "6": "OtherPlant",
+    "7": "OtherPlant",
+    "8": "OtherPlant",
+    "9": "OtherPlant"
+   }
+  },
+  "rf_weed-tnf9e__weed-bqdok": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 257840
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 2111
+   },
+   "images_listed": 10000,
+   "join": {
+    "0": [
+     "BroWeed",
+     "OtherPlant"
+    ],
+    "1": [
+     "Maize",
+     "OtherPlant"
+    ],
+    "2": [
+     "NarWeed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 7889,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant",
+    "1": "OtherPlant",
+    "2": "OtherPlant"
+   }
+  },
+  "rf_weeddetection-dab2e__weed-detection-6ibvx": {
+   "bad_label_lines": 0,
+   "boxes": {},
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1899,
+    "no_boxes": 7
+   },
+   "images_listed": 1906,
+   "join": {
+    "0": [
+     "0 ridderzuring",
+     "OtherPlant"
+    ]
+   },
+   "kept": 0,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_yolo-gyfyq__weed-ieda7": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 5435
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 1942,
+    "near_eval": 1,
+    "no_boxes": 13
+   },
+   "images_listed": 4067,
+   "join": {
+    "0": [
+     "weed",
+     "OtherPlant"
+    ]
+   },
+   "kept": 2111,
+   "layout": [
+    "train",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "ood23": 1
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  },
+  "rf_zig-zag-lnodr__weed-detection-vanpe": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "Carpetweed": 89,
+    "Eclipta": 15,
+    "Goosegrass": 72,
+    "MorningGlory": 290,
+    "OtherPlant": 419
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 84,
+   "dropped": {
+    "cwd12_copy": 84,
+    "near_eval": 59
+   },
+   "images_listed": 1015,
+   "join": {
+    "0": [
+     "Carpet weed",
+     "Carpetweed"
+    ],
+    "1": [
+     "Crabgrass",
+     "OtherPlant"
+    ],
+    "2": [
+     "Eclipta",
+     "Eclipta"
+    ],
+    "3": [
+     "Goosegrass",
+     "Goosegrass"
+    ],
+    "4": [
+     "Morning glory",
+     "MorningGlory"
+    ],
+    "5": [
+     "Nutsedge",
+     "OtherPlant"
+    ]
+   },
+   "kept": 872,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {
+    "dev": 6,
+    "test": 53
+   },
+   "old_join": {
+    "*": "deleted",
+    "0": "deleted",
+    "1": "MorningGlory",
+    "2": "Purslane",
+    "3": "SpottedSpurge",
+    "4": "deleted",
+    "5": "Ragweed"
+   }
+  },
+  "rf_zijian-peng__grass-weed-69hcm": {
+   "bad_label_lines": 0,
+   "boxes": {
+    "OtherPlant": 3
+   },
+   "calibration_only": false,
+   "clipped_boxes": 0,
+   "cwd12_copies": 0,
+   "dropped": {
+    "exact_dup": 2360,
+    "no_boxes": 40
+   },
+   "images_listed": 2403,
+   "join": {
+    "0": [
+     "grass weeds - v2 release",
+     "OtherPlant"
+    ]
+   },
+   "kept": 3,
+   "layout": [
+    "train",
+    "valid",
+    "test"
+   ],
+   "near_eval_by_split": {},
+   "old_join": {
+    "*": "deleted",
+    "0": "OtherPlant"
+   }
+  }
+ },
+ "pool_meta_sha256": "196027ca6e9ef77a55d266614a775e2f36e0ebbe85525ae5d0fc430041c2a3b7",
+ "pool_sha256": "a9c7a3c05e64aa9cc9cbe2bd59dad5e5bdd2a8b53c99033a22ddf00ea13013bc",
+ "registry": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/dataset_registry.json",
+ "seconds": 5472.3,
+ "skipped": {
+  "never_train": [
+   "francesco__weed_crop_aerial",
+   "project_agml__imageweeds_weed_detection"
+  ],
+  "quarantined": [
+   "dronefreak__brackish",
+   "dronefreak__exdark",
+   "dronefreak__gwhd",
+   "dronefreak__seadronessee",
+   "project_agml__cotton_weed_detection",
+   "project_agml__synthetic_cowpea_pod_detection"
+  ],
+  "unknown_layout": [
+   "gh_07931350__weed-yolo",
+   "kg_ravirajsinh45__crop-and-weed-detection-data-with-bounding-boxes"
+  ],
+  "user_flag_garbage": [
+   "gh_minhvuongvu__train-yolov9-beehive-dataset",
+   "gh_tehreemnoor__yolov5-weed-detection-model",
+   "gh_vuyyurusairamreddy__real-time-coconut-tree-disease-detection-and-management-using-yolov8-and-machine-learning-techniques"
+  ]
+ },
+ "skipped_counts": {
+  "never_train": 2,
+  "quarantined": 6,
+  "unknown_layout": 2,
+  "user_flag_garbage": 3
+ },
+ "slugs_total": 65,
+ "slugs_used": 52,
+ "train_core": {
+  "images": 3049,
+  "unhashable": 0
+ },
+ "unsure_flagged_used": []
+}

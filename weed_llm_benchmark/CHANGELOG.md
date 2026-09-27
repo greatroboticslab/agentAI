@@ -9,7 +9,10 @@
 
 **Primary metric:** cwd12 holdout mAP50-95 ≥ **0.90**
 
-> ✅ **STATUS (2026-07):** This goal was **reached** — v3.0.38-A hit cwd12 mAP50-95 = **0.9033**.
+> **STATUS (2026-09-27): not met on a sealed multi-seed mean.** The 0.9033 of v3.0.38-A was one run, measured before
+> the holdout leak was sealed. Quotable now: YOLO11n on train_core with no checkpoint selected on any split, test
+> 0.8541 ± 0.0074 (3 seeds, INC B0); RF-DETR 0.8974 ± 0.0040 (4 unseeded runs, 3 configurations, checkpoint picked on
+> part of the evaluation set). The best published cwd12 mAP50-95 (YOLOWeeds) is 0.8972.
 > Active development has since shifted to the multi-domain dataset **platform** (see the top-level README).
 > The primary metric and the framework requirements below remain the standing invariants for any training work.
 > ⚠️ Post-`v3.1.0` note: the holdout-leak fix (content-level dHash guard) means a fresh training run is needed to
@@ -10423,3 +10426,72 @@ arms (Apple MPS) matched within 0.003. Limits: one domain (all cwd12), crops cut
 from hand-drawn boxes rather than detector boxes, and an oracle that answers with
 the truth; Phase B tests on harvested data, where the name joins above can also
 be audited by what the crops look like.
+
+## 2026-09-27 — v3.61.0: incremental-training protocol (INC), high-precision base, and the INC autopilot
+
+### What changed
+
+**INC package** (`weed_optimizer_framework/tools/inc/`): the protocol in docs/INCREMENTAL_PROTOCOL.md.
+
+- *Splits and scoring.*
+  - `splits` builds dev (8 whole cwd12 sessions), train_core, the sealed test, and out-of-season exams from the Zenodo 3SeasonWeedDet10 2022/2023 subsets (cwd12 photographs removed) plus ImageWeeds. It also writes the never-train dHash index and LOCK.json.
+  - `scorer` is the single locked scorer: Ultralytics 8.4.37 pinned, a class-agnostic score and a per-image correctness bit. A score taken in test mode cannot decide a step.
+- *Decisions.*
+  - `gate` makes the per-increment decision: P(cand > null) over paired seeds, plus regression, species and flips guards and attribution.
+  - Protocol v2 adds `flips_mode: net`, pinned per experiment.
+- *Training.*
+  - `lora` is a real LoRA trainer. Adapters are injected after Ultralytics builds the model and merged on save.
+  - `train` is the executor.
+- *Orchestration.*
+  - `driver` is the idempotent experiment state machine: truth arm, soups, ledger, code pins, a lease on top of flock, and self-advance from inside jobs.
+  - `pilot` and `realloop` build experiments; `report` writes the result tables.
+- *Step 1 data tools.*
+  - `verify`: the BioCLIP-2 box verifier, with known-truth calibration.
+  - `select`: DINOv3-style base selection, with evidence-sourced increments.
+  - `relevance`: zero-shot relevance, which fails closed on a degenerate calibration.
+  - `audit`: the post-hoc label audit.
+
+**INC autopilot** (`tools/inc_autopilot/`, `inc_dashboard*.py`, a hook in `round_scheduler.py`, policy rows in `brain/policy_actions.json`, an `executed` record in `brain/approvals.py`): the platform runs INC campaigns on its own.
+- *Reading and diagnosing.* It reads the evidence (dev only) and fires diagnoses D1–D16 with cited values.
+- *Choosing and running.* It picks from a lever menu (L1–L9 plus R4 cards X1–X8) and runs the choice through a governed executor: policy, approvals, budget envelope, and envelope autonomy that is granted only after the replay tests pass.
+- *Research brain.* The brain runs on the cluster (ollama `qwen3.8:27b`) and reads a 131-paper curated corpus in `docs/literature/`.
+- *Dashboard.* The `/inc` page and `/api/inc/*`.
+
+**Platform fixes.**
+- `mega_trainer`:
+  - the optimizer is passed explicitly;
+  - the merge dir is cleared;
+  - the holdout guard requires exactly 1,977 images;
+  - unhashable images are skipped and counted;
+  - val comes from INC dev when it exists.
+- `dataset_discovery` caps harvests at `max_new`.
+- `dinov2_curator`'s reference pool excludes holdout, dev and exam images, and its per-slug sampling is order-independent.
+
+### Why
+
+The incremental-training design was never tested as specified. Earlier attempts each had at least one of these defects:
+- the holdout doubled as the validation set;
+- names were mis-joined;
+- the training pool was frozen;
+- promotion was unconditional;
+- the LoRA path never trained an adapter.
+
+Next steps were also decided by hand; the autopilot makes the platform decide them.
+
+### How verified
+
+- **Tests:** 24 INC and autopilot test files pass locally, and on the cluster where their dependencies exist.
+- **Adversarial review:** every component went through it, with mutation checks.
+- **Splits:** LOCK.json was verified by a full re-hash on the cluster.
+- **Replay:** the autopilot's replay tests pass on the lab (R1, R3, R4a, R5, R6, R7, negative controls, test-blindness).
+- **Results:** see RESEARCH_LOG 2026-09-27. In brief:
+  - B0 test 0.8541 ± 0.0074;
+  - base B 0.8502 ± 0.0059;
+  - pilot v1/v2/v3 chains against the truth arm;
+  - pilot_v3 full chain test 0.8475 against union retraining 0.8472 ± 0.0014.
+
+- Steps 2-3 (realloop_v1, launched and run by the autopilot): six evidence-sourced increments of 287 images; the
+  gate rejected all six; union with every verified increment lowers test to 0.8410 +- 0.0041 against base B's
+  0.8502 +- 0.0059, while the chain's model (base B seed 0) scores 0.8552. Truth-arm agreement 2/6.
+- Live-operation fixes: the cluster copy of model_router.py was stale (no planner role); the research brain's digest
+  outgrew its 49,152-token context and is now trimmed deterministically with a larger context.

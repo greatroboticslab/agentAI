@@ -1,0 +1,210 @@
+{
+ "builder": "inc.pilot build-baseline",
+ "built_utc": "2026-09-27T07:29:35Z",
+ "cold_recipe": {
+  "batch": 32,
+  "cache": "ram",
+  "close_mosaic": 10,
+  "cos_lr": true,
+  "deterministic": true,
+  "epochs": 100,
+  "freeze": null,
+  "imgsz": 640,
+  "lora": null,
+  "lr0": 0.01,
+  "lrf": 0.01,
+  "momentum": 0.937,
+  "optimizer": "SGD",
+  "trainer": "full",
+  "warmup_bias_lr": 0.1,
+  "warmup_epochs": 3,
+  "weight_decay": 0.0005,
+  "workers": 5
+ },
+ "exp": "base_b_v1",
+ "manifest": {
+  "boxes": {
+   "Carpetweed": 590,
+   "CutleafGroundcherry": 50,
+   "Eclipta": 519,
+   "Goosegrass": 149,
+   "MorningGlory": 920,
+   "OtherPlant": 642,
+   "PalmerAmaranth": 206,
+   "PricklySida": 263,
+   "Purslane": 440,
+   "Ragweed": 401,
+   "Sicklepod": 162,
+   "SpottedSpurge": 756,
+   "Waterhemp": 1427
+  },
+  "boxes_total": 6525,
+  "by_source": {
+   "cottonweeddet12/train": {
+    "boxes": {
+     "Carpetweed": 530,
+     "CutleafGroundcherry": 50,
+     "Eclipta": 512,
+     "Goosegrass": 107,
+     "MorningGlory": 792,
+     "OtherPlant": 0,
+     "PalmerAmaranth": 206,
+     "PricklySida": 263,
+     "Purslane": 440,
+     "Ragweed": 399,
+     "Sicklepod": 121,
+     "SpottedSpurge": 550,
+     "Waterhemp": 1059
+    },
+    "images": 3049
+   },
+   "project_agml__imageweeds_aerial_weed_detection": {
+    "boxes": {
+     "Carpetweed": 0,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 0,
+     "MorningGlory": 0,
+     "OtherPlant": 32,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 0,
+     "SpottedSpurge": 0,
+     "Waterhemp": 33
+    },
+    "images": 17
+   },
+   "project_agml__weed_crop_detection": {
+    "boxes": {
+     "Carpetweed": 0,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 0,
+     "MorningGlory": 0,
+     "OtherPlant": 491,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 2,
+     "Sicklepod": 0,
+     "SpottedSpurge": 0,
+     "Waterhemp": 88
+    },
+    "images": 49
+   },
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+    "boxes": {
+     "Carpetweed": 0,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 0,
+     "MorningGlory": 0,
+     "OtherPlant": 85,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 41,
+     "SpottedSpurge": 206,
+     "Waterhemp": 247
+    },
+    "images": 544
+   },
+   "rf_zig-zag-lnodr__weed-detection-vanpe": {
+    "boxes": {
+     "Carpetweed": 60,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 7,
+     "Goosegrass": 42,
+     "MorningGlory": 128,
+     "OtherPlant": 34,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 0,
+     "SpottedSpurge": 0,
+     "Waterhemp": 0
+    },
+    "images": 268
+   }
+  },
+  "copy": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/base_b_v1/manifests/base_B.jsonl",
+  "dhash0_collisions": {
+   "across_source_session": 0,
+   "extra_rows": 0,
+   "first": [],
+   "groups": 0
+  },
+  "duplicate_images": {
+   "across_source_session": 0,
+   "extra_rows": 0,
+   "first": [],
+   "groups": 0
+  },
+  "duplicate_label_rows": 0,
+  "guard": {
+   "bits": 6,
+   "checked": 3927,
+   "hits": 0,
+   "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+   "index_images": 9501,
+   "unhashable": 0
+  },
+  "images": 3927,
+  "manifest_sha256": "4de04a7c6ce6c116625f10add0f86b550a9b091abb9d46d460472712346c1b71",
+  "name": "base_B",
+  "sessions": 27,
+  "source": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_B.jsonl",
+  "sources": {
+   "cottonweeddet12/train": 3049,
+   "project_agml__imageweeds_aerial_weed_detection": 17,
+   "project_agml__weed_crop_detection": 49,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 544,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 268
+  }
+ },
+ "never_train": {
+  "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+  "locked": true,
+  "matches_lock": true,
+  "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+ },
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "select_build": {
+  "never_train": {
+   "current_sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e",
+   "matches_current": true,
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+   "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+  },
+  "summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/select_summary.json",
+   "sha256": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101"
+  },
+  "train_core": {
+   "lock_sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640",
+   "matches_lock": true,
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/train_core.jsonl",
+   "sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  }
+ },
+ "testing": false,
+ "warmup": {
+  "base": {
+   "covers_whole_run": false,
+   "epochs": 100,
+   "images": 3927,
+   "iterations_per_epoch": 123,
+   "warmup_epochs_effective": 3.0,
+   "warmup_epochs_nominal": 3,
+   "warmup_iterations": 369
+  }
+ }
+}

@@ -21,6 +21,7 @@ from .cwd12_species import (species_of, legacy_to_species, is_legacy_label_list,
                             TRAINER_SLOT_SPECIES, CWD12_ID_TO_SLOT)
 from .near_dup import (NEAR_DUP_BITS, HOLDOUT_NEAR_DUP_BITS,
                        NearHashIndex as _NearHashIndex)
+from .inc import common as _inc
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +248,216 @@ def _load_holdout_dhashes():
     return hashes
 
 
+# INC Step 0.4 (docs/INCREMENTAL_PROTOCOL.md): the sealed holdout is exactly
+# 1,977 photographs (valid 1,129 + test 848). A guard built from anything else
+# did not find the whole holdout (wrong cwd, cluster path absent, a partial
+# copy), and each photograph it lacks is covered by neither the stem filter nor
+# the dHash guard, so a re-upload of it merges into train. No floor below the
+# full count is safe: a floor of 1,900 let a copy missing 77 photographs pass.
+HOLDOUT_IMAGES = 1977
+
+
+def _load_holdout_guard():
+    """(stems, {dhash: HOLDOUT_HASH_SENTINEL}) of the sealed holdout, or raise
+    unless it is complete: exactly HOLDOUT_IMAGES distinct stems, every image
+    hashable. Distinct stems, not files, are counted because the relative and
+    the absolute candidate roots may be two copies of the same holdout; two
+    frames that share a dHash are both covered by it, so hashes are not."""
+    dirs = _holdout_image_dirs()
+    imgs = list(_iter_holdout_images())
+    stems = {p.stem for p in imgs}
+    hashes, unhashable = {}, []
+    for p in imgs:
+        h = _dhash(p)
+        if h is None:
+            unhashable.append(str(p))
+        else:
+            hashes[h] = HOLDOUT_HASH_SENTINEL
+    if len(stems) != HOLDOUT_IMAGES or unhashable:
+        raise RuntimeError(
+            "holdout guard incomplete: %d distinct holdout image(s) in %s, expected "
+            "exactly %d; %d cannot be hashed %s. Nothing is guarded without the "
+            "whole holdout -- run from the repo root or make "
+            "downloads/cottonweeddet12/{test,valid}/images complete and reachable."
+            % (len(stems), [str(d) for d in dirs], HOLDOUT_IMAGES,
+               len(unhashable), unhashable[:3]))
+    return stems, hashes
+
+
+def _load_inc_dev_rows():
+    """The INC dev manifest's rows, checked before a merge clears or writes
+    anything, or raise. Dev becomes the val set, so a row that cannot be staged
+    exactly would either fail after the previous merge was cleared (an empty
+    manifest, a class with no trainer slot) or be dropped by Ultralytics as a
+    corrupt image while the run still reports val_source=inc_dev (a missing
+    file). Checked: the manifest against LOCK.json when it exists; every image
+    and label present with the sha256 the manifest records; every class a cwd12
+    species (OtherPlant has no trainer slot, and dev is cwd12-only)."""
+    path = _inc.manifest_path("dev")
+    rows = _inc.read_manifest(path)
+    if not rows:
+        raise RuntimeError("INC dev manifest %s is empty; it cannot be the val set" % path)
+    if os.path.isfile(_inc.LOCK_PATH):
+        _inc.verify_manifest_against_lock("dev")
+    problems = []
+    for r in rows:
+        img, lbl = r.get("image") or "", r.get("label") or ""
+        if not os.path.isfile(img):
+            problems.append("image missing: %s" % img)
+            continue
+        if not os.path.isfile(lbl):
+            problems.append("label missing: %s" % lbl)
+            continue
+        if _inc.sha256_file(img) != r.get("sha256"):
+            problems.append("image differs from its manifest sha256: %s" % img)
+        if _inc.sha256_file(lbl) != r.get("label_sha256"):
+            problems.append("label differs from its manifest sha256: %s" % lbl)
+        with open(lbl) as fh:
+            for line in fh:
+                parts = line.split()
+                if len(parts) < 5:
+                    continue
+                try:
+                    cid = int(float(parts[0]))
+                except ValueError:
+                    cid = parts[0]
+                if cid not in CWD12_ID_TO_SLOT:
+                    problems.append("class %s is not a cwd12 species: %s" % (cid, lbl))
+                    break
+    if problems:
+        raise RuntimeError("INC dev manifest %s cannot be the val set: %d problem(s), "
+                           "first: %s" % (path, len(problems), problems[:5]))
+    return rows
+
+
+def _inc_train_guard(dev_rows):
+    """(guard, source) that keeps INC evaluation images out of a merged train
+    set: the never-train index (dev, test and exams) once INC splits are built;
+    else, when only the dev manifest exists, its own images; else (None, None).
+    A dev image that cannot be hashed cannot be kept out, so it is an error."""
+    if os.path.isfile(_inc.NEVER_TRAIN_INDEX):
+        return _inc.NeverTrainGuard.load(), "nevertrain_index"
+    if not dev_rows:
+        return None, None
+    entries = []
+    for r in dev_rows:
+        h = _dhash(r["image"])
+        if h is None:
+            raise RuntimeError("INC dev image cannot be hashed, so it cannot be "
+                               "kept out of training: %s" % r["image"])
+        entries.append((h, "dev", r["image"]))
+    return _inc.NeverTrainGuard(entries), "dev_manifest"
+
+
+INC_DEV_VAL_DIR = "inc_dev_val"
+
+
+def _stage_inc_dev_val(out_dir, rows):
+    """Materialise the INC dev split (rows from _load_inc_dev_rows) as the
+    merge's val set. Its labels are in INC ids (= cwd12 ids 0-11); they are
+    rewritten to trainer slots so val shares the merged nc=100 slot space.
+    Returns (images dir, n images)."""
+    dst = os.path.join(out_dir, INC_DEV_VAL_DIR)
+    # materialise's data.yaml names the 13 INC classes; after the rewrite below
+    # it would describe labels that are no longer in that space.
+    os.remove(_inc.materialise(rows, dst))
+    for lbl in Path(dst, "labels").glob("*.txt"):
+        lines_out = []
+        for line in lbl.read_text().splitlines():
+            parts = line.split()
+            if len(parts) < 5:
+                continue
+            slot = CWD12_ID_TO_SLOT[int(float(parts[0]))]
+            lines_out.append(" ".join([str(slot)] + parts[1:]))
+        lbl.write_text("\n".join(lines_out) + ("\n" if lines_out else ""))
+    img_dir = os.path.join(dst, "images")
+    names = os.listdir(img_dir)
+    live = [n for n in names if os.path.isfile(os.path.join(img_dir, n))]
+    if len(names) != len(rows) or len(live) != len(rows):
+        raise RuntimeError("INC dev val staged %d image(s), %d resolvable, for %d "
+                           "manifest rows in %s" % (len(names), len(live), len(rows), img_dir))
+    return img_dir, len(rows)
+
+
+# What a merge writes into out_dir. Only these are cleared before merging:
+# hot_reload_trainer trains inside its merge dir, so run dirs (train2/, ...)
+# holding the checkpoint the next phase continues from sit beside them.
+_MERGE_OUTPUTS = ("train/images", "train/labels", "train/labels.cache",
+                  "valid/images", "valid/labels", "valid/labels.cache",
+                  "cwd12_holdout", INC_DEV_VAL_DIR, "data.yaml")
+
+
+def _clear_merge_output(out_dir):
+    """Remove what an earlier merge into out_dir left there. Refuses any out_dir
+    that is not strictly inside Config.FRAMEWORK_DIR. Returns entries removed."""
+    root = os.path.realpath(Config.FRAMEWORK_DIR)
+    real = os.path.realpath(out_dir)
+    if real == root or os.path.commonpath([root, real]) != root:
+        raise RuntimeError("refusing to clear merge dir %s: not inside %s"
+                           % (out_dir, root))
+    removed = 0
+    for rel in _MERGE_OUTPUTS:
+        p = os.path.join(real, rel)
+        if os.path.islink(p) or os.path.isfile(p):
+            os.remove(p)
+            removed += 1
+        elif os.path.isdir(p):
+            shutil.rmtree(p)
+            removed += 1
+    return removed
+
+
+# v3.0.99.28 (D): DINOv2 quality gate for the "clean subset" experiment.
+# When strategy sets min_dino_score, slugs whose trusted-pool similarity score
+# (results/framework/dinov2_curator/slug_scores.json, written by dinov2_curator)
+# is below the threshold are dropped from training. This lets us build a
+# quality-core training set (e.g. min_dino_score=0.45 keeps only cotton-like
+# high-similarity weed data) to test the "quality > quantity" hypothesis
+# against the 175K-noisy baseline. Off-topic garbage (coconut/beehive ~0.12)
+# is excluded automatically. None = no gate (default, back-compat).
+DINO_SCORES_PATH = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "..", "..", "results", "framework", "dinov2_curator",
+    "slug_scores.json"))
+
+
+def _load_dino_scores(min_dino_score):
+    """{slug: score} for the gate, {} when it is off or the file is unreadable.
+
+    INC 0.3: the trusted slugs the reference pool is sampled from hold the
+    sealed holdout, so a pool built before the reference guard scores a slug
+    higher for resembling the holdout, and this gate then selects training data
+    toward it. Scores that do not record a complete guard (dinov2_curator stamps
+    `ref_guard` on every record) are refused rather than used or ignored: a
+    "curated" run on them is contaminated, one without them is not curated."""
+    if min_dino_score is None:
+        return {}
+    import json as _json2
+    try:
+        with open(DINO_SCORES_PATH) as f:
+            raw = _json2.load(f) or {}
+    except Exception as e:
+        logger.warning(f"[Merge] min_dino_score set but could not load "
+                       f"{DINO_SCORES_PATH}: {e} — DINO gate DISABLED this run")
+        return {}
+    scored = {s: rec for s, rec in raw.items()
+              if isinstance(rec, dict) and rec.get("score") is not None}
+    unguarded = sorted(s for s, rec in scored.items()
+                       if not (rec.get("ref_guard") or {}).get("complete"))
+    if unguarded:
+        raise RuntimeError(
+            "min_dino_score: %d of %d slug scores in %s were not computed against a "
+            "reference pool built under a complete holdout guard (first: %s). That "
+            "pool may hold sealed-holdout photographs. Rebuild the pool and rescore "
+            "(run_s2_dino_scores.sh) before a curated merge."
+            % (len(unguarded), len(scored), DINO_SCORES_PATH, unguarded[:3]))
+    dino_scores = {s: float(rec["score"]) for s, rec in scored.items()}
+    logger.info(f"[Merge] DINO gate active: min_dino_score={min_dino_score}; "
+                f"{len(dino_scores)} slugs scored; "
+                f"{sum(1 for v in dino_scores.values() if v < min_dino_score)} "
+                f"below threshold will be skipped")
+    return dino_scores
+
+
 def _dedup_verdict(hits, ds_name):
     """Whether an image already in the index blocks this one: ("holdout", bits),
     ("duplicate", 0), ("near_cwd12", bits) or None. `hits` is
@@ -419,6 +630,33 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
 
     Returns: (merged_dir, data_yaml, stats, merged_names_list)
     """
+    # INC 0.4: every guard is built before anything is written, so a merge that
+    # cannot be guarded fails without touching the previous one.
+    # v3.0.28: cwd12 holdout stems block alias contamination at the per-image
+    # level (see NEVER_TRAIN_SLUGS above); the dHashes are applied further down.
+    holdout_stems, holdout_hashes = _load_holdout_guard()
+    logger.info(f"[Merge] holdout stem filter active: {len(holdout_stems)} stems "
+                f"blocked from training regardless of source slug")
+
+    # INC 0.4: once the INC dev split exists it is the val set, so it must not
+    # train; the never-train index also keeps the sealed test set and the exams out.
+    use_inc_dev = os.path.isfile(_inc.manifest_path("dev"))
+    dev_rows = _load_inc_dev_rows() if use_inc_dev else None
+    inc_guard, inc_guard_source = _inc_train_guard(dev_rows)
+    if inc_guard is not None:
+        logger.info(f"[Merge] INC never-train guard active ({inc_guard_source}): "
+                    f"{inc_guard.n} evaluation images, copies within "
+                    f"{HOLDOUT_NEAR_DUP_BITS} bits blocked")
+
+    dino_scores = _load_dino_scores(min_dino_score)
+
+    # INC 0.4: out_dir is reused when a run is repeated under the same iteration
+    # name, and the oversample_* links of the previous merge were then scanned as
+    # new training data (docs/REGRESSION_DIAGNOSIS.md §5i).
+    n_cleared = _clear_merge_output(out_dir)
+    if n_cleared:
+        logger.info(f"[Merge] cleared {n_cleared} output(s) of a previous merge in {out_dir}")
+
     disc = DatasetDiscovery()
     registry = disc.registry["datasets"]
 
@@ -434,14 +672,9 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
              "skipped_holdout_near": 0, "skipped_near_cwd12": 0,
              "skipped_user_flag": 0,
              "skipped_low_dino": 0,
+             "skipped_unhashable": 0, "skipped_inc_nevertrain": 0,
              "weed_class_instances": {n: 0 for n in CANONICAL_12_SPECIES}}
     seen_hashes = _NearHashIndex()
-
-    # v3.0.28: load cwd12 holdout stems to block alias contamination at the
-    # per-image level. See NEVER_TRAIN_SLUGS comment above for rationale.
-    holdout_stems = _load_holdout_stems()
-    logger.info(f"[Merge] holdout stem filter active: {len(holdout_stems)} stems "
-                f"blocked from training regardless of source slug")
 
     # v3.1: content-level holdout guard. Pre-seed the dedup set with the dHash of
     # every cwd12 test+valid image so a renamed / re-exported holdout copy (whose
@@ -450,7 +683,7 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     # NEVER_TRAIN slug list are the ONLY guards, and both are filename-based — a
     # Roboflow/Kaggle re-upload of cwd12 test images leaks straight into training
     # and silently inflates the 'never-train' holdout mAP.
-    for _h, _who in _load_holdout_dhashes().items():
+    for _h, _who in holdout_hashes.items():
         seen_hashes.add(_h, (_who, None))
     logger.info(f"[Merge] holdout dHash guard active: {len(seen_hashes)} holdout "
                 f"image hashes pre-seeded; copies within {HOLDOUT_NEAR_DUP_BITS} bits blocked "
@@ -475,35 +708,6 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                         f"{'…' if len(garbage) > 5 else ''}")
         except Exception as e:
             logger.warning(f"[Merge] could not load user flags from {flags_path}: {e}")
-
-    # v3.0.99.28 (D): DINOv2 quality gate for the "clean subset" experiment.
-    # When strategy sets min_dino_score, slugs whose trusted-pool similarity score
-    # (results/framework/dinov2_curator/slug_scores.json, written by dinov2_curator)
-    # is below the threshold are dropped from training. This lets us build a
-    # quality-core training set (e.g. min_dino_score=0.45 keeps only cotton-like
-    # high-similarity weed data) to test the "quality > quantity" hypothesis
-    # against the 175K-noisy baseline. Off-topic garbage (coconut/beehive ~0.12)
-    # is excluded automatically. None = no gate (default, back-compat).
-    dino_scores = {}
-    if min_dino_score is not None:
-        dino_path = os.path.join(os.path.dirname(__file__), "..", "..",
-                                 "results", "framework", "dinov2_curator",
-                                 "slug_scores.json")
-        dino_path = os.path.abspath(dino_path)
-        try:
-            import json as _json2
-            with open(dino_path) as f:
-                raw = _json2.load(f) or {}
-            for s, rec in raw.items():
-                if isinstance(rec, dict) and rec.get("score") is not None:
-                    dino_scores[s] = float(rec["score"])
-            logger.info(f"[Merge] DINO gate active: min_dino_score={min_dino_score}; "
-                        f"{len(dino_scores)} slugs scored; "
-                        f"{sum(1 for v in dino_scores.values() if v < min_dino_score)} "
-                        f"below threshold will be skipped")
-        except Exception as e:
-            logger.warning(f"[Merge] min_dino_score set but could not load "
-                           f"{dino_path}: {e} — DINO gate DISABLED this run")
 
     valid_annotations = {"bbox", "bbox+segmentation", "yolo"}
     if include_autolabel:
@@ -613,35 +817,46 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                 if h is not None:
                     cache[rel_key] = h
                     cache_updated = True
-            if h is not None:
-                verdict = _dedup_verdict(seen_hashes.matches(h), ds_name)
-                if verdict is not None:
-                    kind, bits = verdict
-                    if kind == "holdout":
-                        # v3.1: this harvested image is a content-match for a cwd12
-                        # holdout image (renamed copy that slipped past the stem
-                        # filter). Dropping it is what keeps the eval set out of
-                        # training. Tracked separately so leakage is observable.
-                        # v3.60.0: a re-encoded copy (bits > 0) counts too.
-                        stats["skipped_holdout_hash" if bits == 0
-                              else "skipped_holdout_near"] += 1
-                        if bits:
-                            _near = stats.setdefault("holdout_near_by_dataset", {})
-                            _near[ds_name] = _near.get(ds_name, 0) + 1
-                    elif kind == "duplicate":
-                        # Already saw an identical image from another dataset
-                        stats["skipped_duplicates"] += 1
-                        ds_dup_count += 1
-                    else:
-                        # v3.60.0: a re-encoded copy of a cwd12 train photograph
-                        # that a verified copy already contributed with checked
-                        # labels (rf_agrobot re-uploads all of cwd12 with none).
-                        stats["skipped_near_cwd12"] += 1
-                        ds_dup_count += 1
-                        _nc = stats.setdefault("near_cwd12_by_dataset", {})
-                        _nc[ds_name] = _nc.get(ds_name, 0) + 1
+            if h is None:
+                # INC 0.4: an image the holdout guard cannot compare is an image
+                # it cannot clear; it used to be merged with no check at all.
+                stats["skipped_unhashable"] += 1
+                continue
+            verdict = _dedup_verdict(seen_hashes.matches(h), ds_name)
+            if verdict is not None:
+                kind, bits = verdict
+                if kind == "holdout":
+                    # v3.1: this harvested image is a content-match for a cwd12
+                    # holdout image (renamed copy that slipped past the stem
+                    # filter). Dropping it is what keeps the eval set out of
+                    # training. Tracked separately so leakage is observable.
+                    # v3.60.0: a re-encoded copy (bits > 0) counts too.
+                    stats["skipped_holdout_hash" if bits == 0
+                          else "skipped_holdout_near"] += 1
+                    if bits:
+                        _near = stats.setdefault("holdout_near_by_dataset", {})
+                        _near[ds_name] = _near.get(ds_name, 0) + 1
+                elif kind == "duplicate":
+                    # Already saw an identical image from another dataset
+                    stats["skipped_duplicates"] += 1
+                    ds_dup_count += 1
+                else:
+                    # v3.60.0: a re-encoded copy of a cwd12 train photograph
+                    # that a verified copy already contributed with checked
+                    # labels (rf_agrobot re-uploads all of cwd12 with none).
+                    stats["skipped_near_cwd12"] += 1
+                    ds_dup_count += 1
+                    _nc = stats.setdefault("near_cwd12_by_dataset", {})
+                    _nc[ds_name] = _nc.get(ds_name, 0) + 1
+                continue
+            if inc_guard is not None:
+                hit = inc_guard.index.find(h)
+                if hit is not None:
+                    stats["skipped_inc_nevertrain"] += 1
+                    _by = stats.setdefault("inc_nevertrain_by_split", {})
+                    _by[hit[0][0]] = _by.get(hit[0][0], 0) + 1
                     continue
-                seen_hashes.add(h, (ds_name, rel_key))
+            seen_hashes.add(h, (ds_name, rel_key))
 
             # v3.0.25: STRICT class remap — drop any line whose src_cls is not
             # in ds_class_map. Previously fallback `ds_class_map.get(src_cls, src_cls)`
@@ -751,12 +966,28 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
     # OVERRIDE the val split to point at it. This makes the early-stop signal
     # honest: improvement on cwd12 holdout, not on a 10% slice of the (possibly
     # noisy) merged corpus.
+    # INC 0.4: val selects best.pt, so validating on the sealed holdout makes the
+    # holdout a selection set. The INC dev split, when it exists, replaces it.
     val_path = os.path.join(out_dir, "valid", "images")
-    if val_dataset_root and os.path.isdir(val_dataset_root):
+    stats["val_source"] = "merged_split"
+    if use_inc_dev:
+        val_path, n_dev = _stage_inc_dev_val(out_dir, dev_rows)
+        stats["val_source"] = "inc_dev"
+        logger.info(f"[Merge] val = INC dev split ({n_dev} images, kept out of train) "
+                    f"at {val_path}"
+                    + (f"; val_dataset_root={val_dataset_root} not used" if val_dataset_root else ""))
+    elif val_dataset_root and os.path.isdir(val_dataset_root):
         # Stage cwd12 test+valid into a single staging dir under out_dir/cwd12_holdout
         staged = _stage_cwd12_holdout(val_dataset_root, out_dir)
         val_path = staged
+        stats["val_source"] = "cwd12_holdout"
         logger.info(f"[Merge] val OVERRIDE → cwd12 holdout staged at {staged}")
+        logger.warning(f"[Merge] !!! No INC dev manifest at {_inc.manifest_path('dev')}: "
+                       f"best.pt will be SELECTED ON THE SEALED HOLDOUT ({val_dataset_root}); "
+                       f"its holdout score is then not an unbiased test. Build the INC "
+                       f"splits (inc/splits.py) to validate on dev instead.")
+
+    stats["val_path"] = val_path
 
     # Write data.yaml
     data_yaml = os.path.join(out_dir, "data.yaml")
@@ -774,6 +1005,10 @@ def _merge_datasets(out_dir, val_fraction=0.1, include_autolabel=False,
                 f"NEVER_TRAIN datasets skipped: {stats['skipped_never_train']}. "
                 f"v3.0.28 holdout-stem filter dropped: {stats['skipped_holdout_stem']}. "
                 f"v3.0.30 user-flag GARBAGE skipped: {stats['skipped_user_flag']}. "
+                f"Unhashable skipped: {stats['skipped_unhashable']}. "
+                f"INC never-train skipped: {stats['skipped_inc_nevertrain']} "
+                f"{stats.get('inc_nevertrain_by_split', {})}. "
+                f"val: {stats['val_source']}. "
                 f"Per-class instances: {stats['weed_class_instances']}")
     # v3.0.19 / v3.1: persist ONLY the dHash caches we computed, via a locked
     # re-read-modify-write. The old `disc._save_registry()` here flushed the
@@ -961,6 +1196,8 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
     Strategy keys:
       base_model: override, defaults to Config.DETECTION_MODEL
       epochs (default 100), batch_size, lr (default 0.001),
+      optimizer (default "SGD") -- always passed, so lr is honoured; "auto"
+        lets Ultralytics discard lr and is logged as such,
       patience (default 50), workers, imgsz (default 1024),
       seed (default 0) — RNG seed passed to ultralytics; vary it to obtain a
         mean +/- std over repeats instead of a single run (v3.22.3)
@@ -968,11 +1205,13 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
       include_autolabel (default False — set True in v3.0.25 once
         per-dataset class assignment is verified working)
       val_dataset_root (default None) — path to cottonweeddet12 holdout root.
-        If provided, val is overridden to the hand-labeled holdout and
-        mAP50-95 reported by ultralytics is the honest paper-grade signal.
+        If provided, val is overridden to the hand-labeled holdout -- unless
+        the INC dev manifest exists, which then is the val set instead (a
+        holdout that selects best.pt is no longer a test set).
       min_dino_score (default None) — v3.0.99.28 (D) clean-subset gate. When set,
         slugs with DINOv2 trusted-pool score below it are dropped from training
-        (quality-core experiment). Unscored slugs are kept.
+        (quality-core experiment). Unscored slugs are kept. Scores that do not
+        record a complete reference-pool holdout guard are refused (INC 0.3).
       time_h (default None) — v3.25.0 wall-clock cap in hours, passed to
         ultralytics `time=`. It overrides `epochs` and still ends with a valid
         best.pt. None (the default) keeps the uncapped epoch budget.
@@ -1125,12 +1364,21 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
                     f"(overrides epochs={strategy.get('epochs', 100)}; "
                     f"training still ends with a valid best.pt)")
 
+    # INC 0.4: Ultralytics' default optimizer="auto" discards lr0 and picks its
+    # own optimizer and rate (MuSGD at 0.01 against a configured 0.001 in every
+    # campaign round, REGRESSION_DIAGNOSIS.md §5a). Naming one makes lr0 binding.
+    optimizer = str(strategy.get("optimizer") or "SGD")
+    if optimizer.lower() == "auto":
+        logger.warning(f"[Mega] optimizer='auto' requested: Ultralytics will ignore "
+                       f"lr0={strategy.get('lr', 0.001)} and choose its own")
+
     effective = {
         "epochs": strategy.get("epochs", 100),
         "imgsz": strategy.get("imgsz", 1024),
         "batch": strategy.get("batch_size", -1),
         "patience": strategy.get("patience", 50),
         "lr0": strategy.get("lr", 0.001),
+        "optimizer": optimizer,
         "workers": strategy.get("workers", 4),
         "seed": int(strategy.get("seed", 0)),
         "deterministic": bool(strategy.get("deterministic", True)),
@@ -1188,6 +1436,7 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
         "merged_images": stats["images"],
         "datasets_used": len(used_datasets),
         "num_classes": len(names_list),
+        "val_source": stats.get("val_source"),
         "walltime_s": _walltime_s(),
         "strategy": effective,
     })
@@ -1206,6 +1455,7 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
         name=run_tag or "train",
         patience=strategy.get("patience", 50),
         lr0=strategy.get("lr", 0.001),
+        optimizer=optimizer,
         workers=strategy.get("workers", 4),
         verbose=False,
         save_period=1,  # v3.0.22: save last.pt every epoch so walltime-cut
@@ -1259,6 +1509,7 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
         "epochs_requested": effective["epochs"],
         "epochs_completed": epochs_completed,
         "time_h": effective["time_h"],
+        "val_source": stats.get("val_source"),
     })
 
     del model
@@ -1324,6 +1575,12 @@ def train_yolo_mega(strategy, iteration, run_tag=None):
         "epochs_requested": effective["epochs"],
         "epochs_completed": epochs_completed,
         "time_h": effective["time_h"],
+        # INC 0.4: which split results.csv's mAP was computed on. Once the INC
+        # dev manifest exists it is "inc_dev", not the sealed holdout; a reader
+        # of this run's results.csv must not report that number as a holdout
+        # score ("cwd12_holdout" is the only value for which it is one).
+        "val_source": stats.get("val_source"),
+        "val_path": stats.get("val_path"),
     }
     logger.info(f"[Mega] Complete: {summary}")
     return best_pt, summary

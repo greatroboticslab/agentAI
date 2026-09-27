@@ -1,0 +1,5330 @@
+{
+ "aliases": {
+  "bouthillier2021": "2103.03098",
+  "dinov2": "2304.07193",
+  "dinov2_curation": "2304.07193",
+  "dinov3": "2508.10104",
+  "ibrahim2024": "2403.08763",
+  "lwf2016": null,
+  "northcutt2021": "1911.00068",
+  "owlst2023": "2306.09683",
+  "sorscher2022": "2206.14486",
+  "time2024": "2412.06712",
+  "yolo_lwf2025": "2503.04688"
+ },
+ "min_quote_chars": 20,
+ "n_papers": 128,
+ "n_passages": 432,
+ "papers": [
+  {
+   "file": "1506.02629.md",
+   "id": "1506.02629",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider"
+   },
+   "title": "Generalization in Adaptive Data Analysis and Holdout Reuse",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/1506.02629",
+   "venues": [
+    "NeurIPS 2015, 2015"
+   ],
+   "year": "2015"
+  },
+  {
+   "file": "1602.08405.md",
+   "id": "1602.08405",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|consider"
+   },
+   "title": "We Don't Need No Bounding-Boxes: Training Object Class Detectors Using Only Human Verification",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/1602.08405",
+   "venues": [
+    "CVPR 2016, 2016"
+   ],
+   "year": "2016"
+  },
+  {
+   "file": "1708.06977.md",
+   "id": "1708.06977",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|background"
+   },
+   "title": "Incremental Learning of Object Detectors without Catastrophic Forgetting (ILOD)",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://ar5iv.labs.arxiv.org/html/1708.06977",
+   "venues": [
+    "ICCV 2017, 2017"
+   ],
+   "year": "2017"
+  },
+  {
+   "file": "1902.00423.md",
+   "id": "1902.00423",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|background"
+   },
+   "title": "Do We Train on Test Data? Purging CIFAR of Near-Duplicates",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/1902.00423",
+   "venues": [
+    "Journal of Imaging, 2020"
+   ],
+   "year": "2020"
+  },
+  {
+   "file": "1903.00278.md",
+   "id": "1903.00278",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|adopt"
+   },
+   "title": "Continuous Integration of Machine Learning Models with ease.ml/ci: Towards a Rigorous Yet Practical Treatment",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/1903.00278",
+   "venues": [
+    "SysML 2019, 2019"
+   ],
+   "year": "2019"
+  },
+  {
+   "file": "1905.13289.md",
+   "id": "1905.13289",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider"
+   },
+   "title": "On the Accuracy of Influence Functions for Measuring Group Effects",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/1905.13289",
+   "venues": [
+    "NeurIPS 2019, 2019"
+   ],
+   "year": "2019"
+  },
+  {
+   "file": "1910.08475.md",
+   "id": "1910.08475",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|adopt"
+   },
+   "title": "On Warm-Starting Neural Network Training",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://ar5iv.labs.arxiv.org/html/1910.08475",
+   "venues": [
+    "NeurIPS 2020, 2020"
+   ],
+   "year": "2020"
+  },
+  {
+   "file": "1911.00068.md",
+   "id": "1911.00068",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|background"
+   },
+   "title": "Confident Learning: Estimating Uncertainty in Dataset Labels",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/1911.00068",
+   "venues": [
+    "Journal of Artificial Intelligence Research 70 (2021), 2021"
+   ],
+   "year": "2021"
+  },
+  {
+   "file": "1912.03817.md",
+   "id": "1912.03817",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider"
+   },
+   "title": "Machine Unlearning",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/1912.03817",
+   "venues": [
+    "IEEE S&P 2021, 2021"
+   ],
+   "year": "2021"
+  },
+  {
+   "file": "2002.08484.md",
+   "id": "2002.08484",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider"
+   },
+   "title": "Estimating Training Data Influence by Tracing Gradient Descent",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2002.08484",
+   "venues": [
+    "NeurIPS 2020, 2020"
+   ],
+   "year": "2020"
+  },
+  {
+   "file": "2006.06882.md",
+   "id": "2006.06882",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|partly|background"
+   },
+   "title": "Rethinking Pre-training and Self-training",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2006.06882",
+   "venues": [
+    "NeurIPS 2020, 2020"
+   ],
+   "year": "2020"
+  },
+  {
+   "file": "2102.09480.md",
+   "id": "2102.09480",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|background"
+   },
+   "title": "Unbiased Teacher for Semi-Supervised Object Detection",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2102.09480",
+   "venues": [
+    "ICLR 2021, 2021"
+   ],
+   "year": "2021"
+  },
+  {
+   "file": "2102.13086.md",
+   "id": "2102.13086",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|consider"
+   },
+   "title": "Simple Multi-dataset Detection (UniDet)",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/2102.13086",
+   "venues": [
+    "CVPR 2022 (arXiv 2102.13086), 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2103.03098.md",
+   "id": "2103.03098",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|adopt"
+   },
+   "title": "Accounting for Variance in Machine Learning Benchmarks",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2103.03098",
+   "venues": [
+    "MLSys 2021, 2021"
+   ],
+   "year": "2021"
+  },
+  {
+   "file": "2103.14749.md",
+   "id": "2103.14749",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|background"
+   },
+   "title": "Pervasive Label Errors in Test Sets Destabilize Machine Learning Benchmarks",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/2103.14749",
+   "venues": [
+    "NeurIPS 2021 Datasets and Benchmarks, 2021"
+   ],
+   "year": "2021"
+  },
+  {
+   "file": "2106.09018.md",
+   "id": "2106.09018",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|background"
+   },
+   "title": "End-to-End Semi-Supervised Object Detection with Soft Teacher",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2106.09018",
+   "venues": [
+    "ICCV 2021, 2021"
+   ],
+   "year": "2021"
+  },
+  {
+   "file": "2108.13264.md",
+   "id": "2108.13264",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|adopt"
+   },
+   "title": "Deep Reinforcement Learning at the Edge of the Statistical Precipice",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2108.13264",
+   "venues": [
+    "NeurIPS 2021 (Outstanding Paper), 2021"
+   ],
+   "year": "2021"
+  },
+  {
+   "file": "2109.01903.md",
+   "id": "2109.01903",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|partly|adopt"
+   },
+   "title": "Robust fine-tuning of zero-shot models (WiSE-FT)",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2109.01903",
+   "venues": [
+    "CVPR 2022, 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2110.04960.md",
+   "id": "2110.04960",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|background"
+   },
+   "title": "Performance Evaluation of Deep Transfer Learning on Multiclass Identification of Common Weed Species in Cotton Production Systems (CottonWeedID15)",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://arxiv.org/abs/2110.04960",
+   "venues": [
+    "arXiv 2110.04960 (Computers and Electronics in Agriculture 2022), 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2202.10054.md",
+   "id": "2202.10054",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|background"
+   },
+   "title": "Fine-Tuning can Distort Pretrained Features and Underperform Out-of-Distribution (LP-FT)",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/abs/2202.10054",
+   "venues": [
+    "ICLR 2022 (oral), 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2202.10261.md",
+   "id": "2202.10261",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt"
+   },
+   "title": "A Self-Supervised Descriptor for Image Copy Detection (SSCD)",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2202.10261",
+   "venues": [
+    "CVPR 2022, 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2203.05482.md",
+   "id": "2203.05482",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|consider"
+   },
+   "title": "Model soups: averaging weights of multiple fine-tuned models improves accuracy without increasing inference time",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/abs/2203.05482",
+   "venues": [
+    "ICML 2022, 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2205.13452.md",
+   "id": "2205.13452",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|adopt"
+   },
+   "title": "Continual evaluation for lifelong learning: Identifying the stability gap",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2205.13452",
+   "venues": [
+    "ICLR 2023 (spotlight), 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2206.14486.md",
+   "id": "2206.14486",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt"
+   },
+   "title": "Beyond neural scaling laws: beating power law scaling via data pruning",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2206.14486",
+   "venues": [
+    "NeurIPS 2022 (Outstanding Paper), 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2208.05516.md",
+   "id": "2208.05516",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt"
+   },
+   "title": "Quality Not Quantity: On the Interaction between Dataset Design and Robustness of CLIP",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2208.05516",
+   "venues": [
+    "NeurIPS 2022 (oral), 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2210.11466.md",
+   "id": "2210.11466",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|consider"
+   },
+   "title": "Surgical Fine-Tuning Improves Adaptation to Distribution Shifts",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://ar5iv.labs.arxiv.org/html/2210.11466",
+   "venues": [
+    "ICLR 2023, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2211.11612.md",
+   "id": "2211.11612",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|consider"
+   },
+   "title": "Plug and Play Active Learning for Object Detection (PPAL)",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2211.11612",
+   "venues": [
+    "CVPR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2211.13993.md",
+   "id": "2211.13993",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|background"
+   },
+   "title": "Combating noisy labels in object detection datasets (CLOD)",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/2211.13993",
+   "venues": [
+    "arXiv 2211.13993 (submitted to ICDE 2024), 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "2301.10546.md",
+   "id": "2301.10546",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|partly|consider"
+   },
+   "title": "Backward Compatibility During Data Updates by Weight Interpolation (BCWI)",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/html/2301.10546",
+   "venues": [
+    "arXiv 2301.10546, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2303.05499.md",
+   "id": "2303.05499",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|background"
+   },
+   "title": "Grounding DINO: Marrying DINO with Grounded Pre-Training for Open-Set Object Detection",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2303.05499",
+   "venues": [
+    "ECCV 2024, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2303.06999.md",
+   "id": "2303.06999",
+   "levers": [
+    "L4",
+    "X3",
+    "L5",
+    "D8",
+    "X4"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider",
+    "labelnoise": "OK|yes|consider"
+   },
+   "title": "Identifying Label Errors in Object Detection Datasets by Loss Inspection",
+   "topics": [
+    "labelnoise",
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2303.06999",
+   "venues": [
+    "WACV 2024 (arXiv 2303.06999), 2024",
+    "arXiv 2303.06999, 2023"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2303.09540.md",
+   "id": "2303.09540",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt"
+   },
+   "title": "SemDeDup: Data-efficient learning at web-scale through semantic deduplication",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2303.09540",
+   "venues": [
+    "arXiv 2303.09540, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2303.14186.md",
+   "id": "2303.14186",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|partly|consider"
+   },
+   "title": "TRAK: Attributing Model Behavior at Scale",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2303.14186",
+   "venues": [
+    "ICML 2023, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2304.03110.md",
+   "id": "2304.03110",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|background"
+   },
+   "title": "Continual Detection Transformer for Incremental Object Detection (CL-DETR)",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://ar5iv.labs.arxiv.org/html/2304.03110",
+   "venues": [
+    "CVPR 2023, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2304.06619.md",
+   "id": "2304.06619",
+   "levers": [
+    "L1",
+    "L2",
+    "X1",
+    "L3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|background",
+    "weeds": "OK|partly|consider"
+   },
+   "title": "Class-Incremental Learning of Plant and Disease Detection: Growing Branches with Knowledge Distillation (Dynamic Y-KD)",
+   "topics": [
+    "continual",
+    "weeds"
+   ],
+   "url": "https://arxiv.org/html/2304.06619",
+   "venues": [
+    "CVPPA @ ICCV 2023, 2023",
+    "arXiv 2304.06619 (CVPR 2023 workshop CVPPA), 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2304.07193.md",
+   "id": "2304.07193",
+   "levers": [
+    "L3",
+    "X2",
+    "L4"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt",
+    "selftrain": "OK|yes|adopt"
+   },
+   "title": "DINOv2: Learning Robust Visual Features without Supervision",
+   "topics": [
+    "curation",
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2304.07193",
+   "venues": [
+    "TMLR (01/2024), 2024",
+    "TMLR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2304.07718.md",
+   "id": "2304.07718",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider"
+   },
+   "title": "Data-OOB: Out-of-bag Estimate as a Simple and Efficient Data Value",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2304.07718",
+   "venues": [
+    "ICML 2023, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2304.14108.md",
+   "id": "2304.14108",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|background"
+   },
+   "title": "DataComp: In search of the next generation of multimodal datasets",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2304.14108",
+   "venues": [
+    "NeurIPS 2023 Datasets and Benchmarks, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2305.16291.md",
+   "id": "2305.16291",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider"
+   },
+   "title": "Voyager: An Open-Ended Embodied Agent with Large Language Models",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2305.16291",
+   "venues": [
+    "arXiv 2305.16291, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2305.19765.md",
+   "id": "2305.19765",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|adopt"
+   },
+   "title": "A Bayesian Approach To Analysing Training Data Attribution In Deep Learning",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2305.19765",
+   "venues": [
+    "NeurIPS 2023, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2306.09683.md",
+   "id": "2306.09683",
+   "levers": [
+    "L3",
+    "X2",
+    "L4",
+    "X3"
+   ],
+   "n_lines": 19,
+   "n_passages": 9,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "RESULT",
+     "line": 17,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 18,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 19,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt",
+    "labelnoise": "OK|yes|adopt",
+    "selftrain": "OK|yes|adopt"
+   },
+   "title": "Scaling Open-Vocabulary Object Detection (OWLv2 / OWL-ST)",
+   "topics": [
+    "curation",
+    "labelnoise",
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2306.09683",
+   "venues": [
+    "NeurIPS 2023, 2023",
+    "NeurIPS 2023 (arXiv 2306.09683), 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2308.12284.md",
+   "id": "2308.12284",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|consider"
+   },
+   "title": "D4: Improving LLM Pretraining via Document De-Duplication and Diversification",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2308.12284",
+   "venues": [
+    "NeurIPS 2023 Datasets and Benchmarks, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2309.00832.md",
+   "id": "2309.00832",
+   "levers": [
+    "L4",
+    "X3",
+    "L5",
+    "D8",
+    "X4"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|adopt",
+    "labelnoise": "OK|yes|adopt"
+   },
+   "title": "ObjectLab: Automated Diagnosis of Mislabeled Images in Object Detection Data",
+   "topics": [
+    "labelnoise",
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2309.00832",
+   "venues": [
+    "ICML 2023 Workshop on Data-centric ML Research (arXiv 2309.00832); shipped in cleanlab, 2023",
+    "ICML 2023 Workshop on Data-centric Machine Learning Research, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "2309.17425.md",
+   "id": "2309.17425",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|consider"
+   },
+   "title": "Data Filtering Networks",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2309.17425",
+   "venues": [
+    "ICLR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2310.00902.md",
+   "id": "2310.00902",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider"
+   },
+   "title": "DataInf: Efficiently Estimating Data Influence in LoRA-tuned LLMs and Diffusion Models",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2310.00902",
+   "venues": [
+    "ICLR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2401.04578.md",
+   "id": "2401.04578",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|consider"
+   },
+   "title": "Effective pruning of web-scale datasets based on complexity of concept clusters (Density-Based Pruning)",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2401.04578",
+   "venues": [
+    "ICLR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2401.08056.md",
+   "id": "2401.08056",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|background"
+   },
+   "title": "Robust Tiny Object Detection in Aerial Images amidst Label Noise (DN-TOD)",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/2401.08056",
+   "venues": [
+    "arXiv 2401.08056, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2401.12926.md",
+   "id": "2401.12926",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider"
+   },
+   "title": "DsDm: Model-Aware Dataset Selection with Datamodels",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2401.12926",
+   "venues": [
+    "arXiv 2401.12926, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2403.03390.md",
+   "id": "2403.03390",
+   "levers": [
+    "L4",
+    "L3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|adopt",
+    "weeds": "OK|yes|consider"
+   },
+   "title": "Performance Evaluation of Semi-supervised Learning Frameworks for Multi-Class Weed Detection",
+   "topics": [
+    "selftrain",
+    "weeds"
+   ],
+   "url": "https://arxiv.org/html/2403.03390",
+   "venues": [
+    "arXiv 2403.03390, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2403.08763.md",
+   "id": "2403.08763",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|adopt"
+   },
+   "title": "Simple and Scalable Strategies to Continually Pre-train Large Language Models",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2403.08763",
+   "venues": [
+    "TMLR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2403.17373.md",
+   "id": "2403.17373",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|adopt"
+   },
+   "title": "AIDE: An Automatic Data Engine for Object Detection in Autonomous Driving",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2403.17373",
+   "venues": [
+    "CVPR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2404.07177.md",
+   "id": "2404.07177",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt"
+   },
+   "title": "Scaling Laws for Data Filtering -- Data Curation cannot be Compute Agnostic",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2404.07177",
+   "venues": [
+    "CVPR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2404.09161.md",
+   "id": "2404.09161",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|consider"
+   },
+   "title": "Coreset Selection for Object Detection (CSOD)",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2404.09161",
+   "venues": [
+    "CVPR 2024 Workshop on Dataset Distillation for Computer Vision, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2405.07399.md",
+   "id": "2405.07399",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|consider"
+   },
+   "title": "Semi-Supervised Weed Detection for Rapid Deployment and Enhanced Efficiency",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://arxiv.org/html/2405.07399v1",
+   "venues": [
+    "arXiv 2405.07399, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2405.09673.md",
+   "id": "2405.09673",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|consider"
+   },
+   "title": "LoRA Learns Less and Forgets Less",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2405.09673",
+   "venues": [
+    "TMLR 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2405.15613.md",
+   "id": "2405.15613",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt"
+   },
+   "title": "Automatic Data Curation for Self-Supervised Learning: A Clustering-Based Approach",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2405.15613",
+   "venues": [
+    "arXiv 2405.15613 (code: github.com/facebookresearch/ssl-data-curation), 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2406.11011.md",
+   "id": "2406.11011",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|consider"
+   },
+   "title": "Data Shapley in One Training Run",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2406.11011",
+   "venues": [
+    "ICLR 2025 (Outstanding Paper Runner-Up), 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2406.17711.md",
+   "id": "2406.17711",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|background"
+   },
+   "title": "Data curation via joint example selection further accelerates multimodal learning (JEST)",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2406.17711",
+   "venues": [
+    "arXiv 2406.17711, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2407.06322.md",
+   "id": "2407.06322",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|partly|consider"
+   },
+   "title": "MagMax: Leveraging Model Merging for Seamless Continual Learning",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2407.06322",
+   "venues": [
+    "ECCV 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2408.06292.md",
+   "id": "2408.06292",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|adopt"
+   },
+   "title": "The AI Scientist: Towards Fully Automated Open-Ended Scientific Discovery",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2408.06292",
+   "venues": [
+    "arXiv 2408.06292, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2409.05650.md",
+   "id": "2409.05650",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|consider"
+   },
+   "title": "Replay Consolidation with Label Propagation for Continual Object Detection (RCLPOD)",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2409.05650",
+   "venues": [
+    "arXiv 2409.05650, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2409.09412.md",
+   "id": "2409.09412",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|adopt"
+   },
+   "title": "Label Convergence: Defining an Upper Performance Bound in Object Recognition through Contradictory Annotations",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/2409.09412",
+   "venues": [
+    "WACV 2025 (arXiv 2409.09412), 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2409.13740.md",
+   "id": "2409.13740",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider",
+    "webresearch": "OK|yes|adopt"
+   },
+   "title": "Language agents achieve superhuman synthesis of scientific knowledge (PaperQA2)",
+   "topics": [
+    "agents",
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2409.13740",
+   "venues": [
+    "arXiv 2409.13740, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2409.19998.md",
+   "id": "2409.19998",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|background"
+   },
+   "title": "Do Influence Functions Work on Large Language Models?",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2409.19998",
+   "venues": [
+    "arXiv 2409.19998, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2410.07095.md",
+   "id": "2410.07095",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|background"
+   },
+   "title": "MLE-bench: Evaluating Machine Learning Agents on Machine Learning Engineering",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2410.07095",
+   "venues": [
+    "ICLR 2025 (arXiv 2410.07095), 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2410.15661.md",
+   "id": "2410.15661",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|yes|adopt"
+   },
+   "title": "Scalable Data Ablation Approximations for Language Models through Modular Training and Merging",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2410.15661",
+   "venues": [
+    "EMNLP 2024, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2411.14199.md",
+   "id": "2411.14199",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|partly|adopt"
+   },
+   "title": "OpenScholar: Synthesizing Scientific Literature with Retrieval-augmented LMs",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2411.14199",
+   "venues": [
+    "arXiv 2411.14199; published in Nature, Feb 2026, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2411.18513.md",
+   "id": "2411.18513",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|consider"
+   },
+   "title": "Enhancing weed detection performance by means of GenAI-based image augmentation",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://arxiv.org/html/2411.18513v1",
+   "venues": [
+    "arXiv 2411.18513 (ECCV 2024 CVPPA workshop), 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2412.06712.md",
+   "id": "2412.06712",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|adopt"
+   },
+   "title": "How to Merge Your Multimodal Models Over Time? (TIME)",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2412.06712",
+   "venues": [
+    "arXiv 2412.06712, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "2501.04227.md",
+   "id": "2501.04227",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider"
+   },
+   "title": "Agent Laboratory: Using LLM Agents as Research Assistants",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/abs/2501.04227",
+   "venues": [
+    "arXiv 2501.04227, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2501.10120.md",
+   "id": "2501.10120",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|consider"
+   },
+   "title": "PaSa: An LLM Agent for Comprehensive Academic Paper Search",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2501.10120",
+   "venues": [
+    "arXiv 2501.10120 (ACL 2025 per revision), 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2502.06255.md",
+   "id": "2502.06255",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|background"
+   },
+   "title": "Towards Efficient and Intelligent Laser Weeding: Method and Dataset for Weed Stem Detection",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://arxiv.org/abs/2502.06255",
+   "venues": [
+    "AAAI 2025 (AI for Social Impact track), arXiv 2502.06255, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2502.13138.md",
+   "id": "2502.13138",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider"
+   },
+   "title": "AIDE: AI-Driven Exploration in the Space of Code",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2502.13138",
+   "venues": [
+    "arXiv 2502.13138, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2502.14297.md",
+   "id": "2502.14297",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|background",
+    "webresearch": "OK|yes|background"
+   },
+   "title": "Evaluating Sakana's AI Scientist: Bold Claims, Mixed Results, and a Promising Future?",
+   "topics": [
+    "agents",
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2502.14297",
+   "venues": [
+    "arXiv 2502.14297, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2502.17673.md",
+   "id": "2502.17673",
+   "levers": [
+    "L4",
+    "L3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|adopt",
+    "weeds": "OK|yes|adopt"
+   },
+   "title": "Semi-Supervised Weed Detection in Vegetable Fields: In-domain and Cross-domain Experiments",
+   "topics": [
+    "selftrain",
+    "weeds"
+   ],
+   "url": "https://arxiv.org/abs/2502.17673",
+   "venues": [
+    "arXiv 2502.17673, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2503.04688.md",
+   "id": "2503.04688",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|adopt"
+   },
+   "title": "Teach YOLO to Remember: A Self-Distillation Approach for Continual Object Detection (YOLO LwF)",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2503.04688",
+   "venues": [
+    "arXiv 2503.04688, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2503.09516.md",
+   "id": "2503.09516",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|background"
+   },
+   "title": "Search-R1: Training LLMs to Reason and Leverage Search Engines with Reinforcement Learning",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2503.09516",
+   "venues": [
+    "arXiv 2503.09516, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2503.18813.md",
+   "id": "2503.18813",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|consider"
+   },
+   "title": "Defeating Prompt Injections by Design (CaMeL)",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2503.18813",
+   "venues": [
+    "arXiv 2503.18813, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2503.20201.md",
+   "id": "2503.20201",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|partly|consider"
+   },
+   "title": "Open Deep Search: Democratizing Search with Open-source Reasoning Agents",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2503.20201",
+   "venues": [
+    "arXiv 2503.20201, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2504.07252.md",
+   "id": "2504.07252",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|consider"
+   },
+   "title": "Few-Shot Adaptation of Grounding DINO for Agricultural Domain",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2504.07252",
+   "venues": [
+    "arXiv 2504.07252, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2504.08066.md",
+   "id": "2504.08066",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider"
+   },
+   "title": "The AI Scientist-v2: Workshop-Level Automated Scientific Discovery via Agentic Tree Search",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2504.08066",
+   "venues": [
+    "arXiv 2504.08066 (paper accepted at an ICLR 2025 workshop), 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2504.12516.md",
+   "id": "2504.12516",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|background"
+   },
+   "title": "BrowseComp: A Simple Yet Challenging Benchmark for Browsing Agents",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2504.12516",
+   "venues": [
+    "arXiv 2504.12516 (OpenAI), 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2504.16430.md",
+   "id": "2504.16430",
+   "levers": [
+    "L5",
+    "D8",
+    "X3",
+    "X4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "attribution"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "attribution"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "attribution"
+    }
+   ],
+   "status": {
+    "attribution": "OK|partly|consider"
+   },
+   "title": "MAGIC: Near-Optimal Data Attribution for Deep Learning",
+   "topics": [
+    "attribution"
+   ],
+   "url": "https://arxiv.org/abs/2504.16430",
+   "venues": [
+    "arXiv 2504.16430, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2504.18575.md",
+   "id": "2504.18575",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|background"
+   },
+   "title": "WASP: Benchmarking Web Agent Security Against Prompt Injection Attacks",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2504.18575",
+   "venues": [
+    "arXiv 2504.18575, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2505.14738.md",
+   "id": "2505.14738",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider"
+   },
+   "title": "R&D-Agent: An LLM-Agent Framework Towards Autonomous Data Science",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2505.14738",
+   "venues": [
+    "arXiv 2505.14738, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2505.22954.md",
+   "id": "2505.22954",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|adopt"
+   },
+   "title": "Darwin Godel Machine: Open-Ended Evolution of Self-Improving Agents",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/pdf/2505.22954",
+   "venues": [
+    "ICLR 2026 (arXiv 2505.22954), 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2505.23883.md",
+   "id": "2505.23883",
+   "levers": [
+    "L4"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|adopt"
+   },
+   "title": "BioCLIP 2: Emergent Properties from Scaling Hierarchical Contrastive Learning",
+   "topics": [
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/html/2505.23883",
+   "venues": [
+    "NeurIPS 2025 (Spotlight), 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2506.02359.md",
+   "id": "2506.02359",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|adopt",
+    "selftrain": "OK|yes|adopt"
+   },
+   "title": "Auto-Labeling Data for Object Detection",
+   "topics": [
+    "labelnoise",
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2506.02359",
+   "venues": [
+    "arXiv 2506.02359, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2506.04737.md",
+   "id": "2506.04737",
+   "levers": [
+    "L3",
+    "X2",
+    "L4",
+    "X3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|consider",
+    "labelnoise": "OK|yes|consider"
+   },
+   "title": "Bridging Annotation Gaps: Transferring Labels to Align Object Detection Datasets (Label-Aligned Transfer, LAT)",
+   "topics": [
+    "curation",
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/2506.04737",
+   "venues": [
+    "arXiv 2506.04737, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2506.08837.md",
+   "id": "2506.08837",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|adopt"
+   },
+   "title": "Design Patterns for Securing LLM Agents against Prompt Injections",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2506.08837",
+   "venues": [
+    "arXiv 2506.08837, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2506.11763.md",
+   "id": "2506.11763",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|consider"
+   },
+   "title": "DeepResearch Bench: A Comprehensive Benchmark for Deep Research Agents",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2506.11763",
+   "venues": [
+    "arXiv 2506.11763, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2506.13131.md",
+   "id": "2506.13131",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider"
+   },
+   "title": "AlphaEvolve: A coding agent for scientific and algorithmic discovery",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2506.13131",
+   "venues": [
+    "arXiv 2506.13131, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2506.20803.md",
+   "id": "2506.20803",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|adopt"
+   },
+   "title": "The Ideation-Execution Gap: Execution Outcomes of LLM-Generated versus Human Research Ideas",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2506.20803",
+   "venues": [
+    "arXiv 2506.20803, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2506.21260.md",
+   "id": "2506.21260",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|consider"
+   },
+   "title": "DuET: Dual Incremental Object Detection via Exemplar-Free Task Arithmetic",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/abs/2506.21260",
+   "venues": [
+    "ICCV 2025, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2507.00049.md",
+   "id": "2507.00049",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|consider"
+   },
+   "title": "AdaDeDup: Adaptive Hybrid Data Pruning for Efficient Large-Scale Object Detection Training",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/abs/2507.00049",
+   "venues": [
+    "arXiv 2507.00049, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2507.02554.md",
+   "id": "2507.02554",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider"
+   },
+   "title": "AI Research Agents for Machine Learning: Search, Exploration, and Generalization in MLE-bench",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/abs/2507.02554",
+   "venues": [
+    "arXiv 2507.02554, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2508.06556.md",
+   "id": "2508.06556",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|partly|adopt",
+    "selftrain": "OK|yes|consider"
+   },
+   "title": "From Label Error Detection to Correction: A Modular Framework and Benchmark for Object Detection Datasets (REC\u2713D / Rechecked)",
+   "topics": [
+    "labelnoise",
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2508.06556",
+   "venues": [
+    "arXiv 2508.06556 (v2 Jan 2026), 2026",
+    "arXiv 2508.06556, 2025"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2508.10104.md",
+   "id": "2508.10104",
+   "levers": [
+    "L3",
+    "X2"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "curation"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "curation"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "curation"
+    }
+   ],
+   "status": {
+    "curation": "OK|yes|adopt"
+   },
+   "title": "DINOv3",
+   "topics": [
+    "curation"
+   ],
+   "url": "https://arxiv.org/html/2508.10104v1",
+   "venues": [
+    "arXiv 2508.10104, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2510.21652.md",
+   "id": "2510.21652",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|consider"
+   },
+   "title": "AstaBench: Rigorous Benchmarking of AI Agents with a Scientific Research Suite",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2510.21652",
+   "venues": [
+    "ICLR 2026, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2510.24701.md",
+   "id": "2510.24701",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|adopt"
+   },
+   "title": "Tongyi DeepResearch Technical Report",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2510.24701",
+   "venues": [
+    "arXiv 2510.24701, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2511.09955.md",
+   "id": "2511.09955",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|consider",
+    "selftrain": "OK|yes|consider"
+   },
+   "title": "Robust Object Detection with Pseudo Labels from VLMs using Per-Object Co-teaching",
+   "topics": [
+    "labelnoise",
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2511.09955",
+   "venues": [
+    "arXiv 2511.09955, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2512.02556.md",
+   "id": "2512.02556",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|adopt"
+   },
+   "title": "DeepSeek-V3.2: Pushing the Frontier of Open Large Language Models",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2512.02556",
+   "venues": [
+    "arXiv 2512.02556 (technical report), 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2512.22973.md",
+   "id": "2512.22973",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|consider"
+   },
+   "title": "YOLO-IOD: Towards Real Time Incremental Object Detection",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/html/2512.22973",
+   "venues": [
+    "AAAI 2026, 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "2601.11640.md",
+   "id": "2601.11640",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|partly|consider"
+   },
+   "title": "Confident Learning for Object Detection under Model Constraints (MDDC)",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/2601.11640",
+   "venues": [
+    "arXiv 2601.11640 (under review at ICPR 2026), 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2602.15112.md",
+   "id": "2602.15112",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|adopt"
+   },
+   "title": "ResearchGym: Evaluating Language Model Agents on Real-World AI Research",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2602.15112",
+   "venues": [
+    "arXiv 2602.15112, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2602.15763.md",
+   "id": "2602.15763",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|consider"
+   },
+   "title": "GLM-5: from Vibe Coding to Agentic Engineering",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2602.15763",
+   "venues": [
+    "arXiv 2602.15763 (technical report), 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2603.00160.md",
+   "id": "2603.00160",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|partly|adopt"
+   },
+   "title": "DINOv3 Meets YOLO26 for Weed Detection in Vegetable Crops",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://arxiv.org/html/2603.00160v1",
+   "venues": [
+    "arXiv 2603.00160, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2603.11337.md",
+   "id": "2603.11337",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|adopt"
+   },
+   "title": "RewardHackingAgents: Benchmarking Evaluation Integrity for LLM ML-Engineering Agents",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/abs/2603.11337",
+   "venues": [
+    "arXiv 2603.11337, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2603.26499.md",
+   "id": "2603.26499",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|adopt"
+   },
+   "title": "AIRA_2: Overcoming Bottlenecks in AI Research Agents",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2603.26499",
+   "venues": [
+    "arXiv 2603.26499, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2604.09791.md",
+   "id": "2604.09791",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|adopt"
+   },
+   "title": "Pioneer Agent: Continual Improvement of Small Language Models in Production",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/html/2604.09791",
+   "venues": [
+    "arXiv 2604.09791, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2606.04261.md",
+   "id": "2606.04261",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|consider"
+   },
+   "title": "Can Generalist Agents Automate Data Curation?",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/abs/2606.04261",
+   "venues": [
+    "arXiv 2606.04261, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2606.10666.md",
+   "id": "2606.10666",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|adopt"
+   },
+   "title": "Analyzing Training-Free Corruption Detection for Object Detection Datasets",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://arxiv.org/abs/2606.10666",
+   "venues": [
+    "DataCV Workshop at CVPR 2026 (arXiv 2606.10666), 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2606.19348.md",
+   "id": "2606.19348",
+   "levers": [],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "webresearch"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "webresearch"
+    }
+   ],
+   "status": {
+    "webresearch": "OK|yes|consider"
+   },
+   "title": "DeepSeek-V4: Towards Highly Efficient Million-Token Context Intelligence",
+   "topics": [
+    "webresearch"
+   ],
+   "url": "https://arxiv.org/abs/2606.19348",
+   "venues": [
+    "arXiv 2606.19348 (technical report), 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2606.30875.md",
+   "id": "2606.30875",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "selftrain"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|consider",
+    "selftrain": "OK|yes|consider"
+   },
+   "title": "The Label Imitation Game: Turing Test Network for Zero-Shot Pseudo-Label Pruning",
+   "topics": [
+    "labelnoise",
+    "selftrain"
+   ],
+   "url": "https://arxiv.org/abs/2606.30875",
+   "venues": [
+    "ECCV 2026 (arXiv 2606.30875), 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2607.16492.md",
+   "id": "2607.16492",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|consider"
+   },
+   "title": "WeedExpert-R1: Incentivizing Botanical Reasoning in MLLMs with Reinforcement Learning for Precision Weed Grounding",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://arxiv.org/abs/2607.16492",
+   "venues": [
+    "arXiv 2607.16492, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2608.00927.md",
+   "id": "2608.00927",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|adopt"
+   },
+   "title": "AgriJetsonBench: External-Power-Referenced TensorRT Benchmarking of Agricultural Vision Models on Jetson Edge Platforms",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://arxiv.org/html/2608.00927",
+   "venues": [
+    "arXiv 2608.00927 (Artificial Intelligence in Agriculture), 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2608.07051.md",
+   "id": "2608.07051",
+   "levers": [
+    "L1",
+    "L2",
+    "X1"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "continual"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "continual"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "continual"
+    }
+   ],
+   "status": {
+    "continual": "OK|yes|consider"
+   },
+   "title": "YOLO-PEFT: Parameter-Efficient Fine-Tuning on YOLO Family",
+   "topics": [
+    "continual"
+   ],
+   "url": "https://arxiv.org/abs/2608.07051",
+   "venues": [
+    "arXiv 2608.07051, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2608.07984.md",
+   "id": "2608.07984",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|consider"
+   },
+   "title": "AgriField-40K: Adapting Vision Models to Agriculture With Efficient Continual Pretraining (AgriMAE)",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://arxiv.org/html/2608.07984",
+   "venues": [
+    "arXiv 2608.07984, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2608.21254.md",
+   "id": "2608.21254",
+   "levers": [
+    "L4",
+    "L3"
+   ],
+   "n_lines": 16,
+   "n_passages": 6,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "selftrain"
+    },
+    {
+     "kind": "RESULT",
+     "line": 14,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 15,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 16,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "selftrain": "OK|yes|consider",
+    "weeds": "OK|yes|adopt"
+   },
+   "title": "On the Transferability of Agricultural Weed Detection Under Cross-Field Distribution Shift",
+   "topics": [
+    "selftrain",
+    "weeds"
+   ],
+   "url": "https://arxiv.org/abs/2608.21254",
+   "venues": [
+    "arXiv 2608.21254, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "2608.30724.md",
+   "id": "2608.30724",
+   "levers": [
+    "D13",
+    "D14"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "agents"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "agents"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "agents"
+    }
+   ],
+   "status": {
+    "agents": "OK|yes|background"
+   },
+   "title": "BAITBENCH: Measuring Agent Reward Hacking with Optional Shortcuts Planted in ML Tasks",
+   "topics": [
+    "agents"
+   ],
+   "url": "https://arxiv.org/abs/2608.30724",
+   "venues": [
+    "arXiv 2608.30724, 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "3seasonweeddet10-dataset-weed-image-augmentation-controlnet.md",
+   "id": "3seasonweeddet10-dataset-weed-image-augmentation-controlnet",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|consider"
+   },
+   "title": "3SeasonWeedDet10 dataset and Weed image augmentation by ControlNet-added stable diffusion for multi-class weed detection",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://zenodo.org/records/14861516",
+   "venues": [
+    "Zenodo 10.5281/zenodo.14861516; Computers and Electronics in Agriculture (2025), 2025"
+   ],
+   "year": "2025"
+  },
+  {
+   "file": "iterative-noisy-annotation-correction-model-robust.md",
+   "id": "iterative-noisy-annotation-correction-model-robust",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|background"
+   },
+   "title": "An iterative noisy annotation correction model for robust plant disease detection",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10628849/",
+   "venues": [
+    "Frontiers in Plant Science 2023, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "liteweed-affordable-edge-ai-robotic-platform.md",
+   "id": "liteweed-affordable-edge-ai-robotic-platform",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|background"
+   },
+   "title": "LiteWeed: An affordable edge-AI robotic platform for laser weed management in resource-constrained environments",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://www.global-agriculture.com/ag-tech-research-news/low-cost-laser-weeding-robot-built-for-smallholder-farms-passes-field-tests-in-canada-and-tanzania/",
+   "venues": [
+    "Smart Agricultural Technology (2026), 2026"
+   ],
+   "year": "2026"
+  },
+  {
+   "file": "multi-format-open-source-weed-image.md",
+   "id": "multi-format-open-source-weed-image",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|background"
+   },
+   "title": "Multi-format open-source weed image dataset for real-time weed identification in precision agriculture (ImageWeeds)",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10618417/",
+   "venues": [
+    "Data in Brief, 2023"
+   ],
+   "year": "2023"
+  },
+  {
+   "file": "object-detection-unified-label-space-multiple.md",
+   "id": "object-detection-unified-label-space-multiple",
+   "levers": [
+    "L4",
+    "X3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "labelnoise"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "labelnoise"
+    }
+   ],
+   "status": {
+    "labelnoise": "OK|yes|adopt"
+   },
+   "title": "Object Detection with a Unified Label Space from Multiple Datasets",
+   "topics": [
+    "labelnoise"
+   ],
+   "url": "https://cseweb.ucsd.edu/~mkchandraker/pdf/eccv20_unifiedobjectdetection.pdf",
+   "venues": [
+    "ECCV 2020, 2020"
+   ],
+   "year": "2020"
+  },
+  {
+   "file": "use-synthetic-images-training-deep-learning.md",
+   "id": "use-synthetic-images-training-deep-learning",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|consider"
+   },
+   "title": "Use of synthetic images for training a deep learning model for weed detection and biomass estimation in cotton",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9666527/",
+   "venues": [
+    "Scientific Reports 12, 2022"
+   ],
+   "year": "2022"
+  },
+  {
+   "file": "weed-database-development-updated-survey-public.md",
+   "id": "weed-database-development-updated-survey-public",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|adopt"
+   },
+   "title": "Weed database development: An updated survey of public weed datasets and cross-season weed detection adaptation",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://github.com/vicdxxx/Weed-Datasets-Survey-2023",
+   "venues": [
+    "Ecological Informatics 81, 2024"
+   ],
+   "year": "2024"
+  },
+  {
+   "file": "yoloweeds-novel-benchmark-yolo-object-detectors.md",
+   "id": "yoloweeds-novel-benchmark-yolo-object-detectors",
+   "levers": [
+    "L3"
+   ],
+   "n_lines": 13,
+   "n_passages": 3,
+   "passages": [
+    {
+     "kind": "RESULT",
+     "line": 11,
+     "topic": "weeds"
+    },
+    {
+     "kind": "US",
+     "line": 12,
+     "topic": "weeds"
+    },
+    {
+     "kind": "CORRECTION",
+     "line": 13,
+     "topic": "weeds"
+    }
+   ],
+   "status": {
+    "weeds": "OK|yes|adopt"
+   },
+   "title": "YOLOWeeds: A novel benchmark of YOLO object detectors for multi-class weed detection in cotton production systems (CottonWeedDet12)",
+   "topics": [
+    "weeds"
+   ],
+   "url": "https://github.com/DongChen06/DCW",
+   "venues": [
+    "Computers and Electronics in Agriculture 205:107655, 2023"
+   ],
+   "year": "2023"
+  }
+ ],
+ "provenance": "Curated research notes, each checked against the paper by a verifier (the CORRECTION line records what was checked). These lines are NOT verbatim text from the paper: quote them as the notes' wording, never as the authors' words.",
+ "schema": "inc-literature/1",
+ "source_notes": {
+  "entries": 144,
+  "path": "_source/notes.md",
+  "per_topic": {
+   "agents": 18,
+   "attribution": 18,
+   "continual": 18,
+   "curation": 18,
+   "labelnoise": 18,
+   "selftrain": 18,
+   "webresearch": 18,
+   "weeds": 18
+  },
+  "sha256": "7fe858db123aa22859ebc49ef102a458a0b5849382c3fd5b1cb3cdff05cff608"
+ },
+ "topic_levers": {
+  "agents": [
+   "D13",
+   "D14"
+  ],
+  "attribution": [
+   "L5",
+   "D8",
+   "X3",
+   "X4"
+  ],
+  "continual": [
+   "L1",
+   "L2",
+   "X1"
+  ],
+  "curation": [
+   "L3",
+   "X2"
+  ],
+  "labelnoise": [
+   "L4",
+   "X3"
+  ],
+  "selftrain": [
+   "L4"
+  ],
+  "webresearch": [],
+  "weeds": [
+   "L3"
+  ]
+ }
+}

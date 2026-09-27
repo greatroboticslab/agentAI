@@ -1,0 +1,200 @@
+{
+  "_meta": {
+    "version": "inc-autopilot-thresholds/1",
+    "pre_registered": "2026-09-27",
+    "purpose": "Every number and pattern the INC autopilot's deterministic diagnoses decide with (docs/INC_AUTOPILOT.md, (b)), each with the reason it has its value. diagnose.py carries no compiled fallback: a key missing here makes its diagnosis report 'unknown' and name the key, because two copies of a pre-registered number drift apart.",
+    "read_by": [
+      "weed_optimizer_framework/tools/inc_autopilot/diagnose.py"
+    ],
+    "resolution_order": "This file, then a dict passed to diagnose.detect(thresholds=...) (tests only). There is no environment override: a campaign decision must be reproducible from the committed file.",
+    "convention": "Each leaf is {value, why}. 'mirrors' names a constant of a pinned INC module that the value must equal; tests/test_inc_ap_diagnose.py checks each one, so the autopilot and the gate cannot drift apart. A fraction that must be compared exactly is {num, den}.",
+    "not_in_this_file": "Measurements, as opposed to chosen thresholds: seed noise, GPU-hours and train sizes (read from the experiment that produced them), and the campaign's SU envelope (campaign config, passed in the evidence context). The lever menu and the builder-refusal patterns live in levers.json.",
+    "changing_a_value": "A change after a replay or prospective result has been recorded invalidates that result; record the change and rerun tests/test_inc_ap_replay.py."
+  },
+  "D1": {
+    "p_recipe_flag": {
+      "value": 0.25,
+      "mirrors": "inc/gate.py GateConfig.p_recipe_flag",
+      "why": "The gate's own recipe flag: P(null > inc) at or below this means fine-tuning with no new data degrades the incumbent (docs/INCREMENTAL_PROTOCOL.md, Gate, attribution 1). The diagnosis counts exactly the entries the gate flagged."
+    },
+    "share_recipe_flagged_min": {
+      "value": 0.5,
+      "why": "Contract D1: the recipe flag on at least half of the gate entries. A majority means the degradation is a property of the recipe, not of a few increments."
+    },
+    "share_null_below_inc_min": {
+      "value": 0.5,
+      "why": "Contract D1: null_mean < inc on at least half of the gate entries: the no-new-data arm is worse than the model it started from, so the regression guard sees the recipe, not the data."
+    },
+    "min_gate_entries": {
+      "value": 3,
+      "why": "A share needs at least one decision from each of the pilot's three recipe chains; with fewer entries one noisy decision is the whole share. Not in the contract's text; it never delays D1 on pilot_v1 (the truth-helps condition needs step 2, which is gate entry 4 or later)."
+    },
+    "min_helps_not_accepted": {
+      "value": 1,
+      "why": "Contract D1: at least one chain step on a clean step the truth arm says helps is not ACCEPT. Without it the recipe flag could be harmless: the gate would still accept what the truth arm says helps."
+    }
+  },
+  "D2": {
+    "unevidenced_statuses": {
+      "value": ["no_evidence", "below_gate", "no_feature"],
+      "why": "select.py status values (select.py:1149-1161) for an image with no retrieval evidence toward train_core: no feature, no finite score, or below the retrieval gate. Such images go to increment_pool unselected, and select increments never reads status (select.py:1411-1416)."
+    },
+    "unevidenced_share_min": {
+      "value": 0.95,
+      "why": "Contract D2: at least 95% of a source's images have no domain evidence. 95% leaves room for a stray selected image in a source that is off-domain as a whole."
+    },
+    "species_crops_max": {
+      "value": 0,
+      "why": "Contract D2: 0 species crops in select_summary retrieval.source_evidence. A source that is missing there has no non-conflict species crop at all (select.py:831-833)."
+    },
+    "verified_box_share_max": {
+      "value": 0.01,
+      "why": "Contract D2: 'about 0' verified boxes in admit_summary per_slug. 1% of the source's boxes allows a stray probe-confident box on an off-domain image; a weed-detection source with species classes has far more."
+    }
+  },
+  "D2b": {
+    "leaf_disease_share_min": {
+      "value": 0.5,
+      "why": "The contract leaves theta open. A source passes relevance yet the top prompt of at least half of its sampled crops is a leaf-disease prompt: by majority it is leaf-disease imagery, which relevance reports but never enforces (relevance.py:36-40, 86-94)."
+    }
+  },
+  "D3": {
+    "planted_relabel_pattern": {
+      "value": "relabel",
+      "why": "A step with clean == false is a planted relabelling control when its 'planted' text names relabelling (pilot.py:673: '40% of boxes relabelled to another species'). Matched case-insensitively. Breal's text ('measured label precision < 0.90') is not a relabelling, so it is not a positive control for the labels attribution."
+    },
+    "labels_attribution": {
+      "value": "labels",
+      "mirrors": "inc/gate.py LABELS",
+      "why": "The class_vs_loc value that attributes a step to its labels (gate.py:55). A planted relabelling step whose class_vs_loc is anything else is a failed positive control."
+    }
+  },
+  "D4": {
+    "ready_rate": {
+      "value": {"num": 5, "den": 7},
+      "why": "Contract D4: the best recipe must agree with the truth arm on at least 5 of 7 steps (compared exactly as agree * 7 >= 5 * compared). 5 of 7 leaves at most two disagreements, e.g. the two planted bad steps."
+    }
+  },
+  "D5": {
+    "transient_cause_kinds": {
+      "value": ["transient"],
+      "why": "driver.py blocks a unit with cause {kind: transient} only after TRANSIENT_LIMIT passes in a row failed to read its inputs (driver.py:1678-1691): a read error, not a failed run. A failed_run block (two failed attempts) or a gate refusal needs a person."
+    },
+    "max_auto_unblocks_per_unit": {
+      "value": 1,
+      "why": "Contract D5 / L7: at most one automatic unblock per unit. A unit that blocks again after one was not blocked by a transient cause."
+    },
+    "auto_reason_prefix": {
+      "value": "auto:",
+      "why": "L7 records its reason as 'auto: <cause>'; an unblock record whose reason starts with this (or whose 'auto' flag is set by the driver's own late recovery) counts as automatic."
+    }
+  },
+  "D6": {
+    "stale_hours": {
+      "value": 2,
+      "why": "Contract D6: generation unchanged for more than 2 h with no job queued and the experiment not done. An incremental run takes under 1 h and a cold run under 3 h of walltime, but the in-job advance and the ticker's 10-minute advance both bump the generation well within 2 h while anything is moving."
+    },
+    "job_prefix": {
+      "value": "inc_%s_",
+      "why": "The driver names every array job inc_<exp>_<NNNN> (driver.py:1567); %s is the experiment."
+    }
+  },
+  "D7": {
+    "error_patterns": {
+      "value": [
+        "differs from the git-tracked copy",
+        "code changed since experiment .* was pinned"
+      ],
+      "why": "The driver's two code refusals: outer-vs-nested drift (driver.py:335-338, _drift_error) and a change since the pin (driver.py:1303-1309). Either means the running code is not the code the experiment was pinned to; only a person may repin or sync."
+    }
+  },
+  "D8": {
+    "p_band": {
+      "value": [0.25, 0.75],
+      "mirrors": "inc/gate.py GateConfig.p_reject, GateConfig.p_accept",
+      "why": "P_data strictly inside the gate's HOLD band: the gate could not tell cand from null."
+    },
+    "share_min": {
+      "value": 0.5,
+      "why": "Contract D8: at least half of the gate entries are underpowered."
+    },
+    "sd_mult": {
+      "value": 2.0,
+      "why": "Contract D8: |cand - null| < 2 * max(sd): the effect is inside two seed standard deviations."
+    },
+    "size_multiplier": {
+      "value": 2,
+      "why": "L5 proposes the next increment size as this multiple of the current one. Doubling is the smallest step that changes the power materially and keeps the build inside select's pool; the protocol offers no other size rule."
+    }
+  },
+  "D9": {
+    "warmup_share_max": {
+      "value": 0.15,
+      "why": "Contract D9: Ultralytics' 100-iteration warmup floor covering more than 15% of an incremental run's epochs. pilot_v1: 6.67 of 30 epochs (0.22)."
+    }
+  },
+  "D10": {
+    "margin": {
+      "value": 1.0,
+      "why": "Contract D10: fires when SU spent plus the projected cost of the remaining runs exceeds the envelope itself (margin 1.0)."
+    }
+  },
+  "D11": {
+    "truth_share_min": {
+      "value": 0.4,
+      "why": "Contract D11: the truth arm costs more than 40% of an experiment's GPU-hours (pilot_v1: 8.92 of 17.28, 52%)."
+    },
+    "agreement_min": {
+      "value": {"num": 6, "den": 7},
+      "why": "Contract D11: dropping the truth arm is allowed only after the best recipe agreed with it on at least 6 of 7 steps."
+    },
+    "min_pilots": {
+      "value": 2,
+      "why": "Contract D11: that agreement must hold over at least 2 pilots."
+    }
+  },
+  "D13": {
+    "contradicts": {
+      "value": {"up": ["worse"], "down": ["better"]},
+      "why": "experiments.verdict outcomes (better, worse, within_noise, insufficient) that contradict a lever's predicted direction. within_noise and insufficient do not contradict: they fail to confirm."
+    }
+  },
+  "D15": {
+    "min_pairs": {
+      "value": 2,
+      "why": "D15 fires when at least this many (chain, step) pairs, pooled over every chain as the contract states and as the v2 check itself pools them (docs/INCREMENTAL_PROTOCOL.md, Protocol v2, The criterion), are clean steps the truth arm says help that were REJECTed with P_data >= p_accept and the flips guard as the only failed guard. Each pair is its own gate decision: its own incumbent, cands, nulls and flip counts. One pair can be a single noisy decision; two is the smallest count that is a repetition of the guard. The value is the contract's, set on that reasoning and not tuned. Sensitivity, for the record: on pilot_v2 five pairs qualify (freeze I2, I3; full I2, I3; lora I3), so R5 fires for any value from 1 to 5; pilot_v1 has none, so it is silent for any value. Neither replay case depends on the value, and the precedence over D1 does not use it (it asks whether every truth-helps miss is such a pair)."
+    },
+    "p_accept": {
+      "value": 0.75,
+      "mirrors": "inc/gate.py GateConfig.p_accept",
+      "why": "The gate's accept line: at P_data >= p_accept the gate saw the data effect, so a REJECT came from a guard. The rule reads each ledger decision's own recorded config.p_accept when it has one (a gate block may change p_accept per experiment) and this value only when the decision records none (a report-only row)."
+    },
+    "flips_guard": {
+      "value": "flips",
+      "mirrors": "inc/gate.py decide(): the key of the flips guard in Decision.guards",
+      "why": "The guard whose sole failure D15 counts. Every other guard the decision records (regression, species) must have passed; a guard the row does not record makes the pair not count."
+    },
+    "v1_mode": {
+      "value": "negative",
+      "mirrors": "inc/gate.py FLIPS_NEGATIVE (DEFAULT_FLIPS_MODE)",
+      "why": "Protocol v1, the flips guard on negative flips. It is also the mode of every decision that records no flips_mode (a v1 decision's config omits the key) and of every experiment built before gate blocks existed (pilot_v1, pilot_v2). Only an experiment pinned to this mode gets L9."
+    },
+    "v2_mode": {
+      "value": "net",
+      "mirrors": "inc/gate.py FLIPS_NET",
+      "why": "Protocol v2, the flips guard on net flips (docs/INCREMENTAL_PROTOCOL.md, Protocol v2). D15 on an experiment already pinned to it proposes no rebuild: the pre-registered alternative is what blocked the step, so the guard family itself needs a person (card X6)."
+    }
+  },
+  "D16": {
+    "v2_mode": {
+      "value": "net",
+      "mirrors": "inc/gate.py FLIPS_NET",
+      "why": "D16 reads report.json v2_check only on an experiment pinned to protocol v2: report.py writes v2_check for exactly those."
+    },
+    "severity": {
+      "value": {"refuted": "crit", "supported": "info", "inconclusive": "warn"},
+      "mirrors": "inc/report.py v2_check outcomes",
+      "why": "The pre-registered outcomes of the v2 check (docs/INCREMENTAL_PROTOCOL.md, Protocol v2, The criterion). refuted retires v2 for the experiment's gate: crit, card X7, and no real loop is built on it. supported is recorded, and D4 may proceed. inconclusive leaves v2 unproven: D4 may proceed only on its own threshold, and the record says v2 is unproven."
+    }
+  }
+}

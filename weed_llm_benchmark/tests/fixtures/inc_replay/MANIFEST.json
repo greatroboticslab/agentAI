@@ -1,0 +1,194 @@
+{
+  "format": "inc-autopilot/replay-fixtures/1",
+  "what": "Frozen INC artifacts the autopilot's replay tests read (docs/INC_AUTOPILOT.md, (f) and (g) step 1). Each file is a byte-for-byte copy of the named results file; its sha256 is pinned here and checked by tests/test_inc_ap_fixtures.py, so a replay case can never silently run on edited evidence.",
+  "frozen_utc": "2026-09-27T09:00:00Z",
+  "added": [
+    {
+      "utc": "2026-09-27T12:00:00Z",
+      "files": [
+        "base_b_v1/build_summary.json",
+        "base_b_v1/exp.json",
+        "base_b_v1/report.json",
+        "pilot_v2/build_summary.json",
+        "pilot_v2/exp.json",
+        "pilot_v2/ledger.jsonl",
+        "pilot_v2/report.json"
+      ],
+      "why": "pilot_v2 (the full rehearsal, decided by gate v1) and base_b_v1, copied byte for byte from the local results once both were done: replay case R5 (D15 on the flips guard, lever L9) and tests/test_inc_ap_e2e.py read them."
+    },
+    {
+      "utc": "2026-09-27T16:00:00Z",
+      "files": [
+        "pilot_v3/build_summary.json",
+        "pilot_v3/exp.json",
+        "pilot_v3/ledger.jsonl",
+        "pilot_v3/report.json"
+      ],
+      "why": "pilot_v3 (the full rehearsal decided by gate v2, net flips; v2_check supported), copied byte for byte from the local results once it was done: replay case R6 (D1 fires but does not block D4, whose selected chain full ACCEPTed every truth-helps step; D4 ready, L2 on full replay, recipe full, gate net) reads it. Pinned after its result was known, so R6 is a reproduction test."
+    }
+  ],
+  "files": {
+    "pilot_v1/exp.json": {
+      "sha256": "669af9893d76f4da633bb834c25e6c0ca505fc936322c47ab711028e240f8e3a",
+      "bytes": 13208,
+      "from": "results/framework/inc/pilot_v1/exp.json"
+    },
+    "pilot_v1/report.json": {
+      "sha256": "095ab861e061db596d487cca4eaad12a0050677c72fac967fed5208d497b6bd4",
+      "bytes": 51254,
+      "from": "results/framework/inc/pilot_v1/report.json"
+    },
+    "pilot_v1/ledger.jsonl": {
+      "sha256": "690ac9ec1b3c60c2fcaac1f3a7a29cf5ebdcae98207597264d09ec8c3ec6e845",
+      "bytes": 230999,
+      "from": "results/framework/inc/pilot_v1/ledger.jsonl"
+    },
+    "pilot_v1/build_summary.json": {
+      "sha256": "99784154bb790895a373927b4bcfc953c2dc826c70d67d6a66bf2c92205f15ff",
+      "bytes": 18733,
+      "from": "results/framework/inc/pilot_v1/build_summary.json"
+    },
+    "b0_v1/exp.json": {
+      "sha256": "053d29743bc4a3b12dddac79605d6576b2e4baf625090a88c0927e3f7a3c307d",
+      "bytes": 1119,
+      "from": "results/framework/inc/b0_v1/exp.json"
+    },
+    "b0_v1/ledger.jsonl": {
+      "sha256": "0bbf8dee8b890d44cf4a8b4ad7b83b7a4d83d71dfdb25b3b21c1a08f9c9a7d55",
+      "bytes": 1354,
+      "from": "results/framework/inc/b0_v1/ledger.jsonl"
+    },
+    "pilot_v2/exp.json": {
+      "sha256": "2a31ab804df9b91e669f47f4d0a13a0eb54bb4b6b01fd00d4edebd9e5003fe5c",
+      "bytes": 30919,
+      "from": "results/framework/inc/pilot_v2/exp.json"
+    },
+    "pilot_v2/report.json": {
+      "sha256": "37c5ca1d0f3f9c249870ea8c5f8c1387c411e198ed6320ff072adda63f32911f",
+      "bytes": 66363,
+      "from": "results/framework/inc/pilot_v2/report.json"
+    },
+    "pilot_v2/ledger.jsonl": {
+      "sha256": "e97471f75a488249edf8271876726005479687d7b20be037ae2fe3dbf09a31e9",
+      "bytes": 228134,
+      "from": "results/framework/inc/pilot_v2/ledger.jsonl"
+    },
+    "pilot_v2/build_summary.json": {
+      "sha256": "c770e78cfb3a417a6081aed7601236500fbcfbf0de7fba2078270fdc573cb349",
+      "bytes": 36444,
+      "from": "results/framework/inc/pilot_v2/build_summary.json"
+    },
+    "base_b_v1/exp.json": {
+      "sha256": "4f992ac673b5d0a35b3595addd7baf67a18d97ce0e019c016c70502f7134134b",
+      "bytes": 1092,
+      "from": "results/framework/inc/base_b_v1/exp.json"
+    },
+    "base_b_v1/report.json": {
+      "sha256": "1cdc5be8c9e5487758f8708f658a9d4a9030544df0a1b1ffde1f4b30bf030894",
+      "bytes": 2706,
+      "from": "results/framework/inc/base_b_v1/report.json"
+    },
+    "base_b_v1/build_summary.json": {
+      "sha256": "ef0cb9cf81fa89073a41317de21a4151557050d820097af13799b86f53cf8b87",
+      "bytes": 5407,
+      "from": "results/framework/inc/base_b_v1/build_summary.json"
+    },
+    "pilot_v3/exp.json": {
+      "sha256": "dfbeca03286b552f177d50e5c8d7883b4465daa56f74d267c841e551dc36143c",
+      "bytes": 30956,
+      "from": "results/framework/inc/pilot_v3/exp.json"
+    },
+    "pilot_v3/report.json": {
+      "sha256": "be76c1e5185b355f17a983a786c76fea669641aa6a25784fc72c60218ef157db",
+      "bytes": 68926,
+      "from": "results/framework/inc/pilot_v3/report.json"
+    },
+    "pilot_v3/ledger.jsonl": {
+      "sha256": "93aca87eb92ea5cc7ce0441a1057798ee281756fc3843813a93f61b1354c8df9",
+      "bytes": 256820,
+      "from": "results/framework/inc/pilot_v3/ledger.jsonl"
+    },
+    "pilot_v3/build_summary.json": {
+      "sha256": "d27b4f69da9d0272efe97981571eb6108fb0e5ce187d96469ad0ddc06ea86ab7",
+      "bytes": 36481,
+      "from": "results/framework/inc/pilot_v3/build_summary.json"
+    }
+  },
+  "pending": {
+    "step1/select_summary.json": "INC_DIR/step1/select_summary.json on /ocean. Needed by replay case R2.",
+    "step1/admit_summary.json": "INC_DIR/step1/admit_summary.json on /ocean. Needed by R2.",
+    "step1/select_clusters_by_source.json": "remote.py clusters_by_source of INC_DIR/step1/select_clusters.csv (per-source status counts; the CSV itself is never shipped). Needed by R2.",
+    "step1/relevance.json": "INC_DIR/step1/relevance.json on /ocean, once relevance build has run. R2's second half (D2 silent, D2b on the tomato-leaf source) reads it; R2's first half runs on the same step1 files without it.",
+    "how": "Copy each file here under its INC_DIR-relative name (a remote.py 'fixture --out' goes to a separate directory: it writes its own MANIFEST.json), then add its sha256, bytes and origin to 'files' above; tests/test_inc_ap_fixtures.py fails on any file that is here but not pinned."
+  },
+  "synthetic": {
+    "synthetic/step1_calibration_failed/admit_summary.json": {
+      "sha256": "2dc216591998ee7b6ae8a9338558c474b6759b5325e271d4a8faa0d7b915d13a",
+      "bytes": 1982,
+      "stands_for": "step1/admit_summary.json"
+    },
+    "synthetic/step1_calibration_failed/relevance.json": {
+      "sha256": "103fe2a24eb5d316e440fd9d31113b61f0ce90df571380549349fd448dccdefc",
+      "bytes": 10391,
+      "stands_for": "step1/relevance.json"
+    },
+    "synthetic/step1_calibration_failed/select_clusters_by_source.json": {
+      "sha256": "d74cb41703ae64d2dc15a948ec5ec42ac0b1c6dbe2e48c587ba2677c849feb71",
+      "bytes": 1917,
+      "stands_for": "step1/select_clusters_by_source.json"
+    },
+    "synthetic/step1_calibration_failed/select_summary.json": {
+      "sha256": "ded15e7eb1641a3dfbbd212be9de8f48e0ef1c42fabc6cee409cf79f23e03287",
+      "bytes": 3613,
+      "stands_for": "step1/select_summary.json"
+    },
+    "synthetic/step1_real_calibration_failed/relevance.json": {
+      "sha256": "af2f8968d92aaaae55fbe1c571dcc5dfdb8ec4f9045bb1a4e7353015e178a06f",
+      "bytes": 4816,
+      "stands_for": "step1/relevance.json"
+    }
+  },
+  "synthetic_why": [
+    {
+      "utc": "2026-09-27T20:00:00Z",
+      "files": [
+        "synthetic/step1_calibration_failed/admit_summary.json",
+        "synthetic/step1_calibration_failed/relevance.json",
+        "synthetic/step1_calibration_failed/select_clusters_by_source.json",
+        "synthetic/step1_calibration_failed/select_summary.json"
+      ],
+      "why": "Replay case R7 (docs/INC_AUTOPILOT.md (f)): a small synthetic Step 1, not a copy of any results file, so it has no 'from'. relevance.json has the shape of the cluster's step1/relevance.json of 2026-09-27 and its calibration numbers (tau 0.0557 < tau_min 0.5; share of train_core crops below 0.5: 0.345), and is made for this select build (its inputs' sha256 are the select summary's outputs), so relevance.load refuses it for its calibration, not as malformed. The admit and select summaries give five sources with verified cwd12-species boxes whose increment-pool images (3,213) hold the default real loop (N 6 x M 393 = 2,751); sources named 'synthetic__' are invented, the others carry the real sources' numbers. The replay test copies each file to step1/<name> ('stands_for') beside the pinned pilot_v3. The generator is not kept: the bytes pinned here are the fixture."
+    },
+    {
+      "utc": "2026-09-27T22:00:00Z",
+      "files": [
+        "synthetic/step1_real_calibration_failed/relevance.json"
+      ],
+      "why": "Replay case R8 (docs/INC_AUTOPILOT.md (f)): a relevance.json made for the real Step 1 select build (its inputs carry that build's table sha256 and the sha256 of step1_copies/select_summary.json) with the cluster relevance build's calibration numbers (tau 0.0557 < tau_min 0.5; 34.5 % of train_core crops below 0.5), as in R7's file, so relevance.load refuses it for its calibration, not as malformed. Its per-source tables are empty (the cluster file's per-source scores were not pulled; nothing reads them for a calibration-failed file). The replay test copies it to step1/relevance.json beside the two step1_copies summaries and the pinned pilot_v3. The generator is not kept: the bytes pinned here are the fixture."
+    }
+  ],
+  "step1_copies": {
+    "step1_copies/select_summary.json": {
+      "sha256": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101",
+      "bytes": 25564,
+      "from": "results/framework/inc/step1/select_summary.json",
+      "stands_for": "step1/select_summary.json"
+    },
+    "step1_copies/admit_summary.json": {
+      "sha256": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011",
+      "bytes": 10432,
+      "from": "results/framework/inc/step1/admit_summary.json",
+      "stands_for": "step1/admit_summary.json"
+    }
+  },
+  "step1_copies_why": [
+    {
+      "utc": "2026-09-27T22:00:00Z",
+      "files": [
+        "step1_copies/admit_summary.json",
+        "step1_copies/select_summary.json"
+      ],
+      "why": "Replay case R8 (docs/INC_AUTOPILOT.md (f), the R4 sizing rule of 2026-09-27): byte copies of the local results/framework/inc/step1/select_summary.json and admit_summary.json, the Step 1 summaries the protocol's numbers come from (base B 3,927 images; five evidenced sources holding 1,439 of 96,088 increment-pool images). They live in step1_copies/, outside step1/ and every experiment directory, so no loader reads them in place of the pending cluster pull (R2 still waits for select_clusters_by_source.json and the cluster's relevance.json). Whether the local files equal /ocean's was not checked here (no ssh)."
+    }
+  ]
+}

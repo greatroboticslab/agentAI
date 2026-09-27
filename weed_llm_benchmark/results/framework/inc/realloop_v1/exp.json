@@ -1,0 +1,542 @@
+{
+ "attribution_scope": {
+  "not_run": {
+   "4": "label audit: not re-run per step; the Step 1 verifier judged every box already (every species box of a verified increment is verified; the unverified increment's verdicts are in build_summary.json 'unverified')",
+   "5": "leave-one-source-out cand runs for a multi-source increment: not run by the driver; each increment's per-source counts are in build_summary.json"
+  },
+  "run": [
+   "1 recipe vs data",
+   "2 classification vs localisation",
+   "3 per-species deltas"
+  ]
+ },
+ "base": {
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/base_B.jsonl",
+  "manifest_sha256": "4de04a7c6ce6c116625f10add0f86b550a9b091abb9d46d460472712346c1b71",
+  "n_images": 3927,
+  "name": "base_B",
+  "recipe": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 100,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.01,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "full",
+   "warmup_bias_lr": 0.1,
+   "warmup_epochs": 3,
+   "weight_decay": 0.0005,
+   "workers": 5
+  },
+  "source_manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_B.jsonl"
+ },
+ "builder": "inc.realloop build",
+ "decision_exam": "dev",
+ "effective_warmup": {
+  "cold": {
+   "base": {
+    "covers_whole_run": false,
+    "epochs": 100,
+    "images": 3927,
+    "iterations_per_epoch": 123,
+    "warmup_epochs_effective": 3.0,
+    "warmup_epochs_nominal": 3,
+    "warmup_iterations": 369
+   },
+   "truth": {
+    "s01_V1": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 4214,
+     "iterations_per_epoch": 132,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 396
+    },
+    "s02_V2": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 4501,
+     "iterations_per_epoch": 141,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 423
+    },
+    "s03_UNVERIFIED": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 4788,
+     "iterations_per_epoch": 150,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 450
+    },
+    "s04_V3": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 4788,
+     "iterations_per_epoch": 150,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 450
+    },
+    "s05_OTHER_HEAVY": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 5075,
+     "iterations_per_epoch": 159,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 477
+    },
+    "s06_V4": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 5362,
+     "iterations_per_epoch": 168,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 504
+    }
+   }
+  },
+  "incremental": {
+   "full": {
+    "s01_V1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s02_V2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4501,
+       "iterations_per_epoch": 141,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 141
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s03_UNVERIFIED": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4788,
+       "iterations_per_epoch": 150,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 150
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4501,
+       "iterations_per_epoch": 141,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 141
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s04_V3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5075,
+       "iterations_per_epoch": 159,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 159
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4788,
+       "iterations_per_epoch": 150,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 150
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s05_OTHER_HEAVY": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5362,
+       "iterations_per_epoch": 168,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 168
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5075,
+       "iterations_per_epoch": 159,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 159
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s06_V4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5649,
+       "iterations_per_epoch": 177,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 177
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5362,
+       "iterations_per_epoch": 168,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 168
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    }
+   }
+  },
+  "incremental_effective_epochs": {
+   "max": 1.0,
+   "min": 1.0
+  },
+  "note": "Ultralytics warms up for max(round(warmup_epochs * iterations per epoch), 100) iterations; replay mode full: cand holds the accepted pool + D_k and null the pool, recorded at pool_min (P0) and pool_max (P0 + every earlier increment); the driver records each step's actual sizes",
+  "replay_mode": "full"
+ },
+ "exp": "realloop_v1",
+ "final_exams": [
+  "dev",
+  "ood22",
+  "ood23",
+  "imageweeds",
+  "test"
+ ],
+ "gate": {
+  "flips_mode": "net"
+ },
+ "increment_images": 287,
+ "init_weights": "yolo11n.pt",
+ "initialised_utc": "2026-09-27T19:46:23Z",
+ "recipes": {
+  "full": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 30,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.002,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "full",
+   "warmup_bias_lr": 0.002,
+   "warmup_epochs": 1,
+   "weight_decay": 0.0005,
+   "workers": 5
+  }
+ },
+ "replay_mode": "full",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "step1": {
+  "admit_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/admit_summary.json",
+   "sha256": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011"
+  },
+  "conflicts": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/conflicts.csv",
+   "sha256": "0d528c6e6ba8d6b50b2b963e59c2a8d901e5262472be38dd6d22436abb760c30"
+  },
+  "increment_sources": {
+   "min_evidence": 1,
+   "mode": "evidence",
+   "rule": "source-level species evidence: an increment-pool source is eligible for the regular and OtherPlant-heavy draws only if verify admit judged at least min_evidence of its cwd12-species boxes 'verified' (admit_summary.json per_slug boxes); every image of any other source leaves the draw"
+  },
+  "increments_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/increments_summary.json",
+   "sha256": "0a6f6e6a675072c8c1f94c30f7672ca59c41ca12ba08c9dcb253acdfcaaad686"
+  },
+  "never_train": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+   "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+  },
+  "pool": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/pool.jsonl",
+   "sha256": "a9c7a3c05e64aa9cc9cbe2bd59dad5e5bdd2a8b53c99033a22ddf00ea13013bc"
+  },
+  "pool_meta": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/pool_meta.jsonl",
+   "sha256": "196027ca6e9ef77a55d266614a775e2f36e0ebbe85525ae5d0fc430041c2a3b7"
+  },
+  "relevance": null,
+  "select_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/select_summary.json",
+   "sha256": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101"
+  },
+  "train_core": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/train_core.jsonl",
+   "sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  },
+  "verified": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/verified.jsonl",
+   "sha256": "d0662ef431f9d0cbfb413a83695aec01351cd9dff562eb7135ae91dde335cce4"
+  }
+ },
+ "steps": [
+  {
+   "clean": true,
+   "kind": "verified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_01.jsonl",
+   "manifest_sha256": "c30c6e185d1751d9a6fab1445183d7b9cda859984f637636d2f1c36b660ac343",
+   "n_images": 287,
+   "name": "V1",
+   "select_manifest": "inc_01.jsonl"
+  },
+  {
+   "clean": true,
+   "kind": "verified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_02.jsonl",
+   "manifest_sha256": "9e2264238e5758034b910e611051a8071eb9b850cf408cf0d0bf9ea61b90e15a",
+   "n_images": 287,
+   "name": "V2",
+   "select_manifest": "inc_02.jsonl"
+  },
+  {
+   "clean": false,
+   "kind": "unverified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_unverified.jsonl",
+   "manifest_sha256": "29d6c4678c8226def6f3f28cf21fddc1bcd5e2afe7cac3302f66824bfeda004a",
+   "n_images": 287,
+   "name": "UNVERIFIED",
+   "rule": "M images of the one harvested source with the most eligible images verify did not admit (conflict or unknown), among sources with at least M (ties: the lower name); eligible = not within 3 dHash bits of an image of the base or of a verified increment (a never-train hit, a train_core copy or the same image as one of those stops the build); drawn with default_rng(stable_int(exp + '/unverified')) over the eligible images sorted by key; labels as the species join gave them",
+   "source": "rf_tuf__weed-3434e",
+   "verdicts": {
+    "conflict": 287
+   }
+  },
+  {
+   "clean": true,
+   "kind": "verified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_03.jsonl",
+   "manifest_sha256": "9cfa64518820439591b9b9676a4d5de8d197414768fa8e9524b173ef9a980da5",
+   "n_images": 287,
+   "name": "V3",
+   "select_manifest": "inc_03.jsonl"
+  },
+  {
+   "clean": true,
+   "kind": "otherplant_heavy",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_otherplant.jsonl",
+   "manifest_sha256": "d276688bca6928f5adc2c25e5cd56d49096875a49ff359639161a480b6e27ad5",
+   "n_images": 287,
+   "name": "OTHER_HEAVY",
+   "select_manifest": "inc_otherplant.jsonl"
+  },
+  {
+   "clean": true,
+   "kind": "verified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_04.jsonl",
+   "manifest_sha256": "274b98193fc47d3e3fb5f718e436c4f00aba54e7bd3b4033e1c429c6b766057e",
+   "n_images": 287,
+   "name": "V4",
+   "select_manifest": "inc_04.jsonl"
+  }
+ ],
+ "testing": false,
+ "truth": true,
+ "truth_recipe": {
+  "batch": 32,
+  "cache": "ram",
+  "close_mosaic": 10,
+  "cos_lr": true,
+  "deterministic": true,
+  "epochs": 100,
+  "freeze": null,
+  "imgsz": 640,
+  "lora": null,
+  "lr0": 0.01,
+  "lrf": 0.01,
+  "momentum": 0.937,
+  "optimizer": "SGD",
+  "trainer": "full",
+  "warmup_bias_lr": 0.1,
+  "warmup_epochs": 3,
+  "weight_decay": 0.0005,
+  "workers": 5
+ },
+ "type": "chain"
+}

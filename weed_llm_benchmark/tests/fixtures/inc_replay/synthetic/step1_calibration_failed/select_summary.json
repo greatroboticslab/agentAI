@@ -1,0 +1,91 @@
+{
+ "created": "2026-09-27T01:58:00Z",
+ "inputs": {
+  "crops": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/crops.csv",
+   "sha256": "487d4e3a19e306b3960ffca97e5c878ff45fdd876a72fb78715bc592f8218a28"
+  },
+  "never_train": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/never_train.json",
+   "sha256": "cf318ce5e38f5b4c96630193a5fae3176f3ad4118b59764810133b44782a2a21"
+  },
+  "train_core": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/train_core.jsonl",
+   "sha256": "ab77d254c58b5d37db71bd3e2b579fe0e3f38c219b5bd75ff32c534a7205ede9"
+  },
+  "verified": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/verified.jsonl",
+   "sha256": "bad4e7e6565112fc8fcdcfcb769277d20300e3329faa0d75423d6d6a64a601a7"
+  }
+ },
+ "outputs": {
+  "base_B.jsonl": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_B.jsonl",
+   "rows": 3927,
+   "sha256": "75d6d59d9905df0f4b6eb0aa7a98a732c9be54975edd51066da97457787bcf15"
+  },
+  "base_selected.jsonl": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_selected.jsonl",
+   "rows": 878,
+   "sha256": "8b19dc4a7346b5573a2d1030089b9af8bb0d981f016b5104d85abee3e331cb99"
+  },
+  "increment_pool.jsonl": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/increment_pool.jsonl",
+   "rows": 10138,
+   "sha256": "751289fdd6580b5580173f5d2b5d25516d8bc0ed01b5ea7688404da3492bbc07"
+  },
+  "select_clusters.csv": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/select_clusters.csv",
+   "sha256": "cfeca42195eb6d0d5f1bddee7536d1db0ca181ecd26b4274862feba7079b36f3"
+  }
+ },
+ "retrieval": {
+  "source_evidence": {
+   "project_agml__weed_crop_detection": {
+    "median": 0.1,
+    "species_crops": 1456
+   },
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+    "median": 0.1,
+    "species_crops": 786
+   },
+   "rf_zig-zag-lnodr__weed-detection-vanpe": {
+    "median": 0.1,
+    "species_crops": 366
+   },
+   "synthetic__crop-and-weed-b": {
+    "median": 0.1,
+    "species_crops": 500
+   },
+   "synthetic__weed-source-a": {
+    "median": 0.1,
+    "species_crops": 950
+   }
+  }
+ },
+ "sizes": {
+  "base_B": 3927,
+  "increment_pool": 10138,
+  "selected": 878,
+  "train_core": 3049,
+  "verified": 11016
+ },
+ "sources": {
+  "increment_pool": {
+   "francesco__grass_weeds": 2479,
+   "fvossel__csgo_player_detection": 4012,
+   "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": 434,
+   "project_agml__weed_crop_detection": 206,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 755,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 352,
+   "synthetic__crop-and-weed-b": 800,
+   "synthetic__weed-source-a": 1100
+  },
+  "selected": {
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 500,
+   "synthetic__weed-source-a": 378
+  }
+ },
+ "step": "inc.select build",
+ "synthetic": "Synthetic, for replay case R7 (docs/INC_AUTOPILOT.md (f)): a small Step 1 in the shape of the cluster's files of 2026-09-27. relevance.json carries that build's calibration numbers (tau 0.0557 < 0.5; 34.5 % of the train_core crops below 0.5) and is made for this select build; the evidenced sources hold enough increment-pool images for the default real loop (the real Step 1 does not: 1,439 < 2,751, R7's negative case). Sources named 'synthetic__' are invented; the others carry numbers of the real sources."
+}

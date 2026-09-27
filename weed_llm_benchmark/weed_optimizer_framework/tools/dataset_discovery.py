@@ -1283,6 +1283,7 @@ class DatasetDiscovery:
         queries = queries or self.DEFAULT_HARVEST_QUERIES
         results = []
         seen_ids = set()
+        registered_before = set(self.registry["datasets"])
 
         # ------------ Phase 1: task-filtered bulk discovery (high precision) ------------
         logger.info("[Harvest] Phase 1: task=object-detection bulk list")
@@ -1530,8 +1531,11 @@ class DatasetDiscovery:
                         or self.is_duplicate(s)
                         or self._is_already_flagged_garbage(s)
                     ),
-                    # Allow Roboflow to dominate the quota since it's the big source
-                    max_new=max(rf_quota, 8),
+                    # INC 0.4: only the remaining quota. Asking for max(quota, 8)
+                    # downloaded projects (1K-10K images each, on the API quota
+                    # and the harvest walltime) that the max_new cut below then
+                    # deleted again.
+                    max_new=rf_quota,
                 )
                 # v3.0.30.3: post-filter Roboflow results too
                 for entry in rf:
@@ -1562,6 +1566,33 @@ class DatasetDiscovery:
                 kept.append(r)
             results = kept
 
+        # INC Step 0.4 (docs/INCREMENTAL_PROTOCOL.md): max_new is the size of a
+        # round's increment. Every phase is now asked for the remaining quota
+        # only; this cut is the backstop for a source that returns more than it
+        # was asked for (the Roboflow phase used to be asked for max(quota, 8),
+        # and everything it returned was kept). The earliest-found datasets
+        # stay; the rest are unregistered and their downloads removed, so no
+        # later merge can pick them up and mark them used_for_training. None of
+        # them has been saved yet: only the HF phase saves mid-harvest, and HF
+        # results come first and stop at max_new.
+        cut = results[max(int(max_new), 0):]
+        results = results[:max(int(max_new), 0)]
+        if cut:
+            data_root = os.path.realpath(self.data_dir)
+            for r in cut:
+                slug = r.get("slug")
+                if not slug or slug in registered_before:
+                    continue
+                info = self.registry["datasets"].pop(slug, None) or {}
+                lp = os.path.realpath(info.get("local_path")
+                                      or os.path.join(self.data_dir, slug))
+                if (lp != data_root and os.path.commonpath([data_root, lp]) == data_root
+                        and os.path.isdir(lp)):
+                    shutil.rmtree(lp, ignore_errors=True)
+            logger.warning(
+                f"[Harvest] {len(cut)} dataset(s) over max_new={max_new} cut, "
+                f"unregistered and removed from disk: {[r.get('slug') for r in cut]}")
+
         # v3.0.77.1 (2026-06-02): stamp harvest_round on EVERY slug
         # downloaded in this run. Earlier code only set it in the HF
         # phase; GitHub/Kaggle/RoboflowUniverse paths registered slugs
@@ -1588,6 +1619,7 @@ class DatasetDiscovery:
             "downloaded": len([r for r in results
                                if r["stats"].get("status") == "downloaded"]),
             "rejected_strict_garbage": n_rejected_strict,
+            "cut_over_max_new": [r.get("slug") for r in cut],
             "results": results,
         }
 

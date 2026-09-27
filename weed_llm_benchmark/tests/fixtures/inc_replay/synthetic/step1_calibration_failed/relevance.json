@@ -1,0 +1,398 @@
+{
+ "base_selected": {
+  "images": 878,
+  "images_by_status": {
+   "fail": 378,
+   "insufficient": 0,
+   "pass": 500
+  },
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_selected.jsonl",
+  "name_check": {
+   "sources": {
+    "synthetic__weed-source-a": {
+     "images": 378,
+     "status": "fail"
+    }
+   },
+   "use": "reported only",
+   "words": [
+    "weed",
+    "crop",
+    "plant",
+    "seed",
+    "leaf",
+    "agri",
+    "farm",
+    "field"
+   ]
+  },
+  "not_passing": {
+   "synthetic__weed-source-a": 378
+  },
+  "not_passing_images": 378,
+  "sha256": "8b19dc4a7346b5573a2d1030089b9af8bb0d981f016b5104d85abee3e331cb99",
+  "sources": {
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 500,
+    "images_with_usable_crops": 500,
+    "p_plant_mean": 0.17,
+    "p_plant_median": 0.12,
+    "p_plant_quartiles": [
+     0.06,
+     0.24
+    ],
+    "passes": true,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.55,
+    "status": "pass",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.0,
+     "non_plant": 0.1,
+     "plant": 0.9
+    }
+   },
+   "synthetic__weed-source-a": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 378,
+    "images_with_usable_crops": 378,
+    "p_plant_mean": 0.09,
+    "p_plant_median": 0.04,
+    "p_plant_quartiles": [
+     0.02,
+     0.08
+    ],
+    "passes": false,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.42,
+    "status": "fail",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.0,
+     "non_plant": 0.1,
+     "plant": 0.9
+    }
+   }
+  },
+  "sources_by_status": {
+   "fail": 1,
+   "insufficient": 0,
+   "pass": 1
+  }
+ },
+ "built_utc": "2026-09-27T03:10:00Z",
+ "calibration": {
+  "check": {
+   "ok": false,
+   "rule": "the calibration is usable only when tau >= 0.5, that is, when at least 95 % of train_core crops are judged more plant than non-plant (P(plant) >= 0.5); otherwise the prompts do not separate genuine weeds from the non-plant set, the file is written for a person to read, and relevance.load refuses it",
+   "share_below_0.5": 0.345,
+   "tau_min": 0.5
+  },
+  "crops": 11873,
+  "crops_without_feature": 0,
+  "distribution": {
+   "p0": 0.0003,
+   "p1": 0.0101,
+   "p10": 0.1107,
+   "p100": 1.0,
+   "p25": 0.2961,
+   "p5": 0.0557,
+   "p50": 0.8012,
+   "p75": 0.9913,
+   "p90": 0.9995,
+   "p95": 0.9999,
+   "p99": 1.0
+  },
+  "mean": 0.6021,
+  "percentile": 5.0,
+  "set": "every train_core crop with a feature (crops.csv set 'core'); all genuine weeds",
+  "share_at_or_above_tau": 0.95,
+  "tau": 0.0557,
+  "top_set_share": {
+   "leaf_disease": 0.05,
+   "non_plant": 0.33,
+   "plant": 0.62
+  }
+ },
+ "format": "inc.relevance/1",
+ "increment_pool": {
+  "images": 10138,
+  "images_by_status": {
+   "fail": 5318,
+   "insufficient": 0,
+   "pass": 4820
+  },
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/increment_pool.jsonl",
+  "name_check": {
+   "sources": {
+    "project_agml__weed_crop_detection": {
+     "images": 206,
+     "status": "fail"
+    },
+    "synthetic__weed-source-a": {
+     "images": 1100,
+     "status": "fail"
+    }
+   },
+   "use": "reported only",
+   "words": [
+    "weed",
+    "crop",
+    "plant",
+    "seed",
+    "leaf",
+    "agri",
+    "farm",
+    "field"
+   ]
+  },
+  "not_passing": {
+   "fvossel__csgo_player_detection": 4012,
+   "project_agml__weed_crop_detection": 206,
+   "synthetic__weed-source-a": 1100
+  },
+  "not_passing_images": 5318,
+  "sha256": "751289fdd6580b5580173f5d2b5d25516d8bc0ed01b5ea7688404da3492bbc07",
+  "sources": {
+   "francesco__grass_weeds": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 2479,
+    "images_with_usable_crops": 2479,
+    "p_plant_mean": 0.12,
+    "p_plant_median": 0.07,
+    "p_plant_quartiles": [
+     0.035,
+     0.14
+    ],
+    "passes": true,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.55,
+    "status": "pass",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.02,
+     "non_plant": 0.1,
+     "plant": 0.88
+    }
+   },
+   "fvossel__csgo_player_detection": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 4012,
+    "images_with_usable_crops": 4012,
+    "p_plant_mean": 0.099,
+    "p_plant_median": 0.049,
+    "p_plant_quartiles": [
+     0.0245,
+     0.098
+    ],
+    "passes": false,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.42,
+    "status": "fail",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.0,
+     "non_plant": 0.1,
+     "plant": 0.9
+    }
+   },
+   "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 434,
+    "images_with_usable_crops": 434,
+    "p_plant_mean": 0.36,
+    "p_plant_median": 0.31,
+    "p_plant_quartiles": [
+     0.155,
+     0.62
+    ],
+    "passes": true,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.55,
+    "status": "pass",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.8,
+     "non_plant": 0.1,
+     "plant": 0.1
+    }
+   },
+   "project_agml__weed_crop_detection": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 206,
+    "images_with_usable_crops": 206,
+    "p_plant_mean": 0.091,
+    "p_plant_median": 0.041,
+    "p_plant_quartiles": [
+     0.0205,
+     0.082
+    ],
+    "passes": false,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.42,
+    "status": "fail",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.01,
+     "non_plant": 0.1,
+     "plant": 0.89
+    }
+   },
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 755,
+    "images_with_usable_crops": 755,
+    "p_plant_mean": 0.15,
+    "p_plant_median": 0.1,
+    "p_plant_quartiles": [
+     0.05,
+     0.2
+    ],
+    "passes": true,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.55,
+    "status": "pass",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.03,
+     "non_plant": 0.1,
+     "plant": 0.87
+    }
+   },
+   "rf_zig-zag-lnodr__weed-detection-vanpe": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 352,
+    "images_with_usable_crops": 352,
+    "p_plant_mean": 0.143,
+    "p_plant_median": 0.093,
+    "p_plant_quartiles": [
+     0.0465,
+     0.186
+    ],
+    "passes": true,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.55,
+    "status": "pass",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.02,
+     "non_plant": 0.1,
+     "plant": 0.88
+    }
+   },
+   "synthetic__crop-and-weed-b": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 800,
+    "images_with_usable_crops": 800,
+    "p_plant_mean": 0.112,
+    "p_plant_median": 0.062,
+    "p_plant_quartiles": [
+     0.031,
+     0.124
+    ],
+    "passes": true,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.55,
+    "status": "pass",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.01,
+     "non_plant": 0.1,
+     "plant": 0.89
+    }
+   },
+   "synthetic__weed-source-a": {
+    "crops": 300,
+    "crops_usable": 300,
+    "images": 1100,
+    "images_with_usable_crops": 1100,
+    "p_plant_mean": 0.084,
+    "p_plant_median": 0.034,
+    "p_plant_quartiles": [
+     0.017,
+     0.068
+    ],
+    "passes": false,
+    "sampled": 300,
+    "share_at_or_above_tau": 0.42,
+    "status": "fail",
+    "top_prompts": {},
+    "top_set_share": {
+     "leaf_disease": 0.0,
+     "non_plant": 0.1,
+     "plant": 0.9
+    }
+   }
+  },
+  "sources_by_status": {
+   "fail": 3,
+   "insufficient": 0,
+   "pass": 5
+  }
+ },
+ "inputs": {
+  "base_selected": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_selected.jsonl",
+   "rows": 878,
+   "sha256": "8b19dc4a7346b5573a2d1030089b9af8bb0d981f016b5104d85abee3e331cb99"
+  },
+  "crops": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/crops.csv",
+   "sha256": "487d4e3a19e306b3960ffca97e5c878ff45fdd876a72fb78715bc592f8218a28"
+  },
+  "increment_pool": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/increment_pool.jsonl",
+   "rows": 10138,
+   "sha256": "751289fdd6580b5580173f5d2b5d25516d8bc0ed01b5ea7688404da3492bbc07"
+  },
+  "select_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/select_summary.json",
+   "sha256": "2e73425f99207c2c5daa704773c81f6475d66d482a9186fb7b9fcadbd56d7278"
+  },
+  "train_core": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/train_core.jsonl",
+   "sha256": "ab77d254c58b5d37db71bd3e2b579fe0e3f38c219b5bd75ff32c534a7205ede9"
+  }
+ },
+ "notes": [
+  "calibration.check: tau must be >= 0.5, else relevance.load refuses this file."
+ ],
+ "outputs": {
+  "json": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/relevance.json",
+  "md": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/relevance.md"
+ },
+ "params": {
+  "calibration_percentile": 5.0,
+  "decision_sets": [
+   "plant",
+   "non_plant"
+  ],
+  "diagnostic_set": "leaf_disease",
+  "min_crops": 20,
+  "sample": 300,
+  "seed": 0,
+  "tau_min": 0.5,
+  "text_model": "hf-hub:imageomics/bioclip-2"
+ },
+ "rule": "tau = the 5th percentile of P(plant) over every train_core crop with a feature; a source passes when the median P(plant) of its sample (up to --sample crops with a feature, seeded) is >= tau; a source with fewer than 20 crops with a feature is insufficient and does not pass",
+ "seconds": 812.4,
+ "synthetic": "Synthetic, for replay case R7 (docs/INC_AUTOPILOT.md (f)): a small Step 1 in the shape of the cluster's files of 2026-09-27. relevance.json carries that build's calibration numbers (tau 0.0557 < 0.5; 34.5 % of the train_core crops below 0.5) and is made for this select build; the evidenced sources hold enough increment-pool images for the default real loop (the real Step 1 does not: 1,439 < 2,751, R7's negative case). Sources named 'synthetic__' are invented; the others carry numbers of the real sources.",
+ "text_encoder": {
+  "dim": 768,
+  "logit_bias": null,
+  "logit_scale": 100.0,
+  "model": "hf-hub:imageomics/bioclip-2",
+  "name": "hf-hub:imageomics/bioclip-2"
+ },
+ "what": "INC Step 1 source relevance: zero-shot BioCLIP-2 P(plant) per source (inc/relevance.py)"
+}

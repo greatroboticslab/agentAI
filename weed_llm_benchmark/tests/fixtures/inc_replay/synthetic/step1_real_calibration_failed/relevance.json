@@ -1,0 +1,106 @@
+{
+ "base_selected": {
+  "images": 878,
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_selected.jsonl",
+  "not_passing": {},
+  "sha256": "7e47d37494a5ac1604c0caff375a5da08194f97f1dcbda4104e985bb93486280",
+  "sources": {}
+ },
+ "built_utc": "2026-09-27T03:10:00Z",
+ "calibration": {
+  "check": {
+   "ok": false,
+   "rule": "the calibration is usable only when tau >= 0.5, that is, when at least 95 % of train_core crops are judged more plant than non-plant (P(plant) >= 0.5); otherwise the prompts do not separate genuine weeds from the non-plant set, the file is written for a person to read, and relevance.load refuses it",
+   "share_below_0.5": 0.345,
+   "tau_min": 0.5
+  },
+  "crops": 11873,
+  "crops_without_feature": 0,
+  "distribution": {
+   "p0": 0.0003,
+   "p1": 0.0101,
+   "p10": 0.1107,
+   "p100": 1.0,
+   "p25": 0.2961,
+   "p5": 0.0557,
+   "p50": 0.8012,
+   "p75": 0.9913,
+   "p90": 0.9995,
+   "p95": 0.9999,
+   "p99": 1.0
+  },
+  "mean": 0.6021,
+  "percentile": 5.0,
+  "set": "every train_core crop with a feature (crops.csv set 'core'); all genuine weeds",
+  "share_at_or_above_tau": 0.95,
+  "tau": 0.0557,
+  "top_set_share": {
+   "leaf_disease": 0.05,
+   "non_plant": 0.33,
+   "plant": 0.62
+  }
+ },
+ "format": "inc.relevance/1",
+ "increment_pool": {
+  "images": 96088,
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/increment_pool.jsonl",
+  "not_passing": {},
+  "sha256": "bf6e545d467558a8995a0ccfa9925b864450cbf092fd36dd51cfe7925b4a1ccf",
+  "sources": {}
+ },
+ "inputs": {
+  "base_selected": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_selected.jsonl",
+   "rows": 878,
+   "sha256": "7e47d37494a5ac1604c0caff375a5da08194f97f1dcbda4104e985bb93486280"
+  },
+  "crops": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/crops.csv",
+   "sha256": "d8188b16fad47c34b6a771fb806ab2c1b607d6b99126fc134ada34f299164485"
+  },
+  "increment_pool": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/increment_pool.jsonl",
+   "rows": 96088,
+   "sha256": "bf6e545d467558a8995a0ccfa9925b864450cbf092fd36dd51cfe7925b4a1ccf"
+  },
+  "select_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/select_summary.json",
+   "sha256": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101"
+  },
+  "train_core": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/train_core.jsonl",
+   "sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  }
+ },
+ "notes": [
+  "calibration.check: tau must be >= 0.5, else relevance.load refuses this file."
+ ],
+ "outputs": {
+  "json": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/relevance.json",
+  "md": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/relevance.md"
+ },
+ "params": {
+  "calibration_percentile": 5.0,
+  "decision_sets": [
+   "plant",
+   "non_plant"
+  ],
+  "diagnostic_set": "leaf_disease",
+  "min_crops": 20,
+  "sample": 300,
+  "seed": 0,
+  "tau_min": 0.5,
+  "text_model": "hf-hub:imageomics/bioclip-2"
+ },
+ "rule": "tau = the 5th percentile of P(plant) over every train_core crop with a feature; a source passes when the median P(plant) of its sample (up to --sample crops with a feature, seeded) is >= tau; a source with fewer than 20 crops with a feature is insufficient and does not pass",
+ "seconds": 812.4,
+ "synthetic": "Synthetic, for replay case R8 (docs/INC_AUTOPILOT.md (f)): a relevance.json made for the real Step 1 select build of 2026-09-27 (its inputs are that build's increment_pool.jsonl, base_selected.jsonl, crops.csv and train_core sha256, and the sha256 of the pinned byte copy of its select_summary.json, tests/fixtures/inc_replay/step1_copies/), with the cluster relevance build's calibration numbers (tau 0.0557 < 0.5; 34.5 % of the train_core crops below 0.5), as in R7's file. The per-source tables are empty: the cluster file's per-source scores were not pulled, and neither relevance.load (it refuses the file at its calibration check first) nor the autopilot (D2b is silent on a calibration-failed file) reads them. With the real select and admit summaries the evidenced pool holds 1,439 images: the default loop (6 + 1) x 393 = 2,751 does not fit, the R4 sizing rule gives N 4 x M 287.",
+ "text_encoder": {
+  "dim": 768,
+  "logit_bias": null,
+  "logit_scale": 100.0,
+  "model": "hf-hub:imageomics/bioclip-2",
+  "name": "hf-hub:imageomics/bioclip-2"
+ },
+ "what": "INC Step 1 source relevance: zero-shot BioCLIP-2 P(plant) per source (inc/relevance.py)"
+}

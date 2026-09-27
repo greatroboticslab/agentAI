@@ -1,0 +1,82 @@
+{
+ "built_utc": "2026-09-27T01:23:00Z",
+ "crops_sha256": "487d4e3a19e306b3960ffca97e5c878ff45fdd876a72fb78715bc592f8218a28",
+ "per_slug": {
+  "francesco__grass_weeds": {
+   "boxes": {
+    "other_ok": 6480,
+    "small": 320
+   },
+   "images": {
+    "admitted": 2479
+   }
+  },
+  "fvossel__csgo_player_detection": {
+   "boxes": {
+    "other_ok": 6416,
+    "small": 3423
+   },
+   "images": {
+    "admitted": 4012
+   }
+  },
+  "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+   "boxes": {
+    "other_ok": 1300
+   },
+   "images": {
+    "admitted": 434
+   }
+  },
+  "project_agml__weed_crop_detection": {
+   "boxes": {
+    "conflict": 11,
+    "other_ok": 90,
+    "verified": 394
+   },
+   "images": {
+    "admitted": 206
+   }
+  },
+  "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+   "boxes": {
+    "conflict": 12,
+    "other_ok": 120,
+    "verified": 647
+   },
+   "images": {
+    "admitted": 755
+   }
+  },
+  "rf_zig-zag-lnodr__weed-detection-vanpe": {
+   "boxes": {
+    "other_ok": 40,
+    "verified": 294
+   },
+   "images": {
+    "admitted": 352
+   }
+  },
+  "synthetic__crop-and-weed-b": {
+   "boxes": {
+    "other_ok": 300,
+    "verified": 450
+   },
+   "images": {
+    "admitted": 800
+   }
+  },
+  "synthetic__weed-source-a": {
+   "boxes": {
+    "other_ok": 210,
+    "unknown": 30,
+    "verified": 900
+   },
+   "images": {
+    "admitted": 1100
+   }
+  }
+ },
+ "synthetic": "Synthetic, for replay case R7 (docs/INC_AUTOPILOT.md (f)): a small Step 1 in the shape of the cluster's files of 2026-09-27. relevance.json carries that build's calibration numbers (tau 0.0557 < 0.5; 34.5 % of the train_core crops below 0.5) and is made for this select build; the evidenced sources hold enough increment-pool images for the default real loop (the real Step 1 does not: 1,439 < 2,751, R7's negative case). Sources named 'synthetic__' are invented; the others carry numbers of the real sources.",
+ "verified_sha256": "bad4e7e6565112fc8fcdcfcb769277d20300e3329faa0d75423d6d6a64a601a7"
+}

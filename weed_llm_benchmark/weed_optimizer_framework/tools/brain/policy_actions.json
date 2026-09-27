@@ -11,7 +11,8 @@
     "gpu_hours_source": "Every gpu_type/gpu_count/hours literal below was read from the target script's own #SBATCH header (grep on 2026-09-06) or, where a cluster action's sbatch_extra_args override it, from that override. Not guessed: run_v3_0_43_brain_harvest_oneshot.sh, run_s2_dino_scores.sh, run_m1_merged_seeds.sh, run_v3_0_43_download_known_slugs.sh, run_v3_0_43_topic_backfill.sh, run_v3_0_50_owl_preannotate.sh, run_v3_0_99_clean_train.sh, run_v3_0_36_dinov2_curator.sh, run_v3_0_52_dinov2_route.sh all request --gres=gpu:v100-32:1; the round-scheduler's own 'train' step is the one place that overrides to --gres=gpu:h100-80:1 (db.py DEFAULT_DOMAIN_CONFIG['steps']['train'], byte-identical to round_scheduler._WEED_STEPS['train']).",
     "risk_classification_rule": "Applied uniformly so a reader can re-derive a label rather than trust it: R0 = the call changes no persisted state (a read, a listing, or an explicit dry-run that only counts). R1 = a local, immediately-reversible, no-cluster-cost state change (a cache clear, an idempotent metadata move). R2 = writes or generates a bounded, additive, recoverable artifact — including a routine GPU job up to about half a day — or mutates the authoritative registry in a way that adds or relabels rather than removes. R3 = an external side effect against a scarce or costly third-party resource (Roboflow's free-tier Version-generate quota, ~10/project/month), a job whose declared walltime is far above the routine round budget (clean_train_d's fixed 48 h, 4x a normal train step), an action that changes the shape of the campaign itself (harvest_full_round_e2e bumps the round and widens scope in one click) or the operational restart of the always-on server. R4 = the two calls in the real table whose own code comments say 'APPLY: delete ... files' / 'delete-junk --apply' against the authoritative registry or a hosted third-party store, with no undo path recorded anywhere in this codebase.",
     "param_bound_types": "int/float bounds always declare both 'min' and 'max' — an undeclared side is not 'unbounded', it is a malformed row, because an unbounded numeric input is exactly the case this table exists to close off. 'enum' bounds declare 'value_type' ('int' or 'str') plus 'values'; the supplied value must match that Python type exactly (a string that reads as a number is refused, never coerced). 'str' bounds declare a 'pattern' the whole value must fullmatch; values are capped at 4096 raw characters before matching regardless of the pattern, as a cheap backstop against a pathological input even though the patterns themselves are simple and fixed.",
-    "est_su_formula_shapes": "{'fixed_su': <number>, 'why': str} for a call this table knows costs a fixed, already-measured amount (0 for anything that never touches a GPU). {'unknown': true, 'why': str} for a call whose SU cost is real but not separately metered by this table — the seven 'needs_cluster' subprocess actions that reach the cluster via an interactive SSH session rather than a dedicated sbatch allocation; claiming a number for these would be a guess, and a guessed SU cost is how a ledger silently stops matching sacct. {'gpu_type': str, 'gpu_count' | 'gpu_count_param': ..., 'hours' | 'hours_param': ..., ['hours_default': number], 'why': str} for a real sbatch job: gpu_count/hours are either a literal number or the name of a key to read out of the params dict passed to estimate_su(); hours_default is used only when hours_param names a key the caller did not supply."
+    "est_su_formula_shapes": "{'fixed_su': <number>, 'why': str} for a call this table knows costs a fixed, already-measured amount (0 for anything that never touches a GPU). {'unknown': true, 'why': str} for a call whose SU cost is real but not separately metered by this table — the seven 'needs_cluster' subprocess actions that reach the cluster via an interactive SSH session rather than a dedicated sbatch allocation; claiming a number for these would be a guess, and a guessed SU cost is how a ledger silently stops matching sacct. {'gpu_type': str, 'gpu_count' | 'gpu_count_param': ..., 'hours' | 'hours_param': ..., ['hours_default': number], 'why': str} for a real sbatch job: gpu_count/hours are either a literal number or the name of a key to read out of the params dict passed to estimate_su(); hours_default is used only when hours_param names a key the caller did not supply.",
+    "inc_autopilot_rows": "The fourteen inc_* rows are the INC autopilot's actions (inc_plan_submit and inc_plan_pull carry the research brain's plan job) (docs/INC_AUTOPILOT.md, sections b and d; executor: tools/inc_autopilot/executor.py, the only path that runs them). Paths are bounded to the cluster INC_DIR and experiment names to ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$. Builds carry est_gpu_hours (float, 0-200) priced on V100. round-scheduler appears in the R3 rows' allowed_tiers so the autopilot may file them; policy.py's ceiling gives it no R3 authority, so they run only after a person approves them or under the campaign envelope rule, which the executor enforces and which re-authorises as the person who granted the envelope. Nothing here is R4: repin and every code or protocol change are human cards with no row."
   },
   "actions": {
     "restart_dashboard": {
@@ -799,6 +800,475 @@
         "human"
       ],
       "description": "The WP5 gate's own adversarial example: a stronger quarantine that also purges the slug's derived artifacts (DINOv2 embeddings, cached scores), which a plain quarantine_slug leaves in place. Marked reversible: false because purged derived caches are not restored by 'unmark' — they are simply recomputed next time something scores the slug, which is a real cost, not a free undo. This is exactly the case the spec calls out for the approval queue: a fake tier-1 verdict proposing this must land as needs_approval, never apply outright."
+    },
+    "inc_snapshot": {
+      "template": "python -u -m weed_optimizer_framework.tools.inc_autopilot.remote snapshot --exp {exp} [--ledger-from {ledger_from}] [--no-step1 if no_step1=1]",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "ledger_from": {
+          "type": "int",
+          "min": 0,
+          "max": 100000000
+        },
+        "no_step1": {
+          "type": "int",
+          "min": 0,
+          "max": 1
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A command on the cluster login node (remote.py, bench env, nested copy); it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "round-scheduler",
+        "human"
+      ],
+      "description": "INC autopilot read (docs/INC_AUTOPILOT.md, remote.py verbs): the experiment's small files with their sha256 and per-source aggregates of the Step 1 CSVs. Writes nothing on the cluster; the lab keeps the snapshot."
+    },
+    "inc_report": {
+      "template": "python -u -m weed_optimizer_framework.tools.inc_autopilot.remote report --exp {exp}",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A command on the cluster login node (remote.py, bench env, nested copy); it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Runs inc.report --exp on the login node: rewrites the derived report.md and report.json from the experiment's own state and ledger. R0 by the contract's tier list (docs/INC_AUTOPILOT.md section d): the report is a pure function of files it does not change, and rerunning it reproduces it."
+    },
+    "inc_advance": {
+      "template": "python -u -m weed_optimizer_framework.tools.inc_autopilot.remote advance --exp {exp}",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        }
+      },
+      "risk": "R1",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Submits only runs the experiment's definition already contained when it was built; their GPU cost is charged to the build's est_gpu_hours and later measured from report.gpu_hours, so counting it here would bill it twice."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Calls the pinned inc.driver advance(): idempotent, flock plus O_EXCL lease, the gate decides every increment. R1 because it only moves an experiment along a definition that was approved when it was built."
+    },
+    "inc_relevance_build": {
+      "template": "sbatch run_inc_relevance.sh build [--sample {sample}] [--seed {seed}]  (via python -u -m weed_optimizer_framework.tools.inc_autopilot.remote submit relevance build ...)",
+      "param_bounds": {
+        "sample": {
+          "type": "int",
+          "min": 50,
+          "max": 5000
+        },
+        "seed": {
+          "type": "int",
+          "min": 0,
+          "max": 1000000
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 1.0,
+        "why": "run_inc_relevance.sh's own #SBATCH --gres=gpu:v100-32:1 --time=01:00:00."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "tier2",
+        "human"
+      ],
+      "description": "Lever L3: Step 1 source relevance (relevance.json, relevance.md). Additive and bounded: a rerun with the same inputs is a no-op and one over another build's file refuses; --force and --out are deliberately not parameters here."
+    },
+    "inc_label_audit": {
+      "template": "sbatch run_inc_audit.sh --trusted {trusted} --audit {audit: NAME=PATH,...} --out {out}  (via python -u -m weed_optimizer_framework.tools.inc_autopilot.remote submit audit ...)",
+      "param_bounds": {
+        "trusted": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}\\.jsonl$"
+        },
+        "audit": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9_]{1,16}=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}\\.jsonl(,[A-Za-z0-9_]{1,16}=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}\\.jsonl){0,15}$"
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/[A-Za-z0-9][A-Za-z0-9_-]{0,63}/audit/[A-Za-z0-9_-]{1,64}\\.json$"
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours": 2.0,
+        "why": "run_inc_audit.sh's own #SBATCH --gres=gpu:v100-32:1 --time=02:00:00."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "tier2",
+        "human"
+      ],
+      "description": "Lever L4: the BioCLIP-2 label audit (attribution item 4), exactly run_inc_audit.sh:30-36. 'audit' is the comma-joined NAME=PATH list, split into separate arguments when rendered. Every path must lie under INC_DIR and the output under an experiment's audit/ directory; the module itself may only overwrite an earlier audit's outputs."
+    },
+    "inc_unblock_transient": {
+      "template": "python -m weed_optimizer_framework.tools.inc.driver unblock --exp {exp} --unit {unit} --reason 'auto: {cause}'  (via python -u -m weed_optimizer_framework.tools.inc_autopilot.remote unblock ...)",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "unit": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "base",
+            "truth",
+            "final",
+            "chain:full",
+            "chain:freeze",
+            "chain:lora"
+          ]
+        },
+        "cause": {
+          "type": "str",
+          "pattern": "^[a-z][a-z0-9_]{0,39}$"
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Resets a blocked unit's failed runs; the next advance resubmits runs whose cost the build's est_gpu_hours already carries."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L7, for a cause on the transient allow-list (diagnosis D5) only. The cause bound here checks its shape; the executor refuses a non-human unblock whose cause is not in thresholds.json D5 transient_cause_kinds, or that the ticker's fired D5 does not list as transient for that unit. The executor allows at most one automatic unblock per (experiment, unit); a second blocked episode of the same unit is a pause and a human card. The driver records the unblock and its reason in the experiment's ledger."
+    },
+    "inc_build_pilot": {
+      "template": "sbatch run_inc_build.sh inc.pilot build --exp {exp} --replay-mode {replay_mode} [--gate-flips-mode {gate_flips_mode}]",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "replay_mode": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "sample",
+            "full"
+          ]
+        },
+        "gate_flips_mode": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "negative",
+            "net"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "The build job itself (run_inc_build.sh) holds one V100 on GPU-shared for up to its #SBATCH --time of 4 h, because the allocation has no CPU partition (RM-shared fails with 'Invalid qos'): at most 4 SU per build, which levers.price adds to est_gpu_hours (levers.with_build_job, read from run_inc_build.sh's #SBATCH --time). The rest of the cost is the experiment it defines: every run goes through run_inc_job.sh, whose own #SBATCH header is --gres=gpu:v100-32:1, so the rest of est_gpu_hours is the total V100 GPU-hours of all its runs (the autopilot computes runs x images x epochs x the seconds per image measured in the parent's report gpu_hours). No hours_default: a build with no estimate cannot be charged against the campaign envelope, so its cost is reported unknown rather than guessed."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "tier2",
+        "human"
+      ],
+      "description": "Lever L1: a new pilot experiment (pilot.py refuses a name that already exists, so nothing is overwritten). R3 because it commits tens of GPU-hours and changes the campaign's course. round-scheduler is listed so the autopilot may file it; its ceiling has no R3 cell, so it runs only after a person approves it or under the campaign envelope rule (docs/INC_AUTOPILOT.md section d). --gate-flips-mode (absent = negative, protocol v1) is the gate's flips mode, a pre-registered protocol version, not a threshold: L1 carries its parent's pinned mode when it is not the default, and lever L9 (the pre-registered test of protocol v2, docs/INCREMENTAL_PROTOCOL.md) sets net."
+    },
+    "inc_build_realloop": {
+      "template": "sbatch run_inc_build.sh inc.realloop build --exp {exp} [--base {base}] --replay-mode {replay_mode} --recipes {recipes} [--increment-sources {increment_sources}] [--relevance {relevance}] [--size {size}] [--n-verified {n_verified}] [--no-truth if no_truth=1] [--gate-flips-mode {gate_flips_mode}]",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "base": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}\\.jsonl$"
+        },
+        "replay_mode": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "sample",
+            "full"
+          ]
+        },
+        "recipes": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "full",
+            "freeze",
+            "lora",
+            "full,freeze",
+            "full,lora",
+            "freeze,lora",
+            "full,freeze,lora"
+          ]
+        },
+        "increment_sources": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "relevance",
+            "evidence"
+          ]
+        },
+        "relevance": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}\\.json$"
+        },
+        "size": {
+          "type": "int",
+          "min": 1,
+          "max": 50000
+        },
+        "n_verified": {
+          "type": "int",
+          "min": 1,
+          "max": 20
+        },
+        "no_truth": {
+          "type": "int",
+          "min": 0,
+          "max": 1
+        },
+        "gate_flips_mode": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "negative",
+            "net"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "The build job itself (run_inc_build.sh) holds one V100 on GPU-shared for up to its #SBATCH --time of 4 h, because the allocation has no CPU partition (RM-shared fails with 'Invalid qos'): at most 4 SU per build, which levers.price adds to est_gpu_hours (levers.with_build_job, read from run_inc_build.sh's #SBATCH --time). The rest of the cost is the experiment it defines: every run goes through run_inc_job.sh, whose own #SBATCH header is --gres=gpu:v100-32:1, so the rest of est_gpu_hours is the total V100 GPU-hours of all its runs (the autopilot computes runs x images x epochs x the seconds per image measured in the parent's report gpu_hours). No hours_default: a build with no estimate cannot be charged against the campaign envelope, so its cost is reported unknown rather than guessed."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "tier2",
+        "human"
+      ],
+      "description": "Levers L2, L5 (larger --size) and L6 (--no-truth, only after D11). 'recipes' is a subset of the pilot's table joined in the table's order full, freeze, lora. The builder refuses a stale Step 1, a production build with the relevance criterion but without a relevance.json that passed its calibration check, and a second build of the same name. --increment-sources (absent = relevance, the relevance file): 'evidence' is the source-level species evidence criterion (docs/INCREMENTAL_PROTOCOL.md, Steps 2-3), which L2 and L6 from D4 carry only when step1/relevance.json failed its own calibration check and the evidenced pool holds the build (levers.increment_criterion, D2), and L2 from D1 and L5 when the parent loop was built with it; it never goes with --relevance, and --min-evidence stays at the protocol's default. --size and --n-verified (absent = 10 % of base B and 6): L2 and L6 from D4 carry them only on the evidence criterion when the evidenced pool cannot hold the default N and M and the R4 sizing rule of 2026-09-27 sizes the loop (levers.evidence_sizing: N for at least six decided increments, M = min(the default M, floor(evidenced images / (N + 1))), never below 5 % of base B), each only when it differs from the default; L5 carries a larger --size and the parent's --n-verified. --gate-flips-mode (absent = negative, protocol v1): L2 and L6 carry the mode of the pilot D4 evaluated, L2 from D1 and L5 the parent loop's, each only when it is not the default."
+    },
+    "inc_build_baseline": {
+      "template": "sbatch run_inc_build.sh inc.pilot build-baseline --exp {exp} --manifest {manifest}",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "manifest": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}\\.jsonl$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "The build job itself (run_inc_build.sh) holds one V100 on GPU-shared for up to its #SBATCH --time of 4 h, because the allocation has no CPU partition (RM-shared fails with 'Invalid qos'): at most 4 SU per build, which levers.price adds to est_gpu_hours (levers.with_build_job, read from run_inc_build.sh's #SBATCH --time). The rest of the cost is the experiment it defines: every run goes through run_inc_job.sh, whose own #SBATCH header is --gres=gpu:v100-32:1, so the rest of est_gpu_hours is the total V100 GPU-hours of all its runs (the autopilot computes runs x images x epochs x the seconds per image measured in the parent's report gpu_hours). No hours_default: a build with no estimate cannot be charged against the campaign envelope, so its cost is reported unknown rather than guessed."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "tier2",
+        "human"
+      ],
+      "description": "Lever L8: base B's own cold baseline (base_b_v1), docs/INCREMENTAL_PROTOCOL.md Step 1.6. Three cold 100-epoch runs plus final scoring; the builder refuses a base selected under an earlier lock."
+    },
+    "inc_cancel_exp": {
+      "template": "scancel every job named inc_{exp}_*  (via python -u -m weed_optimizer_framework.tools.inc_autopilot.remote cancel --exp {exp})",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        }
+      },
+      "risk": "R3",
+      "reversible": false,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "Frees an allocation; requests none."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Cancels an experiment's in-flight runs. Not reversible: the GPU time those runs spent is lost, and each cancelled run uses its one automatic resubmission in the driver, so a second failure blocks its unit. R3 (approval) by the contract's tier list: scancel or abandonment of an experiment."
+    },
+    "inc_sync_outer": {
+      "template": "rsync the nested (git-tracked) weed_optimizer_framework onto the outer copy the INC jobs import  (via python -u -m weed_optimizer_framework.tools.inc_autopilot.remote sync-outer)",
+      "param_bounds": {},
+      "risk": "R3",
+      "reversible": false,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A command on the cluster login node (remote.py, bench env, nested copy); it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "X5, the outer-copy half: the INC jobs import the outer copy and refuse on drift. remote.py refuses the sync when it would change any pinned hash a running experiment recorded in state.code.modules. Not reversible: the outer copy is not git-tracked, so what it held before is gone. Repin is R4 and has no row."
+    },
+    "inc_lit_fetch": {
+      "template": "lab: fetch the arXiv abstract of {arxiv_id} into a pending docs/literature entry {paper_id} (a quote counts only after the corpus file is committed)",
+      "param_bounds": {
+        "arxiv_id": {
+          "type": "str",
+          "pattern": "^[0-9]{4}\\.[0-9]{4,5}(v[0-9]{1,2})?$"
+        },
+        "paper_id": {
+          "type": "str",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A lab-side HTTP read; no cluster allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Runs on the lab, not the cluster: the executor calls the lab hook registered for it and refuses when none is. It writes a pending corpus entry only; the literature validator ignores pending entries."
+    },
+    "inc_plan_submit": {
+      "template": "stage the lab's dev-only digest as INC_DIR/_campaign/plans/{campaign}/{n}.input.json and sbatch --export=ALL,PLAN_INPUT=...,PLAN_OUTPUT=...[,PLAN_MODEL={model}] weed_llm_benchmark/run_inc_plan.sh  (the executor's plan-submit segment)",
+      "param_bounds": {
+        "campaign": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "n": {
+          "type": "int",
+          "min": 0,
+          "max": 100000
+        },
+        "digest_sha256": {
+          "type": "str",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "model": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$"
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "h100-80",
+        "gpu_count": 1,
+        "hours": 2.0,
+        "why": "run_inc_plan.sh's own #SBATCH --gres=gpu:h100-80:1 --time=02:00:00: at most 2 H100 GPU-hours, charged at the su_rates.json H100 rate."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "The INC research brain (docs/INC_AUTOPILOT.md (c)): one advisory plan job on a cluster model, submitted by the campaign ticker through the executor. R2 by this table's rule: a routine GPU job well under half a day that writes one bounded, additive artifact (the reply). The executor ships the lab's staged digest only when its content hashes to the digest_sha256 authorised here; the cluster side refuses to overwrite a staged digest or an existing reply. The reply is validated item by item (inc_autopilot/validate.py) and every brain proposal is filed for a person's approval; nothing it says runs on its own."
+    },
+    "inc_plan_pull": {
+      "template": "read INC_DIR/_campaign/plans/{campaign}/{n}.json, the brain's reply, when it exists  (the executor's plan-pull segment, batched into the ticker's campaign snapshot call)",
+      "param_bounds": {
+        "campaign": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "n": {
+          "type": "int",
+          "min": 0,
+          "max": 100000
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A read on the cluster login node; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Pulls the INC research brain's reply back to the lab (docs/INC_AUTOPILOT.md (c)). Writes nothing on the cluster."
     }
   }
 }

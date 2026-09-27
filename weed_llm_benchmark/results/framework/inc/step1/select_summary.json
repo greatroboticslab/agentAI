@@ -1,0 +1,1248 @@
+{
+ "boxes": {
+  "base_B": {
+   "Carpetweed": 590,
+   "CutleafGroundcherry": 50,
+   "Eclipta": 519,
+   "Goosegrass": 149,
+   "MorningGlory": 920,
+   "OtherPlant": 642,
+   "PalmerAmaranth": 206,
+   "PricklySida": 263,
+   "Purslane": 440,
+   "Ragweed": 401,
+   "Sicklepod": 162,
+   "SpottedSpurge": 756,
+   "Waterhemp": 1427
+  },
+  "capped_species": [],
+  "caps": {
+   "Carpetweed": 1590,
+   "CutleafGroundcherry": 150,
+   "Eclipta": 1536,
+   "Goosegrass": 321,
+   "MorningGlory": 2376,
+   "PalmerAmaranth": 618,
+   "PricklySida": 789,
+   "Purslane": 1320,
+   "Ragweed": 1197,
+   "Sicklepod": 363,
+   "SpottedSpurge": 1650,
+   "Waterhemp": 3177
+  },
+  "increment_pool": {
+   "Carpetweed": 10,
+   "CutleafGroundcherry": 0,
+   "Eclipta": 3,
+   "Goosegrass": 10,
+   "MorningGlory": 30,
+   "OtherPlant": 623891,
+   "PalmerAmaranth": 0,
+   "PricklySida": 0,
+   "Purslane": 0,
+   "Ragweed": 1,
+   "Sicklepod": 13,
+   "SpottedSpurge": 70,
+   "Waterhemp": 69
+  },
+  "selected": {
+   "Carpetweed": 60,
+   "CutleafGroundcherry": 0,
+   "Eclipta": 7,
+   "Goosegrass": 42,
+   "MorningGlory": 128,
+   "OtherPlant": 642,
+   "PalmerAmaranth": 0,
+   "PricklySida": 0,
+   "Purslane": 0,
+   "Ragweed": 2,
+   "Sicklepod": 41,
+   "SpottedSpurge": 206,
+   "Waterhemp": 368
+  },
+  "train_core": {
+   "Carpetweed": 530,
+   "CutleafGroundcherry": 50,
+   "Eclipta": 512,
+   "Goosegrass": 107,
+   "MorningGlory": 792,
+   "OtherPlant": 0,
+   "PalmerAmaranth": 206,
+   "PricklySida": 263,
+   "Purslane": 440,
+   "Ragweed": 399,
+   "Sicklepod": 121,
+   "SpottedSpurge": 550,
+   "Waterhemp": 1059
+  }
+ },
+ "clusters": {
+  "k1_target": 98,
+  "level1": 98,
+  "per_level1": [
+   {
+    "below_gate": 2,
+    "id": 0,
+    "images": 3758,
+    "mean_score": 0.084075,
+    "picked": 2,
+    "selected": 2,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 9,
+    "id": 1,
+    "images": 2132,
+    "mean_score": 0.016815,
+    "picked": 1,
+    "selected": 1,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 2,
+    "images": 3221,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 1,
+    "id": 3,
+    "images": 2967,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 31,
+    "id": 4,
+    "images": 1108,
+    "mean_score": 0.029459,
+    "picked": 6,
+    "selected": 6,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 39,
+    "id": 5,
+    "images": 876,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 6,
+    "images": 2223,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 7,
+    "images": 970,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 24,
+    "id": 8,
+    "images": 3090,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 109,
+    "id": 9,
+    "images": 1463,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 10,
+    "images": 1078,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 11,
+    "images": 460,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 12,
+    "images": 455,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 13,
+    "images": 777,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 14,
+    "images": 798,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 15,
+    "images": 512,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 16,
+    "images": 1671,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 17,
+    "images": 932,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 18,
+    "images": 547,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 19,
+    "images": 2416,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 79,
+    "id": 20,
+    "images": 278,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 21,
+    "images": 1790,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 22,
+    "images": 550,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 23,
+    "images": 898,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 1,
+    "id": 24,
+    "images": 838,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 25,
+    "images": 605,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 26,
+    "images": 719,
+    "mean_score": 0.16815,
+    "picked": 1,
+    "selected": 1,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 241,
+    "id": 27,
+    "images": 625,
+    "mean_score": 0.076936,
+    "picked": 62,
+    "selected": 60,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 28,
+    "images": 1850,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 4,
+    "id": 29,
+    "images": 1127,
+    "mean_score": 0.092138,
+    "picked": 2,
+    "selected": 2,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 71,
+    "id": 30,
+    "images": 760,
+    "mean_score": 0.002858,
+    "picked": 1,
+    "selected": 1,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 14,
+    "id": 31,
+    "images": 2205,
+    "mean_score": 0.026268,
+    "picked": 2,
+    "selected": 2,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 32,
+    "images": 618,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 20,
+    "id": 33,
+    "images": 598,
+    "mean_score": 0.013974,
+    "picked": 1,
+    "selected": 1,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 214,
+    "id": 34,
+    "images": 726,
+    "mean_score": 0.003263,
+    "picked": 3,
+    "selected": 3,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 12,
+    "id": 35,
+    "images": 551,
+    "mean_score": 0.038835,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 1,
+    "id": 36,
+    "images": 263,
+    "mean_score": 0.04717,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 2,
+    "id": 37,
+    "images": 459,
+    "mean_score": 0.019417,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 133,
+    "id": 38,
+    "images": 473,
+    "mean_score": 0.010364,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 62,
+    "id": 39,
+    "images": 324,
+    "mean_score": 0.247853,
+    "picked": 260,
+    "selected": 260,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 25,
+    "id": 40,
+    "images": 1117,
+    "mean_score": 0.025555,
+    "picked": 3,
+    "selected": 3,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 13,
+    "id": 41,
+    "images": 2037,
+    "mean_score": 0.044704,
+    "picked": 3,
+    "selected": 3,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 173,
+    "id": 42,
+    "images": 853,
+    "mean_score": 0.156622,
+    "picked": 337,
+    "selected": 131,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 15,
+    "id": 43,
+    "images": 821,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 67,
+    "id": 44,
+    "images": 2037,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 9,
+    "id": 45,
+    "images": 158,
+    "mean_score": 0.127139,
+    "picked": 15,
+    "selected": 11,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 173,
+    "id": 46,
+    "images": 1313,
+    "mean_score": 0.030128,
+    "picked": 13,
+    "selected": 13,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 62,
+    "id": 47,
+    "images": 2743,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 47,
+    "id": 48,
+    "images": 587,
+    "mean_score": 0.135749,
+    "picked": 40,
+    "selected": 40,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 1558,
+    "id": 49,
+    "images": 1851,
+    "mean_score": 0.000925,
+    "picked": 8,
+    "selected": 8,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 247,
+    "id": 50,
+    "images": 626,
+    "mean_score": 0.116182,
+    "picked": 251,
+    "selected": 41,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 3,
+    "id": 51,
+    "images": 943,
+    "mean_score": 0.012531,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 224,
+    "id": 52,
+    "images": 1353,
+    "mean_score": 0.001406,
+    "picked": 1,
+    "selected": 1,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 6,
+    "id": 53,
+    "images": 348,
+    "mean_score": 0.006266,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 54,
+    "images": 519,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 79,
+    "id": 55,
+    "images": 514,
+    "mean_score": 0.286959,
+    "picked": 248,
+    "selected": 248,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 56,
+    "images": 937,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 1,
+    "id": 57,
+    "images": 909,
+    "mean_score": 0.14556,
+    "picked": 3,
+    "selected": 3,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 58,
+    "images": 264,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 59,
+    "images": 588,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 60,
+    "images": 679,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 61,
+    "images": 672,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 62,
+    "images": 1259,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 1,
+    "id": 63,
+    "images": 925,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 64,
+    "images": 802,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 65,
+    "images": 564,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 66,
+    "images": 873,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 67,
+    "images": 729,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 68,
+    "images": 718,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 69,
+    "images": 830,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 70,
+    "images": 727,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 71,
+    "images": 1138,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 1,
+    "id": 72,
+    "images": 838,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 10,
+    "id": 73,
+    "images": 1101,
+    "mean_score": 0.178208,
+    "picked": 98,
+    "selected": 13,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 74,
+    "images": 899,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 643,
+    "id": 75,
+    "images": 652,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 76,
+    "images": 535,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 1,
+    "id": 77,
+    "images": 638,
+    "mean_score": 0.149467,
+    "picked": 8,
+    "selected": 8,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 115,
+    "id": 78,
+    "images": 642,
+    "mean_score": 0.131665,
+    "picked": 415,
+    "selected": 11,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 6,
+    "id": 79,
+    "images": 548,
+    "mean_score": 0.042038,
+    "picked": 2,
+    "selected": 2,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 30,
+    "id": 80,
+    "images": 1358,
+    "mean_score": 0.0,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 81,
+    "images": 508,
+    "mean_score": 0.19408,
+    "picked": 3,
+    "selected": 3,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 82,
+    "images": 563,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 83,
+    "images": 777,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 84,
+    "images": 718,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 85,
+    "images": 637,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 86,
+    "images": 465,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 87,
+    "images": 525,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 88,
+    "images": 466,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 89,
+    "images": 451,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 90,
+    "images": 658,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 91,
+    "images": 901,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 92,
+    "images": 547,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 93,
+    "images": 711,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 94,
+    "images": 981,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 95,
+    "images": 166,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 96,
+    "images": 705,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   },
+   {
+    "below_gate": 0,
+    "id": 97,
+    "images": 476,
+    "mean_score": null,
+    "picked": 0,
+    "selected": 0,
+    "sub_clusters": 8
+   }
+  ],
+  "sub_clusters": 784
+ },
+ "created": "2026-09-27T06:58:19+00:00",
+ "crops": {
+  "admitted_image_crops": 500648,
+  "crops_csv_rows": 564686,
+  "embeddings": {
+   "dim": 768,
+   "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+   "failed_crops": 0,
+   "nan_rows": 0,
+   "nshards": 4
+  },
+  "other_ok_crops": 531781,
+  "other_ok_crops_with_features": 531781,
+  "pool_crops": 545318,
+  "source_evidence_crops": 4805,
+  "train_core_crops": 5029,
+  "train_core_crops_failed": 0
+ },
+ "inputs": {
+  "crops": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/crops.csv",
+   "sha256": "d8188b16fad47c34b6a771fb806ab2c1b607d6b99126fc134ada34f299164485"
+  },
+  "emb_files": [
+   {
+    "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/emb/emb_s000_of_004.npz",
+    "sha256": "f1bc919be553bde29ce79b2dfc256b3f38289a0ba39b83c4d73df913881726b9"
+   },
+   {
+    "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/emb/emb_s001_of_004.npz",
+    "sha256": "34f0ddd7dd4f3a15cab211fefadaff147e2796225daae500cc2f46dc66275158"
+   },
+   {
+    "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/emb/emb_s002_of_004.npz",
+    "sha256": "c9533f468bcf539cdf85e2b021ea1f148e53f65f46b76191dfda2a40b84aa5d5"
+   },
+   {
+    "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/emb/emb_s003_of_004.npz",
+    "sha256": "9ec53d9937dcec67262a93e21452fa6c20ffe2dc7a4e1168987be492f95630c6"
+   }
+  ],
+  "never_train": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+   "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+  },
+  "pool_meta": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/pool_meta.jsonl",
+   "sha256": "196027ca6e9ef77a55d266614a775e2f36e0ebbe85525ae5d0fc430041c2a3b7"
+  },
+  "pool_verdicts": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/pool_verdicts.npz",
+   "sha256": "e5f4df5623ac4680b9294f068ff2f9a8bc77d3e3b0b60e98bbcded8c8628d756"
+  },
+  "train_core": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/train_core.jsonl",
+   "sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  },
+  "verified": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/verified.jsonl",
+   "sha256": "d0662ef431f9d0cbfb413a83695aec01351cd9dff562eb7135ae91dde335cce4"
+  }
+ },
+ "near_dup": {
+  "bits": 3,
+  "groups": 80417,
+  "groups_over_50": 9,
+  "images_in_multi_groups": 23636,
+  "largest_group": 1840,
+  "multi_image_groups": 7087
+ },
+ "never_train": {
+  "checked": 96966,
+  "evaluation_images": 9501,
+  "hits": 0,
+  "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+  "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+ },
+ "otherplant": {
+  "boxes_share_of_selected": 0.429144,
+  "only_images_budget_frac": 0.1,
+  "only_images_eligible": 998,
+  "only_images_selected": 87,
+  "only_images_share_of_selected": 0.099089,
+  "only_images_verified": 95971
+ },
+ "outputs": {
+  "base_B.jsonl": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_B.jsonl",
+   "rows": 3927,
+   "sha256": "4de04a7c6ce6c116625f10add0f86b550a9b091abb9d46d460472712346c1b71"
+  },
+  "base_selected.jsonl": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_selected.jsonl",
+   "rows": 878,
+   "sha256": "7e47d37494a5ac1604c0caff375a5da08194f97f1dcbda4104e985bb93486280"
+  },
+  "increment_pool.jsonl": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/increment_pool.jsonl",
+   "rows": 96088,
+   "sha256": "bf6e545d467558a8995a0ccfa9925b864450cbf092fd36dd51cfe7925b4a1ccf"
+  },
+  "select_clusters.csv": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/select_clusters.csv",
+   "rows": 96966,
+   "sha256": "5ca204fd2848b9af1f47983f43c4cfc569ff545ac9572f17f97ec88790db9483"
+  }
+ },
+ "params": {
+  "base_frac": 0.6,
+  "cap_mult": 3.0,
+  "gate": 0.1,
+  "k1": [
+   10,
+   8,
+   256
+  ],
+  "k2": [
+   10,
+   8
+  ],
+  "kmeans_threads": 1,
+  "max_iter": 100,
+  "n_init": 3,
+  "near_dup_bits": 3,
+  "other_k_max": 64,
+  "other_only_frac": 0.1,
+  "other_sample": 50000,
+  "proto_seed": 0,
+  "refill": false,
+  "seed": 0,
+  "versions": {
+   "numpy": "2.2.6",
+   "sklearn": "1.7.2"
+  }
+ },
+ "retrieval": {
+  "dim": 768,
+  "gate": 0.1,
+  "mean_increment_pool": 0.032793,
+  "mean_selected": 0.31475,
+  "other_typicality": {
+   "other_ok_crops": 531781,
+   "prototypes": [
+    50,
+    50
+   ],
+   "sample": [
+    25000,
+    25000
+   ]
+  },
+  "scale": "percentile of train_core's leave-one-out crop-to-prototype cosine",
+  "scored_on_source": 5381,
+  "scored_on_species": 995,
+  "source_evidence": {
+   "project_agml__greenhouse_crop_weed_detection": {
+    "median": 0.038835,
+    "species_crops": 1383
+   },
+   "project_agml__imageweeds_aerial_weed_detection": {
+    "median": 0.027569,
+    "species_crops": 751
+   },
+   "project_agml__weed_crop_detection": {
+    "median": 0.012531,
+    "species_crops": 1456
+   },
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+    "median": 0.16815,
+    "species_crops": 786
+   },
+   "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+    "median": 0.0,
+    "species_crops": 63
+   },
+   "rf_zig-zag-lnodr__weed-detection-vanpe": {
+    "median": 0.19408,
+    "species_crops": 366
+   }
+  },
+  "train_core_crops_per_species": {
+   "Carpetweed": 530,
+   "CutleafGroundcherry": 50,
+   "Eclipta": 512,
+   "Goosegrass": 107,
+   "MorningGlory": 792,
+   "PalmerAmaranth": 206,
+   "PricklySida": 263,
+   "Purslane": 440,
+   "Ragweed": 399,
+   "Sicklepod": 121,
+   "SpottedSpurge": 550,
+   "Waterhemp": 1059
+  },
+  "train_core_image_score_q05_q50": [
+   0.090234,
+   0.512102
+  ],
+  "train_core_images": 3049,
+  "train_core_images_passing_gate": 0.942276
+ },
+ "seconds": 401.1,
+ "sizes": {
+  "base_B": 3927,
+  "below_gate": 4578,
+  "dropped_by_cap": 0,
+  "dropped_other_budget": 911,
+  "eligible": 1789,
+  "increment_pool": 96088,
+  "no_evidence": 89573,
+  "no_feature": 1026,
+  "passed_over_other_budget": 0,
+  "quota": 58180,
+  "refilled": 0,
+  "selected": 878,
+  "selected_frac_of_verified": 0.009055,
+  "train_core": 3049,
+  "verified": 96966,
+  "with_feature": 95611
+ },
+ "sources": {
+  "below_gate": {
+   "project_agml__greenhouse_crop_weed_detection": 13,
+   "project_agml__imageweeds_aerial_weed_detection": 113,
+   "project_agml__weed_crop_detection": 206,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 143,
+   "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": 4050,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 53
+  },
+  "increment_pool": {
+   "francesco__grass_weeds": 2479,
+   "fvossel__csgo_player_detection": 4012,
+   "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": 434,
+   "project_agml__crop_weed_detection_latvia": 1099,
+   "project_agml__greenhouse_crop_weed_detection": 13,
+   "project_agml__imageweeds_aerial_weed_detection": 113,
+   "project_agml__maize_weed_detection": 432,
+   "project_agml__mh_weed16_weed_detection": 4046,
+   "project_agml__weed_crop_detection": 206,
+   "rf_1111-gzfxi__weed-chilling": 1995,
+   "rf_bishwarup-halder__crop-health-advisor": 15116,
+   "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": 1287,
+   "rf_cotton-weed-detect__grass-weed-cotton-detect": 2306,
+   "rf_fyp-oof0h__smart-agriculture-miw1m": 657,
+   "rf_itmo-mp0nn__grass-detection-4": 786,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 755,
+   "rf_kinjj__weed-avnag": 67,
+   "rf_lemong__agriculture-xi7us": 559,
+   "rf_leopard-ai__weed-detection-8h4kx": 908,
+   "rf_main-otq0a__weed-in-paddy-field-wmjlr": 942,
+   "rf_new-workspace-zbm50__weeds-qftz4": 1956,
+   "rf_project-5nvic__weed-detection-0tfsj": 2217,
+   "rf_robtica-unileon-gluqm__farming-robotics": 1947,
+   "rf_school-5ult5__weed-6a90d": 2007,
+   "rf_srec-dthh0__crop-and-weed-detection-fqrtg": 6538,
+   "rf_srec-dthh0__crop-weed-poxtn": 2760,
+   "rf_test-8qezo__weed-detection-ycai2": 78,
+   "rf_test-gzc3r__crop-mfete": 9072,
+   "rf_tuf__weed-3434e": 4617,
+   "rf_uav-qnoms__uav-wqshy": 6341,
+   "rf_university-of-peradeniya__weed-detection-ekr8i": 1630,
+   "rf_vizerion__weed-detection-5ell6": 2895,
+   "rf_weed-detection-o9sfb__weed-detection-in-a-field": 1451,
+   "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": 4059,
+   "rf_weed-tnf9e__weed-bqdok": 7842,
+   "rf_yolo-gyfyq__weed-ieda7": 2111,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 352,
+   "rf_zijian-peng__grass-weed-69hcm": 3
+  },
+  "selected": {
+   "project_agml__imageweeds_aerial_weed_detection": 17,
+   "project_agml__weed_crop_detection": 49,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 544,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 268
+  },
+  "train_core": {
+   "cottonweeddet12/train": 3049
+  }
+ },
+ "step": "INC Step 1.4-1.5 base selection (inc/select.py)"
+}

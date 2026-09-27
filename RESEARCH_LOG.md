@@ -13,6 +13,174 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-09-27 — Incremental training on a high-precision base, tested properly; the platform now runs the campaign itself
+
+The design under test: build a high-precision base set, add small fixed-size increments one at a time
+(replay, freezing or LoRA), check each increment, attribute a drop and roll it back. Nothing before
+this entry tested that design (docs/CWD12_SPECIES.md §5). The protocol, its runner and the autopilot are
+docs/INCREMENTAL_PROTOCOL.md, docs/INCREMENTAL_PROTOCOL_RUNNER.md and docs/INC_AUTOPILOT.md.
+
+**Measurement first (Step 0).**
+- *Splits:*
+  - dev = 8 whole capture sessions of cwd12 train (617 images, every species ≥ 31 boxes), used for every decision;
+  - train_core = 3,049;
+  - test = the 1,977-image cwd12 holdout, read only by final runs;
+  - out-of-season exams from the Zenodo original of 3SeasonWeedDet10: data2022 (1,915 images after dropping the
+    31 that are cwd12 photographs) and data2023 (1,784);
+  - ImageWeeds (3,208).
+- *Locking:* every manifest and the scorer are hashed into LOCK.json. A full re-hash on the cluster verified. A
+  never-train dHash index (6 bits) guards every training set.
+- *Scorer:* a single locked scorer pinned to Ultralytics 8.4.37. Scores taken in test mode can never decide a step.
+- *LoRA audit:* the April LoRA runs never trained an adapter. `lora_yolo.py` injected adapters and then called
+  `model.train()`, which rebuilds the network from its yaml. A real LoRA trainer (adapters merged on save) replaced it.
+- *B0:* YOLO11n on train_core, 3 seeds, final EMA weights, no split used for checkpoint selection.
+
+| Model | dev | test | ood22 | ood23 | ImageWeeds |
+|---|---|---|---|---|---|
+| B0 (train_core) | 0.8082 ± 0.0063 | 0.8541 ± 0.0074 | 0.7505 ± 0.0131 | 0.186 | 0.061 |
+
+The historical 0.8755 used 17 % more training images and picked best.pt on the holdout itself.
+
+**Step 1: a high-precision base from the harvest.**
+- *Pool:* 102,920 harvested images and 670,818 boxes from 52 sources survived dedup and the guards (8,769 cwd12
+  copies and 8,465 near-copies of evaluation images removed).
+- *Verifier:* a BioCLIP-2 probe on train_core crops (CV top-1 0.985, per-species thresholds at 95 % recall)
+  reads every box.
+  - On known truth, the harvested copies of cwd12 photographs, the current name join is right for 66 % of boxes
+    and the pre-v3.60 join for 25 %.
+  - Boxes the verifier calls *verified* are right 99.96–100 % of the time.
+  - On 20 % planted label swaps it catches 95 % at a 0.8 % false-alarm rate.
+- *Admission:* 96,966 images admitted, but only **2,049** harvested boxes are verified cwd12 species; 531,781 are
+  other plants.
+- *Selection:* DINOv3-style mix (retrieval gate, balanced clusters, per-species caps) added **878** images:
+  base B = 3,927.
+- *B vs B0, 3 seeds each:*
+  - dev 0.8133 ± 0.0070 (+0.005, within noise);
+  - test 0.8502 ± 0.0059 (−0.004, within noise);
+  - **ood22 0.7752 ± 0.0093 (+0.025)**;
+  - **ImageWeeds Ragweed 0.016 (−0.045; class-agnostic 0.115 → 0.043)**.
+  - Verified harvest data helps out-of-season generalisation and hurts the ImageWeeds domain. The mechanism of the
+    ImageWeeds drop is open; a candidate is unlabelled plants in harvested images, which train "not a plant".
+
+**Step 4: the pilot, on known answers.**
+- *Setup:*
+  - base P0 = 1,540 images (7 sessions);
+  - five clean session increments I1–I5 (238–274 images);
+  - two planted bad increments: Bswap (40 % of boxes relabelled) and Breal (real harvested data of audited
+    precision 0.65–0.74);
+  - three recipes (full, freeze, LoRA), each its own chain.
+- *Truth arm:* cold union training with vs without each increment, 3 seeds per step.
+  - clean I2, I3, I5 help, I4 is neutral, I1 hurts (species guard);
+  - Bswap and Breal hurt;
+  - union of all clean data: dev 0.8084, test 0.8472 against the base's 0.7212 / 0.7761.
+
+| | v1 (1:1 replay) | v2 (full rehearsal) |
+|---|---|---|
+| The data test P(cand > null) | right direction on every step of the full chain; both bad increments 0.00 in all chains | clean I2, I3, I5 = 1.00 in all chains |
+| The recipe itself (null vs incumbent) | −0.007 to −0.025 at every step | still below the incumbent |
+| Increments accepted | none | one per chain |
+| Agreement with truth | 3/7 each | full 4/7, freeze 2/7, LoRA 2/7 |
+| Final dev (base 0.7282) | 0.7282 | 0.7305–0.7341 (union 0.8084) |
+
+Two causes, each found from the ledger:
+- **v1: forgetting.** With 1:1 replay, 30 epochs at low learning rate on 31–36 % of the pool degrade the model at
+  every step, so every guard fires.
+- **v2: the flips guard.** Five clean, truth-helps rejections failed the flips guard alone. For example, I2 took
+  dev from 0.7282 to 0.7535 and was rejected. The guard counts images that got worse and ignores the ones that got
+  better.
+
+Protocol v2 (net flips = incumbent-correct minus run-correct) was pre-registered with its falsification rule before
+pilot_v3.
+
+**Attribution.**
+- The class-vs-localisation rule misread the planted label noise as "domain/localisation", because the
+  class-agnostic score also drops under label swaps.
+- The BioCLIP-2 label audit (probe fit on P0 only) reads it right:
+  - Bswap conflict rate 0.380 (true 0.40; 92 % of the wrong labels caught);
+  - clean increments 0.003–0.026;
+  - Breal 0.078 plus 0.69 unjudgeable.
+
+**The platform does it.** The INC autopilot (`tools/inc_autopilot/`) closes the loop on the lab: evidence (dev
+only), diagnoses D1–D16 with cited values, a lever menu tied to evidence and literature, a governed executor
+(policy, approvals, budget envelope), a cluster research brain (qwen3.8:27b through ollama, reading a
+131-paper curated corpus), and the `/inc` page.
+- *Replay test:* from the recorded evidence alone, the autopilot reproduces the manual decisions:
+  - full rehearsal after pilot_v1 (argv identical to the manual command);
+  - the label audit after the misattribution;
+  - no real loop after pilot_v1;
+  - the net-flips pilot after pilot_v2.
+- *Autonomy:* R3 builds run inside a 300-SU envelope only after that replay passes.
+- *First live cycle (2026-09-27 11:50–12:10 UTC), without a person:* it diagnosed pilot_v2, filed R4 cards for the
+  changes it may not make itself (LR re-warm, leave-one-source-out), launched pilot_v3 with the net gate, and staged
+  the research brain.
+
+**pilot_v3 (launched by the platform): full rehearsal + protocol v2 gate.**
+- *Pre-registered v2 check: supported.* v2 agrees with the truth arm on 11 of 21 (chain, step) pairs, against 9 for v1 on the same runs, and accepted no bad increment.
+- *Full chain.* It agrees on 5 of 7 steps: it accepted every truth-helps step (I2, I3, I5) and rejected Bswap and Breal.
+- *The cheap incremental chain reaches union retraining:*
+
+| Final model | dev | test | ood22 | ood23 |
+|---|---|---|---|---|
+| base P0 | 0.7212 | 0.7761 | 0.7041 | 0.087 |
+| **full chain, v3** | **0.8006** | **0.8475** | **0.7630** | **0.183** |
+| union of all clean data, 3 seeds | 0.8084 ± 0.0043 | 0.8472 ± 0.0014 | 0.7561 | 0.164 |
+
+The design holds once the recipe replays the whole accepted pool and the flips guard counts net flips. freeze and LoRA still miss steps on the species guard (3/7 each).
+
+**Steps 2–3 (launched and run by the platform): the incremental loop on real harvested data.**
+- *Relevance criterion.* Zero-shot relevance failed its own calibration check. BioCLIP-2 scores 34.5 % of genuine train_core weed crops as "more non-plant than plant", and genuine weed sources score in the same range as a video-game source. The platform refused the file and escalated. The criterion became source-level species evidence: a source is eligible only when the verifier found at least one verified cwd12-species box in it.
+- *Pool size.* That leaves 1,439 pool images in 5 sources, 4 of them the sources of base B's harvested part. The loop was sized by rule to 6 decided increments of 287 images (7.3 % of B):
+  - four verified increments;
+  - one OtherPlant-heavy increment;
+  - one increment from a source the verifier did not admit.
+- *Results (dev, 3 seeds per arm):*
+
+| Step | Truth arm (union with vs without) | Chain (full recipe, net gate) |
+|---|---|---|
+| V1 | neutral (0.67) | REJECT (P_data 0.11) |
+| V2 | neutral (0.44) | REJECT (0.44) |
+| UNVERIFIED | helps (0.89) | REJECT (0.11) |
+| V3 | neutral (0.33) | REJECT (0.44) |
+| OTHER_HEAVY | hurts | REJECT (1.00, flips) |
+| V4 | hurts | REJECT (1.00, species) |
+
+| Final model | dev | test | ood22 | ood23 |
+|---|---|---|---|---|
+| chain (nothing accepted = base B seed 0) | 0.8189 | 0.8552 | 0.7718 | 0.282 |
+| base B, 3 seeds | 0.8133 ± 0.0070 | 0.8502 ± 0.0059 | 0.7752 ± 0.0093 | 0.190 |
+| union of B and every verified increment | 0.8093 ± 0.0027 | 0.8410 ± 0.0041 | 0.7734 ± 0.0053 | 0.203 |
+
+- *What the real loop shows:*
+  - The harvested increments do not improve the twelve target species. They are mostly other plants plus about 50 target-species boxes each.
+  - Trained in, they lower test from 0.850 to 0.841.
+  - The gate kept the model at the base.
+  - Step agreement with the truth arm is 2/6. The gate rejects neutral steps, which the truth arm calls "neutral", not "hurts".
+  - The v2 check is inconclusive on this loop: v1 would have decided the same.
+  - Cost: 26.2 GPU-hours.
+
+**What the platform decided by itself, and what it could not.**
+- *On its own, from its own ledger, it:*
+  - launched pilot_v3 and the real loop;
+  - ran the relevance build and the label audit;
+  - refused a failed calibration;
+  - escalated what it may not change;
+  - stopped when nothing was left to propose.
+- *Its research brain (qwen3.8:27b on the cluster)* independently proposed re-warming and re-decaying the learning rate in each increment (Ibrahim et al. 2024), the same change as the platform's X1 card.
+- *Three changes needed a strong-brain R4 review.* Each is documented in docs/INC_AUTOPILOT.md as post hoc:
+  - D1 now blocks D4 only when the selected chain misses a truth-helps step;
+  - the evidence criterion replaced the failed zero-shot relevance;
+  - the capacity-sized loop.
+- *Two platform defects found in live operation:*
+  - The cluster's `model_router.py` was stale (no planner role). The drift check compares only the cluster's two copies; a lab-versus-cluster code check is still missing.
+  - The brain's digest outgrew its context (46,923 tokens) as experiments accumulated. It is now trimmed deterministically, with a larger context.
+
+**Open.**
+- X1: LR re-warm and re-decay per increment. It is the next experiment both the platform and its brain propose; it could fix the recipe's own forgetting and the freeze/LoRA misses.
+- X4: leave-one-source-out attribution.
+- X9: revisit zero-shot relevance.
+- The ImageWeeds drop of base B.
+- The harvest itself: the pool holds very few correctly labelled target-species images. More of it does not raise in-domain accuracy. It helps only out-of-season (B vs B0 ood22 +0.025).
+
 ## 2026-09-21 — v3.60.0: the cwd12 class names were wrong, and one headline result goes with them
 
 The twelve cwd12 class ids had been named, since the first commit that staged the dataset

@@ -1,0 +1,48 @@
+{
+ "base": {
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/base_b_v1/manifests/base_B.jsonl",
+  "manifest_sha256": "4de04a7c6ce6c116625f10add0f86b550a9b091abb9d46d460472712346c1b71",
+  "n_images": 3927,
+  "name": "base_B",
+  "recipe": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 100,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.01,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "full",
+   "warmup_bias_lr": 0.1,
+   "warmup_epochs": 3,
+   "weight_decay": 0.0005,
+   "workers": 5
+  },
+  "source_manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_B.jsonl"
+ },
+ "builder": "inc.pilot build-baseline",
+ "decision_exam": "dev",
+ "exp": "base_b_v1",
+ "final_exams": [
+  "dev",
+  "ood22",
+  "ood23",
+  "imageweeds",
+  "test"
+ ],
+ "init_weights": "yolo11n.pt",
+ "initialised_utc": "2026-09-27T07:29:36Z",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "testing": false,
+ "type": "baseline"
+}

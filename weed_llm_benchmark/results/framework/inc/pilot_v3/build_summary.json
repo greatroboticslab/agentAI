@@ -1,0 +1,1488 @@
+{
+ "attribution_scope": {
+  "not_run": {
+   "4": "label audit (BioCLIP-2 re-reading D_k's boxes): out of scope for the pilot",
+   "5": "leave-one-source-out cand runs for a multi-source increment (Breal mixes two sources): out of scope for the pilot"
+  },
+  "run": [
+   "1 recipe vs data",
+   "2 classification vs localisation",
+   "3 per-species deltas"
+  ]
+ },
+ "bin_mean": 251.5,
+ "bin_tolerance": 0.35,
+ "bins": [
+  {
+   "deviation": -0.0537,
+   "flagged": false,
+   "images": 238,
+   "index": 0,
+   "role": "I1",
+   "sessions": [
+    "20210628_iPhoneSE_YL",
+    "20210812_NIKOND3300_YL",
+    "20210818_iPhoneSE_YL",
+    "20210903_CanonEOS4000D_EO",
+    "20210904_iPhoneSE_YL"
+   ]
+  },
+  {
+   "deviation": -0.0537,
+   "flagged": false,
+   "images": 238,
+   "index": 1,
+   "role": "I2",
+   "sessions": [
+    "20210804_iPhoneSE_YL",
+    "20210805_iPhoneSE_YL",
+    "20210903_iPhoneSE_YL"
+   ]
+  },
+  {
+   "deviation": -0.0537,
+   "flagged": false,
+   "images": 238,
+   "index": 2,
+   "role": "I3",
+   "sessions": [
+    "20210809_iPhoneSE_YL",
+    "20210814_iPhoneSE_YL",
+    "20210910_NIKOND3300_YL"
+   ]
+  },
+  {
+   "deviation": 0.0815,
+   "flagged": false,
+   "images": 272,
+   "index": 3,
+   "role": "Bswap_source",
+   "sessions": [
+    "20210813_iPhoneSE_YL",
+    "20210903_iPhone11Pro_BT",
+    "20210909_NIKOND3300_YL"
+   ]
+  },
+  {
+   "deviation": -0.0099,
+   "flagged": false,
+   "images": 249,
+   "index": 4,
+   "role": "I4",
+   "sessions": [
+    "20210903_NIKOND3300_YL",
+    "20210913_iPhoneSE_YL",
+    "20220129_CanonEOS4000D_EO"
+   ]
+  },
+  {
+   "deviation": 0.0895,
+   "flagged": false,
+   "images": 274,
+   "index": 5,
+   "role": "I5",
+   "sessions": [
+    "20210903_YALAL00_EO",
+    "20210910_iPhone11Pro_BT",
+    "20210912_iPhoneSE_YL"
+   ]
+  }
+ ],
+ "bins_flagged": [],
+ "breal": {
+  "after_guard": 1671,
+  "candidates": 1671,
+  "class_order_assumption": "label id i is read as the registry's class_names[i]; the order is not checked against the source's own metadata (unverified)",
+  "class_order_verified": false,
+  "dropped_near_eval": 0,
+  "dropped_near_train_core": 0,
+  "dropped_unhashable": 0,
+  "n": 238,
+  "near_eval_examples": [],
+  "near_train_core_examples": [],
+  "sampled_per_slug": {
+   "project_agml__imageweeds_aerial_weed_detection": 70,
+   "project_agml__weed_crop_detection": 168
+  },
+  "seed_text": "pilot_v3/Breal",
+  "slugs": {
+   "project_agml__imageweeds_aerial_weed_detection": {
+    "boxes_with_ids_outside_class_names": 0,
+    "class_names": [
+     "ragweed",
+     "waterhemp",
+     "horseweed",
+     "redrootpigweed",
+     "kochia"
+    ],
+    "dropped": {},
+    "images_found": 551,
+    "join": {
+     "horseweed": "OtherPlant",
+     "kochia": "OtherPlant",
+     "ragweed": "Ragweed",
+     "redrootpigweed": "OtherPlant",
+     "waterhemp": "Waterhemp"
+    },
+    "layout": [
+     "."
+    ],
+    "root": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/project_agml__imageweeds_aerial_weed_detection",
+    "usable": 551
+   },
+   "project_agml__weed_crop_detection": {
+    "boxes_with_ids_outside_class_names": 0,
+    "class_names": [
+     "Blackbean",
+     "Canola",
+     "Corn",
+     "Field Pea",
+     "Flax",
+     "Horseweed",
+     "Kochia",
+     "Lentil",
+     "Ragweed",
+     "Redroot Pigweed",
+     "Soybean",
+     "Sugar beet",
+     "Waterhemp"
+    ],
+    "dropped": {},
+    "images_found": 1120,
+    "join": {
+     "Blackbean": "OtherPlant",
+     "Canola": "OtherPlant",
+     "Corn": "OtherPlant",
+     "Field Pea": "OtherPlant",
+     "Flax": "OtherPlant",
+     "Horseweed": "OtherPlant",
+     "Kochia": "OtherPlant",
+     "Lentil": "OtherPlant",
+     "Ragweed": "Ragweed",
+     "Redroot Pigweed": "OtherPlant",
+     "Soybean": "OtherPlant",
+     "Sugar beet": "OtherPlant",
+     "Waterhemp": "Waterhemp"
+    },
+    "layout": [
+     "."
+    ],
+    "root": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/project_agml__weed_crop_detection",
+    "usable": 1120
+   }
+  },
+  "train_core_unhashable": 0
+ },
+ "bswap": {
+  "boxes": 492,
+  "changed": 197,
+  "changes_file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/labels/Bswap_changes.json",
+  "seed_text": "pilot_v3/Bswap",
+  "share": 0.40040650406504064,
+  "source_bin": 3,
+  "source_sessions": [
+   "20210813_iPhoneSE_YL",
+   "20210903_iPhone11Pro_BT",
+   "20210909_NIKOND3300_YL"
+  ]
+ },
+ "built_utc": "2026-09-27T12:23:33Z",
+ "clean": [
+  "I1",
+  "I2",
+  "I3",
+  "I4",
+  "I5"
+ ],
+ "cold_recipe": {
+  "batch": 32,
+  "cache": "ram",
+  "close_mosaic": 10,
+  "cos_lr": true,
+  "deterministic": true,
+  "epochs": 100,
+  "freeze": null,
+  "imgsz": 640,
+  "lora": null,
+  "lr0": 0.01,
+  "lrf": 0.01,
+  "momentum": 0.937,
+  "optimizer": "SGD",
+  "trainer": "full",
+  "warmup_bias_lr": 0.1,
+  "warmup_epochs": 3,
+  "weight_decay": 0.0005,
+  "workers": 5
+ },
+ "exp": "pilot_v3",
+ "gate": {
+  "flips_mode": "net"
+ },
+ "increments": {
+  "Breal": {
+   "boxes": {
+    "Carpetweed": 0,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 0,
+    "OtherPlant": 2642,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 240,
+    "Sicklepod": 0,
+    "SpottedSpurge": 0,
+    "Waterhemp": 171
+   },
+   "boxes_total": 3053,
+   "clean": false,
+   "images": 238,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/Breal.jsonl",
+   "manifest_sha256": "87947418ff60355a9226569e4b3f2425e947b256b838a3f86973a9c28778701b",
+   "sources": {
+    "project_agml__imageweeds_aerial_weed_detection": 70,
+    "project_agml__weed_crop_detection": 168
+   }
+  },
+  "Bswap": {
+   "boxes": {
+    "Carpetweed": 91,
+    "CutleafGroundcherry": 17,
+    "Eclipta": 54,
+    "Goosegrass": 24,
+    "MorningGlory": 21,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 51,
+    "PricklySida": 33,
+    "Purslane": 37,
+    "Ragweed": 41,
+    "Sicklepod": 21,
+    "SpottedSpurge": 39,
+    "Waterhemp": 63
+   },
+   "boxes_total": 492,
+   "clean": false,
+   "images": 272,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/Bswap.jsonl",
+   "manifest_sha256": "d36540dc7161171e617d971a7d30d5485f5b5642b0f717a74d5996d77eab1f8a",
+   "sources": {
+    "Bswap": 272
+   }
+  },
+  "I1": {
+   "boxes": {
+    "Carpetweed": 100,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 21,
+    "Goosegrass": 1,
+    "MorningGlory": 45,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 62,
+    "PricklySida": 0,
+    "Purslane": 18,
+    "Ragweed": 9,
+    "Sicklepod": 0,
+    "SpottedSpurge": 26,
+    "Waterhemp": 124
+   },
+   "boxes_total": 406,
+   "clean": true,
+   "images": 238,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I1.jsonl",
+   "manifest_sha256": "2db00bf8833dce4eb1a5db623e594fd4bf289c0d16510c3ab918f6d6472fb2b9",
+   "sources": {
+    "cottonweeddet12/train": 238
+   }
+  },
+  "I2": {
+   "boxes": {
+    "Carpetweed": 1,
+    "CutleafGroundcherry": 4,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 166,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 1,
+    "PricklySida": 12,
+    "Purslane": 11,
+    "Ragweed": 4,
+    "Sicklepod": 83,
+    "SpottedSpurge": 28,
+    "Waterhemp": 2
+   },
+   "boxes_total": 312,
+   "clean": true,
+   "images": 238,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I2.jsonl",
+   "manifest_sha256": "c875d38c49bce1f7b888c66a8f7d3c851f340e75e16e3a7709ffe448d1440d0e",
+   "sources": {
+    "cottonweeddet12/train": 238
+   }
+  },
+  "I3": {
+   "boxes": {
+    "Carpetweed": 66,
+    "CutleafGroundcherry": 3,
+    "Eclipta": 85,
+    "Goosegrass": 3,
+    "MorningGlory": 68,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 9,
+    "PricklySida": 7,
+    "Purslane": 5,
+    "Ragweed": 27,
+    "Sicklepod": 0,
+    "SpottedSpurge": 14,
+    "Waterhemp": 144
+   },
+   "boxes_total": 431,
+   "clean": true,
+   "images": 238,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I3.jsonl",
+   "manifest_sha256": "f29504d52b3de0a982f986be50548d4e7159eb42354d2223b44eb8caab74b833",
+   "sources": {
+    "cottonweeddet12/train": 238
+   }
+  },
+  "I4": {
+   "boxes": {
+    "Carpetweed": 14,
+    "CutleafGroundcherry": 7,
+    "Eclipta": 4,
+    "Goosegrass": 2,
+    "MorningGlory": 48,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 1,
+    "PricklySida": 27,
+    "Purslane": 2,
+    "Ragweed": 62,
+    "Sicklepod": 2,
+    "SpottedSpurge": 77,
+    "Waterhemp": 134
+   },
+   "boxes_total": 380,
+   "clean": true,
+   "images": 249,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I4.jsonl",
+   "manifest_sha256": "2a1408f59f6edfbf0e813b3e00fd46e4849fc6771471bff191e64b90e684184e",
+   "sources": {
+    "cottonweeddet12/train": 249
+   }
+  },
+  "I5": {
+   "boxes": {
+    "Carpetweed": 43,
+    "CutleafGroundcherry": 4,
+    "Eclipta": 52,
+    "Goosegrass": 11,
+    "MorningGlory": 67,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 9,
+    "PricklySida": 14,
+    "Purslane": 26,
+    "Ragweed": 73,
+    "Sicklepod": 0,
+    "SpottedSpurge": 24,
+    "Waterhemp": 81
+   },
+   "boxes_total": 404,
+   "clean": true,
+   "images": 274,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I5.jsonl",
+   "manifest_sha256": "3e964bcd6ba270e1ab2e72ed334b2444620dbb73bc67155ebe8876f5f744e193",
+   "sources": {
+    "cottonweeddet12/train": 274
+   }
+  }
+ },
+ "p0": {
+  "boxes": {
+   "Carpetweed": 185,
+   "CutleafGroundcherry": 32,
+   "Eclipta": 280,
+   "Goosegrass": 81,
+   "MorningGlory": 385,
+   "OtherPlant": 0,
+   "PalmerAmaranth": 48,
+   "PricklySida": 188,
+   "Purslane": 353,
+   "Ragweed": 194,
+   "Sicklepod": 36,
+   "SpottedSpurge": 352,
+   "Waterhemp": 470
+  },
+  "boxes_total": 2604,
+  "images": 1540,
+  "sessions": [
+   "20210812_iPhoneSE_YL",
+   "20210906_iPhoneSE_YL",
+   "20210806_iPhoneSE_YL",
+   "20210827_iPhone11Pro_BT",
+   "20210827_iPhoneSE_YL",
+   "20210712_iPhoneSE_YL",
+   "20210910_iPhoneSE_YL"
+  ],
+  "share": 0.5050836339783535,
+  "sources": {
+   "cottonweeddet12/train": 1540
+  }
+ },
+ "recipes": {
+  "freeze": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 30,
+   "freeze": 11,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.002,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "freeze",
+   "warmup_bias_lr": 0.002,
+   "warmup_epochs": 1,
+   "weight_decay": 0.0005,
+   "workers": 5
+  },
+  "full": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 30,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.002,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "full",
+   "warmup_bias_lr": 0.002,
+   "warmup_epochs": 1,
+   "weight_decay": 0.0005,
+   "workers": 5
+  },
+  "lora": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 30,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": {
+    "alpha": 32,
+    "rank": 16
+   },
+   "lr0": 0.01,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "lora",
+   "warmup_bias_lr": 0.01,
+   "warmup_epochs": 1,
+   "weight_decay": 0.0005,
+   "workers": 5
+  }
+ },
+ "replay_mode": "full",
+ "sequence": [
+  "I1",
+  "I2",
+  "Bswap",
+  "I3",
+  "Breal",
+  "I4",
+  "I5"
+ ],
+ "testing": false,
+ "train_core": {
+  "images": 3049,
+  "locked": true,
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/train_core.jsonl",
+  "sessions": 27,
+  "sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+ },
+ "warmup": {
+  "cold": {
+   "base": {
+    "covers_whole_run": false,
+    "epochs": 100,
+    "images": 1540,
+    "iterations_per_epoch": 49,
+    "warmup_epochs_effective": 3.0,
+    "warmup_epochs_nominal": 3,
+    "warmup_iterations": 147
+   },
+   "truth": {
+    "s01_I1": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 1778,
+     "iterations_per_epoch": 56,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 168
+    },
+    "s02_I2": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2016,
+     "iterations_per_epoch": 63,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 189
+    },
+    "s03_Bswap": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2288,
+     "iterations_per_epoch": 72,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 216
+    },
+    "s04_I3": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2254,
+     "iterations_per_epoch": 71,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 213
+    },
+    "s05_Breal": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2492,
+     "iterations_per_epoch": 78,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 234
+    },
+    "s06_I4": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2503,
+     "iterations_per_epoch": 79,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 237
+    },
+    "s07_I5": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2777,
+     "iterations_per_epoch": 87,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 261
+    }
+   }
+  },
+  "incremental": {
+   "freeze": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   },
+   "full": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   },
+   "lora": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   }
+  },
+  "incremental_effective_epochs": {
+   "max": 2.04,
+   "min": 1.0
+  },
+  "note": "Ultralytics warms up for max(round(warmup_epochs * iterations per epoch), 100) iterations; replay mode full: cand holds the accepted pool + D_k and null the pool, recorded at pool_min (P0) and pool_max (P0 + every earlier increment); the driver records each step's actual sizes",
+  "replay_mode": "full"
+ }
+}

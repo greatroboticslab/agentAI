@@ -48,6 +48,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from .inc import common as _inc
+
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 log = logging.getLogger("dinov2_curator")
@@ -146,18 +148,110 @@ def _resolve_slug_local_path(slug, info):
     return None
 
 
-def _sample_images(slug_dir: Path, n: int, seed: int = 0) -> list[Path]:
-    """Randomly sample N image files from a slug directory."""
+IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".bmp")
+
+
+def _list_images(slug_dir: Path) -> list[Path]:
+    """Every image file under slug_dir, sorted by path relative to it.
+
+    INC 0.3: the sample must be a function of the slug's contents alone. The
+    listing used to be in rglob order (directory-hash order on ext4 / Lustre,
+    different between the lab server and the cluster and changed by any new
+    file) and cut at n*20 in that order, so the same slug and seed gave another
+    sample, and another score, on another machine. The whole slug is listed;
+    os.walk goes through scandir, which takes file types from the directory
+    entries where the filesystem provides them, so this is directory reads, not
+    a stat per image, and small next to embedding the sample."""
+    out = []
+    for root, _dirs, files in os.walk(slug_dir):
+        for f in files:
+            if os.path.splitext(f)[1].lower() in IMAGE_EXTS:
+                out.append(Path(root, f))
+    return sorted(out, key=lambda p: p.relative_to(slug_dir).as_posix())
+
+
+def _sample_images(slug_dir: Path, n: int, seed: int = 0,
+                   exclude=None) -> list[Path]:
+    """N image files of slug_dir in a seeded random order over the sorted
+    listing, so a slug and seed give the same sample on every machine. With
+    `exclude` (path -> bool), excluded files are skipped in that order until N
+    are taken, so the hashing cost is paid on about N files, not all."""
     rng = random.Random(seed)
-    all_imgs = []
-    for p in slug_dir.rglob("*"):
-        if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp"):
-            all_imgs.append(p)
-            if len(all_imgs) >= n * 20:  # cap initial collect for speed
+    all_imgs = _list_images(slug_dir)
+    if exclude is None:
+        if len(all_imgs) <= n:
+            return all_imgs
+        return rng.sample(all_imgs, n)
+    out = []
+    for p in rng.sample(all_imgs, len(all_imgs)):
+        if not exclude(p):
+            out.append(p)
+            if len(out) >= n:
                 break
-    if len(all_imgs) <= n:
-        return all_imgs
-    return rng.sample(all_imgs, n)
+    return out
+
+
+class _ReferenceGuard:
+    """Keeps evaluation images out of the reference pool (INC Step 0.3).
+
+    The trusted slugs include cottonweeddet12 and cottonweed_holdout, which hold
+    the sealed holdout photographs; a pool built from them scores a slug higher
+    for resembling the holdout, and min_dino_score then selects training data
+    toward it. Excluded: a holdout stem, and a dHash within
+    HOLDOUT_NEAR_DUP_BITS of a holdout / dev / exam image (the INC never-train
+    index when it exists, else mega_trainer's holdout guard). An image that
+    cannot be hashed cannot be cleared, so it is excluded too."""
+
+    def __init__(self, stems, guard, source, complete=False):
+        self.stems = stems
+        self.guard = guard
+        self.source = source
+        self.complete = complete
+        self.excluded = {"stem": 0, "near": 0, "unhashable": 0}
+
+    @classmethod
+    def load(cls, required):
+        """With `required`, the whole sealed holdout must be found
+        (mega_trainer._load_holdout_guard: exactly HOLDOUT_IMAGES stems, every
+        one hashable); a photograph it lacks would be neither stem- nor
+        hash-excluded. Without, whatever exists is used and the guard is
+        recorded as incomplete."""
+        from . import mega_trainer as _mt
+        try:
+            stems, hashes = _mt._load_holdout_guard()
+            complete = True
+        except RuntimeError as e:
+            if required:
+                raise RuntimeError(
+                    "reference-pool guard: %s Refusing to build a reference pool that "
+                    "may contain the sealed holdout." % e) from e
+            log.warning(f"reference-pool guard incomplete, used as found: {e}")
+            stems, hashes = _mt._load_holdout_stems(), _mt._load_holdout_dhashes()
+            complete = False
+        if _inc.NEVER_TRAIN_INDEX.is_file():
+            guard, source = _inc.NeverTrainGuard.load(), "inc_nevertrain_index"
+        else:
+            guard = _inc.NeverTrainGuard([(h, "holdout", "") for h in hashes])
+            source = "mega_trainer_holdout"
+        return cls(stems, guard, source, complete)
+
+    def record(self):
+        """What reference_meta.json and every slug score carry about the guard."""
+        return {"source": self.source, "n_hashes": self.guard.n,
+                "n_holdout_stems": len(self.stems), "complete": self.complete}
+
+    def __call__(self, path) -> bool:
+        if Path(path).stem in self.stems:
+            self.excluded["stem"] += 1
+            return True
+        h = _inc.dhash(path)
+        if h is None:
+            self.excluded["unhashable"] += 1
+            return True
+        if self.guard.index.find(h) is not None:
+            self.excluded["near"] += 1
+            return True
+        return False
 
 
 def _load_dinov2():
@@ -282,10 +376,17 @@ def build_reference_pool():
         log.warning(f"No reference slugs for {_scope} — nothing to curate. "
                     f"Upload or keep some data for this domain first.")
 
+    # The weed pool is built from slugs that contain the sealed holdout, so it
+    # may not be built without the guard; another domain uses whatever exists.
+    guard = _ReferenceGuard.load(required=not DINO_DOMAIN or DINO_DOMAIN == "weed")
+    log.info(f"Reference guard ({guard.source}): {guard.guard.n} evaluation-image "
+             f"hashes, {len(guard.stems)} holdout stems")
+
     model, proc = _load_dinov2()
     all_emb = []
     meta = {"slugs": {}, "samples_per_slug": SAMPLES_PER_TRUSTED_SLUG,
-            "domain": DINO_DOMAIN or "weed", "reference_slugs": ref_slugs}
+            "domain": DINO_DOMAIN or "weed", "reference_slugs": ref_slugs,
+            "guard": guard.record()}
 
     for slug in ref_slugs:
         info = ds.get(slug, {})
@@ -294,15 +395,20 @@ def build_reference_pool():
             log.warning(f"  [{slug}] no local_path — skipping")
             meta["slugs"][slug] = {"status": "missing", "n_embedded": 0}
             continue
-        imgs = _sample_images(slug_dir, SAMPLES_PER_TRUSTED_SLUG, seed=42)
-        log.info(f"  [{slug}] sampling {len(imgs)} imgs from {slug_dir}")
+        before = dict(guard.excluded)
+        imgs = _sample_images(slug_dir, SAMPLES_PER_TRUSTED_SLUG, seed=42,
+                              exclude=guard)
+        excluded = {k: guard.excluded[k] - before[k] for k in before}
+        log.info(f"  [{slug}] sampling {len(imgs)} imgs from {slug_dir} "
+                 f"(excluded as evaluation images: {excluded})")
         t0 = time.time()
         emb = _embed_images(model, proc, imgs)
         dt = time.time() - t0
         log.info(f"  [{slug}] embedded {emb.shape} ({dt:.0f}s, "
                  f"{emb.shape[0]/max(dt,0.01):.1f} img/s)")
         all_emb.append(emb)
-        meta["slugs"][slug] = {"status": "ok", "n_embedded": emb.shape[0]}
+        meta["slugs"][slug] = {"status": "ok", "n_embedded": emb.shape[0],
+                               "excluded": excluded}
 
     pool = np.concatenate(all_emb, axis=0) if all_emb else np.zeros((0, 768), dtype=np.float32)
     pool = _normalize(pool)
@@ -347,6 +453,41 @@ def score_one_slug(slug, info, model, proc, ref_pool: np.ndarray,
     }
 
 
+def _reference_guard_record(ref):
+    """The guard record of the pool in REF_POOL, from REF_META, or raise when
+    the weed pool cannot show it was built under a complete holdout guard.
+
+    INC 0.3: a pool built before the guard (every weed pool up to v3.60.0) was
+    sampled from cottonweeddet12 / cottonweed_holdout with the sealed holdout
+    in it; scoring against it, and the min_dino_score gate reading those
+    scores, would go on selecting data toward the holdout until someone reran
+    build-reference. A meta that does not describe this pool file (another
+    shape) proves nothing about it. Another domain's pool is scored with a
+    warning, as it is built without the requirement."""
+    weed = not DINO_DOMAIN or DINO_DOMAIN == "weed"
+    try:
+        with open(REF_META) as f:
+            meta = json.load(f)
+    except (OSError, ValueError) as e:
+        meta, why = {}, f"{REF_META} unreadable ({e})"
+    else:
+        why = ""
+    guard = meta.get("guard") if isinstance(meta.get("guard"), dict) else None
+    if not why and meta.get("pool_shape") != list(ref.shape):
+        why = (f"{REF_META} describes a pool of shape {meta.get('pool_shape')}, "
+               f"not the {list(ref.shape)} in {REF_POOL}")
+    elif not why and not (guard and guard.get("complete")):
+        why = f"{REF_META} records no complete holdout guard ({guard})"
+    if why:
+        if weed:
+            raise RuntimeError(
+                f"refusing to score against {REF_POOL}: {why}. It may have been "
+                f"sampled with sealed-holdout photographs in it; rebuild it with "
+                f"`build-reference` first.")
+        log.warning(f"reference pool guard not shown: {why}")
+    return guard
+
+
 def score_all_slugs():
     """Stage 2: score every slug in the registry vs the reference pool."""
     if not REF_POOL.exists():
@@ -354,6 +495,7 @@ def score_all_slugs():
         sys.exit(1)
     ref = np.load(REF_POOL)
     log.info(f"Loaded reference pool: {ref.shape}")
+    ref_guard = _reference_guard_record(ref)
     reg = _load_registry()
     ds = reg.get("datasets", {})
 
@@ -368,13 +510,18 @@ def score_all_slugs():
         info = ds[slug]
         t0 = time.time()
         try:
-            res = score_one_slug(slug, info, model, proc, ref, seed=i)
+            # INC 0.3: seeded by the slug, not its registry position, so a
+            # slug's sample (and score) does not move when the registry does.
+            res = score_one_slug(slug, info, model, proc, ref,
+                                 seed=_inc.stable_int(slug))
         except Exception as e:
             log.warning(f"  [{slug}] FAIL: {e}")
             res = {"slug": slug, "status": "error", "score": None, "error": str(e)}
         dt = time.time() - t0
         is_trusted = slug in ref_slugs
         res["is_trusted"] = is_trusted
+        # mega_trainer's min_dino_score gate refuses a score without it.
+        res["ref_guard"] = ref_guard
         scores[slug] = res
         sc = res.get("score")
         sc_str = f"{sc:.4f}" if sc is not None else "n/a"

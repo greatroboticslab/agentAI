@@ -1,0 +1,1222 @@
+{
+ "attribution_scope": {
+  "not_run": {
+   "4": "label audit (BioCLIP-2 re-reading D_k's boxes): out of scope for the pilot",
+   "5": "leave-one-source-out cand runs for a multi-source increment (Breal mixes two sources): out of scope for the pilot"
+  },
+  "run": [
+   "1 recipe vs data",
+   "2 classification vs localisation",
+   "3 per-species deltas"
+  ]
+ },
+ "base": {
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/P0.jsonl",
+  "manifest_sha256": "4324a77dfea82b474d34a5145b49d906bd5bf5bdde915ad868090b4abb841aab",
+  "n_images": 1540,
+  "name": "P0",
+  "recipe": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 100,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.01,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "full",
+   "warmup_bias_lr": 0.1,
+   "warmup_epochs": 3,
+   "weight_decay": 0.0005,
+   "workers": 5
+  },
+  "sessions": [
+   "20210812_iPhoneSE_YL",
+   "20210906_iPhoneSE_YL",
+   "20210806_iPhoneSE_YL",
+   "20210827_iPhone11Pro_BT",
+   "20210827_iPhoneSE_YL",
+   "20210712_iPhoneSE_YL",
+   "20210910_iPhoneSE_YL"
+  ]
+ },
+ "builder": "inc.pilot build",
+ "decision_exam": "dev",
+ "effective_warmup": {
+  "cold": {
+   "base": {
+    "covers_whole_run": false,
+    "epochs": 100,
+    "images": 1540,
+    "iterations_per_epoch": 49,
+    "warmup_epochs_effective": 3.0,
+    "warmup_epochs_nominal": 3,
+    "warmup_iterations": 147
+   },
+   "truth": {
+    "s01_I1": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 1778,
+     "iterations_per_epoch": 56,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 168
+    },
+    "s02_I2": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2016,
+     "iterations_per_epoch": 63,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 189
+    },
+    "s03_Bswap": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2288,
+     "iterations_per_epoch": 72,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 216
+    },
+    "s04_I3": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2254,
+     "iterations_per_epoch": 71,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 213
+    },
+    "s05_Breal": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2492,
+     "iterations_per_epoch": 78,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 234
+    },
+    "s06_I4": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2503,
+     "iterations_per_epoch": 79,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 237
+    },
+    "s07_I5": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2777,
+     "iterations_per_epoch": 87,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 261
+    }
+   }
+  },
+  "incremental": {
+   "freeze": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   },
+   "full": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   },
+   "lora": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   }
+  },
+  "incremental_effective_epochs": {
+   "max": 2.04,
+   "min": 1.0
+  },
+  "note": "Ultralytics warms up for max(round(warmup_epochs * iterations per epoch), 100) iterations; replay mode full: cand holds the accepted pool + D_k and null the pool, recorded at pool_min (P0) and pool_max (P0 + every earlier increment); the driver records each step's actual sizes",
+  "replay_mode": "full"
+ },
+ "exp": "pilot_v3",
+ "final_exams": [
+  "dev",
+  "ood22",
+  "ood23",
+  "imageweeds",
+  "test"
+ ],
+ "gate": {
+  "flips_mode": "net"
+ },
+ "init_weights": "yolo11n.pt",
+ "initialised_utc": "2026-09-27T12:24:45Z",
+ "recipes": {
+  "freeze": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 30,
+   "freeze": 11,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.002,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "freeze",
+   "warmup_bias_lr": 0.002,
+   "warmup_epochs": 1,
+   "weight_decay": 0.0005,
+   "workers": 5
+  },
+  "full": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 30,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.002,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "full",
+   "warmup_bias_lr": 0.002,
+   "warmup_epochs": 1,
+   "weight_decay": 0.0005,
+   "workers": 5
+  },
+  "lora": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 30,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": {
+    "alpha": 32,
+    "rank": 16
+   },
+   "lr0": 0.01,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "lora",
+   "warmup_bias_lr": 0.01,
+   "warmup_epochs": 1,
+   "weight_decay": 0.0005,
+   "workers": 5
+  }
+ },
+ "replay_mode": "full",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "steps": [
+  {
+   "clean": true,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I1.jsonl",
+   "manifest_sha256": "2db00bf8833dce4eb1a5db623e594fd4bf289c0d16510c3ab918f6d6472fb2b9",
+   "n_images": 238,
+   "name": "I1",
+   "sessions": [
+    "20210628_iPhoneSE_YL",
+    "20210812_NIKOND3300_YL",
+    "20210818_iPhoneSE_YL",
+    "20210903_CanonEOS4000D_EO",
+    "20210904_iPhoneSE_YL"
+   ]
+  },
+  {
+   "clean": true,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I2.jsonl",
+   "manifest_sha256": "c875d38c49bce1f7b888c66a8f7d3c851f340e75e16e3a7709ffe448d1440d0e",
+   "n_images": 238,
+   "name": "I2",
+   "sessions": [
+    "20210804_iPhoneSE_YL",
+    "20210805_iPhoneSE_YL",
+    "20210903_iPhoneSE_YL"
+   ]
+  },
+  {
+   "clean": false,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/Bswap.jsonl",
+   "manifest_sha256": "d36540dc7161171e617d971a7d30d5485f5b5642b0f717a74d5996d77eab1f8a",
+   "n_images": 272,
+   "name": "Bswap",
+   "planted": "40% of boxes relabelled to another species",
+   "source_sessions": [
+    "20210813_iPhoneSE_YL",
+    "20210903_iPhone11Pro_BT",
+    "20210909_NIKOND3300_YL"
+   ]
+  },
+  {
+   "clean": true,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I3.jsonl",
+   "manifest_sha256": "f29504d52b3de0a982f986be50548d4e7159eb42354d2223b44eb8caab74b833",
+   "n_images": 238,
+   "name": "I3",
+   "sessions": [
+    "20210809_iPhoneSE_YL",
+    "20210814_iPhoneSE_YL",
+    "20210910_NIKOND3300_YL"
+   ]
+  },
+  {
+   "class_order_verified": false,
+   "clean": false,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/Breal.jsonl",
+   "manifest_sha256": "87947418ff60355a9226569e4b3f2425e947b256b838a3f86973a9c28778701b",
+   "n_images": 238,
+   "name": "Breal",
+   "planted": "harvested sources with measured label precision < 0.90"
+  },
+  {
+   "clean": true,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I4.jsonl",
+   "manifest_sha256": "2a1408f59f6edfbf0e813b3e00fd46e4849fc6771471bff191e64b90e684184e",
+   "n_images": 249,
+   "name": "I4",
+   "sessions": [
+    "20210903_NIKOND3300_YL",
+    "20210913_iPhoneSE_YL",
+    "20220129_CanonEOS4000D_EO"
+   ]
+  },
+  {
+   "clean": true,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v3/manifests/I5.jsonl",
+   "manifest_sha256": "3e964bcd6ba270e1ab2e72ed334b2444620dbb73bc67155ebe8876f5f744e193",
+   "n_images": 274,
+   "name": "I5",
+   "sessions": [
+    "20210903_YALAL00_EO",
+    "20210910_iPhone11Pro_BT",
+    "20210912_iPhoneSE_YL"
+   ]
+  }
+ ],
+ "testing": false,
+ "train_core": {
+  "locked": true,
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/train_core.jsonl",
+  "sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+ },
+ "truth": true,
+ "truth_recipe": {
+  "batch": 32,
+  "cache": "ram",
+  "close_mosaic": 10,
+  "cos_lr": true,
+  "deterministic": true,
+  "epochs": 100,
+  "freeze": null,
+  "imgsz": 640,
+  "lora": null,
+  "lr0": 0.01,
+  "lrf": 0.01,
+  "momentum": 0.937,
+  "optimizer": "SGD",
+  "trainer": "full",
+  "warmup_bias_lr": 0.1,
+  "warmup_epochs": 3,
+  "weight_decay": 0.0005,
+  "workers": 5
+ },
+ "type": "chain"
+}

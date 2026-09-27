@@ -1,0 +1,79 @@
+{
+ "artifact": "step1/select_clusters.csv",
+ "format": "inc-autopilot/select-clusters-by-source/1",
+ "sources": {
+  "francesco__grass_weeds": {
+   "increment_pool": {
+    "images": 2479,
+    "status": {
+     "no_evidence": 179,
+     "pool": 2300
+    }
+   }
+  },
+  "fvossel__csgo_player_detection": {
+   "increment_pool": {
+    "images": 4012,
+    "status": {
+     "no_evidence": 3990,
+     "no_feature": 22
+    }
+   }
+  },
+  "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+   "increment_pool": {
+    "images": 434,
+    "status": {
+     "below_gate": 14,
+     "no_evidence": 420
+    }
+   }
+  },
+  "project_agml__weed_crop_detection": {
+   "increment_pool": {
+    "images": 206,
+    "status": {
+     "below_gate": 26,
+     "pool": 180
+    }
+   }
+  },
+  "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+   "increment_pool": {
+    "images": 755,
+    "status": {
+     "below_gate": 55,
+     "pool": 700
+    }
+   }
+  },
+  "rf_zig-zag-lnodr__weed-detection-vanpe": {
+   "increment_pool": {
+    "images": 352,
+    "status": {
+     "below_gate": 22,
+     "pool": 330
+    }
+   }
+  },
+  "synthetic__crop-and-weed-b": {
+   "increment_pool": {
+    "images": 800,
+    "status": {
+     "below_gate": 40,
+     "pool": 760
+    }
+   }
+  },
+  "synthetic__weed-source-a": {
+   "increment_pool": {
+    "images": 1100,
+    "status": {
+     "below_gate": 50,
+     "pool": 1050
+    }
+   }
+  }
+ },
+ "synthetic": "Synthetic, for replay case R7 (docs/INC_AUTOPILOT.md (f)): a small Step 1 in the shape of the cluster's files of 2026-09-27. relevance.json carries that build's calibration numbers (tau 0.0557 < 0.5; 34.5 % of the train_core crops below 0.5) and is made for this select build; the evidenced sources hold enough increment-pool images for the default real loop (the real Step 1 does not: 1,439 < 2,751, R7's negative case). Sources named 'synthetic__' are invented; the others carry numbers of the real sources."
+}

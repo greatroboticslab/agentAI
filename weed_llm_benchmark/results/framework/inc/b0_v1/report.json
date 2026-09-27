@@ -1,0 +1,125 @@
+{
+ "attribution_scope": null,
+ "blocked": {},
+ "code": {
+  "modules": {
+   "tools/cwd12_species.py": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+   "tools/inc/__init__.py": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+   "tools/inc/common.py": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+   "tools/inc/driver.py": "1d65393e0b299706ca9dca00194eb1e7c3b665a6114b93a62dae3c41aac22de7",
+   "tools/inc/gate.py": "e6eadeb76d0d104d53ebd56b84388dacce442616572ba6cf3d2d611deab6975b",
+   "tools/inc/splits.py": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+  },
+  "package_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework",
+  "pinned_utc": "2026-09-27T03:28:31Z",
+  "reason": "init"
+ },
+ "done": true,
+ "done_utc": "2026-09-27T04:20:33Z",
+ "effective_warmup": null,
+ "exams": [
+  "dev",
+  "ood22",
+  "ood23",
+  "imageweeds",
+  "test"
+ ],
+ "exp": "b0_v1",
+ "final": [
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8510457299503759,
+      "n": 3,
+      "sd": 0.0006717121636557292
+     },
+     "twelve": {
+      "mean": 0.8081961671138256,
+      "n": 3,
+      "sd": 0.006283008894520266
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.11492354285694435,
+      "n": 3,
+      "sd": 0.017616013469933474
+     },
+     "twelve": {
+      "mean": 0.060985695067304085,
+      "n": 3,
+      "sd": 0.015879090769812206
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8387711733104126,
+      "n": 3,
+      "sd": 0.005189243351757884
+     },
+     "twelve": {
+      "mean": 0.7505449773982522,
+      "n": 3,
+      "sd": 0.013065792663305839
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.12356744800656881,
+      "n": 3,
+      "sd": 0.011342065797173522
+     },
+     "twelve": {
+      "mean": 0.18611410713081356,
+      "n": 3,
+      "sd": 0.013790557645010885
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8741253907942789,
+      "n": 3,
+      "sd": 0.0018530926416782734
+     },
+     "twelve": {
+      "mean": 0.854088136882485,
+      "n": 3,
+      "sd": 0.007352757446924495
+     }
+    }
+   },
+   "model": "base train_core",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__base__s0",
+    "final__base__s1",
+    "final__base__s2"
+   ]
+  }
+ ],
+ "generated_utc": "2026-09-27T08:21:34Z",
+ "gpu_hours": {
+  "base": {
+   "hours": 1.7679444444444445,
+   "runs": 3
+  },
+  "final": {
+   "hours": 0.43183333333333335,
+   "runs": 3
+  }
+ },
+ "gpu_hours_total": 2.199777777777778,
+ "interventions": [],
+ "notes": [],
+ "replay_mode": null,
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "testing": false,
+ "type": "baseline"
+}

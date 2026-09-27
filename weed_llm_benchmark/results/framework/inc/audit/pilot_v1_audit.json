@@ -1,0 +1,3346 @@
+{
+ "audit_order": [
+  "I1",
+  "I2",
+  "I3",
+  "I4",
+  "I5",
+  "Bswap",
+  "Breal"
+ ],
+ "audits": {
+  "Breal": {
+   "boxes": 2740,
+   "boxes_by_status": {
+    "conflict": 429,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 57,
+    "other_ok": 1922,
+    "unknown": 250,
+    "verified": 82
+   },
+   "boxes_per_class": {
+    "Carpetweed": 0,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 0,
+    "OtherPlant": 2367,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 236,
+    "Sicklepod": 0,
+    "SpottedSpurge": 0,
+    "Waterhemp": 137
+   },
+   "conflict_pairs": {
+    "OtherPlant -> Carpetweed": 4,
+    "OtherPlant -> Goosegrass": 112,
+    "OtherPlant -> MorningGlory": 79,
+    "OtherPlant -> PalmerAmaranth": 84,
+    "OtherPlant -> Sicklepod": 23,
+    "OtherPlant -> SpottedSpurge": 2,
+    "OtherPlant -> Waterhemp": 97,
+    "Ragweed -> Goosegrass": 1,
+    "Waterhemp -> PalmerAmaranth": 27
+   },
+   "geometry_mismatch_examples": [
+    {
+     "box": 0,
+     "delta": 0.003563,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000126"
+    },
+    {
+     "box": 1,
+     "delta": 0.004294,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000126"
+    },
+    {
+     "box": 2,
+     "delta": 0.001827,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000126"
+    },
+    {
+     "box": 3,
+     "delta": 0.002056,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000126"
+    },
+    {
+     "box": 0,
+     "delta": 0.067846,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000141"
+    },
+    {
+     "box": 1,
+     "delta": 0.067709,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000141"
+    },
+    {
+     "box": 0,
+     "delta": 0.004386,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000145"
+    },
+    {
+     "box": 1,
+     "delta": 0.026042,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000145"
+    },
+    {
+     "box": 0,
+     "delta": 0.00603,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000147"
+    },
+    {
+     "box": 0,
+     "delta": 0.001645,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000151"
+    },
+    {
+     "box": 1,
+     "delta": 0.01133,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000151"
+    },
+    {
+     "box": 0,
+     "delta": 0.002742,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000155"
+    },
+    {
+     "box": 1,
+     "delta": 0.00466,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000155"
+    },
+    {
+     "box": 2,
+     "delta": 0.00233,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000155"
+    },
+    {
+     "box": 0,
+     "delta": 0.002193,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000179"
+    },
+    {
+     "box": 1,
+     "delta": 0.003289,
+     "key": "Breal__imageweeds_aerial_weed_detection__default_train_000179"
+    },
+    {
+     "box": 1,
+     "delta": 0.005,
+     "key": "Breal__weed_crop_detection__default_train_000019"
+    },
+    {
+     "box": 3,
+     "delta": 0.005,
+     "key": "Breal__weed_crop_detection__default_train_000052"
+    },
+    {
+     "box": 6,
+     "delta": 0.005,
+     "key": "Breal__weed_crop_detection__default_train_000052"
+    },
+    {
+     "box": 20,
+     "delta": 0.005,
+     "key": "Breal__weed_crop_detection__default_train_000076"
+    }
+   ],
+   "images": 238,
+   "images_matched_by_sha256": 7,
+   "images_refused_in_trusted": 0,
+   "images_without_step1_image": 0,
+   "known_truth": null,
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v1/manifests/Breal.jsonl",
+   "manifest_sha256": "cc9430f558cacc89f8064951155b6c38b8140aaf743ae872f53e118e62c9b7f5",
+   "no_embedding_reasons": {
+    "geometry_mismatch": 57
+   },
+   "otherplant": {
+    "boxes_judged": 2323,
+    "conflict": 401,
+    "conflict_rate": 0.1726,
+    "conflict_rate_ci95": [
+     0.1578,
+     0.1885
+    ],
+    "other_ok": 1922
+   },
+   "per_source": {
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "boxes": 345,
+     "otherplant": {
+      "boxes_judged": 196,
+      "conflict": 78,
+      "conflict_rate": 0.398,
+      "conflict_rate_ci95": [
+       0.332,
+       0.4678
+      ],
+      "other_ok": 118
+     },
+     "species": {
+      "boxes_judged": 133,
+      "conflict": 12,
+      "conflict_rate": 0.0902,
+      "conflict_rate_ci95": [
+       0.0524,
+       0.1511
+      ],
+      "unknown": 95,
+      "unknown_rate": 0.7143,
+      "verified": 26,
+      "verified_rate": 0.1955
+     }
+    },
+    "project_agml__weed_crop_detection": {
+     "boxes": 2395,
+     "otherplant": {
+      "boxes_judged": 2127,
+      "conflict": 323,
+      "conflict_rate": 0.1519,
+      "conflict_rate_ci95": [
+       0.1372,
+       0.1677
+      ],
+      "other_ok": 1804
+     },
+     "species": {
+      "boxes_judged": 227,
+      "conflict": 16,
+      "conflict_rate": 0.0705,
+      "conflict_rate_ci95": [
+       0.0438,
+       0.1114
+      ],
+      "unknown": 155,
+      "unknown_rate": 0.6828,
+      "verified": 56,
+      "verified_rate": 0.2467
+     }
+    }
+   },
+   "per_species": {
+    "OtherPlant": {
+     "boxes": 2367,
+     "boxes_judged": 2323,
+     "conflict": 401,
+     "conflict_rate": 0.1726,
+     "conflict_rate_ci95": [
+      0.1578,
+      0.1885
+     ],
+     "not_judged": 44,
+     "other_ok": 1922
+    },
+    "Ragweed": {
+     "boxes": 236,
+     "boxes_judged": 224,
+     "conflict": 1,
+     "conflict_rate": 0.0045,
+     "conflict_rate_ci95": [
+      0.0008,
+      0.0248
+     ],
+     "not_judged": 12,
+     "unknown": 220,
+     "unknown_rate": 0.9821,
+     "verified": 3,
+     "verified_rate": 0.0134
+    },
+    "Waterhemp": {
+     "boxes": 137,
+     "boxes_judged": 136,
+     "conflict": 27,
+     "conflict_rate": 0.1985,
+     "conflict_rate_ci95": [
+      0.1402,
+      0.2734
+     ],
+     "not_judged": 1,
+     "unknown": 30,
+     "unknown_rate": 0.2206,
+     "verified": 79,
+     "verified_rate": 0.5809
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "project_agml__imageweeds_aerial_weed_detection": 80,
+    "project_agml__weed_crop_detection": 158
+   },
+   "species": {
+    "above_baseline": true,
+    "above_pooled_baseline": true,
+    "baseline_for_mix": {
+     "boxes": 360,
+     "conflict": 28,
+     "conflict_rate": 0.0778,
+     "conflict_rate_ci95": [
+      0.0544,
+      0.1101
+     ],
+     "conflict_recall_on_wrong": 0.9422,
+     "false_conflict_rate": 0.0072,
+     "false_conflict_rate_ci95": [
+      0.0032,
+      0.0197
+     ],
+     "per_species": {
+      "Ragweed": {
+       "baseline_boxes": 194,
+       "baseline_wrong_boxes": 194,
+       "boxes": 224,
+       "conflict_recall_on_wrong": 0.9381,
+       "false_conflict_rate": 0.0052,
+       "weight": 0.6222
+      },
+      "Waterhemp": {
+       "baseline_boxes": 470,
+       "baseline_wrong_boxes": 470,
+       "boxes": 136,
+       "conflict_recall_on_wrong": 0.9489,
+       "false_conflict_rate": 0.0106,
+       "weight": 0.3778
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 360,
+    "conflict": 28,
+    "conflict_rate": 0.0778,
+    "conflict_rate_ci95": [
+     0.0544,
+     0.1101
+    ],
+    "noise_estimate_corrected": 0.0755,
+    "noise_estimate_pooled_baseline": 0.0904,
+    "unknown": 250,
+    "unknown_rate": 0.6944,
+    "verified": 82,
+    "verified_rate": 0.2278
+   }
+  },
+  "Bswap": {
+   "boxes": 492,
+   "boxes_by_status": {
+    "conflict": 187,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 32,
+    "verified": 273
+   },
+   "boxes_per_class": {
+    "Carpetweed": 95,
+    "CutleafGroundcherry": 21,
+    "Eclipta": 56,
+    "Goosegrass": 32,
+    "MorningGlory": 23,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 55,
+    "PricklySida": 27,
+    "Purslane": 30,
+    "Ragweed": 21,
+    "Sicklepod": 21,
+    "SpottedSpurge": 31,
+    "Waterhemp": 80
+   },
+   "conflict_pairs": {
+    "Carpetweed -> Eclipta": 2,
+    "Carpetweed -> PalmerAmaranth": 1,
+    "Carpetweed -> Purslane": 2,
+    "Carpetweed -> Ragweed": 1,
+    "Carpetweed -> SpottedSpurge": 3,
+    "Carpetweed -> Waterhemp": 6,
+    "CutleafGroundcherry -> Carpetweed": 4,
+    "CutleafGroundcherry -> Eclipta": 3,
+    "CutleafGroundcherry -> MorningGlory": 1,
+    "CutleafGroundcherry -> PalmerAmaranth": 3,
+    "CutleafGroundcherry -> PricklySida": 1,
+    "CutleafGroundcherry -> Ragweed": 1,
+    "CutleafGroundcherry -> Waterhemp": 5,
+    "Eclipta -> Carpetweed": 7,
+    "Eclipta -> Goosegrass": 2,
+    "Eclipta -> MorningGlory": 1,
+    "Eclipta -> PalmerAmaranth": 3,
+    "Eclipta -> Ragweed": 1,
+    "Eclipta -> Waterhemp": 3,
+    "Goosegrass -> Carpetweed": 4,
+    "Goosegrass -> Eclipta": 4,
+    "Goosegrass -> PalmerAmaranth": 3,
+    "Goosegrass -> PricklySida": 1,
+    "Goosegrass -> Purslane": 4,
+    "Goosegrass -> Ragweed": 1,
+    "Goosegrass -> SpottedSpurge": 5,
+    "Goosegrass -> Waterhemp": 5,
+    "MorningGlory -> Carpetweed": 5,
+    "MorningGlory -> Eclipta": 3,
+    "MorningGlory -> Goosegrass": 1,
+    "MorningGlory -> PalmerAmaranth": 1,
+    "MorningGlory -> PricklySida": 1,
+    "MorningGlory -> Ragweed": 1,
+    "MorningGlory -> SpottedSpurge": 2,
+    "MorningGlory -> Waterhemp": 3,
+    "PalmerAmaranth -> Carpetweed": 1,
+    "PalmerAmaranth -> Eclipta": 2,
+    "PalmerAmaranth -> Ragweed": 4,
+    "PalmerAmaranth -> SpottedSpurge": 1,
+    "PalmerAmaranth -> Waterhemp": 1,
+    "PricklySida -> Carpetweed": 3,
+    "PricklySida -> Eclipta": 2,
+    "PricklySida -> MorningGlory": 1,
+    "PricklySida -> PalmerAmaranth": 4,
+    "PricklySida -> Ragweed": 1,
+    "PricklySida -> SpottedSpurge": 2,
+    "PricklySida -> Waterhemp": 4,
+    "Purslane -> Carpetweed": 1,
+    "Purslane -> Eclipta": 2,
+    "Purslane -> MorningGlory": 1,
+    "Purslane -> PalmerAmaranth": 1,
+    "Purslane -> PricklySida": 1,
+    "Purslane -> Ragweed": 3,
+    "Purslane -> SpottedSpurge": 1,
+    "Purslane -> Waterhemp": 3,
+    "Ragweed -> Carpetweed": 1,
+    "Ragweed -> Goosegrass": 2,
+    "Ragweed -> Waterhemp": 1,
+    "Sicklepod -> Carpetweed": 3,
+    "Sicklepod -> Eclipta": 2,
+    "Sicklepod -> MorningGlory": 1,
+    "Sicklepod -> PalmerAmaranth": 7,
+    "Sicklepod -> Purslane": 2,
+    "Sicklepod -> SpottedSpurge": 1,
+    "Sicklepod -> Waterhemp": 3,
+    "SpottedSpurge -> Carpetweed": 3,
+    "SpottedSpurge -> Eclipta": 5,
+    "SpottedSpurge -> PalmerAmaranth": 4,
+    "SpottedSpurge -> Purslane": 3,
+    "SpottedSpurge -> Waterhemp": 2,
+    "Waterhemp -> Carpetweed": 2,
+    "Waterhemp -> Eclipta": 3,
+    "Waterhemp -> Goosegrass": 1,
+    "Waterhemp -> MorningGlory": 1,
+    "Waterhemp -> PalmerAmaranth": 4,
+    "Waterhemp -> Ragweed": 2,
+    "Waterhemp -> SpottedSpurge": 1
+   },
+   "geometry_mismatch_examples": [],
+   "images": 272,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_step1_image": 0,
+   "known_truth": {
+    "boxes": 492,
+    "conflict_recall_on_wrong": 0.9239,
+    "correct_judged": 295,
+    "false_conflict_rate_on_correct": 0.0169,
+    "judged": 492,
+    "label_correct_rate": 0.5996,
+    "label_error_rate": 0.4004,
+    "note": "boxes judged on a train_core crop; truth = that crop's train_core label (crops.csv)",
+    "verdicts": {
+     "conflict": 187,
+     "unknown": 32,
+     "verified": 273
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.9254,
+    "wrong_judged": 197
+   },
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v1/manifests/Bswap.jsonl",
+   "manifest_sha256": "2e604b71e08e533a7074bdc571972bedc8b03392d54d98e3d7285b9ebad948ec",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "Bswap": {
+     "boxes": 492,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 492,
+      "conflict": 187,
+      "conflict_rate": 0.3801,
+      "conflict_rate_ci95": [
+       0.3383,
+       0.4237
+      ],
+      "unknown": 32,
+      "unknown_rate": 0.065,
+      "verified": 273,
+      "verified_rate": 0.5549
+     }
+    }
+   },
+   "per_species": {
+    "Carpetweed": {
+     "boxes": 95,
+     "boxes_judged": 95,
+     "conflict": 15,
+     "conflict_rate": 0.1579,
+     "conflict_rate_ci95": [
+      0.0981,
+      0.2443
+     ],
+     "not_judged": 0,
+     "unknown": 12,
+     "unknown_rate": 0.1263,
+     "verified": 68,
+     "verified_rate": 0.7158
+    },
+    "CutleafGroundcherry": {
+     "boxes": 21,
+     "boxes_judged": 21,
+     "conflict": 18,
+     "conflict_rate": 0.8571,
+     "conflict_rate_ci95": [
+      0.6536,
+      0.9502
+     ],
+     "not_judged": 0,
+     "unknown": 3,
+     "unknown_rate": 0.1429,
+     "verified": 0,
+     "verified_rate": 0.0
+    },
+    "Eclipta": {
+     "boxes": 56,
+     "boxes_judged": 56,
+     "conflict": 17,
+     "conflict_rate": 0.3036,
+     "conflict_rate_ci95": [
+      0.199,
+      0.4334
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.0179,
+     "verified": 38,
+     "verified_rate": 0.6786
+    },
+    "Goosegrass": {
+     "boxes": 32,
+     "boxes_judged": 32,
+     "conflict": 27,
+     "conflict_rate": 0.8438,
+     "conflict_rate_ci95": [
+      0.6825,
+      0.9314
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0625,
+     "verified": 3,
+     "verified_rate": 0.0938
+    },
+    "MorningGlory": {
+     "boxes": 23,
+     "boxes_judged": 23,
+     "conflict": 17,
+     "conflict_rate": 0.7391,
+     "conflict_rate_ci95": [
+      0.5353,
+      0.8745
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 6,
+     "verified_rate": 0.2609
+    },
+    "PalmerAmaranth": {
+     "boxes": 55,
+     "boxes_judged": 55,
+     "conflict": 9,
+     "conflict_rate": 0.1636,
+     "conflict_rate_ci95": [
+      0.0886,
+      0.2826
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0364,
+     "verified": 44,
+     "verified_rate": 0.8
+    },
+    "PricklySida": {
+     "boxes": 27,
+     "boxes_judged": 27,
+     "conflict": 17,
+     "conflict_rate": 0.6296,
+     "conflict_rate_ci95": [
+      0.4423,
+      0.7847
+     ],
+     "not_judged": 0,
+     "unknown": 4,
+     "unknown_rate": 0.1481,
+     "verified": 6,
+     "verified_rate": 0.2222
+    },
+    "Purslane": {
+     "boxes": 30,
+     "boxes_judged": 30,
+     "conflict": 13,
+     "conflict_rate": 0.4333,
+     "conflict_rate_ci95": [
+      0.2738,
+      0.608
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 17,
+     "verified_rate": 0.5667
+    },
+    "Ragweed": {
+     "boxes": 21,
+     "boxes_judged": 21,
+     "conflict": 4,
+     "conflict_rate": 0.1905,
+     "conflict_rate_ci95": [
+      0.0767,
+      0.4
+     ],
+     "not_judged": 0,
+     "unknown": 3,
+     "unknown_rate": 0.1429,
+     "verified": 14,
+     "verified_rate": 0.6667
+    },
+    "Sicklepod": {
+     "boxes": 21,
+     "boxes_judged": 21,
+     "conflict": 19,
+     "conflict_rate": 0.9048,
+     "conflict_rate_ci95": [
+      0.7109,
+      0.9735
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0952,
+     "verified": 0,
+     "verified_rate": 0.0
+    },
+    "SpottedSpurge": {
+     "boxes": 31,
+     "boxes_judged": 31,
+     "conflict": 17,
+     "conflict_rate": 0.5484,
+     "conflict_rate_ci95": [
+      0.3777,
+      0.7084
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.0323,
+     "verified": 13,
+     "verified_rate": 0.4194
+    },
+    "Waterhemp": {
+     "boxes": 80,
+     "boxes_judged": 80,
+     "conflict": 14,
+     "conflict_rate": 0.175,
+     "conflict_rate_ci95": [
+      0.1072,
+      0.2726
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.025,
+     "verified": 64,
+     "verified_rate": 0.8
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "Bswap": 272
+   },
+   "species": {
+    "above_baseline": true,
+    "above_pooled_baseline": true,
+    "baseline_for_mix": {
+     "boxes": 492,
+     "conflict": 187,
+     "conflict_rate": 0.3801,
+     "conflict_rate_ci95": [
+      0.3383,
+      0.4237
+     ],
+     "conflict_recall_on_wrong": 0.7056,
+     "false_conflict_rate": 0.0079,
+     "false_conflict_rate_ci95": [
+      0.0063,
+      0.0205
+     ],
+     "per_species": {
+      "Carpetweed": {
+       "baseline_boxes": 185,
+       "baseline_wrong_boxes": 185,
+       "boxes": 95,
+       "conflict_recall_on_wrong": 0.9568,
+       "false_conflict_rate": 0.0108,
+       "weight": 0.1931
+      },
+      "CutleafGroundcherry": {
+       "baseline_boxes": 32,
+       "baseline_wrong_boxes": 32,
+       "boxes": 21,
+       "conflict_recall_on_wrong": 0.9375,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0427
+      },
+      "Eclipta": {
+       "baseline_boxes": 280,
+       "baseline_wrong_boxes": 280,
+       "boxes": 56,
+       "conflict_recall_on_wrong": 0.0036,
+       "false_conflict_rate": 0.0036,
+       "weight": 0.1138
+      },
+      "Goosegrass": {
+       "baseline_boxes": 81,
+       "baseline_wrong_boxes": 81,
+       "boxes": 32,
+       "conflict_recall_on_wrong": 0.6667,
+       "false_conflict_rate": 0.0,
+       "weight": 0.065
+      },
+      "MorningGlory": {
+       "baseline_boxes": 385,
+       "baseline_wrong_boxes": 385,
+       "boxes": 23,
+       "conflict_recall_on_wrong": 0.9403,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0467
+      },
+      "PalmerAmaranth": {
+       "baseline_boxes": 48,
+       "baseline_wrong_boxes": 48,
+       "boxes": 55,
+       "conflict_recall_on_wrong": 0.3125,
+       "false_conflict_rate": 0.0208,
+       "weight": 0.1118
+      },
+      "PricklySida": {
+       "baseline_boxes": 188,
+       "baseline_wrong_boxes": 188,
+       "boxes": 27,
+       "conflict_recall_on_wrong": 0.9574,
+       "false_conflict_rate": 0.0053,
+       "weight": 0.0549
+      },
+      "Purslane": {
+       "baseline_boxes": 353,
+       "baseline_wrong_boxes": 353,
+       "boxes": 30,
+       "conflict_recall_on_wrong": 0.9263,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.061
+      },
+      "Ragweed": {
+       "baseline_boxes": 194,
+       "baseline_wrong_boxes": 194,
+       "boxes": 21,
+       "conflict_recall_on_wrong": 0.9381,
+       "false_conflict_rate": 0.0052,
+       "weight": 0.0427
+      },
+      "Sicklepod": {
+       "baseline_boxes": 36,
+       "baseline_wrong_boxes": 36,
+       "boxes": 21,
+       "conflict_recall_on_wrong": 0.0,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0427
+      },
+      "SpottedSpurge": {
+       "baseline_boxes": 352,
+       "baseline_wrong_boxes": 352,
+       "boxes": 31,
+       "conflict_recall_on_wrong": 0.8693,
+       "false_conflict_rate": 0.0057,
+       "weight": 0.063
+      },
+      "Waterhemp": {
+       "baseline_boxes": 470,
+       "baseline_wrong_boxes": 470,
+       "boxes": 80,
+       "conflict_recall_on_wrong": 0.9489,
+       "false_conflict_rate": 0.0106,
+       "weight": 0.1626
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 492,
+    "conflict": 187,
+    "conflict_rate": 0.3801,
+    "conflict_rate_ci95": [
+     0.3383,
+     0.4237
+    ],
+    "noise_estimate_corrected": 0.5334,
+    "noise_estimate_pooled_baseline": 0.4718,
+    "unknown": 32,
+    "unknown_rate": 0.065,
+    "verified": 273,
+    "verified_rate": 0.5549
+   }
+  },
+  "I1": {
+   "boxes": 406,
+   "boxes_by_status": {
+    "conflict": 3,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 25,
+    "verified": 378
+   },
+   "boxes_per_class": {
+    "Carpetweed": 100,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 21,
+    "Goosegrass": 1,
+    "MorningGlory": 45,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 62,
+    "PricklySida": 0,
+    "Purslane": 18,
+    "Ragweed": 9,
+    "Sicklepod": 0,
+    "SpottedSpurge": 26,
+    "Waterhemp": 124
+   },
+   "conflict_pairs": {
+    "Carpetweed -> Purslane": 1,
+    "Carpetweed -> Waterhemp": 1,
+    "SpottedSpurge -> MorningGlory": 1
+   },
+   "geometry_mismatch_examples": [],
+   "images": 238,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_step1_image": 0,
+   "known_truth": {
+    "boxes": 406,
+    "conflict_recall_on_wrong": null,
+    "correct_judged": 406,
+    "false_conflict_rate_on_correct": 0.0074,
+    "judged": 406,
+    "label_correct_rate": 1.0,
+    "label_error_rate": 0.0,
+    "note": "boxes judged on a train_core crop; truth = that crop's train_core label (crops.csv)",
+    "verdicts": {
+     "conflict": 3,
+     "unknown": 25,
+     "verified": 378
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.931,
+    "wrong_judged": 0
+   },
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v1/manifests/I1.jsonl",
+   "manifest_sha256": "2db00bf8833dce4eb1a5db623e594fd4bf289c0d16510c3ab918f6d6472fb2b9",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "cottonweeddet12/train": {
+     "boxes": 406,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 406,
+      "conflict": 3,
+      "conflict_rate": 0.0074,
+      "conflict_rate_ci95": [
+       0.0025,
+       0.0215
+      ],
+      "unknown": 25,
+      "unknown_rate": 0.0616,
+      "verified": 378,
+      "verified_rate": 0.931
+     }
+    }
+   },
+   "per_species": {
+    "Carpetweed": {
+     "boxes": 100,
+     "boxes_judged": 100,
+     "conflict": 2,
+     "conflict_rate": 0.02,
+     "conflict_rate_ci95": [
+      0.0055,
+      0.07
+     ],
+     "not_judged": 0,
+     "unknown": 12,
+     "unknown_rate": 0.12,
+     "verified": 86,
+     "verified_rate": 0.86
+    },
+    "Eclipta": {
+     "boxes": 21,
+     "boxes_judged": 21,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.1546
+     ],
+     "not_judged": 0,
+     "unknown": 6,
+     "unknown_rate": 0.2857,
+     "verified": 15,
+     "verified_rate": 0.7143
+    },
+    "Goosegrass": {
+     "boxes": 1,
+     "boxes_judged": 1,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.7935
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 1,
+     "verified_rate": 1.0
+    },
+    "MorningGlory": {
+     "boxes": 45,
+     "boxes_judged": 45,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0787
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 45,
+     "verified_rate": 1.0
+    },
+    "PalmerAmaranth": {
+     "boxes": 62,
+     "boxes_judged": 62,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0583
+     ],
+     "not_judged": 0,
+     "unknown": 5,
+     "unknown_rate": 0.0806,
+     "verified": 57,
+     "verified_rate": 0.9194
+    },
+    "Purslane": {
+     "boxes": 18,
+     "boxes_judged": 18,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.1759
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 18,
+     "verified_rate": 1.0
+    },
+    "Ragweed": {
+     "boxes": 9,
+     "boxes_judged": 9,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2991
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.1111,
+     "verified": 8,
+     "verified_rate": 0.8889
+    },
+    "SpottedSpurge": {
+     "boxes": 26,
+     "boxes_judged": 26,
+     "conflict": 1,
+     "conflict_rate": 0.0385,
+     "conflict_rate_ci95": [
+      0.0068,
+      0.1889
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 25,
+     "verified_rate": 0.9615
+    },
+    "Waterhemp": {
+     "boxes": 124,
+     "boxes_judged": 124,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.03
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.0081,
+     "verified": 123,
+     "verified_rate": 0.9919
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "cottonweeddet12/train": 238
+   },
+   "species": {
+    "above_baseline": false,
+    "above_pooled_baseline": false,
+    "baseline_for_mix": {
+     "boxes": 406,
+     "conflict": 3,
+     "conflict_rate": 0.0074,
+     "conflict_rate_ci95": [
+      0.0025,
+      0.0215
+     ],
+     "conflict_recall_on_wrong": 0.7968,
+     "false_conflict_rate": 0.0101,
+     "false_conflict_rate_ci95": [
+      0.0062,
+      0.024
+     ],
+     "per_species": {
+      "Carpetweed": {
+       "baseline_boxes": 185,
+       "baseline_wrong_boxes": 185,
+       "boxes": 100,
+       "conflict_recall_on_wrong": 0.9568,
+       "false_conflict_rate": 0.0108,
+       "weight": 0.2463
+      },
+      "Eclipta": {
+       "baseline_boxes": 280,
+       "baseline_wrong_boxes": 280,
+       "boxes": 21,
+       "conflict_recall_on_wrong": 0.0036,
+       "false_conflict_rate": 0.0036,
+       "weight": 0.0517
+      },
+      "Goosegrass": {
+       "baseline_boxes": 81,
+       "baseline_wrong_boxes": 81,
+       "boxes": 1,
+       "conflict_recall_on_wrong": 0.6667,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0025
+      },
+      "MorningGlory": {
+       "baseline_boxes": 385,
+       "baseline_wrong_boxes": 385,
+       "boxes": 45,
+       "conflict_recall_on_wrong": 0.9403,
+       "false_conflict_rate": 0.0,
+       "weight": 0.1108
+      },
+      "PalmerAmaranth": {
+       "baseline_boxes": 48,
+       "baseline_wrong_boxes": 48,
+       "boxes": 62,
+       "conflict_recall_on_wrong": 0.3125,
+       "false_conflict_rate": 0.0208,
+       "weight": 0.1527
+      },
+      "Purslane": {
+       "baseline_boxes": 353,
+       "baseline_wrong_boxes": 353,
+       "boxes": 18,
+       "conflict_recall_on_wrong": 0.9263,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.0443
+      },
+      "Ragweed": {
+       "baseline_boxes": 194,
+       "baseline_wrong_boxes": 194,
+       "boxes": 9,
+       "conflict_recall_on_wrong": 0.9381,
+       "false_conflict_rate": 0.0052,
+       "weight": 0.0222
+      },
+      "SpottedSpurge": {
+       "baseline_boxes": 352,
+       "baseline_wrong_boxes": 352,
+       "boxes": 26,
+       "conflict_recall_on_wrong": 0.8693,
+       "false_conflict_rate": 0.0057,
+       "weight": 0.064
+      },
+      "Waterhemp": {
+       "baseline_boxes": 470,
+       "baseline_wrong_boxes": 470,
+       "boxes": 124,
+       "conflict_recall_on_wrong": 0.9489,
+       "false_conflict_rate": 0.0106,
+       "weight": 0.3054
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 406,
+    "conflict": 3,
+    "conflict_rate": 0.0074,
+    "conflict_rate_ci95": [
+     0.0025,
+     0.0215
+    ],
+    "noise_estimate_corrected": 0.0,
+    "noise_estimate_pooled_baseline": 0.0016,
+    "unknown": 25,
+    "unknown_rate": 0.0616,
+    "verified": 378,
+    "verified_rate": 0.931
+   }
+  },
+  "I2": {
+   "boxes": 312,
+   "boxes_by_status": {
+    "conflict": 1,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 8,
+    "verified": 303
+   },
+   "boxes_per_class": {
+    "Carpetweed": 1,
+    "CutleafGroundcherry": 4,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 166,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 1,
+    "PricklySida": 12,
+    "Purslane": 11,
+    "Ragweed": 4,
+    "Sicklepod": 83,
+    "SpottedSpurge": 28,
+    "Waterhemp": 2
+   },
+   "conflict_pairs": {
+    "MorningGlory -> Waterhemp": 1
+   },
+   "geometry_mismatch_examples": [],
+   "images": 238,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_step1_image": 0,
+   "known_truth": {
+    "boxes": 312,
+    "conflict_recall_on_wrong": null,
+    "correct_judged": 312,
+    "false_conflict_rate_on_correct": 0.0032,
+    "judged": 312,
+    "label_correct_rate": 1.0,
+    "label_error_rate": 0.0,
+    "note": "boxes judged on a train_core crop; truth = that crop's train_core label (crops.csv)",
+    "verdicts": {
+     "conflict": 1,
+     "unknown": 8,
+     "verified": 303
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.9712,
+    "wrong_judged": 0
+   },
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v1/manifests/I2.jsonl",
+   "manifest_sha256": "c875d38c49bce1f7b888c66a8f7d3c851f340e75e16e3a7709ffe448d1440d0e",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "cottonweeddet12/train": {
+     "boxes": 312,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 312,
+      "conflict": 1,
+      "conflict_rate": 0.0032,
+      "conflict_rate_ci95": [
+       0.0006,
+       0.0179
+      ],
+      "unknown": 8,
+      "unknown_rate": 0.0256,
+      "verified": 303,
+      "verified_rate": 0.9712
+     }
+    }
+   },
+   "per_species": {
+    "Carpetweed": {
+     "boxes": 1,
+     "boxes_judged": 1,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.7935
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 1,
+     "verified_rate": 1.0
+    },
+    "CutleafGroundcherry": {
+     "boxes": 4,
+     "boxes_judged": 4,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.4899
+     ],
+     "not_judged": 0,
+     "unknown": 3,
+     "unknown_rate": 0.75,
+     "verified": 1,
+     "verified_rate": 0.25
+    },
+    "MorningGlory": {
+     "boxes": 166,
+     "boxes_judged": 166,
+     "conflict": 1,
+     "conflict_rate": 0.006,
+     "conflict_rate_ci95": [
+      0.0011,
+      0.0333
+     ],
+     "not_judged": 0,
+     "unknown": 3,
+     "unknown_rate": 0.0181,
+     "verified": 162,
+     "verified_rate": 0.9759
+    },
+    "PalmerAmaranth": {
+     "boxes": 1,
+     "boxes_judged": 1,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.7935
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 1,
+     "verified_rate": 1.0
+    },
+    "PricklySida": {
+     "boxes": 12,
+     "boxes_judged": 12,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2425
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 12,
+     "verified_rate": 1.0
+    },
+    "Purslane": {
+     "boxes": 11,
+     "boxes_judged": 11,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2588
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.0909,
+     "verified": 10,
+     "verified_rate": 0.9091
+    },
+    "Ragweed": {
+     "boxes": 4,
+     "boxes_judged": 4,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.4899
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 4,
+     "verified_rate": 1.0
+    },
+    "Sicklepod": {
+     "boxes": 83,
+     "boxes_judged": 83,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0442
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 83,
+     "verified_rate": 1.0
+    },
+    "SpottedSpurge": {
+     "boxes": 28,
+     "boxes_judged": 28,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.1206
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.0357,
+     "verified": 27,
+     "verified_rate": 0.9643
+    },
+    "Waterhemp": {
+     "boxes": 2,
+     "boxes_judged": 2,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.6576
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 2,
+     "verified_rate": 1.0
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "cottonweeddet12/train": 238
+   },
+   "species": {
+    "above_baseline": false,
+    "above_pooled_baseline": false,
+    "baseline_for_mix": {
+     "boxes": 312,
+     "conflict": 1,
+     "conflict_rate": 0.0032,
+     "conflict_rate_ci95": [
+      0.0006,
+      0.0179
+     ],
+     "conflict_recall_on_wrong": 0.682,
+     "false_conflict_rate": 0.0013,
+     "false_conflict_rate_ci95": [
+      0.0012,
+      0.0204
+     ],
+     "per_species": {
+      "Carpetweed": {
+       "baseline_boxes": 185,
+       "baseline_wrong_boxes": 185,
+       "boxes": 1,
+       "conflict_recall_on_wrong": 0.9568,
+       "false_conflict_rate": 0.0108,
+       "weight": 0.0032
+      },
+      "CutleafGroundcherry": {
+       "baseline_boxes": 32,
+       "baseline_wrong_boxes": 32,
+       "boxes": 4,
+       "conflict_recall_on_wrong": 0.9375,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0128
+      },
+      "MorningGlory": {
+       "baseline_boxes": 385,
+       "baseline_wrong_boxes": 385,
+       "boxes": 166,
+       "conflict_recall_on_wrong": 0.9403,
+       "false_conflict_rate": 0.0,
+       "weight": 0.5321
+      },
+      "PalmerAmaranth": {
+       "baseline_boxes": 48,
+       "baseline_wrong_boxes": 48,
+       "boxes": 1,
+       "conflict_recall_on_wrong": 0.3125,
+       "false_conflict_rate": 0.0208,
+       "weight": 0.0032
+      },
+      "PricklySida": {
+       "baseline_boxes": 188,
+       "baseline_wrong_boxes": 188,
+       "boxes": 12,
+       "conflict_recall_on_wrong": 0.9574,
+       "false_conflict_rate": 0.0053,
+       "weight": 0.0385
+      },
+      "Purslane": {
+       "baseline_boxes": 353,
+       "baseline_wrong_boxes": 353,
+       "boxes": 11,
+       "conflict_recall_on_wrong": 0.9263,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.0353
+      },
+      "Ragweed": {
+       "baseline_boxes": 194,
+       "baseline_wrong_boxes": 194,
+       "boxes": 4,
+       "conflict_recall_on_wrong": 0.9381,
+       "false_conflict_rate": 0.0052,
+       "weight": 0.0128
+      },
+      "Sicklepod": {
+       "baseline_boxes": 36,
+       "baseline_wrong_boxes": 36,
+       "boxes": 83,
+       "conflict_recall_on_wrong": 0.0,
+       "false_conflict_rate": 0.0,
+       "weight": 0.266
+      },
+      "SpottedSpurge": {
+       "baseline_boxes": 352,
+       "baseline_wrong_boxes": 352,
+       "boxes": 28,
+       "conflict_recall_on_wrong": 0.8693,
+       "false_conflict_rate": 0.0057,
+       "weight": 0.0897
+      },
+      "Waterhemp": {
+       "baseline_boxes": 470,
+       "baseline_wrong_boxes": 470,
+       "boxes": 2,
+       "conflict_recall_on_wrong": 0.9489,
+       "false_conflict_rate": 0.0106,
+       "weight": 0.0064
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 312,
+    "conflict": 1,
+    "conflict_rate": 0.0032,
+    "conflict_rate_ci95": [
+     0.0006,
+     0.0179
+    ],
+    "noise_estimate_corrected": 0.0028,
+    "noise_estimate_pooled_baseline": 0.0,
+    "unknown": 8,
+    "unknown_rate": 0.0256,
+    "verified": 303,
+    "verified_rate": 0.9712
+   }
+  },
+  "I3": {
+   "boxes": 431,
+   "boxes_by_status": {
+    "conflict": 3,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 11,
+    "verified": 417
+   },
+   "boxes_per_class": {
+    "Carpetweed": 66,
+    "CutleafGroundcherry": 3,
+    "Eclipta": 85,
+    "Goosegrass": 3,
+    "MorningGlory": 68,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 9,
+    "PricklySida": 7,
+    "Purslane": 5,
+    "Ragweed": 27,
+    "Sicklepod": 0,
+    "SpottedSpurge": 14,
+    "Waterhemp": 144
+   },
+   "conflict_pairs": {
+    "Carpetweed -> SpottedSpurge": 1,
+    "Waterhemp -> PalmerAmaranth": 2
+   },
+   "geometry_mismatch_examples": [],
+   "images": 238,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_step1_image": 0,
+   "known_truth": {
+    "boxes": 431,
+    "conflict_recall_on_wrong": null,
+    "correct_judged": 431,
+    "false_conflict_rate_on_correct": 0.007,
+    "judged": 431,
+    "label_correct_rate": 1.0,
+    "label_error_rate": 0.0,
+    "note": "boxes judged on a train_core crop; truth = that crop's train_core label (crops.csv)",
+    "verdicts": {
+     "conflict": 3,
+     "unknown": 11,
+     "verified": 417
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.9675,
+    "wrong_judged": 0
+   },
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v1/manifests/I3.jsonl",
+   "manifest_sha256": "f29504d52b3de0a982f986be50548d4e7159eb42354d2223b44eb8caab74b833",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "cottonweeddet12/train": {
+     "boxes": 431,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 431,
+      "conflict": 3,
+      "conflict_rate": 0.007,
+      "conflict_rate_ci95": [
+       0.0024,
+       0.0203
+      ],
+      "unknown": 11,
+      "unknown_rate": 0.0255,
+      "verified": 417,
+      "verified_rate": 0.9675
+     }
+    }
+   },
+   "per_species": {
+    "Carpetweed": {
+     "boxes": 66,
+     "boxes_judged": 66,
+     "conflict": 1,
+     "conflict_rate": 0.0152,
+     "conflict_rate_ci95": [
+      0.0027,
+      0.081
+     ],
+     "not_judged": 0,
+     "unknown": 3,
+     "unknown_rate": 0.0455,
+     "verified": 62,
+     "verified_rate": 0.9394
+    },
+    "CutleafGroundcherry": {
+     "boxes": 3,
+     "boxes_judged": 3,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.5615
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.3333,
+     "verified": 2,
+     "verified_rate": 0.6667
+    },
+    "Eclipta": {
+     "boxes": 85,
+     "boxes_judged": 85,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0432
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0235,
+     "verified": 83,
+     "verified_rate": 0.9765
+    },
+    "Goosegrass": {
+     "boxes": 3,
+     "boxes_judged": 3,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.5615
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 3,
+     "verified_rate": 1.0
+    },
+    "MorningGlory": {
+     "boxes": 68,
+     "boxes_judged": 68,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0535
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 68,
+     "verified_rate": 1.0
+    },
+    "PalmerAmaranth": {
+     "boxes": 9,
+     "boxes_judged": 9,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2991
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.1111,
+     "verified": 8,
+     "verified_rate": 0.8889
+    },
+    "PricklySida": {
+     "boxes": 7,
+     "boxes_judged": 7,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.3543
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 7,
+     "verified_rate": 1.0
+    },
+    "Purslane": {
+     "boxes": 5,
+     "boxes_judged": 5,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.4345
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 5,
+     "verified_rate": 1.0
+    },
+    "Ragweed": {
+     "boxes": 27,
+     "boxes_judged": 27,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.1246
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0741,
+     "verified": 25,
+     "verified_rate": 0.9259
+    },
+    "SpottedSpurge": {
+     "boxes": 14,
+     "boxes_judged": 14,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2153
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 14,
+     "verified_rate": 1.0
+    },
+    "Waterhemp": {
+     "boxes": 144,
+     "boxes_judged": 144,
+     "conflict": 2,
+     "conflict_rate": 0.0139,
+     "conflict_rate_ci95": [
+      0.0038,
+      0.0492
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0139,
+     "verified": 140,
+     "verified_rate": 0.9722
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "cottonweeddet12/train": 238
+   },
+   "species": {
+    "above_baseline": false,
+    "above_pooled_baseline": false,
+    "baseline_for_mix": {
+     "boxes": 431,
+     "conflict": 3,
+     "conflict_rate": 0.007,
+     "conflict_rate_ci95": [
+      0.0024,
+      0.0203
+     ],
+     "conflict_recall_on_wrong": 0.7436,
+     "false_conflict_rate": 0.007,
+     "false_conflict_rate_ci95": [
+      0.005,
+      0.0141
+     ],
+     "per_species": {
+      "Carpetweed": {
+       "baseline_boxes": 185,
+       "baseline_wrong_boxes": 185,
+       "boxes": 66,
+       "conflict_recall_on_wrong": 0.9568,
+       "false_conflict_rate": 0.0108,
+       "weight": 0.1531
+      },
+      "CutleafGroundcherry": {
+       "baseline_boxes": 32,
+       "baseline_wrong_boxes": 32,
+       "boxes": 3,
+       "conflict_recall_on_wrong": 0.9375,
+       "false_conflict_rate": 0.0,
+       "weight": 0.007
+      },
+      "Eclipta": {
+       "baseline_boxes": 280,
+       "baseline_wrong_boxes": 280,
+       "boxes": 85,
+       "conflict_recall_on_wrong": 0.0036,
+       "false_conflict_rate": 0.0036,
+       "weight": 0.1972
+      },
+      "Goosegrass": {
+       "baseline_boxes": 81,
+       "baseline_wrong_boxes": 81,
+       "boxes": 3,
+       "conflict_recall_on_wrong": 0.6667,
+       "false_conflict_rate": 0.0,
+       "weight": 0.007
+      },
+      "MorningGlory": {
+       "baseline_boxes": 385,
+       "baseline_wrong_boxes": 385,
+       "boxes": 68,
+       "conflict_recall_on_wrong": 0.9403,
+       "false_conflict_rate": 0.0,
+       "weight": 0.1578
+      },
+      "PalmerAmaranth": {
+       "baseline_boxes": 48,
+       "baseline_wrong_boxes": 48,
+       "boxes": 9,
+       "conflict_recall_on_wrong": 0.3125,
+       "false_conflict_rate": 0.0208,
+       "weight": 0.0209
+      },
+      "PricklySida": {
+       "baseline_boxes": 188,
+       "baseline_wrong_boxes": 188,
+       "boxes": 7,
+       "conflict_recall_on_wrong": 0.9574,
+       "false_conflict_rate": 0.0053,
+       "weight": 0.0162
+      },
+      "Purslane": {
+       "baseline_boxes": 353,
+       "baseline_wrong_boxes": 353,
+       "boxes": 5,
+       "conflict_recall_on_wrong": 0.9263,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.0116
+      },
+      "Ragweed": {
+       "baseline_boxes": 194,
+       "baseline_wrong_boxes": 194,
+       "boxes": 27,
+       "conflict_recall_on_wrong": 0.9381,
+       "false_conflict_rate": 0.0052,
+       "weight": 0.0626
+      },
+      "SpottedSpurge": {
+       "baseline_boxes": 352,
+       "baseline_wrong_boxes": 352,
+       "boxes": 14,
+       "conflict_recall_on_wrong": 0.8693,
+       "false_conflict_rate": 0.0057,
+       "weight": 0.0325
+      },
+      "Waterhemp": {
+       "baseline_boxes": 470,
+       "baseline_wrong_boxes": 470,
+       "boxes": 144,
+       "conflict_recall_on_wrong": 0.9489,
+       "false_conflict_rate": 0.0106,
+       "weight": 0.3341
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 431,
+    "conflict": 3,
+    "conflict_rate": 0.007,
+    "conflict_rate_ci95": [
+     0.0024,
+     0.0203
+    ],
+    "noise_estimate_corrected": 0.0,
+    "noise_estimate_pooled_baseline": 0.0011,
+    "unknown": 11,
+    "unknown_rate": 0.0255,
+    "verified": 417,
+    "verified_rate": 0.9675
+   }
+  },
+  "I4": {
+   "boxes": 380,
+   "boxes_by_status": {
+    "conflict": 10,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 9,
+    "verified": 361
+   },
+   "boxes_per_class": {
+    "Carpetweed": 14,
+    "CutleafGroundcherry": 7,
+    "Eclipta": 4,
+    "Goosegrass": 2,
+    "MorningGlory": 48,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 1,
+    "PricklySida": 27,
+    "Purslane": 2,
+    "Ragweed": 62,
+    "Sicklepod": 2,
+    "SpottedSpurge": 77,
+    "Waterhemp": 134
+   },
+   "conflict_pairs": {
+    "CutleafGroundcherry -> Ragweed": 1,
+    "CutleafGroundcherry -> Waterhemp": 4,
+    "MorningGlory -> Waterhemp": 1,
+    "PricklySida -> Waterhemp": 1,
+    "Sicklepod -> Ragweed": 1,
+    "Sicklepod -> Waterhemp": 1,
+    "SpottedSpurge -> Goosegrass": 1
+   },
+   "geometry_mismatch_examples": [],
+   "images": 249,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_step1_image": 0,
+   "known_truth": {
+    "boxes": 380,
+    "conflict_recall_on_wrong": null,
+    "correct_judged": 380,
+    "false_conflict_rate_on_correct": 0.0263,
+    "judged": 380,
+    "label_correct_rate": 1.0,
+    "label_error_rate": 0.0,
+    "note": "boxes judged on a train_core crop; truth = that crop's train_core label (crops.csv)",
+    "verdicts": {
+     "conflict": 10,
+     "unknown": 9,
+     "verified": 361
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.95,
+    "wrong_judged": 0
+   },
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v1/manifests/I4.jsonl",
+   "manifest_sha256": "2a1408f59f6edfbf0e813b3e00fd46e4849fc6771471bff191e64b90e684184e",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "cottonweeddet12/train": {
+     "boxes": 380,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 380,
+      "conflict": 10,
+      "conflict_rate": 0.0263,
+      "conflict_rate_ci95": [
+       0.0144,
+       0.0478
+      ],
+      "unknown": 9,
+      "unknown_rate": 0.0237,
+      "verified": 361,
+      "verified_rate": 0.95
+     }
+    }
+   },
+   "per_species": {
+    "Carpetweed": {
+     "boxes": 14,
+     "boxes_judged": 14,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2153
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.1429,
+     "verified": 12,
+     "verified_rate": 0.8571
+    },
+    "CutleafGroundcherry": {
+     "boxes": 7,
+     "boxes_judged": 7,
+     "conflict": 5,
+     "conflict_rate": 0.7143,
+     "conflict_rate_ci95": [
+      0.3589,
+      0.9178
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.1429,
+     "verified": 1,
+     "verified_rate": 0.1429
+    },
+    "Eclipta": {
+     "boxes": 4,
+     "boxes_judged": 4,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.4899
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 4,
+     "verified_rate": 1.0
+    },
+    "Goosegrass": {
+     "boxes": 2,
+     "boxes_judged": 2,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.6576
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 2,
+     "verified_rate": 1.0
+    },
+    "MorningGlory": {
+     "boxes": 48,
+     "boxes_judged": 48,
+     "conflict": 1,
+     "conflict_rate": 0.0208,
+     "conflict_rate_ci95": [
+      0.0037,
+      0.109
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.0208,
+     "verified": 46,
+     "verified_rate": 0.9583
+    },
+    "PalmerAmaranth": {
+     "boxes": 1,
+     "boxes_judged": 1,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.7935
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 1,
+     "verified_rate": 1.0
+    },
+    "PricklySida": {
+     "boxes": 27,
+     "boxes_judged": 27,
+     "conflict": 1,
+     "conflict_rate": 0.037,
+     "conflict_rate_ci95": [
+      0.0066,
+      0.1828
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 26,
+     "verified_rate": 0.963
+    },
+    "Purslane": {
+     "boxes": 2,
+     "boxes_judged": 2,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.6576
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 2,
+     "verified_rate": 1.0
+    },
+    "Ragweed": {
+     "boxes": 62,
+     "boxes_judged": 62,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0583
+     ],
+     "not_judged": 0,
+     "unknown": 3,
+     "unknown_rate": 0.0484,
+     "verified": 59,
+     "verified_rate": 0.9516
+    },
+    "Sicklepod": {
+     "boxes": 2,
+     "boxes_judged": 2,
+     "conflict": 2,
+     "conflict_rate": 1.0,
+     "conflict_rate_ci95": [
+      0.3424,
+      1.0
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 0,
+     "verified_rate": 0.0
+    },
+    "SpottedSpurge": {
+     "boxes": 77,
+     "boxes_judged": 77,
+     "conflict": 1,
+     "conflict_rate": 0.013,
+     "conflict_rate_ci95": [
+      0.0023,
+      0.07
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.026,
+     "verified": 74,
+     "verified_rate": 0.961
+    },
+    "Waterhemp": {
+     "boxes": 134,
+     "boxes_judged": 134,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0279
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 134,
+     "verified_rate": 1.0
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "cottonweeddet12/train": 249
+   },
+   "species": {
+    "above_baseline": true,
+    "above_pooled_baseline": true,
+    "baseline_for_mix": {
+     "boxes": 380,
+     "conflict": 10,
+     "conflict_rate": 0.0263,
+     "conflict_rate_ci95": [
+      0.0144,
+      0.0478
+     ],
+     "conflict_recall_on_wrong": 0.9124,
+     "false_conflict_rate": 0.0067,
+     "false_conflict_rate_ci95": [
+      0.0047,
+      0.0137
+     ],
+     "per_species": {
+      "Carpetweed": {
+       "baseline_boxes": 185,
+       "baseline_wrong_boxes": 185,
+       "boxes": 14,
+       "conflict_recall_on_wrong": 0.9568,
+       "false_conflict_rate": 0.0108,
+       "weight": 0.0368
+      },
+      "CutleafGroundcherry": {
+       "baseline_boxes": 32,
+       "baseline_wrong_boxes": 32,
+       "boxes": 7,
+       "conflict_recall_on_wrong": 0.9375,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0184
+      },
+      "Eclipta": {
+       "baseline_boxes": 280,
+       "baseline_wrong_boxes": 280,
+       "boxes": 4,
+       "conflict_recall_on_wrong": 0.0036,
+       "false_conflict_rate": 0.0036,
+       "weight": 0.0105
+      },
+      "Goosegrass": {
+       "baseline_boxes": 81,
+       "baseline_wrong_boxes": 81,
+       "boxes": 2,
+       "conflict_recall_on_wrong": 0.6667,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0053
+      },
+      "MorningGlory": {
+       "baseline_boxes": 385,
+       "baseline_wrong_boxes": 385,
+       "boxes": 48,
+       "conflict_recall_on_wrong": 0.9403,
+       "false_conflict_rate": 0.0,
+       "weight": 0.1263
+      },
+      "PalmerAmaranth": {
+       "baseline_boxes": 48,
+       "baseline_wrong_boxes": 48,
+       "boxes": 1,
+       "conflict_recall_on_wrong": 0.3125,
+       "false_conflict_rate": 0.0208,
+       "weight": 0.0026
+      },
+      "PricklySida": {
+       "baseline_boxes": 188,
+       "baseline_wrong_boxes": 188,
+       "boxes": 27,
+       "conflict_recall_on_wrong": 0.9574,
+       "false_conflict_rate": 0.0053,
+       "weight": 0.0711
+      },
+      "Purslane": {
+       "baseline_boxes": 353,
+       "baseline_wrong_boxes": 353,
+       "boxes": 2,
+       "conflict_recall_on_wrong": 0.9263,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.0053
+      },
+      "Ragweed": {
+       "baseline_boxes": 194,
+       "baseline_wrong_boxes": 194,
+       "boxes": 62,
+       "conflict_recall_on_wrong": 0.9381,
+       "false_conflict_rate": 0.0052,
+       "weight": 0.1632
+      },
+      "Sicklepod": {
+       "baseline_boxes": 36,
+       "baseline_wrong_boxes": 36,
+       "boxes": 2,
+       "conflict_recall_on_wrong": 0.0,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0053
+      },
+      "SpottedSpurge": {
+       "baseline_boxes": 352,
+       "baseline_wrong_boxes": 352,
+       "boxes": 77,
+       "conflict_recall_on_wrong": 0.8693,
+       "false_conflict_rate": 0.0057,
+       "weight": 0.2026
+      },
+      "Waterhemp": {
+       "baseline_boxes": 470,
+       "baseline_wrong_boxes": 470,
+       "boxes": 134,
+       "conflict_recall_on_wrong": 0.9489,
+       "false_conflict_rate": 0.0106,
+       "weight": 0.3526
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 380,
+    "conflict": 10,
+    "conflict_rate": 0.0263,
+    "conflict_rate_ci95": [
+     0.0144,
+     0.0478
+    ],
+    "noise_estimate_corrected": 0.0217,
+    "noise_estimate_pooled_baseline": 0.0255,
+    "unknown": 9,
+    "unknown_rate": 0.0237,
+    "verified": 361,
+    "verified_rate": 0.95
+   }
+  },
+  "I5": {
+   "boxes": 404,
+   "boxes_by_status": {
+    "conflict": 4,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 16,
+    "verified": 384
+   },
+   "boxes_per_class": {
+    "Carpetweed": 43,
+    "CutleafGroundcherry": 4,
+    "Eclipta": 52,
+    "Goosegrass": 11,
+    "MorningGlory": 67,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 9,
+    "PricklySida": 14,
+    "Purslane": 26,
+    "Ragweed": 73,
+    "Sicklepod": 0,
+    "SpottedSpurge": 24,
+    "Waterhemp": 81
+   },
+   "conflict_pairs": {
+    "Carpetweed -> Purslane": 2,
+    "Eclipta -> Goosegrass": 1,
+    "Eclipta -> Ragweed": 1
+   },
+   "geometry_mismatch_examples": [],
+   "images": 274,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_step1_image": 0,
+   "known_truth": {
+    "boxes": 404,
+    "conflict_recall_on_wrong": null,
+    "correct_judged": 404,
+    "false_conflict_rate_on_correct": 0.0099,
+    "judged": 404,
+    "label_correct_rate": 1.0,
+    "label_error_rate": 0.0,
+    "note": "boxes judged on a train_core crop; truth = that crop's train_core label (crops.csv)",
+    "verdicts": {
+     "conflict": 4,
+     "unknown": 16,
+     "verified": 384
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.9505,
+    "wrong_judged": 0
+   },
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v1/manifests/I5.jsonl",
+   "manifest_sha256": "3e964bcd6ba270e1ab2e72ed334b2444620dbb73bc67155ebe8876f5f744e193",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "cottonweeddet12/train": {
+     "boxes": 404,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 404,
+      "conflict": 4,
+      "conflict_rate": 0.0099,
+      "conflict_rate_ci95": [
+       0.0039,
+       0.0252
+      ],
+      "unknown": 16,
+      "unknown_rate": 0.0396,
+      "verified": 384,
+      "verified_rate": 0.9505
+     }
+    }
+   },
+   "per_species": {
+    "Carpetweed": {
+     "boxes": 43,
+     "boxes_judged": 43,
+     "conflict": 2,
+     "conflict_rate": 0.0465,
+     "conflict_rate_ci95": [
+      0.0128,
+      0.1546
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.0233,
+     "verified": 40,
+     "verified_rate": 0.9302
+    },
+    "CutleafGroundcherry": {
+     "boxes": 4,
+     "boxes_judged": 4,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.4899
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 4,
+     "verified_rate": 1.0
+    },
+    "Eclipta": {
+     "boxes": 52,
+     "boxes_judged": 52,
+     "conflict": 2,
+     "conflict_rate": 0.0385,
+     "conflict_rate_ci95": [
+      0.0106,
+      0.1298
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.0192,
+     "verified": 49,
+     "verified_rate": 0.9423
+    },
+    "Goosegrass": {
+     "boxes": 11,
+     "boxes_judged": 11,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2588
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 11,
+     "verified_rate": 1.0
+    },
+    "MorningGlory": {
+     "boxes": 67,
+     "boxes_judged": 67,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0542
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0299,
+     "verified": 65,
+     "verified_rate": 0.9701
+    },
+    "PalmerAmaranth": {
+     "boxes": 9,
+     "boxes_judged": 9,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2991
+     ],
+     "not_judged": 0,
+     "unknown": 1,
+     "unknown_rate": 0.1111,
+     "verified": 8,
+     "verified_rate": 0.8889
+    },
+    "PricklySida": {
+     "boxes": 14,
+     "boxes_judged": 14,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.2153
+     ],
+     "not_judged": 0,
+     "unknown": 4,
+     "unknown_rate": 0.2857,
+     "verified": 10,
+     "verified_rate": 0.7143
+    },
+    "Purslane": {
+     "boxes": 26,
+     "boxes_judged": 26,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.1287
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 26,
+     "verified_rate": 1.0
+    },
+    "Ragweed": {
+     "boxes": 73,
+     "boxes_judged": 73,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.05
+     ],
+     "not_judged": 0,
+     "unknown": 5,
+     "unknown_rate": 0.0685,
+     "verified": 68,
+     "verified_rate": 0.9315
+    },
+    "SpottedSpurge": {
+     "boxes": 24,
+     "boxes_judged": 24,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.138
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 24,
+     "verified_rate": 1.0
+    },
+    "Waterhemp": {
+     "boxes": 81,
+     "boxes_judged": 81,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0453
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0247,
+     "verified": 79,
+     "verified_rate": 0.9753
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "cottonweeddet12/train": 274
+   },
+   "species": {
+    "above_baseline": false,
+    "above_pooled_baseline": false,
+    "baseline_for_mix": {
+     "boxes": 404,
+     "conflict": 4,
+     "conflict_rate": 0.0099,
+     "conflict_rate_ci95": [
+      0.0039,
+      0.0252
+     ],
+     "conflict_recall_on_wrong": 0.7968,
+     "false_conflict_rate": 0.0062,
+     "false_conflict_rate_ci95": [
+      0.0049,
+      0.0128
+     ],
+     "per_species": {
+      "Carpetweed": {
+       "baseline_boxes": 185,
+       "baseline_wrong_boxes": 185,
+       "boxes": 43,
+       "conflict_recall_on_wrong": 0.9568,
+       "false_conflict_rate": 0.0108,
+       "weight": 0.1064
+      },
+      "CutleafGroundcherry": {
+       "baseline_boxes": 32,
+       "baseline_wrong_boxes": 32,
+       "boxes": 4,
+       "conflict_recall_on_wrong": 0.9375,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0099
+      },
+      "Eclipta": {
+       "baseline_boxes": 280,
+       "baseline_wrong_boxes": 280,
+       "boxes": 52,
+       "conflict_recall_on_wrong": 0.0036,
+       "false_conflict_rate": 0.0036,
+       "weight": 0.1287
+      },
+      "Goosegrass": {
+       "baseline_boxes": 81,
+       "baseline_wrong_boxes": 81,
+       "boxes": 11,
+       "conflict_recall_on_wrong": 0.6667,
+       "false_conflict_rate": 0.0,
+       "weight": 0.0272
+      },
+      "MorningGlory": {
+       "baseline_boxes": 385,
+       "baseline_wrong_boxes": 385,
+       "boxes": 67,
+       "conflict_recall_on_wrong": 0.9403,
+       "false_conflict_rate": 0.0,
+       "weight": 0.1658
+      },
+      "PalmerAmaranth": {
+       "baseline_boxes": 48,
+       "baseline_wrong_boxes": 48,
+       "boxes": 9,
+       "conflict_recall_on_wrong": 0.3125,
+       "false_conflict_rate": 0.0208,
+       "weight": 0.0223
+      },
+      "PricklySida": {
+       "baseline_boxes": 188,
+       "baseline_wrong_boxes": 188,
+       "boxes": 14,
+       "conflict_recall_on_wrong": 0.9574,
+       "false_conflict_rate": 0.0053,
+       "weight": 0.0347
+      },
+      "Purslane": {
+       "baseline_boxes": 353,
+       "baseline_wrong_boxes": 353,
+       "boxes": 26,
+       "conflict_recall_on_wrong": 0.9263,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.0644
+      },
+      "Ragweed": {
+       "baseline_boxes": 194,
+       "baseline_wrong_boxes": 194,
+       "boxes": 73,
+       "conflict_recall_on_wrong": 0.9381,
+       "false_conflict_rate": 0.0052,
+       "weight": 0.1807
+      },
+      "SpottedSpurge": {
+       "baseline_boxes": 352,
+       "baseline_wrong_boxes": 352,
+       "boxes": 24,
+       "conflict_recall_on_wrong": 0.8693,
+       "false_conflict_rate": 0.0057,
+       "weight": 0.0594
+      },
+      "Waterhemp": {
+       "baseline_boxes": 470,
+       "baseline_wrong_boxes": 470,
+       "boxes": 81,
+       "conflict_recall_on_wrong": 0.9489,
+       "false_conflict_rate": 0.0106,
+       "weight": 0.2005
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 404,
+    "conflict": 4,
+    "conflict_rate": 0.0099,
+    "conflict_rate_ci95": [
+     0.0039,
+     0.0252
+    ],
+    "noise_estimate_corrected": 0.0047,
+    "noise_estimate_pooled_baseline": 0.0048,
+    "unknown": 16,
+    "unknown_rate": 0.0396,
+    "verified": 384,
+    "verified_rate": 0.9505
+   }
+  }
+ },
+ "baseline_cv": {
+  "folds": 5,
+  "per_fold": [
+   {
+    "boxes": 617,
+    "conflict_recall_on_wrong": 0.7423,
+    "false_conflict_rate": 0.0049,
+    "fold": 0,
+    "groups": 1,
+    "unseen_label": 0
+   },
+   {
+    "boxes": 537,
+    "conflict_recall_on_wrong": 0.8454,
+    "false_conflict_rate": 0.0093,
+    "fold": 1,
+    "groups": 1,
+    "unseen_label": 0
+   },
+   {
+    "boxes": 441,
+    "conflict_recall_on_wrong": 0.9864,
+    "false_conflict_rate": 0.0068,
+    "fold": 2,
+    "groups": 1,
+    "unseen_label": 0
+   },
+   {
+    "boxes": 539,
+    "conflict_recall_on_wrong": 0.6067,
+    "false_conflict_rate": 0.0056,
+    "fold": 3,
+    "groups": 2,
+    "unseen_label": 0
+   },
+   {
+    "boxes": 470,
+    "conflict_recall_on_wrong": 0.8638,
+    "false_conflict_rate": 0.0043,
+    "fold": 4,
+    "groups": 2,
+    "unseen_label": 0
+   }
+  ],
+  "per_species": {
+   "Carpetweed": {
+    "boxes_judged": 185,
+    "conflict": 2,
+    "conflict_rate": 0.0108,
+    "conflict_rate_ci95": [
+     0.003,
+     0.0386
+    ],
+    "conflict_recall_on_wrong": 0.9568,
+    "unknown": 8,
+    "unknown_rate": 0.0432,
+    "verified": 175,
+    "verified_rate": 0.9459,
+    "wrong_boxes_judged": 185
+   },
+   "CutleafGroundcherry": {
+    "boxes_judged": 32,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.1072
+    ],
+    "conflict_recall_on_wrong": 0.9375,
+    "unknown": 2,
+    "unknown_rate": 0.0625,
+    "verified": 30,
+    "verified_rate": 0.9375,
+    "wrong_boxes_judged": 32
+   },
+   "Eclipta": {
+    "boxes_judged": 280,
+    "conflict": 1,
+    "conflict_rate": 0.0036,
+    "conflict_rate_ci95": [
+     0.0006,
+     0.0199
+    ],
+    "conflict_recall_on_wrong": 0.0036,
+    "unknown": 279,
+    "unknown_rate": 0.9964,
+    "verified": 0,
+    "verified_rate": 0.0,
+    "wrong_boxes_judged": 280
+   },
+   "Goosegrass": {
+    "boxes_judged": 81,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0453
+    ],
+    "conflict_recall_on_wrong": 0.6667,
+    "unknown": 27,
+    "unknown_rate": 0.3333,
+    "verified": 54,
+    "verified_rate": 0.6667,
+    "wrong_boxes_judged": 81
+   },
+   "MorningGlory": {
+    "boxes_judged": 385,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0099
+    ],
+    "conflict_recall_on_wrong": 0.9403,
+    "unknown": 23,
+    "unknown_rate": 0.0597,
+    "verified": 362,
+    "verified_rate": 0.9403,
+    "wrong_boxes_judged": 385
+   },
+   "PalmerAmaranth": {
+    "boxes_judged": 48,
+    "conflict": 1,
+    "conflict_rate": 0.0208,
+    "conflict_rate_ci95": [
+     0.0037,
+     0.109
+    ],
+    "conflict_recall_on_wrong": 0.3125,
+    "unknown": 33,
+    "unknown_rate": 0.6875,
+    "verified": 14,
+    "verified_rate": 0.2917,
+    "wrong_boxes_judged": 48
+   },
+   "PricklySida": {
+    "boxes_judged": 188,
+    "conflict": 1,
+    "conflict_rate": 0.0053,
+    "conflict_rate_ci95": [
+     0.0009,
+     0.0295
+    ],
+    "conflict_recall_on_wrong": 0.9574,
+    "unknown": 8,
+    "unknown_rate": 0.0426,
+    "verified": 179,
+    "verified_rate": 0.9521,
+    "wrong_boxes_judged": 188
+   },
+   "Purslane": {
+    "boxes_judged": 353,
+    "conflict": 3,
+    "conflict_rate": 0.0085,
+    "conflict_rate_ci95": [
+     0.0029,
+     0.0247
+    ],
+    "conflict_recall_on_wrong": 0.9263,
+    "unknown": 26,
+    "unknown_rate": 0.0737,
+    "verified": 324,
+    "verified_rate": 0.9178,
+    "wrong_boxes_judged": 353
+   },
+   "Ragweed": {
+    "boxes_judged": 194,
+    "conflict": 1,
+    "conflict_rate": 0.0052,
+    "conflict_rate_ci95": [
+     0.0009,
+     0.0286
+    ],
+    "conflict_recall_on_wrong": 0.9381,
+    "unknown": 12,
+    "unknown_rate": 0.0619,
+    "verified": 181,
+    "verified_rate": 0.933,
+    "wrong_boxes_judged": 194
+   },
+   "Sicklepod": {
+    "boxes_judged": 36,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0964
+    ],
+    "conflict_recall_on_wrong": 0.0,
+    "unknown": 36,
+    "unknown_rate": 1.0,
+    "verified": 0,
+    "verified_rate": 0.0,
+    "wrong_boxes_judged": 36
+   },
+   "SpottedSpurge": {
+    "boxes_judged": 352,
+    "conflict": 2,
+    "conflict_rate": 0.0057,
+    "conflict_rate_ci95": [
+     0.0016,
+     0.0205
+    ],
+    "conflict_recall_on_wrong": 0.8693,
+    "unknown": 46,
+    "unknown_rate": 0.1307,
+    "verified": 304,
+    "verified_rate": 0.8636,
+    "wrong_boxes_judged": 352
+   },
+   "Waterhemp": {
+    "boxes_judged": 470,
+    "conflict": 5,
+    "conflict_rate": 0.0106,
+    "conflict_rate_ci95": [
+     0.0046,
+     0.0247
+    ],
+    "conflict_recall_on_wrong": 0.9489,
+    "unknown": 24,
+    "unknown_rate": 0.0511,
+    "verified": 441,
+    "verified_rate": 0.9383,
+    "wrong_boxes_judged": 470
+   }
+  },
+  "species": {
+   "boxes_judged": 2604,
+   "conflict": 16,
+   "conflict_rate": 0.0061,
+   "conflict_rate_ci95": [
+    0.0038,
+    0.01
+   ],
+   "false_conflict_rate": 0.0061,
+   "unknown": 524,
+   "unknown_rate": 0.2012,
+   "verified": 2064,
+   "verified_rate": 0.7926
+  },
+  "swapped": {
+   "boxes_judged": 2604,
+   "conflict_recall_on_wrong": 0.7988,
+   "rule": "each held-out box given one wrong species, uniform over the other 11, seeded by stable_int('inc/audit/swap/%d' % fold)",
+   "verified_on_wrong": 0.0
+  },
+  "unseen_label_boxes": 0
+ },
+ "built_utc": "2026-09-27T07:21:45Z",
+ "inputs": {
+  "crops": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/crops.csv",
+   "rows": 564686,
+   "sha256": "d8188b16fad47c34b6a771fb806ab2c1b607d6b99126fc134ada34f299164485"
+  },
+  "crops_made_from": {
+   "copies_sha256": "21f7af1fec8870167a9a68b27ef2395bb8b85d80a287dfc337b6c8a0e61f8f63",
+   "pool_meta_sha256": "196027ca6e9ef77a55d266614a775e2f36e0ebbe85525ae5d0fc430041c2a3b7",
+   "pool_sha256": "a9c7a3c05e64aa9cc9cbe2bd59dad5e5bdd2a8b53c99033a22ddf00ea13013bc",
+   "train_core_sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  },
+  "embeddings": {
+   "dim": 768,
+   "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+   "failed_crops": 0,
+   "nan_rows": 0,
+   "nshards": 4
+  },
+  "geom_tol": 0.0001,
+  "versions": {
+   "numpy": "2.2.6",
+   "sklearn": "1.7.2"
+  }
+ },
+ "notes": [
+  "conflict_rate: conflicts / species-labelled boxes with a verdict (verified, conflict, unknown); the label-noise estimate. Boxes not judged (no_embedding, in_trusted, label_unseen) are counted, never guessed.",
+  "baseline_cv: held-out trusted boxes judged by a verifier fitted, thresholds included, on the other folds (grouped by capture session, else source): the false-conflict rate f on true labels, and the conflict recall r under one uniform wrong species per box.",
+  "baseline_for_mix: f and r of each species (baseline_cv.per_species) weighted by the audited set's judged species-labelled boxes per label; f's 95 % interval from seeded draws of each species' f from its Jeffreys posterior. Species without a baseline entry are listed and left out, with their boxes.",
+  "noise_estimate_corrected = (c - f) / (r - f) with f and r of baseline_for_mix, clipped to [0, 1]; it assumes in-domain labels and uniform swaps, so it is indicative only for another domain.",
+  "above_baseline: the conflict rate's Wilson 95 % interval lies wholly above baseline_for_mix's interval of f.",
+  "noise_estimate_pooled_baseline, above_pooled_baseline: the same against the baseline pooled over the trusted set's own species mix; context only, since per-species f and r differ and an audited set's mix need not be the trusted set's.",
+  "known_truth: boxes judged on a train_core crop, whose true label is the crop's train_core label."
+ ],
+ "outputs": {
+  "boxes_csv": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/audit/pilot_v1_audit_boxes.csv",
+  "json": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/audit/pilot_v1_audit.json",
+  "md": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/audit/pilot_v1_audit.md"
+ },
+ "probe": {
+  "classes": [
+   "Waterhemp",
+   "MorningGlory",
+   "Purslane",
+   "SpottedSpurge",
+   "Carpetweed",
+   "Ragweed",
+   "Eclipta",
+   "PricklySida",
+   "PalmerAmaranth",
+   "Sicklepod",
+   "Goosegrass",
+   "CutleafGroundcherry"
+  ],
+  "cv_recall_species_mean": 0.957112,
+  "cv_recall_species_min": 0.95,
+  "cv_top1_species": 0.986559,
+  "folds": 5,
+  "max_cond_pass": 0.99,
+  "n_species_crops": 2604,
+  "note": "verify.fit_verifier on the trusted species boxes only (no OtherPlant sample): the probe never predicts OtherPlant",
+  "otherplant_class": false,
+  "per_class": {
+   "Carpetweed": {
+    "calibration": 185,
+    "cv_confirmed": 0.956757,
+    "cv_conflict": 0.005405,
+    "cv_top1": 0.962162,
+    "held_out_unseen": 0,
+    "sigma": 0.804337,
+    "tau_p": 0.348396,
+    "thresholds": {
+     "cond_pass_target": 0.98736,
+     "n": 185,
+     "n_top": 178,
+     "rank": 1,
+     "recall_cv": 0.956757,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 185
+   },
+   "CutleafGroundcherry": {
+    "calibration": 32,
+    "cv_confirmed": 0.96875,
+    "cv_conflict": 0.0,
+    "cv_top1": 1.0,
+    "held_out_unseen": 0,
+    "sigma": 0.887383,
+    "tau_p": 0.594436,
+    "thresholds": {
+     "cond_pass_target": 0.95,
+     "n": 32,
+     "n_top": 32,
+     "rank": 1,
+     "recall_cv": 0.96875,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 32
+   },
+   "Eclipta": {
+    "calibration": 280,
+    "cv_confirmed": 0.95,
+    "cv_conflict": 0.003571,
+    "cv_top1": 0.996429,
+    "held_out_unseen": 0,
+    "sigma": 0.864441,
+    "tau_p": 0.518571,
+    "thresholds": {
+     "cond_pass_target": 0.953405,
+     "n": 280,
+     "n_top": 279,
+     "rank": 8,
+     "recall_cv": 0.95,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 280
+   },
+   "Goosegrass": {
+    "calibration": 81,
+    "cv_confirmed": 0.962963,
+    "cv_conflict": 0.0,
+    "cv_top1": 0.987654,
+    "held_out_unseen": 0,
+    "sigma": 0.801856,
+    "tau_p": 0.322122,
+    "thresholds": {
+     "cond_pass_target": 0.961875,
+     "n": 81,
+     "n_top": 80,
+     "rank": 1,
+     "recall_cv": 0.962963,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 81
+   },
+   "MorningGlory": {
+    "calibration": 385,
+    "cv_confirmed": 0.950649,
+    "cv_conflict": 0.0,
+    "cv_top1": 1.0,
+    "held_out_unseen": 0,
+    "sigma": 0.809277,
+    "tau_p": 0.521454,
+    "thresholds": {
+     "cond_pass_target": 0.95,
+     "n": 385,
+     "n_top": 385,
+     "rank": 14,
+     "recall_cv": 0.950649,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 385
+   },
+   "OtherPlant": {
+    "calibration": 0,
+    "cv_confirmed": null,
+    "cv_conflict": null,
+    "cv_top1": null,
+    "held_out_unseen": 0,
+    "sigma": null,
+    "tau_p": null,
+    "thresholds": {
+     "n": 0,
+     "n_top": 0,
+     "recall_cv": null,
+     "rule": "too_few",
+     "target_reachable": false
+    },
+    "train": 0
+   },
+   "PalmerAmaranth": {
+    "calibration": 48,
+    "cv_confirmed": 0.958333,
+    "cv_conflict": 0.0,
+    "cv_top1": 0.979167,
+    "held_out_unseen": 0,
+    "sigma": 0.872999,
+    "tau_p": 0.404915,
+    "thresholds": {
+     "cond_pass_target": 0.970213,
+     "n": 48,
+     "n_top": 47,
+     "rank": 1,
+     "recall_cv": 0.958333,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 48
+   },
+   "PricklySida": {
+    "calibration": 188,
+    "cv_confirmed": 0.957447,
+    "cv_conflict": 0.005319,
+    "cv_top1": 0.994681,
+    "held_out_unseen": 0,
+    "sigma": 0.85382,
+    "tau_p": 0.589871,
+    "thresholds": {
+     "cond_pass_target": 0.95508,
+     "n": 188,
+     "n_top": 187,
+     "rank": 5,
+     "recall_cv": 0.957447,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 188
+   },
+   "Purslane": {
+    "calibration": 353,
+    "cv_confirmed": 0.951841,
+    "cv_conflict": 0.008499,
+    "cv_top1": 0.983003,
+    "held_out_unseen": 0,
+    "sigma": 0.884413,
+    "tau_p": 0.469711,
+    "thresholds": {
+     "cond_pass_target": 0.966427,
+     "n": 353,
+     "n_top": 347,
+     "rank": 9,
+     "recall_cv": 0.951841,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 353
+   },
+   "Ragweed": {
+    "calibration": 194,
+    "cv_confirmed": 0.953608,
+    "cv_conflict": 0.0,
+    "cv_top1": 0.994845,
+    "held_out_unseen": 0,
+    "sigma": 0.842052,
+    "tau_p": 0.593809,
+    "thresholds": {
+     "cond_pass_target": 0.954922,
+     "n": 194,
+     "n_top": 193,
+     "rank": 7,
+     "recall_cv": 0.953608,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 194
+   },
+   "Sicklepod": {
+    "calibration": 36,
+    "cv_confirmed": 0.972222,
+    "cv_conflict": 0.0,
+    "cv_top1": 1.0,
+    "held_out_unseen": 0,
+    "sigma": 0.821917,
+    "tau_p": 0.442633,
+    "thresholds": {
+     "cond_pass_target": 0.95,
+     "n": 36,
+     "n_top": 36,
+     "rank": 1,
+     "recall_cv": 0.972222,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 36
+   },
+   "SpottedSpurge": {
+    "calibration": 352,
+    "cv_confirmed": 0.951705,
+    "cv_conflict": 0.005682,
+    "cv_top1": 0.994318,
+    "held_out_unseen": 0,
+    "sigma": 0.798157,
+    "tau_p": 0.380008,
+    "thresholds": {
+     "cond_pass_target": 0.955429,
+     "n": 352,
+     "n_top": 350,
+     "rank": 11,
+     "recall_cv": 0.951705,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 352
+   },
+   "Waterhemp": {
+    "calibration": 470,
+    "cv_confirmed": 0.951064,
+    "cv_conflict": 0.014894,
+    "cv_top1": 0.968085,
+    "held_out_unseen": 0,
+    "sigma": 0.785979,
+    "tau_p": 0.285204,
+    "thresholds": {
+     "cond_pass_target": 0.981319,
+     "n": 470,
+     "n_top": 455,
+     "rank": 5,
+     "recall_cv": 0.951064,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 470
+   }
+  },
+  "recall_target": 0.95,
+  "species_never_verified": [],
+  "species_not_in_trusted": [],
+  "threshold_rule": "joint: tau_p and sigma at one rank of the held-out top-1 true-k crops, the highest with verified rate >= recall_target",
+  "thresholds": {
+   "Carpetweed": {
+    "sigma": 0.804337,
+    "tau_p": 0.348396
+   },
+   "CutleafGroundcherry": {
+    "sigma": 0.887383,
+    "tau_p": 0.594436
+   },
+   "Eclipta": {
+    "sigma": 0.864441,
+    "tau_p": 0.518571
+   },
+   "Goosegrass": {
+    "sigma": 0.801856,
+    "tau_p": 0.322122
+   },
+   "MorningGlory": {
+    "sigma": 0.809277,
+    "tau_p": 0.521454
+   },
+   "OtherPlant": {
+    "sigma": null,
+    "tau_p": null
+   },
+   "PalmerAmaranth": {
+    "sigma": 0.872999,
+    "tau_p": 0.404915
+   },
+   "PricklySida": {
+    "sigma": 0.85382,
+    "tau_p": 0.589871
+   },
+   "Purslane": {
+    "sigma": 0.884413,
+    "tau_p": 0.469711
+   },
+   "Ragweed": {
+    "sigma": 0.842052,
+    "tau_p": 0.593809
+   },
+   "Sicklepod": {
+    "sigma": 0.821917,
+    "tau_p": 0.442633
+   },
+   "SpottedSpurge": {
+    "sigma": 0.798157,
+    "tau_p": 0.380008
+   },
+   "Waterhemp": {
+    "sigma": 0.785979,
+    "tau_p": 0.285204
+   }
+  }
+ },
+ "seconds": 102.9,
+ "trusted": {
+  "boxes": 2604,
+  "grouped_by": {
+   "session": 2604,
+   "source": 0
+  },
+  "groups": 7,
+  "images": 1540,
+  "images_matched_by_sha256": 0,
+  "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/pilot_v1/manifests/P0.jsonl",
+  "manifest_sha256": "4324a77dfea82b474d34a5145b49d906bd5bf5bdde915ad868090b4abb841aab",
+  "no_embedding": 0,
+  "no_embedding_reasons": {},
+  "otherplant_boxes_left_out": 0,
+  "species_boxes_used": 2604,
+  "used_per_species": {
+   "Carpetweed": 185,
+   "CutleafGroundcherry": 32,
+   "Eclipta": 280,
+   "Goosegrass": 81,
+   "MorningGlory": 385,
+   "PalmerAmaranth": 48,
+   "PricklySida": 188,
+   "Purslane": 353,
+   "Ragweed": 194,
+   "Sicklepod": 36,
+   "SpottedSpurge": 352,
+   "Waterhemp": 470
+  }
+ },
+ "what": "INC attribution item 4, the BioCLIP-2 label audit (docs/INCREMENTAL_PROTOCOL.md, Gate)"
+}

@@ -1,0 +1,550 @@
+{
+ "build_seconds": 3824.3,
+ "built_utc": "2026-09-27T02:40:24Z",
+ "class_names": [
+  "Waterhemp",
+  "MorningGlory",
+  "Purslane",
+  "SpottedSpurge",
+  "Carpetweed",
+  "Ragweed",
+  "Eclipta",
+  "PricklySida",
+  "PalmerAmaranth",
+  "Sicklepod",
+  "Goosegrass",
+  "CutleafGroundcherry",
+  "OtherPlant"
+ ],
+ "conversion": {
+  "imageweeds": {
+   "annotation": {},
+   "background_images": {},
+   "boxes_read": 6932,
+   "clipped_boxes": 1,
+   "dropped_boxes": {},
+   "dropped_images": {},
+   "exif_orientation": {
+    "None": 3208
+   },
+   "images_found": 3208
+  },
+  "ood22": {
+   "annotation": {
+    "xml": 1948
+   },
+   "background_images": {},
+   "boxes_read": 3227,
+   "clipped_boxes": 0,
+   "dropped_boxes": {},
+   "dropped_images": {
+    "annotation_frame_rotated": 2
+   },
+   "exif_orientation": {
+    "1": 3,
+    "8": 2,
+    "None": 1943
+   },
+   "images_found": 1948
+  },
+  "ood23": {
+   "annotation": {
+    "xml": 1784
+   },
+   "background_images": {},
+   "boxes_read": 16842,
+   "clipped_boxes": 0,
+   "dropped_boxes": {
+    "degenerate": 1
+   },
+   "dropped_images": {},
+   "exif_orientation": {
+    "0": 54,
+    "1": 39,
+    "3": 156,
+    "6": 401,
+    "8": 49,
+    "None": 1085
+   },
+   "images_found": 1784
+  }
+ },
+ "count_warnings": {
+  "ood22": {
+   "expected": 1948,
+   "found": 1948,
+   "kept": 1915
+  },
+  "ood23": {
+   "expected": 1748,
+   "found": 1784,
+   "kept": 1784
+  }
+ },
+ "dev": {
+  "boxes": {
+   "Carpetweed": 82,
+   "CutleafGroundcherry": 31,
+   "Eclipta": 75,
+   "Goosegrass": 31,
+   "MorningGlory": 96,
+   "PalmerAmaranth": 31,
+   "PricklySida": 42,
+   "Purslane": 197,
+   "Ragweed": 181,
+   "Sicklepod": 31,
+   "SpottedSpurge": 85,
+   "Waterhemp": 212
+  },
+  "frac": 0.16807,
+  "images": 617,
+  "keep_frac": {
+   "Carpetweed": 0.8662,
+   "CutleafGroundcherry": 0.6173,
+   "Eclipta": 0.8722,
+   "Goosegrass": 0.7754,
+   "MorningGlory": 0.8919,
+   "PalmerAmaranth": 0.8703,
+   "PricklySida": 0.8627,
+   "Purslane": 0.6917,
+   "Ragweed": 0.6885,
+   "Sicklepod": 0.7961,
+   "SpottedSpurge": 0.8664,
+   "Waterhemp": 0.8332
+  },
+  "protocol_deviations": [],
+  "search": {
+   "cap_rare": false,
+   "capped": {},
+   "floor": {
+    "Carpetweed": 30,
+    "CutleafGroundcherry": 30,
+    "Eclipta": 30,
+    "Goosegrass": 30,
+    "MorningGlory": 30,
+    "PalmerAmaranth": 30,
+    "PricklySida": 30,
+    "Purslane": 30,
+    "Ragweed": 30,
+    "Sicklepod": 30,
+    "SpottedSpurge": 30,
+    "Waterhemp": 30
+   },
+   "frac_range": [
+    0.13,
+    0.18
+   ],
+   "method": "exact branch and bound",
+   "min_dev_boxes": 30,
+   "min_keep_frac": 0.0,
+   "n_images": 3671,
+   "n_sessions": 35,
+   "nodes": 925993,
+   "target_frac": 0.15,
+   "upper": {
+    "Carpetweed": 613,
+    "CutleafGroundcherry": 81,
+    "Eclipta": 587,
+    "Goosegrass": 138,
+    "MorningGlory": 888,
+    "PalmerAmaranth": 239,
+    "PricklySida": 306,
+    "Purslane": 639,
+    "Ragweed": 581,
+    "Sicklepod": 152,
+    "SpottedSpurge": 636,
+    "Waterhemp": 1271
+   }
+  },
+  "sessions": [
+   "20210810_iPhoneSE_YL",
+   "20210811_iPhoneSE_YL",
+   "20210820_iPhoneSE_YL",
+   "20210827_NIKOND3300_YL",
+   "20210904_NIKOND3300_YL",
+   "20210908_iPhoneSE_YL",
+   "20210909_iPhoneSE_YL",
+   "20210912_CanonEOS4000D_YL"
+  ]
+ },
+ "drop_examples": {
+  "imageweeds": {},
+  "ood22": {
+   "annotation_frame_rotated": [
+    "20220711_NikonD330_YL_53.jpg ann (6000, 4000) image (4000, 6000) orientation 8",
+    "20220711_NikonD330_YL_58.jpg ann (6000, 4000) image (4000, 6000) orientation 8"
+   ]
+  },
+  "ood23": {},
+  "train_core": {
+   "near_test": [
+    {
+     "bits": 6,
+     "eval": "test__20210812_iPhoneSE_YL_743",
+     "train": "train_core__20210812_iPhoneSE_YL_744"
+    },
+    {
+     "bits": 5,
+     "eval": "test__20210903_YALAL00_EO_2",
+     "train": "train_core__20210903_YALAL00_EO_3"
+    },
+    {
+     "bits": 6,
+     "eval": "test__20210903_YALAL00_EO_7",
+     "train": "train_core__20210903_YALAL00_EO_8"
+    },
+    {
+     "bits": 3,
+     "eval": "test__20210903_iPhoneSE_YL_10",
+     "train": "train_core__20210903_iPhoneSE_YL_9"
+    },
+    {
+     "bits": 5,
+     "eval": "test__20210910_NIKOND3300_YL_133",
+     "train": "train_core__20210910_NIKOND3300_YL_134"
+    }
+   ]
+  }
+ },
+ "dropped": {
+  "imageweeds": {
+   "boxes": {},
+   "images": {},
+   "kept_as_background": {}
+  },
+  "ood22": {
+   "boxes": {},
+   "images": {
+    "annotation_frame_rotated": 2
+   },
+   "kept_as_background": {}
+  },
+  "ood23": {
+   "boxes": {
+    "degenerate": 1
+   },
+   "images": {},
+   "kept_as_background": {}
+  },
+  "train_core": {
+   "near_test": 5
+  }
+ },
+ "eval_cross_near_dups": {
+  "ood23~ood22": 1,
+  "test~dev": 1
+ },
+ "exam_cwd12_copies": {
+  "imageweeds": {
+   "dropped": 0,
+   "examples": []
+  },
+  "ood22": {
+   "dropped": 31,
+   "examples": [
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_10.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_10.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_11.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_11.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_12.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_12.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_13.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_13.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/valid/images/20220129_CanonEOS4000D_EO_14.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_14.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_15.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_15.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_16.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_16.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_17.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_17.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_18.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_18.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/valid/images/20220129_CanonEOS4000D_EO_19.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_19.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/test/images/20220129_CanonEOS4000D_EO_2.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_2.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_20.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_20.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_21.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_21.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_22.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_22.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_23.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_23.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/valid/images/20220129_CanonEOS4000D_EO_26.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_26.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/valid/images/20220129_CanonEOS4000D_EO_27.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_27.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_29.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_29.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/test/images/20220129_CanonEOS4000D_EO_3.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_3.jpg"
+    },
+    {
+     "bits": 0,
+     "cwd12": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/cottonweeddet12/train/images/20220129_CanonEOS4000D_EO_30.jpg",
+     "exam": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2022/20220129_CanonEOS4000D_EO_30.jpg"
+    }
+   ]
+  },
+  "ood23": {
+   "dropped": 0,
+   "examples": []
+  }
+ },
+ "exams": {
+  "dev": "created",
+  "imageweeds": "created",
+  "ood22": "created",
+  "ood23": "created",
+  "test": "created"
+ },
+ "exams_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/exams/v1",
+ "imageweeds_class_order": {
+  "inc_ids": [
+   12,
+   12,
+   12,
+   5,
+   12
+  ],
+  "names": [
+   "horseweed",
+   "kochia",
+   "corn",
+   "ragweed",
+   "redrootpigweed"
+  ],
+  "status": "UNVERIFIED ASSUMPTION: the label files ship without a class list; the order is from the HF dataset card (crossdataset_eval.py, 2026-08-26)"
+ },
+ "max_drop_share": 0.01,
+ "missing": [],
+ "nevertrain": {
+  "bits": 6,
+  "complete": false,
+  "entries": 9501,
+  "min_expected": 9502
+ },
+ "other_plant_names": [
+  "Lambsquarters"
+ ],
+ "repo": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark",
+ "splits": {
+  "dev": {
+   "boxes": {
+    "Carpetweed": 82,
+    "CutleafGroundcherry": 31,
+    "Eclipta": 75,
+    "Goosegrass": 31,
+    "MorningGlory": 96,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 31,
+    "PricklySida": 42,
+    "Purslane": 197,
+    "Ragweed": 181,
+    "Sicklepod": 31,
+    "SpottedSpurge": 85,
+    "Waterhemp": 212
+   },
+   "boxes_total": 1094,
+   "images": 617,
+   "manifest_sha256": "a5c904cda494061ba7cc39303098caf0d0a29e7204d1f4da8b57832da4d4ba13"
+  },
+  "imageweeds": {
+   "boxes": {
+    "Carpetweed": 0,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 0,
+    "OtherPlant": 4922,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 2010,
+    "Sicklepod": 0,
+    "SpottedSpurge": 0,
+    "Waterhemp": 0
+   },
+   "boxes_total": 6932,
+   "images": 3208,
+   "manifest_sha256": "357936e3069835d263d2d41875d106f9e22dd808266c7ef633ae94646970e426"
+  },
+  "ood22": {
+   "boxes": {
+    "Carpetweed": 673,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 33,
+    "Goosegrass": 373,
+    "MorningGlory": 448,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 170,
+    "PricklySida": 0,
+    "Purslane": 130,
+    "Ragweed": 120,
+    "Sicklepod": 0,
+    "SpottedSpurge": 345,
+    "Waterhemp": 901
+   },
+   "boxes_total": 3193,
+   "images": 1915,
+   "manifest_sha256": "e5a6aff77beabc0f05c7adee6edb804131896691004837e0bcfec7a354b3df20"
+  },
+  "ood23": {
+   "boxes": {
+    "Carpetweed": 1,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 3,
+    "MorningGlory": 0,
+    "OtherPlant": 12702,
+    "PalmerAmaranth": 1571,
+    "PricklySida": 0,
+    "Purslane": 2391,
+    "Ragweed": 155,
+    "Sicklepod": 0,
+    "SpottedSpurge": 17,
+    "Waterhemp": 1
+   },
+   "boxes_total": 16841,
+   "images": 1784,
+   "manifest_sha256": "8be59afb4e01c5470216da23fab078b9e2f6ed7c97db907bcb0be7fbe4ab0023"
+  },
+  "test": {
+   "boxes": {
+    "Carpetweed": 349,
+    "CutleafGroundcherry": 42,
+    "Eclipta": 278,
+    "Goosegrass": 76,
+    "MorningGlory": 456,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 109,
+    "PricklySida": 180,
+    "Purslane": 353,
+    "Ragweed": 315,
+    "Sicklepod": 91,
+    "SpottedSpurge": 320,
+    "Waterhemp": 688
+   },
+   "boxes_total": 3257,
+   "images": 1977,
+   "manifest_sha256": "31ba7650063f4d03c23e61b520fd32c2d9571b1dbe5ecd05b374805e7c90ff3b"
+  },
+  "train_core": {
+   "boxes": {
+    "Carpetweed": 530,
+    "CutleafGroundcherry": 50,
+    "Eclipta": 512,
+    "Goosegrass": 107,
+    "MorningGlory": 792,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 206,
+    "PricklySida": 263,
+    "Purslane": 440,
+    "Ragweed": 399,
+    "Sicklepod": 121,
+    "SpottedSpurge": 550,
+    "Waterhemp": 1059
+   },
+   "boxes_total": 5029,
+   "images": 3049,
+   "manifest_sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  }
+ },
+ "splits_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1",
+ "splits_version": "v1",
+ "train_sessions": {
+  "20210628_iPhoneSE_YL": 140,
+  "20210712_iPhoneSE_YL": 175,
+  "20210804_iPhoneSE_YL": 4,
+  "20210805_iPhoneSE_YL": 83,
+  "20210806_iPhoneSE_YL": 189,
+  "20210809_iPhoneSE_YL": 81,
+  "20210810_iPhoneSE_YL": 43,
+  "20210811_iPhoneSE_YL": 22,
+  "20210812_NIKOND3300_YL": 8,
+  "20210812_iPhoneSE_YL": 353,
+  "20210813_iPhoneSE_YL": 70,
+  "20210814_iPhoneSE_YL": 1,
+  "20210818_iPhoneSE_YL": 5,
+  "20210820_iPhoneSE_YL": 141,
+  "20210827_NIKOND3300_YL": 66,
+  "20210827_iPhone11Pro_BT": 180,
+  "20210827_iPhoneSE_YL": 177,
+  "20210903_CanonEOS4000D_EO": 1,
+  "20210903_NIKOND3300_YL": 137,
+  "20210903_YALAL00_EO": 59,
+  "20210903_iPhone11Pro_BT": 108,
+  "20210903_iPhoneSE_YL": 152,
+  "20210904_NIKOND3300_YL": 42,
+  "20210904_iPhoneSE_YL": 84,
+  "20210906_iPhoneSE_YL": 300,
+  "20210908_iPhoneSE_YL": 85,
+  "20210909_NIKOND3300_YL": 94,
+  "20210909_iPhoneSE_YL": 33,
+  "20210910_NIKOND3300_YL": 157,
+  "20210910_iPhone11Pro_BT": 131,
+  "20210910_iPhoneSE_YL": 167,
+  "20210912_CanonEOS4000D_YL": 185,
+  "20210912_iPhoneSE_YL": 86,
+  "20210913_iPhoneSE_YL": 86,
+  "20220129_CanonEOS4000D_EO": 26
+ }
+}

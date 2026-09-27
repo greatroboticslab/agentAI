@@ -1,0 +1,2693 @@
+{
+ "agreement": {
+  "freeze": {
+   "agree": 2,
+   "compared": 7,
+   "rate": 0.2857142857142857
+  },
+  "full": {
+   "agree": 4,
+   "compared": 7,
+   "rate": 0.5714285714285714
+  },
+  "lora": {
+   "agree": 2,
+   "compared": 7,
+   "rate": 0.2857142857142857
+  }
+ },
+ "attribution_scope": {
+  "not_run": {
+   "4": "label audit (BioCLIP-2 re-reading D_k's boxes): out of scope for the pilot",
+   "5": "leave-one-source-out cand runs for a multi-source increment (Breal mixes two sources): out of scope for the pilot"
+  },
+  "run": [
+   "1 recipe vs data",
+   "2 classification vs localisation",
+   "3 per-species deltas"
+  ]
+ },
+ "blocked": {},
+ "chains": {
+  "freeze": {
+   "accepted": [
+    "I1"
+   ],
+   "bswap": {
+    "attributed_to_labels": false,
+    "class_vs_loc": "domain/localisation",
+    "verdict": "REJECT"
+   },
+   "final_incumbent": "freeze__s01_I1__soup",
+   "neutral": [],
+   "phase": "done",
+   "quarantined": [
+    "I2",
+    "Bswap",
+    "I3",
+    "Breal",
+    "I4",
+    "I5"
+   ],
+   "recipe": {
+    "batch": 32,
+    "cache": "ram",
+    "close_mosaic": 10,
+    "cos_lr": true,
+    "deterministic": true,
+    "epochs": 30,
+    "freeze": 11,
+    "imgsz": 640,
+    "lora": null,
+    "lr0": 0.002,
+    "lrf": 0.01,
+    "momentum": 0.937,
+    "optimizer": "SGD",
+    "trainer": "freeze",
+    "warmup_bias_lr": 0.002,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0005,
+    "workers": 5
+   },
+   "rejects_without_source_attribution": [
+    "s05_Breal"
+   ],
+   "unverified": null
+  },
+  "full": {
+   "accepted": [
+    "I5"
+   ],
+   "bswap": {
+    "attributed_to_labels": false,
+    "class_vs_loc": "domain/localisation",
+    "verdict": "REJECT"
+   },
+   "final_incumbent": "full__s07_I5__soup",
+   "neutral": [],
+   "phase": "done",
+   "quarantined": [
+    "I1",
+    "I2",
+    "Bswap",
+    "I3",
+    "Breal",
+    "I4"
+   ],
+   "recipe": {
+    "batch": 32,
+    "cache": "ram",
+    "close_mosaic": 10,
+    "cos_lr": true,
+    "deterministic": true,
+    "epochs": 30,
+    "freeze": null,
+    "imgsz": 640,
+    "lora": null,
+    "lr0": 0.002,
+    "lrf": 0.01,
+    "momentum": 0.937,
+    "optimizer": "SGD",
+    "trainer": "full",
+    "warmup_bias_lr": 0.002,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0005,
+    "workers": 5
+   },
+   "rejects_without_source_attribution": [
+    "s05_Breal"
+   ],
+   "unverified": null
+  },
+  "lora": {
+   "accepted": [
+    "I1"
+   ],
+   "bswap": {
+    "attributed_to_labels": false,
+    "class_vs_loc": "none",
+    "verdict": "REJECT"
+   },
+   "final_incumbent": "lora__s01_I1__soup",
+   "neutral": [],
+   "phase": "done",
+   "quarantined": [
+    "I2",
+    "Bswap",
+    "I3",
+    "Breal",
+    "I4",
+    "I5"
+   ],
+   "recipe": {
+    "batch": 32,
+    "cache": "ram",
+    "close_mosaic": 10,
+    "cos_lr": true,
+    "deterministic": true,
+    "epochs": 30,
+    "freeze": null,
+    "imgsz": 640,
+    "lora": {
+     "alpha": 32,
+     "rank": 16
+    },
+    "lr0": 0.01,
+    "lrf": 0.01,
+    "momentum": 0.937,
+    "optimizer": "SGD",
+    "trainer": "lora",
+    "warmup_bias_lr": 0.01,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0005,
+    "workers": 5
+   },
+   "rejects_without_source_attribution": [
+    "s05_Breal"
+   ],
+   "unverified": null
+  }
+ },
+ "code": {
+  "modules": {
+   "tools/cwd12_species.py": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+   "tools/inc/__init__.py": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+   "tools/inc/common.py": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+   "tools/inc/driver.py": "ae9ffa8daeddb292a6658e1d52acaaff0a7f308d9b9c8043383013ec5f1d58b3",
+   "tools/inc/gate.py": "e6eadeb76d0d104d53ebd56b84388dacce442616572ba6cf3d2d611deab6975b",
+   "tools/inc/splits.py": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+  },
+  "package_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework",
+  "pinned_utc": "2026-09-27T05:55:39Z",
+  "reason": "init"
+ },
+ "done": true,
+ "done_utc": "2026-09-27T07:49:08Z",
+ "effective_warmup": {
+  "cold": {
+   "base": {
+    "covers_whole_run": false,
+    "epochs": 100,
+    "images": 1540,
+    "iterations_per_epoch": 49,
+    "warmup_epochs_effective": 3.0,
+    "warmup_epochs_nominal": 3,
+    "warmup_iterations": 147
+   },
+   "truth": {
+    "s01_I1": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 1778,
+     "iterations_per_epoch": 56,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 168
+    },
+    "s02_I2": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2016,
+     "iterations_per_epoch": 63,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 189
+    },
+    "s03_Bswap": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2288,
+     "iterations_per_epoch": 72,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 216
+    },
+    "s04_I3": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2254,
+     "iterations_per_epoch": 71,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 213
+    },
+    "s05_Breal": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2492,
+     "iterations_per_epoch": 78,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 234
+    },
+    "s06_I4": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2503,
+     "iterations_per_epoch": 79,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 237
+    },
+    "s07_I5": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2777,
+     "iterations_per_epoch": 87,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 261
+    }
+   }
+  },
+  "incremental": {
+   "freeze": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   },
+   "full": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   },
+   "lora": {
+    "s01_I1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s02_I2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s03_Bswap": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1812,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2016,
+       "iterations_per_epoch": 63,
+       "warmup_epochs_effective": 1.59,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s04_I3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2288,
+       "iterations_per_epoch": 72,
+       "warmup_epochs_effective": 1.39,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s05_Breal": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1778,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2526,
+       "iterations_per_epoch": 79,
+       "warmup_epochs_effective": 1.27,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s06_I4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1789,
+       "iterations_per_epoch": 56,
+       "warmup_epochs_effective": 1.79,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 2764,
+       "iterations_per_epoch": 87,
+       "warmup_epochs_effective": 1.15,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    },
+    "s07_I5": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3287,
+       "iterations_per_epoch": 103,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 103
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1814,
+       "iterations_per_epoch": 57,
+       "warmup_epochs_effective": 1.75,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3013,
+       "iterations_per_epoch": 95,
+       "warmup_epochs_effective": 1.05,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 1540,
+       "iterations_per_epoch": 49,
+       "warmup_epochs_effective": 2.04,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 100
+      }
+     }
+    }
+   }
+  },
+  "incremental_effective_epochs": {
+   "max": 2.04,
+   "min": 1.0
+  },
+  "note": "Ultralytics warms up for max(round(warmup_epochs * iterations per epoch), 100) iterations; replay mode full: cand holds the accepted pool + D_k and null the pool, recorded at pool_min (P0) and pool_max (P0 + every earlier increment); the driver records each step's actual sizes",
+  "replay_mode": "full"
+ },
+ "exams": [
+  "dev",
+  "ood22",
+  "ood23",
+  "imageweeds",
+  "test"
+ ],
+ "exp": "pilot_v2",
+ "final": [
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8172970370472594,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7305126363516768,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.11811332140946562,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.030273679205399206,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.7992684384950952,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7124780081728194,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.12407800412143781,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.09029005290759562,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8461005763912091,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7861152282986675,
+      "n": 1,
+      "sd": null
+     }
+    }
+   },
+   "model": "chain freeze: final incumbent",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__freeze__incumbent"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8246921367721592,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7341372315721647,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.0916818348160954,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.03446074152337308,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8122721052361552,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7356940137924595,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.10512744499570312,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.10724340627640035,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8456107823163753,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7923419097053547,
+      "n": 1,
+      "sd": null
+     }
+    }
+   },
+   "model": "chain full: final incumbent",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__full__incumbent"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8235589792963374,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.734131549778974,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.10620381743751342,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.0279465105680489,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8036235887637467,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7089413475141584,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.12565829184842173,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.08086701156247701,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8514550520288223,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7855714243410645,
+      "n": 1,
+      "sd": null
+     }
+    }
+   },
+   "model": "chain lora: final incumbent",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__lora__incumbent"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8195193506464148,
+      "n": 3,
+      "sd": 0.0028192253070929525
+     },
+     "twelve": {
+      "mean": 0.7211710320230932,
+      "n": 3,
+      "sd": 0.008531176158826204
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.1101483113200614,
+      "n": 3,
+      "sd": 0.0064077426221729504
+     },
+     "twelve": {
+      "mean": 0.04225111195212015,
+      "n": 3,
+      "sd": 0.013202352525284924
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8051274830379409,
+      "n": 3,
+      "sd": 0.003160200625941522
+     },
+     "twelve": {
+      "mean": 0.7040931017549342,
+      "n": 3,
+      "sd": 0.011768814154147066
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.12694730695613257,
+      "n": 3,
+      "sd": 0.009842721615210845
+     },
+     "twelve": {
+      "mean": 0.08703522236032202,
+      "n": 3,
+      "sd": 0.007833783306781274
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8428393125391436,
+      "n": 3,
+      "sd": 0.0021841706075281238
+     },
+     "twelve": {
+      "mean": 0.7761178482298262,
+      "n": 3,
+      "sd": 0.006327380262864752
+     }
+    }
+   },
+   "model": "base P0",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__base__s0",
+    "final__base__s1",
+    "final__base__s2"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8547863095885693,
+      "n": 3,
+      "sd": 0.0037212326909238447
+     },
+     "twelve": {
+      "mean": 0.8083685911566377,
+      "n": 3,
+      "sd": 0.004286248117036111
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.12226776367597963,
+      "n": 3,
+      "sd": 0.00897951854178225
+     },
+     "twelve": {
+      "mean": 0.05499155842173827,
+      "n": 3,
+      "sd": 0.0019421194941469124
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8372426956851419,
+      "n": 3,
+      "sd": 0.003108174162248132
+     },
+     "twelve": {
+      "mean": 0.7561322540532425,
+      "n": 3,
+      "sd": 0.004685115980023104
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.12515143549991717,
+      "n": 3,
+      "sd": 0.0036729264784865416
+     },
+     "twelve": {
+      "mean": 0.1637394795692816,
+      "n": 3,
+      "sd": 0.04587836559372661
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8717409198487794,
+      "n": 3,
+      "sd": 0.0008718512480997839
+     },
+     "twelve": {
+      "mean": 0.8471862746317135,
+      "n": 3,
+      "sd": 0.0014004148760797782
+     }
+    }
+   },
+   "model": "T_final (union of clean data)",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__Tfinal__s0",
+    "final__Tfinal__s1",
+    "final__Tfinal__s2"
+   ]
+  }
+ ],
+ "generated_utc": "2026-09-27T07:51:23Z",
+ "gpu_hours": {
+  "base": {
+   "hours": 0.7686944444444445,
+   "runs": 3
+  },
+  "chain:freeze": {
+   "hours": 4.423055555555556,
+   "runs": 43
+  },
+  "chain:full": {
+   "hours": 4.7340277777777775,
+   "runs": 43
+  },
+  "chain:lora": {
+   "hours": 5.017666666666666,
+   "runs": 43
+  },
+  "final": {
+   "hours": 1.0811388888888889,
+   "runs": 9
+  },
+  "truth": {
+   "hours": 8.170611111111109,
+   "runs": 21
+  }
+ },
+ "gpu_hours_total": 24.195194444444443,
+ "interventions": [],
+ "label_steps": {
+  "bswap": "Bswap"
+ },
+ "notes": [],
+ "replay_mode": "full",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "steps": [
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.002242673687529173,
+      "blame": null,
+      "class_vs_loc": "none",
+      "map_delta": 0.0062607597480530686,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7299889950306367,
+     "cand_sd": 0.004401327905253352,
+     "d_images": 238,
+     "guards": {
+      "flips": true,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "freeze__s01_I1__soup",
+     "null_mean": 0.7237282352825837,
+     "null_sd": 0.0023098984983469834,
+     "p_data": 0.8888888888888888,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "ACCEPT: P_data=0.889 (cand 0.7300+-0.0044 vs null 0.7237+-0.0023, inc 0.7282); guards pass; P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": "soup",
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 1778,
+      "null": 1540
+     },
+     "truth_equivalent": "helps",
+     "verdict": "ACCEPT",
+     "warmup_epochs_effective": {
+      "cand": 1.79,
+      "null": 2.04
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": 0.008375189010477402,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.018221956187311594,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7315799985722733,
+     "cand_sd": 0.0038317617760364074,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7133580423849617,
+     "null_sd": 0.00209113431079594,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7316+-0.0038 vs null 0.7134+-0.0021, inc 0.7282); guard failed: flips (+7.0 > 4.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 1778,
+      "null": 1540
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.79,
+      "null": 2.04
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.002284161537291607,
+      "blame": null,
+      "class_vs_loc": "none",
+      "map_delta": 0.0015742122351493082,
+      "recipe_flag": false,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7301188748886226,
+     "cand_sd": 0.00364492508536739,
+     "d_images": 238,
+     "guards": {
+      "flips": true,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "lora__s01_I1__soup",
+     "null_mean": 0.7285446626534733,
+     "null_sd": 0.0024520158300925378,
+     "p_data": 0.7777777777777778,
+     "p_recipe": 0.6666666666666666,
+     "pool_images": 1540,
+     "reason": "ACCEPT: P_data=0.778 (cand 0.7301+-0.0036 vs null 0.7285+-0.0025, inc 0.7282); guards pass; P_recipe=0.667; class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": "soup",
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 1778,
+      "null": 1540
+     },
+     "truth_equivalent": "helps",
+     "verdict": "ACCEPT",
+     "warmup_epochs_effective": {
+      "cand": 1.79,
+      "null": 2.04
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 1,
+   "step": "I1",
+   "tag": "s01_I1",
+   "truth": {
+    "p": 0.3333333333333333,
+    "species_failed": [
+     "PricklySida"
+    ],
+    "verdict": "hurts",
+    "with_mean": 0.7182297005173884,
+    "with_sd": 0.009382834076262512,
+    "without_mean": 0.7211710320230932,
+    "without_sd": 0.008531176158826186
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.008492508840348245,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.025044590363839547,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7428589062777174,
+     "cand_sd": 0.0025933269006418722,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7305126363516768,
+     "incumbent_after": "freeze__s01_I1__soup",
+     "null_mean": 0.7178143159138779,
+     "null_sd": 0.002051120986616967,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=1.000 (cand 0.7429+-0.0026 vs null 0.7178+-0.0021, inc 0.7305); guard failed: flips (+9.3 > 5.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 2016,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.59,
+      "null": 1.79
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.010388749876556358,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.04009726653371193,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7534553089186736,
+     "cand_sd": 0.005664066057877481,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7133580423849617,
+     "null_sd": 0.00209113431079594,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7535+-0.0057 vs null 0.7134+-0.0021, inc 0.7282); guard failed: flips (+10.0 > 4.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 1778,
+      "null": 1540
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.79,
+      "null": 2.04
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.00522702165253508,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.019932776486977666,
+      "recipe_flag": true,
+      "species_failed": [
+       "PalmerAmaranth"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7489046136419005,
+     "cand_sd": 0.0034595363548043908,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": false
+     },
+     "inc": 0.734131549778974,
+     "incumbent_after": "lora__s01_I1__soup",
+     "null_mean": 0.7289718371549229,
+     "null_sd": 0.00228759406036131,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=1.000 (cand 0.7489+-0.0035 vs null 0.7290+-0.0023, inc 0.7341); guard failed: species (PalmerAmaranth -0.056 < -0.030); flips (+9.7 > 6.1 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 2016,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.59,
+      "null": 1.79
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 2,
+   "step": "I2",
+   "tag": "s02_I2",
+   "truth": {
+    "p": 1.0,
+    "species_failed": [],
+    "verdict": "helps",
+    "with_mean": 0.7427800192494486,
+    "with_sd": 0.011951188240683792,
+    "without_mean": 0.7182297005173884,
+    "without_sd": 0.009382834076262512
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.013598347381901688,
+      "blame": "recipe",
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.015313896242507674,
+      "recipe_flag": true,
+      "species_failed": [
+       "PricklySida",
+       "Sicklepod",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7025004196713702,
+     "cand_sd": 0.0025783166299029672,
+     "d_images": 272,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7305126363516768,
+     "incumbent_after": "freeze__s01_I1__soup",
+     "null_mean": 0.7178143159138779,
+     "null_sd": 0.002051120986616967,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=0.000 (cand 0.7025+-0.0026 vs null 0.7178+-0.0021, inc 0.7305); guard failed: regression (cand 0.7025 < 0.7264); species (PricklySida -0.044 < -0.030, Sicklepod -0.030 < -0.030, CutleafGroundcherry -0.043 < -0.030); flips (+27.3 > 5.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=domain/localisation",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "Bswap"
+     ],
+     "train_images": {
+      "cand": 2050,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.54,
+      "null": 1.79
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.009482509768282132,
+      "blame": "recipe",
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.014472065162861036,
+      "recipe_flag": true,
+      "species_failed": [
+       "Ragweed",
+       "Eclipta",
+       "PalmerAmaranth",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.6988859772221007,
+     "cand_sd": 0.0026258868661218435,
+     "d_images": 272,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7133580423849617,
+     "null_sd": 0.00209113431079594,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.6989+-0.0026 vs null 0.7134+-0.0021, inc 0.7282); guard failed: regression (cand 0.6989 < 0.7240); species (Ragweed -0.033 < -0.030, Eclipta -0.034 < -0.033, PalmerAmaranth -0.092 < -0.059, CutleafGroundcherry -0.053 < -0.039); flips (+25.7 > 4.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=domain/localisation",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "Bswap"
+     ],
+     "train_images": {
+      "cand": 1812,
+      "null": 1540
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.75,
+      "null": 2.04
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.010816358154381867,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": -0.003413938523752602,
+      "recipe_flag": true,
+      "species_failed": [
+       "PalmerAmaranth",
+       "Sicklepod"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7255578986311703,
+     "cand_sd": 0.004573159619779752,
+     "d_images": 272,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.734131549778974,
+     "incumbent_after": "lora__s01_I1__soup",
+     "null_mean": 0.7289718371549229,
+     "null_sd": 0.00228759406036131,
+     "p_data": 0.3333333333333333,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=0.333 (cand 0.7256+-0.0046 vs null 0.7290+-0.0023, inc 0.7341); guard failed: regression (cand 0.7256 < 0.7296); species (PalmerAmaranth -0.061 < -0.030, Sicklepod -0.071 < -0.067); flips (+17.0 > 6.1 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "Bswap"
+     ],
+     "train_images": {
+      "cand": 2050,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.54,
+      "null": 1.79
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 3,
+   "step": "Bswap",
+   "tag": "s03_Bswap",
+   "truth": {
+    "p": 0.0,
+    "species_failed": [
+     "SpottedSpurge",
+     "PalmerAmaranth"
+    ],
+    "verdict": "hurts",
+    "with_mean": 0.7197318060224037,
+    "with_sd": 0.007586221024703276,
+    "without_mean": 0.7427800192494486,
+    "without_sd": 0.011951188240683792
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.011234036353404253,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.01174198469710197,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7295563006109799,
+     "cand_sd": 0.0015754215895452907,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7305126363516768,
+     "incumbent_after": "freeze__s01_I1__soup",
+     "null_mean": 0.7178143159138779,
+     "null_sd": 0.002051120986616967,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=1.000 (cand 0.7296+-0.0016 vs null 0.7178+-0.0021, inc 0.7305); guard failed: flips (+14.7 > 5.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 2016,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.59,
+      "null": 1.79
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.010004672047658647,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.024280309442775483,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7376383518277372,
+     "cand_sd": 0.004274994354624277,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7133580423849617,
+     "null_sd": 0.00209113431079594,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7376+-0.0043 vs null 0.7134+-0.0021, inc 0.7282); guard failed: flips (+8.3 > 4.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 1778,
+      "null": 1540
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.79,
+      "null": 2.04
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.009895279954167502,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.01872067201763783,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7476925091725607,
+     "cand_sd": 0.0011477694112682836,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.734131549778974,
+     "incumbent_after": "lora__s01_I1__soup",
+     "null_mean": 0.7289718371549229,
+     "null_sd": 0.00228759406036131,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=1.000 (cand 0.7477+-0.0011 vs null 0.7290+-0.0023, inc 0.7341); guard failed: flips (+20.3 > 6.1 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 2016,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.59,
+      "null": 1.79
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 4,
+   "step": "I3",
+   "tag": "s04_I3",
+   "truth": {
+    "p": 1.0,
+    "species_failed": [],
+    "verdict": "helps",
+    "with_mean": 0.780982314220186,
+    "with_sd": 0.00246420592584839,
+    "without_mean": 0.7427800192494486,
+    "without_sd": 0.011951188240683792
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": 0.006725766621654916,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.00215373291105736,
+      "recipe_flag": true,
+      "species_failed": [
+       "Sicklepod"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit",
+      "leave_one_source_out"
+     ],
+     "cand_mean": 0.7199680488249353,
+     "cand_sd": 0.002745655415819861,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7305126363516768,
+     "incumbent_after": "freeze__s01_I1__soup",
+     "null_mean": 0.7178143159138779,
+     "null_sd": 0.002051120986616967,
+     "p_data": 0.6666666666666666,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=0.667 (cand 0.7200+-0.0027 vs null 0.7178+-0.0021, inc 0.7305); guard failed: regression (cand 0.7200 < 0.7264); species (Sicklepod -0.054 < -0.030); flips (+26.7 > 5.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "project_agml__imageweeds_aerial_weed_detection",
+      "project_agml__weed_crop_detection"
+     ],
+     "train_images": {
+      "cand": 2016,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.59,
+      "null": 1.79
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": 0.000804478817896026,
+      "blame": "recipe",
+      "class_vs_loc": "labels",
+      "map_delta": -0.005198604499138004,
+      "recipe_flag": true,
+      "species_failed": [
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit",
+      "leave_one_source_out"
+     ],
+     "cand_mean": 0.7081594378858237,
+     "cand_sd": 0.002174770044139956,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7133580423849617,
+     "null_sd": 0.00209113431079594,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.7082+-0.0022 vs null 0.7134+-0.0021, inc 0.7282); guard failed: regression (cand 0.7082 < 0.7240); species (CutleafGroundcherry -0.051 < -0.039); flips (+19.7 > 4.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=labels",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "project_agml__imageweeds_aerial_weed_detection",
+      "project_agml__weed_crop_detection"
+     ],
+     "train_images": {
+      "cand": 1778,
+      "null": 1540
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.79,
+      "null": 2.04
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": 0.006236125980821683,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": -0.004130431424481551,
+      "recipe_flag": true,
+      "species_failed": [
+       "PalmerAmaranth",
+       "Sicklepod"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit",
+      "leave_one_source_out"
+     ],
+     "cand_mean": 0.7248414057304413,
+     "cand_sd": 0.004090431287132074,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.734131549778974,
+     "incumbent_after": "lora__s01_I1__soup",
+     "null_mean": 0.7289718371549229,
+     "null_sd": 0.00228759406036131,
+     "p_data": 0.2222222222222222,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=0.222 (cand 0.7248+-0.0041 vs null 0.7290+-0.0023, inc 0.7341); guard failed: regression (cand 0.7248 < 0.7296); species (PalmerAmaranth -0.044 < -0.030, Sicklepod -0.087 < -0.067); flips (+26.7 > 6.1 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "project_agml__imageweeds_aerial_weed_detection",
+      "project_agml__weed_crop_detection"
+     ],
+     "train_images": {
+      "cand": 2016,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.59,
+      "null": 1.79
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 5,
+   "step": "Breal",
+   "tag": "s05_Breal",
+   "truth": {
+    "p": 0.0,
+    "species_failed": [],
+    "verdict": "hurts",
+    "with_mean": 0.7709308752476289,
+    "with_sd": 0.003934025794300501,
+    "without_mean": 0.780982314220186,
+    "without_sd": 0.00246420592584839
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.0037808759699472505,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.007470122929182588,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7252844388430605,
+     "cand_sd": 0.0011822422535702915,
+     "d_images": 249,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": true
+     },
+     "inc": 0.7305126363516768,
+     "incumbent_after": "freeze__s01_I1__soup",
+     "null_mean": 0.7178143159138779,
+     "null_sd": 0.002051120986616967,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=1.000 (cand 0.7253+-0.0012 vs null 0.7178+-0.0021, inc 0.7305); guard failed: regression (cand 0.7253 < 0.7264); flips (+15.7 > 5.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 2027,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.56,
+      "null": 1.79
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.010159205791821613,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.014954234823946422,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7283122772089081,
+     "cand_sd": 0.0027889805866039303,
+     "d_images": 249,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7133580423849617,
+     "null_sd": 0.00209113431079594,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7283+-0.0028 vs null 0.7134+-0.0021, inc 0.7282); guard failed: flips (+8.0 > 4.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 1789,
+      "null": 1540
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.79,
+      "null": 2.04
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.005737602735365055,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.0037160082881748657,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7326878454430977,
+     "cand_sd": 0.004233000362620852,
+     "d_images": 249,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.734131549778974,
+     "incumbent_after": "lora__s01_I1__soup",
+     "null_mean": 0.7289718371549229,
+     "null_sd": 0.00228759406036131,
+     "p_data": 0.7777777777777778,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=0.778 (cand 0.7327+-0.0042 vs null 0.7290+-0.0023, inc 0.7341); guard failed: flips (+12.7 > 6.1 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 2027,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.56,
+      "null": 1.79
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 6,
+   "step": "I4",
+   "tag": "s06_I4",
+   "truth": {
+    "p": 0.6666666666666666,
+    "species_failed": [],
+    "verdict": "neutral",
+    "with_mean": 0.7857598446667914,
+    "with_sd": 0.00828425605099291,
+    "without_mean": 0.780982314220186,
+    "without_sd": 0.00246420592584839
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.0024003012794261425,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.008545387344749078,
+      "recipe_flag": true,
+      "species_failed": [
+       "Goosegrass"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.726359703258627,
+     "cand_sd": 0.00038060887078073707,
+     "d_images": 274,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7305126363516768,
+     "incumbent_after": "freeze__s01_I1__soup",
+     "null_mean": 0.7178143159138779,
+     "null_sd": 0.002051120986616967,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=1.000 (cand 0.7264+-0.0004 vs null 0.7178+-0.0021, inc 0.7305); guard failed: regression (cand 0.7264 < 0.7264); species (Goosegrass -0.034 < -0.030); flips (+18.3 > 5.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 2052,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.54,
+      "null": 1.79
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": 0.009194988475516919,
+      "blame": null,
+      "class_vs_loc": "none",
+      "map_delta": 0.020439018999239167,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7337970613842009,
+     "cand_sd": 0.005999501386232599,
+     "d_images": 274,
+     "guards": {
+      "flips": true,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "full__s07_I5__soup",
+     "null_mean": 0.7133580423849617,
+     "null_sd": 0.00209113431079594,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "ACCEPT: P_data=1.000 (cand 0.7338+-0.0060 vs null 0.7134+-0.0021, inc 0.7282); guards pass; P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": "soup",
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 1814,
+      "null": 1540
+     },
+     "truth_equivalent": "helps",
+     "verdict": "ACCEPT",
+     "warmup_epochs_effective": {
+      "cand": 1.75,
+      "null": 2.04
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.005005026840591231,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.019994733827503497,
+      "recipe_flag": true,
+      "species_failed": [
+       "PalmerAmaranth"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7489665709824264,
+     "cand_sd": 0.005221994778121584,
+     "d_images": 274,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": false
+     },
+     "inc": 0.734131549778974,
+     "incumbent_after": "lora__s01_I1__soup",
+     "null_mean": 0.7289718371549229,
+     "null_sd": 0.00228759406036131,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1778,
+     "reason": "REJECT: P_data=1.000 (cand 0.7490+-0.0052 vs null 0.7290+-0.0023, inc 0.7341); guard failed: species (PalmerAmaranth -0.040 < -0.030); flips (+10.3 > 6.1 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 2052,
+      "null": 1778
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.54,
+      "null": 1.79
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 7,
+   "step": "I5",
+   "tag": "s07_I5",
+   "truth": {
+    "p": 1.0,
+    "species_failed": [],
+    "verdict": "helps",
+    "with_mean": 0.8083685911566376,
+    "with_sd": 0.004286248117036021,
+    "without_mean": 0.7857598446667914,
+    "without_sd": 0.00828425605099291
+   }
+  }
+ ],
+ "testing": false,
+ "type": "chain"
+}

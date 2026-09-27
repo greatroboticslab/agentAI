@@ -1,0 +1,2043 @@
+{
+ "agreement": {
+  "freeze": {
+   "agree": 3,
+   "compared": 7,
+   "rate": 0.42857142857142855
+  },
+  "full": {
+   "agree": 3,
+   "compared": 7,
+   "rate": 0.42857142857142855
+  },
+  "lora": {
+   "agree": 3,
+   "compared": 7,
+   "rate": 0.42857142857142855
+  }
+ },
+ "attribution_scope": {
+  "not_run": {
+   "4": "label audit (BioCLIP-2 re-reading D_k's boxes): out of scope for the pilot",
+   "5": "leave-one-source-out cand runs for a multi-source increment (Breal mixes two sources): out of scope for the pilot"
+  },
+  "run": [
+   "1 recipe vs data",
+   "2 classification vs localisation",
+   "3 per-species deltas"
+  ]
+ },
+ "blocked": {},
+ "chains": {
+  "freeze": {
+   "accepted": [],
+   "bswap": {
+    "attributed_to_labels": false,
+    "class_vs_loc": "domain/localisation",
+    "verdict": "REJECT"
+   },
+   "final_incumbent": "base__s0",
+   "neutral": [],
+   "phase": "done",
+   "quarantined": [
+    "I1",
+    "I2",
+    "Bswap",
+    "I3",
+    "Breal",
+    "I4",
+    "I5"
+   ],
+   "recipe": {
+    "batch": 32,
+    "cache": "ram",
+    "close_mosaic": 10,
+    "cos_lr": true,
+    "deterministic": true,
+    "epochs": 30,
+    "freeze": 11,
+    "imgsz": 640,
+    "lora": null,
+    "lr0": 0.002,
+    "lrf": 0.01,
+    "momentum": 0.937,
+    "optimizer": "SGD",
+    "trainer": "freeze",
+    "warmup_bias_lr": 0.002,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0005,
+    "workers": 5
+   },
+   "rejects_without_source_attribution": [
+    "s05_Breal"
+   ]
+  },
+  "full": {
+   "accepted": [],
+   "bswap": {
+    "attributed_to_labels": false,
+    "class_vs_loc": "domain/localisation",
+    "verdict": "REJECT"
+   },
+   "final_incumbent": "base__s0",
+   "neutral": [],
+   "phase": "done",
+   "quarantined": [
+    "I1",
+    "I2",
+    "Bswap",
+    "I3",
+    "Breal",
+    "I4",
+    "I5"
+   ],
+   "recipe": {
+    "batch": 32,
+    "cache": "ram",
+    "close_mosaic": 10,
+    "cos_lr": true,
+    "deterministic": true,
+    "epochs": 30,
+    "freeze": null,
+    "imgsz": 640,
+    "lora": null,
+    "lr0": 0.002,
+    "lrf": 0.01,
+    "momentum": 0.937,
+    "optimizer": "SGD",
+    "trainer": "full",
+    "warmup_bias_lr": 0.002,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0005,
+    "workers": 5
+   },
+   "rejects_without_source_attribution": [
+    "s05_Breal"
+   ]
+  },
+  "lora": {
+   "accepted": [],
+   "bswap": {
+    "attributed_to_labels": false,
+    "class_vs_loc": "domain/localisation",
+    "verdict": "REJECT"
+   },
+   "final_incumbent": "base__s0",
+   "neutral": [],
+   "phase": "done",
+   "quarantined": [
+    "I1",
+    "I2",
+    "Bswap",
+    "I3",
+    "Breal",
+    "I4",
+    "I5"
+   ],
+   "recipe": {
+    "batch": 32,
+    "cache": "ram",
+    "close_mosaic": 10,
+    "cos_lr": true,
+    "deterministic": true,
+    "epochs": 30,
+    "freeze": null,
+    "imgsz": 640,
+    "lora": {
+     "alpha": 32,
+     "rank": 16
+    },
+    "lr0": 0.01,
+    "lrf": 0.01,
+    "momentum": 0.937,
+    "optimizer": "SGD",
+    "trainer": "lora",
+    "warmup_bias_lr": 0.01,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0005,
+    "workers": 5
+   },
+   "rejects_without_source_attribution": [
+    "s05_Breal"
+   ]
+  }
+ },
+ "code": {
+  "modules": {
+   "tools/cwd12_species.py": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+   "tools/inc/__init__.py": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+   "tools/inc/common.py": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+   "tools/inc/driver.py": "1d65393e0b299706ca9dca00194eb1e7c3b665a6114b93a62dae3c41aac22de7",
+   "tools/inc/gate.py": "e6eadeb76d0d104d53ebd56b84388dacce442616572ba6cf3d2d611deab6975b",
+   "tools/inc/splits.py": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+  },
+  "package_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework",
+  "pinned_utc": "2026-09-27T04:05:20Z",
+  "reason": "init"
+ },
+ "done": true,
+ "done_utc": "2026-09-27T05:26:15Z",
+ "effective_warmup": {
+  "cold": {
+   "base": {
+    "covers_whole_run": false,
+    "epochs": 100,
+    "images": 1540,
+    "iterations_per_epoch": 49,
+    "warmup_epochs_effective": 3.0,
+    "warmup_epochs_nominal": 3,
+    "warmup_iterations": 147
+   },
+   "truth": {
+    "s01_I1": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 1778,
+     "iterations_per_epoch": 56,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 168
+    },
+    "s02_I2": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2016,
+     "iterations_per_epoch": 63,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 189
+    },
+    "s03_Bswap": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2288,
+     "iterations_per_epoch": 72,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 216
+    },
+    "s04_I3": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2254,
+     "iterations_per_epoch": 71,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 213
+    },
+    "s05_Breal": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2492,
+     "iterations_per_epoch": 78,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 234
+    },
+    "s06_I4": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2503,
+     "iterations_per_epoch": 79,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 237
+    },
+    "s07_I5": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 2777,
+     "iterations_per_epoch": 87,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 261
+    }
+   }
+  },
+  "incremental": {
+   "freeze": {
+    "s01_I1": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s02_I2": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s03_Bswap": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 544,
+     "iterations_per_epoch": 17,
+     "warmup_epochs_effective": 5.88,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s04_I3": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s05_Breal": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s06_I4": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 498,
+     "iterations_per_epoch": 16,
+     "warmup_epochs_effective": 6.25,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s07_I5": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 548,
+     "iterations_per_epoch": 18,
+     "warmup_epochs_effective": 5.56,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    }
+   },
+   "full": {
+    "s01_I1": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s02_I2": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s03_Bswap": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 544,
+     "iterations_per_epoch": 17,
+     "warmup_epochs_effective": 5.88,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s04_I3": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s05_Breal": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s06_I4": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 498,
+     "iterations_per_epoch": 16,
+     "warmup_epochs_effective": 6.25,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s07_I5": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 548,
+     "iterations_per_epoch": 18,
+     "warmup_epochs_effective": 5.56,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    }
+   },
+   "lora": {
+    "s01_I1": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s02_I2": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s03_Bswap": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 544,
+     "iterations_per_epoch": 17,
+     "warmup_epochs_effective": 5.88,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s04_I3": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s05_Breal": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 476,
+     "iterations_per_epoch": 15,
+     "warmup_epochs_effective": 6.67,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s06_I4": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 498,
+     "iterations_per_epoch": 16,
+     "warmup_epochs_effective": 6.25,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    },
+    "s07_I5": {
+     "covers_whole_run": false,
+     "epochs": 30,
+     "images": 548,
+     "iterations_per_epoch": 18,
+     "warmup_epochs_effective": 5.56,
+     "warmup_epochs_nominal": 1,
+     "warmup_iterations": 100
+    }
+   }
+  },
+  "incremental_effective_epochs": {
+   "max": 6.67,
+   "min": 5.56
+  },
+  "note": "Ultralytics warms up for max(round(warmup_epochs * iterations per epoch), 100) iterations; cand and null sets hold 2|D_k| images"
+ },
+ "exams": [
+  "dev",
+  "ood22",
+  "ood23",
+  "imageweeds",
+  "test"
+ ],
+ "exp": "pilot_v1",
+ "final": [
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.822084525183101,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7281636942174424,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.1037239572032959,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.0369922739015104,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8030510698700593,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7040515669596037,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.11811515375523818,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.08394732680011252,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8403429560019072,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7734860673019547,
+      "n": 1,
+      "sd": null
+     }
+    }
+   },
+   "model": "chain freeze: final incumbent",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__freeze__incumbent"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.822084525183101,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7281636942174424,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.1037239572032959,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.0369922739015104,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8030510698700593,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7040515669596037,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.11811515375523818,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.08394732680011252,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8403429560019072,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7734860673019547,
+      "n": 1,
+      "sd": null
+     }
+    }
+   },
+   "model": "chain full: final incumbent",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__full__incumbent"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.822084525183101,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7281636942174424,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.1037239572032959,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.0369922739015104,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8030510698700593,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7040515669596037,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.11811515375523818,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.08394732680011252,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8403429560019072,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.7734860673019547,
+      "n": 1,
+      "sd": null
+     }
+    }
+   },
+   "model": "chain lora: final incumbent",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__lora__incumbent"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8195193506464148,
+      "n": 3,
+      "sd": 0.0028192253070929525
+     },
+     "twelve": {
+      "mean": 0.7211710320230932,
+      "n": 3,
+      "sd": 0.008531176158826204
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.1101483113200614,
+      "n": 3,
+      "sd": 0.0064077426221729504
+     },
+     "twelve": {
+      "mean": 0.04225111195212015,
+      "n": 3,
+      "sd": 0.013202352525284924
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8051274830379409,
+      "n": 3,
+      "sd": 0.003160200625941522
+     },
+     "twelve": {
+      "mean": 0.7040931017549342,
+      "n": 3,
+      "sd": 0.011768814154147066
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.12694730695613257,
+      "n": 3,
+      "sd": 0.009842721615210845
+     },
+     "twelve": {
+      "mean": 0.08703522236032202,
+      "n": 3,
+      "sd": 0.007833783306781274
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8428393125391436,
+      "n": 3,
+      "sd": 0.0021841706075281238
+     },
+     "twelve": {
+      "mean": 0.7761178482298262,
+      "n": 3,
+      "sd": 0.006327380262864752
+     }
+    }
+   },
+   "model": "base P0",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__base__s0",
+    "final__base__s1",
+    "final__base__s2"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8547863095885693,
+      "n": 3,
+      "sd": 0.0037212326909238447
+     },
+     "twelve": {
+      "mean": 0.8083685911566377,
+      "n": 3,
+      "sd": 0.004286248117036111
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.12226776367597963,
+      "n": 3,
+      "sd": 0.00897951854178225
+     },
+     "twelve": {
+      "mean": 0.05499155842173827,
+      "n": 3,
+      "sd": 0.0019421194941469124
+     }
+    },
+    "ood22": {
+     "agnostic": {
+      "mean": 0.8372426956851419,
+      "n": 3,
+      "sd": 0.003108174162248132
+     },
+     "twelve": {
+      "mean": 0.7561322540532425,
+      "n": 3,
+      "sd": 0.004685115980023104
+     }
+    },
+    "ood23": {
+     "agnostic": {
+      "mean": 0.12515143549991717,
+      "n": 3,
+      "sd": 0.0036729264784865416
+     },
+     "twelve": {
+      "mean": 0.1637394795692816,
+      "n": 3,
+      "sd": 0.04587836559372661
+     }
+    },
+    "test": {
+     "agnostic": {
+      "mean": 0.8717409198487794,
+      "n": 3,
+      "sd": 0.0008718512480997839
+     },
+     "twelve": {
+      "mean": 0.8471862746317135,
+      "n": 3,
+      "sd": 0.0014004148760797782
+     }
+    }
+   },
+   "model": "T_final (union of clean data)",
+   "production": [
+    true
+   ],
+   "runs": [
+    "final__Tfinal__s0",
+    "final__Tfinal__s1",
+    "final__Tfinal__s2"
+   ]
+  }
+ ],
+ "generated_utc": "2026-09-27T05:32:11Z",
+ "gpu_hours": {
+  "base": {
+   "hours": 1.079777777777778,
+   "runs": 3
+  },
+  "chain:freeze": {
+   "hours": 1.904527777777778,
+   "runs": 42
+  },
+  "chain:full": {
+   "hours": 2.1632500000000006,
+   "runs": 42
+  },
+  "chain:lora": {
+   "hours": 2.2606111111111113,
+   "runs": 42
+  },
+  "final": {
+   "hours": 0.9492777777777777,
+   "runs": 9
+  },
+  "truth": {
+   "hours": 8.921833333333336,
+   "runs": 21
+  }
+ },
+ "gpu_hours_total": 17.27927777777778,
+ "interventions": [],
+ "notes": [],
+ "replay_mode": "sample",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "steps": [
+  {
+   "chains": {
+    "freeze": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": 0.0017162036569927652,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.005858643635623384,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7193032410092016,
+     "cand_sd": 0.0018677595264982956,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7134445973735782,
+     "null_sd": 0.0006713310101321283,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7193+-0.0019 vs null 0.7134+-0.0007, inc 0.7282); guard failed: regression (cand 0.7193 < 0.7268); flips (+21.7 > 3.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.007702648709087767,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.013181739967421446,
+      "recipe_flag": true,
+      "species_failed": [
+       "Purslane",
+       "Ragweed"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7159399356955035,
+     "cand_sd": 0.0022287454514400033,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7027581957280821,
+     "null_sd": 0.0008534512176016405,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7159+-0.0022 vs null 0.7028+-0.0009, inc 0.7282); guard failed: regression (cand 0.7159 < 0.7265); species (Purslane -0.032 < -0.030, Ragweed -0.042 < -0.030); flips (+16.0 > 7.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": 0.0033883177134220732,
+      "blame": "recipe",
+      "class_vs_loc": "labels",
+      "map_delta": -0.003207520209664083,
+      "recipe_flag": true,
+      "species_failed": [
+       "Eclipta"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7124772257594557,
+     "cand_sd": 0.005071150375183538,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7156847459691198,
+     "null_sd": 0.001510422041060966,
+     "p_data": 0.3333333333333333,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.333 (cand 0.7125+-0.0051 vs null 0.7157+-0.0015, inc 0.7282); guard failed: regression (cand 0.7125 < 0.7251); species (Eclipta -0.031 < -0.030); flips (+27.3 > 5.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=labels",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 1,
+   "step": "I1",
+   "tag": "s01_I1",
+   "truth": {
+    "p": 0.3333333333333333,
+    "species_failed": [
+     "PricklySida"
+    ],
+    "verdict": "hurts",
+    "with_mean": 0.7182297005173884,
+    "with_sd": 0.009382834076262512,
+    "without_mean": 0.7211710320230932,
+    "without_sd": 0.008531176158826186
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": -0.0058242833073749445,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": -0.0008325148162107165,
+      "recipe_flag": true,
+      "species_failed": [
+       "Carpetweed",
+       "PalmerAmaranth",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7174368367691514,
+     "cand_sd": 0.0024670156079871306,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7182693515853621,
+     "null_sd": 0.0020462093349537143,
+     "p_data": 0.4444444444444444,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.444 (cand 0.7174+-0.0025 vs null 0.7183+-0.0020, inc 0.7282); guard failed: regression (cand 0.7174 < 0.7241); species (Carpetweed -0.056 < -0.030, PalmerAmaranth -0.037 < -0.030, CutleafGroundcherry -0.134 < -0.035); flips (+18.0 > 8.3 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.018374919201179507,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.02449268148378414,
+      "recipe_flag": true,
+      "species_failed": [
+       "PalmerAmaranth"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7277837062132644,
+     "cand_sd": 0.007391182820233938,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7032910247294802,
+     "null_sd": 0.0025726834053248957,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7278+-0.0074 vs null 0.7033+-0.0026, inc 0.7282); guard failed: species (PalmerAmaranth -0.042 < -0.030); flips (+8.0 > 7.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": -0.008100562985398851,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.015597657339199378,
+      "recipe_flag": true,
+      "species_failed": [
+       "PalmerAmaranth",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7255021879186968,
+     "cand_sd": 0.003357013962577923,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7099045305794974,
+     "null_sd": 0.004178450498454056,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7255+-0.0034 vs null 0.7099+-0.0042, inc 0.7282); guard failed: species (PalmerAmaranth -0.060 < -0.042, CutleafGroundcherry -0.110 < -0.031); flips (+24.0 > 8.3 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 2,
+   "step": "I2",
+   "tag": "s02_I2",
+   "truth": {
+    "p": 1.0,
+    "species_failed": [],
+    "verdict": "helps",
+    "with_mean": 0.7427800192494486,
+    "with_sd": 0.011951188240683792,
+    "without_mean": 0.7182297005173884,
+    "without_sd": 0.009382834076262512
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.027124375813453727,
+      "blame": "recipe",
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.02546365105883841,
+      "recipe_flag": true,
+      "species_failed": [
+       "Ragweed",
+       "PalmerAmaranth",
+       "Goosegrass",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.6914373590577082,
+     "cand_sd": 0.0007185665921120309,
+     "d_images": 272,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7169010101165466,
+     "null_sd": 0.0022886717645428573,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.6914+-0.0007 vs null 0.7169+-0.0023, inc 0.7282); guard failed: regression (cand 0.6914 < 0.7236); species (Ragweed -0.060 < -0.030, PalmerAmaranth -0.106 < -0.035, Goosegrass -0.046 < -0.033, CutleafGroundcherry -0.054 < -0.030); flips (+32.0 > 7.6 images); P_recipe=0.000 (recipe flag); class_vs_loc=domain/localisation",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "Bswap"
+     ],
+     "train_images": {
+      "cand": 544,
+      "null": 544
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 5.88,
+      "null": 5.88
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.02936200350960705,
+      "blame": "recipe",
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.03335270216200514,
+      "recipe_flag": true,
+      "species_failed": [
+       "MorningGlory",
+       "Purslane",
+       "SpottedSpurge",
+       "Ragweed",
+       "Eclipta",
+       "PalmerAmaranth",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.6728575824910017,
+     "cand_sd": 0.00491685473953593,
+     "d_images": 272,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7062102846530068,
+     "null_sd": 0.005255644082816004,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.6729+-0.0049 vs null 0.7062+-0.0053, inc 0.7282); guard failed: regression (cand 0.6729 < 0.7177); species (MorningGlory -0.045 < -0.043, Purslane -0.031 < -0.030, SpottedSpurge -0.051 < -0.030, Ragweed -0.040 < -0.030, Eclipta -0.046 < -0.030, PalmerAmaranth -0.104 < -0.049, CutleafGroundcherry -0.041 < -0.030); flips (+38.3 > 8.3 images); P_recipe=0.000 (recipe flag); class_vs_loc=domain/localisation",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "Bswap"
+     ],
+     "train_images": {
+      "cand": 544,
+      "null": 544
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 5.88,
+      "null": 5.88
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.019259197461204414,
+      "blame": "recipe",
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.031087608517856857,
+      "recipe_flag": true,
+      "species_failed": [
+       "MorningGlory",
+       "Ragweed",
+       "PalmerAmaranth",
+       "Goosegrass",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.6897781869678169,
+     "cand_sd": 0.002654422961266659,
+     "d_images": 272,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7208657954856738,
+     "null_sd": 0.0005592227714923203,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.6898+-0.0027 vs null 0.7209+-0.0006, inc 0.7282); guard failed: regression (cand 0.6898 < 0.7270); species (MorningGlory -0.032 < -0.030, Ragweed -0.062 < -0.030, PalmerAmaranth -0.197 < -0.030, Goosegrass -0.041 < -0.030, CutleafGroundcherry -0.048 < -0.038); flips (+28.0 > 7.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=domain/localisation",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "Bswap"
+     ],
+     "train_images": {
+      "cand": 544,
+      "null": 544
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 5.88,
+      "null": 5.88
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 3,
+   "step": "Bswap",
+   "tag": "s03_Bswap",
+   "truth": {
+    "p": 0.1111111111111111,
+    "species_failed": [
+     "SpottedSpurge"
+    ],
+    "verdict": "hurts",
+    "with_mean": 0.7221432282602361,
+    "with_sd": 0.008153193878164986,
+    "without_mean": 0.7427800192494486,
+    "without_sd": 0.011951188240683792
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": -0.0005553443647547951,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": -0.006962348127969031,
+      "recipe_flag": true,
+      "species_failed": [
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7081279698415287,
+     "cand_sd": 0.0008968032435318407,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7150903179694977,
+     "null_sd": 0.0061787285247876505,
+     "p_data": 0.2222222222222222,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.222 (cand 0.7081+-0.0009 vs null 0.7151+-0.0062, inc 0.7282); guard failed: regression (cand 0.7081 < 0.7158); species (CutleafGroundcherry -0.068 < -0.030); flips (+30.7 > 5.3 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.014683639570185036,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.024359813223465476,
+      "recipe_flag": true,
+      "species_failed": [
+       "PalmerAmaranth"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7257138055740615,
+     "cand_sd": 0.004099864514826815,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.701353992350596,
+     "null_sd": 0.002238314878686502,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7257+-0.0041 vs null 0.7014+-0.0022, inc 0.7282); guard failed: species (PalmerAmaranth -0.035 < -0.030); flips (+21.3 > 10.6 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.007566457404096116,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": -0.00290285507666721,
+      "recipe_flag": true,
+      "species_failed": [
+       "SpottedSpurge",
+       "Sicklepod"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7227662881166262,
+     "cand_sd": 0.0036379224989142025,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7256691431932935,
+     "null_sd": 0.0030515428871696064,
+     "p_data": 0.1111111111111111,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.111 (cand 0.7228+-0.0036 vs null 0.7257+-0.0031, inc 0.7282); guard failed: species (SpottedSpurge -0.034 < -0.030, Sicklepod -0.107 < -0.097); flips (+25.7 > 7.2 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 4,
+   "step": "I3",
+   "tag": "s04_I3",
+   "truth": {
+    "p": 1.0,
+    "species_failed": [],
+    "verdict": "helps",
+    "with_mean": 0.780982314220186,
+    "with_sd": 0.00246420592584839,
+    "without_mean": 0.7427800192494486,
+    "without_sd": 0.011951188240683792
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.04287645715507349,
+      "blame": "recipe",
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.020955730023805685,
+      "recipe_flag": true,
+      "species_failed": [
+       "SpottedSpurge",
+       "Ragweed",
+       "PalmerAmaranth",
+       "Sicklepod"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit",
+      "leave_one_source_out"
+     ],
+     "cand_mean": 0.6893380346320633,
+     "cand_sd": 0.001183441952635654,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.710293764655869,
+     "null_sd": 0.0014845739125379713,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.6893+-0.0012 vs null 0.7103+-0.0015, inc 0.7282); guard failed: regression (cand 0.6893 < 0.7252); species (SpottedSpurge -0.032 < -0.030, Ragweed -0.057 < -0.030, PalmerAmaranth -0.036 < -0.030, Sicklepod -0.064 < -0.030); flips (+36.0 > 9.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=domain/localisation",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "project_agml__imageweeds_aerial_weed_detection",
+      "project_agml__weed_crop_detection"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.02999726308187234,
+      "blame": "recipe",
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.04089490752021818,
+      "recipe_flag": true,
+      "species_failed": [
+       "Purslane",
+       "SpottedSpurge",
+       "Ragweed",
+       "Sicklepod",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit",
+      "leave_one_source_out"
+     ],
+     "cand_mean": 0.6661949297727032,
+     "cand_sd": 0.001667268026473114,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7070898372929214,
+     "null_sd": 0.0032032254089815336,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.6662+-0.0017 vs null 0.7071+-0.0032, inc 0.7282); guard failed: regression (cand 0.6662 < 0.7218); species (Purslane -0.060 < -0.030, SpottedSpurge -0.037 < -0.030, Ragweed -0.041 < -0.030, Sicklepod -0.110 < -0.071, CutleafGroundcherry -0.202 < -0.030); flips (+37.7 > 11.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=domain/localisation",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "project_agml__imageweeds_aerial_weed_detection",
+      "project_agml__weed_crop_detection"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.04696732341251897,
+      "blame": "recipe",
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.05868957071517644,
+      "recipe_flag": true,
+      "species_failed": [
+       "Purslane",
+       "SpottedSpurge",
+       "Ragweed",
+       "PricklySida",
+       "PalmerAmaranth",
+       "Sicklepod",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit",
+      "leave_one_source_out"
+     ],
+     "cand_mean": 0.6546337038540052,
+     "cand_sd": 0.004655280360495149,
+     "d_images": 238,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7133232745691817,
+     "null_sd": 0.0004621509925399545,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.6546+-0.0047 vs null 0.7133+-0.0005, inc 0.7282); guard failed: regression (cand 0.6546 < 0.7272); species (Purslane -0.037 < -0.030, SpottedSpurge -0.051 < -0.030, Ragweed -0.114 < -0.030, PricklySida -0.033 < -0.030, PalmerAmaranth -0.089 < -0.030, Sicklepod -0.117 < -0.057, CutleafGroundcherry -0.188 < -0.063); flips (+71.0 > 7.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=domain/localisation",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "project_agml__imageweeds_aerial_weed_detection",
+      "project_agml__weed_crop_detection"
+     ],
+     "train_images": {
+      "cand": 476,
+      "null": 476
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.67,
+      "null": 6.67
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 5,
+   "step": "Breal",
+   "tag": "s05_Breal",
+   "truth": {
+    "p": 0.0,
+    "species_failed": [
+     "Sicklepod"
+    ],
+    "verdict": "hurts",
+    "with_mean": 0.7635058701869344,
+    "with_sd": 0.0015489253048355976,
+    "without_mean": 0.780982314220186,
+    "without_sd": 0.00246420592584839
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": -0.0025918670063309612,
+      "blame": "recipe",
+      "class_vs_loc": "labels",
+      "map_delta": -0.013133276015442674,
+      "recipe_flag": true,
+      "species_failed": [
+       "PricklySida",
+       "Sicklepod",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7005426376157944,
+     "cand_sd": 0.001821063710741434,
+     "d_images": 249,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7136759136312371,
+     "null_sd": 0.004137596610464511,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.7005+-0.0018 vs null 0.7137+-0.0041, inc 0.7282); guard failed: regression (cand 0.7005 < 0.7199); species (PricklySida -0.090 < -0.030, Sicklepod -0.060 < -0.045, CutleafGroundcherry -0.097 < -0.083); flips (+8.7 > 3.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=labels",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 498,
+      "null": 498
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.25,
+      "null": 6.25
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.00888409554077585,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.009670239411868287,
+      "recipe_flag": true,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7058300329842626,
+     "cand_sd": 0.0015942142651874664,
+     "d_images": 249,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": true
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.6961597935723943,
+     "null_sd": 0.0029096417129244718,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7058+-0.0016 vs null 0.6962+-0.0029, inc 0.7282); guard failed: regression (cand 0.7058 < 0.7223); flips (+15.3 > 8.8 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 498,
+      "null": 498
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.25,
+      "null": 6.25
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.009606720456212248,
+      "blame": "data",
+      "class_vs_loc": "labels",
+      "map_delta": -0.014254696613767659,
+      "recipe_flag": false,
+      "species_failed": [
+       "PricklySida",
+       "CutleafGroundcherry"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7134498598795412,
+     "cand_sd": 0.0026750863661444487,
+     "d_images": 249,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7277045564933089,
+     "null_sd": 0.0014816443469786679,
+     "p_data": 0.0,
+     "p_recipe": 0.3333333333333333,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.7134+-0.0027 vs null 0.7277+-0.0015, inc 0.7282); guard failed: regression (cand 0.7134 < 0.7252); species (PricklySida -0.091 < -0.032, CutleafGroundcherry -0.134 < -0.061); flips (+23.0 > 10.6 images); P_recipe=0.333; class_vs_loc=labels",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 498,
+      "null": 498
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 6.25,
+      "null": 6.25
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 6,
+   "step": "I4",
+   "tag": "s06_I4",
+   "truth": {
+    "p": 0.6666666666666666,
+    "species_failed": [],
+    "verdict": "neutral",
+    "with_mean": 0.7857598446667914,
+    "with_sd": 0.00828425605099291,
+    "without_mean": 0.780982314220186,
+    "without_sd": 0.00246420592584839
+   }
+  },
+  {
+   "chains": {
+    "freeze": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": -0.0010541860081723087,
+      "blame": "recipe",
+      "class_vs_loc": "labels",
+      "map_delta": -0.009655437792886357,
+      "recipe_flag": true,
+      "species_failed": [
+       "Purslane",
+       "Eclipta",
+       "Goosegrass"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7131491109285499,
+     "cand_sd": 0.0022839259732363544,
+     "d_images": 274,
+     "guards": {
+      "flips": false,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7228045487214363,
+     "null_sd": 0.003252820613390525,
+     "p_data": 0.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=0.000 (cand 0.7131+-0.0023 vs null 0.7228+-0.0033, inc 0.7282); guard failed: regression (cand 0.7131 < 0.7217); species (Purslane -0.039 < -0.030, Eclipta -0.048 < -0.030, Goosegrass -0.062 < -0.030); flips (+36.0 > 11.1 images); P_recipe=0.000 (recipe flag); class_vs_loc=labels",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 548,
+      "null": 548
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 5.56,
+      "null": 5.56
+     },
+     "warnings": []
+    },
+    "full": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.007724753869304712,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.009231656914718611,
+      "recipe_flag": true,
+      "species_failed": [
+       "Purslane",
+       "Sicklepod"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7175698102204414,
+     "cand_sd": 0.005724953446829093,
+     "d_images": 274,
+     "guards": {
+      "flips": true,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7083381533057228,
+     "null_sd": 0.001997663520059707,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7176+-0.0057 vs null 0.7083+-0.0020, inc 0.7282); guard failed: regression (cand 0.7176 < 0.7242); species (Purslane -0.034 < -0.030, Sicklepod -0.056 < -0.049); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 548,
+      "null": 548
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 5.56,
+      "null": 5.56
+     },
+     "warnings": []
+    },
+    "lora": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": -0.0034383840675431543,
+      "blame": "recipe",
+      "class_vs_loc": "none",
+      "map_delta": 0.007887670203466368,
+      "recipe_flag": true,
+      "species_failed": [
+       "Purslane",
+       "SpottedSpurge",
+       "PalmerAmaranth"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.7231251469139468,
+     "cand_sd": 0.001799308590571576,
+     "d_images": 274,
+     "guards": {
+      "flips": false,
+      "regression": true,
+      "species": false
+     },
+     "inc": 0.7281636942174425,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.7152374767104804,
+     "null_sd": 0.003129832012837633,
+     "p_data": 1.0,
+     "p_recipe": 0.0,
+     "pool_images": 1540,
+     "reason": "REJECT: P_data=1.000 (cand 0.7231+-0.0018 vs null 0.7152+-0.0031, inc 0.7282); guard failed: species (Purslane -0.078 < -0.030, SpottedSpurge -0.034 < -0.030, PalmerAmaranth -0.079 < -0.030); flips (+24.3 > 10.0 images); P_recipe=0.000 (recipe flag); class_vs_loc=none",
+     "replay_mode": "sample",
+     "soup_choice": null,
+     "sources": [
+      "cottonweeddet12/train"
+     ],
+     "train_images": {
+      "cand": 548,
+      "null": 548
+     },
+     "truth_equivalent": "hurts",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 5.56,
+      "null": 5.56
+     },
+     "warnings": []
+    }
+   },
+   "clean": true,
+   "k": 7,
+   "step": "I5",
+   "tag": "s07_I5",
+   "truth": {
+    "p": 1.0,
+    "species_failed": [],
+    "verdict": "helps",
+    "with_mean": 0.8083685911566376,
+    "with_sd": 0.004286248117036021,
+    "without_mean": 0.7857598446667914,
+    "without_sd": 0.00828425605099291
+   }
+  }
+ ],
+ "testing": false,
+ "type": "chain"
+}

@@ -1,0 +1,487 @@
+{
+  "_meta": {
+    "version": "inc-autopilot-levers/1",
+    "pre_registered": "2026-09-27",
+    "purpose": "The pre-registered INC lever menu (docs/INC_AUTOPILOT.md, (b), 'Lever catalogue'). Every in-menu lever is an existing builder CLI or sbatch script; its argv template renders the exact command a person runs by hand (tests/test_inc_ap_levers.py checks each against its documented form and against the builder's real argparse). Off-menu items (X1-X9) are R4 human research cards and have no argv: they are never queued.",
+    "read_by": [
+      "weed_optimizer_framework/tools/inc_autopilot/levers.py",
+      "weed_optimizer_framework/tools/inc_autopilot/diagnose.py (the 'refusals' block)",
+      "weed_optimizer_framework/tools/inc_autopilot/campaign.py (the 'refusals' block's 'retry')"
+    ],
+    "refusals": "Builder refusal -> prerequisite (docs/INC_AUTOPILOT.md): the first entry whose 'pattern' (a regex) the builder's message matches names its 'prerequisite' lever, or null with what it 'needs'. DREF proposes the prerequisite; a refusal with none (null, or no entry matches) is crit and escalates to a person (OP_ESCALATE). 'retry': false marks a refusal the identical build meets again (it reads only Step 1's files and the build's flags): a campaign build that fails with it is declined, never submitted a second time; any other failed build may be proposed again, and the stop-loss pauses the campaign after two consecutive failed steps.",
+    "argv_template": "A list of tokens. A plain string is literal; '{name}' inside a token is replaced by the param or derived value 'name'; the token '{*name}' expands a list value into one token per element; {\"if\": name, \"tokens\": [...]} is rendered only when 'name' is present (not None). Commands run from the cluster checkout root ($REPO, the outer package copy's parent), where run_inc_*.sh live and python -m resolves the package.",
+    "param_bounds": "The bounds of every param a lever takes, in brain/policy_actions.json's param_bounds form (policy._check_params), so an inc_* policy row can copy them and remote.py submit admits the rendered command by them. Names are the builder flags without dashes, '-' as '_' (remote.py's convention); a flag the template fixes is declared too, with its one value, under 'fixed'. est_gpu_hours is the cost param (est_su hours_param). 'derived' values (for example L4's manifest paths) are read from the experiment's own exp.json in the evidence, never supplied by a proposer.",
+    "protocol": "Constants of the INC builders the cost estimator needs; tests/test_inc_ap_levers.py checks each against its module.",
+    "never_on_the_menu": "Hand-written source exclusion lists (project rule), gate thresholds, and anything that overrides a per-increment verdict.",
+    "gate_flips_mode": "The one gate setting on the menu is the builders' --gate-flips-mode, the choice between the two pre-registered protocol versions of the flips guard (negative = v1, net = v2; docs/INCREMENTAL_PROTOCOL.md, Protocol v2). It is not a threshold: every threshold of the gate stays pinned in GateConfig, and the builder writes the mode into exp.json's gate block, which the driver pins at init. Every lever that rebuilds a pilot or a loop (L1, L2, L5, L6, L9) forwards the pinned mode of the experiment it follows (levers.gate_params: the pilot D4 evaluated for L2 and L6, the parent loop for L2 from D1 and L5); the flag is rendered only when that mode is not the builders' default (protocol.gate_flips_mode_default), so a v1 parent's commands are the ones a person ran before the flag existed. Only L9 sets it, to net, as the pre-registered test of v2.",
+    "increment_sources": "realloop build --increment-sources is the choice between the two pre-registered relevance criteria of the verified and OTHER_HEAVY increments (docs/INCREMENTAL_PROTOCOL.md, Steps 2-3): 'relevance' (the default: step1/relevance.json, --relevance) and 'evidence' (source-level species evidence, adopted at the R4 review of 2026-09-27 after the relevance build failed its calibration check). It is a criterion, not a source list: no source is named by hand. It is never a proposer's choice: L2 and L6 from D4 take 'evidence' only when step1/relevance.json is made for the select build and failed its own calibration check, and the evidenced pool holds the build's increments, at the builders' default N and M or at N and M sized by the R4 rule of 2026-09-27 (levers.evidence_sizing; protocol min_decided_increments and min_increment_frac), as levers.increment_criterion renders it and D2 records it; L2 from D1 and L5 keep the parent loop's criterion (levers.loop_params). The flag is rendered only for 'evidence', in the slot --relevance takes (the two exclude each other: levers.check_params, the executor, validate and remote.py submit refuse 'evidence' with --relevance, with realloop's reason, model.EVIDENCE_WITH_RELEVANCE), and --min-evidence is never rendered (the protocol's default, 1)."
+  },
+  "protocol": {
+    "inc_frac": {"value": 0.10, "mirrors": "inc/select.py INC_FRAC", "why": "realloop's default increment size M: this share of base B's images (realloop.default_size)."},
+    "n_verified_default": {"value": 6, "mirrors": "inc/realloop.py N_VERIFIED", "why": "realloop's default number of verified increments; the loop adds UNVERIFIED and OTHER_HEAVY."},
+    "seeds": {"value": 3, "mirrors": "inc/driver.py SEEDS (length)", "why": "Seeds per arm (0, 1, 2) of every INC build."},
+    "gpu_type": {"value": "v100", "why": "run_inc_job.sh, run_inc_audit.sh and run_inc_relevance.sh all request one v100-32 on GPU-shared (1.0 SU per GPU-hour)."},
+    "relevance_format": {"value": "inc.relevance/1", "mirrors": "inc/relevance.py FORMAT", "why": "levers.relevance_state refuses a step1/relevance.json of another format, as relevance.load does, so no build is proposed with a file the builder refuses."},
+    "gate_flips_mode_default": {"value": "negative", "mirrors": "inc/driver.py DEFAULT_FLIPS_MODE (the default of pilot build and realloop build --gate-flips-mode)", "why": "A lever forwards its parent's pinned flips mode as --gate-flips-mode only when it differs from this default: the builder writes the default block without the flag, so the command stays the one a person ran by hand."},
+    "gate_flips_modes": {"value": ["negative", "net"], "mirrors": "inc/driver.py FLIPS_MODES (the builders' --gate-flips-mode choices)", "why": "The two pre-registered protocol versions of the flips guard: v1 (negative flips) and v2 (net flips). The enum of every gate_flips_mode bound."},
+    "relevance_tau_min": {"value": 0.5, "mirrors": "inc/relevance.py TAU_MIN", "why": "The calibration check of a relevance file: tau >= this, else relevance.load refuses the file. levers.relevance_status reads a file's check the way relevance.load does: ok must be a boolean, the check's tau_min must be this value, and ok must equal (tau >= this). A check that holds all three calls the file 'matching' when ok is true (and it is made for the select build) and 'calibration_failed' when ok is false; any other check (ok true with tau below this, another tau_min, ok missing or not a boolean) does not follow from its tau under this rule and is 'refused' (malformed), as relevance.load refuses it. The file's params.tau_min must be this value too (relevance_min_crops)."},
+    "relevance_min_crops": {"value": 20, "mirrors": "inc/relevance.py MIN_CROPS", "why": "The rule a relevance file was made under: relevance.load refuses a file whose params block (min_crops, calibration_percentile, tau_min) is not this code's MIN_CROPS, CAL_PERCENTILE and TAU_MIN ('made under another rule') before it reads the calibration check, so levers.relevance_status calls such a file 'refused' (malformed), never 'calibration_failed' or 'matching'."},
+    "relevance_calibration_percentile": {"value": 5.0, "mirrors": "inc/relevance.py CAL_PERCENTILE", "why": "The percentile of train_core's P(plant) a relevance file's tau is (params.calibration_percentile); see relevance_min_crops: a file made at another percentile is 'refused'."},
+    "increment_sources_modes": {"value": ["relevance", "evidence"], "mirrors": "inc/select.py SOURCE_MODES (realloop build --increment-sources choices)", "why": "The two pre-registered relevance criteria of the verified and OTHER_HEAVY increments (docs/INCREMENTAL_PROTOCOL.md, Steps 2-3): the zero-shot relevance filter and source-level species evidence. The enum of every increment_sources bound."},
+    "increment_sources_default": {"value": "relevance", "mirrors": "inc/select.py SOURCES_RELEVANCE (the default of realloop build --increment-sources)", "why": "A real-loop build uses the relevance file unless --increment-sources evidence is given, so the flag is rendered only for 'evidence' and a relevance build's command stays the one a person ran before the flag existed."},
+    "min_evidence_default": {"value": 1, "mirrors": "inc/select.py MIN_EVIDENCE (the default of realloop build --min-evidence)", "why": "Source-level species evidence: a source is eligible when verify admit judged at least this many of its cwd12-species boxes verified. --min-evidence is not on the menu: every evidence build takes the protocol's default, and levers.evidence_capacity counts evidenced sources with it."},
+    "min_decided_increments": {"value": 6, "mirrors": "docs/INCREMENTAL_PROTOCOL.md, Steps 2-3 acceptance ('at least 6 increments decided')", "why": "The sizing rule of an evidence-sourced real loop (R4 review, 2026-09-27; levers.evidence_sizing): when the evidenced pool cannot hold the default build, N is the smallest number of verified increments with which the loop decides at least this many increments together with UNVERIFIED and OTHER_HEAVY (realloop's sequence: N + 2 steps, so N = 4). A loop that decides fewer does not meet the acceptance, so it is never sized below it, and an evidence loop whose N is given (a brain plan's, an L5 or D1 rebuild's) with fewer is refused (levers.r4_floor), never filed."},
+    "min_increment_frac": {"value": 0.05, "mirrors": "the R4 review of 2026-09-27 (docs/INC_AUTOPILOT.md, D2; docs/INCREMENTAL_PROTOCOL.md, Steps 2-3)", "why": "The floor of the sizing rule: the sized M = min(inc_frac x |B|, floor(evidenced pool images / (N + 1))) must be at least this share of base B's images (half the protocol's 10 %). Below it the review judged an increment too small for the gate to detect an effect, so D2 escalates with the numbers instead of sizing the loop. An evidence loop whose M is given instead of sized (a brain plan's, an L5 or D1 rebuild's) is held to the same floor (levers.r4_floor): below it the lever is refused, never filed."}
+  },
+  "levers": {
+    "L1": {
+      "name": "replay_full",
+      "title": "Rebuild the pilot with full replay (a new experiment)",
+      "kind": "build",
+      "policy_action": "inc_build_pilot",
+      "risk": "R3",
+      "via": "run_inc_build.sh",
+      "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.pilot", "build", "--exp", "{exp}", "--replay-mode", "full",
+               {"if": "gate_flips_mode", "tokens": ["--gate-flips-mode", "{gate_flips_mode}"]}],
+      "param_bounds": {
+        "exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "replay_mode": {"type": "enum", "value_type": "str", "values": ["full"]},
+        "gate_flips_mode": {"type": "enum", "value_type": "str", "values": ["negative", "net"]},
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "fixed": {"replay_mode": "full"},
+      "derived_from_parent": "--gate-flips-mode: the parent pilot's pinned flips mode, rendered only when it is not the builders' default (levers.gate_params).",
+      "estimator": "pilot_rebuild",
+      "control": "The parent pilot: the same definition (bins, Bswap, Breal, recipes, seeds, truth arm) with sample replay.",
+      "success": "The child's best recipe agrees with the truth arm on at least 5 of 7 steps, and at least one step the truth arm says helps is ACCEPTed.",
+      "falsifier": "The child's best agreement stays below 5/7, or no truth-helps step is ACCEPTed by any chain: replay size is not what made the recipe forget (next: X1).",
+      "predicted": {"metric": "agreement", "direction": "up"},
+      "lit": [
+        {"paper_id": "ibrahim2024", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:206"},
+        {"paper_id": "time2024", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:206"}
+      ]
+    },
+    "L2": {
+      "name": "real_loop",
+      "title": "Build the real incremental loop (Steps 2-3) with the recipe the pilot chose",
+      "kind": "build",
+      "policy_action": "inc_build_realloop",
+      "risk": "R3",
+      "via": "run_inc_build.sh",
+      "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.realloop", "build", "--exp", "{exp}", "--base", "{base}",
+               "--replay-mode", "{replay_mode}", "--recipes", "{recipes}",
+               {"if": "increment_sources", "tokens": ["--increment-sources", "{increment_sources}"]},
+               {"if": "relevance", "tokens": ["--relevance", "{relevance}"]},
+               {"if": "size", "tokens": ["--size", "{size}"]},
+               {"if": "n_verified", "tokens": ["--n-verified", "{n_verified}"]},
+               {"if": "gate_flips_mode", "tokens": ["--gate-flips-mode", "{gate_flips_mode}"]}],
+      "param_bounds": {
+        "exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "base": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}\\.jsonl$"},
+        "replay_mode": {"type": "enum", "value_type": "str", "values": ["sample", "full"]},
+        "recipes": {"type": "enum", "value_type": "str",
+                    "values": ["full", "freeze", "lora", "full,freeze", "full,lora", "freeze,lora", "full,freeze,lora"]},
+        "increment_sources": {"type": "enum", "value_type": "str", "values": ["relevance", "evidence"]},
+        "relevance": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}\\.json$"},
+        "size": {"type": "int", "min": 1, "max": 20000},
+        "n_verified": {"type": "int", "min": 1, "max": 12},
+        "gate_flips_mode": {"type": "enum", "value_type": "str", "values": ["negative", "net"]},
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "derived_from_parent": "From D4: --replay-mode, --recipes and --gate-flips-mode of the pilot D4 evaluated (its pinned flips mode, rendered only when it is not the builders' default), and the relevance criterion from Step 1 (levers.increment_criterion): --relevance INC_DIR/step1/relevance.json when that file is made for the select build and passed its calibration check; --increment-sources evidence when it failed its own calibration check and the evidenced pool holds (N + 1) x M images (D2 records which and why). When the evidenced pool cannot hold the default N and M, the loop is sized by the R4 rule (levers.evidence_sizing, 2026-09-27): N = the fewest verified increments that decide protocol.min_decided_increments with UNVERIFIED and OTHER_HEAVY, M = min(inc_frac x |B|, floor(evidenced images / (N + 1))), and --n-verified and --size are rendered where they differ from the builders' defaults; an M below protocol.min_increment_frac x |B| is not sized (D2 escalates). From D1 on a real loop: every flag of the parent loop (levers.loop_params, its criterion included), --replay-mode full.",
+      "estimator": "realloop",
+      "control": "The loop's own base arm B and truth arm, as pre-registered in docs/INCREMENTAL_PROTOCOL.md, Steps 2-3.",
+      "success": "Steps 2-3 acceptance: at least 6 increments decided, the truth arm decided at every step, and each chain's final incumbent compared with T_final, B and B0 on dev.",
+      "falsifier": "The chain's agreement with the truth arm on real data falls below the 5/7 the pilot showed.",
+      "predicted": {"metric": "dev_twelve", "direction": "up"},
+      "lit": [
+        {"paper_id": "ibrahim2024", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:326"},
+        {"paper_id": "lwf2016", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:326"}
+      ]
+    },
+    "L3": {
+      "name": "relevance",
+      "title": "Score every increment-pool source for relevance (Step 1, Source relevance)",
+      "kind": "job",
+      "policy_action": "inc_relevance_build",
+      "risk": "R2",
+      "argv": ["sbatch", "run_inc_relevance.sh", "build"],
+      "script": "run_inc_relevance.sh",
+      "param_bounds": {
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "estimator": "walltime",
+      "control": "Calibration on train_core: tau is the 5th percentile of train_core P(plant).",
+      "success": "Every increment_pool source gets a status, and relevance.load accepts the file for the current select build.",
+      "falsifier": "A source D2 named (no domain evidence) passes relevance: the filter does not see what D2 saw.",
+      "predicted": null,
+      "lit": [
+        {"paper_id": "dinov2_curation", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:241"}
+      ]
+    },
+    "L4": {
+      "name": "label_audit",
+      "title": "BioCLIP-2 label audit of the experiment's increments (attribution item 4)",
+      "kind": "job",
+      "policy_action": "inc_label_audit",
+      "risk": "R2",
+      "argv": ["sbatch", "run_inc_audit.sh", "--trusted", "{trusted}", "--audit", "{*audits}", "--out", "{out}"],
+      "script": "run_inc_audit.sh",
+      "param_bounds": {
+        "exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "derived": {
+        "trusted": "exp.json base.manifest",
+        "audits": "NAME=exp.json steps[].manifest: clean steps in sequence order, then the planted ones",
+        "out": "<INC_DIR>/<exp>/audit/label_audit.json"
+      },
+      "estimator": "walltime",
+      "control": "Held-out trusted folds (baseline_cv) and each audited set's own species mix (baseline_for_mix).",
+      "success": "The planted relabelled step is above_baseline and no clean step is; its known_truth.label_error_rate is near the planted share.",
+      "falsifier": "The planted step is not above_baseline: the audit fails the same positive control class_vs_loc failed.",
+      "predicted": null,
+      "lit": [
+        {"paper_id": "northcutt2021", "doc_ref": null, "status": "candidate, not in the repo"}
+      ]
+    },
+    "L5": {
+      "name": "larger_size",
+      "title": "Rebuild the real loop with a larger increment size",
+      "kind": "build",
+      "policy_action": "inc_build_realloop",
+      "risk": "R3",
+      "via": "run_inc_build.sh",
+      "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.realloop", "build", "--exp", "{exp}", "--base", "{base}",
+               "--replay-mode", "{replay_mode}", "--recipes", "{recipes}",
+               {"if": "increment_sources", "tokens": ["--increment-sources", "{increment_sources}"]},
+               {"if": "relevance", "tokens": ["--relevance", "{relevance}"]},
+               "--size", "{size}",
+               {"if": "n_verified", "tokens": ["--n-verified", "{n_verified}"]},
+               {"if": "no_truth", "tokens": ["--no-truth"]},
+               {"if": "gate_flips_mode", "tokens": ["--gate-flips-mode", "{gate_flips_mode}"]}],
+      "param_bounds": {
+        "exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "base": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}\\.jsonl$"},
+        "replay_mode": {"type": "enum", "value_type": "str", "values": ["sample", "full"]},
+        "recipes": {"type": "enum", "value_type": "str",
+                    "values": ["full", "freeze", "lora", "full,freeze", "full,lora", "freeze,lora", "full,freeze,lora"]},
+        "increment_sources": {"type": "enum", "value_type": "str", "values": ["relevance", "evidence"]},
+        "relevance": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}\\.json$"},
+        "size": {"type": "int", "min": 1, "max": 20000},
+        "n_verified": {"type": "int", "min": 1, "max": 12},
+        "no_truth": {"type": "enum", "value_type": "int", "values": [1]},
+        "gate_flips_mode": {"type": "enum", "value_type": "str", "values": ["negative", "net"]},
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "requires": ["size"],
+      "derived_from_parent": "Every flag but --size is the parent loop's own (levers.loop_params): --base its exp.json base.source_manifest (Step 1's base_B.jsonl), --replay-mode, --recipes, --relevance (step1.relevance.path) or --increment-sources evidence (step1.increment_sources.mode), --n-verified (build_summary.json n_verified), --no-truth when the parent was built without the truth arm, and --gate-flips-mode, its pinned flips mode when that is not the builders' default.",
+      "estimator": "realloop",
+      "control": "The parent loop: the same seeds, recipes, base, relevance, number of increments and truth arm at the current size.",
+      "success": "Fewer than half of the gate entries have P_data in (0.25, 0.75).",
+      "falsifier": "P_data stays inside (0.25, 0.75) at the larger size: the effect is below what this design can detect.",
+      "predicted": {"metric": "agreement", "direction": "up"},
+      "lit": [
+        {"paper_id": "bouthillier2021", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:79"}
+      ]
+    },
+    "L6": {
+      "name": "drop_truth_arm",
+      "title": "Rebuild the real loop without the truth arm",
+      "kind": "build",
+      "policy_action": "inc_build_realloop",
+      "risk": "R3",
+      "via": "run_inc_build.sh",
+      "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.realloop", "build", "--exp", "{exp}", "--base", "{base}",
+               "--replay-mode", "{replay_mode}", "--recipes", "{recipes}",
+               {"if": "increment_sources", "tokens": ["--increment-sources", "{increment_sources}"]},
+               {"if": "relevance", "tokens": ["--relevance", "{relevance}"]},
+               {"if": "size", "tokens": ["--size", "{size}"]},
+               {"if": "n_verified", "tokens": ["--n-verified", "{n_verified}"]},
+               "--no-truth",
+               {"if": "gate_flips_mode", "tokens": ["--gate-flips-mode", "{gate_flips_mode}"]}],
+      "param_bounds": {
+        "exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "base": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}\\.jsonl$"},
+        "replay_mode": {"type": "enum", "value_type": "str", "values": ["sample", "full"]},
+        "recipes": {"type": "enum", "value_type": "str",
+                    "values": ["full", "freeze", "lora", "full,freeze", "full,lora", "freeze,lora", "full,freeze,lora"]},
+        "increment_sources": {"type": "enum", "value_type": "str", "values": ["relevance", "evidence"]},
+        "relevance": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}\\.json$"},
+        "size": {"type": "int", "min": 1, "max": 20000},
+        "n_verified": {"type": "int", "min": 1, "max": 12},
+        "no_truth": {"type": "enum", "value_type": "int", "values": [1]},
+        "gate_flips_mode": {"type": "enum", "value_type": "str", "values": ["negative", "net"]},
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "fixed": {"no_truth": 1},
+      "only_after": ["D11"],
+      "estimator": "realloop",
+      "control": "The previous experiments' truth arms, whose agreement with the chosen recipe established that the chain tracks truth.",
+      "success": "GPU-hours per decided increment fall by about the truth arm's share.",
+      "falsifier": "-",
+      "predicted": null,
+      "lit": []
+    },
+    "L7": {
+      "name": "transient_unblock",
+      "title": "Unblock a unit blocked by a transient read error (once per unit)",
+      "kind": "driver",
+      "policy_action": "inc_unblock_transient",
+      "risk": "R2",
+      "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.driver", "unblock", "--exp", "{exp}", "--unit", "{unit}",
+               "--reason", "auto: {cause}"],
+      "param_bounds": {
+        "exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "unit": {"type": "str", "pattern": "^(base|final|truth|chain:(full|freeze|lora))$"},
+        "cause": {"type": "enum", "value_type": "str", "values": ["transient"]},
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "estimator": "zero",
+      "control": "None (bookkeeping): the unit's own runs, already priced at init.",
+      "success": "The unit leaves 'blocked' and its reset runs complete.",
+      "falsifier": "The unit blocks again: the cause was not transient (a person decides).",
+      "predicted": null,
+      "lit": []
+    },
+    "L8": {
+      "name": "baseline_b",
+      "title": "Build base B's own cold baseline (base_b_v1) before the loop",
+      "kind": "build",
+      "policy_action": "inc_build_baseline",
+      "risk": "R3",
+      "via": "run_inc_build.sh",
+      "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.pilot", "build-baseline", "--exp", "{exp}", "--manifest", "{manifest}"],
+      "param_bounds": {
+        "exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "manifest": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}\\.jsonl$"},
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "estimator": "baseline",
+      "control": "B0 (b0_v1): train_core alone, the same cold recipe and seeds.",
+      "success": "B vs B0 on dev is reported with 3 seeds each before the loop is built.",
+      "falsifier": "-",
+      "predicted": {"metric": "dev_twelve", "direction": "up"},
+      "lit": [],
+      "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:249-250"
+    },
+    "L9": {
+      "name": "gate_v2_pilot",
+      "title": "Rebuild the pilot under protocol v2 (net flips): the pre-registered test of the flips guard",
+      "kind": "build",
+      "policy_action": "inc_build_pilot",
+      "risk": "R3",
+      "via": "run_inc_build.sh",
+      "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.pilot", "build", "--exp", "{exp}", "--replay-mode", "{replay_mode}",
+               "--gate-flips-mode", "{gate_flips_mode}"],
+      "param_bounds": {
+        "exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+        "replay_mode": {"type": "enum", "value_type": "str", "values": ["sample", "full"]},
+        "gate_flips_mode": {"type": "enum", "value_type": "str", "values": ["net"]},
+        "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
+      },
+      "fixed": {"gate_flips_mode": "net"},
+      "only_after": ["D15"],
+      "derived_from_parent": "--replay-mode: the parent pilot's own (exp.json replay_mode, absent = sample), so the child differs from its control in the gate alone; the command always states it (the template has no default for it). The parent must be pinned to protocol v1; a v2 parent gets card X6 instead (D15).",
+      "estimator": "pilot_rebuild",
+      "control": "The parent pilot: the same definition, replay mode, recipes, seeds and truth arm, decided by protocol v1 (negative flips). The child's report also carries each step's v1 counterfactual on its own runs (gate.v1_counterfactual), which the v2 check compares with.",
+      "success": "The pre-registered v2 criterion (the child's report.json v2_check, docs/INCREMENTAL_PROTOCOL.md, Protocol v2) is 'supported', and the child's best recipe agrees with the truth arm on at least 5 of 7 steps (D4 ready).",
+      "falsifier": "v2_check is 'refuted': v2 agrees with the truth arm on fewer (chain, step) pairs than its v1 counterfactual, or ACCEPTed a step not marked clean. v2 is then retired and v1 stays the default (D16, card X7).",
+      "predicted": {"metric": "agreement", "direction": "up"},
+      "lit": [
+        {"paper_id": "2604.09791", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:85", "status": "the source of the flips guard (Pioneer Agent)"},
+        {"paper_id": "2301.10546", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:141-183", "status": "negative flips as a regression metric (BCWI)"}
+      ]
+    }
+  },
+  "cards": {
+    "X1": {
+      "title": "LR re-warming and re-decaying in the incremental recipe",
+      "risk": "R4",
+      "hypothesis": "Replay alone does not stop the cheap recipe from forgetting; Ibrahim et al. 2024 pair replay with re-warming and re-decaying the learning rate.",
+      "why_menu_insufficient": "The incremental recipe's lr0, warmup and epochs are inc/train.py PROTOCOL_* constants (train.py:170-180), which every production run enforces and which the run spec's protocol-recipe hash pins; no builder flag changes them.",
+      "required_change": "A new protocol version of inc/train.py PROTOCOL_* and docs/INCREMENTAL_PROTOCOL.md (Fixed conventions), with its own replay case.",
+      "cheapest_test": "A pilot on the same bins with full replay and the re-warmed recipe, compared with the latest full-replay pilot.",
+      "control": "The latest full-replay pilot (same definition, protocol recipe).",
+      "success_criterion": "Agreement >= 5/7 and every truth-helps step ACCEPTed where the control failed.",
+      "lit": [{"paper_id": "ibrahim2024", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:206"}]
+    },
+    "X2": {
+      "title": "Enforce the leaf-disease prompt set in relevance",
+      "risk": "R4",
+      "hypothesis": "Leaf-disease close-ups pass the plant/non-plant rule but are off the weed-detection task.",
+      "why_menu_insufficient": "relevance.py reports the leaf_disease set's top-prompt share but never uses it for pass/fail (relevance.py:36-40, 86-94); no flag enforces it.",
+      "required_change": "A calibrated leaf-disease rule in inc/relevance.py and docs/INCREMENTAL_PROTOCOL.md (Source relevance), with a new relevance format.",
+      "cheapest_test": "Rebuild relevance.json with the rule on the same select build and compare the statuses.",
+      "control": "The current relevance.json of the same select build.",
+      "success_criterion": "The flagged leaf-disease sources fail and no source whose images look like train_core changes status.",
+      "lit": []
+    },
+    "X3": {
+      "title": "Feed the label audit into attribution",
+      "risk": "R4",
+      "hypothesis": "The BioCLIP-2 audit separates planted label noise where class_vs_loc did not, so attribution should read it.",
+      "why_menu_insufficient": "The audit is standalone: no gate, driver or report code reads it (report.py:230-292), and gate.py is pinned.",
+      "required_change": "A report field that reads the audit, and a new protocol version for any use in attribution.",
+      "cheapest_test": "A report-only field on the finished pilot, checked against the planted Bswap.",
+      "control": "class_vs_loc on the same steps.",
+      "success_criterion": "The planted step is attributed to labels and no clean step is.",
+      "lit": [{"paper_id": "northcutt2021", "doc_ref": null, "status": "candidate, not in the repo"}]
+    },
+    "X4": {
+      "title": "Leave-one-source-out attribution (protocol item 5)",
+      "risk": "R4",
+      "hypothesis": "A REJECTed multi-source increment has one bad source that leave-one-source-out runs would name.",
+      "why_menu_insufficient": "Item 5 has never been implemented: every gate entry lists it as not run (driver.py:228-232), and driver.py is pinned.",
+      "required_change": "New cand runs per source (3 seeds each) in the driver, a new protocol version.",
+      "cheapest_test": "Leave-one-source-out cand runs for the one REJECTed multi-source step, outside the driver.",
+      "control": "The step's own cand and null runs.",
+      "success_criterion": "Dropping one source moves P_data above the accept line while dropping the other does not.",
+      "lit": []
+    },
+    "X5": {
+      "title": "Repin the driver or sync the outer package copy",
+      "risk": "R4",
+      "hypothesis": "The running code differs from the code the experiment was pinned to (drift or a change since the pin).",
+      "why_menu_insufficient": "driver repin changes which code decides an experiment, and an outer-copy sync can change pinned hashes of a running experiment; both are a person's decision.",
+      "required_change": "driver repin --reason, or an rsync of the nested copy over the outer one that refuses to change any hash pinned in a running experiment's state.code.modules.",
+      "cheapest_test": "Compare the pinned hashes in state.json with both copies.",
+      "control": "state.json code.modules of the running experiment.",
+      "success_criterion": "advance runs again with the pinned code, or the change is recorded in the ledger.",
+      "lit": []
+    },
+    "X6": {
+      "title": "Rethink the flips guard family (protocol v2 still blocks steps the truth arm says help)",
+      "risk": "R4",
+      "hypothesis": "On an experiment already decided by protocol v2 (net flips), the flips guard alone still REJECTs clean steps the truth arm says help, at P_data >= p_accept with the regression and species guards passing: per-image exact correctness is too coarse a guard for detection in either form.",
+      "why_menu_insufficient": "The menu holds the two pre-registered flips modes only (--gate-flips-mode negative | net). A third form of the guard, its thresholds (flips_sd_mult, flips_slack_images) or dropping it are GateConfig changes in inc/gate.py, a pinned module, and a new protocol version.",
+      "required_change": "A new protocol version of the flips guard in inc/gate.py and docs/INCREMENTAL_PROTOCOL.md (Gate), pre-registered with its own prospective check against the truth arm, as v2 was.",
+      "cheapest_test": "Recompute the candidate guard post hoc on the finished v2 experiment's recorded per-run counts and runs (no new training), then pre-register it and rebuild the pilot with it.",
+      "control": "The finished v2 experiment: its v2 verdicts and v1 counterfactuals on the same runs.",
+      "success_criterion": "The new guard agrees with the truth arm on more (chain, step) pairs than v2 and v1 on the same runs, and accepts no step not marked clean.",
+      "lit": [{"paper_id": "2604.09791", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:85"}]
+    },
+    "X7": {
+      "title": "Protocol v2 refuted: revert the gate to v1 or rethink the flips guard",
+      "risk": "R4",
+      "hypothesis": "The pre-registered v2 check came out refuted on this experiment: v2 agrees with the truth arm on fewer (chain, step) pairs than its v1 counterfactual, or ACCEPTed a step not marked clean. The protocol says v2 is retired and v1 stays the default.",
+      "why_menu_insufficient": "No real loop is built on a refuted gate (D4 withholds L2), and choosing what replaces it (v1 again, or a new guard) changes the campaign's protocol, which is a person's decision.",
+      "required_change": "A recorded decision in docs/INCREMENTAL_PROTOCOL.md (Protocol v2, What follows from it): retire v2 and build the next experiment with v1, or pre-register a new guard version (X6).",
+      "cheapest_test": "Read the experiment's v2_check discordant pairs and non-clean acceptances against the truth arm before choosing.",
+      "control": "The refuted experiment's own v1 counterfactual verdicts on the same runs.",
+      "success_criterion": "The next experiment is built on a gate that is not refuted, and its D4 decision is taken on that gate.",
+      "lit": [{"paper_id": "2604.09791", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:141-183"}]
+    },
+    "X8": {
+      "title": "Test protocol v2 before rebuilding a real loop the flips guard alone blocked",
+      "risk": "R4",
+      "hypothesis": "On a real loop decided by protocol v1, the flips guard alone REJECTed clean steps the truth arm says help, at P_data >= p_accept with the regression and species guards passing: the gate saw the data effect, and the guard, not the recipe, stopped it (D15).",
+      "why_menu_insufficient": "L9 rebuilds pilots only, and the protocol builds a real loop on v2 only after a v2 pilot's pre-registered check (docs/INCREMENTAL_PROTOCOL.md, Protocol v2). Which pilot to test v2 on, or whether to rebuild the loop at all, is a person's decision; the loop's D1 levers are withheld while this card stands.",
+      "required_change": "None in code: a recorded decision to run L9 on the pilot this loop's recipe came from (the v2 test on a pilot first), then a real loop from that pilot's D4 decision on the v2 gate if its check is supported.",
+      "cheapest_test": "L9 on the loop's source pilot (the one D4 chose its replay mode and recipes from).",
+      "control": "This real loop and its source pilot, both decided by v1.",
+      "success_criterion": "The v2 pilot's v2_check is 'supported' and its D4 agreement is at least 5/7; the loop rebuilt from it ACCEPTs the truth-helps steps this loop REJECTed on flips alone.",
+      "lit": [{"paper_id": "2604.09791", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:141-183"}]
+    },
+    "X9": {
+      "title": "Revisit the zero-shot relevance criterion (its calibration check failed)",
+      "risk": "R4",
+      "hypothesis": "The zero-shot BioCLIP-2 P(plant) score fails its own calibration check on this select build (tau below the check's minimum: more than 5 % of the genuine train_core weed crops read as a non-plant prompt, most likely bare soil on seedlings), so it cannot separate weed sources from non-plant ones. The source-level species evidence criterion builds the loop meanwhile, but it excludes genuine weed datasets whose species are not cwd12 species (their boxes are all OtherPlant, so none can be verified).",
+      "why_menu_insufficient": "The prompts, the calibration percentile and the check are constants of inc/relevance.py (PROMPTS, CAL_PERCENTILE, TAU_MIN) and of docs/INCREMENTAL_PROTOCOL.md (Source relevance); prompts chosen after seeing this pool would be fitted to the data they filter, and relevance build refuses to overwrite the file without --force, which is not a lever param.",
+      "required_change": "A new relevance protocol version (prompts, calibration or score) pre-registered before it is run on this pool, with a new relevance format and its own replay case; or a recorded decision to keep source-level species evidence as the only criterion.",
+      "cheapest_test": "Score the new criterion on train_core crops only (the calibration check) before any pool source is scored; then compare its statuses on the evidenced sources, which must pass.",
+      "control": "The failed relevance.json of the same select build, and the evidence criterion's evidenced sources.",
+      "success_criterion": "The calibration check passes, every source with verified cwd12-species boxes passes, and the non-plant sources D2 named fail.",
+      "lit": [{"paper_id": "dinov2_curation", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md (Step 1, Source relevance, Result on the real pool)"}]
+    }
+  },
+  "operations": {
+    "OP_ADVANCE": {
+      "title": "Advance the experiment once",
+      "kind": "driver",
+      "policy_action": "inc_advance",
+      "risk": "R1",
+      "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.driver", "advance", "--exp", "{exp}"],
+      "param_bounds": {"exp": {"type": "str", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"}}
+    },
+    "OP_PAUSE": {
+      "title": "Pause the campaign and put a human card up",
+      "kind": "campaign",
+      "risk": "R0",
+      "argv": null
+    },
+    "OP_HALT": {
+      "title": "Hard stop: a decision path touched a non-dev exam",
+      "kind": "campaign",
+      "risk": "R0",
+      "argv": null
+    },
+    "OP_ESCALATE": {
+      "title": "Escalate to the research brain and a person",
+      "kind": "campaign",
+      "risk": "R0",
+      "argv": null
+    }
+  },
+  "refusals": [
+    {
+      "pattern": "no \\S*relevance\\.json: the verified and OTHER_HEAVY increments are drawn only from sources that pass the relevance filter",
+      "prerequisite": "L3",
+      "why": "realloop.py relevance_file: a production realloop build refuses without relevance.json next to the base."
+    },
+    {
+      "pattern": "--relevance \\S+: no such file",
+      "prerequisite": "L3",
+      "why": "realloop.py relevance_file: an explicit --relevance that does not exist."
+    },
+    {
+      "pattern": "degenerate calibration in \\S*relevance\\S*\\.json",
+      "prerequisite": null,
+      "needs": "the source-level species evidence criterion: a real loop from D4's decision is built with --increment-sources evidence when the evidenced pool holds its increments, at the default N and M or sized by the R4 rule (D2 names it, levers.increment_criterion renders it); a person decides only when even the sized increments fall below protocol.min_increment_frac of base B, and card X9 revisits the zero-shot criterion",
+      "why": "realloop.py relevance_file (relevance.load): the relevance file failed its own calibration check, so every --relevance build refuses it."
+    },
+    {
+      "pattern": "increment sources 'evidence': the evidenced increment pool cannot supply",
+      "prerequisite": null,
+      "needs": "a person: the builder found the evidenced pool too small for the build's N and M. The lab side sizes N and M by image count only (levers.evidence_sizing); the OtherPlant-heavy share (M images in OtherPlant-heavy near-dup groups) needs select_clusters.csv and only realloop checks it, so a refusal here means the sized loop does not fit on the cluster, and choosing another N and M is a review decision (docs/INCREMENTAL_PROTOCOL.md, Steps 2-3)",
+      "why": "realloop.py evidence_capacity: the evidenced pool holds fewer than (N + 1) x M images, or fewer than M in OtherPlant-heavy near-dup groups.",
+      "retry": false,
+      "retry_why": "The check reads only Step 1's files and the build's flags, before anything is written, so the identical build refuses again: the campaign declines that request instead of submitting it a second time (campaign._build_failed), and DREF escalates."
+    },
+    {
+      "pattern": "\\d+ increments of \\d+ images need \\d+, the draw found \\d+",
+      "prerequisite": null,
+      "needs": "a person: the increment pool holds the build's (N + 1) x M images in total, but the draw keeps near-dup groups whole (select.draw_parts), and the whole groups did not add up to N increments of exactly M images. Choosing another N and M is a review decision (docs/INCREMENTAL_PROTOCOL.md, Steps 2-3); the sized evidence loop needs 1,435 of the 1,439 evidenced images, so this is the refusal it is most likely to meet",
+      "why": "select.py draw_parts (reached from realloop build): the round-robin draw of whole near-dup groups found fewer than N x M images that fit; select.pool_capacity counts images, not whole-group fits, so the capacity check is necessary, not sufficient.",
+      "retry": false,
+      "retry_why": "The draw is deterministic on Step 1's files and the build's flags, so the identical build refuses again: the campaign declines that request instead of submitting it a second time (campaign._build_failed), and DREF escalates."
+    },
+    {
+      "pattern": "is already built at .*; an experiment is built once",
+      "prerequisite": null,
+      "needs": "a new --exp name: levers.child_name names children after every experiment in the evidence, so this means the evidence missed one",
+      "why": "pilot.py _check_new (pilot.py:261-267)."
+    },
+    {
+      "pattern": "LOCK\\.json",
+      "prerequisite": null,
+      "needs": "a person: LOCK and never-train changes are R4",
+      "why": "pilot.py never_train_status / select_provenance and the splits lock."
+    },
+    {
+      "pattern": "run inc\\.select build|changed since the select build|not the one the select build read",
+      "prerequisite": null,
+      "needs": "a Step 1 select rebuild (not on the menu)",
+      "why": "realloop.py step1 checks: the Step 1 files are stale or missing."
+    },
+    {
+      "pattern": "run inc\\.verify admit",
+      "prerequisite": null,
+      "needs": "a Step 1 verify admit run (not on the menu)",
+      "why": "realloop.py: admit_summary.json missing."
+    }
+  ],
+  "supports": {
+    "D9": ["L1"]
+  }
+}
