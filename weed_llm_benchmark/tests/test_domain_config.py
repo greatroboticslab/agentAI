@@ -108,9 +108,10 @@ r = mr.resolve("hard_reasoning", provider_status={})
 ck("hard_reasoning is async", r["is_async"] is True)
 ck("hard_reasoning is rare", r["rare"] is True)
 
-# unknown role → ok False, safe lab fallback
+# unknown role → ok False and NO model: a caller that did not check `ok` must not
+# silently get the lab's small model for work no role approved (model_router.resolve)
 r = mr.resolve("does_not_exist")
-ck("unknown role ok=False", r["ok"] is False and r["model"] == mr.LAB_SMALL)
+ck("unknown role ok=False, no model", r["ok"] is False and r["model"] is None)
 
 # vllm on a lab role is NOT reachable from the lab (cluster-only endpoint)
 ck("vllm not reachable on lab", mr._reachable("vllm:glm-4.7-flash", "lab", OLLAMA_UP) is False)
