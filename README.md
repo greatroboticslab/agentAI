@@ -266,6 +266,11 @@ Upload-and-analyze is the ground floor. A project can also run **agents** — an
   ran it and when; evaluation metrics feed the next round's collection.
 - Fill in a **research field** and the project auto-generates harvest queries and an accept-vocabulary from it — a
   new domain is config, not code. There's a built-in **2-minute guide** at `/guide`.
+- **INC autopilot (2026-09)** — the platform runs incremental-training campaigns by itself. It reads each finished
+  experiment's evidence (dev split only), fires cited diagnoses, picks the next experiment from a lever menu, and
+  launches it on the cluster inside a budget envelope. A research brain (an open 27B model on the cluster) reads a
+  curated 131-paper corpus and proposes ideas beyond the menu. Changes to the decision rules or new code stay with a
+  person. Page: `/inc`. Contract: [`docs/INC_AUTOPILOT.md`](docs/INC_AUTOPILOT.md).
 
 ---
 
@@ -391,10 +396,39 @@ and future applications. The dataset platform above is the weed-detection domain
 | Phase 4D: plant.id Integration | **Done** | API key configured, local test OK (Status 201). Cluster needs pre-cache. 49 credits left. |
 | Phase 4E: DeepSeek-R1 Brain | **Done** | 7 action types (vs Qwen's 1). Autonomously searched HuggingFace + downloaded models. |
 | Phase 4F: Extended Run (6h48m) | **Done** | 7 rounds autonomous. Filter removed 16.3% label noise. Brain reasoning loop validated. |
-| Phase 4G: Anti-Forgetting (LoRA + freeze + distill) | **Done** | Hybrid LoRA: 37 Conv2d layers, 38.15% params. Near-zero mAP forgetting. |
-| Phase 4H: Gemma 4 Brain + Evaluator Fix | **Done** | Gemma 4 31B (MoE). Corrected evaluator (dual-conf). New mAP50: +9.7%, old mAP50: -0.6%. |
+| Phase 4G: Anti-Forgetting (LoRA + freeze + distill) | **Invalid** | Withdrawn 2026-09-26: `lora_yolo.py` never trained an adapter (`Model.train` rebuilds the network from its yaml), and the freeze/distill rows re-scored an earlier job's checkpoint. See Phase 6. |
+| Phase 4H: Gemma 4 Brain + Evaluator Fix | Done (numbers withdrawn) | The brain ran; the mAP figures inherit Phase 4G's defects. |
 | Phase 5: Dataset platform (dashboard, provenance, multi-domain) | **Active** | The platform shown at the top of this page. |
+| Phase 6: Incremental training on a high-precision base (INC) + autopilot | **Done** (2026-09-27) | Locked splits and scorer, per-increment gate with a truth arm, BioCLIP-2 box verifier, real LoRA; the platform launched pilot_v3 and the real-data loop itself. Results below. |
 | Paper writing | Planned | Figures, tables, manuscript |
+
+#### Incremental training on a high-precision base (2026-09)
+
+The design tested: a high-precision base set, small fixed-size increments trained one at a time, a check of every
+increment against paired seeds (P(candidate > null control)) plus regression, species and net-flips guards, then
+attribution and rollback. Every decision is taken on a dev split of whole capture sessions. The 1,977-image cwd12
+test set is read only by final runs, and a cold "truth arm" (union retraining with vs without each increment,
+3 seeds) scores every decision. Protocol: [`docs/INCREMENTAL_PROTOCOL.md`](docs/INCREMENTAL_PROTOCOL.md).
+
+| Model (YOLO11n, final EMA weights, 3 seeds unless one) | dev | test | 2022 out-of-season |
+|---|---|---|---|
+| B0: cwd12 train_core only | 0.808 ± 0.006 | **0.854 ± 0.007** | 0.751 |
+| Pilot base P0 (half of train_core) | 0.721 | 0.776 | 0.704 |
+| Pilot chain v3, full rehearsal + net-flips gate (1 incumbent) | 0.801 | **0.8475** | 0.763 |
+| Pilot union retraining of all clean increments | 0.808 ± 0.004 | **0.8472 ± 0.001** | 0.756 |
+| Base B: train_core + 878 BioCLIP-2-verified harvested images | 0.813 ± 0.007 | 0.850 ± 0.006 | 0.775 |
+| Real-data loop: gate rejected all 6 harvested increments (1 incumbent) | 0.819 | 0.855 | 0.772 |
+| Real-data loop: union retraining with all 6 | 0.809 ± 0.003 | 0.841 ± 0.004 | 0.773 |
+
+- **The cheap incremental chain reaches union retraining.** With the right recipe (the whole accepted pool as
+  replay, and a flips guard that counts net flips), it matches union retraining. With 1:1 replay (v1) the recipe
+  itself degrades the model, and the old flips guard (v2) blocked good increments.
+- **The planted bad increments are caught.** In v3, a 40 % label-swap increment and a real low-precision harvested
+  source were never accepted by any chain: five rejections and one hold.
+- **The harvest, not the method, is the bottleneck.** Of 670k harvested boxes, about 2,000 are verified
+  target-species boxes. Increments drawn from what remains do not help the 12 species; trained in, they lower test.
+- **Per-step results:** `weed_llm_benchmark/results/framework/inc/<experiment>/report.md`.
+- **Notes:** RESEARCH_LOG 2026-09-27.
 
 #### Benchmark results (CottonWeedDet12, 848 test images)
 

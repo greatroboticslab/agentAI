@@ -42,10 +42,47 @@ A web platform (FastAPI dashboard + MongoDB) where a researcher creates a **Proj
 - **Agent Run controls** — each agent's Run fires a real cluster job with inline status.
 - **Activity log** — admin view of who did what (audit trail).
 - **Training** — generic Ultralytics trainer (detect/classify/segment) on any uploaded dataset.
+- **Incremental training (INC) + autopilot** — locked evaluation splits and scorer, a per-increment gate against a
+  truth arm, a BioCLIP-2 box verifier for harvested labels, and an autopilot that runs INC campaigns by itself
+  (`/inc`). See the section below.
 
-**Honest limits (work in progress):** the collector/filter/labeler pipeline is currently
-specialised for the weed/CWD12 domain — per-field specialisation for arbitrary research areas
-is the next backend step. Self-supervised / RL / multi-strategy training are scaffolded (501).
+**Honest limits (work in progress):**
+- The collector/filter/labeler pipeline is currently specialised for the weed/CWD12 domain. Per-field
+  specialisation for arbitrary research areas is the next backend step.
+- Self-supervised / RL / multi-strategy training are scaffolded (501).
+- The INC autopilot does not yet drive collection. It chooses only from a fixed lever menu, and it stops for a
+  person when nothing on the menu applies.
+
+---
+
+## Incremental training (INC) and the autopilot
+
+Contract and results:
+- [`docs/INCREMENTAL_PROTOCOL.md`](../docs/INCREMENTAL_PROTOCOL.md): design, gate, pre-registered checks.
+- [`docs/INCREMENTAL_PROTOCOL_RUNNER.md`](../docs/INCREMENTAL_PROTOCOL_RUNNER.md): run specs, driver, builders.
+- [`docs/INC_AUTOPILOT.md`](../docs/INC_AUTOPILOT.md): diagnoses, levers, governance, research brain.
+- `results/framework/inc/<exp>/report.md` for every experiment.
+- `results/framework/_brain/weed/inc/inc_campaign.jsonl`: the autopilot's own decision ledger.
+
+Reproduce on Bridges-2. Run from the repo root with `REPO` pointing at it and `PYTHONPATH=$REPO`, in the `bench`
+environment (Ultralytics 8.4.37, pinned by the scorer):
+
+```bash
+M=weed_optimizer_framework.tools.inc
+python -m $M.splits build && python -m $M.splits lock --accept-counts && python -m $M.splits verify
+python -m $M.pilot build-b0 --exp b0_v1 && python -m $M.driver advance --exp b0_v1        # B0, 3 seeds
+python -m $M.pilot build --exp pilot_v3 --replay-mode full --gate-flips-mode net          # pilot on known answers
+python -m $M.driver advance --exp pilot_v3     # also advanced from inside every job; repeat until 'done'
+sbatch run_inc_verify.sh all                   # Step 1: harvested pool -> BioCLIP-2 verifier -> admit
+python -m $M.select build                      # base B + increment pool
+python -m $M.realloop build --exp realloop_v1 --base $REPO/results/framework/inc/step1/base_B.jsonl \
+    --replay-mode full --recipes full --increment-sources evidence --size 287 --n-verified 4 --gate-flips-mode net
+python -m $M.report --exp <exp>                # report.md / report.json
+```
+
+On the lab, `python -m weed_optimizer_framework.tools.inc_autopilot.campaign {status,enable,pause}` controls the
+autopilot. `python -m weed_optimizer_framework.tools.inc_autopilot.executor record-replay` runs the replay tests
+that envelope autonomy requires.
 
 ---
 
