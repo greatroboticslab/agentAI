@@ -74,8 +74,10 @@ def main():
     link = re.search(r"\]\((\.\./docs/CWD12_SPECIES\.md)\)", readme)
     check("README link resolves", bool(link) and (HERE / link.group(1)).resolve().is_file())
     log = (GIT_ROOT / "RESEARCH_LOG.md").read_text()
-    first = re.search(r"^## .*$", log, re.M).group(0)
-    check("RESEARCH_LOG newest entry is the correction", "2026-09-21" in first, first)
+    # The correction must stay in the log; later entries go above it.
+    heads = re.findall(r"^## .*$", log, re.M)
+    corr = [h for h in heads if h.startswith("## 2026-09-21") and "cwd12 class names were wrong" in h]
+    check("RESEARCH_LOG holds the 2026-09-21 correction entry", len(corr) == 1, heads[:3])
 
     print("make_figures.species_rows")
     legacy_rows = [{"cls": n, "map50": 0.5, "map50_95": 0.4} for n in S.CWD12_LEGACY_LABELS]
