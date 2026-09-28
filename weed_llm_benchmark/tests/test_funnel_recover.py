@@ -225,6 +225,16 @@ def main():
     check("R-J: a box only an unqualified judge calls a target is masked (any judge masks)",
           pm and classes("p2_mask") == [K["W"]] and len(pm["masked_boxes"]) == 1
           and pm["masked_boxes"][0][1:3] == [0.7, 0.7], pm)
+    cdir = TMP / "lic_fd" / "cards"
+    cdir.mkdir(parents=True, exist_ok=True)
+    (cdir / "index.json").write_text(json.dumps({"cards": {
+        "rf_a": [{"status": 401, "licence": "x"}, {"status": 200, "licence": "CC BY 4.0", "url": "u1",
+                                                    "fetched_utc": "t1"}],
+        "rf_b": [{"status": 200, "licence": None}]}}))
+    fl = RC.fetched_licences(TMP / "lic_fd")
+    check("fetched_licences: the first 200 answer with a licence, with its URL; none without one",
+          fl == {"rf_a": "CC BY 4.0 (fetched by L11a from u1, t1)"}, fl)
+    check("fetched_licences: no cards index, no licences", RC.fetched_licences(TMP / "no_such_fd") == {})
     check("recovery.json records the judges whose calls may mask", doc.get("mask_judges") == ["J-knn1", "J-knn2"],
           doc.get("mask_judges"))
     tn = list(domain.target_names)

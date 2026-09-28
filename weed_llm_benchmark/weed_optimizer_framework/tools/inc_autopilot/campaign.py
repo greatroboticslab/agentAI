@@ -230,7 +230,17 @@ FUNNEL_DECISIONS = ("DEC-1", "DEC-2", "DEC-3", "DEC-4", "DEC-5", "DEC-6", "DEC-7
 # A callable taking the _Run and returning its executor's lab hooks (tests).
 LAB_HOOKS = None
 # The params that tell one funnel step from another in the lineage.
-FUNNEL_KEY_PARAMS = ("verb", "rl", "part", "what", "policy")
+FUNNEL_KEY_PARAMS = ("verb", "rl", "part", "what", "policy", "config")
+
+
+def _step_params(r):
+    """A funnel step's key params from an execution record or proposal: the
+    policy params, plus meta params that name the step but are no flag of the
+    command (L11a's "config", the domain config a stale cards index is fetched
+    again under)."""
+    merged = dict(r.get("meta_params") or {})
+    merged.update(r.get("params") or {})
+    return {k: merged.get(k) for k in FUNNEL_KEY_PARAMS if merged.get(k) is not None}
 TRANSIENT_REFUSALS = ("the cluster is not reachable", "Mongo's health", "the execution log",
                       "no slurm_sh hook", "could not be locked", "collides with another request",
                       "could not be filed", "the approval log could not be written")
@@ -1205,8 +1215,7 @@ class _Run(object):
                 continue
             if lever in LV.FUNNEL_LEVERS:
                 # a funnel step is one per (lever, verb / part / what / policy)
-                mine = {k: (p.get("params") or {}).get(k) for k in FUNNEL_KEY_PARAMS}
-                if {k: (r.get("params") or {}).get(k) for k in FUNNEL_KEY_PARAMS} == mine:
+                if _step_params(r) == _step_params(p):
                     return r
                 continue
             if r.get("parent_exp") == p.get("parent_exp"):
@@ -2059,8 +2068,7 @@ class _Run(object):
                    "approval_id": r.get("approval_id"), "proposal_id": r.get("proposal_id"),
                    "ts": r.get("ts")}
             if r.get("lever") in LV.FUNNEL_LEVERS:
-                rec["params"] = {k: (r.get("params") or {}).get(k) for k in FUNNEL_KEY_PARAMS
-                                 if (r.get("params") or {}).get(k) is not None}
+                rec["params"] = _step_params(r)
             out.append(rec)
         return out
 
@@ -2083,6 +2091,9 @@ class _Run(object):
             lab = self._funnel_lab_files()
             if lab:
                 ctx["funnel_lab"] = lab
+            stale = self._funnel_cards_stale()
+            if stale:
+                ctx["funnel_cards_stale"] = stale
             try:
                 ctx["funnel_lab_pull"] = X.funnel_pull_local(self.paths.lab_inc)
             except OSError as e:
@@ -3056,6 +3067,27 @@ class _Run(object):
             out[rel] = sha
         self.st["funnel_lab_cache"] = keep
         return out
+
+    def _funnel_cards_stale(self):
+        """{"index_domain_sha256", "domain_sha256", "refused"} when the lab's
+        funnel/cards/index.json recorded refusals and was made under another
+        domain config than the current one (lever L11a then fetches again, keyed
+        by the new config), else None."""
+        p = self.paths.lab_inc / "funnel" / "cards" / "index.json"
+        if not p.is_file():
+            return None
+        try:
+            idx = json.loads(p.read_text())
+            from ..funnel import domain as FD
+            cur = FD.load(idx.get("domain") or M.DOMAIN).sha256
+        except Exception as e:                    # an unreadable index or config: L11a decides nothing new
+            self._once("funnel_cards_index", str(e), "funnel_cards_unreadable", reasons=[_short(e, 300)])
+            return None
+        was = ((idx.get("domain_config") or {}).get("sha256"))
+        refused = len(idx.get("refused") or [])
+        if refused and was and was != cur:
+            return {"index_domain_sha256": was, "domain_sha256": cur, "refused": refused}
+        return None
 
     def _funnel_sync(self):
         """The funnel sync (inc_funnel_sync, R0) when DIAGNOSE asked for it; it is

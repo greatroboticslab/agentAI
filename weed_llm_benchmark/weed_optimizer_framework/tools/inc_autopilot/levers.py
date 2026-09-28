@@ -1240,18 +1240,25 @@ def _build_funnel(lid, d, ev, menu):
     if lid in ("L11a", "L12"):
         what = "cards" if lid == "L11a" else "taxonomy"
         target = "funnel/cards/index.json" if lid == "L11a" else "funnel/taxonomy_cache.json"
-        if _has(cluster_files(ev), target):
+        stale = (ev.json(E.CONTEXT) or {}).get("funnel_cards_stale") if lid == "L11a" else None
+        key = {"what": what}
+        if isinstance(stale, dict) and stale.get("domain_sha256"):
+            # the cards index recorded refusals under another domain config: fetch
+            # again, once per config (the lineage key carries the config's sha)
+            key["config"] = str(stale["domain_sha256"])[:12]
+        elif _has(cluster_files(ev), target):
             raise Defer("%s is already on the cluster (funnel/files.json)" % target)
-        if target in lab_files(ev):
+        elif target in lab_files(ev):
             raise Defer("%s is on the lab and not yet on the cluster: the funnel sync (inc_funnel_sync) pushes it"
                         % target)
-        _funnel_once(ev, lid, {"what": what})
+        _funnel_once(ev, lid, key)
         paths = _funnel_paths(ev, menu, lab=True)
         derived = {"prereg": paths["prereg"], "out": paths["out"]}
         if lid == "L12":
             derived["names_from"] = posixpath.join(paths["inc"], "step1", "pool_summary.json")
-        return [_funnel_proposal(lid, {"what": what}, derived, d, cites, menu,
-                                 extra={"sources": det.get("s2_sources") or [], "writes": target})]
+        return [_funnel_proposal(lid, key, derived, d, cites, menu,
+                                 extra={"sources": det.get("s2_sources") or [], "writes": target,
+                                        "stale": stale if key.get("config") else None})]
     if lid == "L13":
         policy = det.get("policy")
         if not policy:

@@ -539,6 +539,40 @@ def test_partial_listing(web):
           msg is not None and "Crops" in msg and "folder_regex" in msg, msg)
 
 
+def test_roboflow_key_file(web):
+    """Without the key in the environment, the Roboflow class list reads the
+    key file the spec names (the platform's own key file), records the
+    project's licence, and never saves the key."""
+    print("Roboflow key file and licence")
+    web.add(F.ROBOFLOW_PROJECT % ("ws", "lic"), {"project": {"classes": {"0": 5}, "license": "CC BY 4.0"}},
+            params={"api_key": "FILE-KEY-456"})
+    web.add(F.ROBOFLOW_PROJECT % ("ws", "leaky"), {"project": {"note": "FILE-KEY-456"}},
+            params={"api_key": "FILE-KEY-456"})
+    kf = TMP / "rf_key"
+    kf.write_text("FILE-KEY-456\n")
+    old = os.environ.pop("ROBOFLOW_API_KEY", None)
+    try:
+        spec = {"kind": "roboflow_classes", "workspace": "ws", "project": "lic", "what": "class_list",
+                "api_key_env": "ROBOFLOW_API_KEY", "api_key_file": str(kf)}
+        out = TMP / "rfkey" / "cards"
+        ents = F.fetch_spec(spec, "slug_k", out, web)
+        text = "".join(pp.read_text() for pp in out.rglob("*") if pp.is_file()) + json.dumps(ents)
+        check("the key file is read when the environment has no key; the licence comes from the project",
+              ents[0]["status"] == 200 and ents[0]["licence"] == "CC BY 4.0", ents)
+        check("  and the key reaches no file and no entry", "FILE-KEY-456" not in text, ents[0]["url"])
+        msg = raises(lambda: F.fetch_spec(dict(spec, project="leaky"), "slug_k", TMP / "rfkey2" / "cards", web),
+                     FetchError)
+        check("an answer that echoes the key is refused and not saved",
+              msg is not None and not list((TMP / "rfkey2").rglob("*.json")), msg)
+        msg = raises(lambda: F.fetch_spec(dict(spec, api_key_file=str(TMP / "no_such_key")), "slug_k",
+                                          TMP / "rfkey3" / "cards", web), FetchError)
+        check("no key in the environment or the file: refused, naming both", msg is not None
+              and "$ROBOFLOW_API_KEY" in msg and "no_such_key" in msg, msg)
+    finally:
+        if old is not None:
+            os.environ["ROBOFLOW_API_KEY"] = old
+
+
 if __name__ == "__main__":
     try:
         dom = test_config(D.load("weed"))
@@ -551,6 +585,7 @@ if __name__ == "__main__":
         test_taxonomy(web)
         test_refetch(dom, web)
         test_partial_listing(web)
+        test_roboflow_key_file(web)
         check("no call went to the real network (every call went through the fake transport)",
               all(isinstance(u, str) for u, _p in web.calls))
     finally:

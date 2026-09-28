@@ -490,6 +490,27 @@ def _judge_label_space(funnel_dir, judge):
         return list(json.loads(str(z["meta"])).get("labels") or [])
 
 
+def fetched_licences(funnel_dir):
+    """{source: licence text} from the cards L11a fetched and hashed
+    (cards/index.json): the first entry of a source that answered 200 with a
+    licence, recorded with its URL and date. The config's sources.licences
+    wins over it (plan). {} without the index."""
+    p = Path(funnel_dir) / "cards" / "index.json"
+    if not p.is_file():
+        return {}
+    try:
+        idx = json.loads(p.read_text())
+    except (OSError, ValueError) as e:
+        raise RecoverError("cards/index.json is unreadable (%s)" % e)
+    out = {}
+    for src, ents in sorted((idx.get("cards") or {}).items()):
+        for e in ents or []:
+            if e.get("status") == 200 and e.get("licence"):
+                out[src] = "%s (fetched by L11a from %s, %s)" % (e["licence"], e.get("url"), e.get("fetched_utc"))
+                break
+    return out
+
+
 def mask_judges_of(label_spaces, domain):
     """The judges whose calls can mask a box (contract §7 R-J, "any judge calls a
     target"): those whose label space holds at least one non-target option. A
@@ -533,7 +554,7 @@ def _box_status(r):
 
 def plan(policies, ledger_rows, gates_, class_maps, name_status, resolver, judge_scores, leak, domain,
          frames_of=None, labels=None, pool_rows=None, base_keys=(), audit=None, rl_qual=None, jq=None,
-         materials=None, genus_unsure_units=(), chain=None, mask_judges=None):
+         materials=None, genus_unsure_units=(), chain=None, mask_judges=None, fetched_licences=None):
     """([image plan], refusals, accepted class maps). ledger_rows maps an
     image key to its box rows (box order); labels maps a key to the step-1
     label boxes; judge_scores maps a judge to {crop_id: label name}."""
@@ -546,7 +567,8 @@ def plan(policies, ledger_rows, gates_, class_maps, name_status, resolver, judge
     noinfo = set(frames_cfg.get("noinfo") or [])
     quarantined = _quarantined(leak)
     not_rec = domain.not_recoverable_sources()
-    licences = (domain.raw.get("sources") or {}).get("licences") or {}
+    licences = dict(fetched_licences or {})
+    licences.update((domain.raw.get("sources") or {}).get("licences") or {})   # the config's record wins
     auth = set(domain.authoritative_sources())
     h3a = _hyp(audit or {}, "H3a")
     maps = _accepted_maps(class_maps, gates_, h3a, domain)
@@ -1034,7 +1056,7 @@ def run(prereg, domain, funnel_dir=None, out_dir=None, policies=("R-A", "R-C", "
                                  domain, frames_of=frames_of, labels=labels, pool_rows=pool, base_keys=base_keys,
                                  audit=audit, rl_qual=rl_qual, jq=jq, materials=materials,
                                  genus_unsure_units=_genus_unsure_units(funnel_dir, domain), chain=chain,
-                                 mask_judges=mask_judges)
+                                 mask_judges=mask_judges, fetched_licences=fetched_licences(funnel_dir))
     rec_sources = sorted({p["source"] for p in plans})
     img_rows = [{"key": k, "source": rows[0]["source"], "near_dup3": rows[0].get("near_dup3"),
                  "image": pool[k]["image"], "base": k in base_keys} for k, rows in ledger.items() if k in pool]

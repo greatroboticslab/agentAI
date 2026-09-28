@@ -250,6 +250,33 @@ def test_r9():
           and sorted(lv["L11"]["sources"]) == n["s2_sources"] and len(n["s2_sources"]) >= 1
           and lv["L12"]["argv"][:4] == ["python", "-m", "weed_optimizer_framework.tools.funnel", "fetch"]
           and lv["L11"]["argv"][:3] == ["sbatch", "run_inc_funnel.sh", "map"], sorted(lv))
+    print("L11a: a cards index with refusals made under another domain config is fetched again, once per config")
+    listing = {"files": {"funnel/taxonomy_cache.json": {"sha256": "a" * 64, "bytes": 1},
+                         "funnel/cards/index.json": {"sha256": "b" * 64, "bytes": 1}}}
+    (TMP / "r9_l11a").mkdir(exist_ok=True)
+    root_c = funnel_world("r9_l11a_w", extra=None)
+    (root_c / "funnel" / "files.json").write_text(json.dumps(listing))
+    stale = {"index_domain_sha256": "c" * 64, "domain_sha256": "d" * 64, "refused": 7}
+    for ctx_extra, want in (({}, None), ({"funnel_cards_stale": stale}, "d" * 12)):
+        evc = E.load_dir(root_c, "realloop_v1", exps=["realloop_v1"], context=ctx_extra,
+                         claims=jload(FF / "claims" / "claims_seed.json"))
+        _dc, _bc, rc = run(evc)
+        l11a = [p_ for p_ in rc["proposals"] if p_["lever"] == "L11a"]
+        if want is None:
+            check("  a current index on the cluster: L11a deferred",
+                  not l11a and any(x["lever"] == "L11a" for x in rc["deferred"]), [p_["lever"] for p_ in rc["proposals"]])
+        else:
+            check("  a stale index: L11a proposed, keyed by the new config (a meta param, no command flag)",
+                  len(l11a) == 1 and l11a[0]["params"].get("config") == want
+                  and "--config" not in l11a[0]["argv"] and l11a[0]["argv"][:4] == ["python", "-m",
+                  "weed_optimizer_framework.tools.funnel", "fetch"], l11a)
+            ctx_done = dict(ctx_extra, lineage=[{"lever": "L11a", "status": "executed",
+                                                 "params": {"what": "cards", "config": want}}])
+            evd = E.load_dir(root_c, "realloop_v1", exps=["realloop_v1"], context=ctx_done,
+                             claims=jload(FF / "claims" / "claims_seed.json"))
+            _dd, _bd, rd = run(evd)
+            check("  ... and not again once that config's fetch ran",
+                  not [p_ for p_ in rd["proposals"] if p_["lever"] == "L11a"], [p_["lever"] for p_ in rd["proposals"]])
     check("no L13 anywhere (it runs only after D18)",
           "L13" not in lv and not [x for x in res["deferred"] if x["lever"] == "L13"]
           and "L13" not in d17["levers"], sorted(lv))

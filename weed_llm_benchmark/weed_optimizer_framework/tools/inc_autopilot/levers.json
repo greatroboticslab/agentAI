@@ -540,6 +540,11 @@
         "{out}"
       ],
       "param_bounds": {
+        "config": {
+          "type": "str",
+          "pattern": "^[0-9a-f]{12}$",
+          "why": "the domain config a stale cards index is fetched again under (campaign funnel_cards_stale); a lineage key, not a flag of the command"
+        },
         "what": {
           "type": "enum",
           "value_type": "str",

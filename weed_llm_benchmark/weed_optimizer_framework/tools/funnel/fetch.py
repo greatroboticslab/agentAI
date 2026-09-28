@@ -101,6 +101,18 @@ def _get(transport, url, params=None):
     return status, data, hashlib.sha256(data).hexdigest(), headers or {}
 
 
+def _key_file(path):
+    """An API key read from a file the config names (the platform's own key
+    file, e.g. the dashboard's), or None. The key is never logged or saved."""
+    if not path:
+        return None
+    try:
+        with open(os.path.expanduser(os.path.expandvars(str(path)))) as fh:
+            return fh.read().strip() or None
+    except OSError:
+        return None
+
+
 def _json(data, what):
     try:
         return json.loads(data.decode("utf-8"))
@@ -238,13 +250,19 @@ def fetch_spec(spec, slug, cards_dir, transport):
         return e
     if kind == "roboflow_classes":
         env = spec.get("api_key_env") or "ROBOFLOW_API_KEY"
-        k = os.environ.get(env)
+        k = (os.environ.get(env) or "").strip() or _key_file(spec.get("api_key_file"))
         url = ROBOFLOW_PROJECT % (spec["workspace"], spec["project"])
         if not k:
-            raise FetchError("%s: the Roboflow class list needs an API key in $%s" % (slug, env))
+            raise FetchError("%s: the Roboflow class list needs an API key in $%s%s" % (
+                slug, env, " or %s" % spec["api_key_file"] if spec.get("api_key_file") else ""))
         st, data, sha, _h = _get(transport, url, {"api_key": k})
+        if st == 200 and k in data.decode("utf-8", "replace"):
+            raise FetchError("%s: the Roboflow answer contains the API key; it is not saved" % slug)
         saved = _save(out_dir, "%s/roboflow_%s.json" % (base, _safe(spec["project"])), data) if st == 200 else None
-        entry(url, {"api_key": k}, saved, st, error=None if st == 200 else "HTTP %s" % st)
+        lic = None
+        if st == 200:
+            lic = ((_json(data, "Roboflow %s" % spec["project"]).get("project") or {}).get("license")) or None
+        entry(url, {"api_key": k}, saved, st, licence=lic, error=None if st == 200 else "HTTP %s" % st)
         return ents
     if prov == "huggingface" and kind == "http":
         repo = spec["repo"]
