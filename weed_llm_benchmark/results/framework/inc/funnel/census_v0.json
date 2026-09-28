@@ -1,0 +1,3709 @@
+[
+ {
+  "source": "rf_tuf__weed-3434e",
+  "src_name": "",
+  "label": "OtherPlant",
+  "n": 6662,
+  "verdict": {
+   "other_ok": 5055,
+   "conflict": 1607
+  },
+  "pred_all": {
+   "OtherPlant": 4067,
+   "PalmerAmaranth": 1302,
+   "Purslane": 596,
+   "Goosegrass": 463,
+   "MorningGlory": 136,
+   "CutleafGroundcherry": 68,
+   "Sicklepod": 11,
+   "PricklySida": 9,
+   "SpottedSpurge": 5,
+   "Waterhemp": 2,
+   "Ragweed": 2,
+   "Eclipta": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 861,
+   "Purslane": 503,
+   "Goosegrass": 153,
+   "MorningGlory": 69,
+   "CutleafGroundcherry": 19,
+   "SpottedSpurge": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.637,
+   "Goosegrass": 0.595,
+   "PalmerAmaranth": 0.675,
+   "PricklySida": 0.354,
+   "Purslane": 0.842,
+   "MorningGlory": 0.624,
+   "Waterhemp": 0.435,
+   "Sicklepod": 0.319,
+   "SpottedSpurge": 0.49,
+   "Eclipta": 0.352,
+   "Ragweed": 0.275,
+   "CutleafGroundcherry": 0.533
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "5",
+  "label": "OtherPlant",
+  "n": 1634,
+  "verdict": {
+   "conflict": 1007,
+   "other_ok": 627
+  },
+  "pred_all": {
+   "MorningGlory": 1304,
+   "OtherPlant": 323,
+   "PalmerAmaranth": 5,
+   "SpottedSpurge": 2
+  },
+  "pred_confident": {
+   "MorningGlory": 1007
+  },
+  "mean_p": {
+   "MorningGlory": 0.784,
+   "OtherPlant": 0.598,
+   "SpottedSpurge": 0.447,
+   "PalmerAmaranth": 0.337
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Waterhemp",
+  "label": "Waterhemp",
+  "n": 1140,
+  "verdict": {
+   "conflict": 706,
+   "unknown": 333,
+   "verified": 101
+  },
+  "pred_all": {
+   "PalmerAmaranth": 528,
+   "OtherPlant": 426,
+   "Waterhemp": 169,
+   "CutleafGroundcherry": 16,
+   "Ragweed": 1
+  },
+  "pred_confident": {
+   "OtherPlant": 411,
+   "PalmerAmaranth": 295,
+   "Waterhemp": 101
+  },
+  "mean_p": {
+   "OtherPlant": 0.576,
+   "PalmerAmaranth": 0.547,
+   "Waterhemp": 0.451,
+   "CutleafGroundcherry": 0.368,
+   "Ragweed": 0.236
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Palmer Amaranth",
+  "label": "PalmerAmaranth",
+  "n": 755,
+  "verdict": {
+   "unknown": 144,
+   "conflict": 265,
+   "verified": 346
+  },
+  "pred_all": {
+   "PalmerAmaranth": 484,
+   "OtherPlant": 267,
+   "Carpetweed": 3,
+   "Ragweed": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 346,
+   "OtherPlant": 265
+  },
+  "mean_p": {
+   "PalmerAmaranth": 0.725,
+   "OtherPlant": 0.66,
+   "Carpetweed": 0.263,
+   "Ragweed": 0.336
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Waterhemp",
+  "label": "Waterhemp",
+  "n": 695,
+  "verdict": {
+   "unknown": 167,
+   "verified": 381,
+   "conflict": 147
+  },
+  "pred_all": {
+   "Waterhemp": 440,
+   "PalmerAmaranth": 150,
+   "OtherPlant": 54,
+   "CutleafGroundcherry": 25,
+   "Eclipta": 14,
+   "PricklySida": 5,
+   "Purslane": 2,
+   "SpottedSpurge": 2,
+   "Carpetweed": 2,
+   "Sicklepod": 1
+  },
+  "pred_confident": {
+   "Waterhemp": 381,
+   "PalmerAmaranth": 102,
+   "OtherPlant": 44,
+   "CutleafGroundcherry": 1
+  },
+  "mean_p": {
+   "Waterhemp": 0.646,
+   "Eclipta": 0.392,
+   "Purslane": 0.274,
+   "OtherPlant": 0.463,
+   "PalmerAmaranth": 0.578,
+   "CutleafGroundcherry": 0.369,
+   "PricklySida": 0.294,
+   "Sicklepod": 0.196,
+   "SpottedSpurge": 0.318,
+   "Carpetweed": 0.268
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Ragweed",
+  "label": "Ragweed",
+  "n": 963,
+  "verdict": {
+   "conflict": 504,
+   "unknown": 445,
+   "verified": 14
+  },
+  "pred_all": {
+   "OtherPlant": 567,
+   "Ragweed": 355,
+   "PalmerAmaranth": 23,
+   "CutleafGroundcherry": 13,
+   "MorningGlory": 3,
+   "Waterhemp": 2
+  },
+  "pred_confident": {
+   "OtherPlant": 493,
+   "Ragweed": 14,
+   "PalmerAmaranth": 9,
+   "MorningGlory": 1,
+   "Waterhemp": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.479,
+   "Ragweed": 0.452,
+   "CutleafGroundcherry": 0.278,
+   "MorningGlory": 0.577,
+   "PalmerAmaranth": 0.518,
+   "Waterhemp": 0.499
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Redroot Pigweed",
+  "label": "OtherPlant",
+  "n": 635,
+  "verdict": {
+   "other_ok": 259,
+   "conflict": 376
+  },
+  "pred_all": {
+   "PalmerAmaranth": 507,
+   "OtherPlant": 57,
+   "CutleafGroundcherry": 36,
+   "Waterhemp": 23,
+   "PricklySida": 10,
+   "Eclipta": 1,
+   "MorningGlory": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 365,
+   "Waterhemp": 11
+  },
+  "mean_p": {
+   "PalmerAmaranth": 0.624,
+   "OtherPlant": 0.483,
+   "CutleafGroundcherry": 0.396,
+   "Waterhemp": 0.449,
+   "PricklySida": 0.386,
+   "Eclipta": 0.335,
+   "MorningGlory": 0.164
+  }
+ },
+ {
+  "source": "project_agml__imageweeds_aerial_weed_detection",
+  "src_name": "waterhemp",
+  "label": "Waterhemp",
+  "n": 402,
+  "verdict": {
+   "verified": 253,
+   "unknown": 68,
+   "conflict": 81
+  },
+  "pred_all": {
+   "Waterhemp": 273,
+   "PalmerAmaranth": 82,
+   "OtherPlant": 35,
+   "CutleafGroundcherry": 9,
+   "PricklySida": 2,
+   "Eclipta": 1
+  },
+  "pred_confident": {
+   "Waterhemp": 253,
+   "PalmerAmaranth": 49,
+   "OtherPlant": 32
+  },
+  "mean_p": {
+   "Waterhemp": 0.629,
+   "PalmerAmaranth": 0.511,
+   "OtherPlant": 0.468,
+   "CutleafGroundcherry": 0.426,
+   "PricklySida": 0.388,
+   "Eclipta": 0.253
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "ragweed",
+  "label": "Ragweed",
+  "n": 390,
+  "verdict": {
+   "conflict": 327,
+   "unknown": 63
+  },
+  "pred_all": {
+   "OtherPlant": 318,
+   "MorningGlory": 32,
+   "Sicklepod": 14,
+   "PalmerAmaranth": 12,
+   "PricklySida": 6,
+   "Eclipta": 5,
+   "Waterhemp": 3
+  },
+  "pred_confident": {
+   "OtherPlant": 316,
+   "MorningGlory": 9,
+   "PalmerAmaranth": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.738,
+   "PalmerAmaranth": 0.522,
+   "Waterhemp": 0.432,
+   "MorningGlory": 0.564,
+   "Eclipta": 0.311,
+   "PricklySida": 0.463,
+   "Sicklepod": 0.66
+  }
+ },
+ {
+  "source": "rf_karthikeya-c8pvy__weed-detection-cwp10",
+  "src_name": "waterhemp",
+  "label": "Waterhemp",
+  "n": 343,
+  "verdict": {
+   "conflict": 4,
+   "verified": 309,
+   "unknown": 30
+  },
+  "pred_all": {
+   "Waterhemp": 320,
+   "Ragweed": 12,
+   "PalmerAmaranth": 5,
+   "OtherPlant": 3,
+   "CutleafGroundcherry": 1,
+   "Carpetweed": 1,
+   "PricklySida": 1
+  },
+  "pred_confident": {
+   "Waterhemp": 309,
+   "OtherPlant": 2,
+   "PalmerAmaranth": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.353,
+   "Waterhemp": 0.781,
+   "CutleafGroundcherry": 0.322,
+   "Ragweed": 0.422,
+   "Carpetweed": 0.409,
+   "PalmerAmaranth": 0.507,
+   "PricklySida": 0.47
+  }
+ },
+ {
+  "source": "rf_karthikeya-c8pvy__weed-detection-cwp10",
+  "src_name": "spottedspurge",
+  "label": "SpottedSpurge",
+  "n": 307,
+  "verdict": {
+   "verified": 281,
+   "conflict": 6,
+   "unknown": 20
+  },
+  "pred_all": {
+   "SpottedSpurge": 301,
+   "OtherPlant": 6
+  },
+  "pred_confident": {
+   "SpottedSpurge": 281,
+   "OtherPlant": 6
+  },
+  "mean_p": {
+   "SpottedSpurge": 0.881,
+   "OtherPlant": 0.584
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Blackbean",
+  "label": "OtherPlant",
+  "n": 1970,
+  "verdict": {
+   "conflict": 261,
+   "other_ok": 1709
+  },
+  "pred_all": {
+   "MorningGlory": 1075,
+   "OtherPlant": 785,
+   "Eclipta": 47,
+   "PricklySida": 30,
+   "CutleafGroundcherry": 19,
+   "PalmerAmaranth": 9,
+   "Waterhemp": 5
+  },
+  "pred_confident": {
+   "MorningGlory": 257,
+   "PalmerAmaranth": 3,
+   "Waterhemp": 1
+  },
+  "mean_p": {
+   "MorningGlory": 0.519,
+   "OtherPlant": 0.46,
+   "CutleafGroundcherry": 0.296,
+   "Eclipta": 0.333,
+   "PalmerAmaranth": 0.375,
+   "PricklySida": 0.325,
+   "Waterhemp": 0.325
+  }
+ },
+ {
+  "source": "rf_cotton-weed-detect__grass-weed-cotton-detect",
+  "src_name": "cotton",
+  "label": "OtherPlant",
+  "n": 405,
+  "verdict": {
+   "conflict": 257,
+   "other_ok": 148
+  },
+  "pred_all": {
+   "MorningGlory": 387,
+   "OtherPlant": 18
+  },
+  "pred_confident": {
+   "MorningGlory": 257
+  },
+  "mean_p": {
+   "MorningGlory": 0.815,
+   "OtherPlant": 0.65
+  }
+ },
+ {
+  "source": "rf_leopard-ai__weed-detection-8h4kx",
+  "src_name": "crop",
+  "label": "OtherPlant",
+  "n": 1157,
+  "verdict": {
+   "other_ok": 902,
+   "conflict": 255
+  },
+  "pred_all": {
+   "OtherPlant": 528,
+   "CutleafGroundcherry": 411,
+   "PalmerAmaranth": 182,
+   "Waterhemp": 26,
+   "PricklySida": 4,
+   "MorningGlory": 2,
+   "SpottedSpurge": 1,
+   "Sicklepod": 1,
+   "Eclipta": 1,
+   "Goosegrass": 1
+  },
+  "pred_confident": {
+   "CutleafGroundcherry": 138,
+   "PalmerAmaranth": 98,
+   "Waterhemp": 15,
+   "MorningGlory": 1,
+   "SpottedSpurge": 1,
+   "Sicklepod": 1,
+   "Goosegrass": 1
+  },
+  "mean_p": {
+   "CutleafGroundcherry": 0.586,
+   "PalmerAmaranth": 0.491,
+   "MorningGlory": 0.702,
+   "OtherPlant": 0.763,
+   "PricklySida": 0.223,
+   "Waterhemp": 0.412,
+   "SpottedSpurge": 0.865,
+   "Sicklepod": 0.904,
+   "Eclipta": 0.369,
+   "Goosegrass": 0.775
+  }
+ },
+ {
+  "source": "rf_zig-zag-lnodr__weed-detection-vanpe",
+  "src_name": "Morning glory",
+  "label": "MorningGlory",
+  "n": 290,
+  "verdict": {
+   "verified": 158,
+   "unknown": 55,
+   "conflict": 77
+  },
+  "pred_all": {
+   "MorningGlory": 211,
+   "OtherPlant": 78,
+   "CutleafGroundcherry": 1
+  },
+  "pred_confident": {
+   "MorningGlory": 158,
+   "OtherPlant": 77
+  },
+  "mean_p": {
+   "MorningGlory": 0.806,
+   "OtherPlant": 0.591,
+   "CutleafGroundcherry": 0.251
+  }
+ },
+ {
+  "source": "project_agml__imageweeds_aerial_weed_detection",
+  "src_name": "redrootpigweed",
+  "label": "OtherPlant",
+  "n": 308,
+  "verdict": {
+   "conflict": 213,
+   "other_ok": 95
+  },
+  "pred_all": {
+   "PalmerAmaranth": 246,
+   "OtherPlant": 36,
+   "Waterhemp": 19,
+   "CutleafGroundcherry": 6,
+   "PricklySida": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 197,
+   "Waterhemp": 16
+  },
+  "mean_p": {
+   "PalmerAmaranth": 0.646,
+   "OtherPlant": 0.548,
+   "Waterhemp": 0.541,
+   "CutleafGroundcherry": 0.375,
+   "PricklySida": 0.374
+  }
+ },
+ {
+  "source": "rf_test-gzc3r__crop-mfete",
+  "src_name": "",
+  "label": "OtherPlant",
+  "n": 20353,
+  "verdict": {
+   "other_ok": 20143,
+   "conflict": 210
+  },
+  "pred_all": {
+   "OtherPlant": 17810,
+   "MorningGlory": 2452,
+   "PalmerAmaranth": 74,
+   "PricklySida": 14,
+   "CutleafGroundcherry": 2,
+   "Sicklepod": 1
+  },
+  "pred_confident": {
+   "MorningGlory": 210
+  },
+  "mean_p": {
+   "OtherPlant": 0.713,
+   "MorningGlory": 0.509,
+   "PalmerAmaranth": 0.462,
+   "PricklySida": 0.456,
+   "Sicklepod": 0.408,
+   "CutleafGroundcherry": 0.45
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Ragweed",
+  "label": "Ragweed",
+  "n": 1086,
+  "verdict": {
+   "unknown": 895,
+   "conflict": 178,
+   "verified": 13
+  },
+  "pred_all": {
+   "OtherPlant": 385,
+   "Ragweed": 352,
+   "Eclipta": 168,
+   "Goosegrass": 61,
+   "CutleafGroundcherry": 51,
+   "SpottedSpurge": 37,
+   "Purslane": 29,
+   "MorningGlory": 1,
+   "Waterhemp": 1,
+   "PalmerAmaranth": 1
+  },
+  "pred_confident": {
+   "OtherPlant": 177,
+   "Ragweed": 13,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "Ragweed": 0.347,
+   "Eclipta": 0.177,
+   "OtherPlant": 0.339,
+   "Goosegrass": 0.18,
+   "SpottedSpurge": 0.168,
+   "CutleafGroundcherry": 0.239,
+   "Purslane": 0.168,
+   "MorningGlory": 0.327,
+   "Waterhemp": 0.279,
+   "PalmerAmaranth": 0.826
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "2",
+  "label": "OtherPlant",
+  "n": 17196,
+  "verdict": {
+   "other_ok": 17033,
+   "conflict": 163
+  },
+  "pred_all": {
+   "OtherPlant": 16113,
+   "PalmerAmaranth": 302,
+   "CutleafGroundcherry": 296,
+   "Eclipta": 174,
+   "Carpetweed": 160,
+   "MorningGlory": 32,
+   "PricklySida": 24,
+   "Sicklepod": 22,
+   "Waterhemp": 21,
+   "Purslane": 20,
+   "Ragweed": 17,
+   "Goosegrass": 12,
+   "SpottedSpurge": 3
+  },
+  "pred_confident": {
+   "Carpetweed": 49,
+   "PalmerAmaranth": 48,
+   "CutleafGroundcherry": 48,
+   "MorningGlory": 8,
+   "Waterhemp": 4,
+   "Purslane": 4,
+   "Eclipta": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.738,
+   "PalmerAmaranth": 0.412,
+   "Eclipta": 0.367,
+   "CutleafGroundcherry": 0.504,
+   "Carpetweed": 0.429,
+   "Goosegrass": 0.423,
+   "Sicklepod": 0.357,
+   "Ragweed": 0.338,
+   "MorningGlory": 0.494,
+   "Purslane": 0.41,
+   "PricklySida": 0.362,
+   "Waterhemp": 0.328,
+   "SpottedSpurge": 0.414
+  }
+ },
+ {
+  "source": "project_agml__imageweeds_aerial_weed_detection",
+  "src_name": "ragweed",
+  "label": "Ragweed",
+  "n": 587,
+  "verdict": {
+   "unknown": 430,
+   "conflict": 157
+  },
+  "pred_all": {
+   "OtherPlant": 327,
+   "Ragweed": 203,
+   "Eclipta": 28,
+   "SpottedSpurge": 13,
+   "CutleafGroundcherry": 10,
+   "Goosegrass": 5,
+   "Carpetweed": 1
+  },
+  "pred_confident": {
+   "OtherPlant": 156,
+   "Carpetweed": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.369,
+   "SpottedSpurge": 0.168,
+   "CutleafGroundcherry": 0.199,
+   "Ragweed": 0.319,
+   "Eclipta": 0.184,
+   "Goosegrass": 0.187,
+   "Carpetweed": 0.694
+  }
+ },
+ {
+  "source": "rf_srec-dthh0__crop-weed-poxtn",
+  "src_name": "1",
+  "label": "OtherPlant",
+  "n": 1661,
+  "verdict": {
+   "other_ok": 1533,
+   "conflict": 128
+  },
+  "pred_all": {
+   "OtherPlant": 961,
+   "CutleafGroundcherry": 516,
+   "PalmerAmaranth": 167,
+   "Waterhemp": 10,
+   "Sicklepod": 4,
+   "Eclipta": 2,
+   "PricklySida": 1
+  },
+  "pred_confident": {
+   "CutleafGroundcherry": 91,
+   "PalmerAmaranth": 34,
+   "Sicklepod": 2,
+   "Waterhemp": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.732,
+   "CutleafGroundcherry": 0.529,
+   "PalmerAmaranth": 0.415,
+   "Sicklepod": 0.828,
+   "Eclipta": 0.238,
+   "Waterhemp": 0.336,
+   "PricklySida": 0.407
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Kochia",
+  "label": "OtherPlant",
+  "n": 851,
+  "verdict": {
+   "other_ok": 730,
+   "conflict": 121
+  },
+  "pred_all": {
+   "Waterhemp": 446,
+   "OtherPlant": 207,
+   "Goosegrass": 149,
+   "Purslane": 23,
+   "Eclipta": 12,
+   "CutleafGroundcherry": 6,
+   "Ragweed": 5,
+   "SpottedSpurge": 3
+  },
+  "pred_confident": {
+   "Waterhemp": 118,
+   "Goosegrass": 3
+  },
+  "mean_p": {
+   "OtherPlant": 0.418,
+   "Waterhemp": 0.368,
+   "Goosegrass": 0.295,
+   "Ragweed": 0.266,
+   "Eclipta": 0.259,
+   "CutleafGroundcherry": 0.235,
+   "Purslane": 0.304,
+   "SpottedSpurge": 0.207
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "1",
+  "label": "OtherPlant",
+  "n": 17184,
+  "verdict": {
+   "other_ok": 17067,
+   "conflict": 117
+  },
+  "pred_all": {
+   "OtherPlant": 15519,
+   "Goosegrass": 1517,
+   "MorningGlory": 63,
+   "Sicklepod": 27,
+   "PalmerAmaranth": 20,
+   "Eclipta": 19,
+   "SpottedSpurge": 7,
+   "PricklySida": 4,
+   "CutleafGroundcherry": 4,
+   "Waterhemp": 3,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "Goosegrass": 93,
+   "MorningGlory": 22,
+   "SpottedSpurge": 1,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.596,
+   "Goosegrass": 0.42,
+   "SpottedSpurge": 0.404,
+   "PalmerAmaranth": 0.317,
+   "MorningGlory": 0.573,
+   "Eclipta": 0.362,
+   "Sicklepod": 0.324,
+   "Waterhemp": 0.287,
+   "PricklySida": 0.244,
+   "CutleafGroundcherry": 0.376,
+   "Purslane": 0.244
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Crop",
+  "label": "OtherPlant",
+  "n": 2121,
+  "verdict": {
+   "other_ok": 2007,
+   "conflict": 114
+  },
+  "pred_all": {
+   "OtherPlant": 1632,
+   "CutleafGroundcherry": 171,
+   "PalmerAmaranth": 162,
+   "MorningGlory": 145,
+   "Waterhemp": 6,
+   "Sicklepod": 3,
+   "Goosegrass": 2
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 50,
+   "MorningGlory": 34,
+   "CutleafGroundcherry": 26,
+   "Waterhemp": 4
+  },
+  "mean_p": {
+   "OtherPlant": 0.69,
+   "MorningGlory": 0.546,
+   "PalmerAmaranth": 0.488,
+   "CutleafGroundcherry": 0.471,
+   "Waterhemp": 0.409,
+   "Goosegrass": 0.404,
+   "Sicklepod": 0.544
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Crab Grass",
+  "label": "OtherPlant",
+  "n": 709,
+  "verdict": {
+   "other_ok": 596,
+   "conflict": 113
+  },
+  "pred_all": {
+   "OtherPlant": 533,
+   "Goosegrass": 176
+  },
+  "pred_confident": {
+   "Goosegrass": 113
+  },
+  "mean_p": {
+   "OtherPlant": 0.811,
+   "Goosegrass": 0.625
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Redroot Pigweed",
+  "label": "OtherPlant",
+  "n": 423,
+  "verdict": {
+   "other_ok": 319,
+   "conflict": 104
+  },
+  "pred_all": {
+   "OtherPlant": 240,
+   "PalmerAmaranth": 178,
+   "MorningGlory": 2,
+   "Ragweed": 2,
+   "Waterhemp": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 104
+  },
+  "mean_p": {
+   "OtherPlant": 0.694,
+   "PalmerAmaranth": 0.711,
+   "Waterhemp": 0.296,
+   "MorningGlory": 0.539,
+   "Ragweed": 0.296
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "8",
+  "label": "OtherPlant",
+  "n": 676,
+  "verdict": {
+   "other_ok": 584,
+   "conflict": 92
+  },
+  "pred_all": {
+   "OtherPlant": 408,
+   "SpottedSpurge": 247,
+   "Sicklepod": 6,
+   "Carpetweed": 6,
+   "Purslane": 5,
+   "Eclipta": 3,
+   "PalmerAmaranth": 1
+  },
+  "pred_confident": {
+   "SpottedSpurge": 88,
+   "Carpetweed": 3,
+   "Sicklepod": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.704,
+   "SpottedSpurge": 0.598,
+   "Sicklepod": 0.406,
+   "Purslane": 0.39,
+   "Carpetweed": 0.438,
+   "Eclipta": 0.394,
+   "PalmerAmaranth": 0.267
+  }
+ },
+ {
+  "source": "rf_zig-zag-lnodr__weed-detection-vanpe",
+  "src_name": "Carpet weed",
+  "label": "Carpetweed",
+  "n": 85,
+  "verdict": {
+   "verified": 74,
+   "unknown": 4,
+   "conflict": 7
+  },
+  "pred_all": {
+   "Carpetweed": 77,
+   "OtherPlant": 7,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "Carpetweed": 74,
+   "OtherPlant": 7
+  },
+  "mean_p": {
+   "Carpetweed": 0.898,
+   "OtherPlant": 0.591,
+   "Purslane": 0.417
+  }
+ },
+ {
+  "source": "project_agml__imageweeds_aerial_weed_detection",
+  "src_name": "kochia",
+  "label": "OtherPlant",
+  "n": 565,
+  "verdict": {
+   "other_ok": 487,
+   "conflict": 78
+  },
+  "pred_all": {
+   "Waterhemp": 256,
+   "OtherPlant": 190,
+   "Goosegrass": 60,
+   "Ragweed": 29,
+   "Purslane": 11,
+   "CutleafGroundcherry": 10,
+   "Eclipta": 9
+  },
+  "pred_confident": {
+   "Waterhemp": 78
+  },
+  "mean_p": {
+   "OtherPlant": 0.462,
+   "Waterhemp": 0.35,
+   "Ragweed": 0.245,
+   "Goosegrass": 0.252,
+   "Purslane": 0.25,
+   "CutleafGroundcherry": 0.229,
+   "Eclipta": 0.2
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Blackbean",
+  "label": "OtherPlant",
+  "n": 697,
+  "verdict": {
+   "conflict": 72,
+   "other_ok": 625
+  },
+  "pred_all": {
+   "OtherPlant": 464,
+   "MorningGlory": 213,
+   "PalmerAmaranth": 19,
+   "Ragweed": 1
+  },
+  "pred_confident": {
+   "MorningGlory": 64,
+   "PalmerAmaranth": 8
+  },
+  "mean_p": {
+   "MorningGlory": 0.568,
+   "OtherPlant": 0.581,
+   "PalmerAmaranth": 0.583,
+   "Ragweed": 0.325
+  }
+ },
+ {
+  "source": "rf_school-5ult5__weed-6a90d",
+  "src_name": "0",
+  "label": "OtherPlant",
+  "n": 3443,
+  "verdict": {
+   "other_ok": 3376,
+   "conflict": 67
+  },
+  "pred_all": {
+   "OtherPlant": 3210,
+   "MorningGlory": 89,
+   "Goosegrass": 50,
+   "Eclipta": 34,
+   "Waterhemp": 32,
+   "PalmerAmaranth": 19,
+   "Carpetweed": 4,
+   "Sicklepod": 3,
+   "CutleafGroundcherry": 1,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "MorningGlory": 56,
+   "Waterhemp": 7,
+   "Goosegrass": 2,
+   "Carpetweed": 1,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.772,
+   "Waterhemp": 0.39,
+   "Goosegrass": 0.4,
+   "Eclipta": 0.324,
+   "MorningGlory": 0.684,
+   "PalmerAmaranth": 0.349,
+   "CutleafGroundcherry": 0.242,
+   "Carpetweed": 0.331,
+   "Purslane": 0.607,
+   "Sicklepod": 0.343
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Corn",
+  "label": "OtherPlant",
+  "n": 1476,
+  "verdict": {
+   "other_ok": 1410,
+   "conflict": 66
+  },
+  "pred_all": {
+   "OtherPlant": 1182,
+   "Goosegrass": 293,
+   "Eclipta": 1
+  },
+  "pred_confident": {
+   "Goosegrass": 66
+  },
+  "mean_p": {
+   "OtherPlant": 0.561,
+   "Goosegrass": 0.507,
+   "Eclipta": 0.357
+  }
+ },
+ {
+  "source": "rf_zig-zag-lnodr__weed-detection-vanpe",
+  "src_name": "Goosegrass",
+  "label": "Goosegrass",
+  "n": 72,
+  "verdict": {
+   "verified": 52,
+   "conflict": 10,
+   "unknown": 10
+  },
+  "pred_all": {
+   "Goosegrass": 62,
+   "OtherPlant": 10
+  },
+  "pred_confident": {
+   "Goosegrass": 52,
+   "OtherPlant": 10
+  },
+  "mean_p": {
+   "Goosegrass": 0.82,
+   "OtherPlant": 0.614
+  }
+ },
+ {
+  "source": "rf_karthikeya-c8pvy__weed-detection-cwp10",
+  "src_name": "sicklepod",
+  "label": "Sicklepod",
+  "n": 150,
+  "verdict": {
+   "conflict": 4,
+   "verified": 57,
+   "unknown": 89
+  },
+  "pred_all": {
+   "Sicklepod": 141,
+   "OtherPlant": 8,
+   "PalmerAmaranth": 1
+  },
+  "pred_confident": {
+   "Sicklepod": 57,
+   "OtherPlant": 3,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.32,
+   "Sicklepod": 0.737,
+   "PalmerAmaranth": 0.612
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "12",
+  "label": "OtherPlant",
+  "n": 307,
+  "verdict": {
+   "other_ok": 247,
+   "conflict": 60
+  },
+  "pred_all": {
+   "OtherPlant": 151,
+   "Sicklepod": 108,
+   "SpottedSpurge": 24,
+   "Ragweed": 12,
+   "Purslane": 8,
+   "MorningGlory": 1,
+   "Goosegrass": 1,
+   "CutleafGroundcherry": 1,
+   "Carpetweed": 1
+  },
+  "pred_confident": {
+   "Sicklepod": 50,
+   "Purslane": 8,
+   "SpottedSpurge": 2
+  },
+  "mean_p": {
+   "SpottedSpurge": 0.502,
+   "Sicklepod": 0.749,
+   "OtherPlant": 0.646,
+   "MorningGlory": 0.529,
+   "Ragweed": 0.422,
+   "Purslane": 0.916,
+   "Goosegrass": 0.563,
+   "CutleafGroundcherry": 0.177,
+   "Carpetweed": 0.308
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "9",
+  "label": "OtherPlant",
+  "n": 1131,
+  "verdict": {
+   "other_ok": 1077,
+   "conflict": 54
+  },
+  "pred_all": {
+   "OtherPlant": 927,
+   "Goosegrass": 189,
+   "Eclipta": 13,
+   "SpottedSpurge": 1,
+   "Carpetweed": 1
+  },
+  "pred_confident": {
+   "Goosegrass": 54
+  },
+  "mean_p": {
+   "OtherPlant": 0.634,
+   "Goosegrass": 0.512,
+   "Eclipta": 0.308,
+   "SpottedSpurge": 0.295,
+   "Carpetweed": 0.415
+  }
+ },
+ {
+  "source": "rf_zig-zag-lnodr__weed-detection-vanpe",
+  "src_name": "Nutsedge",
+  "label": "OtherPlant",
+  "n": 356,
+  "verdict": {
+   "conflict": 50,
+   "other_ok": 306
+  },
+  "pred_all": {
+   "OtherPlant": 191,
+   "Goosegrass": 165
+  },
+  "pred_confident": {
+   "Goosegrass": 50
+  },
+  "mean_p": {
+   "Goosegrass": 0.584,
+   "OtherPlant": 0.615
+  }
+ },
+ {
+  "source": "rf_leopard-ai__weed-detection-8h4kx",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 765,
+  "verdict": {
+   "other_ok": 716,
+   "conflict": 49
+  },
+  "pred_all": {
+   "OtherPlant": 430,
+   "SpottedSpurge": 95,
+   "Goosegrass": 65,
+   "PalmerAmaranth": 59,
+   "Eclipta": 32,
+   "MorningGlory": 24,
+   "Sicklepod": 15,
+   "CutleafGroundcherry": 14,
+   "Ragweed": 14,
+   "Waterhemp": 6,
+   "Purslane": 6,
+   "PricklySida": 3,
+   "Carpetweed": 2
+  },
+  "pred_confident": {
+   "Goosegrass": 29,
+   "MorningGlory": 9,
+   "PalmerAmaranth": 5,
+   "CutleafGroundcherry": 4,
+   "SpottedSpurge": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.435,
+   "CutleafGroundcherry": 0.468,
+   "Eclipta": 0.289,
+   "SpottedSpurge": 0.473,
+   "Sicklepod": 0.568,
+   "Waterhemp": 0.261,
+   "Goosegrass": 0.538,
+   "PalmerAmaranth": 0.479,
+   "Carpetweed": 0.254,
+   "PricklySida": 0.311,
+   "Purslane": 0.245,
+   "Ragweed": 0.357,
+   "MorningGlory": 0.574
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Horseweed",
+  "label": "OtherPlant",
+  "n": 407,
+  "verdict": {
+   "other_ok": 367,
+   "conflict": 40
+  },
+  "pred_all": {
+   "OtherPlant": 233,
+   "Carpetweed": 102,
+   "Eclipta": 35,
+   "Ragweed": 17,
+   "Waterhemp": 13,
+   "CutleafGroundcherry": 5,
+   "PalmerAmaranth": 2
+  },
+  "pred_confident": {
+   "Carpetweed": 35,
+   "Waterhemp": 4,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.492,
+   "Carpetweed": 0.437,
+   "Waterhemp": 0.351,
+   "Ragweed": 0.32,
+   "Eclipta": 0.285,
+   "PalmerAmaranth": 0.404,
+   "CutleafGroundcherry": 0.285
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Horseweed",
+  "label": "OtherPlant",
+  "n": 747,
+  "verdict": {
+   "other_ok": 711,
+   "conflict": 36
+  },
+  "pred_all": {
+   "OtherPlant": 632,
+   "Carpetweed": 79,
+   "PalmerAmaranth": 26,
+   "Ragweed": 4,
+   "MorningGlory": 2,
+   "Eclipta": 1,
+   "Waterhemp": 1,
+   "Sicklepod": 1,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 18,
+   "Carpetweed": 17,
+   "MorningGlory": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.687,
+   "Carpetweed": 0.511,
+   "PalmerAmaranth": 0.615,
+   "Eclipta": 0.155,
+   "MorningGlory": 0.608,
+   "Ragweed": 0.485,
+   "Waterhemp": 0.359,
+   "Sicklepod": 0.414,
+   "Purslane": 0.183
+  }
+ },
+ {
+  "source": "rf_zig-zag-lnodr__weed-detection-vanpe",
+  "src_name": "Crabgrass",
+  "label": "OtherPlant",
+  "n": 63,
+  "verdict": {
+   "conflict": 34,
+   "other_ok": 29
+  },
+  "pred_all": {
+   "Goosegrass": 44,
+   "OtherPlant": 19
+  },
+  "pred_confident": {
+   "Goosegrass": 34
+  },
+  "mean_p": {
+   "Goosegrass": 0.755,
+   "OtherPlant": 0.633
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "broadleaf plantain",
+  "label": "OtherPlant",
+  "n": 850,
+  "verdict": {
+   "other_ok": 817,
+   "conflict": 33
+  },
+  "pred_all": {
+   "OtherPlant": 729,
+   "MorningGlory": 38,
+   "PalmerAmaranth": 35,
+   "PricklySida": 27,
+   "Waterhemp": 5,
+   "CutleafGroundcherry": 4,
+   "Sicklepod": 4,
+   "Eclipta": 4,
+   "SpottedSpurge": 3,
+   "Goosegrass": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 15,
+   "MorningGlory": 14,
+   "Waterhemp": 4
+  },
+  "mean_p": {
+   "OtherPlant": 0.718,
+   "PalmerAmaranth": 0.594,
+   "PricklySida": 0.45,
+   "CutleafGroundcherry": 0.321,
+   "MorningGlory": 0.599,
+   "Goosegrass": 0.274,
+   "Waterhemp": 0.589,
+   "Sicklepod": 0.793,
+   "Eclipta": 0.387,
+   "SpottedSpurge": 0.521
+  }
+ },
+ {
+  "source": "rf_weed-tnf9e__weed-bqdok",
+  "src_name": "Maize",
+  "label": "OtherPlant",
+  "n": 9896,
+  "verdict": {
+   "other_ok": 9863,
+   "conflict": 33
+  },
+  "pred_all": {
+   "OtherPlant": 9687,
+   "Goosegrass": 209
+  },
+  "pred_confident": {
+   "Goosegrass": 33
+  },
+  "mean_p": {
+   "OtherPlant": 0.771,
+   "Goosegrass": 0.499
+  }
+ },
+ {
+  "source": "rf_kinjj__weed-avnag",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 788,
+  "verdict": {
+   "other_ok": 756,
+   "conflict": 32
+  },
+  "pred_all": {
+   "OtherPlant": 648,
+   "Goosegrass": 75,
+   "PalmerAmaranth": 23,
+   "Purslane": 22,
+   "Ragweed": 12,
+   "Carpetweed": 2,
+   "SpottedSpurge": 2,
+   "MorningGlory": 1,
+   "Sicklepod": 1,
+   "Waterhemp": 1,
+   "CutleafGroundcherry": 1
+  },
+  "pred_confident": {
+   "Goosegrass": 28,
+   "Purslane": 2,
+   "PalmerAmaranth": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.768,
+   "Goosegrass": 0.585,
+   "Purslane": 0.405,
+   "PalmerAmaranth": 0.412,
+   "Carpetweed": 0.214,
+   "Ragweed": 0.356,
+   "SpottedSpurge": 0.31,
+   "MorningGlory": 0.378,
+   "Sicklepod": 0.224,
+   "Waterhemp": 0.388,
+   "CutleafGroundcherry": 0.217
+  }
+ },
+ {
+  "source": "rf_weed-tnf9e__weed-bqdok",
+  "src_name": "NarWeed",
+  "label": "OtherPlant",
+  "n": 1556,
+  "verdict": {
+   "other_ok": 1527,
+   "conflict": 29
+  },
+  "pred_all": {
+   "OtherPlant": 1511,
+   "Goosegrass": 45
+  },
+  "pred_confident": {
+   "Goosegrass": 29
+  },
+  "mean_p": {
+   "OtherPlant": 0.87,
+   "Goosegrass": 0.617
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "11",
+  "label": "OtherPlant",
+  "n": 99,
+  "verdict": {
+   "conflict": 26,
+   "other_ok": 73
+  },
+  "pred_all": {
+   "SpottedSpurge": 69,
+   "OtherPlant": 21,
+   "Purslane": 4,
+   "Sicklepod": 3,
+   "Carpetweed": 2
+  },
+  "pred_confident": {
+   "SpottedSpurge": 23,
+   "Sicklepod": 1,
+   "Carpetweed": 1,
+   "Purslane": 1
+  },
+  "mean_p": {
+   "SpottedSpurge": 0.609,
+   "OtherPlant": 0.535,
+   "Sicklepod": 0.538,
+   "Carpetweed": 0.488,
+   "Purslane": 0.425
+  }
+ },
+ {
+  "source": "rf_srec-dthh0__crop-weed-poxtn",
+  "src_name": "0",
+  "label": "OtherPlant",
+  "n": 1412,
+  "verdict": {
+   "other_ok": 1388,
+   "conflict": 24
+  },
+  "pred_all": {
+   "OtherPlant": 1178,
+   "SpottedSpurge": 72,
+   "PalmerAmaranth": 56,
+   "Eclipta": 31,
+   "Goosegrass": 28,
+   "MorningGlory": 21,
+   "CutleafGroundcherry": 14,
+   "Sicklepod": 7,
+   "Waterhemp": 3,
+   "Purslane": 2
+  },
+  "pred_confident": {
+   "Goosegrass": 11,
+   "SpottedSpurge": 5,
+   "MorningGlory": 4,
+   "CutleafGroundcherry": 2,
+   "Waterhemp": 1,
+   "Sicklepod": 1
+  },
+  "mean_p": {
+   "PalmerAmaranth": 0.434,
+   "OtherPlant": 0.685,
+   "Purslane": 0.228,
+   "MorningGlory": 0.532,
+   "CutleafGroundcherry": 0.55,
+   "Eclipta": 0.272,
+   "SpottedSpurge": 0.495,
+   "Goosegrass": 0.548,
+   "Sicklepod": 0.77,
+   "Waterhemp": 0.275
+  }
+ },
+ {
+  "source": "rf_1111-gzfxi__weed-chilling",
+  "src_name": "others",
+  "label": "OtherPlant",
+  "n": 5846,
+  "verdict": {
+   "other_ok": 5823,
+   "conflict": 23
+  },
+  "pred_all": {
+   "OtherPlant": 5592,
+   "SpottedSpurge": 85,
+   "Sicklepod": 43,
+   "Eclipta": 29,
+   "Goosegrass": 25,
+   "Carpetweed": 22,
+   "PalmerAmaranth": 18,
+   "MorningGlory": 9,
+   "Waterhemp": 8,
+   "Purslane": 7,
+   "PricklySida": 4,
+   "CutleafGroundcherry": 2,
+   "Ragweed": 2
+  },
+  "pred_confident": {
+   "Goosegrass": 14,
+   "MorningGlory": 5,
+   "SpottedSpurge": 2,
+   "PricklySida": 1,
+   "Carpetweed": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.807,
+   "SpottedSpurge": 0.335,
+   "Eclipta": 0.47,
+   "PalmerAmaranth": 0.488,
+   "Carpetweed": 0.429,
+   "Goosegrass": 0.612,
+   "MorningGlory": 0.755,
+   "CutleafGroundcherry": 0.323,
+   "Sicklepod": 0.278,
+   "Waterhemp": 0.285,
+   "PricklySida": 0.563,
+   "Purslane": 0.272,
+   "Ragweed": 0.292
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Lentil",
+  "label": "OtherPlant",
+  "n": 627,
+  "verdict": {
+   "other_ok": 605,
+   "conflict": 22
+  },
+  "pred_all": {
+   "OtherPlant": 584,
+   "PalmerAmaranth": 31,
+   "Sicklepod": 10,
+   "Purslane": 2
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 22
+  },
+  "mean_p": {
+   "OtherPlant": 0.625,
+   "Purslane": 0.34,
+   "Sicklepod": 0.289,
+   "PalmerAmaranth": 0.626
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "4",
+  "label": "OtherPlant",
+  "n": 1352,
+  "verdict": {
+   "other_ok": 1330,
+   "conflict": 22
+  },
+  "pred_all": {
+   "OtherPlant": 757,
+   "Eclipta": 205,
+   "PalmerAmaranth": 143,
+   "SpottedSpurge": 124,
+   "Waterhemp": 44,
+   "Carpetweed": 23,
+   "Goosegrass": 21,
+   "Purslane": 12,
+   "MorningGlory": 9,
+   "Sicklepod": 8,
+   "PricklySida": 4,
+   "Ragweed": 2
+  },
+  "pred_confident": {
+   "Carpetweed": 8,
+   "PalmerAmaranth": 5,
+   "Goosegrass": 4,
+   "SpottedSpurge": 2,
+   "Purslane": 1,
+   "Waterhemp": 1,
+   "MorningGlory": 1
+  },
+  "mean_p": {
+   "Waterhemp": 0.262,
+   "Eclipta": 0.353,
+   "MorningGlory": 0.47,
+   "OtherPlant": 0.552,
+   "SpottedSpurge": 0.27,
+   "Goosegrass": 0.418,
+   "Carpetweed": 0.367,
+   "Sicklepod": 0.286,
+   "PalmerAmaranth": 0.326,
+   "Purslane": 0.242,
+   "PricklySida": 0.233,
+   "Ragweed": 0.313
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Grass",
+  "label": "OtherPlant",
+  "n": 716,
+  "verdict": {
+   "other_ok": 694,
+   "conflict": 22
+  },
+  "pred_all": {
+   "OtherPlant": 640,
+   "Goosegrass": 55,
+   "Sicklepod": 13,
+   "PalmerAmaranth": 3,
+   "MorningGlory": 3,
+   "SpottedSpurge": 1,
+   "PricklySida": 1
+  },
+  "pred_confident": {
+   "Goosegrass": 18,
+   "Sicklepod": 3,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.774,
+   "Goosegrass": 0.545,
+   "SpottedSpurge": 0.251,
+   "PalmerAmaranth": 0.434,
+   "Sicklepod": 0.567,
+   "PricklySida": 0.536,
+   "MorningGlory": 0.487
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Arachius",
+  "label": "OtherPlant",
+  "n": 345,
+  "verdict": {
+   "other_ok": 324,
+   "conflict": 21
+  },
+  "pred_all": {
+   "OtherPlant": 284,
+   "Sicklepod": 57,
+   "PalmerAmaranth": 4
+  },
+  "pred_confident": {
+   "Sicklepod": 20,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.742,
+   "Sicklepod": 0.76,
+   "PalmerAmaranth": 0.593
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Soybean",
+  "label": "OtherPlant",
+  "n": 2877,
+  "verdict": {
+   "other_ok": 2858,
+   "conflict": 19
+  },
+  "pred_all": {
+   "OtherPlant": 1280,
+   "Sicklepod": 1040,
+   "MorningGlory": 227,
+   "PalmerAmaranth": 151,
+   "PricklySida": 123,
+   "CutleafGroundcherry": 21,
+   "Waterhemp": 19,
+   "Eclipta": 11,
+   "Goosegrass": 2,
+   "SpottedSpurge": 2,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "Sicklepod": 12,
+   "MorningGlory": 5,
+   "PalmerAmaranth": 1,
+   "Waterhemp": 1
+  },
+  "mean_p": {
+   "MorningGlory": 0.345,
+   "OtherPlant": 0.42,
+   "Sicklepod": 0.413,
+   "PalmerAmaranth": 0.301,
+   "PricklySida": 0.278,
+   "CutleafGroundcherry": 0.352,
+   "Eclipta": 0.274,
+   "Goosegrass": 0.19,
+   "Waterhemp": 0.281,
+   "Purslane": 0.23,
+   "SpottedSpurge": 0.252
+  }
+ },
+ {
+  "source": "rf_1111-gzfxi__weed-chilling",
+  "src_name": "chilli",
+  "label": "OtherPlant",
+  "n": 1296,
+  "verdict": {
+   "other_ok": 1277,
+   "conflict": 19
+  },
+  "pred_all": {
+   "OtherPlant": 1102,
+   "CutleafGroundcherry": 92,
+   "PalmerAmaranth": 36,
+   "Waterhemp": 33,
+   "Eclipta": 18,
+   "MorningGlory": 12,
+   "PricklySida": 3
+  },
+  "pred_confident": {
+   "Waterhemp": 13,
+   "PalmerAmaranth": 6
+  },
+  "mean_p": {
+   "OtherPlant": 0.526,
+   "MorningGlory": 0.36,
+   "Eclipta": 0.34,
+   "CutleafGroundcherry": 0.376,
+   "PricklySida": 0.387,
+   "PalmerAmaranth": 0.369,
+   "Waterhemp": 0.397
+  }
+ },
+ {
+  "source": "rf_new-workspace-zbm50__weeds-qftz4",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 2691,
+  "verdict": {
+   "other_ok": 2673,
+   "conflict": 18
+  },
+  "pred_all": {
+   "OtherPlant": 2467,
+   "Ragweed": 90,
+   "Carpetweed": 60,
+   "PalmerAmaranth": 27,
+   "Purslane": 18,
+   "Goosegrass": 14,
+   "SpottedSpurge": 12,
+   "Eclipta": 2,
+   "Waterhemp": 1
+  },
+  "pred_confident": {
+   "Carpetweed": 14,
+   "Goosegrass": 3,
+   "Ragweed": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.579,
+   "Carpetweed": 0.416,
+   "Ragweed": 0.467,
+   "SpottedSpurge": 0.316,
+   "Eclipta": 0.451,
+   "PalmerAmaranth": 0.293,
+   "Purslane": 0.283,
+   "Goosegrass": 0.513,
+   "Waterhemp": 0.301
+  }
+ },
+ {
+  "source": "rf_karthikeya-c8pvy__weed-detection-cwp10",
+  "src_name": "spurredanoda",
+  "label": "OtherPlant",
+  "n": 261,
+  "verdict": {
+   "other_ok": 245,
+   "conflict": 16
+  },
+  "pred_all": {
+   "PricklySida": 155,
+   "OtherPlant": 50,
+   "MorningGlory": 43,
+   "CutleafGroundcherry": 7,
+   "PalmerAmaranth": 5,
+   "Ragweed": 1
+  },
+  "pred_confident": {
+   "PricklySida": 14,
+   "MorningGlory": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.38,
+   "MorningGlory": 0.4,
+   "PricklySida": 0.524,
+   "CutleafGroundcherry": 0.336,
+   "Ragweed": 0.246,
+   "PalmerAmaranth": 0.365
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "13",
+  "label": "OtherPlant",
+  "n": 116,
+  "verdict": {
+   "other_ok": 102,
+   "conflict": 14
+  },
+  "pred_all": {
+   "OtherPlant": 78,
+   "Goosegrass": 38
+  },
+  "pred_confident": {
+   "Goosegrass": 14
+  },
+  "mean_p": {
+   "OtherPlant": 0.539,
+   "Goosegrass": 0.517
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Corn",
+  "label": "OtherPlant",
+  "n": 696,
+  "verdict": {
+   "other_ok": 683,
+   "conflict": 13
+  },
+  "pred_all": {
+   "OtherPlant": 671,
+   "PalmerAmaranth": 23,
+   "Goosegrass": 1,
+   "Sicklepod": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 13
+  },
+  "mean_p": {
+   "OtherPlant": 0.759,
+   "Goosegrass": 0.531,
+   "PalmerAmaranth": 0.607,
+   "Sicklepod": 0.288
+  }
+ },
+ {
+  "source": "project_agml__maize_weed_detection",
+  "src_name": "maize",
+  "label": "OtherPlant",
+  "n": 2584,
+  "verdict": {
+   "other_ok": 2571,
+   "conflict": 13
+  },
+  "pred_all": {
+   "OtherPlant": 2533,
+   "Goosegrass": 51
+  },
+  "pred_confident": {
+   "Goosegrass": 13
+  },
+  "mean_p": {
+   "OtherPlant": 0.734,
+   "Goosegrass": 0.522
+  }
+ },
+ {
+  "source": "rf_zig-zag-lnodr__weed-detection-vanpe",
+  "src_name": "Eclipta",
+  "label": "Eclipta",
+  "n": 15,
+  "verdict": {
+   "verified": 10,
+   "unknown": 3,
+   "conflict": 2
+  },
+  "pred_all": {
+   "Eclipta": 13,
+   "OtherPlant": 2
+  },
+  "pred_confident": {
+   "Eclipta": 10,
+   "OtherPlant": 2
+  },
+  "mean_p": {
+   "Eclipta": 0.845,
+   "OtherPlant": 0.617
+  }
+ },
+ {
+  "source": "project_agml__imageweeds_aerial_weed_detection",
+  "src_name": "horseweed",
+  "label": "OtherPlant",
+  "n": 329,
+  "verdict": {
+   "other_ok": 318,
+   "conflict": 11
+  },
+  "pred_all": {
+   "OtherPlant": 242,
+   "Carpetweed": 63,
+   "Eclipta": 15,
+   "Ragweed": 7,
+   "Waterhemp": 2
+  },
+  "pred_confident": {
+   "Carpetweed": 11
+  },
+  "mean_p": {
+   "OtherPlant": 0.673,
+   "Eclipta": 0.313,
+   "Carpetweed": 0.403,
+   "Ragweed": 0.361,
+   "Waterhemp": 0.378
+  }
+ },
+ {
+  "source": "rf_main-otq0a__weed-in-paddy-field-wmjlr",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 3528,
+  "verdict": {
+   "other_ok": 3517,
+   "conflict": 11
+  },
+  "pred_all": {
+   "OtherPlant": 2946,
+   "Eclipta": 226,
+   "Goosegrass": 204,
+   "Carpetweed": 41,
+   "CutleafGroundcherry": 40,
+   "Waterhemp": 34,
+   "PalmerAmaranth": 11,
+   "MorningGlory": 9,
+   "Sicklepod": 7,
+   "SpottedSpurge": 5,
+   "PricklySida": 4,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "Eclipta": 8,
+   "Waterhemp": 2,
+   "Goosegrass": 1
+  },
+  "mean_p": {
+   "Goosegrass": 0.29,
+   "OtherPlant": 0.631,
+   "CutleafGroundcherry": 0.255,
+   "Eclipta": 0.418,
+   "Carpetweed": 0.28,
+   "MorningGlory": 0.335,
+   "Sicklepod": 0.266,
+   "Waterhemp": 0.331,
+   "Purslane": 0.198,
+   "PalmerAmaranth": 0.264,
+   "PricklySida": 0.41,
+   "SpottedSpurge": 0.276
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "3",
+  "label": "OtherPlant",
+  "n": 1522,
+  "verdict": {
+   "other_ok": 1512,
+   "conflict": 10
+  },
+  "pred_all": {
+   "OtherPlant": 851,
+   "MorningGlory": 314,
+   "PricklySida": 311,
+   "PalmerAmaranth": 21,
+   "Sicklepod": 19,
+   "CutleafGroundcherry": 4,
+   "Eclipta": 1,
+   "Carpetweed": 1
+  },
+  "pred_confident": {
+   "MorningGlory": 10
+  },
+  "mean_p": {
+   "OtherPlant": 0.449,
+   "MorningGlory": 0.361,
+   "PricklySida": 0.342,
+   "Sicklepod": 0.317,
+   "CutleafGroundcherry": 0.436,
+   "Eclipta": 0.181,
+   "Carpetweed": 0.414,
+   "PalmerAmaranth": 0.337
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Kochia",
+  "label": "OtherPlant",
+  "n": 547,
+  "verdict": {
+   "other_ok": 538,
+   "conflict": 9
+  },
+  "pred_all": {
+   "OtherPlant": 490,
+   "Waterhemp": 31,
+   "PalmerAmaranth": 11,
+   "Carpetweed": 8,
+   "Purslane": 3,
+   "Ragweed": 2,
+   "Sicklepod": 1,
+   "SpottedSpurge": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 4,
+   "Waterhemp": 3,
+   "Carpetweed": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.602,
+   "Carpetweed": 0.368,
+   "Waterhemp": 0.357,
+   "Purslane": 0.217,
+   "PalmerAmaranth": 0.539,
+   "Ragweed": 0.366,
+   "Sicklepod": 0.285,
+   "SpottedSpurge": 0.275
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "0",
+  "label": "OtherPlant",
+  "n": 4707,
+  "verdict": {
+   "other_ok": 4699,
+   "conflict": 8
+  },
+  "pred_all": {
+   "OtherPlant": 4393,
+   "PalmerAmaranth": 137,
+   "Eclipta": 131,
+   "MorningGlory": 18,
+   "Goosegrass": 10,
+   "Purslane": 8,
+   "PricklySida": 5,
+   "Carpetweed": 3,
+   "SpottedSpurge": 2
+  },
+  "pred_confident": {
+   "MorningGlory": 5,
+   "Purslane": 1,
+   "PalmerAmaranth": 1,
+   "SpottedSpurge": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.598,
+   "Eclipta": 0.363,
+   "PalmerAmaranth": 0.352,
+   "Goosegrass": 0.343,
+   "MorningGlory": 0.478,
+   "Carpetweed": 0.326,
+   "Purslane": 0.353,
+   "PricklySida": 0.246,
+   "SpottedSpurge": 0.703
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Spermacoce hispida",
+  "label": "OtherPlant",
+  "n": 624,
+  "verdict": {
+   "conflict": 8,
+   "other_ok": 616
+  },
+  "pred_all": {
+   "OtherPlant": 545,
+   "Carpetweed": 42,
+   "PalmerAmaranth": 14,
+   "SpottedSpurge": 9,
+   "Eclipta": 6,
+   "MorningGlory": 4,
+   "Waterhemp": 2,
+   "Goosegrass": 1,
+   "PricklySida": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 3,
+   "Carpetweed": 3,
+   "SpottedSpurge": 1,
+   "MorningGlory": 1
+  },
+  "mean_p": {
+   "PalmerAmaranth": 0.507,
+   "OtherPlant": 0.727,
+   "Carpetweed": 0.379,
+   "Eclipta": 0.402,
+   "SpottedSpurge": 0.372,
+   "Goosegrass": 0.233,
+   "Waterhemp": 0.418,
+   "MorningGlory": 0.547,
+   "PricklySida": 0.378
+  }
+ },
+ {
+  "source": "rf_fyp-oof0h__smart-agriculture-miw1m",
+  "src_name": "cercospora",
+  "label": "OtherPlant",
+  "n": 258,
+  "verdict": {
+   "other_ok": 251,
+   "conflict": 7
+  },
+  "pred_all": {
+   "OtherPlant": 189,
+   "MorningGlory": 47,
+   "PalmerAmaranth": 20,
+   "Waterhemp": 1,
+   "Eclipta": 1
+  },
+  "pred_confident": {
+   "MorningGlory": 6,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.639,
+   "PalmerAmaranth": 0.429,
+   "MorningGlory": 0.694,
+   "Waterhemp": 0.37,
+   "Eclipta": 0.333
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Soybean",
+  "label": "OtherPlant",
+  "n": 570,
+  "verdict": {
+   "other_ok": 564,
+   "conflict": 6
+  },
+  "pred_all": {
+   "OtherPlant": 462,
+   "PalmerAmaranth": 79,
+   "MorningGlory": 15,
+   "Sicklepod": 12,
+   "Ragweed": 2
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 6
+  },
+  "mean_p": {
+   "OtherPlant": 0.609,
+   "Sicklepod": 0.378,
+   "MorningGlory": 0.411,
+   "PalmerAmaranth": 0.471,
+   "Ragweed": 0.552
+  }
+ },
+ {
+  "source": "project_agml__maize_weed_detection",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 2594,
+  "verdict": {
+   "other_ok": 2588,
+   "conflict": 6
+  },
+  "pred_all": {
+   "OtherPlant": 2577,
+   "Goosegrass": 17
+  },
+  "pred_confident": {
+   "Goosegrass": 6
+  },
+  "mean_p": {
+   "OtherPlant": 0.818,
+   "Goosegrass": 0.552
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Flax",
+  "label": "OtherPlant",
+  "n": 1541,
+  "verdict": {
+   "other_ok": 1536,
+   "conflict": 5
+  },
+  "pred_all": {
+   "OtherPlant": 1534,
+   "PalmerAmaranth": 3,
+   "Ragweed": 2,
+   "Carpetweed": 1,
+   "Waterhemp": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 3,
+   "Ragweed": 1,
+   "Waterhemp": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.801,
+   "Carpetweed": 0.332,
+   "Ragweed": 0.672,
+   "PalmerAmaranth": 0.717,
+   "Waterhemp": 0.417
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Sugar beet",
+  "label": "OtherPlant",
+  "n": 1057,
+  "verdict": {
+   "other_ok": 1053,
+   "conflict": 4
+  },
+  "pred_all": {
+   "OtherPlant": 785,
+   "Eclipta": 187,
+   "Waterhemp": 29,
+   "CutleafGroundcherry": 24,
+   "PalmerAmaranth": 19,
+   "Carpetweed": 9,
+   "PricklySida": 4
+  },
+  "pred_confident": {
+   "Carpetweed": 3,
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.49,
+   "Eclipta": 0.345,
+   "Waterhemp": 0.284,
+   "Carpetweed": 0.377,
+   "PalmerAmaranth": 0.301,
+   "PricklySida": 0.284,
+   "CutleafGroundcherry": 0.278
+  }
+ },
+ {
+  "source": "rf_weed-tnf9e__weed-bqdok",
+  "src_name": "BroWeed",
+  "label": "OtherPlant",
+  "n": 196057,
+  "verdict": {
+   "other_ok": 196053,
+   "conflict": 4
+  },
+  "pred_all": {
+   "OtherPlant": 196030,
+   "Goosegrass": 21,
+   "Carpetweed": 4,
+   "PalmerAmaranth": 1,
+   "MorningGlory": 1
+  },
+  "pred_confident": {
+   "Goosegrass": 2,
+   "Carpetweed": 1,
+   "MorningGlory": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.973,
+   "PalmerAmaranth": 0.455,
+   "Goosegrass": 0.502,
+   "Carpetweed": 0.341,
+   "MorningGlory": 0.688
+  }
+ },
+ {
+  "source": "project_agml__crop_weed_detection_latvia",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 6175,
+  "verdict": {
+   "other_ok": 6172,
+   "conflict": 3
+  },
+  "pred_all": {
+   "OtherPlant": 6159,
+   "Carpetweed": 6,
+   "Eclipta": 4,
+   "Purslane": 3,
+   "Waterhemp": 2,
+   "MorningGlory": 1
+  },
+  "pred_confident": {
+   "Carpetweed": 3
+  },
+  "mean_p": {
+   "OtherPlant": 0.912,
+   "Purslane": 0.407,
+   "Carpetweed": 0.52,
+   "MorningGlory": 0.403,
+   "Eclipta": 0.327,
+   "Waterhemp": 0.281
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "6",
+  "label": "OtherPlant",
+  "n": 114,
+  "verdict": {
+   "other_ok": 111,
+   "conflict": 3
+  },
+  "pred_all": {
+   "OtherPlant": 89,
+   "Sicklepod": 23,
+   "MorningGlory": 2
+  },
+  "pred_confident": {
+   "Sicklepod": 3
+  },
+  "mean_p": {
+   "OtherPlant": 0.503,
+   "Sicklepod": 0.581,
+   "MorningGlory": 0.377
+  }
+ },
+ {
+  "source": "rf_srec-dthh0__crop-and-weed-detection-fqrtg",
+  "src_name": "crop",
+  "label": "OtherPlant",
+  "n": 25198,
+  "verdict": {
+   "other_ok": 25195,
+   "conflict": 3
+  },
+  "pred_all": {
+   "OtherPlant": 25154,
+   "MorningGlory": 40,
+   "Goosegrass": 4
+  },
+  "pred_confident": {
+   "Goosegrass": 2,
+   "MorningGlory": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.906,
+   "MorningGlory": 0.472,
+   "Goosegrass": 0.59
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Alternanthera pungens",
+  "label": "OtherPlant",
+  "n": 465,
+  "verdict": {
+   "other_ok": 462,
+   "conflict": 3
+  },
+  "pred_all": {
+   "OtherPlant": 371,
+   "Carpetweed": 24,
+   "PalmerAmaranth": 19,
+   "Eclipta": 17,
+   "PricklySida": 14,
+   "SpottedSpurge": 7,
+   "MorningGlory": 4,
+   "Purslane": 3,
+   "Waterhemp": 2,
+   "Goosegrass": 2,
+   "Ragweed": 1,
+   "Sicklepod": 1
+  },
+  "pred_confident": {
+   "Carpetweed": 1,
+   "SpottedSpurge": 1,
+   "MorningGlory": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.612,
+   "Carpetweed": 0.322,
+   "PalmerAmaranth": 0.345,
+   "PricklySida": 0.564,
+   "Eclipta": 0.323,
+   "Waterhemp": 0.27,
+   "Ragweed": 0.387,
+   "Sicklepod": 0.409,
+   "SpottedSpurge": 0.359,
+   "Goosegrass": 0.298,
+   "MorningGlory": 0.532,
+   "Purslane": 0.349
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Field Pea",
+  "label": "OtherPlant",
+  "n": 1384,
+  "verdict": {
+   "other_ok": 1382,
+   "conflict": 2
+  },
+  "pred_all": {
+   "OtherPlant": 1370,
+   "MorningGlory": 6,
+   "Sicklepod": 5,
+   "PalmerAmaranth": 2,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 2
+  },
+  "mean_p": {
+   "OtherPlant": 0.532,
+   "PalmerAmaranth": 0.815,
+   "MorningGlory": 0.314,
+   "Sicklepod": 0.289,
+   "Purslane": 0.211
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Sugar beet",
+  "label": "OtherPlant",
+  "n": 493,
+  "verdict": {
+   "other_ok": 492,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 490,
+   "PalmerAmaranth": 3
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.836,
+   "PalmerAmaranth": 0.594
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Field Pea",
+  "label": "OtherPlant",
+  "n": 1484,
+  "verdict": {
+   "other_ok": 1483,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 1479,
+   "PalmerAmaranth": 3,
+   "CutleafGroundcherry": 1,
+   "Ragweed": 1
+  },
+  "pred_confident": {
+   "PalmerAmaranth": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.768,
+   "CutleafGroundcherry": 0.393,
+   "Ragweed": 0.386,
+   "PalmerAmaranth": 0.609
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Lentil",
+  "label": "OtherPlant",
+  "n": 1706,
+  "verdict": {
+   "other_ok": 1705,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 1353,
+   "Sicklepod": 258,
+   "Ragweed": 44,
+   "SpottedSpurge": 18,
+   "Purslane": 16,
+   "Waterhemp": 9,
+   "Carpetweed": 5,
+   "MorningGlory": 1,
+   "PricklySida": 1,
+   "Eclipta": 1
+  },
+  "pred_confident": {
+   "SpottedSpurge": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.465,
+   "Sicklepod": 0.363,
+   "Ragweed": 0.317,
+   "Purslane": 0.291,
+   "Waterhemp": 0.292,
+   "SpottedSpurge": 0.337,
+   "Carpetweed": 0.207,
+   "MorningGlory": 0.343,
+   "PricklySida": 0.281,
+   "Eclipta": 0.232
+  }
+ },
+ {
+  "source": "rf_bishwarup-halder__crop-health-advisor",
+  "src_name": "",
+  "label": "OtherPlant",
+  "n": 29239,
+  "verdict": {
+   "other_ok": 29238,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 28371,
+   "Sicklepod": 611,
+   "CutleafGroundcherry": 177,
+   "PalmerAmaranth": 58,
+   "Waterhemp": 9,
+   "Carpetweed": 5,
+   "SpottedSpurge": 3,
+   "PricklySida": 3,
+   "Eclipta": 2
+  },
+  "pred_confident": {
+   "Sicklepod": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.823,
+   "PalmerAmaranth": 0.385,
+   "Sicklepod": 0.464,
+   "CutleafGroundcherry": 0.355,
+   "Waterhemp": 0.342,
+   "SpottedSpurge": 0.193,
+   "Carpetweed": 0.36,
+   "PricklySida": 0.327,
+   "Eclipta": 0.218
+  }
+ },
+ {
+  "source": "rf_karthikeya-c8pvy__weed-detection-cwp10",
+  "src_name": "swinecress",
+  "label": "OtherPlant",
+  "n": 476,
+  "verdict": {
+   "other_ok": 475,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 269,
+   "Ragweed": 197,
+   "SpottedSpurge": 7,
+   "Carpetweed": 2,
+   "Eclipta": 1
+  },
+  "pred_confident": {
+   "Carpetweed": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.525,
+   "Ragweed": 0.414,
+   "Carpetweed": 0.477,
+   "SpottedSpurge": 0.37,
+   "Eclipta": 0.151
+  }
+ },
+ {
+  "source": "rf_karthikeya-c8pvy__weed-detection-cwp10",
+  "src_name": "morningglory",
+  "label": "MorningGlory",
+  "n": 1,
+  "verdict": {
+   "conflict": 1
+  },
+  "pred_all": {
+   "Waterhemp": 1
+  },
+  "pred_confident": {
+   "Waterhemp": 1
+  },
+  "mean_p": {
+   "Waterhemp": 0.942
+  }
+ },
+ {
+  "source": "rf_project-5nvic__weed-detection-0tfsj",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 5715,
+  "verdict": {
+   "other_ok": 5714,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 5708,
+   "Carpetweed": 3,
+   "Waterhemp": 3,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "Carpetweed": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.931,
+   "Carpetweed": 0.431,
+   "Purslane": 0.362,
+   "Waterhemp": 0.385
+  }
+ },
+ {
+  "source": "rf_test-8qezo__weed-detection-ycai2",
+  "src_name": "1",
+  "label": "OtherPlant",
+  "n": 234,
+  "verdict": {
+   "other_ok": 233,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 233,
+   "Carpetweed": 1
+  },
+  "pred_confident": {
+   "Carpetweed": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.936,
+   "Carpetweed": 0.667
+  }
+ },
+ {
+  "source": "rf_university-of-peradeniya__weed-detection-ekr8i",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 6995,
+  "verdict": {
+   "other_ok": 6994,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 6981,
+   "Carpetweed": 6,
+   "Eclipta": 3,
+   "Purslane": 2,
+   "Waterhemp": 2,
+   "PalmerAmaranth": 1
+  },
+  "pred_confident": {
+   "Waterhemp": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.938,
+   "Eclipta": 0.338,
+   "Carpetweed": 0.42,
+   "Purslane": 0.309,
+   "PalmerAmaranth": 0.284,
+   "Waterhemp": 0.356
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Euphorbia Prostata",
+  "label": "OtherPlant",
+  "n": 150,
+  "verdict": {
+   "other_ok": 149,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 129,
+   "Eclipta": 13,
+   "Goosegrass": 2,
+   "Waterhemp": 2,
+   "Carpetweed": 2,
+   "PricklySida": 1,
+   "Purslane": 1
+  },
+  "pred_confident": {
+   "Purslane": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.643,
+   "Goosegrass": 0.238,
+   "Eclipta": 0.342,
+   "Waterhemp": 0.285,
+   "PricklySida": 0.259,
+   "Carpetweed": 0.238,
+   "Purslane": 0.707
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Leptadenia reticulata",
+  "label": "OtherPlant",
+  "n": 181,
+  "verdict": {
+   "other_ok": 180,
+   "conflict": 1
+  },
+  "pred_all": {
+   "OtherPlant": 157,
+   "Carpetweed": 10,
+   "Eclipta": 4,
+   "Goosegrass": 3,
+   "PalmerAmaranth": 3,
+   "PricklySida": 2,
+   "Waterhemp": 1,
+   "SpottedSpurge": 1
+  },
+  "pred_confident": {
+   "Carpetweed": 1
+  },
+  "mean_p": {
+   "OtherPlant": 0.613,
+   "Carpetweed": 0.321,
+   "Goosegrass": 0.313,
+   "PricklySida": 0.488,
+   "PalmerAmaranth": 0.425,
+   "Waterhemp": 0.311,
+   "SpottedSpurge": 0.271,
+   "Eclipta": 0.287
+  }
+ },
+ {
+  "source": "francesco__grass_weeds",
+  "src_name": "0 ridderzuring",
+  "label": "OtherPlant",
+  "n": 6480,
+  "verdict": {
+   "other_ok": 6480
+  },
+  "pred_all": {
+   "OtherPlant": 6480
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.928
+  }
+ },
+ {
+  "source": "fvossel__csgo_player_detection",
+  "src_name": "",
+  "label": "OtherPlant",
+  "n": 6416,
+  "verdict": {
+   "other_ok": 6416
+  },
+  "pred_all": {
+   "OtherPlant": 6416
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.861
+  }
+ },
+ {
+  "source": "kg_farukalam__tomato-leaf-diseases-detection-computer-vision",
+  "src_name": "",
+  "label": "OtherPlant",
+  "n": 835,
+  "verdict": {
+   "other_ok": 835
+  },
+  "pred_all": {
+   "OtherPlant": 809,
+   "CutleafGroundcherry": 15,
+   "PalmerAmaranth": 11
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.868,
+   "CutleafGroundcherry": 0.359,
+   "PalmerAmaranth": 0.397
+  }
+ },
+ {
+  "source": "project_agml__crop_weed_detection_latvia",
+  "src_name": "crop",
+  "label": "OtherPlant",
+  "n": 297,
+  "verdict": {
+   "other_ok": 297
+  },
+  "pred_all": {
+   "OtherPlant": 297
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.875
+  }
+ },
+ {
+  "source": "project_agml__greenhouse_crop_weed_detection",
+  "src_name": "Canola",
+  "label": "OtherPlant",
+  "n": 509,
+  "verdict": {
+   "other_ok": 509
+  },
+  "pred_all": {
+   "OtherPlant": 504,
+   "PalmerAmaranth": 4,
+   "CutleafGroundcherry": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.672,
+   "PalmerAmaranth": 0.352,
+   "CutleafGroundcherry": 0.394
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "10",
+  "label": "OtherPlant",
+  "n": 384,
+  "verdict": {
+   "other_ok": 384
+  },
+  "pred_all": {
+   "OtherPlant": 317,
+   "Ragweed": 63,
+   "CutleafGroundcherry": 2,
+   "Sicklepod": 1,
+   "PalmerAmaranth": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.53,
+   "Ragweed": 0.407,
+   "Sicklepod": 0.305,
+   "PalmerAmaranth": 0.287,
+   "CutleafGroundcherry": 0.282
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "7",
+  "label": "OtherPlant",
+  "n": 187,
+  "verdict": {
+   "other_ok": 187
+  },
+  "pred_all": {
+   "OtherPlant": 176,
+   "Goosegrass": 4,
+   "Eclipta": 3,
+   "Waterhemp": 2,
+   "Ragweed": 1,
+   "Carpetweed": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.585,
+   "Eclipta": 0.297,
+   "Goosegrass": 0.354,
+   "Waterhemp": 0.233,
+   "Ragweed": 0.358,
+   "Carpetweed": 0.345
+  }
+ },
+ {
+  "source": "project_agml__mh_weed16_weed_detection",
+  "src_name": "14",
+  "label": "OtherPlant",
+  "n": 202,
+  "verdict": {
+   "other_ok": 202
+  },
+  "pred_all": {
+   "OtherPlant": 140,
+   "Sicklepod": 55,
+   "SpottedSpurge": 2,
+   "Goosegrass": 2,
+   "CutleafGroundcherry": 2,
+   "MorningGlory": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "Sicklepod": 0.303,
+   "OtherPlant": 0.521,
+   "SpottedSpurge": 0.464,
+   "Goosegrass": 0.391,
+   "CutleafGroundcherry": 0.242,
+   "MorningGlory": 0.24
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Flax",
+  "label": "OtherPlant",
+  "n": 1745,
+  "verdict": {
+   "other_ok": 1745
+  },
+  "pred_all": {
+   "OtherPlant": 1607,
+   "SpottedSpurge": 95,
+   "Goosegrass": 22,
+   "Waterhemp": 7,
+   "Purslane": 6,
+   "Ragweed": 3,
+   "MorningGlory": 2,
+   "Sicklepod": 2,
+   "Carpetweed": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "MorningGlory": 0.399,
+   "OtherPlant": 0.479,
+   "Goosegrass": 0.24,
+   "SpottedSpurge": 0.27,
+   "Purslane": 0.218,
+   "Sicklepod": 0.215,
+   "Ragweed": 0.255,
+   "Waterhemp": 0.253,
+   "Carpetweed": 0.267
+  }
+ },
+ {
+  "source": "project_agml__weed_crop_detection",
+  "src_name": "Canola",
+  "label": "OtherPlant",
+  "n": 1804,
+  "verdict": {
+   "other_ok": 1804
+  },
+  "pred_all": {
+   "OtherPlant": 1535,
+   "MorningGlory": 86,
+   "PalmerAmaranth": 75,
+   "CutleafGroundcherry": 75,
+   "PricklySida": 27,
+   "Purslane": 2,
+   "Ragweed": 2,
+   "Sicklepod": 1,
+   "Carpetweed": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.465,
+   "PalmerAmaranth": 0.311,
+   "CutleafGroundcherry": 0.291,
+   "MorningGlory": 0.302,
+   "PricklySida": 0.319,
+   "Purslane": 0.306,
+   "Sicklepod": 0.186,
+   "Ragweed": 0.215,
+   "Carpetweed": 0.18
+  }
+ },
+ {
+  "source": "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy",
+  "src_name": "0 ridderzuring",
+  "label": "OtherPlant",
+  "n": 3163,
+  "verdict": {
+   "other_ok": 3163
+  },
+  "pred_all": {
+   "OtherPlant": 3163
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.9
+  }
+ },
+ {
+  "source": "rf_cotton-weed-detect__grass-weed-cotton-detect",
+  "src_name": "grass weeds",
+  "label": "OtherPlant",
+  "n": 5629,
+  "verdict": {
+   "other_ok": 5629
+  },
+  "pred_all": {
+   "OtherPlant": 5629
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.929
+  }
+ },
+ {
+  "source": "rf_fyp-oof0h__smart-agriculture-miw1m",
+  "src_name": "mosaic",
+  "label": "OtherPlant",
+  "n": 198,
+  "verdict": {
+   "other_ok": 198
+  },
+  "pred_all": {
+   "OtherPlant": 194,
+   "MorningGlory": 3,
+   "PalmerAmaranth": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.649,
+   "MorningGlory": 0.525,
+   "PalmerAmaranth": 0.397
+  }
+ },
+ {
+  "source": "rf_fyp-oof0h__smart-agriculture-miw1m",
+  "src_name": "healthy",
+  "label": "OtherPlant",
+  "n": 207,
+  "verdict": {
+   "other_ok": 207
+  },
+  "pred_all": {
+   "OtherPlant": 177,
+   "PalmerAmaranth": 19,
+   "Waterhemp": 7,
+   "MorningGlory": 4
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.521,
+   "PalmerAmaranth": 0.337,
+   "MorningGlory": 0.482,
+   "Waterhemp": 0.391
+  }
+ },
+ {
+  "source": "rf_fyp-oof0h__smart-agriculture-miw1m",
+  "src_name": "leaf curl",
+  "label": "OtherPlant",
+  "n": 166,
+  "verdict": {
+   "other_ok": 166
+  },
+  "pred_all": {
+   "OtherPlant": 164,
+   "PalmerAmaranth": 2
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.903,
+   "PalmerAmaranth": 0.442
+  }
+ },
+ {
+  "source": "rf_fyp-oof0h__smart-agriculture-miw1m",
+  "src_name": "xanthomonas",
+  "label": "OtherPlant",
+  "n": 31,
+  "verdict": {
+   "other_ok": 31
+  },
+  "pred_all": {
+   "OtherPlant": 31
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.7
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Poa_pratensis",
+  "label": "OtherPlant",
+  "n": 386,
+  "verdict": {
+   "other_ok": 386
+  },
+  "pred_all": {
+   "OtherPlant": 386
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.772
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Taraxacum_officinale",
+  "label": "OtherPlant",
+  "n": 1306,
+  "verdict": {
+   "other_ok": 1306
+  },
+  "pred_all": {
+   "OtherPlant": 1303,
+   "Goosegrass": 3
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.856,
+   "Goosegrass": 0.457
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Glechoma_hederacea",
+  "label": "OtherPlant",
+  "n": 259,
+  "verdict": {
+   "other_ok": 259
+  },
+  "pred_all": {
+   "OtherPlant": 259
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.886
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Potentilla_anserina",
+  "label": "OtherPlant",
+  "n": 451,
+  "verdict": {
+   "other_ok": 451
+  },
+  "pred_all": {
+   "OtherPlant": 451
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.854
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Plantago_major",
+  "label": "OtherPlant",
+  "n": 390,
+  "verdict": {
+   "other_ok": 390
+  },
+  "pred_all": {
+   "OtherPlant": 390
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.807
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Propleshina",
+  "label": "OtherPlant",
+  "n": 595,
+  "verdict": {
+   "other_ok": 595
+  },
+  "pred_all": {
+   "OtherPlant": 593,
+   "Purslane": 1,
+   "Goosegrass": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.882,
+   "Purslane": 0.32,
+   "Goosegrass": 0.552
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Achillea_millefolium",
+  "label": "OtherPlant",
+  "n": 289,
+  "verdict": {
+   "other_ok": 289
+  },
+  "pred_all": {
+   "OtherPlant": 289
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.852
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Musor",
+  "label": "OtherPlant",
+  "n": 201,
+  "verdict": {
+   "other_ok": 201
+  },
+  "pred_all": {
+   "OtherPlant": 201
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.92
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Poa_trivialis",
+  "label": "OtherPlant",
+  "n": 169,
+  "verdict": {
+   "other_ok": 169
+  },
+  "pred_all": {
+   "OtherPlant": 169
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.78
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Trifolium_pratense",
+  "label": "OtherPlant",
+  "n": 697,
+  "verdict": {
+   "other_ok": 697
+  },
+  "pred_all": {
+   "OtherPlant": 696,
+   "SpottedSpurge": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.842,
+   "SpottedSpurge": 0.404
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Ranunculus_repens",
+  "label": "OtherPlant",
+  "n": 140,
+  "verdict": {
+   "other_ok": 140
+  },
+  "pred_all": {
+   "OtherPlant": 140
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.905
+  }
+ },
+ {
+  "source": "rf_itmo-mp0nn__grass-detection-4",
+  "src_name": "Dry_grass",
+  "label": "OtherPlant",
+  "n": 118,
+  "verdict": {
+   "other_ok": 118
+  },
+  "pred_all": {
+   "OtherPlant": 118
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.901
+  }
+ },
+ {
+  "source": "rf_lemong__agriculture-xi7us",
+  "src_name": "ginseng",
+  "label": "OtherPlant",
+  "n": 9,
+  "verdict": {
+   "other_ok": 9
+  },
+  "pred_all": {
+   "OtherPlant": 9
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.885
+  }
+ },
+ {
+  "source": "rf_lemong__agriculture-xi7us",
+  "src_name": "pave",
+  "label": "OtherPlant",
+  "n": 57,
+  "verdict": {
+   "other_ok": 57
+  },
+  "pred_all": {
+   "OtherPlant": 57
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.925
+  }
+ },
+ {
+  "source": "rf_lemong__agriculture-xi7us",
+  "src_name": "greenhouse",
+  "label": "OtherPlant",
+  "n": 608,
+  "verdict": {
+   "other_ok": 608
+  },
+  "pred_all": {
+   "OtherPlant": 608
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.915
+  }
+ },
+ {
+  "source": "rf_lemong__agriculture-xi7us",
+  "src_name": "hut",
+  "label": "OtherPlant",
+  "n": 271,
+  "verdict": {
+   "other_ok": 271
+  },
+  "pred_all": {
+   "OtherPlant": 271
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.969
+  }
+ },
+ {
+  "source": "rf_lemong__agriculture-xi7us",
+  "src_name": "solar",
+  "label": "OtherPlant",
+  "n": 278,
+  "verdict": {
+   "other_ok": 278
+  },
+  "pred_all": {
+   "OtherPlant": 278
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.922
+  }
+ },
+ {
+  "source": "rf_lemong__agriculture-xi7us",
+  "src_name": "tresh",
+  "label": "OtherPlant",
+  "n": 19,
+  "verdict": {
+   "other_ok": 19
+  },
+  "pred_all": {
+   "OtherPlant": 19
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.935
+  }
+ },
+ {
+  "source": "rf_lemong__agriculture-xi7us",
+  "src_name": "shed",
+  "label": "OtherPlant",
+  "n": 120,
+  "verdict": {
+   "other_ok": 120
+  },
+  "pred_all": {
+   "OtherPlant": 120
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.906
+  }
+ },
+ {
+  "source": "rf_lemong__agriculture-xi7us",
+  "src_name": "mushroom",
+  "label": "OtherPlant",
+  "n": 6,
+  "verdict": {
+   "other_ok": 6
+  },
+  "pred_all": {
+   "OtherPlant": 6
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.939
+  }
+ },
+ {
+  "source": "rf_project-5nvic__weed-detection-0tfsj",
+  "src_name": "crop",
+  "label": "OtherPlant",
+  "n": 529,
+  "verdict": {
+   "other_ok": 529
+  },
+  "pred_all": {
+   "OtherPlant": 529
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.919
+  }
+ },
+ {
+  "source": "rf_robtica-unileon-gluqm__farming-robotics",
+  "src_name": "corn",
+  "label": "OtherPlant",
+  "n": 16593,
+  "verdict": {
+   "other_ok": 16593
+  },
+  "pred_all": {
+   "OtherPlant": 16592,
+   "Goosegrass": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.941,
+   "Goosegrass": 0.556
+  }
+ },
+ {
+  "source": "rf_srec-dthh0__crop-and-weed-detection-fqrtg",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 47942,
+  "verdict": {
+   "other_ok": 47942
+  },
+  "pred_all": {
+   "OtherPlant": 47941,
+   "Goosegrass": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.973,
+   "Goosegrass": 0.438
+  }
+ },
+ {
+  "source": "rf_srec-dthh0__crop-weed-poxtn",
+  "src_name": "3",
+  "label": "OtherPlant",
+  "n": 912,
+  "verdict": {
+   "other_ok": 912
+  },
+  "pred_all": {
+   "OtherPlant": 912
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.929
+  }
+ },
+ {
+  "source": "rf_srec-dthh0__crop-weed-poxtn",
+  "src_name": "2",
+  "label": "OtherPlant",
+  "n": 1147,
+  "verdict": {
+   "other_ok": 1147
+  },
+  "pred_all": {
+   "OtherPlant": 1147
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.921
+  }
+ },
+ {
+  "source": "rf_test-8qezo__weed-detection-ycai2",
+  "src_name": "0",
+  "label": "OtherPlant",
+  "n": 37,
+  "verdict": {
+   "other_ok": 37
+  },
+  "pred_all": {
+   "OtherPlant": 37
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.887
+  }
+ },
+ {
+  "source": "rf_uav-qnoms__uav-wqshy",
+  "src_name": "",
+  "label": "OtherPlant",
+  "n": 6362,
+  "verdict": {
+   "other_ok": 6362
+  },
+  "pred_all": {
+   "OtherPlant": 6357,
+   "SpottedSpurge": 3,
+   "Purslane": 1,
+   "Carpetweed": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.665,
+   "SpottedSpurge": 0.257,
+   "Purslane": 0.233,
+   "Carpetweed": 0.249
+  }
+ },
+ {
+  "source": "rf_university-of-peradeniya__weed-detection-ekr8i",
+  "src_name": "crop",
+  "label": "OtherPlant",
+  "n": 740,
+  "verdict": {
+   "other_ok": 740
+  },
+  "pred_all": {
+   "OtherPlant": 740
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.895
+  }
+ },
+ {
+  "source": "rf_vizerion__weed-detection-5ell6",
+  "src_name": "0 ridderzuring",
+  "label": "OtherPlant",
+  "n": 7070,
+  "verdict": {
+   "other_ok": 7070
+  },
+  "pred_all": {
+   "OtherPlant": 7070
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.898
+  }
+ },
+ {
+  "source": "rf_weed-detection-o9sfb__weed-detection-in-a-field",
+  "src_name": "0 ridderzuring",
+  "label": "OtherPlant",
+  "n": 3522,
+  "verdict": {
+   "other_ok": 3522
+  },
+  "pred_all": {
+   "OtherPlant": 3522
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.941
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "parthenium hysterophorous",
+  "label": "OtherPlant",
+  "n": 1352,
+  "verdict": {
+   "other_ok": 1352
+  },
+  "pred_all": {
+   "OtherPlant": 1247,
+   "Ragweed": 53,
+   "SpottedSpurge": 13,
+   "Goosegrass": 10,
+   "Carpetweed": 10,
+   "PricklySida": 9,
+   "Eclipta": 5,
+   "MorningGlory": 3,
+   "Waterhemp": 1,
+   "Sicklepod": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.701,
+   "SpottedSpurge": 0.409,
+   "Goosegrass": 0.309,
+   "Ragweed": 0.339,
+   "Eclipta": 0.38,
+   "Waterhemp": 0.358,
+   "Sicklepod": 0.261,
+   "Carpetweed": 0.351,
+   "MorningGlory": 0.51,
+   "PricklySida": 0.504
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Dry leaf",
+  "label": "OtherPlant",
+  "n": 425,
+  "verdict": {
+   "other_ok": 425
+  },
+  "pred_all": {
+   "OtherPlant": 411,
+   "Carpetweed": 8,
+   "PalmerAmaranth": 2,
+   "PricklySida": 2,
+   "Eclipta": 1,
+   "SpottedSpurge": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.748,
+   "PalmerAmaranth": 0.322,
+   "Carpetweed": 0.339,
+   "PricklySida": 0.42,
+   "Eclipta": 0.334,
+   "SpottedSpurge": 0.251
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "phhyllanthus",
+  "label": "OtherPlant",
+  "n": 113,
+  "verdict": {
+   "other_ok": 113
+  },
+  "pred_all": {
+   "OtherPlant": 100,
+   "Sicklepod": 8,
+   "Waterhemp": 2,
+   "Carpetweed": 1,
+   "CutleafGroundcherry": 1,
+   "SpottedSpurge": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.696,
+   "Sicklepod": 0.591,
+   "Carpetweed": 0.408,
+   "CutleafGroundcherry": 0.452,
+   "Waterhemp": 0.222,
+   "SpottedSpurge": 0.239
+  }
+ },
+ {
+  "source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+  "src_name": "Chenopodium",
+  "label": "OtherPlant",
+  "n": 219,
+  "verdict": {
+   "other_ok": 219
+  },
+  "pred_all": {
+   "OtherPlant": 209,
+   "Eclipta": 6,
+   "PricklySida": 2,
+   "PalmerAmaranth": 1,
+   "Carpetweed": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "PalmerAmaranth": 0.516,
+   "OtherPlant": 0.776,
+   "PricklySida": 0.421,
+   "Eclipta": 0.388,
+   "Carpetweed": 0.434
+  }
+ },
+ {
+  "source": "rf_yolo-gyfyq__weed-ieda7",
+  "src_name": "weed",
+  "label": "OtherPlant",
+  "n": 5196,
+  "verdict": {
+   "other_ok": 5196
+  },
+  "pred_all": {
+   "OtherPlant": 5195,
+   "MorningGlory": 1
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.932,
+   "MorningGlory": 0.471
+  }
+ },
+ {
+  "source": "rf_zijian-peng__grass-weed-69hcm",
+  "src_name": "grass weeds - v2 release",
+  "label": "OtherPlant",
+  "n": 3,
+  "verdict": {
+   "other_ok": 3
+  },
+  "pred_all": {
+   "OtherPlant": 3
+  },
+  "pred_confident": {},
+  "mean_p": {
+   "OtherPlant": 0.985
+  }
+ }
+]

@@ -87,3 +87,7 @@ docs/poster/agentAI_poster_48x36_*.png
 
 # poster version folders: the deck is rebuilt by build_version.py
 docs/poster/versions/*/*.pptx
+
+# Funnel audit: rendered crop sheets hold harvested dataset pixels and are never redistributed (docs/FUNNEL_AUDIT.md DEC-7)
+weed_llm_benchmark/results/framework/inc/funnel/sheets/
+weed_llm_benchmark/results/framework/inc/funnel/sheets_*/

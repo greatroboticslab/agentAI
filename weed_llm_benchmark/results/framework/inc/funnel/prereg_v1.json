@@ -1,0 +1,416 @@
+{
+ "format": "funnel-prereg/1",
+ "version": "v1",
+ "date": "2026-09-28",
+ "contract": {
+  "path": "docs/FUNNEL_AUDIT.md",
+  "sha256": "52abc928092c5ccf11bfb2e847a4f2214c6276bc45441e88108a8985acb660b5",
+  "rule": "If this file and the contract differ, the contract wins and the fix is a dated amendment."
+ },
+ "domain": "weed",
+ "class_policy": {
+  "MorningGlory": {
+   "rank": "genus",
+   "taxon": "Ipomoea"
+  },
+  "SpottedSpurge": {
+   "rank": "species",
+   "taxon": "Euphorbia maculata",
+   "not": [
+    "Euphorbia hirta",
+    "Euphorbia hypericifolia",
+    "Euphorbia prostrata",
+    "Euphorbia geniculata"
+   ]
+  },
+  "Ragweed": {
+   "rank": "species",
+   "taxon": "Ambrosia artemisiifolia",
+   "not": [
+    "Ambrosia trifida"
+   ]
+  },
+  "Sicklepod": {
+   "rank": "species",
+   "taxon": "Senna obtusifolia",
+   "not": [
+    "Chamaecrista pumila",
+    "Senna tora"
+   ]
+  },
+  "PalmerAmaranth": {
+   "rank": "species",
+   "taxon": "Amaranthus palmeri",
+   "not": [
+    "Amaranthus retroflexus",
+    "Amaranthus hybridus"
+   ]
+  },
+  "Waterhemp": {
+   "rank": "species",
+   "taxon": "Amaranthus tuberculatus",
+   "not": [
+    "Amaranthus retroflexus",
+    "Amaranthus hybridus"
+   ]
+  },
+  "other_classes": "one species each, as cwd12_species.CWD12_BINOMIAL",
+  "genus_answers_unsure_for": [
+   "Amaranthus",
+   "Euphorbia",
+   "Ambrosia",
+   "Senna",
+   "Chamaecrista"
+  ]
+ },
+ "known_truth": {
+  "KT1": "train_core crops (in-domain; leave-session-out)",
+  "KT2": "cwd12 copies (calibration.json)",
+  "KT3": "three_season 2021 copy",
+  "KT4": "NDSU target boxes (claimed until H1); not split",
+  "KT5": "named non-targets (claimed until H2b)",
+  "KT6": "MH-Weed16 card classes (claimed until H3a)",
+  "KT7": "iNaturalist Research Grade, <=30 per taxon, CC photos, evaluation-only",
+  "qualify_RL_on": [
+   "KT1",
+   "KT2",
+   "KT3",
+   "KT7"
+  ],
+  "KT7_never_qualifies": [
+   "J1",
+   "J-zs"
+  ],
+  "disjointness": [
+   "source",
+   "near_dup_group_3bit",
+   "provenance_group",
+   "annotating_lab"
+  ],
+  "lab_groups": {
+   "NDSU": [
+    "project_agml__weed_crop_detection",
+    "project_agml__greenhouse_crop_weed_detection",
+    "project_agml__imageweeds_aerial_weed_detection",
+    "project_agml__imageweeds_weed_detection"
+   ],
+   "LuLab": [
+    "cwd12",
+    "CottonWeedID15",
+    "project_agml__three_season_weed_detection",
+    "rf_karthikeya-c8pvy__weed-detection-cwp10",
+    "rf_zig-zag-lnodr__weed-detection-vanpe"
+   ]
+  },
+  "forbidden": [
+   "dev",
+   "test",
+   "ood22",
+   "ood23",
+   "imageweeds"
+  ]
+ },
+ "reference_labeller": {
+  "backends": {
+   "RL-A": "claude-opus-5-5 (vision); pool and known-truth crops only",
+   "RL-B": "ollama:qwen3.8:27b (vision), cluster job"
+  },
+  "task": "blind multiple choice: 12 targets + stratum attractors + other plant + not a plant + box invalid + unsure",
+  "qualification": {
+   "se_lb_min": 0.85,
+   "sp_lb_min": 0.85,
+   "levels": [
+    "species",
+    "genus",
+    "plant_vs_nonplant"
+   ],
+   "sentinel_share": 0.2,
+   "wrong_proposal_share_of_sentinels": 0.25,
+   "min_sheet_target_prevalence": 0.2
+  },
+  "primary_rule": "qualified backend with the larger sum of Se and Sp lower bounds at the needed level; tie -> RL-B",
+  "G5_backend": "RL-B only"
+ },
+ "judges": {
+  "panel": [
+   "J0 source label",
+   "J-card",
+   "J-taxon GBIF",
+   "J-zs BioCLIP-2 zero-shot",
+   "J-knn1 DINOv2 train_core",
+   "J-knn2 DINOv2 multi-domain leave-lab-out",
+   "J-vlm = RL-B"
+  ],
+  "J1_never_rejudges_own_discards": true,
+  "qualification": {
+   "precision_lb_min_vs_attractors": 0.85,
+   "rescue_rate_lb_min": 0.5,
+   "correlated_phi": 0.5
+  }
+ },
+ "sampling": {
+  "seed_text": "funnel/v1/<group>/<stratum>",
+  "kt4_seed_text": "funnel/v1/kt4",
+  "groups": {
+   "G0": [
+    120,
+    60
+   ],
+   "G1": [
+    300,
+    160
+   ],
+   "G2": [
+    300,
+    150
+   ],
+   "G2v": [
+    60,
+    30
+   ],
+   "G2a": [
+    60,
+    30
+   ],
+   "G3": [
+    450,
+    250
+   ],
+   "G4": [
+    450,
+    300
+   ],
+   "G5": [
+    160,
+    100
+   ],
+   "sentinels": [
+    400,
+    null
+   ],
+   "KT7_sentinels": [
+    150,
+    null
+   ]
+  },
+  "budget_order_if_short": [
+   "G0+sentinels",
+   "G3",
+   "G2+G2v",
+   "G1",
+   "G5",
+   "G4"
+  ],
+  "G3_clusters_per_no_name_source": 8,
+  "G3_crops_per_unit": [
+   20,
+   30
+  ],
+  "G4_uniform": 300,
+  "name_status": "name_status_v2 frozen at F3 before F6"
+ },
+ "estimators": {
+  "per_stratum": "Wilson (Jeffreys if n<30)",
+  "aggregate": "stratified, FPC, Korn-Graubard",
+  "prioritised": "Horvitz-Thompson",
+  "judge_assisted": "stratified PPI++ with power tuning",
+  "rl_error": "Rogan-Gladen, melded intervals; flag if Se+Sp-1<0.7",
+  "clustering": "cluster bootstrap by image, 2000 resamples; by source across sources",
+  "funnel_recall": "Webber beta-binomial Monte Carlo",
+  "decisions_one_sided": 0.975,
+  "screening": {
+   "holm": true,
+   "fn_rate_null": 0.1,
+   "R_min_boxes": 500,
+   "R_min_small_class": 100,
+   "small_class_train_core_boxes_below": 200
+  }
+ },
+ "hypotheses": {
+  "H0": {
+   "a": "G0 95% interval covers planted share",
+   "b": "relation audit (names hidden) maps cottonweed_holdout and three_season-2021 classes with >=20 boxes to true species; flags cottonweed_holdout old join; does not flag cottonweed_sp8 current join",
+   "c": "reported; gates L11(b) visual maps",
+   "falsified_action": "stop at F8"
+  },
+  "H1_pre": "NDSU label ids agree with upstream Mendeley annotations by geometry",
+  "H1": {
+   "measure": "RL precision (label right and box valid) of non-verified NDSU target boxes",
+   "supported": "LB>=0.85 overall and for Ragweed",
+   "falsified": "UB<0.85 overall"
+  },
+  "H2a": {
+   "frame": "no-information strata (v2)",
+   "supported": "LB>=0.5",
+   "falsified": "UB<0.5"
+  },
+  "H2b": {
+   "frame": "taxon-resolved, target-related and role-name strata (v2)",
+   "supported": "UB<=0.15",
+   "falsified": "LB>0.15"
+  },
+  "H3a": {
+   "geometry_match_min": 0.95,
+   "id_agreement_min": 0.99,
+   "alignments": "identity, +-1, 16 drop-class-d maps; chosen on a seeded half, confirmed on the other",
+   "purity": {
+    "point_min": 0.8,
+    "lb_min": 0.6,
+    "classes": {
+     "12": "Senna obtusifolia",
+     "5": "Ipomoea"
+    }
+   },
+   "falsified": "agreement <0.99 under every alignment, or a purity LB <0.6"
+  },
+  "H3b": {
+   "frame": "anonymous sources other than mh_weed16 with >=100 embedded boxes",
+   "supported": "some class or visual cluster has target-prevalence LB>=0.5",
+   "falsified": "every UB<0.3"
+  },
+  "H4": {
+   "supported": "UB<0.02 named-other and UB<0.10 no-information",
+   "falsified": "LB>=0.02 named-other or LB>=0.10 no-information",
+   "else": "inconclusive"
+  },
+  "H5a": {
+   "exact": "dropped exact_dup twins carrying a target box the kept twin lacks < 100 boxes"
+  },
+  "H5b": {
+   "supported": ">=0.8 of non-cwd12 near_eval hits are the same photo or a consecutive frame",
+   "falsified": "UB<0.8",
+   "backend": "RL-B only"
+  },
+  "H6": {
+   "detector": "DINOv2 descriptors + dHash of flip/rotate variants",
+   "calibration": {
+    "positives": "train_core augmented (flip, rot90, crop 0-20%, brightness +-25%, blur, shear, letterbox 640, JPEG)",
+    "recall_min_per_family": 0.95,
+    "negatives": "7-10 bit pairs from provenance-disjoint sources",
+    "fpr_max": 0.01
+   },
+   "scope": "14 sources with near_eval hits + base B + realloop_v1 increments",
+   "routing": "a source with a detected copy is quarantined from recovery as a whole; a copy in B voids C1 and rebuilds B"
+  },
+  "H7": "J-zs and J-knn1 fail qualification on KT7/KT2; J-knn2 qualifies",
+  "H8": {
+   "supported": "RL-confirmed shifted recall +>=0.20 abs, in-domain precision >=0.99, named-relative conflicts -50% on held-out-lab strata",
+   "falsified": "UB of recall rise <0.10"
+  },
+  "H9": "descriptive multiverse, 24 cells",
+  "H9_prime": {
+   "quantity": "LB of sum N_h*precision_h over admitted strata with precision LB>=0.85",
+   "supported": "best cell LB>=4098",
+   "falsified": "best cell UB<3073.5"
+  },
+  "H10a": {
+   "rule": "gate.truth_detail helps (P>=0.75 and species guard) AND one-sided exact permutation p<=0.025 at 5 v 5 seeds",
+   "falsified": "neutral or hurts"
+  },
+  "H10b": "U vs U-ctl P>=0.75",
+  "H10c": ">=1 M-size recovery increment helps and beats its same-image control P>=0.75",
+  "H10d": "secondary domain dev, never decides",
+  "H11": {
+   "supported": "DA top-1 stage == stage with largest R-hat LB, and log-loss beats uniform over recoverable stages",
+   "DA_blind_to": [
+    "docs/FUNNEL_AUDIT.md",
+    "R14 fixture",
+    "D17 proposal list"
+   ]
+  },
+  "H12": {
+   "supported": ">=0.70 of known-item datasets present in registry",
+   "falsified": "UB<0.70"
+  }
+ },
+ "recovery_gates": {
+  "box": {
+   "precision_lb_min": 0.85,
+   "precision_point_min": 0.9,
+   "one_sided": 0.975,
+   "level": "species (genus for MorningGlory only)"
+  },
+  "class_purity_lb_min": 0.8,
+  "ragweed_identity_check": "30 train_core Ragweed crops are A. artemisiifolia before any NDSU Ragweed is recovered",
+  "levers": [
+   "R-A",
+   "R-C",
+   "R-T",
+   "R-V",
+   "R-J",
+   "R-F"
+  ],
+  "never_recoverable": [
+   "guard stages",
+   "no_boxes",
+   "small boxes",
+   "named relatives (under H2b)",
+   "non-plant and leaf-disease sources"
+  ],
+  "overlay_dir": "INC_DIR/step1_r1/",
+  "source_labels_unchanged": true,
+  "never_train_check_on_unmasked_and_masked": true
+ },
+ "diagnoses": {
+  "D17": "scarcity_conclusion_unaudited: conclusion AND any of S1-S7 AND no matching audit",
+  "D18": {
+   "fn_lb_min": 0.1,
+   "recover_min_frac_of_verified": 0.25
+  },
+  "D19": "filter_recall_unmeasured",
+  "signals": {
+   "S1_reject_accept_min": 1.0,
+   "S2_uninformative_min": 0.1,
+   "S3_class_yield": "verified share <0.25 x median over classes with >=100 name-joined boxes"
+  }
+ },
+ "realloop_v2": {
+  "M": 287,
+  "floor_frac_of_B": 0.05,
+  "sequence": [
+   "REC-VETO",
+   "REC-AUTH-1",
+   "REC-CLASS-1",
+   "REC-JUDGE-1",
+   "REC-AUTH-2",
+   "REC-CLASS-2"
+  ],
+  "clean": false,
+  "substitution_order": [
+   "AUTH",
+   "CLASS",
+   "VETO"
+  ],
+  "arms": {
+   "U": {
+    "seeds": 5,
+    "cap_images": 3927
+   },
+   "B_extra_seeds": 2,
+   "U-ctl": 3,
+   "CLASS-ctl": 3,
+   "JUDGE-ctl": 3
+  },
+  "decisions": "dev 12-class mAP50-95 only"
+ },
+ "decisions": [
+  "DEC-1",
+  "DEC-2",
+  "DEC-3",
+  "DEC-4",
+  "DEC-5",
+  "DEC-6",
+  "DEC-7",
+  "DEC-8",
+  "DEC-9",
+  "DEC-10"
+ ],
+ "budget_gpu_h_cap": 120,
+ "stop_rules": [
+  "H0 fails -> stop at F8",
+  "H6b copy -> R4 incident before F9; C1 void, B rebuilt",
+  "never-train hit in a recovered set -> stop F9",
+  "no RL qualifies for a genus -> hypotheses about it bounded"
+ ],
+ "amendments": []
+}
