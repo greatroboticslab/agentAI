@@ -10495,3 +10495,42 @@ Next steps were also decided by hand; the autopilot makes the platform decide th
   0.8502 +- 0.0059, while the chain's model (base B seed 0) scores 0.8552. Truth-arm agreement 2/6.
 - Live-operation fixes: the cluster copy of model_router.py was stale (no planner role); the research brain's digest
   outgrew its 49,152-token context and is now trimmed deterministically with a larger context.
+
+## 2026-09-28 — v3.62.0 (in progress): funnel audit of the Step 1 filters
+
+### What changed
+
+- **Contract, pre-registered:** `docs/FUNNEL_AUDIT.md` and `results/framework/inc/funnel/prereg_v1.json`, committed before any sample. They fix:
+  - hypotheses H0–H12 and their falsifiers;
+  - the known-truth sets and the circularity and disjointness rules;
+  - sampling, estimators, recovery gates, the realloop_v2 design, and decisions DEC-1..DEC-10.
+- **Runner contract:** `docs/FUNNEL_AUDIT_RUNNER.md`.
+- **`tools/funnel/`**, a domain-free engine:
+  - ledger, strata, seeded draw with a sample lock, estimators and hypothesis evaluators, claims register;
+  - taxonomy resolution through cached GBIF answers;
+  - class-relation audit and geometry match;
+  - lab-side fetches: cards, upstream annotations, iNaturalist known truth;
+  - DINOv2 features, judges, a calibrated copy detector;
+  - blind multiple-choice sheets, two reference-labeller backends, qualification;
+  - recovery overlays with masks, guards, licences and provenance.
+  - Weed specifics live only in `adapters/inc_step1.py` and `domains/weed.json`.
+- **The autopilot:**
+  - signals S1–S7; diagnoses D17 (scarcity conclusion unaudited), D18 (filter false negatives) and D19 (filter recall unmeasured);
+  - levers L10–L14, cards X10–X12;
+  - the claims register and a devil's-advocate role (another model family);
+  - `panel.py`, and an exam list taken from the domain config.
+- **Loop builders:** `inc.realloop` gains `--increment-sources recovered --step1-overlay`; `inc.pilot build-baseline` accepts recovery manifests.
+- **Deploy and reproduction:** `deploy/deploy_funnel.sh` and `docs/FUNNEL_REPRODUCE.md`.
+
+### Why
+
+The 2026-09-27 real loop concluded that the harvest supplies few target-species labels. That conclusion was drawn only through filters whose recall had never been measured outside the reference domain. Every known-truth set of the Step 1 verifier is a copy of cwd12 photographs.
+
+### How verified
+
+- **Tests:** 57 test scripts pass locally, including replays R1–R14, mutation tests M1–M10 and an end-to-end synthetic pipeline test.
+- **Replay gate:** passes on the lab for the deployed code.
+- **Deploy verification:** `deploy_funnel.sh` checks every deployed file on the lab and in both cluster copies.
+- **Live run:** the autopilot fired D17 and D19 on the real Step 1 files by itself. It then ran the taxonomy and card fetches, and submitted the census (job 47242297).
+- **Live-only defects:** four surfaced in the first live steps. Each is fixed with a test (commits d94b1c6, e16b9e1).
+- **No audit estimate exists yet.**

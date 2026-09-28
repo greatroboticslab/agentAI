@@ -4,7 +4,7 @@
 Pinned:
   * C1 and C2 as runner §5.5.10 files them (human-transcribed; the RESEARCH_LOG
     line and the poster figure are cited) validate, and their cites resolve
-    in this repository (line 154 of RESEARCH_LOG.md holds C1's text, the
+    in this repository (C1 was filed from line 154 of RESEARCH_LOG.md at 8b50e52; its text, the
     poster figure data holds the C2 pointer);
   * every allowed transition works for each allowed actor kind, and every
     other (status pair, actor) is refused;
@@ -52,10 +52,10 @@ def cite(artifact, value, line=None, pointer=None):
 
 print("seed claims C1 and C2")
 log = (GIT / "RESEARCH_LOG.md").read_text(encoding="utf-8").splitlines()
-line154 = log[153] if len(log) >= 154 else ""
-words = re.findall(r"[a-z]+", C1_TEXT.lower())
-check("RESEARCH_LOG.md line 154 carries C1's sentence", "harvested increments do not improve" in line154.lower()
-      or all(w in line154.lower() for w in words[:6]), line154[:160])
+# C1 was filed from line 154 (commit 8b50e52); entries are added above it, so it is found by its text
+hits = [i for i, ln in enumerate(log) if "harvested increments do not improve" in ln.lower()]
+line154 = log[hits[0]] if len(hits) == 1 else ""
+check("RESEARCH_LOG.md carries C1's sentence once", len(hits) == 1, hits)
 fig = json.loads((GIT / "docs" / "poster" / "figures_data.json").read_text(encoding="utf-8"))
 reading = (fig.get("s1_gate_verdict_2026_08_25") or {}).get("reading")
 check("the poster figure carries C2's pointer", isinstance(reading, str) and "supervision" in reading, reading)

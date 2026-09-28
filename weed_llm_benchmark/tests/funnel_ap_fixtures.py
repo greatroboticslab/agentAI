@@ -97,9 +97,15 @@ def seed_claims(root, challenged=False):
     of 2026-08-25), filed as the runner's 5.5.10 says. `challenged` gives C1
     the status a surviving DA pass leaves (R10's starting point)."""
     repo = PKG_ROOT.parent
-    line = (repo / "RESEARCH_LOG.md").read_text(encoding="utf-8").splitlines()[RESEARCH_LOG_LINE - 1]
-    if C1_TEXT not in line:
-        raise SystemExit("RESEARCH_LOG.md line %d no longer holds C1's sentence: %r" % (RESEARCH_LOG_LINE, line))
+    # C1 is cited as filed: RESEARCH_LOG.md line RESEARCH_LOG_LINE at commit 8b50e52. Entries
+    # are added above it (newest first), so today the sentence is found by its text, and the
+    # cite keeps the line and text it had when it was filed.
+    lines = (repo / "RESEARCH_LOG.md").read_text(encoding="utf-8").splitlines()
+    hits = [ln for ln in lines if C1_TEXT in ln]
+    if len(hits) != 1:
+        raise SystemExit("RESEARCH_LOG.md holds C1's sentence %d times, not once" % len(hits))
+    line = hits[0]
+    line_no = RESEARCH_LOG_LINE
     rep = json.loads((root / "realloop_v1" / "report.json").read_text())
     fig = json.loads((repo / "docs" / "poster" / "figures_data.json").read_text())
     reading = fig["s1_gate_verdict_2026_08_25"]["reading"]
@@ -107,7 +113,7 @@ def seed_claims(root, challenged=False):
         raise SystemExit("figures_data.json no longer holds C2's reading")
     c1 = _claim("C1", C1_TEXT, "negative", "realloop_v1 on Step 1 of 2026-09-27: the harvested increments",
                 "human-transcribed",
-                [_cite("RESEARCH_LOG.md", line, line=RESEARCH_LOG_LINE),
+                [_cite("RESEARCH_LOG.md", line, line=line_no),
                  _cite("realloop_v1/report.json", rep["agreement"]["full"], pointer="/agreement/full")],
                 history_extra=(("challenged", "tier2:adversary/glm-4.7-flash",
                                 "the devil's-advocate pass left grounded counter-arguments standing"),)

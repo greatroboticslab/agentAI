@@ -13,6 +13,35 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-09-28 — Did the Step 1 filters discard target data? The audit is pre-registered, and the platform flagged its own conclusion
+
+**Question.** The 2026-09-27 loop concluded that the harvest holds few target-species labels. Only 2,049 of 670,818 harvested boxes were verified, and every increment was rejected. The loop observed data only after the filters, and the verifier's known truth is all cwd12 photographs. So the conclusion says nothing yet about what the filters discarded.
+
+**Exploratory reads, not results** (census_v0 and the dataset forensics; all marked post hoc in the contract):
+- **The image-level admission rule** drops a whole image when any box conflicts. It removed 989 of the 2,049 verified target boxes, including all 346 Palmer amaranth boxes.
+- **Most OtherPlant → target "conflicts" are relatives the 13-way probe pulls onto the nearest target.** On named non-target classes, the probe makes a confident target call on 3.1 % of boxes overall, but on 57–69 % of redroot pigweed (called Palmer amaranth) and 64 % of cotton (called MorningGlory).
+- **Anonymous classes resolved from their upstream papers.** MH-Weed16 id 12 is *Senna obtusifolia* (Sicklepod) and id 5 is *Ipomoea obscura*. Ids 8 and 11 are *Euphorbia hirta* and *E. hypericifolia*, relatives of the target spurge, not the target.
+- **Paper-confirmed NDSU target labels:** the verifier verified 855 of 4,639 (18.4 %), and for Ragweed 27 of 2,049.
+
+**Pre-registration.** `docs/FUNNEL_AUDIT.md` (commit 35d3bd5) fixes the following before any sample is drawn:
+- H0–H12, with a planted backtest that stops the campaign if it fails;
+- independent known truth, including iNaturalist Research Grade;
+- two blind reference labellers, qualified on sentinels;
+- stratified estimators, recovery gates, and realloop_v2 with 5-seed arms.
+
+**The platform, without a person.** After deployment the autopilot fired both new diagnoses on the real Step 1 files, citing resolvable evidence:
+- D17: the negative conclusion rests on unaudited filters; signals S1–S7 all hold.
+- D19: "filter recall cannot be measured outside the reference domain: every one of the 14 known-truth set(s) lies in the reference domain".
+
+It then did three things in dependency order:
+- resolved 145 source class names through GBIF, with 19 recorded project overrides;
+- fetched and hashed the dataset cards and upstream annotations;
+- submitted the census job.
+
+Four live-only defects surfaced and were fixed with tests.
+
+**Status.** There is no estimate yet of how much was discarded or whether recovered data raises accuracy. Those come from the platform's audit (F3–F8) and realloop_v2 (F10).
+
 ## 2026-09-27 — Incremental training on a high-precision base, tested properly; the platform now runs the campaign itself
 
 The design under test: build a high-precision base set, add small fixed-size increments one at a time

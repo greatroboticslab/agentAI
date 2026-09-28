@@ -64,6 +64,12 @@ Contract and results:
 - `results/framework/inc/<exp>/report.md` for every experiment.
 - `results/framework/_brain/weed/inc/inc_campaign.jsonl`: the autopilot's own decision ledger.
 
+Funnel audit (in progress): did the Step 1 filters discard target-species data, and does recovering it raise dev
+accuracy? The platform runs it; no estimate exists yet.
+- [`docs/FUNNEL_AUDIT.md`](../docs/FUNNEL_AUDIT.md): the pre-registered contract (hypotheses H0–H12, gates, decisions).
+- [`docs/FUNNEL_AUDIT_RUNNER.md`](../docs/FUNNEL_AUDIT_RUNNER.md): modules, formats and commands.
+- [`docs/FUNNEL_REPRODUCE.md`](../docs/FUNNEL_REPRODUCE.md): deploy (`deploy/deploy_funnel.sh`) and reproduction.
+
 Reproduce on Bridges-2. Run from the repo root with `REPO` pointing at it and `PYTHONPATH=$REPO`, in the `bench`
 environment (Ultralytics 8.4.37, pinned by the scorer):
 
