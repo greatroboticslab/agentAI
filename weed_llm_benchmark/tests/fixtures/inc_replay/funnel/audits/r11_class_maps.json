@@ -1,0 +1,35 @@
+{
+ "format": "funnel-class-maps/1",
+ "proposals": [
+  {
+   "card": {
+    "path": "cards/mh_weed16/table2.json",
+    "sha256": "4945d90c5c5ee4b098d17cd9a3e1a86659b90eaff6cbd5b5d99d4353f7a537e5",
+    "table_source": "PMC12179629 Table 2"
+   },
+   "geometry": {
+    "agreement": 0.995,
+    "alignment": "identity"
+   },
+   "map_to": "Sicklepod",
+   "reason": "card and geometry agree",
+   "source": "project_agml__mh_weed16_weed_detection",
+   "src_id": "12",
+   "src_name": "12",
+   "status": "proposed",
+   "via": "card+geometry"
+  },
+  {
+   "card": null,
+   "geometry": null,
+   "map_to": null,
+   "reason": "the card lists 3 classes, the source has 4: the class count disagrees with the card",
+   "source": "rf_srec__crop-weed-poxtn",
+   "src_id": "2",
+   "src_name": "2",
+   "status": "to_L14",
+   "via": "card"
+  }
+ ],
+ "synthetic": true
+}

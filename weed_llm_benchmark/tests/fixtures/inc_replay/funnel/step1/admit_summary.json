@@ -1,0 +1,578 @@
+{
+ "admitted_boxes_per_class": {
+  "Carpetweed": 70,
+  "CutleafGroundcherry": 0,
+  "Eclipta": 10,
+  "Goosegrass": 52,
+  "MorningGlory": 158,
+  "OtherPlant": 624533,
+  "PalmerAmaranth": 0,
+  "PricklySida": 0,
+  "Purslane": 0,
+  "Ragweed": 3,
+  "Sicklepod": 54,
+  "SpottedSpurge": 276,
+  "Waterhemp": 437
+ },
+ "boxes": {
+  "conflict": 8732,
+  "other_ok": 531781,
+  "unknown": 2756,
+  "verified": 2049
+ },
+ "boxes_small_not_embedded": 125500,
+ "built_utc": "2026-09-27T06:23:02Z",
+ "conflict_boxes": 8732,
+ "crops_sha256": "d8188b16fad47c34b6a771fb806ab2c1b607d6b99126fc134ada34f299164485",
+ "embeddings": {
+  "dim": 768,
+  "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+  "failed_crops": 0,
+  "nan_rows": 0,
+  "nshards": 4
+ },
+ "images": {
+  "admitted": 96966,
+  "conflict": 5358,
+  "unknown": 596
+ },
+ "images_unknown_only_for_small_species_boxes": 4,
+ "inputs": {
+  "copies_sha256": "21f7af1fec8870167a9a68b27ef2395bb8b85d80a287dfc337b6c8a0e61f8f63",
+  "pool_meta_sha256": "196027ca6e9ef77a55d266614a775e2f36e0ebbe85525ae5d0fc430041c2a3b7",
+  "pool_sha256": "a9c7a3c05e64aa9cc9cbe2bd59dad5e5bdd2a8b53c99033a22ddf00ea13013bc",
+  "train_core_sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+ },
+ "otherplant_training_boxes": 5000,
+ "otherplant_training_boxes_judged_out_of_fold": 5000,
+ "per_slug": {
+  "francesco__grass_weeds": {
+   "boxes": {
+    "other_ok": 6480,
+    "small": 320
+   },
+   "images": {
+    "admitted": 2479
+   }
+  },
+  "fvossel__csgo_player_detection": {
+   "boxes": {
+    "other_ok": 6416,
+    "small": 3423
+   },
+   "images": {
+    "admitted": 4012
+   }
+  },
+  "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+   "boxes": {
+    "other_ok": 835,
+    "small": 651
+   },
+   "images": {
+    "admitted": 434
+   }
+  },
+  "project_agml__crop_weed_detection_latvia": {
+   "boxes": {
+    "conflict": 3,
+    "other_ok": 6469,
+    "small": 1182
+   },
+   "images": {
+    "admitted": 1099,
+    "conflict": 3
+   }
+  },
+  "project_agml__greenhouse_crop_weed_detection": {
+   "boxes": {
+    "conflict": 1744,
+    "other_ok": 8065,
+    "unknown": 922,
+    "verified": 461
+   },
+   "images": {
+    "admitted": 13,
+    "conflict": 187
+   }
+  },
+  "project_agml__imageweeds_aerial_weed_detection": {
+   "boxes": {
+    "conflict": 540,
+    "other_ok": 900,
+    "unknown": 498,
+    "verified": 253
+   },
+   "images": {
+    "admitted": 130,
+    "conflict": 244,
+    "unknown": 109
+   }
+  },
+  "project_agml__maize_weed_detection": {
+   "boxes": {
+    "conflict": 19,
+    "other_ok": 5159
+   },
+   "images": {
+    "admitted": 432,
+    "conflict": 19
+   }
+  },
+  "project_agml__mh_weed16_weed_detection": {
+   "boxes": {
+    "conflict": 1576,
+    "other_ok": 45235,
+    "small": 26
+   },
+   "images": {
+    "admitted": 4046,
+    "conflict": 945
+   }
+  },
+  "project_agml__weed_crop_detection": {
+   "boxes": {
+    "conflict": 1215,
+    "other_ok": 15022,
+    "unknown": 1062,
+    "verified": 394
+   },
+   "images": {
+    "admitted": 255,
+    "conflict": 618,
+    "unknown": 247
+   }
+  },
+  "rf_1111-gzfxi__weed-chilling": {
+   "boxes": {
+    "conflict": 42,
+    "other_ok": 7100,
+    "small": 5
+   },
+   "images": {
+    "admitted": 1995,
+    "conflict": 38
+   }
+  },
+  "rf_bishwarup-halder__crop-health-advisor": {
+   "boxes": {
+    "conflict": 1,
+    "other_ok": 29238,
+    "small": 11
+   },
+   "images": {
+    "admitted": 15116,
+    "conflict": 1
+   }
+  },
+  "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+   "boxes": {
+    "other_ok": 3163,
+    "small": 66
+   },
+   "images": {
+    "admitted": 1287
+   }
+  },
+  "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+   "boxes": {
+    "conflict": 257,
+    "other_ok": 5777,
+    "small": 282
+   },
+   "images": {
+    "admitted": 2306,
+    "conflict": 245
+   }
+  },
+  "rf_fyp-oof0h__smart-agriculture-miw1m": {
+   "boxes": {
+    "conflict": 7,
+    "other_ok": 853
+   },
+   "images": {
+    "admitted": 657,
+    "conflict": 7
+   }
+  },
+  "rf_itmo-mp0nn__grass-detection-4": {
+   "boxes": {
+    "other_ok": 5001,
+    "small": 219
+   },
+   "images": {
+    "admitted": 786
+   }
+  },
+  "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+   "boxes": {
+    "conflict": 32,
+    "other_ok": 720,
+    "unknown": 139,
+    "verified": 647
+   },
+   "images": {
+    "admitted": 1299,
+    "conflict": 28,
+    "unknown": 133
+   }
+  },
+  "rf_kinjj__weed-avnag": {
+   "boxes": {
+    "conflict": 32,
+    "other_ok": 756,
+    "small": 226
+   },
+   "images": {
+    "admitted": 67,
+    "conflict": 19
+   }
+  },
+  "rf_lemong__agriculture-xi7us": {
+   "boxes": {
+    "other_ok": 1368,
+    "small": 131
+   },
+   "images": {
+    "admitted": 559
+   }
+  },
+  "rf_leopard-ai__weed-detection-8h4kx": {
+   "boxes": {
+    "conflict": 304,
+    "other_ok": 1618
+   },
+   "images": {
+    "admitted": 908,
+    "conflict": 283
+   }
+  },
+  "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+   "boxes": {
+    "conflict": 11,
+    "other_ok": 3517,
+    "small": 3
+   },
+   "images": {
+    "admitted": 942,
+    "conflict": 11
+   }
+  },
+  "rf_new-workspace-zbm50__weeds-qftz4": {
+   "boxes": {
+    "conflict": 18,
+    "other_ok": 2673
+   },
+   "images": {
+    "admitted": 1956,
+    "conflict": 18
+   }
+  },
+  "rf_project-5nvic__weed-detection-0tfsj": {
+   "boxes": {
+    "conflict": 1,
+    "other_ok": 6243,
+    "small": 5582
+   },
+   "images": {
+    "admitted": 2217,
+    "conflict": 1
+   }
+  },
+  "rf_robtica-unileon-gluqm__farming-robotics": {
+   "boxes": {
+    "other_ok": 16593,
+    "small": 695
+   },
+   "images": {
+    "admitted": 1947
+   }
+  },
+  "rf_school-5ult5__weed-6a90d": {
+   "boxes": {
+    "conflict": 67,
+    "other_ok": 3376,
+    "small": 451
+   },
+   "images": {
+    "admitted": 2007,
+    "conflict": 57
+   }
+  },
+  "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+   "boxes": {
+    "conflict": 3,
+    "other_ok": 73137,
+    "small": 57281
+   },
+   "images": {
+    "admitted": 6538,
+    "conflict": 3
+   }
+  },
+  "rf_srec-dthh0__crop-weed-poxtn": {
+   "boxes": {
+    "conflict": 152,
+    "other_ok": 4980,
+    "small": 13
+   },
+   "images": {
+    "admitted": 2760,
+    "conflict": 145
+   }
+  },
+  "rf_test-8qezo__weed-detection-ycai2": {
+   "boxes": {
+    "conflict": 1,
+    "other_ok": 270,
+    "small": 313
+   },
+   "images": {
+    "admitted": 78,
+    "conflict": 1
+   }
+  },
+  "rf_test-gzc3r__crop-mfete": {
+   "boxes": {
+    "conflict": 210,
+    "other_ok": 20143,
+    "small": 12
+   },
+   "images": {
+    "admitted": 9072,
+    "conflict": 187
+   }
+  },
+  "rf_tuf__weed-3434e": {
+   "boxes": {
+    "conflict": 1607,
+    "other_ok": 5055,
+    "small": 29
+   },
+   "images": {
+    "admitted": 4617,
+    "conflict": 1571
+   }
+  },
+  "rf_uav-qnoms__uav-wqshy": {
+   "boxes": {
+    "other_ok": 6362,
+    "small": 398
+   },
+   "images": {
+    "admitted": 6341
+   }
+  },
+  "rf_university-of-peradeniya__weed-detection-ekr8i": {
+   "boxes": {
+    "conflict": 1,
+    "other_ok": 7734,
+    "small": 2538
+   },
+   "images": {
+    "admitted": 1630,
+    "conflict": 1
+   }
+  },
+  "rf_vizerion__weed-detection-5ell6": {
+   "boxes": {
+    "other_ok": 7070,
+    "small": 164
+   },
+   "images": {
+    "admitted": 2895
+   }
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+   "boxes": {
+    "other_ok": 3522,
+    "small": 166
+   },
+   "images": {
+    "admitted": 1451
+   }
+  },
+  "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+   "boxes": {
+    "conflict": 643,
+    "other_ok": 7954,
+    "small": 739,
+    "unknown": 63
+   },
+   "images": {
+    "admitted": 4059,
+    "conflict": 500,
+    "unknown": 34
+   }
+  },
+  "rf_weed-tnf9e__weed-bqdok": {
+   "boxes": {
+    "conflict": 66,
+    "other_ok": 207443,
+    "small": 50331
+   },
+   "images": {
+    "admitted": 7842,
+    "conflict": 47
+   }
+  },
+  "rf_yolo-gyfyq__weed-ieda7": {
+   "boxes": {
+    "other_ok": 5196,
+    "small": 239
+   },
+   "images": {
+    "admitted": 2111
+   }
+  },
+  "rf_zig-zag-lnodr__weed-detection-vanpe": {
+   "boxes": {
+    "conflict": 180,
+    "other_ok": 335,
+    "small": 4,
+    "unknown": 72,
+    "verified": 294
+   },
+   "images": {
+    "admitted": 620,
+    "conflict": 179,
+    "unknown": 73
+   }
+  },
+  "rf_zijian-peng__grass-weed-69hcm": {
+   "boxes": {
+    "other_ok": 3
+   },
+   "images": {
+    "admitted": 3
+   }
+  }
+ },
+ "per_species": {
+  "Carpetweed": {
+   "boxes": {
+    "conflict": 7,
+    "small": 4,
+    "unknown": 4,
+    "verified": 74
+   },
+   "images": {
+    "admitted": 69,
+    "conflict": 7,
+    "unknown": 8
+   }
+  },
+  "Eclipta": {
+   "boxes": {
+    "conflict": 2,
+    "unknown": 3,
+    "verified": 10
+   },
+   "images": {
+    "admitted": 10,
+    "conflict": 2,
+    "unknown": 3
+   }
+  },
+  "Goosegrass": {
+   "boxes": {
+    "conflict": 10,
+    "unknown": 10,
+    "verified": 52
+   },
+   "images": {
+    "admitted": 52,
+    "conflict": 10,
+    "unknown": 10
+   }
+  },
+  "MorningGlory": {
+   "boxes": {
+    "conflict": 78,
+    "unknown": 55,
+    "verified": 158
+   },
+   "images": {
+    "admitted": 156,
+    "conflict": 77,
+    "unknown": 52
+   }
+  },
+  "OtherPlant": {
+   "boxes": {
+    "conflict": 6256,
+    "other_ok": 531781,
+    "small": 125493
+   },
+   "images": {
+    "admitted": 96040,
+    "conflict": 5109,
+    "unknown": 311
+   }
+  },
+  "PalmerAmaranth": {
+   "boxes": {
+    "conflict": 265,
+    "unknown": 144,
+    "verified": 346
+   },
+   "images": {
+    "conflict": 181
+   }
+  },
+  "Ragweed": {
+   "boxes": {
+    "conflict": 1166,
+    "small": 3,
+    "unknown": 1833,
+    "verified": 27
+   },
+   "images": {
+    "admitted": 3,
+    "conflict": 828,
+    "unknown": 334
+   }
+  },
+  "Sicklepod": {
+   "boxes": {
+    "conflict": 4,
+    "unknown": 89,
+    "verified": 57
+   },
+   "images": {
+    "admitted": 53,
+    "conflict": 3,
+    "unknown": 88
+   }
+  },
+  "SpottedSpurge": {
+   "boxes": {
+    "conflict": 6,
+    "unknown": 20,
+    "verified": 281
+   },
+   "images": {
+    "admitted": 273,
+    "conflict": 3,
+    "unknown": 15
+   }
+  },
+  "Waterhemp": {
+   "boxes": {
+    "conflict": 938,
+    "unknown": 598,
+    "verified": 1044
+   },
+   "images": {
+    "admitted": 381,
+    "conflict": 526,
+    "unknown": 150
+   }
+  }
+ },
+ "rule": "admitted = every species box verified and every OtherPlant box other_ok (or too small to embed); conflict = any box a conflict; else unknown",
+ "seconds": 54.8,
+ "sheet": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/conflicts_sheet.png",
+ "sheet_boxes": 200,
+ "verified_sha256": "d0662ef431f9d0cbfb413a83695aec01351cd9dff562eb7135ae91dde335cce4"
+}

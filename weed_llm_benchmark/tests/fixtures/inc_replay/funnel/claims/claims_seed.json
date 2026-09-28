@@ -1,0 +1,99 @@
+{
+ "claims": [
+  {
+   "cites": [
+    {
+     "artifact": "RESEARCH_LOG.md",
+     "line": 154,
+     "pointer": null,
+     "value": "  - The harvested increments do not improve the twelve target species. They are mostly other plants plus about 50 target-species boxes each."
+    },
+    {
+     "artifact": "realloop_v1/report.json",
+     "line": null,
+     "pointer": "/agreement/full",
+     "value": {
+      "agree": 2,
+      "compared": 6,
+      "rate": 0.3333333333333333,
+      "v1_counterfactual": {
+       "agree": 2,
+       "compared": 6
+      }
+     }
+    }
+   ],
+   "history": [
+    {
+     "by": "human-transcribed",
+     "cites": [
+      {
+       "artifact": "RESEARCH_LOG.md",
+       "line": 154,
+       "pointer": null,
+       "value": "  - The harvested increments do not improve the twelve target species. They are mostly other plants plus about 50 target-species boxes each."
+      },
+      {
+       "artifact": "realloop_v1/report.json",
+       "line": null,
+       "pointer": "/agreement/full",
+       "value": {
+        "agree": 2,
+        "compared": 6,
+        "rate": 0.3333333333333333,
+        "v1_counterfactual": {
+         "agree": 2,
+         "compared": 6
+        }
+       }
+      }
+     ],
+     "from": null,
+     "reason": "filed",
+     "to": "open",
+     "utc": "2026-09-28T12:00:00Z"
+    }
+   ],
+   "id": "C1",
+   "made_by": "human-transcribed",
+   "polarity": "negative",
+   "scope": "realloop_v1 on Step 1 of 2026-09-27: the harvested increments",
+   "status": "open",
+   "text": "The harvested increments do not improve the twelve target species. They are mostly other plants plus about 50 target-species boxes each."
+  },
+  {
+   "cites": [
+    {
+     "artifact": "docs/poster/figures_data.json",
+     "line": null,
+     "pointer": "/s1_gate_verdict_2026_08_25/reading",
+     "value": "Of 13,527 labelled images from six audited harvested sources, only 3,208 come from a source that clears the 0.90 audit bar. Five of six sources fall between 0.18 and 0.74 — the probe reads 1.000 on human-labelled cwd12, so those are the data, not the instrument. Independently, the S3 tier ladder shows adding harvested data is worth 0.00-0.02. Both measurements point the same way: web harvest at this scale supplies volume, not usable supervision."
+    }
+   ],
+   "history": [
+    {
+     "by": "human-transcribed",
+     "cites": [
+      {
+       "artifact": "docs/poster/figures_data.json",
+       "line": null,
+       "pointer": "/s1_gate_verdict_2026_08_25/reading",
+       "value": "Of 13,527 labelled images from six audited harvested sources, only 3,208 come from a source that clears the 0.90 audit bar. Five of six sources fall between 0.18 and 0.74 — the probe reads 1.000 on human-labelled cwd12, so those are the data, not the instrument. Independently, the S3 tier ladder shows adding harvested data is worth 0.00-0.02. Both measurements point the same way: web harvest at this scale supplies volume, not usable supervision."
+      }
+     ],
+     "from": null,
+     "reason": "filed",
+     "to": "open",
+     "utc": "2026-09-28T12:00:00Z"
+    }
+   ],
+   "id": "C2",
+   "made_by": "human-transcribed",
+   "polarity": "scarcity",
+   "scope": "the S1 gate of 2026-08-25: six audited harvested sources",
+   "status": "open",
+   "text": "web harvest at this scale supplies volume, not usable supervision"
+  }
+ ],
+ "format": "funnel-claims/1"
+}

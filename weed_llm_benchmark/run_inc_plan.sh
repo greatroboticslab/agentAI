@@ -51,9 +51,17 @@
 # resident on the GPU (/api/ps size_vram against size). The first run settles
 # the assumption.
 #
+# The same job runs the devil's advocate (docs/FUNNEL_AUDIT.md 8.6) with
+# PLAN_ROLE=adversary: the model comes from model_router's "adversary" role
+# (a family other than the planner's), the digest must be an inc-da-digest/1
+# and the reply is an inc-da-reply/1 (brain_plan run --role adversary). The
+# lab compares the model this job resolved with the planner's last one
+# (validate.validate_da): a same-family reply is recorded but moves no claim.
+#
 #   env: PLAN_INPUT    staged digest json, under $REPO/results/framework/inc/_campaign/plans/  (required)
 #        PLAN_OUTPUT   reply json (default: PLAN_INPUT with .input.json -> .json)
-#        PLAN_MODEL    ollama tag (default: model_router.resolve("planner") and its fallbacks)
+#        PLAN_ROLE     planner (default) or adversary: the model_router role and the reply kind
+#        PLAN_MODEL    ollama tag (default: model_router.resolve(PLAN_ROLE) and its fallbacks)
 #        PLAN_NUM_CTX  context the server is asked to hold  (default: the digest's num_ctx;
 #                      at most brain_plan.MAX_NUM_CTX)
 #        PLAN_TIMEOUT  seconds to wait for the completion   (default 3000)
@@ -74,6 +82,13 @@ cd "$CODE" || exit 1
 export PYTHONPATH="$CODE${PYTHONPATH:+:$PYTHONPATH}"
 
 INPUT="${PLAN_INPUT:?PLAN_INPUT is required}"
+ROLE="${PLAN_ROLE:-planner}"
+case "$ROLE" in
+    planner|adversary) ;;
+    *) echo "FATAL: PLAN_ROLE must be planner or adversary, not $ROLE" >&2; exit 2 ;;
+esac
+REPLY_SCHEMA="inc-plan-reply/1"
+[ "$ROLE" = "adversary" ] && REPLY_SCHEMA="inc-da-reply/1"
 case "$(realpath -m "$INPUT")" in
     "$PLANS"/*) ;;
     *) echo "FATAL: PLAN_INPUT must lie under $PLANS: $INPUT" >&2; exit 2 ;;
@@ -99,12 +114,14 @@ NUM_CTX="${PLAN_NUM_CTX:-$(python3 -c 'import json,sys; print(int(json.load(open
 
 # A failure before the model answers still leaves a reply the lab can read.
 fail() {
-    PLAN_FAIL_REASON="$1" INPUT="$INPUT" OUTPUT="$OUTPUT" MODEL="${PLAN_MODEL:-}" python3 - <<'PY'
+    PLAN_FAIL_REASON="$1" INPUT="$INPUT" OUTPUT="$OUTPUT" MODEL="${PLAN_MODEL:-}" ROLE="$ROLE" \
+        REPLY_SCHEMA="$REPLY_SCHEMA" python3 - <<'PY'
 import json, os, time
-out = {"schema": "inc-plan-reply/1", "ok": False, "reason": os.environ["PLAN_FAIL_REASON"],
-       "model": os.environ.get("MODEL") or None, "plan": None, "parse_problems": [],
+out = {"schema": os.environ["REPLY_SCHEMA"], "ok": False, "reason": os.environ["PLAN_FAIL_REASON"],
+       "model": os.environ.get("MODEL") or None, "parse_problems": [], "role": os.environ["ROLE"],
        "slurm_job_id": os.environ.get("SLURM_JOB_ID"), "place": "cluster",
        "finished_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+out["reply" if os.environ["ROLE"] == "adversary" else "plan"] = None
 try:
     d = json.load(open(os.environ["INPUT"]))
     out.update({"campaign": d.get("campaign"), "n": d.get("n"), "exp": d.get("exp"),
@@ -129,7 +146,7 @@ if [ "$NUM_CTX" -gt "$MAX_CTX" ]; then
     exit 2
 fi
 
-echo "=== inc_plan job=${SLURM_JOB_ID:-none} port=$PORT ctx=$NUM_CTX (max $MAX_CTX) $(date) on $(hostname) ==="
+echo "=== inc_plan job=${SLURM_JOB_ID:-none} role=$ROLE port=$PORT ctx=$NUM_CTX (max $MAX_CTX) $(date) on $(hostname) ==="
 echo "[cfg] input=$INPUT"
 echo "[cfg] output=$OUTPUT"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
@@ -160,18 +177,19 @@ curl -sf "http://127.0.0.1:$PORT/api/tags" -o "$PLANS/logs/inc_plan_tags_${SLURM
     fail "ollama did not come up on port $PORT"; kill $SERVE_PID 2>/dev/null; exit 1; }
 echo "[ollama] serving on $PORT"
 
-# The model comes from model_router, which owns placement: the planner role and
-# then its fallbacks, first one present in the store.
+# The model comes from model_router, which owns placement: the PLAN_ROLE role
+# (planner or adversary) and then its fallbacks, first one present in the store.
 if [ -z "${PLAN_MODEL:-}" ]; then
-    PLAN_MODEL="$(TAGS="$PLANS/logs/inc_plan_tags_${SLURM_JOB_ID:-0}.json" python3 - <<'PY'
+    PLAN_MODEL="$(TAGS="$PLANS/logs/inc_plan_tags_${SLURM_JOB_ID:-0}.json" ROLE="$ROLE" python3 - <<'PY'
 import json, os
 from weed_optimizer_framework.tools import model_router
 try:
     have = {m.get("name") for m in json.load(open(os.environ["TAGS"])).get("models", [])}
 except Exception:
     have = set()
-r = model_router.resolve("planner")
-spec = model_router.ROLES.get("planner", {})
+role = os.environ["ROLE"]
+r = model_router.resolve("planner") if role == "planner" else model_router.resolve(role)
+spec = model_router.ROLES.get(role, {})
 for cand in [r.get("model")] + list(spec.get("fallbacks", [])):
     cand = str(cand or "")
     tag = cand.partition(":")[2] if cand.split(":")[0] in ("vllm", "ollama") else cand
@@ -185,10 +203,10 @@ PY
 )"
 fi
 if [ -z "$PLAN_MODEL" ]; then
-    fail "no planner-role model (or fallback) is in the ollama store"
+    fail "no $ROLE-role model (or fallback) is in the ollama store"
     kill $SERVE_PID 2>/dev/null; exit 1
 fi
-echo "[cfg] model=$PLAN_MODEL"
+echo "[cfg] role=$ROLE model=$PLAN_MODEL family=$(python3 -c 'import sys; from weed_optimizer_framework.tools import model_router as R; print(R.model_family(sys.argv[1]) or "unknown")' "$PLAN_MODEL" 2>/dev/null || echo unknown)"
 
 # The model's own attention layout (/api/show model_info) against the layout
 # brain_plan.MAX_NUM_CTX was sized on. Logged, never enforced: the resident size
@@ -251,7 +269,7 @@ except Exception as exc:
     print("[ollama] /api/ps unreadable: %s" % exc)
 ' || echo "[ollama] /api/ps did not answer"
 
-python3 -u -m weed_optimizer_framework.tools.inc_autopilot.brain_plan run \
+python3 -u -m weed_optimizer_framework.tools.inc_autopilot.brain_plan run --role "$ROLE" \
     --input "$INPUT" --output "$OUTPUT" --endpoint "http://127.0.0.1:$PORT/v1" \
     --model "$PLAN_MODEL" --num-ctx "$NUM_CTX" --timeout "$TIMEOUT"
 RC=$?

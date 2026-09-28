@@ -138,7 +138,14 @@ def main():
     print("nothing unpinned")
     present = sorted(str(p.relative_to(FIX)) for p in FIX.rglob("*") if p.is_file() and p.name != "MANIFEST.json"
                      and "__pycache__" not in p.parts)
-    extra = [p for p in present if p not in files and p not in syn and p not in cps]
+    # The funnel audit's fixtures pin themselves in funnel/MANIFEST.json
+    # (tests/funnel_ap_fixtures.py; tests/test_funnel_ap_units.py checks those pins).
+    fman = FIX / "funnel" / "MANIFEST.json"
+    fun = set()
+    if fman.is_file():
+        fm = json.loads(fman.read_text())
+        fun = {"funnel/" + k for sec in ("files", "derived", "synthetic") for k in (fm.get(sec) or {})}
+    extra = [p for p in present if p not in files and p not in syn and p not in cps and p not in fun]
     check("every file in the fixture tree is pinned", not extra, extra)
     pending = {k: v for k, v in (man.get("pending") or {}).items() if k != "how"}
     check("the cluster-only inputs are listed as pending",

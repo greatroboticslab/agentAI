@@ -15,6 +15,22 @@ What it loads, and nothing else (the allow-list, ALLOWED):
                                             itself is never shipped)
     <exp>/derived/state_runs.json          (remote.py summarize_runs, when the
                                             snapshot ships state.json without runs)
+    step1/pool_summary.json, step1/calibration.json,
+    step1/verifier_fit_info.json           (the FUNNEL audit's Step 1 reads,
+                                            docs/FUNNEL_AUDIT.md 8.2: label spaces
+                                            and drops, what the known truth
+                                            covers, and the verifier's fit record
+                                            projected to its OtherPlant sample,
+                                            which remote.py derives on the cluster)
+    funnel/funnel_ledger.json, funnel/audit_v1.json, funnel/class_maps.json,
+    funnel/recovery.json, funnel/prospective_da.json
+                                           (the funnel audit's aggregates;
+                                            recovery.json lives in step1_r1/ and is
+                                            shipped under this name)
+    funnel/files.json                      (remote.py funnel summary: the name,
+                                            sha256 and size of every file under
+                                            INC_DIR/funnel/, never their content;
+                                            lever preconditions read it)
 plus the campaign context the ticker passes in as a dict (artifact
 campaign/context.json; every key optional; diagnose.py and levers.py read
 exactly these):
@@ -31,6 +47,8 @@ exactly these):
               executions.jsonl); levers.py never proposes a lever again on a
               parent it was already applied to. A record whose status is
               "failed", "refused" or "cancelled" does not count.
+and the campaign's claims register, passed in the same way (artifact
+campaign/claims.json, funnel-claims/1, docs/FUNNEL_AUDIT.md 8.3).
 A name outside the list is refused and recorded, so a run directory, a score
 file or a manifest can never enter the evidence.
 
@@ -40,9 +58,13 @@ read it. The rules are an allow-list of the one decision exam (dev), so an
 exam added upstream later is dropped without anyone updating a list here:
   * under a dict key "exams" (report.json's final rows, report.py:56 puts
     test in every one), a dict keeps only its "dev" entry;
-  * anywhere else, a dict key naming a known non-dev exam (NON_DEV_EXAMS:
+  * anywhere else, a dict key naming a known non-dev split (BLOCKED_SPLITS:
+    the domain config's non-decision exams, NON_DEV_EXAMS, which equal
     driver.FINAL_EXAMS and report.REPORT_EXAMS without dev, checked by
-    tests/test_inc_ap_evidence.py) is dropped with everything under it;
+    tests/test_inc_ap_evidence.py, plus its extra non-decision splits, the
+    weed domain's H10d domain dev; model.non_dev_exams) is dropped with
+    everything under it. A loader given another domain (domain=) uses that
+    domain's list;
   * a dict whose own "exam" field is a string other than "dev" (a score
     stamp) is dropped;
   * a string that is the path of a score file other than scores/dev.json
@@ -90,30 +112,56 @@ from pathlib import Path
 from . import model as M
 
 FORMAT = "inc-autopilot/evidence/1"
-# driver.FINAL_EXAMS / report.REPORT_EXAMS without dev (tests/test_inc_ap_evidence.py
-# checks the equality). Only the key deny-list outside an "exams" dict uses it; the
-# "exams", stamp and score-path rules are an allow-list of DECISION_EXAM.
-NON_DEV_EXAMS = ("test", "ood22", "ood23", "imageweeds")
+# The domain's non-decision exams (model.exam_splits: the domain config's
+# exams.non_decision), which are driver.FINAL_EXAMS / report.REPORT_EXAMS
+# without dev (tests/test_inc_ap_evidence.py checks the equality), and every
+# split no decision may read (model.non_dev_exams: those plus the config's
+# extra non-decision splits). Only the key deny-list outside an "exams" dict
+# uses them; the "exams", stamp and score-path rules are an allow-list of
+# DECISION_EXAM.
+NON_DEV_EXAMS = M.exam_splits()["non_decision"]
+BLOCKED_SPLITS = M.non_dev_exams()
 DECISION_EXAM = M.DECISION_EXAM
 EXAMS_KEY = "exams"                        # report.json final[].exams: {exam: {...}}
-assert DECISION_EXAM == "dev" and DECISION_EXAM not in NON_DEV_EXAMS
+assert DECISION_EXAM == "dev" and DECISION_EXAM not in BLOCKED_SPLITS
+assert set(NON_DEV_EXAMS) <= set(BLOCKED_SPLITS)
 
 CONTEXT = "campaign/context.json"          # passed in by the ticker, never read from disk
+CLAIMS = "campaign/claims.json"            # the claims register, passed in by the ticker
 LOADER = "evidence/loader.json"            # virtual: what the loader opened, refused and dropped
 CLUSTERS_BY_SOURCE = "select_clusters_by_source.json"
+VERIFIER_FIT_INFO = "verifier_fit_info.json"   # remote.py's projection of step1/verifier/fit_info.json
 
 EXP_RE = r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}"
-RESERVED_DIRS = ("step1", "splits", "exams", "logs", "audit")   # INC_DIR entries that are not experiments
+RESERVED_DIRS = ("step1", "splits", "exams", "logs", "audit", "funnel")   # INC_DIR entries that are not experiments
 ROOT_AUDIT = "audit/%s_audit.json"          # a label audit run with --out $INC/audit/<exp>_audit.json
 EXP_FILES = ("exp.json", "state.json", "report.json", "build_summary.json", "ledger.jsonl",
              "audit/label_audit.json", "manifests/increments_summary.json")
 STEP1_FILES = ("select_summary.json", "admit_summary.json", "increments_summary.json",
-               "relevance.json", CLUSTERS_BY_SOURCE)
+               "relevance.json", CLUSTERS_BY_SOURCE, "pool_summary.json", "calibration.json",
+               VERIFIER_FIT_INFO)
+# The funnel audit's aggregates (docs/FUNNEL_AUDIT.md 8.2). recovery.json lives
+# in INC_DIR/step1_r1/ and is shipped as funnel/recovery.json; files.json is the
+# funnel directory's listing (names, sha256, sizes), never a file of the tree.
+FUNNEL_FILES = ("funnel_ledger.json", "audit_v1.json", "class_maps.json", "recovery.json",
+                "prospective_da.json", "files.json")
+FUNNEL_LEDGER = "funnel/funnel_ledger.json"
+FUNNEL_AUDIT = "funnel/audit_v1.json"
+FUNNEL_CLASS_MAPS = "funnel/class_maps.json"
+FUNNEL_RECOVERY = "funnel/recovery.json"
+FUNNEL_DA = "funnel/prospective_da.json"
+FUNNEL_LISTING = "funnel/files.json"
+# The shipped name of a file that lives elsewhere on the cluster, and the
+# derived artifacts built there from a file that is never shipped.
+SHIPPED_AS = {FUNNEL_RECOVERY: "step1_r1/recovery.json"}
+DERIVED_FROM = {"step1/" + VERIFIER_FIT_INFO: "step1/verifier/fit_info.json",
+                FUNNEL_LISTING: "funnel/ (a listing of names, sha256 and sizes)"}
 DERIVED_STATE_RUNS = "derived/state_runs.json"
 ALLOWED = tuple(re.compile(p) for p in (
     r"(?P<exp>%s)/(?P<file>%s)\Z" % (EXP_RE, "|".join(re.escape(f) for f in EXP_FILES + (DERIVED_STATE_RUNS,))),
     r"step1/(?P<file>%s)\Z" % "|".join(re.escape(f) for f in STEP1_FILES),
     r"audit/(?P<exp>%s)_audit\.json\Z" % EXP_RE,
+    r"funnel/(?P<file>%s)\Z" % "|".join(re.escape(f) for f in FUNNEL_FILES),
 ))
 # the path of any score file but the decision exam's (scores/<exam>.json, driver.Paths.score)
 _NON_DEV_SCORE = re.compile(r"(^|/)scores/(?!%s\.json\Z)[^/]+\.json\Z" % re.escape(DECISION_EXAM))
@@ -132,7 +180,7 @@ def allowed(name):
     m = ALLOWED[0].match(name)
     if m:
         return m.group("exp") not in RESERVED_DIRS
-    return bool(ALLOWED[1].match(name) or ALLOWED[2].match(name))
+    return bool(ALLOWED[1].match(name) or ALLOWED[2].match(name) or ALLOWED[3].match(name))
 
 
 def exp_of(name):
@@ -182,14 +230,21 @@ def _non_dev_stamp(d):
     return isinstance(d.get("exam"), str) and d["exam"] != DECISION_EXAM
 
 
-def _non_dev_key(k, parent):
+def blocked_for(domain=None):
+    """The split names the key deny-list drops for a domain (a name or a config
+    path; None: this module's own domain, BLOCKED_SPLITS)."""
+    return BLOCKED_SPLITS if domain is None else M.non_dev_exams(domain)
+
+
+def _non_dev_key(k, parent, blocked=None):
     """A dict key that names a non-dev exam: any key but dev directly under an
-    "exams" dict (allow-list), or a known non-dev exam name anywhere."""
-    return k in NON_DEV_EXAMS or (parent == EXAMS_KEY and k != DECISION_EXAM)
+    "exams" dict (allow-list), or a known non-dev split name anywhere."""
+    return k in (BLOCKED_SPLITS if blocked is None else blocked) or (parent == EXAMS_KEY and k != DECISION_EXAM)
 
 
-def scrub(obj):
-    """(dev-only copy of obj, [dropped JSON pointers]). See the module doc."""
+def scrub(obj, blocked=None):
+    """(dev-only copy of obj, [dropped JSON pointers]). See the module doc.
+    `blocked`: the split names to drop (default BLOCKED_SPLITS; blocked_for)."""
     dropped = []
 
     def go(x, ptr, parent):
@@ -200,7 +255,7 @@ def scrub(obj):
             out = {}
             for k, v in x.items():
                 p = ptr + "/" + _esc(k)
-                if _non_dev_key(k, parent):
+                if _non_dev_key(k, parent, blocked):
                     dropped.append(p)
                     continue
                 w = go(v, p, k)
@@ -223,7 +278,7 @@ def scrub(obj):
     return (None if res is _DROP else res), dropped
 
 
-def leaks(obj, ptr="", parent=None):
+def leaks(obj, ptr="", parent=None, blocked=None):
     """JSON pointers in obj that still name a non-dev exam (a dict key, a
     stamp or a score path, by scrub's rules); [] for scrubbed evidence."""
     out = []
@@ -232,12 +287,12 @@ def leaks(obj, ptr="", parent=None):
             out.append(ptr or "/")
         for k, v in obj.items():
             p = ptr + "/" + _esc(k)
-            if _non_dev_key(k, parent):
+            if _non_dev_key(k, parent, blocked):
                 out.append(p)
-            out.extend(leaks(v, p, k))
+            out.extend(leaks(v, p, k, blocked))
     elif isinstance(obj, list):
         for i, v in enumerate(obj):
-            out.extend(leaks(v, "%s/%d" % (ptr, i)))
+            out.extend(leaks(v, "%s/%d" % (ptr, i), None, blocked))
     elif isinstance(obj, str) and _NON_DEV_SCORE.search(obj):
         out.append(ptr or "/")
     return out
@@ -286,8 +341,9 @@ class Evidence:
     at; the snapshot may hold other experiments of the campaign (earlier
     pilots, the baseline) for the cross-experiment diagnoses."""
 
-    def __init__(self, exp):
+    def __init__(self, exp, blocked=None):
         self.exp = exp
+        self.blocked = BLOCKED_SPLITS if blocked is None else tuple(blocked)
         self.artifacts = {}          # name -> scrubbed JSON
         self.ledgers = {}            # exp -> [(line, scrubbed entry or None)]
         self.provenance = {}         # name -> {"sha256": raw bytes, "bytes": n}; not in canonical()
@@ -400,21 +456,25 @@ class Evidence:
         construction); D14 fires when it is not empty."""
         out = []
         for n, a in sorted(self.artifacts.items()):
-            out.extend("%s#%s" % (n, p) for p in leaks(a))
+            out.extend("%s#%s" % (n, p) for p in leaks(a, blocked=self.blocked))
         for e, v in sorted(self.ledgers.items()):
             for ln, x in v:
-                out.extend("%s/ledger.jsonl:%d#%s" % (e, ln, p) for p in leaks(x))
+                out.extend("%s/ledger.jsonl:%d#%s" % (e, ln, p) for p in leaks(x, blocked=self.blocked))
         return out
 
 
 # ------------------------------------------------------------------ loaders
-def from_texts(texts, exp, context=None, touched=None):
+def from_texts(texts, exp, context=None, touched=None, claims=None, domain=None):
     """Evidence from {artifact name: bytes or str} (the remote snapshot verb's
     small files, or load_dir's reads). `context` is the ticker's dict
-    (refusals, advance, squeue, history, budget, outcomes)."""
+    (refusals, advance, squeue, history, budget, outcomes); `claims` the
+    campaign's claims register (funnel-claims/1), kept as CLAIMS; `domain`
+    the domain whose non-decision splits the scrub drops (default this
+    package's, model.DOMAIN)."""
     if not isinstance(exp, str) or not re.fullmatch(EXP_RE, exp):
         raise EvidenceError("experiment %r is not a valid name" % (exp,))
-    ev = Evidence(exp)
+    blocked = blocked_for(domain)
+    ev = Evidence(exp, blocked=blocked)
     # touched = what was read: load_dir passes the files it opened; for
     # offered texts it is the allow-listed ones (a refused name is recorded
     # in refused and never parsed).
@@ -426,6 +486,11 @@ def from_texts(texts, exp, context=None, touched=None):
         data = texts[name]
         raw = data if isinstance(data, bytes) else str(data).encode("utf-8")
         ev.provenance[name] = {"sha256": _sha(raw), "bytes": len(raw), "source": "file"}
+        if name in SHIPPED_AS:
+            ev.provenance[name]["shipped_as"] = SHIPPED_AS[name]
+        if name in DERIVED_FROM:
+            ev.provenance[name] = {"source": "derived", "json_sha256": _sha(raw),
+                                   "derived_from": DERIVED_FROM[name]}
         text = _text(data)
         if name.endswith("/ledger.jsonl"):
             try:
@@ -436,7 +501,7 @@ def from_texts(texts, exp, context=None, touched=None):
             ev.notes.extend("%s: %s" % (name, n) for n in notes)
             rows, drop = [], []
             for ln, entry in entries:
-                clean, d = scrub(entry)
+                clean, d = scrub(entry, blocked)
                 rows.append((ln, clean))
                 drop.extend("%d#%s" % (ln, p) for p in d)
             ev.ledgers[exp_of(name)] = rows
@@ -448,16 +513,24 @@ def from_texts(texts, exp, context=None, touched=None):
         except ValueError as e:
             ev.notes.append("%s is not JSON (%s); not loaded" % (name, e))
             continue
-        clean, drop = scrub(obj)
+        clean, drop = scrub(obj, blocked)
         ev.artifacts[name] = clean
         if drop:
             ev.dropped[name] = drop
-    if context is not None:
-        ctx = json.loads(json.dumps(context))          # a JSON copy: no live objects
-        clean, drop = scrub(ctx)
-        ev.artifacts[CONTEXT] = clean
+    if isinstance(context, dict) and "claims" in context:
+        # The ticker passes the claims register in its context (runner 5.5.4);
+        # it is kept as its own artifact, CLAIMS, not inside the context.
+        context = dict(context)
+        in_ctx = context.pop("claims")
+        claims = claims if claims is not None else in_ctx
+    for vname, vobj in ((CONTEXT, context), (CLAIMS, claims)):
+        if vobj is None:
+            continue
+        cpy = json.loads(json.dumps(vobj))             # a JSON copy: no live objects
+        clean, drop = scrub(cpy, blocked)
+        ev.artifacts[vname] = clean
         if drop:
-            ev.dropped[CONTEXT] = drop
+            ev.dropped[vname] = drop
     return ev
 
 
@@ -472,11 +545,11 @@ def exp_dirs(root):
                   and (p / "exp.json").is_file())
 
 
-def load_dir(root, exp, exps=None, context=None):
+def load_dir(root, exp, exps=None, context=None, claims=None, domain=None):
     """Evidence from a snapshot directory laid out like INC_DIR (the replay
     fixtures, or a pulled copy): the allow-listed files of `exp`, of every
-    other experiment in `exps` (default: every experiment dir under root) and
-    of step1/. Nothing else under root is opened."""
+    other experiment in `exps` (default: every experiment dir under root), of
+    step1/ and of funnel/. Nothing else under root is opened."""
     root = Path(root)
     names = []
     others = exp_dirs(root) if exps is None else list(exps)
@@ -484,6 +557,7 @@ def load_dir(root, exp, exps=None, context=None):
         names.extend("%s/%s" % (e, f) for f in EXP_FILES)
         names.append(ROOT_AUDIT % e)
     names.extend("step1/%s" % f for f in STEP1_FILES)
+    names.extend("funnel/%s" % f for f in FUNNEL_FILES)
     texts, touched = {}, []
     for n in names:
         if not allowed(n):
@@ -492,20 +566,22 @@ def load_dir(root, exp, exps=None, context=None):
         if p.is_file():
             texts[n] = _read_file(p)
             touched.append(n)
-    return from_texts(texts, exp, context=context, touched=touched)
+    return from_texts(texts, exp, context=context, touched=touched, claims=claims, domain=domain)
 
 
 # ------------------------------------------------------- remote snapshot
 def _snapshot_records(record):
-    """[snapshot or step1 record] inside a remote.py snapshot, step1 or
-    campaign-snapshot record."""
+    """[snapshot, step1 or funnel-summary record] inside a remote.py snapshot,
+    step1, funnel-summary or campaign-snapshot record."""
     verb = (record or {}).get("verb")
-    if verb in ("snapshot", "step1"):
+    if verb in ("snapshot", "step1", "funnel-summary"):
         return [record]
     if verb == "campaign-snapshot":
         out = [(s or {}).get("snapshot") or {} for _, s in sorted((record.get("experiments") or {}).items())]
         if record.get("step1"):
             out.append(record["step1"])
+        if isinstance(record.get("funnel"), dict) and record["funnel"].get("verb") == "funnel-summary":
+            out.append(record["funnel"])
         return out
     raise EvidenceError("not a remote snapshot record (verb %r)" % (verb,))
 
@@ -521,7 +597,7 @@ def _cluster_file(info, **extra):
     return out
 
 
-def from_snapshot(record, exp, context=None, ledger_prefix=None):
+def from_snapshot(record, exp, context=None, ledger_prefix=None, claims=None, domain=None):
     """Evidence from remote.py's INCAP record (snapshot, step1 or
     campaign-snapshot), equal to what load_dir gives on the same files:
       * decision.artifacts are the files' (dev-only) contents;
@@ -532,6 +608,12 @@ def from_snapshot(record, exp, context=None, ledger_prefix=None):
         <exp>/derived/state_runs.json;
       * derived.select_clusters_by_source becomes
         step1/select_clusters_by_source.json;
+      * a funnel-summary record (remote.py funnel summary, alone or under a
+        campaign-snapshot's "funnel") gives its decision.artifacts (the
+        funnel aggregates and the Step 1 funnel reads) as they are, and its
+        derived.funnel_ledger (the summaries-derived ledger, when no ledger
+        file exists on the cluster) as funnel/funnel_ledger.json, marked
+        derived;
       * the ledger's entries keep their 1-based line numbers; ledger_prefix
         ({exp: [(line, entry)]}, the lab's earlier copy) supplies lines the
         record did not ship (remote snapshot --ledger-from).
@@ -559,10 +641,17 @@ def from_snapshot(record, exp, context=None, ledger_prefix=None):
                 put_back = True
             texts[name] = json.dumps(obj, sort_keys=True)
             info = files.get(name)
-            if isinstance(info, dict) and info.get("sha256"):
+            if name in DERIVED_FROM:
+                prov[name] = {"source": "derived", "json_sha256": _json_sha(texts[name]),
+                              "derived_from": DERIVED_FROM[name],
+                              "from_file": _cluster_file(info) if isinstance(info, dict) and info.get("sha256")
+                              else None}
+            elif isinstance(info, dict) and info.get("sha256"):
                 extra = {}
                 if omitted.get(name):
                     extra["shipped_as"] = "compacted: without %s" % ", ".join(omitted[name])
+                if name in SHIPPED_AS:
+                    extra["shipped_as"] = SHIPPED_AS[name]
                 if put_back:
                     extra["final_from"] = "derived.report_final_dev (the dev column)"
                 prov[name] = _cluster_file(info, **extra)
@@ -575,6 +664,11 @@ def from_snapshot(record, exp, context=None, ledger_prefix=None):
                 texts[dn] = json.dumps(derived["state_runs"], sort_keys=True)
                 prov[dn] = {"source": "derived", "json_sha256": _json_sha(texts[dn]),
                             "derived_from": name, "from_file": prov.get(name)}
+        if isinstance(derived.get("funnel_ledger"), dict) and FUNNEL_LEDGER not in arts:
+            texts[FUNNEL_LEDGER] = json.dumps(derived["funnel_ledger"], sort_keys=True)
+            prov[FUNNEL_LEDGER] = {"source": "derived", "json_sha256": _json_sha(texts[FUNNEL_LEDGER]),
+                                   "derived_from": "adapters.inc_step1.ledger_from_summaries on the cluster's "
+                                                   "Step 1 summaries and census_v0.json"}
         if isinstance(derived.get("select_clusters_by_source"), dict):
             dn = "step1/" + CLUSTERS_BY_SOURCE
             texts[dn] = json.dumps(derived["select_clusters_by_source"], sort_keys=True)
@@ -594,14 +688,14 @@ def from_snapshot(record, exp, context=None, ledger_prefix=None):
                   "through_sha256": led.get("through_sha256")}
             prov[led["artifact"]] = (_cluster_file(info, **lp) if isinstance(info, dict) and info.get("sha256")
                                      else dict(lp, source="derived", note="the record gives no file hash"))
-    ev = from_texts(texts, exp, context=context)
+    ev = from_texts(texts, exp, context=context, claims=claims, domain=domain)
     for name, pv in prov.items():
         if name in ev.provenance or name.endswith("/ledger.jsonl"):
             ev.provenance[name] = pv
     for e, rows in ledgers.items():
         clean_rows, drop = [], []
         for ln, entry in rows:
-            clean, d = scrub(entry) if entry is not None else (None, [])
+            clean, d = scrub(entry, ev.blocked) if entry is not None else (None, [])
             clean_rows.append((ln, clean))
             drop.extend("%d#%s" % (ln, p) for p in d)
         ev.ledgers[e] = clean_rows

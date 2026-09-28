@@ -1,0 +1,65 @@
+{
+ "calibration_overlap": [],
+ "d18_inputs": [
+  {
+   "fn_lb": 0.6,
+   "kind": "target_rejected",
+   "recoverable_lb": 1025.5,
+   "relative_of_prediction": false,
+   "source_taxa": [],
+   "stage": "S8",
+   "stratum": "G2/source=project_agml__weed_crop_detection/label=Ragweed/fail=p_below_tau"
+  },
+  {
+   "fn_lb": 0.4,
+   "kind": "other_predicted_target",
+   "recoverable_lb": 513.2,
+   "relative_of_prediction": true,
+   "source_taxa": [
+    "Amaranthus retroflexus"
+   ],
+   "stage": "S9",
+   "stratum": "G1/frame=named/status=taxon_resolved/pred=PalmerAmaranth"
+  }
+ ],
+ "domain": "weed",
+ "format": "funnel-audit/1",
+ "ledger_fingerprint": "409b67c2b6e8fabd5d80fee6a4f54652e1df0de6915bde3301f60d1a8de144e4",
+ "stage_ranking": [
+  {
+   "recoverable_lb": 1025.5,
+   "stage": "S8"
+  },
+  {
+   "recoverable_lb": 513.2,
+   "stage": "S9"
+  }
+ ],
+ "stages": {
+  "S8": {
+   "fn_rate": {
+    "estimate": 0.7,
+    "interval": [
+     0.6,
+     0.8
+    ],
+    "method": "wilson",
+    "n": 60
+   }
+  },
+  "S9": {
+   "fn_rate": {
+    "estimate": 0.5,
+    "interval": [
+     0.4,
+     0.6
+    ],
+    "method": "wilson",
+    "n": 60
+   }
+  }
+ },
+ "synthetic": true,
+ "valid": true,
+ "why": "R11: weed_crop's rejected Ragweed stratum is a false-negative source; greenhouse's OtherPlant -> Palmer stratum names a relative of the prediction"
+}

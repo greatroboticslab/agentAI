@@ -25,6 +25,13 @@ so it can be unit-tested without any network.
 """
 from __future__ import annotations
 
+import re
+
+# Provider prefixes a model id may carry ("vllm:glm-4.7-flash"); model_family
+# reads the name after one of them.
+_PROVIDERS = ("ollama", "vllm", "openai", "anthropic", "sglang", "cloud", "lab")
+_FAMILY_RE = re.compile(r"[A-Za-z]+")
+
 # The only model pulled on the lab 3060 right now — the safe lab-sync default.
 LAB_SMALL = "ollama:qwen2.5:3b"
 
@@ -73,7 +80,42 @@ ROLES: dict = {
         "judgement": True, "place": "cluster", "model": "vllm:deepseek-v3:671b", "latency_budget_s": 0,
         "is_async": True, "rare": True, "fallbacks": ["vllm:glm-4.7-flash", "ollama:gemma4"],
         "desc": "Rare, genuinely-hard one-off reasoning (deepseek-v3 671B; SU-expensive)."},
+    # docs/FUNNEL_AUDIT.md 8.2 and 8.6: the devil's advocate argues against a
+    # negative or scarcity claim before it may be called concluded. It must be
+    # a model family other than the planner's (LLM judges favour their own
+    # family). The planner's first fallback is this role's default and both
+    # fall back to gemma4, so the configured defaults do not guarantee it: the
+    # check compares the models actually resolved for the two replies
+    # (same_family below; inc_autopilot/validate.py validate_da).
+    "adversary": {
+        "judgement": True, "place": "cluster", "model": "vllm:glm-4.7-flash", "latency_budget_s": 0,
+        "is_async": True, "fallbacks": ["ollama:gemma4"],
+        "desc": "Devil's advocate against negative claims (a family other than the planner's)."},
 }
+
+
+def model_family(model_id: str) -> str:
+    """The family of a model id: the leading letters of its name after the
+    provider prefix, lowercased ("vllm:glm-4.7-flash" -> "glm",
+    "ollama:qwen3.8:27b" -> "qwen", "ollama:gemma4" -> "gemma", a bare
+    "qwen3.8:27b" -> "qwen"). "" when the name starts with no letter, which
+    same_family treats as unknown."""
+    text = str(model_id or "").strip()
+    head, sep, rest = text.partition(":")
+    name = rest if sep and head.lower() in _PROVIDERS else text
+    m = _FAMILY_RE.match(name)
+    return m.group(0).lower() if m else ""
+
+
+def same_family(model_a: str, model_b: str):
+    """True when the two resolved models are one family, False when they are
+    two known families, None when either family cannot be read (the caller
+    treats unknown as not independent)."""
+    fa, fb = model_family(model_a), model_family(model_b)
+    if not fa or not fb:
+        return None
+    return fa == fb
+
 
 
 def _provider_of(model_id: str) -> str:

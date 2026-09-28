@@ -98,6 +98,33 @@ status 0 when the record says ok, else 1.
         and not abandoned), report (auto: when state.json says done and
         report.json is missing or older than state.json), snapshot; then
         Step 1 once and status last. One record, one line.
+    funnel summary [--derive-ledger]
+        the funnel audit's aggregates (docs/FUNNEL_AUDIT.md 8.2; runner
+        5.5.6): funnel/{funnel_ledger, audit_v1, class_maps, prospective_da}.json,
+        step1_r1/recovery.json (shipped as funnel/recovery.json),
+        step1/{pool_summary, calibration}.json, the verifier fit record's
+        projection (step1/verifier_fit_info.json, derived) and the listing of
+        INC_DIR/funnel/ (funnel/files.json: names, sha256, sizes, never
+        content), all through dev_only. Never ships conflicts.csv,
+        pool_verdicts.npz, ledger.jsonl, key files, cluster sheets or
+        evaluation descriptors (FUNNEL_NEVER). With --derive-ledger and no
+        funnel_ledger.json on disk, the summaries-derived ledger computed in a
+        temporary directory (derived.funnel_ledger). campaign-snapshot --funnel
+        adds this record under "funnel".
+    funnel ledger-summaries [--write]
+        F2a: adapters.inc_step1.ledger_from_summaries on the Step 1 summaries
+        and funnel/census_v0.json, returned; --write also writes it when no
+        ledger file exists (a census-derived one is never replaced here).
+    funnel dev-scores --exp E [--exp ...] [--truth-step STEP]
+        runs/<run>/scores/dev.json of base runs (or of a real loop step's
+        truth "with" runs), for inc_autopilot/panel.py; a score not stamped
+        dev is refused.
+    submit funnel [...] -- VERB FLAGS
+        sbatch of run_inc_funnel.sh VERB (levers L10, L11 and L13): census,
+        leak, embed-judges, qualify [--rl], draw, sheets, rl-b, ingest,
+        estimate (--prereg, --out), map (--part geometry|relation), recover
+        (--audit, --maps, --policy, --out under INC_DIR); the verb's extra
+        sbatch flags come from funnel/__main__.py SBATCH_RESOURCES.
     fixture --from FILE --out DIR
         (either host) the INCAP line in FILE (a snapshot or campaign-snapshot)
         written out as files named as on the cluster (relative to INC_DIR),
@@ -180,7 +207,11 @@ AGGREGATE_FORMAT = "inc-autopilot/select-clusters-by-source/1"      # evidence.A
 STATE_READ_BYTES = 64 << 20          # state.json is read up to this size: only its compact form is shipped
 PROVENANCE_FORMAT = "inc_autopilot.provenance/1"
 ABANDONED_FORMAT = "inc_autopilot.abandoned/1"
-NON_DEV_EXAMS = ("test", "ood22", "ood23", "imageweeds")    # common.EVAL_SPLITS minus dev
+# The domain config's non-decision exams (common.EVAL_SPLITS minus dev) and
+# every split no decision may read (those plus its extra non-decision splits,
+# the weed domain's H10d domain dev): model.exam_splits / model.non_dev_exams.
+NON_DEV_EXAMS = M.exam_splits()["non_decision"]
+BLOCKED_SPLITS = M.non_dev_exams()
 AUTO_PREFIX = "auto:"               # thresholds.json D5.auto_reason_prefix (tests check they agree); unblock reads the file
 THRESHOLDS_JSON = Path(__file__).with_name("thresholds.json")   # D5: what L7 may unblock (diagnose.py, executor.py)
 LEGACY_AUDIT = "audit/%s_audit.json"    # where pilot_v1's label audit was written by hand (INC_DIR-relative)
@@ -209,17 +240,27 @@ STEP1_BIG = ("select_clusters.csv", "base_selected.jsonl", "increment_pool.jsonl
 
 # The job script per submit builder, and the policy action of each builder form
 # (docs/INC_AUTOPILOT.md (g) step 6).
-SCRIPTS = {"build": "run_inc_build.sh", "relevance": "run_inc_relevance.sh", "audit": "run_inc_audit.sh"}
+SCRIPTS = {"build": "run_inc_build.sh", "relevance": "run_inc_relevance.sh", "audit": "run_inc_audit.sh",
+           "funnel": "run_inc_funnel.sh"}
 # The #SBATCH --job-name each script runs under when submitted by hand: remote.py
 # names its jobs per experiment, but a hand submission of the same experiment
 # carries only this name, so it counts as a possible duplicate.
-SCRIPT_JOB_NAMES = {"build": "inc_build", "relevance": "inc_relevance", "audit": "inc_audit"}
+SCRIPT_JOB_NAMES = {"build": "inc_build", "relevance": "inc_relevance", "audit": "inc_audit",
+                    "funnel": "inc_funnel"}
 BUILDER_ALIASES = {"pilot": "build", "realloop": "build"}      # executor.render's 'submit pilot|realloop ...'
 ACTIONS = {("build", "pilot", "build"): "inc_build_pilot",
            ("build", "pilot", "build-baseline"): "inc_build_baseline",
            ("build", "realloop", "build"): "inc_build_realloop",
            ("relevance", "relevance", "build"): "inc_relevance_build",
            ("audit", "audit", None): "inc_label_audit"}
+# The funnel audit's cluster jobs (docs/FUNNEL_AUDIT.md 8.5; runner 5.6): run_inc_funnel.sh VERB.
+FUNNEL_AUDIT_VERBS = ("census", "leak", "embed-judges", "qualify", "draw", "sheets", "rl-b", "ingest", "estimate")
+for _v in FUNNEL_AUDIT_VERBS:
+    ACTIONS[("funnel", "funnel", _v)] = "inc_funnel_audit"
+ACTIONS[("funnel", "funnel", "map")] = "inc_funnel_map"
+ACTIONS[("funnel", "funnel", "recover")] = "inc_funnel_recover"
+FUNNEL_PARTS = ("geometry", "relation")
+FUNNEL_POLICY_RE = re.compile(r"R-[ACTVJF](,R-[ACTVJF]){0,5}\Z")
 # flag -> (param, kind). Kinds: name, replay_mode, recipes, flips_mode, increment_sources, int (>= 1),
 # int0 (>= 0), seeds, flag, path_in (an existing file), dir_in (an existing dir),
 # out_json, audit_list (NAME=MANIFEST ...). Paths are PATH_KINDS.
@@ -235,6 +276,7 @@ FORMS = {
                                      "--n-verified": ("n_verified", "int"), "--size": ("size", "int"),
                                      "--no-truth": ("no_truth", "flag"), "--relevance": ("relevance", "path_in"),
                                      "--increment-sources": ("increment_sources", "increment_sources"),
+                                     "--step1-overlay": ("step1_overlay", "dir_in"),
                                      "--gate-flips-mode": ("gate_flips_mode", "flips_mode")},
                            "required": ("--exp", "--replay-mode", "--recipes")},
     "inc_relevance_build": {"flags": {"--sample": ("sample", "int"), "--seed": ("seed", "int0"),
@@ -244,7 +286,21 @@ FORMS = {
                                   "--out": ("out", "out_json"), "--nshards": ("nshards", "int")},
                         "required": ("--trusted", "--audit", "--out")},
 }
-PATH_KINDS = ("path_in", "dir_in", "out_json", "audit_list")
+# The funnel builder's grammar (run_inc_funnel.sh VERB FLAGS: a positional verb,
+# then flags), apart from FORMS, whose builders all name a module or command.
+FUNNEL_FORMS = {
+    "inc_funnel_audit": {"flags": {"--prereg": ("prereg", "path_in"), "--out": ("out", "dir_in"),
+                                   "--rl": ("rl", "flag")},
+                         "required": ("--prereg", "--out")},
+    "inc_funnel_map": {"flags": {"--prereg": ("prereg", "path_in"), "--out": ("out", "dir_in"),
+                                 "--part": ("part", "funnel_part")},
+                       "required": ("--prereg", "--out", "--part")},
+    "inc_funnel_recover": {"flags": {"--prereg": ("prereg", "path_in"), "--audit": ("audit", "path_in"),
+                                     "--maps": ("maps", "path_in"), "--policy": ("policy", "funnel_policy"),
+                                     "--out": ("out", "dir_out")},
+                           "required": ("--prereg", "--audit", "--maps", "--policy", "--out")},
+}
+PATH_KINDS = ("path_in", "dir_in", "out_json", "audit_list", "dir_out")
 # What each builder runs when a flag is left out (their argparse defaults; tests
 # check each against its module). A value that depends on the inputs (realloop
 # --size, --base, --relevance; relevance --out, --base-dir) is not listed: those
@@ -258,6 +314,10 @@ REALLOOP_N_VERIFIED = 6        # inc/realloop.py N_VERIFIED
 INCREMENT_SOURCES = ("relevance", "evidence")
 INCREMENT_SOURCES_DEFAULT = "relevance"
 INCREMENT_SOURCES_EVIDENCE = "evidence"
+# realloop build's own choices (realloop.INCREMENT_SOURCE_MODES): select's two
+# criteria and the funnel's recovered overlay (realloop_v2, --step1-overlay).
+INCREMENT_SOURCES_RECOVERED = "recovered"
+REALLOOP_INCREMENT_SOURCES = INCREMENT_SOURCES + (INCREMENT_SOURCES_RECOVERED,)
 RELEVANCE_SAMPLE = 300         # inc/relevance.py SAMPLE
 RELEVANCE_SEED = 0             # inc/relevance.py build --seed default
 
@@ -526,16 +586,18 @@ def _ptr(parts):
     return "".join("/" + str(p).replace("~", "~0").replace("/", "~1") for p in parts)
 
 
-def dev_only(obj, _path=()):
-    """(copy of obj without any dict key named after a non-dev exam, [JSON
-    pointers of what was dropped])."""
+def dev_only(obj, _path=(), blocked=None):
+    """(copy of obj without any dict key named after a non-dev split, [JSON
+    pointers of what was dropped]). `blocked`: the split names (default
+    BLOCKED_SPLITS; model.non_dev_exams(domain) for another domain)."""
     dropped = []
+    names = BLOCKED_SPLITS if blocked is None else tuple(blocked)
 
     def walk(o, path):
         if isinstance(o, dict):
             out = {}
             for k, v in o.items():
-                if k in NON_DEV_EXAMS:
+                if k in names:
                     dropped.append(_ptr(path + (k,)))
                     continue
                 out[k] = walk(v, path + (k,))
@@ -547,9 +609,9 @@ def dev_only(obj, _path=()):
     return walk(obj, tuple(_path)), dropped
 
 
-def non_dev_keys(obj):
-    """JSON pointers of every dict key named after a non-dev exam (tests and the lab's check)."""
-    return dev_only(obj)[1]
+def non_dev_keys(obj, blocked=None):
+    """JSON pointers of every dict key named after a non-dev split (tests and the lab's check)."""
+    return dev_only(obj, blocked=blocked)[1]
 
 
 # --------------------------------------------------------------- small files
@@ -1342,6 +1404,8 @@ def _check_path(kind, value, flag):
         raise Refused("%s %s: no such directory" % (flag, value))
     if kind == "out_json" and not value.endswith(".json"):
         raise Refused("%s %s: must end in .json" % (flag, value))
+    if kind == "dir_out" and not os.path.isdir(os.path.dirname(value.rstrip("/")) or "/"):
+        raise Refused("%s %s: its parent directory does not exist" % (flag, value))
     return value
 
 
@@ -1360,8 +1424,16 @@ def _value(kind, value, flag):
             raise Refused("%s %r is not one of %s" % (flag, value, list(D.FLIPS_MODES)))
         return value
     if kind == "increment_sources":
-        if value not in INCREMENT_SOURCES:
-            raise Refused("%s %r is not one of %s" % (flag, value, list(INCREMENT_SOURCES)))
+        if value not in REALLOOP_INCREMENT_SOURCES:
+            raise Refused("%s %r is not one of %s" % (flag, value, list(REALLOOP_INCREMENT_SOURCES)))
+        return value
+    if kind == "funnel_part":
+        if value not in FUNNEL_PARTS:
+            raise Refused("%s %r is not one of %s" % (flag, value, list(FUNNEL_PARTS)))
+        return value
+    if kind == "funnel_policy":
+        if not FUNNEL_POLICY_RE.match(value):
+            raise Refused("%s %r: comma-separated recovery policies R-A, R-C, R-T, R-V, R-J, R-F" % (flag, value))
         return value
     if kind == "recipes":
         parts = value.split(",")
@@ -1386,7 +1458,7 @@ def _value(kind, value, flag):
             raise Refused("%s %r: NAME=MANIFEST with NAME in [A-Za-z0-9_.-]" % (flag, value))
         _check_path("path_in", path, "%s %s=" % (flag, name))
         return value
-    if kind in ("path_in", "dir_in", "out_json"):
+    if kind in ("path_in", "dir_in", "out_json", "dir_out"):
         return _check_path(kind, value, flag)
     raise Refused("internal: unknown kind %r" % kind)
 
@@ -1416,6 +1488,8 @@ def parse_builder_args(builder, args):
     for a in args:
         if not isinstance(a, str) or not a or BAD_TOKEN_RE.search(a) or len(a) > 1024:
             raise Refused("argument %r holds whitespace, a shell metacharacter or is empty / too long" % (a,))
+    if builder == "funnel":
+        return _parse_funnel_args(args)
     m = MODULE_RE.match(args[0]) if args else None
     if builder == "build":
         # run_inc_build.sh runs a module: the arguments start with it
@@ -1484,6 +1558,15 @@ def parse_builder_args(builder, args):
         raise Refused("%s needs %s" % (action, ", ".join(missing)))
     if params.get("increment_sources") == INCREMENT_SOURCES_EVIDENCE and "relevance" in params:
         raise Refused(M.EVIDENCE_WITH_RELEVANCE)
+    if (params.get("increment_sources") == INCREMENT_SOURCES_RECOVERED) != ("step1_overlay" in params):
+        raise Refused("--increment-sources recovered and --step1-overlay go together (realloop build refuses "
+                      "one without the other)")
+    if params.get("increment_sources") == INCREMENT_SOURCES_RECOVERED:
+        bad = [f for f, k in (("--relevance", "relevance"), ("--n-verified", "n_verified"), ("--no-truth", "no_truth"))
+               if k in params]
+        if bad or "size" not in params:
+            raise Refused("--increment-sources recovered needs --size and refuses %s (realloop build)"
+                          % (", ".join(bad) or "--relevance, --n-verified and --no-truth"))
     if "audit" in params:
         names = [v.partition("=")[0] for v in params["audit"]]
         if len(set(names)) != len(names):
@@ -1492,6 +1575,67 @@ def parse_builder_args(builder, args):
     script_args = ([module, command] if builder == "build" else [command] if builder == "relevance" else []) + args
     return {"builder": builder, "action": action, "module": module, "command": command,
             "script_args": script_args, "params": params, "path_params": path_params}
+
+
+def _parse_funnel_args(args):
+    """The validated request of 'submit funnel -- VERB FLAGS' (run_inc_funnel.sh VERB)."""
+    if not args or args[0].startswith("--"):
+        raise Refused("funnel: the arguments start with the verb (%s, map, recover)" % ", ".join(FUNNEL_AUDIT_VERBS))
+    command, rest = args[0], args[1:]
+    action = ACTIONS.get(("funnel", "funnel", command))
+    if action is None:
+        raise Refused("funnel does not run %r as a job (it runs %s, map, recover)"
+                      % (command, ", ".join(FUNNEL_AUDIT_VERBS)))
+    form = FUNNEL_FORMS[action]
+    params, seen, i = {}, set(), 0
+    while i < len(rest):
+        tok = rest[i]
+        if not tok.startswith("--"):
+            raise Refused("unexpected argument %r (%s takes flags only)" % (tok, action))
+        flag, eq, val = tok.partition("=")
+        spec = form["flags"].get(flag)
+        if spec is None:
+            raise Refused("%s is not accepted for %s (accepted: %s)" % (flag, action, sorted(form["flags"])))
+        if flag in seen:
+            raise Refused("%s given twice" % flag)
+        seen.add(flag)
+        param, kind = spec
+        if kind == "flag":
+            if eq:
+                raise Refused("%s takes no value" % flag)
+            params[param] = True
+            i += 1
+            continue
+        if eq:
+            i += 1
+        else:
+            if i + 1 >= len(rest) or rest[i + 1].startswith("--"):
+                raise Refused("%s needs a value" % flag)
+            val = rest[i + 1]
+            i += 2
+        if not val:
+            raise Refused("%s needs a value" % flag)
+        params[param] = _value(kind, val, flag)
+    missing = [f for f in form["required"] if f not in seen]
+    if missing:
+        raise Refused("%s needs %s" % (action, ", ".join(missing)))
+    if params.get("rl") and command != "qualify":
+        raise Refused("--rl belongs to qualify (the reference labeller's qualification), not %s" % command)
+    if action == "inc_funnel_audit":
+        params["verb"] = command
+    path_params = sorted(p for p, k in form["flags"].values() if k in PATH_KINDS and p in params)
+    return {"builder": "funnel", "action": action, "module": "funnel", "command": command,
+            "script_args": list(args), "params": params, "path_params": path_params}
+
+
+def funnel_resources(verb):
+    """The extra sbatch flags of a funnel verb: funnel/__main__.py
+    SBATCH_RESOURCES[VERB_CLASS[verb]] (the CLI's one table; runner 5.6.1)."""
+    from ..funnel import __main__ as FM
+    cls = FM.VERB_CLASS.get(verb)
+    if cls is None or cls not in FM.SBATCH_RESOURCES:
+        raise Refused("funnel verb %r has no resource class in the CLI's table" % (verb,))
+    return list(FM.SBATCH_RESOURCES[cls])
 
 
 def load_levers(path=None):
@@ -1656,6 +1800,8 @@ def submission_env(prov):
 
 def _job_name(req):
     p = req["params"]
+    if req["builder"] == "funnel":
+        return "inc_funnel_%s" % (req["command"] if req["command"] != "map" else "map_%s" % p.get("part"))
     if req["builder"] == "build":
         return "inc_build_%s" % p["exp"]
     if req["builder"] == "audit":
@@ -1697,7 +1843,8 @@ def submit(builder, args, meta=None, dry_run=False, levers=None):
             raise Refused("job script %s not found" % script)
         name = _job_name(req)
         sbatch = os.environ.get("INCAP_SBATCH", "sbatch")
-        argv = [sbatch, "--parsable", "--job-name=%s" % name, str(script)] + req["script_args"]
+        extra = funnel_resources(req["command"]) if builder == "funnel" else []
+        argv = [sbatch, "--parsable", "--job-name=%s" % name] + extra + [str(script)] + req["script_args"]
         rec.update(job_name=name, sbatch_argv=argv)
         if dry_run:
             return rec
@@ -1716,7 +1863,7 @@ def submit(builder, args, meta=None, dry_run=False, levers=None):
                           % (SCRIPT_JOB_NAMES[builder], hand[0]["id"]))
     except Refused as e:
         return fail(rec, e, error_kind="refused")
-    for d in (inc_dir() / "logs", inc_dir() / "step1" / "logs"):   # Slurm opens --output before the script runs
+    for d in (inc_dir() / "logs", inc_dir() / "step1" / "logs", inc_dir() / "funnel" / "logs"):   # Slurm opens --output before the script runs
         d.mkdir(parents=True, exist_ok=True)
     C = _C()
     try:
@@ -1761,7 +1908,8 @@ def _guard(verb, fn, *a, **kw):
         return fail(rec, e, type(e).__name__, "other")
 
 
-def campaign_snapshot(exps, do_advance=False, report_mode="auto", ledger_from=None, step1=True, backend=None):
+def campaign_snapshot(exps, do_advance=False, report_mode="auto", ledger_from=None, step1=True, backend=None,
+                      funnel=False):
     rec = base_record("campaign-snapshot")
     ledger_from = ledger_from or {}
     out, seen = {}, []
@@ -1794,10 +1942,207 @@ def campaign_snapshot(exps, do_advance=False, report_mode="auto", ledger_from=No
     rec["experiments"] = out
     if step1:
         rec["step1"] = _guard("step1", step1_snapshot)
+    if funnel:
+        rec["funnel"] = _guard("funnel-summary", funnel_summary, derive_ledger=True)
     rec["status"] = _guard("status", status)
     subs = [r for s in out.values() for r in s.values() if isinstance(r, dict)]
-    subs += [rec[k] for k in ("step1", "status") if k in rec]
+    subs += [rec[k] for k in ("step1", "funnel", "status") if k in rec]
     rec["ok"] = all(r.get("ok", False) for r in subs)
+    return rec
+
+
+# ------------------------------------------------------------ the funnel audit
+# docs/FUNNEL_AUDIT.md 8.2 and runner 5.5.6: the funnel verbs print aggregates
+# only. FUNNEL_SHIP is the whole list of files a summary ships (as named for the
+# lab's evidence: recovery.json lives in step1_r1/ and is shipped as
+# funnel/recovery.json); FUNNEL_NEVER names what is never read for shipping,
+# whatever it holds (row-level files, key files, evaluation descriptors). The
+# funnel directory's listing gives names, sha256 and sizes only, never content.
+FUNNEL_SHIP = (("funnel/funnel_ledger.json", "funnel/funnel_ledger.json"),
+               ("funnel/audit_v1.json", "funnel/audit_v1.json"),
+               ("funnel/class_maps.json", "funnel/class_maps.json"),
+               ("funnel/recovery.json", "step1_r1/recovery.json"),
+               ("funnel/prospective_da.json", "funnel/prospective_da.json"),
+               ("step1/pool_summary.json", "step1/pool_summary.json"),
+               ("step1/calibration.json", "step1/calibration.json"))
+FUNNEL_NEVER = ("step1/conflicts.csv", "step1/pool_verdicts.npz", "funnel/ledger.jsonl", "funnel/sample_v1_key.jsonl",
+                "funnel/sheets_v1_key/", "funnel/sheets_v1_cluster/", "funnel/leak_eval_desc.npz",
+                "funnel/leak_pairs_v1.csv")
+FUNNEL_LISTING_DEPTH = 3                 # funnel/<a>/<b>/<file>: rl_answers/RL-B/<sheet>.json
+FUNNEL_HASH_MAX = 64 << 20               # a bigger file is listed with its size, sha256 null
+FIT_INFO = "step1/verifier/fit_info.json"
+
+
+def funnel_listing():
+    """{INC_DIR-relative path: {"sha256", "bytes"}} of INC_DIR/funnel/ to depth
+    FUNNEL_LISTING_DEPTH (one os.listdir per directory; sha256 cached by size
+    and mtime in _campaign/cache/funnel_listing.json)."""
+    root = inc_dir() / "funnel"
+    cache_path = campaign_dir() / "cache" / "funnel_listing.json"
+    cache = _read_json_or_none(cache_path) or {}
+    out, new_cache = {}, {}
+
+    def go(d, depth):
+        try:
+            names = sorted(os.listdir(d))
+        except OSError:
+            return
+        for n in names:
+            p = d / n
+            rel = str(p.relative_to(inc_dir()))
+            if p.is_dir():
+                if depth < FUNNEL_LISTING_DEPTH:
+                    go(p, depth + 1)
+                continue
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            key = "%s|%d|%d" % (rel, st.st_size, st.st_mtime_ns)
+            sha = cache.get(key)
+            if sha is None and st.st_size <= FUNNEL_HASH_MAX:
+                sha = _sha256_file(p)
+            if sha is not None:
+                new_cache[key] = sha
+            out[rel] = {"sha256": sha, "bytes": st.st_size}
+    if root.is_dir():
+        go(root, 1)
+    if new_cache != cache:
+        with contextlib.suppress(OSError):
+            _write_json_atomic(cache_path, new_cache)
+    return out
+
+
+def _derive_ledger():
+    """The summaries-derived funnel ledger of this Step 1 (adapters.inc_step1.
+    ledger_from_summaries on step1/*_summary.json, calibration.json and
+    funnel/census_v0.json), built in a temporary directory: nothing under
+    INC_DIR is written. Returns (ledger, None) or (None, why)."""
+    import tempfile
+    from ..funnel.adapters import inc_step1 as AD
+    from ..funnel import domain as FD
+    census = inc_dir() / "funnel" / "census_v0.json"
+    if not census.is_file():
+        return None, "no funnel/census_v0.json on the cluster"
+    proj = None
+    with contextlib.suppress(Exception):
+        proj = AD.verifier_fit_info_projection(inc_dir() / "step1")
+    with tempfile.TemporaryDirectory(prefix="funnel_ledger_") as td:
+        out = Path(td) / "funnel_ledger.json"
+        AD.ledger_from_summaries(FD.load(M.DOMAIN), inc_dir() / "step1", census, out, fit_info_projection=proj)
+        with open(out) as fh:
+            return json.load(fh), None
+
+
+def funnel_summary(derive_ledger=False):
+    """INCAP funnel-summary: the funnel's aggregates (FUNNEL_SHIP), the verifier
+    fit record's projection (derived: step1/verifier_fit_info.json), and the
+    listing of INC_DIR/funnel (derived: funnel/files.json); with derive_ledger
+    and no funnel_ledger.json on disk, the summaries-derived ledger computed in
+    memory (derived.funnel_ledger). Everything in "decision" passes dev_only."""
+    rec = base_record("funnel-summary")
+    arts, derived, files, missing, notes = {}, {}, {}, [], []
+    for name, rel in FUNNEL_SHIP:
+        p = inc_dir() / rel
+        if not p.is_file():
+            missing.append(rel)
+            continue
+        obj, info = read_small(p)
+        files[name] = dict(info, path=rel)
+        if obj is None:
+            notes.append("%s not shipped: %s" % (rel, info.get("why")))
+            continue
+        arts[name] = obj
+    fp = inc_dir() / FIT_INFO
+    if fp.is_file():
+        try:
+            from ..funnel.adapters import inc_step1 as AD
+            arts["step1/verifier_fit_info.json"] = AD.verifier_fit_info_projection(inc_dir() / "step1")
+            files["step1/verifier_fit_info.json"] = {"sha256": _sha256_file(fp), "bytes": fp.stat().st_size,
+                                                    "path": FIT_INFO, "shipped": False,
+                                                    "why": "projected to its OtherPlant sample"}
+        except Exception as e:
+            notes.append("verifier fit record not projected: %s: %s" % (type(e).__name__, _short(e, 200)))
+    else:
+        missing.append(FIT_INFO)
+    arts["funnel/files.json"] = {"format": "funnel-files/1", "root": "funnel/", "files": funnel_listing()}
+    if derive_ledger and "funnel/funnel_ledger.json" not in arts and "funnel/funnel_ledger.json" not in files:
+        try:
+            led, why = _derive_ledger()
+        except Exception as e:
+            led, why = None, "%s: %s" % (type(e).__name__, _short(e, 300))
+        if led is not None:
+            derived["funnel_ledger"] = led
+        else:
+            notes.append("summaries-derived ledger not built: %s" % why)
+    decision, redacted = dev_only({"artifacts": arts, "derived": derived})
+    rec.update(decision_exam=M.DECISION_EXAM, decision=decision, redacted=redacted, files=files,
+               missing=missing, notes=notes, never_shipped=list(FUNNEL_NEVER))
+    return rec
+
+
+def funnel_ledger_summaries(write=False):
+    """INCAP funnel-ledger-summaries (F2a): the summaries-derived ledger, built
+    in memory; with write, also written to INC_DIR/funnel/funnel_ledger.json
+    when no ledger is there (a census-derived ledger is never replaced here)."""
+    rec = base_record("funnel-ledger-summaries")
+    led, why = _derive_ledger()
+    if led is None:
+        return fail(rec, why, error_kind="missing")
+    target = inc_dir() / "funnel" / "funnel_ledger.json"
+    if write:
+        if target.exists():
+            cur = _read_json_or_none(target) or {}
+            if cur.get("derivation") != "summaries" or cur.get("fingerprint") != led.get("fingerprint"):
+                return fail(rec, "%s exists (derivation %r); a census-derived or other ledger is not replaced here"
+                            % (target, cur.get("derivation")), error_kind="refused")
+        else:
+            _write_json_atomic(target, led)
+            rec["written"] = str(target)
+    rec["ledger"] = dev_only(led)[0]
+    rec["fingerprint"] = led.get("fingerprint")
+    return rec
+
+
+FUNNEL_BASE_RUN_RE = re.compile(r"base__s[0-9]+\Z")
+
+
+def funnel_dev_scores(exps, truth_step=None):
+    """INCAP funnel-dev-scores: runs/<run>/scores/dev.json of each experiment's
+    base runs (base__s<seed>), or with truth_step of a real loop step's truth
+    'with' runs (truth__s<k>_<step>__union__s<seed>), and nothing else. A score
+    not stamped dev is refused (the panel reads dev only)."""
+    rec = base_record("funnel-dev-scores")
+    if truth_step is not None and not NAME_RE.match(truth_step):
+        return fail(rec, "--truth-step %r is not a step name" % truth_step, error_kind="refused")
+    rx = re.compile(r"truth__s[0-9]+_%s__union__s[0-9]+\Z" % re.escape(truth_step)) if truth_step \
+        else FUNNEL_BASE_RUN_RE
+    scores, files = {}, {}
+    for exp in exps:
+        try:
+            _check_exp(exp)
+        except Refused as e:
+            return fail(rec, e, error_kind="refused")
+        runs = inc_dir() / exp / "runs"
+        got = {}
+        try:
+            names = sorted(os.listdir(runs))
+        except OSError:
+            names = []
+        for rid in names:
+            if not rx.match(rid):
+                continue
+            p = runs / rid / "scores" / ("%s.json" % M.DECISION_EXAM)
+            if not p.is_file():
+                continue
+            obj, info = read_small(p)
+            if not isinstance(obj, dict) or obj.get("exam") != M.DECISION_EXAM:
+                return fail(rec, "%s/runs/%s/scores/%s.json is not a dev score" % (exp, rid, M.DECISION_EXAM),
+                            error_kind="refused")
+            got[rid] = obj
+            files["%s/runs/%s/scores/%s.json" % (exp, rid, M.DECISION_EXAM)] = info
+        scores[exp] = got
+    rec.update(scores=scores, files=files, truth_step=truth_step, exams_read=[M.DECISION_EXAM])
     return rec
 
 
@@ -1940,7 +2285,7 @@ def _split_submit(argv):
 def dispatch(argv):
     if not argv:
         raise _ArgError("a verb is needed: status, snapshot, advance, report, unblock, cancel, sync-outer, "
-                        "submit, campaign-snapshot, fixture")
+                        "submit, campaign-snapshot, funnel, fixture")
     verb, rest = argv[0], argv[1:]
     if verb == "submit":
         builder, meta, dry, args = _split_submit(rest)
@@ -1983,9 +2328,28 @@ def dispatch(argv):
         ap.add_argument("--report", choices=("auto", "always", "never"), default="auto")
         ap.add_argument("--ledger-from", action="append", default=[])
         ap.add_argument("--no-step1", action="store_true")
+        ap.add_argument("--funnel", action="store_true")
         a = ap.parse_args(rest)
         return campaign_snapshot(a.exp, do_advance=a.advance, report_mode=a.report,
-                                 ledger_from=_ledger_map(a.ledger_from), step1=not a.no_step1)
+                                 ledger_from=_ledger_map(a.ledger_from), step1=not a.no_step1, funnel=a.funnel)
+    if verb == "funnel":
+        if not rest or rest[0] not in ("summary", "dev-scores", "ledger-summaries"):
+            raise _ArgError("funnel summary [--derive-ledger] | dev-scores --exp E [--exp ...] [--truth-step S] | "
+                            "ledger-summaries [--write]")
+        sub, rest = rest[0], rest[1:]
+        ap = _Parser(prog="inc_autopilot.remote funnel %s" % sub)
+        if sub == "summary":
+            ap.add_argument("--derive-ledger", action="store_true")
+            a = ap.parse_args(rest)
+            return funnel_summary(derive_ledger=a.derive_ledger)
+        if sub == "dev-scores":
+            ap.add_argument("--exp", action="append", required=True)
+            ap.add_argument("--truth-step", default=None)
+            a = ap.parse_args(rest)
+            return funnel_dev_scores(a.exp, truth_step=a.truth_step)
+        ap.add_argument("--write", action="store_true")
+        a = ap.parse_args(rest)
+        return funnel_ledger_summaries(write=a.write)
     if verb == "fixture":
         ap.add_argument("--from", dest="src", required=True)
         ap.add_argument("--out", required=True)

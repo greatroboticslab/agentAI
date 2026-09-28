@@ -222,14 +222,22 @@ HISTORY_KEEP = 48                    # (utc, generation) per experiment for D6: 
 REFUSALS_KEEP = 5
 CARDS_KEEP = 50
 STOP_IDS = ("D7", "D10", "D14")
+DA_IN_FLIGHT = ("staged", "submitted")    # a devil's-advocate pass not yet ended
 BUILD_FAILED = ("build_failed", "refused_drift", "refused_missing_module", "env_failed", "killed")
+# The R4 decisions of the funnel audit (docs/FUNNEL_AUDIT.md 13), logged once
+# per campaign with decided_by human-delegated (runner 5.5.4).
+FUNNEL_DECISIONS = ("DEC-1", "DEC-2", "DEC-3", "DEC-4", "DEC-5", "DEC-6", "DEC-7", "DEC-8", "DEC-9", "DEC-10")
+# A callable taking the _Run and returning its executor's lab hooks (tests).
+LAB_HOOKS = None
+# The params that tell one funnel step from another in the lineage.
+FUNNEL_KEY_PARAMS = ("verb", "rl", "part", "what", "policy")
 TRANSIENT_REFUSALS = ("the cluster is not reachable", "Mongo's health", "the execution log",
                       "no slurm_sh hook", "could not be locked", "collides with another request",
                       "could not be filed", "the approval log could not be written")
 DEFAULT_CONFIG = {"enabled": False, "paused_reason": None, "goal": None, "exps": [],
                   "current_exp": None, "autonomy": "off", "autonomy_granted_by": None,
                   "envelope_su": None, "daily_cap_su": None,
-                  "brain": {"enabled": False, "model": None}}
+                  "brain": {"enabled": False, "model": None}, "funnel": True}
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 HUMAN_RE = re.compile(r"^human:[A-Za-z0-9][A-Za-z0-9@._+-]{0,126}$")
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$")
@@ -333,6 +341,17 @@ class Paths(object):
         self.track_summary = self.campaign_dir / "track_record.json"
         self.experiments = self.brain_dir / M.DOMAIN / "experiments.jsonl"
         self.lock = self.campaigns / ".tick.lock"
+        # The funnel audit (docs/FUNNEL_AUDIT.md 8.3, 8.6): the claims register,
+        # the lab's INC tree (its funnel/ holds prospective_da.json and the
+        # fetched files the sync pushes), the contract and the R14 fixture (the
+        # DA's blind markers), and a person's verify queue (L14).
+        self.claims = self.campaign_dir / "claims.json"
+        root = Path(lab_repo) if lab_repo is not None else M.LAB_REPO
+        self.lab_inc = root / "results" / "framework" / "inc"
+        self.contract = root.parent / "docs" / "FUNNEL_AUDIT.md"
+        self.r14_fixtures = [root / "tests" / "fixtures" / "inc_replay" / "funnel" / "da" / name
+                             for name in ("da_positive.json", "da_sycophantic.json")]
+        self.verify_queue = self.brain_dir / M.DOMAIN / "known_truth" / "human_verify_queue.jsonl"
 
     def state(self, name):
         return self.campaigns / name / "state.json"
@@ -502,7 +521,8 @@ def _blank_state(name, cfg):
             "diagnoses": [], "health": [], "diagnosed_hash": None, "health_hash": None,
             "prospective": {}, "rules_version": None, "reported": {}, "launched": {}, "building": None,
             "build_failed": {}, "wait_jobs": [], "refusals": [], "declined": [], "attempts": {},
-            "adopt_skip": [], "superseded": [], "brain": None, "brain_n": 0,
+            "adopt_skip": [], "superseded": [], "brain": None, "brain_n": 0, "da": None,
+            "funnel_sync_due": False,
             "snapshot_failures": 0, "transport_failures": 0,
             "notes": {}, "last_snapshot_utc": None, "last_tick_utc": None, "updated_utc": None}
 
@@ -810,6 +830,7 @@ class _Run(object):
         self.xctx = X.Context(slurm_sh=ssh, resources=resources, domain_budget=domain_budget,
                               clock=clock, lab_repo=paths.lab_repo, preamble=preamble,
                               diagnoses=lambda _name: self._hook_diagnoses())
+        self.xctx.local_hooks.update(self._lab_hooks())
 
     # ---- plumbing
     def _goal_error(self):
@@ -973,8 +994,10 @@ class _Run(object):
                        % ", ".join(ids))
 
     def _complete(self, kind, title, detail):
-        """COMPLETE: a human card, never a silent idle."""
+        """COMPLETE: a human card, never a silent idle. A negative claim still
+        open or challenged is named as not concluded (contract 8.6)."""
         st = self.st
+        detail = str(detail or "") + self._complete_claims_note()
         st["phase"] = "COMPLETE"
         st["item"] = None
         self._card(kind, title, detail)
@@ -1112,7 +1135,8 @@ class _Run(object):
     def _wants_observation(self):
         st = self.st
         b = st.get("brain") or {}
-        return st.get("phase") in OBSERVING or b.get("status") == "submitted"
+        return st.get("phase") in OBSERVING or b.get("status") == "submitted" \
+            or (st.get("da") or {}).get("status") == "submitted"
 
     # ---- part A: the item, an approved item, the brain submission
     def _act(self):
@@ -1142,6 +1166,12 @@ class _Run(object):
             b = st.get("brain") or {}
             if b.get("status") == "staged":
                 self._submit_brain()
+        if self.ssh.calls == before and self.ssh.left() and not self._paused_reason():
+            da = st.get("da") or {}
+            if da.get("status") == "staged":
+                self._submit_da()
+        if self.ssh.calls == before and self.ssh.left() and not self._paused_reason():
+            self._funnel_sync()
 
     def _prior_execution(self, pid):
         """The last execution record of proposal `pid` that ran, may have run, or
@@ -1172,6 +1202,12 @@ class _Run(object):
             if r.get("status") in LV.LINEAGE_IGNORED or r.get("lever") not in lids:
                 continue
             if exclude_pid and r.get("proposal_id") == exclude_pid:
+                continue
+            if lever in LV.FUNNEL_LEVERS:
+                # a funnel step is one per (lever, verb / part / what / policy)
+                mine = {k: (p.get("params") or {}).get(k) for k in FUNNEL_KEY_PARAMS}
+                if {k: (r.get("params") or {}).get(k) for k in FUNNEL_KEY_PARAMS} == mine:
+                    return r
                 continue
             if r.get("parent_exp") == p.get("parent_exp"):
                 return r
@@ -1709,7 +1745,13 @@ class _Run(object):
         exp = st["exp"]
         live = self._live_exps()
         b = st.get("brain") or {}
-        pull = {"campaign": self.name, "n": int(b["n"])} if b.get("status") == "submitted" else None
+        da = st.get("da") or {}
+        pulls = []
+        if b.get("status") == "submitted":
+            pulls.append(("brain", {"campaign": self.name, "n": int(b["n"])}))
+        if da.get("status") == "submitted":
+            pulls.append(("da", {"campaign": self.name, "n": int(da["n"])}))
+        pull = pulls[0][1] if len(pulls) == 1 else ([p for _k, p in pulls] if pulls else None)
         lf = {}
         for e in live:
             pos = (st.get("ledger") or {}).get(e)
@@ -1717,7 +1759,7 @@ class _Run(object):
                 lf[e] = (int(pos["next_line"]), pos.get("through_sha256"))
         res = X.campaign_snapshot(live, advance=st.get("phase") == "RUN", report="auto",
                                   ledger_from=lf, actor=AUTO, campaign=self.camp, ctx=self.xctx,
-                                  plan_pull=pull)
+                                  plan_pull=pull, funnel=bool(self.cfg.get("funnel")))
         if res.get("status") == "refused":
             self._once("snapshot_refused", res.get("reasons"), "snapshot_refused",
                        reasons=res.get("reasons"))
@@ -1759,8 +1801,13 @@ class _Run(object):
             self._once("ledger_partial", sorted(st.get("ledger") or {}), "ledger_partial",
                        reasons=["a ledger was read only in part this tick; no decision is made on it"])
             return
-        if pull is not None:
-            self._brain_pulled(res.get("plan_pull"))
+        if pulls:
+            got = res.get("plan_pulls") if isinstance(pull, list) else [res.get("plan_pull")]
+            for (kind, _p), r in zip(pulls, got or []):
+                if kind == "brain":
+                    self._brain_pulled(r)
+                else:
+                    self._da_pulled(r)
         if st.get("phase") == "GATE" or self._paused_reason():
             return
         self._phase_machine(ev, payload, status)
@@ -1949,6 +1996,8 @@ class _Run(object):
         rec = {"verb": "campaign-snapshot", "utc": payload.get("utc"), "experiments": exps}
         if isinstance(payload.get("step1"), dict):
             rec["step1"] = self._decision_only(payload["step1"])
+        if isinstance(payload.get("funnel"), dict) and payload["funnel"].get("verb") == "funnel-summary":
+            rec["funnel"] = self._decision_only(payload["funnel"])
         return rec
 
     def _prefix(self, record):
@@ -2005,10 +2054,14 @@ class _Run(object):
                 ls = "in_flight"
             elif ls == "uncertain" and child and (launched.get(child) or {}).get("built_utc"):
                 ls = "executed"               # the snapshot confirmed the build
-            out.append({"lever": r.get("lever"), "action": r.get("action"),
-                        "parent_exp": r.get("parent_exp"), "child_exp": child, "status": ls,
-                        "approval_id": r.get("approval_id"), "proposal_id": r.get("proposal_id"),
-                        "ts": r.get("ts")})
+            rec = {"lever": r.get("lever"), "action": r.get("action"),
+                   "parent_exp": r.get("parent_exp"), "child_exp": child, "status": ls,
+                   "approval_id": r.get("approval_id"), "proposal_id": r.get("proposal_id"),
+                   "ts": r.get("ts")}
+            if r.get("lever") in LV.FUNNEL_LEVERS:
+                rec["params"] = {k: (r.get("params") or {}).get(k) for k in FUNNEL_KEY_PARAMS
+                                 if (r.get("params") or {}).get(k) is not None}
+            out.append(rec)
         return out
 
     def _context(self, status, payload):
@@ -2026,6 +2079,17 @@ class _Run(object):
         if isinstance(adv, dict) and adv.get("ok") is False and adv.get("error"):
             ctx["advance"] = {"error": _short(adv.get("error"), 2000),
                               "error_kind": adv.get("error_kind")}
+        if self.cfg.get("funnel"):
+            lab = self._funnel_lab_files()
+            if lab:
+                ctx["funnel_lab"] = lab
+            try:
+                ctx["funnel_lab_pull"] = X.funnel_pull_local(self.paths.lab_inc)
+            except OSError as e:
+                self._once("funnel_lab_pull", str(e), "funnel_lab_unreadable", reasons=[_short(e, 300)])
+        reg = self._claims()
+        if reg is not None:
+            ctx["claims"] = reg              # evidence keeps it as campaign/claims.json
         bud = self._budget_now()
         if isinstance(bud, dict) and bud.get("envelope_su") is not None:
             ctx["budget"] = {"envelope_su": bud.get("envelope_su"),
@@ -2446,6 +2510,27 @@ class _Run(object):
                      trigger=[{"id": "D4", "name": d4.get("name"), "exp": pilot,
                                "cites": d4.get("cites") or []}] if d4.get("fired") else [])
 
+    def _funnel_step(self, ev, diags, prop):
+        """The funnel audit's part of DIAGNOSE: DEC-1..DEC-10 logged once, D18's
+        claim transitions applied, the prospective DA record scored once a
+        valid audit of this Step 1 lands (outcome.record_da: H11 and the DA's
+        predictions, the adversary's track record), the DA pass staged when
+        due, the funnel sync queued when the lab holds files the cluster does
+        not."""
+        if ev.json(E.FUNNEL_LEDGER) is not None:
+            self._log_decisions()
+        self._apply_d18(diags)
+        self._score_da(ev)
+        why, ids = self._da_wanted(ev, prop)
+        if why:
+            self._stage_da(ev, why, ids, prop)
+        if any(o.get("op") == "OP_FUNNEL_SYNC" for o in (prop or {}).get("operations") or []) \
+                or (self.cfg.get("funnel") and LV.funnel_sync_needed(ev)):
+            # Data movement (R0, runner 6.3) is due whenever one side holds a
+            # listed file the other lacks, whichever diagnosis fires: the
+            # sheets and the audit come back after D17-D19 have gone quiet.
+            self.st["funnel_sync_due"] = True
+
     def _key(self, p):
         return _canon([p.get("lever"), p.get("parent_exp"), list(BP.proposal_key(p))])
 
@@ -2485,6 +2570,12 @@ class _Run(object):
                 return [], ("stop-loss: lever %s already ran %d times in this campaign; a %s would "
                             "be more than %d" % (p.get("lever"), n, "further submission",
                                                  X.MAX_LEVER_SUBMISSIONS))
+            if p.get("waits_for"):
+                w = p["waits_for"]
+                self._once("waits:%s:%s" % (p.get("lever"), " ".join(p.get("argv") or [])), w, "not_taken",
+                           lever=p.get("lever"), reasons=["waits for %s: %s is not on the cluster (%s)"
+                                                          % (w.get("lever"), w.get("cluster_file"), w.get("why"))])
+                continue
             bad = self._invalid(p)
             if bad:
                 self._ledger("invalid_proposal", lever=p.get("lever"), reasons=[bad],
@@ -2556,6 +2647,7 @@ class _Run(object):
                 self._card("escalation", "A lever's prediction was contradicted" if d13
                            else "Escalated to a person by %s" % ", ".join(trig),
                            "; ".join(d.get("summary") or "" for d in fired if d["id"] == "D13") if d13 else why)
+        self._funnel_step(ev, diags, prop)
         cands, stop_reason = self._filter(prop.get("proposals") or [], diags)
         if stop_reason:
             return self._pause(stop_reason)
@@ -2576,6 +2668,18 @@ class _Run(object):
             self._ledger("brain_wait", reasons=["nothing deterministic to propose; the brain plan "
                                                 "%d is still due" % b.get("n")])
             return None
+        da = st.get("da") or {}
+        if da.get("status") in DA_IN_FLIGHT:
+            # Contract 8.6: the DA pass runs before a COMPLETE card that carries
+            # a negative claim. COMPLETE neither submits nor pulls, so the
+            # campaign waits here (BRAIN_WAIT observes and submits) and
+            # diagnoses again once the pass has ended.
+            st["phase"] = "BRAIN_WAIT"
+            st["da_wait"] = True
+            self._ledger("da_wait", reasons=["nothing deterministic to propose; the devil's-advocate pass %s "
+                                             "(%s) is due before the COMPLETE card" % (da.get("n"),
+                                                                                      da.get("claim_ids"))])
+            return None
         return self._complete_residual(prop, fired)
 
     def _complete_residual(self, prop, fired):
@@ -2590,6 +2694,394 @@ class _Run(object):
                      (" Declined or refused earlier in this campaign, not proposed again: %s."
                       % "; ".join(declined)) if declined else ""))
         return self._complete("residual", "Nothing left the autopilot may propose", detail)
+
+    # ---- the funnel audit: claims, decisions and the devil's advocate
+    # docs/FUNNEL_AUDIT.md 8.3 (claims), 8.6 (the DA pass), 13 (DEC-1..DEC-10);
+    # runner 5.5.4. The claims register is the lab's campaign/claims.json
+    # (Paths.claims); every transition is a campaign ledger entry with its
+    # decided_by. The DA pass is staged when D17 fires (OP_DA), when a negative
+    # claim appears in the register, and before a COMPLETE card while a
+    # negative claim is open; it runs as the plan job with PLAN_ROLE=adversary,
+    # is pulled with the snapshot, validated (validate.validate_da), recorded
+    # in the lab's funnel/prospective_da.json and pushed by the funnel sync.
+    def _claims(self):
+        """The claims register (funnel.claims.load), or None when there is none;
+        an invalid register is noted once and read as none."""
+        from ..funnel import claims as FC
+        if not self.paths.claims.is_file():
+            return None
+        try:
+            return FC.load(self.paths.claims)
+        except Exception as e:
+            self._once("claims_invalid", str(e), "claims_invalid", error=_short(e, 400))
+            return None
+
+    def _save_claims(self, reg):
+        from ..funnel import claims as FC
+        FC.save(self.paths.claims, reg)
+
+    def _log_decisions(self):
+        """DEC-1..DEC-10 (contract 13), logged once per campaign with decided_by
+        human-delegated, the first time the funnel ledger is in the evidence."""
+        st = self.st
+        if st.get("decisions_logged"):
+            return
+        st["decisions_logged"] = self.utc
+        self._ledger("decisions_recorded", decided_by="human-delegated",
+                     decisions=list(FUNNEL_DECISIONS), source="docs/FUNNEL_AUDIT.md 13",
+                     reasons=["the R4 decisions of the funnel audit, made under the project owner's standing "
+                              "delegation before any platform code, sample draw or reference label; X12 (the final "
+                              "claim status) is not delegated"])
+
+    def _transition(self, reg, claim_id, to, by, reason, cites, actor_kind, proof=None):
+        """One claim transition through funnel.claims (its rules refuse what is not
+        allowed), saved and entered in the campaign ledger. Returns why not, or ""."""
+        from ..funnel import claims as FC
+        try:
+            FC.transition(reg, claim_id, to, by, reason, cites, actor_kind, proof)
+            self._save_claims(reg)
+        except Exception as e:
+            self._once("claim_refused:%s:%s" % (claim_id, to), str(e), "claim_transition_refused",
+                       decided_by=by, claim_id=claim_id, to=to, reasons=[_short(e, 400)])
+            return str(e)
+        self._ledger("claim_transition", decided_by=by, claim_id=claim_id, to=to, actor_kind=actor_kind,
+                     reasons=[reason], cites=cites)
+        return ""
+
+    def _apply_d18(self, diags):
+        """D18 silent on a valid audit whose fingerprint matches proposes each
+        challenged negative claim's move to tested_survives (actor autopilot);
+        the cite carries the audit's sha256 (funnel.claims)."""
+        d18 = next((d for d in diags if d.get("id") == "D18"), None)
+        trans = ((d18 or {}).get("detail") or {}).get("claim_transitions") or []
+        if not trans:
+            return
+        reg = self._claims()
+        if reg is None:
+            return
+        for t in trans:
+            sha = t.get("audit_sha256")
+            cite = M.cite("funnel/audit_v1.json", sha, pointer="")
+            proof = {"audit_sha256": sha, "valid": True, "fingerprint_match": True,
+                     "d18_fired": bool((d18 or {}).get("fired") and "L13" in ((d18 or {}).get("levers") or []))}
+            self._transition(reg, t.get("claim_id"), t.get("to"), AUTO,
+                             "D18 is silent on the valid audit of this Step 1 (fingerprint %s...): the filters' "
+                             "false negatives stay below the pre-registered bounds" % str(t.get("ledger_fingerprint"))[:12],
+                             [cite], "autopilot", proof)
+
+    def _da_claims_done(self):
+        """The claims a DA pass was staged for in this campaign (answered,
+        invalid or failed alike: a pass is recorded, never retried until it
+        passes; contract 10 F2)."""
+        st = self.st
+        return set(st.get("da_claims") or []) | set((st.get("da") or {}).get("claim_ids") or [])
+
+    def _da_wanted(self, ev, prop):
+        """(why or "", [claim id]): the DA pass is due when D17 asked for it, or a
+        negative claim is open that no DA pass has answered yet. One claim per
+        pass: the reply (inc-da-reply/1) answers one claim_id, so a digest of
+        several claims would leave the others unanswered, and open for good
+        (open -> tested_survives is not a transition)."""
+        reg = self._claims()
+        from ..funnel import claims as FC
+        neg = [c for c in FC.open_negative(reg)] if reg else []
+        if not neg:
+            return "", []
+        done = self._da_claims_done()
+        pending = sorted((c for c in neg if c["id"] not in done), key=lambda c: (len(c["id"]), c["id"]))
+        if not pending:
+            return "", []
+        ops = [o.get("op") for o in (prop or {}).get("operations") or []]
+        if "OP_DA" in ops:
+            return "D17 fired on an unaudited negative conclusion", [pending[0]["id"]]
+        new = [c["id"] for c in pending if c.get("status") == "open"]
+        if new:
+            return ("negative claim %s is open and no devil's-advocate pass has answered it" % new[0]), [new[0]]
+        return "", []
+
+    def _stage_da(self, ev, why, claim_ids, prop):
+        """Build and stage the DA digest (brain_plan.build_da_digest): blind to
+        the contract, the pre-registration, the R14 fixture and D17's proposals."""
+        st = self.st
+        da = st.get("da") or {}
+        if da.get("status") in ("staged", "submitted"):
+            return
+        led = ev.json(E.FUNNEL_LEDGER)
+        if not isinstance(led, dict):
+            self._once("da_no_ledger", claim_ids, "da_waiting", reasons=["the DA pass needs the funnel ledger in the "
+                                                                          "evidence (remote funnel summary)"])
+            return
+        n = int(st.get("brain_n") or 0) + 1
+        st["brain_n"] = n
+        st["da_claims"] = sorted(self._da_claims_done() | set(claim_ids))
+        d17 = [p for p in (prop or {}).get("proposals") or [] if "D17" in (p.get("trigger") or [])]
+        loop = DG._latest_loop(ev)[0]
+        try:
+            reg = self._claims() or {}
+            only = dict(reg, claims=[c for c in reg.get("claims") or [] if c.get("id") in claim_ids])
+            marks = BP.blind_markers(self.paths.lab_inc / "funnel" / "prereg_v1.json",
+                                     self.paths.contract, self.paths.r14_fixtures, d17)
+            digest = BP.build_da_digest(ev, only, led, BP.load_menu(), campaign=self.name, n=n,
+                                        markers=marks, loop=loop, created_utc=self.utc)
+            _write_json(self.paths.plan_input(self.name, n), digest)
+        except Exception as e:
+            st["da"] = {"n": n, "status": "failed", "claim_ids": claim_ids,
+                        "reason": "%s: %s" % (type(e).__name__, _short(e, 300))}
+            self._ledger("da_failed", n=n, reasons=[st["da"]["reason"]])
+            return
+        st["da"] = {"n": n, "status": "staged", "digest_sha256": digest["sha256"], "claim_ids": claim_ids,
+                    "fingerprint": led.get("fingerprint"), "staged_utc": self.utc, "why": why,
+                    "markers": len(marks), "blind_markers": digest.get("blind_markers"), "exp": loop}
+        self._ledger("da_staged", n=n, digest_sha256=digest["sha256"], claim_ids=claim_ids, reasons=[why],
+                     tokens_estimated=digest.get("tokens_estimated"), num_ctx=digest.get("num_ctx"),
+                     blind_markers_checked=len(marks), dropped_artifacts=digest.get("dropped_artifacts"))
+
+    def _submit_da(self):
+        st = self.st
+        da = st["da"]
+        params = {"campaign": self.name, "n": int(da["n"]), "digest_sha256": da["digest_sha256"]}
+        req = {"id": _sha([self.name, "da", da["n"], da["digest_sha256"]])[:32],
+               "policy_action": "inc_plan_submit", "params": params,
+               "reason": "devil's-advocate pass %d of %s against %s" % (da["n"], self.name, da.get("claim_ids"))}
+        res = X.submit(req, actor=AUTO, campaign=self.camp, ctx=self.xctx)
+        why = "; ".join(res.get("reasons") or [])
+        if res.get("status") == "executed" or X.uncertain(res):
+            jobs = list(res.get("job_ids") or [])
+            da.update(status="submitted", submitted_utc=self.utc, job_id=jobs[0] if jobs else None,
+                      uncertain=not res.get("status") == "executed")
+            self._ledger("da_submitted", job_ids=jobs, n=da["n"], digest_sha256=da["digest_sha256"],
+                         est_su=res.get("est_su"))
+        elif X.never_ran(res) or (res.get("status") == "refused" and any(t in why for t in TRANSIENT_REFUSALS)):
+            self._once("da_submit:%s" % da["n"], why, "da_waiting", reasons=res.get("reasons"))
+        else:
+            da.update(status="failed", reason=_short(why or res.get("status"), 500))
+            self._ledger("da_failed", n=da["n"], reasons=res.get("reasons"), status=res.get("status"))
+
+    def _planner_model(self):
+        """The model the planner's last reply was resolved to (the brain plan
+        this campaign merged), else the planner role's resolution now."""
+        from .. import model_router as MR
+        got = (self.st.get("brain") or {}).get("model_resolved")
+        return got or str(MR.resolve("planner").get("model") or "")
+
+    def _da_pulled(self, pull_res):
+        st = self.st
+        da = st.get("da") or {}
+        if da.get("status") != "submitted":
+            return
+        payload = ((pull_res or {}).get("remote") or {}).get("payload") if pull_res else None
+        reply, exists = None, False
+        if isinstance(payload, dict) and payload.get("verb") == "plan-pull":
+            exists = bool(payload.get("exists"))
+            reply = payload.get("reply")
+        col = BP.collect(reply if exists else None, da.get("submitted_utc"), now_utc=self.utc,
+                         digest_sha256=da.get("digest_sha256"), pulled_utc=self.utc, role="adversary")
+        if col["status"] == "pending":
+            return
+        if col["status"] != "ready":
+            da.update(status=col["status"], reason=_short(col.get("reason"), 500))
+            self._ledger("da_%s" % col["status"], n=da.get("n"), reasons=[col.get("reason")],
+                         recorded=_short(json.dumps(reply, sort_keys=True), 2000) if reply else None)
+            return
+        self._merge_da(col["reply"])
+
+    def _merge_da(self, reply):
+        """Validate the DA reply, record it (funnel/prospective_da.json on the
+        lab, pushed by the funnel sync), move each answered claim to
+        challenged when surviving counter-arguments came from a model of
+        another family, and file what they propose (tier2:adversary levers,
+        R4 cards). An invalid reply is recorded as invalid, not retried."""
+        from ..funnel import claims as FC
+        st = self.st
+        da = st["da"]
+        ev = self.ev
+        reg = self._claims() or FC.new_register()
+        diags = DG.detect(ev)
+        adv = str(reply.get("model_used") or reply.get("model") or "")
+        resolved = {"adversary": adv, "planner": self._planner_model()}
+        try:
+            from . import corpus as CO
+            corp = CO.Corpus()
+        except Exception:
+            corp = None
+        staged = dict(reg, claims=[c for c in reg.get("claims") or [] if c.get("id") in (da.get("claim_ids") or [])])
+        val = V.validate_da(reply, ev, ev.json(E.FUNNEL_LEDGER), BP.load_menu(), resolved, diagnoses=diags,
+                            corpus=corp, claims=staged)
+        path = self.paths.lab_inc / "funnel" / "prospective_da.json"
+        if path.exists():
+            self._ledger("da_not_recorded", n=da.get("n"), reasons=["%s exists: the prospective DA record is "
+                                                                     "written once" % path])
+        else:
+            try:
+                rec = dict(self._prospective_header(da), claim_ids=da.get("claim_ids"),
+                           digest_sha256=da.get("digest_sha256"), blind_check=self._blind_check(da),
+                           model=val["model"], reply=V.da_reply_of(reply), validation=val,
+                           stage_forecast=val.get("stage_forecast"), committed_utc=self.utc,
+                           campaign=self.name, n=da.get("n"))
+                _write_json(path, rec)
+            except Exception as e:
+                self._ledger("da_not_recorded", n=da.get("n"),
+                             reasons=["the prospective DA record could not be written: %s: %s"
+                                      % (type(e).__name__, _short(e, 400))])
+        surviving = sum(1 for c in val.get("counter_arguments") or [] if c.get("kept") and c.get("counted"))
+        da.update(status="merged" if val.get("ok") else "invalid", merged_utc=self.utc,
+                  surviving=surviving, moves_claims=val.get("moves_claims"),
+                  invalid_reason=val.get("invalid_reason"))
+        self._ledger("da_merged" if val.get("ok") else "da_invalid", decided_by=BP.actor_for("adversary/%s" % adv),
+                     n=da.get("n"), counts=val.get("counts"), same_family=val["model"].get("same_family"),
+                     moves_claims=val.get("moves_claims"), invalid_reason=val.get("invalid_reason"),
+                     path=str(path))
+        if not val.get("ok") or not val.get("moves_claims"):
+            return
+        cites = [c for ca in val["counter_arguments"] if ca.get("counted") for c in ca.get("evidence_cites") or []]
+        proof = {"valid": True, "surviving": surviving, "model": adv, "planner_model": resolved["planner"],
+                 "same_family": val["model"]["same_family"]}
+        actor = BP.actor_for("adversary/%s" % adv)
+        for cid in [val.get("claim_id")]:
+            c = FC.get(reg, cid) if cid else None
+            if c and c.get("status") in ("open", "tested_survives"):
+                self._transition(reg, cid, "challenged", actor,
+                                 "%d grounded counter-argument(s) of the devil's advocate survived validation"
+                                 % surviving, cites[:20], "adversary", proof)
+        for f in V.da_filings(val, BP.load_menu()):
+            if "card" in f:
+                r = (LV.load_menu().get("cards") or {}).get(f["card"]) or {}
+                self._record_cards([M.card(f["card"], r.get("title", f["card"]), ["D17"], cites[:5],
+                                           r.get("hypothesis", ""), r.get("why_menu_insufficient", ""),
+                                           r.get("required_change", ""), r.get("cheapest_test", ""),
+                                           r.get("control", ""), r.get("success_criterion", ""),
+                                           proposed_by=actor)], source=actor)
+            else:
+                self._ledger("da_test_proposed", decided_by=actor, lever=f["lever"], params=f.get("params"),
+                             counter_argument=f["counter_argument"],
+                             reasons=["a surviving counter-argument names %s as its cheapest test; the "
+                                      "deterministic funnel levers run it in their order" % f["lever"]])
+
+    def _prospective_header(self, da):
+        """The runner 1.2 header of funnel/prospective_da.json: the sha256 of
+        the pre-registration and of the contract (contract, header: every later
+        audit artifact records both), the domain config, the code and the
+        staged digest and claims register it answers. Refuses (ValueError) when
+        the lab's contract is not the one the pre-registration names."""
+        from .. import funnel as FUN
+        from ..funnel import domain as FD
+        pre_path = self.paths.lab_inc / "funnel" / "prereg_v1.json"
+        raw = pre_path.read_bytes()
+        pre = json.loads(raw.decode("utf-8"))
+        csha = hashlib.sha256(self.paths.contract.read_bytes()).hexdigest()
+        if (pre.get("contract") or {}).get("sha256") != csha:
+            raise ValueError("the contract %s (sha256 %s) is not the one %s names (%s)"
+                             % (self.paths.contract, csha[:12], pre_path, str((pre.get("contract") or {})
+                                                                               .get("sha256"))[:12]))
+        prereg = {"path": str(pre_path), "sha256": hashlib.sha256(raw).hexdigest(),
+                  "core_sha256": FD.prereg_core_sha256(pre),
+                  "contract": {"path": pre["contract"].get("path") or str(self.paths.contract), "sha256": csha}}
+        inputs = {"digest": {"path": str(self.paths.plan_input(self.name, int(da.get("n") or 0))),
+                             "sha256": da.get("digest_sha256")}}
+        if self.paths.claims.is_file():
+            inputs["claims"] = FUN.file_record(self.paths.claims)
+        return FUN.header("prospective_da", FD.load(pre.get("domain") or M.DOMAIN), prereg, inputs,
+                          modules=(V, BP))
+
+    def _blind_check(self, da):
+        """{"markers": the staged digest's hashed markers, "found": the markers
+        its bytes hold now (none, or check_staged would have refused it)}."""
+        marks = [list(m) for m in da.get("blind_markers") or []]
+        found = []
+        dg = _read_json(self.paths.plan_input(self.name, int(da.get("n") or 0)))
+        if isinstance(dg, dict) and marks:
+            found = BP.blind_found(BP._dump({k: v for k, v in dg.items() if k != "blind_markers"}),
+                                   [(int(a), str(b)) for a, b in marks])
+        return {"markers": marks, "found": found}
+
+    def _score_da(self, ev):
+        """outcome.record_da once per (prospective record, audit): when the
+        lab's funnel/prospective_da.json exists and the evidence holds a valid
+        audit of this Step 1 (diagnose._valid_audit), H11 and the DA's
+        predictions enter the adversary's track record (contract 6 H11, 8.6)."""
+        path = self.paths.lab_inc / "funnel" / "prospective_da.json"
+        led = ev.json(E.FUNNEL_LEDGER)
+        if not path.is_file() or not isinstance(led, dict):
+            return
+        audit, _c, _why = DG._valid_audit(ev, led)
+        if audit is None:
+            return
+        raw = path.read_bytes()
+        key = [hashlib.sha256(raw).hexdigest(), (ev.provenance.get(E.FUNNEL_AUDIT) or {}).get("sha256")
+               or (ev.provenance.get(E.FUNNEL_AUDIT) or {}).get("json_sha256")]
+        if self.st.get("da_scored") == key:
+            return
+        try:
+            from ..funnel import ledger as FL
+            pda = json.loads(raw.decode("utf-8"))
+            out = OC.record_da(pda, audit, events_path=self.paths.track_events,
+                               summary_path=self.paths.track_summary, recoverable_stages=FL.recoverable_stages(led))
+        except Exception as e:
+            self._once("da_score_failed:%s" % key[0][:12], str(e), "da_score_failed",
+                       reasons=["%s: %s" % (type(e).__name__, _short(e, 400))])
+            return
+        self.st["da_scored"] = key
+        self._ledger("da_scored", decided_by=out.get("proposed_by"), h11=(out.get("h11") or {}).get("verdict"),
+                     scored=out.get("scored"), correct=out.get("correct"), prospective_sha256=key[0],
+                     audit_sha256=key[1])
+
+    def _complete_claims_note(self):
+        """The COMPLETE card's line on the negative claims: a claim still open or
+        challenged is never 'concluded' (contract 8.6)."""
+        reg = self._claims()
+        if not reg:
+            return ""
+        from ..funnel import claims as FC
+        neg = FC.open_negative(reg)
+        if not neg:
+            return ""
+        return (" Negative claim(s) not concluded: %s (a challenged claim is not concluded while its "
+                "counter-arguments stand; a person signs a claim's final status, card X12)."
+                % ", ".join("%s %s" % (c.get("id"), c.get("status")) for c in neg))
+
+    def _funnel_lab_files(self):
+        """{INC_DIR-relative path: sha256} of the lab's funnel files the sync
+        pushes (executor.FUNNEL_SYNC_FILES), sha256 cached by size and mtime."""
+        cache = self.st.setdefault("funnel_lab_cache", {})
+        out, keep = {}, {}
+        for rel in X.funnel_sync_list(self.paths.lab_inc):
+            p = self.paths.lab_inc / rel
+            try:
+                stt = p.stat()
+            except OSError:
+                continue
+            key = "%s|%d|%d" % (rel, stt.st_size, stt.st_mtime_ns)
+            sha = cache.get(key) or hashlib.sha256(p.read_bytes()).hexdigest()
+            keep[key] = sha
+            out[rel] = sha
+        self.st["funnel_lab_cache"] = keep
+        return out
+
+    def _funnel_sync(self):
+        """The funnel sync (inc_funnel_sync, R0) when DIAGNOSE asked for it; it is
+        this tick's one connection to the cluster."""
+        st = self.st
+        if not st.get("funnel_sync_due") or not self.ssh.left():
+            return
+        self.ssh.calls += 1                       # the sync opens its own connection: the tick's one
+        res = X.submit({"id": _sha([self.name, "funnel_sync", self.utc])[:32], "policy_action": "inc_funnel_sync",
+                        "params": {}, "reason": "push the lab's funnel files to the cluster"},
+                       actor=AUTO, campaign=self.camp, ctx=self.xctx)
+        st["funnel_sync_due"] = False
+        self._ledger("funnel_sync", status=res.get("status"), reasons=res.get("reasons"),
+                     pushed=((res.get("remote") or {}).get("payload") or {}).get("pushed"))
+
+    def _lab_hooks(self):
+        """The lab hooks this campaign's executor calls: the funnel fetch (L11a,
+        L12), the verify queue (L14) and the funnel sync (LAB_HOOKS replaces
+        them, tests)."""
+        if LAB_HOOKS is not None:
+            return LAB_HOOKS(self)
+        return {"inc_funnel_fetch": X.funnel_fetch_hook(),
+                "inc_funnel_sync": X.funnel_sync_hook(self.paths.lab_inc, os.environ.get("CLUSTER_SSH", "")),
+                "inc_verify_queue": lambda params: X.write_verify_queue(
+                    LV.verify_queue_rows(self.ev) if self.ev is not None else [], self.paths.verify_queue)}
+
 
     # ---- the brain
     def _stage_brain(self, ev, diags, cands, prop):
@@ -2680,6 +3172,7 @@ class _Run(object):
                                  summary_path=self.paths.track_summary)
         except OSError:
             pass
+        b["model_resolved"] = str(reply.get("model_used") or reply.get("model") or "") or None
         merged = BP.merge(b.get("deterministic") or [], col, val)
         filed = []
         for p in merged.get("proposals") or []:
@@ -2718,11 +3211,33 @@ class _Run(object):
                      % (b.get("staged_utc"), BP.PLAN_TIMEOUT_S))
             self._ledger("brain_timeout", n=b.get("n"), reasons=[b["reason"]])
 
+    def _da_expire(self):
+        """A DA pass staged and never submitted in time is given up, as a brain
+        plan is (a submitted one times out in brain_plan.collect)."""
+        da = self.st.get("da") or {}
+        t0 = _secs(da.get("staged_utc"))
+        if da.get("status") == "staged" and t0 is not None and self.now - t0 > BP.PLAN_TIMEOUT_S:
+            da.update(status="timeout", reason="staged at %s and not submitted within %d s"
+                      % (da.get("staged_utc"), BP.PLAN_TIMEOUT_S))
+            self._ledger("da_timeout", n=da.get("n"), reasons=[da["reason"]])
+
     def _brain_wait_step(self):
         st = self.st
         self._brain_expire()
+        self._da_expire()
         b = st.get("brain") or {}
         if b.get("status") in ("staged", "submitted"):
+            return
+        if (st.get("da") or {}).get("status") in DA_IN_FLIGHT:
+            return
+        if st.pop("da_wait", False) and not (b.get("exp") == st.get("exp") and b.get("filed")):
+            # The wait was for the DA pass alone: DIAGNOSE again, so the next
+            # claim's pass is staged or the COMPLETE card states the claims as
+            # the pass left them.
+            st["phase"] = "DIAGNOSE"
+            self._ledger("da_wait_over", n=(st.get("da") or {}).get("n"),
+                         reasons=["the devil's-advocate pass ended %s: DIAGNOSE again"
+                                  % (st.get("da") or {}).get("status")])
             return
         filed = [f for f in b.get("filed") or [] if f.get("status") == "filed"]
         if filed:

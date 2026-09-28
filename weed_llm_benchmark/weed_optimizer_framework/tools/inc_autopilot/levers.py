@@ -137,8 +137,8 @@ RECIPE_ORDER = ("full", "freeze", "lora")     # pilot.inc_recipes() order
 KIND_VERIFIED = "verified"                    # realloop.KIND_VERIFIED (a step's "kind" in exp.json)
 BUILD_SCRIPT = "run_inc_build.sh"             # the job every inc_build_* action submits (build_job_hours)
 LINEAGE_IGNORED = ("failed", "refused", "cancelled")   # context lineage records that did not apply a lever
-_SUB = re.compile(r"\{([a-z_]+)\}")
-_SPREAD = re.compile(r"\{\*([a-z_]+)\}\Z")
+_SUB = re.compile(r"\{([a-z0-9_]+)\}")
+_SPREAD = re.compile(r"\{\*([a-z0-9_]+)\}\Z")
 _TIME = re.compile(r"^#SBATCH\s+--time=(?:(\d+)-)?(\d+):(\d+)(?::(\d+))?\s*$", re.M)
 
 
@@ -321,6 +321,7 @@ RELEVANCE_TABLES = (("increment_pool", "increment_pool.jsonl"), ("base_selected"
 SEL, ADMIT, REL = "step1/select_summary.json", "step1/admit_summary.json", "step1/relevance.json"
 SOURCES_RELEVANCE, SOURCES_EVIDENCE = "relevance", "evidence"   # select.SOURCES_* (protocol increment_sources_modes)
 CALIBRATION_FAILED = "calibration_failed"
+SOURCES_RECOVERED = "recovered"                # realloop.SOURCES_RECOVERED (the funnel's overlay, realloop_v2)
 
 
 def relevance_status(ev, menu=None):
@@ -881,13 +882,23 @@ def estimate_pilot_rebuild(ev, parent, replay_mode="full"):
 
 
 def _latest_rates(ev):
+    """The measured rates of the latest complete pilot; with none in the
+    evidence, of the latest finished real loop (its report has the same arms:
+    the recovered loop of the funnel audit is priced from the loop whose recipe
+    it takes)."""
     from . import diagnose as DG
     for e in reversed(DG.complete_pilots(ev)):
         try:
             return rates(ev, e)
         except Defer:
             continue
-    raise Defer("no complete pilot in the evidence to measure GPU time per image")
+    loop, _rep = DG._latest_loop(ev)
+    if loop is not None:
+        try:
+            return rates(ev, loop)
+        except Defer:
+            pass
+    raise Defer("no complete pilot (or finished real loop) in the evidence to measure GPU time per image")
 
 
 def realloop_sequence(n_verified):
@@ -906,6 +917,7 @@ def estimate_realloop(ev, params, menu=None):
     cites = cites + [ev.cite("step1/select_summary.json", "/sizes/base_B")]
     m = params.get("size") or max(1, int(round(protocol("inc_frac", menu) * n_base)))
     nv = params.get("n_verified") or protocol("n_verified_default", menu)
+    recovered = params.get("increment_sources") == SOURCES_RECOVERED
     recipes = params["recipes"].split(",")
     unknown = [r for r in recipes if r not in rt["inc_s_per_image_epoch"]]
     if unknown:
@@ -916,7 +928,8 @@ def estimate_realloop(ev, params, menu=None):
     truth = not params.get("no_truth")
     base_h = seeds * n_base * ce * rt["cold_s_per_image_epoch"] / 3600.0
     truth_h, t, sizes, pool = 0.0, n_base, [], n_base
-    for _, clean in realloop_sequence(nv):
+    seq = ([("REC", False)] * protocol("recovered_steps", menu)) if recovered else realloop_sequence(nv)
+    for _, clean in seq:
         if truth:
             truth_h += seeds * (t + m) * ce * rt["cold_s_per_image_epoch"] / 3600.0
         sizes.append((pool + m, pool) if params["replay_mode"] == "full" else (2 * m, 2 * m))
@@ -927,7 +940,9 @@ def estimate_realloop(ev, params, menu=None):
     finals = (len(recipes) + seeds + (seeds if truth else 0)) * rt["final_h_per_run"]
     total = base_h + truth_h + chains + finals
     return round(total, 3), {"estimator": "realloop", "rates_from": rt["from"], "base_images": n_base,
-                             "size": m, "n_verified": nv, "truth": truth, "base_hours": round(base_h, 3),
+                             "size": m, "n_verified": None if recovered else nv,
+                             "steps": len(seq), "recovered": recovered, "truth": truth,
+                             "base_hours": round(base_h, 3),
                              "truth_hours": round(truth_h, 3), "chains_hours": round(chains, 3),
                              "final_hours": round(finals, 3), "upper_bound": params["replay_mode"] == "full"}, cites
 
@@ -1006,7 +1021,293 @@ def price(lid, params, ev, parent=None, menu=None):
         return est, info, []
     if kind == "zero":
         return 0.0, {"estimator": "zero"}, []
+    if kind == "funnel_walltime":
+        est, info = estimate_funnel(lid, params, menu)
+        return est, info, []
     raise Defer("lever %s names no estimator levers.py knows (%r)" % (lid, kind))
+
+
+# ------------------------------------------------------------ the funnel audit
+# Levers L10-L14 (docs/FUNNEL_AUDIT.md 8.5; runner 5.5.3). L10, L11 and L13 are
+# sbatch jobs of run_inc_funnel.sh on the cluster; L11a and L12 run the funnel
+# CLI's fetch verb on the lab (R0); L14 is a lab hook that queues verify-only
+# tasks for a person. Their paths are derived, never a proposer's: the cluster
+# INC_DIR's funnel/prereg_v1.json and funnel/ for the jobs, the lab's INC tree
+# for the fetches. A job waits for the file it reads on the cluster (the lever
+# row's "preconditions", read from funnel/files.json, the funnel directory's
+# listing); until the file is there the proposal carries waits_for and is
+# listed under deferred with "then", the way D2 defers L2 behind L3.
+
+FUNNEL_LEVERS = ("L10", "L11", "L11a", "L12", "L13", "L14")
+# The order of the funnel's cluster steps and the file each writes (runner 6.1):
+# L10's next verb is the first whose output is not on the cluster yet.
+FUNNEL_STEPS = (("L10", {"verb": "census"}, "funnel/census_v1.json"),
+                ("L10", {"verb": "leak"}, "funnel/leak_v1.json"),
+                ("L11", {"part": "geometry"}, "funnel/relation_geometry_v1.json"),
+                ("L10", {"verb": "embed-judges"}, "funnel/judges/"),
+                ("L10", {"verb": "qualify"}, "funnel/judge_qualification.json"),
+                ("L11", {"part": "relation"}, "funnel/relation_audit_v1.json"),
+                ("L10", {"verb": "draw"}, "funnel/sample_v1.csv"),
+                ("L10", {"verb": "sheets"}, "funnel/sheets_v1/index.json"),
+                ("L10", {"verb": "rl-b"}, "funnel/rl_answers/RL-B/"),
+                ("L10", {"verb": "ingest"}, "funnel/gold_v1.csv"),
+                ("L10", {"verb": "qualify", "rl": 1}, "funnel/rl_qualification.json"),
+                ("L10", {"verb": "estimate"}, "funnel/audit_v1.json"))
+
+
+def cluster_files(ev):
+    """{INC_DIR-relative path: {"sha256", "bytes"}} of the funnel directory on
+    the cluster (funnel/files.json, remote.py funnel summary), or None when
+    the listing is not in the evidence (every file then counts as absent)."""
+    lst = ev.json(E.FUNNEL_LISTING)
+    files = (lst or {}).get("files") if isinstance(lst, dict) else None
+    return files if isinstance(files, dict) else None
+
+
+def lab_files(ev):
+    """The lab's own funnel files the ticker listed (context 'funnel_lab':
+    {INC_DIR-relative path: sha256}), or {}."""
+    ctx = ev.json(E.CONTEXT) or {}
+    v = ctx.get("funnel_lab")
+    return v if isinstance(v, dict) else {}
+
+
+def _has(files, path):
+    """True when `path` (a file, or a directory ending in '/') is in the listing."""
+    if not files:
+        return False
+    if path.endswith("/"):
+        return any(str(k).startswith(path) for k in files)
+    return path in files
+
+
+def funnel_next(ev, lid=None):
+    """(lever, params, output) of the funnel's first cluster step whose output
+    is not in the cluster listing, among steps of lever `lid` (default: any);
+    (None, None, None) when every step's output is there."""
+    files = cluster_files(ev)
+    for lv, params, out in FUNNEL_STEPS:
+        if lid is not None and lv != lid:
+            continue
+        if not _has(files, out):
+            return lv, dict(params), out
+    return None, None, None
+
+
+def _funnel_paths(ev, menu, lab=False):
+    """{"prereg", "out", "inc"}: the funnel's paths on the cluster (INC_DIR from
+    the evidence, levers.inc_dir) or on the lab (model.LAB_REPO)."""
+    inc = str(M.LAB_REPO / protocol("funnel_lab_inc_dir", menu)) if lab else inc_dir(ev)
+    return {"inc": inc, "prereg": posixpath.join(inc, protocol("funnel_prereg", menu)),
+            "out": posixpath.join(inc, protocol("funnel_out", menu))}
+
+
+def funnel_resources(verb, menu=None):
+    """The extra sbatch flags of a funnel verb (protocol funnel_sbatch_resources
+    of funnel_verb_class[verb]), or None when there are none."""
+    cls = protocol("funnel_verb_class", menu).get(verb)
+    if cls is None:
+        raise LeverError("%r is not a funnel verb" % (verb,))
+    flags = protocol("funnel_sbatch_resources", menu).get(cls)
+    if flags is None:
+        raise LeverError("funnel verb class %r has no sbatch resources entry" % cls)
+    return list(flags) or None
+
+
+def estimate_funnel(lid, params, menu=None):
+    """(hours, detail): a funnel job holds run_inc_funnel.sh's GPU for up to its
+    #SBATCH --time. A verb of the gpu_large class (rl-b) holds an H100 instead
+    of the header's V100: its hours are stated in V100 GPU-hours at the
+    su_rates.json ratio, since the policy row prices est_gpu_hours on V100."""
+    r = row(lid, menu)
+    hours, info = estimate_walltime(r.get("script") or protocol("funnel_script", menu))
+    verb = params.get("verb") if lid == "L10" else {"L11": "map", "L13": "recover"}.get(lid)
+    cls = protocol("funnel_verb_class", menu).get(verb)
+    gpu = protocol("funnel_gpu_by_class", menu).get(cls)
+    info = dict(info, estimator="funnel_walltime", verb=verb, verb_class=cls, gpu=gpu)
+    if gpu and gpu != "v100":
+        from ..brain import su_ledger
+        rates = su_ledger.rates()
+        ratio = float(rates[gpu]["su_per_gpu_hour"]) / float(rates["v100"]["su_per_gpu_hour"])
+        info.update(gpu_hours=hours, su_ratio_to_v100=ratio)
+        hours = round(hours * ratio, 3)
+    return hours, info
+
+
+def _funnel_once(ev, lid, key):
+    """Defer when the campaign's lineage records lever lid with these params
+    (a funnel step runs once per campaign; a person decides whether to repeat
+    one that ran and left no output)."""
+    ctx = ev.json(E.CONTEXT) or {}
+    for i, r in enumerate(ctx.get("lineage") or []):
+        if not isinstance(r, dict) or r.get("status") in LINEAGE_IGNORED or r.get("lever") != lid:
+            continue
+        p = r.get("params") if isinstance(r.get("params"), dict) else {}
+        if all(p.get(k) == v for k, v in key.items()):
+            raise Defer("%s %s was already run in this campaign (%s); its output is not on the cluster yet, and a "
+                        "person decides whether to run it again" % (lid, " ".join("%s=%s" % kv for kv in sorted(
+                            key.items())), r.get("status")))
+
+
+def _waits(ev, lid, key, menu):
+    """The waits_for record of a funnel job whose input file is not on the
+    cluster (the row's preconditions keyed by verb or part), or None."""
+    pre = (row(lid, menu).get("preconditions") or {}).get(key)
+    if not isinstance(pre, dict):
+        return None
+    if _has(cluster_files(ev), pre["cluster_file"]):
+        return None
+    return {"lever": pre.get("then"), "cluster_file": pre["cluster_file"], "why": pre.get("why"),
+            "listing": "in the evidence" if cluster_files(ev) is not None else "not in the evidence"}
+
+
+def _funnel_proposal(lid, params, derived, d, cites, menu, waits=None, extra=None):
+    est, info = (estimate_funnel(lid, params, menu) if row(lid, menu).get("estimator") == "funnel_walltime"
+                 else (0.0, {"estimator": "zero"}))
+    p = _proposal(lid, params, derived, d, cites, est, info, None, None, menu)
+    if waits:
+        p["waits_for"] = waits
+    if extra:
+        p.update(extra)
+    return p
+
+
+def recovered_loop_params(ev, menu=None):
+    """(params, parent, cites) of the recovered real loop (realloop_v2,
+    contract 9.1): the latest finished real loop's base, replay mode, recipes
+    and gate flips mode, --increment-sources recovered, --step1-overlay
+    <INC_DIR>/step1_r1 and --size its increment_images. Defers until the
+    recovery overlay is complete (funnel/recovery.json status complete)."""
+    from . import diagnose as DG
+    rec = ev.json(E.FUNNEL_RECOVERY)
+    if not isinstance(rec, dict) or rec.get("status") != "complete":
+        raise Defer("the recovery overlay is not complete (%s status %r)"
+                    % (E.FUNNEL_RECOVERY, (rec or {}).get("status") if isinstance(rec, dict) else None))
+    loop, _rep = DG._latest_loop(ev)
+    if loop is None:
+        raise Defer("no finished real loop in the evidence to take the recipe from")
+    pd = ev.json("%s/exp.json" % loop) or {}
+    art = "%s/exp.json" % loop
+    size = pd.get("increment_images")
+    if not isinstance(size, int) or isinstance(size, bool):
+        raise Defer("%s records no increment_images" % loop)
+    src = (pd.get("base") or {}).get("source_manifest")
+    base = src if isinstance(src, str) and src.startswith("/") else posixpath.join(inc_dir(ev, loop), "step1",
+                                                                                   "base_B.jsonl")
+    params = {"base": base, "replay_mode": pd.get("replay_mode", DG.DEFAULT_REPLAY_MODE),
+              "recipes": _recipes_param(pd.get("recipes") or {}), "increment_sources": SOURCES_RECOVERED,
+              "step1_overlay": posixpath.join(inc_dir(ev, loop), protocol("funnel_recover_out", menu).rstrip("/")),
+              "size": size}
+    gp, gc = gate_params(ev, loop, menu)
+    params.update(gp)
+    cites = [ev.cite(E.FUNNEL_RECOVERY, "/status"), ev.cite(art, "/increment_images")] + list(gc)
+    for ptr in ("/base/source_manifest", "/replay_mode", "/recipes"):
+        try:
+            cites.append(ev.cite(art, ptr))
+        except KeyError:
+            pass
+    _once(ev, "L2", loop, params=params)
+    params["exp"] = realloop_name(ev.exps())
+    return params, loop, cites
+
+
+def _build_funnel(lid, d, ev, menu):
+    """[proposal] of funnel lever lid triggered by diagnosis d."""
+    det = d.get("detail") or {}
+    cites = list(d["cites"])
+    if lid == "L10":
+        nl, params, out = funnel_next(ev, "L10")
+        if nl is None:
+            raise Defer("every L10 stage's output is on the cluster (funnel/files.json)")
+        if det.get("first_verb") and cluster_files(ev) is None:
+            params = {"verb": det["first_verb"]}
+        _funnel_once(ev, "L10", params)
+        paths = _funnel_paths(ev, menu)
+        derived = {"prereg": paths["prereg"], "out": paths["out"],
+                   "sbatch_resources": funnel_resources(params["verb"], menu)}
+        return [_funnel_proposal("L10", params, derived, d, cites, menu,
+                                 waits=_waits(ev, "L10", params["verb"], menu),
+                                 extra={"funnel_step": {"writes": out}})]
+    if lid == "L11":
+        nl, params, out = funnel_next(ev, "L11")
+        if nl is None:
+            raise Defer("both L11 parts' outputs are on the cluster (funnel/files.json)")
+        _funnel_once(ev, "L11", params)
+        paths = _funnel_paths(ev, menu)
+        return [_funnel_proposal("L11", params, {"prereg": paths["prereg"], "out": paths["out"]}, d, cites, menu,
+                                 waits=_waits(ev, "L11", params["part"], menu),
+                                 extra={"funnel_step": {"writes": out}, "sources": det.get("s2_sources") or []})]
+    if lid in ("L11a", "L12"):
+        what = "cards" if lid == "L11a" else "taxonomy"
+        target = "funnel/cards/index.json" if lid == "L11a" else "funnel/taxonomy_cache.json"
+        if _has(cluster_files(ev), target):
+            raise Defer("%s is already on the cluster (funnel/files.json)" % target)
+        if target in lab_files(ev):
+            raise Defer("%s is on the lab and not yet on the cluster: the funnel sync (inc_funnel_sync) pushes it"
+                        % target)
+        _funnel_once(ev, lid, {"what": what})
+        paths = _funnel_paths(ev, menu, lab=True)
+        derived = {"prereg": paths["prereg"], "out": paths["out"]}
+        if lid == "L12":
+            derived["names_from"] = posixpath.join(paths["inc"], "step1", "pool_summary.json")
+        return [_funnel_proposal(lid, {"what": what}, derived, d, cites, menu,
+                                 extra={"sources": det.get("s2_sources") or [], "writes": target})]
+    if lid == "L13":
+        policy = det.get("policy")
+        if not policy:
+            raise Defer("D18 names no recovery policy")
+        _funnel_once(ev, "L13", {"policy": policy})
+        paths = _funnel_paths(ev, menu)
+        inc = paths["inc"]
+        derived = {"prereg": paths["prereg"], "audit": posixpath.join(inc, "funnel", "audit_v1.json"),
+                   "maps": posixpath.join(inc, "funnel", "class_maps.json"),
+                   "out": posixpath.join(inc, protocol("funnel_recover_out", menu))}
+        return [_funnel_proposal("L13", {"policy": policy}, derived, d, cites, menu,
+                                 extra={"strata": det.get("strata") or [],
+                                        "known_confusions": det.get("known_confusions") or []})]
+    if lid == "L14":
+        rows = det.get("to_l14") or []
+        if not rows:
+            raise Defer("no class map waits for a person's verification")
+        _funnel_once(ev, "L14", {})
+        return [_funnel_proposal("L14", {}, {}, d, cites, menu, extra={"queue": rows})]
+    raise Defer("no builder for funnel lever %s" % lid)
+
+
+def verify_queue_rows(ev):
+    """The verify tasks of lever L14: class maps whose card and source class
+    counts disagree (class_maps.json proposals with status to_L14)."""
+    maps = ev.json(E.FUNNEL_CLASS_MAPS) if ev is not None else None
+    rows = []
+    for p in (maps or {}).get("proposals") or [] if isinstance(maps, dict) else []:
+        if isinstance(p, dict) and p.get("status") == "to_L14":
+            rows.append({k: p.get(k) for k in ("source", "src_id", "src_name", "map_to", "via", "reason")})
+    return rows
+
+
+def funnel_sync_needed(ev):
+    """The funnel files one side holds and the other does not (runner 6.3),
+    [INC_DIR-relative path]: the lab's push-list files the cluster lacks
+    (context funnel_lab against funnel/files.json), and the cluster's
+    pull-list files the lab lacks or holds another version of (funnel/files.json
+    and the shipped recovery record against context funnel_lab_pull). A
+    cluster file listed without a sha256 (too large to hash there) counts
+    only while the lab has no copy."""
+    from . import executor as X
+    have = cluster_files(ev) or {}
+    out = {p for p, sha in lab_files(ev).items() if (have.get(p) or {}).get("sha256") != sha}
+    ctx = ev.json(E.CONTEXT) or {}
+    local = ctx.get("funnel_lab_pull") if isinstance(ctx.get("funnel_lab_pull"), dict) else {}
+    for p, info in have.items():
+        if not X.funnel_pull_refusals([p]):
+            sha = (info or {}).get("sha256") if isinstance(info, dict) else None
+            if p not in local or (sha is not None and local[p] != sha):
+                out.add(p)
+    rec = ev.provenance.get(E.FUNNEL_RECOVERY) or {}
+    rel = X.FUNNEL_PULL_RECOVERY
+    if ev.json(E.FUNNEL_RECOVERY) is not None and rec.get("sha256") and local.get(rel) != rec.get("sha256"):
+        out.add(rel)
+    return sorted(out)
 
 
 # --------------------------------------------------------------- propose
@@ -1019,7 +1320,15 @@ def _proposal(lid, params, derived, trigger, cites, est, est_detail, parent, chi
     r = row(lid, menu)
     params = dict(params, **{k: v for k, v in (r.get("fixed") or {}).items()})
     params["est_gpu_hours"] = est
-    cmd = argv(lid, params, derived, menu)
+    if r.get("argv") is None and r.get("kind") == "lab_hook":
+        # A lab hook (L14) has no command: the executor calls the hook the
+        # campaign registered for its policy action, with these params.
+        ok, reasons = check_params(lid, params, menu)
+        if not ok:
+            raise LeverError("%s params refused: %s" % (lid, "; ".join(reasons)))
+        cmd = []
+    else:
+        cmd = argv(lid, params, derived, menu)
     p = M.proposal(lid, cmd, params, r["policy_action"], r["risk"], [trigger["id"]], list(cites),
                    lit=_lit(r), control=r.get("control", ""), success=r.get("success", ""),
                    falsifier=r.get("falsifier", ""), est_gpu_hours=est)
@@ -1186,6 +1495,9 @@ def loop_params(ev, parent):
         cites.append(ev.cite(art, "/replay_mode"))
     crit = (pd.get("step1") or {}).get("increment_sources")
     mode = crit.get("mode") if isinstance(crit, dict) else None
+    if mode == SOURCES_RECOVERED:
+        raise Defer("%s draws its increments from the funnel's recovery overlay; only the funnel's own L2 builds "
+                    "such a loop (recovered_loop_params)" % parent)
     if crit is not None and mode not in protocol("increment_sources_modes"):
         raise Defer("%s records increment sources %r, which realloop build --increment-sources does not take"
                     % (parent, crit))
@@ -1274,6 +1586,8 @@ def _rebuild_params(ev, parent, lid, **change):
 def _build(lid, d, ev, menu, fired):
     """[proposal] for lever lid triggered by diagnosis d."""
     det = d.get("detail") or {}
+    if lid in FUNNEL_LEVERS:
+        return _build_funnel(lid, d, ev, menu)
     if lid == "L1":
         parent = det.get("pilot") or d.get("exp")
         _once(ev, "L1", parent)
@@ -1284,6 +1598,10 @@ def _build(lid, d, ev, menu, fired):
         return [_proposal(lid, params, {}, d, d["cites"] + gc + c, est, info, parent, child, menu)]
     if lid == "L9":
         return [_build_l9(d, ev, menu)]
+    if lid == "L2" and d["id"] == "D18":
+        params, parent, pc = recovered_loop_params(ev, menu)
+        est, info, c = price(lid, params, ev, parent, menu)
+        return [_proposal(lid, params, {}, d, d["cites"] + pc + c, est, info, parent, params["exp"], menu)]
     if lid in ("L2", "L6"):
         if d["id"] == "D11":
             d4 = fired.get("D4")
@@ -1441,11 +1759,16 @@ def propose(diagnoses, ev, menu=None):
                     out["refused"].append({"lever": lid, "trigger": d["id"], "reason": str(e)})
                     continue
                 for p in built:
-                    k = (lid, tuple(p["argv"]))
+                    k = (lid, tuple(p["argv"]) if p["argv"] else (p.get("policy_action"),))
                     if k in props:
                         merge(props[k], d, p["cites"])
                     else:
                         props[k] = p
+                        if p.get("waits_for"):
+                            w = p["waits_for"]
+                            out["deferred"].append({"lever": lid, "trigger": d["id"],
+                                                    "reason": "then: %s after %s (%s is not on the cluster)"
+                                                              % (lid, w.get("lever"), w.get("cluster_file"))})
             else:
                 out["refused"].append({"lever": lid, "trigger": d["id"], "reason": "not on the menu"})
         for then in (d.get("detail") or {}).get("then") or []:

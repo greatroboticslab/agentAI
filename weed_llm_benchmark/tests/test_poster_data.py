@@ -117,10 +117,15 @@ def main():
     try:
         import figures as _F
         roles = _F._router_roles()
+        # The poster is final (sent 2026-09-21) and is never rebuilt. Roles added
+        # to the router after that date are listed here with their date and are
+        # outside the printed figure; every other role must be one it printed.
+        after_poster = {"adversary": "2026-09-28, docs/FUNNEL_AUDIT.md 8.2"}
+        printed = sorted(r for r in roles if r not in after_poster)
         check("model_router declares the eight roles Figure 4 prints",
-              len(roles) == 8,
-              "the router now declares %d; the figure and the dispatch block both say eight"
-              % len(roles))
+              printed == ["analysis_summary", "curation", "deep_review", "hard_reasoning",
+                          "harvest_brain", "interactive_plan", "labeling_vlm", "planner"],
+              "the router's roles outside the post-poster list are %s" % printed)
         lab = sorted(r for r, s in roles.items() if s["place"] == "lab")
         check("exactly the two lab roles the sheet names run on the lab box",
               lab == ["analysis_summary", "interactive_plan"],

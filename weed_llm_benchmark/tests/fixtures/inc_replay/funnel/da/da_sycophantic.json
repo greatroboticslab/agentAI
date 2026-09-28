@@ -1,0 +1,24 @@
+{
+ "claim_id": "C1",
+ "concessions": [
+  {
+   "checked": [],
+   "claim_id": "C1",
+   "why": "The conclusion is right; the data are poor."
+  },
+  {
+   "claim_id": "C1",
+   "why": "Nothing suggests the filters erred."
+  }
+ ],
+ "counter_arguments": [],
+ "stage_forecast": {
+  "S0": 0.14285714285714285,
+  "S10": 0.14285714285714285,
+  "S3": 0.14285714285714285,
+  "S7": 0.14285714285714285,
+  "S7b": 0.14285714285714285,
+  "S8": 0.14285714285714285,
+  "S9": 0.14285714285714285
+ }
+}

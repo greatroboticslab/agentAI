@@ -59,9 +59,18 @@ An evidence.Evidence, or the map `artifacts_of()` makes of it:
 Cite and evidence.py's addresses. `load_artifacts()` builds it from a local
 INC tree through evidence.load_dir.
 
+The devil's advocate (docs/FUNNEL_AUDIT.md 8.6): build_da_digest() stages an
+inc-da-digest/1 (the negative claims, the funnel ledger's stage ids and
+roles, the allow-listed dev-only evidence) that holds none of the blind
+markers (the contract, the pre-registration, the R14 fixture, D17's
+proposals; only their sha256 travel, and check_staged refuses a digest
+holding one); run_da() is the job body of the adversary role and writes an
+inc-da-reply/1; validate.validate_da checks it on the lab.
+
 CLI:
   python -m weed_optimizer_framework.tools.inc_autopilot.brain_plan digest --inc-dir DIR --exp EXP --out F [--parent P ... --campaign C --n N --num-ctx N]
-  python -m weed_optimizer_framework.tools.inc_autopilot.brain_plan run --input F --output G --endpoint URL --model M [--num-ctx N --timeout S]
+  python -m weed_optimizer_framework.tools.inc_autopilot.brain_plan digest --role adversary --claims PATH --inc-dir DIR --exp LOOP --out F [--prereg P --contract C --fixture F ...]
+  python -m weed_optimizer_framework.tools.inc_autopilot.brain_plan run --input F --output G --endpoint URL --model M [--role planner|adversary --num-ctx N --timeout S]
   python -m weed_optimizer_framework.tools.inc_autopilot.brain_plan parse REPLY.txt
 """
 from __future__ import annotations
@@ -91,12 +100,15 @@ DIGEST_SCHEMA = "inc-plan-digest/2"
 STAGED_SCHEMAS = (DIGEST_SCHEMA, "inc-plan-digest/1")
 REPLY_SCHEMA = "inc-plan-reply/1"
 
-# The exams no decision may read (docs/INC_AUTOPILOT.md (d)). dev is the only
-# decision exam (model.DECISION_EXAM).
-FORBIDDEN_EXAMS = ("test", "ood22", "ood23", "imageweeds")
+# The exams no decision may read (docs/INC_AUTOPILOT.md (d)), from the domain
+# config (model.non_dev_exams: its non-decision exams and its extra
+# non-decision splits; docs/FUNNEL_AUDIT.md 8.8). dev is the only decision
+# exam (model.DECISION_EXAM).
+FORBIDDEN_EXAMS = M.non_dev_exams()
+_FORBIDDEN_ALT = "|".join(re.escape(x) for x in FORBIDDEN_EXAMS)
 _FORBIDDEN_PATH_RE = re.compile(
-    r"(?:scores/(?:test|ood22|ood23|imageweeds)\.json"
-    r"|(?:^|/)exams/(?:test|ood22|ood23|imageweeds)(?:/|$))")
+    r"(?:scores/(?:%s)\.json"
+    r"|(?:^|/)exams/(?:%s)(?:/|$))" % (_FORBIDDEN_ALT, _FORBIDDEN_ALT))
 
 # A plan not back within this many seconds of submission is abandoned and the
 # deterministic proposal goes ahead alone (contract (c): timeout 2 h, the
@@ -1170,6 +1182,8 @@ def check_staged(digest):
     digest edited after staging is refused however consistently its hashes
     were recomputed.
     """
+    if digest.get("schema") == DA_DIGEST_SCHEMA:
+        return check_staged_da(digest)
     if digest.get("schema") not in STAGED_SCHEMAS:
         raise ValueError("not an INC plan digest (schema %r; this copy runs %s)"
                          % (digest.get("schema"), ", ".join(STAGED_SCHEMAS)))
@@ -1216,6 +1230,8 @@ def run(input_path, output_path, endpoint="", model="", num_ctx=0, timeout_s=360
             raise ValueError("the staged digest is not a JSON object")
         out.update({"campaign": digest.get("campaign"), "n": digest.get("n"),
                     "exp": digest.get("exp"), "digest_sha256": digest.get("sha256")})
+        if digest.get("schema") == DA_DIGEST_SCHEMA:
+            raise ValueError("a DA digest runs with --role adversary (run_da), not as a plan")
         prompt = check_staged(digest)
         num_ctx = int(num_ctx or digest.get("num_ctx") or DEFAULT_NUM_CTX)
         out["num_ctx"] = num_ctx
@@ -1279,7 +1295,7 @@ def _stamp_seconds(stamp):
 
 
 def collect(reply, submitted_utc, now_utc=None, timeout_s=PLAN_TIMEOUT_S, digest_sha256=None,
-            pulled_utc=None):
+            pulled_utc=None, role="planner"):
     """{"status": "ready" | "late" | "failed" | "pending" | "timeout", "reply", "reason"}.
 
     `reply` is the pulled <n>.json (a path, a dict, or None when nothing came
@@ -1303,9 +1319,11 @@ def collect(reply, submitted_utc, now_utc=None, timeout_s=PLAN_TIMEOUT_S, digest
         rep = _read_json(reply) if Path(reply).is_file() else None
     submitted = _utc_seconds(submitted_utc)
     now = _utc_seconds(now_utc or M.utc_now())
+    want_schema, body = (DA_REPLY_SCHEMA, "reply") if role == "adversary" else (REPLY_SCHEMA, "plan")
     if isinstance(rep, dict):
-        if rep.get("schema") != REPLY_SCHEMA:
-            return {"status": "failed", "reply": rep, "reason": "not a plan reply"}
+        if rep.get("schema") != want_schema:
+            return {"status": "failed", "reply": rep, "reason": "not a %s reply" % ("DA" if role == "adversary"
+                                                                                    else "plan")}
         if not digest_sha256:
             return {"status": "failed", "reply": rep,
                     "reason": "no staged digest sha256 to match the reply against; a reply that "
@@ -1314,8 +1332,8 @@ def collect(reply, submitted_utc, now_utc=None, timeout_s=PLAN_TIMEOUT_S, digest
             return {"status": "failed", "reply": rep,
                     "reason": "the reply answers digest %s, not the staged digest %s"
                               % (str(rep.get("digest_sha256"))[:12], str(digest_sha256)[:12])}
-        if not (rep.get("ok") and isinstance(rep.get("plan"), dict)):
-            return {"status": "failed", "reply": rep, "reason": rep.get("reason") or "no plan"}
+        if not (rep.get("ok") and isinstance(rep.get(body), dict)):
+            return {"status": "failed", "reply": rep, "reason": rep.get("reason") or "no %s" % body}
         landed = _stamp_seconds(pulled_utc) if pulled_utc else now
         finished = _stamp_seconds(rep.get("finished_utc"))
         landed = max(x for x in (landed, finished) if x is not None)
@@ -1393,11 +1411,372 @@ def merge(deterministic, collected, validated=None):
     return out
 
 
+# --- the devil's-advocate pass (docs/FUNNEL_AUDIT.md 8.6; runner 5.5.5) --------------------
+#
+# The same job (run_inc_plan.sh with PLAN_ROLE=adversary) runs a model of the
+# adversary role (model_router, a family other than the planner's) on a DA
+# digest: the allow-listed dev-only evidence, the text of the negative claims,
+# and the funnel ledger's stage ids with their roles. The DA must be blind to
+# the contract, the pre-registration, the replay fixture of its own test (R14)
+# and D17's proposals (contract 6 H11): a digest holding any of DA_BLIND_MARKERS
+# is refused when it is built and again on the cluster (check_staged). The
+# digest carries only the sha256 of each marker, so it holds none of them.
+
+DA_DIGEST_SCHEMA = "inc-da-digest/1"
+DA_REPLY_SCHEMA = "inc-da-reply/1"
+ROLES = ("planner", "adversary")
+# Top-level header keys of a funnel artifact (runner 1.2) left out of the DA
+# digest: they name the contract, the pre-registration and the code, which the
+# DA must not see. Pointers into what is kept are the artifact's own.
+DA_HEADER_KEYS = ("prereg", "contract", "domain_config", "code", "inputs", "seeds", "built_utc", "testing")
+# Artifacts the DA reads, and how much of each (a projection keeps the
+# artifact's own structure, so a cite's pointer is the file's). In the order a
+# digest over budget drops them, last first.
+DA_ARTIFACT_KEEP = (
+    ("funnel/funnel_ledger.json", None),
+    ("step1/admit_summary.json", None),
+    ("step1/select_summary.json", ("sizes", "sources", "retrieval", "near_dup", "otherplant", "boxes", "crops")),
+    ("step1/pool_summary.json", ("per_slug", "boxes", "boxes_per_class", "images", "dropped", "skipped",
+                                 "skipped_counts", "slugs_total", "slugs_used", "cwd12_copies")),
+    ("step1/calibration.json", ("cwd12_copies", "swaps", "thresholds", "notes")),
+    ("step1/verifier_fit_info.json", None),
+    ("funnel/class_maps.json", ("proposals",)),
+    ("<loop>/report.json", ("exp", "type", "done", "steps", "agreement", "chains", "gpu_hours_total")),
+    ("<loop>/exp.json", ("steps", "increment_images", "builder", "type")),
+    ("<loop>/build_summary.json", ("size", "evidence", "n_verified", "sequence", "unverified")),
+)
+DA_STAGED_KEYS = ("schema", "role", "campaign", "n", "exp", "claim_ids", "sections", "prompt", "prompt_sha256",
+                  "num_ctx", "tokens_estimated", "blind_markers", "evidence_sha256", "created_utc", "sha256",
+                  "dropped_artifacts")
+
+DA_PROMPT_HEADER = """You are the devil's advocate of a data-curation campaign. The campaign has written down a
+negative claim (CLAIMS): that the data it harvested holds little that is useful. Your job is to find the
+strongest grounded reasons the claim may be wrong, and to concede where the evidence supports it.
+
+Every counter-argument must be testable and grounded:
+1. argument and mechanism: what may have gone wrong, and how.
+2. evidence_cites: at least 2 values from at least 2 DIFFERENT artifacts of EVIDENCE. A cite is
+   {"artifact", "pointer", "value"}: pointer is an RFC 6901 JSON pointer into the named artifact as shown
+   (keys joined with "/", list positions 0-based), value is the exact value there (full precision, same type).
+3. lit_cites: optional; leave empty unless you quote a corpus passage verbatim.
+4. prediction: {"stage": a stage id of STAGES, "stratum": a short description or null, "metric": "fn_rate",
+   "purity" or "truth_verdict", "direction": "above", "below", "helps", "neutral" or "hurts",
+   "threshold": a number or null}. It must name a stage that exists in STAGES.
+5. cheapest_test: {"lever": one of TESTS' lever ids, "params": {...its required params...}} or
+   {"card": one of TESTS' card ids}.
+6. falsifier: the observation that would show the counter-argument wrong.
+Concessions: {"claim_id", "checked": [cites of the values you checked], "why"}. A concession that names
+no checked value is not counted.
+stage_forecast: for every stage id in RECOVERABLE, the probability that it is the stage where the audit
+finds the most recoverable data; the values sum to 1.
+Decisions use the dev split only: do not mention, cite or reason about any other exam or holdout.
+Reply with ONE JSON object and nothing else:
+{"claim_id": "", "counter_arguments": [{"argument": "", "mechanism": "", "evidence_cites": [],
+  "lit_cites": [], "prediction": {"stage": "", "stratum": null, "metric": "fn_rate", "direction": "above",
+  "threshold": null}, "cheapest_test": {"lever": "", "params": {}}, "falsifier": ""}],
+ "concessions": [{"claim_id": "", "checked": [], "why": ""}],
+ "stage_forecast": {"<stage id>": 0.0}}
+"""
+DA_TEST_LEVERS = ("L10", "L11", "L12", "L14")
+DA_TEST_CARDS = ("X10", "X11")
+
+
+def blind_markers(prereg_path=None, contract_path=None, fixture_paths=(), proposals=()):
+    """[str]: what the DA must never see (contract 6 H11): the contract's path
+    and sha256, the pre-registration's path and core sha256, the sha256 of each
+    R14 fixture file, and the ids and argv of D17's proposals. Files that do
+    not exist contribute their path only."""
+    out = []
+
+    def add(x):
+        x = str(x or "").strip()
+        if len(x) >= 6 and x not in out:
+            out.append(x)
+    if contract_path:
+        cp = Path(contract_path)
+        add("docs/" + cp.name if cp.parent.name == "docs" else cp.name)
+        add(cp.name)
+        if cp.is_file():
+            add(hashlib.sha256(cp.read_bytes()).hexdigest())
+    if prereg_path:
+        pp = Path(prereg_path)
+        add("funnel/" + pp.name)
+        if pp.is_file():
+            raw = pp.read_bytes()
+            add(hashlib.sha256(raw).hexdigest())
+            try:
+                obj = json.loads(raw.decode("utf-8"))
+                core = {k: v for k, v in obj.items() if k != "amendments"}
+                add(hashlib.sha256(json.dumps(core, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+                                   .encode("utf-8")).hexdigest())
+                add(((obj.get("contract") or {}).get("sha256")))
+            except ValueError:
+                pass
+    for f in fixture_paths or ():
+        fp = Path(f)
+        if fp.is_file():
+            add(hashlib.sha256(fp.read_bytes()).hexdigest())
+    for p in proposals or ():
+        if isinstance(p, dict):
+            add(p.get("id"))
+            if p.get("argv"):
+                add(" ".join(str(a) for a in p["argv"]))
+    return out
+
+
+def _marker_hashes(markers):
+    return sorted({(len(m), hashlib.sha256(m.encode("utf-8")).hexdigest()) for m in markers})
+
+
+def blind_found(text, hashed):
+    """[sha256] of the hashed markers whose text occurs in `text` (every window
+    of each marker's length is hashed)."""
+    found = []
+    data = text if isinstance(text, str) else _dump(text)
+    by_len = {}
+    for n, h in hashed or []:
+        by_len.setdefault(int(n), set()).add(h)
+    for n, hs in sorted(by_len.items()):
+        if n <= 0 or n > len(data):
+            continue
+        for i in range(0, len(data) - n + 1):
+            h = hashlib.sha256(data[i:i + n].encode("utf-8")).hexdigest()
+            if h in hs:
+                found.append(h)
+                hs.discard(h)
+                if not hs:
+                    break
+    return sorted(set(found))
+
+
+def _project_top(obj, keep):
+    if not isinstance(obj, dict):
+        return obj
+    out = {k: v for k, v in obj.items() if k not in DA_HEADER_KEYS}
+    if keep is not None:
+        out = {k: v for k, v in out.items() if k in keep}
+    return out
+
+
+def render_da_prompt(sections):
+    parts = [DA_PROMPT_HEADER.rstrip(), ""]
+    for title, key in (("CLAIMS", "claims"), ("STAGES", "stages"), ("RECOVERABLE", "recoverable"),
+                       ("TESTS", "tests"), ("EVIDENCE", "evidence")):
+        if key in sections:
+            parts.append("### %s" % title)
+            parts.append(_dump(sections[key]))
+            parts.append("")
+    parts.append("Reply with the JSON object only.")
+    return "\n".join(parts)
+
+
+def da_digest_sha256(digest):
+    return _sha({k: v for k, v in digest.items() if k not in ("created_utc", "sha256")})
+
+
+def build_da_digest(evidence, claims, ledger, menu, campaign="default", n=0, markers=(), loop=None,
+                    created_utc=None, num_ctx=None):
+    """The DA's input (inc-da-digest/1): the open negative claims' text, the
+    ledger's stage ids with their roles and which are recoverable, the tests it
+    may name, and the allow-listed dev-only evidence (header keys of funnel
+    artifacts left out; DA_ARTIFACT_KEEP). Refuses (ValueError) when the
+    rendered digest holds a blind marker, when an evidence section carries a
+    non-dev split, or when it cannot fit the context or the ssh line even with
+    the optional artifacts dropped."""
+    from ..brain import supervisor
+    arts = artifacts_of(evidence) or {}
+    neg = [c for c in (claims or {}).get("claims") or [] if isinstance(c, dict)
+           and c.get("polarity") in ("scarcity", "negative") and c.get("status") in ("open", "challenged")]
+    if not neg:
+        raise ValueError("no open or challenged negative claim for the devil's advocate to answer")
+    from ..funnel import ledger as FL
+    stages = [{"id": s.get("id"), "role": s.get("role"), "unit": s.get("unit"),
+               "recoverable": s.get("recoverable")} for s in (ledger or {}).get("stages") or [] if isinstance(s, dict)]
+    rec = list(FL.recoverable_stages(ledger))
+    tests = {"levers": [], "cards": []}
+    for lid in DA_TEST_LEVERS:
+        r = (menu or {}).get(lid) or {}
+        tests["levers"].append({"id": lid, "title": r.get("title"), "requires": list(r.get("requires") or []),
+                                "params": {k: v for k, v in (r.get("param_bounds") or {}).items()
+                                           if k != PRICE_PARAM}})
+    for cid in DA_TEST_CARDS:
+        r = (menu or {}).get(cid) or {}
+        tests["cards"].append({"id": cid, "title": r.get("title")})
+    ev_sec, order = {}, []
+    for name, keep in DA_ARTIFACT_KEEP:
+        name = name.replace("<loop>", str(loop)) if "<loop>" in name else name
+        if "<loop>" in name or (loop is None and name.startswith("None/")):
+            continue
+        obj = arts.get(name)
+        if obj is None:
+            continue
+        ev_sec[name] = _project_top(dev_only(obj), keep)
+        order.append(name)
+    sections = {"claims": [{"id": c.get("id"), "text": c.get("text"), "polarity": c.get("polarity"),
+                            "scope": c.get("scope"), "status": c.get("status")} for c in neg],
+                "stages": stages, "recoverable": rec, "tests": tests, "evidence": ev_sec}
+    sections = json.loads(json.dumps(sections))
+    for key in sections:
+        assert_dev_only(sections[key], "DA digest section %r" % key)
+    hashed = _marker_hashes([m for m in markers if m])
+    est = supervisor.estimate_tokens
+    budget = (int(num_ctx) - REPLY_RESERVE_TOKENS) if num_ctx else AUTO_BUDGET_TOKENS
+    dropped = []
+    while True:
+        prompt = render_da_prompt(sections)
+        tokens = est(prompt)
+        dg = {"schema": DA_DIGEST_SCHEMA, "role": "adversary", "campaign": str(campaign), "n": int(n),
+              "exp": loop, "claim_ids": [c.get("id") for c in neg], "sections": sections, "prompt": prompt,
+              "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+              "num_ctx": int(num_ctx) if num_ctx else choose_num_ctx(tokens), "tokens_estimated": tokens,
+              "blind_markers": [[int(a), b] for a, b in hashed], "evidence_sha256": _sha(sections["evidence"]),
+              "dropped_artifacts": list(dropped), "created_utc": created_utc or M.utc_now()}
+        dg["sha256"] = da_digest_sha256(dg)
+        if tokens <= budget and staged_chars(dg) <= STAGED_BUDGET_CHARS:
+            break
+        optional = [nm for nm in reversed(order) if nm in sections["evidence"] and nm != "funnel/funnel_ledger.json"]
+        if not optional:
+            raise ValueError("the DA digest is %d tokens (%d staged characters) with only the ledger left, over "
+                             "its budget %d (or the ssh line %d)" % (tokens, staged_chars(dg), budget,
+                                                                     STAGED_BUDGET_CHARS))
+        sections["evidence"].pop(optional[0])
+        dropped.append(optional[0])
+    plain = [m for m in markers if m]
+    body = _dump({k: v for k, v in dg.items() if k != "blind_markers"})
+    hit = [m for m in plain if m in body]
+    if hit:
+        raise ValueError("the DA digest would hold %d blind marker(s) (the contract, the pre-registration, the "
+                         "R14 fixture or D17's proposals); refused" % len(hit))
+    return dg
+
+
+def check_staged_da(digest):
+    """The prompt of a staged DA digest, or ValueError: its sha256 recomputes,
+    its prompt is the rendering of its sections, no section carries a non-dev
+    split, and no blind marker (by its sha256) occurs anywhere in it."""
+    if digest.get("schema") != DA_DIGEST_SCHEMA or digest.get("role") != "adversary":
+        raise ValueError("not a DA digest (schema %r, role %r)" % (digest.get("schema"), digest.get("role")))
+    unknown = sorted(set(digest) - set(DA_STAGED_KEYS))
+    if unknown:
+        raise ValueError("the staged DA digest carries keys it may not: %s" % unknown)
+    sections = digest.get("sections")
+    if not isinstance(sections, dict) or not sections:
+        raise ValueError("the staged DA digest has no sections")
+    if da_digest_sha256(digest) != digest.get("sha256"):
+        raise ValueError("the staged DA digest does not match its sha256: it was edited after staging")
+    prompt = digest.get("prompt")
+    if not isinstance(prompt, str) or prompt != render_da_prompt(sections):
+        raise ValueError("the staged DA prompt is not the rendering of the digest's sections")
+    if hashlib.sha256(prompt.encode("utf-8")).hexdigest() != digest.get("prompt_sha256"):
+        raise ValueError("the staged DA prompt does not match its prompt_sha256")
+    for key, sec in sections.items():
+        assert_dev_only(sec, "staged DA digest section %r" % key)
+    m = _PROMPT_KEY_LEAK_RE.search(prompt)
+    if m:
+        raise ValueError("the staged DA prompt carries non-dev exam data (%s)" % m.group(0))
+    hashed = [(int(a), str(b)) for a, b in digest.get("blind_markers") or []]
+    found = blind_found(_dump({k: v for k, v in digest.items() if k != "blind_markers"}), hashed)
+    if found:
+        raise ValueError("the staged DA digest holds %d blind marker(s); the devil's advocate must not see the "
+                         "contract, the pre-registration, its own test fixture or D17's proposals" % len(found))
+    return prompt
+
+
+def parse_da_reply(text):
+    """(reply, problems): the inc-da-reply/1 object of a model's text, or None."""
+    problems = []
+    if not isinstance(text, str) or not text.strip():
+        return None, ["empty reply"]
+    body = _THINK_RE.sub("", text).strip()
+    obj = None
+    for cand in [body] + [m.group(1) for m in _FENCE_RE.finditer(body)]:
+        try:
+            obj = json.loads(cand)
+            break
+        except Exception:
+            pass
+    if obj is None:
+        dec = json.JSONDecoder()
+        for i, ch in enumerate(body):
+            if ch == "{":
+                try:
+                    obj, _ = dec.raw_decode(body[i:])
+                    break
+                except Exception:
+                    continue
+    if not isinstance(obj, dict):
+        return None, ["reply carries no JSON object"]
+    out = {"claim_id": obj.get("claim_id")}
+    for key in ("counter_arguments", "concessions"):
+        v = obj.get(key, [])
+        if not isinstance(v, list):
+            problems.append("%s is not a list; ignored" % key)
+            v = []
+        out[key] = v
+    out["stage_forecast"] = obj.get("stage_forecast")
+    extra = sorted(set(obj) - {"claim_id", "counter_arguments", "concessions", "stage_forecast"})
+    if extra:
+        problems.append("unknown top-level keys ignored: %s" % ", ".join(extra))
+    return out, problems
+
+
+def run_da(input_path, output_path, endpoint="", model="", num_ctx=0, timeout_s=3600, client=None):
+    """The job body of the adversary role: one completion for one staged DA
+    digest. Always writes output_path ({"schema": inc-da-reply/1, "ok", "reply",
+    "model", "model_used", ...}); the lab validates it (validate.validate_da)."""
+    started = time.time()
+    out = {"schema": DA_REPLY_SCHEMA, "role": "adversary", "ok": False, "reason": "", "model": model,
+           "proposed_by": actor_for("adversary/%s" % (model or "unknown")), "endpoint": endpoint,
+           "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
+           "place": "cluster" if os.environ.get("SLURM_JOB_ID") else "local",
+           "started_utc": M.utc_now(), "reply": None, "parse_problems": []}
+    try:
+        digest = _read_json(input_path)
+        if not isinstance(digest, dict):
+            raise ValueError("the staged DA digest is not a JSON object")
+        out.update({"campaign": digest.get("campaign"), "n": digest.get("n"), "exp": digest.get("exp"),
+                    "digest_sha256": digest.get("sha256"), "claim_ids": digest.get("claim_ids")})
+        prompt = check_staged_da(digest)
+        num_ctx = int(num_ctx or digest.get("num_ctx") or DEFAULT_NUM_CTX)
+        out["num_ctx"] = num_ctx
+        if num_ctx > MAX_NUM_CTX:
+            raise ValueError("num_ctx %d is over MAX_NUM_CTX %d" % (num_ctx, MAX_NUM_CTX))
+        if client is None:
+            from ..brain import supervisor
+            client = supervisor.OpenAICompatClient(endpoint=endpoint, model=model, timeout_s=timeout_s, api="ollama")
+        res = client(prompt, model, int(num_ctx)) or {}
+        text = str(res.get("text") or "")
+        out.update({"tokens_in": res.get("tokens_in"), "tokens_out": res.get("tokens_out"),
+                    "latency_s": res.get("latency_s"), "truncated": bool(res.get("truncated")),
+                    "model_used": res.get("model_used") or model, "raw_text": text[:MAX_RAW_TEXT]})
+        if res.get("error"):
+            out["reason"] = str(res["error"])[:1000]
+        else:
+            reply, problems = parse_da_reply(text)
+            out["reply"], out["parse_problems"] = reply, problems
+            out["ok"] = reply is not None
+            if reply is None:
+                out["reason"] = "; ".join(problems)
+    except Exception as exc:
+        out["reason"] = "%s: %s" % (type(exc).__name__, exc)
+    out["elapsed_s"] = round(time.time() - started, 2)
+    out["finished_utc"] = M.utc_now()
+    _atomic_write(output_path, out)
+    return out
+
+
 def _main(argv=None):
     ap = argparse.ArgumentParser(prog="inc_autopilot.brain_plan",
                                  description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd")
     d = sub.add_parser("digest", help="build a dev-only digest from a local INC tree")
+    d.add_argument("--role", choices=ROLES, default="planner",
+                   help="adversary: a DA digest (inc-da-digest/1) of the negative claims in --claims")
+    d.add_argument("--claims", default=None, help="the claims register (funnel-claims/1); --role adversary")
+    d.add_argument("--prereg", default=None, help="the pre-registration, a blind marker; --role adversary")
+    d.add_argument("--contract", default=None, help="the contract, a blind marker; --role adversary")
+    d.add_argument("--fixture", action="append", default=[],
+                   help="a replay fixture of the DA's own test, a blind marker; --role adversary")
     d.add_argument("--inc-dir", required=True)
     d.add_argument("--exp", required=True)
     d.add_argument("--parent", action="append", default=[])
@@ -1410,6 +1789,8 @@ def _main(argv=None):
                         "fixes it and the digest is trimmed to fit")
     d.add_argument("--out", required=True)
     r = sub.add_parser("run", help="cluster job body: one completion for a staged digest")
+    r.add_argument("--role", choices=ROLES, default="planner",
+                   help="planner (inc-plan-digest) or adversary (inc-da-digest); must match the digest")
     r.add_argument("--input", required=True)
     r.add_argument("--output", required=True)
     r.add_argument("--endpoint", required=True)
@@ -1420,6 +1801,23 @@ def _main(argv=None):
     p = sub.add_parser("parse", help="parse a saved reply text")
     p.add_argument("reply")
     args = ap.parse_args(argv)
+    if args.cmd == "digest" and args.role == "adversary":
+        from . import evidence as EV
+        if not args.claims:
+            ap.error("--role adversary needs --claims")
+        claims = _read_json(args.claims)
+        ev = EV.load_dir(args.inc_dir, args.exp, exps=[args.exp] + list(args.parent), claims=claims)
+        led = ev.json(EV.FUNNEL_LEDGER)
+        if not isinstance(led, dict):
+            ap.error("no funnel/funnel_ledger.json under %s" % args.inc_dir)
+        marks = blind_markers(args.prereg, args.contract, args.fixture)
+        dg = build_da_digest(ev, claims, led, load_menu(args.menu), campaign=args.campaign, n=args.n,
+                             markers=marks, loop=args.exp, num_ctx=args.num_ctx or None)
+        _atomic_write(args.out, dg)
+        print("DA digest %s: %d est. tokens, num_ctx %d, claims %s, %d blind marker(s) checked, dropped %s -> %s"
+              % (dg["sha256"][:12], dg["tokens_estimated"], dg["num_ctx"], dg["claim_ids"], len(marks),
+                 dg["dropped_artifacts"] or "none", args.out))
+        return 0
     if args.cmd == "digest":
         from .corpus import Corpus
         arts = load_artifacts(args.inc_dir, [args.exp] + list(args.parent))
@@ -1438,6 +1836,14 @@ def _main(argv=None):
                  len(tr["cuts"]), "".join("\n  cut %s: %s" % (c["stage"], c["cut"])
                                           for c in tr["cuts"]), args.out))
         return 0
+    if args.cmd == "run" and args.role == "adversary":
+        rep = run_da(args.input, args.output, args.endpoint, args.model, args.num_ctx, args.timeout)
+        body = rep.get("reply") or {}
+        print("[da] ok=%s model=%s counter_arguments=%d concessions=%d tokens_in=%s %.1fs reason=%s"
+              % (rep["ok"], args.model, len(body.get("counter_arguments") or []),
+                 len(body.get("concessions") or []), rep.get("tokens_in"), rep.get("elapsed_s", 0),
+                 rep.get("reason") or "-"))
+        return 0 if rep["ok"] else 1
     if args.cmd == "run":
         rep = run(args.input, args.output, args.endpoint, args.model, args.num_ctx, args.timeout)
         plan = rep.get("plan") or {}

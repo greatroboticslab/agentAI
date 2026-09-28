@@ -1,0 +1,328 @@
+{
+ "derivation": "summaries",
+ "domain": "vehicles",
+ "domain_scores": {
+  "dashcam_c": 0.02,
+  "fleet_b": 0.03,
+  "reference": {
+   "q05": 0.1,
+   "q50": 0.5
+  },
+  "roadcam_a": 0.45
+ },
+ "fingerprint": "7f76127f3a2ce2b88b341233206491e32b8f814d1a680b5386159fa6bd0a21be",
+ "format": "funnel-ledger/1",
+ "identity_inputs": {
+  "events": "316e122c69b953616bd177da64598db4e25dd3c5389e782fdc04555e2a234e4d",
+  "summary": "42e0eaf7b4a03c42acea3e71cc68dd38376ee651b8288805c49fe2206e9c2272"
+ },
+ "input_records": {},
+ "inputs": {
+  "events": "316e122c69b953616bd177da64598db4e25dd3c5389e782fdc04555e2a234e4d",
+  "summary": "42e0eaf7b4a03c42acea3e71cc68dd38376ee651b8288805c49fe2206e9c2272"
+ },
+ "label_spaces": {
+  "dashcam_c": {
+   "boxes": 5000,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 5000,
+    "numeric": 0
+   }
+  },
+  "fleet_b": {
+   "boxes": 7000,
+   "classes": 3,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 0,
+    "numeric": 7000
+   }
+  },
+  "roadcam_a": {
+   "boxes": 8000,
+   "classes": 4,
+   "kinds": {
+    "generic": 0,
+    "named": 8000,
+    "none": 0,
+    "numeric": 0
+   }
+  }
+ },
+ "name_status_version": "v1",
+ "other_class": 3,
+ "reject_class": null,
+ "stages": [
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [],
+   "discarded": {
+    "no_boxes": 200
+   },
+   "discarded_by_label": null,
+   "filter": "read",
+   "guard": false,
+   "id": "V0",
+   "in": 5000,
+   "kept": 4800,
+   "kept_by_label": null,
+   "recoverable": false,
+   "role": "read",
+   "unit": "image",
+   "version": "1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "V0"
+   ],
+   "discarded": {
+    "near_eval": 100
+   },
+   "discarded_by_label": null,
+   "filter": "eval guard",
+   "guard": true,
+   "id": "V1",
+   "in": 4800,
+   "kept": 4700,
+   "kept_by_label": null,
+   "recoverable": false,
+   "role": "guard",
+   "unit": "image",
+   "version": "1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "V1"
+   ],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "join",
+   "guard": false,
+   "id": "V2",
+   "in": 20000,
+   "kept": 20000,
+   "kept_by_label": {
+    "OtherObject": 18600,
+    "bus": 200,
+    "car": 900,
+    "truck": 300
+   },
+   "recoverable": true,
+   "role": "join",
+   "unit": "box",
+   "version": "1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "V2"
+   ],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "name status",
+   "guard": false,
+   "id": "V3",
+   "in": 9,
+   "kept": 9,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "name_status",
+   "unit": "class",
+   "version": "1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "V3"
+   ],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "reject sample",
+   "guard": false,
+   "id": "V4",
+   "in": null,
+   "kept": null,
+   "kept_by_label": null,
+   "recoverable": "not a discard",
+   "role": "reject_class_sample",
+   "unit": "box",
+   "version": "1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {
+    "fleet_b": {
+     "discarded": {
+      "conflict": 280,
+      "unknown": 300
+     },
+     "in": 600,
+     "kept": 20
+    }
+   },
+   "calibration": {
+    "domains_covered": [
+     "roadref"
+    ],
+    "known_truth_sets": [
+     {
+      "domain_basis": "copies of the reference images",
+      "domain_score": [
+       0.1,
+       1.0
+      ],
+      "id": "copies:roadref",
+      "sha256": "f81dc4af0863ed9eaf3a9f7cb9c4342d08c9307aa4749e3aa0e48fd189283971",
+      "sources": [
+       "roadref"
+      ]
+     }
+    ],
+    "precision": 1.0,
+    "recall": 0.95
+   },
+   "depends_on": [
+    "V2",
+    "V4"
+   ],
+   "discarded": {
+    "conflict": 400,
+    "unknown": 700
+   },
+   "discarded_by_label": null,
+   "filter": "target check",
+   "guard": false,
+   "id": "V5",
+   "in": 1400,
+   "kept": 300,
+   "kept_by_label": {
+    "bus": 5,
+    "car": 250,
+    "truck": 45
+   },
+   "recoverable": true,
+   "role": "target_check",
+   "unit": "box",
+   "version": "1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": {
+    "domains_covered": [
+     "roadref"
+    ],
+    "known_truth_sets": [
+     {
+      "domain_basis": "copies of the reference images",
+      "domain_score": [
+       0.1,
+       1.0
+      ],
+      "id": "copies:roadref",
+      "sha256": "f81dc4af0863ed9eaf3a9f7cb9c4342d08c9307aa4749e3aa0e48fd189283971",
+      "sources": [
+       "roadref"
+      ]
+     }
+    ],
+    "precision": 1.0,
+    "recall": 0.95
+   },
+   "depends_on": [
+    "V2",
+    "V4"
+   ],
+   "discarded": {
+    "conflict": 600
+   },
+   "discarded_by_label": null,
+   "filter": "other check",
+   "guard": false,
+   "id": "V6",
+   "in": 18600,
+   "kept": 18000,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "other_check",
+   "unit": "box",
+   "version": "1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "V5",
+    "V6"
+   ],
+   "discarded": {
+    "conflict": 500,
+    "unknown": 200
+   },
+   "discarded_by_label": null,
+   "filter": "image rule",
+   "guard": false,
+   "id": "V7",
+   "in": 4700,
+   "kept": 4000,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "image_rule",
+   "unit": "image",
+   "version": "1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "V5"
+   ],
+   "discarded": {
+    "not_evidenced": 2
+   },
+   "discarded_by_label": null,
+   "filter": "evidence",
+   "guard": false,
+   "id": "V8",
+   "in": 3,
+   "kept": 1,
+   "kept_by_label": null,
+   "recoverable": "derived",
+   "role": "evidence",
+   "unit": "source",
+   "version": "1"
+  }
+ ],
+ "target_classes": [
+  "car",
+  "truck",
+  "bus"
+ ]
+}

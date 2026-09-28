@@ -1,0 +1,1750 @@
+{
+ "format": "funnel-domain/1",
+ "domain": "weed",
+ "adapter": "inc_step1",
+ "domain_terms": [
+  "cwd12",
+  "cottonweed",
+  "weeds",
+  "agml",
+  "pigweed",
+  "amaranth",
+  "bioclip",
+  "otherplant",
+  "ndsu",
+  "imageomics"
+ ],
+ "classes": {
+  "targets": [
+   {
+    "id": 0,
+    "name": "Waterhemp",
+    "common": "Waterhemp",
+    "taxon": "Amaranthus tuberculatus",
+    "rank": "species",
+    "genus": "Amaranthus",
+    "not": [
+     "Amaranthus retroflexus",
+     "Amaranthus hybridus"
+    ],
+    "siblings": [
+     "PalmerAmaranth"
+    ]
+   },
+   {
+    "id": 1,
+    "name": "MorningGlory",
+    "common": "Morning glory",
+    "taxon": "Ipomoea",
+    "rank": "genus",
+    "genus": "Ipomoea",
+    "not": [],
+    "siblings": []
+   },
+   {
+    "id": 2,
+    "name": "Purslane",
+    "common": "Purslane",
+    "taxon": "Portulaca oleracea",
+    "rank": "species",
+    "genus": "Portulaca",
+    "not": [],
+    "siblings": []
+   },
+   {
+    "id": 3,
+    "name": "SpottedSpurge",
+    "common": "Spotted spurge",
+    "taxon": "Euphorbia maculata",
+    "rank": "species",
+    "genus": "Euphorbia",
+    "not": [
+     "Euphorbia hirta",
+     "Euphorbia hypericifolia",
+     "Euphorbia prostrata",
+     "Euphorbia geniculata"
+    ],
+    "siblings": []
+   },
+   {
+    "id": 4,
+    "name": "Carpetweed",
+    "common": "Carpetweed",
+    "taxon": "Mollugo verticillata",
+    "rank": "species",
+    "genus": "Mollugo",
+    "not": [],
+    "siblings": []
+   },
+   {
+    "id": 5,
+    "name": "Ragweed",
+    "common": "Ragweed",
+    "taxon": "Ambrosia artemisiifolia",
+    "rank": "species",
+    "genus": "Ambrosia",
+    "not": [
+     "Ambrosia trifida"
+    ],
+    "siblings": []
+   },
+   {
+    "id": 6,
+    "name": "Eclipta",
+    "common": "Eclipta",
+    "taxon": "Eclipta prostrata",
+    "rank": "species",
+    "genus": "Eclipta",
+    "not": [],
+    "siblings": []
+   },
+   {
+    "id": 7,
+    "name": "PricklySida",
+    "common": "Prickly sida",
+    "taxon": "Sida spinosa",
+    "rank": "species",
+    "genus": "Sida",
+    "not": [],
+    "siblings": []
+   },
+   {
+    "id": 8,
+    "name": "PalmerAmaranth",
+    "common": "Palmer amaranth",
+    "taxon": "Amaranthus palmeri",
+    "rank": "species",
+    "genus": "Amaranthus",
+    "not": [
+     "Amaranthus retroflexus",
+     "Amaranthus hybridus"
+    ],
+    "siblings": [
+     "Waterhemp"
+    ]
+   },
+   {
+    "id": 9,
+    "name": "Sicklepod",
+    "common": "Sicklepod",
+    "taxon": "Senna obtusifolia",
+    "rank": "species",
+    "genus": "Senna",
+    "not": [
+     "Chamaecrista pumila",
+     "Senna tora"
+    ],
+    "siblings": []
+   },
+   {
+    "id": 10,
+    "name": "Goosegrass",
+    "common": "Goosegrass",
+    "taxon": "Eleusine indica",
+    "rank": "species",
+    "genus": "Eleusine",
+    "not": [],
+    "siblings": []
+   },
+   {
+    "id": 11,
+    "name": "CutleafGroundcherry",
+    "common": "Cutleaf groundcherry",
+    "taxon": "Physalis angulata",
+    "rank": "species",
+    "genus": "Physalis",
+    "not": [],
+    "siblings": []
+   }
+  ],
+  "other": {
+   "id": 12,
+   "name": "OtherPlant"
+  },
+  "genus_answer_unsure_for": [
+   "Amaranthus",
+   "Euphorbia",
+   "Ambrosia",
+   "Senna",
+   "Chamaecrista"
+  ],
+  "small_class_train_boxes_below": 200
+ },
+ "attractors": [
+  {
+   "id": "A01",
+   "taxon": "Amaranthus retroflexus",
+   "common": "Redroot pigweed",
+   "rank": "species",
+   "confused_with": [
+    "PalmerAmaranth",
+    "Waterhemp"
+   ],
+   "option": "Redroot pigweed (Amaranthus retroflexus)"
+  },
+  {
+   "id": "A02",
+   "taxon": "Amaranthus hybridus",
+   "common": "Smooth pigweed",
+   "rank": "species",
+   "confused_with": [
+    "PalmerAmaranth",
+    "Waterhemp"
+   ],
+   "option": "Smooth pigweed (Amaranthus hybridus)"
+  },
+  {
+   "id": "A03",
+   "taxon": "Bassia scoparia",
+   "common": "Kochia",
+   "rank": "species",
+   "confused_with": [
+    "Waterhemp"
+   ],
+   "option": "Kochia (Bassia scoparia)"
+  },
+  {
+   "id": "A04",
+   "taxon": "Erigeron canadensis",
+   "common": "Horseweed",
+   "rank": "species",
+   "confused_with": [
+    "Carpetweed"
+   ],
+   "option": "Horseweed (Erigeron canadensis)"
+  },
+  {
+   "id": "A05",
+   "taxon": "Euphorbia hirta",
+   "common": "Asthma-plant spurge",
+   "rank": "species",
+   "confused_with": [
+    "SpottedSpurge"
+   ],
+   "option": "Asthma-plant spurge (Euphorbia hirta)"
+  },
+  {
+   "id": "A06",
+   "taxon": "Euphorbia hypericifolia",
+   "common": "Graceful sandmat",
+   "rank": "species",
+   "confused_with": [
+    "SpottedSpurge"
+   ],
+   "option": "Graceful sandmat (Euphorbia hypericifolia)"
+  },
+  {
+   "id": "A07",
+   "taxon": "Chamaecrista",
+   "common": "Partridge pea or dwarf cassia",
+   "rank": "genus",
+   "confused_with": [
+    "Sicklepod"
+   ],
+   "option": "Partridge pea or dwarf cassia (Chamaecrista, any species)"
+  },
+  {
+   "id": "A08",
+   "taxon": "Digitaria",
+   "common": "Crabgrass",
+   "rank": "genus",
+   "confused_with": [
+    "Goosegrass"
+   ],
+   "option": "Crabgrass (Digitaria, any species)"
+  },
+  {
+   "id": "A09",
+   "taxon": "Cyperus",
+   "common": "Nutsedge",
+   "rank": "genus",
+   "confused_with": [
+    "Goosegrass"
+   ],
+   "option": "Nutsedge (Cyperus, any species)"
+  },
+  {
+   "id": "A10",
+   "taxon": "Ambrosia trifida",
+   "common": "Giant ragweed",
+   "rank": "species",
+   "confused_with": [
+    "Ragweed"
+   ],
+   "option": "Giant ragweed (Ambrosia trifida)"
+  },
+  {
+   "id": "A11",
+   "taxon": "Gossypium hirsutum",
+   "common": "Cotton",
+   "rank": "species",
+   "confused_with": [
+    "MorningGlory"
+   ],
+   "option": "Cotton (Gossypium hirsutum)"
+  },
+  {
+   "id": "A12",
+   "taxon": "Phaseolus vulgaris",
+   "common": "Common bean (black bean)",
+   "rank": "species",
+   "confused_with": [
+    "MorningGlory"
+   ],
+   "option": "Common bean (black bean) (Phaseolus vulgaris)"
+  }
+ ],
+ "names": {
+  "numeric_regex": "[0-9]+",
+  "generic_keys": [
+   "background",
+   "bg",
+   "broadleaf",
+   "broadleafweed",
+   "broadleafweeds",
+   "broadleaves",
+   "dicot",
+   "dicots",
+   "grass",
+   "grasses",
+   "grassweed",
+   "grassweeds",
+   "green",
+   "greenery",
+   "herb",
+   "herbs",
+   "invasive",
+   "invasiveplant",
+   "item",
+   "label",
+   "leaf",
+   "leaves",
+   "misc",
+   "mixed",
+   "monocot",
+   "monocots",
+   "na",
+   "narrowleaf",
+   "narrowleafweed",
+   "none",
+   "novel",
+   "null",
+   "object",
+   "objects",
+   "other",
+   "others",
+   "plant",
+   "plants",
+   "sedge",
+   "sedges",
+   "seedling",
+   "seedlings",
+   "sp",
+   "species",
+   "spp",
+   "target",
+   "thing",
+   "unknown",
+   "unlabeled",
+   "unlabelled",
+   "veg",
+   "vegetation",
+   "volunteer",
+   "weed",
+   "weedplant",
+   "weedplants",
+   "weeds",
+   "weedsp",
+   "weedspecies",
+   "weedspp",
+   "wildplant"
+  ],
+  "generic_regex": "(class|cls|label|obj|object|item|id|weed|weeds|plant|plants|crop|crops|species|sp|type)?\\d+",
+  "non_object_words": [
+   "aphid",
+   "beetle",
+   "caterpillar",
+   "greenhouse",
+   "human",
+   "insect",
+   "larva",
+   "moth",
+   "musor",
+   "person",
+   "pest",
+   "propleshina",
+   "robot",
+   "shadow",
+   "solar",
+   "tractor",
+   "tresh"
+  ],
+  "non_object_keys": [
+   "bug",
+   "car",
+   "hut",
+   "marker",
+   "mite",
+   "mushroom",
+   "pave",
+   "pests",
+   "pot",
+   "rock",
+   "shed",
+   "soil",
+   "stone",
+   "tag",
+   "tray",
+   "worm"
+  ],
+  "state_words": [
+   "bacteri",
+   "blight",
+   "cercospora",
+   "damage",
+   "deficien",
+   "disease",
+   "drygrass",
+   "dryleaf",
+   "fungal",
+   "fungus",
+   "healthy",
+   "leafcurl",
+   "lesion",
+   "mildew",
+   "mosaic",
+   "virus",
+   "xanthomonas"
+  ],
+  "state_keys": [
+   "mold",
+   "rot",
+   "rust"
+  ],
+  "role_names": [
+   "crop",
+   "crops"
+  ],
+  "related_tokens": [
+   "waterhemp",
+   "amaranth",
+   "pigweed",
+   "palmer",
+   "morningglory",
+   "ipomoea",
+   "purslane",
+   "portulaca",
+   "spurge",
+   "euphorbia",
+   "carpetweed",
+   "mollugo",
+   "ragweed",
+   "ambrosia",
+   "eclipta",
+   "falsedaisy",
+   "sida",
+   "sicklepod",
+   "senna",
+   "cassia",
+   "goosegrass",
+   "eleusine",
+   "groundcherry",
+   "physalis"
+  ],
+  "related_allowed_keys": [
+   "ambrosiatrifida",
+   "giantragweed"
+  ],
+  "frames": {
+   "noinfo": [
+    "no_name",
+    "numeric",
+    "generic",
+    "unresolvable"
+   ],
+   "named": [
+    "taxon_resolved",
+    "target_related",
+    "target_synonym",
+    "role"
+   ],
+   "excluded": [
+    "non_object",
+    "state"
+   ]
+  },
+  "query_rules": {
+   "separators": "[_\\-]+",
+   "drop_leading_numeric_token": true
+  },
+  "why": "Word lists are verify.py's GENERIC_NAME_KEYS, NON_PLANT_WORDS, CWD12_RELATED_TOKENS and OTHER_ALLOWED_KEYS split by kind (verify.py is unchanged). *_words match as substrings of the name key, *_keys as the whole key: verify matches its short object and disease words (car, pot, rot, rust, ...) as whole keys, and a substring 'rot' would catch 'rotundus'. The object and state names census_v0 shows (greenhouse, hut, solar, shed, pave, Musor, Propleshina, tresh; cercospora, xanthomonas, mosaic, leaf curl, healthy, dry leaf, dry grass) are added (contract S7b)."
+ },
+ "taxonomy": {
+  "authority": {
+   "kind": "gbif_backbone",
+   "match_url": "https://api.gbif.org/v1/species/match",
+   "search_url": "https://api.gbif.org/v1/species/search",
+   "version_url": "https://api.gbif.org/v1/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c",
+   "match_params": {
+    "strict": "true"
+   },
+   "search_params": {
+    "qField": "VERNACULAR",
+    "limit": "20",
+    "datasetKey": "d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
+   },
+   "checked": "2026-09-28: species/match (name, strict) and species/search (q, qField, limit, datasetKey) answered as used here"
+  },
+  "overrides": {
+   "ecliptaalba": {
+    "taxon": "Eclipta prostrata",
+    "why": "GBIF keeps Eclipta alba apart from E. prostrata; the project's alias table (cwd12_species) joins them (contract section 4.3, J-taxon; R4)"
+   },
+   "blackbean": {
+    "taxon": "Phaseolus vulgaris",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: black bean is a Phaseolus vulgaris cultivar group; GBIF has no vernacular 'Blackbean', which left a named crop in the no-information frame (NDSU weed_crop and greenhouse papers list it as a crop)"
+   },
+   "corn": {
+    "taxon": "Zea mays",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered Agrostemma (corn cockle)"
+   },
+   "cotton": {
+    "taxon": "Gossypium",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered Eriophorum (cottongrass); genus only, the source does not name the species"
+   },
+   "fieldpea": {
+    "taxon": "Pisum sativum",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered Sphaerophysa"
+   },
+   "flax": {
+    "taxon": "Linum usitatissimum",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the scientific match answered 'Flaxus'"
+   },
+   "horseweed": {
+    "taxon": "Erigeron canadensis",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered Laennecia; the NDSU papers name Conyza canadensis, accepted as Erigeron canadensis"
+   },
+   "kochia": {
+    "taxon": "Bassia scoparia",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered Neokochia californica; the NDSU papers mean Kochia scoparia, accepted as Bassia scoparia"
+   },
+   "lentil": {
+    "taxon": "Lens culinaris",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered Vicia"
+   },
+   "canola": {
+    "taxon": "Brassica napus",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered Brassica rapa; canola is mostly B. napus in North Dakota"
+   },
+   "chilli": {
+    "taxon": "Capsicum annuum",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered Capsicum lanceolatum"
+   },
+   "soybean": {
+    "taxon": "Glycine max",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: the vernacular search answered the genus Glycine"
+   },
+   "partheniumhysterophorous": {
+    "taxon": "Parthenium hysterophorus",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: a misspelling that does not resolve"
+   },
+   "phhyllanthus": {
+    "taxon": "Phyllanthus",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: a misspelling that does not resolve"
+   },
+   "spurredanoda": {
+    "taxon": "Anoda cristata",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: spurred anoda, a CottonWeedID15 class; unresolved, it fell into the no-information frame although it is a mallow related to prickly sida"
+   },
+   "arachius": {
+    "taxon": "Arachis hypogaea",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: probable misspelling of Arachis (groundnut) in an Indian crop-weed set; the verifier's argmax on it is the legume Sicklepod (57 of 345), consistent with a legume; uncertain, and conservative: a named legume is sibling-guarded against Sicklepod"
+   },
+   "swinecress": {
+    "taxon": "Lepidium didymum",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: swinecress; the vernacular search answered the genus Lepidium"
+   },
+   "crabgrass": {
+    "taxon": "Digitaria",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: genus only: the source does not name the crabgrass species"
+   },
+   "nutsedge": {
+    "taxon": "Cyperus",
+    "why": "Name-status v2 override (docs/FUNNEL_AUDIT.md 4.3 J-taxon: project policy overrides the backbone, R4), decided 2026-09-28 before the sample draw after the GBIF answers were read [post hoc]: genus only: yellow and purple nutsedge are both called nutsedge"
+   }
+  },
+  "informative_via": [
+   "scientific",
+   "vernacular"
+  ],
+  "mappable_via": [
+   "scientific",
+   "override"
+  ]
+ },
+ "stages": [
+  {
+   "id": "S-1",
+   "name": "discovery",
+   "role": "discovery",
+   "unit": "dataset",
+   "guard": false,
+   "recoverable": "harvest (outside Step 1)",
+   "depends_on": [],
+   "filter": "the harvest brain's search and download choices (dataset_discovery)"
+  },
+  {
+   "id": "S0",
+   "name": "harvest cap",
+   "role": "cap",
+   "unit": "image",
+   "guard": false,
+   "recoverable": true,
+   "depends_on": [],
+   "filter": "download limit (location unverified)"
+  },
+  {
+   "id": "S1",
+   "name": "registry skip",
+   "role": "registry",
+   "unit": "source",
+   "guard": false,
+   "recoverable": "unknown_layout only",
+   "depends_on": [],
+   "filter": "verify._skip_reason and verify._layout: never_train, quarantine, user flag, layout"
+  },
+  {
+   "id": "S2",
+   "name": "read",
+   "role": "read",
+   "unit": "image",
+   "guard": false,
+   "recoverable": false,
+   "depends_on": [
+    "S1"
+   ],
+   "filter": "verify.read_source_label: no label, unreadable, no box, unmapped class; unhashable image"
+  },
+  {
+   "id": "S3",
+   "name": "exact_dup",
+   "role": "dedup",
+   "unit": "image",
+   "guard": false,
+   "recoverable": true,
+   "depends_on": [
+    "S2"
+   ],
+   "filter": "dHash-equal to an earlier pool image (slugs in sorted order; the first is kept)"
+  },
+  {
+   "id": "S4",
+   "name": "near_eval",
+   "role": "guard",
+   "unit": "image",
+   "guard": true,
+   "recoverable": false,
+   "depends_on": [
+    "S2"
+   ],
+   "filter": "within HOLDOUT_NEAR_DUP_BITS of a never-train image (C.NeverTrainGuard)"
+  },
+  {
+   "id": "S5",
+   "name": "cwd12_copy",
+   "role": "guard",
+   "unit": "image",
+   "guard": true,
+   "recoverable": false,
+   "depends_on": [
+    "S2"
+   ],
+   "filter": "within verify.CORE_COPY_BITS of a train_core image"
+  },
+  {
+   "id": "S6",
+   "name": "small boxes",
+   "role": "size",
+   "unit": "box",
+   "guard": false,
+   "recoverable": false,
+   "depends_on": [
+    "S5"
+   ],
+   "filter": "a side under semisup_labeler.MIN_BOX_PX"
+  },
+  {
+   "id": "S7",
+   "name": "species join",
+   "role": "join",
+   "unit": "box",
+   "guard": false,
+   "recoverable": true,
+   "depends_on": [
+    "S5"
+   ],
+   "filter": "verify.class_join (mega_trainer's v3.60.0 species join); a miss becomes OtherPlant"
+  },
+  {
+   "id": "S7b",
+   "name": "name status",
+   "role": "name_status",
+   "unit": "class",
+   "guard": false,
+   "recoverable": true,
+   "depends_on": [
+    "S7"
+   ],
+   "filter": "verify.other_name_status (v1); name_status_v2 via the taxonomy resolver (funnel)"
+  },
+  {
+   "id": "S8b",
+   "name": "OtherPlant training sample",
+   "role": "reject_class_sample",
+   "unit": "box",
+   "guard": false,
+   "recoverable": "not a discard",
+   "depends_on": [
+    "S7b"
+   ],
+   "filter": "verify._other_sample: N_OTHER crops, uniform over v1-eligible OtherPlant boxes"
+  },
+  {
+   "id": "S8",
+   "name": "verifier on target-labelled boxes",
+   "role": "target_check",
+   "unit": "box",
+   "guard": false,
+   "recoverable": true,
+   "depends_on": [
+    "S7",
+    "S8b"
+   ],
+   "filter": "verify.verdicts: argmax = label, p >= tau, cos >= sigma"
+  },
+  {
+   "id": "S9",
+   "name": "verifier on OtherPlant-labelled boxes",
+   "role": "other_check",
+   "unit": "box",
+   "guard": false,
+   "recoverable": true,
+   "depends_on": [
+    "S7",
+    "S8b"
+   ],
+   "filter": "verify.verdicts: a confident target call is a conflict"
+  },
+  {
+   "id": "S10",
+   "name": "image admission",
+   "role": "image_rule",
+   "unit": "image",
+   "guard": false,
+   "recoverable": true,
+   "depends_on": [
+    "S8",
+    "S9"
+   ],
+   "filter": "verify.image_verdict"
+  },
+  {
+   "id": "S11",
+   "name": "base selection",
+   "role": "selection",
+   "unit": "image",
+   "guard": false,
+   "recoverable": "routing",
+   "depends_on": [
+    "S8",
+    "S10"
+   ],
+   "filter": "select.build: evidence, retrieval gate, OtherPlant budget, caps"
+  },
+  {
+   "id": "S12",
+   "name": "increment evidence criterion",
+   "role": "evidence",
+   "unit": "source",
+   "guard": false,
+   "recoverable": "derived",
+   "depends_on": [
+    "S8"
+   ],
+   "filter": "select.load_evidence (min_evidence 1)"
+  },
+  {
+   "id": "S13",
+   "name": "zero-shot relevance",
+   "role": "relevance",
+   "unit": "source",
+   "guard": false,
+   "recoverable": "retired",
+   "depends_on": [],
+   "filter": "relevance.py (failed its check)"
+  },
+  {
+   "id": "S14",
+   "name": "realloop gate",
+   "role": "gate",
+   "unit": "increment",
+   "guard": false,
+   "recoverable": "not a data filter",
+   "depends_on": [
+    "S12"
+   ],
+   "filter": "gate.py chain arm"
+  }
+ ],
+ "exams": {
+  "decision": "dev",
+  "non_decision": [
+   "test",
+   "ood22",
+   "ood23",
+   "imageweeds"
+  ],
+  "extra_non_decision": [
+   "domain_dev"
+  ]
+ },
+ "sources": {
+  "reference": "train_core",
+  "lab_groups": {
+   "NDSU": [
+    "project_agml__weed_crop_detection",
+    "project_agml__greenhouse_crop_weed_detection",
+    "project_agml__imageweeds_aerial_weed_detection",
+    "project_agml__imageweeds_weed_detection"
+   ],
+   "LuLab": [
+    "train_core",
+    "cwd12",
+    "CottonWeedID15",
+    "project_agml__three_season_weed_detection",
+    "rf_karthikeya-c8pvy__weed-detection-cwp10",
+    "rf_zig-zag-lnodr__weed-detection-vanpe"
+   ]
+  },
+  "authoritative": {
+   "project_agml__weed_crop_detection": {
+    "paper": "PMC11986624",
+    "licence": "CC BY 4.0",
+    "claimed_by": "H1"
+   },
+   "project_agml__greenhouse_crop_weed_detection": {
+    "paper": "PMC11599996",
+    "licence": "CC BY 4.0",
+    "claimed_by": "H1"
+   }
+  },
+  "licences": {
+   "project_agml__weed_crop_detection": "CC BY 4.0 (Mendeley 10.17632/mthv4ppwyw.2; AgML card cc-by-4.0)",
+   "project_agml__greenhouse_crop_weed_detection": "CC BY 4.0 (Mendeley 10.17632/hs7d7kpd3z.2)",
+   "project_agml__mh_weed16_weed_detection": "CC BY 4.0 (Mendeley 10.17632/d3n3mgjjbv.2; AgML card cc-by-4.0)"
+  },
+  "not_recoverable": {
+   "fvossel__csgo_player_detection": "non-plant or leaf-disease source",
+   "rf_uav-qnoms__uav-wqshy": "non-plant or leaf-disease source",
+   "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": "non-plant or leaf-disease source",
+   "rf_bishwarup-halder__crop-health-advisor": "non-plant or leaf-disease source"
+  },
+  "capture_stem_regex": {},
+  "card_image_counts": {
+   "project_agml__mh_weed16_weed_detection": 6656
+  },
+  "card_resolvers": {
+   "project_agml__mh_weed16_weed_detection": {
+    "fetch": [
+     {
+      "kind": "http",
+      "provider": "huggingface",
+      "repo": "Project-AgML/MH_Weed16_weed_detection",
+      "what": "card"
+     },
+     {
+      "kind": "http",
+      "provider": "mendeley",
+      "dataset": "d3n3mgjjbv",
+      "version": 2,
+      "what": "card",
+      "licence": "CC BY 4.0"
+     },
+     {
+      "kind": "http",
+      "provider": "url",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12179629/",
+      "what": "paper"
+     }
+    ],
+    "class_table": {
+     "0": {
+      "name": "Kena",
+      "taxon": "Commelina benghalensis"
+     },
+     "1": {
+      "name": "Lavhala",
+      "taxon": "Cyperus rotundus"
+     },
+     "2": {
+      "name": "Lambs Quarter Plant",
+      "taxon": "Chenopodium album"
+     },
+     "3": {
+      "name": "Little Mallow",
+      "taxon": "Malva parviflora"
+     },
+     "4": {
+      "name": "Moti_ dudhi",
+      "taxon": "Euphorbia geniculata"
+     },
+     "5": {
+      "name": "Obscure morning glory",
+      "taxon": "Ipomoea obscura"
+     },
+     "6": {
+      "name": "Asian pigeon wings",
+      "taxon": "Clitoria ternatea"
+     },
+     "7": {
+      "name": "Bilayat",
+      "taxon": "Argemone mexicana"
+     },
+     "8": {
+      "name": "Choti_ dudhi",
+      "taxon": "Euphorbia hirta"
+     },
+     "9": {
+      "name": "Digitaria SP",
+      "taxon": "Digitaria sanguinalis"
+     },
+     "10": {
+      "name": "Gajar_ gavat",
+      "taxon": "Parthenium hysterophorus"
+     },
+     "11": {
+      "name": "Gracefulsandmat",
+      "taxon": "Euphorbia hypericifolia"
+     },
+     "12": {
+      "name": "Sicklepod",
+      "taxon": "Senna obtusifolia"
+     },
+     "13": {
+      "name": "Harali",
+      "taxon": "Cynodon dactylon"
+     },
+     "14": {
+      "name": "Dwarf Cassia",
+      "taxon": "Chamaecrista pumila"
+     },
+     "15": {
+      "name": "Punarnava",
+      "taxon": "Boerhaavia diffusa"
+     }
+    },
+    "table_source": "PMC12179629 (Data in Brief 61:111691) Table 2, read 2026-09-28",
+    "upstream_annotations": {
+     "kind": "archive",
+     "provider": "mendeley",
+     "dataset": "d3n3mgjjbv",
+     "version": 2,
+     "what": "annotations",
+     "licence": "CC BY 4.0",
+     "files": [
+      "intel Real Sense Depth_Annotations.zip"
+     ],
+     "format": "voc+yolo",
+     "voc_dir": "PASCAL_VOC",
+     "yolo_dir": "YOLO_darknet",
+     "frame_name_regex": "^(?P<stem>.+?\\.mp4)_(?P<frame>\\d+)\\.png$"
+    },
+    "refetch_images": {
+     "kind": "archive",
+     "provider": "mendeley",
+     "dataset": "d3n3mgjjbv",
+     "version": 2,
+     "what": "images",
+     "licence": "CC BY 4.0",
+     "files": [
+      "intel Real Sense Depth_Clicks.zip"
+     ]
+    }
+   },
+   "project_agml__weed_crop_detection": {
+    "fetch": [
+     {
+      "kind": "http",
+      "provider": "huggingface",
+      "repo": "Project-AgML/weed_crop_detection",
+      "what": "card"
+     },
+     {
+      "kind": "http",
+      "provider": "mendeley",
+      "dataset": "mthv4ppwyw",
+      "version": 2,
+      "what": "card",
+      "licence": "CC BY 4.0"
+     },
+     {
+      "kind": "http",
+      "provider": "url",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11986624/",
+      "what": "paper"
+     }
+    ],
+    "class_table": {
+     "0": {
+      "name": "Black bean",
+      "taxon": "Phaseolus"
+     },
+     "1": {
+      "name": "Canola",
+      "taxon": "Brassica napus"
+     },
+     "2": {
+      "name": "Corn",
+      "taxon": "Zea mays"
+     },
+     "3": {
+      "name": "Field Pea",
+      "taxon": "Pisum sativum"
+     },
+     "4": {
+      "name": "Flax",
+      "taxon": "Linum usitatissimum"
+     },
+     "5": {
+      "name": "Horseweed",
+      "taxon": "Conyza canadensis"
+     },
+     "6": {
+      "name": "Kochia",
+      "taxon": "Bassia scoparia"
+     },
+     "7": {
+      "name": "Lentil",
+      "taxon": "Lens culinaris"
+     },
+     "8": {
+      "name": "Ragweed",
+      "taxon": "Ambrosia artemisiifolia"
+     },
+     "9": {
+      "name": "Redroot Pigweed",
+      "taxon": "Amaranthus retroflexus"
+     },
+     "10": {
+      "name": "Soybean",
+      "taxon": "Glycine max"
+     },
+     "11": {
+      "name": "Sugar beet",
+      "taxon": "Beta vulgaris"
+     },
+     "12": {
+      "name": "Waterhemp",
+      "taxon": "Amaranthus tuberculatus"
+     }
+    },
+    "table_source": "PMC11986624 Table 2 (class ids, names) and its data table (taxa), read 2026-09-28",
+    "upstream_annotations": {
+     "kind": "archive",
+     "provider": "mendeley",
+     "dataset": "mthv4ppwyw",
+     "version": 2,
+     "what": "annotations",
+     "licence": "CC BY 4.0",
+     "files_regex": "\\.txt$",
+     "format": "yolo",
+     "classes_file": "classes.txt"
+    }
+   },
+   "project_agml__greenhouse_crop_weed_detection": {
+    "fetch": [
+     {
+      "kind": "http",
+      "provider": "huggingface",
+      "repo": "Project-AgML/greenhouse_crop_weed_detection",
+      "what": "card"
+     },
+     {
+      "kind": "http",
+      "provider": "mendeley",
+      "dataset": "hs7d7kpd3z",
+      "version": 2,
+      "what": "card",
+      "licence": "CC BY 4.0"
+     },
+     {
+      "kind": "http",
+      "provider": "url",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11599996/",
+      "what": "paper"
+     }
+    ],
+    "class_table": null,
+    "names": {
+     "blackbean": "Phaseolus vulgaris",
+     "canola": "Brassica napus",
+     "corn": "Zea mays",
+     "fieldpea": "Pisum sativum",
+     "flax": "Linum usitatissimum",
+     "horseweed": "Conyza canadensis",
+     "kochia": "Bassia scoparia",
+     "lentil": "Lens culinaris",
+     "palmeramaranth": "Amaranthus palmeri",
+     "ragweed": "Ambrosia artemisiifolia",
+     "redrootpigweed": "Amaranthus retroflexus",
+     "soybean": "Glycine max",
+     "sugarbeet": "Beta vulgaris",
+     "waterhemp": "Amaranthus tuberculatus"
+    },
+    "table_source": "PMC11599996 data table (species and taxa named; no class-id table), read 2026-09-28",
+    "upstream_annotations": {
+     "kind": "archive",
+     "provider": "mendeley",
+     "dataset": "hs7d7kpd3z",
+     "version": 2,
+     "what": "annotations",
+     "licence": "CC BY 4.0",
+     "files_regex": "\\.txt$",
+     "format": "yolo",
+     "classes_file": "classes.txt"
+    }
+   },
+   "rf_tuf__weed-3434e": {
+    "fetch": [
+     {
+      "kind": "roboflow_classes",
+      "workspace": "tuf",
+      "project": "weed-3434e",
+      "what": "class_list",
+      "api_key_env": "ROBOFLOW_API_KEY"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Roboflow project",
+    "upstream_annotations": null
+   },
+   "rf_test-gzc3r__crop-mfete": {
+    "fetch": [
+     {
+      "kind": "roboflow_classes",
+      "workspace": "test-gzc3r",
+      "project": "crop-mfete",
+      "what": "class_list",
+      "api_key_env": "ROBOFLOW_API_KEY"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Roboflow project",
+    "upstream_annotations": null
+   },
+   "rf_srec-dthh0__crop-weed-poxtn": {
+    "fetch": [
+     {
+      "kind": "roboflow_classes",
+      "workspace": "srec-dthh0",
+      "project": "crop-weed-poxtn",
+      "what": "class_list",
+      "api_key_env": "ROBOFLOW_API_KEY"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Roboflow project",
+    "upstream_annotations": null
+   },
+   "rf_school-5ult5__weed-6a90d": {
+    "fetch": [
+     {
+      "kind": "roboflow_classes",
+      "workspace": "school-5ult5",
+      "project": "weed-6a90d",
+      "what": "class_list",
+      "api_key_env": "ROBOFLOW_API_KEY"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Roboflow project",
+    "upstream_annotations": null
+   },
+   "rf_test-8qezo__weed-detection-ycai2": {
+    "fetch": [
+     {
+      "kind": "roboflow_classes",
+      "workspace": "test-8qezo",
+      "project": "weed-detection-ycai2",
+      "what": "class_list",
+      "api_key_env": "ROBOFLOW_API_KEY"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Roboflow project",
+    "upstream_annotations": null
+   },
+   "rf_bishwarup-halder__crop-health-advisor": {
+    "fetch": [
+     {
+      "kind": "roboflow_classes",
+      "workspace": "bishwarup-halder",
+      "project": "crop-health-advisor",
+      "what": "class_list",
+      "api_key_env": "ROBOFLOW_API_KEY"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Roboflow project",
+    "upstream_annotations": null
+   },
+   "rf_uav-qnoms__uav-wqshy": {
+    "fetch": [
+     {
+      "kind": "roboflow_classes",
+      "workspace": "uav-qnoms",
+      "project": "uav-wqshy",
+      "what": "class_list",
+      "api_key_env": "ROBOFLOW_API_KEY"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Roboflow project",
+    "upstream_annotations": null
+   },
+   "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+    "fetch": [
+     {
+      "kind": "http",
+      "provider": "url",
+      "what": "card",
+      "url": "https://www.kaggle.com/datasets/farukalam/tomato-leaf-diseases-detection-computer-vision"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Kaggle dataset page",
+    "upstream_annotations": null
+   },
+   "fvossel__csgo_player_detection": {
+    "fetch": [
+     {
+      "kind": "http",
+      "provider": "huggingface",
+      "repo": "fvossel/csgo_player_detection",
+      "what": "card"
+     }
+    ],
+    "class_table": null,
+    "table_source": "Hugging Face dataset card (answered 401 on 2026-09-28)",
+    "upstream_annotations": null
+   }
+  },
+  "relation_checks": {
+   "h0b_map_sources": [
+    "cottonweed_holdout",
+    "project_agml__three_season_weed_detection"
+   ],
+   "h0b_flag_old_join": [
+    "cottonweed_holdout"
+   ],
+   "h0b_keep_current_join": [
+    "cottonweed_sp8"
+   ],
+   "h0b_judge": "J-knn1",
+   "h0c_source": "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop",
+   "why": "contract section 6 H0(b) and H0(c): copies of reference photographs with a known twin, and a shifted named source outside the NDSU group"
+  },
+  "known_items": {
+   "indexes": [
+    {
+     "kind": "http",
+     "provider": "url",
+     "what": "index",
+     "format": "task_class_index",
+     "url": "https://raw.githubusercontent.com/Project-AgML/AgML/main/agml/_assets/public_datasources.json",
+     "slug_template": "project_agml__{name}"
+    }
+   ],
+   "survey_topics": [
+    "weeds"
+   ],
+   "survey_title_words": [
+    "survey"
+   ],
+   "box_words": [
+    "bounding box",
+    "bounding-box",
+    "bbox",
+    "object detection",
+    "detection",
+    "detector",
+    "yolo",
+    "pascal voc"
+   ],
+   "detection_tasks": [
+    "object_detection"
+   ],
+   "slug_templates": [
+    {
+     "url_regex": "kaggle\\.com/datasets/(?P<a>[^/?#]+)/(?P<b>[^/?#]+)",
+     "slug": "kg_{a}__{b}"
+    },
+    {
+     "url_regex": "github\\.com/(?P<a>[^/?#]+)/(?P<b>[^/?#]+)",
+     "slug": "gh_{a}__{b}"
+    },
+    {
+     "url_regex": "universe\\.roboflow\\.com/(?P<a>[^/?#]+)/(?P<b>[^/?#]+)",
+     "slug": "rf_{a}__{b}"
+    },
+    {
+     "url_regex": "huggingface\\.co/datasets/(?P<a>[^/?#]+)/(?P<b>[^/?#]+)",
+     "slug": "{a}__{b}"
+    }
+   ],
+   "rule": "An item is a public dataset documented, in its own index entry or note, to hold at least one target class (by class name, common name, taxon or alias) with boxes (an object detection task or a box word). Sources: the literature notes of the domain's topic, the dataset surveys those notes cite (their README tables), and the AgML index."
+  }
+ },
+ "known_truth": {
+  "KT1": {
+   "what": "train_core crops with capture sessions",
+   "allowed_uses": [
+    "in_domain_calibration",
+    "sentinel",
+    "exemplar",
+    "qualification",
+    "judge_bank"
+   ],
+   "independent": false,
+   "claimed_by": null,
+   "never_qualifies": [],
+   "sources": [
+    "train_core"
+   ],
+   "split": "session"
+  },
+  "KT2": {
+   "what": "cwd12 copies box-matched to their train_core twin (calibration.json)",
+   "allowed_uses": [
+    "planted_positive",
+    "sentinel",
+    "qualification",
+    "rescue"
+   ],
+   "independent": false,
+   "claimed_by": null,
+   "never_qualifies": [],
+   "sources": [
+    "cottonweed_holdout",
+    "cottonweed_sp8",
+    "rf_agrobot-weed-workspace__weed-detection-sd89f",
+    "rf_karthikeya-c8pvy__weed-detection-cwp10",
+    "rf_zig-zag-lnodr__weed-detection-vanpe"
+   ],
+   "split": null
+  },
+  "KT3": {
+   "what": "the three_season 2021 copy with true names",
+   "allowed_uses": [
+    "in_domain_calibration",
+    "sentinel",
+    "qualification"
+   ],
+   "independent": false,
+   "claimed_by": null,
+   "never_qualifies": [],
+   "sources": [
+    "project_agml__three_season_weed_detection"
+   ],
+   "split": null
+  },
+  "KT4": {
+   "what": "NDSU target-labelled boxes (papers name the species); not split",
+   "allowed_uses": [
+    "estimation_population",
+    "agreement_only",
+    "shift_calibration_after_H1"
+   ],
+   "independent": false,
+   "claimed_by": "H1",
+   "never_qualifies": [],
+   "sources": [
+    "project_agml__weed_crop_detection",
+    "project_agml__greenhouse_crop_weed_detection"
+   ],
+   "split": null
+  },
+  "KT5": {
+   "what": "named non-target boxes (attractor or class-policy 'not' taxa)",
+   "allowed_uses": [
+    "specificity",
+    "agreement_only",
+    "judge_bank"
+   ],
+   "independent": false,
+   "claimed_by": "H2b",
+   "never_qualifies": [],
+   "sources": [],
+   "split": null
+  },
+  "KT6": {
+   "what": "MH-Weed16 card-resolved classes (id 12 Senna obtusifolia, id 5 Ipomoea obscura)",
+   "allowed_uses": [
+    "shifted_positive_after_H3a",
+    "agreement_only",
+    "judge_bank:calibration"
+   ],
+   "independent": false,
+   "claimed_by": "H3a",
+   "never_qualifies": [],
+   "sources": [
+    "project_agml__mh_weed16_weed_detection"
+   ],
+   "split": "near_dup3"
+  },
+  "KT7": {
+   "what": "iNaturalist Research Grade photos of the targets and attractor taxa, CC licences",
+   "allowed_uses": [
+    "sentinel",
+    "qualification",
+    "exemplar",
+    "planted"
+   ],
+   "independent": true,
+   "claimed_by": null,
+   "never_qualifies": [
+    "J1",
+    "J-zs"
+   ],
+   "sources": [
+    "kt7"
+   ],
+   "split": null
+  },
+  "qualify_rl_on": [
+   "KT1",
+   "KT2",
+   "KT3",
+   "KT7"
+  ],
+  "forbidden": [
+   "dev",
+   "test",
+   "ood22",
+   "ood23",
+   "imageweeds"
+  ],
+  "kt7": {
+   "provider": {
+    "kind": "inat_observations",
+    "url": "https://api.inaturalist.org/v1/observations",
+    "params": {
+     "quality_grade": "research",
+     "photos": "true",
+     "photo_license": "cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nc-sa,cc-by-nd,cc-by-nc-nd",
+     "place_id": "1,6681",
+     "term_id": "12",
+     "term_value_id": "21",
+     "order_by": "id",
+     "order": "asc",
+     "per_page": "30"
+    },
+    "photo_size": "large",
+    "why": "Research grade, CC-licensed photos (DEC-8) from the United States (place 1) and India (place 6681). iNaturalist has no seedling annotation; the vegetative stage is Plant Phenology (term 12) = No Evidence of Flowering (value 21). Checked against api.inaturalist.org/v1 on 2026-09-28."
+   },
+   "per_taxon_max": 30,
+   "taxa": [
+    "Amaranthus tuberculatus",
+    "Ipomoea",
+    "Portulaca oleracea",
+    "Euphorbia maculata",
+    "Mollugo verticillata",
+    "Ambrosia artemisiifolia",
+    "Eclipta prostrata",
+    "Sida spinosa",
+    "Amaranthus palmeri",
+    "Senna obtusifolia",
+    "Eleusine indica",
+    "Physalis angulata",
+    "Amaranthus retroflexus",
+    "Amaranthus hybridus",
+    "Bassia scoparia",
+    "Erigeron canadensis",
+    "Euphorbia hirta",
+    "Euphorbia hypericifolia",
+    "Chamaecrista",
+    "Digitaria",
+    "Cyperus",
+    "Ambrosia trifida",
+    "Gossypium hirsutum",
+    "Phaseolus vulgaris"
+   ],
+   "licences": [
+    "cc0",
+    "cc-by",
+    "cc-by-nc",
+    "cc-by-sa",
+    "cc-by-nc-sa",
+    "cc-by-nd",
+    "cc-by-nc-nd"
+   ],
+   "roles": {
+    "exemplar": 6,
+    "g0_every": 3
+   }
+  }
+ },
+ "identity_checks": [
+  {
+   "class": "Ragweed",
+   "n": 30,
+   "from": "KT1",
+   "before": [
+    "R-A"
+   ],
+   "excluded_taxa": [
+    "Ambrosia trifida"
+   ],
+   "pass_share_min": 0.8
+  }
+ ],
+ "judges": {
+  "features": {
+   "model": "facebook/dinov2-base",
+   "pooling": "cls"
+  },
+  "panel": [
+   {
+    "id": "J1",
+    "kind": "step1_probe",
+    "role": "stratum_key"
+   },
+   {
+    "id": "J-zs",
+    "kind": "zero_shot",
+    "text_encoder": "adapter",
+    "prompt_template": "a photo of {lineage} with common name {common}.",
+    "non_object_prompts": [
+     "a photo of bare soil.",
+     "a photo of an empty plant pot.",
+     "a photo of a wall.",
+     "a photo of a person.",
+     "a photo of a vehicle.",
+     "a photo of a building."
+    ],
+    "collapse": {
+     "attractors": "other",
+     "named_non_targets": "other"
+    }
+   },
+   {
+    "id": "J-knn1",
+    "kind": "knn",
+    "bank": [
+     "KT1"
+    ],
+    "holdout": "session",
+    "k": 10,
+    "temperature": 0.07
+   },
+   {
+    "id": "J-knn2",
+    "kind": "knn",
+    "bank": [
+     "KT1",
+     "KT4",
+     "KT5",
+     "KT6:calibration",
+     "KT7:exemplar"
+    ],
+    "holdout": "disjoint",
+    "k": 10,
+    "temperature": 0.07,
+    "kt5_per_cell_max": 300
+   },
+   {
+    "id": "J-vlm",
+    "kind": "rl",
+    "backend": "RL-B"
+   }
+  ]
+ },
+ "reference_labeller": {
+  "backends": {
+   "RL-A": {
+    "kind": "external",
+    "model": "claude-opus-5-5",
+    "family": "claude",
+    "may_see": [
+     "pool",
+     "known_truth"
+    ]
+   },
+   "RL-B": {
+    "kind": "ollama",
+    "model": "qwen3.8:27b",
+    "family": "qwen",
+    "may_see": [
+     "pool",
+     "known_truth",
+     "eval"
+    ]
+   }
+  },
+  "judged_families": [
+   "bioclip",
+   "dinov2",
+   "qwen",
+   "glm"
+  ],
+  "prompt": "You are checking plant labels for a scientific audit. The first image is a reference board: each numbered row shows example photographs of one option. The second image is one numbered panel: on the left, one object cut from a field photograph and enlarged; on the right, the whole photograph with the object's box drawn in red.\nWhich ONE option names the object inside the red box?\n{options}\nAnswer on one line: the option number, a comma, then YES if the box holds exactly one whole plant of the kind you chose, NO if it does not, or NA if the option you chose is not a plant kind. Example: 7, YES",
+  "sheet_prompt": "You are checking plant labels for a scientific audit. The first image is a reference board: each numbered row shows example photographs of one option. The second image is one numbered panel: on the left, one object cut from a field photograph and enlarged; on the right, the whole photograph with the object's box drawn in red.\nWhich ONE option names the object inside the red box?\n{options}\nFor every panel, answer on its own line: the panel number, a colon, the option number, a comma, then YES, NO or NA. Example: 3: 7, YES",
+  "pair_prompt": "Panel images A (left) and B (right). Are they the same photograph (possibly cropped, resized, flipped, recoloured or re-compressed), consecutive frames of the same scene, or different photographs?\n{options}\nAnswer with the option number only.",
+  "pair_sheet_prompt": "Panel images A (left) and B (right). Are they the same photograph (possibly cropped, resized, flipped, recoloured or re-compressed), consecutive frames of the same scene, or different photographs?\n{options}\nAnswer with the option number only.",
+  "options_tail": [
+   "Another plant (none of the numbered plants)",
+   "Not a plant",
+   "The box does not hold one plant (box invalid)",
+   "Unsure"
+  ],
+  "pair_options": [
+   "The same photograph (possibly cropped, resized, flipped, recoloured or re-compressed)",
+   "Consecutive frames of the same scene",
+   "Different photographs",
+   "Unsure"
+  ],
+  "boards": [
+   {
+    "id": "B1",
+    "targets_from": "KT1",
+    "attractors_from": "KT7",
+    "per_option": 6
+   },
+   {
+    "id": "B2",
+    "targets_from": "KT7",
+    "attractors_from": "KT7",
+    "per_option": 6
+   }
+  ],
+  "sheet": {
+   "items": 15,
+   "sentinels": 3,
+   "min_prevalence": 0.2,
+   "max_low_prior": 4
+  }
+ },
+ "sampling": {
+  "G5_allocation": {
+   "rf_tuf__weed-3434e": "all",
+   "fvossel__csgo_player_detection": "all",
+   "rf_university-of-peradeniya__weed-detection-ekr8i": 20,
+   "rf_project-5nvic__weed-detection-0tfsj": 20,
+   "rf_test-8qezo__weed-detection-ycai2": 20,
+   "rf_vitif246x__weed-oqamx": 20
+  },
+  "G5_dup_twins": "all_sha_differs",
+  "sentinel_weights": {
+   "KT1": 100,
+   "KT2": 60,
+   "KT3": 40,
+   "KT4": 60,
+   "KT5": 80,
+   "KT6": 60,
+   "KT7": 150
+  },
+  "pair_sentinels": {
+   "positive": 20,
+   "negative": 20
+  }
+ },
+ "leak": {
+  "negative_source_pairs": [
+   [
+    "train_core",
+    "project_agml__mh_weed16_weed_detection"
+   ]
+  ],
+  "families": {
+   "flip": {},
+   "rot90": {},
+   "crop": {
+    "max_frac": 0.2
+   },
+   "brightness": {
+    "max_delta": 0.25
+   },
+   "blur": {
+    "radius": [
+     1,
+     2
+    ]
+   },
+   "shear": {
+    "max_deg": 10
+   },
+   "letterbox640": {
+    "size": 640
+   },
+   "jpeg": {
+    "quality": [
+     50,
+     90
+    ]
+   }
+  }
+ },
+ "recovery": {
+  "levers": {
+   "R-A": {
+    "scope": "non-admitted images of the authoritative sources",
+    "gate": [
+     "H1-pre",
+     "H1",
+     "identity_checks",
+     "box"
+    ]
+   },
+   "R-C": {
+    "scope": "images holding an aligned card-mapped id",
+    "gate": [
+     "H3a",
+     "class",
+     "box"
+    ]
+   },
+   "R-T": {
+    "scope": "classes whose name resolves (scientific) to a target taxon",
+    "gate": [
+     "class"
+    ]
+   },
+   "R-V": {
+    "scope": "images holding a vetoed verified box",
+    "gate": [
+     "box"
+    ]
+   },
+   "R-J": {
+    "scope": "OtherPlant boxes in no-information strata of sources H6 does not quarantine",
+    "gate": [
+     "H7",
+     "H2a",
+     "box"
+    ]
+   },
+   "R-F": {
+    "scope": "images the harvest cap left out",
+    "gate": [
+     "step1_chain",
+     "H3a",
+     "class",
+     "box"
+    ]
+   }
+  },
+  "domain_dev": {
+   "min_group_images": 20
+  }
+ }
+}

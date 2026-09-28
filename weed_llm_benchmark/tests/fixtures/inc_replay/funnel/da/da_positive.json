@@ -1,0 +1,263 @@
+{
+ "claim_id": "C1",
+ "concessions": [
+  {
+   "checked": [
+    {
+     "artifact": "step1/pool_summary.json",
+     "line": null,
+     "pointer": "/per_slug/project_agml__greenhouse_crop_weed_detection/join/10",
+     "value": [
+      "Redroot Pigweed",
+      "OtherPlant"
+     ]
+    },
+    {
+     "artifact": "step1/admit_summary.json",
+     "line": null,
+     "pointer": "/per_slug/project_agml__greenhouse_crop_weed_detection/boxes/conflict",
+     "value": 1744
+    }
+   ],
+   "claim_id": "C1",
+   "why": "Much of the greenhouse other-plant to Palmer conflict may be redroot pigweed, a relative the source names, not a hidden Palmer amaranth."
+  },
+  {
+   "checked": [
+    {
+     "artifact": "realloop_v1/report.json",
+     "line": null,
+     "pointer": "/steps/0/truth/verdict",
+     "value": "neutral"
+    },
+    {
+     "artifact": "realloop_v1/report.json",
+     "line": null,
+     "pointer": "/agreement/full/agree",
+     "value": 2
+    }
+   ],
+   "claim_id": "C1",
+   "why": "Data that exists may still not help: the truth arm scores most verified steps neutral."
+  }
+ ],
+ "counter_arguments": [
+  {
+   "argument": "The verifier's recall outside its own domain was never measured.",
+   "cheapest_test": {
+    "lever": "L10",
+    "params": {
+     "verb": "census"
+    }
+   },
+   "evidence_cites": [
+    {
+     "artifact": "step1/select_summary.json",
+     "line": null,
+     "pointer": "/retrieval/train_core_image_score_q05_q50",
+     "value": [
+      0.090234,
+      0.512102
+     ]
+    },
+    {
+     "artifact": "step1/select_summary.json",
+     "line": null,
+     "pointer": "/retrieval/source_evidence/project_agml__weed_crop_detection/median",
+     "value": 0.012531
+    },
+    {
+     "artifact": "step1/calibration.json",
+     "line": null,
+     "pointer": "/cwd12_copies/calibration_only_slugs",
+     "value": [
+      "cottonweed_holdout",
+      "cottonweed_sp8"
+     ]
+    }
+   ],
+   "falsifier": "The audit's S8 false-negative rate has an upper bound below 0.10.",
+   "lit_cites": [],
+   "mechanism": "Every known-truth set the thresholds were set on is a copy of the reference photographs, while most species-bearing sources score below the reference domain's 5th percentile.",
+   "prediction": {
+    "direction": "above",
+    "metric": "fn_rate",
+    "stage": "S8",
+    "stratum": null,
+    "threshold": 0.1
+   }
+  },
+  {
+   "argument": "Paper-confirmed Ragweed labels were rejected.",
+   "cheapest_test": {
+    "card": "X11"
+   },
+   "evidence_cites": [
+    {
+     "artifact": "step1/pool_summary.json",
+     "line": null,
+     "pointer": "/per_slug/project_agml__weed_crop_detection/join/8",
+     "value": [
+      "Ragweed",
+      "Ragweed"
+     ]
+    },
+    {
+     "artifact": "step1/admit_summary.json",
+     "line": null,
+     "pointer": "/per_species/Ragweed/boxes/verified",
+     "value": 27
+    }
+   ],
+   "falsifier": "Reference labels show the rejected Ragweed boxes are mostly not Ragweed.",
+   "lit_cites": [],
+   "mechanism": "The source's class list names Ragweed and the join maps it to the target, yet almost none of those boxes were verified.",
+   "prediction": {
+    "direction": "above",
+    "metric": "fn_rate",
+    "stage": "S8",
+    "stratum": "rejected Ragweed of an authoritative source",
+    "threshold": 0.5
+   }
+  },
+  {
+   "argument": "Uninformative label spaces were never resolved.",
+   "cheapest_test": {
+    "lever": "L12",
+    "params": {}
+   },
+   "evidence_cites": [
+    {
+     "artifact": "funnel/funnel_ledger.json",
+     "line": null,
+     "pointer": "/label_spaces/rf_tuf__weed-3434e/kinds/none",
+     "value": 6662
+    },
+    {
+     "artifact": "step1/pool_summary.json",
+     "line": null,
+     "pointer": "/per_slug/project_agml__mh_weed16_weed_detection/join/12",
+     "value": [
+      "12",
+      "OtherPlant"
+     ]
+    }
+   ],
+   "falsifier": "Every uninformative class resolves to non-target taxa.",
+   "lit_cites": [],
+   "mechanism": "Sources with no class names or numeric ids can only be joined to the other class, whatever they hold.",
+   "prediction": {
+    "direction": "above",
+    "metric": "fn_rate",
+    "stage": "S7",
+    "stratum": null,
+    "threshold": 0.1
+   }
+  },
+  {
+   "argument": "The evidence criterion is circular.",
+   "cheapest_test": {
+    "lever": "L10",
+    "params": {
+     "verb": "census"
+    }
+   },
+   "evidence_cites": [
+    {
+     "artifact": "funnel/funnel_ledger.json",
+     "line": null,
+     "pointer": "/stages/15/kept",
+     "value": 5
+    },
+    {
+     "artifact": "step1/admit_summary.json",
+     "line": null,
+     "pointer": "/per_slug/project_agml__greenhouse_crop_weed_detection/boxes/verified",
+     "value": 461
+    }
+   ],
+   "falsifier": "The audited S8 false negatives do not change which sources are evidenced.",
+   "lit_cites": [],
+   "mechanism": "It admits a source only when the verifier verified its boxes, so it inherits the verifier's recall.",
+   "prediction": {
+    "direction": "above",
+    "metric": "fn_rate",
+    "stage": "S8",
+    "stratum": null,
+    "threshold": 0.1
+   }
+  },
+  {
+   "argument": "The truth arm contradicts the conclusion.",
+   "cheapest_test": {
+    "lever": "L10",
+    "params": {
+     "verb": "census"
+    }
+   },
+   "evidence_cites": [
+    {
+     "artifact": "realloop_v1/report.json",
+     "line": null,
+     "pointer": "/steps/2/truth/verdict",
+     "value": "helps"
+    },
+    {
+     "artifact": "step1/admit_summary.json",
+     "line": null,
+     "pointer": "/per_slug/rf_tuf__weed-3434e/boxes/conflict",
+     "value": 1607
+    }
+   ],
+   "falsifier": "Recovered data is neutral or hurts in the dose arm.",
+   "lit_cites": [],
+   "mechanism": "The only increment drawn from rejected data is the only one the truth arm scored helps.",
+   "prediction": {
+    "direction": "helps",
+    "metric": "truth_verdict",
+    "stage": "S10",
+    "stratum": null,
+    "threshold": null
+   }
+  },
+  {
+   "argument": "The reject class may be confounded with one source.",
+   "cheapest_test": {
+    "card": "X11"
+   },
+   "evidence_cites": [
+    {
+     "artifact": "step1/admit_summary.json",
+     "line": null,
+     "pointer": "/otherplant_training_boxes",
+     "value": 5000
+    },
+    {
+     "artifact": "funnel/funnel_ledger.json",
+     "line": null,
+     "pointer": "/reject_class",
+     "value": null
+    }
+   ],
+   "falsifier": "The reject-class sample's largest (source, name) cell holds less than half of it.",
+   "lit_cites": [],
+   "mechanism": "The other-class training sample is drawn from named other-plant boxes, a pool one source's generic abbreviation dominates.",
+   "prediction": {
+    "direction": "above",
+    "metric": "fn_rate",
+    "stage": "S9",
+    "stratum": null,
+    "threshold": 0.1
+   }
+  }
+ ],
+ "stage_forecast": {
+  "S0": 0.02,
+  "S10": 0.1,
+  "S3": 0.03,
+  "S7": 0.15,
+  "S7b": 0.1,
+  "S8": 0.4,
+  "S9": 0.2
+ }
+}

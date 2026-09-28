@@ -1,0 +1,38 @@
+{
+ "claims": [
+  {
+   "cites": [
+    {
+     "artifact": "funnel/funnel_ledger.json",
+     "line": null,
+     "pointer": "/stages/5/kept_by_label/bus",
+     "value": 5
+    }
+   ],
+   "history": [
+    {
+     "by": "human-transcribed",
+     "cites": [
+      {
+       "artifact": "funnel/funnel_ledger.json",
+       "line": null,
+       "pointer": "/stages/5/kept_by_label/bus",
+       "value": 5
+      }
+     ],
+     "from": null,
+     "reason": "filed",
+     "to": "open",
+     "utc": "2026-09-28T12:00:00Z"
+    }
+   ],
+   "id": "C1",
+   "made_by": "human-transcribed",
+   "polarity": "scarcity",
+   "scope": "vehicles harvest",
+   "status": "open",
+   "text": "The harvested dashcam logs hold few usable bus boxes."
+  }
+ ],
+ "format": "funnel-claims/1"
+}

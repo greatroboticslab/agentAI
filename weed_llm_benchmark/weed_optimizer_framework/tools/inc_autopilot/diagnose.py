@@ -33,6 +33,28 @@ D8 gate_underpowered, D10 budget_projection, D14 test_touch.
 RULES order is the order levers.propose ranks proposals in: D15 sits next to
 D1, which it takes precedence over, and D16 next to D4, which it gates.
 
+The funnel audit (docs/FUNNEL_AUDIT.md 8.4; runner 5.5.2): D17
+scarcity_conclusion_unaudited, D18 filter_false_negatives and D19
+filter_recall_unmeasured sit after D2, so D19's L10 ranks before D4's
+real-loop L2 (DEC-4). Their suspicion signals S1-S7 (funnel_signals) are
+functions of the funnel ledger (funnel/funnel_ledger.json), the claims
+register (campaign/claims.json) and the loop reports only; the ledger is read
+through its stages' "role" keys and its own class lists, never a stage id or
+a class name, so the same code and thresholds run on any domain. D17 fires
+when a negative conclusion exists (C: the latest finished real loop accepted
+nothing and no clean step helps, or the sizing rule shrank its M, or an open
+or challenged claim is negative), a signal holds (S), and no valid audit of
+this Step 1 exists (A: an audit_v1.json whose ledger_fingerprint is the
+ledger's fingerprint and which is not invalid). It proposes L10 first, L12
+and L11 for the uninformative sources, the devil's-advocate pass (OP_DA) and
+card X11 on S4 or S6; never L13. D19 needs no conclusion: S1, S4 or S6 for a
+recoverable stage with no audit proposes L10. D18 reads the audit's
+d18_inputs, proposes L13 with the recovery policies of the strata that pass
+its two bounds, guards a stratum whose prediction is a relative of its
+source taxa, sends class maps the card contradicts to L14, escalates an
+invalid audit, and when silent on a valid audit proposes the claims'
+transition to tested_survives (detail.claim_transitions).
+
 prospective_d4(report) freezes D4's decision on a pilot report into a JSON
 file before a person chooses the real-loop recipe (contract (f), R4b). The
 record carries the rules version (rules_version(): the first 12 hex of the
@@ -137,6 +159,7 @@ from pathlib import Path
 
 from . import evidence as E
 from . import model as M
+from .evidence import walk
 
 THRESHOLDS_FILE = Path(__file__).resolve().parent / "thresholds.json"
 LEVERS_FILE = Path(__file__).resolve().parent / "levers.json"
@@ -167,7 +190,8 @@ NAMES = {"D1": "recipe_forgets", "D2": "unmeasured_source_property", "D2b": "rel
          "D8": "gate_underpowered", "D9": "warmup_dominates", "D10": "budget_projection",
          "D11": "truth_cost_share", "D12": "chains_indistinguishable", "D13": "prediction_contradicted",
          "D14": "test_touch", "D15": "guard_blocks_truth_helps", "D16": "gate_v2_check",
-         "DREF": "builder_refusal"}
+         "D17": "scarcity_conclusion_unaudited", "D18": "filter_false_negatives",
+         "D19": "filter_recall_unmeasured", "DREF": "builder_refusal"}
 D4_NOT_READY = "no_recipe_tracks_truth"
 HEALTH = ("D5", "D6", "D7", "D8", "D10", "D14")
 GATE_PIN = "gate_pin"                        # driver.py GATE_PIN (state.json key and ledger entry type)
@@ -1771,9 +1795,759 @@ def dref(ev, th):
     return _diag("DREF", True, sev, summary, cites, levers, ev.exp, {"refusals": items})
 
 
+# ------------------------------------------------------ the funnel audit (D17-D19)
+# docs/FUNNEL_AUDIT.md 8.4. The suspicion signals S1-S7 are functions of the
+# funnel ledger (funnel/funnel_ledger.json, format funnel-ledger/1), the claims
+# register and the loop reports only. They read stages by their "role" key and
+# the ledger's own class lists, never a stage id or a class name, so the same
+# code and thresholds run on any domain (replay case R13).
+FUNNEL_LEDGER_FORMAT = "funnel-ledger/1"
+FUNNEL_AUDIT_FORMAT = "funnel-audit/1"
+SIGNAL_IDS = ("S1", "S2", "S3", "S4", "S5", "S6", "S7")
+RECOVER_POLICY_ORDER = ("R-A", "R-C", "R-T", "R-V", "R-J", "R-F")   # funnel/recover.py POLICIES
+
+
+def _funnel_ledger(ev):
+    """(ledger, why): the funnel ledger in the evidence, or None with why not."""
+    led = ev.json(E.FUNNEL_LEDGER)
+    if led is None:
+        return None, "no %s in the evidence" % E.FUNNEL_LEDGER
+    if not isinstance(led, dict) or led.get("format") != FUNNEL_LEDGER_FORMAT \
+            or not isinstance(led.get("stages"), list):
+        return None, "%s is not a %s file with stages" % (E.FUNNEL_LEDGER, FUNNEL_LEDGER_FORMAT)
+    return led, ""
+
+
+def _stage_index(led, roles):
+    """[(index, stage)] of the ledger's stages whose role is in roles, in stage order."""
+    return [(i, s) for i, s in enumerate(led.get("stages") or [])
+            if isinstance(s, dict) and s.get("role") in roles]
+
+
+def _lcite(ev, *parts):
+    return ev.cite(E.FUNNEL_LEDGER, E.pointer(*parts))
+
+
+def _int(x):
+    return x if isinstance(x, int) and not isinstance(x, bool) else None
+
+
+def _signal(holds, summary, cites=(), detail=None):
+    return {"holds": holds, "summary": summary, "cites": list(cites), "detail": detail or {}}
+
+
+def _s1(ev, led, th):
+    roles = _t(th, "SIGNALS", "S1_roles")
+    tmin = _t(th, "SIGNALS", "S1_reject_accept_min")
+    oreason = _t(th, "SIGNALS", "S1_other_reason")
+    tc = _stage_index(led, [roles[0]])
+    oc = _stage_index(led, roles[1:])
+    if len(tc) != 1:
+        return _signal(None, "not evaluated: the ledger has %d stage(s) of role %s, not one" % (len(tc), roles[0]))
+    i, st = tc[0]
+    kept = _int(st.get("kept"))
+    disc = st.get("discarded") if isinstance(st.get("discarded"), dict) else None
+    if kept is None or disc is None or any(_int(v) is None for v in disc.values()):
+        return _signal(None, "not evaluated: the %s stage records no whole kept and discarded counts" % roles[0])
+    cites = [_lcite(ev, "stages", i, "kept")] + [_lcite(ev, "stages", i, "discarded", r) for r in sorted(disc)]
+    rejected = sum(disc.values())
+    parts = {"%s:%s" % (st.get("id"), r): disc[r] for r in sorted(disc)}
+    for j, o in oc:
+        od = o.get("discarded") if isinstance(o.get("discarded"), dict) else {}
+        if _int(od.get(oreason)) is None:
+            return _signal(None, "not evaluated: the %s stage records no whole %r discard" % (o.get("role"), oreason))
+        rejected += od[oreason]
+        parts["%s:%s" % (o.get("id"), oreason)] = od[oreason]
+        cites.append(_lcite(ev, "stages", j, "discarded", oreason))
+    if not kept:
+        return _signal(None, "not evaluated: the %s stage kept nothing (the ratio is undefined)" % roles[0], cites)
+    ratio = rejected / float(kept)
+    summary = ("S1 reject/accept = %d / %d = %.2f (%s) %s %g"
+               % (rejected, kept, ratio, " + ".join("%s %d" % (k, v) for k, v in parts.items()),
+                  ">=" if ratio >= tmin else "<", tmin))
+    return _signal(ratio >= tmin, summary, cites, {"rejected": rejected, "kept": kept, "ratio": ratio,
+                                                    "parts": parts, "stage": st.get("id")})
+
+
+def _s2(ev, led, th):
+    kinds = _t(th, "SIGNALS", "S2_uninformative_kinds")
+    tmin = _t(th, "SIGNALS", "S2_uninformative_share_min")
+    smin = _t(th, "SIGNALS", "S2_source_share_min")
+    ls = led.get("label_spaces")
+    if not isinstance(ls, dict) or not ls:
+        return _signal(None, "not evaluated: the ledger has no label_spaces")
+    unin, boxes, cites, sources = 0, 0, [], []
+    for src in sorted(ls):
+        e = ls[src] if isinstance(ls[src], dict) else {}
+        k = e.get("kinds") if isinstance(e.get("kinds"), dict) else {}
+        b = _int(e.get("boxes"))
+        if b is None or any(_int(k.get(x, 0)) is None for x in kinds):
+            return _signal(None, "not evaluated: label_spaces/%s has no whole box counts" % src)
+        u = sum(k.get(x, 0) for x in kinds)
+        unin += u
+        boxes += b
+        cites.append(_lcite(ev, "label_spaces", src, "boxes"))
+        cites += [_lcite(ev, "label_spaces", src, "kinds", x) for x in kinds if x in k]
+        if b and u / float(b) > smin:
+            sources.append({"source": src, "uninformative": u, "boxes": b})
+    try:
+        cites.insert(0, _lcite(ev, "name_status_version"))
+    except KeyError:
+        return _signal(None, "not evaluated: the ledger does not record its name_status_version", cites)
+    if not boxes:
+        return _signal(None, "not evaluated: the label spaces hold no boxes", cites)
+    share = unin / float(boxes)
+    sources.sort(key=lambda x: (-x["uninformative"], x["source"]))
+    summary = ("S2 uninformative names (%s, name status %s) = %d / %d = %.3f %s %g; %d source(s) more than %g "
+               "uninformative" % ("+".join(kinds), led.get("name_status_version"), unin, boxes, share,
+                                  ">=" if share >= tmin else "<", tmin, len(sources), smin))
+    return _signal(share >= tmin, summary, cites, {"uninformative": unin, "boxes": boxes, "share": share,
+                                                    "name_status_version": led.get("name_status_version"),
+                                                    "sources": sources})
+
+
+def _s3(ev, led, th):
+    roles = _t(th, "SIGNALS", "S3_roles")
+    nmin = _t(th, "SIGNALS", "S3_min_joined_boxes")
+    frac = _t(th, "SIGNALS", "S3_yield_frac_of_median")
+    js, ts = _stage_index(led, [roles[0]]), _stage_index(led, [roles[1]])
+    if len(js) != 1 or len(ts) != 1:
+        return _signal(None, "not evaluated: the ledger needs one %s and one %s stage" % tuple(roles))
+    (ji, j), (ti, t) = js[0], ts[0]
+    jk, tk = j.get("kept_by_label"), t.get("kept_by_label")
+    targets = led.get("target_classes") or []
+    if not isinstance(jk, dict) or not isinstance(tk, dict) or not targets:
+        return _signal(None, "not evaluated: kept_by_label or target_classes is missing from the ledger")
+    rows = []
+    for k in targets:
+        n = _int(jk.get(k))
+        if n is None or n < nmin:
+            continue
+        v = _int(tk.get(k, 0))
+        if v is None:
+            return _signal(None, "not evaluated: %s kept_by_label[%s] is not a whole count" % (roles[1], k))
+        rows.append({"class": k, "verified": v, "joined": n, "share": v / float(n)})
+    if len(rows) < 2:
+        return _signal(None, "not evaluated: %d class(es) with >= %d joined boxes" % (len(rows), nmin))
+    shares = sorted(r["share"] for r in rows)
+    m = len(shares)
+    median = shares[m // 2] if m % 2 else (shares[m // 2 - 1] + shares[m // 2]) / 2.0
+    cut = frac * median
+    out = [r for r in rows if r["share"] < cut]
+    cites = []
+    for r in rows:
+        cites += [_lcite(ev, "stages", ji, "kept_by_label", r["class"])]
+        if r["class"] in tk:
+            cites += [_lcite(ev, "stages", ti, "kept_by_label", r["class"])]
+    summary = ("S3 class yield: median verified share %.3f over %d class(es) with >= %d joined boxes; below %g x "
+               "median: %s" % (median, len(rows), nmin, frac, ", ".join("%s %d/%d = %.3f" % (
+                   r["class"], r["verified"], r["joined"], r["share"]) for r in out) or "none"))
+    return _signal(bool(out), summary, cites, {"median": median, "cut": cut, "classes": rows, "outliers": out})
+
+
+def _s4(ev, led, th):
+    roles = _t(th, "SIGNALS", "S4_roles")
+    nmin = _t(th, "SIGNALS", "S4_min_sources_below_q05")
+    ds = led.get("domain_scores")
+    ref = (ds or {}).get("reference") if isinstance(ds, dict) else None
+    q05 = _num((ref or {}).get("q05"))
+    if q05 is None:
+        return _signal(None, "not evaluated: the ledger has no domain_scores.reference.q05")
+    cites = [_lcite(ev, "domain_scores", "reference", "q05")]
+    sets, unknown = [], []
+    for i, st in _stage_index(led, roles):
+        cal = st.get("calibration")
+        if not isinstance(cal, dict):
+            continue
+        for k, s in enumerate(cal.get("known_truth_sets") or []):
+            sc = (s or {}).get("domain_score")
+            if not (isinstance(sc, list) and len(sc) == 2 and all(_num(x) is not None for x in sc)):
+                unknown.append((s or {}).get("id"))
+                continue
+            sets.append({"stage": st.get("id"), "id": s.get("id"), "domain_score": sc,
+                         "in_domain": sc[0] >= q05 and sc[1] <= 1.0})
+            cites.append(_lcite(ev, "stages", i, "calibration", "known_truth_sets", k, "domain_score"))
+    below = []
+    for src in sorted(k for k in ds if k != "reference"):
+        v = _num(ds[src])
+        if v is not None and v < q05:
+            below.append({"source": src, "median": v})
+            cites.append(_lcite(ev, "domain_scores", src))
+    if unknown:
+        return _signal(None, "not evaluated: known-truth set(s) %s record no domain score" % unknown, cites)
+    out_of_domain = [s for s in sets if not s["in_domain"]]
+    holds = not out_of_domain and len(below) >= nmin
+    summary = ("S4 calibration domain gap: %d known-truth set(s), %d in the reference domain [q05 %.4g, 1]; %d "
+               "source median(s) below q05 (%s)%s"
+               % (len(sets), len(sets) - len(out_of_domain), q05, len(below),
+                  ", ".join("%s %.4g" % (b["source"], b["median"]) for b in below) or "none",
+                  "" if holds else ("; set(s) %s cover other domains" % [s["id"] for s in out_of_domain]
+                                    if out_of_domain else "")))
+    return _signal(holds, summary, cites, {"q05": q05, "sets": sets, "below_q05": below})
+
+
+def _s5(ev, led, th):
+    from ..funnel import ledger as FL
+    pairs = FL.unaudited_dependencies(led)
+    idx = {s.get("id"): i for i, s in enumerate(led.get("stages") or []) if isinstance(s, dict)}
+    cites, rows = [], []
+    for stage, dep in pairs:
+        i, j = idx.get(stage), idx.get(dep)
+        if i is None or j is None:
+            continue
+        st = led["stages"][i]
+        row = {"stage": stage, "depends_on": dep, "in": _int(st.get("in")), "kept": _int(st.get("kept")),
+               "unit": st.get("unit"), "role": st.get("role")}
+        rows.append(row)
+        cites += [_lcite(ev, "stages", i, "depends_on"), _lcite(ev, "stages", j, "audit")]
+        if row["in"] is not None and row["kept"] is not None:
+            cites += [_lcite(ev, "stages", i, "in"), _lcite(ev, "stages", i, "kept")]
+    summary = ("S5 derived dependency: %d keep or discard criterion(s) depend on an unaudited stage: %s"
+               % (len(rows), ", ".join("%s -> %s%s" % (r["stage"], r["depends_on"],
+                                                        " (%d of %d %ss kept)" % (r["kept"], r["in"], r["unit"])
+                                                        if r["in"] is not None and r["kept"] is not None else "")
+                                       for r in rows) or "none"))
+    return _signal(bool(rows), summary, cites, {"pairs": rows})
+
+
+def _cell_share(cell):
+    """The share a reject-class cell holds of its sample: its 'share', or 'n'
+    over 'of' (or 'total'); None when the cell gives neither."""
+    if not isinstance(cell, dict):
+        return None
+    s = _num(cell.get("share"))
+    if s is not None:
+        return s
+    n, of = _num(cell.get("n")), _num(cell.get("of", cell.get("total")))
+    return n / of if n is not None and of else None
+
+
+def _s6(ev, led, th):
+    smin = _t(th, "SIGNALS", "S6_top_cell_share_min")
+    rc = led.get("reject_class")
+    if not isinstance(rc, dict):
+        return _signal(None, "not evaluated: the ledger records no reject-class sample (reject_class is null)")
+    tc = _stage_index(led, ["target_check"])
+    disc_src = set()
+    if len(tc) == 1:
+        for src, e in sorted((tc[0][1].get("by_source") or {}).items()):
+            d = (e or {}).get("discarded") if isinstance(e, dict) else None
+            if isinstance(d, dict) and any(_int(v) for v in d.values()):
+                disc_src.add(src)
+    cites = []
+    samp = rc.get("sample_sources") if isinstance(rc.get("sample_sources"), dict) else None
+    overlap = sorted(disc_src & set(samp or {})) if samp is not None else []
+    if samp is not None:
+        cites.append(_lcite(ev, "reject_class", "sample_sources"))
+    key = "drawn_top_cell" if isinstance(rc.get("drawn_top_cell"), dict) else "eligible_top_cell"
+    share = _cell_share(rc.get(key))
+    if share is not None:
+        cites.append(_lcite(ev, "reject_class", key))
+    if samp is None and share is None:
+        return _signal(None, "not evaluated: the reject-class record has neither its sample's sources nor a top "
+                             "cell with a share")
+    holds = bool(overlap) or (share is not None and share >= smin)
+    summary = ("S6 reject-class confound: %d sample source(s) among the sources whose target boxes were rejected%s; "
+               "the %s holds %s of the sample (cut %g)"
+               % (len(overlap), " (%s)" % ", ".join(overlap) if overlap else "",
+                  key.replace("_", " "), "%.3f" % share if share is not None else "an unknown share", smin))
+    return _signal(holds, summary, cites, {"overlap": overlap, "top_cell": rc.get(key), "top_cell_key": key,
+                                           "share": share})
+
+
+def _s7(ev, th):
+    kinds = _t(th, "SIGNALS", "S7_rejected_kinds")
+    rows, cites, seen = [], [], []
+    for e in ev.exps():
+        d, rep = _defn(ev, e), _report(ev, e)
+        done, _dc = _finished(ev, e)
+        if not (isinstance(d, dict) and isinstance(rep, dict) and done):
+            continue
+        dsteps = {s.get("name"): (k, s) for k, s in enumerate(d.get("steps") or []) if isinstance(s, dict)}
+        helps_rej, helps_clean = [], []
+        for k, s in enumerate(rep.get("steps") or []):
+            if not isinstance(s, dict):
+                continue
+            name = s.get("step")
+            if name not in dsteps:
+                continue
+            dk, ds = dsteps[name]
+            if ((s.get("truth") or {}).get("verdict")) != HELPS:
+                continue
+            if ds.get("kind") in kinds:
+                helps_rej.append((k, dk, name))
+            if ds.get("clean") is True:
+                helps_clean.append((k, dk, name))
+        if not helps_rej and not helps_clean:
+            continue
+        seen.append(e)
+        if helps_rej and not helps_clean:
+            for k, dk, name in helps_rej:
+                rows.append({"exp": e, "step": name, "report_index": k, "exp_index": dk})
+                cites += [ev.cite("%s/report.json" % e, "/steps/%d/truth/verdict" % k),
+                          ev.cite("%s/exp.json" % e, "/steps/%d/kind" % dk)]
+    summary = ("S7 truth-arm contradiction: %s" % ("; ".join(
+        "%s step %s (kind in %s) is truth %s while no clean step is" % (r["exp"], r["step"], kinds, HELPS)
+        for r in rows) if rows else "no finished loop has a step drawn from rejected data that helps while no "
+                                    "clean step does"))
+    return _signal(bool(rows), summary, cites, {"steps": rows})
+
+
+def funnel_signals(ev, th):
+    """{S id: {"holds": True | False | None, "summary", "cites", "detail"}}.
+    None means not evaluated (the summary says why); a rule that raises is
+    reported as not evaluated with the error, never as a silent False."""
+    led, why = _funnel_ledger(ev)
+    out = {}
+    for sid, fn in (("S1", _s1), ("S2", _s2), ("S3", _s3), ("S4", _s4), ("S5", _s5), ("S6", _s6)):
+        if led is None:
+            out[sid] = _signal(None, "not evaluated: %s" % why)
+            continue
+        try:
+            out[sid] = fn(ev, led, th)
+        except _Missing:
+            raise
+        except Exception as e:                      # the ledger is untrusted input
+            out[sid] = _signal(None, "not evaluated: %s raised %s (%s)" % (sid, type(e).__name__, str(e)[:200]))
+    try:
+        out["S7"] = _s7(ev, th)
+    except _Missing:
+        raise
+    except Exception as e:
+        out["S7"] = _signal(None, "not evaluated: S7 raised %s (%s)" % (type(e).__name__, str(e)[:200]))
+    return out
+
+
+def _latest_loop(ev):
+    """(exp, report) of the latest finished real loop (exp.json builder
+    inc.realloop build, report done), or (None, None)."""
+    last = (None, None)
+    for e in ev.exps():
+        d, rep = _defn(ev, e), _report(ev, e)
+        if isinstance(d, dict) and d.get("builder") == REALLOOP_BUILDER and isinstance(rep, dict) \
+                and rep.get("done") is True:
+            last = (e, rep)
+    return last
+
+
+def _open_negative_claims(ev, th):
+    """[(index, claim)] of the claims register's open or challenged claims of a
+    negative polarity (D17 (C), claims.open_negative)."""
+    pol = _t(th, "D17", "conclusion_polarities")
+    sts = _t(th, "D17", "claim_statuses")
+    reg = ev.json(E.CLAIMS)
+    out = []
+    for i, c in enumerate((reg or {}).get("claims") or [] if isinstance(reg, dict) else []):
+        if isinstance(c, dict) and c.get("polarity") in pol and c.get("status") in sts:
+            out.append((i, c))
+    return out
+
+
+def _conclusion(ev, th):
+    """(holds, cites, detail): D17's condition (C), a negative conclusion exists."""
+    cites, forms = [], []
+    exp, rep = _latest_loop(ev)
+    if exp is not None:
+        accepted, helps = [], []
+        vcites = []
+        d = _defn(ev, exp) or {}
+        clean = {s.get("name"): s.get("clean") for s in d.get("steps") or [] if isinstance(s, dict)}
+        for k, s in enumerate(rep.get("steps") or []):
+            if not isinstance(s, dict):
+                continue
+            for r, c in sorted((s.get("chains") or {}).items()):
+                if isinstance(c, dict) and "verdict" in c:
+                    vcites.append(ev.cite("%s/report.json" % exp, E.pointer("steps", k, "chains", r, "verdict")))
+                    if c.get("verdict") == ACCEPT:
+                        accepted.append("%s/%s" % (s.get("step"), r))
+            if clean.get(s.get("step")) is True and "verdict" in (s.get("truth") or {}):
+                vcites.append(ev.cite("%s/report.json" % exp, E.pointer("steps", k, "truth", "verdict")))
+                if s["truth"]["verdict"] == HELPS:
+                    helps.append(s.get("step"))
+        if not accepted and not helps:
+            forms.append({"form": "loop_negative", "exp": exp,
+                          "why": "%s accepted nothing and no clean step is truth %s" % (exp, HELPS)})
+            cites += vcites
+        sized = _t(th, "D17", "sized_flag")
+        bs = ev.json("%s/build_summary.json" % exp)
+        try:
+            flag = walk(bs, E.pointer(*sized)) if isinstance(bs, dict) else None
+        except KeyError:
+            flag = None
+        if flag is False:
+            forms.append({"form": "sized_down", "exp": exp,
+                          "why": "%s's increment size is not the builders' default (the evidence sizing rule "
+                                 "shrank M)" % exp})
+            cites.append(ev.cite("%s/build_summary.json" % exp, E.pointer(*sized)))
+            try:
+                cites.append(ev.cite("%s/build_summary.json" % exp, "/size/images_per_increment"))
+            except KeyError:
+                pass
+    claims = _open_negative_claims(ev, th)
+    if claims:
+        forms.append({"form": "claims", "claims": [c.get("id") for _i, c in claims],
+                      "why": "open or challenged claim(s) of a negative polarity: %s"
+                             % ", ".join("%s (%s, %s)" % (c.get("id"), c.get("polarity"), c.get("status"))
+                                         for _i, c in claims)})
+        for i, _c in claims:
+            cites += [ev.cite(E.CLAIMS, "/claims/%d/polarity" % i), ev.cite(E.CLAIMS, "/claims/%d/status" % i)]
+    return bool(forms), cites, {"forms": forms, "loop": exp}
+
+
+def _valid_audit(ev, led):
+    """(audit or None, cites, why): the evidence's funnel/audit_v1.json when it
+    is a valid audit of this ledger (its ledger_fingerprint is the ledger's
+    fingerprint and it is not invalid for calibration overlap)."""
+    a = ev.json(E.FUNNEL_AUDIT)
+    if a is None:
+        return None, [], "no %s in the evidence" % E.FUNNEL_AUDIT
+    if not isinstance(a, dict) or a.get("format") != FUNNEL_AUDIT_FORMAT:
+        return None, [], "%s is not a %s file" % (E.FUNNEL_AUDIT, FUNNEL_AUDIT_FORMAT)
+    cites = []
+    try:
+        cites.append(ev.cite(E.FUNNEL_AUDIT, "/ledger_fingerprint"))
+        cites.append(ev.cite(E.FUNNEL_AUDIT, "/valid"))
+    except KeyError:
+        return None, cites, "%s records no ledger_fingerprint or valid flag" % E.FUNNEL_AUDIT
+    fp = (led or {}).get("fingerprint")
+    if not fp or a.get("ledger_fingerprint") != fp:
+        return None, cites, ("%s audits another Step 1 (ledger fingerprint %s..., this ledger's %s...)"
+                             % (E.FUNNEL_AUDIT, str(a.get("ledger_fingerprint"))[:12], str(fp)[:12]))
+    if a.get("valid") is not True:
+        return None, cites, ("%s is invalid (calibration overlap, contract 4.1): nothing may cite it"
+                             % E.FUNNEL_AUDIT)
+    return a, cites, ""
+
+
+def d17(ev, th):
+    """D17 scarcity_conclusion_unaudited (contract 8.4): (C) a negative
+    conclusion exists, (S) at least one of S1-S7 holds, (A) no valid audit of
+    this Step 1 exists. Proposes L10 (census) first, L12 and L11 (with L11a,
+    the card fetch it reads) for the S2 sources, the devil's-advocate pass
+    (OP_DA), and card X11 when S4 or S6 holds. Never L13 (only after D18)."""
+    use = _t(th, "D17", "signals")
+    led, why = _funnel_ledger(ev)
+    if led is None:
+        return _silent("D17", "not evaluated: %s" % why)
+    conclusion, ccites, cdet = _conclusion(ev, th)
+    if not conclusion:  # funnel-mutation: M1
+        return _silent("D17", "no negative conclusion: no finished real loop that accepted nothing, no sized-down "
+                              "loop and no open negative claim", detail={"conclusion": cdet})
+    sig = funnel_signals(ev, th)
+    held = [s for s in use if sig[s]["holds"] is True]
+    audit, acites, awhy = _valid_audit(ev, led)
+    detail = {"conclusion": cdet, "signals": sig, "held": held, "audit": awhy or "valid",
+              "ledger": {"derivation": led.get("derivation"), "fingerprint": led.get("fingerprint"),
+                         "name_status_version": led.get("name_status_version")}}
+    if audit is not None:
+        return _silent("D17", "audited: %s is a valid audit of this Step 1 (fingerprint %s...)"
+                       % (E.FUNNEL_AUDIT, str(led.get("fingerprint"))[:12]), cites=acites, detail=detail)
+    if not held:
+        return _silent("D17", "no suspicion signal holds (%s)" % "; ".join(sig[s]["summary"] for s in use),
+                       cites=ccites, detail=detail)
+    cites = list(ccites)
+    for s in held:
+        cites += sig[s]["cites"]
+    try:
+        cites.append(_lcite(ev, "fingerprint"))
+    except KeyError:
+        pass
+    levers = ["L10"]
+    s2_sources = [x["source"] for x in (sig["S2"]["detail"].get("sources") or [])] if "S2" in held else []
+    if s2_sources:
+        levers += ["L12", "L11a", "L11"]
+    levers += _sync_op(ev)
+    levers.append("OP_DA")
+    if "S4" in held or "S6" in held:
+        levers.append("X11")
+    detail.update(first_verb=_t(th, "D17", "first_verb"), s2_sources=s2_sources,
+                  then=[], never=["L13 (only after D18)"])
+    gap, gap_why = _kt_gap(ev, led, th)
+    if gap:
+        detail["needs"] = gap_why
+    summary = ("a negative conclusion (%s) rests on unaudited filters (%s; %s) -> L10 %s%s, the devil's-advocate "
+               "pass%s" % ("; ".join(f["why"] for f in cdet["forms"]), ", ".join(held), awhy,
+                          detail["first_verb"],
+                          ", L12 and L11 for %d uninformative source(s)" % len(s2_sources) if s2_sources else "",
+                          ", X11" if "X11" in levers else ""))
+    return _diag("D17", True, "warn", summary, _dedupe(cites), levers, None, detail)
+
+
+def _kt_gap(ev, led, th):
+    """(gap, why): True when no known-truth set of the class-deciding stages
+    (SIGNALS.S4_roles) lies outside the reference domain [q05, 1] (contract 8.8:
+    a domain with no shifted truth gets "filter recall cannot be measured",
+    not a silent audit). None when the ledger records no reference q05."""
+    q05 = _num(((led.get("domain_scores") or {}).get("reference") or {}).get("q05"))
+    if q05 is None:
+        return None, ""
+    sets = []
+    for _i, st in _stage_index(led, _t(th, "SIGNALS", "S4_roles")):
+        for s in ((st.get("calibration") or {}).get("known_truth_sets") or []):
+            sc = (s or {}).get("domain_score")
+            if isinstance(sc, list) and len(sc) == 2 and all(_num(x) is not None for x in sc):
+                sets.append((s.get("id"), sc[0] >= q05 and sc[1] <= 1.0))
+    if any(not inside for _i, inside in sets):
+        return False, ""
+    return True, ("filter recall cannot be measured outside the reference domain: %s; it needs an out-of-domain "
+                  "known-truth set whose labels are independent of every audited source"
+                  % ("every one of the %d known-truth set(s) lies in the reference domain [q05 %.4g, 1]"
+                     % (len(sets), q05) if sets else "the ledger records no known-truth set"))
+
+
+def _sync_op(ev):
+    """["OP_FUNNEL_SYNC"] when the lab holds funnel files the cluster does not
+    (levers.funnel_sync_needed: the ticker's funnel_lab context against the
+    cluster's funnel/files.json), else []."""
+    from . import levers as LV
+    return ["OP_FUNNEL_SYNC"] if LV.funnel_sync_needed(ev) else []
+
+
+def _dedupe(cites):
+    out, have = [], set()
+    for c in cites:
+        k = json.dumps(c, sort_keys=True)
+        if k not in have:
+            have.add(k)
+            out.append(c)
+    return out
+
+
+def d19(ev, th):
+    """D19 filter_recall_unmeasured (contract 8.4): S1, S4 or S6 holds for a
+    recoverable stage with no audit; needs no conclusion. Proposes L10, which
+    levers.propose ranks before L2 (RULES order; DEC-4)."""
+    use = _t(th, "D19", "signals")
+    roles = _t(th, "D19", "stage_roles")
+    led, why = _funnel_ledger(ev)
+    if led is None:
+        return _silent("D19", "not evaluated: %s" % why)
+    from ..funnel import ledger as FL
+    rec = set(FL.recoverable_stages(led))
+    audit, _ac, _aw = _valid_audit(ev, led)
+    audited = {k for k, v in ((audit or {}).get("stages") or {}).items()
+               if isinstance(v, dict) and isinstance(v.get("fn_rate"), dict)}
+    stages = [(i, s) for i, s in _stage_index(led, roles)
+              if s.get("id") in rec and s.get("audit") is None and s.get("id") not in audited]
+    if not stages:
+        return _silent("D19", "every recoverable stage of role %s carries an audit (in the ledger, or in the valid "
+                              "audit of this Step 1), or none is recoverable" % roles)
+    sig = funnel_signals(ev, th)
+    held = [s for s in use if sig[s]["holds"] is True]
+    detail = {"signals": {s: sig[s] for s in use}, "held": held,
+              "stages": [s.get("id") for _i, s in stages]}
+    if not held:
+        return _silent("D19", "none of %s holds (%s)" % (use, "; ".join(sig[s]["summary"] for s in use)),
+                       detail=detail)
+    cites = []
+    for s in held:
+        cites += sig[s]["cites"]
+    for i, _s in stages:
+        cites += [_lcite(ev, "stages", i, "recoverable"), _lcite(ev, "stages", i, "audit")]
+    gap, gap_why = _kt_gap(ev, led, th)
+    if gap:
+        detail["needs"] = gap_why
+    summary = ("filter recall is unmeasured: %s hold for the recoverable, unaudited stage(s) %s -> L10 (ranked "
+               "before any real-loop build, DEC-4)%s" % (", ".join(held), ", ".join(detail["stages"]),
+                                                         "; %s" % gap_why if gap else ""))
+    return _diag("D19", True, "warn", summary, _dedupe(cites), ["L10"] + _sync_op(ev), None, detail)
+
+
+def _stratum_source(row):
+    """The source slug a d18_inputs row is about: its 'source' key, else the
+    slug inside its stratum id (a 'c:<slug>|<id>' or 'k:<slug>|<id>|<j>' unit,
+    or a 'source=<slug>' key), else None."""
+    if isinstance(row.get("source"), str) and row["source"]:
+        return row["source"]
+    sid = str(row.get("stratum") or "")
+    m = re.search(r"(?:^|[/=])[ck]:([^|/]+)\|", sid)
+    if m:
+        return m.group(1)
+    m = re.search(r"(?:^|/)source=([^/]+)", sid)
+    return m.group(1) if m else None
+
+
+def d18(ev, th):
+    """D18 filter_false_negatives (contract 8.4): per stratum of the audit's
+    d18_inputs, FN lower bound >= fn_lb_min and recoverable lower bound >=
+    recover_min_frac_of_verified x the target_check kept count. Levers by
+    kind (thresholds D18); a stratum whose prediction is a relative of its
+    source taxa is a known confusion, never recovered. A row naming a stage
+    the ledger does not mark recoverable, or a guard stage, is refused
+    (detail refused_stages; contract 7: guards are never touched), and when
+    only such rows pass the bounds D18 escalates and no claim moves. Silent on
+    a valid audit of this Step 1: its detail proposes the claim transition to
+    tested_survives. An invalid audit (calibration overlap) escalates."""
+    led, why = _funnel_ledger(ev)
+    a = ev.json(E.FUNNEL_AUDIT)
+    if a is None:
+        return _silent("D18", "no %s in the evidence" % E.FUNNEL_AUDIT)
+    if led is None:
+        return _silent("D18", "not evaluated: %s" % why)
+    if isinstance(a, dict) and a.get("format") == FUNNEL_AUDIT_FORMAT and a.get("valid") is False:
+        cites = [ev.cite(E.FUNNEL_AUDIT, "/valid")]
+        try:
+            cites.append(ev.cite(E.FUNNEL_AUDIT, "/calibration_overlap"))
+        except KeyError:
+            pass
+        overlap = a.get("calibration_overlap") or []
+        return _diag("D18", True, "crit",
+                     "calibration_overlap: %s is invalid (%d stratum/judge overlap(s) with calibration material, "
+                     "contract 4.1); nothing may cite it -> escalate" % (E.FUNNEL_AUDIT, len(overlap)),
+                     cites, ["OP_ESCALATE"], None, {"calibration_overlap": overlap, "valid": False})
+    audit, acites, awhy = _valid_audit(ev, led)
+    if audit is None:
+        return _silent("D18", "not evaluated: %s" % awhy, cites=acites)
+    fn_min = _t(th, "D18", "fn_lb_min")
+    frac = _t(th, "D18", "recover_min_frac_of_verified")
+    by_role = _t(th, "D18", "rejected_policy_by_role")
+    unin = _t(th, "D18", "uninformative_policies")
+    other_policy = _t(th, "D18", "other_policy")
+    tc = _stage_index(led, ["target_check"])
+    kept = _int(tc[0][1].get("kept")) if len(tc) == 1 else None
+    if kept is None:
+        return _silent("D18", "not evaluated: the ledger has no target_check stage with a kept count")
+    rmin = frac * kept
+    roles = {s.get("id"): s.get("role") for s in led.get("stages") or [] if isinstance(s, dict)}
+    maps = ev.json(E.FUNNEL_CLASS_MAPS)
+    card_sources = set()
+    to_l14 = []
+    for k, p in enumerate((maps or {}).get("proposals") or [] if isinstance(maps, dict) else []):
+        if not isinstance(p, dict):
+            continue
+        if p.get("status") == "proposed" and p.get("via") == "card+geometry":
+            card_sources.add(p.get("source"))
+        if p.get("status") == "to_L14":
+            to_l14.append((k, p))
+    fire, confusions, refused, cites = [], [], [], list(acites)
+    try:
+        cites.append(_lcite(ev, "stages", tc[0][0], "kept"))
+    except KeyError:
+        pass
+    from ..funnel import ledger as FL
+    recoverable = set(FL.recoverable_stages(led))
+    guards = {s.get("id") for s in led.get("stages") or [] if isinstance(s, dict) and s.get("guard") is True}
+    for i, row in enumerate(a.get("d18_inputs") or []):
+        if not isinstance(row, dict):
+            continue
+        fl, rl = _num(row.get("fn_lb")), _num(row.get("recoverable_lb"))
+        if fl is None or rl is None or fl < fn_min or rl < rmin:
+            continue
+        if row.get("stage") not in recoverable or row.get("stage") in guards:
+            # Contract 7 and 8.4: D18 fires for a recoverable stage only, and
+            # guard stages are never touched, whatever the audit says.
+            refused.append({"stage": row.get("stage"), "stratum": row.get("stratum"), "kind": row.get("kind"),
+                            "why": "stage %s is %s in the ledger: never recovered"
+                                   % (row.get("stage"), "a guard" if row.get("stage") in guards
+                                      else "not recoverable (recoverable is not true)")})
+            for key in ("stage", "fn_lb", "recoverable_lb"):
+                cites.append(ev.cite(E.FUNNEL_AUDIT, "/d18_inputs/%d/%s" % (i, key)))
+            continue
+        rc = [ev.cite(E.FUNNEL_AUDIT, "/d18_inputs/%d/fn_lb" % i),
+              ev.cite(E.FUNNEL_AUDIT, "/d18_inputs/%d/recoverable_lb" % i),
+              ev.cite(E.FUNNEL_AUDIT, "/d18_inputs/%d/kind" % i)]
+        kind = row.get("kind")
+        rec = {"stage": row.get("stage"), "stratum": row.get("stratum"), "kind": kind, "fn_lb": fl,
+               "recoverable_lb": rl, "source": _stratum_source(row)}
+        if kind == "other_predicted_target" and row.get("relative_of_prediction") is not False:
+            rec["why"] = ("the source taxa %s include a relative of the prediction (or it is unknown): a known "
+                          "confusion, never relabelled (the sibling guard)" % (row.get("source_taxa") or []))
+            try:
+                rc.append(ev.cite(E.FUNNEL_AUDIT, "/d18_inputs/%d/relative_of_prediction" % i))
+            except KeyError:
+                pass
+            confusions.append(rec)
+            cites += rc
+            continue
+        if kind == "target_rejected":
+            rec["policy"] = by_role.get(roles.get(row.get("stage")))
+            rec["card"] = "X11"
+        elif kind == "uninformative_label_space":
+            # Contract 8.4: a card map is applied only "when the card and the purity check
+            # agree" (H3a supported); otherwise the stratum goes to the judges (R-J), whose
+            # own gates (H2a, H7) recover.py applies. Without this, D18 would propose R-C
+            # for a map recover.py must refuse.
+            h3a = ((a.get("hypotheses") or {}).get("H3a") or {}).get("verdict")
+            if rec["source"] in card_sources and h3a == "supported":
+                rec["policy"] = unin["card_map"]
+            else:
+                rec["policy"] = unin["judges"]
+                if rec["source"] in card_sources:
+                    rec["why_not_card_map"] = "H3a is %s" % h3a
+                    try:
+                        rc.append(ev.cite(E.FUNNEL_AUDIT, "/hypotheses/H3a/verdict"))
+                    except KeyError:
+                        pass
+        elif kind == "other_predicted_target":
+            rec["policy"] = other_policy
+            rc.append(ev.cite(E.FUNNEL_AUDIT, "/d18_inputs/%d/relative_of_prediction" % i))
+        if not rec.get("policy"):
+            rec["why"] = "kind %r of stage %s has no recovery policy" % (kind, row.get("stage"))
+            confusions.append(rec)
+            continue
+        fire.append(rec)
+        cites += rc
+    for k, p in to_l14:
+        cites.append(ev.cite(E.FUNNEL_CLASS_MAPS, "/proposals/%d/status" % k))
+    policies = [p for p in RECOVER_POLICY_ORDER if any(r["policy"] == p for r in fire)]
+    detail = {"strata": fire, "known_confusions": confusions, "refused_stages": refused,
+              "policy": ",".join(policies) or None,
+              "to_l14": [{"source": p.get("source"), "src_id": p.get("src_id"), "src_name": p.get("src_name"),
+                          "map_to": p.get("map_to"), "reason": p.get("reason")} for _k, p in to_l14],
+              "recover_min": rmin, "fn_lb_min": fn_min, "target_check_kept": kept}
+    if not fire and refused:
+        # An audit that asks to recover a guard or non-recoverable stage is not
+        # evidence the filters were right: no claim moves, a person looks.
+        summary = ("the valid audit puts %d stratum(s) of guard or non-recoverable stage(s) above D18's bounds "
+                   "(%s): never recovered, and no claim moves on this audit -> escalate"
+                   % (len(refused), ", ".join("%s %s" % (r["stage"], r["stratum"]) for r in refused)))
+        detail["claim_transitions"] = []
+        return _diag("D18", True, "warn", summary, _dedupe(cites), ["OP_ESCALATE"] + (["L14"] if to_l14 else []),
+                     None, detail)
+    if not fire:
+        trans = []
+        for i, c in _open_negative_claims(ev, th):
+            if c.get("status") == "challenged":
+                trans.append({"claim_id": c.get("id"), "to": "tested_survives", "actor_kind": "autopilot",
+                              "audit_sha256": (ev.provenance.get(E.FUNNEL_AUDIT) or {}).get("sha256"),
+                              "ledger_fingerprint": led.get("fingerprint")})
+        detail["claim_transitions"] = trans
+        levers = ["L14"] if to_l14 else []
+        summary = ("no stratum of the valid audit has FN lb >= %g and recoverable lb >= %.1f (%g x %d verified)%s%s"
+                   % (fn_min, rmin, frac, kept,
+                      "; the claim(s) %s may move to tested_survives" % ", ".join(t["claim_id"] for t in trans)
+                      if trans else "",
+                      "; %d class map(s) to the verify queue (L14)" % len(to_l14) if to_l14 else ""))
+        if to_l14:
+            return _diag("D18", True, "info", summary, _dedupe(cites), levers, None, detail)
+        return _silent("D18", summary, cites=_dedupe(cites), detail=detail)
+    levers = ["L13"] + (["L14"] if to_l14 else []) + _sync_op(ev) + (["X11"] if any(r.get("card") for r in fire)
+                                                                    else [])
+    rec = ev.json(E.FUNNEL_RECOVERY)
+    if isinstance(rec, dict) and rec.get("status") == "complete":
+        levers.insert(1, "L2")
+        cites.append(ev.cite(E.FUNNEL_RECOVERY, "/status"))
+    else:
+        detail["then"] = ["L2 with --increment-sources recovered"]
+    summary = ("the audit finds filter false negatives in %d stratum(s) (%s) -> L13 --policy %s%s%s"
+               % (len(fire), "; ".join("%s %s fn_lb %.2f, recoverable lb %.0f -> %s"
+                                        % (r["stage"], r["stratum"], r["fn_lb"], r["recoverable_lb"], r["policy"])
+                                        for r in fire),
+                  detail["policy"],
+                  "; %d known confusion(s) guarded" % len(confusions) if confusions else "",
+                  "; %d class map(s) to L14" % len(to_l14) if to_l14 else ""))
+    if refused:
+        summary += ("; %d stratum(s) of guard or non-recoverable stage(s) refused (%s)"
+                    % (len(refused), ", ".join(r["stage"] for r in refused)))
+    return _diag("D18", True, "warn", summary, _dedupe(cites), levers, None, detail)
+
+
 # The order levers.propose ranks proposals in (module doc): D15 next to D1,
-# which it takes precedence over; D16 next to D4, which it gates.
-RULES = (("D1", d1), ("D15", d15), ("D2", d2), ("D2b", d2b), ("D3", d3), ("D3b", d3b), ("D4", d4),
+# which it takes precedence over; D16 next to D4, which it gates; the funnel
+# diagnoses D17, D18 and D19 after D2 (runner 5.5.2), so D19's L10 ranks ahead
+# of D4's real-loop L2 (DEC-4).
+RULES = (("D1", d1), ("D15", d15), ("D2", d2), ("D17", d17), ("D18", d18), ("D19", d19), ("D2b", d2b),
+         ("D3", d3), ("D3b", d3b), ("D4", d4),
          ("D16", d16), ("D5", d5), ("D6", d6), ("D7", d7), ("D8", d8), ("D9", d9), ("D10", d10), ("D11", d11),
          ("D12", d12), ("D13", d13), ("D14", d14), ("DREF", dref))
 

@@ -154,7 +154,8 @@ REMOTE_TIMEOUT_S = {"inc_snapshot": 300, "inc_report": 300, "inc_advance": 240,
                     "inc_campaign_snapshot": 600, "inc_cancel_exp": 180, "inc_sync_outer": 300,
                     "inc_build_pilot": 300, "inc_build_realloop": 300, "inc_build_baseline": 300,
                     "inc_relevance_build": 300, "inc_label_audit": 300,
-                    "inc_unblock_transient": 180}
+                    "inc_unblock_transient": 180, "inc_funnel_audit": 300, "inc_funnel_map": 300,
+                    "inc_funnel_recover": 300, "inc_funnel_dev_scores": 300}
 DEFAULT_REMOTE_TIMEOUT_S = 120
 # ssh's own messages for a connection that was never made (read off the last
 # stderr line of a call that printed nothing): the remote command never ran.
@@ -182,8 +183,11 @@ STOP_OPERATIONS = ("OP_PAUSE", "OP_HALT")
 # evidence); R8 is pilot_v3 with the real Step 1 summaries, whose evidenced
 # pool cannot hold the default loop (D2 does not escalate: the R4 sizing
 # rule -> L2 with --increment-sources evidence --size 287 --n-verified 4).
+# R9-R14 and the funnel's negative controls, mutation harness and domain-free
+# test (docs/FUNNEL_AUDIT.md 8.9; runner 5.5.9): envelope autonomy needs them too.
+FUNNEL_REPLAY_CASES = ("R9", "R9_early", "R9b", "R10", "R11", "R12", "R13", "R14", "funnel_negative_controls")
 REPLAY_REQUIRED = ("R1", "R3", "R4a", "R5", "R6", "R7", "R8", "negative_controls", "test_blindness",
-                   "earliest_fire", "governance")
+                   "earliest_fire", "governance") + FUNNEL_REPLAY_CASES + ("funnel_mutations", "domain_free")
 REPLAY_MAY_SKIP = ("R2", "R4b")
 CODE_ROOT = Path(__file__).resolve().parents[3]       # the directory holding weed_optimizer_framework/
 # Files outside this package that decide what the executor may do; a replay
@@ -193,9 +197,16 @@ GOVERNANCE_FILES = ("weed_optimizer_framework/tools/brain/policy_actions.json",
                     "weed_optimizer_framework/tools/brain/approvals.py",
                     "weed_optimizer_framework/tools/brain/su_ledger.py",
                     "tests/test_inc_ap_replay.py",
-                    "tests/test_inc_ap_governance.py")
+                    "tests/test_inc_ap_governance.py",
+                    "tests/test_funnel_ap_replay.py",
+                    "tests/test_funnel_ap_mutations.py",
+                    "tests/test_funnel_domain_free.py",
+                    "weed_optimizer_framework/tools/funnel/domains/weed.json")
 REPLAY_SCRIPTS = {"replay": "tests/test_inc_ap_replay.py",
-                  "governance": "tests/test_inc_ap_governance.py"}
+                  "governance": "tests/test_inc_ap_governance.py",
+                  "funnel": "tests/test_funnel_ap_replay.py",
+                  "funnel_mutations": "tests/test_funnel_ap_mutations.py",
+                  "domain_free": "tests/test_funnel_domain_free.py"}
 # How test_inc_ap_replay.py names a skipped check, mapped to the case it
 # belongs to. A skip under any other name makes the recorded result a fail.
 REPLAY_SKIP_CASES = (("R2", "R2"), ("R4b", "R4b"), ("remote snapshot", "live_path"))
@@ -220,12 +231,13 @@ ARGV_FORMS = {
                          ("--gate-flips-mode", "gate_flips_mode", "str")),
                         ("exp", "replay_mode")),
     "inc_build_baseline": ("inc.pilot", "build-baseline",
-                           (("--exp", "exp", "str"), ("--manifest", "manifest", "str")),
+                           (("--exp", "exp", "str"), ("--manifest", "manifest", "str"), ("--seeds", "seeds", "str")),
                            ("exp", "manifest")),
     "inc_build_realloop": ("inc.realloop", "build",
                            (("--exp", "exp", "str"), ("--base", "base", "str"),
                             ("--replay-mode", "replay_mode", "str"), ("--recipes", "recipes", "str"),
                             ("--increment-sources", "increment_sources", "str"),
+                            ("--step1-overlay", "step1_overlay", "str"),
                             ("--relevance", "relevance", "str"), ("--size", "size", "int"),
                             ("--n-verified", "n_verified", "int"), ("--no-truth", "no_truth", "flag"),
                             ("--gate-flips-mode", "gate_flips_mode", "str")),
@@ -240,7 +252,29 @@ ARGV_FORMS = {
                               (("--exp", "exp", "str"), ("--unit", "unit", "str"),
                                ("--reason", "cause", "auto")),
                               ("exp", "unit", "cause")),
+    # The funnel audit (docs/FUNNEL_AUDIT.md 8.5): run_inc_funnel.sh VERB; the
+    # command "{verb}" is the positional verb param. The verb's extra sbatch
+    # flags stand before the script in a lever's argv; they are the cluster's
+    # to add (remote.py submit funnel, funnel/__main__.py SBATCH_RESOURCES).
+    "inc_funnel_audit": ("run_inc_funnel.sh", "{verb}",
+                         (("--prereg", "prereg", "str"), ("--out", "out", "str"), ("--rl", "rl", "flag")),
+                         ("verb", "prereg", "out")),
+    "inc_funnel_map": ("run_inc_funnel.sh", "map",
+                       (("--prereg", "prereg", "str"), ("--out", "out", "str"), ("--part", "part", "str")),
+                       ("prereg", "out", "part")),
+    "inc_funnel_recover": ("run_inc_funnel.sh", "recover",
+                           (("--prereg", "prereg", "str"), ("--audit", "audit", "str"), ("--maps", "maps", "str"),
+                            ("--policy", "policy", "str"), ("--out", "out", "str")),
+                           ("prereg", "audit", "maps", "policy", "out")),
+    # L11a and L12 run the funnel CLI's fetch on the lab (a lab hook runs it).
+    "inc_funnel_fetch": ("funnel", "fetch",
+                         (("--prereg", "prereg", "str"), ("--what", "what", "str"),
+                          ("--names-from", "names_from", "str"), ("--out", "out", "str")),
+                         ("prereg", "what", "out")),
 }
+# Lab-side actions: the executor calls the hook the caller registered for each
+# (Context.local_hooks) and refuses when none is.
+LAB_ACTIONS = ("inc_lit_fetch", "inc_funnel_fetch", "inc_verify_queue", "inc_funnel_sync")
 # The research brain's plan job (docs/INC_AUTOPILOT.md (c)): staged and
 # submitted, then pulled back, by segments the executor builds itself
 # (_plan_segment), not by remote.py verbs.
@@ -251,7 +285,9 @@ PLAN_MAX_STAGED_CHARS = 96 * 1024
 # remote.py submit BUILDER and the module named first in its ARGS.
 SUBMIT_FORMS = {"inc_build_pilot": ("build", "pilot"), "inc_build_baseline": ("build", "pilot"),
                 "inc_build_realloop": ("build", "realloop"),
-                "inc_relevance_build": ("relevance", None), "inc_label_audit": ("audit", None)}
+                "inc_relevance_build": ("relevance", None), "inc_label_audit": ("audit", None),
+                "inc_funnel_audit": ("funnel", None), "inc_funnel_map": ("funnel", None),
+                "inc_funnel_recover": ("funnel", None)}
 
 
 class ExecError(Exception):
@@ -442,7 +478,8 @@ def _last_line(text, prefix_re):
 
 
 def run_replay_tests(ctx=None, python=None, scripts=None, timeout=3600, code_root=None):
-    """Run the replay and governance scripts and record the result.
+    """Run the replay and governance scripts (and the funnel's replay, mutation
+    and domain-free scripts, REPLAY_SCRIPTS) and record the result.
 
     The replay script's cases are read from its exit code and its closing
     line "N failure(s), M skipped: <names>": exit 0 passes every case it
@@ -467,7 +504,8 @@ def run_replay_tests(ctx=None, python=None, scripts=None, timeout=3600, code_roo
             runs[key] = {"rc": None, "tail": "", "stderr_tail": "%s: %s" % (type(e).__name__, e)}
     rp = runs["replay"]
     m = _last_line(rp["tail"], r"^(\d+) failure\(s\), (\d+) skipped: (.*)$")
-    replay_cases = [c for c in REPLAY_REQUIRED if c != "governance"]
+    replay_cases = [c for c in REPLAY_REQUIRED if c != "governance" and c not in FUNNEL_REPLAY_CASES
+                    and c not in ("funnel_mutations", "domain_free")]
     if rp["rc"] == 0 and m and m.group(1) == "0":
         skipped = [] if m.group(3).strip() == "none" else [s.strip() for s in m.group(3).split(",")]
         for c in replay_cases + list(REPLAY_MAY_SKIP):
@@ -486,6 +524,31 @@ def run_replay_tests(ctx=None, python=None, scripts=None, timeout=3600, code_roo
             cases[c] = "fail"
     gv = runs["governance"]
     cases["governance"] = "pass" if gv["rc"] == 0 and "ALL PASS" in gv["tail"] else "fail"
+    # The funnel audit's scripts (docs/FUNNEL_AUDIT.md 8.9): each passes its
+    # cases only on exit 0 with "0 failure(s), 0 skipped: none" (a skip there
+    # is a case not run, never a pass).
+    for key, keyed in (("funnel", FUNNEL_REPLAY_CASES), ("funnel_mutations", ("funnel_mutations",)),
+                       ("domain_free", ("domain_free",))):
+        if key not in scripts:
+            notes.append("the %s script was not given: its case(s) %s are not run" % (key, ", ".join(keyed)))
+            for c in keyed:
+                cases[c] = "fail"
+            continue
+        path = root / scripts[key]
+        try:
+            p = subprocess.run([python or sys.executable, str(path)], cwd=str(root),
+                               capture_output=True, text=True, timeout=timeout)
+            runs[key] = {"rc": p.returncode, "tail": (p.stdout or "")[-2000:],
+                         "stderr_tail": (p.stderr or "")[-500:]}
+        except (OSError, subprocess.TimeoutExpired) as e:
+            runs[key] = {"rc": None, "tail": "", "stderr_tail": "%s: %s" % (type(e).__name__, e)}
+        m = _last_line(runs[key]["tail"], r"^(\d+) failure\(s\), (\d+) skipped: (.*)$")
+        ok = runs[key]["rc"] == 0 and m is not None and m.group(1) == "0" and m.group(2) == "0"
+        if not ok:
+            notes.append("the %s script exited %s%s" % (key, runs[key]["rc"], "" if m else
+                                                          " with no closing summary line"))
+        for c in keyed:
+            cases[c] = "pass" if ok else "fail"
     after = code_hash()
     if after != before:
         notes.append("the code changed while the tests ran")
@@ -526,12 +589,19 @@ def params_from_argv(action, argv):
     tail = _builder_tail(argv, first)
     if tail is None:
         raise ExecError("the argv %r does not run %s" % (" ".join(map(str, argv)), first))
-    if command:
+    out = {}
+    if command and command.startswith("{") and command.endswith("}"):
+        # a positional param (run_inc_funnel.sh VERB)
+        if not tail or tail[0].startswith("--"):
+            raise ExecError("the argv does not name the %s of %s" % (command[1:-1], first))
+        out[command[1:-1]] = tail[0]
+        tail = tail[1:]
+    elif command:
         if not tail or tail[0] != command:
             raise ExecError("the argv does not run %s %s" % (first, command))
         tail = tail[1:]
     flags = {f: (p, k) for f, p, k in spec}
-    out, i = {}, 0
+    i = 0
     while i < len(tail):
         tok = tail[i]
         if tok not in flags:
@@ -627,6 +697,8 @@ def render(action, params, meta=None):
         need("arxiv_id")
         need("paper_id")
         return {"builder": None, "remote": None, "local": True}
+    if action in ("inc_verify_queue", "inc_funnel_sync"):
+        return {"builder": None, "remote": None, "local": True}
     if action in PLAN_ACTIONS:
         need("campaign")
         if p.get("n") in (None, ""):
@@ -644,8 +716,12 @@ def render(action, params, meta=None):
         need(k)
     if action == "inc_build_realloop" and LV.evidence_with_relevance(p):
         raise ExecError(M.EVIDENCE_WITH_RELEVANCE)
+    if command and command.startswith("{") and command.endswith("}"):
+        command = need(command[1:-1])
     flags = _flag_tokens(spec, p)
     builder = [first] + ([command] if command else []) + flags
+    if action == "inc_funnel_fetch":
+        return {"builder": builder, "remote": None, "local": True}
     if action == "inc_unblock_transient":
         return {"builder": builder, "remote": ["unblock"] + flags, "local": False}
     sub, module = SUBMIT_FORMS[action]
@@ -818,13 +894,20 @@ def parse_remote(res, n):
 
 # --- the research brain's plan job ----------------------------------------------------
 # Cluster side of inc_plan_submit, run in the bench env from the nested copy.
-# argv: input output raw_sha256 model job_name cluster_repo payload. It writes
+# argv: input output raw_sha256 model job_name cluster_repo payload [role]; a
+# devil's-advocate digest adds role "adversary", exported to the job as
+# PLAN_ROLE (docs/FUNNEL_AUDIT.md 8.6). It writes
 # the staged digest once (identical bytes are accepted again), refuses when a
 # reply already exists, and sbatches run_inc_plan.sh from the repo root.
 _PLAN_SUBMIT_PY = """
 import base64, gzip, hashlib, json, os, re, subprocess, sys
 inp, out, want, model, name, repo, payload = sys.argv[1:8]
+role = sys.argv[8] if len(sys.argv) > 8 else ""
 rec = {"verb": "plan-submit", "ok": False, "input": inp, "output": out}
+if role not in ("", "adversary"):
+    rec["error"] = "role %r is not adversary" % role
+    print("INCAP " + json.dumps(rec, sort_keys=True))
+    sys.exit(1)
 def done(**kw):
     rec.update(kw)
     print("INCAP " + json.dumps(rec, sort_keys=True))
@@ -852,7 +935,8 @@ else:
         fh.write(raw)
     os.replace(tmp, inp)
 os.makedirs(os.path.join(plans, "logs"), exist_ok=True)
-export = "ALL,PLAN_INPUT=%s,PLAN_OUTPUT=%s" % (inp, out) + (",PLAN_MODEL=%s" % model if model else "")
+export = "ALL,PLAN_INPUT=%s,PLAN_OUTPUT=%s" % (inp, out) + (",PLAN_MODEL=%s" % model if model else "") \
+    + (",PLAN_ROLE=%s" % role if role else "")
 try:
     p = subprocess.run(["sbatch", "--parsable", "--job-name=" + name, "--export=" + export,
                         "weed_llm_benchmark/run_inc_plan.sh"], cwd=repo, capture_output=True,
@@ -924,12 +1008,16 @@ def _plan_segment(ctx, action, params):
     if str(digest.get("campaign")) != campaign or digest.get("n") != n:
         raise ExecError("the staged digest %s is plan %r of %r, not plan %d of %s"
                         % (local, digest.get("n"), digest.get("campaign"), n, campaign))
+    adversary = digest.get("schema") == BP.DA_DIGEST_SCHEMA
+    if adversary and digest.get("role") != "adversary":
+        raise ExecError("the staged DA digest %s names role %r" % (local, digest.get("role")))
     payload = base64.b64encode(gzip.compress(raw, mtime=0)).decode("ascii")
     if len(payload) > PLAN_MAX_STAGED_CHARS:
         raise ExecError("the staged digest compresses to %d characters, over the %d one ssh command "
                         "line carries" % (len(payload), PLAN_MAX_STAGED_CHARS))
     args = [paths["input"], paths["output"], hashlib.sha256(raw).hexdigest(),
-            str(params.get("model") or ""), "inc_plan_%s_%d" % (campaign, n), M.CLUSTER_REPO, payload]
+            str(params.get("model") or ""), ("inc_da_%s_%d" if adversary else "inc_plan_%s_%d") % (campaign, n),
+            M.CLUSTER_REPO, payload] + (["adversary"] if adversary else [])
     return "python -u -c %s %s" % (shlex.quote(_PLAN_SUBMIT_PY), " ".join(shlex.quote(a) for a in args))
 
 
@@ -1816,7 +1904,7 @@ def _ledger_pos(v):
 
 
 def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_step1=False,
-                      actor=M.AUTOPILOT_ACTOR, campaign=None, ctx=None, plan_pull=None):
+                      actor=M.AUTOPILOT_ACTOR, campaign=None, ctx=None, plan_pull=None, funnel=False):
     """remote.py campaign-snapshot: advance, report and snapshot in one verb.
 
     Composite, so it has no policy row of its own: each part is authorised
@@ -1828,7 +1916,11 @@ def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_s
     `ledger_from` maps an experiment to N or (N, through_sha256) (_ledger_pos).
     `plan_pull` ({"campaign", "n"}) adds the research brain's reply read
     (inc_plan_pull, R0) to the same ssh call; its own result, logged on its
-    own, comes back under "plan_pull" (None when it was not asked for).
+    own, comes back under "plan_pull" (None when it was not asked for). A
+    list of such dicts (the brain's and the devil's advocate's replies) comes
+    back as a list under "plan_pulls", one result per pull, in order.
+    `funnel` adds the funnel summary (inc_funnel_summary, R0: remote.py
+    campaign-snapshot --funnel) to the snapshot record, under "funnel".
     """
     ctx = ctx or Context()
     now = ctx.clock()
@@ -1862,7 +1954,7 @@ def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_s
     resources = ctx.resources()
     if resources.get("cluster_reachable") is False:
         return _finish(ctx, res, "refused", ["the cluster is not reachable"])
-    parts = []
+    parts = [("inc_funnel_summary", {})] if funnel else []
     for e in exps:
         sp = {"exp": e}
         if e in pos:
@@ -1892,29 +1984,37 @@ def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_s
             argv += ["--ledger-from", ("%s=%d:%s" % (e, n, sha)) if sha else ("%s=%d" % (e, n))]
     if no_step1:
         argv.append("--no-step1")
+    if funnel:
+        argv.append("--funnel")
     plans = [{"res": res, "action": "inc_campaign_snapshot", "params": params, "local": False,
               "remote": argv}]
-    pull_done = None
-    if plan_pull is not None:
-        preq = _normalize({"policy_action": "inc_plan_pull", "params": dict(plan_pull)})
+    pulls = plan_pull if isinstance(plan_pull, list) else ([plan_pull] if plan_pull is not None else [])
+    done = []
+    for pp in pulls:
+        preq = _normalize({"policy_action": "inc_plan_pull", "params": dict(pp)})
         pres = _new_result(preq, actor, camp, now)
         pres["risk"] = POL.risk_of("inc_plan_pull")
         auth = POL.authorize(actor, "inc_plan_pull", preq["params"], None, resources)
         if not auth["allowed"] or auth["needs_approval"]:
-            pull_done = _finish(ctx, pres, "refused", auth["reasons"])
-        else:
-            try:
-                seg = _plan_segment(ctx, "inc_plan_pull", preq["params"])
-            except (ExecError, TypeError, ValueError) as e:
-                pull_done = _finish(ctx, pres, "refused", [str(e)])
-            else:
-                pres["authorized_as"], pres["decided_by"], pres["basis"] = actor, actor, "direct"
-                plans.append({"res": pres, "action": "inc_plan_pull", "params": preq["params"],
-                              "local": False, "remote": seg})
+            done.append(_finish(ctx, pres, "refused", auth["reasons"]))
+            continue
+        try:
+            seg = _plan_segment(ctx, "inc_plan_pull", preq["params"])
+        except (ExecError, TypeError, ValueError) as e:
+            done.append(_finish(ctx, pres, "refused", [str(e)]))
+            continue
+        pres["authorized_as"], pres["decided_by"], pres["basis"] = actor, actor, "direct"
+        plans.append({"res": pres, "action": "inc_plan_pull", "params": preq["params"],
+                      "local": False, "remote": seg})
+        done.append(None)
     results = _run_plans(ctx, plans)
     out = results[0]
-    if plan_pull is not None:
-        out["plan_pull"] = results[1] if len(results) > 1 else pull_done
+    it = iter(results[1:])
+    pulled = [d if d is not None else next(it, None) for d in done]
+    if isinstance(plan_pull, list):
+        out["plan_pulls"] = pulled
+    elif plan_pull is not None:
+        out["plan_pull"] = pulled[0] if pulled else None
     return out
 
 
@@ -2097,3 +2197,370 @@ def main(argv=None):
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# --- lab hooks of the funnel audit (docs/FUNNEL_AUDIT.md 8.5, runner 6.3) --------------------
+# The campaign registers these in Context.local_hooks; each takes the action's
+# params and returns {"ok": bool, ...}. `runner` is subprocess.run (tests
+# inject a fake); nothing here runs at import.
+
+FUNNEL_MODULE = "weed_optimizer_framework.tools.funnel"
+# The fixed list the lab pushes to the cluster (runner 6.3, lab -> cluster),
+# INC_DIR-relative; a directory entry ends in "/". prereg_v1.json and
+# census_v0.json reach the cluster through git, not through the sync.
+FUNNEL_SYNC_FILES = ("funnel/taxonomy_cache.json", "funnel/known_items_v1.json", "funnel/fetch_manifest.json",
+                     "funnel/cards/", "funnel/kt7/", "funnel/refetch/", "funnel/prospective_da.json",
+                     "funnel/rl_answers/RL-A/")
+# The fixed list the lab pulls back from the cluster (runner 6.3, cluster ->
+# lab): the aggregates, the qualification files, the sample and the sheets the
+# lab's reference labeller answers (F7b), and the recovery record. Nothing
+# else moves: no key file, no cluster-only sheet, no row-level ledger, no gold,
+# no embedding or judge score, nothing under step1/, no evaluation image.
+FUNNEL_PULL_FILES = ("funnel/census_v1.json", "funnel/name_status_v2.json", "funnel/funnel_ledger.json",
+                     "funnel/audit_v1.json", "funnel/audit_v1.md", "funnel/class_maps.json",
+                     "funnel/relation_geometry_v1.json", "funnel/relation_audit_v1.json",
+                     "funnel/judge_qualification.json", "funnel/rl_qualification.json", "funnel/leak_v1.json",
+                     "funnel/frames_v1.json", "funnel/sample_v1.csv", "funnel/sheets_v1/", "step1_r1/recovery.json")
+FUNNEL_PULL_RECOVERY = "step1_r1/recovery.json"      # shipped to the evidence as funnel/recovery.json
+# The pre-registration comes back only when the cluster's copy has grown by
+# amendments (the sample lock) over the same core; a person commits it.
+FUNNEL_PREREG_REL = "funnel/prereg_v1.json"
+
+
+def funnel_fetch_argv(params, python=None):
+    """The funnel CLI's fetch command of an inc_funnel_fetch request (L11a, L12)."""
+    argv = [python or sys.executable, "-m", FUNNEL_MODULE, "fetch", "--prereg", str(params["prereg"]),
+            "--what", str(params["what"])]
+    if params.get("names_from"):
+        argv += ["--names-from", str(params["names_from"])]
+    return argv + ["--out", str(params["out"])]
+
+
+def funnel_fetch_hook(runner=None, python=None, cwd=None, timeout=3600):
+    """The lab hook of inc_funnel_fetch: runs the funnel CLI's fetch (it writes
+    hashed files and fetch_manifest.json under the lab's funnel/)."""
+    def hook(params):
+        argv = funnel_fetch_argv(params, python)
+        try:
+            p = (runner or subprocess.run)(argv, cwd=str(cwd or CODE_ROOT), capture_output=True, text=True,
+                                           timeout=timeout)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return {"ok": False, "error": "%s: %s" % (type(e).__name__, e), "argv": argv}
+        return {"ok": p.returncode == 0, "rc": p.returncode, "argv": argv,
+                "tail": (p.stdout or "")[-1500:], "stderr_tail": (p.stderr or "")[-500:],
+                "error": "" if p.returncode == 0 else "fetch exited %d" % p.returncode}
+    return hook
+
+
+def funnel_sync_list(lab_inc):
+    """[INC_DIR-relative path] of the lab's files the sync may push: every file
+    under an entry of FUNNEL_SYNC_FILES that exists in `lab_inc`."""
+    root = Path(lab_inc)
+    out = []
+    for rel in FUNNEL_SYNC_FILES:
+        p = root / rel
+        if rel.endswith("/"):
+            if p.is_dir():
+                out += sorted(str(f.relative_to(root)) for f in p.rglob("*") if f.is_file())
+        elif p.is_file():
+            out.append(rel)
+    return out
+
+
+def funnel_sync_refusals(paths, allowed=FUNNEL_SYNC_FILES):
+    """Paths outside the fixed list (runner 6.3: the sync refuses them)."""
+    bad = []
+    for x in paths:
+        if ".." in Path(x).parts or not any(x == r or (r.endswith("/") and x.startswith(r)) for r in allowed):
+            bad.append(x)
+    return bad
+
+
+def funnel_pull_refusals(paths):
+    """Paths outside the pull list (runner 6.3, cluster -> lab)."""
+    return funnel_sync_refusals(paths, FUNNEL_PULL_FILES)
+
+
+def _sha_file(path):
+    h = hashlib.sha256()
+    with open(str(path), "rb") as fh:
+        for b in iter(lambda: fh.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+def funnel_pull_local(lab_inc):
+    """{INC_DIR-relative path: sha256} of the lab's copies of the pull list's
+    files (and of the pre-registration), for the ticker's context: what the
+    lab already holds of what the cluster sends back."""
+    root = Path(lab_inc)
+    out = {}
+    for rel in FUNNEL_PULL_FILES + (FUNNEL_PREREG_REL,):
+        p = root / rel
+        if rel.endswith("/"):
+            if p.is_dir():
+                for f in sorted(p.rglob("*")):
+                    if f.is_file() and not f.is_symlink():
+                        out[str(f.relative_to(root))] = _sha_file(f)
+        elif p.is_file():
+            out[rel] = _sha_file(p)
+    return out
+
+
+# Cluster side of the pull's listing: stdin the pull list (entries ending in
+# "/" are directories), argv the cluster INC_DIR. Prints the sha256 of every
+# file the list names that exists (never a symlink), and the pre-registration's
+# raw and core sha256 and amendment count. Reads nothing outside the list.
+_PULL_LIST_PY = r"""
+import hashlib, json, os, sys
+inc = sys.argv[1]
+entries = json.loads(sys.stdin.read())
+def sha(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as fh:
+        for b in iter(lambda: fh.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
+files = {}
+for rel in entries:
+    p = os.path.join(inc, rel)
+    if rel.endswith("/"):
+        for root, dirs, fs in os.walk(p):
+            dirs.sort()
+            for f in sorted(fs):
+                fp = os.path.join(root, f)
+                if not os.path.islink(fp) and os.path.isfile(fp):
+                    files[os.path.relpath(fp, inc)] = sha(fp)
+    elif os.path.isfile(p) and not os.path.islink(p):
+        files[rel] = sha(p)
+prereg = None
+pp = os.path.join(inc, "funnel", "prereg_v1.json")
+if os.path.isfile(pp):
+    raw = open(pp, "rb").read()
+    obj = json.loads(raw.decode("utf-8"))
+    core = {k: v for k, v in obj.items() if k != "amendments"}
+    prereg = {"sha256": hashlib.sha256(raw).hexdigest(), "amendments": len(obj.get("amendments") or []),
+              "core_sha256": hashlib.sha256(json.dumps(core, sort_keys=True, separators=(",", ":"),
+                                                       ensure_ascii=False).encode("utf-8")).hexdigest()}
+print("INCAP " + json.dumps({"verb": "funnel-pull-list", "files": files, "prereg": prereg}, sort_keys=True))
+"""
+
+
+def _prereg_state(path):
+    """(core sha256, amendments) of a pre-registration file."""
+    obj = json.loads(Path(path).read_text(encoding="utf-8"))
+    core = {k: v for k, v in obj.items() if k != "amendments"}
+    return (hashlib.sha256(json.dumps(core, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+                           .encode("utf-8")).hexdigest(), list(obj.get("amendments") or []))
+
+
+def _remote_py(repo, script, args):
+    return ("cd %s/weed_llm_benchmark && source %s && conda activate bench && python -c %s %s"
+            % (shlex.quote(repo), shlex.quote(CONDA_SH), shlex.quote(script),
+               " ".join(shlex.quote(str(a)) for a in args)))
+
+
+def funnel_pull(lab_inc, target, cluster_inc=None, runner=None, repo=None):
+    """Cluster -> lab (runner 6.3): list the pull list's files on the cluster
+    with their sha256 (one ssh), rsync the ones the lab lacks or holds another
+    version of into a staging directory, check every staged file against the
+    listed sha256, and only then move them into place. The pre-registration
+    comes back only when the cluster's copy has the lab's core and grew by
+    amendments; another core is refused. Refuses any listed path outside the
+    list. Returns {"ok", "pulled", "prereg", "error"}."""
+    cluster_inc = cluster_inc or M.CLUSTER_INC_DIR
+    repo = repo or M.CLUSTER_REPO
+    run = runner or subprocess.run
+    lab = Path(lab_inc)
+    try:
+        c = run(["ssh", target, _remote_py(repo, _PULL_LIST_PY, [cluster_inc])],
+                input=json.dumps(list(FUNNEL_PULL_FILES)), capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok": False, "pulled": [], "error": "pull listing: %s: %s" % (type(e).__name__, e)}
+    out = c.stdout or ""
+    if c.returncode != 0 or "INCAP " not in out:
+        return {"ok": False, "pulled": [], "error": "pull listing failed (exit %s): %s"
+                % (c.returncode, (out + (c.stderr or ""))[-300:])}
+    try:
+        rec = json.loads(out.split("INCAP ", 1)[1].splitlines()[0])
+        listed = dict(rec.get("files") or {})
+    except (ValueError, IndexError, AttributeError) as e:
+        return {"ok": False, "pulled": [], "error": "pull listing unreadable: %s" % e}
+    bad = funnel_pull_refusals(listed)
+    if bad:
+        return {"ok": False, "pulled": [], "error": "the cluster listed paths outside the pull list: %s" % bad[:5]}
+    want = {rel: sha for rel, sha in listed.items()
+            if not (lab / rel).is_file() or _sha_file(lab / rel) != sha}
+    prereg_note = "not on the cluster"
+    cp = rec.get("prereg")
+    lp = lab / FUNNEL_PREREG_REL
+    if isinstance(cp, dict):
+        if not lp.is_file():
+            return {"ok": False, "pulled": [], "error": "the lab has no %s to compare the cluster's with"
+                    % FUNNEL_PREREG_REL}
+        core, amends = _prereg_state(lp)
+        if cp.get("core_sha256") != core:
+            return {"ok": False, "pulled": [], "error": "the cluster's %s has another core (%s, the lab's %s): a "
+                    "different pre-registration; nothing is pulled" % (FUNNEL_PREREG_REL,
+                                                                       str(cp.get("core_sha256"))[:12], core[:12])}
+        if int(cp.get("amendments") or 0) > len(amends):
+            want[FUNNEL_PREREG_REL] = cp.get("sha256")
+            prereg_note = "amendments grew (%d -> %d): pulled for a person to commit" % (len(amends),
+                                                                                      cp.get("amendments"))
+        else:
+            prereg_note = "unchanged"
+    if not want:
+        return {"ok": True, "pulled": [], "prereg": prereg_note, "error": ""}
+    staging = lab / ".funnel_pull" / uuid.uuid4().hex
+    staging.mkdir(parents=True)
+    try:
+        argv = ["rsync", "-a", "--files-from=-", "--", "%s:%s/" % (target, cluster_inc), str(staging) + "/"]
+        try:
+            p = run(argv, input="\n".join(sorted(want)) + "\n", capture_output=True, text=True, timeout=1800)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return {"ok": False, "pulled": [], "error": "rsync: %s: %s" % (type(e).__name__, e)}
+        if p.returncode != 0:
+            return {"ok": False, "pulled": [], "error": "rsync exited %d: %s" % (p.returncode, (p.stderr or "")[-300:])}
+        wrong = []
+        for rel, sha in sorted(want.items()):
+            f = staging / rel
+            got = _sha_file(f) if f.is_file() else None
+            if got != sha:
+                wrong.append([rel, got, sha])
+        if wrong:
+            return {"ok": False, "pulled": [], "error": "changed in transit, nothing moved into place: %s" % wrong[:3]}
+        if FUNNEL_PREREG_REL in want:
+            core, amends = _prereg_state(lp)
+            ncore, namends = _prereg_state(staging / FUNNEL_PREREG_REL)
+            if ncore != core or namends[:len(amends)] != amends:
+                return {"ok": False, "pulled": [], "error": "the cluster's pre-registration does not extend the "
+                        "lab's by amendments alone; nothing moved into place"}
+        for rel in sorted(want):
+            dest = lab / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(str(staging / rel), str(dest))
+        return {"ok": True, "pulled": sorted(want), "prereg": prereg_note, "error": ""}
+    finally:
+        import shutil
+        shutil.rmtree(str(staging), ignore_errors=True)
+        try:
+            staging.parent.rmdir()
+        except OSError:
+            pass
+
+
+# Cluster side of the sync's arrival check (runner 6.3: every transfer is
+# verified on arrival). stdin: {INC_DIR-relative path: sha256} of what the lab
+# pushed; argv: the cluster INC_DIR and "1" when a fetch manifest was pushed.
+# Every pushed file must hash as it did on the lab (prospective_da.json and the
+# RL-A answers are in no fetch manifest); then funnel.fetch.check_manifest
+# checks the fetched files against fetch_manifest.json and rebuilds their
+# machine-local tables. Exit 1 on any mismatch.
+_SYNC_CHECK_PY = r"""
+import hashlib, json, os, sys
+inc, manifest = sys.argv[1], sys.argv[2] == "1"
+want = json.loads(sys.stdin.read())
+bad = []
+for rel, sha in sorted(want.items()):
+    h = hashlib.sha256()
+    try:
+        with open(os.path.join(inc, rel), "rb") as fh:
+            for b in iter(lambda: fh.read(1 << 20), b""):
+                h.update(b)
+        got = h.hexdigest()
+    except OSError as e:
+        got = "unreadable (%s)" % type(e).__name__
+    if got != sha:
+        bad.append([rel, got, sha])
+rec = {"verb": "funnel-sync-check", "checked": len(want), "mismatched": bad, "manifest": None}
+if manifest and not bad:
+    try:
+        from weed_optimizer_framework.tools.funnel import fetch
+        fetch.check_manifest(os.path.join(inc, "funnel"))
+        rec["manifest"] = "ok"
+    except Exception as e:
+        rec["manifest"] = "%s: %s" % (type(e).__name__, e)
+        bad.append(["funnel/fetch_manifest.json", rec["manifest"], "fetch.check_manifest"])
+print("INCAP " + json.dumps(rec, sort_keys=True))
+sys.exit(1 if bad else 0)
+"""
+
+
+def funnel_sync_hook(lab_inc, target, cluster_inc=None, runner=None, repo=None):
+    """The lab hook of inc_funnel_sync (runner 6.3), both directions over the
+    dashboard's ssh target. Lab -> cluster: rsync the fixed file list from the
+    lab's INC tree to the cluster's, then verify the arrival there
+    (_SYNC_CHECK_PY): every pushed file hashes as on the lab, and when a fetch
+    manifest was pushed, funnel.fetch.check_manifest (StaleInput on a
+    mismatch). Cluster -> lab: funnel_pull (the pull list, verified before it
+    is moved into place). Refuses a path outside either list."""
+    cluster_inc = cluster_inc or M.CLUSTER_INC_DIR
+    repo = repo or M.CLUSTER_REPO
+
+    def hook(params):
+        files = funnel_sync_list(lab_inc)
+        bad = funnel_sync_refusals(files)
+        if bad:
+            return {"ok": False, "error": "outside the sync's fixed list: %s" % bad[:5]}
+        if not target:
+            return {"ok": False, "error": "no cluster ssh target (CLUSTER_SSH) to sync with"}
+        res = push(files) if files else {"ok": True, "pushed": [], "note": "nothing to push"}
+        if not res.get("ok"):
+            return res
+        pull = funnel_pull(lab_inc, target, cluster_inc, runner, repo)
+        res.update(pulled=pull.get("pulled") or [], prereg=pull.get("prereg"))
+        if not pull.get("ok"):
+            res.update(ok=False, error="pull: %s" % pull.get("error"))
+        return res
+
+    def push(files):
+        shas = {rel: hashlib.sha256((Path(lab_inc) / rel).read_bytes()).hexdigest() for rel in files}
+        run = runner or subprocess.run
+        argv = ["rsync", "-a", "--files-from=-", "--", str(Path(lab_inc)) + "/", "%s:%s/" % (target, cluster_inc)]
+        try:
+            p = run(argv, input="\n".join(files) + "\n", capture_output=True, text=True, timeout=1800)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return {"ok": False, "error": "rsync: %s: %s" % (type(e).__name__, e), "files": files}
+        if p.returncode != 0:
+            return {"ok": False, "error": "rsync exited %d: %s" % (p.returncode, (p.stderr or "")[-300:]),
+                    "files": files}
+        manifest = "1" if "funnel/fetch_manifest.json" in shas else "0"
+        check = ("cd %s/weed_llm_benchmark && source %s && conda activate bench && python -c %s %s %s"
+                 % (shlex.quote(repo), shlex.quote(CONDA_SH), shlex.quote(_SYNC_CHECK_PY),
+                    shlex.quote(cluster_inc), manifest))
+        try:
+            c = run(["ssh", target, check], input=json.dumps(shas, sort_keys=True), capture_output=True, text=True,
+                    timeout=300)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return {"ok": False, "error": "arrival check: %s: %s" % (type(e).__name__, e), "files": files}
+        return {"ok": c.returncode == 0, "pushed": files, "rc": c.returncode, "sha256": shas,
+                "error": "" if c.returncode == 0 else "the arrival check on the cluster failed: %s"
+                % ((c.stdout or "") + (c.stderr or ""))[-400:]}
+    return hook
+
+
+def write_verify_queue(rows, path):
+    """Append verify tasks (lever L14) to the person's queue file, once each
+    (a task's id is the sha256 of its content); returns {"ok", "added", "path"}."""
+    path = Path(path)
+    have = set()
+    if path.is_file():
+        for ln in path.read_text(encoding="utf-8").splitlines():
+            try:
+                have.add(json.loads(ln).get("task_id"))
+            except ValueError:
+                continue
+    added = []
+    for r in rows or []:
+        task = dict(r, kind="class_map_verify", question="Does this source class hold the proposed class?")
+        tid = hashlib.sha256(json.dumps(task, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+        if tid in have:
+            continue
+        have.add(tid)
+        added.append(dict(task, task_id=tid, queued_utc=M.utc_now()))
+    if added:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as fh:
+            for t in added:
+                fh.write(json.dumps(t, sort_keys=True) + "\n")
+    return {"ok": True, "added": len(added), "path": str(path)}

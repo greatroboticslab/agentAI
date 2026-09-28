@@ -27,11 +27,71 @@
     "relevance_tau_min": {"value": 0.5, "mirrors": "inc/relevance.py TAU_MIN", "why": "The calibration check of a relevance file: tau >= this, else relevance.load refuses the file. levers.relevance_status reads a file's check the way relevance.load does: ok must be a boolean, the check's tau_min must be this value, and ok must equal (tau >= this). A check that holds all three calls the file 'matching' when ok is true (and it is made for the select build) and 'calibration_failed' when ok is false; any other check (ok true with tau below this, another tau_min, ok missing or not a boolean) does not follow from its tau under this rule and is 'refused' (malformed), as relevance.load refuses it. The file's params.tau_min must be this value too (relevance_min_crops)."},
     "relevance_min_crops": {"value": 20, "mirrors": "inc/relevance.py MIN_CROPS", "why": "The rule a relevance file was made under: relevance.load refuses a file whose params block (min_crops, calibration_percentile, tau_min) is not this code's MIN_CROPS, CAL_PERCENTILE and TAU_MIN ('made under another rule') before it reads the calibration check, so levers.relevance_status calls such a file 'refused' (malformed), never 'calibration_failed' or 'matching'."},
     "relevance_calibration_percentile": {"value": 5.0, "mirrors": "inc/relevance.py CAL_PERCENTILE", "why": "The percentile of train_core's P(plant) a relevance file's tau is (params.calibration_percentile); see relevance_min_crops: a file made at another percentile is 'refused'."},
-    "increment_sources_modes": {"value": ["relevance", "evidence"], "mirrors": "inc/select.py SOURCE_MODES (realloop build --increment-sources choices)", "why": "The two pre-registered relevance criteria of the verified and OTHER_HEAVY increments (docs/INCREMENTAL_PROTOCOL.md, Steps 2-3): the zero-shot relevance filter and source-level species evidence. The enum of every increment_sources bound."},
+    "increment_sources_modes": {"value": ["relevance", "evidence", "recovered"], "mirrors": "inc/realloop.py INCREMENT_SOURCE_MODES (realloop build --increment-sources choices: select.SOURCE_MODES and the funnel's recovered overlay)", "why": "The two pre-registered relevance criteria of the verified and OTHER_HEAVY increments (docs/INCREMENTAL_PROTOCOL.md, Steps 2-3): the zero-shot relevance filter and source-level species evidence. The enum of every increment_sources bound."},
+    "recovered_steps": {"value": 6, "mirrors": "inc/realloop.py RECOVERED_SEQUENCE (length)", "why": "The recovered loop's steps (REC-VETO, REC-AUTH-1, REC-CLASS-1, REC-JUDGE-1, REC-AUTH-2, REC-CLASS-2; contract 9.1), every one clean false: levers.estimate_realloop prices a recovered L2 over them."},
     "increment_sources_default": {"value": "relevance", "mirrors": "inc/select.py SOURCES_RELEVANCE (the default of realloop build --increment-sources)", "why": "A real-loop build uses the relevance file unless --increment-sources evidence is given, so the flag is rendered only for 'evidence' and a relevance build's command stays the one a person ran before the flag existed."},
     "min_evidence_default": {"value": 1, "mirrors": "inc/select.py MIN_EVIDENCE (the default of realloop build --min-evidence)", "why": "Source-level species evidence: a source is eligible when verify admit judged at least this many of its cwd12-species boxes verified. --min-evidence is not on the menu: every evidence build takes the protocol's default, and levers.evidence_capacity counts evidenced sources with it."},
     "min_decided_increments": {"value": 6, "mirrors": "docs/INCREMENTAL_PROTOCOL.md, Steps 2-3 acceptance ('at least 6 increments decided')", "why": "The sizing rule of an evidence-sourced real loop (R4 review, 2026-09-27; levers.evidence_sizing): when the evidenced pool cannot hold the default build, N is the smallest number of verified increments with which the loop decides at least this many increments together with UNVERIFIED and OTHER_HEAVY (realloop's sequence: N + 2 steps, so N = 4). A loop that decides fewer does not meet the acceptance, so it is never sized below it, and an evidence loop whose N is given (a brain plan's, an L5 or D1 rebuild's) with fewer is refused (levers.r4_floor), never filed."},
-    "min_increment_frac": {"value": 0.05, "mirrors": "the R4 review of 2026-09-27 (docs/INC_AUTOPILOT.md, D2; docs/INCREMENTAL_PROTOCOL.md, Steps 2-3)", "why": "The floor of the sizing rule: the sized M = min(inc_frac x |B|, floor(evidenced pool images / (N + 1))) must be at least this share of base B's images (half the protocol's 10 %). Below it the review judged an increment too small for the gate to detect an effect, so D2 escalates with the numbers instead of sizing the loop. An evidence loop whose M is given instead of sized (a brain plan's, an L5 or D1 rebuild's) is held to the same floor (levers.r4_floor): below it the lever is refused, never filed."}
+    "min_increment_frac": {"value": 0.05, "mirrors": "the R4 review of 2026-09-27 (docs/INC_AUTOPILOT.md, D2; docs/INCREMENTAL_PROTOCOL.md, Steps 2-3)", "why": "The floor of the sizing rule: the sized M = min(inc_frac x |B|, floor(evidenced pool images / (N + 1))) must be at least this share of base B's images (half the protocol's 10 %). Below it the review judged an increment too small for the gate to detect an effect, so D2 escalates with the numbers instead of sizing the loop. An evidence loop whose M is given instead of sized (a brain plan's, an L5 or D1 rebuild's) is held to the same floor (levers.r4_floor): below it the lever is refused, never filed."},
+    "funnel_script": {
+      "value": "run_inc_funnel.sh",
+      "why": "The funnel's sbatch wrapper (runner 5.6.2): every L10, L11 and L13 job, priced by its #SBATCH --time."
+    },
+    "funnel_prereg": {
+      "value": "funnel/prereg_v1.json",
+      "why": "The pre-registration every funnel verb takes as --prereg, relative to INC_DIR (contract F0; runner 3.3)."
+    },
+    "funnel_out": {
+      "value": "funnel/",
+      "why": "The funnel verbs' --out, relative to INC_DIR, with the trailing slash of the runner's commands (runner 6.1)."
+    },
+    "funnel_recover_out": {
+      "value": "step1_r1/",
+      "why": "recover's --out, relative to INC_DIR: the content-addressed overlay (contract 7)."
+    },
+    "funnel_verb_class": {
+      "value": {
+        "census": "cpu",
+        "leak": "gpu",
+        "embed-judges": "gpu",
+        "qualify": "cpu",
+        "draw": "cpu",
+        "sheets": "cpu",
+        "rl-b": "gpu_large",
+        "ingest": "cpu",
+        "estimate": "cpu",
+        "map": "cpu",
+        "recover": "cpu",
+        "fetch": "lab"
+      },
+      "mirrors": "funnel/__main__.py VERB_CLASS",
+      "why": "Which resources a funnel verb's job holds (runner 5.6.1); tests/test_funnel_ap_units.py checks it against the CLI."
+    },
+    "funnel_sbatch_resources": {
+      "value": {
+        "cpu": [],
+        "gpu": [],
+        "gpu_large": [
+          "--gres=gpu:h100-80:1",
+          "--cpus-per-task=12",
+          "--mem=80G"
+        ]
+      },
+      "mirrors": "funnel/__main__.py SBATCH_RESOURCES",
+      "why": "The extra sbatch flags per resource class, before the script name (runner 5.6.1, 9 item 30): none for the verbs run_inc_funnel.sh's own one-V100 header covers, an H100-80 for rl-b as run_inc_plan.sh holds for the same model."
+    },
+    "funnel_gpu_by_class": {
+      "value": {
+        "cpu": "v100",
+        "gpu": "v100",
+        "gpu_large": "h100"
+      },
+      "why": "The GPU a funnel job holds, per resource class, for its price: run_inc_funnel.sh's own header is one V100 (GPU-shared; the allocation has no CPU partition), rl-b adds an H100-80."
+    },
+    "funnel_lab_inc_dir": {
+      "value": "results/framework/inc",
+      "why": "The lab's INC tree relative to model.LAB_REPO (runner, Paths: LAB_INC), where L11a and L12 write before the push."
+    }
   },
   "levers": {
     "L1": {
@@ -71,6 +131,7 @@
       "argv": ["python", "-m", "weed_optimizer_framework.tools.inc.realloop", "build", "--exp", "{exp}", "--base", "{base}",
                "--replay-mode", "{replay_mode}", "--recipes", "{recipes}",
                {"if": "increment_sources", "tokens": ["--increment-sources", "{increment_sources}"]},
+               {"if": "step1_overlay", "tokens": ["--step1-overlay", "{step1_overlay}"]},
                {"if": "relevance", "tokens": ["--relevance", "{relevance}"]},
                {"if": "size", "tokens": ["--size", "{size}"]},
                {"if": "n_verified", "tokens": ["--n-verified", "{n_verified}"]},
@@ -81,13 +142,15 @@
         "replay_mode": {"type": "enum", "value_type": "str", "values": ["sample", "full"]},
         "recipes": {"type": "enum", "value_type": "str",
                     "values": ["full", "freeze", "lora", "full,freeze", "full,lora", "freeze,lora", "full,freeze,lora"]},
-        "increment_sources": {"type": "enum", "value_type": "str", "values": ["relevance", "evidence"]},
+        "increment_sources": {"type": "enum", "value_type": "str", "values": ["relevance", "evidence", "recovered"]},
+        "step1_overlay": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/step1_r1/?$"},
         "relevance": {"type": "str", "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}\\.json$"},
         "size": {"type": "int", "min": 1, "max": 20000},
         "n_verified": {"type": "int", "min": 1, "max": 12},
         "gate_flips_mode": {"type": "enum", "value_type": "str", "values": ["negative", "net"]},
         "est_gpu_hours": {"type": "float", "min": 0.0, "max": 200.0}
       },
+      "derived_from_recovery": "From D18 once the recovery overlay is complete (funnel/recovery.json status complete; contract 9.1, realloop_v2): --increment-sources recovered --step1-overlay <INC_DIR>/step1_r1 --size M, M the latest real loop's increment_images, with that loop's base, replay mode, recipes and gate flips mode (levers.recovered_loop_params); never --relevance, --n-verified or --no-truth (realloop refuses them with recovered).",
       "derived_from_parent": "From D4: --replay-mode, --recipes and --gate-flips-mode of the pilot D4 evaluated (its pinned flips mode, rendered only when it is not the builders' default), and the relevance criterion from Step 1 (levers.increment_criterion): --relevance INC_DIR/step1/relevance.json when that file is made for the select build and passed its calibration check; --increment-sources evidence when it failed its own calibration check and the evidenced pool holds (N + 1) x M images (D2 records which and why). When the evidenced pool cannot hold the default N and M, the loop is sized by the R4 rule (levers.evidence_sizing, 2026-09-27): N = the fewest verified increments that decide protocol.min_decided_increments with UNVERIFIED and OTHER_HEAVY, M = min(inc_frac x |B|, floor(evidenced images / (N + 1))), and --n-verified and --size are rendered where they differ from the builders' defaults; an M below protocol.min_increment_frac x |B| is not sized (D2 escalates). From D1 on a real loop: every flag of the parent loop (levers.loop_params, its criterion included), --replay-mode full.",
       "estimator": "realloop",
       "control": "The loop's own base arm B and truth arm, as pre-registered in docs/INCREMENTAL_PROTOCOL.md, Steps 2-3.",
@@ -292,6 +355,346 @@
         {"paper_id": "2604.09791", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:85", "status": "the source of the flips guard (Pioneer Agent)"},
         {"paper_id": "2301.10546", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md:141-183", "status": "negative flips as a regression metric (BCWI)"}
       ]
+    },
+    "L10": {
+      "name": "funnel_audit",
+      "title": "Audit what the Step 1 filters discarded (the funnel audit, one stage per job)",
+      "kind": "job",
+      "policy_action": "inc_funnel_audit",
+      "risk": "R2",
+      "argv": [
+        "sbatch",
+        {
+          "if": "sbatch_resources",
+          "tokens": [
+            "{*sbatch_resources}"
+          ]
+        },
+        "run_inc_funnel.sh",
+        "{verb}",
+        "--prereg",
+        "{prereg}",
+        "--out",
+        "{out}",
+        {
+          "if": "rl",
+          "tokens": [
+            "--rl"
+          ]
+        }
+      ],
+      "script": "run_inc_funnel.sh",
+      "param_bounds": {
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "census",
+            "leak",
+            "embed-judges",
+            "qualify",
+            "draw",
+            "sheets",
+            "rl-b",
+            "ingest",
+            "estimate"
+          ]
+        },
+        "rl": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            1
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "requires": [
+        "verb"
+      ],
+      "derived": {
+        "prereg": "<INC_DIR>/funnel/prereg_v1.json (protocol funnel_prereg)",
+        "out": "<INC_DIR>/funnel/ (protocol funnel_out)",
+        "sbatch_resources": "the extra sbatch flags of the verb's resource class (protocol funnel_sbatch_resources[funnel_verb_class[verb]]; none for the CPU and V100 verbs)"
+      },
+      "preconditions": {
+        "census": {
+          "cluster_file": "funnel/taxonomy_cache.json",
+          "then": "L12",
+          "why": "census resolves every census name through the taxonomy cache and refuses a miss, naming lever L12 (runner 5.2.2); the cache is built on the lab (L12) and pushed."
+        },
+        "estimate": {
+          "cluster_file": "funnel/prospective_da.json",
+          "then": "OP_DA",
+          "why": "estimate refuses without the committed devil's-advocate reply (contract 6 H11, runner 4.17): its absence is a stop, not a skip."
+        }
+      },
+      "estimator": "funnel_walltime",
+      "control": "Known truth disjoint from every audited stratum (contract 4.1): the planted control G0 and the sentinels, with the reference labeller qualified on independent truth only.",
+      "success": "H0 passes, and every recoverable stage has an FN interval with half-width <= 0.10 (contract 8.5 L10).",
+      "falsifier": "H0 fails: the estimator, the reference labeller or the relation audit is defective, and the audit is void (the campaign stops at F8).",
+      "predicted": null,
+      "lit": [
+        {
+          "paper_id": "dodge2021",
+          "doc_ref": "docs/FUNNEL_AUDIT.md 2.1",
+          "status": "contract table, corpus entry pending"
+        },
+        {
+          "paper_id": "webber2013",
+          "doc_ref": "docs/FUNNEL_AUDIT.md 2.1",
+          "status": "contract table, corpus entry pending"
+        }
+      ]
+    },
+    "L11": {
+      "name": "resolve_label_spaces",
+      "title": "Resolve uninformative label spaces: geometry match against fetched upstream annotations, or the relation audit",
+      "kind": "job",
+      "policy_action": "inc_funnel_map",
+      "risk": "R2",
+      "argv": [
+        "sbatch",
+        "run_inc_funnel.sh",
+        "map",
+        "--prereg",
+        "{prereg}",
+        "--out",
+        "{out}",
+        "--part",
+        "{part}"
+      ],
+      "script": "run_inc_funnel.sh",
+      "param_bounds": {
+        "part": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "geometry",
+            "relation"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "requires": [
+        "part"
+      ],
+      "derived": {
+        "prereg": "<INC_DIR>/funnel/prereg_v1.json",
+        "out": "<INC_DIR>/funnel/"
+      },
+      "preconditions": {
+        "geometry": {
+          "cluster_file": "funnel/cards/index.json",
+          "then": "L11a",
+          "why": "the geometry match reads the upstream annotation archives L11a fetched and hashed on the lab (runner 5.2.4)."
+        },
+        "relation": {
+          "cluster_file": "funnel/judge_qualification.json",
+          "then": "L10",
+          "why": "the relation audit uses the allowed judge with the best qualification (runner 5.2.4), written by L10 qualify (F5)."
+        }
+      },
+      "estimator": "funnel_walltime",
+      "control": "The class count the source's card or paper states, and the H3a-type exact geometry match on a seeded half, confirmed on the other half.",
+      "success": "A class map is accepted when the card and the geometry match agree and the class purity meets the class gate (lower bound >= 0.8); applying it is lever L13 (R3).",
+      "falsifier": "The class count disagrees with the card, or no alignment reaches the pre-registered agreement: the class goes to the verify queue (L14).",
+      "predicted": null,
+      "lit": [
+        {
+          "paper_id": "uijlings2022",
+          "doc_ref": "docs/FUNNEL_AUDIT.md 2.1",
+          "status": "contract table, corpus entry pending"
+        },
+        {
+          "paper_id": "zhou2022_unidet",
+          "doc_ref": "docs/FUNNEL_AUDIT.md 2.1",
+          "status": "contract table, corpus entry pending"
+        }
+      ]
+    },
+    "L11a": {
+      "name": "fetch_cards",
+      "title": "Fetch and hash dataset cards, author class lists and upstream annotations (lab)",
+      "kind": "lab",
+      "policy_action": "inc_funnel_fetch",
+      "risk": "R0",
+      "argv": [
+        "python",
+        "-m",
+        "weed_optimizer_framework.tools.funnel",
+        "fetch",
+        "--prereg",
+        "{prereg}",
+        "--what",
+        "{what}",
+        "--out",
+        "{out}"
+      ],
+      "param_bounds": {
+        "what": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "cards",
+            "kt7",
+            "known-items",
+            "refetch"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "requires": [
+        "what"
+      ],
+      "derived": {
+        "prereg": "<LAB INC_DIR>/funnel/prereg_v1.json",
+        "out": "<LAB INC_DIR>/funnel/"
+      },
+      "estimator": "zero",
+      "control": "The card's own statement of its classes and licence, hashed as fetched (runner 4.5 cards/index.json).",
+      "success": "Every S2 source with a documented upstream has its card and annotation archive fetched and hashed; the fetch manifest checks on arrival on the cluster.",
+      "falsifier": "The upstream is unreachable or its class list is missing: the source's classes rest on visual clusters and reference labels only (contract H3b).",
+      "predicted": null,
+      "lit": []
+    },
+    "L12": {
+      "name": "taxonomy_resolve",
+      "title": "Resolve every source class name through the taxonomy authority, version and responses cached (lab)",
+      "kind": "lab",
+      "policy_action": "inc_funnel_fetch",
+      "risk": "R0",
+      "argv": [
+        "python",
+        "-m",
+        "weed_optimizer_framework.tools.funnel",
+        "fetch",
+        "--prereg",
+        "{prereg}",
+        "--what",
+        "{what}",
+        "--names-from",
+        "{names_from}",
+        "--out",
+        "{out}"
+      ],
+      "param_bounds": {
+        "what": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "taxonomy"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "fixed": {
+        "what": "taxonomy"
+      },
+      "derived": {
+        "prereg": "<LAB INC_DIR>/funnel/prereg_v1.json",
+        "out": "<LAB INC_DIR>/funnel/",
+        "names_from": "<LAB INC_DIR>/step1/pool_summary.json (every joined source class name)"
+      },
+      "estimator": "zero",
+      "control": "The domain config's pinned class policy and overrides (R4); a vernacular match alone never maps a class.",
+      "success": "Every census name resolves or is recorded unresolvable in funnel/taxonomy_cache.json; synonyms and descendants at a target's rank map, relatives are listed as confusable.",
+      "falsifier": "The authority maps a relative to a target (the sibling guard's own test fails).",
+      "predicted": null,
+      "lit": []
+    },
+    "L13": {
+      "name": "recover_increment",
+      "title": "Recover the audited false negatives into a content-addressed overlay (step1_r1), gated per stratum",
+      "kind": "job",
+      "policy_action": "inc_funnel_recover",
+      "risk": "R3",
+      "argv": [
+        "sbatch",
+        "run_inc_funnel.sh",
+        "recover",
+        "--prereg",
+        "{prereg}",
+        "--audit",
+        "{audit}",
+        "--maps",
+        "{maps}",
+        "--policy",
+        "{policy}",
+        "--out",
+        "{out}"
+      ],
+      "script": "run_inc_funnel.sh",
+      "param_bounds": {
+        "policy": {
+          "type": "str",
+          "pattern": "^R-[ACTVJF](,R-[ACTVJF]){0,5}$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "requires": [
+        "policy"
+      ],
+      "only_after": [
+        "D18"
+      ],
+      "derived": {
+        "prereg": "<INC_DIR>/funnel/prereg_v1.json",
+        "audit": "<INC_DIR>/funnel/audit_v1.json",
+        "maps": "<INC_DIR>/funnel/class_maps.json",
+        "out": "<INC_DIR>/step1_r1/"
+      },
+      "estimator": "funnel_walltime",
+      "control": "The same images with the join labels and no masks (arm U-ctl), and B alone, in realloop_v2 (contract 9).",
+      "success": "H10: the dose arm U is 'helps' against B by the pinned truth rule and the 5 v 5 permutation test.",
+      "falsifier": "Every recovered arm is neutral or hurts: the claim becomes 'scarcity of useful target data (audited)'.",
+      "predicted": {
+        "metric": "dev_twelve",
+        "direction": "up"
+      },
+      "lit": []
+    },
+    "L14": {
+      "name": "verify_queue",
+      "title": "Queue verify-only tasks for a person (class maps the card and the geometry do not settle)",
+      "kind": "lab_hook",
+      "policy_action": "inc_verify_queue",
+      "risk": "R2",
+      "argv": null,
+      "hook": "writes one verify task per queued unit to <brain dir>/<domain>/known_truth/human_verify_queue.jsonl; answers come back in human_verify.jsonl, read by the funnel's rl.ingest",
+      "param_bounds": {
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "estimator": "zero",
+      "control": "A person's yes/no on each proposed class map, split 50/50 by a seeded hash of the unit id into calibration and estimation halves (contract 8.5 L14).",
+      "success": "Every queued class map is answered and its purity is estimated from the answers.",
+      "falsifier": "The answers disagree with the geometry-matched map beyond the class gate: the map is refused.",
+      "predicted": null,
+      "lit": []
     }
   },
   "cards": {
@@ -393,6 +796,39 @@
       "control": "The failed relevance.json of the same select build, and the evidence criterion's evidenced sources.",
       "success_criterion": "The calibration check passes, every source with verified cwd12-species boxes passes, and the non-plant sources D2 named fail.",
       "lit": [{"paper_id": "dinov2_curation", "doc_ref": "docs/INCREMENTAL_PROTOCOL.md (Step 1, Source relevance, Result on the real pool)"}]
+    },
+    "X10": {
+      "title": "Class-definition policy (which taxa count as each target class)",
+      "risk": "R4",
+      "hypothesis": "A class's definition decides which recovered boxes count as that class, for example whether a genus-level class takes every species of its genus (contract 5.1); an audit finding may argue for another definition.",
+      "why_menu_insufficient": "The class policy is pre-registered (DEC-3) and fixed before any reference label exists; changing it changes what every estimate measures, which is a person's decision.",
+      "required_change": "A dated amendment of the class policy in the contract and prereg_v1.json, before any reference label, with the reason.",
+      "cheapest_test": "Count, on the audit's reference labels, the boxes whose status flips between the two definitions.",
+      "control": "The pre-registered class policy (DEC-3).",
+      "success_criterion": "The amended policy is recorded before any reference label it would change.",
+      "lit": []
+    },
+    "X11": {
+      "title": "Filter recall out of domain (refit the verifier with near-miss negatives, leave-source-out)",
+      "risk": "R4",
+      "hypothesis": "The verifier was calibrated only on known truth from its own domain (S4) or learned its reject class mostly from one source's generic names (S6), so its recall on shifted sources is unmeasured and may be low.",
+      "why_menu_insufficient": "The verifier, its thresholds and its reject-class sample are pinned Step 1 code (verify.py); a refit is a new Step 1 version, a person's decision (contract 8.7, card X11, H8).",
+      "required_change": "The H8 refit (F11): named relatives added to the reject class, the reject-class sample drawn leave-source-out with name status v2, cross-fitted by lab; its product is a candidate verifier only.",
+      "cheapest_test": "The refit on the existing embeddings, scored on the audit's reference-labelled shifted strata (H8).",
+      "control": "The pinned verifier on the same strata; in-domain precision on the reference domain's own known truth.",
+      "success_criterion": "Shifted recall rises by >= 0.20 against reference labels while in-domain precision stays >= 0.99 (H8).",
+      "lit": []
+    },
+    "X12": {
+      "title": "Claim status sign-off",
+      "risk": "R4",
+      "hypothesis": "A claim's final status (refuted, accepted_open, or scarcity audited) follows from the audit and the recovery test by the pre-registered table (contract 9.3), but only a person signs it.",
+      "why_menu_insufficient": "Claim status moves only through the devil's-advocate machinery or a person (contract 8.3); the final sign-off is not delegated (contract 13).",
+      "required_change": "A person's transition of the claim in campaign/claims.json, recorded with its cites.",
+      "cheapest_test": "Read the audit's hypotheses and realloop_v2's panel against the contract's 9.3 table.",
+      "control": "The pre-registered interpretation table (contract 9.3).",
+      "success_criterion": "The claim's status and its history cite the audit and the panel.",
+      "lit": []
     }
   },
   "operations": {
@@ -420,6 +856,20 @@
       "title": "Escalate to the research brain and a person",
       "kind": "campaign",
       "risk": "R0",
+      "argv": null
+    },
+    "OP_FUNNEL_SYNC": {
+      "title": "Sync the funnel files: push the lab's (taxonomy cache, cards, KT7, the devil's-advocate record, RL-A answers) to the cluster and pull the cluster's aggregates, sample and sheets back, each verified by sha256 on arrival",
+      "kind": "campaign",
+      "risk": "R0",
+      "policy_action": "inc_funnel_sync",
+      "argv": null
+    },
+    "OP_DA": {
+      "title": "Stage the devil's-advocate pass against the negative claims (a cluster job of the adversary role)",
+      "kind": "campaign",
+      "risk": "R2",
+      "policy_action": "inc_plan_submit",
       "argv": null
     }
   },
@@ -479,6 +929,17 @@
       "prerequisite": null,
       "needs": "a Step 1 verify admit run (not on the menu)",
       "why": "realloop.py: admit_summary.json missing."
+    },
+    {
+      "pattern": "no resolution for \\d+ name\\(s\\) in taxonomy_cache\\.json: run fetch --what taxonomy \\(lever L12\\)",
+      "prerequisite": "L12",
+      "why": "funnel census (adapters.inc_step1.census): a census name has no entry in the taxonomy cache, which is built on the lab (runner 5.2.2)."
+    },
+    {
+      "pattern": "prospective_da\\.json",
+      "prerequisite": null,
+      "needs": "the devil's-advocate pass (operation OP_DA): its validated reply is written to funnel/prospective_da.json on the lab and pushed before the estimate (contract 6 H11); a person pushes it if the sync failed",
+      "why": "funnel estimate refuses without funnel/prospective_da.json (runner 4.17)."
     }
   ],
   "supports": {

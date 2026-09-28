@@ -1043,10 +1043,15 @@ def section_replay_gate():
                 ("governance fails", "0 failure(s), 0 skipped: none", 0, "1 failure(s)", 1, "fail",
                  {"R2": "pass", "governance": "fail"}),
                 ("no summary line", "done", 0, "ALL PASS", 0, "fail", {"R1": "fail"}))
+        # The funnel audit's replay, mutation and domain-free scripts pass here
+        # (their own cases are pinned in tests/test_funnel_ap_units.py).
+        for name in ("f.py", "m.py", "d.py"):
+            script(name, "0 failure(s), 0 skipped: none", 0)
         for label, rout, rrc, gout, grc, want, sub_cases in runs:
             script("r.py", rout, rrc)
             script("g.py", gout, grc)
-            rec = X.run_replay_tests(ctx=w.ctx, scripts={"replay": "r.py", "governance": "g.py"},
+            rec = X.run_replay_tests(ctx=w.ctx, scripts={"replay": "r.py", "governance": "g.py", "funnel": "f.py",
+                                                         "funnel_mutations": "m.py", "domain_free": "d.py"},
                                      code_root=tmp)
             got = {k: rec["cases"].get(k) for k in sub_cases}
             check("replay runner, %s: records %s with %s" % (label, want, sub_cases),

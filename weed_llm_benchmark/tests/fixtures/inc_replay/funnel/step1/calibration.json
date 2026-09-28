@@ -1,0 +1,884 @@
+{
+ "built_utc": "2026-09-27T06:17:47Z",
+ "crops_sha256": "d8188b16fad47c34b6a771fb806ab2c1b607d6b99126fc134ada34f299164485",
+ "cwd12_copies": {
+  "calibration_only_slugs": [
+   "cottonweed_holdout",
+   "cottonweed_sp8"
+  ],
+  "copies": 8769,
+  "copies_per_slug": {
+   "cottonweed_holdout": 1180,
+   "cottonweed_sp8": 1869,
+   "project_agml__mh_weed16_weed_detection": 1,
+   "project_agml__three_season_weed_detection": 2576,
+   "rf_agrobot-weed-workspace__weed-detection-sd89f": 2846,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 200,
+   "rf_project-5nvic__weed-detection-0tfsj": 2,
+   "rf_test-8qezo__weed-detection-ycai2": 2,
+   "rf_university-of-peradeniya__weed-detection-ekr8i": 7,
+   "rf_vitif246x__weed-oqamx": 2,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 84
+  },
+  "current_join": {
+   "final_model_optimistic": {
+    "overall": {
+     "boxes": 14045,
+     "conflict_recall_on_wrong": 0.8411,
+     "correct_judged": 9302,
+     "false_conflict_rate_on_correct": 0.0051,
+     "judged": 14042,
+     "label_correct_rate": 0.6623,
+     "verdicts": {
+      "conflict": 4034,
+      "other_ok": 753,
+      "small": 3,
+      "unknown": 285,
+      "verified": 8970
+     },
+     "verified_precision": 1.0,
+     "verified_recall_on_correct": 0.9643,
+     "wrong_judged": 4740
+    },
+    "per_slug": {
+     "cottonweed_holdout": {
+      "boxes": 2449,
+      "conflict_recall_on_wrong": null,
+      "correct_judged": 2449,
+      "false_conflict_rate_on_correct": 0.0061,
+      "judged": 2449,
+      "label_correct_rate": 1.0,
+      "verdicts": {
+       "conflict": 15,
+       "unknown": 86,
+       "verified": 2348
+      },
+      "verified_precision": 1.0,
+      "verified_recall_on_correct": 0.9588,
+      "wrong_judged": 0
+     },
+     "cottonweed_sp8": {
+      "boxes": 2580,
+      "conflict_recall_on_wrong": null,
+      "correct_judged": 2580,
+      "false_conflict_rate_on_correct": 0.0043,
+      "judged": 2580,
+      "label_correct_rate": 1.0,
+      "verdicts": {
+       "conflict": 11,
+       "unknown": 67,
+       "verified": 2502
+      },
+      "verified_precision": 1.0,
+      "verified_recall_on_correct": 0.9698,
+      "wrong_judged": 0
+     },
+     "project_agml__three_season_weed_detection": {
+      "boxes": 4223,
+      "conflict_recall_on_wrong": null,
+      "correct_judged": 4223,
+      "false_conflict_rate_on_correct": 0.005,
+      "judged": 4223,
+      "label_correct_rate": 1.0,
+      "verdicts": {
+       "conflict": 21,
+       "unknown": 130,
+       "verified": 4072
+      },
+      "verified_precision": 1.0,
+      "verified_recall_on_correct": 0.9642,
+      "wrong_judged": 0
+     },
+     "rf_agrobot-weed-workspace__weed-detection-sd89f": {
+      "boxes": 4743,
+      "conflict_recall_on_wrong": 0.8411,
+      "correct_judged": 0,
+      "false_conflict_rate_on_correct": null,
+      "judged": 4740,
+      "label_correct_rate": 0.0,
+      "verdicts": {
+       "conflict": 3987,
+       "other_ok": 753,
+       "small": 3
+      },
+      "verified_precision": null,
+      "verified_recall_on_correct": null,
+      "wrong_judged": 4740
+     },
+     "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+      "boxes": 44,
+      "conflict_recall_on_wrong": null,
+      "correct_judged": 44,
+      "false_conflict_rate_on_correct": 0.0,
+      "judged": 44,
+      "label_correct_rate": 1.0,
+      "verdicts": {
+       "unknown": 2,
+       "verified": 42
+      },
+      "verified_precision": 1.0,
+      "verified_recall_on_correct": 0.9545,
+      "wrong_judged": 0
+     },
+     "rf_zig-zag-lnodr__weed-detection-vanpe": {
+      "boxes": 6,
+      "conflict_recall_on_wrong": null,
+      "correct_judged": 6,
+      "false_conflict_rate_on_correct": 0.0,
+      "judged": 6,
+      "label_correct_rate": 1.0,
+      "verdicts": {
+       "verified": 6
+      },
+      "verified_precision": 1.0,
+      "verified_recall_on_correct": 1.0,
+      "wrong_judged": 0
+     }
+    }
+   },
+   "overall": {
+    "boxes": 14045,
+    "conflict_recall_on_wrong": 0.8329,
+    "correct_judged": 9302,
+    "false_conflict_rate_on_correct": 0.0067,
+    "judged": 14042,
+    "label_correct_rate": 0.6623,
+    "verdicts": {
+     "conflict": 4010,
+     "other_ok": 792,
+     "small": 3,
+     "unknown": 443,
+     "verified": 8797
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.9457,
+    "wrong_judged": 4740
+   },
+   "per_slug": {
+    "cottonweed_holdout": {
+     "boxes": 2449,
+     "conflict_recall_on_wrong": null,
+     "correct_judged": 2449,
+     "false_conflict_rate_on_correct": 0.009,
+     "judged": 2449,
+     "label_correct_rate": 1.0,
+     "verdicts": {
+      "conflict": 22,
+      "unknown": 125,
+      "verified": 2302
+     },
+     "verified_precision": 1.0,
+     "verified_recall_on_correct": 0.94,
+     "wrong_judged": 0
+    },
+    "cottonweed_sp8": {
+     "boxes": 2580,
+     "conflict_recall_on_wrong": null,
+     "correct_judged": 2580,
+     "false_conflict_rate_on_correct": 0.0058,
+     "judged": 2580,
+     "label_correct_rate": 1.0,
+     "verdicts": {
+      "conflict": 15,
+      "unknown": 103,
+      "verified": 2462
+     },
+     "verified_precision": 1.0,
+     "verified_recall_on_correct": 0.9543,
+     "wrong_judged": 0
+    },
+    "project_agml__three_season_weed_detection": {
+     "boxes": 4223,
+     "conflict_recall_on_wrong": null,
+     "correct_judged": 4223,
+     "false_conflict_rate_on_correct": 0.0059,
+     "judged": 4223,
+     "label_correct_rate": 1.0,
+     "verdicts": {
+      "conflict": 25,
+      "unknown": 212,
+      "verified": 3986
+     },
+     "verified_precision": 1.0,
+     "verified_recall_on_correct": 0.9439,
+     "wrong_judged": 0
+    },
+    "rf_agrobot-weed-workspace__weed-detection-sd89f": {
+     "boxes": 4743,
+     "conflict_recall_on_wrong": 0.8329,
+     "correct_judged": 0,
+     "false_conflict_rate_on_correct": null,
+     "judged": 4740,
+     "label_correct_rate": 0.0,
+     "verdicts": {
+      "conflict": 3948,
+      "other_ok": 792,
+      "small": 3
+     },
+     "verified_precision": null,
+     "verified_recall_on_correct": null,
+     "wrong_judged": 4740
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "boxes": 44,
+     "conflict_recall_on_wrong": null,
+     "correct_judged": 44,
+     "false_conflict_rate_on_correct": 0.0,
+     "judged": 44,
+     "label_correct_rate": 1.0,
+     "verdicts": {
+      "unknown": 3,
+      "verified": 41
+     },
+     "verified_precision": 1.0,
+     "verified_recall_on_correct": 0.9318,
+     "wrong_judged": 0
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "boxes": 6,
+     "conflict_recall_on_wrong": null,
+     "correct_judged": 6,
+     "false_conflict_rate_on_correct": 0.0,
+     "judged": 6,
+     "label_correct_rate": 1.0,
+     "verdicts": {
+      "verified": 6
+     },
+     "verified_precision": 1.0,
+     "verified_recall_on_correct": 1.0,
+     "wrong_judged": 0
+    }
+   }
+  },
+  "matched_boxes": 14045,
+  "matched_without_fold": 0,
+  "old_wrong_joins": {
+   "deleted_boxes": {
+    "cottonweed_holdout": 1147,
+    "cottonweed_sp8": 0,
+    "project_agml__three_season_weed_detection": 2379,
+    "rf_agrobot-weed-workspace__weed-detection-sd89f": 0,
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": 0,
+    "rf_zig-zag-lnodr__weed-detection-vanpe": 6
+   },
+   "final_model_optimistic": {
+    "overall": {
+     "boxes": 10513,
+     "conflict_recall_on_wrong": 0.8916,
+     "correct_judged": 2580,
+     "false_conflict_rate_on_correct": 0.0043,
+     "judged": 10510,
+     "label_correct_rate": 0.2454,
+     "verdicts": {
+      "conflict": 7081,
+      "other_ok": 755,
+      "small": 3,
+      "unknown": 171,
+      "verified": 2503
+     },
+     "verified_precision": 0.9996,
+     "verified_recall_on_correct": 0.9698,
+     "wrong_judged": 7930
+    },
+    "per_slug": {
+     "cottonweed_holdout": {
+      "boxes": 1302,
+      "conflict_recall_on_wrong": 0.967,
+      "correct_judged": 0,
+      "false_conflict_rate_on_correct": null,
+      "judged": 1302,
+      "label_correct_rate": 0.0,
+      "verdicts": {
+       "conflict": 1259,
+       "unknown": 43
+      },
+      "verified_precision": null,
+      "verified_recall_on_correct": null,
+      "wrong_judged": 1302
+     },
+     "cottonweed_sp8": {
+      "boxes": 2580,
+      "conflict_recall_on_wrong": null,
+      "correct_judged": 2580,
+      "false_conflict_rate_on_correct": 0.0043,
+      "judged": 2580,
+      "label_correct_rate": 1.0,
+      "verdicts": {
+       "conflict": 11,
+       "unknown": 67,
+       "verified": 2502
+      },
+      "verified_precision": 1.0,
+      "verified_recall_on_correct": 0.9698,
+      "wrong_judged": 0
+     },
+     "project_agml__three_season_weed_detection": {
+      "boxes": 1844,
+      "conflict_recall_on_wrong": 0.9664,
+      "correct_judged": 0,
+      "false_conflict_rate_on_correct": null,
+      "judged": 1844,
+      "label_correct_rate": 0.0,
+      "verdicts": {
+       "conflict": 1782,
+       "unknown": 61,
+       "verified": 1
+      },
+      "verified_precision": 0.0,
+      "verified_recall_on_correct": null,
+      "wrong_judged": 1844
+     },
+     "rf_agrobot-weed-workspace__weed-detection-sd89f": {
+      "boxes": 4743,
+      "conflict_recall_on_wrong": 0.8411,
+      "correct_judged": 0,
+      "false_conflict_rate_on_correct": null,
+      "judged": 4740,
+      "label_correct_rate": 0.0,
+      "verdicts": {
+       "conflict": 3987,
+       "other_ok": 753,
+       "small": 3
+      },
+      "verified_precision": null,
+      "verified_recall_on_correct": null,
+      "wrong_judged": 4740
+     },
+     "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+      "boxes": 44,
+      "conflict_recall_on_wrong": 0.9545,
+      "correct_judged": 0,
+      "false_conflict_rate_on_correct": null,
+      "judged": 44,
+      "label_correct_rate": 0.0,
+      "verdicts": {
+       "conflict": 42,
+       "other_ok": 2
+      },
+      "verified_precision": null,
+      "verified_recall_on_correct": null,
+      "wrong_judged": 44
+     }
+    }
+   },
+   "overall": {
+    "boxes": 10513,
+    "conflict_recall_on_wrong": 0.876,
+    "correct_judged": 2580,
+    "false_conflict_rate_on_correct": 0.0058,
+    "judged": 10510,
+    "label_correct_rate": 0.2454,
+    "verdicts": {
+     "conflict": 6962,
+     "other_ok": 795,
+     "small": 3,
+     "unknown": 290,
+     "verified": 2463
+    },
+    "verified_precision": 0.9996,
+    "verified_recall_on_correct": 0.9543,
+    "wrong_judged": 7930
+   },
+   "per_slug": {
+    "cottonweed_holdout": {
+     "boxes": 1302,
+     "conflict_recall_on_wrong": 0.9424,
+     "correct_judged": 0,
+     "false_conflict_rate_on_correct": null,
+     "judged": 1302,
+     "label_correct_rate": 0.0,
+     "verdicts": {
+      "conflict": 1227,
+      "unknown": 75
+     },
+     "verified_precision": null,
+     "verified_recall_on_correct": null,
+     "wrong_judged": 1302
+    },
+    "cottonweed_sp8": {
+     "boxes": 2580,
+     "conflict_recall_on_wrong": null,
+     "correct_judged": 2580,
+     "false_conflict_rate_on_correct": 0.0058,
+     "judged": 2580,
+     "label_correct_rate": 1.0,
+     "verdicts": {
+      "conflict": 15,
+      "unknown": 103,
+      "verified": 2462
+     },
+     "verified_precision": 1.0,
+     "verified_recall_on_correct": 0.9543,
+     "wrong_judged": 0
+    },
+    "project_agml__three_season_weed_detection": {
+     "boxes": 1844,
+     "conflict_recall_on_wrong": 0.9387,
+     "correct_judged": 0,
+     "false_conflict_rate_on_correct": null,
+     "judged": 1844,
+     "label_correct_rate": 0.0,
+     "verdicts": {
+      "conflict": 1731,
+      "unknown": 112,
+      "verified": 1
+     },
+     "verified_precision": 0.0,
+     "verified_recall_on_correct": null,
+     "wrong_judged": 1844
+    },
+    "rf_agrobot-weed-workspace__weed-detection-sd89f": {
+     "boxes": 4743,
+     "conflict_recall_on_wrong": 0.8329,
+     "correct_judged": 0,
+     "false_conflict_rate_on_correct": null,
+     "judged": 4740,
+     "label_correct_rate": 0.0,
+     "verdicts": {
+      "conflict": 3948,
+      "other_ok": 792,
+      "small": 3
+     },
+     "verified_precision": null,
+     "verified_recall_on_correct": null,
+     "wrong_judged": 4740
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "boxes": 44,
+     "conflict_recall_on_wrong": 0.9318,
+     "correct_judged": 0,
+     "false_conflict_rate_on_correct": null,
+     "judged": 44,
+     "label_correct_rate": 0.0,
+     "verdicts": {
+      "conflict": 41,
+      "other_ok": 3
+     },
+     "verified_precision": null,
+     "verified_recall_on_correct": null,
+     "wrong_judged": 44
+    }
+   },
+   "right_wrong_deleted": {
+    "cottonweed_holdout": [
+     0,
+     1302,
+     1147
+    ],
+    "cottonweed_sp8": [
+     2580,
+     0,
+     0
+    ],
+    "project_agml__three_season_weed_detection": [
+     0,
+     1844,
+     2379
+    ],
+    "rf_agrobot-weed-workspace__weed-detection-sd89f": [
+     0,
+     4743,
+     0
+    ],
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": [
+     0,
+     44,
+     0
+    ],
+    "rf_zig-zag-lnodr__weed-detection-vanpe": [
+     0,
+     0,
+     6
+    ]
+   },
+   "right_wrong_deleted_total": [
+    2580,
+    7933,
+    3532
+   ]
+  },
+  "unmatched_boxes": {
+   "project_agml__mh_weed16_weed_detection": 9,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 159,
+   "rf_project-5nvic__weed-detection-0tfsj": 13,
+   "rf_test-8qezo__weed-detection-ycai2": 13,
+   "rf_university-of-peradeniya__weed-detection-ekr8i": 36,
+   "rf_vitif246x__weed-oqamx": 13,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 82
+  }
+ },
+ "embeddings": {
+  "dim": 768,
+  "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+  "failed_crops": 0,
+  "nan_rows": 0,
+  "nshards": 4
+ },
+ "notes": [
+  "(a) truth = the train_core box at the same coordinates (tol 0.02); the verdicts come from verifiers fitted without the original's capture session. current_join labels the copies as the pool labels everything now; old_wrong_joins labels the same boxes as mega_trainer did before v3.60.0 (legacy-label string match, cottonweed_holdout through its four-name list), and counts the boxes that join deleted. final_model_optimistic uses the verifier admit uses, which was trained on the original photographs.",
+  "(b) 20% of each held-out fold's species labels reassigned to a random other species (seeded); the fold's verifier is fitted, thresholds included, on the other folds only.",
+  "verified_precision = share of verified boxes whose label is correct; conflict_recall_on_wrong and false_conflict_rate_on_correct are over boxes with a verdict (not small, not failed)."
+ ],
+ "seconds": 244.3,
+ "swaps": {
+  "folds": [
+   {
+    "boxes": 989,
+    "conflict_recall_on_wrong": 0.9596,
+    "correct_judged": 791,
+    "false_conflict_rate_on_correct": 0.0088,
+    "fold": 0,
+    "judged": 989,
+    "label_correct_rate": 0.7998,
+    "sessions": [
+     "20210804_iPhoneSE_YL",
+     "20210818_iPhoneSE_YL",
+     "20210903_iPhone11Pro_BT",
+     "20210906_iPhoneSE_YL",
+     "20210913_iPhoneSE_YL",
+     "20220129_CanonEOS4000D_EO"
+    ],
+    "swap_sha256": "34b0fc36ae0412118b246bff4c18221c7ca2f07b143831f37238d9445c0ead7f",
+    "swapped": 198,
+    "swapped_to_species": {
+     "Carpetweed": 15,
+     "CutleafGroundcherry": 10,
+     "Eclipta": 15,
+     "Goosegrass": 21,
+     "MorningGlory": 16,
+     "PalmerAmaranth": 19,
+     "PricklySida": 21,
+     "Purslane": 22,
+     "Ragweed": 10,
+     "Sicklepod": 17,
+     "SpottedSpurge": 20,
+     "Waterhemp": 12
+    },
+    "swapped_true_species": {
+     "Carpetweed": 17,
+     "Eclipta": 28,
+     "Goosegrass": 9,
+     "MorningGlory": 17,
+     "PricklySida": 5,
+     "Purslane": 12,
+     "Ragweed": 19,
+     "SpottedSpurge": 24,
+     "Waterhemp": 67
+    },
+    "verdicts": {
+     "conflict": 197,
+     "unknown": 32,
+     "verified": 760
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.9608,
+    "wrong_judged": 198
+   },
+   {
+    "boxes": 1020,
+    "conflict_recall_on_wrong": 0.8873,
+    "correct_judged": 816,
+    "false_conflict_rate_on_correct": 0.0049,
+    "fold": 1,
+    "judged": 1020,
+    "label_correct_rate": 0.8,
+    "sessions": [
+     "20210806_iPhoneSE_YL",
+     "20210812_iPhoneSE_YL",
+     "20210813_iPhoneSE_YL",
+     "20210910_iPhone11Pro_BT"
+    ],
+    "swap_sha256": "4a4b8863dafb70b490b647ea0090eac6bde1fde621e32a6dca644539ed4b9782",
+    "swapped": 204,
+    "swapped_to_species": {
+     "Carpetweed": 21,
+     "CutleafGroundcherry": 22,
+     "Eclipta": 12,
+     "Goosegrass": 13,
+     "MorningGlory": 13,
+     "PalmerAmaranth": 22,
+     "PricklySida": 14,
+     "Purslane": 11,
+     "Ragweed": 24,
+     "Sicklepod": 15,
+     "SpottedSpurge": 19,
+     "Waterhemp": 18
+    },
+    "swapped_true_species": {
+     "Carpetweed": 5,
+     "CutleafGroundcherry": 1,
+     "Eclipta": 2,
+     "MorningGlory": 69,
+     "PalmerAmaranth": 18,
+     "PricklySida": 6,
+     "Purslane": 51,
+     "Ragweed": 3,
+     "Sicklepod": 10,
+     "SpottedSpurge": 16,
+     "Waterhemp": 23
+    },
+    "verdicts": {
+     "conflict": 185,
+     "unknown": 111,
+     "verified": 724
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.8873,
+    "wrong_judged": 204
+   },
+   {
+    "boxes": 989,
+    "conflict_recall_on_wrong": 0.9697,
+    "correct_judged": 791,
+    "false_conflict_rate_on_correct": 0.0177,
+    "fold": 2,
+    "judged": 989,
+    "label_correct_rate": 0.7998,
+    "sessions": [
+     "20210712_iPhoneSE_YL",
+     "20210809_iPhoneSE_YL",
+     "20210812_NIKOND3300_YL",
+     "20210814_iPhoneSE_YL",
+     "20210827_iPhone11Pro_BT",
+     "20210903_CanonEOS4000D_EO",
+     "20210903_NIKOND3300_YL"
+    ],
+    "swap_sha256": "b0c322535fc55ac2680c5d400d9fc03fff4002f52460ead3dc61e08af69dff45",
+    "swapped": 198,
+    "swapped_to_species": {
+     "Carpetweed": 17,
+     "CutleafGroundcherry": 17,
+     "Eclipta": 21,
+     "Goosegrass": 19,
+     "MorningGlory": 22,
+     "PalmerAmaranth": 19,
+     "PricklySida": 16,
+     "Purslane": 17,
+     "Ragweed": 14,
+     "Sicklepod": 14,
+     "SpottedSpurge": 11,
+     "Waterhemp": 11
+    },
+    "swapped_true_species": {
+     "Carpetweed": 27,
+     "CutleafGroundcherry": 3,
+     "Eclipta": 8,
+     "Goosegrass": 7,
+     "MorningGlory": 12,
+     "PalmerAmaranth": 2,
+     "PricklySida": 25,
+     "Purslane": 14,
+     "Ragweed": 23,
+     "SpottedSpurge": 41,
+     "Waterhemp": 36
+    },
+    "verdicts": {
+     "conflict": 206,
+     "unknown": 16,
+     "verified": 767
+    },
+    "verified_precision": 0.9987,
+    "verified_recall_on_correct": 0.9684,
+    "wrong_judged": 198
+   },
+   {
+    "boxes": 1031,
+    "conflict_recall_on_wrong": 0.9612,
+    "correct_judged": 825,
+    "false_conflict_rate_on_correct": 0.0048,
+    "fold": 3,
+    "judged": 1031,
+    "label_correct_rate": 0.8002,
+    "sessions": [
+     "20210628_iPhoneSE_YL",
+     "20210805_iPhoneSE_YL",
+     "20210904_iPhoneSE_YL",
+     "20210909_NIKOND3300_YL",
+     "20210910_iPhoneSE_YL"
+    ],
+    "swap_sha256": "42d5896fc105950bf3da9373a4574c23d11711fd298a5cece6269bd293f34f1e",
+    "swapped": 206,
+    "swapped_to_species": {
+     "Carpetweed": 18,
+     "CutleafGroundcherry": 20,
+     "Eclipta": 16,
+     "Goosegrass": 19,
+     "MorningGlory": 16,
+     "PalmerAmaranth": 11,
+     "PricklySida": 17,
+     "Purslane": 18,
+     "Ragweed": 22,
+     "Sicklepod": 15,
+     "SpottedSpurge": 19,
+     "Waterhemp": 15
+    },
+    "swapped_true_species": {
+     "Carpetweed": 41,
+     "Eclipta": 42,
+     "Goosegrass": 1,
+     "MorningGlory": 24,
+     "PalmerAmaranth": 16,
+     "PricklySida": 1,
+     "Purslane": 6,
+     "Ragweed": 7,
+     "SpottedSpurge": 12,
+     "Waterhemp": 56
+    },
+    "verdicts": {
+     "conflict": 202,
+     "unknown": 48,
+     "verified": 781
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.9467,
+    "wrong_judged": 206
+   },
+   {
+    "boxes": 1000,
+    "conflict_recall_on_wrong": 0.98,
+    "correct_judged": 800,
+    "false_conflict_rate_on_correct": 0.0025,
+    "fold": 4,
+    "judged": 1000,
+    "label_correct_rate": 0.8,
+    "sessions": [
+     "20210827_iPhoneSE_YL",
+     "20210903_YALAL00_EO",
+     "20210903_iPhoneSE_YL",
+     "20210910_NIKOND3300_YL",
+     "20210912_iPhoneSE_YL"
+    ],
+    "swap_sha256": "43851d0c5aa9e9e021a2f08d62c0bb49e00200f4465f67d5eef07207c884bbc0",
+    "swapped": 200,
+    "swapped_to_species": {
+     "Carpetweed": 24,
+     "CutleafGroundcherry": 15,
+     "Eclipta": 14,
+     "Goosegrass": 21,
+     "MorningGlory": 10,
+     "PalmerAmaranth": 19,
+     "PricklySida": 21,
+     "Purslane": 11,
+     "Ragweed": 20,
+     "Sicklepod": 14,
+     "SpottedSpurge": 17,
+     "Waterhemp": 14
+    },
+    "swapped_true_species": {
+     "Carpetweed": 17,
+     "CutleafGroundcherry": 3,
+     "Eclipta": 27,
+     "Goosegrass": 5,
+     "MorningGlory": 35,
+     "PalmerAmaranth": 2,
+     "PricklySida": 20,
+     "Purslane": 4,
+     "Ragweed": 26,
+     "Sicklepod": 9,
+     "SpottedSpurge": 26,
+     "Waterhemp": 26
+    },
+    "verdicts": {
+     "conflict": 198,
+     "unknown": 22,
+     "verified": 780
+    },
+    "verified_precision": 1.0,
+    "verified_recall_on_correct": 0.975,
+    "wrong_judged": 200
+   }
+  ],
+  "frac": 0.2,
+  "overall": {
+   "boxes": 5029,
+   "conflict_recall_on_wrong": 0.9513,
+   "correct_judged": 4023,
+   "false_conflict_rate_on_correct": 0.0077,
+   "judged": 5029,
+   "label_correct_rate": 0.8,
+   "verdicts": {
+    "conflict": 988,
+    "unknown": 229,
+    "verified": 3812
+   },
+   "verified_precision": 0.9997,
+   "verified_recall_on_correct": 0.9473,
+   "wrong_judged": 1006
+  },
+  "swapped_to_species": {
+   "Carpetweed": 95,
+   "CutleafGroundcherry": 84,
+   "Eclipta": 78,
+   "Goosegrass": 93,
+   "MorningGlory": 77,
+   "PalmerAmaranth": 90,
+   "PricklySida": 89,
+   "Purslane": 79,
+   "Ragweed": 90,
+   "Sicklepod": 75,
+   "SpottedSpurge": 86,
+   "Waterhemp": 70
+  },
+  "swapped_true_species": {
+   "Carpetweed": 107,
+   "CutleafGroundcherry": 7,
+   "Eclipta": 107,
+   "Goosegrass": 22,
+   "MorningGlory": 157,
+   "PalmerAmaranth": 38,
+   "PricklySida": 57,
+   "Purslane": 87,
+   "Ragweed": 78,
+   "Sicklepod": 19,
+   "SpottedSpurge": 119,
+   "Waterhemp": 208
+  }
+ },
+ "thresholds": {
+  "class_names": [
+   "Waterhemp",
+   "MorningGlory",
+   "Purslane",
+   "SpottedSpurge",
+   "Carpetweed",
+   "Ragweed",
+   "Eclipta",
+   "PricklySida",
+   "PalmerAmaranth",
+   "Sicklepod",
+   "Goosegrass",
+   "CutleafGroundcherry",
+   "OtherPlant"
+  ],
+  "sigma": [
+   0.807496,
+   0.813227,
+   0.887879,
+   0.813939,
+   0.805736,
+   0.850177,
+   0.861087,
+   0.852722,
+   0.858348,
+   0.880239,
+   0.82908,
+   0.869015,
+   0.704575
+  ],
+  "tau_p": [
+   0.400525,
+   0.633677,
+   0.598537,
+   0.701933,
+   0.469376,
+   0.727164,
+   0.620081,
+   0.734598,
+   0.459068,
+   0.780154,
+   0.577428,
+   0.569864,
+   0.301714
+  ]
+ }
+}

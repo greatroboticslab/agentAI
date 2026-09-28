@@ -7,7 +7,7 @@
       "weed_optimizer_framework/tools/inc_autopilot/diagnose.py"
     ],
     "resolution_order": "This file, then a dict passed to diagnose.detect(thresholds=...) (tests only). There is no environment override: a campaign decision must be reproducible from the committed file.",
-    "convention": "Each leaf is {value, why}. 'mirrors' names a constant of a pinned INC module that the value must equal; tests/test_inc_ap_diagnose.py checks each one, so the autopilot and the gate cannot drift apart. A fraction that must be compared exactly is {num, den}.",
+    "convention": "Each leaf is {value, why}. 'checked_against' names the pre-registered transcription (funnel/prereg_v1.json) or funnel module a value must agree with; tests/test_funnel_ap_units.py checks each one. 'mirrors' names a constant of a pinned INC module that the value must equal; tests/test_inc_ap_diagnose.py checks each one, so the autopilot and the gate cannot drift apart. A fraction that must be compared exactly is {num, den}.",
     "not_in_this_file": "Measurements, as opposed to chosen thresholds: seed noise, GPU-hours and train sizes (read from the experiment that produced them), and the campaign's SU envelope (campaign config, passed in the evidence context). The lever menu and the builder-refusal patterns live in levers.json.",
     "changing_a_value": "A change after a replay or prospective result has been recorded invalidates that result; record the change and rerun tests/test_inc_ap_replay.py."
   },
@@ -195,6 +195,120 @@
       "value": {"refuted": "crit", "supported": "info", "inconclusive": "warn"},
       "mirrors": "inc/report.py v2_check outcomes",
       "why": "The pre-registered outcomes of the v2 check (docs/INCREMENTAL_PROTOCOL.md, Protocol v2, The criterion). refuted retires v2 for the experiment's gate: crit, card X7, and no real loop is built on it. supported is recorded, and D4 may proceed. inconclusive leaves v2 unproven: D4 may proceed only on its own threshold, and the record says v2 is unproven."
+    }
+  },
+  "SIGNALS": {
+    "S1_reject_accept_min": {
+      "value": 1.0,
+      "checked_against": "funnel/prereg_v1.json diagnoses.signals.S1_reject_accept_min",
+      "why": "Contract 8.4 S1: the target-class evidence the filters rejected (every target-labelled discard of the target_check stage, conflict and unknown, plus the other_check stage's conflicts, which are other-class boxes the probe confidently calls a target) is at least as large as what they verified. At 1.0 the filters threw away as much target evidence as they kept, which a claim of scarcity must explain before it rests on the kept side alone."
+    },
+    "S1_roles": {
+      "value": ["target_check", "other_check"],
+      "why": "The ledger stage roles S1 reads (funnel-ledger/1 'role', so the rule names no domain's stage ids): every discard of target_check and its kept count as the denominator, and the S1_other_reason discard of other_check."
+    },
+    "S1_other_reason": {
+      "value": "conflict",
+      "why": "The discard reason of the other_check stage that counts toward S1: an other-class box the probe confidently calls a target (verify.verdicts). other_ok boxes are kept, not rejected target evidence."
+    },
+    "S2_uninformative_share_min": {
+      "value": 0.1,
+      "checked_against": "funnel/prereg_v1.json diagnoses.signals.S2_uninformative_min",
+      "why": "Contract 8.4 S2: at least a tenth of the embedded boxes carry a source class name with no class information (no name, a number, a generic word), so the join could only call them the other class and no evidence criterion can admit their sources."
+    },
+    "S2_uninformative_kinds": {
+      "value": ["none", "numeric", "generic"],
+      "why": "The label_spaces kinds (funnel-ledger/1) that carry no class information; 'named' is the rest. The cite names the ledger's name_status_version, because the kinds of v1 (verify.other_name_status) and v2 (resolved through the taxonomy authority) differ."
+    },
+    "S2_source_share_min": {
+      "value": 0.5,
+      "why": "The sources S2 names for levers L11 and L12: those whose embedded boxes are more than half uninformative names (contract 3.4, 'sources whose embedded boxes are more than half uninformative names'). A source with a few uninformative classes among named ones is not where a class map or a taxonomy lookup pays."
+    },
+    "S3_min_joined_boxes": {
+      "value": 100,
+      "why": "Contract 8.4 S3: a class is compared only when at least 100 boxes were joined to it by name; below that its verified share is one small source's accident."
+    },
+    "S3_yield_frac_of_median": {
+      "value": 0.25,
+      "why": "Contract 8.4 S3: a class whose verified share is below a quarter of the median share over the compared classes is an outlier of the filter, not of the data. Post hoc: chosen with today's Ragweed yield (27 of 3,029) in view, so replay case R9 reproduces it."
+    },
+    "S3_roles": {
+      "value": ["join", "target_check"],
+      "why": "S3 divides the target_check stage's kept_by_label[k] (verified per class) by the join stage's kept_by_label[k] (the pool's boxes joined to class k by name, small boxes included)."
+    },
+    "S4_min_sources_below_q05": {
+      "value": 1,
+      "why": "Contract 8.4 S4: no known-truth set covers the domain range of the pool when every set's domain score lies within [reference q05, 1] (in domain) while at least this many sources' medians lie below the reference q05. One out-of-domain source the calibration never saw is enough for the filter's recall there to be unmeasured."
+    },
+    "S4_roles": {
+      "value": ["target_check", "other_check"],
+      "why": "The stages whose calibration.known_truth_sets S4 reads: the filters that decide class membership."
+    },
+    "S6_top_cell_share_min": {
+      "value": 0.5,
+      "why": "Runner 9 item 19 (the contract gives no cut point): the reject-class sample is confounded when a majority of it comes from one (source, name) cell. The drawn sample's share is used when the ledger records it, else the eligible pool's. Since the 0.620 share of one cell was seen first, R9-type evidence for S6 is a reproduction."
+    },
+    "S7_rejected_kinds": {
+      "value": ["unverified"],
+      "why": "Loop step kinds (exp.json steps[].kind) drawn from data the filters rejected: realloop's UNVERIFIED increment (realloop.KIND_UNVERIFIED), the only step a filter-trusting loop draws from rejected data. S7 holds when such a step is truth 'helps' (diagnose.HELPS, the gate's) while no clean step of the same loop is."
+    }
+  },
+  "D17": {
+    "conclusion_polarities": {
+      "value": ["scarcity", "negative"],
+      "checked_against": "funnel/claims.py POLARITIES without positive",
+      "why": "Contract 8.4 D17 (C): an open or challenged claim of these polarities is a negative conclusion. A positive claim is not what this diagnosis questions."
+    },
+    "claim_statuses": {
+      "value": ["open", "challenged"],
+      "checked_against": "funnel/claims.py open_negative",
+      "why": "Contract 8.4 D17 (C): the statuses of a claim still standing unaudited. tested_survives, refuted and accepted_open are settled."
+    },
+    "signals": {
+      "value": ["S1", "S2", "S3", "S4", "S5", "S6", "S7"],
+      "why": "Contract 8.4 D17 (S): any one of the suspicion signals."
+    },
+    "sized_flag": {
+      "value": ["size", "default"],
+      "why": "Contract 8.4 D17 (C), second form: the evidence sizing rule shrank M. realloop's build_summary.json records size.default false when the increment size is not the builders' default inc_frac x |B| (levers.evidence_sizing sized it); that is the flag read, at this path."
+    },
+    "first_verb": {
+      "value": "census",
+      "why": "L10's first stage (F3): the census reconciles the Step 1 files exactly and writes the census-derived ledger every later stage reads. Contract 8.4 D17: 'Proposes: L10' first."
+    }
+  },
+  "D18": {
+    "fn_lb_min": {
+      "value": 0.1,
+      "checked_against": "funnel/prereg_v1.json diagnoses.D18.fn_lb_min",
+      "why": "Contract 8.4 D18: a recoverable stratum is a filter false-negative source when the one-sided 97.5 % lower bound of its FN rate is at least 0.10."
+    },
+    "recover_min_frac_of_verified": {
+      "value": 0.25,
+      "checked_against": "funnel/prereg_v1.json diagnoses.D18.recover_min_frac_of_verified",
+      "why": "Contract 8.4 D18: and its recoverable lower bound is at least a quarter of the target_check stage's kept (verified) count. A stratum that can recover less than a quarter of what was already admitted cannot overturn a scarcity conclusion."
+    },
+    "rejected_policy_by_role": {
+      "value": {"target_check": "R-A", "image_rule": "R-V"},
+      "why": "Contract 8.4 D18 and 7: a target-labelled but rejected stratum is recovered with REC-AUTH (R-A) when the verifier rejected it, and with box-level admission (R-V) when the image rule vetoed a verified box; the stratum's stage role picks which."
+    },
+    "uninformative_policies": {
+      "value": {"card_map": "R-C", "judges": "R-J"},
+      "why": "Contract 8.4 D18: an uninformative label space is recovered by applying a card class map (R-C) when class_maps.json holds a card+geometry proposal for its source, otherwise by the judge panel (R-J)."
+    },
+    "other_policy": {
+      "value": "R-J",
+      "why": "Contract 8.4 D18: an other-labelled box the probe predicts as a target is relabelled only by the qualified judge panel (R-J), and only where no source taxon is a relative of the prediction (the sibling guard; a relative is a known confusion)."
+    }
+  },
+  "D19": {
+    "signals": {
+      "value": ["S1", "S4", "S6"],
+      "why": "Contract 8.4 D19: filter recall is unmeasured when the filters rejected at least as much target evidence as they kept (S1), no known truth covers the pool's domains (S4), or the reject class is confounded (S6), for a recoverable stage with no audit. It needs no conclusion: on today's Step 1 it would have fired before realloop_v1's 26.2 GPU-h."
+    },
+    "stage_roles": {
+      "value": ["target_check", "other_check"],
+      "why": "The stages S1, S4 and S6 are about: D19 fires only when one of them is recoverable (recoverable is true) and carries no audit."
     }
   }
 }

@@ -100,6 +100,38 @@ sha256, images, sessions, boxes per class, images and boxes per source, the
 duplicate counts, the guard and that select record (select_build, null for
 any other manifest).
 
+Recovery manifests (the funnel audit's realloop_v2 arms, docs/FUNNEL_AUDIT.md
+9.2; runner docs/FUNNEL_AUDIT_RUNNER.md 5.6.4). A manifest is a recovery
+manifest when a row's label lies under INC_DIR/step1_r1/labels_overlay or its
+image under INC_DIR/step1_r1/images_masked, or when the manifest file lies
+under INC_DIR/step1_r1 (paths compared after resolving symlinks). For one,
+recovery_provenance checks, after check_training_manifest:
+  * step1_r1/recovery.json is funnel-recovery/1 and 'complete' (and, for a
+    production build, not written by a testing recover), every input its
+    header records still hashes as recorded, and recovered_pool.jsonl hashes
+    as it records;
+  * the manifest is named by sha256 in step1_r1/arms/arms.json (an arm of
+    `funnel recover --arms`; arms.json must be funnel-arms/1, for a
+    production build not written by a testing run, and every input its
+    header records - recovery.json, recovered_pool.jsonl, the base and the
+    realloop experiment - must still hash as recorded, since the arm's sha256
+    alone vouches for its control rows), or it is recovered_pool.jsonl
+    itself (the sha256 recovery.json records); otherwise every recovered row
+    (a row whose key is a recovered_pool.jsonl key, or whose label or image
+    lies in the overlay)
+    must be a recovered_pool.jsonl row with the same image, image sha256,
+    label and label sha256. Overlay rows of a named arm are checked the same
+    way; an arm's control rows (join labels on unmasked pool images) are
+    vouched for by the arm's sha256;
+  * the unmasked originals of the manifest's recovered rows clear the
+    never-train guard, through pool_meta.jsonl's dHash (a row outside verify's
+    pool: the dHash of its file).
+A production build refuses a failure, a testing build warns and records it.
+Any build refuses a manifest holding an image of the H10d domain dev (the
+recovery's domain_dev.jsonl), which is never trained on. build_summary.json
+records "recovery_build" only for a recovery manifest; the summary of any
+other manifest is unchanged.
+
 base_b_v1 and the real loop (inc/realloop.py) train the same base: the
 loop's base arm is the same three cold runs (same manifest bytes, recipe,
 seeds and init), and its final runs read base B's test again. The driver
@@ -899,6 +931,232 @@ def check_training_manifest(path, guard=None, what="training manifest"):
     return rows, dhashes, info
 
 
+R1_NAME = "step1_r1"                      # INC_DIR/step1_r1: the funnel audit's recovery overlay
+RECOVERY_FORMAT = "funnel-recovery/1"
+ARMS_FORMAT = "funnel-arms/1"
+
+
+def r1_dir():
+    return Path(C.INC_DIR) / R1_NAME
+
+
+def _under(path, root):
+    """path lies inside root, compared after resolving symlinks."""
+    p, r = os.path.realpath(str(path)), os.path.realpath(str(root))
+    return p == r or p.startswith(r.rstrip(os.sep) + os.sep)
+
+
+def _json_rows(path):
+    rows = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
+
+
+def _record_path(path):
+    """A recorded path; a relative one is relative to REPO (the funnel headers' convention)."""
+    p = Path(str(path))
+    return p if p.is_absolute() else Path(C.REPO) / p
+
+
+def stale_inputs(doc, what):
+    """Problems with a funnel header's recorded inputs ({name: {"path",
+    "sha256"}}): none recorded, a record without path or sha256, or a file that
+    is missing or no longer hashes as recorded (the runner's freshness chain:
+    a consumer re-hashes its producer's inputs)."""
+    inputs = doc.get("inputs") if isinstance(doc, dict) else None
+    if not isinstance(inputs, dict) or not inputs:
+        return ["%s records no inputs, so its freshness cannot be checked" % what]
+    out = []
+    for name in sorted(inputs):
+        r = inputs[name]
+        if not isinstance(r, dict) or not r.get("path") or not r.get("sha256"):
+            out.append("%s input %r has no {path, sha256} record" % (what, name))
+            continue
+        p = _record_path(r["path"])
+        if not p.is_file():
+            out.append("%s input %r (%s) is missing" % (what, name, p))
+        elif C.sha256_file(p) != r["sha256"]:
+            out.append("%s input %r (%s) changed after it was written" % (what, name, p))
+    return out
+
+
+def domain_dev_record(rec):
+    """(keys, record) of the H10d hold-out (domain dev) a recovery.json names.
+    Its domain_dev record points at the rows (a .jsonl) or at the
+    domain_dev.json document whose "rows" record points at them; every file
+    must hash as recorded, and a "rows_sha256" beside the record must be the
+    rows' sha256. Raises PilotError."""
+    dd = rec.get("domain_dev") if isinstance(rec, dict) else None
+    if not isinstance(dd, dict) or not dd.get("path") or not dd.get("sha256"):
+        raise PilotError("recovery.json has no domain_dev {path, sha256} record (the H10d hold-out)")
+
+    def hashed(path, sha, what):
+        p = _record_path(path)
+        if not p.is_file():
+            raise PilotError("the H10d domain dev %s %s does not exist" % (what, p))
+        got = C.sha256_file(p)
+        if got != sha:
+            raise PilotError("the H10d domain dev %s %s hashes to %s, recorded %s" % (what, p, got[:12], str(sha)[:12]))
+        return p
+    p = hashed(dd["path"], dd["sha256"], "record")
+    if p.suffix == ".jsonl":
+        rows_path, rows_sha = p, dd["sha256"]
+    else:
+        try:
+            with open(p) as fh:
+                rr = json.load(fh).get("rows")
+        except (OSError, ValueError, AttributeError) as e:
+            raise PilotError("the H10d domain dev document %s cannot be read: %s" % (p, e))
+        if not isinstance(rr, dict) or not rr.get("path") or not rr.get("sha256"):
+            raise PilotError("the H10d domain dev document %s has no rows {path, sha256} record" % p)
+        rows_path, rows_sha = hashed(rr["path"], rr["sha256"], "rows"), rr["sha256"]
+    if dd.get("rows_sha256") is not None and dd["rows_sha256"] != rows_sha:
+        raise PilotError("recovery.json's domain_dev rows_sha256 %s is not the rows' %s"
+                         % (str(dd["rows_sha256"])[:12], rows_sha[:12]))
+    try:
+        dd_rows = _json_rows(rows_path)
+    except (OSError, ValueError) as e:
+        raise PilotError("the H10d domain dev rows %s cannot be read: %s" % (rows_path, e))
+    keys = {r.get("key") if isinstance(r, dict) else None for r in dd_rows}
+    if None in keys:
+        raise PilotError("the H10d domain dev rows %s hold a row without a key" % rows_path)
+    return keys, {"path": str(p), "sha256": dd["sha256"],
+                  "rows": {"path": str(rows_path), "sha256": rows_sha, "images": len(dd_rows)}}
+
+
+def recovery_provenance(manifest_path, rows, testing=False, guard=None):
+    """The recovery record of a manifest (module docstring, "Recovery
+    manifests"), or None when it is not a recovery manifest. A production
+    build raises PilotError on any problem, a testing build warns and records
+    it in "problems"; a manifest holding a domain-dev image is refused by
+    every build."""
+    r1 = r1_dir()
+    mp = Path(os.path.abspath(str(manifest_path)))
+    labels_dir, masked_dir = r1 / "labels_overlay", r1 / "images_masked"
+    overlay_rows = [r for r in rows if _under(r["label"], labels_dir) or _under(r["image"], masked_dir)]
+    if not overlay_rows and not _under(mp, r1):
+        return None
+    sha = C.sha256_file(mp)
+    problems = []
+    out = {"manifest": {"path": str(mp), "sha256": sha, "rows": len(rows)}, "r1_dir": str(r1),
+           "recovery": None, "recovered_pool": None, "named_by": None,
+           "overlay_rows": len(overlay_rows), "recovered_rows": 0, "matched_rows": 0,
+           "unmasked_guard": None, "domain_dev": None, "problems": problems}
+    rec_path = r1 / "recovery.json"
+    try:
+        with open(rec_path) as fh:
+            rec = json.load(fh)
+    except (OSError, ValueError) as e:
+        rec = None
+        problems.append("%s cannot be read: %s" % (rec_path, e))
+    pool_rows = {}
+    if isinstance(rec, dict):
+        out["recovery"] = {"path": str(rec_path), "sha256": C.sha256_file(rec_path), "format": rec.get("format"),
+                           "status": rec.get("status")}
+        if rec.get("format") != RECOVERY_FORMAT:
+            problems.append("%s has format %r, not %r" % (rec_path, rec.get("format"), RECOVERY_FORMAT))
+        if rec.get("status") != "complete":
+            problems.append("%s has status %r, not 'complete'" % (rec_path, rec.get("status")))
+        if rec.get("testing") and not testing:
+            problems.append("%s was written by a testing recover" % rec_path)
+        problems.extend(stale_inputs(rec, str(rec_path)))
+        pool_path = r1 / "recovered_pool.jsonl"
+        want = (rec.get("recovered_pool") or {}).get("sha256") if isinstance(rec.get("recovered_pool"), dict) else None
+        got = C.sha256_file(pool_path) if pool_path.is_file() else None
+        out["recovered_pool"] = {"path": str(pool_path), "sha256": got, "recorded_sha256": want}
+        if got is None or got != want:
+            problems.append("%s is missing or does not hash as %s records (%s != %s)"
+                            % (pool_path, rec_path.name, (got or "none")[:12], (want or "none")[:12]))
+        else:
+            try:
+                pool_rows = {r["key"]: r for r in _json_rows(pool_path)}
+            except (OSError, ValueError, KeyError, TypeError) as e:
+                problems.append("%s cannot be read: %s" % (pool_path, e))
+        try:
+            held, dd_rec = domain_dev_record(rec)
+        except PilotError as e:
+            held, dd_rec = None, None
+            problems.append(str(e))
+        if held is not None:
+            clash = sorted(r["key"] for r in rows if r["key"] in held)
+            out["domain_dev"] = dict(dd_rec, held_out=len(held), in_manifest=len(clash))
+            if clash:
+                raise PilotError("%s holds %d image(s) of the H10d domain dev %s, which is never trained on, e.g. %s"
+                                 % (mp, len(clash), dd_rec["rows"]["path"], clash[:3]))
+        arms_path = r1 / "arms" / "arms.json"
+        if arms_path.is_file():
+            try:
+                with open(arms_path) as fh:
+                    arms_doc = json.load(fh)
+                arms = arms_doc.get("arms") or {}
+            except (OSError, ValueError, AttributeError) as e:
+                arms_doc, arms = {}, {}
+                problems.append("%s cannot be read: %s" % (arms_path, e))
+            named = sorted(a for a, v in arms.items() if isinstance(v, dict) and v.get("sha256") == sha)
+            if named:
+                out["named_by"] = {"file": str(arms_path), "sha256": C.sha256_file(arms_path), "arm": named[0]}
+                # the arm vouches for its control rows only while the files it was made from are unchanged
+                if arms_doc.get("format") != ARMS_FORMAT:
+                    problems.append("%s has format %r, not %r" % (arms_path, arms_doc.get("format"), ARMS_FORMAT))
+                if arms_doc.get("testing") and not testing:
+                    problems.append("%s was written by a testing recover --arms" % arms_path)
+                problems.extend(stale_inputs(arms_doc, str(arms_path)))
+        if out["named_by"] is None and want is not None and sha == want:
+            out["named_by"] = {"file": str(rec_path), "sha256": out["recovery"]["sha256"], "arm": None,
+                               "what": "recovered_pool"}
+    # the rows that must be recovered_pool.jsonl's own
+    if out["named_by"] is not None:
+        recovered = overlay_rows
+    else:
+        ov = {r["key"] for r in overlay_rows}
+        recovered = [r for r in rows if r["key"] in pool_rows or r["key"] in ov]
+    out["recovered_rows"] = len(recovered)
+    fields = ("image", "sha256", "label", "label_sha256")
+    unmatched = [r["key"] for r in recovered
+                 if r["key"] not in pool_rows or any(r.get(f) != pool_rows[r["key"]].get(f) for f in fields)]
+    out["matched_rows"] = len(recovered) - len(unmatched)
+    if unmatched:
+        problems.append("%d recovered row(s) of %s are not recovered_pool.jsonl rows with the same image and label "
+                        "(path and sha256), e.g. %s" % (len(unmatched), mp, unmatched[:3]))
+    # the unmasked originals of every manifest row that is a recovered_pool row
+    orig = [pool_rows[r["key"]] for r in rows if r["key"] in pool_rows]
+    if orig:
+        from . import select as S
+        from . import verify as V
+        dh = {}
+        in_pool = [o for o in orig if o.get("pool") != "FETCH"]
+        try:
+            dh.update(S.read_pool_dhash(V.POOL_META, [o["key"] for o in in_pool]))
+        except (S.SelectError, OSError, KeyError, ValueError) as e:
+            problems.append("pool_meta.jsonl dHash of the unmasked originals: %s" % e)
+        for o in orig:
+            if o.get("pool") == "FETCH":
+                dh[o["key"]] = C.dhash(o.get("unmasked_image"))
+        if guard is None:
+            try:
+                guard = C.NeverTrainGuard.load()
+            except (OSError, ValueError, KeyError, RuntimeError) as e:
+                raise PilotError("cannot load the never-train index %s: %s" % (C.NEVER_TRAIN_INDEX, e))
+        by_image = {o.get("unmasked_image"): dh.get(o["key"]) for o in orig}
+        hits, unhashable = guard.check([o.get("unmasked_image") for o in orig], hash_fn=by_image.get)
+        out["unmasked_guard"] = {"checked": len(orig), "hits": len(hits), "unhashable": len(unhashable),
+                                 "bits": HOLDOUT_NEAR_DUP_BITS, "first_hits": [list(h) for h in hits[:10]]}
+        if hits or unhashable:
+            problems.append("never-train guard on the unmasked originals: %d image(s) within %d dHash bits of an "
+                            "evaluation image and %d that cannot be hashed; first: %s %s"
+                            % (len(hits), HOLDOUT_NEAR_DUP_BITS, len(unhashable), hits[:3], unhashable[:3]))
+    if problems:
+        msg = "recovery manifest %s: %s" % (mp, "; ".join(problems))
+        if not testing:
+            raise PilotError(msg)
+        log("WARNING: %s (testing build)" % msg)
+    return out
+
+
 def by_source(rows):
     """{source: {"images", "boxes": boxes per INC class}}, sources sorted."""
     groups = collections.defaultdict(list)
@@ -932,6 +1190,7 @@ def build_baseline(exp, manifest, seeds=D.SEEDS, testing=False, backend=None, gu
     nt = never_train_status(testing=bool(testing))
     rows, _dhashes, info = check_training_manifest(src, guard=guard)
     sha = info["train_manifest_sha256"]
+    recovery = recovery_provenance(src, rows, testing=bool(testing), guard=guard)
     sel = select_base_summary(src, sha)
     select_build = None
     if sel is not None:
@@ -955,6 +1214,8 @@ def build_baseline(exp, manifest, seeds=D.SEEDS, testing=False, backend=None, gu
                "manifest": dict(manifest_summary(rows, sha, info), name=name, source=str(src), copy=str(dst)),
                "never_train": nt, "select_build": select_build,
                "cold_recipe": cold, "warmup": {"base": effective_warmup(cold, len(rows))}}
+    if recovery is not None:          # only a recovery manifest's summary carries the key
+        summary["recovery_build"] = recovery
     D._write_json(paths.root / BUILD_SUMMARY, summary)
     log("%s: baseline on %s (%s), %d images, %d boxes, %d source(s), seeds %s"
         % (exp, src, sha[:12], len(rows), info["n_train_boxes"], len(info["train_sources"]), list(seeds)))

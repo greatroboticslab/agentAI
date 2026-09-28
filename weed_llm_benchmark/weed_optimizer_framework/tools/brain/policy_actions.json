@@ -12,7 +12,7 @@
     "risk_classification_rule": "Applied uniformly so a reader can re-derive a label rather than trust it: R0 = the call changes no persisted state (a read, a listing, or an explicit dry-run that only counts). R1 = a local, immediately-reversible, no-cluster-cost state change (a cache clear, an idempotent metadata move). R2 = writes or generates a bounded, additive, recoverable artifact — including a routine GPU job up to about half a day — or mutates the authoritative registry in a way that adds or relabels rather than removes. R3 = an external side effect against a scarce or costly third-party resource (Roboflow's free-tier Version-generate quota, ~10/project/month), a job whose declared walltime is far above the routine round budget (clean_train_d's fixed 48 h, 4x a normal train step), an action that changes the shape of the campaign itself (harvest_full_round_e2e bumps the round and widens scope in one click) or the operational restart of the always-on server. R4 = the two calls in the real table whose own code comments say 'APPLY: delete ... files' / 'delete-junk --apply' against the authoritative registry or a hosted third-party store, with no undo path recorded anywhere in this codebase.",
     "param_bound_types": "int/float bounds always declare both 'min' and 'max' — an undeclared side is not 'unbounded', it is a malformed row, because an unbounded numeric input is exactly the case this table exists to close off. 'enum' bounds declare 'value_type' ('int' or 'str') plus 'values'; the supplied value must match that Python type exactly (a string that reads as a number is refused, never coerced). 'str' bounds declare a 'pattern' the whole value must fullmatch; values are capped at 4096 raw characters before matching regardless of the pattern, as a cheap backstop against a pathological input even though the patterns themselves are simple and fixed.",
     "est_su_formula_shapes": "{'fixed_su': <number>, 'why': str} for a call this table knows costs a fixed, already-measured amount (0 for anything that never touches a GPU). {'unknown': true, 'why': str} for a call whose SU cost is real but not separately metered by this table — the seven 'needs_cluster' subprocess actions that reach the cluster via an interactive SSH session rather than a dedicated sbatch allocation; claiming a number for these would be a guess, and a guessed SU cost is how a ledger silently stops matching sacct. {'gpu_type': str, 'gpu_count' | 'gpu_count_param': ..., 'hours' | 'hours_param': ..., ['hours_default': number], 'why': str} for a real sbatch job: gpu_count/hours are either a literal number or the name of a key to read out of the params dict passed to estimate_su(); hours_default is used only when hours_param names a key the caller did not supply.",
-    "inc_autopilot_rows": "The fourteen inc_* rows are the INC autopilot's actions (inc_plan_submit and inc_plan_pull carry the research brain's plan job) (docs/INC_AUTOPILOT.md, sections b and d; executor: tools/inc_autopilot/executor.py, the only path that runs them). Paths are bounded to the cluster INC_DIR and experiment names to ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$. Builds carry est_gpu_hours (float, 0-200) priced on V100. round-scheduler appears in the R3 rows' allowed_tiers so the autopilot may file them; policy.py's ceiling gives it no R3 authority, so they run only after a person approves them or under the campaign envelope rule, which the executor enforces and which re-authorises as the person who granted the envelope. Nothing here is R4: repin and every code or protocol change are human cards with no row."
+    "inc_autopilot_rows": "The twenty-two inc_* rows are the INC autopilot's actions (inc_plan_submit and inc_plan_pull carry the research brain's plan job and the devil's-advocate job; the eight inc_funnel_* and inc_verify_queue rows are the funnel audit's levers L10-L14, its data movement and its reads, docs/FUNNEL_AUDIT.md 8.5 and 8.7) (docs/INC_AUTOPILOT.md, sections b and d; executor: tools/inc_autopilot/executor.py, the only path that runs them). Paths are bounded to the cluster INC_DIR and experiment names to ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$. Builds carry est_gpu_hours (float, 0-200) priced on V100. round-scheduler appears in the R3 rows' allowed_tiers so the autopilot may file them; policy.py's ceiling gives it no R3 authority, so they run only after a person approves them or under the campaign envelope rule, which the executor enforces and which re-authorises as the person who granted the envelope. Nothing here is R4: repin and every code or protocol change are human cards with no row."
   },
   "actions": {
     "restart_dashboard": {
@@ -1061,8 +1061,13 @@
           "value_type": "str",
           "values": [
             "relevance",
-            "evidence"
+            "evidence",
+            "recovered"
           ]
+        },
+        "step1_overlay": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_r1/?$"
         },
         "relevance": {
           "type": "str",
@@ -1123,6 +1128,10 @@
         "manifest": {
           "type": "str",
           "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}\\.jsonl$"
+        },
+        "seeds": {
+          "type": "str",
+          "pattern": "^(0|[1-9][0-9]{0,2})(,(0|[1-9][0-9]{0,2})){0,9}$"
         },
         "est_gpu_hours": {
           "type": "float",
@@ -1269,6 +1278,271 @@
         "human"
       ],
       "description": "Pulls the INC research brain's reply back to the lab (docs/INC_AUTOPILOT.md (c)). Writes nothing on the cluster."
+    },
+    "inc_funnel_audit": {
+      "template": "sbatch [SBATCH_RESOURCES of the verb] run_inc_funnel.sh {verb} --prereg {prereg} --out {out} [--rl if rl=1]  (via python -u -m weed_optimizer_framework.tools.inc_autopilot.remote submit funnel -- {verb} ...)",
+      "param_bounds": {
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "census",
+            "leak",
+            "embed-judges",
+            "qualify",
+            "draw",
+            "sheets",
+            "rl-b",
+            "ingest",
+            "estimate"
+          ]
+        },
+        "prereg": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/funnel/prereg_v1\\.json$"
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/funnel/$"
+        },
+        "rl": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            1
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "run_inc_funnel.sh's own #SBATCH --gres=gpu:v100-32:1 --time=08:00:00 on GPU-shared (the allocation has no CPU partition): est_gpu_hours is that walltime in V100 GPU-hours, levers.estimate_funnel; rl-b holds an H100-80 instead (funnel/__main__.py SBATCH_RESOURCES), so its hours are stated in V100 GPU-hours at the su_rates.json ratio. No default: an unpriced job is not charged."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "tier2",
+        "human"
+      ],
+      "description": "Lever L10 (docs/FUNNEL_AUDIT.md 8.5): one stage of the funnel audit as a cluster job. R2 by this table's rule: a routine GPU job under half a day that writes bounded, additive artifacts under INC_DIR/funnel/ (the CLI refuses to overwrite an output with other inputs, and the sample lock makes the drawn sample immutable). remote.py submit funnel admits only these verbs and paths, and adds the verb's own sbatch resources on the cluster."
+    },
+    "inc_funnel_map": {
+      "template": "sbatch run_inc_funnel.sh map --prereg {prereg} --out {out} --part {part}  (via python -u -m weed_optimizer_framework.tools.inc_autopilot.remote submit funnel -- map ...)",
+      "param_bounds": {
+        "prereg": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/funnel/prereg_v1\\.json$"
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/funnel/$"
+        },
+        "part": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "geometry",
+            "relation"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "run_inc_funnel.sh's own #SBATCH --gres=gpu:v100-32:1 --time=08:00:00 (levers.estimate_funnel)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "tier2",
+        "human"
+      ],
+      "description": "Lever L11(b) (docs/FUNNEL_AUDIT.md 8.5): the exact geometry match against the upstream annotations L11a fetched, or the relation audit. It writes proposals only (class_maps.json is immutable after it is written); applying a class map is lever L13 (R3)."
+    },
+    "inc_funnel_recover": {
+      "template": "sbatch run_inc_funnel.sh recover --prereg {prereg} --audit {audit} --maps {maps} --policy {policy} --out {out}  (via python -u -m weed_optimizer_framework.tools.inc_autopilot.remote submit funnel -- recover ...)",
+      "param_bounds": {
+        "prereg": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/funnel/prereg_v1\\.json$"
+        },
+        "audit": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/funnel/audit_v1\\.json$"
+        },
+        "maps": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/funnel/class_maps\\.json$"
+        },
+        "policy": {
+          "type": "str",
+          "pattern": "^R-[ACTVJF](,R-[ACTVJF]){0,5}$"
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_r1/$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "run_inc_funnel.sh's own #SBATCH --gres=gpu:v100-32:1 --time=08:00:00 (levers.estimate_funnel)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "tier2",
+        "human"
+      ],
+      "description": "Lever L13 (docs/FUNNEL_AUDIT.md 7 and 8.5): recovery into the content-addressed overlay INC_DIR/step1_r1/, gated per stratum. R3: it applies class maps and changes what later builds may train on; the source labels and every guard stay untouched (the overlay is additive and the recover verb checks both), and it runs only after D18 fired on a valid audit."
+    },
+    "inc_funnel_fetch": {
+      "template": "lab: python -m weed_optimizer_framework.tools.funnel fetch --prereg {prereg} --what {what} [--names-from {names_from}] --out {out}",
+      "param_bounds": {
+        "prereg": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/funnel/prereg_v1\\.json$"
+        },
+        "what": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "cards",
+            "kt7",
+            "known-items",
+            "refetch",
+            "taxonomy"
+          ]
+        },
+        "names_from": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/step1/pool_summary\\.json$"
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/funnel/$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 0.0
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A lab-side HTTP read of public cards, the taxonomy authority and citizen-science photos; no cluster allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Levers L11a and L12 (docs/FUNNEL_AUDIT.md 8.5, R0): runs on the lab, not the cluster; the executor calls the lab hook the campaign registers for it and refuses when none is. It writes hashed files under the lab's funnel/ and its fetch manifest; inc_funnel_sync pushes them."
+    },
+    "inc_verify_queue": {
+      "template": "lab: append verify-only tasks for a person to <brain dir>/<domain>/known_truth/human_verify_queue.jsonl",
+      "param_bounds": {
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 0.0
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A lab-side file append; no cluster allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L14 (docs/FUNNEL_AUDIT.md 8.5, R2): the lab hook writes one verify task per queued unit (a class map the card and the geometry match do not settle); a person's answers come back through human_verify.jsonl. Additive; nothing is decided by it."
+    },
+    "inc_funnel_sync": {
+      "template": "lab: push the fixed list of the lab's funnel files (runner 6.3) to INC_DIR/funnel/ and check them on arrival, then pull the fixed cluster list back, checked before it is moved into place",
+      "param_bounds": {},
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A file transfer to the cluster login node; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "The funnel's data movement (runner 6.3), both directions. Lab to cluster: only the fixed file list moves (taxonomy_cache.json, known_items_v1.json, fetch_manifest.json, cards/, kt7/, refetch/, prospective_da.json, rl_answers/RL-A/); every pushed file must hash on the cluster as on the lab, and the fetched files are checked against their manifest. Cluster to lab: only the fixed pull list (the census, name status, ledger, audit, class maps, relation and qualification files, leak record, frames, sample, sheets_v1/ and step1_r1/recovery.json, and the pre-registration when its amendments grew over the same core), each checked against its cluster sha256 before it is moved into place. The sync refuses a path outside either list. No evaluation image or key file ever moves."
+    },
+    "inc_funnel_summary": {
+      "template": "python -u -m weed_optimizer_framework.tools.inc_autopilot.remote funnel summary [--derive-ledger]",
+      "param_bounds": {},
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A read on the cluster login node; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "The funnel's aggregates for the lab (docs/FUNNEL_AUDIT.md 8.2): the ledger, audit, class maps, recovery record and DA record, the Step 1 funnel reads, and the funnel directory's listing (names, sha256, sizes). Never ships conflicts.csv, pool_verdicts.npz, ledger.jsonl, key files or evaluation descriptors. With --derive-ledger and no ledger on disk, the summaries-derived ledger is computed in memory and returned."
+    },
+    "inc_funnel_dev_scores": {
+      "template": "python -u -m weed_optimizer_framework.tools.inc_autopilot.remote funnel dev-scores --exp {exp} [--truth-step {truth_step}]",
+      "param_bounds": {
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "truth_step": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A read on the cluster login node; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "The dev scores the realloop_v2 panel compares (inc_autopilot/panel.py): runs/<run>/scores/dev.json of an experiment's base runs, or of a real loop step's truth 'with' runs, and nothing else; a score not stamped dev is refused."
     }
   }
 }

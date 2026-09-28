@@ -361,6 +361,17 @@ def fold(events):
             for k, v in (ev.get("counts") or {}).items():
                 if k in p and isinstance(v, int):
                     p[k] += v
+        elif ev.get("kind") == "da_outcome":
+            # The adversary role's track record: its predictions scored when their
+            # tests landed, and H11 (docs/FUNNEL_AUDIT.md 6 H11, 8.6).
+            p = props.setdefault(ev.get("proposed_by") or "unknown", _blank_proposer())
+            p["scored"] += len(ev.get("predictions") or [])
+            p["correct"] += int(ev.get("correct") or 0)
+            p["insufficient"] += sum(1 for x in ev.get("predictions") or [] if x.get("verdict") == "insufficient")
+            h = ev.get("h11") or {}
+            if h.get("verdict") in ("supported", "falsified"):
+                p["h11_scored"] = p.get("h11_scored", 0) + 1
+                p["h11_supported"] = p.get("h11_supported", 0) + (1 if h["verdict"] == "supported" else 0)
         elif ev.get("kind") == "outcome":
             lv = levers.setdefault(ev.get("lever") or "unknown",
                                    {"scored": 0, "correct": 0, "contradicted": 0,
@@ -416,5 +427,252 @@ def record(proposal, child_report, parent_report, b0_report=None, child_exp="chi
     out = score(proposal, child_report, parent_report, b0_report, child_exp, parent_exp)
     _append(events_path or TRACK_EVENTS, out)
     _append(experiments_path or EXPERIMENTS_FILE, out["result"])
+    write_summary(events_path, summary_path)
+    return out
+
+
+# --- the funnel audit: H10 from the panel, the devil's advocate's predictions and H11 -----
+# docs/FUNNEL_AUDIT.md 6 (H10, H11) and 8.6; runner 5.5.5 and 5.5.7.
+
+H10A_ALPHA = 0.025          # contract 6 H10a: one-sided exact permutation p at 5 v 5 seeds
+H10_P_MIN = 0.75            # gate.GateConfig.p_accept: the pinned "helps" line (H10b, H10c)
+DA_ROLE = "adversary"
+
+
+def h10(panel, realloop_report=None):
+    """{"H10a", "H10b", "H10c"}: each {"verdict", "why", ...} from panel.json
+    (panel.build_panel) and realloop_v2's report.json (the truth arm's verdicts
+    of the recovery steps, dev only).
+
+    H10a supported only when the pinned rule says helps AND the 5 v 5 exact
+    permutation p <= 0.025; the rule alone is 'helps (decision rule, alpha about
+    0.20)', inconclusive; neutral or hurts falsifies it. H10b: U beats U-ctl at
+    P >= 0.75. H10c: at least one recovery step is truth 'helps' and, where a
+    same-image control exists, its "with" runs beat that control at P >= 0.75
+    (_h10c)."""
+    comps = {c.get("id"): c for c in (panel or {}).get("comparisons") or [] if isinstance(c, dict)}
+    out = {}
+    a = comps.get("H10a")
+    if a is None:
+        out["H10a"] = {"verdict": "not_evaluated", "why": "no H10a comparison in the panel"}
+    else:
+        det, perm = a.get("truth_detail_3v3") or {}, a.get("perm_5v5") or {}
+        v, p = det.get("verdict"), perm.get("p")
+        if v == "helps" and isinstance(p, (int, float)) and p <= H10A_ALPHA:
+            verdict, why = "supported", "the pinned rule says helps and the 5 v 5 permutation p %.4g <= %g" % (
+                p, H10A_ALPHA)
+        elif v == "helps":
+            verdict = "inconclusive"
+            why = ("helps (decision rule, alpha about 0.20) but the 5 v 5 permutation p %s is not <= %g: not "
+                   "confirmed" % ("%.4g" % p if isinstance(p, (int, float)) else "is missing", H10A_ALPHA))
+        elif v in ("neutral", "hurts"):
+            verdict, why = "falsified", "the pinned rule says %s (P %.3f)" % (v, det.get("p") or 0.0)
+        else:
+            verdict, why = "not_evaluated", "the H10a comparison has no truth verdict"
+        out["H10a"] = {"verdict": verdict, "why": why, "rule": v, "p_perm": p, "p_rule": det.get("p")}
+    b = comps.get("H10b")
+    if b is None:
+        out["H10b"] = {"verdict": "not_evaluated", "why": "no H10b comparison in the panel"}
+    else:
+        p = (b.get("truth_detail_3v3") or {}).get("p")
+        out["H10b"] = {"verdict": "supported" if isinstance(p, (int, float)) and p >= H10_P_MIN else "not_supported",
+                       "why": "P(U > U-ctl) = %s against %g" % (p, H10_P_MIN), "p": p}
+    out["H10c"] = _h10c(panel, realloop_report)
+    return out
+
+
+def _h10c(panel, realloop_report):
+    """H10c (contract 6): at least one M-size recovery increment is truth
+    'helps' and, where a same-image control exists, beats it at P >= 0.75.
+    Every recovery step of realloop_v2 counts (panel.RECOVERY_STEPS, which is
+    realloop.RECOVERED_SEQUENCE). The steps with a pre-registered same-image
+    control are those of panel.spec_v2()'s H10c comparisons, and such a step
+    counts only through its control's comparison (a control missing from the
+    panel leaves that step unjudged, never passed). Without realloop_v2's
+    report the truth verdicts are unknown: not_evaluated, not 'not supported'."""
+    from . import panel as PN
+    if not isinstance(realloop_report, dict):
+        return {"verdict": "not_evaluated", "why": "needs realloop_v2's report.json (the truth arm's verdicts)"}
+    verdicts = {}
+    for s in (BP.dev_only(realloop_report) or {}).get("steps") or []:
+        v = (s.get("truth") or {}).get("verdict") if isinstance(s, dict) else None
+        if isinstance(s, dict) and s.get("step") in PN.RECOVERY_STEPS and v in ("helps", "neutral", "hurts"):
+            verdicts[s["step"]] = v
+    if not verdicts:
+        return {"verdict": "not_evaluated", "why": "the report has no truth verdict for a recovery step (%s)"
+                % ", ".join(PN.RECOVERY_STEPS)}
+    spec = PN.spec_v2()
+    controlled = {}                                   # step -> comparison id
+    for c in spec["comparisons"]:
+        arm = spec["arms"].get(c["with"]) or {}
+        if str(c["id"]).startswith("H10c") and arm.get("kind") == "truth_with":
+            controlled[arm.get("step")] = c["id"]
+    comps = {c.get("id"): c for c in (panel or {}).get("comparisons") or [] if isinstance(c, dict)}
+    parts = []
+    for step in PN.RECOVERY_STEPS:
+        if step not in verdicts:
+            continue
+        cid = controlled.get(step)
+        rec = {"step": step, "truth_verdict": verdicts[step], "comparison": cid, "p_vs_control": None}
+        if cid is None:
+            rec["passes"] = verdicts[step] == "helps"
+        elif cid not in comps:
+            rec["passes"] = False if verdicts[step] != "helps" else None
+            rec["why"] = "its same-image control (%s) is not in the panel" % cid
+        else:
+            p = (comps[cid].get("truth_detail_3v3") or {}).get("p")
+            rec["p_vs_control"] = p
+            rec["passes"] = verdicts[step] == "helps" and isinstance(p, (int, float)) and p >= H10_P_MIN
+        parts.append(rec)
+    if any(x["passes"] is True for x in parts):
+        return {"verdict": "supported", "parts": parts,
+                "why": "a recovery step helps in the truth arm and, where a same-image control exists, beats it at "
+                       "P >= %g" % H10_P_MIN}
+    if any(x["passes"] is None for x in parts):
+        return {"verdict": "not_evaluated", "parts": parts,
+                "why": "a recovery step that helps waits for its same-image control in the panel"}
+    return {"verdict": "not_supported", "parts": parts,
+            "why": "no recovery step helps in the truth arm while beating its same-image control where one exists"}
+
+
+def _da_actor(model):
+    """The adversary's actor string, in the form policy._ACTOR_RE accepts (the
+    campaign's ledger uses the same form)."""
+    return BP.actor_for("%s/%s" % (DA_ROLE, model or "unknown"))
+
+
+def _audit_usable(audit):
+    """(ok, why): an audit a DA outcome may be scored on. An invalid audit
+    (calibration overlap, contract 4.1 and 8.4) may not be cited by anything."""
+    if not isinstance(audit, dict) or not audit:
+        return False, "no audit_v1.json yet"
+    if audit.get("valid") is not True:
+        return False, "the audit is not valid (valid %r: calibration overlap); nothing may cite it" % (
+            audit.get("valid"),)
+    return True, ""
+
+
+def h11(prospective_da, audit, recoverable_stages=None):
+    """H11 (contract 6, review): the DA's top-1 forecast stage is the audit's
+    stage with the largest recoverable lower bound, and its log-loss on that
+    stage beats the uniform forecast over the ledger's recoverable stages.
+    Scored either way; not_evaluated without both files or on an invalid audit.
+
+    The audit's own H11 (audit_v1.json hypotheses.H11, written by
+    funnel/estimate.py, the only producer of audit numbers) is taken as it is
+    when it is decided. Otherwise it is computed here with the same rule, which
+    needs `recoverable_stages` (the ledger's): the uniform forecast is over
+    those, never over the stages the DA happened to name."""
+    ok, why = _audit_usable(audit)
+    if not ok:
+        return {"verdict": "not_evaluated", "why": why}
+    hyp = (audit.get("hypotheses") or {}).get("H11") if isinstance(audit.get("hypotheses"), dict) else None
+    if isinstance(hyp, dict) and hyp.get("verdict") in ("supported", "falsified"):
+        pt = hyp.get("parts") or {}
+        return {"verdict": hyp["verdict"], "source": "audit_v1.json /hypotheses/H11 (funnel/estimate.py)",
+                "top1": pt.get("forecast_top1"), "truth": pt.get("top_stage"), "p_truth": pt.get("p_top"),
+                "log_loss": pt.get("log_loss"), "uniform_log_loss": pt.get("uniform_log_loss"),
+                "stages": pt.get("stages"), "why": hyp.get("why")}
+    fc = ((prospective_da or {}).get("stage_forecast") or
+          (((prospective_da or {}).get("reply") or {}).get("stage_forecast")))
+    if recoverable_stages is None:
+        return {"verdict": "not_evaluated", "why": "the audit has no decided H11, and the ledger's recoverable "
+                                                   "stages (the uniform forecast's support) were not given"}
+    rec = [s for s in recoverable_stages]
+    rank = [r for r in audit.get("stage_ranking") or [] if isinstance(r, dict) and r.get("stage") in rec]
+    if not isinstance(fc, dict) or not fc or not rank or not rec:
+        return {"verdict": "not_evaluated", "why": "needs the DA's stage_forecast, the audit's stage_ranking and "
+                                                   "the recoverable stages"}
+    if all(isinstance(r.get("recoverable_lb"), (int, float)) for r in rank):
+        rank = sorted(rank, key=lambda r: (-float(r["recoverable_lb"]), str(r["stage"])))
+    truth = rank[0]["stage"]
+    top = sorted(fc, key=lambda s: (-float(fc[s]), s))[0]
+    p = float(fc.get(truth, 0.0))
+    ll = -math.log(p) if p > 0 else float("inf")
+    uni = math.log(len(rec))
+    ok = top == truth and ll < uni
+    return {"verdict": "supported" if ok else "falsified", "source": "outcome.h11", "top1": top, "truth": truth,
+            "p_truth": p, "log_loss": ll, "uniform_log_loss": uni, "stages": len(rec),
+            "why": "top-1 %s %s the largest recoverable lower bound (%s); log-loss %.4g %s uniform %.4g over %d "
+                   "recoverable stage(s)" % (top, "is" if top == truth else "is not", truth, ll,
+                                             "<" if ll < uni else ">=", uni, len(rec))}
+
+
+def _prediction_outcome(pred, audit, panel_h10):
+    """(verdict, why) of one DA prediction against the audit (fn_rate, purity)
+    or the panel (truth_verdict): correct / wrong / insufficient."""
+    metric, direction, thr = pred.get("metric"), pred.get("direction"), pred.get("threshold")
+    if metric == "fn_rate":
+        st = ((audit or {}).get("stages") or {}).get(pred.get("stage")) or {}
+        iv = (st.get("fn_rate") or {}).get("interval")
+        if not (isinstance(iv, list) and len(iv) == 2) or not isinstance(thr, (int, float)):
+            return "insufficient", "the audit has no fn_rate interval for stage %s (or no threshold)" % pred.get("stage")
+        lo, hi = iv
+        if direction == "above":
+            return ("correct", "fn_rate lb %.3g >= %g" % (lo, thr)) if lo >= thr else \
+                (("wrong", "fn_rate ub %.3g < %g" % (hi, thr)) if hi < thr else ("insufficient", "the interval "
+                                                                                  "straddles %g" % thr))
+        if direction == "below":
+            return ("correct", "fn_rate ub %.3g < %g" % (hi, thr)) if hi < thr else \
+                (("wrong", "fn_rate lb %.3g >= %g" % (lo, thr)) if lo >= thr else ("insufficient", "the interval "
+                                                                                    "straddles %g" % thr))
+        return "insufficient", "direction %r does not apply to fn_rate" % direction
+    if metric == "purity":
+        # a stratum's purity is its target share: the audit also holds, per stratum, the estimates the
+        # recovery gates read ("label", "pred", "purity:<class>", "label:<class>"), never this one
+        rows = [r for r in (audit or {}).get("strata") or [] if isinstance(r, dict)
+                and r.get("stratum") == pred.get("stratum") and r.get("event", "target") == "target"]
+        if not rows or not isinstance(thr, (int, float)):
+            return "insufficient", "the audit has no stratum %r (or no threshold)" % pred.get("stratum")
+        lo, hi = rows[0].get("interval") or [None, None]
+        if lo is None:
+            return "insufficient", "stratum %r has no interval" % pred.get("stratum")
+        if direction == "above":
+            return ("correct", "purity lb %.3g >= %g" % (lo, thr)) if lo >= thr else \
+                (("wrong", "purity ub %.3g < %g" % (hi, thr)) if hi < thr else ("insufficient", "straddles"))
+        if direction == "below":
+            return ("correct", "purity ub %.3g < %g" % (hi, thr)) if hi < thr else \
+                (("wrong", "purity lb %.3g >= %g" % (lo, thr)) if lo >= thr else ("insufficient", "straddles"))
+        return "insufficient", "direction %r does not apply to purity" % direction
+    if metric == "truth_verdict":
+        v = ((panel_h10 or {}).get("H10a") or {}).get("rule")
+        if v not in ("helps", "neutral", "hurts"):
+            return "insufficient", "no realloop_v2 panel verdict yet"
+        return ("correct" if v == direction else "wrong"), "the dose arm's truth verdict is %s" % v
+    return "insufficient", "unknown metric %r" % (metric,)
+
+
+def score_da(prospective_da, audit=None, panel=None, realloop_report=None, recoverable_stages=None):
+    """The outcome record of one devil's-advocate pass: H11 and each kept
+    prediction's verdict once its test landed (the audit for fn_rate and
+    purity, the panel for truth_verdict). An invalid audit scores nothing:
+    its predictions stay insufficient and H11 is not evaluated."""
+    val = (prospective_da or {}).get("validation") or {}
+    model = ((prospective_da or {}).get("model") or {}).get("resolved")
+    ph10 = h10(panel, realloop_report) if panel else None
+    usable, why_not = _audit_usable(audit)
+    preds = []
+    for ca in val.get("counter_arguments") or []:
+        if not (ca.get("kept") and ca.get("counted")):
+            continue
+        pred = ca.get("prediction") or {}
+        if not usable and pred.get("metric") in ("fn_rate", "purity"):
+            verdict, why = "insufficient", why_not
+        else:
+            verdict, why = _prediction_outcome(pred, audit if usable else None, ph10)
+        preds.append({"counter_argument": ca.get("index"), "prediction": ca.get("prediction"),
+                      "verdict": verdict, "why": why})
+    return {"kind": "da_outcome", "utc": M.utc_now(), "proposed_by": _da_actor(model), "role": DA_ROLE,
+            "model": model, "digest_sha256": (prospective_da or {}).get("digest_sha256"),
+            "h11": h11(prospective_da, audit, recoverable_stages), "predictions": preds,
+            "scored": sum(1 for x in preds if x["verdict"] != "insufficient"),
+            "correct": sum(1 for x in preds if x["verdict"] == "correct")}
+
+
+def record_da(prospective_da, audit=None, panel=None, realloop_report=None, events_path=None, summary_path=None,
+              recoverable_stages=None):
+    """score_da + append to the track record (the adversary role's row)."""
+    out = score_da(prospective_da, audit, panel, realloop_report, recoverable_stages)
+    _append(events_path or TRACK_EVENTS, out)
     write_summary(events_path, summary_path)
     return out

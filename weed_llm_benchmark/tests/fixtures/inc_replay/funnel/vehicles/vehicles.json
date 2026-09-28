@@ -1,0 +1,282 @@
+{
+ "adapter": "vehicle_logs",
+ "attractors": [
+  {
+   "common": "van",
+   "confused_with": [
+    "car"
+   ],
+   "id": "van",
+   "option": "A van",
+   "rank": "species",
+   "taxon": "van"
+  }
+ ],
+ "classes": {
+  "genus_answer_unsure_for": [],
+  "other": {
+   "id": 3,
+   "name": "OtherObject"
+  },
+  "small_class_train_boxes_below": 100,
+  "targets": [
+   {
+    "common": "car",
+    "genus": "motorcar",
+    "id": 0,
+    "name": "car",
+    "not": [
+     "van"
+    ],
+    "rank": "species",
+    "siblings": [],
+    "taxon": "car"
+   },
+   {
+    "common": "truck",
+    "genus": "lorry",
+    "id": 1,
+    "name": "truck",
+    "not": [],
+    "rank": "species",
+    "siblings": [
+     "bus"
+    ],
+    "taxon": "truck"
+   },
+   {
+    "common": "bus",
+    "genus": "coach",
+    "id": 2,
+    "name": "bus",
+    "not": [],
+    "rank": "species",
+    "siblings": [
+     "truck"
+    ],
+    "taxon": "bus"
+   }
+  ]
+ },
+ "domain": "vehicles",
+ "domain_terms": [
+  "roadcam",
+  "fleetcam"
+ ],
+ "exams": {
+  "decision": "dev",
+  "extra_non_decision": [],
+  "non_decision": [
+   "test",
+   "night_exam",
+   "rain_exam"
+  ]
+ },
+ "format": "funnel-domain/1",
+ "known_truth": {
+  "KV1": {
+   "allowed_uses": [
+    "calibration"
+   ],
+   "claimed_by": null,
+   "independent": false,
+   "never_qualifies": [],
+   "sources": [
+    "roadref"
+   ],
+   "split": null,
+   "what": "copies of reference images"
+  },
+  "forbidden": [
+   "dev",
+   "test",
+   "night_exam",
+   "rain_exam"
+  ],
+  "qualify_rl_on": [
+   "KV1"
+  ]
+ },
+ "names": {
+  "frames": {
+   "excluded": [
+    "non_object",
+    "state"
+   ],
+   "named": [
+    "taxon_resolved",
+    "target_related",
+    "target_synonym",
+    "role"
+   ],
+   "noinfo": [
+    "no_name",
+    "numeric",
+    "generic",
+    "unresolvable"
+   ]
+  },
+  "generic_keys": [
+   "object",
+   "vehicle"
+  ],
+  "generic_regex": "(class|obj)[0-9]*",
+  "non_object_words": [
+   "sign",
+   "sky"
+  ],
+  "numeric_regex": "[0-9]+",
+  "related_allowed_keys": [],
+  "related_tokens": [
+   "lorry"
+  ],
+  "role_names": [
+   "traffic"
+  ],
+  "state_words": [
+   "blurred"
+  ]
+ },
+ "sources": {
+  "lab_groups": {
+   "RoadLab": [
+    "roadref",
+    "roadcam_a"
+   ]
+  },
+  "reference": "roadref"
+ },
+ "stages": [
+  {
+   "depends_on": [],
+   "filter": "a label file with no valid box",
+   "guard": false,
+   "id": "V0",
+   "name": "read",
+   "recoverable": false,
+   "role": "read",
+   "unit": "image"
+  },
+  {
+   "depends_on": [
+    "V0"
+   ],
+   "filter": "near an evaluation image",
+   "guard": true,
+   "id": "V1",
+   "name": "eval guard",
+   "recoverable": false,
+   "role": "guard",
+   "unit": "image"
+  },
+  {
+   "depends_on": [
+    "V1"
+   ],
+   "filter": "source class name joined to a target",
+   "guard": false,
+   "id": "V2",
+   "name": "join",
+   "recoverable": true,
+   "role": "join",
+   "unit": "box"
+  },
+  {
+   "depends_on": [
+    "V2"
+   ],
+   "filter": "informative names",
+   "guard": false,
+   "id": "V3",
+   "name": "name status",
+   "recoverable": true,
+   "role": "name_status",
+   "unit": "class"
+  },
+  {
+   "depends_on": [
+    "V3"
+   ],
+   "filter": "the reject class's training sample",
+   "guard": false,
+   "id": "V4",
+   "name": "reject sample",
+   "recoverable": "not a discard",
+   "role": "reject_class_sample",
+   "unit": "box"
+  },
+  {
+   "depends_on": [
+    "V2",
+    "V4"
+   ],
+   "filter": "probe verifies target-labelled boxes",
+   "guard": false,
+   "id": "V5",
+   "name": "target check",
+   "recoverable": true,
+   "role": "target_check",
+   "unit": "box"
+  },
+  {
+   "depends_on": [
+    "V2",
+    "V4"
+   ],
+   "filter": "probe checks other-labelled boxes",
+   "guard": false,
+   "id": "V6",
+   "name": "other check",
+   "recoverable": true,
+   "role": "other_check",
+   "unit": "box"
+  },
+  {
+   "depends_on": [
+    "V5",
+    "V6"
+   ],
+   "filter": "every box verified",
+   "guard": false,
+   "id": "V7",
+   "name": "image rule",
+   "recoverable": true,
+   "role": "image_rule",
+   "unit": "image"
+  },
+  {
+   "depends_on": [
+    "V5"
+   ],
+   "filter": "a source with verified boxes",
+   "guard": false,
+   "id": "V8",
+   "name": "evidence",
+   "recoverable": "derived",
+   "role": "evidence",
+   "unit": "source"
+  }
+ ],
+ "taxonomy": {
+  "authority": {
+   "kind": "hypernym_table",
+   "table": {
+    "coach": "bus",
+    "hatchback": "car",
+    "lorry": "truck",
+    "minibus": "bus",
+    "pickup": "truck",
+    "sedan": "car",
+    "van": "van"
+   }
+  },
+  "informative_via": [
+   "scientific"
+  ],
+  "mappable_via": [
+   "scientific",
+   "override"
+  ],
+  "overrides": {}
+ }
+}

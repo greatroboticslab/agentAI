@@ -1,0 +1,77 @@
+{
+ "calibration_overlap": [],
+ "d18_inputs": [
+  {
+   "fn_lb": 0.0,
+   "kind": "target_rejected",
+   "recoverable_lb": 0.0,
+   "relative_of_prediction": false,
+   "source_taxa": [],
+   "stage": "S8",
+   "stratum": "G2/source=project_agml__weed_crop_detection/label=Ragweed/fail=p_below_tau"
+  },
+  {
+   "fn_lb": 0.01,
+   "kind": "other_predicted_target",
+   "recoverable_lb": 3.0,
+   "relative_of_prediction": false,
+   "source_taxa": [],
+   "stage": "S9",
+   "stratum": "G1/frame=noinfo/status=no_name/pred=PalmerAmaranth"
+  }
+ ],
+ "domain": "weed",
+ "format": "funnel-audit/1",
+ "ledger_fingerprint": "409b67c2b6e8fabd5d80fee6a4f54652e1df0de6915bde3301f60d1a8de144e4",
+ "stage_ranking": [
+  {
+   "recoverable_lb": 3.0,
+   "stage": "S9"
+  },
+  {
+   "recoverable_lb": 0.0,
+   "stage": "S8"
+  }
+ ],
+ "stages": {
+  "S8": {
+   "fn_rate": {
+    "estimate": 0.01,
+    "interval": [
+     0.0,
+     0.04
+    ],
+    "method": "kg",
+    "n": 300
+   }
+  },
+  "S9": {
+   "fn_rate": {
+    "estimate": 0.01,
+    "interval": [
+     0.0,
+     0.03
+    ],
+    "method": "kg",
+    "n": 300
+   }
+  }
+ },
+ "strata": [
+  {
+   "N": 1072,
+   "estimate": 0.0,
+   "group": "G2",
+   "interval": [
+    0.0,
+    0.041
+   ],
+   "method": "jeffreys",
+   "n": 60,
+   "stratum": "G2/source=project_agml__weed_crop_detection/label=Ragweed/fail=p_below_tau"
+  }
+ ],
+ "synthetic": true,
+ "valid": true,
+ "why": "R10: every stratum's FN upper bound is below 0.05"
+}

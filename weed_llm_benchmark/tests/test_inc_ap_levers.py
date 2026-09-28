@@ -246,24 +246,33 @@ def test_menu():
     menu = LV.load_menu()
     from weed_optimizer_framework.tools.brain import policy
     lv = menu["levers"]
-    check("L1-L9 are on the menu", sorted(lv) == ["L%d" % i for i in range(1, 10)], sorted(lv))
+    # L10-L14 (and L11a, the card fetch L11 reads) are the funnel audit's levers
+    # (docs/FUNNEL_AUDIT.md 8.5); L14 is a lab hook with no command.
+    check("L1-L14 and L11a are on the menu",
+          sorted(lv) == sorted(["L%d" % i for i in range(1, 15)] + ["L11a"]), sorted(lv))
     for lid, r in sorted(lv.items()):
-        good = (isinstance(r.get("argv"), list) and r["argv"] and r.get("policy_action", "").startswith("inc_")
+        command = (isinstance(r.get("argv"), list) and r["argv"]) or \
+            (r.get("kind") == "lab_hook" and r.get("argv") is None and isinstance(r.get("hook"), str))
+        good = (command and r.get("policy_action", "").startswith("inc_")
                 and r.get("risk") in ("R0", "R1", "R2", "R3") and isinstance(r.get("param_bounds"), dict)
                 and all(isinstance(r.get(k), str) and r[k] for k in ("control", "success", "falsifier", "title"))
-                and r.get("estimator") in ("pilot_rebuild", "realloop", "walltime", "zero", "baseline"))
+                and r.get("estimator") in ("pilot_rebuild", "realloop", "walltime", "zero", "baseline",
+                                           "funnel_walltime"))
         check("%s: command, action, risk, bounds, control, success, falsifier, estimator" % lid, good, r.keys())
         ok, why = policy._check_params({k: 0 for k in []}, r["param_bounds"])
         kinds = {b.get("type") for b in r["param_bounds"].values()}
         check("%s: bounds use policy's types" % lid, ok and kinds <= {"str", "int", "float", "enum"}, kinds)
         check("%s: est_gpu_hours is bounded in [0, 200]" % lid,
               r["param_bounds"].get("est_gpu_hours") == {"type": "float", "min": 0.0, "max": 200.0})
-    check("risks: builds R3, relevance/audit/unblock R2",
+    check("risks: builds R3, relevance/audit/unblock R2; the funnel: audit and maps R2, lab fetches R0, recovery R3, "
+          "the verify queue R2",
           {k: v["risk"] for k, v in lv.items()} == {"L1": "R3", "L2": "R3", "L3": "R2", "L4": "R2", "L5": "R3",
-                                                     "L6": "R3", "L7": "R2", "L8": "R3", "L9": "R3"})
+                                                     "L6": "R3", "L7": "R2", "L8": "R3", "L9": "R3",
+                                                     "L10": "R2", "L11": "R2", "L11a": "R0", "L12": "R0",
+                                                     "L13": "R3", "L14": "R2"})
     cards = menu["cards"]
-    check("X1-X9 are R4 cards with no command",
-          sorted(cards) == ["X%d" % i for i in range(1, 10)]
+    check("X1-X12 are R4 cards with no command",
+          sorted(cards) == sorted("X%d" % i for i in range(1, 13))
           and all(c["risk"] == "R4" and "argv" not in c and c.get("required_change") for c in cards.values()))
     names = {p for r in lv.values() for p in r["param_bounds"]}
     # The gate's flips mode is the one gate setting on the menu: the choice between the two
@@ -275,11 +284,15 @@ def test_menu():
     check("no lever takes a source list, a gate threshold or a verdict", not forbidden, forbidden)
     from weed_optimizer_framework.tools.inc import select as S0
     crit = {k: r["param_bounds"]["increment_sources"] for k, r in lv.items() if "increment_sources" in r["param_bounds"]}
-    check("increment_sources is an enum of select.SOURCE_MODES on the real-loop levers only (L2, L5, L6), and the "
-          "protocol's modes, default and min_evidence are select's",
+    from weed_optimizer_framework.tools.inc import realloop as RL0
+    check("increment_sources is an enum of select.SOURCE_MODES on the real-loop levers only (L2, L5, L6), L2 adds "
+          "the funnel's recovered overlay (realloop.INCREMENT_SOURCE_MODES, realloop_v2), and the protocol's modes "
+          "are realloop's, its default and min_evidence select's",
           sorted(crit) == ["L2", "L5", "L6"]
-          and all(b == {"type": "enum", "value_type": "str", "values": list(S0.SOURCE_MODES)} for b in crit.values())
-          and LV.protocol("increment_sources_modes") == list(S0.SOURCE_MODES)
+          and all(crit[k] == {"type": "enum", "value_type": "str", "values": list(S0.SOURCE_MODES)} for k in ("L5", "L6"))
+          and crit["L2"] == {"type": "enum", "value_type": "str", "values": list(RL0.INCREMENT_SOURCE_MODES)}
+          and LV.protocol("increment_sources_modes") == list(RL0.INCREMENT_SOURCE_MODES)
+          and LV.protocol("recovered_steps") == len(RL0.RECOVERED_SEQUENCE)
           and LV.protocol("increment_sources_default") == S0.SOURCES_RELEVANCE
           and (LV.SOURCES_RELEVANCE, LV.SOURCES_EVIDENCE) == (S0.SOURCES_RELEVANCE, S0.SOURCES_EVIDENCE)
           and LV.protocol("min_evidence_default") == S0.MIN_EVIDENCE, crit)

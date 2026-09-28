@@ -1,0 +1,80 @@
+{
+ "derivation": "summaries",
+ "domain": "weed",
+ "domain_scores": {
+  "reference": {
+   "q05": 0.090234,
+   "q50": 0.512102
+  }
+ },
+ "fingerprint": "344a9c85ceca1306162858039f9b58fb570bb66301a0fbbbe533119b1735f518",
+ "format": "funnel-ledger/1",
+ "identity_inputs": {
+  "s1_gate_verdict_2026_08_25": "4829f4917b9270abfa4cc7b6d387be679fe4cd752fb6971edc68c0e54bd5833e"
+ },
+ "input_records": {},
+ "inputs": {
+  "s1_gate_verdict_2026_08_25": "4829f4917b9270abfa4cc7b6d387be679fe4cd752fb6971edc68c0e54bd5833e"
+ },
+ "label_spaces": {},
+ "name_status_version": "v1",
+ "other_class": 12,
+ "reject_class": null,
+ "stages": [
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": {
+    "domains_covered": [
+     "train_core"
+    ],
+    "known_truth_sets": [
+     {
+      "domain_basis": "the reference domain itself (the probe reads 1.000 on it)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "cwd12_human_labelled",
+      "sha256": "34227e09ff846784af81d69e9df699dc44b022d353fb1917b28c0711f49444d6",
+      "sources": [
+       "train_core"
+      ]
+     }
+    ],
+    "precision": 1.0,
+    "recall": null
+   },
+   "depends_on": [],
+   "discarded": {
+    "below_bar": 10319
+   },
+   "discarded_by_label": null,
+   "filter": "the S1 gate's probe audit of harvested labels (0.90 bar)",
+   "guard": false,
+   "id": "S8",
+   "in": 13527,
+   "kept": 3208,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "target_check",
+   "unit": "image",
+   "version": "2026-08-25"
+  }
+ ],
+ "target_classes": [
+  "Waterhemp",
+  "MorningGlory",
+  "Purslane",
+  "SpottedSpurge",
+  "Carpetweed",
+  "Ragweed",
+  "Eclipta",
+  "PricklySida",
+  "PalmerAmaranth",
+  "Sicklepod",
+  "Goosegrass",
+  "CutleafGroundcherry"
+ ]
+}

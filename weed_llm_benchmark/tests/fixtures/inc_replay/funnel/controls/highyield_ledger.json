@@ -1,0 +1,2437 @@
+{
+ "derivation": "summaries",
+ "domain": "weed",
+ "domain_scores": {
+  "project_agml__greenhouse_crop_weed_detection": 0.038835,
+  "project_agml__imageweeds_aerial_weed_detection": 0.027569,
+  "project_agml__weed_crop_detection": 0.012531,
+  "reference": {
+   "q05": 0.090234,
+   "q50": 0.512102
+  },
+  "rf_karthikeya-c8pvy__weed-detection-cwp10": 0.16815,
+  "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": 0.0,
+  "rf_zig-zag-lnodr__weed-detection-vanpe": 0.19408
+ },
+ "fingerprint": "409b67c2b6e8fabd5d80fee6a4f54652e1df0de6915bde3301f60d1a8de144e4",
+ "format": "funnel-ledger/1",
+ "identity_inputs": {
+  "admit_summary": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011",
+  "calibration": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+  "pool_summary": "dfac3e5efa3a681e6b9c8ff0431e25145c9bb7aad4cd20b9482833f8d0408958",
+  "select_summary": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101"
+ },
+ "input_records": {
+  "admit_summary": {
+   "bytes": 10432,
+   "path": "step1/admit_summary.json",
+   "sha256": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011"
+  },
+  "calibration": {
+   "bytes": 22505,
+   "path": "step1/calibration.json",
+   "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46"
+  },
+  "census_v0": {
+   "bytes": 69313,
+   "path": "census_v0.json",
+   "sha256": "adebb2bb296125beac009a31f5a1d2b5002029998fd714f84e0fbb0d1ccdb992"
+  },
+  "pool_summary": {
+   "bytes": 40094,
+   "path": "step1/pool_summary.json",
+   "sha256": "dfac3e5efa3a681e6b9c8ff0431e25145c9bb7aad4cd20b9482833f8d0408958"
+  },
+  "select_summary": {
+   "bytes": 25564,
+   "path": "step1/select_summary.json",
+   "sha256": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101"
+  }
+ },
+ "inputs": {
+  "admit_summary": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011",
+  "calibration": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+  "census_v0": "adebb2bb296125beac009a31f5a1d2b5002029998fd714f84e0fbb0d1ccdb992",
+  "pool_summary": "dfac3e5efa3a681e6b9c8ff0431e25145c9bb7aad4cd20b9482833f8d0408958",
+  "select_summary": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101"
+ },
+ "label_spaces": {
+  "francesco__grass_weeds": {
+   "boxes": 6480,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 6480,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "fvossel__csgo_player_detection": {
+   "boxes": 6416,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 6416,
+    "numeric": 0
+   }
+  },
+  "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+   "boxes": 835,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 835,
+    "numeric": 0
+   }
+  },
+  "project_agml__crop_weed_detection_latvia": {
+   "boxes": 6472,
+   "classes": 2,
+   "kinds": {
+    "generic": 6175,
+    "named": 297,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "project_agml__greenhouse_crop_weed_detection": {
+   "boxes": 11192,
+   "classes": 14,
+   "kinds": {
+    "generic": 0,
+    "named": 11192,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "project_agml__imageweeds_aerial_weed_detection": {
+   "boxes": 2191,
+   "classes": 5,
+   "kinds": {
+    "generic": 0,
+    "named": 2191,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "project_agml__maize_weed_detection": {
+   "boxes": 5178,
+   "classes": 2,
+   "kinds": {
+    "generic": 2594,
+    "named": 2584,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "project_agml__mh_weed16_weed_detection": {
+   "boxes": 46811,
+   "classes": 15,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 0,
+    "numeric": 46811
+   }
+  },
+  "project_agml__weed_crop_detection": {
+   "boxes": 17693,
+   "classes": 13,
+   "kinds": {
+    "generic": 0,
+    "named": 17693,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_1111-gzfxi__weed-chilling": {
+   "boxes": 7142,
+   "classes": 2,
+   "kinds": {
+    "generic": 5846,
+    "named": 1296,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_bishwarup-halder__crop-health-advisor": {
+   "boxes": 29239,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 29239,
+    "numeric": 0
+   }
+  },
+  "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+   "boxes": 3163,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 3163,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+   "boxes": 6034,
+   "classes": 2,
+   "kinds": {
+    "generic": 5629,
+    "named": 405,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_fyp-oof0h__smart-agriculture-miw1m": {
+   "boxes": 860,
+   "classes": 5,
+   "kinds": {
+    "generic": 0,
+    "named": 860,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_itmo-mp0nn__grass-detection-4": {
+   "boxes": 5001,
+   "classes": 12,
+   "kinds": {
+    "generic": 0,
+    "named": 5001,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+   "boxes": 1538,
+   "classes": 6,
+   "kinds": {
+    "generic": 0,
+    "named": 1538,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_kinjj__weed-avnag": {
+   "boxes": 788,
+   "classes": 1,
+   "kinds": {
+    "generic": 788,
+    "named": 0,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_lemong__agriculture-xi7us": {
+   "boxes": 1368,
+   "classes": 8,
+   "kinds": {
+    "generic": 0,
+    "named": 1368,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_leopard-ai__weed-detection-8h4kx": {
+   "boxes": 1922,
+   "classes": 2,
+   "kinds": {
+    "generic": 765,
+    "named": 1157,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+   "boxes": 3528,
+   "classes": 1,
+   "kinds": {
+    "generic": 3528,
+    "named": 0,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_new-workspace-zbm50__weeds-qftz4": {
+   "boxes": 2691,
+   "classes": 1,
+   "kinds": {
+    "generic": 2691,
+    "named": 0,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_project-5nvic__weed-detection-0tfsj": {
+   "boxes": 6244,
+   "classes": 2,
+   "kinds": {
+    "generic": 5715,
+    "named": 529,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_robtica-unileon-gluqm__farming-robotics": {
+   "boxes": 16593,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 16593,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_school-5ult5__weed-6a90d": {
+   "boxes": 3443,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 0,
+    "numeric": 3443
+   }
+  },
+  "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+   "boxes": 73140,
+   "classes": 2,
+   "kinds": {
+    "generic": 47942,
+    "named": 25198,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_srec-dthh0__crop-weed-poxtn": {
+   "boxes": 5132,
+   "classes": 4,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 0,
+    "numeric": 5132
+   }
+  },
+  "rf_test-8qezo__weed-detection-ycai2": {
+   "boxes": 271,
+   "classes": 2,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 0,
+    "numeric": 271
+   }
+  },
+  "rf_test-gzc3r__crop-mfete": {
+   "boxes": 20353,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 20353,
+    "numeric": 0
+   }
+  },
+  "rf_tuf__weed-3434e": {
+   "boxes": 6662,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 6662,
+    "numeric": 0
+   }
+  },
+  "rf_uav-qnoms__uav-wqshy": {
+   "boxes": 6362,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 0,
+    "none": 6362,
+    "numeric": 0
+   }
+  },
+  "rf_university-of-peradeniya__weed-detection-ekr8i": {
+   "boxes": 7735,
+   "classes": 2,
+   "kinds": {
+    "generic": 6995,
+    "named": 740,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_vizerion__weed-detection-5ell6": {
+   "boxes": 7070,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 7070,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+   "boxes": 3522,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 3522,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+   "boxes": 8660,
+   "classes": 14,
+   "kinds": {
+    "generic": 716,
+    "named": 7944,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_weed-tnf9e__weed-bqdok": {
+   "boxes": 207509,
+   "classes": 3,
+   "kinds": {
+    "generic": 0,
+    "named": 207509,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_yolo-gyfyq__weed-ieda7": {
+   "boxes": 5196,
+   "classes": 1,
+   "kinds": {
+    "generic": 5196,
+    "named": 0,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_zig-zag-lnodr__weed-detection-vanpe": {
+   "boxes": 881,
+   "classes": 6,
+   "kinds": {
+    "generic": 0,
+    "named": 881,
+    "none": 0,
+    "numeric": 0
+   }
+  },
+  "rf_zijian-peng__grass-weed-69hcm": {
+   "boxes": 3,
+   "classes": 1,
+   "kinds": {
+    "generic": 0,
+    "named": 3,
+    "none": 0,
+    "numeric": 0
+   }
+  }
+ },
+ "name_status_version": "v1",
+ "other_class": 12,
+ "reject_class": null,
+ "stages": [
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "the harvest brain's search and download choices (dataset_discovery)",
+   "guard": false,
+   "id": "S-1",
+   "in": null,
+   "kept": null,
+   "kept_by_label": null,
+   "recoverable": "harvest (outside Step 1)",
+   "role": "discovery",
+   "unit": "dataset",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {
+    "project_agml__mh_weed16_weed_detection": {
+     "discarded": {
+      "cap": 1656
+     },
+     "in": 6656,
+     "kept": 5000
+    }
+   },
+   "calibration": null,
+   "depends_on": [],
+   "discarded": {
+    "cap": 1656
+   },
+   "discarded_by_label": null,
+   "filter": "download limit (location unverified)",
+   "guard": false,
+   "id": "S0",
+   "in": 6656,
+   "kept": 5000,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "cap",
+   "unit": "image",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [],
+   "discarded": {
+    "never_train": 2,
+    "quarantined": 6,
+    "unknown_layout": 2,
+    "user_flag_garbage": 3
+   },
+   "discarded_by_label": null,
+   "filter": "verify._skip_reason and verify._layout: never_train, quarantine, user flag, layout",
+   "guard": false,
+   "id": "S1",
+   "in": 65,
+   "kept": 52,
+   "kept_by_label": null,
+   "recoverable": "unknown_layout only",
+   "role": "registry",
+   "unit": "source",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {
+    "francesco__grass_weeds": {
+     "discarded": {
+      "no_boxes": 7
+     }
+    },
+    "fvossel__csgo_player_detection": {
+     "discarded": {
+      "no_boxes": 983
+     }
+    },
+    "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+     "discarded": {
+      "no_boxes": 20
+     }
+    },
+    "project_agml__mh_weed16_weed_detection": {
+     "discarded": {
+      "no_boxes": 7
+     }
+    },
+    "rf_1111-gzfxi__weed-chilling": {
+     "discarded": {
+      "no_boxes": 3
+     }
+    },
+    "rf_agrobot-weed-workspace__weed-detection-sd89f": {
+     "discarded": {
+      "no_boxes": 344
+     }
+    },
+    "rf_chaitali-5f9xc__weed-detection-n0dy9": {
+     "discarded": {
+      "no_boxes": 6
+     }
+    },
+    "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+     "discarded": {
+      "no_boxes": 32
+     }
+    },
+    "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+     "discarded": {
+      "no_boxes": 7
+     }
+    },
+    "rf_detection-lztth__weed-detection-8bdyy": {
+     "discarded": {
+      "no_boxes": 6
+     }
+    },
+    "rf_indian-institute-of-technology-roorkee-rlcww__weed-xeamn": {
+     "discarded": {
+      "no_boxes": 6
+     }
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "discarded": {
+      "no_boxes": 2
+     }
+    },
+    "rf_kinjj__weed-avnag": {
+     "discarded": {
+      "no_boxes": 1
+     }
+    },
+    "rf_lemong__agriculture-xi7us": {
+     "discarded": {
+      "no_boxes": 48
+     }
+    },
+    "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+     "discarded": {
+      "no_boxes": 1
+     }
+    },
+    "rf_mrunal-ramanna-5c9iq__weed-detection-r67fp": {
+     "discarded": {
+      "no_boxes": 6
+     }
+    },
+    "rf_new-workspace-zbm50__weeds-qftz4": {
+     "discarded": {
+      "no_boxes": 1
+     }
+    },
+    "rf_project-gfw5f__weed-detection-oxdom": {
+     "discarded": {
+      "no_boxes": 6
+     }
+    },
+    "rf_python-lec__weed-detection-5bf1l": {
+     "discarded": {
+      "no_boxes": 6
+     }
+    },
+    "rf_robtica-unileon-gluqm__farming-robotics": {
+     "discarded": {
+      "no_boxes": 13
+     }
+    },
+    "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+     "discarded": {
+      "no_boxes": 4
+     }
+    },
+    "rf_test-8qezo__weed-detection-ycai2": {
+     "discarded": {
+      "no_boxes": 1
+     }
+    },
+    "rf_tuf__weed-3434e": {
+     "discarded": {
+      "no_boxes": 1843
+     }
+    },
+    "rf_uav-qnoms__uav-wqshy": {
+     "discarded": {
+      "no_boxes": 7
+     }
+    },
+    "rf_university-of-peradeniya__weed-detection-ekr8i": {
+     "discarded": {
+      "no_boxes": 3
+     }
+    },
+    "rf_vizerion__weed-detection-5ell6": {
+     "discarded": {
+      "no_boxes": 45
+     }
+    },
+    "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+     "discarded": {
+      "no_boxes": 17
+     }
+    },
+    "rf_weed-detection-pfrni__weed-detection-twqao": {
+     "discarded": {
+      "no_boxes": 6
+     }
+    },
+    "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+     "discarded": {
+      "no_boxes": 15
+     }
+    },
+    "rf_weeddetection-dab2e__weed-detection-6ibvx": {
+     "discarded": {
+      "no_boxes": 7
+     }
+    },
+    "rf_yolo-gyfyq__weed-ieda7": {
+     "discarded": {
+      "no_boxes": 13
+     }
+    },
+    "rf_zijian-peng__grass-weed-69hcm": {
+     "discarded": {
+      "no_boxes": 40
+     }
+    }
+   },
+   "calibration": null,
+   "depends_on": [
+    "S1"
+   ],
+   "discarded": {
+    "no_boxes": 3506
+   },
+   "discarded_by_label": null,
+   "filter": "verify.read_source_label: no label, unreadable, no box, unmapped class; unhashable image",
+   "guard": false,
+   "id": "S2",
+   "in": 168505,
+   "kept": 164999,
+   "kept_by_label": null,
+   "recoverable": false,
+   "role": "read",
+   "unit": "image",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {
+    "fvossel__csgo_player_detection": {
+     "discarded": {
+      "exact_dup": 3
+     }
+    },
+    "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+     "discarded": {
+      "exact_dup": 283
+     }
+    },
+    "project_agml__crop_weed_detection_latvia": {
+     "discarded": {
+      "exact_dup": 70
+     }
+    },
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "discarded": {
+      "exact_dup": 68
+     }
+    },
+    "project_agml__maize_weed_detection": {
+     "discarded": {
+      "exact_dup": 49
+     }
+    },
+    "project_agml__mh_weed16_weed_detection": {
+     "discarded": {
+      "exact_dup": 1
+     }
+    },
+    "rf_1111-gzfxi__weed-chilling": {
+     "discarded": {
+      "exact_dup": 27
+     }
+    },
+    "rf_bishwarup-halder__crop-health-advisor": {
+     "discarded": {
+      "exact_dup": 55
+     }
+    },
+    "rf_chaitali-5f9xc__weed-detection-n0dy9": {
+     "discarded": {
+      "exact_dup": 1655
+     }
+    },
+    "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+     "discarded": {
+      "exact_dup": 1921
+     }
+    },
+    "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+     "discarded": {
+      "exact_dup": 308
+     }
+    },
+    "rf_detection-lztth__weed-detection-8bdyy": {
+     "discarded": {
+      "exact_dup": 1655
+     }
+    },
+    "rf_fyp-oof0h__smart-agriculture-miw1m": {
+     "discarded": {
+      "exact_dup": 258
+     }
+    },
+    "rf_indian-institute-of-technology-roorkee-rlcww__weed-xeamn": {
+     "discarded": {
+      "exact_dup": 1655
+     }
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "discarded": {
+      "exact_dup": 4
+     }
+    },
+    "rf_leopard-ai__weed-detection-8h4kx": {
+     "discarded": {
+      "exact_dup": 109
+     }
+    },
+    "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+     "discarded": {
+      "exact_dup": 3
+     }
+    },
+    "rf_mrunal-ramanna-5c9iq__weed-detection-r67fp": {
+     "discarded": {
+      "exact_dup": 1655
+     }
+    },
+    "rf_project-5nvic__weed-detection-0tfsj": {
+     "discarded": {
+      "exact_dup": 191
+     }
+    },
+    "rf_project-gfw5f__weed-detection-oxdom": {
+     "discarded": {
+      "exact_dup": 1655
+     }
+    },
+    "rf_python-lec__weed-detection-5bf1l": {
+     "discarded": {
+      "exact_dup": 1655
+     }
+    },
+    "rf_robtica-unileon-gluqm__farming-robotics": {
+     "discarded": {
+      "exact_dup": 93
+     }
+    },
+    "rf_school-5ult5__weed-6a90d": {
+     "discarded": {
+      "exact_dup": 7
+     }
+    },
+    "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+     "discarded": {
+      "exact_dup": 3
+     }
+    },
+    "rf_srec-dthh0__crop-weed-poxtn": {
+     "discarded": {
+      "exact_dup": 2267
+     }
+    },
+    "rf_test-8qezo__weed-detection-ycai2": {
+     "discarded": {
+      "exact_dup": 2599
+     }
+    },
+    "rf_test-gzc3r__crop-mfete": {
+     "discarded": {
+      "exact_dup": 781
+     }
+    },
+    "rf_tuf__weed-3434e": {
+     "discarded": {
+      "exact_dup": 656
+     }
+    },
+    "rf_uav-qnoms__uav-wqshy": {
+     "discarded": {
+      "exact_dup": 655
+     }
+    },
+    "rf_unitec-qdvgo__weed-detection-in-grass": {
+     "discarded": {
+      "exact_dup": 2479
+     }
+    },
+    "rf_university-of-peradeniya__weed-detection-ekr8i": {
+     "discarded": {
+      "exact_dup": 5009
+     }
+    },
+    "rf_vitif246x__weed-oqamx": {
+     "discarded": {
+      "exact_dup": 2587
+     }
+    },
+    "rf_vizerion__weed-detection-5ell6": {
+     "discarded": {
+      "exact_dup": 1948
+     }
+    },
+    "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+     "discarded": {
+      "exact_dup": 2473
+     }
+    },
+    "rf_weed-detection-pfrni__weed-detection-twqao": {
+     "discarded": {
+      "exact_dup": 1655
+     }
+    },
+    "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+     "discarded": {
+      "exact_dup": 41
+     }
+    },
+    "rf_weed-tnf9e__weed-bqdok": {
+     "discarded": {
+      "exact_dup": 2111
+     }
+    },
+    "rf_weeddetection-dab2e__weed-detection-6ibvx": {
+     "discarded": {
+      "exact_dup": 1899
+     }
+    },
+    "rf_yolo-gyfyq__weed-ieda7": {
+     "discarded": {
+      "exact_dup": 1942
+     }
+    },
+    "rf_zijian-peng__grass-weed-69hcm": {
+     "discarded": {
+      "exact_dup": 2360
+     }
+    }
+   },
+   "calibration": null,
+   "depends_on": [
+    "S2"
+   ],
+   "discarded": {
+    "exact_dup": 44845
+   },
+   "discarded_by_label": null,
+   "filter": "dHash-equal to an earlier pool image (slugs in sorted order; the first is kept)",
+   "guard": false,
+   "id": "S3",
+   "in": 147765,
+   "kept": 102920,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "dedup",
+   "unit": "image",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {
+    "cottonweed_holdout": {
+     "discarded": {
+      "near_eval": 1026
+     }
+    },
+    "cottonweed_sp8": {
+     "discarded": {
+      "near_eval": 1573
+     }
+    },
+    "fvossel__csgo_player_detection": {
+     "discarded": {
+      "near_eval": 2
+     }
+    },
+    "project_agml__crop_weed_detection_latvia": {
+     "discarded": {
+      "near_eval": 4
+     }
+    },
+    "project_agml__three_season_weed_detection": {
+     "discarded": {
+      "near_eval": 2424
+     }
+    },
+    "rf_agrobot-weed-workspace__weed-detection-sd89f": {
+     "discarded": {
+      "near_eval": 2458
+     }
+    },
+    "rf_bishwarup-halder__crop-health-advisor": {
+     "discarded": {
+      "near_eval": 2
+     }
+    },
+    "rf_itmo-mp0nn__grass-detection-4": {
+     "discarded": {
+      "near_eval": 1
+     }
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "discarded": {
+      "near_eval": 134
+     }
+    },
+    "rf_new-workspace-zbm50__weeds-qftz4": {
+     "discarded": {
+      "near_eval": 2
+     }
+    },
+    "rf_project-5nvic__weed-detection-0tfsj": {
+     "discarded": {
+      "near_eval": 150
+     }
+    },
+    "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+     "discarded": {
+      "near_eval": 4
+     }
+    },
+    "rf_test-8qezo__weed-detection-ycai2": {
+     "discarded": {
+      "near_eval": 142
+     }
+    },
+    "rf_tuf__weed-3434e": {
+     "discarded": {
+      "near_eval": 13
+     }
+    },
+    "rf_uav-qnoms__uav-wqshy": {
+     "discarded": {
+      "near_eval": 1
+     }
+    },
+    "rf_university-of-peradeniya__weed-detection-ekr8i": {
+     "discarded": {
+      "near_eval": 337
+     }
+    },
+    "rf_vitif246x__weed-oqamx": {
+     "discarded": {
+      "near_eval": 132
+     }
+    },
+    "rf_yolo-gyfyq__weed-ieda7": {
+     "discarded": {
+      "near_eval": 1
+     }
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "discarded": {
+      "near_eval": 59
+     }
+    }
+   },
+   "calibration": null,
+   "depends_on": [
+    "S2"
+   ],
+   "discarded": {
+    "near_eval": 8465
+   },
+   "discarded_by_label": null,
+   "filter": "within HOLDOUT_NEAR_DUP_BITS of a never-train image (C.NeverTrainGuard)",
+   "guard": true,
+   "id": "S4",
+   "in": 164999,
+   "kept": 156534,
+   "kept_by_label": null,
+   "recoverable": false,
+   "role": "guard",
+   "unit": "image",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {
+    "cottonweed_holdout": {
+     "discarded": {
+      "cwd12_copy": 1180
+     }
+    },
+    "cottonweed_sp8": {
+     "discarded": {
+      "cwd12_copy": 1869
+     }
+    },
+    "project_agml__mh_weed16_weed_detection": {
+     "discarded": {
+      "cwd12_copy": 1
+     }
+    },
+    "project_agml__three_season_weed_detection": {
+     "discarded": {
+      "cwd12_copy": 2576
+     }
+    },
+    "rf_agrobot-weed-workspace__weed-detection-sd89f": {
+     "discarded": {
+      "cwd12_copy": 2846
+     }
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "discarded": {
+      "cwd12_copy": 200
+     }
+    },
+    "rf_project-5nvic__weed-detection-0tfsj": {
+     "discarded": {
+      "cwd12_copy": 2
+     }
+    },
+    "rf_test-8qezo__weed-detection-ycai2": {
+     "discarded": {
+      "cwd12_copy": 2
+     }
+    },
+    "rf_university-of-peradeniya__weed-detection-ekr8i": {
+     "discarded": {
+      "cwd12_copy": 7
+     }
+    },
+    "rf_vitif246x__weed-oqamx": {
+     "discarded": {
+      "cwd12_copy": 2
+     }
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "discarded": {
+      "cwd12_copy": 84
+     }
+    }
+   },
+   "calibration": null,
+   "depends_on": [
+    "S2"
+   ],
+   "discarded": {
+    "cwd12_copy": 8769
+   },
+   "discarded_by_label": null,
+   "filter": "within verify.CORE_COPY_BITS of a train_core image",
+   "guard": true,
+   "id": "S5",
+   "in": 156534,
+   "kept": 147765,
+   "kept_by_label": null,
+   "recoverable": false,
+   "role": "guard",
+   "unit": "image",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "S5"
+   ],
+   "discarded": {
+    "small": 125500
+   },
+   "discarded_by_label": null,
+   "filter": "a side under semisup_labeler.MIN_BOX_PX",
+   "guard": false,
+   "id": "S6",
+   "in": 670818,
+   "kept": 545318,
+   "kept_by_label": null,
+   "recoverable": false,
+   "role": "size",
+   "unit": "box",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "S5"
+   ],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "verify.class_join (mega_trainer's v3.60.0 species join); a miss becomes OtherPlant",
+   "guard": false,
+   "id": "S7",
+   "in": 670818,
+   "kept": 670818,
+   "kept_by_label": {
+    "Carpetweed": 89,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 15,
+    "Goosegrass": 72,
+    "MorningGlory": 291,
+    "OtherPlant": 663530,
+    "PalmerAmaranth": 755,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 3029,
+    "Sicklepod": 150,
+    "SpottedSpurge": 307,
+    "Waterhemp": 2580
+   },
+   "recoverable": true,
+   "role": "join",
+   "unit": "box",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "S7"
+   ],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "verify.other_name_status (v1); name_status_v2 via the taxonomy resolver (funnel)",
+   "guard": false,
+   "id": "S7b",
+   "in": 140,
+   "kept": 140,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "name_status",
+   "unit": "class",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "S7b"
+   ],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "verify._other_sample: N_OTHER crops, uniform over v1-eligible OtherPlant boxes",
+   "guard": false,
+   "id": "S8b",
+   "in": 316417,
+   "kept": null,
+   "kept_by_label": null,
+   "recoverable": "not a discard",
+   "role": "reject_class_sample",
+   "unit": "box",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {
+    "Carpetweed|OtherPlant": 7,
+    "Eclipta|OtherPlant": 2,
+    "Goosegrass|OtherPlant": 10,
+    "MorningGlory|OtherPlant": 77,
+    "MorningGlory|Waterhemp": 1,
+    "PalmerAmaranth|OtherPlant": 265,
+    "Ragweed|Carpetweed": 1,
+    "Ragweed|MorningGlory": 10,
+    "Ragweed|OtherPlant": 1142,
+    "Ragweed|PalmerAmaranth": 12,
+    "Ragweed|Waterhemp": 1,
+    "Sicklepod|OtherPlant": 3,
+    "Sicklepod|PalmerAmaranth": 1,
+    "SpottedSpurge|OtherPlant": 6,
+    "Waterhemp|CutleafGroundcherry": 1,
+    "Waterhemp|OtherPlant": 489,
+    "Waterhemp|PalmerAmaranth": 448
+   },
+   "by_source": {
+    "project_agml__greenhouse_crop_weed_detection": {
+     "discarded": {
+      "conflict": 1475,
+      "unknown": 922
+     },
+     "in": 2858,
+     "kept": 461
+    },
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "discarded": {
+      "conflict": 238,
+      "unknown": 498
+     },
+     "in": 989,
+     "kept": 253
+    },
+    "project_agml__weed_crop_detection": {
+     "discarded": {
+      "conflict": 325,
+      "unknown": 1062
+     },
+     "in": 1781,
+     "kept": 394
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "discarded": {
+      "conflict": 15,
+      "unknown": 139
+     },
+     "in": 801,
+     "kept": 647
+    },
+    "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+     "discarded": {
+      "conflict": 327,
+      "unknown": 63
+     },
+     "in": 390,
+     "kept": 0
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "discarded": {
+      "conflict": 96,
+      "unknown": 72
+     },
+     "in": 462,
+     "kept": 294
+    }
+   },
+   "calibration": {
+    "domains_covered": [
+     "reference"
+    ],
+    "known_truth_sets": [
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:cottonweed_holdout",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "cottonweed_holdout"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:cottonweed_sp8",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "cottonweed_sp8"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:project_agml__three_season_weed_detection",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "project_agml__three_season_weed_detection"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:rf_agrobot-weed-workspace__weed-detection-sd89f",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "rf_agrobot-weed-workspace__weed-detection-sd89f"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:rf_karthikeya-c8pvy__weed-detection-cwp10",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "rf_karthikeya-c8pvy__weed-detection-cwp10"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:rf_zig-zag-lnodr__weed-detection-vanpe",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "rf_zig-zag-lnodr__weed-detection-vanpe"
+      ]
+     },
+     {
+      "domain_basis": "held-out reference images",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "swaps:train_core",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "train_core"
+      ]
+     },
+     {
+      "domain_basis": "an independent shifted set",
+      "domain_score": [
+       0.0,
+       0.045117
+      ],
+      "id": "shifted:independent",
+      "sha256": "488f8a877046dd2b8b72f29d1793df984e52ef126e93850b89066ded8b65939a",
+      "sources": [
+       "kt7"
+      ]
+     }
+    ],
+    "precision": 1.0,
+    "recall": 0.9457
+   },
+   "depends_on": [
+    "S7",
+    "S8b"
+   ],
+   "discarded": {
+    "conflict": 500,
+    "unknown": 781
+   },
+   "discarded_by_label": null,
+   "filter": "verify.verdicts: argmax = label, p >= tau, cos >= sigma",
+   "guard": false,
+   "id": "S8",
+   "in": 7281,
+   "kept": 6000,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "target_check",
+   "unit": "box",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {
+    "OtherPlant|Carpetweed": 157,
+    "OtherPlant|CutleafGroundcherry": 328,
+    "OtherPlant|Eclipta": 10,
+    "OtherPlant|Goosegrass": 776,
+    "OtherPlant|MorningGlory": 2051,
+    "OtherPlant|PalmerAmaranth": 1883,
+    "OtherPlant|PricklySida": 15,
+    "OtherPlant|Purslane": 521,
+    "OtherPlant|Ragweed": 2,
+    "OtherPlant|Sicklepod": 95,
+    "OtherPlant|SpottedSpurge": 132,
+    "OtherPlant|Waterhemp": 286
+   },
+   "by_source": {
+    "francesco__grass_weeds": {
+     "discarded": {},
+     "in": 6480,
+     "kept": 6480
+    },
+    "fvossel__csgo_player_detection": {
+     "discarded": {},
+     "in": 6416,
+     "kept": 6416
+    },
+    "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+     "discarded": {},
+     "in": 835,
+     "kept": 835
+    },
+    "project_agml__crop_weed_detection_latvia": {
+     "discarded": {
+      "conflict": 3
+     },
+     "in": 6472,
+     "kept": 6469
+    },
+    "project_agml__greenhouse_crop_weed_detection": {
+     "discarded": {
+      "conflict": 269
+     },
+     "in": 8334,
+     "kept": 8065
+    },
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "discarded": {
+      "conflict": 302
+     },
+     "in": 1202,
+     "kept": 900
+    },
+    "project_agml__maize_weed_detection": {
+     "discarded": {
+      "conflict": 19
+     },
+     "in": 5178,
+     "kept": 5159
+    },
+    "project_agml__mh_weed16_weed_detection": {
+     "discarded": {
+      "conflict": 1576
+     },
+     "in": 46811,
+     "kept": 45235
+    },
+    "project_agml__weed_crop_detection": {
+     "discarded": {
+      "conflict": 890
+     },
+     "in": 15912,
+     "kept": 15022
+    },
+    "rf_1111-gzfxi__weed-chilling": {
+     "discarded": {
+      "conflict": 42
+     },
+     "in": 7142,
+     "kept": 7100
+    },
+    "rf_bishwarup-halder__crop-health-advisor": {
+     "discarded": {
+      "conflict": 1
+     },
+     "in": 29239,
+     "kept": 29238
+    },
+    "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+     "discarded": {},
+     "in": 3163,
+     "kept": 3163
+    },
+    "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+     "discarded": {
+      "conflict": 257
+     },
+     "in": 6034,
+     "kept": 5777
+    },
+    "rf_fyp-oof0h__smart-agriculture-miw1m": {
+     "discarded": {
+      "conflict": 7
+     },
+     "in": 860,
+     "kept": 853
+    },
+    "rf_itmo-mp0nn__grass-detection-4": {
+     "discarded": {},
+     "in": 5001,
+     "kept": 5001
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "discarded": {
+      "conflict": 17
+     },
+     "in": 737,
+     "kept": 720
+    },
+    "rf_kinjj__weed-avnag": {
+     "discarded": {
+      "conflict": 32
+     },
+     "in": 788,
+     "kept": 756
+    },
+    "rf_lemong__agriculture-xi7us": {
+     "discarded": {},
+     "in": 1368,
+     "kept": 1368
+    },
+    "rf_leopard-ai__weed-detection-8h4kx": {
+     "discarded": {
+      "conflict": 304
+     },
+     "in": 1922,
+     "kept": 1618
+    },
+    "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+     "discarded": {
+      "conflict": 11
+     },
+     "in": 3528,
+     "kept": 3517
+    },
+    "rf_new-workspace-zbm50__weeds-qftz4": {
+     "discarded": {
+      "conflict": 18
+     },
+     "in": 2691,
+     "kept": 2673
+    },
+    "rf_project-5nvic__weed-detection-0tfsj": {
+     "discarded": {
+      "conflict": 1
+     },
+     "in": 6244,
+     "kept": 6243
+    },
+    "rf_robtica-unileon-gluqm__farming-robotics": {
+     "discarded": {},
+     "in": 16593,
+     "kept": 16593
+    },
+    "rf_school-5ult5__weed-6a90d": {
+     "discarded": {
+      "conflict": 67
+     },
+     "in": 3443,
+     "kept": 3376
+    },
+    "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+     "discarded": {
+      "conflict": 3
+     },
+     "in": 73140,
+     "kept": 73137
+    },
+    "rf_srec-dthh0__crop-weed-poxtn": {
+     "discarded": {
+      "conflict": 152
+     },
+     "in": 5132,
+     "kept": 4980
+    },
+    "rf_test-8qezo__weed-detection-ycai2": {
+     "discarded": {
+      "conflict": 1
+     },
+     "in": 271,
+     "kept": 270
+    },
+    "rf_test-gzc3r__crop-mfete": {
+     "discarded": {
+      "conflict": 210
+     },
+     "in": 20353,
+     "kept": 20143
+    },
+    "rf_tuf__weed-3434e": {
+     "discarded": {
+      "conflict": 1607
+     },
+     "in": 6662,
+     "kept": 5055
+    },
+    "rf_uav-qnoms__uav-wqshy": {
+     "discarded": {},
+     "in": 6362,
+     "kept": 6362
+    },
+    "rf_university-of-peradeniya__weed-detection-ekr8i": {
+     "discarded": {
+      "conflict": 1
+     },
+     "in": 7735,
+     "kept": 7734
+    },
+    "rf_vizerion__weed-detection-5ell6": {
+     "discarded": {},
+     "in": 7070,
+     "kept": 7070
+    },
+    "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+     "discarded": {},
+     "in": 3522,
+     "kept": 3522
+    },
+    "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+     "discarded": {
+      "conflict": 316
+     },
+     "in": 8270,
+     "kept": 7954
+    },
+    "rf_weed-tnf9e__weed-bqdok": {
+     "discarded": {
+      "conflict": 66
+     },
+     "in": 207509,
+     "kept": 207443
+    },
+    "rf_yolo-gyfyq__weed-ieda7": {
+     "discarded": {},
+     "in": 5196,
+     "kept": 5196
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "discarded": {
+      "conflict": 84
+     },
+     "in": 419,
+     "kept": 335
+    },
+    "rf_zijian-peng__grass-weed-69hcm": {
+     "discarded": {},
+     "in": 3,
+     "kept": 3
+    }
+   },
+   "calibration": {
+    "domains_covered": [
+     "reference"
+    ],
+    "known_truth_sets": [
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:cottonweed_holdout",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "cottonweed_holdout"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:cottonweed_sp8",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "cottonweed_sp8"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:project_agml__three_season_weed_detection",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "project_agml__three_season_weed_detection"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:rf_agrobot-weed-workspace__weed-detection-sd89f",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "rf_agrobot-weed-workspace__weed-detection-sd89f"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:rf_karthikeya-c8pvy__weed-detection-cwp10",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "rf_karthikeya-c8pvy__weed-detection-cwp10"
+      ]
+     },
+     {
+      "domain_basis": "copies of reference images (within the train_core copy radius)",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "copies:rf_zig-zag-lnodr__weed-detection-vanpe",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "rf_zig-zag-lnodr__weed-detection-vanpe"
+      ]
+     },
+     {
+      "domain_basis": "held-out reference images",
+      "domain_score": [
+       0.090234,
+       1.0
+      ],
+      "id": "swaps:train_core",
+      "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46",
+      "sources": [
+       "train_core"
+      ]
+     },
+     {
+      "domain_basis": "an independent shifted set",
+      "domain_score": [
+       0.0,
+       0.045117
+      ],
+      "id": "shifted:independent",
+      "sha256": "488f8a877046dd2b8b72f29d1793df984e52ef126e93850b89066ded8b65939a",
+      "sources": [
+       "kt7"
+      ]
+     }
+    ],
+    "precision": null,
+    "recall": null
+   },
+   "depends_on": [
+    "S7",
+    "S8b"
+   ],
+   "discarded": {
+    "conflict": 300
+   },
+   "discarded_by_label": null,
+   "filter": "verify.verdicts: a confident target call is a conflict",
+   "guard": false,
+   "id": "S9",
+   "in": 538037,
+   "kept": 537737,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "other_check",
+   "unit": "box",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {
+    "francesco__grass_weeds": {
+     "discarded": {},
+     "in": 2479,
+     "kept": 2479
+    },
+    "fvossel__csgo_player_detection": {
+     "discarded": {},
+     "in": 4012,
+     "kept": 4012
+    },
+    "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+     "discarded": {},
+     "in": 434,
+     "kept": 434
+    },
+    "project_agml__crop_weed_detection_latvia": {
+     "discarded": {
+      "conflict": 3
+     },
+     "in": 1102,
+     "kept": 1099
+    },
+    "project_agml__greenhouse_crop_weed_detection": {
+     "discarded": {
+      "conflict": 187
+     },
+     "in": 200,
+     "kept": 13
+    },
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "discarded": {
+      "conflict": 244,
+      "unknown": 109
+     },
+     "in": 483,
+     "kept": 130
+    },
+    "project_agml__maize_weed_detection": {
+     "discarded": {
+      "conflict": 19
+     },
+     "in": 451,
+     "kept": 432
+    },
+    "project_agml__mh_weed16_weed_detection": {
+     "discarded": {
+      "conflict": 945
+     },
+     "in": 4991,
+     "kept": 4046
+    },
+    "project_agml__weed_crop_detection": {
+     "discarded": {
+      "conflict": 618,
+      "unknown": 247
+     },
+     "in": 1120,
+     "kept": 255
+    },
+    "rf_1111-gzfxi__weed-chilling": {
+     "discarded": {
+      "conflict": 38
+     },
+     "in": 2033,
+     "kept": 1995
+    },
+    "rf_bishwarup-halder__crop-health-advisor": {
+     "discarded": {
+      "conflict": 1
+     },
+     "in": 15117,
+     "kept": 15116
+    },
+    "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+     "discarded": {},
+     "in": 1287,
+     "kept": 1287
+    },
+    "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+     "discarded": {
+      "conflict": 245
+     },
+     "in": 2551,
+     "kept": 2306
+    },
+    "rf_fyp-oof0h__smart-agriculture-miw1m": {
+     "discarded": {
+      "conflict": 7
+     },
+     "in": 664,
+     "kept": 657
+    },
+    "rf_itmo-mp0nn__grass-detection-4": {
+     "discarded": {},
+     "in": 786,
+     "kept": 786
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "discarded": {
+      "conflict": 28,
+      "unknown": 133
+     },
+     "in": 1460,
+     "kept": 1299
+    },
+    "rf_kinjj__weed-avnag": {
+     "discarded": {
+      "conflict": 19
+     },
+     "in": 86,
+     "kept": 67
+    },
+    "rf_lemong__agriculture-xi7us": {
+     "discarded": {},
+     "in": 559,
+     "kept": 559
+    },
+    "rf_leopard-ai__weed-detection-8h4kx": {
+     "discarded": {
+      "conflict": 283
+     },
+     "in": 1191,
+     "kept": 908
+    },
+    "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+     "discarded": {
+      "conflict": 11
+     },
+     "in": 953,
+     "kept": 942
+    },
+    "rf_new-workspace-zbm50__weeds-qftz4": {
+     "discarded": {
+      "conflict": 18
+     },
+     "in": 1974,
+     "kept": 1956
+    },
+    "rf_project-5nvic__weed-detection-0tfsj": {
+     "discarded": {
+      "conflict": 1
+     },
+     "in": 2218,
+     "kept": 2217
+    },
+    "rf_robtica-unileon-gluqm__farming-robotics": {
+     "discarded": {},
+     "in": 1947,
+     "kept": 1947
+    },
+    "rf_school-5ult5__weed-6a90d": {
+     "discarded": {
+      "conflict": 57
+     },
+     "in": 2064,
+     "kept": 2007
+    },
+    "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+     "discarded": {
+      "conflict": 3
+     },
+     "in": 6541,
+     "kept": 6538
+    },
+    "rf_srec-dthh0__crop-weed-poxtn": {
+     "discarded": {
+      "conflict": 145
+     },
+     "in": 2905,
+     "kept": 2760
+    },
+    "rf_test-8qezo__weed-detection-ycai2": {
+     "discarded": {
+      "conflict": 1
+     },
+     "in": 79,
+     "kept": 78
+    },
+    "rf_test-gzc3r__crop-mfete": {
+     "discarded": {
+      "conflict": 187
+     },
+     "in": 9259,
+     "kept": 9072
+    },
+    "rf_tuf__weed-3434e": {
+     "discarded": {
+      "conflict": 1571
+     },
+     "in": 6188,
+     "kept": 4617
+    },
+    "rf_uav-qnoms__uav-wqshy": {
+     "discarded": {},
+     "in": 6341,
+     "kept": 6341
+    },
+    "rf_university-of-peradeniya__weed-detection-ekr8i": {
+     "discarded": {
+      "conflict": 1
+     },
+     "in": 1631,
+     "kept": 1630
+    },
+    "rf_vizerion__weed-detection-5ell6": {
+     "discarded": {},
+     "in": 2895,
+     "kept": 2895
+    },
+    "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+     "discarded": {},
+     "in": 1451,
+     "kept": 1451
+    },
+    "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+     "discarded": {
+      "conflict": 500,
+      "unknown": 34
+     },
+     "in": 4593,
+     "kept": 4059
+    },
+    "rf_weed-tnf9e__weed-bqdok": {
+     "discarded": {
+      "conflict": 47
+     },
+     "in": 7889,
+     "kept": 7842
+    },
+    "rf_yolo-gyfyq__weed-ieda7": {
+     "discarded": {},
+     "in": 2111,
+     "kept": 2111
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "discarded": {
+      "conflict": 179,
+      "unknown": 73
+     },
+     "in": 872,
+     "kept": 620
+    },
+    "rf_zijian-peng__grass-weed-69hcm": {
+     "discarded": {},
+     "in": 3,
+     "kept": 3
+    }
+   },
+   "calibration": null,
+   "depends_on": [
+    "S8",
+    "S9"
+   ],
+   "discarded": {
+    "conflict": 5358,
+    "unknown": 596
+   },
+   "discarded_by_label": null,
+   "filter": "verify.image_verdict",
+   "guard": false,
+   "id": "S10",
+   "in": 102920,
+   "kept": 96966,
+   "kept_by_label": null,
+   "recoverable": true,
+   "role": "image_rule",
+   "unit": "image",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "S8",
+    "S10"
+   ],
+   "discarded": {
+    "below_gate": 4578,
+    "dropped_other_budget": 911,
+    "no_evidence": 89573,
+    "no_feature": 1026
+   },
+   "discarded_by_label": null,
+   "filter": "select.build: evidence, retrieval gate, OtherPlant budget, caps",
+   "guard": false,
+   "id": "S11",
+   "in": 96966,
+   "kept": 878,
+   "kept_by_label": null,
+   "recoverable": "routing",
+   "role": "selection",
+   "unit": "image",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {
+    "francesco__grass_weeds": {
+     "discarded": {
+      "not_evidenced": 2479
+     },
+     "in": 2479,
+     "kept": 0
+    },
+    "fvossel__csgo_player_detection": {
+     "discarded": {
+      "not_evidenced": 4012
+     },
+     "in": 4012,
+     "kept": 0
+    },
+    "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+     "discarded": {
+      "not_evidenced": 434
+     },
+     "in": 434,
+     "kept": 0
+    },
+    "project_agml__crop_weed_detection_latvia": {
+     "discarded": {
+      "not_evidenced": 1099
+     },
+     "in": 1099,
+     "kept": 0
+    },
+    "project_agml__greenhouse_crop_weed_detection": {
+     "discarded": {},
+     "in": 13,
+     "kept": 13
+    },
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "discarded": {},
+     "in": 113,
+     "kept": 113
+    },
+    "project_agml__maize_weed_detection": {
+     "discarded": {
+      "not_evidenced": 432
+     },
+     "in": 432,
+     "kept": 0
+    },
+    "project_agml__mh_weed16_weed_detection": {
+     "discarded": {
+      "not_evidenced": 4046
+     },
+     "in": 4046,
+     "kept": 0
+    },
+    "project_agml__weed_crop_detection": {
+     "discarded": {},
+     "in": 206,
+     "kept": 206
+    },
+    "rf_1111-gzfxi__weed-chilling": {
+     "discarded": {
+      "not_evidenced": 1995
+     },
+     "in": 1995,
+     "kept": 0
+    },
+    "rf_bishwarup-halder__crop-health-advisor": {
+     "discarded": {
+      "not_evidenced": 15116
+     },
+     "in": 15116,
+     "kept": 0
+    },
+    "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+     "discarded": {
+      "not_evidenced": 1287
+     },
+     "in": 1287,
+     "kept": 0
+    },
+    "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+     "discarded": {
+      "not_evidenced": 2306
+     },
+     "in": 2306,
+     "kept": 0
+    },
+    "rf_fyp-oof0h__smart-agriculture-miw1m": {
+     "discarded": {
+      "not_evidenced": 657
+     },
+     "in": 657,
+     "kept": 0
+    },
+    "rf_itmo-mp0nn__grass-detection-4": {
+     "discarded": {
+      "not_evidenced": 786
+     },
+     "in": 786,
+     "kept": 0
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "discarded": {},
+     "in": 755,
+     "kept": 755
+    },
+    "rf_kinjj__weed-avnag": {
+     "discarded": {
+      "not_evidenced": 67
+     },
+     "in": 67,
+     "kept": 0
+    },
+    "rf_lemong__agriculture-xi7us": {
+     "discarded": {
+      "not_evidenced": 559
+     },
+     "in": 559,
+     "kept": 0
+    },
+    "rf_leopard-ai__weed-detection-8h4kx": {
+     "discarded": {
+      "not_evidenced": 908
+     },
+     "in": 908,
+     "kept": 0
+    },
+    "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+     "discarded": {
+      "not_evidenced": 942
+     },
+     "in": 942,
+     "kept": 0
+    },
+    "rf_new-workspace-zbm50__weeds-qftz4": {
+     "discarded": {
+      "not_evidenced": 1956
+     },
+     "in": 1956,
+     "kept": 0
+    },
+    "rf_project-5nvic__weed-detection-0tfsj": {
+     "discarded": {
+      "not_evidenced": 2217
+     },
+     "in": 2217,
+     "kept": 0
+    },
+    "rf_robtica-unileon-gluqm__farming-robotics": {
+     "discarded": {
+      "not_evidenced": 1947
+     },
+     "in": 1947,
+     "kept": 0
+    },
+    "rf_school-5ult5__weed-6a90d": {
+     "discarded": {
+      "not_evidenced": 2007
+     },
+     "in": 2007,
+     "kept": 0
+    },
+    "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+     "discarded": {
+      "not_evidenced": 6538
+     },
+     "in": 6538,
+     "kept": 0
+    },
+    "rf_srec-dthh0__crop-weed-poxtn": {
+     "discarded": {
+      "not_evidenced": 2760
+     },
+     "in": 2760,
+     "kept": 0
+    },
+    "rf_test-8qezo__weed-detection-ycai2": {
+     "discarded": {
+      "not_evidenced": 78
+     },
+     "in": 78,
+     "kept": 0
+    },
+    "rf_test-gzc3r__crop-mfete": {
+     "discarded": {
+      "not_evidenced": 9072
+     },
+     "in": 9072,
+     "kept": 0
+    },
+    "rf_tuf__weed-3434e": {
+     "discarded": {
+      "not_evidenced": 4617
+     },
+     "in": 4617,
+     "kept": 0
+    },
+    "rf_uav-qnoms__uav-wqshy": {
+     "discarded": {
+      "not_evidenced": 6341
+     },
+     "in": 6341,
+     "kept": 0
+    },
+    "rf_university-of-peradeniya__weed-detection-ekr8i": {
+     "discarded": {
+      "not_evidenced": 1630
+     },
+     "in": 1630,
+     "kept": 0
+    },
+    "rf_vizerion__weed-detection-5ell6": {
+     "discarded": {
+      "not_evidenced": 2895
+     },
+     "in": 2895,
+     "kept": 0
+    },
+    "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+     "discarded": {
+      "not_evidenced": 1451
+     },
+     "in": 1451,
+     "kept": 0
+    },
+    "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+     "discarded": {
+      "not_evidenced": 4059
+     },
+     "in": 4059,
+     "kept": 0
+    },
+    "rf_weed-tnf9e__weed-bqdok": {
+     "discarded": {
+      "not_evidenced": 7842
+     },
+     "in": 7842,
+     "kept": 0
+    },
+    "rf_yolo-gyfyq__weed-ieda7": {
+     "discarded": {
+      "not_evidenced": 2111
+     },
+     "in": 2111,
+     "kept": 0
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "discarded": {},
+     "in": 352,
+     "kept": 352
+    },
+    "rf_zijian-peng__grass-weed-69hcm": {
+     "discarded": {
+      "not_evidenced": 3
+     },
+     "in": 3,
+     "kept": 0
+    }
+   },
+   "calibration": null,
+   "depends_on": [
+    "S8"
+   ],
+   "discarded": {
+    "not_evidenced": 33
+   },
+   "discarded_by_label": null,
+   "filter": "select.load_evidence (min_evidence 1)",
+   "guard": false,
+   "id": "S12",
+   "in": 38,
+   "kept": 5,
+   "kept_by_label": null,
+   "recoverable": "derived",
+   "role": "evidence",
+   "unit": "source",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "relevance.py (failed its check)",
+   "guard": false,
+   "id": "S13",
+   "in": null,
+   "kept": null,
+   "kept_by_label": null,
+   "recoverable": "retired",
+   "role": "relevance",
+   "unit": "source",
+   "version": "step1"
+  },
+  {
+   "audit": null,
+   "by_label_pred": {},
+   "by_source": {},
+   "calibration": null,
+   "depends_on": [
+    "S12"
+   ],
+   "discarded": {},
+   "discarded_by_label": null,
+   "filter": "gate.py chain arm",
+   "guard": false,
+   "id": "S14",
+   "in": null,
+   "kept": null,
+   "kept_by_label": null,
+   "recoverable": "not a data filter",
+   "role": "gate",
+   "unit": "increment",
+   "version": "step1"
+  }
+ ],
+ "target_classes": [
+  "Waterhemp",
+  "MorningGlory",
+  "Purslane",
+  "SpottedSpurge",
+  "Carpetweed",
+  "Ragweed",
+  "Eclipta",
+  "PricklySida",
+  "PalmerAmaranth",
+  "Sicklepod",
+  "Goosegrass",
+  "CutleafGroundcherry"
+ ]
+}

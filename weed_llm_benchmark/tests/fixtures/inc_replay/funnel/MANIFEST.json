@@ -1,0 +1,141 @@
+{
+ "derived": {
+  "funnel_ledger_summaries.json": {
+   "by": "adapters.inc_step1.ledger_from_summaries('weed', 'step1', 'census_v0.json', ...) run from this directory",
+   "bytes": 51902,
+   "inputs": [
+    "census_v0.json",
+    "step1/admit_summary.json",
+    "step1/select_summary.json",
+    "step1/pool_summary.json",
+    "step1/calibration.json"
+   ],
+   "sha256": "d21ac17abfe4bc18fbac2aa4beb6b5999e6c12877525042c32def3c68d29f3d1"
+  }
+ },
+ "files": {
+  "census_v0.json": {
+   "bytes": 69313,
+   "from": "results/framework/inc/funnel/census_v0.json",
+   "sha256": "adebb2bb296125beac009a31f5a1d2b5002029998fd714f84e0fbb0d1ccdb992"
+  },
+  "realloop_v1/build_summary.json": {
+   "bytes": 52117,
+   "from": "results/framework/inc/realloop_v1/build_summary.json",
+   "sha256": "bdf2b08d0ccd693991546c2faef4d6454ffa049068d7e07ad59b67a0dad13504"
+  },
+  "realloop_v1/exp.json": {
+   "bytes": 16082,
+   "from": "results/framework/inc/realloop_v1/exp.json",
+   "sha256": "f75a6b7ef3b7ff5ceb074a12a6a6b8106a3b020ac2e120b5d6d39f88ab3f4af4"
+  },
+  "realloop_v1/ledger.jsonl": {
+   "bytes": 88414,
+   "from": "results/framework/inc/realloop_v1/ledger.jsonl",
+   "sha256": "5c8775a676122622fc57cbc00db6cc96e8c3723ef6e5a9406992b6769ce57076"
+  },
+  "realloop_v1/report.json": {
+   "bytes": 27808,
+   "from": "results/framework/inc/realloop_v1/report.json",
+   "sha256": "80d25f7dad7c3c05cb670fbef3dbefe7c2919239faa6433e7ef4d80299f061c4"
+  },
+  "step1/admit_summary.json": {
+   "bytes": 10432,
+   "from": "results/framework/inc/step1/admit_summary.json",
+   "sha256": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011"
+  },
+  "step1/calibration.json": {
+   "bytes": 22505,
+   "from": "results/framework/inc/step1/calibration.json",
+   "sha256": "1ac92840c8590b9fc7400f015251f738b1aeb38748681e93437afe3f9e764a46"
+  },
+  "step1/pool_summary.json": {
+   "bytes": 40094,
+   "from": "results/framework/inc/step1/pool_summary.json",
+   "sha256": "dfac3e5efa3a681e6b9c8ff0431e25145c9bb7aad4cd20b9482833f8d0408958"
+  },
+  "step1/select_summary.json": {
+   "bytes": 25564,
+   "from": "results/framework/inc/step1/select_summary.json",
+   "sha256": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101"
+  }
+ },
+ "format": "inc-autopilot/funnel-replay-fixtures/1",
+ "frozen_utc": "2026-09-28T12:00:00Z",
+ "pending": {
+  "step1/verifier_fit_info.json": "the cluster projection of step1/verifier/fit_info.json (adapters.inc_step1.verifier_fit_info_projection): not local; S6 stays not evaluated until it is pulled"
+ },
+ "synthetic": {
+  "audits/r10_audit.json": {
+   "bytes": 1431,
+   "sha256": "c6f91df4a5960a275da89c39ae40dd321943e8aae6996984c1f785ff658314c9",
+   "why": "R10: an audited negative (every stratum's FN upper bound < 0.05)"
+  },
+  "audits/r11_audit.json": {
+   "bytes": 1330,
+   "sha256": "9a1a9b194b3ba6dc86fdb86a223edd66fa710d2f05f5e73e1f005e7742a8ab84",
+   "why": "R11: an audited positive with a sibling stratum"
+  },
+  "audits/r11_class_maps.json": {
+   "bytes": 843,
+   "sha256": "d75aaf78b86510a8239235f022fc1ade02810298127a1597a7fdc87ee0042b99",
+   "why": "R11: one card+geometry class map proposal and one whose class count disagrees with its card"
+  },
+  "audits/r12_audit.json": {
+   "bytes": 1094,
+   "sha256": "1b5ae69413c985f36c9d71e16b1aa391ce5bb8b054731e2090018bae6f46e1ca",
+   "why": "R12: an invalid audit (a judge's calibration shares a lab with a stratum)"
+  },
+  "claims/claims_challenged.json": {
+   "bytes": 3620,
+   "sha256": "f755a4f617e8bdc09e340ab4eea4ec3462491b5fe29107a2d673229e33130fdd",
+   "why": "the same register after a surviving devil's-advocate pass moved C1 to challenged (R10's starting point)"
+  },
+  "claims/claims_seed.json": {
+   "bytes": 3373,
+   "sha256": "37b77af2b90a18e2085741151e3341751c4b3148ecb3e921592deab1979b6cd7",
+   "why": "C1 and C2 as runner 5.5.10 files them (C1 from RESEARCH_LOG.md line 154, C2 from docs/poster/figures_data.json /s1_gate_verdict_2026_08_25/reading), both open, timestamps fixed at the freeze"
+  },
+  "controls/highyield_ledger.json": {
+   "bytes": 51590,
+   "sha256": "635631633f847d23854e49cd3d1518215298438ccf5f1174c598cce1302c0db0",
+   "why": "negative control: a high-yield Step 1 (S1 < 1) with an out-of-domain known-truth set (S4 false)"
+  },
+  "da/da_positive.json": {
+   "bytes": 6787,
+   "sha256": "c321baf55f865a5d2b2c9fbb3cdac4b5354d1438cb867455589e169e38a08103",
+   "why": "R14: the positive devil's-advocate reply (contract 8.6: six counter-arguments, two concessions); written by the contract's author, so it tests the validator's mechanics only"
+  },
+  "da/da_sycophantic.json": {
+   "bytes": 480,
+   "sha256": "aa45a2f9c6b1fadf4e5a32a92b9bf71f8a4b116455828f3e535a5439e88b0e5b",
+   "why": "R14: a sycophantic reply (concessions without checks)"
+  },
+  "r9b/r9b_claims.json": {
+   "bytes": 1734,
+   "sha256": "bafe02a9dd19c16e9586bb2155f7c4941c3ef98ccfa61f03767b056aae7eaf2b",
+   "why": "R9b: claim C2 alone"
+  },
+  "r9b/r9b_ledger.json": {
+   "bytes": 1755,
+   "sha256": "743cb887db3fab1acab72e4756b9555d34c0fa813310155e135c3796acff1781",
+   "why": "R9b: the ledger reconstructed from what existed on 2026-08-25 (the S1 gate verdict in docs/poster/figures_data.json; train_core's reference scale from select_summary.json)"
+  },
+  "vehicles/vehicles.json": {
+   "bytes": 4522,
+   "sha256": "ef468254d620af47a05651e2c46189f8d7447fa12f4c4bd88887d2cf69c71d76",
+   "why": "R13: a second domain (car, truck, bus and OtherObject; a hypernym table; no out-of-domain known truth)"
+  },
+  "vehicles/vehicles_claims.json": {
+   "bytes": 754,
+   "sha256": "d7e952213e25c7080b8e6cd6f225a543e7ccc27835fbe7d13d2c6b6cee8986e3",
+   "why": "R13: the vehicles domain's negative claim"
+  },
+  "vehicles/vehicles_ledger.json": {
+   "bytes": 6021,
+   "sha256": "b624ff78920c2f0a6cf9609d9fcb9edc28027f51cbef85680ee89bbc9521dc16",
+   "why": "R13: a funnel ledger of the vehicles domain with a numeric-named and a no-name source"
+  }
+ },
+ "what": "The funnel audit's replay fixtures (docs/FUNNEL_AUDIT.md 8.9; runner 5.5.10), read by tests/test_funnel_ap_replay.py and pinned here: byte copies of the local results files, the ledger derived from them by the Step 1 adapter, and synthetic files, each with its why. None sits under a name evidence.load_dir reads from INC_DIR/funnel/."
+}

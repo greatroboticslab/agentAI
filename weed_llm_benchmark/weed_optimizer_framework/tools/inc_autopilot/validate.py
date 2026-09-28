@@ -86,16 +86,33 @@ from . import model as M
 VALIDATION_SCHEMA = "inc-plan-validation/1"
 
 # Free-text references to a non-dev exam or the sealed split. Conservative on
-# purpose: a false positive costs one dropped item, a miss costs the rule.
-LEAK_TEXT_RE = re.compile(
-    r"\b(?:ood22|ood23|imageweeds)\b"
-    r"|\btest[ _-]?(?:split|set|exam|scores?|map|mAP50(?:-95)?|values?|results?|metrics?"
-    r"|numbers?|json|jsonl|twelve|agnostic)\b"
-    r"|\b(?:on|sealed|cwd12)\s+test\b"
-    r"|\bh[oe]ld[ -]?out\b"
-    r"|(?:^|[/\s\"'=:])test\.jsonl?\b"
-    r"|scores/test|exams[./]test",
-    re.I)
+# purpose: a false positive costs one dropped item, a miss costs the rule. The
+# exam names and the "<dataset> test" phrases come from the domain config
+# (model.non_dev_exams, model.domain_terms; docs/FUNNEL_AUDIT.md 8.8 review),
+# so another domain's exams are refused as this one's are.
+_TERM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*\Z")
+
+
+def leak_text_re(domain=None):
+    """The free-text leak pattern of a domain (a name or a config path; None:
+    this package's, model.DOMAIN)."""
+    exams = [e for e in M.non_dev_exams(domain) if e != "test"]
+    terms = [t for t in M.domain_terms(domain) if isinstance(t, str) and _TERM_RE.match(t)]
+    parts = []
+    if exams:
+        parts.append(r"\b(?:%s)\b" % "|".join(re.escape(e) for e in exams))
+    parts += [r"\btest[ _-]?(?:split|set|exam|scores?|map|mAP50(?:-95)?|values?|results?|metrics?"
+              r"|numbers?|json|jsonl|twelve|agnostic)\b",
+              r"\b(?:%s)\s+test\b" % "|".join(["on", "sealed"] + [re.escape(t) for t in terms]),
+              r"\bh[oe]ld[ -]?out\b",
+              r"(?:^|[/\s\"'=:])test\.jsonl?\b",
+              r"scores/test|exams[./]test"]
+    return re.compile("|".join(parts), re.I)
+
+
+LEAK_TEXT_RE = leak_text_re()
+
+INVALID_AUDIT_ARTIFACT = "funnel/audit_v1.json"   # evidence.FUNNEL_AUDIT
 
 OFF_MENU_TEXT = ("hypothesis", "why_menu_insufficient", "required_change", "cheapest_test",
                  "control", "success_criterion")
@@ -183,6 +200,11 @@ def resolve_cite(artifacts, cite):
     if not isinstance(name, str) or name not in artifacts:
         return False, "artifact %r is not in the snapshot" % (name,)
     obj = artifacts[name]
+    if name == INVALID_AUDIT_ARTIFACT and isinstance(obj, dict) and obj.get("valid") is not True:
+        # docs/FUNNEL_AUDIT.md 8.4 (D18) and 4.1: an audit whose calibration
+        # material overlaps an audited stratum is invalid, and nothing may cite it.
+        return False, ("%s is not a valid audit (valid %r: calibration overlap); nothing may cite it"
+                       % (name, obj.get("valid")))
     line, pointer = cite.get("line"), cite.get("pointer")
     if name.endswith(".jsonl"):
         if isinstance(line, bool) or not isinstance(line, int):
@@ -209,20 +231,21 @@ def _short(v, n=80):
     return s if len(s) <= n else s[:n] + "..."
 
 
-def _text_leaks(obj, path=""):
+def _text_leaks(obj, path="", pattern=None):
     """[(path, phrase)] of leak phrases in every string (and dict key) of obj."""
+    rx = pattern or LEAK_TEXT_RE
     found = []
     if isinstance(obj, dict):
         for k, v in obj.items():
-            m = LEAK_TEXT_RE.search(str(k))
+            m = rx.search(str(k))
             if m:
                 found.append(("%s/%s" % (path, k), m.group(0)))
-            found.extend(_text_leaks(v, "%s/%s" % (path, k)))
+            found.extend(_text_leaks(v, "%s/%s" % (path, k), rx))
     elif isinstance(obj, list):
         for i, v in enumerate(obj):
-            found.extend(_text_leaks(v, "%s/%d" % (path, i)))
+            found.extend(_text_leaks(v, "%s/%d" % (path, i), rx))
     elif isinstance(obj, str):
-        m = LEAK_TEXT_RE.search(obj)
+        m = rx.search(obj)
         if m:
             found.append((path, m.group(0).strip()))
     return found
@@ -863,4 +886,282 @@ def validate(reply, artifacts, menu, corpus, model=None, diagnoses=None, exp=Non
             counts["cards"] += 1
             out["cards"].append(card)
     out["stop_recommendation"] = _stop(plan.get("stop_recommendation"), counts, out["dropped"])
+    return out
+
+
+# --- the devil's-advocate reply (docs/FUNNEL_AUDIT.md 8.6) ---------------------------------
+
+DA_REPLY_SCHEMA = "inc-da-reply/1"
+DA_VALIDATION_SCHEMA = "inc-da-validation/1"
+DA_METRICS = ("fn_rate", "purity", "truth_verdict")
+DA_DIRECTIONS = ("above", "below", "helps", "neutral", "hurts")
+DA_TEST_LEVERS = ("L10", "L11", "L12", "L14")
+DA_TEST_CARDS = ("X10", "X11")
+DA_FORECAST_TOL = 1e-6
+DA_MIN_CITES = 2
+DA_MIN_ARTIFACTS = 2
+
+
+def da_reply_of(reply):
+    """The inc-da-reply/1 object of a job reply (brain_plan.run --role
+    adversary wraps it under "reply") or the object itself; None otherwise."""
+    if not isinstance(reply, dict):
+        return None
+    if reply.get("schema") == DA_REPLY_SCHEMA and isinstance(reply.get("reply"), dict):
+        return reply["reply"]
+    if "counter_arguments" in reply or "concessions" in reply:
+        return reply
+    return None
+
+
+def recoverable_stages(ledger):
+    """The ledger's recoverable stage ids (funnel.ledger.recoverable_stages)."""
+    from ..funnel import ledger as FL
+    return list(FL.recoverable_stages(ledger))
+
+
+def _stage_ids(ledger):
+    return [s.get("id") for s in (ledger or {}).get("stages") or [] if isinstance(s, dict)]
+
+
+def _check_forecast(fc, ledger):
+    """[] when stage_forecast is a probability over the ledger's recoverable
+    stages summing to 1 within DA_FORECAST_TOL (contract 6 H11), else reasons."""
+    if not isinstance(fc, dict) or not fc:
+        return ["stage_forecast is missing or not an object"]
+    rec = set(recoverable_stages(ledger))
+    bad = sorted(k for k in fc if k not in rec)
+    reasons = []
+    if bad:
+        reasons.append("stage_forecast names stage(s) %s that are not recoverable stages of the ledger (%s)"
+                       % (bad, sorted(rec)))
+    vals = list(fc.values())
+    if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0 or v > 1
+           for v in vals):
+        reasons.append("stage_forecast holds a value that is not a probability in [0, 1]")
+    elif abs(sum(vals) - 1.0) > DA_FORECAST_TOL:
+        reasons.append("stage_forecast sums to %r, not 1 (tolerance %g)" % (sum(vals), DA_FORECAST_TOL))
+    return reasons
+
+
+def _da_test_ok(test, ctx):
+    """(ok, reason): cheapest_test is a menu lever of DA_TEST_LEVERS whose
+    preconditions hold on the fired diagnoses (only_after, requires), or an R4
+    card of DA_TEST_CARDS."""
+    if not isinstance(test, dict):
+        return False, "cheapest_test is not an object"
+    if "card" in test:
+        if test.get("card") in DA_TEST_CARDS and set(test) <= {"card", "why"}:
+            return True, ""
+        return False, "cheapest_test card %r is not one of %s" % (test.get("card"), DA_TEST_CARDS)
+    lever = test.get("lever")
+    if lever not in DA_TEST_LEVERS:
+        return False, "cheapest_test lever %r is not one of %s" % (lever, DA_TEST_LEVERS)
+    row = ctx["menu"].get(lever)
+    if row is None or row.get("menu") != "menu":
+        return False, "cheapest_test lever %s is not on the menu" % lever
+    params = test.get("params") or {}
+    if not isinstance(params, dict):
+        return False, "cheapest_test params is not an object"
+    pre = preconditions(lever, row, dict(row.get("fixed") or {}, **params), ctx)
+    if pre:
+        return False, "cheapest_test %s: %s" % (lever, "; ".join(pre))
+    bounds, source = BP.lever_bounds(row)
+    if bounds is not None and params:
+        from ..brain import policy
+        ok, why = policy._check_params(dict(row.get("fixed") or {}, **params), bounds)
+        if not ok:
+            return False, "cheapest_test %s params: %s" % (lever, "; ".join(why))
+    return True, ""
+
+
+def _check_prediction(pred, ledger):
+    if not isinstance(pred, dict):
+        return ["prediction is missing or not an object"]
+    reasons = []
+    if pred.get("stage") not in _stage_ids(ledger):
+        reasons.append("prediction.stage %r is not a stage of the ledger" % (pred.get("stage"),))
+    if pred.get("metric") not in DA_METRICS:
+        reasons.append("prediction.metric %r is not one of %s" % (pred.get("metric"), DA_METRICS))
+    if pred.get("direction") not in DA_DIRECTIONS:
+        reasons.append("prediction.direction %r is not one of %s" % (pred.get("direction"), DA_DIRECTIONS))
+    t = pred.get("threshold")
+    if t is not None and (isinstance(t, bool) or not isinstance(t, (int, float)) or not math.isfinite(t)):
+        reasons.append("prediction.threshold %r is not null or a finite number" % (t,))
+    if not isinstance(pred.get("stratum"), (str, type(None))):
+        reasons.append("prediction.stratum is not a string")
+    return reasons
+
+
+def validate_da(reply, evidence, ledger, menu, resolved_models, diagnoses=None, corpus=None, domain=None,
+                claims=None):
+    """The validation record of one devil's-advocate reply (contract 8.6).
+
+    `reply`: the job reply or the bare inc-da-reply/1 object; `evidence`: the
+    dev-only snapshot (an evidence.Evidence or artifacts map) cites resolve
+    against; `ledger`: the funnel ledger (stage ids, recoverable stages);
+    `menu`: brain_plan.load_menu(); `resolved_models`: {"adversary": the model
+    that answered, "planner": the model the planner's last reply was resolved
+    to}; `diagnoses`: the diagnoses of that snapshot (D17's own cites are the
+    echo filter's reference; the fired ones decide lever preconditions);
+    `claims`: the claims register (the reply's claim must be one of its open
+    or challenged negative claims); `domain`: whose non-decision splits are
+    refused (default model.DOMAIN).
+
+    A counter-argument is dropped when any cite does not resolve exactly or a
+    literature quote is not verbatim in the corpus, when it names a non-dev
+    split, when its prediction names no stage of the ledger, when its
+    cheapest test is neither a menu lever whose preconditions hold nor an R4
+    card (X10, X11), or when it cites fewer than 2 values from fewer than 2
+    distinct artifacts. One that adds no artifact beyond the diagnosis's own
+    cites is kept but not counted (the echo filter). A concession without a
+    resolving check is dropped. An invalid stage_forecast makes the whole
+    reply invalid; so does a reply that is not inc-da-reply/1. A same-family
+    reply (the two resolved models are one family, or either family is
+    unknown) is recorded but moves no claim.
+    """
+    from .. import model_router as MR
+    job = reply if isinstance(reply, dict) else {}
+    inner = da_reply_of(reply)
+    adv = str((resolved_models or {}).get("adversary") or job.get("model_used") or job.get("model") or "")
+    plan = str((resolved_models or {}).get("planner") or "")
+    fam = MR.same_family(adv, plan)
+    out = {"schema": DA_VALIDATION_SCHEMA, "ok": False, "invalid_reason": None, "validated_utc": M.utc_now(),
+           "digest_sha256": job.get("digest_sha256"),
+           "model": {"role": "adversary", "resolved": adv or None, "family": MR.model_family(adv) or None,
+                     "planner_resolved": plan or None, "planner_family": MR.model_family(plan) or None,
+                     "same_family": True if fam is None else fam, "family_known": fam is not None},
+           "claim_id": None, "counter_arguments": [], "concessions": [], "stage_forecast": None,
+           "counts": {"counter_arguments": 0, "kept": 0, "counted": 0, "echo": 0, "dropped": 0,
+                      "concessions": 0, "concessions_kept": 0, "cites_checked": 0, "cites_failed": 0,
+                      "lit_checked": 0, "lit_failed": 0, "lit_project_notes": 0, "leaks": 0}}
+    out["moves_claims"] = False
+    if inner is None:
+        out["invalid_reason"] = "not an %s reply" % DA_REPLY_SCHEMA
+        return out
+    counts = out["counts"]
+    ev = evidence_of(evidence)
+    artifacts = BP.dev_only(BP.artifacts_of(evidence) or {})
+    diags = [d for d in (diagnoses or []) if isinstance(d, dict)]
+    fired = {d.get("id"): d for d in diags if d.get("fired")}
+    d17 = next((d for d in diags if d.get("id") == "D17"), None)
+    echo_ref = {c.get("artifact") for c in ((d17 or {}).get("cites") or []) if isinstance(c, dict)}
+    ctx = {"menu": menu or {}, "diags": fired, "artifacts": artifacts}
+    pattern = leak_text_re(domain)
+    blocked = M.non_dev_exams(domain)
+    claim_id = inner.get("claim_id")
+    out["claim_id"] = claim_id
+    negative = {c.get("id") for c in ((claims or {}).get("claims") or []) if isinstance(c, dict)
+                and c.get("polarity") in ("scarcity", "negative") and c.get("status") in ("open", "challenged")}
+    if claims is not None and claim_id not in negative:
+        out["invalid_reason"] = ("claim_id %r is not an open or challenged negative claim of the register (%s)"
+                                 % (claim_id, sorted(negative)))
+        return out
+    fc_reasons = _check_forecast(inner.get("stage_forecast"), ledger)
+    if fc_reasons:
+        out["invalid_reason"] = "; ".join(fc_reasons)
+        return out
+    out["stage_forecast"] = dict(inner["stage_forecast"])
+    for i, ca in enumerate(inner.get("counter_arguments") or []):
+        counts["counter_arguments"] += 1
+        reasons = []
+        rec = {"index": i, "kept": False, "counted": False, "reasons": reasons}
+        if not isinstance(ca, dict):
+            reasons.append("counter-argument is not an object")
+            out["counter_arguments"].append(rec)
+            counts["dropped"] += 1
+            continue
+        scan = {k: v for k, v in ca.items() if k != "lit_cites"}
+        leaks = _text_leaks(scan, pattern=pattern)
+        leaks += [(p, "a non-dev split key") for p in BP.dev_leaks(scan)]
+        leaks += [(p, "a non-dev split key") for p in E_leaks(scan, blocked)]
+        if leaks:
+            counts["leaks"] += 1
+            reasons += ["test leak: %s at %s" % (phrase, path or "/") for path, phrase in leaks[:5]]
+        for f in ("argument", "mechanism", "falsifier"):
+            if not isinstance(ca.get(f), str) or not ca[f].strip():
+                reasons.append("%s is missing" % f)
+        cites = _check_evidence(artifacts, ca.get("evidence_cites"), reasons, counts, required=True)
+        arts = sorted({c["artifact"] for c in cites})
+        if not reasons and (len(cites) < DA_MIN_CITES or len(arts) < DA_MIN_ARTIFACTS):
+            reasons.append("a counter-argument cites at least %d values from at least %d distinct artifacts "
+                           "(it cites %d from %s)" % (DA_MIN_CITES, DA_MIN_ARTIFACTS, len(cites), arts))
+        lits = _check_lit(corpus, ca.get("lit_cites") or [], reasons, counts)
+        reasons.extend(_check_prediction(ca.get("prediction"), ledger))
+        ok, why = _da_test_ok(ca.get("cheapest_test"), ctx)
+        if not ok:
+            reasons.append(why)
+        if reasons:
+            counts["dropped"] += 1
+            out["counter_arguments"].append(rec)
+            continue
+        echo = set(arts) <= echo_ref
+        rec.update(kept=True, counted=not echo, echo=echo, artifacts=arts, evidence_cites=cites, lit_cites=lits,
+                   argument=ca["argument"].strip(), mechanism=ca["mechanism"].strip(),
+                   prediction=ca["prediction"], cheapest_test=ca["cheapest_test"],
+                   falsifier=ca["falsifier"].strip())
+        if echo:
+            reasons.append("echo: it cites no artifact beyond the diagnosis's own (%s); kept, not counted"
+                           % ", ".join(arts))
+            counts["echo"] += 1
+        counts["kept"] += 1
+        counts["counted"] += 0 if echo else 1
+        out["counter_arguments"].append(rec)
+    for i, cc in enumerate(inner.get("concessions") or []):
+        counts["concessions"] += 1
+        reasons = []
+        rec = {"index": i, "kept": False, "reasons": reasons}
+        if not isinstance(cc, dict):
+            reasons.append("concession is not an object")
+        else:
+            leaks = _text_leaks(cc, pattern=pattern) + [(p, "a non-dev split key") for p in E_leaks(cc, blocked)]
+            if leaks:
+                counts["leaks"] += 1
+                reasons += ["test leak: %s at %s" % (phrase, path or "/") for path, phrase in leaks[:5]]
+            if not isinstance(cc.get("why"), str) or not cc["why"].strip():
+                reasons.append("why is missing")
+            checked = cc.get("checked")
+            if not isinstance(checked, list) or not checked:
+                reasons.append("a concession without checks is not a finding: it names no checked value")
+            else:
+                good = _check_evidence(artifacts, checked, reasons, counts, required=True)
+                if not reasons:
+                    rec.update(checked=good)
+            if cc.get("claim_id") not in (None, claim_id):
+                reasons.append("concession names claim %r, not the reply's %r" % (cc.get("claim_id"), claim_id))
+        if not reasons:
+            rec.update(kept=True, claim_id=claim_id, why=cc["why"].strip())
+            counts["concessions_kept"] += 1
+        out["concessions"].append(rec)
+    out["ok"] = True
+    out["moves_claims"] = bool(counts["counted"]) and out["model"]["same_family"] is False
+    if out["model"]["same_family"] is not False:
+        out["same_family_note"] = ("the adversary (%s) and the planner (%s) resolved to %s: recorded, moves no "
+                                   "claim" % (adv or "unknown", plan or "unknown",
+                                              "one family" if fam else "a family that cannot be read"))
+    return out
+
+
+def E_leaks(obj, blocked):
+    """evidence.leaks with a domain's split list (keys naming a non-dev split)."""
+    from . import evidence as EV
+    return EV.leaks(obj, blocked=blocked)
+
+
+def da_filings(record, menu=None):
+    """What the surviving counter-arguments of a validated DA reply file: a
+    tier2:adversary proposal per menu-lever test, an R4 card per card test.
+    [{"counter_argument", "lever" | "card", "params"}], only when the reply
+    may move a claim (record.moves_claims)."""
+    out = []
+    if not isinstance(record, dict) or not record.get("moves_claims"):
+        return out
+    for ca in record.get("counter_arguments") or []:
+        if not (ca.get("kept") and ca.get("counted")):
+            continue
+        t = ca.get("cheapest_test") or {}
+        if "card" in t:
+            out.append({"counter_argument": ca["index"], "card": t["card"]})
+        else:
+            out.append({"counter_argument": ca["index"], "lever": t["lever"], "params": dict(t.get("params") or {})})
     return out

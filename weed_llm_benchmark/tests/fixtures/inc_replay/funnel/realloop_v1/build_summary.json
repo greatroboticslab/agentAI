@@ -1,0 +1,1991 @@
+{
+ "attribution_scope": {
+  "not_run": {
+   "4": "label audit: not re-run per step; the Step 1 verifier judged every box already (every species box of a verified increment is verified; the unverified increment's verdicts are in build_summary.json 'unverified')",
+   "5": "leave-one-source-out cand runs for a multi-source increment: not run by the driver; each increment's per-source counts are in build_summary.json"
+  },
+  "run": [
+   "1 recipe vs data",
+   "2 classification vs localisation",
+   "3 per-species deltas"
+  ]
+ },
+ "base": {
+  "boxes": {
+   "Carpetweed": 590,
+   "CutleafGroundcherry": 50,
+   "Eclipta": 519,
+   "Goosegrass": 149,
+   "MorningGlory": 920,
+   "OtherPlant": 642,
+   "PalmerAmaranth": 206,
+   "PricklySida": 263,
+   "Purslane": 440,
+   "Ragweed": 401,
+   "Sicklepod": 162,
+   "SpottedSpurge": 756,
+   "Waterhemp": 1427
+  },
+  "boxes_total": 6525,
+  "by_source": {
+   "cottonweeddet12/train": {
+    "boxes": {
+     "Carpetweed": 530,
+     "CutleafGroundcherry": 50,
+     "Eclipta": 512,
+     "Goosegrass": 107,
+     "MorningGlory": 792,
+     "OtherPlant": 0,
+     "PalmerAmaranth": 206,
+     "PricklySida": 263,
+     "Purslane": 440,
+     "Ragweed": 399,
+     "Sicklepod": 121,
+     "SpottedSpurge": 550,
+     "Waterhemp": 1059
+    },
+    "images": 3049
+   },
+   "project_agml__imageweeds_aerial_weed_detection": {
+    "boxes": {
+     "Carpetweed": 0,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 0,
+     "MorningGlory": 0,
+     "OtherPlant": 32,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 0,
+     "SpottedSpurge": 0,
+     "Waterhemp": 33
+    },
+    "images": 17
+   },
+   "project_agml__weed_crop_detection": {
+    "boxes": {
+     "Carpetweed": 0,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 0,
+     "MorningGlory": 0,
+     "OtherPlant": 491,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 2,
+     "Sicklepod": 0,
+     "SpottedSpurge": 0,
+     "Waterhemp": 88
+    },
+    "images": 49
+   },
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+    "boxes": {
+     "Carpetweed": 0,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 0,
+     "MorningGlory": 0,
+     "OtherPlant": 85,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 41,
+     "SpottedSpurge": 206,
+     "Waterhemp": 247
+    },
+    "images": 544
+   },
+   "rf_zig-zag-lnodr__weed-detection-vanpe": {
+    "boxes": {
+     "Carpetweed": 60,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 7,
+     "Goosegrass": 42,
+     "MorningGlory": 128,
+     "OtherPlant": 34,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 0,
+     "SpottedSpurge": 0,
+     "Waterhemp": 0
+    },
+    "images": 268
+   }
+  },
+  "copy": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/base_B.jsonl",
+  "dhash0_collisions": {
+   "across_source_session": 0,
+   "extra_rows": 0,
+   "first": [],
+   "groups": 0
+  },
+  "duplicate_images": {
+   "across_source_session": 0,
+   "extra_rows": 0,
+   "first": [],
+   "groups": 0
+  },
+  "duplicate_label_rows": 0,
+  "guard": {
+   "bits": 6,
+   "checked": 3927,
+   "hits": 0,
+   "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+   "index_images": 9501,
+   "unhashable": 0
+  },
+  "images": 3927,
+  "manifest_sha256": "4de04a7c6ce6c116625f10add0f86b550a9b091abb9d46d460472712346c1b71",
+  "name": "base_B",
+  "sessions": 27,
+  "source": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/base_B.jsonl",
+  "sources": {
+   "cottonweeddet12/train": 3049,
+   "project_agml__imageweeds_aerial_weed_detection": 17,
+   "project_agml__weed_crop_detection": 49,
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": 544,
+   "rf_zig-zag-lnodr__weed-detection-vanpe": 268
+  }
+ },
+ "builder": "inc.realloop build",
+ "built_utc": "2026-09-27T19:46:23Z",
+ "clean": [
+  "V1",
+  "V2",
+  "V3",
+  "OTHER_HEAVY",
+  "V4"
+ ],
+ "cold_recipe": {
+  "batch": 32,
+  "cache": "ram",
+  "close_mosaic": 10,
+  "cos_lr": true,
+  "deterministic": true,
+  "epochs": 100,
+  "freeze": null,
+  "imgsz": 640,
+  "lora": null,
+  "lr0": 0.01,
+  "lrf": 0.01,
+  "momentum": 0.937,
+  "optimizer": "SGD",
+  "trainer": "full",
+  "warmup_bias_lr": 0.1,
+  "warmup_epochs": 3,
+  "weight_decay": 0.0005,
+  "workers": 5
+ },
+ "evidence": {
+  "admit_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/admit_summary.json",
+   "sha256": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011"
+  },
+  "capacity": {
+   "evidenced_other_heavy_images": 1243,
+   "evidenced_pool_images": 1439,
+   "evidenced_sources_in_pool": {
+    "project_agml__greenhouse_crop_weed_detection": 13,
+    "project_agml__imageweeds_aerial_weed_detection": 113,
+    "project_agml__weed_crop_detection": 206,
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": 755,
+    "rf_zig-zag-lnodr__weed-detection-vanpe": 352
+   },
+   "excluded_images": 94649,
+   "excluded_sources": 33,
+   "increment_images": 287,
+   "min_evidence": 1,
+   "n_verified": 4,
+   "needed_images": 1435,
+   "needed_other_heavy_images": 287
+  },
+  "criterion": "evidence",
+  "cross_check": {
+   "checked": true,
+   "rule": "select_summary.json retrieval.source_evidence species_crops >= admit_summary.json per_slug verified boxes for every source, and every source it counts has a per_slug entry",
+   "sources_compared": 38
+  },
+  "evidenced_sources": {
+   "project_agml__greenhouse_crop_weed_detection": {
+    "pool_images": 13,
+    "verified_boxes": 461
+   },
+   "project_agml__imageweeds_aerial_weed_detection": {
+    "pool_images": 113,
+    "verified_boxes": 253
+   },
+   "project_agml__weed_crop_detection": {
+    "pool_images": 206,
+    "verified_boxes": 394
+   },
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+    "pool_images": 755,
+    "verified_boxes": 647
+   },
+   "rf_zig-zag-lnodr__weed-detection-vanpe": {
+    "pool_images": 352,
+    "verified_boxes": 294
+   }
+  },
+  "excluded_images": 94649,
+  "excluded_sources": {
+   "francesco__grass_weeds": {
+    "images": 2479,
+    "verified_boxes": 0
+   },
+   "fvossel__csgo_player_detection": {
+    "images": 4012,
+    "verified_boxes": 0
+   },
+   "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": {
+    "images": 434,
+    "verified_boxes": 0
+   },
+   "project_agml__crop_weed_detection_latvia": {
+    "images": 1099,
+    "verified_boxes": 0
+   },
+   "project_agml__maize_weed_detection": {
+    "images": 432,
+    "verified_boxes": 0
+   },
+   "project_agml__mh_weed16_weed_detection": {
+    "images": 4046,
+    "verified_boxes": 0
+   },
+   "rf_1111-gzfxi__weed-chilling": {
+    "images": 1995,
+    "verified_boxes": 0
+   },
+   "rf_bishwarup-halder__crop-health-advisor": {
+    "images": 15116,
+    "verified_boxes": 0
+   },
+   "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+    "images": 1287,
+    "verified_boxes": 0
+   },
+   "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+    "images": 2306,
+    "verified_boxes": 0
+   },
+   "rf_fyp-oof0h__smart-agriculture-miw1m": {
+    "images": 657,
+    "verified_boxes": 0
+   },
+   "rf_itmo-mp0nn__grass-detection-4": {
+    "images": 786,
+    "verified_boxes": 0
+   },
+   "rf_kinjj__weed-avnag": {
+    "images": 67,
+    "verified_boxes": 0
+   },
+   "rf_lemong__agriculture-xi7us": {
+    "images": 559,
+    "verified_boxes": 0
+   },
+   "rf_leopard-ai__weed-detection-8h4kx": {
+    "images": 908,
+    "verified_boxes": 0
+   },
+   "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+    "images": 942,
+    "verified_boxes": 0
+   },
+   "rf_new-workspace-zbm50__weeds-qftz4": {
+    "images": 1956,
+    "verified_boxes": 0
+   },
+   "rf_project-5nvic__weed-detection-0tfsj": {
+    "images": 2217,
+    "verified_boxes": 0
+   },
+   "rf_robtica-unileon-gluqm__farming-robotics": {
+    "images": 1947,
+    "verified_boxes": 0
+   },
+   "rf_school-5ult5__weed-6a90d": {
+    "images": 2007,
+    "verified_boxes": 0
+   },
+   "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+    "images": 6538,
+    "verified_boxes": 0
+   },
+   "rf_srec-dthh0__crop-weed-poxtn": {
+    "images": 2760,
+    "verified_boxes": 0
+   },
+   "rf_test-8qezo__weed-detection-ycai2": {
+    "images": 78,
+    "verified_boxes": 0
+   },
+   "rf_test-gzc3r__crop-mfete": {
+    "images": 9072,
+    "verified_boxes": 0
+   },
+   "rf_tuf__weed-3434e": {
+    "images": 4617,
+    "verified_boxes": 0
+   },
+   "rf_uav-qnoms__uav-wqshy": {
+    "images": 6341,
+    "verified_boxes": 0
+   },
+   "rf_university-of-peradeniya__weed-detection-ekr8i": {
+    "images": 1630,
+    "verified_boxes": 0
+   },
+   "rf_vizerion__weed-detection-5ell6": {
+    "images": 2895,
+    "verified_boxes": 0
+   },
+   "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+    "images": 1451,
+    "verified_boxes": 0
+   },
+   "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+    "images": 4059,
+    "verified_boxes": 0
+   },
+   "rf_weed-tnf9e__weed-bqdok": {
+    "images": 7842,
+    "verified_boxes": 0
+   },
+   "rf_yolo-gyfyq__weed-ieda7": {
+    "images": 2111,
+    "verified_boxes": 0
+   },
+   "rf_zijian-peng__grass-weed-69hcm": {
+    "images": 3,
+    "verified_boxes": 0
+   }
+  },
+  "kept_images": 1439,
+  "min_evidence": 1,
+  "near_dup_groups_split": 0,
+  "pool_images_before": 96088,
+  "rule": "source-level species evidence: an increment-pool source is eligible for the regular and OtherPlant-heavy draws only if verify admit judged at least min_evidence of its cwd12-species boxes 'verified' (admit_summary.json per_slug boxes); every image of any other source leaves the draw"
+ },
+ "exp": "realloop_v1",
+ "gate": {
+  "flips_mode": "net"
+ },
+ "increments": {
+  "OTHER_HEAVY": {
+   "boxes": {
+    "Carpetweed": 0,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 0,
+    "OtherPlant": 1795,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 0,
+    "Sicklepod": 0,
+    "SpottedSpurge": 0,
+    "Waterhemp": 5
+   },
+   "boxes_total": 1800,
+   "by_source": {
+    "project_agml__greenhouse_crop_weed_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 632,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 13
+    },
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 122,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 1
+     },
+     "images": 55
+    },
+    "project_agml__weed_crop_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 882,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 4
+     },
+     "images": 64
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 81,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 77
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 78,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 78
+    }
+   },
+   "clean": true,
+   "dhash0_collisions": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_images": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_label_rows": 0,
+   "guard": {
+    "bits": 6,
+    "checked": 287,
+    "hits": 0,
+    "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+    "index_images": 9501,
+    "unhashable": 0
+   },
+   "images": 287,
+   "kind": "otherplant_heavy",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_otherplant.jsonl",
+   "manifest_sha256": "d276688bca6928f5adc2c25e5cd56d49096875a49ff359639161a480b6e27ad5",
+   "position": 5,
+   "sessions": 0,
+   "sources": {
+    "project_agml__greenhouse_crop_weed_detection": 13,
+    "project_agml__imageweeds_aerial_weed_detection": 55,
+    "project_agml__weed_crop_detection": 64,
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": 77,
+    "rf_zig-zag-lnodr__weed-detection-vanpe": 78
+   }
+  },
+  "UNVERIFIED": {
+   "boxes": {
+    "Carpetweed": 0,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 0,
+    "OtherPlant": 340,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 0,
+    "Sicklepod": 0,
+    "SpottedSpurge": 0,
+    "Waterhemp": 0
+   },
+   "boxes_total": 340,
+   "by_source": {
+    "rf_tuf__weed-3434e": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 340,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 287
+    }
+   },
+   "clean": false,
+   "dhash0_collisions": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_images": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_label_rows": 0,
+   "guard": {
+    "bits": 6,
+    "checked": 287,
+    "hits": 0,
+    "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+    "index_images": 9501,
+    "unhashable": 0
+   },
+   "images": 287,
+   "kind": "unverified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_unverified.jsonl",
+   "manifest_sha256": "29d6c4678c8226def6f3f28cf21fddc1bcd5e2afe7cac3302f66824bfeda004a",
+   "position": 3,
+   "sessions": 0,
+   "sources": {
+    "rf_tuf__weed-3434e": 287
+   }
+  },
+  "V1": {
+   "boxes": {
+    "Carpetweed": 1,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 3,
+    "MorningGlory": 6,
+    "OtherPlant": 852,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 1,
+    "Sicklepod": 3,
+    "SpottedSpurge": 17,
+    "Waterhemp": 16
+   },
+   "boxes_total": 899,
+   "by_source": {
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 13,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 6
+    },
+    "project_agml__weed_crop_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 646,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 1,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 1
+     },
+     "images": 44
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 138,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 3,
+      "SpottedSpurge": 17,
+      "Waterhemp": 15
+     },
+     "images": 172
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "boxes": {
+      "Carpetweed": 1,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 3,
+      "MorningGlory": 6,
+      "OtherPlant": 55,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 65
+    }
+   },
+   "clean": true,
+   "dhash0_collisions": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_images": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_label_rows": 0,
+   "guard": {
+    "bits": 6,
+    "checked": 287,
+    "hits": 0,
+    "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+    "index_images": 9501,
+    "unhashable": 0
+   },
+   "images": 287,
+   "kind": "verified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_01.jsonl",
+   "manifest_sha256": "c30c6e185d1751d9a6fab1445183d7b9cda859984f637636d2f1c36b660ac343",
+   "position": 1,
+   "sessions": 0,
+   "sources": {
+    "project_agml__imageweeds_aerial_weed_detection": 6,
+    "project_agml__weed_crop_detection": 44,
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": 172,
+    "rf_zig-zag-lnodr__weed-detection-vanpe": 65
+   }
+  },
+  "V2": {
+   "boxes": {
+    "Carpetweed": 6,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 2,
+    "Goosegrass": 2,
+    "MorningGlory": 5,
+    "OtherPlant": 881,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 0,
+    "Sicklepod": 3,
+    "SpottedSpurge": 17,
+    "Waterhemp": 15
+   },
+   "boxes_total": 931,
+   "by_source": {
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 5,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 3
+    },
+    "project_agml__weed_crop_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 685,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 47
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 138,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 3,
+      "SpottedSpurge": 17,
+      "Waterhemp": 15
+     },
+     "images": 169
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "boxes": {
+      "Carpetweed": 6,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 2,
+      "Goosegrass": 2,
+      "MorningGlory": 5,
+      "OtherPlant": 53,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 68
+    }
+   },
+   "clean": true,
+   "dhash0_collisions": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_images": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_label_rows": 0,
+   "guard": {
+    "bits": 6,
+    "checked": 287,
+    "hits": 0,
+    "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+    "index_images": 9501,
+    "unhashable": 0
+   },
+   "images": 287,
+   "kind": "verified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_02.jsonl",
+   "manifest_sha256": "9e2264238e5758034b910e611051a8071eb9b850cf408cf0d0bf9ea61b90e15a",
+   "position": 2,
+   "sessions": 0,
+   "sources": {
+    "project_agml__imageweeds_aerial_weed_detection": 3,
+    "project_agml__weed_crop_detection": 47,
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": 169,
+    "rf_zig-zag-lnodr__weed-detection-vanpe": 68
+   }
+  },
+  "V3": {
+   "boxes": {
+    "Carpetweed": 2,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 1,
+    "Goosegrass": 3,
+    "MorningGlory": 6,
+    "OtherPlant": 333,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 0,
+    "Sicklepod": 4,
+    "SpottedSpurge": 17,
+    "Waterhemp": 15
+   },
+   "boxes_total": 381,
+   "by_source": {
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 100,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 46
+    },
+    "project_agml__weed_crop_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 36,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 4
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 140,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 4,
+      "SpottedSpurge": 17,
+      "Waterhemp": 15
+     },
+     "images": 169
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "boxes": {
+      "Carpetweed": 2,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 1,
+      "Goosegrass": 3,
+      "MorningGlory": 6,
+      "OtherPlant": 57,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 68
+    }
+   },
+   "clean": true,
+   "dhash0_collisions": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_images": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_label_rows": 0,
+   "guard": {
+    "bits": 6,
+    "checked": 287,
+    "hits": 0,
+    "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+    "index_images": 9501,
+    "unhashable": 0
+   },
+   "images": 287,
+   "kind": "verified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_03.jsonl",
+   "manifest_sha256": "9cfa64518820439591b9b9676a4d5de8d197414768fa8e9524b173ef9a980da5",
+   "position": 4,
+   "sessions": 0,
+   "sources": {
+    "project_agml__imageweeds_aerial_weed_detection": 46,
+    "project_agml__weed_crop_detection": 4,
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": 169,
+    "rf_zig-zag-lnodr__weed-detection-vanpe": 68
+   }
+  },
+  "V4": {
+   "boxes": {
+    "Carpetweed": 1,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 2,
+    "MorningGlory": 13,
+    "OtherPlant": 872,
+    "PalmerAmaranth": 0,
+    "PricklySida": 0,
+    "Purslane": 0,
+    "Ragweed": 0,
+    "Sicklepod": 3,
+    "SpottedSpurge": 19,
+    "Waterhemp": 18
+   },
+   "boxes_total": 928,
+   "by_source": {
+    "project_agml__imageweeds_aerial_weed_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 6,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 3
+    },
+    "project_agml__weed_crop_detection": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 675,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 2
+     },
+     "images": 47
+    },
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+     "boxes": {
+      "Carpetweed": 0,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 0,
+      "MorningGlory": 0,
+      "OtherPlant": 134,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 3,
+      "SpottedSpurge": 19,
+      "Waterhemp": 16
+     },
+     "images": 164
+    },
+    "rf_zig-zag-lnodr__weed-detection-vanpe": {
+     "boxes": {
+      "Carpetweed": 1,
+      "CutleafGroundcherry": 0,
+      "Eclipta": 0,
+      "Goosegrass": 2,
+      "MorningGlory": 13,
+      "OtherPlant": 57,
+      "PalmerAmaranth": 0,
+      "PricklySida": 0,
+      "Purslane": 0,
+      "Ragweed": 0,
+      "Sicklepod": 0,
+      "SpottedSpurge": 0,
+      "Waterhemp": 0
+     },
+     "images": 73
+    }
+   },
+   "clean": true,
+   "dhash0_collisions": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_images": {
+    "across_source_session": 0,
+    "extra_rows": 0,
+    "first": [],
+    "groups": 0
+   },
+   "duplicate_label_rows": 0,
+   "guard": {
+    "bits": 6,
+    "checked": 287,
+    "hits": 0,
+    "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+    "index_images": 9501,
+    "unhashable": 0
+   },
+   "images": 287,
+   "kind": "verified",
+   "manifest": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/inc_04.jsonl",
+   "manifest_sha256": "274b98193fc47d3e3fb5f718e436c4f00aba54e7bd3b4033e1c429c6b766057e",
+   "position": 6,
+   "sessions": 0,
+   "sources": {
+    "project_agml__imageweeds_aerial_weed_detection": 3,
+    "project_agml__weed_crop_detection": 47,
+    "rf_karthikeya-c8pvy__weed-detection-cwp10": 164,
+    "rf_zig-zag-lnodr__weed-detection-vanpe": 73
+   }
+  }
+ },
+ "n_verified": 4,
+ "never_train": {
+  "index": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+  "locked": true,
+  "matches_lock": true,
+  "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+ },
+ "recipe_definitions": {
+  "full": {
+   "batch": 32,
+   "cache": "ram",
+   "close_mosaic": 10,
+   "cos_lr": true,
+   "deterministic": true,
+   "epochs": 30,
+   "freeze": null,
+   "imgsz": 640,
+   "lora": null,
+   "lr0": 0.002,
+   "lrf": 0.01,
+   "momentum": 0.937,
+   "optimizer": "SGD",
+   "trainer": "full",
+   "warmup_bias_lr": 0.002,
+   "warmup_epochs": 1,
+   "weight_decay": 0.0005,
+   "workers": 5
+  }
+ },
+ "recipes": [
+  "full"
+ ],
+ "relevance": {
+  "applied": false,
+  "reason": "increment sources 'evidence': the source-evidence criterion ('evidence') replaces the relevance filter"
+ },
+ "replay_mode": "full",
+ "same_base_baselines": [
+  "base_b_v1"
+ ],
+ "select_increments": {
+  "other_heavy_seed_text": "realloop_v1/otherplant",
+  "params": {
+   "admit_summary_sha256": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011",
+   "clusters_sha256": "5ca204fd2848b9af1f47983f43c4cfc569ff545ac9572f17f97ec88790db9483",
+   "exp": "realloop_v1",
+   "min_evidence": 1,
+   "n": 4,
+   "never_train_sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e",
+   "other_heavy": true,
+   "other_heavy_min": 0.5,
+   "pool_sha256": "bf6e545d467558a8995a0ccfa9925b864450cbf092fd36dd51cfe7925b4a1ccf",
+   "seed": 222290805,
+   "size": 287,
+   "sources": "evidence"
+  },
+  "per_increment": [
+   {
+    "boxes": {
+     "Carpetweed": 1,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 3,
+     "MorningGlory": 6,
+     "OtherPlant": 852,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 1,
+     "Sicklepod": 3,
+     "SpottedSpurge": 17,
+     "Waterhemp": 16
+    },
+    "images": 287,
+    "kind": "verified",
+    "level1_clusters": 10,
+    "manifest": "inc_01.jsonl",
+    "multi_image_groups": 5,
+    "near_dup_groups": 282,
+    "no_feature_images": 0,
+    "otherplant_box_share": 0.94772,
+    "sources": {
+     "project_agml__imageweeds_aerial_weed_detection": 6,
+     "project_agml__weed_crop_detection": 44,
+     "rf_karthikeya-c8pvy__weed-detection-cwp10": 172,
+     "rf_zig-zag-lnodr__weed-detection-vanpe": 65
+    }
+   },
+   {
+    "boxes": {
+     "Carpetweed": 6,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 2,
+     "Goosegrass": 2,
+     "MorningGlory": 5,
+     "OtherPlant": 881,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 3,
+     "SpottedSpurge": 17,
+     "Waterhemp": 15
+    },
+    "images": 287,
+    "kind": "verified",
+    "level1_clusters": 12,
+    "manifest": "inc_02.jsonl",
+    "multi_image_groups": 10,
+    "near_dup_groups": 277,
+    "no_feature_images": 0,
+    "otherplant_box_share": 0.946294,
+    "sources": {
+     "project_agml__imageweeds_aerial_weed_detection": 3,
+     "project_agml__weed_crop_detection": 47,
+     "rf_karthikeya-c8pvy__weed-detection-cwp10": 169,
+     "rf_zig-zag-lnodr__weed-detection-vanpe": 68
+    }
+   },
+   {
+    "boxes": {
+     "Carpetweed": 2,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 1,
+     "Goosegrass": 3,
+     "MorningGlory": 6,
+     "OtherPlant": 333,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 4,
+     "SpottedSpurge": 17,
+     "Waterhemp": 15
+    },
+    "images": 287,
+    "kind": "verified",
+    "level1_clusters": 13,
+    "manifest": "inc_03.jsonl",
+    "multi_image_groups": 7,
+    "near_dup_groups": 280,
+    "no_feature_images": 0,
+    "otherplant_box_share": 0.874016,
+    "sources": {
+     "project_agml__imageweeds_aerial_weed_detection": 46,
+     "project_agml__weed_crop_detection": 4,
+     "rf_karthikeya-c8pvy__weed-detection-cwp10": 169,
+     "rf_zig-zag-lnodr__weed-detection-vanpe": 68
+    }
+   },
+   {
+    "boxes": {
+     "Carpetweed": 1,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 2,
+     "MorningGlory": 13,
+     "OtherPlant": 872,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 3,
+     "SpottedSpurge": 19,
+     "Waterhemp": 18
+    },
+    "images": 287,
+    "kind": "verified",
+    "level1_clusters": 10,
+    "manifest": "inc_04.jsonl",
+    "multi_image_groups": 3,
+    "near_dup_groups": 284,
+    "no_feature_images": 0,
+    "otherplant_box_share": 0.939655,
+    "sources": {
+     "project_agml__imageweeds_aerial_weed_detection": 3,
+     "project_agml__weed_crop_detection": 47,
+     "rf_karthikeya-c8pvy__weed-detection-cwp10": 164,
+     "rf_zig-zag-lnodr__weed-detection-vanpe": 73
+    }
+   },
+   {
+    "boxes": {
+     "Carpetweed": 0,
+     "CutleafGroundcherry": 0,
+     "Eclipta": 0,
+     "Goosegrass": 0,
+     "MorningGlory": 0,
+     "OtherPlant": 1795,
+     "PalmerAmaranth": 0,
+     "PricklySida": 0,
+     "Purslane": 0,
+     "Ragweed": 0,
+     "Sicklepod": 0,
+     "SpottedSpurge": 0,
+     "Waterhemp": 5
+    },
+    "images": 287,
+    "kind": "otherplant_heavy",
+    "level1_clusters": 21,
+    "manifest": "inc_otherplant.jsonl",
+    "multi_image_groups": 3,
+    "near_dup_groups": 284,
+    "no_feature_images": 0,
+    "otherplant_box_share": 0.997222,
+    "sources": {
+     "project_agml__greenhouse_crop_weed_detection": 13,
+     "project_agml__imageweeds_aerial_weed_detection": 55,
+     "project_agml__weed_crop_detection": 64,
+     "rf_karthikeya-c8pvy__weed-detection-cwp10": 77,
+     "rf_zig-zag-lnodr__weed-detection-vanpe": 78
+    }
+   }
+  ],
+  "seed_text": "realloop_v1"
+ },
+ "select_provenance": {
+  "never_train": {
+   "current_sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e",
+   "matches_current": true,
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+   "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+  },
+  "train_core": {
+   "lock_sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640",
+   "matches_lock": true,
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/train_core.jsonl",
+   "sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  }
+ },
+ "sequence": [
+  "V1",
+  "V2",
+  "UNVERIFIED",
+  "V3",
+  "OTHER_HEAVY",
+  "V4"
+ ],
+ "size": {
+  "base_images": 3927,
+  "default": false,
+  "images_per_increment": 287,
+  "inc_frac": 0.1
+ },
+ "step1": {
+  "admit_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/admit_summary.json",
+   "sha256": "956cf818006f9edd3eee372fbffb3d903fed11354ed7db2e829dbcb63e4a8011"
+  },
+  "conflicts": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/conflicts.csv",
+   "sha256": "0d528c6e6ba8d6b50b2b963e59c2a8d901e5262472be38dd6d22436abb760c30"
+  },
+  "increment_sources": {
+   "min_evidence": 1,
+   "mode": "evidence",
+   "rule": "source-level species evidence: an increment-pool source is eligible for the regular and OtherPlant-heavy draws only if verify admit judged at least min_evidence of its cwd12-species boxes 'verified' (admit_summary.json per_slug boxes); every image of any other source leaves the draw"
+  },
+  "increments_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/realloop_v1/manifests/increments_summary.json",
+   "sha256": "0a6f6e6a675072c8c1f94c30f7672ca59c41ca12ba08c9dcb253acdfcaaad686"
+  },
+  "never_train": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/nevertrain_dhash.json",
+   "sha256": "68242cbe621963f16041382997896083865050a51d461a95d16729c300ef0e0e"
+  },
+  "pool": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/pool.jsonl",
+   "sha256": "a9c7a3c05e64aa9cc9cbe2bd59dad5e5bdd2a8b53c99033a22ddf00ea13013bc"
+  },
+  "pool_meta": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/pool_meta.jsonl",
+   "sha256": "196027ca6e9ef77a55d266614a775e2f36e0ebbe85525ae5d0fc430041c2a3b7"
+  },
+  "relevance": null,
+  "select_summary": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/select_summary.json",
+   "sha256": "0c2be2577bda9d27c0025f6f0c4445146193969d9779ebb20b9fb32b2daba101"
+  },
+  "train_core": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v1/train_core.jsonl",
+   "sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  },
+  "verified": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/verified.jsonl",
+   "sha256": "d0662ef431f9d0cbfb413a83695aec01351cd9dff562eb7135ae91dde335cce4"
+  }
+ },
+ "testing": false,
+ "truth": true,
+ "unverified": {
+  "candidates": {
+   "project_agml__crop_weed_detection_latvia": {
+    "conflict": 3,
+    "eligible": 3,
+    "excluded_near_dup": 0,
+    "non_admitted": 3,
+    "unknown": 0
+   },
+   "project_agml__greenhouse_crop_weed_detection": {
+    "conflict": 187,
+    "eligible": 187,
+    "excluded_near_dup": 0,
+    "non_admitted": 187,
+    "unknown": 0
+   },
+   "project_agml__imageweeds_aerial_weed_detection": {
+    "conflict": 244,
+    "eligible": 351,
+    "excluded_near_dup": 2,
+    "non_admitted": 353,
+    "unknown": 109
+   },
+   "project_agml__maize_weed_detection": {
+    "conflict": 19,
+    "eligible": 19,
+    "excluded_near_dup": 0,
+    "non_admitted": 19,
+    "unknown": 0
+   },
+   "project_agml__mh_weed16_weed_detection": {
+    "conflict": 945,
+    "eligible": 945,
+    "excluded_near_dup": 0,
+    "non_admitted": 945,
+    "unknown": 0
+   },
+   "project_agml__weed_crop_detection": {
+    "conflict": 618,
+    "eligible": 860,
+    "excluded_near_dup": 5,
+    "non_admitted": 865,
+    "unknown": 247
+   },
+   "rf_1111-gzfxi__weed-chilling": {
+    "conflict": 38,
+    "eligible": 38,
+    "excluded_near_dup": 0,
+    "non_admitted": 38,
+    "unknown": 0
+   },
+   "rf_bishwarup-halder__crop-health-advisor": {
+    "conflict": 1,
+    "eligible": 1,
+    "excluded_near_dup": 0,
+    "non_admitted": 1,
+    "unknown": 0
+   },
+   "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+    "conflict": 245,
+    "eligible": 245,
+    "excluded_near_dup": 0,
+    "non_admitted": 245,
+    "unknown": 0
+   },
+   "rf_fyp-oof0h__smart-agriculture-miw1m": {
+    "conflict": 7,
+    "eligible": 7,
+    "excluded_near_dup": 0,
+    "non_admitted": 7,
+    "unknown": 0
+   },
+   "rf_karthikeya-c8pvy__weed-detection-cwp10": {
+    "conflict": 28,
+    "eligible": 160,
+    "excluded_near_dup": 1,
+    "non_admitted": 161,
+    "unknown": 133
+   },
+   "rf_kinjj__weed-avnag": {
+    "conflict": 19,
+    "eligible": 19,
+    "excluded_near_dup": 0,
+    "non_admitted": 19,
+    "unknown": 0
+   },
+   "rf_leopard-ai__weed-detection-8h4kx": {
+    "conflict": 283,
+    "eligible": 283,
+    "excluded_near_dup": 0,
+    "non_admitted": 283,
+    "unknown": 0
+   },
+   "rf_main-otq0a__weed-in-paddy-field-wmjlr": {
+    "conflict": 11,
+    "eligible": 11,
+    "excluded_near_dup": 0,
+    "non_admitted": 11,
+    "unknown": 0
+   },
+   "rf_new-workspace-zbm50__weeds-qftz4": {
+    "conflict": 18,
+    "eligible": 18,
+    "excluded_near_dup": 0,
+    "non_admitted": 18,
+    "unknown": 0
+   },
+   "rf_project-5nvic__weed-detection-0tfsj": {
+    "conflict": 1,
+    "eligible": 1,
+    "excluded_near_dup": 0,
+    "non_admitted": 1,
+    "unknown": 0
+   },
+   "rf_school-5ult5__weed-6a90d": {
+    "conflict": 57,
+    "eligible": 57,
+    "excluded_near_dup": 0,
+    "non_admitted": 57,
+    "unknown": 0
+   },
+   "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+    "conflict": 3,
+    "eligible": 3,
+    "excluded_near_dup": 0,
+    "non_admitted": 3,
+    "unknown": 0
+   },
+   "rf_srec-dthh0__crop-weed-poxtn": {
+    "conflict": 145,
+    "eligible": 145,
+    "excluded_near_dup": 0,
+    "non_admitted": 145,
+    "unknown": 0
+   },
+   "rf_test-8qezo__weed-detection-ycai2": {
+    "conflict": 1,
+    "eligible": 1,
+    "excluded_near_dup": 0,
+    "non_admitted": 1,
+    "unknown": 0
+   },
+   "rf_test-gzc3r__crop-mfete": {
+    "conflict": 187,
+    "eligible": 187,
+    "excluded_near_dup": 0,
+    "non_admitted": 187,
+    "unknown": 0
+   },
+   "rf_tuf__weed-3434e": {
+    "conflict": 1571,
+    "eligible": 1571,
+    "excluded_near_dup": 0,
+    "non_admitted": 1571,
+    "unknown": 0
+   },
+   "rf_university-of-peradeniya__weed-detection-ekr8i": {
+    "conflict": 1,
+    "eligible": 1,
+    "excluded_near_dup": 0,
+    "non_admitted": 1,
+    "unknown": 0
+   },
+   "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": {
+    "conflict": 500,
+    "eligible": 534,
+    "excluded_near_dup": 0,
+    "non_admitted": 534,
+    "unknown": 34
+   },
+   "rf_weed-tnf9e__weed-bqdok": {
+    "conflict": 47,
+    "eligible": 47,
+    "excluded_near_dup": 0,
+    "non_admitted": 47,
+    "unknown": 0
+   },
+   "rf_zig-zag-lnodr__weed-detection-vanpe": {
+    "conflict": 179,
+    "eligible": 252,
+    "excluded_near_dup": 0,
+    "non_admitted": 252,
+    "unknown": 73
+   }
+  },
+  "conflict_boxes": 296,
+  "conflict_images": 287,
+  "conflict_pairs": {
+   "OtherPlant -> CutleafGroundcherry": 4,
+   "OtherPlant -> Goosegrass": 29,
+   "OtherPlant -> MorningGlory": 10,
+   "OtherPlant -> PalmerAmaranth": 148,
+   "OtherPlant -> Purslane": 105
+  },
+  "excluded_near_dup_examples": [
+   {
+    "bits": 3,
+    "key": "project_agml__imageweeds_aerial_weed_detection__default_train_000261",
+    "near": "OTHER_HEAVY/project_agml__imageweeds_aerial_weed_detection__default_train_000544",
+    "source": "project_agml__imageweeds_aerial_weed_detection"
+   },
+   {
+    "bits": 3,
+    "key": "project_agml__imageweeds_aerial_weed_detection__default_train_000525",
+    "near": "base_B/project_agml__imageweeds_aerial_weed_detection__default_train_000526",
+    "source": "project_agml__imageweeds_aerial_weed_detection"
+   },
+   {
+    "bits": 3,
+    "key": "project_agml__weed_crop_detection__default_train_000565",
+    "near": "V4/project_agml__weed_crop_detection__default_train_000570",
+    "source": "project_agml__weed_crop_detection"
+   },
+   {
+    "bits": 2,
+    "key": "project_agml__weed_crop_detection__default_train_000590",
+    "near": "V4/project_agml__weed_crop_detection__default_train_000589",
+    "source": "project_agml__weed_crop_detection"
+   },
+   {
+    "bits": 2,
+    "key": "project_agml__weed_crop_detection__default_train_000594",
+    "near": "V4/project_agml__weed_crop_detection__default_train_000589",
+    "source": "project_agml__weed_crop_detection"
+   },
+   {
+    "bits": 1,
+    "key": "project_agml__weed_crop_detection__default_train_000595",
+    "near": "OTHER_HEAVY/project_agml__weed_crop_detection__default_train_000600",
+    "source": "project_agml__weed_crop_detection"
+   },
+   {
+    "bits": 1,
+    "key": "project_agml__weed_crop_detection__default_train_000601",
+    "near": "OTHER_HEAVY/project_agml__weed_crop_detection__default_train_000600",
+    "source": "project_agml__weed_crop_detection"
+   },
+   {
+    "bits": 3,
+    "key": "rf_karthikeya-c8pvy__weed-detection-cwp10__train__Swinecress_22_jpg_rf_82d758fb3564fbad4441e80ed95e0db3",
+    "near": "V3/rf_karthikeya-c8pvy__weed-detection-cwp10__train__Swinecress_72_jpg_rf_e34b180e1c6dfa8eeace8ccc540f7f23",
+    "source": "rf_karthikeya-c8pvy__weed-detection-cwp10"
+   }
+  ],
+  "images": 287,
+  "near_dup_bits": 3,
+  "rule": "M images of the one harvested source with the most eligible images verify did not admit (conflict or unknown), among sources with at least M (ties: the lower name); eligible = not within 3 dHash bits of an image of the base or of a verified increment (a never-train hit, a train_core copy or the same image as one of those stops the build); drawn with default_rng(stable_int(exp + '/unverified')) over the eligible images sorted by key; labels as the species join gave them",
+  "seed_text": "realloop_v1/unverified",
+  "source": "rf_tuf__weed-3434e",
+  "source_admit_summary": {
+   "boxes": {
+    "conflict": 1607,
+    "other_ok": 5055,
+    "small": 29
+   },
+   "images": {
+    "admitted": 4617,
+    "conflict": 1571
+   }
+  },
+  "source_evidence": {
+   "evidenced": false,
+   "verified_boxes": 0
+  },
+  "verdicts": {
+   "conflict": 287
+  }
+ },
+ "warmup": {
+  "cold": {
+   "base": {
+    "covers_whole_run": false,
+    "epochs": 100,
+    "images": 3927,
+    "iterations_per_epoch": 123,
+    "warmup_epochs_effective": 3.0,
+    "warmup_epochs_nominal": 3,
+    "warmup_iterations": 369
+   },
+   "truth": {
+    "s01_V1": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 4214,
+     "iterations_per_epoch": 132,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 396
+    },
+    "s02_V2": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 4501,
+     "iterations_per_epoch": 141,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 423
+    },
+    "s03_UNVERIFIED": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 4788,
+     "iterations_per_epoch": 150,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 450
+    },
+    "s04_V3": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 4788,
+     "iterations_per_epoch": 150,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 450
+    },
+    "s05_OTHER_HEAVY": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 5075,
+     "iterations_per_epoch": 159,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 477
+    },
+    "s06_V4": {
+     "covers_whole_run": false,
+     "epochs": 100,
+     "images": 5362,
+     "iterations_per_epoch": 168,
+     "warmup_epochs_effective": 3.0,
+     "warmup_epochs_nominal": 3,
+     "warmup_iterations": 504
+    }
+   }
+  },
+  "incremental": {
+   "full": {
+    "s01_V1": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s02_V2": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4501,
+       "iterations_per_epoch": 141,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 141
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s03_UNVERIFIED": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4788,
+       "iterations_per_epoch": 150,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 150
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4501,
+       "iterations_per_epoch": 141,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 141
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s04_V3": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5075,
+       "iterations_per_epoch": 159,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 159
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4788,
+       "iterations_per_epoch": 150,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 150
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s05_OTHER_HEAVY": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5362,
+       "iterations_per_epoch": 168,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 168
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5075,
+       "iterations_per_epoch": 159,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 159
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    },
+    "s06_V4": {
+     "cand": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5649,
+       "iterations_per_epoch": 177,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 177
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 4214,
+       "iterations_per_epoch": 132,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 132
+      }
+     },
+     "null": {
+      "pool_max": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 5362,
+       "iterations_per_epoch": 168,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 168
+      },
+      "pool_min": {
+       "covers_whole_run": false,
+       "epochs": 30,
+       "images": 3927,
+       "iterations_per_epoch": 123,
+       "warmup_epochs_effective": 1.0,
+       "warmup_epochs_nominal": 1,
+       "warmup_iterations": 123
+      }
+     }
+    }
+   }
+  },
+  "incremental_effective_epochs": {
+   "max": 1.0,
+   "min": 1.0
+  },
+  "note": "Ultralytics warms up for max(round(warmup_epochs * iterations per epoch), 100) iterations; replay mode full: cand holds the accepted pool + D_k and null the pool, recorded at pool_min (P0) and pool_max (P0 + every earlier increment); the driver records each step's actual sizes",
+  "replay_mode": "full"
+ }
+}
