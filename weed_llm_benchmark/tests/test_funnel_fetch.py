@@ -122,16 +122,16 @@ class Web(object):
         self.routes = {}
         self.calls = []
 
-    def add(self, url, body, status=200, params=None):
+    def add(self, url, body, status=200, params=None, headers=None):
         data = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
-        self.routes[(url, json.dumps(params or {}, sort_keys=True))] = (status, data)
+        self.routes[(url, json.dumps(params or {}, sort_keys=True))] = (status, data, headers or {})
 
     def __call__(self, url, params):
         self.calls.append((url, dict(params or {})))
         got = self.routes.get((url, json.dumps(dict(params or {}), sort_keys=True)))
         if got is None:
             return 404, b"not found", {}
-        return got[0], got[1], {}
+        return got[0], got[1], dict(got[2])
 
 
 ANN_ZIP = zbytes({"ann/PASCAL_VOC/f1.xml": "<annotation><filename>V.mp4_1.png</filename><size><width>10</width>"
@@ -507,6 +507,38 @@ def test_refetch(dom, web):
           raises(lambda: F.refetch(D.load(str(p)), slug, TMP / "rf", web), FetchError))
 
 
+def test_partial_listing(web):
+    """The Mendeley public API lists at most 1,000 files per folder and answers
+    206 with "Content-Range: items a-b/total" (it pages by no parameter). A
+    partially listed folder outside the spec's folder_regex is recorded; one
+    inside the spec's scope refuses the fetch."""
+    print("partial Mendeley listings")
+    web.add(F.MENDELEY_FOLDERS % ("mdl2", 1), [{"id": "lab", "name": "Label files"}, {"id": "crp", "name": "Crops"}])
+    lab = b"0 0.5 0.5 0.1 0.1\n"
+    url = "https://data.mendeley.com/public-files/datasets/mdl2/files/l1/file_downloaded"
+    web.add(url, lab)
+    web.add(F.MENDELEY_FILES % "mdl2", [], params={"folder_id": "root", "version": "1"})
+    web.add(F.MENDELEY_FILES % "mdl2", [{"filename": "l1.txt", "content_details": {"download_url": url,
+                                                                                   "sha256_hash": sha(lab)}}],
+            params={"folder_id": "lab", "version": "1"})
+    web.add(F.MENDELEY_FILES % "mdl2", [{"filename": "c%d.jpg" % i, "content_details": {}} for i in range(2)],
+            status=206, params={"folder_id": "crp", "version": "1"}, headers={"Content-Range": "items 0-1/5"})
+    out = TMP / "partial" / "cards"
+    spec = {"kind": "archive", "provider": "mendeley", "dataset": "mdl2", "version": 1, "what": "annotations",
+            "files_regex": "\\.txt$", "folder_regex": "^Label files$", "format": "yolo"}
+    ents = F.fetch_spec(spec, "slug_p", out, web)
+    listing = read_json(out / "slug_p" / "mendeley_mdl2_v1_files.json")
+    check("a 206 folder outside folder_regex is recorded as partial, and the label file is fetched",
+          [e["file"] for e in ents] == ["slug_p/annotations/Label_files/l1.txt"]
+          and listing["partial_folders"] == {"Crops": {"listed": 2, "total": 5, "content_range": "items 0-1/5"}},
+          (ents, listing.get("partial_folders")))
+    wide = dict(spec)
+    del wide["folder_regex"]
+    msg = raises(lambda: F.fetch_spec(wide, "slug_p", TMP / "partial2" / "cards", web), FetchError)
+    check("a 206 folder inside the spec's scope refuses the fetch, naming the folder",
+          msg is not None and "Crops" in msg and "folder_regex" in msg, msg)
+
+
 if __name__ == "__main__":
     try:
         dom = test_config(D.load("weed"))
@@ -518,6 +550,7 @@ if __name__ == "__main__":
         test_known_items(dom, web)
         test_taxonomy(web)
         test_refetch(dom, web)
+        test_partial_listing(web)
         check("no call went to the real network (every call went through the fake transport)",
               all(isinstance(u, str) for u, _p in web.calls))
     finally:

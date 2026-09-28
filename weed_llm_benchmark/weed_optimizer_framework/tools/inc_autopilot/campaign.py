@@ -3078,7 +3078,8 @@ class _Run(object):
         if LAB_HOOKS is not None:
             return LAB_HOOKS(self)
         return {"inc_funnel_fetch": X.funnel_fetch_hook(),
-                "inc_funnel_sync": X.funnel_sync_hook(self.paths.lab_inc, os.environ.get("CLUSTER_SSH", "")),
+                "inc_funnel_sync": X.funnel_sync_hook(self.paths.lab_inc, os.environ.get("CLUSTER_SSH", ""),
+                                                      data_target=M.CLUSTER_DATA_SSH),
                 "inc_verify_queue": lambda params: X.write_verify_queue(
                     LV.verify_queue_rows(self.ev) if self.ev is not None else [], self.paths.verify_queue)}
 

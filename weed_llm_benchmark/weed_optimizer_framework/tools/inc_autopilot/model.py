@@ -46,6 +46,9 @@ REPLAY_DIR = CAMPAIGN_DIR / "replay"                          # replay / prospec
 # remote.py verbs over one batched ssh per tick).
 CLUSTER_REPO = os.environ.get("CLUSTER_REPO", "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark")
 CLUSTER_INC_DIR = CLUSTER_REPO + "/results/framework/inc"
+# Bulk copies (rsync) go through the cluster's data-transfer node: the login
+# node has no rsync. The same variable and default as dashboard_server's uploads.
+CLUSTER_DATA_SSH = os.environ.get("CLUSTER_DATA_SSH", "byler@data.bridges2.psc.edu")
 CLUSTER_CAMPAIGN_DIR = CLUSTER_INC_DIR + "/_campaign"          # provenance/<exp>.json, plan inputs
 
 AUTOPILOT_ACTOR = "round-scheduler:inc-autopilot"

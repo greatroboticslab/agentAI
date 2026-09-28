@@ -229,6 +229,26 @@ contract.write_bytes(text)
 os.environ["FUNNEL_CONTRACT"] = str(TMP / "nowhere.md")
 check("FUNNEL_CONTRACT overrides the contract path", raises(lambda: D.load_prereg(PREREG), F.PreregError))
 del os.environ["FUNNEL_CONTRACT"]
+# The lab layout: the package tree (with its results/) under <home>/weed_llm_benchmark and the docs
+# beside it in <home>/docs, while REPO names a directory without the contract.
+home = TMP / "labhome"
+lab_prereg = home / "weed_llm_benchmark" / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json"
+lab_prereg.parent.mkdir(parents=True)
+lab_prereg.write_bytes(PREREG.read_bytes())
+(home / "docs").mkdir()
+old_repo = os.environ["REPO"]
+C.REPO = pathlib.Path(TMP / "no_docs_here")
+try:
+    check("REPO without the contract and no ancestor of the prereg holding it: refused",
+          raises(lambda: D.load_prereg(lab_prereg), F.PreregError) is not None)
+    (home / "docs" / "FUNNEL_AUDIT.md").write_bytes(text)
+    check("  ... and found up the prereg's own path once <home>/docs holds it",
+          D.load_prereg(lab_prereg).core_sha256 == pre.core_sha256)
+    (home / "docs" / "FUNNEL_AUDIT.md").write_bytes(text + b"\nanother contract\n")
+    check("  ... but never another contract (the sha256 check still refuses)",
+          raises(lambda: D.load_prereg(lab_prereg), F.PreregError) is not None)
+finally:
+    C.REPO = pathlib.Path(old_repo)
 
 print("amendments")
 raw_before = PREREG.read_bytes()

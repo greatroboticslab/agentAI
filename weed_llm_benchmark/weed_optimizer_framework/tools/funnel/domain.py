@@ -697,9 +697,13 @@ def prereg_core_sha256(obj):
     return hashlib.sha256(canonical_json(core).encode("utf-8")).hexdigest()
 
 
-def contract_path(prereg):
+def contract_path(prereg, prereg_path=None):
     """The contract file a prereg names: $FUNNEL_CONTRACT when set, else REPO /
-    the prereg's contract path."""
+    the prereg's contract path when that file exists, else the first ancestor
+    of the prereg file's directory that holds the contract path (the lab keeps
+    its package tree under ~/weed_llm_benchmark and the docs beside it, so its
+    REPO is not the git root). The caller checks the file's sha256 against the
+    prereg, so a search cannot substitute another contract."""
     raw = prereg.raw if isinstance(prereg, Prereg) else prereg
     env = os.environ.get("FUNNEL_CONTRACT")
     if env:
@@ -708,7 +712,16 @@ def contract_path(prereg):
         rel = raw["contract"]["path"]
     except (KeyError, TypeError):
         raise PreregError("the prereg names no contract path")
-    return C.REPO / rel
+    first = C.REPO / rel
+    if first.is_file():
+        return first
+    if prereg_path is None and isinstance(prereg, Prereg):
+        prereg_path = prereg.path
+    if prereg_path is not None:
+        for anc in Path(prereg_path).resolve().parents:
+            if (anc / rel).is_file():
+                return anc / rel
+    return first
 
 
 class Prereg(object):
@@ -783,7 +796,7 @@ def load_prereg(path, domain=None):
     if not isinstance(raw.get("amendments", []), list):
         raise PreregError("%s: amendments must be a list" % path)
     want = (raw.get("contract") or {}).get("sha256")
-    cpath = contract_path(raw)
+    cpath = contract_path(raw, prereg_path=path)
     cdata = _read_bytes(cpath, PreregError)
     got = hashlib.sha256(cdata).hexdigest()
     if got != want:

@@ -2360,14 +2360,16 @@ def _remote_py(repo, script, args):
                " ".join(shlex.quote(str(a)) for a in args)))
 
 
-def funnel_pull(lab_inc, target, cluster_inc=None, runner=None, repo=None):
+def funnel_pull(lab_inc, target, cluster_inc=None, runner=None, repo=None, data_target=None):
     """Cluster -> lab (runner 6.3): list the pull list's files on the cluster
     with their sha256 (one ssh), rsync the ones the lab lacks or holds another
     version of into a staging directory, check every staged file against the
     listed sha256, and only then move them into place. The pre-registration
     comes back only when the cluster's copy has the lab's core and grew by
     amendments; another core is refused. Refuses any listed path outside the
-    list. Returns {"ok", "pulled", "prereg", "error"}."""
+    list. The listing runs over ssh on target; the copy runs rsync against
+    data_target (the data-transfer node; default target). Returns {"ok",
+    "pulled", "prereg", "error"}."""
     cluster_inc = cluster_inc or M.CLUSTER_INC_DIR
     repo = repo or M.CLUSTER_REPO
     run = runner or subprocess.run
@@ -2414,7 +2416,8 @@ def funnel_pull(lab_inc, target, cluster_inc=None, runner=None, repo=None):
     staging = lab / ".funnel_pull" / uuid.uuid4().hex
     staging.mkdir(parents=True)
     try:
-        argv = ["rsync", "-a", "--files-from=-", "--", "%s:%s/" % (target, cluster_inc), str(staging) + "/"]
+        argv = ["rsync", "-a", "--files-from=-", "--", "%s:%s/" % (data_target or target, cluster_inc),
+                str(staging) + "/"]
         try:
             p = run(argv, input="\n".join(sorted(want)) + "\n", capture_output=True, text=True, timeout=1800)
         except (OSError, subprocess.TimeoutExpired) as e:
@@ -2486,14 +2489,16 @@ sys.exit(1 if bad else 0)
 """
 
 
-def funnel_sync_hook(lab_inc, target, cluster_inc=None, runner=None, repo=None):
+def funnel_sync_hook(lab_inc, target, cluster_inc=None, runner=None, repo=None, data_target=None):
     """The lab hook of inc_funnel_sync (runner 6.3), both directions over the
     dashboard's ssh target. Lab -> cluster: rsync the fixed file list from the
     lab's INC tree to the cluster's, then verify the arrival there
     (_SYNC_CHECK_PY): every pushed file hashes as on the lab, and when a fetch
     manifest was pushed, funnel.fetch.check_manifest (StaleInput on a
     mismatch). Cluster -> lab: funnel_pull (the pull list, verified before it
-    is moved into place). Refuses a path outside either list."""
+    is moved into place). Refuses a path outside either list. rsync runs
+    against data_target (the cluster's data-transfer node: the login node has
+    no rsync; default target), ssh commands against target."""
     cluster_inc = cluster_inc or M.CLUSTER_INC_DIR
     repo = repo or M.CLUSTER_REPO
 
@@ -2507,7 +2512,7 @@ def funnel_sync_hook(lab_inc, target, cluster_inc=None, runner=None, repo=None):
         res = push(files) if files else {"ok": True, "pushed": [], "note": "nothing to push"}
         if not res.get("ok"):
             return res
-        pull = funnel_pull(lab_inc, target, cluster_inc, runner, repo)
+        pull = funnel_pull(lab_inc, target, cluster_inc, runner, repo, data_target=data_target)
         res.update(pulled=pull.get("pulled") or [], prereg=pull.get("prereg"))
         if not pull.get("ok"):
             res.update(ok=False, error="pull: %s" % pull.get("error"))
@@ -2516,7 +2521,8 @@ def funnel_sync_hook(lab_inc, target, cluster_inc=None, runner=None, repo=None):
     def push(files):
         shas = {rel: hashlib.sha256((Path(lab_inc) / rel).read_bytes()).hexdigest() for rel in files}
         run = runner or subprocess.run
-        argv = ["rsync", "-a", "--files-from=-", "--", str(Path(lab_inc)) + "/", "%s:%s/" % (target, cluster_inc)]
+        argv = ["rsync", "-a", "--files-from=-", "--", str(Path(lab_inc)) + "/",
+                "%s:%s/" % (data_target or target, cluster_inc)]
         try:
             p = run(argv, input="\n".join(files) + "\n", capture_output=True, text=True, timeout=1800)
         except (OSError, subprocess.TimeoutExpired) as e:

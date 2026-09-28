@@ -631,6 +631,16 @@ def test_lab_hooks():
           and json.loads(calls[2][1]) == list(X.FUNNEL_PULL_FILES) and res.get("pulled") == [], calls[2:])
     check("no ssh target: refused, nothing run",
           not X.funnel_sync_hook(lab, "", runner=runner)({})["ok"] and len(calls) == 3)
+    del calls[:]
+    res = X.funnel_sync_hook(lab, "cluster-host", cluster_inc="/c/inc", runner=runner, repo="/c/repo",
+                             data_target="dtn-host")({})
+    check("with a data-transfer node, rsync goes to it and the ssh checks stay on the login target (the "
+          "login node has no rsync)",
+          res["ok"] and calls[0][0][0] == "rsync" and calls[0][0][-1] == "dtn-host:/c/inc/"
+          and all(c[0][:2] == ["ssh", "cluster-host"] for c in calls[1:]), [c[0][:2] + c[0][-1:] for c in calls])
+    check("the campaign's hook uses the data-transfer node (model.CLUSTER_DATA_SSH)",
+          "data_target=M.CLUSTER_DATA_SSH" in (ROOT / "weed_optimizer_framework" / "tools" / "inc_autopilot"
+                                               / "campaign.py").read_text())
     print("executor: the sync's arrival check, run here on a copy standing for the cluster")
     arrive = TMP / "arrive_inc"
     shutil.copytree(str(lab), str(arrive))

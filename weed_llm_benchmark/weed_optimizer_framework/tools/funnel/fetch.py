@@ -167,16 +167,27 @@ def _mendeley_listing(transport, dataset, version):
             parts.append(by_id[fid]["name"])
             fid = by_id[fid].get("parent_id")
         return "/".join(reversed(parts))
-    out = {}
+    out, partial = {}, {}
     for fid in ["root"] + sorted(by_id):
-        st, data, sha, _h = _get(transport, MENDELEY_FILES % dataset, {"folder_id": fid, "version": str(version)})
-        if st != 200:
+        st, data, sha, h = _get(transport, MENDELEY_FILES % dataset, {"folder_id": fid, "version": str(version)})
+        if st not in (200, 206):
             raise FetchError("Mendeley files of %s v%s folder %s answered %s" % (dataset, version, fid, st))
-        raw.append({"url": MENDELEY_FILES % dataset, "params": {"folder_id": fid, "version": str(version)},
-                    "sha256": sha})
         files = _json(data, "Mendeley files")
-        out[path_of(fid) if fid != "root" else ""] = files
-    return out, raw
+        path = path_of(fid) if fid != "root" else ""
+        rec = {"url": MENDELEY_FILES % dataset, "params": {"folder_id": fid, "version": str(version)},
+               "sha256": sha, "status": st}
+        if st == 206:
+            # The public API lists at most 1,000 files per folder and answers 206 with
+            # "Content-Range: items a-b/total"; it pages by no parameter or Range header
+            # (checked 2026-09-28). Such a folder is recorded as partially listed.
+            cr = {str(k).lower(): v for k, v in (h or {}).items()}.get("content-range", "")
+            m = re.match(r"items\s+(\d+)-(\d+)/(\d+)", str(cr))
+            total = int(m.group(3)) if m else None
+            partial[path] = {"listed": len(files), "total": total, "content_range": cr}
+            rec["partial"] = partial[path]
+        raw.append(rec)
+        out[path] = files
+    return out, raw, partial
 
 
 def _select(names, spec):
@@ -264,9 +275,17 @@ def fetch_spec(spec, slug, cards_dir, transport):
             entry(MENDELEY_DATASET % ds, {"version": str(ver)}, None, st, error="HTTP %s" % st)
         if kind == "http":
             return ents
-        listing, raw = _mendeley_listing(transport, ds, ver)
+        listing, raw, partial = _mendeley_listing(transport, ds, ver)
         _save(out_dir, "%s/mendeley_%s_v%s_files.json" % (base, ds, ver),
-              json.dumps({"listing": listing, "requests": raw}, sort_keys=True, indent=1).encode("utf-8"))
+              json.dumps({"listing": listing, "requests": raw, "partial_folders": partial},
+                         sort_keys=True, indent=1).encode("utf-8"))
+        # A partially listed folder inside the spec's scope could hide a wanted file:
+        # refuse, and name the folders (the spec narrows its scope with folder_regex).
+        frx = re.compile(spec["folder_regex"]) if spec.get("folder_regex") else None
+        in_scope = sorted(f for f in partial if frx is None or frx.search(f))
+        if in_scope:
+            raise FetchError("%s: Mendeley %s v%s lists only part of folder(s) %s inside the spec's scope; "
+                             "narrow it with folder_regex" % (slug, ds, ver, in_scope))
         rec = {(folder, f["filename"]): f for folder, files in listing.items() for f in files}
         chosen = _select(sorted(rec), spec)
         if not chosen:

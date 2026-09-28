@@ -1111,7 +1111,8 @@
      "licence": "CC BY 4.0",
      "files_regex": "\\.txt$",
      "format": "yolo",
-     "classes_file": "classes.txt"
+     "classes_file": "classes.txt",
+     "folder_regex": "^raw images with label files$"
     }
    },
    "rf_tuf__weed-3434e": {
