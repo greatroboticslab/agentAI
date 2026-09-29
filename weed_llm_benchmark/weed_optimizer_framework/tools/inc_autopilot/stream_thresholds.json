@@ -190,6 +190,10 @@
    "value": 2,
    "why": "Contract 6.6: 2 consecutive failed steps in a lane hold that lane."
   },
+  "step_retries": {
+   "value": 2,
+   "why": "How many times one step (stream.step_key: the lever and its policy params) is proposed again after it failed, whether or not the failures were consecutive; the next failure leaves it with a person (its lane held until a person releases it: stream release, or enable). The funnel's rule for its jobs (levers.json protocol funnel_job_retries). Each re-proposal carries a new id (the executor runs an id once; seen live on 2026-09-28: L23 re-proposed under its old id after its job failed was refused). The collection levers keep their per-source bound (7.5)."
+  },
   "zero_yield_sources": {
    "value": 3,
    "why": "Contract 6.6: 3 consecutive sources ending failed or with zero admitted target boxes hold the DATA lane; one zero-yield source is legitimate (a licence hold, a copy source), so 2 do not."

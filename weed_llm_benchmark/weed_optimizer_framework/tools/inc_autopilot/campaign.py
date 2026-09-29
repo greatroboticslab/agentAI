@@ -120,7 +120,15 @@ card; configure refuses autonomy 'envelope' while it stands.
 Lineage: the context `lineage` records come from the executor's execution log
 (every lever that ran or may have run in the campaign, a build still in
 flight included; a build that failed does not count), so levers.applied never
-proposes a lever twice on one parent. Remote ledger reads carry the
+proposes a lever twice on one parent. A funnel job (L10, L11, L13) that
+left squeue has its final Slurm state read from sacct in the same snapshot
+(campaign-snapshot --sacct, for every funnel job whose state is not recorded
+yet); WAIT_JOB's job_finished entry and the state's funnel_jobs record it,
+and a job that ended in a failure state (JOB_FAILED_STATES) makes its
+lineage record 'failed', so levers.py proposes the step again, under a new
+proposal id, at most levers.json protocol funnel_job_retries times; the
+stop-loss on submissions counts a funnel lever per step (one lever runs nine
+verbs). Remote ledger reads carry the
 `through_sha256` of the previous read; a `prefix_mismatch` rewrites the lab's
 copy from line 0, and an incomplete read postpones every decision.
 
@@ -231,6 +239,22 @@ FUNNEL_DECISIONS = ("DEC-1", "DEC-2", "DEC-3", "DEC-4", "DEC-5", "DEC-6", "DEC-7
 LAB_HOOKS = None
 # The params that tell one funnel step from another in the lineage.
 FUNNEL_KEY_PARAMS = ("verb", "rl", "part", "what", "policy", "config")
+# The funnel levers that run as Slurm jobs of run_inc_funnel.sh (levers.json
+# L10, L11, L13). A job leaves squeue when it ends; its final state comes from
+# sacct (the campaign snapshot's --sacct, remote.job_states), is recorded in
+# the state's funnel_jobs, and a job that ended in a failure state makes its
+# lineage record 'failed', so levers.py may propose the step again (at most
+# protocol funnel_job_retries times).
+FUNNEL_JOB_LEVERS = ("L10", "L11", "L13")
+JOB_FAILED_STATES = ("FAILED", "TIMEOUT", "CANCELLED", "OUT_OF_MEMORY", "NODE_FAIL", "BOOT_FAIL", "DEADLINE",
+                     "PREEMPTED")
+JOB_UNKNOWN = "UNKNOWN"              # recorded when sacct gave no final state in SACCT_TRIES snapshots
+SACCT_TRIES = 3                      # snapshots a job gone from squeue may lack a final state in sacct
+SACCT_MAX = 20                       # job ids one snapshot asks sacct about
+JOB_ID_RE = re.compile(r"^[0-9]+(_[0-9]+)?$")
+# run_inc_funnel.sh's #SBATCH --output: <INC_DIR>/funnel/logs/%x_%j.out, %x the
+# job name remote.py submit gives (remote._job_name).
+FUNNEL_LOG_DIR = "funnel/logs"
 
 
 def _step_params(r):
@@ -241,6 +265,44 @@ def _step_params(r):
     merged = dict(r.get("meta_params") or {})
     merged.update(r.get("params") or {})
     return {k: merged.get(k) for k in FUNNEL_KEY_PARAMS if merged.get(k) is not None}
+
+
+def job_state(rows, job_id):
+    """The final Slurm state of job `job_id` from a sacct record's jobs
+    ({id: {"state", ...}}; an array job's tasks as <id>_<task>): its first
+    failure state, COMPLETED when every row completed, else None (not ended,
+    or not in sacct). 'CANCELLED by <uid>' reads CANCELLED."""
+    jid = str(job_id)
+    states = [str((v or {}).get("state") or "").split(" ")[0].upper().rstrip("+")
+              for k, v in sorted((rows or {}).items()) if str(k) == jid or str(k).split("_")[0] == jid]
+    if not states:
+        return None
+    failed = [s for s in states if s in JOB_FAILED_STATES]
+    if failed:
+        return failed[0]
+    return "COMPLETED" if all(s == "COMPLETED" for s in states) else None
+
+
+def funnel_job_log(rec, job_id):
+    """The log a funnel job writes (run_inc_funnel.sh --output
+    <INC_DIR>/funnel/logs/%x_%j.out), from its execution record: the
+    directory of its --prereg (<INC_DIR>/funnel/) and the job name remote.py
+    submit gives the step (remote._job_name), or None."""
+    p = (rec or {}).get("params") or {}
+    prereg = p.get("prereg")
+    lever = (rec or {}).get("lever")
+    if not prereg or lever not in FUNNEL_JOB_LEVERS:
+        return None
+    if lever == "L10":
+        name = "inc_funnel_%s" % p.get("verb")
+    elif lever == "L11":
+        name = "inc_funnel_map_%s" % p.get("part")
+    else:
+        name = "inc_funnel_recover"
+    inc = os.path.dirname(os.path.dirname(str(prereg)))
+    return "%s/%s/%s_%s.out" % (inc, FUNNEL_LOG_DIR, name, job_id)
+
+
 TRANSIENT_REFUSALS = ("the cluster is not reachable", "Mongo's health", "the execution log",
                       "no slurm_sh hook", "could not be locked", "collides with another request",
                       "could not be filed", "the approval log could not be written")
@@ -851,6 +913,7 @@ class _Run(object):
         self.ev = None
         self.status = {}
         self.partial = False
+        self._sacct_asked = []
         self.xctx = X.Context(slurm_sh=ssh, resources=resources, domain_budget=domain_budget,
                               clock=clock, lab_repo=paths.lab_repo, preamble=preamble,
                               diagnoses=lambda _name: self._hook_diagnoses())
@@ -1333,6 +1396,12 @@ class _Run(object):
             st["wait_since_utc"] = self.utc
             st["card"] = None
             st["phase"] = "WAIT_JOB"
+            st.pop("wait_funnel", None)
+            if p.get("lever") in FUNNEL_JOB_LEVERS and st["wait_jobs"]:
+                # a funnel job: WAIT_JOB records each job's final state (sacct)
+                # once the jobs leave squeue (_funnel_wait_ended)
+                st["wait_funnel"] = {"lever": p.get("lever"), "params": _step_params(p),
+                                     "job_ids": [str(j) for j in st["wait_jobs"]], "proposal_id": p.get("id")}
 
     def _follow_build(self, item, res, child, uncertain=False):
         """RUN on the experiment a build makes: its building record is what the
@@ -1780,9 +1849,10 @@ class _Run(object):
             pos = (st.get("ledger") or {}).get(e)
             if pos and pos.get("next_line"):
                 lf[e] = (int(pos["next_line"]), pos.get("through_sha256"))
+        self._sacct_asked = self._funnel_sacct_ids()
         res = X.campaign_snapshot(live, advance=st.get("phase") == "RUN", report="auto",
                                   ledger_from=lf, actor=AUTO, campaign=self.camp, ctx=self.xctx,
-                                  plan_pull=pull, funnel=bool(self.cfg.get("funnel")))
+                                  plan_pull=pull, funnel=bool(self.cfg.get("funnel")), sacct=self._sacct_asked)
         if res.get("status") == "refused":
             self._once("snapshot_refused", res.get("reasons"), "snapshot_refused",
                        reasons=res.get("reasons"))
@@ -1811,6 +1881,7 @@ class _Run(object):
         self.status = status
         self._mirror_ledgers(payload)
         self._note_history(status)
+        self._note_job_states(payload, status)         # before the context: its lineage reads them
         ctx = self._context(status, payload)
         self._persist_snapshot(payload, ctx)
         record = self._composite(payload)
@@ -1857,7 +1928,11 @@ class _Run(object):
         if st["phase"] == "WAIT_JOB":
             if self._jobs_queued(status, st.get("wait_jobs") or []):
                 return
-            self._ledger("job_finished", job_ids=st.get("wait_jobs"))
+            if isinstance(st.get("wait_funnel"), dict):
+                if not self._funnel_wait_ended(st["wait_funnel"]):
+                    return
+            else:
+                self._ledger("job_finished", job_ids=st.get("wait_jobs"))
             st["wait_jobs"] = []
             st["phase"] = "DIAGNOSE"
         if st["phase"] == "REPORT":
@@ -2083,8 +2158,138 @@ class _Run(object):
                    "ts": r.get("ts")}
             if r.get("lever") in LV.FUNNEL_LEVERS:
                 rec["params"] = _step_params(r)
+                job = self._job_failure(r)
+                if job is not None and ls in ("executed", "uncertain", "in_flight"):
+                    # its job ended in a failure state: the step did not apply, and
+                    # levers.py may propose it again (funnel_job_retries)
+                    rec["status"], rec["job"] = "failed", job
             out.append(rec)
         return out
+
+    # ---- the final state of the funnel's jobs (sacct)
+    def _funnel_sacct_ids(self):
+        """Job ids of this campaign's funnel jobs (L10, L11, L13 executions that
+        ran or may have run) whose final state the state does not record yet:
+        the snapshot asks sacct about them (at most SACCT_MAX, the latest). A
+        job run before its campaign recorded final states is asked too, so a
+        failure that ended an earlier WAIT_JOB unread is found."""
+        known = self.st.get("funnel_jobs") or {}
+        ids = []
+        for r in X.executions(self.xctx):
+            if r.get("campaign") != self.name or r.get("lever") not in FUNNEL_JOB_LEVERS:
+                continue
+            if r.get("status") not in ("executed", "started") and not r.get("charged"):
+                continue
+            for j in r.get("job_ids") or []:
+                j = str(j)
+                if JOB_ID_RE.match(j) and j not in known and j not in ids:
+                    ids.append(j)
+        return ids[-SACCT_MAX:]
+
+    def _funnel_execs(self):
+        """{job id: the execution record that submitted it} of this campaign."""
+        out = {}
+        for r in X.executions(self.xctx):
+            if r.get("campaign") == self.name:
+                for j in r.get("job_ids") or []:
+                    out[str(j)] = r
+        return out
+
+    def _note_job_states(self, payload, status):
+        """Record the final state of every asked funnel job that left squeue, as
+        the snapshot's sacct reports it (state funnel_jobs, ledger 'job_state').
+        A job that is still queued, or that sacct does not show ended, is asked
+        again next tick; after SACCT_TRIES such snapshots it is recorded
+        UNKNOWN (and counts as it did before this record existed: a person
+        decides). Nothing is read while squeue cannot be read."""
+        st = self.st
+        asked = list(self._sacct_asked or [])
+        if not asked:
+            return
+        sq = status.get("squeue") if isinstance(status.get("squeue"), dict) else {}
+        if not sq.get("ok"):
+            return
+        queued = {str(j.get("id", "")).split("_")[0] for j in sq.get("jobs") or [] if isinstance(j, dict)}
+        sac = payload.get("sacct") if isinstance(payload.get("sacct"), dict) else {}
+        rows = sac.get("jobs") if sac.get("ok") and isinstance(sac.get("jobs"), dict) else {}
+        jobs = st.setdefault("funnel_jobs", {})
+        misses = st.setdefault("sacct_misses", {})
+        execs = self._funnel_execs()
+        for jid in asked:
+            if jid in jobs or jid.split("_")[0] in queued:
+                continue
+            state = job_state(rows, jid)
+            if state is None:
+                misses[jid] = int(misses.get(jid) or 0) + 1
+                if misses[jid] < SACCT_TRIES:
+                    continue
+                state = JOB_UNKNOWN
+            misses.pop(jid, None)
+            rec = execs.get(jid) or {}
+            log = funnel_job_log(rec, jid)
+            jobs[jid] = {"state": state, "utc": self.utc, "lever": rec.get("lever"), "params": _step_params(rec),
+                         "proposal_id": rec.get("proposal_id"), "log": log}
+            self._ledger("job_state", job_ids=[jid], state=state, lever=rec.get("lever"),
+                         params=_step_params(rec), proposal_id=rec.get("proposal_id"), log=log,
+                         reasons=["sacct: job %s ended %s" % (jid, state) if state != JOB_UNKNOWN else
+                                  "sacct showed no final state for job %s in %d snapshots after it left squeue"
+                                  % (jid, SACCT_TRIES)])
+
+    def _job_failure(self, rec):
+        """{"ids", "states", "log"} when a job of execution record `rec` ended in
+        a failure state (state funnel_jobs), else None."""
+        jobs = self.st.get("funnel_jobs") or {}
+        ids = [str(j) for j in rec.get("job_ids") or []]
+        states = {j: (jobs.get(j) or {}).get("state") for j in ids if j in jobs}
+        failed = [j for j in ids if states.get(j) in JOB_FAILED_STATES]
+        if not failed:
+            return None
+        return {"ids": ids, "states": states, "log": (jobs.get(failed[-1]) or {}).get("log")}
+
+    def _funnel_wait_ended(self, wf):
+        """WAIT_JOB of a funnel job (L10, L11, L13), its jobs gone from squeue:
+        True once every job's final state is recorded (_note_job_states), with
+        the job_finished entry carrying them; False while sacct has not settled
+        one (at most SACCT_TRIES snapshots, then UNKNOWN)."""
+        st = self.st
+        jobs = st.get("funnel_jobs") or {}
+        ids = [str(j) for j in wf.get("job_ids") or []]
+        states = {j: (jobs.get(j) or {}).get("state") for j in ids}
+        if any(s is None for s in states.values()):
+            return False
+        failed = [j for j in ids if states[j] in JOB_FAILED_STATES]
+        step = " ".join("%s=%s" % kv for kv in sorted((wf.get("params") or {}).items()))
+        log = (jobs.get(failed[-1] if failed else ids[-1]) or {}).get("log") if ids else None
+        if failed:
+            n = self._failed_runs({"lever": wf.get("lever"), "params": wf.get("params")})
+            retries = int(LV.protocol("funnel_job_retries"))
+            why = ("%s %s: job(s) %s ended %s (failed run %d; the step is proposed again at most %d times after a "
+                   "failed job, then a person decides); the log is %s"
+                   % (wf.get("lever"), step, ",".join(failed), ",".join(states[j] for j in failed), n, retries, log))
+        else:
+            why = "%s %s: job(s) %s ended %s" % (wf.get("lever"), step, ",".join(ids),
+                                               ",".join(states[j] for j in ids))
+        self._ledger("job_finished", job_ids=st.get("wait_jobs"), job_states=states, lever=wf.get("lever"),
+                     params=wf.get("params"), proposal_id=wf.get("proposal_id"), failed=bool(failed), log=log,
+                     reasons=[why])
+        st.pop("wait_funnel", None)
+        return True
+
+    def _failed_runs(self, p):
+        """How many runs of funnel step p (its lever and key params) ended with
+        a failed job in this campaign (the lineage)."""
+        want = _step_params(p)
+        return sum(1 for r in self.lineage() if r.get("lever") == p.get("lever") and r.get("status") == "failed"
+                   and isinstance(r.get("job"), dict) and (r.get("params") or {}) == want)
+
+    def _step_count(self, p):
+        """Submissions of funnel step p (its lever and key params) in this
+        campaign that ran or may have run: the funnel's stop-loss counts per
+        step, since one lever (L10) runs nine verbs."""
+        want = _step_params(p)
+        return sum(1 for r in X.executions(self.xctx)
+                   if r.get("campaign") == self.name and r.get("lever") == p.get("lever")
+                   and _step_params(r) == want and (r.get("status") == "executed" or r.get("charged")))
 
     def _context(self, status, payload):
         """The ticker's context for evidence.py (campaign/context.json). No exam value."""
@@ -2590,11 +2795,21 @@ class _Run(object):
                            reasons=["declined or refused earlier in this campaign"])
                 self._declined_now.append(p)
                 continue
-            n = X._lever_count(self.xctx, self.name, p.get("lever"))
-            if n >= X.MAX_LEVER_SUBMISSIONS:
-                return [], ("stop-loss: lever %s already ran %d times in this campaign; a %s would "
-                            "be more than %d" % (p.get("lever"), n, "further submission",
-                                                 X.MAX_LEVER_SUBMISSIONS))
+            if p.get("lever") in LV.FUNNEL_LEVERS:
+                # one funnel lever runs many steps (L10: nine verbs): the
+                # stop-loss counts the submissions of this step
+                n = self._step_count(p)
+                if n >= X.MAX_LEVER_SUBMISSIONS:
+                    return [], ("stop-loss: %s %s already ran %d times in this campaign; a further submission "
+                                "would be more than %d" % (p.get("lever"), " ".join(
+                                    "%s=%s" % kv for kv in sorted(_step_params(p).items())), n,
+                                    X.MAX_LEVER_SUBMISSIONS))
+            else:
+                n = X._lever_count(self.xctx, self.name, p.get("lever"))
+                if n >= X.MAX_LEVER_SUBMISSIONS:
+                    return [], ("stop-loss: lever %s already ran %d times in this campaign; a %s would "
+                                "be more than %d" % (p.get("lever"), n, "further submission",
+                                                     X.MAX_LEVER_SUBMISSIONS))
             if p.get("waits_for"):
                 w = p["waits_for"]
                 self._once("waits:%s:%s" % (p.get("lever"), " ".join(p.get("argv") or [])), w, "not_taken",
@@ -2619,6 +2834,10 @@ class _Run(object):
         st = self.st
         key = self._key(p)
         attempt = int((st.get("attempts") or {}).get(key) or 0)
+        if p.get("lever") in LV.FUNNEL_LEVERS:
+            # a funnel step proposed again after its job failed is a new request
+            # (the executor runs a proposal id once): each failed run moves the id on
+            attempt += self._failed_runs(p)
         p = copy.deepcopy(p)
         p["id"] = _sha([self.name, p.get("lever"), p.get("policy_action"), p.get("argv"),
                         p.get("params"), p.get("parent_exp"), attempt])[:32]

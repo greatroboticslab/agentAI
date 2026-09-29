@@ -26,7 +26,9 @@ What is asserted:
   * health: a stop-loss pause in the config or only in the ticker's state is
     crit, and a page resume ends it for the ticker too; a stale tick is crit;
     an approval card is warn; a recorded crit diagnosis on the current
-    experiment is crit; a tree the ticker does not write is crit;
+    experiment is crit; a tree the ticker does not write is crit; a
+    stream-mode campaign is read from the lane ticker's own state (its lanes
+    as the phase, its own last tick; a held lane warns);
   * POST /api/inc/campaign goes through campaign.configure / pause /
     set_goal: goals the ticker reads (check_goal), the scheduler's lock,
     the campaign ledger, administrators only;
@@ -90,6 +92,7 @@ from weed_optimizer_framework.tools.inc_autopilot import evidence as E    # noqa
 from weed_optimizer_framework.tools.inc_autopilot import executor as EX   # noqa: E402
 from weed_optimizer_framework.tools.inc_autopilot import model as M  # noqa: E402
 from weed_optimizer_framework.tools.inc_autopilot import remote as RM     # noqa: E402
+from weed_optimizer_framework.tools.inc_autopilot import stream as S      # noqa: E402
 
 assert pathlib.Path(M.LAB_REPO).resolve() == LAB.resolve(), M.LAB_REPO
 FIX = ROOT / "tests" / "fixtures" / "inc_replay"
@@ -104,6 +107,7 @@ RESOURCES = {"mongo_ok": True, "cluster_reachable": True}
 FIXTURE_LEDGER = [json.loads(x) for x in (FIX / "pilot_v1" / "ledger.jsonl").read_text().splitlines()
                   if x.strip()]
 N_LEDGER = len(FIXTURE_LEDGER)
+TICKER_STALE = IDB.STALE_AFTER_S
 
 
 class QuietLog(object):
@@ -688,6 +692,75 @@ class TestHealthMisc(unittest.TestCase):
         self.assertEqual(r.json()["level"], "crit")
         self.assertNotIn("@", json.dumps(r.json()))
         self.assertIn("<person>", r.json()["reason"])
+
+
+class TestHealthStream(unittest.TestCase):
+    """A stream-mode campaign's health row reads the lane ticker's own state
+    (stream.StreamRun). The false alarm of 2026-09-28: /api/health/inc said
+    "the ticker has never ticked this enabled campaign" for a stream campaign
+    whose ticks were in inc_campaign.jsonl, because the row read the
+    experiment-mode state format only."""
+
+    def setUp(self):
+        self.w = World()
+        S.configure_stream("s1", OWNER, domain="weed", enable=True)
+        self.c = _client()
+
+    @staticmethod
+    def _row(v, name):
+        return [r for r in v["campaigns"] if r["campaign"] == name][0]
+
+    def _tick_stream(self):
+        # the cluster is unreachable: the lane ticker still ticks (and stamps it)
+        return C.tick(slurm_sh=lambda script, timeout=60: {"ok": False, "stdout": "", "returncode": 255,
+                                                            "stderr": "ssh: connect to host bridges2: timed out"},
+                      log=QuietLog(), resources=RESOURCES, names=["s1"])
+
+    def test_a_ticked_stream_campaign_is_read_from_its_own_state(self):
+        self._tick_stream()
+        sp = S.StreamPaths(None, "weed")
+        st = S.load_state(sp, "s1")
+        self.assertTrue(st and st.get("last_tick_utc"), "the lane ticker wrote its state")
+        self.assertTrue([e for e in (json.loads(x) for x in PATHS.ledger.read_text().splitlines() if x.strip())
+                         if e.get("campaign") == "s1"], "its events are in inc_campaign.jsonl")
+        self.assertIsNone(IDB._state("s1"), "the experiment-mode read cannot see a stream state (the incident)")
+        v = IDB.verdict(now=time.time() + 3 * 3600)
+        row = self._row(v, "s1")
+        self.assertNotIn("never ticked", json.dumps(row), row)
+        self.assertEqual(row["mode"], "stream")
+        self.assertIn("last ticked", " ".join(row["crit"]), "3 h later, its own last tick is stale")
+        v = IDB.verdict()
+        row = self._row(v, "s1")
+        self.assertNotIn("never ticked", json.dumps(v), v["reason"])
+        self.assertLess(row["last_tick_age_s"], TICKER_STALE, row)
+        self.assertEqual(row["phase"], ", ".join("%s %s" % (ln, st["lanes"][ln]["phase"]) for ln in S.ALL_LANES),
+                         "the phase is the lanes' summary")
+        self.assertEqual(row["crit"], [], row)
+        c1 = self._row(v, NAME)
+        self.assertNotIn("mode", c1, "an experiment-mode row is read as before")
+
+    def test_a_held_lane_warns_and_a_stream_pause_is_crit(self):
+        self._tick_stream()
+        sp = S.StreamPaths(None, "weed")
+        st = S.load_state(sp, "s1")
+        st["lanes"]["MAINT"].update(hold="stop-loss: 2 consecutive failed steps (last: job(s) 1 ended FAILED)",
+                                    hold_utc=st["last_tick_utc"])
+        sp.state("s1").write_text(json.dumps(st))
+        IDB._FILE_CACHE.clear()
+        row = self._row(IDB.verdict(), "s1")
+        self.assertIn("MAINT IDLE (held)", row["phase"])
+        self.assertTrue(any("lane MAINT held" in x for x in row["warn"]), row)
+        st["paused"] = {"reason": "stop-loss: 2 lanes are held", "utc": C._utc(time.time() + 60)}
+        sp.state("s1").write_text(json.dumps(st))
+        IDB._FILE_CACHE.clear()
+        v = IDB.verdict()
+        self.assertEqual(v["level"], "crit")
+        self.assertIn("s1: paused: stop-loss: 2 lanes are held", v["reason"])
+
+    def test_an_enabled_stream_campaign_not_ticked_yet(self):
+        v = IDB.verdict()
+        self.assertIn("not ticked yet", " ".join(self._row(v, "s1")["warn"]))
+        self.assertIn("never ticked", " ".join(self._row(IDB.verdict(now=time.time() + 3 * 3600), "s1")["crit"]))
 
 
 class TestNoSshFromReads(Base):

@@ -31,7 +31,15 @@ globals, so a re-exported call would still resolve v1 paths. Here:
   nevertrain_v2(path=None)     the v2 never-train guard
 
 EXAMS_DIR stays the v1 exam directory for the same reason as the evaluation
-manifests. Standard library only at module level.
+manifests.
+
+Decision L-8 (§2.6): a train_core row within 6 bits of an evaluation image
+under one of the 8 flips and rotations is dropped from base_v2 and from
+train_core.jsonl, through the list TRAIN_CORE_VARIANT_DROPS (sha256 in LOCK
+v2). dev, test and imageweeds stay byte copies of v1 (BYTE_COPIES); v2's
+train_core is v1's with the listed rows removed (filter_manifest_bytes:
+every other line byte-identical, in order), a byte copy when nothing is
+listed. Standard library only at module level.
 """
 from __future__ import annotations
 
@@ -52,6 +60,10 @@ BASE_COPIES_INDEX = SPLITS_DIR / "base_copies_dhash.json"
 BASE_MANIFEST = "base_v2"
 BASE_PROVENANCE = SPLITS_DIR / "base_v2_provenance.jsonl"
 L5_EXCLUDED = SPLITS_DIR / "l5_excluded.jsonl"
+# L-8: the train_core rows a flip or rotation puts within 6 bits of an evaluation image
+VARIANT_DROPS_NAME = "train_core_variant_drops.jsonl"
+TRAIN_CORE_VARIANT_DROPS = SPLITS_DIR / VARIANT_DROPS_NAME
+VARIANT_DROPS_LOCK_KEY = "train_core_variant_drops_sha256"
 EXAMS_DIR = _v1.EXAMS_DIR                    # the v1 exams: the v1 scorer reads them
 
 EVAL_SPLITS = ("dev", "test", "imageweeds")
@@ -61,7 +73,9 @@ SEALED_EXAM = "test"
 V2_TRAIN_MANIFESTS = TRAIN_SPLITS + (BASE_MANIFEST,)
 V2_MANIFESTS = TRAIN_SPLITS + (BASE_MANIFEST,) + EVAL_SPLITS
 # Manifests v2 holds as byte copies of v1 (§4.1): their sha256 equals v1's LOCK.
-BYTE_COPIES = ("dev", "test", "imageweeds", "train_core")
+BYTE_COPIES = ("dev", "test", "imageweeds")
+# Manifests v2 holds as v1's bytes minus the rows L-8 drops (filter_manifest_bytes).
+FILTERED_COPIES = ("train_core",)
 
 V1_SPLITS_VERSION = _v1.SPLITS_VERSION
 V1_SPLITS_DIR = _v1.SPLITS_DIR
@@ -150,6 +164,61 @@ def verify_manifest_against_lock_v2(split, lock=None):
     if got != want:
         raise Inc2Error("v2 manifest %s changed since it was locked (%s != %s)" % (split, got[:12], want[:12]))
     return got
+
+
+# ------------------------------------------------------ L-8 variant drops
+def filter_manifest_bytes(data, drop_shas):
+    """(bytes, dropped rows) of a JSON-lines manifest's bytes without the rows
+    whose image sha256 is in drop_shas. Every other line is kept byte for
+    byte, in order, so v2's train_core is v1's minus the L-8 rows and a
+    reader can re-derive it from the v1 bytes and the list."""
+    drop = {str(s) for s in drop_shas}
+    kept, dropped = [], []
+    for line in bytes(data).splitlines(keepends=True):
+        text = line.strip()
+        if text:
+            row = json.loads(text)
+            if str(row.get("sha256")) in drop:
+                dropped.append(row)
+                continue
+        kept.append(line)
+    return b"".join(kept), dropped
+
+
+def read_variant_drops(lock=None, lock_path=None, production=True):
+    """(rows, record) of the L-8 list beside LOCK v2
+    (train_core_variant_drops.jsonl), the file hashing to the sha256 LOCK v2
+    records. A production LOCK that records no list is refused (every LOCK
+    the v2 build writes records one, empty or not); a testing LOCK without
+    one gives no rows, recorded. A missing, changed or unreadable file
+    refuses (fail closed)."""
+    lock_path = Path(lock_path or LOCK_PATH)
+    lock = lock if lock is not None else read_lock_v2(lock_path)
+    path = lock_path.parent / VARIANT_DROPS_NAME
+    want = lock.get(VARIANT_DROPS_LOCK_KEY)
+    if want is None:
+        if production:
+            raise Inc2Error("LOCK v2 %s records no %s: the L-8 drops cannot be checked" % (lock_path,
+                                                                                          VARIANT_DROPS_LOCK_KEY))
+        return [], {"path": str(path), "sha256": None, "images": 0, "note": "LOCK v2 records none (testing)"}
+    try:
+        got = sha256_file(path)
+    except OSError:
+        got = None
+    if got != want:
+        raise Inc2Error("%s hashes to %s, LOCK v2 records %s" % (path, (got or "none")[:12], str(want)[:12]))
+    rows = []
+    try:
+        with open(path) as fh:
+            for ln in fh:
+                if ln.strip():
+                    r = json.loads(ln)
+                    if not isinstance(r, dict) or not r.get("sha256") or not r.get("key"):
+                        raise ValueError("a row without key or sha256")
+                    rows.append(r)
+    except (OSError, ValueError) as e:
+        raise Inc2Error("cannot read %s: %s" % (path, e))
+    return rows, {"path": str(path), "sha256": got, "images": len(rows), "keys": sorted(r["key"] for r in rows)}
 
 
 class NeverTrainGuard(_v1.NeverTrainGuard):

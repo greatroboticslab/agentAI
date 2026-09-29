@@ -41,6 +41,14 @@ What is pinned:
 - canary-verdict: within one b0_v1 sd passes, outside fails; a test-mode
   run or score, another base manifest or recipe than the reference's, and a
   missing reference exp.json do not pass;
+- L-8: the world's v1 train_core holds one row v2 drops; the canary trains
+  v2's train_core (v1's minus that row), its exp.json and build summary
+  record the dropped row and the list's sha256, and a manifest that is not
+  v1's minus the list is refused; its verdict accepts the reduced manifest
+  by the reference's sha256 plus the list's sha256 (canary.json names the
+  dropped row), and refuses a reduced manifest with no recorded drops,
+  drops from another reference, another list than LOCK v2's, or a list
+  changed since the build;
 - capacity-verdict: an arm beating n640 by more than 2 pooled sd is chosen,
   none beating it keeps n640; truth_every follows the measured rate; the
   decision is identical when every test score is perturbed (test-blind) and
@@ -169,9 +177,27 @@ def test_builds(Wd):
           % (s["cost_estimate"]["flops_factor"], s["cost_estimate"]["pixel_factor"], m["cost_estimate"]["flops_factor"]),
           abs(s["cost_estimate"]["flops_factor"] - 3.3427) < 1e-3 and s["cost_estimate"]["pixel_factor"] == 1.0
           and abs(m["cost_estimate"]["flops_factor"] - 10.5733) < 1e-3 and m["cost_estimate"]["pixel_factor"] == 1.0)
-    can, _ = B.build_definition("canary_v2", manifest=V2() / "train_core.jsonl", role="canary", testing=True)
+    can, can_summ = B.build_definition("canary_v2", manifest=V2() / "train_core.jsonl", role="canary", testing=True)
     check("canary: seed 0 on the v2 train_core copy, final exam dev only",
           can["seeds"] == [0] and can["final_exams"] == ["dev"] and can["base"]["source_locked"] == "train_core")
+    vd, drop = can.get("variant_drops") or {}, Wd["variant_drops"][0]
+    check("L-8: the canary trains v1's train_core (b0_v1's base) minus the recorded drop: %d of %d images"
+          % (can["base"]["n_images"], len(Wd["train_core_v1"])),
+          can["base"]["n_images"] == len(Wd["train_core_v1"]) - 1 == len(Wd["train_core"])
+          and vd.get("reference_manifest_sha256") == W.sha(C.manifest_path("train_core"))
+          and vd.get("manifest_sha256") == can["base"]["manifest_sha256"] != vd.get("reference_manifest_sha256"), vd)
+    check("... its exp.json records which rows were dropped (key, image sha256, match) and the list by the sha256 "
+          "LOCK v2 records; build_summary.json too",
+          vd.get("count") == 1 and [r["key"] for r in vd["rows"]] == [drop["key"]]
+          and vd["rows"][0]["sha256"] == drop["sha256"] and vd["rows"][0]["match"]["variant"] == "transverse"
+          and vd["sha256"] == W.sha(V2() / "train_core_variant_drops.jsonl")
+          == json.loads((V2() / "LOCK.json").read_text())["train_core_variant_drops_sha256"]
+          and vd["decided_by"].startswith("L-8") and can_summ.get("variant_drops") == vd, vd)
+    check("... only the canary records them", "variant_drops" not in defn and "variant_drops" not in s)
+    bad_tc = W.write_manifest("scratch", "train_core_bad", Wd["train_core"][1:])
+    e = refused(B.variant_drops_record, W.sha(bad_tc), production=False)
+    check("the canary's L-8 record refuses a manifest that is not v1's train_core minus the listed rows",
+          e is not None and "would not reproduce b0_v1" in str(e), e)
     mixed = W.write_manifest("scratch", "mixed", Wd["train_core"] + Wd["inc"])
     mx, _ = B.build_definition("b_mixed", manifest=mixed, testing=True)
     check("research_only (8) from base_v2's provenance: b_v2 true (its tsw22 rows), the canary false (every "
@@ -430,7 +456,7 @@ def decision_reads_test(doc):
     return bool(found)
 
 
-def test_verdicts():
+def test_verdicts(Wd):
     print("canary-verdict, capacity-verdict, estimate")
     rep = C.INC_DIR / "b0_ref" / "report.json"
     rep.parent.mkdir(parents=True, exist_ok=True)
@@ -466,6 +492,66 @@ def test_verdicts():
     oth = B.canary_verdict("can_other", "b0_ref")
     check("a canary trained on another manifest than the reference's seed 0 does not pass",
           oth["within_one_sd"] and oth["same_run_as_reference"]["manifest_sha256"] is False and not oth["passed"], oth)
+
+    print("canary-verdict with the L-8 drops (b0_v1's base minus the recorded rows)")
+    ref2 = C.INC_DIR / "b0_ref2"
+    ref2.mkdir(parents=True, exist_ok=True)
+    (ref2 / "report.json").write_text(rep.read_text())
+    v1_tc = C.manifest_path("train_core")
+    ref_base = {"manifest": str(ref2 / "manifests" / "x.jsonl"), "source_manifest": str(v1_tc),
+                "manifest_sha256": W.sha(v1_tc), "recipe": RC.cold("n640")}
+    (ref2 / "exp.json").write_text(json.dumps({"exp": "b0_ref2", "type": "baseline", "seeds": [0, 1, 2],
+                                               "base": ref_base}))
+    rec = B.variant_drops_record(W.sha(V2() / "train_core.jsonl"), production=False)
+    v2_tc = W.sha(V2() / "train_core.jsonl")
+    for exp, drops in (("can_l8", rec), ("can_l8_none", None),
+                       ("can_l8_other_ref", dict(rec, reference_manifest_sha256="d" * 64)),
+                       ("can_l8_other_list", dict(rec, sha256="e" * 64))):
+        fake_baseline(exp, "n640", [0.8101], [0.85], manifest_sha=v2_tc)
+        d = json.loads((C.INC_DIR / exp / "exp.json").read_text())
+        if drops is not None:
+            d["variant_drops"] = drops
+        (C.INC_DIR / exp / "exp.json").write_text(json.dumps(d))
+    l8 = B.canary_verdict("can_l8", "b0_ref2")
+    mm = l8.get("manifest_match") or {}
+    check("a canary on b0_v1's base minus the recorded L-8 drops passes: accepted by the reference's sha256 and the "
+          "list's sha256, canary.json names the dropped row",
+          l8["passed"] and l8["same_run_as_reference"]["manifest_sha256"] is True
+          and mm.get("how") == "reference minus the recorded L-8 drops"
+          and [r["key"] for r in mm.get("dropped", [])] == [Wd["variant_drops"][0]["key"]]
+          and mm.get("variant_drops_sha256") == W.sha(V2() / "train_core_variant_drops.jsonl")
+          and json.loads((C.INC_DIR / "can_l8" / "canary.json").read_text())["manifest_match"] == mm, mm)
+    for exp, why in (("can_l8_none", "records no drops"), ("can_l8_other_ref", "records drops from another reference"),
+                     ("can_l8_other_list", "records another L-8 list than LOCK v2's")):
+        v = B.canary_verdict(exp, "b0_ref2", write=False)
+        check("a canary on the reduced manifest that %s does not pass" % why,
+              v["within_one_sd"] and v["same_run_as_reference"]["manifest_sha256"] is False and not v["passed"],
+              v.get("manifest_match"))
+    lst = V2() / "train_core_variant_drops.jsonl"
+    saved = lst.read_bytes()
+    lst.write_bytes(saved + b"\n")
+    try:
+        v = B.canary_verdict("can_l8", "b0_ref2", write=False)
+    finally:
+        lst.write_bytes(saved)
+    check("... nor one whose L-8 list changed since it was built",
+          not v["passed"] and v["same_run_as_reference"]["manifest_sha256"] is False, v.get("manifest_match"))
+    d = json.loads((C.INC_DIR / "can_l8" / "exp.json").read_text())
+    saved_exp = json.dumps(d)
+    lst.write_bytes(saved + b"\n")
+    d["variant_drops"] = dict(d["variant_drops"], sha256=W.sha(lst))
+    (C.INC_DIR / "can_l8" / "exp.json").write_text(json.dumps(d))
+    try:
+        v = B.canary_verdict("can_l8", "b0_ref2", write=False)
+    finally:
+        lst.write_bytes(saved)
+        (C.INC_DIR / "can_l8" / "exp.json").write_text(saved_exp)
+    check("... nor one whose record names a list LOCK v2 does not record, even when the file matches the record",
+          not v["passed"] and any("LOCK v2 does not record" in p for p in (v.get("manifest_match") or {}).get(
+              "problems", [])), v.get("manifest_match"))
+    ok2 = B.canary_verdict("can_ok", "b0_ref2", write=False)
+    check("... nor a canary on another manifest against this reference",
+          not ok2["passed"] and ok2["same_run_as_reference"]["manifest_sha256"] is False)
 
     fake_baseline("cap_n", "n640", [0.810, 0.813, 0.808], [0.854, 0.851, 0.858])
     fake_baseline("cap_s", "s640", [0.840, 0.842, 0.838], [0.874, 0.870, 0.877], rate_ms=25.0)
@@ -547,7 +633,7 @@ def main():
         test_builds(Wd)
         test_e2e_baseline(Wd)
         test_e2e_chain(Wd)
-        test_verdicts()
+        test_verdicts(Wd)
         test_autopilot_argv()
     finally:
         shutil.rmtree(W.TMP, ignore_errors=True)

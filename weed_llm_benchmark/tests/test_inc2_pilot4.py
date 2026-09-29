@@ -20,6 +20,12 @@ What is pinned:
   that no longer hashes as recorded, a T_final that is not the rule's, a
   source that is not a chain, a bin holding an hflip copy of a test image
   (the v2 guard over every bin); a second build;
+- L-8: a bin holding the bytes of an L-8 train_core drop (re-keyed and
+  relabelled, as pilot_v3's Bswap copies are) is built without that row: its
+  copy is the source's bytes minus that line, the entry carries the new
+  sha256 and count beside the source's, exp.json's variant_drops and the
+  summary's sha_identical name the bin and the row, every other bin stays
+  sha-identical, and the pinned driver accepts the definition;
 - init (FakeBackend): the first submission is the three cold base runs, each
   spec one the v2 executor accepts, with INC_JOB_SCRIPT = run_inc2_job.sh;
 - verdict: READY once done with every arm complete, survivors, the best
@@ -165,6 +171,40 @@ def test_build(Wd, extra):
     check("... and none of them wrote an exp.json", not (C.INC_DIR / "pilot_v4s" / "exp.json").exists())
 
 
+def test_build_l8(Wd, extra):
+    print("build: a bin holding an L-8 train_core drop")
+    drop = Wd["variant_drops"][0]
+    rows = list(extra)
+    i = 3 * P.SEQUENCE.index("Bswap")
+    rows[i] = W.row_for("bswap_tc_xv", pathlib.Path(drop["image"]), [(3, .5, .5, .2, .2)], "cottonweeddet12/train")
+    src = make_source("src_l8", Wd, rows)
+    sdef = json.loads((src / "exp.json").read_text())
+    defn, summ = P4.build_definition("pilot_v4_l8", "src_l8", "x1a", testing=W.TESTING)
+    D.validate_definition(json.loads(json.dumps(defn)))
+    D.check_definition_data(defn)
+    by = {s_["name"]: s_ for s_ in defn["steps"]}
+    sb = {s_["name"]: s_ for s_ in sdef["steps"]}
+    bs = by["Bswap"]
+    src_lines = pathlib.Path(sb["Bswap"]["manifest"]).read_bytes().splitlines(keepends=True)
+    want = b"".join(ln for ln in src_lines if json.loads(ln)["key"] != "bswap_tc_xv")
+    check("the Bswap copy is the source's bytes minus the L-8 row (re-keyed, relabelled, same image bytes)",
+          pathlib.Path(bs["manifest"]).read_bytes() == want and bs["n_images"] == 2 and bs["source_n_images"] == 3
+          and bs["manifest_sha256"] == W.sha(bs["manifest"]) != sb["Bswap"]["manifest_sha256"]
+          and bs["source_manifest_sha256"] == sb["Bswap"]["manifest_sha256"] and bs["l8_dropped"] == ["bswap_tc_xv"],
+          {k: bs.get(k) for k in ("n_images", "source_n_images", "l8_dropped")})
+    vd = defn["variant_drops"]
+    check("... exp.json's variant_drops names the bin, the row and the list (by LOCK v2's sha256); the summary marks "
+          "only Bswap as not sha-identical",
+          list(vd["bins"]) == ["Bswap"] and vd["bins"]["Bswap"]["dropped"][0]["l8_key"] == drop["key"]
+          and vd["list"]["sha256"] == json.loads((W.v2_dir() / "LOCK.json").read_text())[T.VARIANT_DROPS_LOCK_KEY]
+          and summ["sha_identical"] == {n: n != "Bswap" for n in ["P0"] + list(P.SEQUENCE)}
+          and summ["bins"]["Bswap"]["guard"]["refused"] == 0, (vd, summ["sha_identical"]))
+    check("... every other bin and P0 are the source's, sha-identical",
+          all(by[n]["manifest_sha256"] == sb[n]["manifest_sha256"] == W.sha(by[n]["manifest"])
+              and "l8_dropped" not in by[n] for n in P.SEQUENCE if n != "Bswap")
+          and defn["base"]["manifest_sha256"] == sdef["base"]["manifest_sha256"])
+
+
 def test_init():
     print("init through the v2 job script")
     subs = []
@@ -280,6 +320,7 @@ def main():
         Wd = W.build_world()
         extra = W.make_rows("pv", 21, 700, "cottonweeddet12/train")
         test_build(Wd, extra)
+        test_build_l8(Wd, extra)
         defn = test_init()
         test_verdict(defn)
         test_recorded_pilot_v3()

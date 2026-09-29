@@ -26,6 +26,14 @@ copied). What changes:
     verdicts from pilot_v3's ledger and its final dev from pilot_v3's report,
     judged by the same rule) and the sha256 of pilot_v3's exp.json, ledger
     and report.
+Decision L-8 (docs/CONTINUOUS_LOOP.md 2.6): a bin row whose image bytes are an
+L-8 drop (splits v2's train_core_variant_drops.jsonl, by image sha256, the
+list hashing as LOCK v2 records) is removed from that bin's copy, every
+other line byte-identical; the entry then carries the new sha256 and image
+count beside the source's (source_manifest_sha256, source_n_images), and
+exp.json's variant_drops and the summary's sha_identical record which bins
+and rows. pilot_v3 trained on those rows; one image of a 238-274-image bin
+is negligible and pilot_v3 is not re-run (L-8). Nothing else is removed.
 Before anything is written, every manifest passes inc2.train's check_manifest
 and the splits v2 never-train guard (fail closed), and the definition passes
 the pinned driver's validate_definition and check_definition_data. build
@@ -53,9 +61,11 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 from ..inc import common as C
@@ -64,6 +74,7 @@ from ..inc import gate as G
 from ..inc import pilot as P
 from ..inc.scorer import TEST_ENV
 from . import baseline as B
+from . import common as C2
 from . import recipes as RC
 from . import train as T
 
@@ -203,6 +214,18 @@ def reference(source):
 
 
 # ------------------------------------------------------------------- build
+def l8_drops(production=True):
+    """({image sha256: key}, record) of the L-8 list LOCK v2 records (the
+    executor's own reader: a production LOCK must record one)."""
+    lock = _read_json(T.v2_lock_path())
+    if not isinstance(lock, dict):
+        raise Pilot4Error("%s is missing or unreadable: the L-8 drops cannot be read" % T.v2_lock_path())
+    try:
+        return T.load_variant_drops(lock, production=production)
+    except T.RunError as e:
+        raise Pilot4Error("the L-8 list: %s" % e)
+
+
 def check_source(defn):
     if defn.get("type") != "chain":
         raise Pilot4Error("the source is a %r experiment, not a chain" % defn.get("type"))
@@ -243,28 +266,69 @@ def build_definition(exp="pilot_v4", source=SOURCE_DEFAULT, recipes=ALLOWED_RECI
         raise Pilot4Error(str(e))
     lock = B.v2_lock_status(testing=bool(testing))
     production = not testing
+    drops, drops_rec = l8_drops(production)
     entries = [("base", src["base"])] + [("step", s) for s in src["steps"]]
-    checked = {}
-    for _kind, e in entries:
-        p = Path(e["manifest"])
-        if _sha(p) != e["manifest_sha256"]:
-            raise Pilot4Error("%s's manifest %s does not hash to its recorded %s" % (source, p, e["manifest_sha256"][:12]))
-        try:
-            rows, _dh, info = B.check_training_manifest(p, production=production, what="%s bin %s" % (source, e["name"]))
-        except B.BaselineError as err:
-            raise Pilot4Error(str(err))
-        checked[e["name"]] = {"images": len(rows), "guard": info["guard"], "boxes": info["train_class_counts"]}
+    checked, reduced = {}, {}
+    scratch = Path(tempfile.mkdtemp(prefix="inc2_pilot4_"))
+    try:
+        for _kind, e in entries:
+            p = Path(e["manifest"])
+            try:
+                with open(p, "rb") as fh:
+                    data = fh.read()
+            except OSError as err:
+                raise Pilot4Error("%s's manifest %s cannot be read (%s)" % (source, p, err))
+            if hashlib.sha256(data).hexdigest() != e["manifest_sha256"]:
+                raise Pilot4Error("%s's manifest %s does not hash to its recorded %s"
+                                  % (source, p, e["manifest_sha256"][:12]))
+            kept, dropped = C2.filter_manifest_bytes(data, drops)
+            check_path = p
+            if dropped:
+                check_path = scratch / p.name
+                check_path.write_bytes(kept)
+                reduced[e["name"]] = {"bytes": kept, "sha256": hashlib.sha256(kept).hexdigest(),
+                                      "n_images": e["n_images"] - len(dropped),
+                                      "source_manifest_sha256": e["manifest_sha256"],
+                                      "source_n_images": e["n_images"],
+                                      "dropped": [{"key": r["key"], "sha256": r["sha256"],
+                                                   "l8_key": drops[str(r["sha256"])]} for r in dropped]}
+            try:
+                rows, _dh, info = B.check_training_manifest(check_path, production=production,
+                                                            what="%s bin %s" % (source, e["name"]))
+            except B.BaselineError as err:
+                raise Pilot4Error(str(err))
+            if dropped and len(rows) != reduced[e["name"]]["n_images"]:
+                raise Pilot4Error("%s bin %s: %d rows after the L-8 drops, expected %d"
+                                  % (source, e["name"], len(rows), reduced[e["name"]]["n_images"]))
+            checked[e["name"]] = {"images": len(rows), "guard": info["guard"], "boxes": info["train_class_counts"],
+                                  "l8_dropped": (reduced.get(e["name"]) or {}).get("dropped", [])}
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
     copies = {}
     for _kind, e in entries:
         src_path = Path(e["manifest"])
         dst = paths.manifests / src_path.name
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(src_path, dst)
-        if C.sha256_file(dst) != e["manifest_sha256"]:
-            raise Pilot4Error("the copy of %s does not hash to %s" % (src_path, e["manifest_sha256"][:12]))
+        want = e["manifest_sha256"]
+        if e["name"] in reduced:
+            dst.write_bytes(reduced[e["name"]]["bytes"])
+            want = reduced[e["name"]]["sha256"]
+        else:
+            shutil.copyfile(src_path, dst)
+        if C.sha256_file(dst) != want:
+            raise Pilot4Error("the copy of %s does not hash to %s" % (src_path, want[:12]))
         copies[e["name"]] = str(dst)
-    base = dict(copy.deepcopy(src["base"]), manifest=copies[src["base"]["name"]], source_manifest=src["base"]["manifest"])
-    steps = [dict(copy.deepcopy(s), manifest=copies[s["name"]], source_manifest=s["manifest"]) for s in src["steps"]]
+
+    def entry(e):
+        out = dict(copy.deepcopy(e), manifest=copies[e["name"]], source_manifest=e["manifest"])
+        if e["name"] in reduced:
+            r = reduced[e["name"]]
+            out.update(manifest_sha256=r["sha256"], n_images=r["n_images"],
+                       source_manifest_sha256=r["source_manifest_sha256"], source_n_images=r["source_n_images"],
+                       l8_dropped=[d["key"] for d in r["dropped"]])
+        return out
+    base = entry(src["base"])
+    steps = [entry(s) for s in src["steps"]]
     rec = {r: RC.incremental(r, arm_rec["id"]) for r in recipes}
     warmup = P.warmup_table(rec, base["recipe"], base["n_images"],
                             [(s["name"], s["n_images"], s["clean"]) for s in steps], "full")
@@ -278,7 +342,11 @@ def build_definition(exp="pilot_v4", source=SOURCE_DEFAULT, recipes=ALLOWED_RECI
             "effective_warmup": warmup, "attribution_scope": copy.deepcopy(src.get("attribution_scope")),
             "stage_a": stage_a,
             "splits_v2": {"lock": lock["lock"], "lock_sha256": lock["lock_sha256"],
-                          "nevertrain_sha256": lock["index_sha256"]}}
+                          "nevertrain_sha256": lock["index_sha256"]},
+            "variant_drops": {"decided_by": B.L8_DECISION, "list": drops_rec,
+                              "bins": {n: {k: v for k, v in r.items() if k != "bytes"} for n, r in reduced.items()},
+                              "note": ("pilot_v3 trained on these rows; negligible, not re-run (L-8)" if reduced
+                                       else "no bin holds an L-8 drop: every bin is pilot_v3's, sha-identical")}}
     defn.update(RC.stamp(arm_rec))
     if src.get("init_weights") not in (None, arm_rec["model"]):
         raise Pilot4Error("the source's init weights %r are not %s" % (src.get("init_weights"), arm_rec["model"]))
@@ -289,7 +357,8 @@ def build_definition(exp="pilot_v4", source=SOURCE_DEFAULT, recipes=ALLOWED_RECI
         raise Pilot4Error("the pinned driver refuses the definition: %s" % e)
     summary = {"exp": exp, "testing": bool(testing), "built_utc": D._utc(), "builder": BUILDER, "source": source,
                "recipes": rec, "cold_recipe": base["recipe"], "bins": checked,
-               "sha_identical": {n: True for n in copies}, "stage_a": stage_a, "splits_v2": lock, "arm": arm_rec,
+               "sha_identical": {n: n not in reduced for n in copies}, "variant_drops": defn["variant_drops"],
+               "stage_a": stage_a, "splits_v2": lock, "arm": arm_rec,
                "warmup": warmup}
     D._write_json(paths.root / P.BUILD_SUMMARY, summary)
     return defn, summary

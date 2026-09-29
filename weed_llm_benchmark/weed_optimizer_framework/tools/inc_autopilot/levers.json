@@ -91,6 +91,10 @@
     "funnel_lab_inc_dir": {
       "value": "results/framework/inc",
       "why": "The lab's INC tree relative to model.LAB_REPO (runner, Paths: LAB_INC), where L11a and L12 write before the push."
+    },
+    "funnel_job_retries": {
+      "value": 2,
+      "why": "How many times a funnel job step (L10, L11, L13: one lineage key, lever plus verb, part or policy) is proposed again after its Slurm job ended in a failure state (campaign.JOB_FAILED_STATES, read from sacct when the job leaves squeue). A refusal the job met because an input was missing clears once the input arrives (embed-judges without the KT7 photos, 2026-09-28); the third failed run stays deferred for a person, with the last job's state and log. A step whose job completed without its output stays with a person at once, as before."
     }
   },
   "levers": {
@@ -427,11 +431,43 @@
           "then": "L12",
           "why": "census resolves every census name through the taxonomy cache and refuses a miss, naming lever L12 (runner 5.2.2); the cache is built on the lab (L12) and pushed."
         },
-        "estimate": {
-          "cluster_file": "funnel/prospective_da.json",
-          "then": "OP_DA",
-          "why": "estimate refuses without the committed devil's-advocate reply (contract 6 H11, runner 4.17): its absence is a stop, not a skip."
-        }
+        "embed-judges": {
+          "cluster_file": "funnel/kt7/crops_kt7.csv",
+          "then": "L11a",
+          "what": "kt7",
+          "why": "judges.score_all embeds and scores the independent-truth photos (J-knn2's KT7 exemplars, J1 on KT7) and refuses without kt7/crops_kt7.csv, naming fetch --what kt7 (runner G-vision notes 12 and 13); the photos are fetched on the lab (L11a --what kt7), pushed, and the table is rebuilt on arrival (fetch.check_manifest). Seen 2026-09-28: the job embedded 564,686 crops and then refused."
+        },
+        "qualify": {
+          "cluster_file": "funnel/kt7/crops_kt7.csv",
+          "then": "L11a",
+          "what": "kt7",
+          "why": "qualification reads the known truth through the adapter (adapter.known_truth): KT7 is in qualify_rl_on, holds the other_named negatives and half the rescue set (runner 5.4.3); without the fetched photos the adapter returns no KT7 item (adapters.inc_step1._kt7_items), so the step waits for them instead of qualifying without the independent set."
+        },
+        "draw": {
+          "cluster_file": "funnel/kt7/crops_kt7.csv",
+          "then": "L11a",
+          "what": "kt7",
+          "why": "the sample's planted G0 takes half its positives and all its negatives from the KT7 g0 photos, and the sentinels include the KT7 sentinel photos (runner 4.8); without them the adapter returns no KT7 item, and the draw would lock a sample that lacks them."
+        },
+        "sheets": {
+          "cluster_file": "funnel/kt7/crops_kt7.csv",
+          "then": "L11a",
+          "what": "kt7",
+          "why": "board B1 takes its attractor exemplars and board B2 all its exemplars from the KT7 photos, read from kt7/crops_kt7.csv (runner 4.10)."
+        },
+        "estimate": [
+          {
+            "cluster_file": "funnel/kt7/crops_kt7.csv",
+            "then": "L11a",
+            "what": "kt7",
+            "why": "the shift thresholds and J1's errors on the independent set are computed from KT7 (contract 6 H9, runner 5.1.6); without the photos the adapter returns no KT7 item."
+          },
+          {
+            "cluster_file": "funnel/prospective_da.json",
+            "then": "OP_DA",
+            "why": "estimate refuses without the committed devil's-advocate reply (contract 6 H11, runner 4.17): its absence is a stop, not a skip."
+          }
+        ]
       },
       "estimator": "funnel_walltime",
       "control": "Known truth disjoint from every audited stratum (contract 4.1): the planted control G0 and the sentinels, with the reference labeller qualified on independent truth only.",
@@ -495,6 +531,7 @@
         "geometry": {
           "cluster_file": "funnel/cards/index.json",
           "then": "L11a",
+          "what": "cards",
           "why": "the geometry match reads the upstream annotation archives L11a fetched and hashed on the lab (runner 5.2.4)."
         },
         "relation": {

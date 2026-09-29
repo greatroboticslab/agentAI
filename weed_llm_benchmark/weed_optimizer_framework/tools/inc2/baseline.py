@@ -52,8 +52,13 @@ Roles and their contract rows (§4.4, §3.6, L-4):
              dev, imageweeds, test
   capacity   LOCK v2's base_v2, arm s640 or m640, seeds 0..2; finals dev,
              imageweeds, test (L-4: test read once per arm at R0)
-  canary     LOCK v2's train_core (the v2 byte copy), arm n640, seed 0;
-             final exam dev only
+  canary     LOCK v2's train_core (v1's train_core minus the L-8 drops),
+             arm n640, seed 0; final exam dev only. exp.json's
+             variant_drops records the dropped rows (key, image sha256, the
+             evaluation image each matched) and the derivation: v1's
+             train_core (b0_v1's base, by sha256) filtered by the L-8 list
+             (by sha256, the one LOCK v2 records) is the canary's manifest
+             byte for byte, or the build refuses
   union      --union (B0 u tsw), seeds 0..2; finals dev, imageweeds
   milestone  a stream pool P_s, seeds 0..4 (group E's inc2.stream milestone);
              finals dev, imageweeds, test
@@ -78,7 +83,15 @@ sidecar without failing the run, so the canary is where a sidecar that does
 not work on the cluster's Ultralytics shows up first), the run and its score
 are production ones, and the canary trained what the reference's seed 0
 trained (the reference exp.json's base manifest_sha256 and cold recipe, seed
-0 among its seeds). Written to INC_DIR/<exp>/canary.json.
+0 among its seeds). Decision L-8 drops train_core rows that b0_v1 trained
+on, so the manifest is accepted either as the reference's (same sha256) or
+as the reference's minus the L-8 drops: the canary's variant_drops names the
+reference's base sha256 and the list's sha256, the list still hashes to it
+and LOCK v2 records it, and the reference's manifest (its copy, its source
+or v1's train_core, whichever hashes as the reference records) filtered by
+the listed image sha256s hashes to the canary's manifest. canary.json
+records how the manifest matched and which rows were dropped. Written to
+INC_DIR/<exp>/canary.json.
 
 capacity-verdict (L-4's rule, dev only): every arm's base runs on the seeds
 all arms share, their dev mAP50-95 (production scores, one scorer, one dev
@@ -105,6 +118,7 @@ submit. It submits nothing itself; the driver does not track that run.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -118,6 +132,7 @@ from ..inc import driver as D
 from ..inc import pilot as P
 from ..inc.scorer import TEST_ENV
 from ..inc.splits import sanitise
+from . import common as C2
 from . import recipes as RC
 from . import train as T
 
@@ -317,6 +332,94 @@ def research_only_record(rows):
                     "research-only (8, P6)"}
 
 
+L8_DECISION = "L-8, docs/CONTINUOUS_LOOP.md 2.6 (human-delegated, 2026-09-29)"
+L8_RULE = ("the canary trains b0_v1's base (v1's train_core, by sha256) minus the rows whose image sha256 the L-8 "
+           "list names (by the list's sha256, the one LOCK v2 records); every other line byte-identical")
+
+
+def variant_drops_record(manifest_sha, production=True):
+    """The canary's record of decision L-8 (module docstring): the listed
+    rows and the derivation of its manifest from v1's train_core. Refuses
+    (BaselineError) unless v1's train_core (by the v1 LOCK's sha256) minus
+    the listed image sha256s hashes to manifest_sha; the list must hash as
+    LOCK v2 records (a production LOCK must record one)."""
+    lock_path = T.v2_lock_path()
+    lock = _read_json(lock_path)
+    if not isinstance(lock, dict):
+        raise BaselineError("%s is missing or unreadable: the L-8 drops cannot be read" % lock_path)
+    try:
+        rows, rec = C2.read_variant_drops(lock, lock_path, production=production)
+    except C2.Inc2Error as e:
+        raise BaselineError("the L-8 list: %s" % e)
+    v1_path = C.manifest_path("train_core")
+    try:
+        v1_sha = C.read_lock()["manifests"]["train_core"]
+        with open(v1_path, "rb") as fh:
+            data = fh.read()
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise BaselineError("v1's train_core (b0_v1's base) cannot be read: %s" % e)
+    if hashlib.sha256(data).hexdigest() != v1_sha:
+        raise BaselineError("%s does not hash as the v1 LOCK records" % v1_path)
+    reduced, dropped = C2.filter_manifest_bytes(data, {r["sha256"] for r in rows})
+    got = hashlib.sha256(reduced).hexdigest()
+    if got != manifest_sha or sorted(r["key"] for r in dropped) != sorted(r["key"] for r in rows):
+        raise BaselineError("the canary's manifest (%s) is not v1's train_core minus the L-8 drops (%s, %d row(s)): "
+                            "it would not reproduce b0_v1" % (str(manifest_sha)[:12], got[:12], len(rows)))
+    return {"decided_by": L8_DECISION, "rule": L8_RULE, "file": rec["path"], "sha256": rec["sha256"],
+            "lock_sha256": lock.get(C2.VARIANT_DROPS_LOCK_KEY), "count": len(rows),
+            "rows": [{k: r.get(k) for k in ("key", "image", "sha256", "source", "session", "reason", "match")}
+                     for r in sorted(rows, key=lambda r: r["key"])],
+            "reference_manifest_sha256": v1_sha, "reference_manifest": str(v1_path), "manifest_sha256": manifest_sha,
+            "note": ("b0_v1 trained on these rows; the effect is negligible and b0_v1 is not re-run (L-8)"
+                     if rows else "nothing dropped: the canary's manifest is b0_v1's")}
+
+
+def canary_manifest_match(defn, ref_defn):
+    """(ok, record): whether the canary trained the reference's base
+    manifest (same sha256), or the reference's minus the L-8 drops its
+    exp.json records (module docstring, canary-verdict)."""
+    cb, rb = defn.get("base") or {}, ref_defn.get("base") or {}
+    cs, rs = cb.get("manifest_sha256"), rb.get("manifest_sha256")
+    if cs is not None and cs == rs:
+        return True, {"how": "identical"}
+    vd = defn.get("variant_drops")
+    if not isinstance(vd, dict) or not vd.get("rows"):
+        return False, {"how": None, "why": "another manifest than the reference's, and no L-8 drops recorded"}
+    probs = []
+    if vd.get("reference_manifest_sha256") != rs:
+        probs.append("the recorded drops were taken from another manifest than the reference's")
+    if vd.get("manifest_sha256") != cs:
+        probs.append("the recorded drops do not name the canary's manifest")
+    lock = _read_json(T.v2_lock_path())
+    if not isinstance(lock, dict) or lock.get(C2.VARIANT_DROPS_LOCK_KEY) != vd.get("sha256"):
+        probs.append("LOCK v2 does not record the L-8 list the canary recorded")
+    path = T.v2_dir() / C2.VARIANT_DROPS_NAME
+    if _sha(path) != vd.get("sha256"):
+        probs.append("%s does not hash as the canary recorded" % path)
+    listed = {}
+    if not probs:
+        for r in C.read_manifest(path):
+            listed[str(r["sha256"])] = r["key"]
+        if sorted(listed.values()) != sorted(r.get("key") for r in vd["rows"]):
+            probs.append("the L-8 list's rows are not the ones the canary recorded")
+    data = None
+    for cand in (rb.get("manifest"), rb.get("source_manifest"), str(C.manifest_path("train_core"))):
+        if cand and _sha(cand) == rs:
+            with open(cand, "rb") as fh:
+                data = fh.read()
+            break
+    if data is None:
+        probs.append("no copy of the reference's base manifest hashes as the reference records")
+    elif not probs:
+        reduced, dropped = C2.filter_manifest_bytes(data, set(listed))
+        if hashlib.sha256(reduced).hexdigest() != cs or len(dropped) != len(listed):
+            probs.append("the reference's base minus the listed rows is not the canary's manifest")
+    rec = {"how": None if probs else "reference minus the recorded L-8 drops", "problems": probs,
+           "dropped": [{k: r.get(k) for k in ("key", "sha256", "match")} for r in vd["rows"]],
+           "variant_drops_sha256": vd.get("sha256"), "reference_manifest_sha256": rs, "manifest_sha256": cs}
+    return not probs, rec
+
+
 def _final_exams(final_exams, role):
     ex = list(final_exams) if final_exams else list(ROLE_FINAL_EXAMS[role])
     bad = [e for e in ex if e not in T.EXAMS]
@@ -405,6 +508,7 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
     except P.PilotError as e:
         raise BaselineError(str(e))
     exams = _final_exams(final_exams, role)
+    drops = None
     if union:
         srcs = [Path(os.path.abspath(str(p))) for p in union]
         rows, guard, parts = check_union(srcs, production=production)
@@ -422,6 +526,7 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         sha = info["train_manifest_sha256"]
         if locked_name(sha, lock) != locked:
             raise BaselineError("%s changed while it was checked (the role was decided on other bytes)" % src)
+        drops = variant_drops_record(sha, production=production) if role == "canary" else None
         name = sanitise(src.stem)
         dst = paths.manifests / ("%s.jsonl" % name)
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -436,6 +541,8 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
             "cost_estimate": cost, "research_only": research_only_record(rows),
             "splits_v2": {"lock": lock["lock"], "lock_sha256": lock["lock_sha256"],
                           "nevertrain_sha256": lock["index_sha256"]}}
+    if drops is not None:
+        defn["variant_drops"] = drops
     defn.update(RC.stamp(arm_rec))
     if extra:
         defn.update(extra)
@@ -453,6 +560,8 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
                "splits_v2": lock, "cold_recipe": RC.cold(arm_rec["id"]),
                "warmup": {"base": P.effective_warmup(RC.cold(arm_rec["id"]), len(rows))},
                "cost_estimate": cost, "research_only": defn["research_only"], "code": code}
+    if drops is not None:
+        summary["variant_drops"] = drops
     D._write_json(paths.root / BUILD_SUMMARY, summary)
     return defn, summary
 
@@ -506,11 +615,11 @@ def canary_verdict(exp="canary_v2", reference="b0_v1", write=True, allow_testing
     value, rec = scores[0]
     ref_path = C.INC_DIR / reference / "exp.json"
     ref_defn = _read_json(ref_path)
-    same = None
+    same, match = None, None
     if isinstance(ref_defn, dict) and isinstance(ref_defn.get("base"), dict):
         cb, rb = defn.get("base") or {}, ref_defn["base"]
-        same = {"manifest_sha256": cb.get("manifest_sha256") == rb.get("manifest_sha256")
-                and cb.get("manifest_sha256") is not None,
+        manifest_ok, match = canary_manifest_match(defn, ref_defn)
+        same = {"manifest_sha256": manifest_ok,
                 "cold_recipe": cb.get("recipe") == rb.get("recipe") and cb.get("recipe") is not None,
                 "seed_0": 0 in (ref_defn.get("seeds") or []) and 0 in (defn.get("seeds") or [])}
     same_run = bool(same) and all(same.values())
@@ -539,10 +648,11 @@ def canary_verdict(exp="canary_v2", reference="b0_v1", write=True, allow_testing
     doc = {"format": CANARY_FORMAT, "exp": exp, "reference": reference, "canary_dev": value,
            "reference_dev": ref, "abs_diff": abs(value - ref["mean"]), "within_one_sd": within,
            "sidecar_ok": sidecar_ok, "sidecar": sc, "passed": passed, "production": production,
-           "testing_allowed": bool(allow_testing), "same_run_as_reference": same,
+           "testing_allowed": bool(allow_testing), "same_run_as_reference": same, "manifest_match": match,
            "rule": "|canary base__s0 dev mAP50-95 - mean(reference seeds)| <= sd(reference seeds) (4.4), the "
                    "canary's scorer sidecar was written (the v2 executor's whole path, the sidecar included), a "
-                   "production run and score, and the reference's base manifest, cold recipe and seed 0",
+                   "production run and score, and the reference's base manifest (or it minus the L-8 drops the "
+                   "canary recorded, by the reference's sha256 and the list's sha256), cold recipe and seed 0",
            "inputs": {"canary_score": {k: rec[k] for k in ("run_id", "path", "sha256")},
                       "exp_json_sha256": _sha(C.INC_DIR / exp / "exp.json"),
                       "reference_exp_json": {"path": str(ref_path), "sha256": _sha(ref_path)}},

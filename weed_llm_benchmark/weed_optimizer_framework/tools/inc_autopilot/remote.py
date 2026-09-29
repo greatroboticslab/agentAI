@@ -93,11 +93,14 @@ status 0 when the record says ok, else 1.
         submission by hand, whose experiment cannot be told); an audit is
         refused when one of that experiment already exists.
     campaign-snapshot --exp X [--exp Y ...] [--advance] [--report {auto,always,never}]
-                      [--ledger-from X=N[:SHA256] ...] [--no-step1]
+                      [--ledger-from X=N[:SHA256] ...] [--no-step1] [--funnel] [--sacct JOBID ...]
         several verbs in ONE call: per experiment advance (when asked, built
         and not abandoned), report (auto: when state.json says done and
         report.json is missing or older than state.json), snapshot; then
-        Step 1 once and status last. One record, one line.
+        Step 1 once and status last. One record, one line. --sacct adds
+        sacct's record of the named jobs (job_states: state, elapsed, GPUs;
+        no log is read), under "sacct": a job that ended is gone from squeue,
+        and the campaign reads the final state of its funnel jobs there.
     funnel summary [--derive-ledger]
         the funnel audit's aggregates (docs/FUNNEL_AUDIT.md 8.2; runner
         5.5.6): funnel/{funnel_ledger, audit_v1, class_maps, prospective_da}.json,
@@ -1910,8 +1913,18 @@ def _guard(verb, fn, *a, **kw):
         return fail(rec, e, type(e).__name__, "other")
 
 
+def job_states(job_ids):
+    """sacct of the named jobs, {"ok", "jobs": {id: {"state", "elapsed_s",
+    "gpu_count", "gpu_type"}}} (stream_remote.sacct; INCAP_SACCT replaces the
+    command in tests). Only a stream data job's log is ever read there, so a
+    funnel job ships its state alone."""
+    from . import stream_remote as SR
+    rec = SR.sacct(job_ids)
+    return dict(rec, verb="sacct") if isinstance(rec, dict) else rec
+
+
 def campaign_snapshot(exps, do_advance=False, report_mode="auto", ledger_from=None, step1=True, backend=None,
-                      funnel=False):
+                      funnel=False, sacct=None):
     rec = base_record("campaign-snapshot")
     ledger_from = ledger_from or {}
     out, seen = {}, []
@@ -1947,6 +1960,10 @@ def campaign_snapshot(exps, do_advance=False, report_mode="auto", ledger_from=No
     if funnel:
         rec["funnel"] = _guard("funnel-summary", funnel_summary, derive_ledger=True)
     rec["status"] = _guard("status", status)
+    if sacct:
+        # read-only, and never sinks the snapshot: a failed sacct only leaves
+        # the job states unread this tick
+        rec["sacct"] = _guard("sacct", job_states, [str(j) for j in sacct])
     subs = [r for s in out.values() for r in s.values() if isinstance(r, dict)]
     subs += [rec[k] for k in ("step1", "funnel", "status") if k in rec]
     rec["ok"] = all(r.get("ok", False) for r in subs)
@@ -2337,9 +2354,14 @@ def dispatch(argv):
         ap.add_argument("--ledger-from", action="append", default=[])
         ap.add_argument("--no-step1", action="store_true")
         ap.add_argument("--funnel", action="store_true")
+        ap.add_argument("--sacct", action="append", default=[])
         a = ap.parse_args(rest)
+        bad = [j for j in a.sacct if not re.match(r"^[0-9]+(_[0-9]+)?$", j)]
+        if bad:
+            raise _ArgError("--sacct takes Slurm job ids, got %r" % bad)
         return campaign_snapshot(a.exp, do_advance=a.advance, report_mode=a.report,
-                                 ledger_from=_ledger_map(a.ledger_from), step1=not a.no_step1, funnel=a.funnel)
+                                 ledger_from=_ledger_map(a.ledger_from), step1=not a.no_step1, funnel=a.funnel,
+                                 sacct=a.sacct)
     if verb == "funnel":
         if not rest or rest[0] not in ("summary", "dev-scores", "ledger-summaries"):
             raise _ArgError("funnel summary [--derive-ledger] | dev-scores --exp E [--exp ...] [--truth-step S] | "

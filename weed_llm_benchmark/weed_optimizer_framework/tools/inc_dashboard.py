@@ -117,6 +117,8 @@ FILE_CACHE_MAX = 48
 ACK_MAX = 300
 # Ticker cards that wait on a person (campaign._alarm counts them as warn).
 PERSON_CARDS = ("approval", "escalation", "cluster", "config")
+# A stream campaign's cards that wait on a person as well (stream.summary's alarm).
+STREAM_PERSON_CARDS = ("drift", "stop_loss", "platform")
 
 # Page verbs -> policy actions. Every one goes through executor.submit; a
 # policy action id is accepted as its own verb.
@@ -329,6 +331,26 @@ def _state(name):
     if not isinstance(st, dict) or st.get("format") != C.STATE_FORMAT:
         return None
     return st
+
+
+def _stream_state(cfg):
+    """(state, diagnoses path) of a stream-mode campaign (config mode 'stream'):
+    the lane ticker's own state (stream.StreamRun, format
+    inc-autopilot/stream-state/1) under its domain's campaign directory, or
+    (None, path) before its first tick. _state reads only the experiment-mode
+    format, so it never sees a stream campaign's ticks."""
+    from .inc_autopilot import stream as S
+    sp = S.StreamPaths(_lab_repo_arg(), M.campaign_domain(cfg))
+    return S.load_state(sp, cfg["name"]), sp.diagnoses(cfg["name"])
+
+
+def _lanes_phase(st):
+    """A stream campaign's phase: each lane's phase, a held lane marked."""
+    from .inc_autopilot import stream as S
+    lanes = (st or {}).get("lanes") or {}
+    return ", ".join("%s %s%s" % (ln, (lanes.get(ln) or {}).get("phase") or "?",
+                                  " (held)" if (lanes.get(ln) or {}).get("hold") else "")
+                     for ln in S.ALL_LANES if ln in lanes) or None
 
 
 def _state_names():
@@ -1380,7 +1402,7 @@ def _compare_prospective(rec):
 
 
 # ------------------------------------------------------------ health
-def _recorded_crit(cfg, st):
+def _recorded_crit(cfg, st, diag_path=None):
     """Fired crit diagnoses the ticker recorded on the campaign's current
     experiment: its health diagnoses of the last observation, and its last full
     diagnosis when that was about the current experiment. A record not newer
@@ -1394,7 +1416,7 @@ def _recorded_crit(cfg, st):
         for d in (st or {}).get("health") or []:
             if isinstance(d, dict) and d.get("fired") and d.get("severity") == "crit":
                 out.append("%s %s (health, %s)" % (d.get("id"), d.get("name"), st.get("last_snapshot_utc")))
-    rec = _read_json(_paths().diagnoses(cfg["name"]))
+    rec = _read_json(diag_path or _paths().diagnoses(cfg["name"]))
     if isinstance(rec, dict) and rec.get("exp") == (st or {}).get("exp") and str(rec.get("utc") or "") > since:
         for d in rec.get("diagnoses") or []:
             if isinstance(d, dict) and d.get("fired") and d.get("severity") == "crit":
@@ -1416,7 +1438,10 @@ def verdict(now=None):
     (campaign._alarm's warn); an enabled campaign not ticked yet (for
     STALE_AFTER_S after it was enabled or configured); autonomy on
     without a replay pass on this code; this check failing itself. ok
-    otherwise, including "no campaign configured"."""
+    otherwise, including "no campaign configured". A stream-mode campaign
+    (config mode 'stream') is read from the lane ticker's own state
+    (_stream_state): its phase is its lanes', its last tick the lane ticker's,
+    and a held lane or a stream card waiting on a person is warn."""
     now = now or time.time()
     try:
         return _verdict(now)
@@ -1440,15 +1465,20 @@ def _verdict(now):
         (crit if any(c.get("enabled") for c in camps) else warn).append(tree)
     for c in camps:
         name = c["name"]
-        st = _state(name)
+        stream = c.get("mode") == "stream"
+        # a stream campaign's ticker (stream.StreamRun) keeps its own state:
+        # its lanes are its phase, and it stamps last_tick_utc every tick
+        st, diag_path = _stream_state(c) if stream else (_state(name), None)
         cur, _src = _current(c, st)
         paused = _paused(c, st)
         last = _utc_seconds((st or {}).get("last_tick_utc"))
         since = max([t for t in (_utc_seconds(c.get("resumed_utc")), _utc_seconds(c.get("updated_utc")))
                      if t] or [0]) or None
         row = {"campaign": name, "enabled": bool(c.get("enabled")), "paused_reason": _mask(paused),
-               "phase": (st or {}).get("phase"), "current_exp": cur,
+               "phase": _lanes_phase(st) if stream else (st or {}).get("phase"), "current_exp": cur,
                "last_tick_age_s": (now - last) if last else None, "crit": [], "warn": []}
+        if stream:
+            row["mode"] = "stream"
         if paused:
             row["crit"].append("paused: %s" % _short(_mask(paused), 200))
         elif c.get("enabled"):
@@ -1474,9 +1504,13 @@ def _verdict(now):
                 if st.get("phase") == "COMPLETE":
                     row["warn"].append("complete: %s; a person decides the next step"
                                        % _short(card.get("title") or "", 160))
-                elif card.get("kind") in PERSON_CARDS:
+                elif card.get("kind") in PERSON_CARDS + (STREAM_PERSON_CARDS if stream else ()):
                     row["warn"].append("%s: %s" % (card["kind"], _short(card.get("title") or "", 160)))
-                row["crit"] += _recorded_crit(c, st)
+                if stream:
+                    for ln, lane in sorted((st.get("lanes") or {}).items()):
+                        if (lane or {}).get("hold"):
+                            row["warn"].append("lane %s held: %s" % (ln, _short(lane["hold"], 200)))
+                row["crit"] += _recorded_crit(c, st, diag_path)
         if str(c.get("autonomy") or "off") == "envelope" and not replay_ok:
             row["warn"].append("autonomy is on but no replay pass is recorded on this code; R3 builds "
                                "wait for a person")

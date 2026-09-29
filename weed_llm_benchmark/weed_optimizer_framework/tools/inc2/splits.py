@@ -8,16 +8,18 @@
     python -m weed_optimizer_framework.tools.inc2.splits verify
     python -m weed_optimizer_framework.tools.inc2.splits summary
 
-Only the training side changes (§4.1). dev, test, imageweeds and train_core
-are byte copies of the v1 manifests, each equal to the v1 LOCK's sha256, so
-every v2 model is scored by the unchanged v1 scorer on the v1 exams and B0's,
-B's and realloop_v1's numbers stay comparable. The v1 files are inputs only;
-nothing under splits/v1 is written.
+Only the training side changes (§4.1). dev, test and imageweeds are byte
+copies of the v1 manifests, each equal to the v1 LOCK's sha256, so every v2
+model is scored by the unchanged v1 scorer on the v1 exams and B0's, B's and
+realloop_v1's numbers stay comparable. train_core is v1's train_core minus
+the rows decision L-8 drops (below): every other line byte-identical, in
+order, and a byte copy of v1 when nothing is dropped. The v1 files are
+inputs only; nothing under splits/v1 is written.
 
 build (one GPU-shared job; the order of §4.2):
   1. precondition: inc.splits.verify() is [] (a full re-hash of v1), the
      scorer is the one the v1 LOCK records;
-  2. the four byte copies, refused on any mismatch with the v1 LOCK;
+  2. the v1 manifests read, each refused on any mismatch with the v1 LOCK;
   3. tsw22 / tsw23 from the v1 ood22 / ood23 rows: keys tsw2x__<stem> (no
      training row carries an exam key), source 3seasonweeddet10/data202x,
      session = the stem minus the frame number, labels byte-copied from the
@@ -44,8 +46,17 @@ build (one GPU-shared job; the order of §4.2):
      licence table, the Zenodo record or an owner table (--licences);
      unresolved -> research_only true, licence "unresolved", the base's
      owner-accepted exemption, never silently. train_core gets the 8-variant
-     check too: base v2 holds every train_core row (a byte copy of v1, which
-     compared the stored dHash only), so a hit refuses the build (R4);
+     check too (v1 compared the stored dHash only). Decision L-8: a row
+     within 6 bits of an evaluation image under a flip or rotation
+     (near_eval_variant) is dropped from base v2 and from train_core.jsonl,
+     listed in train_core_variant_drops.jsonl with its match (sha256 in LOCK
+     v2) and recorded in summary.json as an incident; B0's, B's and
+     realloop_v1's training sets held it and are not re-run. More drops
+     than variant_drop_cap(|train_core|) = max(1, floor(0.5 % of
+     train_core)), or a hit on the stored dHash itself (which v1 checked, so
+     v1 and this build disagree), still refuses the build (R4). A near copy
+     of a dropped image in tsw or base B is dropped as near_train_core: the
+     de-duplication index keeps every v1 train_core image;
   6. nevertrain_dhash.json: dev + test + imageweeds (the v1 index's entries
      for those splits) at 6 bits, written incomplete (refused by every
      loader) until lock;
@@ -80,11 +91,16 @@ lock: refuses unless v1 still verifies, the build is intact (every manifest,
 image and label re-hashed), embed_scan.json covers every tsw and harvested
 row of base_v2 by key and sha256 with no copy among them, no base v2 row is
 refused by the never-train guard (from the recorded dHash and 8 variants),
+the L-8 list hashes as the build recorded, is within the cap, names only v1
+train_core rows (same bytes) that the never-train guard refuses as
+near_eval_variant on their re-computed hashes, and v2's train_core is v1's
+minus exactly those rows,
 the funnel's leak_v1.json (when complete) lists no base v2 image as a copy,
 the byte copies still equal v1 and the scorer is v1's, and the build is not
 a --testing one (unless lock --testing). Marks both indexes complete, writes
 LOCK.json (with the funnel's H6 status of base B's part: pending, or the
-leak_v1 result) and lock_log.jsonl, then makes every file under splits/v2
+leak_v1 result; the L-8 list's sha256; derived_from: the byte copies and
+train_core's derivation) and lock_log.jsonl, then makes every file under splits/v2
 read-only. A second lock or a build after lock refuses: a change is a new
 splits version (R4).
 
@@ -131,6 +147,15 @@ COPY_REASONS = ("near_eval_v2", "near_eval_variant", "near_eval_embed", FUNNEL_R
 PARTS = ("train_core", "tsw22", "tsw23", BASE_B)
 L5_SOURCES = ("rf_karthikeya-c8pvy__weed-detection-cwp10", "rf_zig-zag-lnodr__weed-detection-vanpe")
 L5_DECISION = "L-5, docs/CONTINUOUS_LOOP.md 2.6 (human-delegated, 2026-09-28)"
+# L-8: train_core rows a flip or rotation puts within 6 bits of an evaluation image are dropped,
+# up to the cap; beyond it the build refuses (an R4 incident for a person).
+L8_DECISION = "L-8, docs/CONTINUOUS_LOOP.md 2.6 (human-delegated, 2026-09-29)"
+VARIANT_DROP_REASON = "near_eval_variant"
+VARIANT_DROP_CAP_FRAC = 0.005
+VARIANT_DROP_CAP_MIN = 1
+V1_RESULTS_NOTE = ("B0's, B's and realloop_v1's training sets held these train_core images (v1 compared the stored "
+                   "dHash only). The effect is negligible (%d of %d training images) and those results are not "
+                   "re-run (L-8).")
 UNRESOLVED = "unresolved"
 LICENCE_EXEMPTION = ("An unresolved licence of a base v2 row is recorded as licence 'unresolved' with "
                      "research_only true: the owner-accepted exemption for the base (D-A named these images; "
@@ -312,6 +337,13 @@ def writer():
                 path.unlink()
         except OSError:
             pass
+
+
+def variant_drop_cap(n_train_core):
+    """The most train_core rows decision L-8 lets a build drop by itself:
+    max(1, floor(0.5 % of train_core)); 15 of the real 3,049. A single
+    image is always a stray; more than the cap is an R4 incident."""
+    return max(VARIANT_DROP_CAP_MIN, int(VARIANT_DROP_CAP_FRAC * int(n_train_core)))
 
 
 def _pin(testing, what, got, want, errors):
@@ -532,9 +564,9 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
     errors = []
     lock1, summ1, idx1, scorer, inputs = _v1_state(testing, scorer_path, errors)
 
-    # 2. the byte copies
+    # 2. the v1 manifests: the byte copies (dev, test, imageweeds), train_core (copied minus the L-8 drops), ood
     v1rows, copy_bytes = {}, {}
-    for split in C2.BYTE_COPIES + ("ood22", "ood23"):
+    for split in C2.BYTE_COPIES + C2.FILTERED_COPIES + ("ood22", "ood23"):
         p = C1.manifest_path(split)
         with open(p, "rb") as fh:
             data = fh.read()
@@ -542,7 +574,7 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
         if got != lock1["manifests"].get(split):
             raise SplitError("v1 manifest %s hashes to %s, the v1 LOCK says %s" % (split, got[:12],
                                                                                   str(lock1["manifests"].get(split))[:12]))
-        if split in C2.BYTE_COPIES:
+        if split in C2.BYTE_COPIES + C2.FILTERED_COPIES:
             copy_bytes[split] = data
         v1rows[split] = C1.read_manifest(p)
         _pin(testing, "the v1 row count of %s" % split, len(v1rows[split]), REAL_PINS["rows"][split], errors)
@@ -621,24 +653,43 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
         raise SplitError("%d train_core image(s) cannot be hashed (e.g. %s); v1 hashed them all"
                          % (len(bad_core), bad_core[:3]))
 
-    # train_core against the eight variants: base v2 holds every train_core row (a byte copy of v1, which
-    # checked the stored dHash only), so a flipped or rotated evaluation copy among them would put an
-    # evaluation image into every v2 training run (docs/CONTINUOUS_LOOP.md 8, never-train v2)
-    core_hits = collections.Counter()
-    core_examples = []
+    # train_core against the eight variants (docs/CONTINUOUS_LOOP.md 8, never-train v2): v1 checked the stored
+    # dHash only, so a flipped or rotated evaluation copy may sit in train_core. Decision L-8: such a row is
+    # dropped from base v2 and from train_core.jsonl through a recorded list, up to the cap; a hit on the stored
+    # dHash itself means v1 and this build disagree, and it refuses (R4)
+    core_drops, core_refused = [], []
     for r in core:
         reason, match = eval_guard.check(r["dhash"], r["variants"])
-        if reason:
-            core_hits[reason] += 1
-            if len(core_examples) < 20:
-                core_examples.append({"key": r["key"], "reason": reason, "match": match})
-    if core_hits:
+        if reason == VARIANT_DROP_REASON:
+            core_drops.append((r, match))
+        elif reason:
+            core_refused.append({"key": r["key"], "reason": reason, "match": match})
+    if core_refused:
         raise SplitError(
-            "R4 INCIDENT: %d train_core image(s) are within %d bits of an evaluation image under a flip or rotation "
-            "(%s; e.g. %s). v1 checked the stored dHash only; B0's, B's and realloop_v1's training sets hold them, "
-            "and base v2 cannot drop them without ceasing to hold train_core as a byte copy. The build is refused "
-            "and the owner decides. Nothing was written." % (sum(core_hits.values()), BITS, dict(core_hits),
-                                                            core_examples[:5]))
+            "R4 INCIDENT: %d train_core image(s) are refused by the never-train guard on their stored dHash (e.g. "
+            "%s). v1 compared exactly that, so v1 and this build disagree; decision L-8 covers flips and rotations "
+            "only. The build is refused and the owner decides. Nothing was written." % (len(core_refused),
+                                                                                       core_refused[:5]))
+    cap = variant_drop_cap(len(core))
+    drop_rows = [{"key": r["key"], "reason": VARIANT_DROP_REASON, "match": m} for r, m in core_drops]
+    if len(core_drops) > cap:
+        raise SplitError(
+            "R4 INCIDENT: %d train_core image(s) are within %d bits of an evaluation image under a flip or rotation, "
+            "more than the %d decision L-8 lets a build drop by itself (max(%d, %.1f %% of %d); e.g. %s). The build "
+            "is refused and the owner decides. Nothing was written."
+            % (len(core_drops), BITS, cap, VARIANT_DROP_CAP_MIN, 100 * VARIANT_DROP_CAP_FRAC, len(core),
+               drop_rows[:5]))
+    if core_drops:
+        log("INCIDENT (decision L-8): %d train_core image(s) are within %d bits of an evaluation image under a flip "
+            "or rotation (%s). They are dropped from base v2 and train_core.jsonl and listed in %s. %s"
+            % (len(core_drops), BITS, drop_rows, C2.VARIANT_DROPS_NAME,
+               V1_RESULTS_NOTE % (len(core_drops), len(core))))
+    drop_keys = {r["key"] for r, _m in core_drops}
+    drop_shas = {r["sha256"] for r, _m in core_drops}
+    core_kept = [r for r in core if r["key"] not in drop_keys]
+    if sum(1 for r in core if r["sha256"] in drop_shas) != len(core_drops):
+        raise SplitError("a dropped train_core image shares its bytes with a kept row; the L-8 list is by image "
+                         "sha256, so the drop would not be exact")
 
     # base B: the recorded bytes, L-5, the H6(b) check
     shas = dict(_pmap(_sha_task, sorted({r["image"] for r in base_rows} | {r["label"] for r in base_rows}),
@@ -673,16 +724,16 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
     if dev_sessions != {r["session"] for r in v1rows["dev"]}:
         raise SplitError("the v1 summary's dev sessions differ from the dev manifest's")
     sess = {"dev": dev_sessions, "test": {r["session"] for r in v1rows["test"]} - {""},
-            "train_core": {r["session"] for r in core} - {""}}
+            "train_core": {r["session"] for r in core_kept} - {""}}
 
     # 4-5. decisions, part by part, in base order
     drops = collections.defaultdict(collections.Counter)
     examples = collections.defaultdict(list)
     overlap = {}
     earlier = NearHashIndex()
-    for r in core:
+    for r in core:                      # every v1 train_core image, the L-8 drops too: a near copy of one is dropped
         earlier.add(r["dhash"], ("train_core", r["key"]), max_bits=BITS)
-    kept = {"train_core": core}
+    kept = {"train_core": core_kept}
 
     def drop(part, r, reason, detail=None):
         drops[part][reason] += 1
@@ -791,6 +842,16 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
         if v is not None:
             evidence[s] = {k: v.get(k) for k in ("kept", "cwd12_copies", "near_eval_by_split", "dropped")}
 
+    # train_core v2 (L-8): v1's bytes minus the dropped rows, every other line byte-identical
+    core_bytes, filtered = C2.filter_manifest_bytes(copy_bytes["train_core"], drop_shas)
+    left = sorted(json.loads(ln)["key"] for ln in core_bytes.splitlines() if ln.strip())
+    if {r["key"] for r in filtered} != drop_keys or left != sorted(r["key"] for r in core_kept):
+        raise SplitError("v1 train_core minus the L-8 rows is not the kept train_core")
+    variant_drops = [dict({k: r[k] for k in C1.MANIFEST_KEYS}, dhash=int(r["dhash"]),
+                          variants=[int(x) for x in r["variants"]], reason=VARIANT_DROP_REASON, match=m,
+                          decided_by=L8_DECISION)
+                     for r, m in sorted(core_drops, key=lambda t: t[0]["key"])]
+
     # ---- every check has passed: write
     C2.SPLITS_DIR.mkdir(parents=True, exist_ok=True)
     staged = C2.SPLITS_DIR / STAGING_NAME
@@ -809,6 +870,10 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
         shas[split] = C2.write_bytes_atomic(C2.v2_manifest_path(split), copy_bytes[split])
         if shas[split] != lock1["manifests"][split]:
             raise SplitError("the byte copy of %s does not hash as v1" % split)
+    shas["train_core"] = C2.write_bytes_atomic(C2.v2_manifest_path("train_core"), core_bytes)
+    if (shas["train_core"] == lock1["manifests"]["train_core"]) != (not core_drops):
+        raise SplitError("train_core v2 does not hash as v1 minus the L-8 rows")
+    drops_sha = C2.write_jsonl_atomic(C2.TRAIN_CORE_VARIANT_DROPS, variant_drops)
     for split in TSW:
         shas[split] = C1.write_manifest(C2.v2_manifest_path(split), [_manifest_row(r) for r in kept[split]])
     shas[C2.BASE_MANIFEST] = C1.write_manifest(C2.v2_manifest_path(C2.BASE_MANIFEST),
@@ -837,10 +902,21 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
         "built_utc": C2.utc(), "build_seconds": round(time.time() - t0, 1),
         "splits_dir": str(C2.SPLITS_DIR), "inputs": inputs, "code": _code_record(),
         "manifests": {s: {"sha256": shas[s], "rows": n} for s, n in
-                      [(s, len(v1rows[s])) for s in C2.BYTE_COPIES]
+                      [(s, len(v1rows[s])) for s in C2.BYTE_COPIES] + [("train_core", len(core_kept))]
                       + [(s, len(kept[s])) for s in TSW] + [(C2.BASE_MANIFEST, len(base_v2))]},
         "byte_copies": {s: {"sha256": shas[s], "v1_lock_sha256": lock1["manifests"][s], "identical": True}
                         for s in C2.BYTE_COPIES},
+        "train_core": {"v1_rows": len(core), "rows": len(core_kept), "sha256": shas["train_core"],
+                       "v1_lock_sha256": lock1["manifests"]["train_core"], "identical": not core_drops,
+                       "derivation": "v1 train_core.jsonl minus the rows whose image sha256 %s lists (L-8); every "
+                                     "other line byte-identical, in order" % C2.VARIANT_DROPS_NAME},
+        "train_core_variant_drops": {
+            "decided_by": L8_DECISION, "incident": bool(core_drops), "count": len(core_drops), "cap": cap,
+            "cap_rule": "max(%d, floor(%.1f %% of the %d v1 train_core rows)); more refuses the build (R4)"
+                        % (VARIANT_DROP_CAP_MIN, 100 * VARIANT_DROP_CAP_FRAC, len(core)),
+            "keys": sorted(drop_keys), "matches": drop_rows, "file": str(C2.TRAIN_CORE_VARIANT_DROPS),
+            "sha256": drops_sha, "excluded_from": ["train_core.jsonl", "base_v2.jsonl", "base_copies_dhash.json"],
+            "v1_results": V1_RESULTS_NOTE % (len(core_drops), len(core)) if core_drops else None},
         "base_v2": {"images": len(base_v2), "parts": parts_n, "boxes": boxes, "boxes_total": sum(boxes.values()),
                     "otherplant_share": round(boxes["OtherPlant"] / max(1, sum(boxes.values())), 6),
                     "disjoint": "key, path, sha256 and 6-bit dHash (with the 8 variants) across parts"},
@@ -864,8 +940,6 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
                                       "embed scan" if scan is not None else "embed scan: not yet run",
                                       "funnel leak_v1 base_B copies: %s" % funnel_rec["state"]]},
                    "v1_pool_evidence": evidence},
-        "train_core_variant_hits": {"counts": dict(core_hits), "examples": core_examples,
-                                    "note": "a hit refuses the build (R4): base v2 holds every train_core row"},
         "funnel_leak_v1": funnel_rec,
         "nevertrain": {"entries": len(entries), "per_split": dict(collections.Counter(s for _h, s, _k in entries)),
                        "bits": BITS, "complete": False, "sha256": nt_sha},
@@ -880,9 +954,10 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
         "dev_sessions": sorted(dev_sessions),
     }
     C2.write_json_atomic(summary_path(), summary)
-    log("built in %.0fs: base_v2 %d images (%s); tsw drops %s; L-5 excluded %d; never-train %d entries%s"
-        % (time.time() - t0, len(base_v2), parts_n, {s: dict(drops[s]) for s in TSW}, len(l5_rows), len(entries),
-           "; TESTING world" if testing else ""))
+    log("built in %.0fs: base_v2 %d images (%s); tsw drops %s; L-5 excluded %d; L-8 train_core drops %d; "
+        "never-train %d entries%s"
+        % (time.time() - t0, len(base_v2), parts_n, {s: dict(drops[s]) for s in TSW}, len(l5_rows), len(core_drops),
+           len(entries), "; TESTING world" if testing else ""))
     if scan is None:
         log("next: `scan` (the embedding copy scan), then `build` again (it applies the scan), then `lock`")
     return summary
@@ -1234,6 +1309,63 @@ def _never_train_problems(prov, eval_entries):
     return []
 
 
+def _variant_drops_problems(summary, lock1, eval_entries, v2_core_sha):
+    """(problems, rows, sha256) of the L-8 list (train_core_variant_drops.jsonl)
+    at lock: it hashes as the build recorded; it holds at most the cap; each
+    row is a v1 train_core row (same key, image, label and bytes) whose image
+    still hashes as recorded, whose re-computed dHash and 8 variants are the
+    recorded ones, and which the never-train guard refuses as
+    near_eval_variant; and v2's train_core is exactly v1's minus the listed
+    rows. A list that fails any of these was not written by this build's
+    rule (a tampered list), so lock refuses."""
+    path = C2.TRAIN_CORE_VARIANT_DROPS
+    rec = summary.get("train_core_variant_drops") or {}
+    try:
+        sha = C1.sha256_file(path)
+    except OSError:
+        return ["%s missing: build again" % path], [], None
+    probs = []
+    if sha != rec.get("sha256"):
+        probs.append("%s changed since the build (%s != %s)" % (path.name, sha[:12], str(rec.get("sha256"))[:12]))
+    try:
+        rows = C1.read_manifest(path)
+    except (OSError, ValueError) as e:
+        return probs + ["%s unreadable: %s" % (path.name, e)], [], sha
+    v1_path = C1.manifest_path("train_core")
+    with open(v1_path, "rb") as fh:
+        v1_bytes = fh.read()
+    if hashlib.sha256(v1_bytes).hexdigest() != lock1["manifests"]["train_core"]:
+        return probs + ["v1 train_core does not match the v1 LOCK"], rows, sha
+    v1_by_key = {r["key"]: r for r in C1.read_manifest(v1_path)}
+    cap = variant_drop_cap(len(v1_by_key))
+    if len(rows) > cap:
+        probs.append("%s lists %d rows, more than the L-8 cap %d" % (path.name, len(rows), cap))
+    if sorted(r.get("key") for r in rows) != sorted(rec.get("keys") or []) or len(rows) != rec.get("count"):
+        probs.append("%s does not list the rows summary.json records" % path.name)
+    guard = G.GuardV2(eval_entries)
+    for r in rows:
+        v1 = v1_by_key.get(r.get("key"))
+        if v1 is None or any(r.get(k) != v1[k] for k in C1.MANIFEST_KEYS):
+            probs.append("%s: %s is not a v1 train_core row with the same bytes" % (path.name, r.get("key")))
+            continue
+        if _sha_task(r["image"])[1] != r["sha256"]:
+            probs.append("%s: the image of %s no longer hashes as recorded" % (path.name, r["key"]))
+            continue
+        h, v = G.image_hashes(r["image"])
+        vl = G.variant_list(v)
+        if h is None or vl is None or r.get("dhash") != int(h) or [x for _n, x in vl] != r.get("variants"):
+            probs.append("%s: the recorded dHash or variants of %s are not its image's" % (path.name, r["key"]))
+            continue
+        reason, _m = guard.check(r["dhash"], r["variants"])
+        if reason != VARIANT_DROP_REASON or r.get("reason") != VARIANT_DROP_REASON:
+            probs.append("%s: %s is not refused as %s (the guard says %s); L-8 drops only those"
+                         % (path.name, r["key"], VARIANT_DROP_REASON, reason))
+    reduced, dropped = C2.filter_manifest_bytes(v1_bytes, {r.get("sha256") for r in rows})
+    if hashlib.sha256(reduced).hexdigest() != v2_core_sha or len(dropped) != len(rows):
+        probs.append("v2 train_core is not v1's train_core minus the rows %s lists" % path.name)
+    return probs, rows, sha
+
+
 def _index_problems(path, want_entries, what):
     try:
         data = _read_json(path, what)
@@ -1349,7 +1481,8 @@ def _lock(scorer_path, procs, testing=False):
     bp, bc = _index_problems(C2.BASE_COPIES_INDEX, [(int(p["dhash"]), p["part"], p["key"]) for p in prov],
                              "the base-copy index")
     sp, scan = _scan_problems(prov, summary)
-    probs = bprobs + ip + bp + sp
+    dp, drops, drops_sha = _variant_drops_problems(summary, lock1, eval_entries, shas.get("train_core"))
+    probs = bprobs + ip + bp + sp + dp
     if not bprobs:
         probs += _never_train_problems(prov, eval_entries)
     funnel_copies, funnel_rec = funnel_base_b_copies()
@@ -1381,11 +1514,21 @@ def _lock(scorer_path, procs, testing=False):
         "provenance": {"file": C2.BASE_PROVENANCE.name, "sha256": C1.sha256_file(C2.BASE_PROVENANCE),
                        "rows": len(prov)},
         "l5_excluded_sha256": C1.sha256_file(C2.L5_EXCLUDED),
+        C2.VARIANT_DROPS_LOCK_KEY: drops_sha,
+        "train_core_variant_drops": {"file": C2.VARIANT_DROPS_NAME, "sha256": drops_sha, "rows": len(drops),
+                                     "keys": sorted(r["key"] for r in drops), "decided_by": L8_DECISION,
+                                     "cap": variant_drop_cap(len(C1.read_manifest(C1.manifest_path("train_core")))),
+                                     "incident": bool(drops)},
         "summary_sha256": C1.sha256_file(summary_path()),
         "embed_scan_sha256": C1.sha256_file(embed_scan_path()),
         "scorer_sha256": C1.sha256_file(scorer),
         "derived_from": {"v1_lock_sha256": C1.sha256_file(C1.LOCK_PATH), "v1_lock_path": str(C1.LOCK_PATH),
-                         "identical": list(C2.BYTE_COPIES)},
+                         "identical": list(C2.BYTE_COPIES) + ([] if drops else list(C2.FILTERED_COPIES)),
+                         "train_core": {"v1_sha256": lock1["manifests"]["train_core"], "sha256": shas["train_core"],
+                                        "minus": C2.VARIANT_DROPS_NAME, "minus_sha256": drops_sha,
+                                        "dropped": len(drops),
+                                        "rule": "v1 train_core.jsonl without the rows whose image sha256 the list "
+                                                "names; every other line byte-identical, in order (L-8)"}},
         "h6": {"base_b": {"dhash_8_variant_check": "passed for the kept part",
                           "embed_scan": {"calibration_source": scan["detector"].get("calibration_source"),
                                          "cos_threshold": scan["detector"].get("cos_threshold"),
@@ -1407,8 +1550,8 @@ def _lock(scorer_path, procs, testing=False):
         fh.write(json.dumps({"utc": new["created_utc"], "lock": new, "lock_sha256": C1.sha256_file(C2.LOCK_PATH)},
                             sort_keys=True) + "\n")
     n = _make_read_only(C2.SPLITS_DIR)
-    log("locked splits v2: base_v2 %d images, %d never-train entries, %d base-copy entries; %d files read-only"
-        % (len(base), len(nt["entries"]), len(bc["entries"]), n))
+    log("locked splits v2: base_v2 %d images, %d never-train entries, %d base-copy entries, %d L-8 train_core "
+        "drop(s); %d files read-only" % (len(base), len(nt["entries"]), len(bc["entries"]), len(drops), n))
     return new
 
 
@@ -1450,12 +1593,23 @@ def verify(scorer_path=None, check_v1=True, procs=PROCS):
         probs += manifest_problems(s, files)
     for name, key in ((C2.NEVER_TRAIN_INDEX, "nevertrain_sha256"), (C2.BASE_COPIES_INDEX, "base_copies_sha256"),
                       (C2.BASE_PROVENANCE, "provenance_sha256"), (C2.L5_EXCLUDED, "l5_excluded_sha256"),
+                      (C2.TRAIN_CORE_VARIANT_DROPS, C2.VARIANT_DROPS_LOCK_KEY),
                       (summary_path(), "summary_sha256"), (embed_scan_path(), "embed_scan_sha256")):
         try:
             if C1.sha256_file(name) != lk.get(key):
                 probs.append("%s changed since it was locked" % name)
         except OSError:
             probs.append("%s missing" % name)
+    try:                                  # train_core v2 = v1's minus the L-8 rows (derived_from.train_core)
+        drops, _rec = C2.read_variant_drops(lk, C2.LOCK_PATH, production=True)
+        with open(C1.manifest_path("train_core"), "rb") as fh:
+            reduced, dropped = C2.filter_manifest_bytes(fh.read(), {r["sha256"] for r in drops})
+        der = (lk.get("derived_from") or {}).get("train_core") or {}
+        if (hashlib.sha256(reduced).hexdigest() != lk["manifests"].get("train_core") or len(dropped) != len(drops)
+                or der.get("sha256") != lk["manifests"].get("train_core")):
+            probs.append("train_core v2 is not v1's train_core minus the rows %s lists" % C2.VARIANT_DROPS_NAME)
+    except (C2.Inc2Error, OSError, ValueError, KeyError) as e:
+        probs.append("train_core's L-8 derivation cannot be checked: %s" % e)
     try:
         G.GuardV2.load(C2.LOCK_PATH)
     except C2.Inc2Error as e:
@@ -1498,6 +1652,9 @@ def print_summary():
     log("base B: kept %d of %d; L-5 excluded %d %s; H6(b) incident in the L-5 part: %s"
         % (s["base_b"]["kept"], s["base_b"]["rows"], s["base_b"]["l5"]["excluded"], s["base_b"]["l5"]["per_source"],
            s["base_b"]["h6b"]["incident_l5_part"]))
+    vd = s.get("train_core_variant_drops") or {}
+    log("train_core: %s of %s v1 rows kept; L-8 drops %s (cap %s) %s"
+        % (s["train_core"]["rows"], s["train_core"]["v1_rows"], vd.get("count"), vd.get("cap"), vd.get("matches")))
     log("licences: unresolved %s; research_only rows %d" % (s["licences"]["unresolved_sources"],
                                                            s["licences"]["research_only_rows"]))
     log("embed scan applied: %s" % s["embed_scan"]["applied"])

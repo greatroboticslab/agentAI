@@ -41,6 +41,15 @@ tests/fixtures/inc_replay/funnel/, never typed):
          keeps 0 and C1 stays challenged; a fabricated cite and a test leak are
          dropped, an echo is kept but not counted; a same-family reply moves
          no claim; a digest holding a blind marker is refused.
+  R15    the KT7 incident of 2026-09-28 (the platform's own run): embed-judges
+         embedded every crop and refused without funnel/kt7/crops_kt7.csv;
+         the platform had never proposed the KT7 fetch, and the failed job
+         was never run again. Now embed-judges (and qualify, draw, sheets,
+         estimate) waits for the KT7 table, L11a fetches what the waiting step
+         names (cards first, then kt7; known-items needs --sources and stays
+         with a person), a job that ended FAILED lets the step run again once
+         the file is on the cluster, and the third failed run stays with a
+         person with the job's state and log path.
   funnel_negative_controls  pilot_v1-v3, b0_v1 and base_b_v1 with the funnel
          ledger and no claim: D17 is silent (no conclusion); a high-yield Step
          1 with out-of-domain known truth: D19 is silent.
@@ -329,6 +338,179 @@ def test_r9():
     check("proposals, cards, operations and argv byte-identical",
           json.dumps(LV.stable(res), sort_keys=True) == json.dumps(LV.stable(LV.propose(db_, evb)), sort_keys=True))
     return root, ev, diags, res
+
+
+# ------------------------------------------------------------------------ R15
+# The cluster's funnel files when embed-judges refused (2026-09-28): census,
+# leak, the cards and the geometry match done, the DINOv2 shard written; no
+# KT7 photos, no judges.
+LIVE_0928 = ("funnel/taxonomy_cache.json", "funnel/census_v1.json", "funnel/leak_v1.json", "funnel/cards/index.json",
+             "funnel/relation_geometry_v1.json", "funnel/emb_dinov2/emb_s000_of_001.npz")
+KT7_FILES = ("funnel/kt7/kt7_items.jsonl", "funnel/kt7/crops_kt7.csv")
+KT7_TABLE = "funnel/kt7/crops_kt7.csv"
+# The campaign's lineage then (campaign._Run.lineage: the steps that ran).
+LINEAGE_0928 = [{"lever": "L12", "status": "executed", "params": {"what": "taxonomy"}},
+                {"lever": "L10", "status": "executed", "params": {"verb": "census"}},
+                {"lever": "L11a", "status": "executed", "params": {"what": "cards"}},
+                {"lever": "L10", "status": "executed", "params": {"verb": "leak"}},
+                {"lever": "L11", "status": "executed", "params": {"part": "geometry"}}]
+
+
+def _sha(p, salt=""):
+    return hashlib.sha256((salt + p).encode()).hexdigest()
+
+
+def _embed_run(n, status="failed", state="FAILED"):
+    """A lineage record of an embed-judges run, as the ticker writes it: its job's
+    final state (sacct) makes it 'failed', with the job's ids, states and log."""
+    rec = {"lever": "L10", "status": status, "params": {"verb": "embed-judges"}, "proposal_id": "p%d" % n}
+    if status == "failed":
+        jid = str(47300000 + n)
+        rec["job"] = {"ids": [jid], "states": {jid: state},
+                      "log": "%s/funnel/logs/inc_funnel_embed-judges_%s.out" % (cluster_inc(), jid)}
+    return rec
+
+
+def test_r15():
+    print("R15 the KT7 incident of 2026-09-28: embed-judges waits for the KT7 photos and L11a fetches them; a "
+          "failed job lets the step run again once they are there; the third failure stays with a person")
+    claims = jload(FF / "claims" / "claims_seed.json")
+    root = funnel_world("r15")
+    inc = cluster_inc()
+    lab_out = posixpath.join(str(M.LAB_REPO / LV.protocol("funnel_lab_inc_dir")), "funnel/")
+    menu = LV.load_menu()
+
+    def evidence(files, lineage=(), lab=None):
+        (root / "funnel" / "files.json").write_text(json.dumps(
+            {"format": "funnel-files/1", "files": {p: {"sha256": _sha(p), "bytes": 1} for p in files}}))
+        ctx = {"lineage": list(lineage)}
+        if lab:
+            ctx["funnel_lab"] = lab
+        return E.load_dir(root, "realloop_v1", exps=["realloop_v1"], context=ctx, claims=claims)
+
+    def props(res, lever):
+        return [p for p in res["proposals"] if p["lever"] == lever]
+
+    def deferred(res, lever):
+        return [x["reason"] for x in res["deferred"] if x["lever"] == lever]
+
+    # (1) the incident as it stood: embed-judges ran, its failure unrecorded
+    ev = evidence(LIVE_0928, LINEAGE_0928 + [_embed_run(1, status="executed")])
+    diags, by, res = run(ev)
+    check("L10's next step is embed-judges (its output, funnel/judges/, is not on the cluster)",
+          LV.funnel_next(ev, "L10")[1] == {"verb": "embed-judges"}, LV.funnel_next(ev, "L10"))
+    w = LV._waits(ev, "L10", "embed-judges", menu)
+    check("embed-judges waits for %s: then L11a, what kt7" % KT7_TABLE,
+          (w or {}).get("lever") == "L11a" and w.get("what") == "kt7" and w.get("cluster_file") == KT7_TABLE, w)
+    check("  the run that ran is not repeated while its failure is not recorded (a person's decision, as before)",
+          not props(res, "L10") and any("was already run in this campaign (executed)" in r
+                                        for r in deferred(res, "L10")), deferred(res, "L10"))
+    l11a = props(res, "L11a")
+    check("L11a is proposed with what=kt7, the fetch the waiting step needs (the cards are on the cluster)",
+          len(l11a) == 1 and l11a[0]["params"].get("what") == "kt7"
+          and l11a[0]["argv"] == ["python", "-m", "weed_optimizer_framework.tools.funnel", "fetch", "--prereg",
+                                  lab_out + "prereg_v1.json", "--what", "kt7", "--out", lab_out]
+          and (l11a[0].get("needed_by") or {}).get("verb") == "embed-judges" and l11a[0]["writes"] == KT7_TABLE,
+          l11a and (l11a[0]["argv"], l11a[0].get("needed_by")))
+    from weed_optimizer_framework.tools.inc_autopilot import executor as X
+    from weed_optimizer_framework.tools.brain import policy as POL
+
+    def executable(p):
+        row = POL.describe(p["policy_action"])
+        pol, _meta = X.resolve_params(p["policy_action"], row, p["params"], p["argv"], p["est_gpu_hours"])
+        ok, _why = X.argv_check(X.render(p["policy_action"], pol), p["argv"])
+        return ok and POL._check_params(pol, row["param_bounds"])[0]
+    check("  the executor renders it back to its argv, inside inc_funnel_fetch's policy bounds",
+          l11a and executable(l11a[0]))
+    check("  its lineage key carries what (kt7 is a new step: the cards fetch that ran does not stand for it)",
+          l11a and LV.stable(l11a[0])["params"] == {"what": "kt7", "est_gpu_hours": 0.0}, l11a and l11a[0]["params"])
+
+    # (2) the job's final state recorded: FAILED
+    ev = evidence(LIVE_0928, LINEAGE_0928 + [_embed_run(1)])
+    diags, by, res = run(ev)
+    l10 = props(res, "L10")
+    want = ["sbatch", "run_inc_funnel.sh", "embed-judges", "--prereg", inc + "/funnel/prereg_v1.json", "--out",
+            inc + "/funnel/"]
+    check("its job ended FAILED: embed-judges is proposed again, with its exact command",
+          len(l10) == 1 and l10[0]["argv"] == want and executable(l10[0]), l10 and l10[0]["argv"])
+    check("  carrying waits_for L11a --what kt7, and listed as deferred behind it",
+          l10 and (l10[0].get("waits_for") or {}).get("what") == "kt7"
+          and any("then: L10 after L11a --what kt7 (%s is not on the cluster)" % KT7_TABLE in r
+                  for r in deferred(res, "L10")), (l10 and l10[0].get("waits_for"), deferred(res, "L10")))
+    check("  and L11a (what=kt7) is still the proposal that unblocks it",
+          [p["params"]["what"] for p in props(res, "L11a")] == ["kt7"], [p["params"] for p in props(res, "L11a")])
+
+    # (3) fetched on the lab, not yet on the cluster: the sync pushes it
+    lab = {p: _sha(p, "lab") for p in KT7_FILES}
+    ev = evidence(LIVE_0928, LINEAGE_0928 + [_embed_run(1), {"lever": "L11a", "status": "executed",
+                                                             "params": {"what": "kt7"}}], lab=lab)
+    diags, by, res = run(ev)
+    check("KT7 fetched on the lab: L11a is not proposed again (the sync pushes it) and L10 still waits",
+          not props(res, "L11a") and props(res, "L10") and props(res, "L10")[0].get("waits_for")
+          and any("%s is on the lab and not yet on the cluster" % KT7_TABLE in r and "pushes it" in r
+                  for r in deferred(res, "L11a")),
+          (deferred(res, "L11a"), [p["lever"] for p in res["proposals"]]))
+    check("  the funnel sync is due for both KT7 files", set(KT7_FILES) <= set(LV.funnel_sync_needed(ev)),
+          LV.funnel_sync_needed(ev))
+
+    # (4) on the cluster (check_manifest rebuilt the machine-local table)
+    lab_same = {"funnel/kt7/kt7_items.jsonl": _sha("funnel/kt7/kt7_items.jsonl"), KT7_TABLE: _sha(KT7_TABLE, "lab")}
+    ev = evidence(LIVE_0928 + KT7_FILES, LINEAGE_0928 + [_embed_run(1), {"lever": "L11a", "status": "executed",
+                                                                         "params": {"what": "kt7"}}], lab=lab_same)
+    diags, by, res = run(ev)
+    l10 = props(res, "L10")
+    check("the KT7 file appears on the cluster: embed-judges is proposed again, waiting for nothing",
+          len(l10) == 1 and l10[0]["argv"] == want and not l10[0].get("waits_for")
+          and not deferred(res, "L10"), (l10 and l10[0].get("waits_for"), deferred(res, "L10")))
+    check("  L11a has nothing left to fetch", not props(res, "L11a") and deferred(res, "L11a"), deferred(res, "L11a"))
+    check("  the machine-local table (each host's own image paths) does not keep the sync due",
+          KT7_TABLE not in LV.funnel_sync_needed(ev), LV.funnel_sync_needed(ev))
+
+    # (5) the bound: proposed again at most funnel_job_retries times after a failed job
+    retries = LV.protocol("funnel_job_retries")
+    runs = [_embed_run(i) for i in range(1, retries + 1)]
+    diags, by, res = run(evidence(LIVE_0928 + KT7_FILES, LINEAGE_0928 + runs))
+    check("after %d failed runs it is proposed again (%d retries)" % (retries, retries),
+          retries == 2 and [p["argv"][2] for p in props(res, "L10")] == ["embed-judges"],
+          [p["argv"] for p in props(res, "L10")])
+    runs.append(_embed_run(retries + 1, state="TIMEOUT"))
+    diags, by, res = run(evidence(LIVE_0928 + KT7_FILES, LINEAGE_0928 + runs))
+    why = " ".join(deferred(res, "L10"))
+    check("the third failure stays with a person: deferred with the job's state and its log path",
+          not props(res, "L10") and "failed 3 times" in why and "ended TIMEOUT" in why
+          and "%s/funnel/logs/inc_funnel_embed-judges_47300003.out" % inc in why and "a person" in why, why)
+
+    # (6) the other steps that read the KT7 photos wait for them too
+    ev = evidence(LIVE_0928)
+    ok = {v: (LV._waits(ev, "L10", v, menu) or {}) for v in ("embed-judges", "qualify", "draw", "sheets", "estimate")}
+    check("qualify, draw, sheets and estimate wait for the KT7 table as well (then L11a --what kt7)",
+          all(w.get("lever") == "L11a" and w.get("what") == "kt7" and w.get("cluster_file") == KT7_TABLE
+              for w in ok.values()), ok)
+    w_est = LV._waits(evidence(LIVE_0928 + KT7_FILES), "L10", "estimate", menu) or {}
+    check("  estimate then still waits for the devil's-advocate record (OP_DA)",
+          w_est.get("lever") == "OP_DA" and w_est.get("cluster_file") == "funnel/prospective_da.json", w_est)
+    check("  census and leak read no KT7 file (census waits only for the taxonomy cache)",
+          LV._waits(ev, "L10", "leak", menu) is None
+          and (LV._waits(evidence(()), "L10", "census", menu) or {}).get("lever") == "L12")
+
+    # (7) the order of the fetches, and a fetch L11a's command cannot run
+    files = tuple(p for p in LIVE_0928 if p != "funnel/cards/index.json")
+    diags, by, res = run(evidence(files, LINEAGE_0928[:2] + LINEAGE_0928[3:] + [_embed_run(1)]))
+    check("cards missing and KT7 needed: L11a fetches the cards first",
+          [p["params"]["what"] for p in props(res, "L11a")] == ["cards"], [p["params"] for p in props(res, "L11a")])
+    diags, by, res = run(evidence(files, LINEAGE_0928 + [_embed_run(1)]))
+    check("  the cards fetch already ran (its index not pushed yet): L11a moves on to kt7",
+          [p["params"]["what"] for p in props(res, "L11a")] == ["kt7"], [p["params"] for p in props(res, "L11a")])
+    menu_h12 = copy.deepcopy(menu)
+    menu_h12["levers"]["L10"]["preconditions"]["embed-judges"] = {
+        "cluster_file": "funnel/known_items_v1.json", "then": "L11a", "what": "known-items", "why": "test"}
+    ev = evidence(LIVE_0928 + KT7_FILES, LINEAGE_0928 + [_embed_run(1)])
+    fw = LV.fetch_waits(ev, menu_h12)
+    res = LV.propose(DG.detect(ev), ev, menu=menu_h12)
+    check("a step waiting on the H12 list selects fetch --what known-items, which needs --sources the L11a command "
+          "does not carry: deferred for a person, never run to a sure refusal",
+          list(fw) == ["known-items"] and not props(res, "L11a")
+          and any("--what known-items" in r and "--sources" in r for r in deferred(res, "L11a")), deferred(res, "L11a"))
 
 
 def legacy_world(name, exps, step1):
@@ -863,6 +1045,7 @@ def main():
         test_r12()
         test_r13()
         test_r14(root, ev, diags)
+        test_r15()
         test_negative_controls()
     finally:
         shutil.rmtree(str(TMP), ignore_errors=True)

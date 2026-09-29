@@ -1036,9 +1036,20 @@ def price(lid, params, ev, parent=None, menu=None):
 # for the fetches. A job waits for the file it reads on the cluster (the lever
 # row's "preconditions", read from funnel/files.json, the funnel directory's
 # listing); until the file is there the proposal carries waits_for and is
-# listed under deferred with "then", the way D2 defers L2 behind L3.
+# listed under deferred with "then", the way D2 defers L2 behind L3. A
+# precondition whose "then" is L11a names the fetch it needs ("what"), and the
+# L11a builder fetches what a waiting step needs (_build_fetch).
 
 FUNNEL_LEVERS = ("L10", "L11", "L11a", "L12", "L13", "L14")
+# The lab fetches L11a runs, in the order it takes them (inc_funnel_fetch's
+# what values but taxonomy, which is L12): the cards whenever their index is
+# missing or stale, the others only when a waiting funnel step names them.
+FETCH_ORDER = ("cards", "kt7", "known-items", "refetch")
+CARDS_INDEX = "funnel/cards/index.json"
+# A fetch L11a's command cannot run: funnel fetch refuses --what known-items
+# without the H12 source documents (--sources), which neither the L11a command
+# nor inc_funnel_fetch's policy row carries.
+FETCH_NEEDS = {"known-items": "--sources (the H12 source documents; runner 6.1 F3a: --sources docs/literature)"}
 # The order of the funnel's cluster steps and the file each writes (runner 6.1):
 # L10's next verb is the first whose output is not on the cluster yet.
 FUNNEL_STEPS = (("L10", {"verb": "census"}, "funnel/census_v1.json"),
@@ -1134,31 +1145,86 @@ def estimate_funnel(lid, params, menu=None):
     return hours, info
 
 
-def _funnel_once(ev, lid, key):
+def _funnel_once(ev, lid, key, menu=None):
     """Defer when the campaign's lineage records lever lid with these params
     (a funnel step runs once per campaign; a person decides whether to repeat
-    one that ran and left no output)."""
+    one that ran and left no output). A run whose Slurm job ended in a failure
+    state (the ticker's lineage status 'failed' with its 'job' record:
+    campaign.JOB_FAILED_STATES, read from sacct) does not count: the step is
+    proposed again, at most protocol funnel_job_retries times; the next failed
+    run leaves it with a person, with the last job's state and log."""
     ctx = ev.json(E.CONTEXT) or {}
+    failed = []
     for i, r in enumerate(ctx.get("lineage") or []):
-        if not isinstance(r, dict) or r.get("status") in LINEAGE_IGNORED or r.get("lever") != lid:
+        if not isinstance(r, dict) or r.get("lever") != lid:
             continue
         p = r.get("params") if isinstance(r.get("params"), dict) else {}
-        if all(p.get(k) == v for k, v in key.items()):
-            raise Defer("%s %s was already run in this campaign (%s); its output is not on the cluster yet, and a "
-                        "person decides whether to run it again" % (lid, " ".join("%s=%s" % kv for kv in sorted(
-                            key.items())), r.get("status")))
+        if not all(p.get(k) == v for k, v in key.items()):
+            continue
+        if r.get("status") == "failed" and isinstance(r.get("job"), dict):
+            failed.append(r)
+            continue
+        if r.get("status") in LINEAGE_IGNORED:
+            continue
+        raise Defer("%s %s was already run in this campaign (%s); its output is not on the cluster yet, and a "
+                    "person decides whether to run it again" % (lid, " ".join("%s=%s" % kv for kv in sorted(
+                        key.items())), r.get("status")))
+    retries = int(protocol("funnel_job_retries", menu))
+    if len(failed) > retries:
+        job = failed[-1]["job"]
+        states = job.get("states") if isinstance(job.get("states"), dict) else {}
+        raise Defer("%s %s failed %d times in this campaign (the last: job %s ended %s); a step is proposed again "
+                    "at most %d times after a failed job, so a person reads the last job's log (%s) and decides "
+                    "whether to run it again" % (lid, " ".join("%s=%s" % kv for kv in sorted(key.items())),
+                                                 len(failed), ",".join(str(j) for j in job.get("ids") or []) or "?",
+                                                 ",".join(str(states[j]) for j in sorted(states)) or "in a failure state",
+                                                 retries, job.get("log") or "not recorded"))
+
+
+def _preconditions(lid, key, menu):
+    """The row's preconditions of a funnel step (keyed by verb or part), as a
+    list: a single precondition or several, in the order they are checked."""
+    pre = (row(lid, menu).get("preconditions") or {}).get(key)
+    if isinstance(pre, dict):
+        return [pre]
+    return [x for x in pre if isinstance(x, dict)] if isinstance(pre, list) else []
 
 
 def _waits(ev, lid, key, menu):
     """The waits_for record of a funnel job whose input file is not on the
-    cluster (the row's preconditions keyed by verb or part), or None."""
-    pre = (row(lid, menu).get("preconditions") or {}).get(key)
-    if not isinstance(pre, dict):
-        return None
-    if _has(cluster_files(ev), pre["cluster_file"]):
-        return None
-    return {"lever": pre.get("then"), "cluster_file": pre["cluster_file"], "why": pre.get("why"),
-            "listing": "in the evidence" if cluster_files(ev) is not None else "not in the evidence"}
+    cluster (the first of the row's preconditions keyed by verb or part whose
+    file the listing lacks), or None. A precondition met by a lab fetch names
+    its kind ('what'), which the record carries."""
+    for pre in _preconditions(lid, key, menu):
+        if _has(cluster_files(ev), pre["cluster_file"]):
+            continue
+        w = {"lever": pre.get("then"), "cluster_file": pre["cluster_file"], "why": pre.get("why"),
+             "listing": "in the evidence" if cluster_files(ev) is not None else "not in the evidence"}
+        if pre.get("what"):
+            w["what"] = pre["what"]
+        return w
+    return None
+
+
+def fetch_waits(ev, menu=None):
+    """{what: waits record}: the lab fetches (L11a) the funnel's next cluster
+    steps wait for. For the next step of L10 and of L11 (funnel_next, whether
+    it is proposed now or deferred because it already ran), every precondition
+    whose file the cluster lacks and whose 'then' is L11a, keyed by its 'what',
+    with the step that waits ('for')."""
+    menu = menu or load_menu()
+    out = {}
+    for lid in ("L10", "L11"):
+        nl, params, _out = funnel_next(ev, lid)
+        if nl is None:
+            continue
+        key = params["verb"] if lid == "L10" else params["part"]
+        for pre in _preconditions(lid, key, menu):
+            if pre.get("then") != "L11a" or not pre.get("what") or _has(cluster_files(ev), pre["cluster_file"]):
+                continue
+            out.setdefault(pre["what"], {"lever": "L11a", "what": pre["what"], "cluster_file": pre["cluster_file"],
+                                         "why": pre.get("why"), "for": dict(params, lever=lid)})
+    return out
 
 
 def _funnel_proposal(lid, params, derived, d, cites, menu, waits=None, extra=None):
@@ -1237,28 +1303,22 @@ def _build_funnel(lid, d, ev, menu):
         return [_funnel_proposal("L11", params, {"prereg": paths["prereg"], "out": paths["out"]}, d, cites, menu,
                                  waits=_waits(ev, "L11", params["part"], menu),
                                  extra={"funnel_step": {"writes": out}, "sources": det.get("s2_sources") or []})]
-    if lid in ("L11a", "L12"):
-        what = "cards" if lid == "L11a" else "taxonomy"
-        target = "funnel/cards/index.json" if lid == "L11a" else "funnel/taxonomy_cache.json"
-        stale = (ev.json(E.CONTEXT) or {}).get("funnel_cards_stale") if lid == "L11a" else None
-        key = {"what": what}
-        if isinstance(stale, dict) and stale.get("domain_sha256"):
-            # the cards index recorded refusals under another domain config: fetch
-            # again, once per config (the lineage key carries the config's sha)
-            key["config"] = str(stale["domain_sha256"])[:12]
-        elif _has(cluster_files(ev), target):
+    if lid == "L11a":
+        return [_build_fetch(d, ev, menu)]
+    if lid == "L12":
+        target = "funnel/taxonomy_cache.json"
+        key = {"what": "taxonomy"}
+        if _has(cluster_files(ev), target):
             raise Defer("%s is already on the cluster (funnel/files.json)" % target)
-        elif target in lab_files(ev):
+        if target in lab_files(ev):
             raise Defer("%s is on the lab and not yet on the cluster: the funnel sync (inc_funnel_sync) pushes it"
                         % target)
         _funnel_once(ev, lid, key)
         paths = _funnel_paths(ev, menu, lab=True)
-        derived = {"prereg": paths["prereg"], "out": paths["out"]}
-        if lid == "L12":
-            derived["names_from"] = posixpath.join(paths["inc"], "step1", "pool_summary.json")
+        derived = {"prereg": paths["prereg"], "out": paths["out"],
+                   "names_from": posixpath.join(paths["inc"], "step1", "pool_summary.json")}
         return [_funnel_proposal(lid, key, derived, d, cites, menu,
-                                 extra={"sources": det.get("s2_sources") or [], "writes": target,
-                                        "stale": stale if key.get("config") else None})]
+                                 extra={"sources": det.get("s2_sources") or [], "writes": target, "stale": None})]
     if lid == "L13":
         policy = det.get("policy")
         if not policy:
@@ -1281,6 +1341,59 @@ def _build_funnel(lid, d, ev, menu):
     raise Defer("no builder for funnel lever %s" % lid)
 
 
+def _build_fetch(d, ev, menu):
+    """The L11a proposal: the first lab fetch due, in FETCH_ORDER. The cards
+    when their index is stale (context funnel_cards_stale: fetched again once
+    per domain config, the config's sha12 in the lineage key) or on neither
+    host; then a fetch a waiting funnel step names (fetch_waits: kt7 while
+    embed-judges, qualify, draw, sheets or estimate waits for the KT7 photos;
+    known-items while a step waits for the H12 list). A fetch whose file is on
+    the lab and not yet on the cluster waits for the sync, one that already
+    ran waits for a person (_funnel_once), and the next fetch due is taken
+    instead; with none left the lever is deferred with every reason."""
+    det = d.get("detail") or {}
+    cites = list(d["cites"])
+    stale = (ev.json(E.CONTEXT) or {}).get("funnel_cards_stale")
+    waits = fetch_waits(ev, menu)
+    held = []
+    for what in FETCH_ORDER:
+        key = {"what": what}
+        target = CARDS_INDEX if what == "cards" else (waits.get(what) or {}).get("cluster_file")
+        if what == "cards" and isinstance(stale, dict) and stale.get("domain_sha256"):
+            # the cards index recorded refusals under another domain config: fetch
+            # again, once per config (the lineage key carries the config's sha)
+            key["config"] = str(stale["domain_sha256"])[:12]
+        elif target is None:
+            continue                              # no waiting funnel step names this fetch
+        elif _has(cluster_files(ev), target):
+            held.append("%s is already on the cluster (funnel/files.json)" % target)
+            continue
+        elif target in lab_files(ev):
+            held.append("%s is on the lab and not yet on the cluster: the funnel sync (inc_funnel_sync) pushes it"
+                        % target)
+            continue
+        try:
+            _funnel_once(ev, "L11a", key, menu)
+        except Defer as e:
+            held.append(str(e))
+            continue
+        if what in FETCH_NEEDS:
+            w = waits.get(what) or {}
+            held.append("%s waits for %s, which fetch --what %s writes only with %s; the L11a command carries no "
+                        "such flag, so a person runs that fetch on the lab" % (
+                            "L10 %s" % (w.get("for") or {}).get("verb") if (w.get("for") or {}).get("verb")
+                            else "a funnel step", target, what, FETCH_NEEDS[what]))
+            continue
+        paths = _funnel_paths(ev, menu, lab=True)
+        derived = {"prereg": paths["prereg"], "out": paths["out"]}
+        extra = {"sources": (det.get("s2_sources") or []) if what == "cards" else [], "writes": target,
+                 "stale": stale if key.get("config") else None}
+        if what != "cards" and what in waits:
+            extra["needed_by"] = waits[what]["for"]      # the waiting step this fetch unblocks
+        return _funnel_proposal("L11a", key, derived, d, cites, menu, extra=extra)
+    raise Defer("; ".join(held) or "no lab fetch is due (%s)" % ", ".join(FETCH_ORDER))
+
+
 def verify_queue_rows(ev):
     """The verify tasks of lever L14: class maps whose card and source class
     counts disagree (class_maps.json proposals with status to_L14)."""
@@ -1299,10 +1412,17 @@ def funnel_sync_needed(ev):
     pull-list files the lab lacks or holds another version of (funnel/files.json
     and the shipped recovery record against context funnel_lab_pull). A
     cluster file listed without a sha256 (too large to hash there) counts
-    only while the lab has no copy."""
+    only while the lab has no copy. A machine-local crop table
+    (funnel.fetch.MACHINE_LOCAL: kt7/crops_kt7.csv, refetch/crops_refetch.csv)
+    counts only while the cluster has none: it holds each host's own image
+    paths, and fetch.check_manifest rebuilds it on arrival, so the two copies
+    never hash alike."""
     from . import executor as X
+    from ..funnel import fetch as FF
     have = cluster_files(ev) or {}
-    out = {p for p, sha in lab_files(ev).items() if (have.get(p) or {}).get("sha256") != sha}
+    machine = {"funnel/" + rel for rel in FF.MACHINE_LOCAL}
+    out = {p for p, sha in lab_files(ev).items()
+           if (p not in have if p in machine else (have.get(p) or {}).get("sha256") != sha)}
     ctx = ev.json(E.CONTEXT) or {}
     local = ctx.get("funnel_lab_pull") if isinstance(ctx.get("funnel_lab_pull"), dict) else {}
     for p, info in have.items():
@@ -1774,8 +1894,10 @@ def propose(diagnoses, ev, menu=None):
                         if p.get("waits_for"):
                             w = p["waits_for"]
                             out["deferred"].append({"lever": lid, "trigger": d["id"],
-                                                    "reason": "then: %s after %s (%s is not on the cluster)"
-                                                              % (lid, w.get("lever"), w.get("cluster_file"))})
+                                                    "reason": "then: %s after %s%s (%s is not on the cluster)"
+                                                              % (lid, w.get("lever"),
+                                                                 " --what %s" % w["what"] if w.get("what") else "",
+                                                                 w.get("cluster_file"))})
             else:
                 out["refused"].append({"lever": lid, "trigger": d["id"], "reason": "not on the menu"})
         for then in (d.get("detail") or {}).get("then") or []:

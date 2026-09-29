@@ -29,6 +29,16 @@
     with its runner 1.2 header, a reply for an unstaged claim refused, the
     COMPLETE card held while a pass is in flight, the record scored once a
     valid audit lands, and the COMPLETE note;
+  * campaign.py, a funnel job that failed (the live incident of 2026-09-28:
+    embed-judges refused without the KT7 photos and was never run again):
+    WAIT_JOB records each job's final state from sacct (job_finished,
+    funnel_jobs, the log path), the lineage record turns 'failed', the step
+    passes the stop-loss counted per step and runs again under a new id, at
+    most funnel_job_retries times, then stays with a person; a job that
+    ended before states were recorded is asked about and found; UNKNOWN
+    after SACCT_TRIES snapshots; an experiment-mode job's wait unchanged;
+  * remote.py campaign-snapshot --sacct (job_states) and
+    executor.campaign_snapshot's sacct (no flag when none is asked);
   * the funnel fixtures' MANIFEST.json pins; run_inc_plan.sh's PLAN_ROLE.
 
 No network, no GPU, no cluster.
@@ -908,6 +918,251 @@ def test_campaign_da():
           sorted(hooks) == ["inc_funnel_fetch", "inc_funnel_sync", "inc_verify_queue"])
 
 
+# ------------------------------------------------------------------ campaign: a funnel job that failed
+SEG_RE = re.compile(r'echo "INCAP_SEG (\d+)"; (.*?); echo "INCAP_SEG_END', re.S)
+LIVE_FILES = ("funnel/taxonomy_cache.json", "funnel/census_v1.json", "funnel/leak_v1.json", "funnel/cards/index.json",
+              "funnel/relation_geometry_v1.json", "funnel/emb_dinov2/emb_s000_of_001.npz",
+              "funnel/kt7/kt7_items.jsonl", "funnel/kt7/crops_kt7.csv")
+
+
+class FakeCluster(object):
+    """slurm_sh for the executor: every submit gets the next job id."""
+
+    def __init__(self, first=47300001):
+        self.next_job, self.scripts, self.submits = first, [], []
+
+    def __call__(self, script, timeout=60):
+        self.scripts.append(script)
+        out = ["Welcome"]
+        for m in SEG_RE.finditer(script):
+            i, argv = int(m.group(1)), shlex.split(m.group(2))
+            args = argv[4:]
+            if args and args[0] == "submit":
+                self.submits.append(args)
+                rec = {"verb": "submit", "ok": True, "job_id": str(self.next_job), "argv": args}
+                self.next_job += 1
+            else:
+                rec = {"verb": args[0] if args else None, "ok": False, "error": "not on this fake cluster"}
+            out += ["INCAP_SEG %d" % i, "INCAP " + json.dumps(rec), "INCAP_SEG_END %d %d" % (i, 0 if rec["ok"] else 1)]
+        return {"ok": True, "stdout": "\n".join(out), "stderr": "", "returncode": 0}
+
+
+def test_campaign_job_failure():
+    print("campaign: a funnel job that ended FAILED (sacct) makes its step 'failed' in the lineage; the step runs "
+          "again under a new id, at most funnel_job_retries times; experiment-mode waits are unchanged")
+    from weed_optimizer_framework.tools.inc_autopilot import campaign as CP
+    cluster = FakeCluster()
+    lab = TMP / "lab_jobs"
+    paths = CP.Paths(lab)
+    t = [1790000000.0]
+    r = CP._Run("funnelcamp", {"enabled": True}, paths, CP._SshBudget(cluster), lambda: t[0], CP._Log(), None,
+                {"mongo_ok": True, "cluster_reachable": True}, None, None, None)
+    r.st = CP._blank_state("funnelcamp", r.cfg)
+    r.st["exp"] = "realloop_v1"
+    root = world("jobs_world")
+    (root / "funnel" / "files.json").write_text(json.dumps(
+        {"format": "funnel-files/1", "files": {p: {"sha256": "a" * 64, "bytes": 1} for p in LIVE_FILES}}))
+    inc = M.CLUSTER_INC_DIR
+    # census and leak ran as L10 jobs before (2 of L10's submissions), the geometry match as L11
+    for n, (lever, action, params) in enumerate((
+            ("L10", "inc_funnel_audit", {"verb": "census"}), ("L10", "inc_funnel_audit", {"verb": "leak"}),
+            ("L11", "inc_funnel_map", {"part": "geometry"}))):
+        X._log(r.xctx, {"ts": "2026-09-28T10:0%d:00Z" % n, "campaign": "funnelcamp", "action": action, "lever": lever,
+                        "params": dict(params, prereg=inc + "/funnel/prereg_v1.json", out=inc + "/funnel/"),
+                        "status": "executed", "charged": True, "job_ids": [str(47200001 + n)],
+                        "proposal_id": "old%d" % n, "est_su": 8.0})
+
+    def evidence():
+        return E.load_dir(root, "realloop_v1", exps=["realloop_v1"], context={"lineage": r.lineage()},
+                          claims=jload(FF / "claims" / "claims_seed.json"))
+
+    def propose_embed():
+        ev = evidence()
+        res = LV.propose(DG.detect(ev), ev)
+        return ev, res, [p for p in res["proposals"] if p["lever"] == "L10"]
+
+    def snapshot(squeue_ids, sacct):
+        """One observation: what _observe does with a campaign-snapshot record
+        before the phase machine (the jobs asked, then their states noted).
+        sacct knows the earlier jobs completed."""
+        r._sacct_asked = r._funnel_sacct_ids()
+        sacct = dict({j: {"state": "COMPLETED"} for j in ("47200001", "47200002", "47200003")}, **sacct)
+        status = {"squeue": {"ok": True, "jobs": [{"id": j, "name": "inc_funnel_x", "state": "RUNNING"}
+                                                  for j in squeue_ids]},
+                  "experiments": [{"exp": "realloop_v1", "done": True, "report": "current"}]}
+        payload = {"verb": "campaign-snapshot", "experiments": {}, "status": status,
+                   "sacct": {"ok": True, "jobs": sacct}}
+        r._note_job_states(payload, status)
+        return payload, status
+
+    diagnosed = []
+    r._diagnose = lambda ev: diagnosed.append(ev)
+
+    def run_step(state):
+        """The step proposed, filtered, driven through the executor, waited for,
+        and its job ended in `state`. Returns (proposal id, job id)."""
+        ev, res, l10 = propose_embed()
+        cands, stop = r._filter(l10, [])
+        if stop or not cands:
+            return None, (stop, [x["reason"] for x in res["deferred"] if x["lever"] == "L10"])
+        r._new_item(cands[0], [])
+        pid = r.st["item"]["proposal"]["id"]
+        r.ssh = r.xctx.slurm_sh = CP._SshBudget(cluster)        # a new tick: its one ssh
+        r._drive_item()
+        jid = (r.st.get("wait_jobs") or [None])[0]
+        payload, status = snapshot([jid], {jid: {"state": "RUNNING"}})
+        r._phase_machine(ev, payload, status)
+        still = r.st["phase"] == "WAIT_JOB"
+        t[0] += 600
+        payload, status = snapshot([], {jid: {"state": state}})
+        r._phase_machine(evidence(), payload, status)
+        return pid, (jid, still)
+
+    ev, res, l10 = propose_embed()
+    check("the next funnel step is embed-judges, KT7 on the cluster: proposed with no wait",
+          [p["argv"][2] for p in l10] == ["embed-judges"] and not l10[0].get("waits_for"), [p["argv"] for p in l10])
+    pid1, (jid1, still) = run_step("FAILED")
+    check("it ran as a job (R2, direct) and the campaign waited for it while squeue listed it",
+          jid1 == "47300001" and still and cluster.submits, (jid1, still))
+    led = [json.loads(x) for x in paths.ledger.read_text().splitlines()]
+    fin = [e for e in led if e["event"] == "job_finished"]
+    log1 = "%s/funnel/logs/inc_funnel_embed-judges_%s.out" % (inc, jid1)
+    check("its job left squeue ended FAILED: job_finished records each job's final state, the step and the log",
+          fin and fin[-1].get("job_states") == {jid1: "FAILED"} and fin[-1].get("failed") is True
+          and fin[-1].get("params") == {"verb": "embed-judges"} and fin[-1].get("log") == log1
+          and "at most 2 times" in fin[-1]["reasons"][0], fin[-1:])
+    check("  the state records it (funnel_jobs), with the log path run_inc_funnel.sh writes (remote._job_name)",
+          (r.st["funnel_jobs"].get(jid1) or {}).get("state") == "FAILED"
+          and r.st["funnel_jobs"][jid1]["log"] == log1
+          and RM._job_name({"builder": "funnel", "command": "embed-judges", "params": {}}) == "inc_funnel_embed-judges",
+          r.st.get("funnel_jobs"))
+    check("  the earlier funnel jobs' final states were read on the way (census, leak, the geometry match: "
+          "COMPLETED), and their lineage records stay executed",
+          all(r.st["funnel_jobs"][j]["state"] == "COMPLETED" for j in ("47200001", "47200002", "47200003"))
+          and [x["status"] for x in r.lineage()][:3] == ["executed"] * 3, r.st.get("funnel_jobs"))
+    check("  WAIT_JOB is over: DIAGNOSE (the next observation diagnoses)", r.st["phase"] == "DIAGNOSE"
+          and "wait_funnel" not in r.st, r.st["phase"])
+    lin = [x for x in r.lineage() if (x.get("params") or {}).get("verb") == "embed-judges"]
+    check("the lineage record of that run is 'failed', with the job's ids, states and log (levers.py ignores it)",
+          len(lin) == 1 and lin[0]["status"] == "failed"
+          and lin[0]["job"] == {"ids": [jid1], "states": {jid1: "FAILED"}, "log": log1}, lin)
+    check("L10 ran 3 times in this campaign (census, leak, embed-judges): the per-lever count would stop it",
+          X._lever_count(r.xctx, "funnelcamp", "L10") == 3 >= X.MAX_LEVER_SUBMISSIONS)
+    pid2, (jid2, _s) = run_step("FAILED")
+    check("the step is proposed again, passes the stop-loss (counted per step: embed-judges ran once) and runs "
+          "under a new proposal id", pid2 and pid2 != pid1 and jid2 == "47300002", (pid1, pid2, jid2))
+    pid3, (jid3, _s) = run_step("OUT_OF_MEMORY")
+    check("  a third run after the second failure (2 retries), again a new id", pid3 not in (None, pid1, pid2)
+          and jid3 == "47300003", (pid3, jid3))
+    pid4, why = run_step("FAILED")
+    why_txt = " ".join(why[1] or []) if isinstance(why, tuple) and len(why) > 1 else str(why)
+    check("the third failure stays with a person: not proposed, deferred with the state and the last job's log",
+          pid4 is None and "failed 3 times" in why_txt and "OUT_OF_MEMORY" in why_txt
+          and "inc_funnel_embed-judges_47300003.out" in why_txt, why)
+    check("  every job's final state is recorded, so the snapshot asks sacct about none",
+          r._funnel_sacct_ids() == []
+          and [r.st["funnel_jobs"][j]["state"] for j in (jid1, jid2, jid3)] == ["FAILED", "FAILED", "OUT_OF_MEMORY"],
+          r._funnel_sacct_ids())
+
+    # a state from before this record: the job ran, its WAIT_JOB ended unread
+    r2 = CP._Run("funnelcamp", {"enabled": True}, CP.Paths(TMP / "lab_jobs2"), CP._SshBudget(None), lambda: t[0],
+                 CP._Log(), None, {}, None, None, None)
+    r2.st = CP._blank_state("funnelcamp", r2.cfg)
+    X._log(r2.xctx, {"ts": "2026-09-28T12:00:00Z", "campaign": "funnelcamp", "action": "inc_funnel_audit",
+                     "lever": "L10", "status": "executed", "charged": True, "job_ids": ["46999999"],
+                     "params": {"verb": "embed-judges", "prereg": inc + "/funnel/prereg_v1.json", "out": inc + "/funnel/"},
+                     "proposal_id": "live1", "est_su": 8.0})
+    check("a live campaign whose job ended before states were recorded: the next snapshot asks sacct about it",
+          r2._funnel_sacct_ids() == ["46999999"] and r2.lineage()[0]["status"] == "executed", r2._funnel_sacct_ids())
+    r2._sacct_asked = r2._funnel_sacct_ids()
+    r2._note_job_states({"sacct": {"ok": True, "jobs": {"46999999": {"state": "FAILED"}}}},
+                        {"squeue": {"ok": True, "jobs": []}})
+    check("  sacct says FAILED: its lineage record turns 'failed' (the step may run again)",
+          r2.lineage()[0]["status"] == "failed" and r2._funnel_sacct_ids() == [], r2.lineage())
+    X._log(r2.xctx, {"ts": "2026-09-28T13:00:00Z", "campaign": "funnelcamp", "action": "inc_funnel_audit",
+                     "lever": "L10", "status": "executed", "charged": True, "job_ids": ["47000001"],
+                     "params": {"verb": "qualify", "prereg": inc + "/funnel/prereg_v1.json", "out": inc + "/funnel/"},
+                     "proposal_id": "live2", "est_su": 8.0})
+    for n in range(CP.SACCT_TRIES):
+        r2._sacct_asked = r2._funnel_sacct_ids()
+        r2._note_job_states({"sacct": {"ok": True, "jobs": {}}}, {"squeue": {"ok": True, "jobs": []}})
+        if n == 0:
+            check("  a job sacct does not show ended is asked again", r2._funnel_sacct_ids() == ["47000001"])
+    check("  ... and after %d snapshots it is recorded UNKNOWN: its step stays with a person, as before"
+          % CP.SACCT_TRIES, r2.st["funnel_jobs"]["47000001"]["state"] == CP.JOB_UNKNOWN
+          and [x["status"] for x in r2.lineage()] == ["failed", "executed"], r2.st["funnel_jobs"])
+    check("job_state reads sacct's states: 'CANCELLED by <uid>', array tasks, and nothing until the job ended",
+          CP.job_state({"1": {"state": "CANCELLED by 512"}}, "1") == "CANCELLED"
+          and CP.job_state({"2_0": {"state": "COMPLETED"}, "2_1": {"state": "TIMEOUT"}}, "2") == "TIMEOUT"
+          and CP.job_state({"3_0": {"state": "COMPLETED"}, "3_1": {"state": "COMPLETED"}}, "3") == "COMPLETED"
+          and CP.job_state({"4": {"state": "RUNNING"}}, "4") is None and CP.job_state({}, "5") is None)
+
+    # experiment mode: a non-funnel job's wait is what it was
+    r3 = CP._Run("expcamp", {"enabled": True}, CP.Paths(TMP / "lab_jobs3"), CP._SshBudget(None), lambda: t[0],
+                 CP._Log(), None, {}, None, None, None)
+    r3.st = CP._blank_state("expcamp", r3.cfg)
+    r3.st["exp"] = "pilot_v1"
+    r3._diagnose = lambda ev: None
+    item = {"proposal": {"lever": "L4", "policy_action": "inc_label_audit", "id": "a4", "params": {}},
+            "key": "k", "attempt": 0}
+    r3._on_executed(item, {"status": "executed", "job_ids": ["7001"], "params": {}})
+    check("an L4 audit job: WAIT_JOB as before, no funnel wait, and its snapshot asks sacct nothing",
+          r3.st["phase"] == "WAIT_JOB" and "wait_funnel" not in r3.st and r3._funnel_sacct_ids() == [], r3.st)
+    r3._sacct_asked = []
+    r3._phase_machine(ev, {"experiments": {}}, {"squeue": {"ok": True, "jobs": []}, "experiments": []})
+    fin3 = [json.loads(x) for x in CP.Paths(TMP / "lab_jobs3").ledger.read_text().splitlines()
+            if json.loads(x)["event"] == "job_finished"]
+    check("  and its job_finished entry is the one it always was (its job ids; no job state, step or log)",
+          fin3 and fin3[-1]["job_ids"] == ["7001"]
+          and not {"job_states", "failed", "log", "lever", "params", "reasons"} & set(fin3[-1])
+          and "funnel_jobs" not in r3.st and r3.st["phase"] == "RUN", fin3)
+
+
+def test_snapshot_sacct():
+    print("remote campaign-snapshot --sacct and executor.campaign_snapshot's sacct")
+    script = TMP / "fake_sacct.sh"
+    script.write_text("#!/bin/sh\necho 'JobIDRaw|JobName|State|Elapsed|AllocTRES|NodeList'\n"
+                      "echo '47300001|inc_funnel_embed-judges|FAILED|01:02:03|billing=5,gres/gpu:v100-32=1|v001'\n"
+                      "echo '47300002|inc_funnel_qualify|CANCELLED by 512|00:00:03||None'\n")
+    script.chmod(0o755)
+    old = os.environ.get("INCAP_SACCT")
+    os.environ["INCAP_SACCT"] = str(script)
+    try:
+        js = RM.job_states(["47300001", "47300002"])
+        check("remote.job_states reads sacct (stream_remote.sacct): each job's state, no log for a funnel job",
+              js.get("ok") and js["jobs"]["47300001"]["state"] == "FAILED"
+              and js["jobs"]["47300002"]["state"].startswith("CANCELLED")
+              and not any("refusal" in v for v in js["jobs"].values()), js)
+        (INC / "snapx").mkdir(parents=True, exist_ok=True)
+        rec = RM.dispatch(["campaign-snapshot", "--exp", "snapx", "--no-step1", "--sacct", "47300001"])
+        check("campaign-snapshot --sacct ships the record under 'sacct' (the snapshot's ok unchanged by it)",
+              rec.get("verb") == "campaign-snapshot" and (rec.get("sacct") or {}).get("jobs", {}).get("47300001", {})
+              .get("state") == "FAILED", {k: rec.get(k) for k in ("sacct", "ok")})
+        rec0 = RM.dispatch(["campaign-snapshot", "--exp", "snapx", "--no-step1"])
+        check("  without --sacct there is no such key", "sacct" not in rec0, sorted(rec0))
+        raised = raises(lambda: RM.dispatch(["campaign-snapshot", "--exp", "snapx", "--sacct", "1;rm"]), RM._ArgError)
+        check("  a job id that is not one is refused", raised)
+    finally:
+        if old is None:
+            os.environ.pop("INCAP_SACCT", None)
+        else:
+            os.environ["INCAP_SACCT"] = old
+    seen = []
+
+    def sh(script_text, timeout=60):
+        seen.append(script_text)
+        return {"ok": True, "stdout": "", "stderr": "", "returncode": 0}
+    ctx = X.Context(slurm_sh=sh, lab_repo=str(TMP / "lab_snap"), resources={"mongo_ok": True, "cluster_reachable": True})
+    X.campaign_snapshot(["realloop_v1"], ctx=ctx, funnel=True)
+    X.campaign_snapshot(["realloop_v1"], ctx=ctx, funnel=True, sacct=["47300001", "47300002_1"])
+    check("executor.campaign_snapshot: no --sacct when none is asked (the experiment-mode command as it was), "
+          "one --sacct per job otherwise", len(seen) == 2 and "--sacct" not in seen[0]
+          and "--funnel --sacct 47300001 --sacct 47300002_1" in seen[1], [s[-200:] for s in seen])
+    bad = X.campaign_snapshot(["realloop_v1"], ctx=ctx, sacct=["1;rm -rf /"])
+    check("  a job id that is not one is refused before anything runs", bad["status"] == "refused" and len(seen) == 2,
+          bad.get("reasons"))
+
+
 def lab_tree(paths):
     """The lab tree a campaign reads beside its INC copy: the pre-registration
     in its funnel/ and the contract in docs/ (runner 1.5)."""
@@ -1082,7 +1337,8 @@ def main():
     try:
         for t in (test_thresholds_checked_against, test_mirrors, test_model_router, test_panel_and_outcome,
                   test_h11_and_score_da, test_remote_dev_scores, test_remote_summary, test_remote_submit,
-                  test_executor_render, test_lab_hooks, test_campaign_da, test_fixture_manifest, test_plan_script):
+                  test_executor_render, test_lab_hooks, test_campaign_da, test_campaign_job_failure,
+                  test_snapshot_sacct, test_fixture_manifest, test_plan_script):
             try:
                 t()
             except Exception as e:

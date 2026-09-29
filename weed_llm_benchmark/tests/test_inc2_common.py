@@ -24,7 +24,12 @@ Pinned:
   * inc2/common.py imports only the standard library and inc.common at module
     level (AST);
   * the atomic writers: the file appears whole or not at all; a failed write
-    leaves the old file and no temporary file.
+    leaves the old file and no temporary file;
+  * L-8: filter_manifest_bytes removes exactly the rows whose image sha256 is
+    listed and keeps every other line byte for byte, in order;
+    read_variant_drops reads the list only when it hashes as LOCK v2
+    records, refuses a production LOCK without the record and a changed
+    file, and gives no rows for a testing LOCK without it.
 
 Run:  python3 tests/test_inc2_common.py
 """
@@ -87,8 +92,10 @@ def test_constants():
     check("inc.common is untouched: still v1 after importing inc2.common",
           C1.SPLITS_VERSION == "v1" and C1.SPLITS_DIR == TMP / "inc" / "splits" / "v1"
           and C1.EVAL_SPLITS == ("dev", "test", "ood22", "ood23", "imageweeds") and C1.TRAIN_SPLITS == ("train_core",))
-    check("the byte copies are dev, test, imageweeds and train_core",
-          set(C2.BYTE_COPIES) == {"dev", "test", "imageweeds", "train_core"})
+    check("the byte copies are dev, test and imageweeds; train_core is v1's minus the L-8 list (L-8)",
+          C2.BYTE_COPIES == ("dev", "test", "imageweeds") and C2.FILTERED_COPIES == ("train_core",)
+          and C2.TRAIN_CORE_VARIANT_DROPS == C2.SPLITS_DIR / "train_core_variant_drops.jsonl"
+          and C2.VARIANT_DROPS_LOCK_KEY == "train_core_variant_drops_sha256")
 
 
 def test_reexport():
@@ -276,6 +283,37 @@ def test_atomic():
           (TMP / "a" / "t.csv").read_text() == 'a,b\n1,\n"x,y",2\n' and s == C1.sha256_file(TMP / "a" / "t.csv"))
 
 
+def test_variant_drops():
+    print("L-8: the filter and the list reader")
+    rows = [{"image": "/i%d.png" % i, "label": "/l%d.txt" % i, "sha256": ("%x" % i) * 64, "label_sha256": "b" * 64,
+             "source": "s", "session": "", "key": "train_core__k%d" % i} for i in range(1, 6)]
+    path = TMP / "tc.jsonl"
+    C2.write_manifest(path, rows)
+    data = path.read_bytes()
+    out, dropped = C2.filter_manifest_bytes(data, {rows[2]["sha256"]})
+    lines = data.splitlines(keepends=True)
+    check("filter_manifest_bytes drops the listed row's line and keeps every other line byte for byte, in order",
+          out == b"".join(lines[:2] + lines[3:]) and [r["key"] for r in dropped] == [rows[2]["key"]])
+    check("... nothing listed: the bytes unchanged", C2.filter_manifest_bytes(data, set()) == (data, []))
+    d = C2.SPLITS_DIR
+    d.mkdir(parents=True, exist_ok=True)
+    lst = d / C2.VARIANT_DROPS_NAME
+    C2.write_jsonl_atomic(lst, [dict(rows[2], reason="near_eval_variant")])
+    lock = {"splits_version": "v2", C2.VARIANT_DROPS_LOCK_KEY: C2.sha256_file(lst)}
+    got, rec = C2.read_variant_drops(lock, C2.LOCK_PATH)
+    check("read_variant_drops reads a list that hashes as LOCK v2 records",
+          [r["key"] for r in got] == [rows[2]["key"]] and rec["sha256"] == lock[C2.VARIANT_DROPS_LOCK_KEY])
+    check("... refuses a production LOCK that records none, gives none for a testing one",
+          raises(lambda: C2.read_variant_drops({"splits_version": "v2"}, C2.LOCK_PATH), C2.Inc2Error, "records no")
+          and C2.read_variant_drops({"splits_version": "v2"}, C2.LOCK_PATH, production=False)[0] == [])
+    lst.write_text(lst.read_text() + "\n")
+    check("... and refuses a list that changed since the LOCK",
+          raises(lambda: C2.read_variant_drops(lock, C2.LOCK_PATH), C2.Inc2Error, "LOCK v2 records"))
+    lst.unlink()
+    check("... or is missing",
+          raises(lambda: C2.read_variant_drops(lock, C2.LOCK_PATH), C2.Inc2Error, "hashes to none"))
+
+
 def main():
     test_constants()
     test_reexport()
@@ -284,6 +322,7 @@ def main():
     test_no_pathless_load()
     test_imports()
     test_atomic()
+    test_variant_drops()
     print()
     if FAILURES:
         print("%d FAILED: %s" % (len(FAILURES), FAILURES))

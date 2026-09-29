@@ -148,7 +148,7 @@ These are implementation choices the decisions above leave open. The contract ru
 
 ### 2.6 Decisions recorded before the build (2026-09-28)
 
-These were made after the design review and before any code, under the owner's delegation for this campaign. They are logged with `decided_by: human-delegated` when group F lands. Where one differs from §2.5, it replaces that default.
+These were made after the design review and before any code, under the owner's delegation for this campaign. L-8 was added on 2026-09-29, after the first real `inc2.splits build` refused (§4.2 step 5a). They are logged with `decided_by: human-delegated` when group F lands. Where one differs from §2.5, it replaces that default.
 
 | Id | Decision | Reason |
 |---|---|---|
@@ -159,6 +159,7 @@ These were made after the design review and before any code, under the owner's d
 | L-5 | **base_v2 drops the images of `rf_karthikeya-c8pvy__weed-detection-cwp10` and `rf_zig-zag-lnodr__weed-detection-vanpe` outright.** These are 812 of base B's 878 harvested images. The other 66 go through the copy scan (§4.2). | Both sources are re-uploads from the lab that produced dev and test, and the v1 pool caught 132 and 59 near-eval copies in them. A copy that dHash misses would inflate the success measure. Their images add little beyond cwd12 itself: B against B0 moved dev by +0.005 and test by −0.004, both within noise. |
 | L-6 | **Freeze and LoRA stay out of stream version 1**, by the survival rule of §5.1. A new pilot that passes the rule can re-admit them. | pilot_v3 chains: full reached 5/7 agreement and test 0.8475; LoRA 3/7 and 0.8132; freeze 3/7 and 0.7992. |
 | L-7 | **The /ocean quota floor of D27 is 3 %.** The campaign PAUSEs when staging + projected bytes leave less than 3 % of the /ocean quota free, about 210 GB of the 6.84 TiB project quota. Before collection starts, free space must also cover `collect_gb_envelope`. `stream_thresholds.json` D27 `quota_free_frac` is 0.03 (it was 0.1). | Measured 2026-09-28: 454 GB free (94 % used). The whole lab shares the quota, so a 10 % floor (about 700 GB) would PAUSE the campaign on its first snapshot, before it collects anything. The stream's projected need is under 50 GB. |
+| L-8 | **train_core rows within 6 bits of an evaluation image under a flip or rotation are dropped (2026-09-29).** They leave base_v2, `splits/v2/train_core.jsonl` and every v2 training manifest, through an explicit list the build writes (`splits/v2/train_core_variant_drops.jsonl`, its sha256 in LOCK v2), handled as L-5's list is: `inc2.train` refuses the listed bytes under any key. The build records them as an incident in `summary.json` (count, keys, matches) instead of refusing. More than max(1, ⌊0.5 % × train_core⌋) such rows (15 of 3,049), or a hit on the stored dHash itself, still refuses the build (R4). The real case: `train_core__20210909_NIKOND3300_YL_91`, whose transverse is 5 bits from `test__20210910_NIKOND3300_YL_160` (build job 47257533). **Note on v1 results:** B0's, B's and realloop_v1's training sets held that image (v1 compared the stored dHash only). The effect is negligible (1 of 3,049), and they are not re-run. | 1 image of 3,049: dropping it costs nothing measurable, and an evaluation image must not have a transposed near-copy in training. Nobody inspects the pair visually, because evaluation pixels are never shown to an external model. |
 
 ---
 
@@ -487,14 +488,16 @@ The funnel audit is a live, pre-registered campaign on base B and splits v1. Its
 
 ### 4.1 Design: only the training side changes
 
-- **Byte copies of v1.** dev, test, imageweeds and train_core are copied from v1, and each must match the v1 LOCK: `a5c904cd…`, `31ba7650…`, `357936e3…` and `242ef6b9…`.
+- **Byte copies of v1.** dev, test and imageweeds are copied from v1, and each must match the v1 LOCK: `a5c904cd…`, `31ba7650…` and `357936e3…`.
+- **train_core is v1's minus the L-8 drops.** `splits/v2/train_core.jsonl` is v1's train_core (`242ef6b9…`) with the rows of `train_core_variant_drops.jsonl` removed. Every other line is byte-identical and in the same order, so anyone can re-derive it from the v1 file and the list. With nothing listed it is a byte copy.
+  - **Why train_core.jsonl itself drops them**, instead of keeping v1's bytes for provenance beside a separate training view: L-8 removes those rows from every v2 training manifest, and train_core.jsonl is one (the canary and B0 ∪ tsw train it). A byte copy that still held a transposed near-copy of a test image would be a manifest every training run refuses (`inc2.train` checks the 8 variants). Provenance is kept by LOCK v2 instead: `derived_from.train_core` records v1's sha256, the list's sha256 and the rule, and `lock` and `verify` re-derive the file.
 - **The v1 scorer, unchanged.** Every v2 model is scored by the unchanged v1 scorer (sha `18c00837…`), which reads the v1 LOCK and `exams/v1`.
 - **Consequence.** The score stamps the gate compares (`gate.SHARED_KEYS`) are identical across v1 and v2, so B0, B and realloop_v1's dev, test and ImageWeeds numbers stay directly comparable. There is no new scorer, no new exam directory and no relock of v1.
 
 ### 4.2 Build steps — `inc2/splits.py build|lock|verify` (group A), output `INC_DIR/splits/v2/`
 
 1. **Precondition:** `inc.splits.verify()` returns [], a full re-hash of v1.
-2. **The four byte copies,** refused on any mismatch.
+2. **The three byte copies** (dev, test, imageweeds) **and v1's train_core,** each refused on any mismatch with the v1 LOCK. train_core is written minus the L-8 drops (step 5a).
 3. **`tsw22.jsonl` (1,915 rows) and `tsw23.jsonl` (1,784 rows),** built from the v1 `ood22`/`ood23` rows:
    - keys `tsw22__<stem>` and `tsw23__<stem>`, so no training row carries an exam key;
    - `source = 3seasonweeddet10/data2022|data2023`;
@@ -509,20 +512,28 @@ The funnel audit is a live, pre-registered campaign on base B and splits v1. Its
 5. **Base B's 878.** The same 8-variant check runs against dev, test and imageweeds. **A hit refuses the build and is an R4 incident.** It would void B's and realloop_v1's results, which is the funnel's H6(b) stop rule.
    - **[review] The dHash check is not enough for these 878.** 812 of them come from two sources the v1 pool already caught copying the evaluation splits: `rf_karthikeya-c8pvy__weed-detection-cwp10` (544 selected; v1 dropped 200 cwd12 copies and 134 near-eval images, 120 of test and 12 of dev) and `rf_zig-zag-lnodr__weed-detection-vanpe` (268 selected; 84 cwd12 copies, 53 near-test, 6 near-dev) (`step1/pool_summary.json` `per_slug`). A re-upload that held exact copies very likely also holds augmented ones beyond 6 bits. The funnel's own H6(a) quarantines such a source as a whole once any copy is found. So before `lock`, `inc2.splits` runs the embedding copy detector of §3.2 (`near_eval_embed`) over base B's 878 and over tsw22/tsw23, against dev, test and ImageWeeds, and writes the result into LOCK v2. A hit is handled by the H6(b) rule above. Whether a hit also removes the whole source's images from base v2 (as H6(a) would) is an owner decision (R4). The funnel campaign is paused, so this scan cannot wait for its F4.
    - **[review] Licences.** Base B's 878 and the v1 increment pool were collected without a licence record (the v1 Step 1 code holds none). Their licence is read, per source, from the funnel's card index (`funnel/fetch.py` records the Roboflow, HF, Mendeley and Zenodo licence fields) and written into `base_v2.jsonl`'s provenance. Unresolved → `research_only: true` with `licence: unresolved`, recorded as an owner-accepted exemption for the base (D-A named these images), never silently.
+5a. **train_core against the 8 variants (decision L-8, 2026-09-29).** v1 compared the stored dHash only, so each train_core row is checked against dev, test and imageweeds under its 8 flips and rotations.
+   - **A variant hit (`near_eval_variant`) is dropped, not refused.** The row leaves base_v2 and `train_core.jsonl`. It is listed in `splits/v2/train_core_variant_drops.jsonl`: its v1 manifest row, its dHash and 8 variants, the reason, the match (evaluation split, key, bits, variant) and `decided_by: L-8`. `summary.json` `train_core_variant_drops` records it as an incident: count, cap, keys, matches, the list's sha256, and the note that B0's, B's and realloop_v1's training sets held it and are not re-run.
+   - **Limits, still R4.** More drops than max(1, ⌊0.5 % × |train_core|⌋) (15 of the real 3,049) refuse the build. So does a hit on the stored dHash itself: v1 compared exactly that, so v1 and this build would disagree, and L-8 covers flips and rotations only. Nothing is written before either check passes.
+   - **De-duplication keeps the dropped image.** The earlier-image index of steps 4–5 still holds every v1 train_core image, so a tsw or base B near-copy of a dropped image is dropped as `near_train_core`, never kept in its place.
+   - **The real case** (build job 47257533, which refused under the rule this step replaces): `train_core__20210909_NIKOND3300_YL_91`, transverse, 5 bits from `test__20210910_NIKOND3300_YL_160`.
 6. **`nevertrain_dhash.json` v2:** dev 617 + test 1,977 + imageweeds 3,208 = **5,802** entries at 6 bits. It is marked complete only at lock (`splits._finalise_index` logic).
 7. **`base_copies_dhash.json`:** every image of base v2 at 6 bits. Harvested copies of base photographs never return as "new" data with worse labels. Examples:
    - the AgML three_season release, where the old join turned Purslane into Palmer amaranth;
    - the cwd12 copies in cwp10 and vanpe;
    - the 1,055 v1 near-eval drops, which are copies of ood22/ood23 and so become base copies under v2.
-8. **`base_v2.jsonl`** = train_core ∪ tsw22 ∪ tsw23 ∪ `step1/base_selected.jsonl` (878 rows, sha `7e47d374…`). That is 7,626 before the pair drop and 7,625 expected after it. It is checked pairwise disjoint by key, path, sha256 and 6-bit dHash.
+8. **`base_v2.jsonl`** = train_core (minus the L-8 drops) ∪ tsw22 ∪ tsw23 ∪ `step1/base_selected.jsonl` (878 rows, sha `7e47d374…`). That is 7,626 before the pair drop and 7,625 expected after it, before L-5 and L-8. It is checked pairwise disjoint by key, path, sha256 and 6-bit dHash. The L-8 drops are in no v2 manifest, in `base_copies_dhash.json` or in the provenance file.
 9. **`LOCK.json` v2:**
    - `splits_version: "v2"`;
    - manifests {train_core, tsw22, tsw23, base_v2, dev, test, imageweeds};
    - `nevertrain_sha256` and `base_copies_sha256`;
    - `scorer_sha256`;
-   - `derived_from` {the v1 LOCK sha256, identical: [dev, test, imageweeds, train_core]};
+   - `derived_from` {the v1 LOCK sha256, identical: [dev, test, imageweeds] (plus train_core when nothing is dropped), train_core: {v1 sha256, v2 sha256, the L-8 list and its sha256, the count, the rule}};
+   - `train_core_variant_drops_sha256` and `train_core_variant_drops` {file, sha256, rows, keys, cap, decided_by};
    - the funnel H6 status of base B's part (`pending` or the `leak_v1` result);
    - plus `lock_log.jsonl`; every file is 0444.
+   - **[L-8] lock re-checks the list.** It must hash as the build recorded and hold at most the cap. Each row must be a v1 train_core row with the same bytes, whose image still hashes as recorded and whose re-computed dHash and 8 variants are the recorded ones. GuardV2 must refuse each row as `near_eval_variant`. v2's train_core must be exactly v1's minus the listed rows. A changed list, or a forged one naming a clean row (even with a matching `summary.json`), refuses. `verify` re-hashes the list against LOCK v2 and re-derives train_core.
+   - **[L-8] Consumers.** `inc2.train` refuses the listed image bytes under any key or source (reason `train_core_variant_drop`), after checking the list's sha256 against LOCK v2. A production LOCK without the record is refused. GuardV2 and the v2 `NeverTrainGuard` refuse the same images by their pixels (`near_eval_variant`), since that is what put them on the list.
 
 ### 4.3 The new protocol package `inc2` and what the v1 code refuses
 
@@ -553,7 +564,7 @@ Costs in V100 GPU-h (= SU), est. from B0 (1.77 GPU-h for 3 seeds × 3,049 × 100
 | Run | Status | GPU-h | Why |
 |---|---|---|---|
 | **B_v2**, 5 cold seeds on base_v2 + finals (dev, imageweeds, test) | required (milestone 0) | 6.9–7.9 | The loop's starting point and D-A's measured effect. 5 seeds make the p ≤ 0.025 test possible; at 3 v 3 the smallest p is 0.05. |
-| **Canary**: B0 seed 0 under `inc2.train` | required | 0.6 | Reproduces b0_v1 `base__s0`. It must fall within 1 sd of B0's seeds (0.0063) on dev. |
+| **Canary**: B0 seed 0 under `inc2.train` | required | 0.6 | Reproduces b0_v1 `base__s0` on b0_v1's base minus the L-8 drops (LOCK v2's train_core). The manifest is accepted by b0_v1's base sha256 plus the L-8 list's sha256, and exp.json records the dropped rows. It must fall within 1 sd of B0's seeds (0.0063) on dev. |
 | **B0 ∪ tsw** (6,748 images), 3 seeds | recommended (does not reopen D-A) | 3.7–4.2 | Isolates the 878 harvested images, which lowered ImageWeeds in v1 (0.061 → 0.016). |
 | H100 calibration: B0 seed 0 on H100 | optional | 0.3–0.6 (= 0.6–1.2 SU) | H100 costs 2 SU/h and its speed-up is unmeasured. It uses V100 until then. |
 | B0, B | **not re-run** | 0 | Identical manifests and scorer. |
@@ -1067,11 +1078,12 @@ Each group owns its files and tests and edits nothing another group owns. The in
 **Provides:** `inc2.common`; `GuardV2.load(lock_path)`, `.check(dhash, variants) → (reason | None, match)`; `inc2.guard.dhash_variants(path)`.
 
 **Acceptance:**
-- the four byte copies match the v1 LOCK shas;
+- the three byte copies match the v1 LOCK shas, and train_core is v1's minus the L-8 list (L-8);
 - 5,802 index entries;
 - tsw22 has 1,915 rows and tsw23 1,784 minus the recorded drops;
 - every planted copy kind is caught;
 - a planted copy in B's part refuses the build;
+- [L-8] a planted transverse copy of a test image in train_core is dropped, listed and refused by `inc2.train` under another key; more than the cap refuses the build;
 - [review] a planted 15 % crop, shear or brightness copy of a test image in B's part, more than 6 bits away under all 8 variants, is caught by the embedding scan before lock;
 - [review] a planted tsw row from a dev session is dropped, and a row sharing a session with test is counted;
 - [review] `inc2.common` resolution test (§4.3): v2 training paths, v1 evaluation paths, and no argument-less `NeverTrainGuard.load()`;
@@ -1092,7 +1104,8 @@ Each group owns its files and tests and edits nothing another group owns. The in
 - ood exams are refused;
 - a planted dev copy is refused by `guard_rows`;
 - the job script exports `INC_JOB_SCRIPT` as itself and runs `inc2.train`, then `inc.driver advance`;
-- pilot_v4's bins are sha-identical to pilot_v3's `exp.json` entries and it has no truth arm;
+- pilot_v4's bins are sha-identical to pilot_v3's `exp.json` entries, except for rows whose image bytes are L-8 drops, which are removed and recorded; it has no truth arm;
+- [L-8] the canary builds on v1's train_core minus the L-8 list, records the dropped rows, and its verdict accepts that manifest by b0_v1's base sha256 plus the list's sha256;
 - baseline builds pass the pinned `driver.validate_definition` and `check_definition_data`;
 - a FakeBackend end-to-end test (driver init + advance of a baseline and of a 1-step chain) submits only `run_inc2_job.sh`.
 
@@ -1333,7 +1346,7 @@ That is **fewer than M = 763 without the MH-Weed16 rejoin or R3.** Collection is
 7. **`--testing`** lifts the real-data pins: the v1 LOCK prefixes (a5c904cd, 31ba7650, 357936e3, 242ef6b9, e5a6aff7, 8be59afb), the scorer 18c00837, base_selected 7e47d374, and the counts 617, 1,977, 3,208, 3,049, 1,915, 1,784, 878, 5,802 and 812. `run_inc2_splits.sh` refuses it. `test_inc2_splits.py` checks the pins against the local artifacts.
 8. **Calibration location.** When the funnel's `leak_v1.json` is absent or failed, the stream's own calibration (seed prefix `stream/v1/leak`, the funnel prereg's H6 gates) is written under `splits/v2/leak/` (group A's directory), not `intake/leak/` (group D's). It does not depend on the evaluation splits, so `step1_stream` can reuse it by path through `guard.load_calibration`.
 9. **`inc2.common`.** `read_lock` and `verify_manifest_against_lock` refuse as ambiguous (use `read_lock_v2`/`read_lock_v1` and `verify_manifest_against_lock_v2`). `manifest_path` dispatches: dev, test and imageweeds go to the v1 files, and train_core, tsw22, tsw23 and base_v2 go to v2. `NeverTrainGuard.load()` requires a path.
-10. **train_core against the 8 variants refuses the build (R4).** base_v2 holds every train_core row as a byte copy of v1, and v1 compared the stored dHash only. A flipped or rotated evaluation copy in train_core would therefore reach every v2 training run, and `inc2.train.guard_rows` would then refuse every run (the canary and B_v2 included). Refusing at build names the images at once, instead of locking and idling R0 on guard failures.
+10. **train_core against the 8 variants: dropped under L-8, refused beyond its cap.** v1 compared the stored dHash only, so a flipped or rotated evaluation copy may sit in train_core, and `inc2.train.guard_rows` would refuse every run that holds it (the canary and B_v2 included). As first built, a hit refused the build (R4), because base v2 held train_core as a byte copy of v1. The first real build (job 47257533) refused on one image, and decision L-8 (§2.6) replaced the rule; see "Amendment: decision L-8" below.
 11. **The funnel's `leak_v1.json` is applied when it is complete** (status complete, calibration passed). Its `scans.base_B` copies are applied by key or image path; when the listing is shorter than the count, the rest are read from its pairs file, checked by sha256, and a missing or changed file refuses. A listed image in the part base_v2 keeps refuses `build` and `lock` (H6(b), R4). One in the L-5 part is recorded as the incident. An absent or incomplete run is recorded as `pending`.
 12. **`lock` refuses a `--testing` build** unless given `lock --testing`, which `run_inc2_splits.sh` refuses. The platform's lock takes no flags, so it can never seal a synthetic world.
 13. **`lock` re-runs the never-train check** from the provenance file's recorded dHash and 8 variants of every base_v2 row. It also writes `provenance: {file, sha256, rows}` (read by `inc2.stream`) and `h6_status` (read by `stream_remote`'s lock status) beside the flat keys.
@@ -1349,17 +1362,17 @@ That is **fewer than M = 763 without the MH-Weed16 rejoin or R3.** Collection is
 18. **The writer lock** is taken over when its holder's process on this host is gone, or when its Slurm job has ended (`squeue`: "Invalid job id" or a finished state). A build killed at its time limit on another node runs no release, so without this rule a person would have to remove the lock. When `squeue` cannot tell, the lock still refuses.
 19. **The job script's drift check** also covers `funnel/domain.py`, `funnel/ledger.py` and `funnel/domains/weed.json`. The build and scan read the outer copy of that config for licences, lab groups, the embedder, the augmentation families and the negative groups.
 
-**Numbers other groups depend on.** With L-5, base_v2 is about 3,049 + 1,915 + 1,784 − 1 (the ood23–ood22 pair) + 66 ≈ 6,813 images, minus any dev-session or copy drops [to verify on cluster]. ⌈0.10 × 6,813⌉ = 682, not the 763 of P2, which was computed before L-5. The cost rows of §5.6 use N = 7,626. M is group E's; the number to read is `summary.json` `base_v2.images`.
+**Numbers other groups depend on.** With L-5 and L-8, base_v2 is about 3,048 (3,049 minus the one L-8 drop) + 1,915 + 1,784 − 1 (the ood23–ood22 pair) + 66 ≈ 6,812 images, minus any dev-session or copy drops [to verify on cluster]. ⌈0.10 × 6,812⌉ = 682, not the 763 of P2, which was computed before L-5. The cost rows of §5.6 use N = 7,626. M is group E's; the number to read is `summary.json` `base_v2.images`.
 
 **Not in group A's files.** L-3's per-species tolerance gate (§2.6) is to be "a new gate version in `inc2/`", but §9 assigns it to no group.
 
 **How it was verified.** Locally, on synthetic worlds, with no network and no GPU:
-- `test_inc2_common.py`: 43 checks, including a flipped copy that the v1 check passes and the v2 `NeverTrainGuard` refuses;
+- `test_inc2_common.py`: 43 checks at first build (49 with L-8), including a flipped copy that the v1 check passes and the v2 `NeverTrainGuard` refuses;
 - `test_inc2_guard.py`: 68 checks, including `GuardV2.load` on a LOCK or index that leaves out an evaluation split or image, and six calibration records that say `ok: true` but fail their own gates;
-- `test_inc2_splits.py`: 118 checks. Among them:
+- `test_inc2_splits.py`: 118 checks at first build (138 with L-8). Among them:
   - the platform's sequence: a build with no `embed_scan.json` scans by itself, then lock;
   - no second scan when one covers the candidates;
-  - a planted train_core rotation of a test image refuses the build;
+  - a planted train_core rotation of a test image refused the build (replaced by the L-8 checks below);
   - funnel `leak_v1.json` copies, listed or in its pairs file, refuse the build and lock (a missing pairs file refuses too);
   - lock refuses a `--testing` build without `--testing`, and a base v2 row left unscanned;
   - the writer lock is taken over from an ended Slurm job and refused for a running or unknown one;
@@ -1373,6 +1386,44 @@ The existing `test_inc_splits`, `test_funnel_leak`, `test_funnel_embed`, `test_f
 - `run_inc2_build.sh` (group E) runs `inc2.splits build`, which now scans. Its drift list lacks `funnel/embed.py`, `funnel/__init__.py`, `funnel/domain.py` and `funnel/domains/weed.json`. It exports no `HF_HUB_OFFLINE`; `inc2.splits` sets it by default.
 - `inc2.stream._base_hashes` (group E) accepts the provenance file unchecked when the LOCK has no `provenance.sha256`. LOCK v2 now carries that key.
 - `step1_stream` (group C) now validates calibrations through `guard.calibration_problems`. Its test fixture `write_calibration` still writes a bare `ok: true` record.
+
+#### Amendment (2026-09-29): decision L-8
+
+**What happened.** The first real `run_inc2_build.sh inc2.splits build` (cluster job 47257533) refused under item 10's first rule. One train_core image, `train_core__20210909_NIKOND3300_YL_91`, is 5 bits from `test__20210910_NIKOND3300_YL_160` under the transverse variant. Nothing was written. Decision L-8 (§2.6) drops such rows instead.
+
+**What changed, and why.**
+1. **`inc2/splits.py` build.** It computes the variant hits on train_core as before (§4.2 step 5a).
+   - **Hits within the cap are dropped.** A `near_eval_variant` hit is dropped from base_v2 and from `train_core.jsonl`. It is listed in `splits/v2/train_core_variant_drops.jsonl`: the v1 row, its dHash and variants, the match and `decided_by`. It is recorded in `summary.json` `train_core_variant_drops` as an incident (count, cap, keys, matches, sha256, the v1-results note). The build goes on.
+   - **The cap.** It is max(1, ⌊0.5 % × |train_core|⌋): 15 of 3,049, and 1 in a 40-image test world. A single image is always a stray; more is a pattern for a person. Past the cap the build refuses (R4).
+   - **A stored-dHash hit still refuses.** v1 checked exactly that, so v1 and v2 would disagree, and L-8 covers flips and rotations only.
+   - **Nothing is written before these checks pass**, as before.
+2. **Where the drop is applied.** `train_core.jsonl` is v1's bytes minus the listed rows, matched by image sha256; every other line is identical and in order. `train_core.jsonl` itself drops them, rather than keeping v1's bytes beside a separate training view. L-8 removes the rows from every v2 training manifest, and a byte copy holding them would be a manifest every run refuses. `inc2.common.BYTE_COPIES` is now (dev, test, imageweeds), and `FILTERED_COPIES` is (train_core). `filter_manifest_bytes` is the one derivation rule; `read_variant_drops` is the list reader, checked against LOCK v2.
+3. **LOCK v2** records `train_core_variant_drops_sha256`, a `train_core_variant_drops` block and `derived_from.train_core` (v1 sha256, v2 sha256, the list, the rule). `identical` lists train_core only when nothing is dropped.
+   - `lock` re-checks the list (§4.2 step 9): the recorded sha256, the cap, v1 rows with the same bytes, re-computed hashes, GuardV2's `near_eval_variant`, and v2 = v1 minus the list. So a forged list naming a clean row is refused even when `summary.json` was edited to match.
+   - `verify` re-hashes the list and re-derives train_core.
+4. **Guards.** `inc2.train.guard_rows` refuses the listed bytes under any key (`train_core_variant_drop`), after checking the list against LOCK v2, as it does for L-5. A production LOCK without the record is refused. GuardV2 and the v2 `NeverTrainGuard` needed no change: they refuse the same images by their pixels, since that is what lists them.
+5. **The de-duplication index keeps every v1 train_core image**, the dropped ones included. A tsw or base B near-copy of a dropped image is dropped (`near_train_core`), never kept in its place.
+6. **v1 results.** B0's, B's and realloop_v1's training sets held that image. The effect is negligible (1 of 3,049), and they are not re-run (L-8); the summary and the canary's exp.json say so.
+
+**Group B's modules, changed for L-8** (their build note has the details): the canary trains b0_v1's base minus the list and records the dropped rows (`inc2/baseline.py`); `inc2.train` refuses the listed bytes; `inc2/pilot4.py` removes listed bytes from pilot_v3's bin copies. pilot_v3's Bswap bin was built from session `20210909_NIKOND3300_YL`, the dropped image's session, so without this Stage A would refuse [to verify on cluster: whether Bswap holds that image].
+
+**Not changed.** `collect/intake.py` (group D) refuses re-uploads of the L-5 images by its own list. It does not read the L-8 list: an intake copy of a dropped image is refused by GuardV2 when it is within 6 bits of the evaluation image under a variant, as the dropped image itself is. A near-copy of the dropped image that is more than 6 bits from the evaluation image under every variant is not refused by any list. That is the same rule as for any image, and 1 image is at stake.
+
+**How it was verified.** Locally, on synthetic worlds:
+- `test_inc2_splits.py` plants a real transverse copy of a test image in the world's train_core; v1 keeps it (more than 6 bits under its stored dHash, 0 under transverse). The build:
+  - drops it, lists it with its match, records the incident, and leaves it out of `train_core.jsonl` (v1's bytes minus that line), base_v2, the base-copy index and the provenance;
+  - locks, with LOCK v2 recording the list and the derivation;
+  - after lock, GuardV2, the v2 `NeverTrainGuard` and `inc2.train.guard_rows` refuse the image re-listed under another key and source.
+  - Two variant hits (over the cap of 1) refuse, and so does a stored-dHash hit, each with nothing written.
+  - lock refuses a list changed after the build, and a forged list naming a clean row with a matching summary.
+  - verify and `inc2.train` catch a list changed after lock.
+- `test_inc2_common.py` covers the filter and the reader. `test_inc2_train.py`, `test_inc2_baseline.py` and `test_inc2_pilot4.py` cover group B's side.
+- **Mutation check.** 18 single mutations were run in a scratch copy of the package, and each made its suite fail:
+  - in `splits.py`: the cap, the stored-dHash refusal, keeping the drop in the base, and lock's list-hash, guard-reason and derivation checks; verify's list hash; the LOCK key;
+  - in `train.py`: the byte refusal, the production record and the list hash;
+  - in `common.py`: the filter;
+  - in `baseline.py`: the canary's build derivation, its verdict's LOCK, reference and file checks, and its exp.json record;
+  - in `pilot4.py`: the bin filter.
 
 
 ### Build note (group C)
@@ -1461,8 +1512,12 @@ The existing `test_inc_verify`, `test_inc_select`, `test_funnel_recover` and `te
    - the finals are dev and imageweeds (P10: no test);
    - READY means pilot_v4 is done and each arm has 7 verdicts and a final dev.
    - Every pilot_v3 bin must pass the v2 guard before the build. v1 never checked flips and rotations, so a variant copy of an evaluation image in pilot_v3's Breal would make the build refuse. That would be an incident to report, not a check to work around [to verify on cluster].
+   - **[L-8, 2026-09-29]** The exception is a row whose image bytes are on splits v2's L-8 list (`train_core_variant_drops.jsonl`, read through `inc2.train.load_variant_drops`). It is removed from that bin's copy, keeping every other line byte-identical. The entry carries the new `manifest_sha256` and `n_images` beside `source_manifest_sha256`, `source_n_images` and `l8_dropped`. exp.json's `variant_drops` and the summary's `sha_identical` name the bin and the row. Why: pilot_v3's Bswap was built from session `20210909_NIKOND3300_YL`, which holds the one real L-8 image, and L-8 removes it from every v2 training manifest. One image of a 238–274-image bin is negligible next to the recorded truth verdicts, and pilot_v3 is not re-run. Any other guard refusal still refuses the build.
 8. **The canary rule** is read as |canary − mean(b0_v1 seeds)| ≤ sd(b0_v1 seeds) on dev 12-class (0.8082 ± 0.0063, from `b0_v1/report.json`). It also needs a production run and score, a written sidecar, and b0_v1's base manifest (by sha256), cold recipe and seed 0, read from `b0_v1/exp.json`: a canary that trained something else, or in test mode, reproduces nothing.
-9. **Defence in depth.** `inc2.train` refuses a GuardV2 reason it does not know, and it also looks every variant up in the v2 never-train index itself. It refuses the bytes of every L-5 image (`splits/v2/l5_excluded.jsonl`, sha256 in LOCK v2) under any key or source. A production run refuses a LOCK v2 marked testing or one that records no L-5 list.
+   - **[L-8, 2026-09-29] b0_v1's base minus the L-8 drops.** L-8 removes from LOCK v2's train_core a row that b0_v1 trained on, so the canary trains b0_v1's base minus the listed rows.
+   - **At build**, `variant_drops_record` requires v1's train_core (by the v1 LOCK's sha256, which is b0_v1's base `242ef6b9…`) filtered by the list's image sha256s (the list hashing as LOCK v2 records) to be the canary's manifest byte for byte, or the build refuses. The record goes into exp.json and `build_summary.json` as `variant_drops`: each dropped row's key, image sha256 and match, the list's sha256, the reference sha256 and the rule.
+   - **At verdict**, `canary_manifest_match` accepts the manifest as identical to the reference's, or as the reference's minus the recorded drops. For the second, the canary's record must name the reference's base sha256 and the list's sha256, LOCK v2 must still record that list, the file must still hash to it, and the reference's manifest (its copy, its source or v1's train_core, whichever hashes as recorded), filtered by the listed sha256s, must hash to the canary's manifest. `canary.json` `manifest_match` says how it matched and names the dropped rows. The dev rule is unchanged: one image of 3,049 is not expected to move dev by a measurable amount.
+9. **Defence in depth.** `inc2.train` refuses a GuardV2 reason it does not know, and it also looks every variant up in the v2 never-train index itself. It refuses the bytes of every L-5 image (`splits/v2/l5_excluded.jsonl`, sha256 in LOCK v2) under any key or source, and, since L-8, of every L-8 drop (`splits/v2/train_core_variant_drops.jsonl`, reason `train_core_variant_drop`). A production run refuses a LOCK v2 marked testing, or one that records no L-5 or no L-8 list.
 10. **Research-only.** A baseline's exp.json records `research_only` (§8) from `splits/v2/base_v2_provenance.jsonl`, read only when it hashes as LOCK v2 records. The flag is false only when every row is known and none is research-only; a research-only row or a row of unknown licence makes it true (P6). A milestone on a pool with intake rows should pass its own record via `extra`.
 
 **What the owner should know about L-4.**
@@ -1473,10 +1528,11 @@ The existing `test_inc_verify`, `test_inc_select`, `test_funnel_recover` and `te
 - **The truth arm.** The pinned driver's truth arm covers every step of an experiment or none. "Truth on every ⌈cost/25⌉-th step" therefore has to be realised by group E's segment builder, for example truth on in every n-th segment of K = 1; `capacity_v1.json` gives `truth_every`.
 
 **How it was verified.** Locally, on synthetic worlds, with no network and no GPU:
-- **`test_inc2_train.py` (80 checks):**
+- **`test_inc2_train.py` (80 checks; 87 with L-8):**
   - real 1-epoch CPU runs through the pinned scorer and the sidecar, with the real `inc2.guard`;
   - planted exact, 1–6-bit, re-encoded, hflip and rot90 copies are refused;
   - an L-5 image re-listed under another key is refused, and an L-5 list that does not hash as LOCK v2 records stops the run;
+  - [L-8] the world's v1 train_core holds a transverse copy of a test image that v2's train_core and base_v2 leave out. Re-listed under another key and source, it is refused by the list and by GuardV2, and by the list alone when GuardV2 is patched to pass. A changed list stops the run, and a production LOCK with an L-5 list but no L-8 list is refused;
   - the job script's order, its `INC_JOB_SCRIPT` export and its drift stop (the funnel modules included);
   - the pinned modules are unchanged against git HEAD.
 - **`test_inc2_gate3.py` (47 checks):**
@@ -1484,12 +1540,13 @@ The existing `test_inc_verify`, `test_inc_select`, `test_funnel_recover` and `te
   - the equivalence battery;
   - an unavailable step: a pinned ACCEPT commits as HOLD, a pinned REJECT stands;
   - realloop_v1's recorded ledger.
-- **`test_inc2_baseline.py` (70 checks):**
+- **`test_inc2_baseline.py` (70 checks; 81 with L-8):**
   - FakeBackend baseline and 1-step chain runs to done, submitting only `run_inc2_job.sh`;
   - the autopilot's L23B argv shapes (`--arch`/`--imgsz`, no role) build B_v2, both capacity arms and the canary with the right role, arm and exams; roles that do not match, and test outside a milestone read, are refused;
   - the canary passes only as a production run on b0_v1's manifest and recipe;
+  - [L-8] the canary builds on v1's train_core minus the list and records the dropped row; a manifest that is not v1's minus the list is refused. Its verdict passes on the reduced manifest, and fails with no recorded drops, with drops from another reference, with another list than LOCK v2's (even when the file matches the canary's record), or with a list changed since the build;
   - the capacity decision is test-blind.
-- **`test_inc2_pilot4.py` (28 checks):** on pilot_v3's recorded chains, R0 survives with 5/7 and 0.8006, and freeze and LoRA fail with 3/7; a bin with an hflip test copy refuses the build; a HOLD on a planted bin is not a rejection.
+- **`test_inc2_pilot4.py` (28 checks; 31 with L-8):** on pilot_v3's recorded chains, R0 survives with 5/7 and 0.8006, and freeze and LoRA fail with 3/7; a bin with an hflip test copy refuses the build; a HOLD on a planted bin is not a rejection; [L-8] a Bswap bin holding an L-8 drop, re-keyed and relabelled, is copied without that row and recorded, with every other bin sha-identical.
 - **Mutation checks.** 45 source mutations of the group's decisions and guards (listed in docs/INCREMENTAL_PROTOCOL.md, "Protocol v3", "How it was verified") were each run against these tests in a scratch copy of the package, and every one made a test fail.
 - **Existing suites, unchanged and passing:** `test_inc_train`, `test_inc_driver`, `test_inc_gate`, `test_inc_scorer`, `test_inc_realloop`, group A's `test_inc2_common` and `test_inc2_guard`, and group E's `test_inc2_stream` and `test_inc2_stream_report` (run against these modules).
 

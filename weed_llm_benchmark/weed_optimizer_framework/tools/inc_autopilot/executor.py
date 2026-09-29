@@ -225,7 +225,7 @@ REPLAY_MAY_SKIP = ("R2", "R4b")
 # needs every one of them to pass (stream_replay_status).
 STREAM_REPLAY_CASES = ("S1", "S1b", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S13",
                        "S14", "S15", "S16", "S17", "S18", "S19", "S20", "S21", "S22", "S23", "S24", "S25", "S26",
-                       "S27", "S28", "stream_prospective", "stream_r0")
+                       "S27", "S28", "S29", "stream_prospective", "stream_r0")
 STREAM_MUTATION_CASE = "stream_mutations"
 CODE_ROOT = Path(__file__).resolve().parents[3]       # the directory holding weed_optimizer_framework/
 # Files outside this package that decide what the executor may do; a replay
@@ -2268,7 +2268,7 @@ def _ledger_pos(v):
 
 
 def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_step1=False,
-                      actor=M.AUTOPILOT_ACTOR, campaign=None, ctx=None, plan_pull=None, funnel=False):
+                      actor=M.AUTOPILOT_ACTOR, campaign=None, ctx=None, plan_pull=None, funnel=False, sacct=()):
     """remote.py campaign-snapshot: advance, report and snapshot in one verb.
 
     Composite, so it has no policy row of its own: each part is authorised
@@ -2285,6 +2285,10 @@ def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_s
     back as a list under "plan_pulls", one result per pull, in order.
     `funnel` adds the funnel summary (inc_funnel_summary, R0: remote.py
     campaign-snapshot --funnel) to the snapshot record, under "funnel".
+    `sacct` (job ids) adds sacct's record of those jobs (remote.py
+    campaign-snapshot --sacct, read-only), under "sacct": the ticker reads
+    the final state of the funnel jobs it waits for there, since a job that
+    ended is gone from squeue. Nothing changes when it is empty.
     """
     ctx = ctx or Context()
     now = ctx.clock()
@@ -2292,6 +2296,9 @@ def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_s
     ledger_from = dict(ledger_from or {})
     params = {"exps": exps, "advance": bool(advance), "report": report,
               "ledger_from": ledger_from, "no_step1": bool(no_step1)}
+    sacct = [str(j) for j in sacct or []]
+    if sacct:
+        params["sacct"] = sacct
     req = _normalize({"policy_action": "inc_campaign_snapshot", "params": params})
     try:
         camp = _campaign(campaign)
@@ -2309,6 +2316,8 @@ def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_s
         return _finish(ctx, res, "refused", ["ledger_from names %r, not a listed experiment "
                                              "with a whole line count (and optionally the "
                                              "sha256 of those lines)" % bad])
+    if not all(re.match(r"^[0-9]+(_[0-9]+)?$", j) for j in sacct):
+        return _finish(ctx, res, "refused", ["sacct job ids must be numeric, got %r" % (sacct,)])
     pos = {k: _ledger_pos(v) for k, v in ledger_from.items()}
     tier = _tier(actor)
     if tier is None:
@@ -2350,6 +2359,8 @@ def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_s
         argv.append("--no-step1")
     if funnel:
         argv.append("--funnel")
+    for j in sacct:
+        argv += ["--sacct", j]
     plans = [{"res": res, "action": "inc_campaign_snapshot", "params": params, "local": False,
               "remote": argv}]
     pulls = plan_pull if isinstance(plan_pull, list) else ([plan_pull] if plan_pull is not None else [])

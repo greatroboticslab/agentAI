@@ -8,7 +8,12 @@ tree each run the same experiment-mode computations in a subprocess, on the
 pinned replay fixtures, and print one JSON record:
 
   * the rules version (diagnose.rules_version: diagnose.py, thresholds.json,
-    levers.json, levers.py are untouched by stream mode);
+    levers.json, levers.py are untouched by stream mode). A later funnel
+    change moves it until committed (levers.json, levers.py): it may differ
+    only when those two files alone changed and levers.json's experiment-mode
+    part (every non-funnel lever row, the cards, operations, refusals, _meta
+    and the protocol constants but funnel_*) is identical; the rest of the
+    record is compared byte for byte either way;
   * for pilot_v1, pilot_v2, pilot_v3 and realloop_v1 (the whole tree as each
     replay case loads it): every diagnosis (id, fired, severity, summary,
     levers, cites, detail) and levers.propose's proposals (argv, params,
@@ -46,7 +51,14 @@ os.environ["INC_DIR"] = os.path.join(sys.argv[3], "inc")
 from weed_optimizer_framework.tools.inc_autopilot import evidence as E, diagnose as DG, levers as LV
 from weed_optimizer_framework.tools.inc_autopilot import brain_plan as BP, executor as X, budget as B, model as M
 from weed_optimizer_framework.tools.brain import policy as POL, approvals as AP
-out = {"rules_version": DG.rules_version()}
+out = {"rules_version": DG.rules_version(), "rules_files": DG.rules_digest()["files"]}
+_menu = json.loads(open(LV.MENU_FILE).read())
+_fun = set(LV.FUNNEL_LEVERS)
+out["levers_json_experiment"] = hashlib.sha256(json.dumps(
+    {"levers": {k: v for k, v in _menu["levers"].items() if k not in _fun}, "cards": _menu.get("cards"),
+     "operations": _menu.get("operations"), "refusals": _menu.get("refusals"), "_meta": _menu.get("_meta"),
+     "protocol": {k: v for k, v in _menu["protocol"].items() if not k.startswith("funnel_")}},
+    sort_keys=True).encode()).hexdigest()
 def diag_rec(ds):
     return [{k: d.get(k) for k in ("id", "fired", "severity", "summary", "levers", "cites", "detail", "exp")} for d in ds]
 trees = {"pilot_v1": ["pilot_v1", "b0_v1"], "pilot_v2": ["pilot_v1", "pilot_v2", "b0_v1", "base_b_v1"],
@@ -185,7 +197,28 @@ def main():
         a_s = a_s.replace(str(wa), "<W>").replace(str(head_root), "<R>")
         b_s = b_s.replace(str(wb), "<W>").replace(str(ROOT), "<R>")
         d = diff(json.loads(a_s), json.loads(b_s))
-        check("the rules version is unchanged (%s)" % a.get("rules_version"), a.get("rules_version") == b.get("rules_version"))
+        # The rules version hashes diagnose.py, thresholds.json, levers.json and
+        # levers.py whole, so a funnel change (the funnel levers' rows and code,
+        # the funnel_* protocol constants) moves it until it is committed. It
+        # may move only that way: the files that changed are levers.json and
+        # levers.py, and levers.json's experiment-mode rows, cards, operations,
+        # refusals and protocol are the same; every record below is still
+        # compared byte for byte.
+        ra, rb = a.get("rules_files") or {}, b.get("rules_files") or {}
+        changed = sorted(k for k in set(ra) | set(rb) if ra.get(k) != rb.get(k))
+        if a.get("rules_version") == b.get("rules_version"):
+            check("the rules version is unchanged (%s)" % a.get("rules_version"), True)
+        else:
+            check("the rules version moved (%s -> %s) for a funnel change only: %s changed; levers.json's "
+                  "experiment-mode rows, cards, operations, refusals and protocol are identical"
+                  % (a.get("rules_version"), b.get("rules_version"), ", ".join(changed)),
+                  changed and set(changed) <= {"levers.json", "levers.py"}
+                  and a.get("levers_json_experiment") == b.get("levers_json_experiment"),
+                  (changed, a.get("levers_json_experiment"), b.get("levers_json_experiment")))
+        rules_keys = ("rules_version", "rules_files", "levers_json_experiment")
+        a_s = json.dumps({k: v for k, v in json.loads(a_s).items() if k not in rules_keys}, sort_keys=True)
+        b_s = json.dumps({k: v for k, v in json.loads(b_s).items() if k not in rules_keys}, sort_keys=True)
+        d = [x for x in d if not x[0].startswith(tuple("/" + k for k in rules_keys))]
         for key in ("pilot_v1", "pilot_v2", "pilot_v3", "realloop_v1"):
             check("%s: diagnoses, proposals, argv, cards and evidence identical" % key,
                   not [x for x in d if x[0].startswith("/" + key) and "digest" not in x[0]],
@@ -198,7 +231,7 @@ def main():
         for key in ("render", "policy", "envelope_scope", "budget", "fits", "replay_required", "envelope_levers"):
             check("%s identical" % key, not [x for x in d if x[0].startswith("/" + key)],
                   [x for x in d if x[0].startswith("/" + key)][:5])
-        check("the whole record is byte-identical", a_s == b_s, d[:8])
+        check("the whole record (the rules version aside, checked above) is byte-identical", a_s == b_s, d[:8])
     finally:
         shutil.rmtree(str(tmp), ignore_errors=True)
     print("\n%d failure(s), %d skipped: %s" % (len(FAILURES), len(SKIPS), ", ".join(SKIPS) or "none"))

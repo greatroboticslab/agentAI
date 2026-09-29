@@ -27,7 +27,10 @@ re-scores, and the atomic run.json. What differs from inc/train.py:
     against the v2 LOCK) at HOLDOUT_NEAR_DUP_BITS: a hit stops the run even if
     GuardV2 passed it. An image whose bytes are one of the L-5 exclusions
     (splits/v2/l5_excluded.jsonl, its sha256 checked against LOCK v2; a
-    production LOCK without that record is refused) stops the run too. A
+    production LOCK without that record is refused) stops the run too, and
+    so does one whose bytes are an L-8 drop (the train_core rows within 6
+    bits of an evaluation image under a flip or rotation,
+    splits/v2/train_core_variant_drops.jsonl, likewise), under any key. A
     guard that cannot be imported or loaded stops the run;
   * check_manifest refuses the v1 and the v2 evaluation manifests, by path and
     by content (a manifest whose sha256 is a LOCK's dev / test / ood22 / ood23
@@ -132,6 +135,12 @@ GUARD_MODULE = "guard"                              # inc2.guard (splits v2 grou
 # a re-listing under another key cannot bring them back.
 L5_NAME = "l5_excluded.jsonl"
 L5_REASON = "l5_excluded"
+# L-8 (docs/CONTINUOUS_LOOP.md §2.6): train_core rows within 6 bits of an
+# evaluation image under a flip or rotation leave base_v2 and train_core;
+# splits v2 lists them (sha256 in LOCK v2). Refused by their bytes, as L-5.
+VARIANT_DROPS_NAME = "train_core_variant_drops.jsonl"
+VARIANT_DROPS_LOCK_KEY = "train_core_variant_drops_sha256"
+VARIANT_DROP_REASON = "train_core_variant_drop"
 
 # The scorer sidecar (module docstring): which runs get one, on which exam.
 SIDECAR_KINDS = ("base", "union", "cand", "soup")
@@ -802,13 +811,41 @@ def load_l5(lock, production=True):
     return shas, {"path": str(path), "sha256": got, "images": len(shas)}
 
 
+def load_variant_drops(lock, production=True):
+    """({image sha256: key} of the L-8 drops, record): splits v2's
+    train_core_variant_drops.jsonl, which must hash to the sha256 LOCK v2
+    records. A production LOCK without that record is refused (every LOCK
+    the v2 build writes has one, empty or not); a testing LOCK without it
+    gives no drops, recorded."""
+    path = v2_dir() / VARIANT_DROPS_NAME
+    want = lock.get(VARIANT_DROPS_LOCK_KEY)
+    if want is None:
+        if production:
+            raise RunError("guard", "LOCK v2 records no %s: the L-8 train_core drops cannot be checked"
+                           % VARIANT_DROPS_LOCK_KEY)
+        return {}, {"path": str(path), "sha256": None, "images": 0, "note": "LOCK v2 records none (testing)"}
+    got = _sha_or_none(path)
+    if got != want:
+        raise RunError("guard", "%s hashes to %s, LOCK v2 records %s" % (path, (got or "none")[:12], str(want)[:12]))
+    shas = {}
+    try:
+        with open(path) as fh:
+            for ln in fh:
+                if ln.strip():
+                    r = json.loads(ln)
+                    shas[str(r["sha256"])] = str(r["key"])
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise RunError("guard", "cannot read %s: %s" % (path, e))
+    return shas, {"path": str(path), "sha256": got, "images": len(shas), "keys": sorted(shas.values())}
+
+
 def load_v2_guards(production=True):
     """(inc2.guard module, GuardV2 loaded from the v2 LOCK, the v2 never-train
-    index as a pinned NeverTrainGuard, record, the L-5 image sha256s). Fails
-    closed (RunError 'guard') when the LOCK, the index, the L-5 list or the
-    guard cannot be read, or the index is not the one the LOCK records; a
-    production run also refuses a LOCK a testing build wrote (a synthetic
-    world)."""
+    index as a pinned NeverTrainGuard, record, the L-5 image sha256s, the L-8
+    drops {image sha256: key}). Fails closed (RunError 'guard') when the
+    LOCK, the index, the L-5 or L-8 list or the guard cannot be read, or the
+    index is not the one the LOCK records; a production run also refuses a
+    LOCK a testing build wrote (a synthetic world)."""
     g2 = guard_module()
     lock_path, idx_path = v2_lock_path(), v2_nevertrain_path()
     lock = _read_json(lock_path)
@@ -831,18 +868,20 @@ def load_v2_guards(production=True):
     except (OSError, ValueError, KeyError, RuntimeError) as e:
         raise RunError("guard", "cannot load the v2 never-train index %s: %s" % (idx_path, e))
     l5, l5_rec = load_l5(lock, production=production)
+    drops, drops_rec = load_variant_drops(lock, production=production)
     rec = {"splits_version": RC.SPLITS_VERSION, "lock": str(lock_path), "lock_sha256": _sha_or_none(lock_path),
            "index": str(idx_path), "index_sha256": got, "index_images": index.n,
            "bits": C.HOLDOUT_NEAR_DUP_BITS, "guard_module": getattr(g2, "__file__", None),
-           "guard_module_sha256": _sha_or_none(getattr(g2, "__file__", "") or ""), "l5_excluded": l5_rec}
-    return g2, guard, index, rec, l5
+           "guard_module_sha256": _sha_or_none(getattr(g2, "__file__", "") or ""), "l5_excluded": l5_rec,
+           "train_core_variant_drops": drops_rec}
+    return g2, guard, index, rec, l5, drops
 
 
 def guard_rows(rows, dhashes, production=True):
     """The splits v2 never-train guard over every image (module docstring),
     fail closed. Returns the guard record; raises RunError('guard') with it
     attached."""
-    g2, guard, index, rec, l5 = load_v2_guards(production=production)
+    g2, guard, index, rec, l5, drops = load_v2_guards(production=production)
     paths = [r["image"] for r in rows]
     variants = variant_hashes(g2, paths)
     reasons, refused, crosscheck = {}, [], []
@@ -850,6 +889,10 @@ def guard_rows(rows, dhashes, production=True):
         if str(r.get("sha256")) in l5:
             reasons[L5_REASON] = reasons.get(L5_REASON, 0) + 1
             refused.append([str(r["image"]), L5_REASON, "an L-5 excluded image (%s)" % r["key"]])
+        if str(r.get("sha256")) in drops:
+            reasons[VARIANT_DROP_REASON] = reasons.get(VARIANT_DROP_REASON, 0) + 1
+            refused.append([str(r["image"]), VARIANT_DROP_REASON, "the L-8 train_core drop %s, listed as %s"
+                            % (drops[str(r["sha256"])], r["key"])])
     for p in paths:
         dh = dhashes.get(p)
         var = variants.get(p)
@@ -876,8 +919,8 @@ def guard_rows(rows, dhashes, production=True):
                crosscheck_hits=len(crosscheck), first_refused=refused[:10], first_crosscheck=crosscheck[:10],
                never_train_reasons=list(NEVER_TRAIN_REASONS), harmless_reasons=list(HARMLESS_REASONS))
     if refused or crosscheck:
-        err = RunError("guard", "splits v2 never-train guard: %d image(s) refused by GuardV2 or the L-5 list (%s) "
-                                "and %d within %d bits of a dev / test / imageweeds image under a flip or rotation "
+        err = RunError("guard", "splits v2 never-train guard: %d image(s) refused by GuardV2 or the L-5 / L-8 "
+                                "lists (%s) and %d within %d bits of a dev / test / imageweeds image under a flip or rotation "
                                 "(index cross-check); first: %s %s"
                        % (len(refused), dict(sorted(reasons.items())), len(crosscheck), C.HOLDOUT_NEAR_DUP_BITS,
                           refused[:2], crosscheck[:2]))

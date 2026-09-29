@@ -30,7 +30,12 @@ What is pinned:
   base rows are counted as base_copy, not refused; an image whose bytes are
   an L-5 exclusion (l5_excluded.jsonl, sha256 in LOCK v2) is refused, an L-5
   list that does not hash as LOCK v2 records stops the run, and a production
-  LOCK v2 that records no L-5 list is refused;
+  LOCK v2 that records no L-5 list is refused; likewise for the L-8 list
+  (train_core_variant_drops.jsonl: the world's v1 train_core holds a
+  transverse copy of a test image that v2's train_core and base_v2 leave
+  out): its bytes re-listed under another key are refused by the list and
+  by GuardV2, by the list alone when GuardV2 is patched to pass, a changed
+  list stops the run and a production LOCK without the record is refused;
 - the arm: no arm means n640 (with a warning) only for yolo11n.pt; a cold run
   whose init is not the arm's checkpoint (name or pinned sha256) departs;
 - end to end on the CPU: a base run, a cand from it, a null and a final run
@@ -210,9 +215,15 @@ def build_world():
          "train_core": make_rows("tc", 16, 0, "cottonweeddet12/train"),
          "tsw22": make_rows("tsw22__f", 6, 500, "3seasonweeddet10/data2022"),
          "inc": make_rows("nw", 6, 600, "new_source")}
+    # L-8: v1's train_core also holds a transverse copy of a test image (v1 compared the stored dHash only);
+    # splits v2 drops it from train_core and base_v2 and lists it in train_core_variant_drops.jsonl
+    xv = planted("tc_xv", W["test"][5]["image"], "transverse")
+    W["variant_drops"] = [row_for("tc_xv", xv, [(0, 0.5, 0.5, 0.2, 0.2)], "cottonweeddet12/train", "s0")]
+    W["train_core_v1"] = W["train_core"] + W["variant_drops"]
     v1 = {}
-    for split in ("dev", "test", "imageweeds", "ood22", "ood23", "train_core"):
+    for split in ("dev", "test", "imageweeds", "ood22", "ood23"):
         v1[split] = C.write_manifest(C.manifest_path(split), W[split])
+    v1["train_core"] = C.write_manifest(C.manifest_path("train_core"), W["train_core_v1"])
     for split in ("dev", "test", "imageweeds"):
         C.materialise(W[split], C.EXAMS_DIR / split)
     nt1 = [[C.dhash(r["image"]), s, r["key"]] for s in ("dev", "test", "ood22", "ood23", "imageweeds") for r in W[s]]
@@ -222,9 +233,17 @@ def build_world():
     d = v2_dir()
     d.mkdir(parents=True, exist_ok=True)
     v2 = {}
-    for split in ("dev", "test", "imageweeds", "train_core"):
+    for split in ("dev", "test", "imageweeds"):
         shutil.copyfile(C.manifest_path(split), d / ("%s.jsonl" % split))
         v2[split] = sha(d / ("%s.jsonl" % split))
+    drops = [dict(r, dhash=C.dhash(r["image"]), reason="near_eval_variant",
+                  match={"split": "test", "key": W["test"][5]["key"], "variant": "transverse"})
+             for r in W["variant_drops"]]
+    (d / "train_core_variant_drops.jsonl").write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in drops))
+    tc_v1 = C.manifest_path("train_core").read_bytes()
+    (d / "train_core.jsonl").write_bytes(b"".join(ln for ln in tc_v1.splitlines(keepends=True)
+                                                  if json.loads(ln)["key"] != "tc_xv"))
+    v2["train_core"] = sha(d / "train_core.jsonl")
     v2["tsw22"] = C.write_manifest(d / "tsw22.jsonl", W["tsw22"])
     v2["tsw23"] = C.write_manifest(d / "tsw23.jsonl", [])
     W["base_v2"] = W["train_core"] + W["tsw22"]
@@ -239,6 +258,7 @@ def build_world():
         "train_splits": ["train_core", "tsw22", "tsw23"], "base_manifest": "base_v2",
         "final_exams": ["dev", "imageweeds", "test"], "nevertrain_sha256": nt_sha, "nevertrain_entries": len(nt),
         "base_copies_sha256": bc_sha, "base_copies_entries": len(bc),
+        "train_core_variant_drops_sha256": sha(d / "train_core_variant_drops.jsonl"),
         "scorer_sha256": sha(pathlib.Path(S.__file__).resolve()), "testing": True}, sort_keys=True))
     cold_checkpoint(C.REPO / "yolo11n.pt")
     for exp, testing in ((EXP, TESTING), (EXP_PROD, None)):
@@ -281,7 +301,7 @@ def run_json(path):
 
 def planted(key, src_image, how):
     """A copy of src_image: 'exact' (same bytes), 'reencode' (JPEG q60),
-    'hflip', 'rot90'. Returns its path."""
+    'hflip', 'rot90', 'transverse'. Returns its path."""
     dst = TMP / "planted" / ("%s.jpg" % key)
     dst.parent.mkdir(parents=True, exist_ok=True)
     if how == "exact":
@@ -293,6 +313,8 @@ def planted(key, src_image, how):
             im = im.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
         elif how == "rot90":
             im = im.transpose(Image.Transpose.ROTATE_90)
+        elif how == "transverse":
+            im = im.transpose(Image.Transpose.TRANSVERSE)
         im.save(dst, quality=60 if how == "reencode" else 95)
     return dst
 
@@ -627,6 +649,7 @@ def test_guard(W):
         lock.write_bytes(saved_lock)
         l5_path.unlink()
 
+    test_guard_variant_drops(W, base, rows, dh, lock, saved_lock)
     g2 = T.guard_module()
     img = planted("te_hflip3", W["test"][4]["image"], "hflip")
     m = write_manifest(EXP, "cross", base + [row_for("pl_cross", img, [(0, 0.5, 0.5, 0.2, 0.2)], "planted")])
@@ -648,6 +671,76 @@ def test_guard(W):
             e = x
     check("a GuardV2 reason the executor does not know refuses (fail closed)", e is not None
           and "some_new_reason" in str(e), e)
+
+
+def test_guard_variant_drops(W, base, rows, dh, lock, saved_lock):
+    print("the L-8 list (train_core_variant_drops.jsonl)")
+    drop = W["variant_drops"][0]
+    lst = v2_dir() / T.VARIANT_DROPS_NAME
+    check("fixture: the L-8 image is in v1's train_core, not in v2's train_core or base_v2",
+          drop["key"] in {r["key"] for r in C.read_manifest(C.manifest_path("train_core"))}
+          and drop["sha256"] not in {r["sha256"] for m in ("train_core", "base_v2")
+                                     for r in C.read_manifest(v2_dir() / ("%s.jsonl" % m))})
+    relisted = dict(drop, key="elsewhere_xv_0001", source="some_reupload")
+    m = write_manifest(EXP, "l8", base + [relisted])
+    rows_l8, dh_l8, _ = T.check_manifest(m)
+    try:
+        T.guard_rows(rows_l8, dh_l8, production=False)
+        e = None
+    except T.RunError as x:
+        e = x
+    g = getattr(e, "guard", {}) or {}
+    check("an L-8 drop re-listed under another key and source is refused by its bytes (train_core_variant_drop) and "
+          "by GuardV2 (near_eval_variant)",
+          e is not None and e.stage == "guard" and g.get("reasons", {}).get("train_core_variant_drop") == 1
+          and g.get("reasons", {}).get("near_eval_variant") == 1 and g.get("refused") == 2
+          and (g.get("train_core_variant_drops") or {}).get("keys") == [drop["key"]], (e, g.get("reasons")))
+    g2 = T.guard_module()
+    with patched(g2.GuardV2, "check", lambda self, d, v=None: (None, None)):
+        try:
+            T.guard_rows(rows_l8, dh_l8, production=False)
+            e = None
+        except T.RunError as x:
+            e = x
+    g = getattr(e, "guard", {}) or {}
+    check("... and still refused by the list when GuardV2 passes everything (defence in depth)",
+          e is not None and g.get("reasons", {}).get("train_core_variant_drop") == 1, (e, g.get("reasons")))
+    rec_ok = T.guard_rows(rows, dh, production=False)
+    check("... while base_v2 passes, the L-8 list recorded in the guard record",
+          rec_ok["refused"] == 0 and rec_ok["train_core_variant_drops"]["sha256"] == sha(lst), rec_ok)
+    saved = lst.read_bytes()
+    lst.write_bytes(saved + b"\n")
+    try:
+        try:
+            T.guard_rows(rows, dh, production=False)
+            e = None
+        except T.RunError as x:
+            e = x
+    finally:
+        lst.write_bytes(saved)
+    check("an L-8 list that does not hash as LOCK v2 records stops the run", e is not None and e.stage == "guard"
+          and T.VARIANT_DROPS_NAME in str(e), e)
+    l5_path = v2_dir() / "l5_excluded.jsonl"
+    l5_path.write_text("")
+    lk = json.loads(saved_lock)
+    try:
+        lock.write_text(json.dumps(dict({k: v for k, v in lk.items() if k != T.VARIANT_DROPS_LOCK_KEY},
+                                        testing=False, l5_excluded_sha256=sha(l5_path)), sort_keys=True))
+        try:
+            T.guard_rows(rows, dh, production=True)
+            e = None
+        except T.RunError as x:
+            e = x
+        check("a production LOCK v2 that records the L-5 list but no L-8 list is refused", e is not None
+              and "no %s" % T.VARIANT_DROPS_LOCK_KEY in str(e), e)
+        lock.write_text(json.dumps(dict({k: v for k, v in lk.items() if k != T.VARIANT_DROPS_LOCK_KEY}),
+                                   sort_keys=True))
+        rec_t = T.guard_rows(rows, dh, production=False)
+        check("... a testing LOCK without one checks no L-8 bytes, and says so", rec_t["refused"] == 0
+              and rec_t["train_core_variant_drops"]["sha256"] is None, rec_t.get("train_core_variant_drops"))
+    finally:
+        lock.write_bytes(saved_lock)
+        l5_path.unlink()
 
 
 def test_end_to_end(W):

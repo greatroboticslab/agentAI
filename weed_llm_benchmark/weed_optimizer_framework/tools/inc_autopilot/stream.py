@@ -50,6 +50,10 @@ CLI (lab):
         [--window-cap-su SU] [--daily-cap-su SU] [--alloc-reserve-su SU] [--collect-gb-envelope GB]
         [--collect-gb-daily GB] [--envelope-end-utc YYYY-MM-DDTHH:MM:SSZ] [--protocol-v3-accepted]
     python -m weed_optimizer_framework.tools.inc_autopilot.stream status [--name N]
+    python -m weed_optimizer_framework.tools.inc_autopilot.stream release --name N --by human:<email>
+        (a person's release of every lane a stop-loss held: 2 consecutive failed steps, a step past
+        stop_loss step_retries, the DATA lane's zero-yield run; the next tick frees each lane held
+        before the release and clears its steps' failure counts. `enable` does the same.)
     python -m weed_optimizer_framework.tools.inc_autopilot.stream lab-run --spec FILE   (the detached runner)
 """
 from __future__ import annotations
@@ -90,6 +94,11 @@ HUMAN_RE = re.compile(r"^human:[A-Za-z0-9][A-Za-z0-9@._+-]{0,126}$")
 HEALTH_EXP = ("D5", "D6", "D7", "D14")
 CARDS_KEEP = 80
 REFUSALS_KEEP = 5
+FAILED_IDS_KEEP = 200                # proposal ids of lane items that ended failed (never proposed again)
+# The collection levers, whose attempts are bounded per source (7.5: 3 failed
+# attempts close a source; a 4th attempt pauses, S15): the step bound
+# (stop_loss step_retries) leaves them to that rule.
+SOURCE_BOUND = ("L16", "L16L", "L16R", "L16S", "L16I", "L17")
 STALE_TO_PAUSE = 2
 BUILD_LOST_SNAPSHOTS = 3
 WAIT_REFUSALS = ("today's cap", "this month's window", "of the domain's", "the cluster is not reachable",
@@ -121,6 +130,15 @@ PERSON_LEVERS = ("LH",)
 
 
 # ------------------------------------------------------------------ helpers
+def step_key(lever, policy_params):
+    """The key of one step of a lane (the attempts, the step's failed runs):
+    the lever and its policy params (levers_stream.policy_params) without the
+    price (est_gpu_hours), which may change between two proposals of the same
+    step. The proposal side and the failure side compute it the same way, so a
+    failed step is proposed again with the next attempt, under a new id."""
+    return "%s:%s" % (lever, _sha({k: v for k, v in (policy_params or {}).items() if k != "est_gpu_hours"})[:12])
+
+
 def _utc(t):
     return datetime.datetime.fromtimestamp(float(t), datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -340,7 +358,7 @@ def blank_state(name, cfg):
             "stage": {"r0": {}}, "discover": {}, "cards": [], "card": None, "notes": {},
             "refusals": [], "declined": [], "source_reviews": {}, "person_items": {}, "history": {}, "stale": {},
             "d33_history": [],
-            "attempts": {}, "rollbacks": [],
+            "attempts": {}, "rollbacks": [], "failed_ids": [], "step_failures": {},
             "doublings": 0, "drift": None, "decisions_logged": False, "prospective": None, "bisected": None,
             "last_snapshot_utc": None, "last_tick_utc": None, "snapshot_failures": 0, "updated_utc": None}
 
@@ -588,6 +606,7 @@ class StreamRun(object):
                     self._ledger("lane_released", lane=ln, hold=lane["hold"],
                                  decided_by=self.cfg.get("updated_by") or "human")
                     lane["hold"], lane["fails"], lane["hold_utc"] = None, 0, None
+                    self._release_steps(ln)
                     if ln == "DATA":
                         st["zero_run"] = []
         if not p or not self.cfg.get("enabled") or self.cfg.get("paused_reason"):
@@ -600,6 +619,7 @@ class StreamRun(object):
             lane = st["lanes"][ln]
             if lane.get("hold"):
                 self._ledger("lane_released", lane=ln, hold=lane["hold"])
+                self._release_steps(ln)
             lane["hold"], lane["fails"] = None, 0
         st["zero_run"] = []
         if (st.get("card") or {}).get("kind") == "paused":
@@ -1258,6 +1278,8 @@ class StreamRun(object):
                 continue
             if p["id"] in (st.get("declined") or []):
                 continue
+            if self._step_exhausted(lane_name, lane, p):
+                continue
             done_at = (st.get("done_keys") or {}).get(_sha([p.get("lever") or lever, p.get("params") or {}])[:16])
             # done at or after the snapshot the evidence came from (an item the
             # fold of that snapshot finished may not show its effect in it)
@@ -1284,6 +1306,62 @@ class StreamRun(object):
                 "L21": "ROLLBACK", "L23": "SPLITS", "L23B": "BASELINE", "L25": "STAGE_A", "L27": "BISECT",
                 "L28": "STAGE_C", "L4": "AUDIT", "LV": "VERDICT", "LI": "INIT", "LA": "ARM",
                 "LC": "COMPARE"}.get(lever, "ITEM")
+
+    def _failed_ids(self):
+        """Proposal ids of this campaign's lane items that ended failed (state
+        failed_ids). A state written before the list existed takes them once
+        from the campaign ledger's 'failed' entries, so a step that failed
+        before this record existed is not proposed under its old id either."""
+        st = self.st
+        if not isinstance(st.get("failed_ids"), list):
+            ids = []
+            try:
+                with open(str(self.paths.ledger), "r", encoding="utf-8") as fh:
+                    for line in fh:
+                        if '"failed"' not in line:
+                            continue
+                        try:
+                            rec = json.loads(line)
+                        except ValueError:
+                            continue
+                        if rec.get("campaign") == self.name and rec.get("event") == "failed" \
+                                and rec.get("proposal_id") and rec["proposal_id"] not in ids:
+                            ids.append(rec["proposal_id"])
+            except OSError:
+                pass
+            st["failed_ids"] = ids[-FAILED_IDS_KEEP:]
+        return list(st["failed_ids"])
+
+    def _step_exhausted(self, ln, lane, p):
+        """True, with lane `ln` held for a person, when the step of proposal p
+        (step_key: its lever and policy params) has failed more than
+        stop_loss step_retries times: it is proposed again at most that many
+        times after a failure. A person's release (stream release, or
+        enable) frees the lane and clears the lane's step counts. The
+        collection levers are bounded per source instead (SOURCE_BOUND)."""
+        if p.get("lever") in SOURCE_BOUND:
+            return False
+        key = step_key(p.get("lever"), p.get("params"))
+        rec = (self.st.get("step_failures") or {}).get(key) or {}
+        n = int(rec.get("n") or 0)
+        retries = int(LS.t(self.th, "stop_loss", "step_retries"))
+        if n <= retries:
+            return False
+        lane["hold"] = ("stop-loss: %s failed %d times (last: %s); a step is proposed again at most %d times after a "
+                        "failure, so a person decides whether to run it again: stream release --name %s --by "
+                        "human:<email>" % (p.get("lever"), n, _short(rec.get("last"), 200), retries, self.name))
+        lane["hold_utc"] = self.utc
+        self._card("stop_loss", "Lane %s held: %s failed %d times" % (ln, p.get("lever"), n), lane["hold"],
+                   lever=p.get("lever"))
+        self._ledger("lane_held", lane=ln, hold=lane["hold"], lever=p.get("lever"), step=key,
+                     proposal_id=rec.get("proposal_id"))
+        return True
+
+    def _release_steps(self, ln):
+        """A person released lane `ln`: its steps' failure counts start again."""
+        sf = self.st.get("step_failures") or {}
+        for k in [k for k, v in sf.items() if (v or {}).get("lane") == ln]:
+            sf.pop(k, None)
 
     def _next_name(self, kind):
         taken = set(self.st.get("exps") or [])
@@ -1440,9 +1518,18 @@ class StreamRun(object):
             est, estimate = LS.price(lid, params, dom, info)
         else:
             estimate = {"estimator": "zero"}
-        attempt = int((st.get("attempts") or {}).get("%s:%s" % (lid, _sha(params)[:12])) or 0)
-        p = LS.proposal(self.name, lid, params, trigger=[did], cites=cites, lane=LANE_OF.get(lever),
-                        parent_exp=parent, child_exp=child, est=est, estimate=estimate, attempt=attempt)
+        akey = step_key(lid, LS.policy_params(lid, params))
+        attempt = int((st.get("attempts") or {}).get(akey) or 0)
+        failed_ids = set(self._failed_ids())
+        for _ in range(64):
+            p = LS.proposal(self.name, lid, params, trigger=[did], cites=cites, lane=LANE_OF.get(lever),
+                            parent_exp=parent, child_exp=child, est=est, estimate=estimate, attempt=attempt)
+            if p["id"] not in failed_ids:
+                break
+            # the id of a lane item that ended failed is never proposed again: the
+            # executor runs an id once and refuses a changed proposal under an id
+            # it filed (seen live on 2026-09-28: L23 after its job failed)
+            attempt += 1
         p["lever"] = lid
         if info.get("pins"):
             p["pins"] = info["pins"]
@@ -2017,9 +2104,13 @@ class StreamRun(object):
             self._clear(ln)
             return
         lane["fails"] = int(lane.get("fails") or 0) + 1
-        key = "%s:%s" % (lever, _sha(params)[:12])
+        key = step_key(lever, params)             # the proposal's params: its policy params and price
         att = st.setdefault("attempts", {})
         att[key] = int(att.get(key) or 0) + 1
+        st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+        sf = st.setdefault("step_failures", {})
+        sf[key] = {"n": int((sf.get(key) or {}).get("n") or 0) + 1, "lever": lever, "lane": ln,
+                   "last": _short(why, 300), "utc": self.utc, "proposal_id": p["id"]}
         st["refusals"] = (list(st.get("refusals") or []) + [{"builder": p.get("policy_action"),
                                                               "message": _short(why, 1000)}])[-REFUSALS_KEEP:]
         self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
@@ -2564,6 +2655,26 @@ def complete_available(st):
     return len(segs) <= last
 
 
+def release(name, by, cfg_hooks=None, lab_repo=None, clock=None):
+    """A person releases the lanes of stream campaign `name` that a stop-loss
+    held (6.6): the campaign is enabled again with a resume stamp
+    (configure_stream enable), and the next tick frees every lane held before
+    that stamp (StreamRun._resumed: 'lane_released' in the campaign ledger)
+    and clears its steps' failure counts. Returns the lanes it will free."""
+    from . import campaign as C
+    cfg_hooks = cfg_hooks or C.default_cfg_hooks()
+    raw = ((cfg_hooks[0]() or {}).get(C.CONFIG_KEY) or {}).get(name)
+    if not isinstance(raw, dict) or raw.get("mode") != "stream":
+        raise ValueError("%r is not a stream campaign" % (name,))
+    c = stream_config(raw, name)
+    st = load_state(StreamPaths(lab_repo, M.campaign_domain(c)), name) or {}
+    held = {ln: (st.get("lanes") or {}).get(ln, {}).get("hold") for ln in LANES
+            if ((st.get("lanes") or {}).get(ln) or {}).get("hold")}
+    out = configure_stream(name, by, enable=True, cfg_hooks=cfg_hooks, lab_repo=lab_repo, clock=clock)
+    return {"ok": True, "campaign": name, "released_by": by, "resumed_utc": out.get("resumed_utc"),
+            "held_lanes": held}
+
+
 def status(name=None, cfg_hooks=None, lab_repo=None):
     from . import campaign as C
     cfg_hooks = cfg_hooks or C.default_cfg_hooks()
@@ -2599,6 +2710,9 @@ def main(argv=None):
     e.add_argument("--protocol-v3-accepted", action="store_true")
     s = sub.add_parser("status")
     s.add_argument("--name", default=None)
+    rl = sub.add_parser("release")
+    rl.add_argument("--name", required=True)
+    rl.add_argument("--by", required=True)
     c = sub.add_parser("complete")
     c.add_argument("--name", required=True)
     c.add_argument("--by", required=True)
@@ -2629,6 +2743,8 @@ def main(argv=None):
                                    collect_gb_daily=a.collect_gb_daily, envelope_end_utc=a.envelope_end_utc,
                                    protocol_v3_accepted=a.protocol_v3_accepted or None, cfg_hooks=hooks,
                                    lab_repo=a.lab_repo)
+        elif a.cmd == "release":
+            out = release(a.name, a.by, cfg_hooks=hooks, lab_repo=a.lab_repo)
         elif a.cmd == "status":
             out = status(a.name, hooks, a.lab_repo)
         elif a.cmd == "complete":

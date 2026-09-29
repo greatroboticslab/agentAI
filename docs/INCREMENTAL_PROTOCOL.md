@@ -516,7 +516,7 @@ Protocol v3 is the protocol of the continuous loop (docs/CONTINUOUS_LOOP.md). It
 |---|---|
 | Splits | Splits v2 (docs/CONTINUOUS_LOOP.md §4). The training base is `base_v2` = train_core + tsw22 + tsw23 + the kept part of base B. The evaluation splits are dev, test and imageweeds, byte copies of v1's. ood22 and ood23 are training data (tsw22, tsw23) and are never an exam: a v3 spec that lists them is refused. |
 | Scorer | The v1 scorer, unchanged: the v1 LOCK's sha256, the v1 exams, imgsz 640 for every exam and every arm. |
-| Never-train guard | The v2 index (dev + test + imageweeds, at 6 dHash bits) is checked against every training image and against each of its 8 flips and rotations, fail closed. `inc2.guard.GuardV2` decides; `inc2.train` also looks every variant up in the v2 index itself, so a hit refuses the run even if GuardV2 misses it. The images L-5 drops from base_v2 (`splits/v2/l5_excluded.jsonl`, its sha256 in LOCK v2) are refused by their bytes in every v2 training run, whatever key or source lists them. |
+| Never-train guard | The v2 index (dev + test + imageweeds, at 6 dHash bits) is checked against every training image and against each of its 8 flips and rotations, fail closed. `inc2.guard.GuardV2` decides; `inc2.train` also looks every variant up in the v2 index itself, so a hit refuses the run even if GuardV2 misses it. The images L-5 drops from base_v2 (`splits/v2/l5_excluded.jsonl`, its sha256 in LOCK v2) are refused by their bytes in every v2 training run, whatever key or source lists them. So are the train_core rows L-8 drops (`splits/v2/train_core_variant_drops.jsonl`, its sha256 in LOCK v2: within 6 bits of an evaluation image under a flip or rotation). |
 | Gate | The pinned `inc/gate.py` decides every chain step, with protocol v2's net flips. Protocol v3 replaces one number, the species guard's tolerance (below). Every other guard, threshold and verdict rule is unchanged. |
 | Recipes | The table below. Freeze and LoRA are out of stream version 1 (L-6). |
 | Detector | An arm (detector and imgsz) is pinned per experiment (L-4). `n640` (YOLO11n at 640 px) is the continuity arm. |
@@ -600,7 +600,7 @@ For each of the 12 species s: **tol_s = max(0.03, 1.96 × SE_s)**. The species g
 |---|---|---|---|---|
 | B_v2 on base_v2 | milestone 0, arm n640 | 0–4 | dev, imageweeds, test | the loop's starting point |
 | Capacity arms on base_v2 | s640, m640 | 0–2 | dev, imageweeds, test | the switch rule above |
-| Canary: B0 seed 0 under `inc2.train` | train_core (v2 copy) | 0 | dev | passes when \|canary − mean(b0_v1 seeds)\| ≤ sd(b0_v1 seeds) on dev (0.8082 ± 0.0063), its scorer sidecar was written, the run and its score are production ones, and it trained b0_v1's base manifest (by sha256) with b0_v1's cold recipe |
+| Canary: B0 seed 0 under `inc2.train` | train_core (v2: v1's minus the L-8 drops) | 0 | dev | passes when \|canary − mean(b0_v1 seeds)\| ≤ sd(b0_v1 seeds) on dev (0.8082 ± 0.0063), its scorer sidecar was written, the run and its score are production ones, and it trained b0_v1's base manifest, or that manifest minus the L-8 drops its exp.json records (accepted by b0_v1's base sha256 plus the list's sha256), with b0_v1's cold recipe |
 | B0 ∪ tsw | train_core ∪ tsw22 ∪ tsw23 | 0–2 | dev, imageweeds | recommended: isolates the harvested part of base_v2 |
 | Milestone | a stream pool P_s | 0–4 | dev, imageweeds, test | the only place test is read; the chain incumbent is scored on the same exams as a secondary number |
 
@@ -617,7 +617,7 @@ For each of the 12 species s: **tol_s = max(0.03, 1.96 × SE_s)**. The species g
   - the v1 and v2 evaluation manifests are refused by path and by content;
   - planted exact, 1–6-bit, re-encoded, hflip and rot90 copies of dev and test images are refused, each a failed run.json at stage guard;
   - the index cross-check refuses an hflip copy that GuardV2 is made to pass;
-  - an L-5 image re-listed under another key and source is refused, and an L-5 list that does not hash as LOCK v2 records stops the run;
+  - an L-5 image re-listed under another key and source is refused, and an L-5 list that does not hash as LOCK v2 records stops the run; the same for an L-8 drop and the L-8 list;
   - a missing guard, a missing or mismatched LOCK v2, and (in production) a testing LOCK each stop the run;
   - real 1-epoch CPU runs (base, cand, null, final) finish; the base and cand runs carry a sidecar whose arrays reproduce the score exactly; a tampered sidecar is re-scored, not retrained;
   - production runs are refused for a tiny recipe or a foreign cold checkpoint;
@@ -641,5 +641,5 @@ For each of the 12 species s: **tol_s = max(0.03, 1.96 × SE_s)**. The species g
   - a FakeBackend baseline runs to done through the real v2 executor, and a 1-step chain runs to done with every spec accepted by the v2 executor; only `run_inc2_job.sh` is submitted;
   - the capacity decision is identical when every test score is perturbed;
   - the autopilot's argv shapes (`--arch`/`--imgsz`, no role) build B_v2, both capacity arms and the canary with the right role, arm and exams; roles that do not match, and test outside a milestone read, are refused;
-  - a test-mode canary, or one trained on another manifest than b0_v1's, does not pass.
+  - a test-mode canary, or one trained on another manifest than b0_v1's, does not pass; one trained on b0_v1's manifest minus the recorded L-8 drops passes, and fails when the record names another reference or another list than LOCK v2's.
 - **Mutation checks.** Each of these was changed in the source, the tests were run and failed, and the source was restored: the guard's refusal, the index cross-check, the variant check, the testing-LOCK refusal, the unhashable refusal, the ood refusal, the content check of evaluation manifests, x1a's lr0, imgsz in the deviation check, the arm's checkpoint sha256, the cand sidecar, the chain's sidecar failure, the job script's INC_JOB_SCRIPT export and its drift stop, the v3 z and floor, re-derivation, the sidecar's weights and production checks, the regression guard in v3, the bootstrap seed and its ddof, the capacity threshold, the canary's sd and its production and manifest checks, the capacity decision's test blindness, the union guard, the agreement minimum, HOLD as a rejection, the final dev floor, the pilot bins' guard, the role inference and the role's manifest and arm checks, the P10 test refusal, the `--arch`/`--imgsz` mapping, the secondary's log dir, the funnel modules in the job's drift check, the research-only flag and its provenance hash check, the truth arm's sidecar binding, the unavailable-ACCEPT hold and the L-5 check (45 mutations, each run in a scratch copy of the package).

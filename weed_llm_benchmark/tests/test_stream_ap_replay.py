@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Stream-mode replay and scenario cases S1-S28 (docs/CONTINUOUS_LOOP.md 6.8).
+"""Stream-mode replay and scenario cases S1-S29 (docs/CONTINUOUS_LOOP.md 6.8;
+S29 reproduces the live incident of 2026-09-28: a failed job's step proposed
+again under its old id).
 
 Each case prints "case <id>: pass|fail"; executor.run_replay_tests records
 them per case (executor.STREAM_REPLAY_CASES), and a failing case fails the
@@ -1350,6 +1352,108 @@ def s27():
         r"(stream_thresholds|thresholds|levers|stream_levers)\.json[^\n]*['\"]w", src))
 
 
+# ----------------------------------------------------------------------- S29
+def _maint(w):
+    it = w.lane("MAINT").get("item") or {}
+    return it, (it.get("proposal") or {}).get("id")
+
+
+def s29():
+    """The live incident of 2026-09-28 (a stream campaign): the MAINT lane's
+    L23 splits build ran after a person approved it and its job ended FAILED;
+    the lane ticker proposed L23 again under the SAME proposal id (the attempt
+    was counted under one key and read under another: the params with and
+    without the price), so the executor refused it as a changed proposal under
+    a filed id and the lane was held. Now: a new id on every re-proposal,
+    filed for a person again, nothing refused; the step is proposed again at
+    most stop_loss step_retries times, then its lane waits for a person, whose
+    release (stream release) frees it."""
+    w = World("s29")
+    w.step1_status()
+    w.placement({"hf": "pass"})
+    w.tick(2)
+    it, first = _maint(w)
+    check("no LOCK: L23 (the splits build) is proposed in MAINT and filed for a person (R3)",
+          it.get("lever") == "L23" and it.get("status") == "filed"
+          and w.approvals()[it["approval_id"]]["status"] == "pending", it)
+    AP.decide("weed", it["approval_id"], "approve", OWNER, "run the splits build", w.clock(), root=str(w.lab))
+    w.tick(2)
+    it, _ = _maint(w)
+    check("  approved, it runs as a job", it.get("status") == "running" and it.get("job_ids"), it)
+    w.job_done("inc_build_splits", "FAILED")
+    w.tick(2)
+    it, second = _maint(w)
+    refused = [r for r in w.executions() if r.get("lever") == "L23" and r.get("status") == "refused"]
+    check("its job ended FAILED: L23 is proposed again under a NEW proposal id",
+          it.get("lever") == "L23" and second and second != first, (first, second))
+    check("  and filed for a person again (a pending approval of the new id), not refused as a changed proposal",
+          it.get("status") == "filed" and w.approvals()[it["approval_id"]]["status"] == "pending"
+          and (w.approvals()[it["approval_id"]].get("context") or {}).get("proposal_id") == second
+          and not refused, (it.get("status"), [r.get("reasons") for r in refused]))
+    st = w.state()
+    key = S.step_key("L23", it["proposal"]["params"])
+    check("  the lane is not held; the failed id is recorded, and the step's failed runs are 1",
+          not w.lane("MAINT").get("hold") and first in st["failed_ids"]
+          and st["step_failures"][key]["n"] == 1, (w.lane("MAINT").get("hold"), st.get("step_failures")))
+    AP.decide("weed", it["approval_id"], "approve", OWNER, "again", w.clock(), root=str(w.lab))
+    w.tick(2)
+    w.job_done("inc_build_splits", "FAILED")
+    w.tick(2)
+    hold = w.lane("MAINT").get("hold")
+    check("a second consecutive failure holds MAINT (contract 6.6, 2 consecutive failed steps), with its card",
+          "2 consecutive failed steps" in str(hold)
+          and any(c.get("title") == "Lane MAINT held" for c in w.state()["cards"]), hold)
+    # the live campaign's state was written before failed_ids existed: the
+    # ids of its failed items are taken from the campaign ledger instead
+    st = w.state()
+    for k in ("failed_ids", "attempts", "step_failures"):
+        st.pop(k, None)
+    _write_state(w, st)
+    failed = sorted({e.get("proposal_id") for e in w.events("failed") if e.get("lever") == "L23"})
+    out = subprocess.run([sys.executable, "-m", "weed_optimizer_framework.tools.inc_autopilot.stream",
+                          "--config", str(w.cfg), "--lab-repo", str(w.lab), "release", "--name", NAME,
+                          "--by", OWNER], capture_output=True, text=True, cwd=str(PKG), timeout=300,
+                         env=dict(os.environ, PYTHONPATH=str(PKG)))
+    rel = json.loads(out.stdout or "{}") if out.returncode == 0 else {}
+    check("a person releases the lane with the documented CLI (stream release --name N --by human:<email>)",
+          out.returncode == 0 and rel.get("ok") and "MAINT" in (rel.get("held_lanes") or {}),
+          (out.returncode, out.stdout[-300:], out.stderr[-600:]))
+    # the CLI stamps the resume with the wall clock, and this world's clock runs
+    # ahead of it: the stamp that frees the lane here is the world's, through
+    # the function the CLI calls
+    S.release(NAME, OWNER, cfg_hooks=w.hooks, lab_repo=str(w.lab), clock=w.clock)
+    w.tick(2)
+    it, third = _maint(w)
+    check("  the next tick frees MAINT (lane_released) and L23 is filed again under an id no failed item had "
+          "(read from the ledger for a state written before the record existed)",
+          not w.lane("MAINT").get("hold") and any(e.get("lane") == "MAINT" for e in w.events("lane_released"))
+          and it.get("status") == "filed" and third and third not in failed and len(failed) == 2,
+          (w.lane("MAINT").get("hold"), third, failed))
+    # the step bound: a step whose failures were not consecutive (another item
+    # of the lane succeeded in between) is proposed again at most step_retries
+    # times; the state below is that of its third failed run
+    retries = int(LS.t(LS.load_thresholds(), "stop_loss", "step_retries"))
+    st = w.state()
+    st["lanes"]["MAINT"].update(item=None, phase="IDLE", fails=0)
+    st["failed_ids"] = list(st.get("failed_ids") or []) + [third]
+    st["step_failures"] = {key: {"n": retries + 1, "lever": "L23", "lane": "MAINT", "last": "job(s) 9 ended FAILED",
+                                 "utc": W.utc(w.t[0]), "proposal_id": third}}
+    _write_state(w, st)
+    w.tick(2)
+    hold = w.lane("MAINT").get("hold")
+    check("after %d failed runs of one step it is not proposed again: MAINT waits for a person, the hold naming "
+          "the release command" % (retries + 1),
+          not w.lane("MAINT").get("item") and "L23 failed %d times" % (retries + 1) in str(hold)
+          and "stream release --name %s" % NAME in str(hold), (hold, _maint(w)[0].get("status")))
+    S.release(NAME, OWNER, cfg_hooks=w.hooks, lab_repo=str(w.lab), clock=w.clock)
+    w.tick(2)
+    it, fourth = _maint(w)
+    check("  a person's release clears the lane's step counts: L23 is filed again under a fresh id",
+          not w.lane("MAINT").get("hold") and it.get("status") == "filed" and fourth not in (first, second, third)
+          and not w.state().get("step_failures"), (w.lane("MAINT").get("hold"), fourth))
+    check("every tick made at most one ssh", w.max_calls() <= 1, w.max_calls())
+
+
 # ----------------------------------------------------------------------- S28
 def s28():
     sys.path.insert(0, str(PKG / "tests"))
@@ -1566,6 +1670,7 @@ CASES = [("S1", s1), ("S1b", s1b), ("S2", s2), ("S3", s3), ("S4", s4), ("S5", s5
          ("S7", s7), ("S8", s8), ("S9", s9), ("S10", s10), ("S11", s11), ("S12", s12), ("S13", s13), ("S14", s14),
          ("S15", s15), ("S16", s16), ("S17", s17), ("S18", s18), ("S19", s19), ("S20", s20), ("S21", s21),
          ("S22", s22), ("S23", s23), ("S24", s24), ("S25", s25), ("S26", s26), ("S27", s27), ("S28", s28),
+         ("S29", s29),
          ("stream_prospective", s_prospective), ("stream_r0", s_r0)]
 
 

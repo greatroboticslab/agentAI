@@ -1583,6 +1583,8 @@ The signals are functions of the funnel ledger, the claims and the loop reports 
 **Preconditions.**
 - L10 `census` has the precondition "`funnel/taxonomy_cache.json` is on the cluster", read from `funnel summary`'s file list. Until it holds, L10 is proposed and deferred with `then: L12`, in the way R2 defers L2 behind L3.
 - L10 `estimate` requires `funnel/prospective_da.json` on the cluster.
+- [2026-09-29] L10 `embed-judges`, `qualify`, `draw`, `sheets` and `estimate` require `funnel/kt7/crops_kt7.csv` on the cluster (then L11a with what = kt7). On 2026-09-28 embed-judges ran without it: it embedded all 564,686 crops, then refused. The L11a builder picks the fetch the next waiting step needs, in this order: cards (missing or stale), kt7, known-items, refetch. known-items needs `--sources`, which L11a does not carry, so it is deferred for a person.
+- [2026-09-29] A funnel job that ends in a failure state is marked failed in the lineage; the state comes from `sacct` through the snapshot's `--sacct`. Its step may be proposed again, with a new proposal id, at most twice. A third failure stays with a person, together with the job state and log path. Funnel levers are counted per step for the lever stop-loss.
 - A `refusals` entry maps the census message "no resolution ... run fetch --what taxonomy (lever L12)" to prerequisite L12 with `retry: true`.
 
 The realloop_v2 build is L2 with the new params `increment_sources: recovered`, `step1_overlay` and `size`. The `protocol.increment_sources_modes` mirror becomes `inc/realloop.py INCREMENT_SOURCE_MODES`. The baselines of §6 F10 are L8 with `seeds`.
