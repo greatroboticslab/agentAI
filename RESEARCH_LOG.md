@@ -41,7 +41,11 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 **What it implies for the loop.**
 - Bulk data from a neighbouring dataset, skewed toward species that are already strong and half unscored, does not move the metric.
 - The lever is targeted data for the rare, weak species (CutleafGroundcherry, PricklySida, Carpetweed, Goosegrass, Purslane, SpottedSpurge), possibly with class balance. This is the loop's targeted-collection design (D-C), and the first measurement supports it.
-- Still to come at R0: the capacity arms (YOLO11s and YOLO11m at 640), which ask whether a larger model uses the extra data.
+- **Capacity arm, same day.** YOLO11s on base_v2 (3 seeds) scores test **0.8653 ± 0.0051**, the best sealed result so far, with a gap to 0.90 of 0.035 and class-agnostic 0.8842.
+  - It recovers the diluted species: CutleafGroundcherry 0.744→0.821, PricklySida 0.881→0.904, Goosegrass 0.826→0.850.
+  - YOLO11n could not absorb the heavier, skewed base; YOLO11s can.
+  - The weakest species are now Carpetweed (0.728), SpottedSpurge (0.803) and Purslane (0.805).
+  - Not yet separated: how much of the gain is capacity and how much is data. There is no YOLO11s arm on train_core alone.
 
 ## 2026-09-29 — The "leakage" was a calibration error: at the funnel's threshold, 64 % of clean same-domain images looked like copies
 

@@ -156,6 +156,11 @@ def s1b():
     check("with no open candidate and no discovery yet, D20 starts L15 on the lab (detached), for the deficit classes",
           len(l15) == 1 and "--classes" in l15[0]["argv"]
           and "PricklySida" in l15[0]["argv"][l15[0]["argv"].index("--classes") + 1], l15)
+    lab_inc = str(S.StreamPaths(str(w.lab), "weed").lab_inc)
+    check("  and names the lab's INC tree (--inc-dir): the ticker's environment has no INC_DIR, and the default "
+          "is the cluster's /ocean path (2026-09-29, PermissionError at intake_lock)",
+          l15 and "--inc-dir" in l15[0]["argv"] and l15[0]["argv"][l15[0]["argv"].index("--inc-dir") + 1] == lab_inc,
+          l15 and l15[0]["argv"])
     check("  L15 used no ssh: the tick's one call was the snapshot",
           w.verbs[-1][0] == "stream-snapshot" and w.max_calls() <= 1)
     # the recorded provider responses reproduce four of the five known items
@@ -1187,7 +1192,10 @@ def s22():
                     "decision": {"status": "pending_names"}}])
     wn.tick(2)
     l26 = [x for x in wn.runner.launched if "names" in x["argv"] and "collect" in " ".join(x["argv"])]
-    check("pending names: L26 resolves them on the lab first (detached)", l26, [x["argv"] for x in wn.runner.launched])
+    check("pending names: L26 resolves them on the lab first (detached), in the lab's INC tree",
+          l26 and all(x["argv"][x["argv"].index("--inc-dir") + 1] == str(S.StreamPaths(str(wn.lab), "weed").lab_inc)
+                      for x in l26 if "--inc-dir" in x["argv"]) and all("--inc-dir" in x["argv"] for x in l26),
+          [x["argv"] for x in wn.runner.launched])
     wn.runner.finish()
     wn.tick(4)
     syn = [x for x in wn.runner.launched if "lab-sync" in x["argv"]]

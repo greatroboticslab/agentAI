@@ -1633,7 +1633,11 @@ class StreamRun(object):
                                      names=bool(params.get("names")))
                 else:
                     verb = {"discover": "plan", "names": "names", "fetch": "fetch"}[kind]
-                    argv = [sys.executable, "-m", "weed_optimizer_framework.tools.collect", verb]
+                    # the lab's INC tree, named: the ticker's environment sets no INC_DIR, and inc.common's
+                    # default is the cluster's /ocean path (2026-09-29: two L15 plans failed at intake_lock
+                    # with PermissionError '/ocean' after five minutes of discovery)
+                    argv = [sys.executable, "-m", "weed_optimizer_framework.tools.collect", verb,
+                            "--inc-dir", str(self.paths.lab_inc)]
                     for k, flag in (("config", "--config"), ("classes", "--classes"), ("source", "--source"),
                                     ("max_bytes", "--max-bytes"), ("out", "--out")):
                         if params.get(k) not in (None, ""):
