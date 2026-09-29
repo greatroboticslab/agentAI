@@ -98,8 +98,10 @@ fi
 # Every module the verbs import (the scan's included), outer copy (what runs)
 # against the nested one (git-tracked).
 # funnel/domains/weed.json is read by build and scan (licences, lab groups, the
-# embedder, the augmentation families and the negative groups).
+# embedder, the augmentation families, the negative groups and, for the v2
+# calibration of decision L-9, the non-plant sources).
 MODULES=(tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py tools/inc2/splits.py
+         tools/inc2/embed_calibration.py
          tools/inc/__init__.py tools/inc/common.py tools/inc/splits.py tools/inc/scorer.py tools/inc/verify.py
          tools/funnel/__init__.py tools/funnel/leak.py tools/funnel/embed.py tools/funnel/estimate.py
          tools/funnel/domain.py tools/funnel/ledger.py tools/funnel/domains/weed.json

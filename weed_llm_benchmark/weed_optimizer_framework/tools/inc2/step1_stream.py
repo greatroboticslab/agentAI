@@ -914,6 +914,24 @@ def OWN_CALIBRATIONS(inc_dir):
     return [inc_dir / "splits" / "v2" / "leak" / "leak_calibration.json", inc_dir / "intake" / "leak" / "leak_v1.json"]
 
 
+def V2_CALIBRATION(inc_dir):
+    """The v2 embedding calibration (decision L-9(c)) splits v2 writes beside
+    LOCK v2: per-image false positives on hard same-domain negatives, never
+    below its base's threshold."""
+    return Path(inc_dir) / "splits" / "v2" / "embed_calibration_v2.json"
+
+
+def v2_calibration_state(path, lock_path=None):
+    """(record in calibration_state's form plus "role", or None, why) of the
+    v2 calibration; with a LOCK v2 that exists, the file must hash to what it
+    records (inc2.embed_calibration.state)."""
+    try:
+        from . import embed_calibration as EC
+    except ImportError as e:
+        return None, "inc2.embed_calibration is not importable (%s)" % e
+    return EC.state(path, lock_path)
+
+
 class _EvalAdapter:
     def __init__(self, rows):
         self._rows = rows
@@ -934,9 +952,17 @@ def eval_rows_v1():
     return out
 
 
-def load_scanner(layout, own_path=None, funnel_path=None, embedder=None, eval_rows=None, procs=1):
+def load_scanner(layout, own_path=None, funnel_path=None, embedder=None, eval_rows=None, procs=1, v2_path=None):
     """A CopyScanner from the calibrations on disk. Without a passed
-    calibration it holds no index (rows needing the scan are then held)."""
+    calibration it holds no index (rows needing the scan are then held).
+
+    Decision L-9(c): when splits v2's embed_calibration_v2.json loads (and
+    hashes as LOCK v2 records, once there is one), its threshold judges every
+    row: it takes its base's role ("funnel" for the funnel's leak_v1.json,
+    "own" for the stream's) and the role of any other calibration found, so
+    a same-lab row is still released only as P9 says, but never at the
+    per-pair threshold the v2 calibration replaces. A v2 file that does not
+    load is recorded as rejected and the others are used as before."""
     from ..funnel import embed as E
     from ..funnel import leak as L
     own, rejected = None, {}
@@ -950,6 +976,15 @@ def load_scanner(layout, own_path=None, funnel_path=None, embedder=None, eval_ro
     fun, why = calibration_state(fp)
     if fun is None and why != "absent":
         rejected[str(fp)] = why
+    v2p = Path(v2_path) if v2_path else V2_CALIBRATION(layout.inc_dir)
+    v2, why = v2_calibration_state(v2p, Path(layout.inc_dir) / "splits" / "v2" / "LOCK.json")
+    if v2 is not None:
+        if v2["role"] == "funnel" or fun is not None:
+            fun = dict(v2)
+        if v2["role"] != "funnel" or own is not None:
+            own = dict(v2)
+    elif why != "absent":
+        rejected[str(v2p)] = why
     for p, w in sorted(rejected.items()):
         log("WARNING: calibration %s is not used: %s (rows needing the copy scan stay held)" % (p, w))
     if own is None and fun is None:

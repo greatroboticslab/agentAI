@@ -50,7 +50,11 @@ Pinned:
     intake refuses and commits nothing);
   * against the real inc2.guard.GuardV2 over a synthetic LOCK v2: a flipped
     dev copy, a rotated base image and a near copy of an earlier batch are
-    refused, a clean image kept.
+    refused, a clean image kept;
+  * decision L-9(c): the rows held for the copy scan are bound to the v2
+    embedding calibration LOCK v2 records (manifest, guard.json,
+    summary.json); a file that does not hash as recorded, or a production
+    LOCK that records none, refuses the intake.
 
 Run:  python3 tests/test_collect_intake.py
 """
@@ -639,6 +643,69 @@ def test_real_guard(cfg):
     e = raises(lambda: I.intake(cfg, sid3, lock_path=prod), GuardUnavailable)
     check("a production LOCK v2 that records no L-5 list refuses the intake (the exclusions cannot be checked)",
           e is not None and "l5_excluded_sha256" in str(e), e)
+    test_copy_scan_binding(cfg, evals, base, cats, anns)
+
+
+def write_v2_calibration(d, threshold=0.91, testing=True):
+    """splits v2's embed_calibration_v2.json (group A's format, decision
+    L-9(c)): a record that shows it passed (every family at recall 1, the hard
+    tier within the gate), on a base the funnel's threshold 0.8256."""
+    from weed_optimizer_framework.tools.funnel import leak as L
+    from weed_optimizer_framework.tools.inc2 import embed_calibration as EC
+    tier = {"n": 12, "false_hits": 0, "fpr": 0.0, "ub": 0.26, "constraining": True}
+    cal = {"ok": True, "why": [], "protocol": EC.PROTOCOL, "testing": testing, "cos_threshold": threshold,
+           "strict_threshold": 0.97, "dhash_bits_max": 6, "recall_min": L.RECALL_MIN, "fpr_max": L.FPR_MAX,
+           "min_negatives": 5 if testing else EC.MIN_NEGATIVES, "floor": 0.8256, "constraining": ["hard"],
+           "base": {"source": "funnel_leak_v1", "role": "funnel", "cos_threshold": 0.8256,
+                    "file": {"path": "/cluster/inc/funnel/leak_v1.json", "sha256": "b" * 64}},
+           "positives": {f: {"n": 10, "hits": 10, "recall": 1.0} for f in L.FAMILIES}, "known_limits": [],
+           "negatives": {"hard": tier}}
+    doc = {"format": EC.FORMAT, "calibration": cal, "detector": {"descriptor": {"embedder": "facebook/dinov2-base:cls"}}}
+    p = pathlib.Path(d) / EC.NAME
+    p.write_text(json.dumps(doc, sort_keys=True))
+    from weed_optimizer_framework.tools.inc import common as C
+    return C.sha256_file(p)
+
+
+def test_copy_scan_binding(cfg, evals, base, cats, anns):
+    """Decision L-9(c): the rows an intake holds for the copy scan are bound to
+    the v2 embedding calibration LOCK v2 records (the threshold step1_stream's
+    scan judges them by); a production LOCK without one, or a file that does
+    not hash as recorded, refuses the intake."""
+    from weed_optimizer_framework.tools.collect import GuardUnavailable
+    from weed_optimizer_framework.tools.collect import intake as I
+    print("the v2 embedding calibration LOCK v2 records (L-9(c))")
+    lock = make_lock_v2(evals, [base], [])
+    sha = write_v2_calibration(lock.parent)
+    lk = json.loads(lock.read_text())
+    lk["embed_calibration_v2_sha256"] = sha
+    lock.write_text(json.dumps(lk))
+    sid = fetch_simple(cfg, "77777777-0000-0000-0000-00000000000a", coco_files({"q0.png": W.img_bytes(917)}, cats,
+                                                                                anns[:1]))
+    r = I.intake(cfg, sid, lock_path=lock)
+    rows = [json.loads(x) for x in (pathlib.Path(r["dir"]) / "manifest.jsonl").read_text().splitlines()]
+    gd = json.loads((pathlib.Path(r["dir"]) / "guard.json").read_text())
+    sm = json.loads((pathlib.Path(r["dir"]) / "summary.json").read_text())
+    check("intake binds every row it holds for the copy scan to the v2 calibration (threshold 0.91, by sha256)",
+          rows and all("h6_scan" in x["holds"] and (x.get("copy_scan_calibration") or {}).get("sha256") == sha
+                       and x["copy_scan_calibration"]["cos_threshold"] == 0.91 for x in rows), rows[:1])
+    check("... and guard.json and summary.json record it (its threshold, protocol and who judges the rows)",
+          gd["copy_scan"]["checked"] is True and gd["copy_scan"]["cos_threshold"] == 0.91
+          and gd["copy_scan"]["file"]["sha256"] == sha and "step1_stream" in gd["copy_scan"]["judged_by"]
+          and sm["copy_scan"]["cos_threshold"] == 0.91, gd.get("copy_scan"))
+    p = lock.parent / "embed_calibration_v2.json"
+    keep = p.read_bytes()
+    p.write_bytes(keep + b" ")
+    sid2 = fetch_simple(cfg, "66666666-0000-0000-0000-00000000000b", coco_files({"q1.png": W.img_bytes(918)}, cats,
+                                                                                 anns[:1]))
+    e = raises(lambda: I.intake(cfg, sid2, lock_path=lock), GuardUnavailable)
+    check("a v2 calibration that no longer hashes as LOCK v2 records refuses the intake (fail closed)",
+          e is not None and "hashes to" in str(e), e)
+    p.write_bytes(keep)
+    prod = make_lock_v2(evals, [base], [], testing=False)
+    e = raises(lambda: I.intake(cfg, sid2, lock_path=prod), GuardUnavailable)
+    check("a production LOCK v2 that records no v2 calibration refuses the intake (its held rows could not be bound)",
+          e is not None and "embed_calibration_v2_sha256" in str(e), e)
 
 
 def test_ftp_box_table(cfg):

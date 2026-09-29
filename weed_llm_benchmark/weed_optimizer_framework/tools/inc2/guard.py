@@ -28,7 +28,10 @@ negatives: 7-10-bit and hardest pairs between provenance-disjoint groups; the
 pre-registered recall and false-positive gates) runs under a directory the
 caller owns, with its own seed prefix, and never writes the funnel's
 directory. A passed funnel leak_v1.json may be reused instead (its threshold,
-recorded by path and sha256).
+recorded by path and sha256). Decision L-9(c) adds the v2 calibration
+(inc2.embed_calibration: per-image false positives on hard same-domain
+negatives, never below its base's threshold); load_calibration and
+calibration_problems read it by its own rules.
 
 Standard library and near_dup at module level; PIL, numpy and funnel.leak are
 imported where used.
@@ -312,9 +315,16 @@ def calibration_problems(cal):
     embedding half never fires), a dHash radius other than the never-train
     radius, gates looser than the pre-registered H6 ones (recall 0.95 per
     family, false positives 0.01), a family of funnel.leak.FAMILIES without
-    positives or below its recall gate, and an empty or failing negative set."""
+    positives or below its recall gate, and an empty or failing negative set.
+
+    A v2 record (inc2.embed_calibration, decision L-9(c): per-image
+    negatives, a family below the recall gate recorded as a known limit) is
+    judged by its own rules, embed_calibration.record_problems."""
     import math
     from ..funnel import leak as L
+    if isinstance(cal, dict) and cal.get("protocol") is not None:
+        from . import embed_calibration as EC
+        return EC.record_problems(cal)
     probs = []
     try:
         theta = float(cal.get("cos_threshold"))
@@ -359,13 +369,24 @@ def load_calibration(path, embedder_name=None):
     leak_v1.json. Returns {"calibration", "cos_threshold", "dhash_bits_max",
     "embedder", "file", "format"}. A failed calibration, one whose record does
     not show it passed (calibration_problems), one without a threshold or
-    embedder, or one made with another embedder refuses."""
+    embedder, or one made with another embedder refuses. A v2 calibration
+    (inc2.embed_calibration, L-9(c)) is read by embed_calibration.load: the
+    same keys, its v2 threshold."""
     path = Path(path)
     try:
         with open(path) as fh:
             doc = json.load(fh)
     except (OSError, ValueError) as e:
         raise GuardError("calibration %s unreadable (%s)" % (path, e))
+    if isinstance(doc, dict) and (doc.get("format") == "inc2-embed-calibration/2"
+                                  or (isinstance(doc.get("calibration"), dict)
+                                      and doc["calibration"].get("protocol") is not None)):
+        from . import embed_calibration as EC
+        try:
+            rec = EC.load(path, embedder_name=embedder_name)
+        except C2.Inc2Error as e:
+            raise GuardError(str(e))
+        return {k: rec[k] for k in ("calibration", "cos_threshold", "dhash_bits_max", "embedder", "file", "format")}
     cal = doc.get("calibration") if isinstance(doc, dict) else None
     if not isinstance(cal, dict) or cal.get("ok") is not True or cal.get("cos_threshold") is None:
         raise GuardError("%s holds no passed calibration; nothing may be judged by it (%s)"

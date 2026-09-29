@@ -189,6 +189,7 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/funnel/__init__.py tools/funnel/leak.py tools/funnel/embed.py tools/funnel/estimate.py
          tools/funnel/domain.py tools/funnel/ledger.py tools/funnel/domains/weed.json
          tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py tools/inc2/splits.py tools/inc2/recipes.py
+         tools/inc2/embed_calibration.py
          tools/inc2/train.py tools/inc2/baseline.py tools/inc2/pilot4.py tools/inc2/gate3.py
          tools/inc2/scorer_sidecar.py tools/inc2/step1_stream.py tools/inc2/mask.py tools/inc2/stream.py
          tools/inc2/stream_report.py)

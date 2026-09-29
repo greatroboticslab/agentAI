@@ -27,19 +27,20 @@ build (one GPU-shared job; the order of §4.2):
      Zenodo record's licence recorded;
   4. drops, each recorded with its reason: within 6 bits of dev, test or
      imageweeds by dHash or by any of the 8 flips and rotations; a copy
-     found by the embedding scan (near_eval_embed, or unhashable_embed for an
-     image the scan could not describe); a row of a dev
-     session (dev is session-held-out); a row within 6 bits of an image of an
-     earlier part of the base (train_core, tsw22, tsw23, base B's part, in that
-     order: the one ood23-ood22 pair keeps its tsw22 row). Rows sharing a
-     session with test or train_core are kept and counted;
+     found by the embedding scan under the row's copy rule (L-9, below;
+     unhashable_embed for an image the scan could not describe); a row of a
+     dev or test capture session (L-9(a)); a row within 6 bits of an image of
+     an earlier part of the base (train_core, tsw22, tsw23, base B's part, in
+     that order: the one ood23-ood22 pair keeps its tsw22 row). Rows sharing
+     a session with train_core are kept and counted;
   5. base B's 878 (step1/base_selected.jsonl, checked against the sha256 that
      select_summary.json records): L-5 drops every image of cwp10 and vanpe
      outright (listed in l5_excluded.jsonl); the rest get the same 8-variant
      check against dev, test and imageweeds, the embedding scan and, once
-     the funnel's leak_v1.json is complete, its list of base B copies, and a
-     hit refuses the build (an R4 incident: it would void B's and
-     realloop_v1's results, funnel H6(b)).
+     the funnel's leak_v1.json is complete, its list of base B copies (L-9(b):
+     only matches against a v2 evaluation split that are copies at the v2
+     threshold), and a hit refuses the build (an R4 incident: it would void
+     B's and realloop_v1's results, funnel H6(b)).
      The L-5 part is checked too, and a hit there is recorded as that
      incident without refusing (its images are in no v2 manifest). Licences
      come per source from the funnel's card index, the funnel config's
@@ -82,24 +83,53 @@ v1 manifests, base_selected.jsonl and the funnel config; the `scan` verb runs
 it alone. So the platform's sequence is build, then lock (L23's two verbs);
 build --skip-scan applies only an existing scan, and lock refuses without one.
 
-build applies embed_scan.json: a tsw row it flags (a copy, or an image it
-could not describe) is dropped as near_eval_embed, a flagged row of base B's
-kept part refuses the build (H6(b), R4), a flagged L-5 row is recorded as an
-incident.
+Decision L-9 (2026-09-29; job 47259471 refused on the threshold's scene
+similarity, not on copies): the scan's threshold (the funnel's 0.8256) is
+recalibrated for images without capture provenance (inc2.embed_calibration:
+per-image false positives on hard same-domain negatives, never below the
+scan's threshold) into embed_calibration_v2.json, which the scan verb and a
+build (scan_mode auto) write after the scan. build applies embed_scan.json
+through it, and records per row which rule applied (copy_rules.jsonl; the
+provenance file's copy_rule):
+  tsw rows (the md5-verified Zenodo original of the lab's own dataset):
+    a row whose capture session (the date_camera prefix of its name) is a
+    dev or test session is dropped (dev_session, test_session);
+    tsw_provenance: every other row with a capture session is exempt from
+    the embedding threshold and stays under the 6-bit dHash + 8-variant
+    check; tsw_embed_v2: a row without one is judged like base B;
+    an image the scan could not describe is dropped (unhashable_embed);
+  base B (base_b_embed_v2): a hit at or above the v2 threshold (or within
+    6 dHash bits) in the kept part refuses the build (H6(b), R4); a hit
+    only at the scan's threshold is recorded, not applied; the L-5 part is
+    recorded as an incident as before;
+  the funnel's leak_v1 base_B list: an entry is applied only when its
+    evaluation split is a v2 one (dev, test, imageweeds) and it is a copy
+    at the v2 threshold; an entry against ood22 / ood23 (exams in v1,
+    training in v2) is recorded as not_v2_split, one below the v2
+    threshold as below_v2_threshold.
+Without a current v2 calibration (build --skip-scan), every scan hit and
+every v2-split funnel entry applies (the scan's own threshold), and lock
+refuses until one exists.
 
 lock: refuses unless v1 still verifies, the build is intact (every manifest,
 image and label re-hashed), embed_scan.json covers every tsw and harvested
-row of base_v2 by key and sha256 with no copy among them, no base v2 row is
+row of base_v2 by key and sha256 with no copy among them under each row's
+copy rule (re-derived; the provenance file's copy_rule must agree), the v2
+calibration is the one the build applied and was made from the scan's
+calibration and evaluation descriptors, copy_rules.jsonl is the build's, no
+base v2 row is
 refused by the never-train guard (from the recorded dHash and 8 variants),
 the L-8 list hashes as the build recorded, is within the cap, names only v1
 train_core rows (same bytes) that the never-train guard refuses as
 near_eval_variant on their re-computed hashes, and v2's train_core is v1's
 minus exactly those rows,
-the funnel's leak_v1.json (when complete) lists no base v2 image as a copy,
+the funnel's leak_v1.json (when complete) lists no base v2 image as a copy
+of a v2 evaluation split at the v2 threshold (L-9(b)),
 the byte copies still equal v1 and the scorer is v1's, and the build is not
 a --testing one (unless lock --testing). Marks both indexes complete, writes
 LOCK.json (with the funnel's H6 status of base B's part: pending, or the
-leak_v1 result; the L-8 list's sha256; derived_from: the byte copies and
+leak_v1 result; the L-8 list's sha256; the v2 calibration's, its negatives
+file's and copy_rules.jsonl's sha256; derived_from: the byte copies and
 train_core's derivation) and lock_log.jsonl, then makes every file under splits/v2
 read-only. A second lock or a build after lock refuses: a change is a new
 splits version (R4).
@@ -119,6 +149,7 @@ import collections
 import contextlib
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -129,6 +160,7 @@ import time
 from pathlib import Path
 
 from . import common as C2
+from . import embed_calibration as EC
 from . import guard as G
 from ..inc import common as C1
 from ..inc import splits as S1
@@ -156,6 +188,18 @@ VARIANT_DROP_CAP_MIN = 1
 V1_RESULTS_NOTE = ("B0's, B's and realloop_v1's training sets held these train_core images (v1 compared the stored "
                    "dHash only). The effect is negligible (%d of %d training images) and those results are not "
                    "re-run (L-8).")
+# L-9: which copy rule judges a candidate row (copy_rules.jsonl, the provenance file's copy_rule)
+L9_DECISION = "L-9, docs/CONTINUOUS_LOOP.md 2.6 (human-delegated, 2026-09-29)"
+RULE_TRAIN_CORE = "train_core"                  # v1's train_core, the 8-variant dHash check (L-8)
+RULE_TSW_PROVENANCE = "tsw_provenance"          # L-9(a): exempt from the embedding threshold, dHash + 8 variants
+RULE_TSW_EVAL_SESSION = "tsw_eval_session"      # L-9(a): a dev or test capture session, dropped
+RULE_TSW_EMBED = "tsw_embed_v2"                 # a tsw row without a capture session: the v2 threshold
+RULE_BASE_B = "base_b_embed_v2"                 # L-9(c): the v2 threshold
+RULE_L5 = "l5_excluded"
+COPY_RULES_NAME = "copy_rules.jsonl"
+FUNNEL_NOT_V2 = "not_v2_split"                  # L-9(b): a funnel match against ood22 / ood23
+FUNNEL_BELOW_V2 = "below_v2_threshold"          # a funnel match below the v2 threshold and > 6 dHash bits
+FUNNEL_APPLIED = "applied"
 UNRESOLVED = "unresolved"
 LICENCE_EXEMPTION = ("An unresolved licence of a base v2 row is recorded as licence 'unresolved' with "
                      "research_only true: the owner-accepted exemption for the base (D-A named these images; "
@@ -246,6 +290,14 @@ def summary_path():
 
 def embed_scan_path():
     return C2.SPLITS_DIR / EMBED_SCAN_NAME
+
+
+def embed_calibration_path():
+    return C2.SPLITS_DIR / EC.NAME
+
+
+def copy_rules_path():
+    return C2.SPLITS_DIR / COPY_RULES_NAME
 
 
 def leak_dir():
@@ -712,10 +764,22 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
         current = _scan_current(scan, want_scan, lock1, bs_sha, inputs["funnel_domain"]["sha256"])
         if not current:
             raise SplitError("the embedding scan just written does not cover the build's candidates")
-    scanned, flagged = _scan_index(scan)
+    scanned, hits, unscannable = _scan_index(scan)
+    ecal = None
     if scan is not None:
         inputs["embed_scan"] = C2.file_record(embed_scan_path())
-    funnel_copies, funnel_rec = funnel_base_b_copies()
+        # L-9(c): the threshold for images without capture provenance (made by the scan, or here when the
+        # scan is current but the calibration is not; --skip-scan only applies a current one)
+        ecal = _calibrate_v2(scan, embedder, dom_path, domain_raw, procs, testing, compute=(scan_mode == "auto"))
+        if ecal is not None:
+            inputs["embed_calibration_v2"] = C2.file_record(embed_calibration_path())
+        else:
+            log("WARNING: no current v2 embedding calibration (build --skip-scan): every scan hit and every v2 "
+                "funnel entry applies at the scan's own threshold, and lock refuses until `scan` or `build` "
+                "writes %s" % EC.NAME)
+    t2 = ecal["cos_threshold"] if ecal is not None else None
+    t_strict = ecal["strict_threshold"] if ecal is not None else None
+    funnel_matches, funnel_rec = funnel_base_b_matches()
     if funnel_rec.get("path"):
         inputs["funnel_leak_v1"] = {"path": funnel_rec["path"], "sha256": funnel_rec["sha256"]}
 
@@ -726,10 +790,11 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
     sess = {"dev": dev_sessions, "test": {r["session"] for r in v1rows["test"]} - {""},
             "train_core": {r["session"] for r in core_kept} - {""}}
 
-    # 4-5. decisions, part by part, in base order
+    # 4-5. decisions, part by part, in base order; every candidate's copy rule recorded (L-9)
     drops = collections.defaultdict(collections.Counter)
     examples = collections.defaultdict(list)
     overlap = {}
+    rules = []
     earlier = NearHashIndex()
     for r in core:                      # every v1 train_core image, the L-8 drops too: a near copy of one is dropped
         earlier.add(r["dhash"], ("train_core", r["key"]), max_bits=BITS)
@@ -747,20 +812,23 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
                 if r["session"] in sess[where]:
                     ov[where] += 1
                     ov["sessions"]["%s|%s" % (where, r["session"])] += 1
+            ev = embed_evidence(hits, unscannable, (split, r["key"], r["sha256"]), t2, t_strict)
+            rule = tsw_rule(r["session"], sess["dev"], sess["test"])
             reason, match = eval_guard.check(r["dhash"], r["variants"])
+            if not reason and rule == RULE_TSW_EVAL_SESSION:
+                where = "dev" if r["session"] in sess["dev"] else "test"
+                reason, match = "%s_session" % where, {"session": r["session"]}
+            if not reason and ev["unscannable"]:
+                reason, match = "unhashable_embed", {"why": "the image cannot be described"}
+            if not reason and rule == RULE_TSW_EMBED and ev["applied_hit"]:
+                reason, match = "near_eval_embed", ev["match"]
+            if not reason:
+                hit = _near_earlier(earlier, r)
+                if hit:
+                    reason, match = "near_%s" % hit[0][0], {"with": hit[0][1], "bits": hit[1], "variant": hit[2]}
+            rules.append(_rule_row(split, r, rule, reason, match, ev, None, "dropped" if reason else "kept"))
             if reason:
                 drop(split, r, reason, match)
-                continue
-            f = flagged.get((split, r["key"], r["sha256"]))
-            if f:
-                drop(split, r, f[0], f[1])
-                continue
-            if r["session"] in dev_sessions:
-                drop(split, r, "dev_session", {"session": r["session"]})
-                continue
-            hit = _near_earlier(earlier, r)
-            if hit:
-                drop(split, r, "near_%s" % hit[0][0], {"with": hit[0][1], "bits": hit[1], "variant": hit[2]})
                 continue
             keep.append(r)
         for r in keep:
@@ -772,16 +840,20 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
     incident, unchecked, refused, l5_rows, keep = [], [], [], [], []
     for r in sorted(base_rows, key=lambda r: r["key"]):
         excluded = r["source"] in L5_SOURCES
+        rule = RULE_L5 if excluded else RULE_BASE_B
+        ev = embed_evidence(hits, unscannable, (BASE_B, r["key"], r["sha256"]), t2, t_strict)
+        fun = funnel_verdict((funnel_matches.get(r["key"]) or []) + (funnel_matches.get(str(r["image"])) or []), t2)
         reason, match = eval_guard.check(r["dhash"], r["variants"])
-        f = flagged.get((BASE_B, r["key"], r["sha256"]))
-        if not reason and f:
-            reason, match = f
-        fc = funnel_copies.get(r["key"]) or funnel_copies.get(str(r["image"]))
-        if not reason and fc:
-            reason, match = FUNNEL_REASON, fc
+        if not reason and ev["unscannable"]:
+            reason, match = "unhashable_embed", {"why": "the image cannot be described"}
+        if not reason and ev["applied_hit"]:
+            reason, match = "near_eval_embed", ev["match"]
+        if not reason and fun["applied"]:
+            reason, match = FUNNEL_REASON, fun["applied"]
         what = {"key": r["key"], "source": r["source"], "reason": reason, "match": match or {}}
         if excluded:
             l5_rows.append(r)
+            rules.append(_rule_row(BASE_B, r, rule, reason, match, ev, fun, "excluded"))
             if reason in COPY_REASONS:
                 incident.append(what)
             elif reason:
@@ -792,8 +864,11 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
             continue
         hit = _near_earlier(earlier, r)
         if hit:
-            drop(BASE_B, r, "near_%s" % hit[0][0], {"with": hit[0][1], "bits": hit[1], "variant": hit[2]})
+            reason, match = "near_%s" % hit[0][0], {"with": hit[0][1], "bits": hit[1], "variant": hit[2]}
+            rules.append(_rule_row(BASE_B, r, rule, reason, match, ev, fun, "dropped"))
+            drop(BASE_B, r, reason, match)
             continue
+        rules.append(_rule_row(BASE_B, r, rule, None, None, ev, fun, "kept"))
         keep.append(r)
     kept[BASE_B] = keep
     if refused:
@@ -801,8 +876,11 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
         raise SplitError(
             "R4 INCIDENT (funnel H6(b)): %d image(s) of base B's part that base v2 would keep are copies of an "
             "evaluation image, %d cannot be compared with one (%s). A copy voids B's and realloop_v1's results; "
-            "the build is refused and the owner decides (docs/CONTINUOUS_LOOP.md 4.2 step 5). Nothing was written."
-            % (len(copies), len(refused) - len(copies), refused[:5]))
+            "the build is refused and the owner decides (docs/CONTINUOUS_LOOP.md 4.2 step 5). Judged at %s. "
+            "Nothing was written."
+            % (len(copies), len(refused) - len(copies), refused[:5],
+               "the v2 threshold %.6f (L-9(c))" % t2 if t2 is not None
+               else "the scan's own threshold (no v2 calibration)"))
     if incident:
         log("R4 INCIDENT (funnel H6(b)) in base B's L-5 part: %d image(s) copy an evaluation image (%s). They "
             "are in no v2 manifest, so the build goes on; B's and realloop_v1's results are void (recorded in "
@@ -821,7 +899,8 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
     if problems:
         raise SplitError("base v2 is not pairwise disjoint across parts: %s" % problems[:5])
 
-    # provenance
+    # provenance (with the copy rule that judged each row, L-9)
+    rule_of = {x["key"]: x["rule"] for x in rules}
     per_source = {}
     prov = []
     for r in sorted(base_v2, key=lambda r: r["key"]):
@@ -835,7 +914,8 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
                      "image": r["image"], "sha256": r["sha256"], "label_sha256": r["label_sha256"],
                      "dhash": int(r["dhash"]), "variants": [int(x) for x in r["variants"]],
                      "licence": ps["licence"], "licence_basis": ps["basis"], "research_only": ps["research_only"],
-                     "lab_group": ps["lab_group"], "origin_key": r.get("v1_key") or r["key"]})
+                     "lab_group": ps["lab_group"], "origin_key": r.get("v1_key") or r["key"],
+                     "copy_rule": RULE_TRAIN_CORE if r["part"] == "train_core" else rule_of[r["key"]]})
     evidence = {}
     for s in sorted({r["source"] for r in base_rows}):
         v = ((pool_sum or {}).get("per_slug") or {}).get(s)
@@ -892,6 +972,8 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
            "dhash": r["dhash"], "variants": r["variants"], "decided_by": L5_DECISION}
           for r in sorted(l5_rows, key=lambda r: r["key"])]
     l5_sha = C2.write_jsonl_atomic(C2.L5_EXCLUDED, l5)
+    rules.sort(key=lambda x: (PARTS.index(x["part"]), x["key"]))
+    rules_sha = C2.write_jsonl_atomic(copy_rules_path(), rules)
 
     unresolved = sorted(s for s, v in per_source.items() if v["licence"] == UNRESOLVED)
     ro_rows = sum(v["rows"] for v in per_source.values() if v["research_only"])
@@ -952,15 +1034,83 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
                                     for s in TSW}}
                        if scan is not None else {"applied": False}),
         "dev_sessions": sorted(dev_sessions),
+        "test_sessions": sorted(sess["test"]),
+        "l9": _l9_summary(rules, rules_sha, ecal, scan),
+        "embed_v2": _embed_v2_summary(ecal, scan, rules),
     }
     C2.write_json_atomic(summary_path(), summary)
     log("built in %.0fs: base_v2 %d images (%s); tsw drops %s; L-5 excluded %d; L-8 train_core drops %d; "
-        "never-train %d entries%s"
+        "never-train %d entries; copy rules %s; v2 threshold %s%s"
         % (time.time() - t0, len(base_v2), parts_n, {s: dict(drops[s]) for s in TSW}, len(l5_rows), len(core_drops),
-           len(entries), "; TESTING world" if testing else ""))
+           len(entries), dict(collections.Counter(x["rule"] for x in rules)), t2, "; TESTING world" if testing else ""))
     if scan is None:
         log("next: `scan` (the embedding copy scan), then `build` again (it applies the scan), then `lock`")
     return summary
+
+
+def _l9_summary(rules, rules_sha, ecal, scan):
+    """summary.json's l9 block: per tsw split and for base B, the copy rules
+    applied, what the scan flagged at its own threshold and what was applied,
+    the funnel entries by verdict (L-9(b))."""
+    out = {"decided_by": L9_DECISION,
+           "copy_rules": {"file": str(copy_rules_path()), "sha256": rules_sha, "rows": len(rules)},
+           "scan_threshold": (scan or {}).get("detector", {}).get("cos_threshold") if scan else None,
+           "v2_threshold": ecal["cos_threshold"] if ecal else None}
+    for part in list(TSW) + [BASE_B]:
+        rs = [x for x in rules if x["part"] == part]
+        flagged = [x for x in rs if x["embed"]["base_hit"]]
+        exempt = [x for x in flagged if not x["embed_threshold_applies"]]
+        cs = sorted(float(x["embed"]["base_hit"]["cos"]) for x in exempt)
+        rec = {"rules": dict(collections.Counter(x["rule"] for x in rs)),
+               "decisions": dict(collections.Counter("%s|%s" % (x["rule"], x["decision"]) for x in rs)),
+               "flagged_at_scan_threshold": len(flagged),
+               "flagged_where_the_threshold_applies": len(flagged) - len(exempt),
+               "copies_at_v2_threshold_where_it_applies": sum(1 for x in rs if x["embed_threshold_applies"]
+                                                              and x["embed"]["applied_hit"]),
+               "flagged_exempt": len(exempt), "flagged_exempt_kept": sum(1 for x in exempt if x["decision"] == "kept"),
+               "flagged_exempt_at_v2_threshold": sum(1 for x in exempt if x["embed"]["applied_hit"]),
+               "flagged_exempt_cos": ({"min": cs[0], "median": cs[len(cs) // 2], "max": cs[-1]} if cs else None),
+               "flagged_exempt_eval_splits": dict(collections.Counter(x["embed"]["base_hit"]["eval_split"]
+                                                                      for x in exempt))}
+        fun = collections.Counter(e["verdict"] for x in rs for e in x.get("funnel") or ())
+        if fun:
+            rec["funnel_entries"] = dict(fun)
+            rec["funnel_images"] = {v: sum(1 for x in rs if any(e["verdict"] == v for e in x.get("funnel") or ()))
+                                    for v in (FUNNEL_APPLIED, FUNNEL_NOT_V2, FUNNEL_BELOW_V2)}
+        out[part] = rec
+    return out
+
+
+def _embed_v2_summary(ecal, scan, rules):
+    """summary.json's embed_v2 block: the v2 calibration applied, and per
+    source the embedding hits against the count its per-image
+    false-positive rate predicts (EC.source_verdict; informational: a
+    source's removal from base v2 is the owner's decision, R4)."""
+    if ecal is None:
+        return {"applied": False, "why": "no scan yet" if scan is None else "no current v2 calibration "
+                                                                            "(build --skip-scan)"}
+    cal = ecal["calibration"]
+    per = collections.defaultdict(lambda: {"images": 0, "hits": 0, "strict": 0, "dhash": 0})
+    for x in rules:
+        if x["embed"]["unscannable"]:
+            continue
+        v = per["%s|%s" % (x["part"], x["source"])]
+        v["images"] += 1
+        v["hits"] += int(x["embed"]["applied_hit"])
+        v["strict"] += int(x["embed"]["strict_hit"])
+        v["dhash"] += int(x["reason"] in ("near_eval_v2", "near_eval_variant") or x["embed"]["dhash_hit"])
+    per_source = {k: EC.source_verdict(v["images"], v["hits"], v["strict"], v["dhash"], ecal["p_false"])
+                  for k, v in sorted(per.items())}
+    return {"applied": True, "decided_by": EC.DECISION, "file": ecal["file"], "cos_threshold": ecal["cos_threshold"],
+            "strict_threshold": ecal["strict_threshold"], "base": cal.get("base"), "p_false": ecal["p_false"],
+            "known_limits": ecal["known_limits"],
+            "negatives": {t: {k: v.get(k) for k in ("n", "false_hits", "fpr", "ub", "at_base", "constraining")}
+                          for t, v in (cal.get("negatives") or {}).items()},
+            "recall": {f: {k: v.get(k) for k in ("n", "hits", "recall", "lb", "at_base")}
+                       for f, v in (cal.get("positives") or {}).items()},
+            "per_source": per_source,
+            "per_source_note": "informational: a flagged source is the owner's decision (R4); single images are "
+                               "judged by the copy rules"}
 
 
 def _near_earlier(index, r):
@@ -1015,25 +1165,106 @@ def _load_scan():
 
 
 def _scan_index(scan):
-    """({(set, key, sha256)}, {(set, key, sha256): (reason, match)}) of a scan."""
+    """({(set, key, sha256)} scanned, {(set, key, sha256): [every hit]},
+    {(set, key, sha256)} that could not be described) of a scan. Each hit is
+    {eval_split, eval_key, cos, bits, variant} (evaluation keys only)."""
     if scan is None:
-        return set(), {}
+        return set(), {}, set()
     scanned = set()
     sha = {}
     for s, rows in (scan.get("scanned") or {}).items():
         for key, sha256 in rows:
             scanned.add((s, key, sha256))
             sha[(s, key)] = sha256
-    flagged = {}
+    hits = collections.defaultdict(list)
     for h in scan.get("hits") or ():
         k = (h["set"], h["key"], sha.get((h["set"], h["key"])))
-        if k not in flagged or h["cos"] > flagged[k][1]["cos"]:
-            flagged[k] = ("near_eval_embed", {kk: h[kk] for kk in ("eval_split", "eval_key", "cos", "bits",
-                                                                   "variant")})
-    for u in scan.get("unscannable") or ():
-        k = (u["set"], u["key"], sha.get((u["set"], u["key"])))
-        flagged[k] = ("unhashable_embed", {"why": "the image cannot be described"})
-    return scanned, flagged
+        hits[k].append({kk: h[kk] for kk in ("eval_split", "eval_key", "cos", "bits", "variant")})
+    uns = {(u["set"], u["key"], sha.get((u["set"], u["key"]))) for u in scan.get("unscannable") or ()}
+    return scanned, dict(hits), uns
+
+
+def _cos(e):
+    try:
+        return float(e.get("cos"))
+    except (TypeError, ValueError):
+        return float("-inf")
+
+
+def _bits(e):
+    try:
+        return int(e.get("bits"))
+    except (TypeError, ValueError):
+        return 65
+
+
+def embed_evidence(hits, unscannable, k, threshold, strict=None):
+    """What the scan says about one candidate (set, key, sha256), judged at
+    `threshold` (the v2 one; None: the scan's own, every hit applies): the
+    best hit at the scan's threshold, whether a hit is a copy at `threshold`
+    (cos >= it or within 6 dHash bits under a variant) and its best entry,
+    a hit at or above the strict threshold, a dHash hit, and whether the
+    image could not be described."""
+    entries = list(hits.get(k) or ())
+    best = max(entries, key=lambda e: (_cos(e), -_bits(e))) if entries else None
+    applied = [e for e in entries if threshold is None or _bits(e) <= BITS or _cos(e) >= threshold]
+    top = max(applied, key=lambda e: (_cos(e), -_bits(e))) if applied else None
+    return {"unscannable": k in unscannable, "base_hit": dict(best) if best else None, "n_base_hits": len(entries),
+            "applied_hit": bool(applied), "match": dict(top, n_copies=len(applied)) if top else None,
+            "strict_hit": strict is not None and any(_cos(e) >= strict for e in entries),
+            "dhash_hit": any(_bits(e) <= BITS for e in entries), "threshold": threshold}
+
+
+def tsw_rule(session, dev_sessions, test_sessions):
+    """L-9(a): the copy rule of a tsw row by its capture session."""
+    if session and (session in dev_sessions or session in test_sessions):
+        return RULE_TSW_EVAL_SESSION
+    if EC.capture_session(session):
+        return RULE_TSW_PROVENANCE
+    return RULE_TSW_EMBED
+
+
+def funnel_verdict(entries, threshold):
+    """L-9(b): {"applied": the best entry that is a v2 copy or None,
+    "entries": every distinct entry with its verdict}. An entry against an
+    evaluation split outside v2 (ood22, ood23) is not_v2_split; one against
+    a v2 split is applied when it is within 6 dHash bits or at or above
+    `threshold` (None: always, the scan's own threshold), else
+    below_v2_threshold. An entry whose numbers cannot be read is applied
+    (fail closed)."""
+    out, seen = [], set()
+    for e in entries or ():
+        ident = (e.get("eval_split"), e.get("eval_key"))
+        if ident in seen:
+            continue
+        seen.add(ident)
+        if e.get("eval_split") not in C2.EVAL_SPLITS:
+            verdict = FUNNEL_NOT_V2
+        elif threshold is None or _bits(e) <= BITS or _cos(e) >= threshold or not math.isfinite(_cos(e)):
+            verdict = FUNNEL_APPLIED
+        else:
+            verdict = FUNNEL_BELOW_V2
+        out.append({"eval_split": e.get("eval_split"), "eval_key": e.get("eval_key"), "cos": e.get("cos"),
+                    "bits": e.get("bits"), "variant": e.get("variant"), "verdict": verdict})
+    applied = [e for e in out if e["verdict"] == FUNNEL_APPLIED]
+    best = max(applied, key=lambda e: (_cos(e), -_bits(e))) if applied else None
+    return {"applied": dict({k: best[k] for k in ("eval_split", "eval_key", "cos", "bits", "variant")},
+                            source="funnel leak_v1.json", n_copies=len(applied)) if best else None,
+            "entries": out}
+
+
+def _rule_row(part, r, rule, reason, match, ev, fun, decision):
+    """One row of copy_rules.jsonl: the candidate, the copy rule that judged
+    it, its decision and the evidence (evaluation keys only)."""
+    row = {"part": part, "key": r["key"], "sha256": r["sha256"], "source": r["source"],
+           "session": r.get("session") or "", "rule": rule, "decision": decision, "reason": reason,
+           "match": match or None, "decided_by": L9_DECISION,
+           "embed_threshold_applies": rule in (RULE_TSW_EMBED, RULE_BASE_B, RULE_L5),
+           "embed": {k: ev[k] for k in ("unscannable", "base_hit", "n_base_hits", "applied_hit", "strict_hit",
+                                        "dhash_hit", "threshold")}}
+    if fun is not None and fun["entries"]:
+        row["funnel"] = fun["entries"]
+    return row
 
 
 def _scan_current(scan, want, lock1, bs_sha, domain_sha):
@@ -1052,18 +1283,39 @@ def _scan_current(scan, want, lock1, bs_sha, domain_sha):
         return False
     if (inp.get("funnel_domain") or {}).get("sha256") != domain_sha:
         return False
-    scanned, _flagged = _scan_index(scan)
+    if _scan_inputs_changed(scan):
+        return False
+    scanned, _hits, _uns = _scan_index(scan)
     return scanned == want
 
 
-def funnel_base_b_copies(path=None):
-    """({key or image path: copy entry}, record) of the base B images the
-    funnel's pre-registered H6 scan (leak_v1.json, status complete, passed
-    calibration) lists as copies of an evaluation image. The listing in
-    leak_v1.json is capped (LISTED_MAX); when it is shorter than the count,
-    the rest comes from the pairs file it records, checked by sha256, and a
-    pairs file that cannot be read refuses (fail closed). No file, or a run
-    that is not complete: ({}, state "pending"), which the LOCK records."""
+def _scan_inputs_changed(scan):
+    """Why the calibration file or the evaluation descriptors the scan used
+    no longer hash as it recorded (a funnel leak rerun, a deleted cache), or
+    None. Such a scan is stale: its hits were cut at another threshold, and
+    the v2 calibration (L-9(c)) is built on exactly those two files."""
+    det = scan.get("detector") or {}
+    for what, rec in (("calibration", det.get("calibration") or {}),
+                      ("evaluation descriptors", det.get("eval_descriptors") or {})):
+        p = rec.get("path")
+        if not p or not Path(p).is_file() or C1.sha256_file(p) != rec.get("sha256"):
+            return "the %s the scan used (%s) is missing or changed since the scan" % (what, p)
+    return None
+
+
+def funnel_base_b_matches(path=None):
+    """({key or image path: [every match entry]}, record) of the base B
+    images the funnel's pre-registered H6 scan (leak_v1.json, status
+    complete, passed calibration) lists as copies of an evaluation image,
+    whatever the evaluation split: which of them apply is funnel_verdict's
+    (L-9(b)). The listing in leak_v1.json is capped (funnel.leak.LISTED_MAX
+    pairs); when it may be truncated (as long as the cap, or fewer images
+    than the count), every base_B copy pair is read from the pairs file it
+    records, checked by sha256, and a pairs file that cannot be read refuses
+    (fail closed): a match against a v2 split beyond the cap must not be
+    missed. No file, or a run that is not complete: ({}, state "pending"),
+    which the LOCK records."""
+    from ..funnel import leak as L
     p = Path(path or funnel_leak_path())
     if not p.is_file():
         return {}, {"state": "pending", "path": None, "sha256": None}
@@ -1077,7 +1329,8 @@ def funnel_base_b_copies(path=None):
     listed = [e for e in b.get("listed") or [] if isinstance(e, dict)]
     n = int(b.get("copies") or 0)
     entries = list(listed)
-    if n > len({e.get("key") for e in listed}):
+    truncated = len(listed) >= L.LISTED_MAX or n > len({e.get("key") for e in listed})
+    if truncated:
         pc = doc.get("pairs_csv") or {}
         pp = Path(pc.get("path") or (p.parent / "leak_pairs_v1.csv"))
         if not pp.is_file() or (pc.get("sha256") and C1.sha256_file(pp) != pc["sha256"]):
@@ -1089,14 +1342,81 @@ def funnel_base_b_copies(path=None):
                 if row.get("set") == "base_B" and row.get("kind") == "copy":
                     entries.append({"key": row["key"], "eval_split": row["eval_split"], "eval_key": row["eval_key"],
                                     "cos": float(row["cos"]), "bits": int(row["bits"]), "variant": row["variant"]})
-    out = {}
+    out = collections.defaultdict(list)
     for e in entries:
         m = {k: e.get(k) for k in ("eval_split", "eval_key", "cos", "bits", "variant")}
         m["source"] = "funnel leak_v1.json"
-        for k in (e.get("key"), e.get("image")):
+        for k in {e.get("key"), e.get("image")}:
             if k:
-                out.setdefault(str(k), m)
-    return out, dict(rec, state="complete", base_b_copies=n, base_copy=bool((doc.get("h6b") or {}).get("base_copy")))
+                out[str(k)].append(m)
+    splits_hit = collections.Counter(e.get("eval_split") for e in entries)
+    return dict(out), dict(rec, state="complete", base_b_copies=n, pairs_read=bool(truncated),
+                           base_copy=bool((doc.get("h6b") or {}).get("base_copy")),
+                           entries_by_split=dict(sorted((str(k), v) for k, v in splits_hit.items())))
+
+
+def _embedder_name(domain_raw):
+    from ..funnel import embed as E
+    model, pooling = E.features_config(domain_raw)
+    return E.embedder_name(model, pooling)
+
+
+def _calibrate_v2(scan, embedder, dom_path, domain_raw, procs, testing, force=False, compute=True):
+    """The v2 embedding calibration (L-9(c), inc2.embed_calibration) for the
+    calibration and evaluation descriptors this scan used, written to
+    splits/v2/embed_calibration_v2.json: loaded when current, else computed
+    (compute True) or None (compute False: build --skip-scan). The base is
+    the scan's calibration, whose file must still hash as the scan recorded;
+    the evaluation descriptors are the scan's cache, likewise. Reads v1's
+    train_core, dev, test and imageweeds (each checked against the v1
+    LOCK), Step 1's pool.jsonl (the provenance-disjoint and easy negatives)
+    and the funnel config. The embedder is made only when something must be
+    described."""
+    det = scan.get("detector") or {}
+    stale = _scan_inputs_changed(scan)
+    if stale:
+        if not compute:
+            log("WARNING: %s; the v2 calibration is not applied (build --skip-scan)" % stale)
+            return None
+        raise SplitError("%s: run `scan` (or build) again" % stale)
+    bp = (det.get("calibration") or {}).get("path")
+    ev = det.get("eval_descriptors") or {}
+    cache = ev.get("path")
+    name = embedder.name if embedder is not None else _embedder_name(domain_raw)
+    try:
+        base = EC.base_info(bp, det.get("calibration_source"), name)
+    except C2.Inc2Error as e:
+        raise SplitError("the scan's calibration cannot be the v2 calibration's base: %s" % e)
+    _sets, eval_rows, inputs = scan_candidates()
+    lock1 = C1.read_lock()
+    core_path = C1.manifest_path("train_core")
+    if C1.sha256_file(core_path) != lock1["manifests"]["train_core"]:
+        raise SplitError("v1 train_core does not match the v1 LOCK")
+    core_rows = C1.read_manifest(core_path)
+    pool_rows = C1.read_manifest(pool_path()) if pool_path().is_file() else []
+    recall_min, fpr_max, gates = _h6_gates()
+    summ1 = _read_json(C1.SPLITS_DIR / S1.SUMMARY_NAME, "v1 summary.json")
+    holder = {"emb": embedder}
+
+    def get_embedder():
+        if holder["emb"] is None:
+            holder["emb"] = _make_embedder(domain_raw)
+        return holder["emb"]
+
+    def get_index():
+        return G.eval_index(eval_rows, get_embedder(), cache, procs=procs)
+    inputs.update(train_core=C2.file_record(core_path), funnel_domain=C2.file_record(dom_path), gates=gates,
+                  embed_scan=C2.file_record(embed_scan_path()), eval_descriptors=dict(ev),
+                  pool=C2.file_record(pool_path()) if pool_path().is_file() else None)
+    try:
+        return EC.calibrate(embed_calibration_path(), base, name, get_embedder, get_index, ev["sha256"], eval_rows,
+                            core_rows, pool_rows, domain_raw, leak_dir(), recall_min, fpr_max,
+                            min_negatives=EC.MIN_NEGATIVES_TESTING if testing else EC.MIN_NEGATIVES,
+                            dev_sessions=(summ1.get("dev") or {}).get("sessions") or (), procs=procs,
+                            testing=testing, force=force, inputs=inputs, domain_sha=C1.sha256_file(dom_path),
+                            compute=compute)
+    except C2.Inc2Error as e:
+        raise SplitError("the v2 embedding calibration (L-9(c)): %s" % e)
 
 
 def _make_embedder(domain_raw):
@@ -1230,7 +1550,15 @@ def _scan(embedder, calibration_path, procs, force, domain_config, testing):
            "hits": hits, "unscannable": [{"set": where[k], "key": k} for k in sorted(unscannable)],
            "counts": counts, "code": _code_record(), "status": "complete"}
     C2.write_json_atomic(embed_scan_path(), doc)
-    log("scan done in %.0fs: %s. Next: `build` (it applies the scan), then `lock`" % (time.time() - t0, counts))
+    log("scan done in %.0fs: %s" % (time.time() - t0, counts))
+    # L-9(c): the threshold for images without capture provenance, from the descriptors the scan's
+    # calibration recorded (computed here only where they are missing)
+    t1 = time.time()
+    ecal = _calibrate_v2(doc, embedder, dom_path, domain_raw, procs, testing, force=force, compute=True)
+    log("v2 calibration in %.0fs: cos >= %.6f (the scan's %.6f), strict %.6f, known limits %s. Next: `build` (it "
+        "applies the scan through it), then `lock`" % (time.time() - t1, ecal["cos_threshold"], scanner.threshold,
+                                                       ecal["strict_threshold"],
+                                                       [x["family"] for x in ecal["known_limits"]]))
     return doc
 
 
@@ -1381,36 +1709,95 @@ def _index_problems(path, want_entries, what):
     return probs, data
 
 
+def _embed_calibration_problems(scan, summary):
+    """(the v2 calibration record or None, problems) at lock: it exists and
+    shows it passed, it was made from the calibration and evaluation
+    descriptors this scan used, its negatives file hashes as it records, and
+    it is the one the build applied (summary.json embed_v2)."""
+    path = embed_calibration_path()
+    if not path.is_file():
+        return None, ["%s missing: run `build` (or `scan`) again; the v2 embedding calibration (L-9(c)) judges "
+                      "base B and every tsw row without a capture session" % EC.NAME]
+    try:
+        ecal = EC.load(path)
+        doc = _read_json(path, EC.NAME)
+    except (C2.Inc2Error, OSError, ValueError) as e:
+        return None, ["the v2 embedding calibration cannot be used: %s" % e]
+    probs = []
+    det = scan.get("detector") or {}
+    if ((ecal.get("base") or {}).get("file") or {}).get("sha256") != (det.get("calibration") or {}).get("sha256"):
+        probs.append("%s was made from another calibration than the one embed_scan.json used: run `build` again"
+                     % EC.NAME)
+    if (doc.get("identity") or {}).get("eval_descriptors_sha256") != (det.get("eval_descriptors") or {}).get("sha256"):
+        probs.append("%s was made from other evaluation descriptors than embed_scan.json's" % EC.NAME)
+    nc = doc.get("negatives_csv") or {}
+    npath = C2.SPLITS_DIR / EC.NEGATIVES_NAME
+    if not npath.is_file() or C1.sha256_file(npath) != nc.get("sha256"):
+        probs.append("%s is missing or does not hash as %s records" % (EC.NEGATIVES_NAME, EC.NAME))
+    if ((summary.get("embed_v2") or {}).get("file") or {}).get("sha256") != ecal["file"]["sha256"]:
+        probs.append("the build applied %s: run `build` again (it applies the scan through %s)"
+                     % ("no v2 calibration" if not (summary.get("embed_v2") or {}).get("applied")
+                        else "another v2 calibration", EC.NAME))
+    if ecal.get("testing") and not summary.get("testing"):
+        probs.append("%s is a testing calibration and the build is not" % EC.NAME)
+    return ecal, probs
+
+
 def _scan_problems(base_prov, summary):
-    """Coverage of the embedding scan over base v2's tsw and harvested rows."""
+    """Coverage of the embedding scan over base v2's tsw and harvested rows,
+    and each row judged again by its copy rule (L-9): a tsw row of a dev or
+    test capture session; an image the scan could not describe; a copy at
+    the v2 threshold (within 6 dHash bits, or cos at or above it) of a row
+    the threshold applies to (base B, a tsw row without a capture session).
+    The provenance file's copy_rule must be the rule re-derived here.
+    Returns (problems, scan, v2 calibration record or None)."""
     try:
         scan = _load_scan()
     except SplitError as e:
-        return [str(e)], None
+        return [str(e)], None, None
     if scan is None:
-        return ["embed_scan.json missing: run `scan` (the embedding copy scan of 4.2 step 5) before lock"], None
+        return ["embed_scan.json missing: run `scan` (the embedding copy scan of 4.2 step 5) before lock"], None, None
     probs = []
     for s in C2.EVAL_SPLITS:
         if (scan.get("inputs") or {}).get("manifests", {}).get(s) != summary["manifests"][s]["sha256"]:
             probs.append("embed_scan.json was made against another %s manifest" % s)
-    scanned, flagged = _scan_index(scan)
-    uncovered, bad = [], []
+    ecal, eprobs = _embed_calibration_problems(scan, summary)
+    probs += eprobs
+    t2 = ecal["cos_threshold"] if ecal is not None else None
+    scanned, hits, uns = _scan_index(scan)
+    dev_s = set(summary.get("dev_sessions") or ())
+    test_s = {r["session"] for r in C1.read_manifest(C2.v2_manifest_path("test"))} - {""}
+    uncovered, bad, wrong_rule = [], [], []
     for p in base_prov:
         if p["part"] == "train_core":
+            if p.get("copy_rule") != RULE_TRAIN_CORE:
+                wrong_rule.append(p["key"])
             continue
         s = p["part"]
         k = (s, p["key"], p["sha256"])
+        rule = tsw_rule(p.get("session") or "", dev_s, test_s) if s in TSW else RULE_BASE_B
+        if p.get("copy_rule") != rule:
+            wrong_rule.append(p["key"])
         if k not in scanned:
             uncovered.append(p["key"])
-        elif k in flagged:
-            bad.append((p["key"], flagged[k][0]))
+            continue
+        ev = embed_evidence(hits, uns, k, t2)
+        if rule == RULE_TSW_EVAL_SESSION:
+            bad.append((p["key"], "a dev or test capture session (L-9(a))"))
+        elif ev["unscannable"]:
+            bad.append((p["key"], "unhashable_embed"))
+        elif rule != RULE_TSW_PROVENANCE and ev["applied_hit"]:
+            bad.append((p["key"], "near_eval_embed"))
     if uncovered:
         probs.append("%d base v2 row(s) were not scanned (e.g. %s): run `scan` again" % (len(uncovered), uncovered[:3]))
+    if wrong_rule:
+        probs.append("%d provenance row(s) do not carry the copy rule L-9 gives them (e.g. %s)"
+                     % (len(wrong_rule), wrong_rule[:3]))
     if bad:
-        probs.append("%d base v2 row(s) are flagged by the embedding scan (e.g. %s): run `build` again (it drops "
-                     "flagged tsw rows; a flagged row of base B's part is an R4 incident and refuses)"
-                     % (len(bad), bad[:3]))
-    return probs, scan
+        probs.append("%d base v2 row(s) are flagged by the embedding scan under their copy rule (e.g. %s): run "
+                     "`build` again (it drops such tsw rows; such a row of base B's part is an R4 incident and "
+                     "refuses)" % (len(bad), bad[:3]))
+    return probs, scan, ecal
 
 
 def funnel_h6_status():
@@ -1480,17 +1867,26 @@ def _lock(scorer_path, procs, testing=False):
     ip, nt = _index_problems(C2.NEVER_TRAIN_INDEX, eval_entries, "the v2 never-train index")
     bp, bc = _index_problems(C2.BASE_COPIES_INDEX, [(int(p["dhash"]), p["part"], p["key"]) for p in prov],
                              "the base-copy index")
-    sp, scan = _scan_problems(prov, summary)
+    sp, scan, ecal = _scan_problems(prov, summary)
     dp, drops, drops_sha = _variant_drops_problems(summary, lock1, eval_entries, shas.get("train_core"))
     probs = bprobs + ip + bp + sp + dp
     if not bprobs:
         probs += _never_train_problems(prov, eval_entries)
-    funnel_copies, funnel_rec = funnel_base_b_copies()
+    funnel_matches, funnel_rec = funnel_base_b_matches()
+    t2 = ecal["cos_threshold"] if ecal is not None else None
     hit = sorted(p["key"] for p in prov if p["part"] == BASE_B
-                 and (funnel_copies.get(p["key"]) or funnel_copies.get(str(p["image"]))))
+                 and funnel_verdict((funnel_matches.get(p["key"]) or []) + (funnel_matches.get(str(p["image"])) or []),
+                                    t2)["applied"])
     if hit:
         probs.append("R4 INCIDENT (funnel H6(b)): the funnel's leak_v1.json lists %d image(s) of base v2's base B "
-                     "part as copies of an evaluation image (e.g. %s); the owner decides" % (len(hit), hit[:3]))
+                     "part as copies of a v2 evaluation image at the v2 threshold (L-9(b)) (e.g. %s); the owner "
+                     "decides" % (len(hit), hit[:3]))
+    try:
+        rules_sha = C1.sha256_file(copy_rules_path())
+    except OSError:
+        rules_sha = None
+    if rules_sha is None or rules_sha != ((summary.get("l9") or {}).get("copy_rules") or {}).get("sha256"):
+        probs.append("%s is missing or changed since the build" % COPY_RULES_NAME)
     if probs:
         raise SplitError("cannot lock, %d problem(s): %s" % (len(probs), probs[:10]))
     nt.pop("note", None)
@@ -1521,6 +1917,20 @@ def _lock(scorer_path, procs, testing=False):
                                      "incident": bool(drops)},
         "summary_sha256": C1.sha256_file(summary_path()),
         "embed_scan_sha256": C1.sha256_file(embed_scan_path()),
+        EC.LOCK_KEY: ecal["file"]["sha256"],
+        "embed_calibration_v2": {"file": EC.NAME, "sha256": ecal["file"]["sha256"], "decided_by": EC.DECISION,
+                                 "cos_threshold": ecal["cos_threshold"], "strict_threshold": ecal["strict_threshold"],
+                                 "p_false": ecal["p_false"], "testing": ecal["testing"],
+                                 "base": {k: (ecal["base"] or {}).get(k) for k in ("source", "role", "cos_threshold",
+                                                                                   "file")},
+                                 "known_limits": [x["family"] for x in ecal["known_limits"]],
+                                 "negatives_csv": EC.NEGATIVES_NAME,
+                                 "negatives_csv_sha256": C1.sha256_file(C2.SPLITS_DIR / EC.NEGATIVES_NAME)},
+        "embed_calibration_v2_negatives_sha256": C1.sha256_file(C2.SPLITS_DIR / EC.NEGATIVES_NAME),
+        "copy_rules_sha256": rules_sha,
+        "l9": {"decided_by": L9_DECISION, "copy_rules": COPY_RULES_NAME,
+               "rules": {part: (summary.get("l9") or {}).get(part, {}).get("rules") for part in list(TSW) + [BASE_B]},
+               "funnel_base_b_entries": ((summary.get("l9") or {}).get(BASE_B) or {}).get("funnel_entries")},
         "scorer_sha256": C1.sha256_file(scorer),
         "derived_from": {"v1_lock_sha256": C1.sha256_file(C1.LOCK_PATH), "v1_lock_path": str(C1.LOCK_PATH),
                          "identical": list(C2.BYTE_COPIES) + ([] if drops else list(C2.FILTERED_COPIES)),
@@ -1532,6 +1942,7 @@ def _lock(scorer_path, procs, testing=False):
         "h6": {"base_b": {"dhash_8_variant_check": "passed for the kept part",
                           "embed_scan": {"calibration_source": scan["detector"].get("calibration_source"),
                                          "cos_threshold": scan["detector"].get("cos_threshold"),
+                                         "cos_threshold_v2": ecal["cos_threshold"],
                                          "embedder": scan["detector"].get("embedder"),
                                          "copies_in_base_v2": 0, "counts": scan_counts},
                           "l5_excluded": base_b["l5"]["excluded"],
@@ -1539,6 +1950,7 @@ def _lock(scorer_path, procs, testing=False):
                           "funnel_leak_v1": funnel_h6_status(),
                           "funnel_base_b_copies_in_base_v2": 0, "funnel_state": funnel_rec["state"]}},
         "h6_status": {"base_v2_copies": 0, "embed_scan": scan["detector"].get("calibration_source"),
+                      "embed_v2_threshold": ecal["cos_threshold"],
                       "funnel_leak_v1": funnel_rec["state"],
                       "incident_in_l5_part": base_b["h6b"]["incident_l5_part"]},
         "research_only_rows": summary["licences"]["research_only_rows"],
@@ -1594,7 +2006,10 @@ def verify(scorer_path=None, check_v1=True, procs=PROCS):
     for name, key in ((C2.NEVER_TRAIN_INDEX, "nevertrain_sha256"), (C2.BASE_COPIES_INDEX, "base_copies_sha256"),
                       (C2.BASE_PROVENANCE, "provenance_sha256"), (C2.L5_EXCLUDED, "l5_excluded_sha256"),
                       (C2.TRAIN_CORE_VARIANT_DROPS, C2.VARIANT_DROPS_LOCK_KEY),
-                      (summary_path(), "summary_sha256"), (embed_scan_path(), "embed_scan_sha256")):
+                      (summary_path(), "summary_sha256"), (embed_scan_path(), "embed_scan_sha256"),
+                      (embed_calibration_path(), EC.LOCK_KEY),
+                      (C2.SPLITS_DIR / EC.NEGATIVES_NAME, "embed_calibration_v2_negatives_sha256"),
+                      (copy_rules_path(), "copy_rules_sha256")):
         try:
             if C1.sha256_file(name) != lk.get(key):
                 probs.append("%s changed since it was locked" % name)
@@ -1614,6 +2029,10 @@ def verify(scorer_path=None, check_v1=True, procs=PROCS):
         G.GuardV2.load(C2.LOCK_PATH)
     except C2.Inc2Error as e:
         probs.append("GuardV2 refuses the LOCK: %s" % e)
+    try:
+        EC.load(embed_calibration_path(), lock=lk)
+    except (C2.Inc2Error, OSError) as e:
+        probs.append("the v2 embedding calibration does not load against LOCK v2: %s" % e)
     scorer = Path(scorer_path or S1.default_scorer_path())
     try:
         if C1.sha256_file(scorer) != lk["scorer_sha256"]:
@@ -1658,6 +2077,18 @@ def print_summary():
     log("licences: unresolved %s; research_only rows %d" % (s["licences"]["unresolved_sources"],
                                                            s["licences"]["research_only_rows"]))
     log("embed scan applied: %s" % s["embed_scan"]["applied"])
+    e2 = s.get("embed_v2") or {}
+    l9 = s.get("l9") or {}
+    log("L-9: v2 threshold %s (scan's %s), strict %s, known limits %s; copy rules %s"
+        % (e2.get("cos_threshold"), l9.get("scan_threshold"), e2.get("strict_threshold"),
+           [x.get("family") for x in e2.get("known_limits") or []],
+           {p: (l9.get(p) or {}).get("rules") for p in list(TSW) + [BASE_B]}))
+    for p in list(TSW) + [BASE_B]:
+        v = l9.get(p) or {}
+        log("  %s: flagged at the scan's threshold %s (exempt %s, kept %s; cos %s); copies at v2 where it applies %s; "
+            "funnel %s" % (p, v.get("flagged_at_scan_threshold"), v.get("flagged_exempt"), v.get("flagged_exempt_kept"),
+                           v.get("flagged_exempt_cos"), v.get("copies_at_v2_threshold_where_it_applies"),
+                           v.get("funnel_images")))
     log("LOCK v2: %s" % ("present" if C2.LOCK_PATH.exists() else "absent"))
 
 

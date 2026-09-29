@@ -38,7 +38,7 @@ Pinned:
     no training row carries an exam key; drops, each recorded: a flipped test
     image (near_eval_variant), a rotated imageweeds image, the ood23 near
     duplicate of an ood22 row (the tsw22 row is kept), every row of a dev
-    session; the row sharing a session with test is kept and counted; L-5
+    session and (L-9(a)) the row sharing a session with test, counted; L-5
     drops every cwp10 and vanpe image (listed in l5_excluded.jsonl), and a
     flipped test image among them is recorded as an H6(b) incident without
     refusing; a harvested near copy of a train_core image is dropped; base_v2
@@ -48,7 +48,8 @@ Pinned:
   * lock refuses before the embedding scan; the scan (the stream's own
     calibration, since the funnel's leak_v1.json there failed) finds the 15 %
     crop of a test image in tsw22 and the sheared test image in base B's kept
-    part, both > 6 bits under every variant, and the flipped / rotated copies;
+    part, both > 6 bits under every variant, the flipped / rotated copies,
+    and the 2022 capture of a test scene (kept under L-9(a));
     it covers every candidate (all v1 ood rows, all of base B), not the
     build's manifests, and carries evaluation keys only;
     lock then refuses (flagged rows), and a second build refuses (R4, the
@@ -62,6 +63,31 @@ Pinned:
     refuses a flipped test image, a base copy and the dropped ood23 duplicate,
     and passes a fresh image; build, scan and lock refuse once locked; verify
     catches a changed label and a writable file;
+  * decision L-9 (the second real build, job 47259471, refused on scenes):
+    the world adds two train_core frames of a test scene (cosine 0.95 under
+    the hue embedder, another capture date), a 2022 tsw22 capture of a test
+    scene in its own capture session (cosine 1.0, far by dHash) and a
+    harvested photograph of a test scene (0.85). Every tsw and base B
+    candidate's copy rule is in copy_rules.jsonl and the provenance file:
+    tsw rows of a dev or test capture session are dropped (the test-session
+    row is no longer kept), other tsw rows with a capture session are exempt
+    from the embedding threshold (the flagged 2022 capture is kept), rows
+    without one are judged like base B (the 15 % crop is dropped). The scan
+    writes the v2 calibration: per-image hard negatives raise the threshold
+    above the train_core scene frames (their false hits at the scan's
+    threshold recorded), the base's positives give back its threshold,
+    rates and bounds per tier, recall per family, evaluation keys only.
+    With the incident's funnel calibration (0.80, no seeds) as the base: the
+    sheared test image in base B still refuses at the v2 threshold; without
+    it the build passes, keeping the harvested scene (recorded, not applied)
+    and the funnel's matches against ood23 (not_v2_split), test and
+    imageweeds below the v2 threshold (below_v2_threshold); a scan whose
+    calibration file changed is stale (build scans again), and
+    build --skip-scan on a stale scan (no v2 calibration) reproduces the
+    incident, except the ood23 match. lock refuses another v2 calibration
+    than the build's, a changed copy_rules.jsonl and a provenance copy_rule
+    that is not the re-derived one; LOCK v2 records the three files'
+    sha256 and the v2 threshold; verify catches each file changed after lock;
   * the CLI end to end: build --testing, lock, verify, summary;
   * run_inc2_splits.sh: bash -n, GPU-shared, verbs, refusals (unknown verb,
     --testing, scan without a GPU, outer/nested drift), a dry run per verb,
@@ -116,6 +142,7 @@ except ImportError as e:
 from weed_optimizer_framework.tools.inc import common as C1  # noqa: E402
 from weed_optimizer_framework.tools.inc import splits as S1  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import common as C2  # noqa: E402
+from weed_optimizer_framework.tools.inc2 import embed_calibration as EC  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import guard as G  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import splits as S2  # noqa: E402
 from weed_optimizer_framework.tools.funnel import leak as L  # noqa: E402
@@ -144,6 +171,8 @@ IWA = "project_agml__imageweeds_aerial_weed_detection"
 MH = "project_agml__mh_weed16_weed_detection"
 IMG = {}
 VARIANT_STEM = "20210701_FakeCam_S0_%d" % (SESSIONS[0] + 1)      # the L-8 image: a transverse test copy
+SCENE_STEMS = tuple("20210701_FakeCam_S0_%d" % (SESSIONS[0] + k) for k in (2, 3))   # L-9(c) hard negatives
+Y22_STEM = "20220715_FakeCam_Y22_1"             # L-9(a): a tsw22 capture of a test scene, another session
 
 
 # ------------------------------------------------------------------- world
@@ -204,8 +233,11 @@ def grid(seed):
     return g
 
 
-def render(g, hues):
-    band = np.repeat(np.repeat(np.array([0, 0, 0, 1, 1, 1, 2, 2])[:, None], 9, axis=1), BLOCK, axis=0)
+def render(g, hues, bands=(0, 0, 0, 1, 1, 1, 2, 2)):
+    """The block-grid photograph: row band i painted in hue hues[bands[i]],
+    brightness from the grid. The hue histogram (HueEmbedder) depends on the
+    bands only, the dHash on the grid and the hues."""
+    band = np.repeat(np.repeat(np.array(bands)[:, None], 9, axis=1), BLOCK, axis=0)
     band = np.repeat(band, BLOCK, axis=1)
     H = np.array([int((h + 0.5) * 256 / N_BINS) for h in hues], dtype=np.uint8)[band]
     V = np.repeat(np.repeat(g, BLOCK, axis=0), BLOCK, axis=1).astype(np.uint8)
@@ -243,6 +275,27 @@ def neighbour(g0, hues0, hues, want, seed, all_far=False):
         if bits(hv["id"], h0) in want and (not all_far or min(bits(hv[v], h0) for v in L.VARIANTS) > 6):
             return img
     raise RuntimeError("could not plant a neighbour")
+
+
+def scene_of(src, bands, extra_hue, seed):
+    """A "same scene" photograph of the image at src (L-9): its hues in the
+    given row bands (plus extra_hue as a fourth), a fresh brightness grid, so
+    its hue histogram is close to src's (cosine by the bands: (3,3,1,1) ->
+    0.954, (2,2,2,2) -> 0.853, the same bands -> 1.0) while its dHash is
+    more than 6 bits from src's under every variant: not a copy."""
+    _g0, h0 = IMG[str(src)]
+    t0 = L.dhash_variants(render(_g0, h0))["id"]
+    hues = tuple(h0) + (extra_hue,)
+    for s_ in range(seed, seed + 400):
+        img = render(grid(s_), hues, bands)
+        hv = L.dhash_variants(img)
+        if min(bits(hv[v], t0) for v in L.VARIANTS) > 6:
+            return img
+    raise RuntimeError("no far scene image")
+
+
+SCENE_TRAIN = (0, 0, 0, 1, 1, 1, 2, 3)          # (3,3,1,1): cosine 0.954 with the test image
+SCENE_BASE = (0, 0, 1, 1, 2, 2, 3, 3)           # (2,2,2,2): cosine 0.853
 
 
 def far_augment(src, family, seed, params=None):
@@ -305,6 +358,12 @@ def make_v1_world():
     # L-8: a transverse copy of a test image among the frames of train session S0 (too large to become dev)
     p = save(transpose(test_image(1), Image.Transpose.TRANSVERSE), root / "train" / "images" / (VARIANT_STEM + ".png"))
     yolo(root / "train" / "labels" / (VARIANT_STEM + ".txt"), [(5, 0.5, 0.5, 0.2, 0.2)])
+    # L-9(c): two frames of S0 (another capture date than test) that photograph test image 3's scene: the hard
+    # negatives whose cosine (0.954) the v2 calibration must rise above
+    extra = next(TRIPLES)[0]
+    for i, stem in enumerate(SCENE_STEMS):
+        save(scene_of(test_image(3), SCENE_TRAIN, extra, 3000 + 50 * i), root / "train" / "images" / (stem + ".png"))
+        yolo(root / "train" / "labels" / (stem + ".txt"), [(7, 0.5, 0.5, 0.2, 0.2)])
     ts = REPO / "downloads" / "3seasonweeddet10"
     d22, d23 = ts / "data2022" / "fieldA", ts / "data2023"
     for s in range(len(SESSIONS)):                 # one frame of every train session (dev ones included)
@@ -312,6 +371,11 @@ def make_v1_world():
         voc(p, [("Waterhemp", (10, 10, 50, 50))])
     p = photo(d22 / "20210801_FakeCam_TEST_901.png", 520)          # shares a session with test
     voc(p, [("Palmer Amaranth", (10, 10, 50, 50)), ("Lambsquarters", (60, 20, 100, 60))])
+    # L-9(a): a 2022 capture of test image 1's scene (its hues, cosine 1.0 under the hue embedder, far by dHash):
+    # the scan flags it at any threshold; its capture session is not a dev or test one, so it is kept
+    g1, h1 = IMG[str(test_image(1))]
+    p = save(scene_of(test_image(1), (0, 0, 0, 1, 1, 1, 2, 2), h1[0], 3200), d22 / (Y22_STEM + ".png"))
+    voc(p, [("Carpetweed", (10, 10, 50, 50))])
     for n in ("field22_a", "field22_b"):
         p = photo(d22 / (n + ".png"), 530 + len(n) + (n == "field22_b"))
         voc(p, [("Carpetweed", (10, 10, 50, 50))])
@@ -348,9 +412,9 @@ def harvested(table, slug, name, img, boxes):
 
 
 def v1_core():
-    """v1 train_core without the planted L-8 image, sorted by key."""
-    return sorted((r for r in C1.read_manifest(C1.manifest_path("train_core")) if not r["key"].endswith(VARIANT_STEM)),
-                  key=lambda r: r["key"])
+    """v1 train_core without the planted L-8 image and the L-9 scene frames, sorted by key."""
+    return sorted((r for r in C1.read_manifest(C1.manifest_path("train_core"))
+                   if not r["key"].endswith((VARIANT_STEM,) + SCENE_STEMS)), key=lambda r: r["key"])
 
 
 def variant_row():
@@ -372,6 +436,10 @@ def make_step1():
     BASE["broken"]["sha256"] = C1.sha256_file(bad)
     g0, h0 = IMG[core[5]["image"]]
     harvested(BASE, WCD, "near_core", neighbour(g0, h0, h0, {1, 2}, 950), [(1, 0.5, 0.5, 0.2, 0.2)])
+    # L-9(c): a harvested photograph of test image 3's scene (cosine 0.853, far by dHash): not a copy; flagged
+    # at a low per-pair threshold, cleared at the v2 one (below the scene frames of train_core at 0.954)
+    harvested(BASE, WCD, "scene_test3", scene_of(test_image(3), SCENE_BASE, next(TRIPLES)[0], 3100),
+              [(4, 0.5, 0.5, 0.2, 0.2)])
     harvested(EXTRA, WCD, "rot_test4", transpose(test_image(4), Image.Transpose.ROTATE_90), [(2, .5, .5, .2, .2)])
     harvested(EXTRA, WCD, "shear_test4", far_augment(test_image(4), "shear", 960), [(2, .5, .5, .2, .2)])
     pool = []
@@ -622,10 +690,12 @@ def test_first_build(v1):
     dev_sessions = set(json.loads((INC / "splits" / "v1" / "summary.json").read_text())["dev"]["sessions"])
     n_dev = sum(1 for x in range(len(SESSIONS)) if "20210701_FakeCam_S%d" % x in dev_sessions)
     t22, t23 = s["tsw"]["tsw22"], s["tsw"]["tsw23"]
-    check("tsw22 drops: the flipped test image (near_eval_variant) and the %d dev-session row(s)" % n_dev,
-          t22["dropped"] == {"near_eval_variant": 1, "dev_session": n_dev} and n_dev >= 1, t22["dropped"])
+    check("tsw22 drops: the flipped test image (near_eval_variant), the %d dev-session row(s) and (L-9(a)) the "
+          "test-session row" % n_dev,
+          t22["dropped"] == {"near_eval_variant": 1, "dev_session": n_dev, "test_session": 1} and n_dev >= 1,
+          t22["dropped"])
     check("tsw22 keeps the rest, the embedding copy included (no scan yet): %d of %d"
-          % (t22["kept"], t22["v1_rows"]), t22["kept"] == t22["v1_rows"] - 1 - n_dev)
+          % (t22["kept"], t22["v1_rows"]), t22["kept"] == t22["v1_rows"] - 2 - n_dev)
     check("tsw23 drops: the ood22 near duplicate (the tsw22 row kept) and the rotated imageweeds image",
           t23["dropped"] == {"near_tsw22": 1, "near_eval_variant": 1}, t23["dropped"])
     ex = {e["key"]: e for e in t23["examples"]}
@@ -633,16 +703,51 @@ def test_first_build(v1):
           and ex["tsw23__field23_rot_iw"]["match"]["split"] == "imageweeds"
           and ex["tsw23__field23_rot_iw"]["match"]["variant"] in ("rot90", "rot270"), t23["examples"])
     ov = t22["session_overlap"]
-    check("the row sharing a session with test is kept and counted (test 1); train_core sessions %d"
-          % ov["train_core"], ov["test"] == 1 and ov["dev"] == n_dev and ov["train_core"] == len(SESSIONS) - n_dev
-          and "tsw22__20210801_FakeCam_TEST_901" in {r["key"] for r in C1.read_manifest(C2.v2_manifest_path("tsw22"))},
-          ov)
+    check("L-9(a): the row sharing a capture session with test is dropped (test_session) and counted (test 1); "
+          "rows sharing one with train_core are kept (%d)" % ov["train_core"],
+          ov["test"] == 1 and ov["dev"] == n_dev and ov["train_core"] == len(SESSIONS) - n_dev
+          and "tsw22__20210801_FakeCam_TEST_901" not in {r["key"] for r in C1.read_manifest(
+              C2.v2_manifest_path("tsw22"))}
+          and {e["key"]: e["reason"] for e in t22["examples"]}.get("tsw22__20210801_FakeCam_TEST_901")
+          == "test_session", ov)
     rows22 = C1.read_manifest(C2.v2_manifest_path("tsw22"))
     v1_22 = {S2.tsw_key("tsw22", r["key"]): r for r in C1.read_manifest(C1.manifest_path("ood22"))}
     check("tsw rows: key tsw22__<stem>, source 3seasonweeddet10/data2022, session = stem minus frame number",
           all(r["key"].startswith("tsw22__") and r["source"] == "3seasonweeddet10/data2022" for r in rows22)
-          and next(r for r in rows22 if r["key"].endswith("TEST_901"))["session"] == "20210801_FakeCam_TEST"
+          and next(r for r in rows22 if r["key"].endswith(Y22_STEM))["session"] == "20220715_FakeCam_Y22"
           and next(r for r in rows22 if r["key"].endswith("field22_a"))["session"] == "field22_a")
+    rules = {x["key"]: x for x in C1.read_manifest(S2.copy_rules_path())}
+    cand = ({S2.tsw_key(t, r["key"]) for t, v in S2.TSW.items() for r in C1.read_manifest(C1.manifest_path(v))}
+            | {r["key"] for r in C1.read_manifest(S2.base_selected_path())})
+    want_rule = {}
+    for k in cand:
+        if k.startswith(("tsw22__", "tsw23__")):
+            sess_ = S1.session_of(k.split("__", 1)[1])
+            want_rule[k] = ("tsw_eval_session" if (sess_ in dev_sessions or sess_ == "20210801_FakeCam_TEST")
+                            else "tsw_provenance" if sess_[:1].isdigit() else "tsw_embed_v2")
+        else:
+            want_rule[k] = "l5_excluded" if k.startswith((CWP, VANPE)) else "base_b_embed_v2"
+    check("L-9: copy_rules.jsonl names the rule of every tsw and base B candidate (%s)"
+          % dict(__import__("collections").Counter(x["rule"] for x in rules.values())),
+          set(rules) == cand - {BASE["hflip_test3"]["key"]} | {BASE["hflip_test3"]["key"]}
+          and all(rules[k]["rule"] == want_rule[k] for k in rules) and set(rules) == cand
+          and all(x["decided_by"].startswith("L-9") for x in rules.values())
+          and s["l9"]["copy_rules"]["sha256"] == C1.sha256_file(S2.copy_rules_path()),
+          sorted((k, rules.get(k, {}).get("rule"), v) for k, v in want_rule.items()
+                 if rules.get(k, {}).get("rule") != v)[:5])
+    check("... tsw rows of a capture session outside dev and test are tsw_provenance (the embedding threshold does "
+          "not apply), a row without one tsw_embed_v2, dev / test sessions tsw_eval_session (dropped)",
+          rules["tsw22__" + Y22_STEM]["rule"] == "tsw_provenance"
+          and rules["tsw22__" + Y22_STEM]["embed_threshold_applies"] is False
+          and rules["tsw22__field22_crop_test"]["rule"] == "tsw_embed_v2"
+          and rules["tsw22__20210801_FakeCam_TEST_901"]["decision"] == "dropped"
+          and rules["tsw22__20210801_FakeCam_TEST_901"]["reason"] == "test_session")
+    prov_ = {p_["key"]: p_ for p_ in C1.read_manifest(C2.BASE_PROVENANCE)}
+    check("... and the provenance file carries each kept row's copy rule (train_core: train_core)",
+          all(p_["copy_rule"] == ("train_core" if p_["part"] == "train_core" else rules[k]["rule"])
+              for k, p_ in prov_.items()))
+    check("without a scan the v2 calibration is not applied (recorded)",
+          s["embed_v2"]["applied"] is False and s["l9"]["v2_threshold"] is None, s["embed_v2"])
     check("tsw labels are byte copies of the v1 converted files under v2/labels/tsw22 (same sha256)",
           all(pathlib.Path(r["label"]).parent == S2.label_dir("tsw22")
               and pathlib.Path(r["label"]).read_bytes() == pathlib.Path(v1_22[r["key"]]["label"]).read_bytes()
@@ -668,12 +773,12 @@ def test_first_build(v1):
           == [BASE["hflip_test3"]["key"]] and b["h6b"]["incident"][0]["reason"] == "near_eval_variant",
           b["h6b"])
     check("the harvested near copy of a train_core image is dropped (near_train_core)",
-          b["dropped"] == {"near_train_core": 1} and b["kept"] == 6, b)
+          b["dropped"] == {"near_train_core": 1} and b["kept"] == 7, b)
     parts = s["base_v2"]["parts"]
     check("base_v2 = train_core (minus the L-8 drop) + tsw22 + tsw23 + base B's kept part (%s)" % parts,
           len(base) == sum(parts.values()) and parts["train_core"] == len(C1.read_manifest(C1.manifest_path(
               "train_core"))) - 1 and parts["tsw22"] == t22["kept"] and parts["tsw23"] == t23["kept"]
-          and parts["base_b"] == 6)
+          and parts["base_b"] == 7)
     bc_keys = {k for _h, _p, k in json.loads(C2.BASE_COPIES_INDEX.read_text())["entries"]}
     check("the L-8 image is in no v2 training manifest, not in the base-copy index nor the provenance, by key or "
           "by bytes", not [m for m in C2.V2_TRAIN_MANIFESTS for r in C1.read_manifest(C2.v2_manifest_path(m))
@@ -725,10 +830,31 @@ def test_scan_and_refusals():
     hit_keys = {(h["set"], h["key"]) for h in doc["hits"]}
     want = {("tsw22", "tsw22__field22_crop_test"), ("base_b", EXTRA["shear_test4"]["key"]),
             ("tsw22", "tsw22__field22_hflip_test"), ("tsw23", "tsw23__field23_rot_iw"),
-            ("base_b", BASE["hflip_test3"]["key"])}
+            ("base_b", BASE["hflip_test3"]["key"]), ("tsw22", "tsw22__" + Y22_STEM)}
     check("found: the 15 % crop of a test image in tsw22 and the sheared test image in base B's kept part "
-          "(embedding), the flipped / rotated copies (the detector's dHash half), nothing else",
+          "(embedding), the flipped / rotated copies (the detector's dHash half), and the 2022 capture of a test "
+          "scene (a scene, not a copy: L-9(a) keeps it); nothing else",
           hit_keys == want, sorted(hit_keys ^ want))
+    ec = json.loads(S2.embed_calibration_path().read_text())
+    cal2 = ec["calibration"]
+    hard = cal2["negatives"]["hard"]
+    check("the scan wrote the v2 calibration (L-9(c)) on the scan's own calibration: per-image hard negatives, the "
+          "two train_core frames of test image 3's scene are false hits at the scan's threshold %.4f and not at the "
+          "v2 one %.4f (raised above them, never below the base)" % (cal2["floor"], cal2["cos_threshold"]),
+          ec["format"] == EC.FORMAT and cal2["ok"] and cal2["base"]["source"] == "inc2"
+          and cal2["cos_threshold"] >= cal2["floor"] == doc["detector"]["cos_threshold"]
+          and hard["at_base"]["false_hits"] == 2 and hard["false_hits"] == 0 and hard["n"] >= 30
+          and hard["excluded_dhash_copies"] == 1 and cal2["base"]["positives"] == "reproduced from its seeds"
+          and cal2["base"]["recomputed_threshold"] == cal2["floor"], (cal2["floor"], cal2["cos_threshold"], hard))
+    check("... every family's recall recorded at the new threshold and at the base's; the one-sided 97.5 % upper "
+          "bounds reported per tier", all(set(v) >= {"recall", "lb", "at_base"} for v in cal2["positives"].values())
+          and all(cal2["negatives"][t]["ub"] is not None for t in ("hard", "provenance_disjoint"))
+          and cal2["negatives"]["easy"]["n"] == 0 and cal2["negatives"]["easy"].get("absent_from_pool"))
+    neg_text = (C2.SPLITS_DIR / EC.NEGATIVES_NAME).read_text()
+    check("... its negatives file names evaluation keys, never an evaluation image path",
+          "test__20210801_FakeCam_TEST_3" in neg_text and not [p_ for x in C2.EVAL_SPLITS
+                                                              for p_ in (r["image"] for r in C1.read_manifest(
+                                                                  C1.manifest_path(x))) if p_ in neg_text])
     check("the unreadable L-5 image is listed as unscannable, nothing else",
           doc["unscannable"] == [{"set": "base_b", "key": BASE["broken"]["key"]}], doc["unscannable"])
     far = {}
@@ -769,9 +895,26 @@ def funnel_doc(own, listed=(), copies=None, pairs=None):
     return doc
 
 
-def listed_entry(row, split="test", key="test__x"):
-    return {"key": row["key"], "image": row["image"], "eval_split": split, "eval_key": key, "cos": 0.99,
-            "bits": 30, "variant": "id"}
+def listed_entry(row, split="test", key="test__x", cos=0.99, bits_=30):
+    return {"key": row["key"], "image": row["image"], "eval_split": split, "eval_key": key, "cos": cos,
+            "bits": bits_, "variant": "id"}
+
+
+INCIDENT_THETA = 0.80
+
+
+def incident_funnel_doc(listed):
+    """The funnel's leak_v1.json of the real incident (job 47259471), in this
+    world: complete, a passed calibration record at a per-pair threshold
+    (0.80) below the world's same-scene cosines (0.853 harvested, 0.954
+    train_core), no seeds recorded; its base_B list holds the given entries."""
+    cal = {"ok": True, "why": [], "cos_threshold": INCIDENT_THETA, "dhash_bits_max": 6,
+           "recall_min": L.RECALL_MIN, "fpr_max": L.FPR_MAX,
+           "positives": {f: {"n": 40, "hits": 40} for f in L.FAMILIES},
+           "negatives": {"pairs_7_10": {"n": 200, "false_hits": 0}, "hard": {"n": 200, "false_hits": 1}}}
+    return {"format": "funnel-leak/1", "status": "complete", "h6b": {"base_copy": bool(listed), "incident": False},
+            "detector": {"descriptor": {"embedder": "facebook/dinov2-base:cls"}}, "calibration": cal,
+            "scans": {"base_B": {"images": len(BASE), "copies": len({e["key"] for e in listed}), "listed": listed}}}
 
 
 def test_final_build_and_lock(v1):
@@ -823,13 +966,64 @@ def test_final_build_and_lock(v1):
     C2.write_json_atomic(S2.funnel_leak_path(), funnel_doc(own, [listed_entry(BASE["w2"])]))
     ok, msg = raises(lambda: S2.lock(scorer_path=SCORER, procs=1, testing=True), "funnel H6(b)")
     check("lock refuses when leak_v1.json lists a base v2 image, even after a clean build", ok, msg[:300])
-    C2.write_json_atomic(S2.funnel_leak_path(), funnel_doc(own, []))
+
+    print("the incident of job 47259471 (L-9): the funnel's per-pair threshold flags scenes, not copies")
+    ood23_key = sorted(r["key"] for r in C1.read_manifest(C1.manifest_path("ood23")))[0]
+    inc_listed = [listed_entry(BASE["w0"], "ood23", ood23_key, 0.84, 22),          # an exam in v1, training in v2
+                  listed_entry(BASE["w1"], "test", "test__20210801_FakeCam_TEST_2", 0.83, 27),
+                  listed_entry(BASE["a0"], "imageweeds", "imageweeds__iw_1", 0.828, 27)]
+    C2.write_json_atomic(S2.funnel_leak_path(), incident_funnel_doc(inc_listed))
+    write_base_selected(["shear_test4"])
+    ok, msg = raises(lambda: S2.build(testing=True, scorer_path=SCORER, procs=1), "R4 INCIDENT")
+    check("with the incident's calibration as the base, the sheared test image in base B's kept part (an augmented "
+          "copy) still refuses the build, judged at the v2 threshold",
+          ok and EXTRA["shear_test4"]["key"] in msg and "near_eval_embed" in msg and "v2 threshold" in msg, msg[:500])
+    ec = json.loads(S2.embed_calibration_path().read_text())["calibration"]
+    scene_cos = {}
+    emb_ = HueEmbedder()
+    with Image.open(test_image(3)) as im3, Image.open(BASE["scene_test3"]["image"]) as imb:
+        e3, eb = emb_([im3.convert("RGB")])[0], emb_([imb.convert("RGB")])[0]
+    scene_cos["base_b"] = float(e3 @ eb)
+    check("the v2 calibration on the incident's base: floor %.2f, raised to %.4f, above the harvested scene "
+          "(cos %.3f) and the train_core scene frames (their hard-tier false hits: %d at %.2f, 0 at v2); the base's "
+          "positives are drawn with this stream's seeds (it records none)"
+          % (INCIDENT_THETA, ec["cos_threshold"], scene_cos["base_b"], ec["negatives"]["hard"]["at_base"]["false_hits"],
+             INCIDENT_THETA),
+          ec["floor"] == INCIDENT_THETA and ec["base"]["source"] == "funnel_leak_v1"
+          and ec["cos_threshold"] > max(scene_cos["base_b"], 0.95) and ec["negatives"]["hard"]["false_hits"] == 0
+          and ec["negatives"]["hard"]["at_base"]["false_hits"] >= 2 and ec["negatives"]["hard"]["at_base"]["fpr"] > 0.01
+          and "stream/v1/leak" in ec["base"]["positives"], ec)
+    write_base_selected([])
 
     print("without the harvested copy: scan (funnel threshold), build, lock")
     doc = S2.scan(embedder=HueEmbedder(), procs=1, testing=True)
     check("a passed funnel leak_v1.json is reused and recorded",
           doc["detector"]["calibration_source"] == "funnel_leak_v1"
           and doc["detector"]["calibration"]["path"] == str(S2.funnel_leak_path()), doc["detector"])
+    flagged = {h["key"] for h in doc["hits"]}
+    check("the scan at the incident's threshold flags the harvested scene of a test image and the tsw22 capture "
+          "of one (scenes, not copies)", BASE["scene_test3"]["key"] in flagged and "tsw22__" + Y22_STEM in flagged,
+          sorted(flagged))
+    fdoc = json.loads(S2.funnel_leak_path().read_text())
+    C2.write_json_atomic(S2.funnel_leak_path(), dict(fdoc, note="rewritten by a funnel rerun"))
+    made = len(MADE)
+    S2.build(testing=True, scorer_path=SCORER, procs=1)
+    new_sha = C1.sha256_file(S2.funnel_leak_path())
+    check("a scan whose calibration file changed since it ran is stale: build scans again (embed_scan.json now "
+          "records the new file) and makes the v2 calibration again on it",
+          len(MADE) == made + 1
+          and json.loads(S2.embed_scan_path().read_text())["detector"]["calibration"]["sha256"] == new_sha
+          and json.loads(S2.embed_calibration_path().read_text())["calibration"]["base"]["file"]["sha256"] == new_sha,
+          len(MADE) - made)
+    C2.write_json_atomic(S2.funnel_leak_path(), dict(fdoc, note="rewritten again"))
+    ok, msg = raises(lambda: S2.build(testing=True, scorer_path=SCORER, procs=1, scan_mode="skip"), "R4 INCIDENT")
+    check("... while build --skip-scan applies the stale scan at the scan's own threshold, without a v2 calibration: "
+          "the incident recurs (the harvested scene and the funnel's test and imageweeds matches refuse, R4), but "
+          "not through the ood23 match (L-9(b) needs no calibration)",
+          ok and "no v2 calibration" in msg and BASE["scene_test3"]["key"] in msg and BASE["w1"]["key"] in msg
+          and BASE["a0"]["key"] in msg and BASE["w0"]["key"] not in msg and len(MADE) == made + 1, msg[:600])
+    C2.write_json_atomic(S2.funnel_leak_path(), fdoc)
+    doc = S2.scan(embedder=HueEmbedder(), procs=1, testing=True)
     table = TMP / "licences.json"
     table.write_text(json.dumps({"sources": {"cottonweeddet12": {"licence": "CC BY 4.0",
                                                                   "evidence": "a person's reading of the record"}}}))
@@ -840,6 +1034,35 @@ def test_final_build_and_lock(v1):
           rc == 0 and s["licences"]["per_source"]["cottonweeddet12/train"]["licence"] == "CC BY 4.0"
           and "owner table" in s["licences"]["per_source"]["cottonweeddet12/train"]["basis"]
           and s["licences"]["research_only_rows"] == 0 and "licences" in s["inputs"] and len(MADE) == made)
+    rules = {x["key"]: x for x in C1.read_manifest(S2.copy_rules_path())}
+    in_base = {r["key"] for r in C1.read_manifest(C2.v2_manifest_path("base_v2"))}
+    sc = rules[BASE["scene_test3"]["key"]]
+    check("L-9(c): the harvested scene of a test image, flagged at the incident's threshold (cos %.3f), is below "
+          "the v2 threshold: recorded, not applied, kept (the build no longer refuses on it)"
+          % sc["embed"]["base_hit"]["cos"],
+          sc["rule"] == "base_b_embed_v2" and sc["decision"] == "kept" and sc["embed"]["base_hit"]
+          and not sc["embed"]["applied_hit"] and BASE["scene_test3"]["key"] in in_base, sc)
+    y = rules["tsw22__" + Y22_STEM]
+    check("L-9(a): the tsw22 capture of a test scene (another capture session) is kept under tsw_provenance, "
+          "though the scan flags it at both thresholds (cos %.3f)" % y["embed"]["base_hit"]["cos"],
+          y["rule"] == "tsw_provenance" and y["decision"] == "kept" and y["embed"]["applied_hit"]
+          and y["embed_threshold_applies"] is False and "tsw22__" + Y22_STEM in in_base, y)
+    fv = {k: [e["verdict"] for e in rules[BASE[k]["key"]].get("funnel") or []] for k in ("w0", "w1", "a0")}
+    check("L-9(b): the funnel's matches are read: against ood23 not a v2 leak (not_v2_split), against test and "
+          "imageweeds below the v2 threshold (below_v2_threshold); none applied, all three images kept",
+          fv == {"w0": ["not_v2_split"], "w1": ["below_v2_threshold"], "a0": ["below_v2_threshold"]}
+          and all(BASE[k]["key"] in in_base for k in ("w0", "w1", "a0"))
+          and s["l9"]["base_b"]["funnel_images"] == {"applied": 0, "not_v2_split": 1, "below_v2_threshold": 2}, fv)
+    ev2 = s["embed_v2"]
+    check("summary.json records the v2 calibration applied (its base, floor, per-tier rates at both thresholds, "
+          "recall, known limits) and per source the hits against the count the per-image rate predicts",
+          ev2["applied"] and ev2["base"]["cos_threshold"] == INCIDENT_THETA and ev2["cos_threshold"] > 0.95
+          and ev2["negatives"]["hard"]["at_base"]["false_hits"] >= 2 and "per_source" in ev2
+          and all("expected_false_hits" in v for v in ev2["per_source"].values())
+          and s["l9"]["tsw22"]["flagged_exempt_kept"] >= 1, ev2.get("negatives"))
+    check("... and funnel_leak_v1 records how many of its matches are against each split",
+          s["funnel_leak_v1"]["entries_by_split"] == {"imageweeds": 1, "ood23": 1, "test": 1},
+          s["funnel_leak_v1"])
     scan_bytes = S2.embed_scan_path().read_bytes()
     doc = json.loads(scan_bytes)
     in_base = {r["key"] for r in C1.read_manifest(C2.v2_manifest_path("base_v2"))}
@@ -849,6 +1072,30 @@ def test_final_build_and_lock(v1):
     ok, msg = raises(lambda: S2.lock(scorer_path=SCORER, procs=1, testing=True), "were not scanned")
     check("lock refuses when embed_scan.json leaves a base v2 row unscanned", ok and dropped_key in msg, msg[:300])
     S2.embed_scan_path().write_bytes(scan_bytes)
+
+    print("lock re-checks the L-9 copy rules and the v2 calibration")
+    cpath, rpath, ppath = S2.embed_calibration_path(), S2.copy_rules_path(), C2.BASE_PROVENANCE
+    c_bytes, r_bytes, p_bytes = cpath.read_bytes(), rpath.read_bytes(), ppath.read_bytes()
+    cdoc = json.loads(c_bytes)
+    cdoc["calibration"]["cos_threshold"] = cdoc["calibration"]["floor"]      # still a record that passes its gates
+    C2.write_json_atomic(cpath, cdoc)
+    ok, msg = raises(lambda: S2.lock(scorer_path=SCORER, procs=1, testing=True), "cannot lock")
+    check("lock refuses a v2 calibration other than the one the build applied (here its threshold lowered to the "
+          "floor)", ok and "the build applied another v2 calibration" in msg and not C2.LOCK_PATH.exists(), msg[:400])
+    cpath.write_bytes(c_bytes)
+    rpath.write_bytes(r_bytes + b"\n")
+    ok, msg = raises(lambda: S2.lock(scorer_path=SCORER, procs=1, testing=True), "cannot lock")
+    check("lock refuses copy_rules.jsonl changed since the build", ok and "copy_rules.jsonl is missing or changed" in msg,
+          msg[:400])
+    rpath.write_bytes(r_bytes)
+    prov_rows = C1.read_manifest(ppath)
+    j = next(i for i, p_ in enumerate(prov_rows) if p_["part"] == "base_b")
+    prov_rows[j]["copy_rule"] = "tsw_provenance"
+    C2.write_jsonl_atomic(ppath, prov_rows)
+    ok, msg = raises(lambda: S2.lock(scorer_path=SCORER, procs=1, testing=True), "cannot lock")
+    check("lock re-derives every row's copy rule: a base B row the provenance file calls tsw_provenance (exempt from "
+          "the embedding threshold) refuses", ok and "do not carry the copy rule" in msg, msg[:400])
+    ppath.write_bytes(p_bytes)
 
     print("lock re-checks the L-8 list")
     dpath, spath = C2.TRAIN_CORE_VARIANT_DROPS, S2.summary_path()
@@ -904,6 +1151,18 @@ def test_final_build_and_lock(v1):
           and lk["h6"]["base_b"]["incident_in_l5_part"] is True
           and lk["h6"]["base_b"]["funnel_leak_v1"]["status"] == "complete" and lk["testing"] is True
           and lk["h6_status"]["funnel_leak_v1"] == "complete", lk["h6"])
+    ec2 = lk.get("embed_calibration_v2") or {}
+    check("... L-9: the v2 calibration (sha256, threshold above the incident's 0.80, its base), its negatives file "
+          "and copy_rules.jsonl by sha256; the H6 block carries the v2 threshold",
+          lk[EC.LOCK_KEY] == C1.sha256_file(S2.embed_calibration_path()) == ec2["sha256"]
+          and ec2["cos_threshold"] > 0.95 and ec2["base"]["source"] == "funnel_leak_v1"
+          and ec2["base"]["cos_threshold"] == INCIDENT_THETA
+          and lk["embed_calibration_v2_negatives_sha256"] == C1.sha256_file(C2.SPLITS_DIR / EC.NEGATIVES_NAME)
+          and lk["copy_rules_sha256"] == C1.sha256_file(S2.copy_rules_path())
+          and lk["h6"]["base_b"]["embed_scan"]["cos_threshold_v2"] == ec2["cos_threshold"]
+          and lk["h6_status"]["embed_v2_threshold"] == ec2["cos_threshold"] and lk["l9"]["rules"]["tsw22"], ec2)
+    check("... and EC.locked reads it back through LOCK v2", EC.locked(C2.LOCK_PATH)[0]["cos_threshold"]
+          == ec2["cos_threshold"])
     nt = json.loads(C2.NEVER_TRAIN_INDEX.read_text())
     check("both indexes are complete now", nt["complete"] is True and nt["min_expected"] == len(nt["entries"])
           and json.loads(C2.BASE_COPIES_INDEX.read_text())["complete"] is True)
@@ -967,6 +1226,19 @@ def test_after_lock():
           any("changed" in p and str(lbl) in p for p in probs) and any("writable" in p for p in probs), probs[:4])
     lbl.write_bytes(orig)
     os.chmod(lbl, 0o444)
+    check("verify passes again once restored", S2.verify(scorer_path=SCORER, check_v1=False, procs=1) == [])
+    for f_ in (S2.embed_calibration_path(), S2.copy_rules_path(), C2.SPLITS_DIR / EC.NEGATIVES_NAME):
+        orig = f_.read_bytes()
+        os.chmod(f_, 0o644)
+        f_.write_bytes(orig + b" ")
+        probs = S2.verify(scorer_path=SCORER, check_v1=False, procs=1)
+        e_ = raises(lambda: EC.locked(C2.LOCK_PATH), "hashes to", C2.Inc2Error)
+        f_.write_bytes(orig)
+        os.chmod(f_, 0o444)
+        check("verify catches %s changed after lock%s" % (f_.name, " (and EC.locked refuses it)"
+                                                          if f_.name == EC.NAME else ""),
+              any("changed since it was locked" in p and f_.name in p for p in probs)
+              and (f_.name != EC.NAME or e_[0]), probs[:3])
     check("verify passes again once restored", S2.verify(scorer_path=SCORER, check_v1=False, procs=1) == [])
     check("CLI verify and summary exit 0",
           S2.main(["verify", "--scorer", str(SCORER), "--procs", "1"]) == 0 and S2.main(["summary"]) == 0)
@@ -1059,7 +1331,7 @@ def test_job_script():
     mods = [ln for ln in text.split("MODULES=(", 1)[1].split(")", 1)[0].split()]
     need = {"tools/inc2/common.py", "tools/inc2/guard.py", "tools/inc2/splits.py", "tools/inc/splits.py",
             "tools/funnel/leak.py", "tools/funnel/embed.py", "tools/mega_trainer.py", "tools/funnel/domain.py",
-            "tools/funnel/domains/weed.json"}
+            "tools/funnel/domains/weed.json", "tools/inc2/embed_calibration.py", "tools/funnel/estimate.py"}
     check("the drift check covers the inc2, splits, funnel leak/embed and dHash modules", need <= set(mods),
           sorted(need - set(mods)))
     pkg = ROOT / "weed_optimizer_framework"

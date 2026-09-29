@@ -119,7 +119,7 @@ for m in $COL_FILES tools/funnel/__init__.py tools/funnel/domain.py tools/funnel
     [ -f "$f" ] || { echo "FATAL: module missing in the nested copy: $m" >&2; exit 1; }
     echo "module $m: $(sha "$f")"
 done
-for m in tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py; do
+for m in tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py tools/inc2/embed_calibration.py; do
     f="$CODE/weed_optimizer_framework/$m"
     if [ -f "$f" ]; then
         echo "module $m: $(sha "$f")"

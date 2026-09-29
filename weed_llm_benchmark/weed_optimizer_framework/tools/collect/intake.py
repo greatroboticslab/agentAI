@@ -16,7 +16,16 @@ guard loads:
      the images decision L-5 dropped from base v2 outright (splits v2's
      l5_excluded.jsonl, checked against LOCK v2): an image whose bytes, or
      any of whose eight variants within 6 bits, copy one is refused as
-     l5_copy (a re-upload of those sources would otherwise bring them back);
+     l5_copy (a re-upload of those sources would otherwise bring them back).
+     Then the embedding calibration that will judge the batch's rows held
+     h6_scan (decision L-9(c)): splits v2's embed_calibration_v2.json, the
+     one LOCK v2 records (per-image false positives on hard same-domain
+     negatives, never below the funnel's threshold), checked against its
+     sha256 and its own gates. A production LOCK that records none, or a
+     file that does not hash or load, refuses the intake (fail closed). Its
+     threshold is bound to every held row (copy_scan_calibration) and
+     recorded in guard.json and summary.json; inc2.step1_stream's copy
+     scan judges the rows by it;
   4. archives extracted (zip, tar; no path escapes the work directory) into
      intake/work/<source>/<fetch sha12>/x/, other files linked in;
   5. normalise (normalize.read, the known item's format options) and the
@@ -125,6 +134,33 @@ def load_l5(lock_path=None):
             idx.add(int(r["dhash"]), r.get("key"), max_bits=L5_BITS)
         n += 1
     return shas, idx, {"path": str(path), "sha256": want, "images": n, "bits": L5_BITS}
+
+
+def load_copy_scan(lock_path=None):
+    """(record or None, what guard.json records): the v2 embedding
+    calibration (decision L-9(c)) that judges the rows an intake holds for
+    the copy scan, beside LOCK v2, which records its sha256
+    (inc2.embed_calibration.locked). Fails closed (GuardUnavailable): a
+    production LOCK that records none, a file that is missing, changed or
+    does not show a usable calibration. A testing LOCK without one gives
+    None, recorded."""
+    try:
+        from ..inc2 import common as C2
+        from ..inc2 import embed_calibration as EC
+    except ImportError as e:
+        raise GuardUnavailable("inc2.embed_calibration is not installed (%s): intake refuses (fail closed)" % e)
+    lock_path = Path(lock_path or C2.LOCK_PATH)
+    try:
+        rec, why = EC.locked(lock_path, production=True)
+    except Exception as e:  # noqa: BLE001 - any failure to bind the calibration refuses
+        raise GuardUnavailable("the v2 embedding calibration LOCK v2 records cannot be used: %s (fail closed)" % e)
+    if rec is None:
+        return None, {"checked": False, "why": why, "lock": str(lock_path)}
+    return rec, {"checked": True, "decided_by": EC.DECISION, "protocol": rec["protocol"], "file": rec["file"],
+                 "cos_threshold": rec["cos_threshold"], "strict_threshold": rec["strict_threshold"],
+                 "embedder": rec["embedder"], "p_false": rec["p_false"], "role": rec["role"],
+                 "known_limits": [x.get("family") for x in rec["known_limits"]],
+                 "judged_by": "inc2.step1_stream's copy scan (it releases or refuses the h6_scan hold)"}
 
 
 def l5_hit(l5, sha, variants):
@@ -393,6 +429,11 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         g = guard if guard is not None else default_guard(lock_path)
         # the L-5 exclusions (a stand-in guard given without a LOCK, in tests, checks none: recorded)
         l5 = load_l5(lock_path) if (guard is None or lock_path is not None) else None
+        # the embedding calibration that judges the rows held for the copy scan (L-9(c))
+        if guard is None or lock_path is not None:
+            copy_scan, copy_scan_rec = load_copy_scan(lock_path)
+        else:
+            copy_scan, copy_scan_rec = None, {"checked": False, "why": "a stand-in guard was given without a LOCK"}
         earlier = _earlier_manifests(inc)
         for r in earlier:
             if r.get("dhash") is not None:
@@ -554,6 +595,9 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                    "boxes": len(boxes), "target_boxes": tb, "unmapped_boxes": counts.get(cfg.unmapped_id, 0),
                    "class_ids": sorted(counts), "width": wh[0], "height": wh[1], "rel": rel, "intake_utc": now_s,
                    "bad_boxes": it["bad"], "unlisted_class_boxes": unlisted, "clipped_boxes": it["clipped"]}
+            if "h6_scan" in holds and copy_scan is not None:
+                row["copy_scan_calibration"] = {"file": copy_scan["file"]["path"], "sha256": copy_scan["file"]["sha256"],
+                                                "cos_threshold": copy_scan["cos_threshold"]}
             manifest.append(row)
             decisions.append({"kind": "image", "source": source_id, "rel": rel, "key": key, "decision": "kept",
                               "reason": "kept", "target_boxes": tb, "boxes": len(boxes)})
@@ -567,7 +611,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                      "guard_counts": gcounts, "index": g.index_record() if hasattr(g, "index_record") else None,
                      "l5_excluded": l5[2] if l5 is not None else {"checked": False, "why": "a stand-in guard was "
                                                                   "given without a LOCK"},
-                     "earlier_intake_images": len(earlier),
+                     "earlier_intake_images": len(earlier), "copy_scan": copy_scan_rec,
                      "seen_index": "not read here: inc2.step1_stream applies exact_dup with its own seen index"})
         write_json_atomic(bdir / "guard.json", gdoc)
         src = header("sources", cfg, inputs={"fetch": {"path": str(sdir / "fetch.json"), "sha256": fetch_sha}},
@@ -615,7 +659,8 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                      "yield": yld, "source_leak": leak,
                      "zero_yield": kept_tb == 0, "zero_yield_reasons": dict(sorted(reasons.items())) if kept_tb == 0
                      else None, "hold_until": hold, "lab_group": lab_group, "research_only": research_only,
-                     "format": res.format, "seconds": round(time.time() - t0, 3)})
+                     "format": res.format, "copy_scan": copy_scan_rec,
+                     "seconds": round(time.time() - t0, 3)})
         write_json_atomic(bdir / "summary.json", summ)
         append_chained(batches_ledger(inc), {"format": FORMATS["batch"], "ts": utc(), "batch": batch,
                                              "source": source_id, "fetch_sha256": fetch_sha, "manifest_sha256": m_sha,
