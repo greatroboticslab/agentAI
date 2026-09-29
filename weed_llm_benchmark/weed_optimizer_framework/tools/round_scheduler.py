@@ -104,6 +104,34 @@ _WEED_STEPS = {
 
 _FALLBACK_LOGGED = set()     # (domain, step) already reported as template-less
 
+# docs/CONTINUOUS_LOOP.md 8 ("No mega_trainer training", "The old harvest cannot
+# feed the pool"): while a stream campaign owns a domain (a campaigns.<name>
+# block with mode "stream" and that domain, enabled or paused), the scheduler
+# refuses the domain's old collect, filter and train steps. The stream collects
+# through tools/collect and trains only through gated increments.
+STREAM_CLOSED_STEPS = ("collect", "filter", "train")
+
+
+def stream_owner(domain, cfg=None):
+    """The name of the stream campaign that owns `domain`, or None."""
+    c = cfg if isinstance(cfg, dict) else _cfg()
+    camps = c.get("campaigns") if isinstance(c, dict) else None
+    for name, raw in sorted((camps or {}).items()):
+        if isinstance(raw, dict) and raw.get("mode") == "stream" and raw.get("domain") == domain:
+            return name
+    return None
+
+
+def old_path_refusal(domain, step, auto_sync=False, cfg=None):
+    """"" or why an old-path step (the round scheduler's collect / filter / train,
+    or a dashboard harvest; auto_sync: AUTO_SYNC=1, a push to a public Roboflow
+    project) is refused for `domain` while a stream campaign owns it."""
+    owner = stream_owner(domain, cfg)
+    if owner and (step in STREAM_CLOSED_STEPS or auto_sync):
+        return ("the stream campaign %s owns the %s domain: the old %s path is closed (docs/CONTINUOUS_LOOP.md 8)%s"
+                % (owner, domain, step, "; AUTO_SYNC=1 would push to a public Roboflow project" if auto_sync else ""))
+    return ""
+
 
 def _log():
     return _CTX["log"]
@@ -1408,6 +1436,15 @@ def _advance(domain: str, dcfg: dict):
         return
 
     if not _review_gate(domain, cur, nxt, st):
+        return
+
+    closed = old_path_refusal(domain, nxt)
+    if closed:
+        _log().error("[rounds] %s: step %s REFUSED (%s)" % (domain, nxt, closed))
+        _record(domain, nxt, "refused", detail=closed[:200])
+        _log_action("rounds_" + nxt, {"ok": False, "domain": domain, "round": cur.get("round_num"), "step": nxt,
+                                      "jobid": None, "cmd": None, "msg": closed})
+        _pause(domain, dcfg, st, closed)
         return
 
     # A step whose head entry stops advancing (a supervisor-owned entry the

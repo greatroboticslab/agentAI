@@ -620,3 +620,187 @@ New code lives in `tools/inc_autopilot/`, **not** `tools/inc/`, so the pinned `i
 - `/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/weed_optimizer_framework/tools/brain/policy.py`
 - `/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/weed_llm_benchmark/run_inc_audit.sh`
 - `/Users/xiaogui/Desktop/2026spring/research/weed_llm_benchmark/docs/INCREMENTAL_PROTOCOL.md`
+
+## (h) Stream mode: the continuous campaign (docs/CONTINUOUS_LOOP.md 6)
+
+Stream mode runs a campaign that never COMPLETEs by itself: it collects targeted data, admits it box by box, cuts fixed-size increments, trains each against the incumbent with the pinned gate, rolls back what hurts and consolidates. The contract is docs/CONTINUOUS_LOOP.md; this section records what was built for it in `inc_autopilot/`, why, and how it was verified.
+
+### Dispatch, and what stays as it was
+
+- **Dispatch.** `campaign._tick_all` hands a campaign whose config says `"mode": "stream"` to `stream.StreamRun`. Every other campaign runs `campaign._Run`, unchanged. The rotation across campaigns and the one ssh per tick (`campaign._SshBudget`) are shared.
+- **Experiment mode is byte-identical.** `diagnose.py`, `levers.py`, `levers.json` and `thresholds.json` are not edited, so `diagnose.rules_version()` does not change and no experiment campaign is re-diagnosed by the deploy. The stream menu and thresholds live in their own files for that reason: `stream_levers.json` and `stream_thresholds.json`. `executor.ENVELOPE_LEVERS`, `REPLAY_REQUIRED`, the v1 policy rows and every v1 argv are unchanged.
+  - Verified by `tests/test_stream_ap_identity.py`: the package at git HEAD and the working tree compute, on the pinned fixtures, the rules version; every diagnosis and proposal of pilot_v1, pilot_v2, pilot_v3 and realloop_v1; the brain digests of pilot_v3 and realloop_v1; the executor's rendering of every v1 action; the v1 policy rows; a budget state and its `fits`. The two records are byte-identical.
+  - The existing suites pass unchanged: `test_inc_ap_{brain,campaign,dashboard,diagnose,e2e,evidence,fixtures,governance,levers,remote,replay}.py`, `test_funnel_ap_{units,replay,mutations}.py` and `test_funnel_domain_free.py`.
+
+### Files
+
+| File | Role |
+|---|---|
+| `stream.py` | The lane ticker (`StreamRun`), its state, `configure_stream`, the detached lab runner (`LabRunner`, `lab_run`, `lab_sync`), `summary`, `status`, the CLI. |
+| `diagnose_stream.py` | D20–D33, D8S (L22), D10S, the lanes' own items (DR0, DCMP, DPIPE, DHOLD, DBIS), the verifier-refit trigger (DKT), and the R0 records as the other groups' verbs write them (DSA Stage A, DSC Stage C, DCAP the capacity decision of L-4, DCAN the canary). The stream's dispositions are read from inc2.stream's commit lines; the guard-based disposition of 3.5 is applied here only to the pinned prior (realloop_v1). Pure functions of the evidence; the stream rules version; the prospective stream record. |
+| `levers_stream.py` | The stream menu: argv rendering with `{pkg}` (the campaign's `protocol_package`), parameter checks against the policy rows, limits, prices (the cost model of 5.6). |
+| `stream_remote.py` | The cluster verbs `stream-snapshot`, `stream-submit`, `stream-run`, dispatched by `remote.py`. |
+| `stream_levers.json`, `stream_thresholds.json` | The menu (L15–L28, LP, the sub-levers L16L/L16R/L16I/L16S, L23B and LV, the rollout's LI and LA, LC, LH; cards X13–X17; limits; the gated R2 and envelope lists) and the thresholds, each with its reason. |
+| `stream_domains/weed.json` | The weed domain's facts: sid, M and K (for prices before the stream exists; the stream's own M is inc2.stream's), species priority, evaluation labs, the baselines and capacity arms under inc2.baseline's names and arm ids, Stage A and C, the cost rates, walltimes, the never-train source (parsed, never imported), the prior (realloop_v1 by path and sha256), the allocation end date, the owner's decisions DEC-A..D and L-1..L-6. The stream code names no domain term; everything domain-specific is here or in the funnel domain config it points at. |
+
+Edits outside the new files: `campaign.py` (dispatch, `check_goal(..., mode)`, status), `executor.py` (the stream actions, gating, limits, replay), `budget.py` (windows, domain cap, settlement), `remote.py` (dispatch of the stream verbs), `evidence.py` (the allow-list), `model.py` (per-campaign domain), `brain/policy_actions.json` (22 new rows), `brain/approvals.py` (`ENVELOPE_ACTIONS`), `brain/su_rates.json` (a `partitions` block), `round_scheduler.py` (the ownership guard).
+
+### Configuration
+
+`~/.round_scheduler.json` → `campaigns.<name>`, written by `stream.configure_stream` (a person's command; the CLI is `python -m weed_optimizer_framework.tools.inc_autopilot.stream enable --name N --by human:<email> --domain weed ...`):
+
+```
+{"mode": "stream", "domain": "weed", "protocol_package": "inc2",
+ "stream": {"sid": "weed_stream_v1", "stream_domain": "weed", "collect_config": "collect/domains/weed.json", "K_max": 4},
+ "goal": {"kind": "continuous"}, "autonomy": "off" | "envelope", "autonomy_granted_by": "human:<email>",
+ "data_autonomy": "off" | "on", "envelope_su": 1000, "envelope_end_utc": "2026-12-31T23:59:59Z",
+ "window": "month", "window_cap_su": 350, "daily_cap_su": 120, "alloc_reserve_su": null,
+ "collect_gb_envelope": 200, "collect_gb_daily": 50, "protocol_v3_accepted_by": null}
+```
+
+The defaults are L-2's. `data_autonomy`, `autonomy: envelope`, `protocol_v3_accepted_by` and a completion (`completed_by`) are a person's flags: `configure_stream` refuses any actor but `human:<email>`, and the ticker never writes them.
+
+### The lanes and the tick
+
+Four lanes, one item each: DATA, TRAIN and MAINT as the contract has them, and a STOP lane for L24 (quarantine a source) and L7 (unblock a transient block), so a busy DATA lane never delays a quarantine. Each tick:
+
+1. **Lab work, no ssh.** The last snapshot and the lab's files (candidates.json, the collect config) become a dev-only `evidence.Evidence`; the diagnoses run on it; the pauses, holds and cards apply; each idle lane takes the first item its diagnoses call for; lab items (L15, L26, L16L, L16S) start as detached processes (`LabRunner`: `python -m ...stream lab-run --spec FILE`), and running ones are polled through their result files.
+2. **The one ssh.** Ready items in the order STOP, TRAIN, DATA, MAINT: an R3 item (or an approved one) is tried alone, since its grant runs it in its own call, and filed without a call when no grant applies; the direct items go in one `executor.submit_many`. With nothing ready, one `executor.stream_snapshot`.
+3. **The snapshot is folded.** Module drift (S23), the stream ledger's hash chain, experiments built and done, jobs ended (squeue, then sacct; each stream job's SU settled from sacct), intake batches and admitted yields, the zero-yield stop-loss, D5–D7 and D14 on every live experiment.
+
+Phases per lane: DATA `IDLE, DISCOVER, NAMES, PROBE, COLLECT, SYNC, INTAKE, ADMIT, QUARANTINE, HOLD_RELEASE, WAIT_DATA`; TRAIN `IDLE, SEGMENT, COMMIT, FORK`; MAINT `IDLE, SPLITS, BASELINE, VERDICT, STAGE_A, INIT, ARM, STAGE_C, MILESTONE, COMPARE, ROLLBACK, BISECT, AUDIT`. An item follows its lever's `follow`: `login` (done when the verb returns), `job` (squeue, then sacct), `build` (until the experiment is built), `experiment` (until it is done with a current report), `lab` (its result file). A login-node verb's effect shows only in the next snapshot, so an item done since the last snapshot is not proposed again on the evidence taken before it (`done_keys`); inc2.stream's exit 3 (another writer holds `stream.lease`) is a transient, never a failed step. Every experiment the stream ledger names (segments, milestones, Stage C, each bisect arm) is tracked, advanced and observed.
+
+**Never COMPLETE (P7, 6.7).** D29 moves DATA to WAIT_DATA with discovery backing off 7, 14 and 30 days, and raises a card. `stream.complete_available` says when every condition of 6.7 holds; only a person may then mark the campaign complete (`stream complete`, refused otherwise).
+
+**Pauses, holds, stop-losses.** 2 consecutive failed steps hold a lane (until a person resumes: `stream enable` after the hold releases it); 3 consecutive sources ending failed or with zero admitted target boxes hold DATA, with a card listing each source's decision reasons; 2 held lanes, D7, D10S (the envelope exhausted, or the domain ledger, round history included, over the domain's `su_envelope`), D14, D27 (the allocation reserve, the quota, the allocation's end date: `allocation_ended`), a broken stream-ledger chain, 3 raising ticks, a 4th collection attempt on one source, or an outcome that is unknown for a non-build pause the campaign. Diagnosis holds (D25, D26, D28 while a leaking source is neither quarantined nor kept by a person, D30, D32, D33 on 2 consecutive committed segments, D22's cutter refusal until the cutter's probe fills M again, D27's short quota for DATA) are recomputed every tick. The envelope's end date pauses with `envelope_ended`.
+
+**The R0 prerequisites.** DR0 proposes, one MAINT item at a time and in this order: the splits build and lock (L23, filed for a person every time); the baselines (L23B: B_v2 with 5 seeds, the canary, the two capacity arms, then B0 ∪ tsw, recommended); the canary's verdict and, once every arm is done, the capacity decision (LV: `inc2.baseline canary-verdict`, `capacity-verdict`); Stage A (L25, once a person has accepted Protocol v3) and its verdict (LV: `inc2.pilot4 verdict`); the stream's creation with Stage A's recorded `segment1_recipes` as its Stage B arms (LI: `inc2.stream init`); the capacity decision adopted as the stream's arm (LA: `choose-arm`); Stage C (L28, with the stream's own M). DCMP then has the stream decide every finished milestone, Stage C chain and bisect arm (LC: `compare --exp`). DATA takes the network probe (LP) and Step 1's one-time jobs (L17 `bootstrap`, `knowntruth`, `backfill`). TRAIN cuts no segment until the lock, milestone 0, a passed canary, Stage A's READY record, the capacity decision, the stream and its adopted arm, Stage C's read verdict and the bootstrap all exist, and the prospective stream record of the current stream rules version has been written. `tests/test_stream_ap_replay.py` case `stream_r0` drives this whole sequence through the platform.
+
+### Levers (stream_levers.json)
+
+| Lever | Action | Risk | Command |
+|---|---|---|---|
+| L15 | `inc_stream_discover` | R0, lab, detached | `python -m weed_optimizer_framework.tools.collect plan --config <collect config> --classes <deficit> --out <lab>/collect/candidates.json` |
+| L26 | `inc_stream_names` | R0, lab, detached | `... collect names --source <id> --out <lab INC_DIR>/intake/names/` |
+| LP | `inc_stream_probe` | R0 | `sbatch -p GPU-shared run_inc_collect.sh probe` |
+| L16 | `inc_stream_collect` | R2 gated | `sbatch -p GPU-shared run_inc_collect.sh fetch --source <id> --max-bytes <B>` |
+| L16L | `inc_stream_collect_lab` | R2 gated, lab, detached | `... collect fetch --source <id> --max-bytes <B> --out <lab INC_DIR>/intake/staging/` |
+| L16S | `inc_stream_sync` | R0, lab, detached | rsync of the source's staging, sha256 checked on arrival |
+| L16I | `inc_stream_intake` | R2 gated | `sbatch -p GPU-shared run_inc_collect.sh intake --source <id>` |
+| L16R | `inc_stream_collect_review` | R3, a person | the L16 command, for a source that failed a pre-check |
+| L17 | `inc_stream_admit` | R2 gated | `sbatch -p GPU-shared run_inc2_stream.sh admit --intake <batch>` (also `bootstrap`, `knowntruth`, `backfill`, `scan-holds --hold h6_scan`) |
+| L18 | `inc_build_segment` | R3, envelope | `python -m weed_optimizer_framework.tools.inc2.stream build --stream <sid> --k <K> --exp <sid>_sNNN` (the summary's `next_segment`; the arm and the truth cadence are the stream's own) |
+| L19 | `inc_stream_commit` | R1, login node | `... inc2.stream commit --exp <sid>_sNNN` |
+| L20 | `inc_build_consolidation` | R3, envelope | `... inc2.stream milestone --stream <sid>` (builds the summary's `milestones.next`) |
+| L21 | `inc_stream_rollback` | R3; envelope only to the pool the last 'hurts' milestone recommended | `... inc2.stream rollback --stream <sid> --to <P_c>` |
+| L22 | `inc_build_segment` | R3, envelope; at most 2 | `... inc2.stream fork --stream <sid> --m <2M>` |
+| L23 | `inc_splits_build` | R3, a person | `... inc2.splits build` / `lock` |
+| L23B | `inc_build_baseline_v2` | R3, envelope | `... inc2.baseline build --exp <exp> (--manifest <INC_DIR>/splits/v2/<m>.jsonl \| --union <m1>,<m2>,<m3>) --seeds <s> --arm n640\|s640\|m640 --role b_v2\|capacity\|canary\|union` |
+| LV | `inc_stream_verdict` | R1, login node | `... inc2.baseline canary-verdict --exp canary_v2`, `... inc2.baseline capacity-verdict`, `... inc2.pilot4 verdict --exp pilot_v4` |
+| LI | `inc_stream_init` | R3, envelope; once | `... inc2.stream init --stream <sid> --stage-b <Stage A's segment1_recipes>` (a build job) |
+| LA | `inc_stream_choose_arm` | R1, login node; once | `... inc2.stream choose-arm --stream <sid>` |
+| L24 | `inc_stream_quarantine` | R2 gated; a firing D28 or D31 cited | `... inc2.stream quarantine --source <id> --cite D28|D31` |
+| L25 | `inc_build_pilot4` | R3, envelope after Protocol v3 is accepted | `... inc2.pilot4 build --exp pilot_v4 --from pilot_v3 --recipes x1a,x1b` |
+| L27 | `inc_build_consolidation` | R3, envelope; one per rollback | `... inc2.stream bisect --stream <sid> --from <P_c>` (the lane follows the first arm, `<sid>_bNNN`) |
+| L28 | `inc_build_segment` | R3, envelope; once per stream version | `... inc2.stream feasibility --stream <sid> --holdout tsw22 --m <M>` |
+| LC | `inc_stream_compare` | R1, login node | `... inc2.stream compare --exp <sid>_mNNN \| <sid>_c001 \| <sid>_bNNN` |
+| LH | `inc_stream_release` | R3, a person | `... inc2.stream release --stream <sid> --hold funnel_F9` |
+
+The builds go through `run_inc2_build.sh` (`stream-submit build`), the jobs through `run_inc_collect.sh` and `run_inc2_stream.sh`, always `-p GPU-shared`; the login-node verbs through `stream-run`. `executor.ARGV_FORMS` renders every one of them from the policy parameters, token for token, and `tests/test_stream_ap_units.py` reads every stream argv back with the other groups' own parsers: `inc2.stream.build_parser()` (group E), `collect.__main__.build_parser()` (group D) and `inc2.step1_stream.build_parser()` (group C; the job script's `scan-holds` is its alias of `serve-holds`).
+
+**Prices** (V100 GPU-hours, `levers_stream.price`, est., at the upper cold rate of 7.0 ms per image-epoch so a price is never low): at the contract's N = 7,626 and M = 763 a segment of K = 4 with one recipe and the truth arm on is 36.7 GPU-h plus the 4 h build job (contract: 33–37); with L-5's base (about 6,813 images, M about 682 [to verify on cluster]) it is 32.9. The price reads the stream's M from its summary, the arm's cost factor from the capacity decision, and the truth cadence of L-4 (⌈cost/25⌉ above 25 GPU-h per step), which inc2.stream decides for itself. A milestone at 9.2K images is 9.7 GPU-h (contract: 8–9.5); B_v2's 5 seeds are 8.2 GPU-h (contract: 6.9–7.9 plus finals).
+
+### Diagnoses (diagnose_stream.py)
+
+D20–D33 as 6.4 defines them, with the review's readings: D29 never COMPLETEs; D30 counts the REJECTs whose disposition is `recipe` (only the regression guard failed), never `attribution.blame`; D31 fires on a `data` disposition or a truth `hurts`, whatever P_recipe; D33 also holds L18 on 2 consecutive segments.
+
+**What each reads.** The stream's own segments are read from inc2.stream's commit lines in the hash-chained stream ledger: per step of the chosen chain, the Protocol v3 verdict and guards (L-3), P_data, the truth verdict and the disposition the commit recorded by the guard rule of 3.5 (inc2.stream.dispose), each cited at its address in the ledger; a commit on a stale base decides nothing. Before Stage A is READY with no commit, D30 and D33 read the pinned realloop_v1 ledger (by sha256, the funnel's copy) through the same rule, applied here. D22 reads the summary's eligible count and the cutter's own probe (`cut.probe.exact_fill`), and a build refused with "no exact fill" or "after the guard excluded": Q ≥ M that cannot be filled is escalated, never a silent wait. D23 reads the segments the platform built and the summary's `uncommitted_done`. D24 applies the pre-registered triggers (4 accepted, 3 segments, 30 days) to the summary's counts since the last good milestone. D25 proposes L21 only when the summary's `rollback_pending` names the pool and the recorded comparison meets p ≤ 0.025 with a lower mean (a disagreement goes to a person); a species-guard-only 'hurts' is card X17; the boundary check is applied to the summary's means and sd. D28 reads the intake summary's `source_leak` shares and step1_stream's per-source `near_eval_embed`. DHOLD reads the summary's `queue.held_past_deadline` (step1_stream's `holds_past_deadline` when there is no summary). DKT recomputes the Wilson bound from step1_stream's `knowntruth` counts and takes its species trigger list. DSA, DCAP and DCAN read the verdict files (`pilot_v4/stage_a.json`, `capacity/capacity_v1.json`, `canary_v2/canary.json`); DSC reads the ledger's feasibility read line.
+
+Also: D8S (underpowered → L22, then X17 after 2 doublings), D10S (the envelope exhausted), DR0, DCMP, DPIPE, DHOLD (S26), DBIS (L27 after a rollback, only when a good milestone on P_c can decide the arms; else X4 stays with a person), DKT (the verifier-refit triggers of 3.3, pre-registered in `stream_thresholds.json`: a Wilson lower bound < 0.99 on ≥ 30 matched verified boxes, or ≥ 100 new target boxes of a species with ≥ 0.5 unknown → card X11), DCAN (a failed canary holds TRAIN and goes to a person).
+
+**The disposition of the prior (3.5 review).** ACCEPT → accepted. Otherwise the first of: `data` (P_data ≤ the decision's own `config.p_reject`, else 0.25, unless the step's truth arm says `helps`), `species`, `flips`, `recipe` (only the regression guard failed), and `hold` for a HOLD. `attribution.blame` is never read (S19 flips every blame and gets the same dispositions).
+
+### Governance (6.5)
+
+- **Gated R2 (L16, L17, L24).** Direct only with `data_autonomy: on`, a stream replay pass (`executor.stream_replay_status`), L16's floors set by a person (`floor_gb`, `floor_su`: null placeholders file every L16 for a person), L24 citing a firing D28 or D31, and the limits; otherwise filed for a person (shadow mode).
+- **R3 envelope (L18, L20, L21 to the recommended pool, L22, L23B, L25, L27, L28, LI).** As the experiment-mode envelope rule, with `stream_levers.json`'s parameter checks and limits instead of 3-per-campaign, and the stream replay pass. The envelope's trigger check reads the diagnoses the item was proposed from as well as this tick's (a lane-gated diagnosis goes silent once its item holds the lane).
+- **Limits.** L16: ≤ 3 attempts per source, ≤ 6 jobs and ≤ min(50, `collect_gb_daily`) GB per day, ≤ 50 GB per source, ≤ `collect_gb_envelope` over the campaign; L18: 1 in flight, 1 per day; L20: 1 in flight; L21: 1 per milestone; L22: 2; L25: 1; L27: 1 per rollback; L28: 1 per stream version; LI: 1. The R1 login-node verbs (L19, LV, LA, LC) run once per due state: their diagnoses stop calling for them once the record they write is observed, and an item done since the last snapshot is not proposed again.
+- **The replay gate.** `executor.STREAM_REPLAY_CASES` (S1–S28, the prospective record and the rollout `stream_r0`) and the mutation harness (`stream_mutations`) are run by `executor record-replay` (`REPLAY_SCRIPTS["stream"]`, `["stream_mutations"]`); each case is recorded from its own line `case <id>: pass|fail`. A failing case fails the whole record, so it blocks every campaign's envelope, the funnel's and weed_inc_v1's included. A stream campaign's own autonomy needs every stream case recorded as a pass. The stream scripts and `collect/domains/weed.json` are governance files; the stream's JSON files are inside the package the code hash covers.
+- **Budget (6.6).** `budget.state` adds, for a stream campaign only, the monthly window (this calendar month's ledger spend plus the estimates charged this month and still committed, against `window_cap_su`) and the domain cap (every campaign's `inc:*` ledger steps and committed estimates against the domain envelope). `fits` refuses past either. Stream jobs are settled from sacct (`budget.record_job_spend`, job `inc:job<ID>:sacct`), which releases their estimates; builds are released by their experiment's report spend (a stream build's experiment is its checked `child_exp`). `su_rates.json` gains a `partitions` block (GPU-shared, GPU, RM-shared), read by `budget.partition_rates`.
+- **Test blindness.** The evidence goes through `evidence.scrub` with the domain's own non-decision exams; the cluster verb ships aggregates through `remote.dev_only`; hashes that cover evaluation content (the LOCK's sha256, the stream ledger's `prev_sha256`) are kept out of the decision data; the evidence record carries the tick's clock, not the cluster's. S12 perturbs every test and non-decision exam value and gets identical diagnoses, argv and evidence digests.
+- **The old paths.** `round_scheduler.old_path_refusal` refuses a domain's collect, filter and train steps while a stream campaign owns it (enabled or paused), and `_advance` records the refusal and pauses the domain; `old_path_refusal(domain, step, auto_sync=True)` is the check for the dashboard's harvest route.
+
+### Cluster verbs (stream_remote.py)
+
+- `stream-snapshot --sid SID [--exp E ...] [--advance E ...] [--report auto] [--ledger-from E=N[:SHA]] [--dev-scores E ...] [--sacct ID ...] [--largest]`: per experiment advance (with `INC_JOB_SCRIPT` = `run_inc2_job.sh`; without that script nothing is advanced), report and snapshot (remote.py's own verbs); the stream summary (`stream/<sid>/{queue_summary.json, ledger.jsonl}`, `step1_stream/status.json`, `intake/<batch>/summary.json`, `intake/sources.json` (the collector's own fold of `intake/sources.jsonl`, `collect.state.fold`), `intake/placement.json`, `splits/v2/lock_status.json`, and the R0 verdicts `capacity/capacity_v1.json`, `<exp>/canary.json`, `<exp>/stage_a.json` from INC_DIR's top level); remote status; sacct, with the last refusal line of a failed data job's log (`inc_stream_*` jobs only; a build's log is never read); `projects`; the quota; the stream modules' sha256.
+- `stream-submit KIND [--parent-exp P] [--child-exp E] [--trigger T] [--approval-id ID] [--decided-by A] [--dry-run] -- ARGS`: the grammar of each job script checked (`run_inc2_build.sh` takes `inc2.stream init|build|milestone|fork|feasibility|bisect`, `inc2.splits build|lock`, `inc2.baseline build`, `inc2.pilot4 build`); `sbatch --parsable --job-name=<name> -p GPU-shared <script> ARGS`; a queued job of the same name refuses; an "Invalid qos" refusal comes back as `error_kind: qos`.
+- `stream-run <pkg>.<module> VERB [--approval-id ID] [--decided-by A] -- FLAGS`: `inc2.stream commit|compare|choose-arm|rollback|quarantine|release`, `inc2.baseline canary-verdict|capacity-verdict`, `inc2.pilot4 verdict`, as a subprocess on the login node; a person's approval is passed as `INCAP_DECIDED_BY` (inc2.stream takes only a `human:` value); exit 3 is `error_kind: busy`; the last JSON line is the result, the call goes to `_campaign/provenance/_actions.jsonl`.
+
+The `projects` and quota parsers read the output's `Resource:`/`Balance:`/`End Date:` lines and the first line naming `/ocean` with two sizes; both layouts are to be verified on the cluster.
+
+### Corrections after the adversarial review (2026-09-28)
+
+Each item: what was wrong, what changed, and the check that now fails without the change (every one was proved by switching the change off in place and running the named case, then restoring the file and re-checking its sha256).
+
+**The loop could stop and wait for a person that nothing required.**
+- **A gated data item filed in shadow mode stayed filed after `data_autonomy` was set on.** The DATA lane then waited for ever on the old filing. A filed L16, L17 or L24 whose approval is still pending is now re-checked against its gates every tick once `data_autonomy` is on. S16.
+- **A funnel_F9 release (LH, a person's R3 item) held the DATA lane until a person acted**, which stopped collection. LH is now filed "parked", outside its lane, and adopted into the lane only once a person approves it. S26.
+- **An L16R review a person approved was never run:** reviews were filed outside the lanes and nothing picked the approval up. The proposal is now parked with the review and adopted into the DATA lane once approved. S1.
+- **An approved lane item that a person ran from the INC page left its lane waiting.** The lane now follows that run's outcome (its job ids, or its failure). `test_stream_ap_units.py` (lane mechanics).
+- **A lane held by a stop-loss could be released only by a pause.** `stream enable` after the hold (its `resumed_utc` later than the hold's `hold_utc`) now releases it. S20.
+- **D22 kept TRAIN held on a build refusal recorded before the queue changed.** The refusal is superseded once the cutter's own probe (`cut.probe.exact_fill`) fills M again. S24.
+- **D26 priced the incremental runs with the longest recipe of the domain (x1b, 50 epochs)** instead of the recipes the stream runs. On an arm priced at 4× n640 with r0 and x1a, it held TRAIN and MAINT for runs never made. The context now carries the stream's recipes. S11 (on the s640 arm with a 12,500-image pool: r0 + x1a no hold; r0 + x1b hold).
+- **The first cut could read the arm from before the capacity decision was recorded.** TRAIN now waits one tick until the evidence carries the chosen arm. S11.
+
+**Supply was lost silently.**
+- **D21 judged a source's yield before its admission.** It divided the admitted boxes by the fetched GB while the data was still being fetched or intaken. Once the floors are set, that closes every source at its first fetch. D21 now judges only an `admitted` source whose admitted yield has been observed (`yield_recorded`). S2.
+- **A fetch that stopped at a byte cap was never continued.** `collect.fetch` records `complete: false` and the files left, but nothing set `partial`. `stream-snapshot` now carries each source's last fetch completeness (`fetch_complete`, `fetch_remaining`), and a lab fetch's closing line gives the same. A partial source is collected again once its admitted shard is observed. When its 3 attempts are used, it is filed for a person rather than pausing the campaign. S2, S15.
+- **A source whose class names were pending went to a person instead of to L26**, because its empty target-class list read as "no target class". It also could never be intaken on the cluster: L26 writes the names layer on the lab only, and every collector job reads it offline. The pre-check now sends such a source to L26. The lab now pushes `intake/names/names_cache.json` and `names_<source>.json` to the cluster, before the cluster fetch (`L16S --names`) and with every staging push. S22, units (lab sync).
+- **Lab-to-cluster syncs used the six-jobs-a-day allowance of L16.** A sync is no job. S15.
+
+**Diagnoses read the wrong thing.**
+- **D33's hold on 2 consecutive segments counted the pinned prior (realloop_v1) and segments that were not consecutive.** TRAIN held after the first stream segment. The run is now counted from the stream ledger's own commits, and a silent segment breaks it. S6.
+- **D27 took SU already spent off the allocation balance a second time.** The balance from `projects` already has it taken off. D27 now subtracts only what every campaign has committed and not yet spent (`budget.state` `domain_committed_su`). S10.
+- **The domain's round history was not checked (6.6 review).** D10S now pauses with card X14 when the domain ledger, every step counted, already exhausts the live domain's `su_envelope`. S10.
+
+**Leak and ordering.**
+- **A source D28 flagged stayed cuttable while its quarantine waited**, whether in shadow mode or waiting for its R3 turn. D28 now holds TRAIN until the source is quarantined or a person keeps it (a denied L24 records `leak_kept_by`). A ready STOP item now goes before any R3 build in the tick's one ssh (6.2 step 2). S25, units.
+- **The next segment could be cut before the evidence showed the last commit.** A tick that submits takes no snapshot, so D8S, D30, D32 and D33 would have read the commit one segment late. TRAIN now waits for the commit to appear in the evidence. `stream_prospective`.
+- **After a fork (L22):**
+  - the fork is adopted in the fold that sees its job end;
+  - nothing is proposed for the new stream on the old stream's evidence (the next tick's one call is the new stream's snapshot);
+  - items still aimed at the old stream are withdrawn;
+  - the new stream version gets its own prospective record;
+  - an item finished in the fold of the snapshot in hand is not proposed again on that snapshot's evidence;
+  - a job lever refused as "already executed" frees its lane instead of failing as a job that "ended unknown".
+
+  `stream_prospective` (D8S → L22 → adoption → LA → the new stream's first L18), units.
+
+**Accounting.**
+- **The build job of a stream build was never settled from sacct**, and a fork's estimate was never released. Both are now settled. S5, units.
+- **The lab sync read whole staging files into memory to hash them.** They are now hashed in 1 MB blocks. Units.
+- **A person could not set a new envelope end or the daily byte cap from the CLI.** `stream enable` takes `--envelope-end-utc` and `--collect-gb-daily`. Units.
+
+### Corrections from the integration run (2026-09-28)
+
+`tests/test_stream_pipeline.py` runs this ticker on one synthetic world whose every INC_DIR file is written by the real code of groups A–E (docs/CONTINUOUS_LOOP.md, "Verification"). It found six defects at the seams between the ticker and those groups. Each check below fails when its change is switched off (the file restored and re-hashed afterwards).
+- **D28 proposed L24 before the stream existed.** Step 1's one-time jobs (R1, DATA lane) can find a leaking source before `inc2.stream init` (R0, MAINT lane). `inc2.stream quarantine` then exits 1, twice, which holds the STOP lane on a stop-loss; D28 also holds TRAIN until the source is quarantined, so no segment was ever cut. D28 now fires (card, TRAIN hold) but proposes L24 only once the stream ledger shows `init`. Check: the pipeline's segment 1, and "no failed L24".
+- **D24 proposed a milestone while a rollback was pending.** After a "hurts" milestone the summary's counts still include the increments the rollback is about to suspend. The milestone was built after L21 on the rolled-back pool, which `inc2.stream` refuses (a milestone exists for it): a failed MAINT step. D24 is now silent while `rollback_pending` names a pool. Check: the MAINT order L20, LC, L21, L27, LC.
+- **D24's 30-day trigger stopped at the last stream write.** It read `days_since_first_accepted` as the summary had it when written; a quiet stream is not rewritten, so the trigger never fired. The days since the summary's `generated_utc` are now added. Check: milestone 1.
+- **Collection could start before R1.** D20 comes before DR0 in the diagnosis order, so the one-item DATA lane took discovery (or, with candidates, a fetch) before Step 1's bootstrap, knowntruth and backfill. Contract 10 starts collection once R1 passes. D20 is now silent until the three have run. S6's evidence context now states that R1 ran. Checks: "R1 before collection", S6.
+- **The snapshot shipped a stale queue summary.** `inc2.stream` rewrites `queue_summary.json` only in its writing verbs. A Step 1 batch (admit, backfill, scan-holds) that added supply while TRAIN waited for Q ≥ M was never seen by D22, and the held and past-deadline counts stopped. `stream_remote.refresh_summary` now runs `inc2.stream summary --stream SID` (the stream's own writer, under its lease) before the snapshot reads the file. It runs when step1_stream's `queue.jsonl` or `events.jsonl` is newer than the summary, or the summary is older than 24 h. A busy lease or a refusal keeps the old file, the snapshot records the outcome under `refresh`, and the call is bounded to 240 s inside the snapshot's 600 s. A refresh also performs the stream's own crash repair and code-change record, which the next writing verb would otherwise do. Check: the pipeline's P8 stage (a `serve-holds` batch, then one refresh).
+- **A source fetched or intaken outside the campaign's own items had no status.** Such a source may come from a person's run of the collector, a lab fetch or a restarted ticker. DPIPE never took its next step (L16I, L17 admit). Its status is now adopted from the collector's ledger when the ticker's own table has none or `candidate`. Check: the pipeline's DATA stage (L17 admit of a real intake batch).
+
+After these changes: `test_stream_ap_replay.py` 31 of 31 cases (228 checks), `test_stream_ap_mutations.py` 18 of 18 killed, `test_stream_ap_units.py` 281 checks, `test_stream_ap_identity.py` (experiment mode byte-identical) and `test_round_scheduler_stream_guard.py` pass. The statement below that no run joins the real `inc2.stream`, `inc2.step1_stream` and `collect` to this ticker describes these five scripts; `tests/test_stream_pipeline.py` now does so on a synthetic world (not on real data).
+
+### Verification
+
+| Test | What it shows | Result (2026-09-28, local) |
+|---|---|---|
+| `tests/test_stream_ap_replay.py` | S1–S28, the prospective record and the rollout (`stream_r0`), on the simulated world (`tests/test_stream_ap_world.py`): the real ticker, executor, policy, approvals and remote verbs on a temporary INC_DIR; the cluster's commands and the other groups' login-node verbs faked, writing their files in their formats (the commit's dispositions by inc2.stream.dispose itself) | 31 of 31 cases, 228 checks, pass |
+| `tests/test_stream_ap_mutations.py` | SM1–SM18 over D20–D33's comparisons and the prior's disposition, each switched off in a copy: every mutant is killed by some S-case | 18 of 18 killed |
+| `tests/test_stream_ap_units.py` | the menu against the executor, the policy rows and the other groups' parsers; prices against 5.6; the cluster verbs' grammar, parsers, `INCAP_DECIDED_BY` and exit 3; the allow-list; the budget windows and settlement; the R0 records and a failed canary; the other groups' formats (collect-candidates/1 with the collector's pre-check, the never-train source parsed, step1_stream's known truth and holds, the intake summary's `source_leak`, the collector's source fold and fetch completeness); the replay gate; config and dispatch; the lab runner and sync (names layer included); lane mechanics (STOP first, items run elsewhere, recovery) | 281 checks pass |
+| `tests/test_stream_ap_identity.py` | experiment mode byte-identical to git HEAD | pass |
+| `tests/test_round_scheduler_stream_guard.py` | the ownership guard, `_advance`, the dashboard check, `roboflow_sync` skipping `status: intake` (real function) | all pass |
+
+**What these tests are and are not.** S6 and S19 replay recorded ledgers (realloop_v1, pilot_v3). Every other case is a synthetic scenario written with the contract in view: a reproduction of the contract, not evidence that the loop works on real data. Nothing here has run on the cluster. The other groups' argv grammars are checked with their own parsers, and their file formats with fakes written to match their code (the formats are listed in docs/CONTINUOUS_LOOP.md, Build notes); no end-to-end run joins the real `inc2.stream`, `inc2.step1_stream` and `collect` to this ticker on real data.

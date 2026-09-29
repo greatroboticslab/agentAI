@@ -133,7 +133,8 @@ CLUSTERS_BY_SOURCE = "select_clusters_by_source.json"
 VERIFIER_FIT_INFO = "verifier_fit_info.json"   # remote.py's projection of step1/verifier/fit_info.json
 
 EXP_RE = r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}"
-RESERVED_DIRS = ("step1", "splits", "exams", "logs", "audit", "funnel")   # INC_DIR entries that are not experiments
+RESERVED_DIRS = ("step1", "splits", "exams", "logs", "audit", "funnel",   # INC_DIR entries that are not experiments
+                 "stream", "step1_stream", "intake")
 ROOT_AUDIT = "audit/%s_audit.json"          # a label audit run with --out $INC/audit/<exp>_audit.json
 EXP_FILES = ("exp.json", "state.json", "report.json", "build_summary.json", "ledger.jsonl",
              "audit/label_audit.json", "manifests/increments_summary.json")
@@ -157,11 +158,30 @@ SHIPPED_AS = {FUNNEL_RECOVERY: "step1_r1/recovery.json"}
 DERIVED_FROM = {"step1/" + VERIFIER_FIT_INFO: "step1/verifier/fit_info.json",
                 FUNNEL_LISTING: "funnel/ (a listing of names, sha256 and sizes)"}
 DERIVED_STATE_RUNS = "derived/state_runs.json"
+# The stream's artifacts (docs/CONTINUOUS_LOOP.md 3.8): the cutter's queue
+# summary, the stream ledger and the dev scores of the stream's base runs
+# (remote stream-snapshot, dev-stamped only), Step 1's stream status, the intake
+# batch summaries, the fold of intake/sources.jsonl and the network probe's
+# placement, the splits lock's status (derived: presence, sha256, version;
+# never the LOCK's manifest table), and the R0 verdicts, which read dev only
+# (inc2.baseline's capacity/capacity_v1.json and <exp>/canary.json,
+# inc2.pilot4's <exp>/stage_a.json; capacity_v1_report.* holds test and is not
+# on the list). A stream ledger has no experiment: it is kept as a JSON list
+# artifact, not under Evidence.ledgers.
+BATCH_RE = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}"
+STREAM_FILES = ("queue_summary.json", "ledger.jsonl", "dev_scores.json")
 ALLOWED = tuple(re.compile(p) for p in (
     r"(?P<exp>%s)/(?P<file>%s)\Z" % (EXP_RE, "|".join(re.escape(f) for f in EXP_FILES + (DERIVED_STATE_RUNS,))),
     r"step1/(?P<file>%s)\Z" % "|".join(re.escape(f) for f in STEP1_FILES),
     r"audit/(?P<exp>%s)_audit\.json\Z" % EXP_RE,
     r"funnel/(?P<file>%s)\Z" % "|".join(re.escape(f) for f in FUNNEL_FILES),
+    r"stream/(?P<sid>%s)/(?P<file>%s)\Z" % (EXP_RE, "|".join(re.escape(f) for f in STREAM_FILES)),
+    r"step1_stream/status\.json\Z",
+    r"intake/(?P<batch>%s)/summary\.json\Z" % BATCH_RE,
+    r"intake/(?P<file>sources|placement)\.json\Z",
+    r"splits/(?P<ver>v[0-9]{1,3})/lock_status\.json\Z",
+    r"capacity/capacity_v1\.json\Z",
+    r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a)\.json\Z" % ("|".join(RESERVED_DIRS), EXP_RE),
 ))
 # the path of any score file but the decision exam's (scores/<exam>.json, driver.Paths.score)
 _NON_DEV_SCORE = re.compile(r"(^|/)scores/(?!%s\.json\Z)[^/]+\.json\Z" % re.escape(DECISION_EXAM))
@@ -180,7 +200,7 @@ def allowed(name):
     m = ALLOWED[0].match(name)
     if m:
         return m.group("exp") not in RESERVED_DIRS
-    return bool(ALLOWED[1].match(name) or ALLOWED[2].match(name) or ALLOWED[3].match(name))
+    return any(rx.match(name) for rx in ALLOWED[1:])
 
 
 def exp_of(name):
@@ -492,6 +512,19 @@ def from_texts(texts, exp, context=None, touched=None, claims=None, domain=None)
             ev.provenance[name] = {"source": "derived", "json_sha256": _sha(raw),
                                    "derived_from": DERIVED_FROM[name]}
         text = _text(data)
+        if name.endswith("/ledger.jsonl") and exp_of(name) is None:
+            # a stream ledger (stream/<sid>/ledger.jsonl): a list artifact
+            try:
+                entries, notes = parse_ledger(text)
+            except EvidenceError as e:
+                ev.notes.append("%s: %s; not loaded" % (name, e))
+                continue
+            ev.notes.extend("%s: %s" % (name, n) for n in notes)
+            clean, drop = scrub([x for _ln, x in entries], blocked)
+            ev.artifacts[name] = clean
+            if drop:
+                ev.dropped[name] = drop
+            continue
         if name.endswith("/ledger.jsonl"):
             try:
                 entries, notes = parse_ledger(text)
@@ -582,6 +615,8 @@ def _snapshot_records(record):
             out.append(record["step1"])
         if isinstance(record.get("funnel"), dict) and record["funnel"].get("verb") == "funnel-summary":
             out.append(record["funnel"])
+        if isinstance(record.get("stream"), dict) and record["stream"].get("verb") == "stream-summary":
+            out.append(record["stream"])
         return out
     raise EvidenceError("not a remote snapshot record (verb %r)" % (verb,))
 
@@ -639,7 +674,11 @@ def from_snapshot(record, exp, context=None, ledger_prefix=None, claims=None, do
                     and isinstance(derived.get("report_final_dev"), list):
                 obj = dict(obj, final=derived["report_final_dev"])
                 put_back = True
-            texts[name] = json.dumps(obj, sort_keys=True)
+            if name.endswith("/ledger.jsonl") and exp_of(name) is None and isinstance(obj, list):
+                # a stream ledger shipped as its list of entries: back to JSON lines
+                texts[name] = "".join(json.dumps(x, sort_keys=True) + "\n" for x in obj)
+            else:
+                texts[name] = json.dumps(obj, sort_keys=True)
             info = files.get(name)
             if name in DERIVED_FROM:
                 prov[name] = {"source": "derived", "json_sha256": _json_sha(texts[name]),

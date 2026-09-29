@@ -10534,3 +10534,51 @@ The 2026-09-27 real loop concluded that the harvest supplies few target-species 
 - **Live run:** the autopilot fired D17 and D19 on the real Step 1 files by itself. It then ran the taxonomy and card fetches, and submitted the census (job 47242297).
 - **Live-only defects:** four surfaced in the first live steps. Each is fixed with a test (commits d94b1c6, e16b9e1).
 - **No audit estimate exists yet.**
+
+## 2026-09-28 — v3.63.0 (in progress): the continuous loop (collect → filter → fixed increments → gate → rollback)
+
+### What changed
+
+- **`docs/CONTINUOUS_LOOP.md`:** the contract for the loop the platform runs by itself.
+  - Owner decisions D-A to D-D:
+    - the 3SeasonWeedDet10 2022/2023 subsets move into training, so the out-of-season exams are gone;
+    - Step 1 admits per box, with masking;
+    - collection is targeted at the 12 species;
+    - fixed-size increments pass through the pinned gate, with rollback.
+  - Decisions L-1 to L-7, made before the build:
+    - a per-species tolerance for the species guard;
+    - a capacity grid at R0 (YOLO11n, s and m at 640 px);
+    - base_v2 drops the cwp10/vanpe re-uploads;
+    - freeze and LoRA are out of stream v1;
+    - the budget is 1,000 SU;
+    - the /ocean floor is 3 %.
+- **`tools/inc2/`** (a new protocol package; no pinned module edited):
+  - splits v2 with LOCK v2, a never-train index of dev + test + ImageWeeds, and an 8-variant plus embedding copy guard;
+  - recipes, a guarded trainer, baselines and the capacity arms;
+  - gate3 (per-species tolerance);
+  - incremental Step 1 with per-box masking;
+  - the streaming chain on the pinned driver (cut, build, commit, rollback, bisect, milestone), and reports that lead with the test metric and the gap to 0.90.
+- **`tools/collect/`:** a targeted collector that never trains.
+  - Pre-download filtering by resolved class names; Zenodo, GitHub, Kaggle, Mendeley, mediaTUM and Hugging Face providers.
+  - Licence recording, normalisers, class maps (including an EPPO table), and intake guarded by the v2 copy check.
+- **The autopilot's stream mode:** a lane ticker, levers L15–L28, diagnoses D20–D33, budget and stop-losses, and a campaign that never goes COMPLETE by itself. `round_scheduler` refuses the old weed collect/filter/train steps while a stream campaign owns the domain.
+- **Deploy:** `deploy/deploy_funnel.sh` ships the stream packages and tests. It runs the replay set locally before copying, and it refuses changes to pinned and shared modules.
+
+### Why
+
+The professor's method had never run end to end:
+- collection had been off since 2026-09-10;
+- the autopilot did not drive collection;
+- Step 1 was a one-shot pass that admitted 878 harvested images;
+- the real loop tested 6 × 287 images once.
+
+Every result sat near test 0.85, against the 0.90 goal.
+
+### How verified
+
+- **Local tests:** 88 test scripts pass (about 7,700 checks). They include an end-to-end synthetic run of the loop in which no dev, test or ImageWeeds image reaches any of 36 training manifests, and mutation checks on the new guards and diagnoses.
+- **Cluster checks, 2026-09-28:**
+  - `yolo11s.pt` (sha256 85a76fe8…) and `yolo11m.pt` (d5ffc1a6…) are placed in `$REPO`;
+  - GPU SU remaining is 10,529;
+  - /ocean has 454 GB free.
+- **No loop result exists yet.**

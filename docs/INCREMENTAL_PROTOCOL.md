@@ -505,3 +505,141 @@ Run after 5 and before Steps 2–3: `sbatch run_inc_relevance.sh build` (docs/IN
   3. applies the gate;
   4. submits the next sbatch array (`run_inc_train.sh`, GPU-shared, 1 × V100-32).
 - **Ledger:** every decision is appended to `ledger.jsonl` with its inputs. Decisions are made by `gate.py`, not by a person or an LLM.
+
+## Protocol v3 (splits v2 and the continuous loop)
+
+Protocol v3 is the protocol of the continuous loop (docs/CONTINUOUS_LOOP.md). It is pre-registered here before any v3 run, under the owner's decisions of 2026-09-28 (docs/CONTINUOUS_LOOP.md §2.6: L-3, L-4, L-6). Its code is the package `tools/inc2/`: `recipes.py`, `train.py`, `gate3.py`, `scorer_sidecar.py`, `baseline.py` and `pilot4.py` for this section, with `common.py`, `guard.py` and `splits.py` for splits v2. The pinned v1 modules (`inc/driver.py`, `inc/gate.py`, `inc/scorer.py` and the rest) are not edited. Everything in "Fixed conventions", "Scorer" and "Gate" above still holds unless this section replaces it.
+
+### What changes, and what does not
+
+| Item | Protocol v3 |
+|---|---|
+| Splits | Splits v2 (docs/CONTINUOUS_LOOP.md §4). The training base is `base_v2` = train_core + tsw22 + tsw23 + the kept part of base B. The evaluation splits are dev, test and imageweeds, byte copies of v1's. ood22 and ood23 are training data (tsw22, tsw23) and are never an exam: a v3 spec that lists them is refused. |
+| Scorer | The v1 scorer, unchanged: the v1 LOCK's sha256, the v1 exams, imgsz 640 for every exam and every arm. |
+| Never-train guard | The v2 index (dev + test + imageweeds, at 6 dHash bits) is checked against every training image and against each of its 8 flips and rotations, fail closed. `inc2.guard.GuardV2` decides; `inc2.train` also looks every variant up in the v2 index itself, so a hit refuses the run even if GuardV2 misses it. The images L-5 drops from base_v2 (`splits/v2/l5_excluded.jsonl`, its sha256 in LOCK v2) are refused by their bytes in every v2 training run, whatever key or source lists them. |
+| Gate | The pinned `inc/gate.py` decides every chain step, with protocol v2's net flips. Protocol v3 replaces one number, the species guard's tolerance (below). Every other guard, threshold and verdict rule is unchanged. |
+| Recipes | The table below. Freeze and LoRA are out of stream version 1 (L-6). |
+| Detector | An arm (detector and imgsz) is pinned per experiment (L-4). `n640` (YOLO11n at 640 px) is the continuity arm. |
+
+### The recipe table
+
+Every recipe is SGD, batch 32, momentum 0.937, weight decay 0.0005, cosine to lrf 0.01, close_mosaic 10, deterministic, trainer `full`, at the arm's imgsz. An incremental recipe's `warmup_bias_lr` equals its lr0, which is the runner's convention for incremental runs; without it the bias LR would start at Ultralytics' 0.1.
+
+| Name | Used for | Epochs | lr0 | Warmup epochs | warmup_bias_lr |
+|---|---|---|---|---|---|
+| `cold` | base and union runs | 100 | 0.01 | 3 | 0.1 |
+| `r0` | cand and null runs: the current full rehearsal | 30 | 0.002 | 1 | 0.002 |
+| `x1a` | cand and null runs: LR re-warm | 30 | 0.005 | 3 | 0.005 |
+| `x1b` | cand and null runs: LR re-warm | 50 | 0.01 | 3 | 0.01 |
+
+- For the n640 arm, `cold` and `r0` are exactly `inc.pilot`'s cold and full recipes.
+- A production run whose recipe departs from the table in any key but the seed, `cache` and `workers` is refused (`inc2.recipes.deviations`). That is stricter than v1's check, which left momentum, weight decay and close_mosaic unchecked.
+- **Freeze and LoRA** are refused by the survival rule below, applied to pilot_v3's recorded chains: each agreed with the truth arm on 3 of 7 steps, against the 5 required. A later pilot that passes the rule can re-admit them, under a new stream version.
+
+### The arms (L-4)
+
+| Arm | Checkpoint | Training imgsz | GFLOPs of one forward pass at nc 13 |
+|---|---|---|---|
+| `n640` | yolo11n.pt | 640 | 6.454 |
+| `s640` | yolo11s.pt | 640 | 21.574 |
+| `m640` | yolo11m.pt | 640 | 68.240 |
+
+- **Where the FLOPs come from.** `ultralytics.utils.torch_utils.get_flops` (thop) on `yolo11{n,s,m}.yaml` at 13 classes, Ultralytics 8.4.22, on the laptop.
+- **How an arm is pinned.** A build records the arm in exp.json with the sha256 of its checkpoint in `$REPO`. Nothing is downloaded. The executor refuses a production cold run whose init is not that checkpoint.
+- **Scoring.** Every arm trains and scores at 640 px (the locked scorer infers at 640 px), so the grid varies capacity only. A resolution arm needs a new scorer version (R4) and is not in this grid.
+- **The switch rule (dev only).** Each arm's 3 cold seeds are compared on the seeds all arms share (0, 1, 2), by dev mAP50-95. An arm qualifies when mean(arm) − mean(n640) > 2 × pooled sd, with pooled sd = √((sd(arm)² + sd(n640)²) / 2). The stream takes the qualifying arm with the highest dev mean, the one with fewer FLOPs on a tie; if no arm qualifies it stays on n640.
+- **The truth arm.** When one r0 step of the chosen arm with its truth arm costs more than 25 GPU-h, the truth arm runs on every ⌈cost / 25⌉-th step. The cost uses the arm's measured cold rate (its base runs' `train_seconds` per image-epoch), and the incremental rate is taken as cold × 7.4 / 6.5 (the n640 ratio, est.).
+- **Test.** Test is read once per arm at R0, as a milestone read, in a report kept apart from the decision.
+- **Cost before a run (est.).** The measured n640 rates (cold 6.0–7.0 ms per image-epoch, incremental 7.4, scoring 54.5 ms per exam image; docs/CONTINUOUS_LOOP.md §5.6) are bracketed for the other arms. The low end is scaled by the pixel ratio, since the data loader bounds a larger model from below. The high end is scaled by the FLOPs ratio, the contract's basis; YOLO11n is loader-bound on a V100, so this over-states a larger model's time.
+
+### The species guard (L-3)
+
+For each of the 12 species s: **tol_s = max(0.03, 1.96 × SE_s)**. The species guard passes s when mean(cand AP_s) − mean(null AP_s) ≥ −tol_s. That tolerance replaces the pinned max(0.03, 3 × sd_s(null)).
+
+- **What SE_s is.** The image-bootstrap standard error of the incumbent's dev AP for s:
+  - 1,000 resamples of the 617 dev images, drawn once for all species with `numpy.random.default_rng(stable_int("inc2/v3/species_se"))`;
+  - an image drawn k times counts k times, with its detections and its GT boxes;
+  - AP50-95 is computed with Ultralytics' `ap_per_class`, the scorer's own AP function;
+  - SE_s is the sample sd (ddof 1) over the resamples that hold a GT box of s.
+- **Where it comes from.** The locked scorer records per-class AP over the whole exam, but not the per-image inputs behind it. `inc2/scorer_sidecar.py` therefore calls the pinned scorer unchanged, as a library, with a validator subclass that keeps each image's metric inputs. It checks that these reproduce the score's per_class exactly, and records SE_s beside the run's dev score (`scores/dev.sidecar.json`). Every base, union, cand and soup run of a v2 experiment gets one.
+- **What does not change.** P_data, P_recipe, the regression guard, the flips guard, their thresholds and the verdict rule are the pinned gate's, with the experiment's pinned config.
+- **How a step is re-decided.** `inc2.gate3.decide` reads the pinned driver's ledger entry of the step. It re-derives the recorded decision from the recorded score files, each checked by sha256, and refuses a decision the pinned gate does not reproduce. It then replaces only the species tolerance. The truth arm's species guard is replaced the same way (`truth3`), with SE_s from the "without" arm's first run.
+- **When it cannot apply.** A step whose incumbent has no usable sidecar, or whose recorded inputs do not verify, is recorded as unavailable. Its commit verdict never accepts: a pinned ACCEPT commits as HOLD (the v3 tolerance can be stricter than the pinned one, so an ACCEPT on the rule that was not applied is not an ACCEPT of Protocol v3), and a pinned REJECT or HOLD stands. A truth entry that cannot be re-decided keeps its pinned verdict.
+- **Why.** The pinned guard scales one species' drop by the null arm's spread, and all three null runs start from the same weights. On realloop_v1 that sd was 0.0061 for PricklySida, so the threshold sat at the 0.03 floor. PricklySida has 42 dev boxes, and the guard failed on it in 5 of the 6 steps, with drops of 0.033–0.057 (`realloop_v1/ledger.jsonl`). The sampling noise of a 42-box AP is not in that rule.
+- **A sensitivity reading of the recorded ledger**, with hypothetical SEs because realloop_v1 has no sidecars:
+  - with SE_PricklySida = 0.025, only V4 changes, to ACCEPT: a species-only failure at P_data 1.00;
+  - V1–V3 and UNVERIFIED still fail the regression guard, and OTHER_HEAVY the flips guard.
+  - Stage C (docs/CONTINUOUS_LOOP.md §5.1) is the rule's first reading on measured SEs.
+
+### Stage A: pilot_v4 (known truth)
+
+- **Build.** `inc2.pilot4` builds pilot_v4 on pilot_v3's bins, sha-identical: P0 and [I1, I2, Bswap, I3, Breal, I4, I5], with the same seeds, cold recipe, gate block (net flips) and replay mode (full).
+- **Chains.** x1a and x1b, with no truth arm. The reference is pilot_v3's recorded truth verdicts. R0 is pilot_v3's own full chain and is not re-run.
+- **Final exams.** dev and imageweeds. Test is not read.
+- **The survival rule.** An arm survives only if it does all of the following:
+  - it ACCEPTs I2, I3 and I5;
+  - it REJECTs Bswap and Breal (a HOLD is not a rejection);
+  - it agrees with the truth arm on ≥ 5 of 7 steps (ACCEPT ~ helps, HOLD ~ neutral, REJECT ~ hurts);
+  - its final incumbent's dev mAP50-95 is ≥ 0.8084 − 2 × 0.0043 = 0.7998 (pilot_v3's T_final dev mean and sd; the build checks that pilot_v3's report reproduces them).
+- **R0 on its record:** agreement 5/7, final dev 0.8006; it survives.
+- **The record.** `stage_a.json` is READY once pilot_v4 is done and every arm has all 7 verdicts and a final dev. The best survivor has the most agreement, then the higher final dev, then fewer epochs. D30 holds the TRAIN lane until this record is READY, whether or not an arm survived.
+
+### Stage B: segment 1
+
+- **Chains.** Segment 1 runs two chains: r0 and the best Stage A survivor, or r0 alone if none survives.
+- **The rule.** For each chain and each step, δ_min = max(0, inc − mean(null) − 2·sd(null)). The chosen chain has, in order:
+  1. the smallest median δ_min;
+  2. then fewer recipe flags (P_recipe ≤ 0.25);
+  3. then the cheaper recipe (fewer epochs);
+  4. a tie goes to r0.
+- **Implementation.** `inc2.recipes.stage_b_choice` reads the pinned ledger's gate entries. Test is never an input. No arm is added after results are seen without a new pre-registration.
+
+### Baselines
+
+| Run | Role | Seeds | Final exams | Rule |
+|---|---|---|---|---|
+| B_v2 on base_v2 | milestone 0, arm n640 | 0–4 | dev, imageweeds, test | the loop's starting point |
+| Capacity arms on base_v2 | s640, m640 | 0–2 | dev, imageweeds, test | the switch rule above |
+| Canary: B0 seed 0 under `inc2.train` | train_core (v2 copy) | 0 | dev | passes when \|canary − mean(b0_v1 seeds)\| ≤ sd(b0_v1 seeds) on dev (0.8082 ± 0.0063), its scorer sidecar was written, the run and its score are production ones, and it trained b0_v1's base manifest (by sha256) with b0_v1's cold recipe |
+| B0 ∪ tsw | train_core ∪ tsw22 ∪ tsw23 | 0–2 | dev, imageweeds | recommended: isolates the harvested part of base_v2 |
+| Milestone | a stream pool P_s | 0–4 | dev, imageweeds, test | the only place test is read; the chain incumbent is scored on the same exams as a secondary number |
+
+- **Test reads (P10).** Only milestone reads open test: B_v2 (milestone 0), the capacity arms at R0 (L-4) and the stream's milestones. A build of any other role that lists test is refused.
+- **Roles.** A role given to the builder must match what is built: B_v2 and the capacity arms train LOCK v2's base_v2 (by sha256) on n640 and on another arm, the canary trains LOCK v2's train_core on n640. Without a role (the autopilot's argv names none) the builder infers it from the same facts; anything else is a plain baseline without test.
+- **Research-only.** A baseline's `research_only` flag is false only when every row is in splits v2's provenance file, that file hashes as LOCK v2 records, and no row is research-only. Otherwise it is true.
+
+### How it was verified (laptop, no GPU; nothing of Protocol v3 has run on the cluster)
+
+- **`tests/test_inc2_train.py`:**
+  - the v3 table has no deviation on any arm;
+  - freeze and LoRA are refused;
+  - ood exams are refused;
+  - the v1 and v2 evaluation manifests are refused by path and by content;
+  - planted exact, 1–6-bit, re-encoded, hflip and rot90 copies of dev and test images are refused, each a failed run.json at stage guard;
+  - the index cross-check refuses an hflip copy that GuardV2 is made to pass;
+  - an L-5 image re-listed under another key and source is refused, and an L-5 list that does not hash as LOCK v2 records stops the run;
+  - a missing guard, a missing or mismatched LOCK v2, and (in production) a testing LOCK each stop the run;
+  - real 1-epoch CPU runs (base, cand, null, final) finish; the base and cand runs carry a sidecar whose arrays reproduce the score exactly; a tampered sidecar is re-scored, not retrained;
+  - production runs are refused for a tiny recipe or a foreign cold checkpoint;
+  - `run_inc2_job.sh` exports INC_JOB_SCRIPT as itself and runs `inc2.train`, then `inc.driver advance`;
+  - the pinned modules are unchanged against git HEAD.
+- **`tests/test_inc2_gate3.py`:**
+  - the bootstrap is deterministic under its seed;
+  - a real CPU sidecar reproduces the pinned scorer's per_class exactly;
+  - with SE_s = pinned threshold_s / 1.96, every verdict of a battery equals the pinned one;
+  - tampered score files and forged decisions are refused;
+  - the sidecar's SE equals the sample sd of per-resample APs recomputed independently;
+  - an unavailable step with a pinned ACCEPT commits as HOLD, and one with a pinned REJECT stays REJECT;
+  - on realloop_v1's recorded ledger, the reading above.
+- **`tests/test_inc2_pilot4.py`:**
+  - the bins are sha-identical;
+  - a bin holding an hflip copy of a test image refuses the build;
+  - a HOLD on a planted bin is not a rejection;
+  - the rule applied to pilot_v3's recorded chains gives R0 survives (5/7, 0.8006), and freeze and LoRA fail (3/7).
+- **`tests/test_inc2_baseline.py`:**
+  - every build passes the pinned driver's `validate_definition` and `check_definition_data`;
+  - a FakeBackend baseline runs to done through the real v2 executor, and a 1-step chain runs to done with every spec accepted by the v2 executor; only `run_inc2_job.sh` is submitted;
+  - the capacity decision is identical when every test score is perturbed;
+  - the autopilot's argv shapes (`--arch`/`--imgsz`, no role) build B_v2, both capacity arms and the canary with the right role, arm and exams; roles that do not match, and test outside a milestone read, are refused;
+  - a test-mode canary, or one trained on another manifest than b0_v1's, does not pass.
+- **Mutation checks.** Each of these was changed in the source, the tests were run and failed, and the source was restored: the guard's refusal, the index cross-check, the variant check, the testing-LOCK refusal, the unhashable refusal, the ood refusal, the content check of evaluation manifests, x1a's lr0, imgsz in the deviation check, the arm's checkpoint sha256, the cand sidecar, the chain's sidecar failure, the job script's INC_JOB_SCRIPT export and its drift stop, the v3 z and floor, re-derivation, the sidecar's weights and production checks, the regression guard in v3, the bootstrap seed and its ddof, the capacity threshold, the canary's sd and its production and manifest checks, the capacity decision's test blindness, the union guard, the agreement minimum, HOLD as a rejection, the final dev floor, the pilot bins' guard, the role inference and the role's manifest and arm checks, the P10 test refusal, the `--arch`/`--imgsz` mapping, the secondary's log dir, the funnel modules in the job's drift check, the research-only flag and its provenance hash check, the truth arm's sidecar binding, the unavailable-ACCEPT hold and the L-5 check (45 mutations, each run in a scratch copy of the package).

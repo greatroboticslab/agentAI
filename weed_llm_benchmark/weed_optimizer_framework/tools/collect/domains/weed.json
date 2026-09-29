@@ -1,0 +1,663 @@
+{
+ "format": "collect-domain/1",
+ "domain": "weed",
+ "about": {
+  "what": "The targeted collector's configuration for the continuous loop (docs/CONTINUOUS_LOOP.md sections 3.1, 3.2, 7). A governance file (section 6.5): written by a person or a deploy, never by the running platform.",
+  "built": "2026-09-28, group D build of the continuous loop"
+ },
+ "targets": {
+  "path": "funnel/domains/weed.json",
+  "sha256": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f",
+  "why": "the target classes, their taxa, the reject class id and the taxonomy authority are the funnel domain's (a pointer by path and sha256, never a copy; section 3.1)"
+ },
+ "class_space": {
+  "unmapped_id": 13,
+  "why": "numeric, unresolvable and no-name classes (and any class the status map does not map) get id 13, which exists only in intake labels; their boxes are kept so that per-box admission masks them (section 3.2)"
+ },
+ "taxonomy": {
+  "funnel_cache": "funnel/taxonomy_cache.json",
+  "names_layer": "intake/names/names_cache.json"
+ },
+ "alias_table": {
+  "module": "weed_optimizer_framework.tools.cwd12_species",
+  "attr": "_ALIASES",
+  "why": "the project's species aliases (the v3.60.0 join); a name it joins has the funnel's 'target' status"
+ },
+ "search_terms": {
+  "Waterhemp": [
+   "waterhemp",
+   "tall waterhemp"
+  ],
+  "MorningGlory": [
+   "morning glory",
+   "ivyleaf morning glory",
+   "pitted morning glory",
+   "tall morningglory"
+  ],
+  "Purslane": [
+   "common purslane"
+  ],
+  "SpottedSpurge": [
+   "spotted spurge",
+   "prostrate spurge"
+  ],
+  "Carpetweed": [
+   "carpetweed",
+   "green carpetweed"
+  ],
+  "Ragweed": [
+   "common ragweed"
+  ],
+  "Eclipta": [
+   "eclipta",
+   "false daisy"
+  ],
+  "PricklySida": [
+   "prickly sida",
+   "prickly mallow",
+   "teaweed"
+  ],
+  "PalmerAmaranth": [
+   "Palmer amaranth",
+   "Palmer pigweed"
+  ],
+  "Sicklepod": [
+   "sicklepod",
+   "coffeeweed"
+  ],
+  "Goosegrass": [
+   "goosegrass",
+   "Indian goosegrass"
+  ],
+  "CutleafGroundcherry": [
+   "cutleaf groundcherry",
+   "wild tomato"
+  ]
+ },
+ "priority": {
+  "PricklySida": 1,
+  "CutleafGroundcherry": 1,
+  "Sicklepod": 1,
+  "Eclipta": 2,
+  "Goosegrass": 2,
+  "SpottedSpurge": 2,
+  "Carpetweed": 3,
+  "Ragweed": 3,
+  "MorningGlory": 3,
+  "PalmerAmaranth": 3,
+  "Purslane": 3,
+  "Waterhemp": 3
+ },
+ "query_grammar": {
+  "templates": {
+   "text": [
+    "\"{binomial}\"",
+    "\"{common}\"",
+    "{common} weed",
+    "{common} detection",
+    "{genus} dataset"
+   ],
+   "class": [
+    "{common}",
+    "{binomial}"
+   ],
+   "taxon": [
+    "{binomial}"
+   ],
+   "eppo": [
+    "{eppo}"
+   ]
+  },
+  "max_queries_per_provider": 40,
+  "max_results_per_query": 20,
+  "max_describe_per_provider": 40,
+  "why": "section 7.1: binomial, common names, '<common> weed', '<common> detection', '<genus> dataset'; class-name search on the provider that declares class lists; the binomial on the annotation index; EPPO codes where a repository names classes by code"
+ },
+ "providers": {
+  "zenodo": {
+   "kind": "zenodo",
+   "enabled": true,
+   "search": true,
+   "template": "text"
+  },
+  "mendeley": {
+   "kind": "mendeley",
+   "enabled": true,
+   "search": true,
+   "template": "text"
+  },
+  "huggingface": {
+   "kind": "huggingface",
+   "enabled": true,
+   "search": true,
+   "template": "text",
+   "templates": [
+    "{common}",
+    "{binomial}",
+    "{common} detection"
+   ],
+   "credentials": {
+    "optional": true,
+    "env": [
+     "HF_TOKEN"
+    ],
+    "files": [
+     "~/.hf_token",
+     "~/.cache/huggingface/token"
+    ]
+   }
+  },
+  "kaggle": {
+   "kind": "kaggle",
+   "enabled": true,
+   "search": true,
+   "template": "text",
+   "credentials": {
+    "env": [
+     "KAGGLE_API_TOKEN"
+    ],
+    "files": [
+     "~/.kaggle/access_token",
+     "~/.kaggle_token"
+    ],
+    "basic_files": [
+     "~/.kaggle/kaggle.json"
+    ]
+   }
+  },
+  "github": {
+   "kind": "github",
+   "enabled": true,
+   "search": true,
+   "template": "text",
+   "max_queries": 10,
+   "credentials": {
+    "optional": true,
+    "env": [
+     "GITHUB_TOKEN"
+    ],
+    "files": [
+     "~/.gh_pat"
+    ]
+   }
+  },
+  "roboflow": {
+   "kind": "roboflow",
+   "enabled": true,
+   "search": true,
+   "template": "class",
+   "export_format": "yolov8",
+   "credentials": {
+    "env": [
+     "ROBOFLOW_API_KEY"
+    ],
+    "files": [
+     "~/.roboflow_key"
+    ]
+   },
+   "why": "the only provider that declares class lists before download (section 7.3); read only, never uploaded to"
+  },
+  "weedai": {
+   "kind": "weedai",
+   "enabled": true,
+   "search": true,
+   "template": "taxon",
+   "base_url": "https://weed-ai.sydney.edu.au",
+   "index": "weedid"
+  },
+  "mediatum": {
+   "kind": "mediatum",
+   "enabled": true,
+   "search": false,
+   "base_url": "https://mediatum.ub.tum.de",
+   "ftp": {
+    "host": "dataserv.ub.tum.de"
+   }
+  }
+ },
+ "placement": {
+  "lab_only": [
+   "github"
+  ],
+  "why": "GitHub is lab only: the login-node SOCKS proxy is refused from compute nodes (section 7.2); every other provider runs on the cluster once the network probe passes there"
+ },
+ "download": {
+  "base_timeout_s": 120,
+  "min_rate_bytes_per_s": 2000000,
+  "read_timeout_s": 60,
+  "attempts": 3,
+  "why": "a timeout scaled to size (not a flat 480 s): 120 s plus the size at 2 MB/s"
+ },
+ "licence_policy": {
+  "permissive": [
+   "cc0",
+   "public-domain",
+   "cc-by",
+   "cc-by-sa",
+   "mit",
+   "apache-2.0",
+   "bsd",
+   "bsd-2-clause",
+   "bsd-3-clause",
+   "odbl",
+   "odc-by",
+   "cdla-permissive",
+   "unlicense",
+   "gpl-2.0",
+   "gpl-3.0",
+   "lgpl",
+   "agpl-3.0"
+  ],
+  "research_only": [
+   "cc-by-nc",
+   "cc-by-nc-sa",
+   "cc-by-nc-nd",
+   "cc-by-nd",
+   "cdla-sharing",
+   "research-only"
+  ],
+  "refused": [
+   "all-rights-reserved"
+  ],
+  "unresolved": [
+   "unresolved"
+  ],
+  "why": "P6 (section 2.5): unresolved -> held; non-commercial (and no-derivatives) -> research_only; a permissive copy is preferred; nothing is redistributed"
+ },
+ "licence_overrides": {},
+ "budgets": {
+  "bytes_per_source": 50000000000.0,
+  "bytes_daily": 50000000000.0,
+  "bytes_envelope": 200000000000.0,
+  "attempts_per_source": 3,
+  "approved_bytes": {},
+  "floor_gb": null,
+  "floor_su": null,
+  "why": "section 6.6 limits (50 GB per source unless a person approves, 50 GB a day, the 200 GB proposal); a fetch keeps 20 GB free on its filesystem (the /ocean project quota itself is read by the autopilot, D27); floor_gb and floor_su are set by a person from the first wave (section 7.4)",
+  "disk_margin_bytes": 20000000000.0
+ },
+ "estimates": {
+  "boxes_per_image": 2.0,
+  "unknown_images": 500,
+  "unknown_bytes": 2000000000.0,
+  "text_target_share": 0.5,
+  "deficit_bonus": 1.0,
+  "why": "ranking priors only (expected target boxes per GB, D20): 2 boxes per image, a text-only source counts half its boxes as targets"
+ },
+ "prefilter": {
+  "reject_tokens": [
+   "car",
+   "cars",
+   "truck",
+   "vehicle",
+   "person",
+   "people",
+   "pedestrian",
+   "face",
+   "helmet",
+   "hardhat",
+   "ppe",
+   "boots",
+   "sunglasses",
+   "plate",
+   "drone",
+   "uav",
+   "bee",
+   "bees",
+   "insect",
+   "pest",
+   "aphid",
+   "beetle",
+   "fruit",
+   "flower",
+   "disease",
+   "blight",
+   "rust",
+   "mildew",
+   "lesion",
+   "leafspot",
+   "cell",
+   "blood",
+   "xray",
+   "dog",
+   "cat",
+   "bird",
+   "fish",
+   "boat",
+   "ship",
+   "gun",
+   "knife",
+   "smoke",
+   "fire"
+  ],
+  "legacy_labels": [
+   "Carpetweeds",
+   "Crabgrass",
+   "Eclipta",
+   "Goosegrass",
+   "Morningglory",
+   "Nutsedge",
+   "PalmerAmaranth",
+   "PricklySida",
+   "Purslane",
+   "Ragweed",
+   "Sicklepod",
+   "SpottedSpurge"
+  ],
+  "copy_candidate_min": 4,
+  "box_words": [
+   "bounding box",
+   "bounding-box",
+   "bbox",
+   "object detection",
+   "detection",
+   "detector",
+   "yolo",
+   "pascal voc",
+   "coco format"
+  ],
+  "image_level_words": [
+   "image classification",
+   "classification dataset",
+   "image-level",
+   "image level labels"
+  ],
+  "presumed_derivative": {
+   "providers": [
+    "roboflow",
+    "kaggle",
+    "huggingface",
+    "weedai"
+   ],
+   "declares_any": [
+    "PricklySida",
+    "CutleafGroundcherry"
+   ],
+   "min_targets": 3,
+   "lab_group": "LuLab",
+   "why": "section 7.2 [review]: these two species have no known public source outside the lab of dev and test"
+  },
+  "never_fetch": [
+   {
+    "provider": "zenodo",
+    "ref": "14861516",
+    "why": "3SeasonWeedDet10: data2022 and data2023 are base v2 (D-A), data2021 holds copies of the evaluation photographs (KT3)"
+   }
+  ],
+  "never_fetch_title_regex": [
+   "(?i)cotton\\s*weed\\s*det\\s*-?\\s*12(?![0-9])",
+   "(?i)\\bcwd\\s*12\\b",
+   "(?i)image\\s*weeds",
+   "(?i)\\bweed\\s*sense\\b",
+   "(?i)(?<![0-9])3\\s*-?\\s*season\\s*weed\\s*det",
+   "(?i)three[\\s_-]*season[\\s_-]*weed"
+  ],
+  "why": "section 7.2: whole-token rejects; the legacy-label copy rule of verify.old_join; the reference and exam datasets are never fetched, and neither is 3SeasonWeedDet10 under any record or title (its 2022/2023 parts are base v2, its 2021 part holds copies of the evaluation photographs)"
+ },
+ "class_map": {
+  "status_map": {
+   "target": "target",
+   "target_synonym": "target",
+   "taxon_resolved": "other",
+   "role": "other",
+   "target_related": {
+    "scientific": "other",
+    "override": "other",
+    "default": "unmapped"
+   },
+   "default": "unmapped"
+  },
+  "related_needs_species_rank": true,
+  "why": "section 3.2: target and target_synonym -> the target id; any other resolved plant -> the reject class; a relative of a target resolved above species rank (a target's genus), vernacular or by token only, and numeric, no-name, generic, state, non-object and unresolvable names -> unmapped"
+ },
+ "lab_groups": {
+  "LuLab": {
+   "evaluation": true,
+   "members": [
+    "kg_yuzhenlu__cottonweeddet3",
+    "kg_yuzhenlu__cottonweedid15"
+   ],
+   "refs": [
+    {
+     "provider": "kaggle",
+     "ref_regex": "(?i)^yuzhenlu/"
+    },
+    {
+     "title_regex": "(?i)cotton\\s*weed\\s*(det|id)\\s*\\d+"
+    },
+    {
+     "text_regex": "(?i)\\blu,\\s*yuzhen\\b|\\byuzhen\\s+lu\\b"
+    }
+   ],
+   "why": "the lab that produced dev and test, recognised by its Kaggle account, its dataset names and its author (P9: held until the copy scan)"
+  },
+  "NDSU": {
+   "evaluation": true,
+   "members": [],
+   "refs": [
+    {
+     "text_regex": "(?i)north dakota state|\\bndsu\\b"
+    }
+   ],
+   "why": "the lab of the ImageWeeds exam (same-lab sources are reported as such)"
+  },
+  "TAMU": {
+   "evaluation": false,
+   "members": [
+    "weedai_5c78d067-8750-4803-9cbe-57df8fae55e4"
+   ]
+  },
+  "TUM": {
+   "evaluation": false,
+   "members": [
+    "mediatum_1717366"
+   ]
+  }
+ },
+ "copy_scan": {
+  "ready_files": [
+   "funnel/leak_v1.json",
+   "splits/v2/leak/leak_calibration.json",
+   "intake/leak/leak_v1.json"
+  ],
+  "why": "P9: an evaluation-lab source is fetched once one of these holds a passed calibration of the embedding copy detector (read through inc2.guard.load_calibration): the funnel's, the stream's own (group A writes it under splits/v2/leak/), or one under intake/leak/"
+ },
+ "hold": {
+  "deadline_days": 21
+ },
+ "eppo": {
+  "path": "collect/domains/eppo_codes_v1.json",
+  "sha256": "457d46ce5a2401577ed3bd1816c840f6d62a1245237757a2b3397e1227cec238"
+ },
+ "card_class_tables": {
+  "weedai_5c78d067-8750-4803-9cbe-57df8fae55e4": {
+   "by_name": {
+    "weed: amaranthus palmeri (BBCH10-12)": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "weed: amaranthus palmeri (BBCH13-16)": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "weed: amaranthus palmeri (BBCH17-19)": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "weed: amaranthus palmeri (BBCH51-59)": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "weed: amaranthus palmeri (BBCH60-69)": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "weed: amaranthus palmeri (BBCH13-29 - bushy)": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "weed: amaranthus palmeri (BBCH51-59 - bushy)": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "weed: amaranthus palmeri (BBCH60-69 - bushy)": {
+     "taxon": "Amaranthus palmeri"
+    }
+   },
+   "table_source": "the annotation index's upload record of PAGS8 (api/upload_info, category_statistics), read 2026-09-28: eight growth-stage categories of one species",
+   "pinned_by": "group D build 2026-09-28, pending the owner's acceptance (section 10, item 5)"
+  }
+ },
+ "known_items_why": "section 7.3: an audit of discovery recall (S1b), not a seed list; each stays fetchable after a recorded miss",
+ "known_items": [
+  {
+   "id": "mendeley_d3n3mgjjbv_v2",
+   "name": "mh_weed16",
+   "decided_by": "owner 2026-09-28 D-C",
+   "title": "MH-Weed16 full",
+   "provider": "mendeley",
+   "ref": "d3n3mgjjbv/2",
+   "owned_by": "funnel",
+   "owned_why": "owned by the funnel audit: waits for H3a; the pool's copy is rejoined by step1_stream and the R-F refetch is the funnel's (section 3.9); the collector never registers it a second time",
+   "match": [
+    {
+     "provider": "mendeley",
+     "ref_regex": "^d3n3mgjjbv"
+    },
+    {
+     "provider": "huggingface",
+     "ref_regex": "(?i)mh_?weed16"
+    },
+    {
+     "title_regex": "(?i)mh[-_ ]?weed\\s*16"
+    }
+   ],
+   "copies": [],
+   "licence": {
+    "text": "CC BY 4.0"
+   },
+   "lab_group": null
+  },
+  {
+   "id": "weedai_5c78d067-8750-4803-9cbe-57df8fae55e4",
+   "name": "pags8",
+   "decided_by": "owner 2026-09-28 D-C",
+   "title": "Palmer amaranth Growth Stage - 8 (PAGS8)",
+   "provider": "weedai",
+   "ref": "5c78d067-8750-4803-9cbe-57df8fae55e4",
+   "lab_group": "TAMU",
+   "provenance_cleared": true,
+   "exhaustive_labels": false,
+   "format": "coco",
+   "match": [
+    {
+     "provider": "weedai",
+     "ref_regex": "^5c78d067"
+    },
+    {
+     "title_regex": "(?i)\\bpags\\s*8\\b|palmer amaranth growth stage"
+    }
+   ],
+   "notes": "the upload holds 614 images and 1,940 boxes in eight growth-stage categories (read 2026-09-28; the paper's 1,228 images / 5,026 boxes are not all in this upload); CC BY 4.0"
+  },
+  {
+   "id": "mediatum_1717366",
+   "name": "mfwd_porol",
+   "decided_by": "owner 2026-09-28 D-C",
+   "title": "Moving Fields Weed Dataset, the target species' trays",
+   "provider": "mediatum",
+   "ref": "1717366",
+   "lab_group": "TUM",
+   "provenance_cleared": true,
+   "exhaustive_labels": null,
+   "format": "box_csv",
+   "format_options": {
+    "csv": "gt.csv",
+    "label_column": "label_id",
+    "file_column": "filename",
+    "group_column": "tray_id"
+   },
+   "select": {
+    "root": "jpegs",
+    "codes": "targets",
+    "index_files": [
+     "gt.csv"
+    ],
+    "checksums_file": "checksums.sha512",
+    "ftp": {
+     "user": "m1717366",
+     "password": "m1717366"
+    }
+   },
+   "match": [
+    {
+     "provider": "mediatum",
+     "ref": "1717366"
+    },
+    {
+     "provider": "github",
+     "ref_regex": "(?i)^grimmlab/mfwd$"
+    },
+    {
+     "title_regex": "(?i)\\bmfwd\\b|moving fields weed"
+    }
+   ],
+   "notes": "FTP login m1717366/m1717366 is the record's public access (the authors' download script); the jpegs of the target code's trays measured 6.78 GB in 21 archives on 2026-09-28; the capture group is the tray"
+  },
+  {
+   "id": "kg_yuzhenlu__cottonweeddet3",
+   "name": "cottonweeddet3",
+   "decided_by": "owner 2026-09-28 D-C",
+   "title": "CottonWeedDet3",
+   "provider": "kaggle",
+   "ref": "yuzhenlu/cottonweeddet3",
+   "lab_group": "LuLab",
+   "exhaustive_labels": false,
+   "match": [
+    {
+     "provider": "kaggle",
+     "ref": "yuzhenlu/cottonweeddet3"
+    },
+    {
+     "title_regex": "(?i)cotton\\s*weed\\s*det\\s*3\\b"
+    }
+   ],
+   "notes": "the lab of dev and test: held until the copy scan (P9); the Kaggle token must be rotated first (section 10, item 6)"
+  },
+  {
+   "id": "ndsu_classification_sets",
+   "name": "ndsu_classification",
+   "decided_by": "owner 2026-09-28 D-C",
+   "title": "NDSU greenhouse and crop-with-weed classification sets",
+   "fetchable": false,
+   "not_fetchable_why": "image-level labels only, and the records are not identified; kept for recall (section 7.3)",
+   "annotation": "image_level",
+   "lab_group": "NDSU",
+   "match": [
+    {
+     "text_regex": "(?i)north dakota state|\\bndsu\\b"
+    }
+   ]
+  },
+  {
+   "id": "kg_yuzhenlu__cottonweedid15",
+   "name": "cottonweedid15",
+   "decided_by": "owner 2026-09-28 D-C",
+   "title": "CottonWeedID15",
+   "provider": "kaggle",
+   "ref": "yuzhenlu/cottonweedid15",
+   "lab_group": "LuLab",
+   "annotation": "image_level",
+   "match": [
+    {
+     "provider": "kaggle",
+     "ref": "yuzhenlu/cottonweedid15"
+    },
+    {
+     "title_regex": "(?i)cotton\\s*weed\\s*id\\s*15"
+    }
+   ],
+   "notes": "image-level (5,187 images): a pseudo-box protocol would be a new protocol version"
+  }
+ ],
+ "guard": {
+  "lock": null,
+  "why": "None: inc2.common.LOCK_PATH (LOCK v2)"
+ },
+ "normalise": {
+  "keep_work": false
+ }
+}

@@ -1,0 +1,240 @@
+{
+ "_meta": {
+  "version": "inc-autopilot-stream-thresholds/1",
+  "pre_registered": "2026-09-28",
+  "contract": "docs/CONTINUOUS_LOOP.md 6.4 (D20-D33), 6.6 (stop-losses), 6.7 (holds), 5.3 (M and K), 2.6 L-3/L-4",
+  "purpose": "The pre-registered thresholds of the stream-mode diagnoses (inc_autopilot/diagnose_stream.py), each with the reason it has its value, in thresholds.json's house style. They live in their own file, not in a 'stream' block of thresholds.json, because diagnose.rules_version() hashes thresholds.json whole: a stream block there would change the experiment-mode rules version and re-diagnose the live experiment campaigns (docs/CONTINUOUS_LOOP.md, Build notes, group F).",
+  "read_by": [
+   "weed_optimizer_framework/tools/inc_autopilot/diagnose_stream.py",
+   "weed_optimizer_framework/tools/inc_autopilot/stream.py"
+  ],
+  "writers": "A person or a deploy, never the running platform (contract 6.5, S27): floor_gb and floor_su are derived from the measured first collection wave and written here by a person; a null floor is a placeholder, and L16 is not autonomous while it stands (contract 7.4, 10 R3)."
+ },
+ "D20": {
+  "low_water_M_mult": {
+   "value": 2,
+   "why": "Contract 6.4 D20: the DATA lane collects while the eligible target images are below 2M, the low-water mark, so that a full increment is always in reserve when a segment is cut."
+  },
+  "deficit_segments": {
+   "value": 2,
+   "why": "Contract 6.4 D20: a species is in deficit when the queue holds fewer of its target boxes than the last 2 segments consumed."
+  },
+  "discover_after_days": {
+   "value": 7,
+   "why": "Contract 6.4 D20 and 6.7: with no open candidate, discovery (L15) runs again when the last run is more than 7 days old."
+  },
+  "verify_rate_default": {
+   "value": 0.5,
+   "why": "The expected share of a candidate's declared target boxes that survive the guards and the verifier, used only to rank candidates when the candidate states no expected count; contract 7.3 expects 4.4k-10.4k verified of about 16.6k raw target boxes (0.27-0.63), and 0.5 is the midpoint. Ranking only: nothing is admitted on it."
+  },
+  "deficit_bonus": {
+   "value": 1.0,
+   "why": "A candidate that declares a deficit species (D20's list, or a species D33 names) ranks as if it yielded (1 + bonus) times its expected boxes per GB: contract 6.4 D20/D33 ask for a bonus without a size; 1.0 doubles the rank, which puts any deficit source above a non-deficit source of equal yield."
+  }
+ },
+ "D21": {
+  "floor_gb": {
+   "value": null,
+   "why": "Contract 7.4: verified target boxes admitted per GB below which a source is closed. Set by a person from the measured first D-C wave; null is the placeholder, under which D21 does not evaluate and L16 is not autonomous."
+  },
+  "floor_su": {
+   "value": null,
+   "why": "Contract 7.4: verified target boxes admitted per SU of collect + admit. Set by a person from the first wave; null is the placeholder."
+  },
+  "min_gb": {
+   "value": 2.0,
+   "why": "Contract 6.4 D21: a source is judged only after min(2 GB, the whole source) has been fetched."
+  }
+ },
+ "D22": {
+  "cut_M_mult": {
+   "value": 4,
+   "why": "Contract 5.3: a segment is cut when Q >= 4M (K = 4 increments)."
+  },
+  "stale_days": {
+   "value": 7,
+   "why": "Contract 5.3: or when Q >= M and the oldest eligible row is at least 7 days old."
+  },
+  "K_max": {
+   "value": 4,
+   "why": "Contract 5.3 and P2: K <= 4 increments per segment; supply, not SU, limits the loop, and shorter segments give earlier boundary checks."
+  }
+ },
+ "D24": {
+  "accepted": {
+   "value": 4,
+   "why": "Contract 5.5: a milestone after 4 accepted increments since the last one."
+  },
+  "segments": {
+   "value": 3,
+   "why": "Contract 5.5: or after 3 segments."
+  },
+  "days": {
+   "value": 30,
+   "why": "Contract 5.5: or after 30 days with at least one accepted increment."
+  }
+ },
+ "D25": {
+  "boundary_sd_mult": {
+   "value": 2.0,
+   "why": "Contract 5.5: the boundary check fires when mean(new base seeds) < mean(old) - 2 sd(old); at 3 v 3 it is an alarm, not a claim. D25 applies it to the means and sd the stream summary's boundary_check records (inc2.stream), not to its 'fires' flag."
+  },
+  "perm_p": {
+   "value": 0.025,
+   "why": "Contract 3.6: a milestone rolls back only on the one-sided 5 v 5 permutation test at p <= 0.025 with mean(new) < mean(old) (as FUNNEL_AUDIT H10a). inc2.stream compare computes the test; D25 proposes L21 only when the recorded p and means meet this value, and hands a disagreement to a person. A species-guard-only 'hurts' does not roll back (D33, X17)."
+  }
+ },
+ "D26": {
+  "walltime_share": {
+   "value": 0.8,
+   "why": "Contract 6.4 D26: hold builds when the projected longest run of the next build is at least 0.8 of its walltime limit (cold 8 h, incremental 3 h, build 4 h), before a run times out the way the round scheduler's did on 2026-08-29."
+  }
+ },
+ "D27": {
+  "quota_free_frac": {
+   "value": 0.03,
+   "why": "Contract 6.6 and decision L-7: pause when staging + projected bytes leave less than 3 % of the /ocean quota free (about 210 GB of the 6.84 TiB project quota, which the whole lab shares). Measured 2026-09-28: 454 GB free (94 % used); the stream's projected need is under 50 GB. Before collection starts, free space must also cover collect_gb_envelope."
+  },
+  "renewal_card_days": {
+   "value": 30,
+   "why": "Contract 6.6: the allocation renewal card is raised 30 days before the allocation's end date."
+  }
+ },
+ "D28": {
+  "never_train_share": {
+   "value": 0.05,
+   "why": "Contract 6.4 D28: a source with at least 5 % of its images refused by the never-train v2 guard (6-bit dHash, its 8 variants, or the embedding copy detector) is a leak and is quarantined (L24)."
+  },
+  "base_copy_share": {
+   "value": 0.2,
+   "why": "Contract 6.4 D28: or with at least 20 % base copies (a re-upload of the base's own photographs)."
+  }
+ },
+ "D29": {
+  "recent_days": {
+   "value": 14,
+   "why": "Contract 6.4 D29: collection is exhausted when an L15 run in the last 14 days found nothing new and no open candidate is predicted above the floor."
+  },
+  "backoff_days": {
+   "value": [
+    7,
+    14,
+    30
+   ],
+   "why": "Contract 6.7 review: WAIT_DATA re-runs discovery after 7, then 14, then 30 days, and never COMPLETEs (P7)."
+  }
+ },
+ "D30": {
+  "share_min": {
+   "value": 0.5,
+   "why": "Contract 6.4 D30 review: TRAIN holds when at least half of the last decided segment's REJECTs are recipe-caused in the guard reading of 3.5 (only the regression guard failed)."
+  }
+ },
+ "D31": {
+  "blames_to_quarantine": {
+   "value": 2,
+   "why": "Contract 6.4 D31: a source blamed for data twice is quarantined (L24) and D21 closes it."
+  }
+ },
+ "D32": {
+  "window": {
+   "value": 12,
+   "why": "Contract 6.4 D32: no ACCEPT in the last 12 decided increments while D30 is silent holds L18 and raises a card; the DATA lane then runs at half cadence."
+  }
+ },
+ "D33": {
+  "share": {
+   "value": 0.5,
+   "why": "Contract 6.4 D33: the same species fails the species guard in at least half of a segment's REJECTs (realloop_v1: PricklySida, 5 of 6)."
+  },
+  "hold_after_segments": {
+   "value": 2,
+   "why": "Contract 6.4 review: D33 also holds L18 once it has fired on 2 consecutive segments, so a species guard tripping on every step does not burn segments until D32."
+  }
+ },
+ "D8S": {
+  "p_band": {
+   "value": [
+    0.25,
+    0.75
+   ],
+   "why": "Contract 6.4 'Recipe or data?': P_data in (0.25, 0.75), the gate's own HOLD band (GateConfig p_reject, p_accept)."
+  },
+  "share_min": {
+   "value": 0.5,
+   "why": "Contract 6.4: underpowered when that holds on at least half of the decided steps."
+  },
+  "sd_mult": {
+   "value": 2.0,
+   "why": "As D8: |cand - null| below 2 max(sd)."
+  },
+  "max_doublings": {
+   "value": 2,
+   "why": "Contract 6.3 L22: at most 2 doublings of M, then card X17."
+  }
+ },
+ "disposition": {
+  "p_reject": {
+   "value": 0.25,
+   "why": "Contract 3.5 review: a REJECT is disposed 'data' at P_data <= p_reject (GateConfig p_reject 0.25) unless the step's truth arm says 'helps'. inc2.stream commit records every stream disposition; this value applies only where D30/D31/D33 read the pinned prior (realloop_v1) through the same rule, before Stage A is READY; the step's own recorded config.p_reject is used when the gate block set one."
+  }
+ },
+ "capacity": {
+  "truth_step_hours_max": {
+   "value": 25.0,
+   "why": "Contract 2.6 L-4: a step whose cost with the truth arm exceeds 25 GPU-h runs the truth arm on every ceil(cost/25)-th step. inc2.stream applies the rule per segment from its own cost model; here it prices L18 proposals and enters the prospective stream record. The capacity switch rule itself (2 pooled sd on dev) is inc2.baseline capacity-verdict's, read from capacity/capacity_v1.json, not re-implemented here."
+  }
+ },
+ "stop_loss": {
+  "lane_fails": {
+   "value": 2,
+   "why": "Contract 6.6: 2 consecutive failed steps in a lane hold that lane."
+  },
+  "zero_yield_sources": {
+   "value": 3,
+   "why": "Contract 6.6: 3 consecutive sources ending failed or with zero admitted target boxes hold the DATA lane; one zero-yield source is legitimate (a licence hold, a copy source), so 2 do not."
+  },
+  "held_lanes_to_pause": {
+   "value": 2,
+   "why": "Contract 6.6: the campaign pauses when 2 lanes are held."
+  },
+  "errors_to_pause": {
+   "value": 3,
+   "why": "Contract 6.6: the ticker raising on 3 ticks in a row pauses (campaign.ERRORS_TO_PAUSE)."
+  }
+ },
+ "holds": {
+  "deadline_days": {
+   "value": 21,
+   "why": "Contract 6.7 review: a hold that waits on the funnel campaign (funnel_F9, h6_scan, the MH-Weed16 rejoin) carries a deadline 21 days after the row's admission; past it an h6_scan hold is served by the stream's own copy detector and a funnel_F9 hold becomes an R3 item for a person."
+  }
+ },
+ "cadence": {
+  "discover_min_hours": {
+   "value": 24,
+   "why": "L15 runs at most once a day: discovery reads public provider APIs, and a daily cadence is far above the pace at which new public datasets appear (contract 11.1)."
+  },
+  "shadow_days": {
+   "value": 3,
+   "why": "Contract 10 R3: shadow mode for at least 3 days (diagnose and propose only) before a person may set data_autonomy on."
+  }
+ },
+ "known_truth": {
+  "min_lower_bound": {
+   "value": 0.99,
+   "why": "Contract 3.3 (a proposed verifier-refit trigger, pre-registered here): a batch's known-truth verified precision whose Wilson lower bound falls under 0.99 (the in-domain precision was 99.96-100 %) raises card X11."
+  },
+  "min_matched": {
+   "value": 30,
+   "why": "Contract 3.3: on at least 30 matched verified boxes, so a handful of matches cannot trip it."
+  },
+  "min_new_boxes": {
+   "value": 100,
+   "why": "Contract 3.3: a species with at least 100 new target-labelled boxes ... (step1_stream lists such species in status.json refit_triggers.species_unknown_share with the same values, REFIT_SPECIES_NEW_BOXES and REFIT_SPECIES_UNKNOWN_SHARE; the per-species counts are not in its status)."
+  },
+  "max_unknown_share": {
+   "value": 0.5,
+   "why": "Contract 3.3: ... of which at least half the verifier calls unknown."
+  }
+ }
+}

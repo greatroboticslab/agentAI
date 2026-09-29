@@ -461,3 +461,132 @@ Writes `INC_DIR/<exp>/report.md` and `report.json`:
 - Item 4 is run once after the pilot, post hoc, by `inc/audit.py` (`run_inc_audit.sh`): trusted = P0, audited = I1–I5, `Bswap` and `Breal` (docs/INCREMENTAL_PROTOCOL.md, Gate, attribution item 4). The driver, `exp.json` and the gate entries are unchanged.
 
 **Scorer:** a model with no prediction on an exam scores 0 (and is then rejected by the gate); it does not crash the scorer.
+
+## Protocol v3 runner (`tools/inc2/`)
+
+How Protocol v3 (docs/INCREMENTAL_PROTOCOL.md, "Protocol v3") is run. The pinned driver (`inc/driver.py`) runs every v2 experiment unchanged; only the executor, the builders and the job script are new.
+
+### Executor — `python -m weed_optimizer_framework.tools.inc2.train --spec SPEC`
+
+It is a copy of `inc/train.py`, and the spec format, the run-dir lock, re-runs and run.json are the same. The differences:
+
+- **Exams:**
+  - a spec may list only dev, imageweeds and test;
+  - ood22 and ood23 are refused;
+  - test stays final-only.
+- **Manifest:** `check_manifest` also refuses the v1 and v2 evaluation manifests, by path and by content (a manifest whose sha256 is a LOCK's dev, test, ood22, ood23 or imageweeds sha256).
+- **Guard (splits v2, fail closed).** `guard_rows`:
+  - loads `inc2.guard.GuardV2.load(INC_DIR/splits/v2/LOCK.json)` and passes it each image's dHash and 8 variant dHashes;
+  - refuses `unhashable`, `near_eval_v2`, `near_eval_variant`, `near_eval_embed` and any reason it does not know;
+  - counts `base_copy`, `exact_dup` and `near_dup_intake` without refusing (a base_v2 row is a base copy by definition);
+  - looks every variant up in the v2 never-train index itself (`inc.common.NeverTrainGuard.load(path)`), after checking the index's sha256 against LOCK v2;
+  - refuses an image whose sha256 is in `splits/v2/l5_excluded.jsonl` (reason `l5_excluded`: the images L-5 drops from base_v2, under any key or source), after checking that file's sha256 against LOCK v2's `l5_excluded_sha256`.
+  - A production run refuses a LOCK v2 written by a testing build, and a LOCK v2 that records no L-5 list.
+  - run.json `guard` records the reason counts, the cross-check hits, and the LOCK, index and guard-module sha256.
+- **Recipe and arm** (stage `recipe`, before the device):
+  - exp.json's `arm` record gives the imgsz;
+  - `inc2.recipes.deviations` gives the departures from the v3 table;
+  - a cold run's init must be the arm's checkpoint (its name, and its sha256 when the record pins one).
+  - Production refuses either kind of departure; testing records them (`recipe_deviations`, `init_check`).
+  - An exp.json without `arm` is the n640 arm, allowed only with `init_weights` yolo11n.pt or none.
+- **Code:** `code_modules()` hashes the v1 executor modules, `tools/funnel/leak.py` with the two funnel modules it imports (`__init__.py`, `embed.py`), and every `tools/inc2/*.py` into run.json. Drift from the nested copy fails the run, as in v1.
+- **Sidecar.** After the scorer, every base, union, cand and soup run scored on dev runs `python -m weed_optimizer_framework.tools.inc2.scorer_sidecar --weights weights/final.pt --exam dev --score scores/dev.json --out scores/dev.sidecar.json`, with the scorer's own test settings in test mode.
+  - The sidecar must name this run's weights and this run's dev score (sha256), and its npz must hash as recorded. Otherwise the run fails at stage `sidecar`, except in a `baseline` experiment, where no gate decision reads it: there the failure is recorded (`sidecars.dev.status` "failed", a warning) and the run is done.
+  - run.json `sidecars.dev` records the JSON's and the npz's path and sha256, and the SE per species.
+  - A re-run whose sidecar files are missing or changed re-scores the verified weights instead of retraining.
+  - Cost per run: a second validation pass on dev, plus the bootstrap. The bootstrap took 20 s on the laptop for a synthetic exam with 617 images and 108k predictions.
+- **run.json** also says `protocol` "v3", `protocol_package` "inc2" and `splits_version` "v2", and records `arm`, `recipe_name` and `init_check`.
+
+### Job script — `weed_llm_benchmark/run_inc2_job.sh <list_file> [<exp>]`
+
+It is `run_inc_job.sh` with the v2 executor (the same sbatch header, `INC_JOB_ADVANCE` modes and exit status). In addition:
+- **INC_JOB_SCRIPT.** Before anything else, it exports `INC_JOB_SCRIPT=$REPO/weed_llm_benchmark/run_inc2_job.sh`. The pinned driver's in-job advance (`driver.job_script()`) therefore keeps submitting this script, never `run_inc_job.sh`. A missing copy stops it with exit 2.
+- **Drift check.** It compares every module the executor and the driver import (the funnel package's `__init__.py`, `embed.py` and `leak.py` included), and every nested `tools/inc2/*.py`, between the outer and the nested package copies. A missing outer module or a difference stops the job with exit 1; `INC_ALLOW_DRIFT=1` runs it anyway.
+- **Order:**
+  1. `python -m …inc2.train --spec SPEC`;
+  2. `python -m …inc.driver advance --exp EXP --quiet`; in auto mode only after `inc2.train --flock-check` passes.
+- **What it never does:** reset, pull or copy the checkout, or touch Roboflow.
+- `INC2_JOB_REPO` and `INC2_JOB_CONDA_SH` replace the cluster paths (tests only).
+
+The builders below set `INC_JOB_SCRIPT` to this script before `driver init` and refuse when it already names another script. Any other caller that advances a v2 experiment must export it too: the build job script and the autopilot's `advance`.
+
+### Baselines — `python -m weed_optimizer_framework.tools.inc2.baseline …`
+
+| Command | What it does |
+|---|---|
+| `build --exp E (--manifest P \| --union P1,P2,…) [--seeds …] [--arm n640\|s640\|m640 \| --arch yolo11s --imgsz 640] [--final-exams …] [--role …] [--testing \| --testing-settings JSON] [--no-init]` | A `baseline` experiment: one cold base run per seed with the arm's cold recipe, then final runs on the final exams. The arm is `--arm`, or `--arch` with `--imgsz` (the autopilot's L23B argv), which must name one table row and agree with `--arm` when both are given. Role defaults: b_v2 and milestone seeds 0–4, canary seed 0, the others 0–2; finals dev, imageweeds, test for b_v2, capacity and milestone, dev for the canary, dev and imageweeds for union and baseline. |
+| `canary-verdict --exp canary_v2 [--reference b0_v1]` | `INC_DIR/<exp>/canary.json`: \|canary base__s0 dev − mean\| ≤ sd of the reference's base seeds (b0_v1 report.json's dev 12-class, else its runs' scores), the canary's sidecar written, a production run and score, and the reference's base manifest (sha256), cold recipe and seed 0 (from the reference's exp.json, which must exist). The canary is where a sidecar that does not work on the cluster's Ultralytics shows up first. |
+| `capacity-verdict --n b_v2 --arms b_v2_s640,b_v2_m640 [--m M] [--out-dir D]` | The L-4 decision (dev only) → `INC_DIR/capacity/capacity_v1.json`; the report for people (dev, imageweeds and test, mean ± sd, gap to 0.90) → `capacity_v1_report.{json,md}`. |
+| `secondary --exp <milestone> --weights W [--run-id secondary__incumbent] [--source TEXT]` | A final spec scoring the chain incumbent on the milestone's exams, a one-line list file, `secondary.json` and the sbatch argv of `run_inc2_job.sh`. It submits nothing; the driver does not track that run. |
+| `estimate --n-images N [--seeds …] [--arm A]` | The est. cost of a baseline. |
+
+**Roles (P10: test is read only at milestone reads).** Without `--role` the role is inferred: `--union` is union; LOCK v2's base_v2 (by sha256) is b_v2 on n640 and capacity on another arm; LOCK v2's train_core is canary; anything else is baseline. An explicit role must match: b_v2 and capacity train base_v2 (b_v2 on n640, capacity on another arm), the canary trains train_core on n640, union needs `--union`. A build that lists test for a role other than b_v2, capacity or milestone is refused.
+
+**Build checks, before anything is written:**
+- the arm resolves; its checkpoint is in `$REPO`, and a testing build may lack it;
+- the role matches the manifest and the arm, and the final exams are the role's (above);
+- LOCK v2 exists and its never-train index hashes as recorded; a production build refuses a testing LOCK;
+- the manifest passes `inc2.train.check_manifest` and `guard_rows`;
+- `--union` parts are pairwise disjoint by key, image path and sha256;
+- the definition passes the pinned driver's `validate_definition` and `check_definition_data`.
+
+**exp.json** carries `inc2.recipes.stamp(arm)`:
+- `protocol` v3, `protocol_package` inc2, `splits_version` v2;
+- the `arm` record with the checkpoint's sha256;
+- `init_weights` = the arm's checkpoint.
+
+It also records `role`, `base.source_manifest` and `base.source_locked` (the LOCK v2 name of the manifest, or a list for a union), `cost_estimate` (est., low and high GPU-h, and the projected longest run against the 8 h cold walltime and D26's 0.8 line), `research_only` (false only when every row is in splits v2's provenance file, that file hashes as LOCK v2 records, and none is research-only; otherwise true, with its basis), and `splits_v2` (the LOCK and index sha256). `build_summary.json` records the manifest summary, the guard record, the LOCK status and the sha256 of the builder, the executor, the guard, the driver and `inc/pilot.py`.
+
+**capacity_v1.json (format inc2-capacity/1):**
+- per arm: the seeds, dev values, mean, sd, diff_vs_n, pooled_sd, qualifies, and the score files read (path and sha256);
+- `chosen_arm`, `chosen_exp` and `chosen_arm_record`;
+- `step_cost` with its basis (measured or est.), `m`, and `truth_every`.
+- It opens exp.json, the base runs' run.json and their `scores/dev.json`, and nothing else.
+
+### Stage A — `python -m weed_optimizer_framework.tools.inc2.pilot4 …`
+
+| Command | What it does |
+|---|---|
+| `build --exp pilot_v4 --from pilot_v3 --recipes x1a,x1b [--testing …] [--no-init]` | The chain on pilot_v3's bins, as below. |
+| `verdict --exp pilot_v4 [--no-write]` | `INC_DIR/pilot_v4/stage_a.json`, as below. |
+
+**build:**
+- **Bins.** It copies P0 and the seven bins of pilot_v3's exp.json byte for byte into `pilot_v4/manifests/`, and each copy must hash to pilot_v3's recorded `manifest_sha256`. Each step entry keeps its name, clean flag and sessions and records `source_manifest`.
+- **Checks.** Every bin must pass `check_manifest` and the v2 guard. pilot_v3 must be a full-replay chain whose base recipe is the v3 cold recipe, with a truth verdict for all 7 steps.
+- **Recipes.** Only x1a and x1b; r0, freeze and LoRA are refused.
+- **exp.json** has `truth: false`, pilot_v3's gate block, final exams dev and imageweeds, and a `stage_a` block. That block holds the rule, the truth verdicts, R0's record judged by the same rule, the T_final cross-check, and the sha256 of pilot_v3's exp.json, ledger and report.
+
+**stage_a.json (format inc2-stage-a/1):**
+- `status` (READY | PENDING);
+- per arm: its step verdicts, agreement, final dev (`runs/final__<r>__incumbent/scores/dev.json`), every check and `survives`;
+- `survivors`, `best_survivor` and `segment1_recipes` (`["r0"]` plus the best survivor);
+- while PENDING, what is missing;
+- the sha256 of its inputs.
+
+### Protocol v3 gate — `python -m weed_optimizer_framework.tools.inc2.gate3 {decide,show} --exp E [--no-verify] [--out P]`
+
+`decide` writes `INC_DIR/<exp>/gate3.json` (format inc2-gate3/1). It has one record per gate entry (`steps`) and per truth entry (`truth`), each with these fields:
+- `verdict` (v3), `pinned_verdict`, `changed`, `commit_verdict`, `v3_applied` and `status` (decided | unavailable); an unavailable step also has `commit_rule` and the pinned `failed_guards` and `p_data_le_p_reject`;
+- `failed_guards`, `pinned_failed_guards`, `p_data_le_p_reject`, `guards` (regression and flips as recorded, species v3), `species_tolerance` and `species_se`;
+- `attribution` (blame follows the v3 verdict);
+- `inputs`: the ledger entry's sha256, the score files, and the sidecar's path and sha256.
+
+The document also records the ledger's and exp.json's sha256, both configs and a summary (changed, unavailable, unavailable_held, truth_unavailable). `show` prints the same without writing. `--no-verify` decides from the recorded guards without re-deriving them from the score files; the truth arm's sidecar is still bound to the weights of its first "without" run through that run's score file (checked by sha256).
+
+**Unavailable steps never accept.** A step whose v3 decision cannot be made commits its pinned verdict, except that a pinned ACCEPT commits as HOLD. The v3 tolerance can be stricter than the pinned one for a species whose null spread is wide, so a pinned ACCEPT is not a Protocol v3 ACCEPT; a HOLD returns the increment to the queue once. A pinned REJECT or HOLD stands.
+
+**How a stream commit uses it** (group E, `inc2.stream commit`):
+1. After segment `<sid>_sNNN` is done, run `decide` or `gate3.decide_experiment(exp)`.
+2. For the chain the Stage B rule names (`inc2.recipes.stage_b_choice` on the same ledger), an increment joins P_s when its step's `commit_verdict` is ACCEPT.
+3. The disposition of a REJECT (docs/CONTINUOUS_LOOP.md §3.5) reads the step's v3 `failed_guards` and `p_data_le_p_reject`: data (unless the truth record's `commit_verdict` is helps), then species, flips, and recipe (regression only).
+4. A step recorded unavailable commits as its `commit_verdict` (a pinned ACCEPT as HOLD), and its disposition reads the pinned guards recorded with it.
+
+The pinned chain inside the segment is not re-run. A step that v3 ACCEPTs and the pinned gate REJECTed joins P_s on its own step's evidence, and the next segment trains cold on P_s.
+
+### Scorer sidecar — `python -m weed_optimizer_framework.tools.inc2.scorer_sidecar --weights W --exam dev --score S --out O`
+
+It calls `inc.scorer.score` (pinned, unchanged) with a subclass of the scorer's validator, installed through the scorer's validator cache for its own process. It writes:
+- `O` (format inc2-scorer-sidecar/1): the recorded score's path, sha256 and stamps; the sidecar score's metrics; the consistency checks (the stamps must be equal and per_class within 0.002 of the recorded score; `ap_per_class` on the captured arrays must equal its own per_class within 1e-9); the npz's path and sha256; and `species_se`, which holds the seed text, the seed, 1,000 resamples and per species `ap`, `se`, `n_valid`, `n_gt`, `mean`, `p2_5` and `p97_5`;
+- `<stem>.images.npz`: `keys`, `pred_img`, `tp` (N × 10), `conf`, `pred_cls`, `target_img` and `target_cls`.
+
+Exit codes: 0 written, 2 refused (writing nothing), 1 error. It is also the backfill tool for a run scored before the sidecar existed; that is a GPU job.

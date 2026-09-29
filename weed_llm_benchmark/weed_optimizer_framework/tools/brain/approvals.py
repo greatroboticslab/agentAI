@@ -72,9 +72,17 @@ TERMINAL = ("approved", "denied")
 # config that could add a name here could grant itself R3 authority.
 ENVELOPE_GRANTEES = ("round-scheduler:inc-autopilot",)
 # The only actions a grant may approve: the INC menu builds (levers L1, L2,
-# L5 and L8; docs/INC_AUTOPILOT.md section d). Anything else in the queue is
-# decided by a person, whoever filed it.
-ENVELOPE_ACTIONS = ("inc_build_pilot", "inc_build_realloop", "inc_build_baseline")
+# L5 and L8; docs/INC_AUTOPILOT.md section d), and a stream campaign's builds
+# (docs/CONTINUOUS_LOOP.md 6.5: L18, L22 and L28 through inc_build_segment,
+# L20 and L27 through inc_build_consolidation, L21's rollback to the pool the
+# last 'hurts' milestone recommended, L23's baselines, L25's Stage A pilot and
+# LI, the stream's creation). L23's splits build
+# and lock, a source that failed its pre-check and a funnel_F9 release are not
+# here: a person decides them. Anything else in the queue is decided by a
+# person, whoever filed it.
+ENVELOPE_ACTIONS = ("inc_build_pilot", "inc_build_realloop", "inc_build_baseline",
+                    "inc_build_segment", "inc_build_consolidation", "inc_stream_rollback",
+                    "inc_build_baseline_v2", "inc_build_pilot4", "inc_stream_init")
 EXEC_PHASES = ("started", "done", "failed", "released")
 
 

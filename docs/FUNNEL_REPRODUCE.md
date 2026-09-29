@@ -32,6 +32,7 @@ This document explains how to deploy the funnel audit and have the platform run 
 - The environment of `deploy/run_dashboard_labserver.sh`: `CLUSTER_SSH` and `CLUSTER_REPO`. `CLUSTER_DATA_SSH` defaults to `byler@data.bridges2.psc.edu`.
 
 **Cluster:**
+- For the continuous loop's capacity arms (docs/CONTINUOUS_LOOP.md L-4): `yolo11s.pt` (sha256 `85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d5`) and `yolo11m.pt` (`d5ffc1a674953a08e11a8d21e022781b1b23a19b730afc309290bd9fb5305b95`) in `$REPO`, from the Ultralytics assets release v8.3.0 (placed 2026-09-28).
 - The conda env `bench`. Checked 2026-09-28: torch 2.5.1, torchvision 0.20.1, timm 1.0.25, open_clip 3.3.0, transformers 5.8.0, scikit-learn 1.7.2, scipy 1.15.3, Pillow 12.0.0, OpenCV 4.10.0.
 - The Hugging Face cache with `facebook/dinov2-base` and BioCLIP-2 (`imageomics/bioclip-2`).
 - The ollama store `/ocean/projects/cis240145p/byler/ollama/models` with `qwen3.8:27b` (RL-B and the planner) and `glm-4.7-flash` / `gemma4` (the adversary).
@@ -45,7 +46,7 @@ weed_llm_benchmark/deploy/deploy_funnel.sh --dry-run    # list what would be cop
 ```
 
 **What it copies:**
-- *Package paths* go to the lab tree and to both cluster copies: the nested git copy `$CLUSTER_REPO/weed_llm_benchmark/`, and the outer copy `$CLUSTER_REPO/` that the INC job scripts import. The paths are:
+- *Package paths* go to the lab tree and to both cluster copies. They include the continuous loop's packages (`tools/inc2/`, `tools/collect/`, the stream-mode autopilot and their tests, listed in the script): the nested git copy `$CLUSTER_REPO/weed_llm_benchmark/`, and the outer copy `$CLUSTER_REPO/` that the INC job scripts import. The paths are:
   - `tools/funnel/`, `tools/inc_autopilot/`, `tools/inc/`, `tools/model_router.py`, `tools/cwd12_species.py`;
   - the policy table (`tools/brain/policy_actions.json`, `approvals.py`);
   - the job scripts;

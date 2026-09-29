@@ -1,0 +1,4606 @@
+{
+"calls": [
+{
+"data": null,
+"headers": {
+"Content-Length": "2"
+},
+"json": [],
+"method": "GET",
+"params": {
+"full": "true",
+"limit": "8",
+"search": "Palmer amaranth"
+},
+"status": 200,
+"url": "https://huggingface.co/api/datasets"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "2"
+},
+"json": [],
+"method": "GET",
+"params": {
+"full": "true",
+"limit": "8",
+"search": "Sicklepod"
+},
+"status": 200,
+"url": "https://huggingface.co/api/datasets"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "2"
+},
+"json": [],
+"method": "GET",
+"params": {
+"full": "true",
+"limit": "8",
+"search": "Purslane"
+},
+"status": 200,
+"url": "https://huggingface.co/api/datasets"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "2"
+},
+"json": [],
+"method": "GET",
+"params": {
+"full": "true",
+"limit": "8",
+"search": "Palmer pigweed"
+},
+"status": 200,
+"url": "https://huggingface.co/api/datasets"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "2"
+},
+"json": [],
+"method": "GET",
+"params": {
+"full": "true",
+"limit": "8",
+"search": "coffeeweed"
+},
+"status": 200,
+"url": "https://huggingface.co/api/datasets"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "2"
+},
+"json": [],
+"method": "GET",
+"params": {
+"full": "true",
+"limit": "8",
+"search": "common purslane"
+},
+"status": 200,
+"url": "https://huggingface.co/api/datasets"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "21981"
+},
+"json": {
+"records": [
+{
+"description": "This repository contains all the electropherograms (ABI format chromatogram file, ab1) obtained by Sanger sequencing carried out for the paper entitled \u201cRecent discovery of Amaranthus palmeri (Amaranthaceae) in Italy: characterization of ALS-resistant populations and sensitivity to alternative herbicides\u201d. Three A. palmeri (Palmer Amaranth) populations were found in soybean fields in Italy, were ALS-resistance was suspected. Bioassay test revealed that all the three populations were cross-resistant to thifensulfuron-methyl and imazamox, due to a point mutation at position 574 of ALS. DNA of 15",
+"id": "zjwvrbtbyt",
+"title": "Sanger sequences for \u201cRecent discovery of Amaranthus palmeri in Italy: characterization of ALS-resistant populations and sensitivity to alternative herbicides\u201d",
+"url": "https://data.mendeley.com/datasets/zjwvrbtbyt"
+},
+{
+"description": "This dataset contains annotated RGB images collected to develop and benchmark YOLO models for weed detection in commercial horseradish (Armoracia rusticana) production systems in Southern Illinois. The data support research on vision-based, real-time robotic weeding in a high-value specialty crop with limited herbicide options. This dataset is provided to accompany the manuscript submitted to Frontiers in Agronomy, titled \u2018Evaluation of YOLO-based Weed Detection Models on Commercial Horseradish Fields in Southern Illinois'.\n\nImages were captured during the 2024 growing season from two commerci",
+"id": "fcf7brsfm6",
+"title": "Horseradish and weed dataset from commercial fields in Southern Illinois",
+"url": "https://data.mendeley.com/datasets/fcf7brsfm6"
+},
+{
+"description": "This repository has been created as a partial fulfilment of the peer-review revision process of the paper \u201cA family affair: resistance mechanism and alternative control of three Amaranthus species resistant to acetolactate synthase inhibitors in Italy\u201d submitted to Pest Management Science. This repository contains all the electropherograms (ABI format chromatogram file, ab1) obtained by Sanger sequencing of Amaranthus spp plants survived to the field dose of thifensulfuron-methyl discussed in the paper named above (that was under revision at the time of the dataset creation). Three Amaranthus ",
+"id": "hxrvf9cpkx",
+"title": "Amaranthus tuberculatus, Amaranthus hybridus and Amaranthus retroflexus acetolactate synthase (ALS) gene, partial cds",
+"url": "https://data.mendeley.com/datasets/hxrvf9cpkx"
+},
+{
+"description": "List of PKL files for LC-MS/MS identification of Amaranthus seed proteins derived from 2-DE spots.",
+"id": "p3dhzyhvnk",
+"title": "List of PKL files for LC-MS/MS identification of Amaranthus seed proteins derived from 2-DE spots",
+"url": "https://data.mendeley.com/datasets/p3dhzyhvnk"
+},
+{
+"description": "This dataset is based on Amaranthus Dubius\u2019s Diseases. Three types of Disease have been found. Anthracnose,Leaf Blight and Shot Hole. 108 images of Anthracnose, 102 images of Leaf Blight , 124 images of Shot Hole and 128 images of fresh Amaranthus Dubius. Leaves have been collected from Gouronagar, Bagpara. Therefore, total 462 images.",
+"id": "kwyz4gby2k",
+"title": "An image dataset of Amaranthus Dubius leaf images",
+"url": "https://data.mendeley.com/datasets/kwyz4gby2k"
+},
+{
+"description": "This dataset supports the research article \"Evaluating Climate-Driven Shifts in the Suitable Habitat and Ecological Niche of Amaranthus spinosus\". It includes:\n1. Species distribution modeling results (biomod2 ensemble models) for Amaranthus spinosus in China under current and future climate scenarios (CMIP6 SSP1-2.6, SSP2-4.5, SSP3-7.0, SSP5-8.5 for 2050s and 2090s).\n2. Environmental predictor layers (climatic variables and Human Footprint Index).\n3. Occurrence data of Amaranthus spinosus in its native (tropical America) and invaded (China) ranges.\n4. R scripts for PCA-env niche analysis and ",
+"id": "ptt9g259fh",
+"title": "Evaluating Climate-Driven Shifts in the Suitable Habitat and Ecological Niche of Amaranthus spinosus",
+"url": "https://data.mendeley.com/datasets/ptt9g259fh"
+},
+{
+"description": "Data Description: Good and Bad Classification of Amaranthus Leaf (Amaranthus cruentus)\nThis project involves a dataset aimed at classifying Amaranthus Leaf (Amaranthus cruentus) into \"good\" and \"bad\" categories. The dataset comprises a total of 1000 samples, evenly divided into 500 good samples and 500 bad samples. The classification is based on specific criteria related to the health and quality of the leaves.\n\nDataset Overview\nTotal Samples: 1000\nGood Samples: 500\nBad Samples: 500\nData Attributes\nEach sample in the dataset consists of several attributes that provide detailed information abou",
+"id": "vzx64zbkny",
+"title": "Good and Bad classification of  Amaranthus Leaf Red (Amaranthus cruentus)    )",
+"url": "https://data.mendeley.com/datasets/vzx64zbkny"
+},
+{
+"description": "This repository contains a field-acquired RGB image dataset of five winter leafy vegetables cultivated in agricultural plots in Cumilla, Bangladesh, captured under natural conditions between November 2025 and January 2026. Images were collected using multiple smartphone devices (e.g., iPhone 15, Redmi Note 14 Pro, vivo Y50i) to introduce sensor variability. The dataset is designed for leafy vegetable image classification and includes natural variation in illumination, leaf pose/orientation, growth stage, and background.\n\nClasses (5)\n1) Purslane (Portulaca oleracea) \u2013 231 images\n2) Radish Leave",
+"id": "vzt878hwdn",
+"title": "AgroWinterLeaf-BD: A curated field image dataset of five winter leafy vegetables from Bangladesh",
+"url": "https://data.mendeley.com/datasets/vzt878hwdn"
+},
+{
+"description": "",
+"id": "cvh7574hwj",
+"title": "Volatile-mediated allelopathy: Perovskia atriplicifolia Benth. volatile organic compounds trigger phenylpropanoid\u2013lignin remodelling in Amaranthus retroflexus L.",
+"url": "https://data.mendeley.com/datasets/cvh7574hwj"
+},
+{
+"description": "This dataset contains georeferenced locations of individual Amaranthus retroflexus L. plants mapped across two vegetable field trials at the North Willamette Research and Extension Center, Aurora, Oregon, in 2025, together with the plot boundaries and the trained instance-segmentation models used to generate them.\n\nThe data were collected to address whether conventional quadrat sampling can adequately characterize weed density and spatial distribution for evaluating site-specific weed management. Because the benefit of site-specific control depends on how weeds are distributed within a field, ",
+"id": "wbj8fm8p8n",
+"title": "UAV-derived Amaranthus retroflexus plant locations and plot boundaries from two site-specific weed management trials, Oregon, 2025",
+"url": "https://data.mendeley.com/datasets/wbj8fm8p8n"
+}
+]
+},
+"method": "GET",
+"params": {
+"query": "\"Amaranthus palmeri\"",
+"size": "8",
+"type": "DATASET"
+},
+"status": 200,
+"url": "https://data.mendeley.com/api/research-data/search"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "19265"
+},
+"json": {
+"records": [
+{
+"description": "Zanthoxylum asiaticum, formerly recognized as Toddalia asiatica along with its three varieties such as T. asiatica var. floribunda, T. asiatica var. gracilis, and T. asiatica var. obtusifolia, underwent a significant taxonomic revision in a recent phylogenetic investigation of Rutaceae. The findings of this study lead to the proposal of new combinations for Z. asiaticum var. floribunda, Z. asiaticum var. gracilis and Z. asiaticum var. obtusifolia based on the detailed morphological and anatomical studies. A detailed description, notes, photo plates and comparison table are provided for better ",
+"id": "phsmy7kpy9",
+"title": "New status and combinations in Zanthoxylum asiaticum (Rutaceae) ",
+"url": "https://data.mendeley.com/datasets/phsmy7kpy9"
+},
+{
+"description": "In the present study we investigated the development of multisensory integration in individuals who suffered from congenital bilateral cataract and got surgically treated for sight restoration several years from birth. We found that multisensory integration can still develop with time following surgery after several years of early-onset visual deprivation. \nExperiment 1 assessed cataract-treated individuals' reliance on their restored visual abilities when estimating the size of an object simultaneously explored by touch. Participants explored a standard object visually, haptically or visual-h",
+"id": "swrwmfy6tg",
+"title": "Development of multisensory integration following prolonged early-onset visual deprivation. Senna et al. ",
+"url": "https://data.mendeley.com/datasets/swrwmfy6tg"
+},
+{
+"description": "In the present study, we developed and applied a multisensory training procedure to improve space representation and mobility in children and adolescents who have been surgically treated for congenital cataracts several years after birth. \nThe training associated augmented audio-visual feedback with body movements. Ethiopian cataract-treated participants improved their space representation and their ability to navigate the environment after only one week of training. The improvement was comparable to that of a group of blind children, who underwent a training procedure that coupled their movem",
+"id": "mf48nrdf55",
+"title": "     Multisensory training improves the development of spatial cognition after sight restoration from congenital cataracts",
+"url": "https://data.mendeley.com/datasets/mf48nrdf55"
+},
+{
+"description": "We investigated whether early visual and visuomotor experience is essential for developing the ability to recalibrate the sensorimotor system. We tested young individuals who suffered from congenital visual deprivation due to bilateral cataracts before undergoing sight restoration surgery years later. We altered participants\u2019 visuomotor mapping using prism goggles shifting their visual field laterally, and asked participants to perform a pointing task. We compared their recalibration performance to such distortion to that of two sighted controls: one matched to cataract-treated participants fo",
+"id": "ksdwxdwtxg",
+"title": "Recalibrating vision-for-action requires years after sight restoration from congenital blindness",
+"url": "https://data.mendeley.com/datasets/ksdwxdwtxg"
+},
+{
+"description": "Supplemental materials for the manuscript titled, \"Dose optimization of deuruxolitinib in adults with alopecia areata: A phase 2 randomized trial,\" by Brett King, Steven Kempers, Natasha A. Mesinkovska, Paradi Mirmirani, Amy McMichael, Julian Mackay-Wiggan, Maryanne M. Senna, Janet L. Roberts, Arash Mostaghimi, Abel Jarell, Bridget Daly, Colleen Hamilton, and James Cassella in the Journal of the American Academy of Dermatology.",
+"id": "7w7j84x77s",
+"title": "Dose optimization of deuruxolitinib in adults with alopecia areata: A phase 2 randomized trial",
+"url": "https://data.mendeley.com/datasets/7w7j84x77s"
+},
+{
+"description": "This dataset contains functional trait measurements of three pioneer tree species in Costa Rica (Cecropia peltata, C. obtusifolia, C. insignis). Traits include stem allometry (height, diameter, slenderness), reproductive status, crown illumination index (CII), and leaf traits (specific leaf area, leaf thickness, leaf dry matter content, leaf area, number of leaves). Data were collected across ontogenetic stages (non-reproductive vs. reproductive individuals) and light environments to assess how size and canopy exposure shape trait variation. The dataset supports analyses of trait scaling relat",
+"id": "ksj8gyymj3",
+"title": "Ontogenetic Shifts and Light-Driven Plasticity in Functional Traits of Three Cecropia Species",
+"url": "https://data.mendeley.com/datasets/ksj8gyymj3"
+},
+{
+"description": "In Benin, two medicinal plants are commonly used by rural populations to treat skin infections. Very few investigations are carried out on them against skin infections, despite their increased use. The present study is carried out on these two anti-infectious plants, namely: Senna alata (L.) Roxb. (Leguminosae-Caesalpinioideae) and Lantana cumara L. (Verbenaceae). The objective of this study is to characterize the groups of chemicals contained in the two herbal drugs. The phytochemical tests carried out on the two (02) plant extracts revealed that the different drugs contain Anthocyanins, Quin",
+"id": "bt4mp7jvx3",
+"title": "Phytochemical study of extracts from the leaves of Senna alata (L.) Roxb. (Leguminosae-Caesalpinioideae) and Lantana cumara L. (Verbenaceae), two main plants traditionally used to treat skin infections in Benin | IJB 2021",
+"url": "https://data.mendeley.com/datasets/bt4mp7jvx3"
+},
+{
+"description": "Our hypotesis is based in compared the surfaces of pMHCs made with immunogenic epitopes and self peptides to find similaryties between them.\nThe images from pMHCs files was processed with Python scripts to get the median and the variation of RGB channels of the regions of interests. ",
+"id": "yvbwg5sjg2",
+"title": "pMHCs",
+"url": "https://data.mendeley.com/datasets/yvbwg5sjg2"
+},
+{
+"description": "In the current study, 11 commercially available food packaging and 2 drug packages were analysed for the presence of 4 heavy metals namely vanadium, arsenic, mercury and cadmium. Packaging material forms the mainstay of modern food industry. Hence, it is important to study their interference with food/drug present in the packaging material. As research has shown leaching of toxins from packaging material, monitoring the heavy metal leaching is essential to prevent harmful effects to the human body. In summary, a wide variety of food and drug packaging materials from the Indian market were test",
+"id": "gnwy7nzpnt",
+"title": "ICP-OES data  for \"Assessment of toxins in food and drug packaging materials\"",
+"url": "https://data.mendeley.com/datasets/gnwy7nzpnt"
+},
+{
+"description": "SUPPLEMENTAL APPENDIX 1A-1C for:\nJanus Kinase Inhibitor Use in Adults Aged 65 Years and Older:A Clinical Review Across Atopic Dermatitis, Alopecia Areata, and Psoriasis ",
+"id": "5p4ygjwnd6",
+"title": "Janus Kinase Inhibitor Use in Adults Aged 65 Years and Older: A Clinical Review Across Atopic Dermatitis, Alopecia Areata, and Psoriasis",
+"url": "https://data.mendeley.com/datasets/5p4ygjwnd6"
+}
+]
+},
+"method": "GET",
+"params": {
+"query": "\"Senna obtusifolia\"",
+"size": "8",
+"type": "DATASET"
+},
+"status": 200,
+"url": "https://data.mendeley.com/api/research-data/search"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "13979"
+},
+"json": {
+"records": [
+{
+"description": "Mass spectrometry data of Portulaca oleracea",
+"id": "sckbkd7m9c",
+"title": "13C SPATIAL FLUX-4",
+"url": "https://data.mendeley.com/datasets/sckbkd7m9c"
+},
+{
+"description": "Data from the manuscript Impact of the application of selenium nanoparticles on the physicochemical characteristics and antioxidant system in purslane (Portulaca oleracea L.) are shown.",
+"id": "gf9xctvjrf",
+"title": "Application of selenium nanoparticles in Portulaca oleracea L",
+"url": "https://data.mendeley.com/datasets/gf9xctvjrf"
+},
+{
+"description": "Transcriptomic analysis reveals antibacterial mechanism of probiotic fermented Portulaca oleracea L. against Cronobacter sakazakii and its application in reconstituted powdered infant formula",
+"id": "mcdtk882vw",
+"title": "Supplementary data-Transcriptomic analysis reveals antibacterial mechanism of probiotic fermented Portulaca oleracea L. against Cronobacter sakazakii and its application in reconstituted powdered infant formula",
+"url": "https://data.mendeley.com/datasets/mcdtk882vw"
+},
+{
+"description": "This repository contains a field-acquired RGB image dataset of five winter leafy vegetables cultivated in agricultural plots in Cumilla, Bangladesh, captured under natural conditions between November 2025 and January 2026. Images were collected using multiple smartphone devices (e.g., iPhone 15, Redmi Note 14 Pro, vivo Y50i) to introduce sensor variability. The dataset is designed for leafy vegetable image classification and includes natural variation in illumination, leaf pose/orientation, growth stage, and background.\n\nClasses (5)\n1) Purslane (Portulaca oleracea) \u2013 231 images\n2) Radish Leave",
+"id": "vzt878hwdn",
+"title": "AgroWinterLeaf-BD: A curated field image dataset of five winter leafy vegetables from Bangladesh",
+"url": "https://data.mendeley.com/datasets/vzt878hwdn"
+},
+{
+"description": "The dataset records the effects of Eucalyptus tereticornis leaf extracts on black turtle bean (Phaseolus vulgaris L., NABE\u202f2) and common purslane (Portulaca oleracea L.) under five concentration treatments (0\u2013100% w/v) with three replicates. Over 14 days, germination, seedling growth, biomass, stem girth, and leaf count were measured. Analyses using ANOVA, Tukey\u2019s HSD, and linear mixed models showed concentration\u2011dependent inhibition (p < 0.01). Bean germination fell from 96.7% to 40.0%, with biomass reduced by ~50%. Purslane was more sensitive, with germination dropping from 90.0% to 13.3%, h",
+"id": "7znrj57p3t",
+"title": "Comparative allelopathic effects of Eucalyptus tereticornis leaf extracts on germination and seedling growth of black turtle bean (Phaseolus vulgaris) and common purslane (Portulaca oleracea)",
+"url": "https://data.mendeley.com/datasets/7znrj57p3t"
+},
+{
+"description": "Repository of data from EFFECT OF INJECTABLE TREATMENT WITH Euterpe oleracea ON THE ACHILLES TENDON REPAIR PROCESS IN RATS",
+"id": "h8thw6n4b9",
+"title": "EFFECT OF INJECTABLE TREATMENT WITH Euterpe oleracea ON THE ACHILLES TENDON REPAIR PROCESS IN RATS",
+"url": "https://data.mendeley.com/datasets/h8thw6n4b9"
+},
+{
+"description": "This dataset contains organelle genome sequences of  globally collected  Brassica accesions, in which the chloroplast genomes consists of  1,327 natural and 31 synthetic B. napus, 90 B.rapa and 107 B. oleracea accessions, and the mitochondrial genomes consists of  1,457 natural and 31 synthetic B. napus, 183 B.rapa and 104 B. oleracea accessions.  The genome sequencing data of natural rapeseed accessions were obtained from the NCBI database under SRP155312, PRJNA430009 and PRJNA358784. The raw sequnceing data of 20 synthetic B. napus accessions can be found in European Nucleotide Archive (http",
+"id": "9g7kxvgnyr",
+"title": "The chloroplast and mitochondrial genome sequences of worldwide collection of B. napus, B. rapa and B. oleracea accessions",
+"url": "https://data.mendeley.com/datasets/9g7kxvgnyr"
+},
+{
+"description": "Cerebral malaria (CM) is one of the most severe neurological complications caused by Plasmodium falciparum, whose pathogenesis is complex and still little elucidated, being associated with cognitive behavioral and motor alterations. In attempt to prevent the development of this condition, experimental models have been used to test new therapeutic agents, such as natural products with antioxidant properties. In this context, it is relevant to evaluate the protective effect of A\u00e7a\u00ed berry (Euterpe oleracea) during the evolution of experimental cerebral malaria (ECM) induced in murine model by the",
+"id": "hc785xkvfn",
+"title": "Euterpe oleracea and cerebral malaria",
+"url": "https://data.mendeley.com/datasets/hc785xkvfn"
+},
+{
+"description": "Brassica oleracea, commonly known as kohlrabi, is a nutritious cruciferous vegetable widely consumed in South Asia. It is valued for its low calorie content, high moisture level, and crisp texture, making it suitable for healthy and diabetic-friendly diets. Kohlrabi is a good source of dietary fiber, vitamin C, vitamin B6, and minerals such as potassium, calcium, and magnesium, which support digestion, immunity, bone health, and cardiovascular function.\nThe standard shelf life of Brassica oleracea (kohlrabi) depends mainly on storage conditions. At ambient (room) temperature (25\u201330 \u00b0C), kohlra",
+"id": "3t3x2p5n5j",
+"title": "Good and Bad classification of Brassica oleracea ",
+"url": "https://data.mendeley.com/datasets/3t3x2p5n5j"
+},
+{
+"description": "Supplementary material for the Microchemical Journal, title: A rapid LC-MS/MS method for lutein quantification in spinach (Spinacia oleracea) \n\nMasashi Miura, Miho Sakai, Mamiko Nogami, Miwa Sato, Takeshi Yatsushiro\n\nAppendix A, which includes Fig. A.1 and A.2 and Tables A.1 to A.5.",
+"id": "2j77n3ynnc",
+"title": "Data for: A rapid LC-MS/MS method for lutein quantification in spinach (Spinacia oleracea)  ",
+"url": "https://data.mendeley.com/datasets/2j77n3ynnc"
+}
+]
+},
+"method": "GET",
+"params": {
+"query": "\"Portulaca oleracea\"",
+"size": "8",
+"type": "DATASET"
+},
+"status": 200,
+"url": "https://data.mendeley.com/api/research-data/search"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "16292"
+},
+"json": {
+"records": [
+{
+"description": "This repository contains all the electropherograms (ABI format chromatogram file, ab1) obtained by Sanger sequencing carried out for the paper entitled \u201cRecent discovery of Amaranthus palmeri (Amaranthaceae) in Italy: characterization of ALS-resistant populations and sensitivity to alternative herbicides\u201d. Three A. palmeri (Palmer Amaranth) populations were found in soybean fields in Italy, were ALS-resistance was suspected. Bioassay test revealed that all the three populations were cross-resistant to thifensulfuron-methyl and imazamox, due to a point mutation at position 574 of ALS. DNA of 15",
+"id": "zjwvrbtbyt",
+"title": "Sanger sequences for \u201cRecent discovery of Amaranthus palmeri in Italy: characterization of ALS-resistant populations and sensitivity to alternative herbicides\u201d",
+"url": "https://data.mendeley.com/datasets/zjwvrbtbyt"
+},
+{
+"description": "This dataset contains annotated RGB images collected to develop and benchmark YOLO models for weed detection in commercial horseradish (Armoracia rusticana) production systems in Southern Illinois. The data support research on vision-based, real-time robotic weeding in a high-value specialty crop with limited herbicide options. This dataset is provided to accompany the manuscript submitted to Frontiers in Agronomy, titled \u2018Evaluation of YOLO-based Weed Detection Models on Commercial Horseradish Fields in Southern Illinois'.\n\nImages were captured during the 2024 growing season from two commerci",
+"id": "fcf7brsfm6",
+"title": "Horseradish and weed dataset from commercial fields in Southern Illinois",
+"url": "https://data.mendeley.com/datasets/fcf7brsfm6"
+},
+{
+"description": "Amaranth and quinoa seed proteins were extracted by a polarity-based method. Hydrophilic and hydrophobic proteins were analysed by 2-DE, and the representative spots for each species were identified by LC-MS/MS. AH1, hydrophilic amaranth proteins; AH0, hydrophobic amaranth proteins; CH1, hydrophilic quinoa proteins; CH0, hydrophobic quinoa proteins. ",
+"id": "6g9zhgknn2",
+"title": "List of PKL and mzML files generated by LC-MS/MS for identification of amaranth and quinoa seed storage proteins",
+"url": "https://data.mendeley.com/datasets/6g9zhgknn2"
+},
+{
+"description": "The dataset contains leaf images from 6 different winter vegetable species commonly cultivated and consumed in Bangladesh. These include spinach, red amaranth, cabbage, mustard greens, lettuce, radish leaves. Total image number is 606.",
+"id": "9c7crxrvmf",
+"title": "An image dataset for classification of vegetable",
+"url": "https://data.mendeley.com/datasets/9c7crxrvmf"
+},
+{
+"description": "Calcimimetic network meta-analysis open dataset.",
+"id": "w427ks4wvy",
+"title": "Calcimimetic network meta-analysis open dataset",
+"url": "https://data.mendeley.com/datasets/w427ks4wvy"
+},
+{
+"description": "These folders contain the code, data, and output to reproduce the exhibits in \"Implicit Extrapolation and the Beliefs Channel of Investment Demand\" by Haoyang Liu and Christopher Palmer, published in the Journal of Financial Economics.\n\nCorresponding author: Haoyang Liu, Federal Reserve Bank of Dallas, liuhy@berkeley.edu",
+"id": "w7bgjcxbxb",
+"title": "Implicit Extrapolation and the Beliefs Channel of Investment Demand (FINEC-D-23-00484)",
+"url": "https://data.mendeley.com/datasets/w7bgjcxbxb"
+},
+{
+"description": "Dataset to perform the meta-analysis of Sendra-P\u00e9rez, C., Sanchez-Jimenez, J. L., Marzano-Felisatti, J. M., Encarnaci\u00f3n-Mart\u00ednez, A., Salvador-Palmer, R., & Priego-Quesada, J. I. (2023). Reliability of threshold determination using portable muscle oxygenation monitors during exercise testing: a systematic review and meta-analysis. Scientific Reports, 13(1). https://doi.org/10.1038/s41598-023-39651-z ",
+"id": "s9v495y83j",
+"title": "Dataset of \"Reliability of threshold determination using portable muscle oxygenation monitors during exercise testing: a systematic review and meta-analysis.\"",
+"url": "https://data.mendeley.com/datasets/s9v495y83j"
+},
+{
+"description": "This Dataset focuses on Leaf Disease Detection to identify and classify diseases affecting \nplant leaves. The goal is to develop a method for early detection, improving agricultural \npractices, reducing pesticide use, and increasing crop yields. \nThe study includes four plant species: \n                 \u25cf Beans (2032)                \n                 \u25cf Corn ( 706)\n                 \u25cf Red Amaranth (401)\nLocation: Leaf images, both healthy and diseased, were collected from different sources \nLocated in Bangladesh. \n\nDataset Amount: \n1.Original Data: 3139\n\nThe dataset consists of visual images aime",
+"id": "462s4m8w8k",
+"title": "Bangladeshi Leaf Disease Detection Dataset",
+"url": "https://data.mendeley.com/datasets/462s4m8w8k"
+},
+{
+"description": "Input data used to benchmark the PRFFECT software as described in the manuscript, \"PRFFECT: A Versatile Tool for Spectroscopists\" Benjamin R. Smith, Matthew J. Baker, David S. Palmer.  The column headers are explained in the Supporting Information for the manuscript.   The data is in comma-separated-variable format, which can be opened by most text editors and spreadsheet programs.\n",
+"id": "t42j85xn68",
+"title": "Data for: PRFFECT: A Versatile Tool for Spectroscopists",
+"url": "https://data.mendeley.com/datasets/t42j85xn68"
+},
+{
+"description": "We present a regional tree-ring chronology from moisture-sensitive Juniperus seravschanica from the Kuramin Mountains (Tajikistan) in western Central Asia, which is used to reveal past summer drought variability from CE 1650 to 2015. The chronology accounts for 40.5% of the variance of the June\u2013July self-calibrating Palmer Drought Severity Index (scPDSI) during the instrumental period (1901 to 2012). ",
+"id": "v5f4g7n53z",
+"title": "Juniper tree-ring data from the Kuramin Mountains (Republic of Tajikistan), reveals changing summer drought signals in western Central Asia",
+"url": "https://data.mendeley.com/datasets/v5f4g7n53z"
+}
+]
+},
+"method": "GET",
+"params": {
+"query": "\"Palmer amaranth\"",
+"size": "8",
+"type": "DATASET"
+},
+"status": 200,
+"url": "https://data.mendeley.com/api/research-data/search"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "268"
+},
+"json": {
+"records": []
+},
+"method": "GET",
+"params": {
+"query": "\"Sicklepod\"",
+"size": "8",
+"type": "DATASET"
+},
+"status": 200,
+"url": "https://data.mendeley.com/api/research-data/search"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "6752"
+},
+"json": {
+"records": [
+{
+"description": "Supplementary files: Purslane supplementation improved antioxidant capacity and milk quality potentially through rumen microbiota in dairy goats",
+"id": "9m5w5thkp9",
+"title": "Purslane supplementation improved antioxidant capacity and milk quality potentially through rumen microbiota in dairy goats",
+"url": "https://data.mendeley.com/datasets/9m5w5thkp9"
+},
+{
+"description": "Data from the manuscript Impact of the application of selenium nanoparticles on the physicochemical characteristics and antioxidant system in purslane (Portulaca oleracea L.) are shown.",
+"id": "gf9xctvjrf",
+"title": "Application of selenium nanoparticles in Portulaca oleracea L",
+"url": "https://data.mendeley.com/datasets/gf9xctvjrf"
+},
+{
+"description": "Shape features extracted from ImageJ particle analysis based on four weed species (Common Lambsquarters, Common Purslane, Horseweed, and Redroot Pigweed) images that were used in the hand crafted image processing and machine learning models/methodology development to identify the weeds.  ",
+"id": "787mkh2kjc",
+"title": "Machine Learning and Handcrafted Image Processing Weed Classification Results Data",
+"url": "https://data.mendeley.com/datasets/787mkh2kjc"
+},
+{
+"description": "The dataset records the effects of Eucalyptus tereticornis leaf extracts on black turtle bean (Phaseolus vulgaris L., NABE\u202f2) and common purslane (Portulaca oleracea L.) under five concentration treatments (0\u2013100% w/v) with three replicates. Over 14 days, germination, seedling growth, biomass, stem girth, and leaf count were measured. Analyses using ANOVA, Tukey\u2019s HSD, and linear mixed models showed concentration\u2011dependent inhibition (p < 0.01). Bean germination fell from 96.7% to 40.0%, with biomass reduced by ~50%. Purslane was more sensitive, with germination dropping from 90.0% to 13.3%, h",
+"id": "7znrj57p3t",
+"title": "Comparative allelopathic effects of Eucalyptus tereticornis leaf extracts on germination and seedling growth of black turtle bean (Phaseolus vulgaris) and common purslane (Portulaca oleracea)",
+"url": "https://data.mendeley.com/datasets/7znrj57p3t"
+},
+{
+"description": "This repository contains a field-acquired RGB image dataset of five winter leafy vegetables cultivated in agricultural plots in Cumilla, Bangladesh, captured under natural conditions between November 2025 and January 2026. Images were collected using multiple smartphone devices (e.g., iPhone 15, Redmi Note 14 Pro, vivo Y50i) to introduce sensor variability. The dataset is designed for leafy vegetable image classification and includes natural variation in illumination, leaf pose/orientation, growth stage, and background.\n\nClasses (5)\n1) Purslane (Portulaca oleracea) \u2013 231 images\n2) Radish Leave",
+"id": "vzt878hwdn",
+"title": "AgroWinterLeaf-BD: A curated field image dataset of five winter leafy vegetables from Bangladesh",
+"url": "https://data.mendeley.com/datasets/vzt878hwdn"
+}
+]
+},
+"method": "GET",
+"params": {
+"query": "\"Purslane\"",
+"size": "8",
+"type": "DATASET"
+},
+"status": 200,
+"url": "https://data.mendeley.com/api/research-data/search"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "7"
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"text": "Success",
+"url": "https://weed-ai.sydney.edu.au/api/set_csrf/"
+},
+{
+"data": "{}\n{\"query\": {\"match_phrase\": {\"annotations.category.name\": \"amaranthus palmeri\"}}, \"size\": 0, \"aggs\": {\"u\": {\"terms\": {\"field\": \"upload_id.keyword\", \"size\": 8}}}}\n",
+"headers": {
+"Content-Length": "606"
+},
+"json": {
+"responses": [
+{
+"_shards": {
+"failed": 0,
+"skipped": 0,
+"successful": 1,
+"total": 1
+},
+"aggregations": {
+"u": {
+"buckets": [
+{
+"doc_count": 993,
+"key": "0935d5a0-1270-4e6b-9618-2224240b5a03"
+},
+{
+"doc_count": 614,
+"key": "5c78d067-8750-4803-9cbe-57df8fae55e4"
+},
+{
+"doc_count": 305,
+"key": "2c14915b-0827-4b65-9908-d2a6df0d48f3"
+},
+{
+"doc_count": 260,
+"key": "84fd3c3f-dd3e-400b-ac5a-d18ca712c3d0"
+},
+{
+"doc_count": 26,
+"key": "7e03cd97-f462-439d-b4c7-b6289edcc21b"
+}
+],
+"doc_count_error_upper_bound": 0,
+"sum_other_doc_count": 0
+}
+},
+"hits": {
+"hits": [],
+"max_score": null,
+"total": {
+"relation": "eq",
+"value": 2198
+}
+},
+"status": 200,
+"timed_out": false,
+"took": 1
+}
+],
+"took": 1
+},
+"method": "POST",
+"params": {},
+"status": 200,
+"url": "https://weed-ai.sydney.edu.au/elasticsearch/weedid/_msearch"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "7"
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"text": "Success",
+"url": "https://weed-ai.sydney.edu.au/api/set_csrf/"
+},
+{
+"data": "{}\n{\"query\": {\"match_phrase\": {\"annotations.category.name\": \"senna obtusifolia\"}}, \"size\": 0, \"aggs\": {\"u\": {\"terms\": {\"field\": \"upload_id.keyword\", \"size\": 8}}}}\n",
+"headers": {
+"Content-Length": "354"
+},
+"json": {
+"responses": [
+{
+"_shards": {
+"failed": 0,
+"skipped": 0,
+"successful": 1,
+"total": 1
+},
+"aggregations": {
+"u": {
+"buckets": [
+{
+"doc_count": 198,
+"key": "2c14915b-0827-4b65-9908-d2a6df0d48f3"
+}
+],
+"doc_count_error_upper_bound": 0,
+"sum_other_doc_count": 0
+}
+},
+"hits": {
+"hits": [],
+"max_score": null,
+"total": {
+"relation": "eq",
+"value": 198
+}
+},
+"status": 200,
+"timed_out": false,
+"took": 1
+}
+],
+"took": 1
+},
+"method": "POST",
+"params": {},
+"status": 200,
+"url": "https://weed-ai.sydney.edu.au/elasticsearch/weedid/_msearch"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "7"
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"text": "Success",
+"url": "https://weed-ai.sydney.edu.au/api/set_csrf/"
+},
+{
+"data": "{}\n{\"query\": {\"match_phrase\": {\"annotations.category.name\": \"portulaca oleracea\"}}, \"size\": 0, \"aggs\": {\"u\": {\"terms\": {\"field\": \"upload_id.keyword\", \"size\": 8}}}}\n",
+"headers": {
+"Content-Length": "354"
+},
+"json": {
+"responses": [
+{
+"_shards": {
+"failed": 0,
+"skipped": 0,
+"successful": 1,
+"total": 1
+},
+"aggregations": {
+"u": {
+"buckets": [
+{
+"doc_count": 652,
+"key": "2c14915b-0827-4b65-9908-d2a6df0d48f3"
+}
+],
+"doc_count_error_upper_bound": 0,
+"sum_other_doc_count": 0
+}
+},
+"hits": {
+"hits": [],
+"max_score": null,
+"total": {
+"relation": "eq",
+"value": 652
+}
+},
+"status": 200,
+"timed_out": false,
+"took": 1
+}
+],
+"took": 1
+},
+"method": "POST",
+"params": {},
+"status": 200,
+"url": "https://weed-ai.sydney.edu.au/elasticsearch/weedid/_msearch"
+},
+{
+"data": null,
+"headers": {
+"content-length": "41041"
+},
+"json": {
+"hits": {
+"hits": [
+{
+"files": [
+{
+"checksum": "md5:acd73ce57f0991952dc3e44e03197ce9",
+"key": "Dataset_TrebolAizpurua_2025.zip",
+"links": {
+"self": "https://zenodo.org/api/records/16092346/files/Dataset_TrebolAizpurua_2025.zip/content"
+},
+"size": 14573
+}
+],
+"id": 16092346,
+"links": {
+"self_html": "https://zenodo.org/records/16092346"
+},
+"metadata": {
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>Trebol-Aizpurua, E.; Eceiza, M.V.; Jimenez-Martinez, C.; Mar&iacute;, A.I.; Royuela, M.; Zabalza, A.; Gil-Monreal, M. Resistance to Amino Acid Biosynthesis Inhibiting-Herbicides in Amaranthus palmeri Populations from Aragon (Spain). Plants 2025, 14, 1505.&nbsp;</p>",
+"keywords": [
+"target-site",
+"nicosulfuron",
+"imazamox",
+"glyphosate",
+"ALS mutation",
+"EPSPS gene amplification"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Dataset_TrebolAizpurua_2025"
+},
+"revision": 6
+},
+{
+"files": [
+{
+"checksum": "md5:2f72cd3395fd6b7c487ffa9a42ba130f",
+"key": "Dataset_BarcoAntonanzas_2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/15875029/files/Dataset_BarcoAntonanzas_2022.zip/content"
+},
+"size": 21656
+}
+],
+"id": 15875029,
+"links": {
+"self_html": "https://zenodo.org/records/15875029"
+},
+"metadata": {
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>Mar&iacute;a Barco-Anto&ntilde;anzas, Miriam Gil-Monreal, Mikel V. Eceiza, Mercedes Royuela, Ana Zabalza, Primary metabolism in an Amaranthus palmeri population with multiple resistance to glyphosate and pyrithiobac herbicides, Plant Science, Volume 318, 2022, 111212,</p>",
+"keywords": [
+"glyphosate",
+"acetolactate synthase",
+"palmer amaranth",
+"5-enolpyruvylshikimate-3-phosphate synthase",
+"target site resistance"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Daset_BarcoAnto\u00f1anzas2022"
+},
+"revision": 10
+},
+{
+"files": [
+{
+"checksum": "md5:64363fb49b8a5282efe4e09df2e06ef5",
+"key": "Dataset_Eceiza_2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/16090067/files/Dataset_Eceiza_2022.zip/content"
+},
+"size": 4440896
+}
+],
+"id": 16090067,
+"links": {
+"self_html": "https://zenodo.org/records/16090067"
+},
+"metadata": {
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>&nbsp;Mikel Vicente Eceiza, Miriam Gil-Monreal, Mar&iacute;a Barco-Anto&ntilde;anzas, Ana Zabalza, Mercedes Royuela,<br>The moderate oxidative stress induced by glyphosate is not detected in Amaranthus palmeri plants overexpressing EPSPS,<br>Journal of Plant Physiology, Volume 274, 2022,153720,<br>https://doi.org/10.1016/j.jplph.2022.153720--</p>",
+"keywords": [
+"oxidative stress",
+"glyphosate",
+"herbicide mode of action"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Dataset_Eceiza_2022"
+},
+"revision": 8
+},
+{
+"files": [
+{
+"checksum": "md5:8553dd19fa2c9f9e09149fe41231c2a5",
+"key": "Dataset_Eceiza_2023.zip",
+"links": {
+"self": "https://zenodo.org/api/records/16090529/files/Dataset_Eceiza_2023.zip/content"
+},
+"size": 779767
+}
+],
+"id": 16090529,
+"links": {
+"self_html": "https://zenodo.org/records/16090529"
+},
+"metadata": {
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>&nbsp;Eceiza MV, Barco-Anto&ntilde;anzas M,Gil-Monreal M, Huybrechts M, Zabalza A, Cuypers A and Royuela M (2023) Role of oxidative<br>stress in the physiology of sensitive and resistant Amaranthus palmeri populations treated with herbicides inhibiting acetolactate synthase. Front. Plant Sci. 13:1040456.<br>doi: 10.3389/fpls.2022.1040456---</p>",
+"keywords": [
+"oxidative stress",
+"nicosulfuron",
+"herbicide mode of action",
+"acetolactato shyntase",
+"amaranthus palmeri"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Dataset_Eceiza_2023"
+},
+"revision": 8
+},
+{
+"files": [
+{
+"checksum": "md5:e8584440a568bc3e7acf3056c41f4ca9",
+"key": "Dataset_ZuletGonzalez_2023.zip",
+"links": {
+"self": "https://zenodo.org/api/records/16091477/files/Dataset_ZuletGonzalez_2023.zip/content"
+},
+"size": 136493
+}
+],
+"id": 16091477,
+"links": {
+"self_html": "https://zenodo.org/records/16091477"
+},
+"metadata": {
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>Zulet-Gonzalez, A.; Gorzolka, K.; D&ouml;ll, S.; Gil-Monreal, M.; Royuela, M.; Zabalza, A. Unravelling the Phytotoxic Effects of Glyphosate on Sensitive and Resistant Amaranthus palmeri Populations by GC&ndash;MS and LC&ndash;MS Metabolic Profiling. Plants 2023, 12, 1345.&nbsp;<br>https://doi.org/10.3390/plants12061345<br>---</p>",
+"keywords": [
+"primary metabolism",
+"phenylpropanoids",
+"flavonoids",
+"mode of action",
+"EPSPS",
+"non-targeted metabolomics",
+"signalling molecules"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Dataset_ZuletGonzalez_2023"
+},
+"revision": 6
+},
+{
+"files": [
+{
+"checksum": "md5:f8f9a50dbce2637f48584c02e84a5cf5",
+"key": "Dataset_BarcoAntonanzas_2023.zip",
+"links": {
+"self": "https://zenodo.org/api/records/16083355/files/Dataset_BarcoAntonanzas_2023.zip/content"
+},
+"size": 14465
+}
+],
+"id": 16083355,
+"links": {
+"self_html": "https://zenodo.org/records/16083355"
+},
+"metadata": {
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>&nbsp;Barco-Anto&ntilde;anzas, M., Font-Farre, M., Eceiza, M.V., Gil-Monreal, M., van der Hoorn, R.A.L., Royuela, M. et al. (2023) Cysteine proteases are activated in sensitive Amaranthus palmeri populations upon treatment with herbicides inhibiting amino acid biosynthesis. Physiologia Plantarum, 175(5), e13993. Available from: https://doi.org/10.1111/ppl.13993---</p>",
+"keywords": [
+"amaranthus palmeri",
+"cysteine proteases",
+"glyphosate",
+"acetolactate synthase"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Dataset_BarcoAnto\u00f1anzas_2023"
+},
+"revision": 6
+},
+{
+"files": [
+{
+"checksum": "md5:73a210542730c5b68b64fee1c84f7eef",
+"key": "resistant_Weeds.zip",
+"links": {
+"self": "https://zenodo.org/api/records/7512489/files/resistant_Weeds.zip/content"
+},
+"size": 10752554438
+}
+],
+"id": 7512489,
+"links": {
+"self_html": "https://zenodo.org/records/7512489"
+},
+"metadata": {
+"description": "<p>This dataset is conformed by glyphosate resistant weeds in Zero Tillage agriculture system.</p>\n\n<p>(a) Echinochloa crus galli L. cover ground-1, (cg); labe: ECHCGcg1</p>\n\n<p>(b) Echinochloa crus galli L., cg2;&nbsp;&nbsp;ECHCGcg2</p>\n\n<p>(c) Eleusine indica L.; ELEIN</p>\n\n<p>(d) Amaranthus Palmeri L.; AMAQU</p>\n\n<p>(e) Cyperus rotundus L. (non-resistant weed); CYPRO</p>\n\n<p>(f) Parietaria debilis L., cg3;&nbsp;PAIDEcg3</p>\n\n<p>(g) Parietaria debilis L.: cg4; PAIDEcg4</p>\n\n<p>(h) Conyza sumatrensis L., cg5; ERISUcg5</p>\n\n<p>(i) Conyza sumatrensis L.; cg6&nbsp; ERISUcg6</p>\n\n<p>&nbsp;</p>\n\n<p>Funding by&nbsp; National Technological University, Argentina&nbsp;<strong>PID-UTN-7862</strong></p>\n\n<p>&nbsp;</p>",
+"keywords": [
+"weed, resistant weed"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "ResistantWeeds"
+},
+"revision": 2
+},
+{
+"files": [
+{
+"checksum": "md5:45a6573eb62059abdfbe96d0000ef710",
+"key": "Dataset_ZuletGonzalez_2024.zip",
+"links": {
+"self": "https://zenodo.org/api/records/16091876/files/Dataset_ZuletGonzalez_2024.zip/content"
+},
+"size": 52210
+}
+],
+"id": 16091876,
+"links": {
+"self_html": "https://zenodo.org/records/16091876"
+},
+"metadata": {
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>Zulet-Gonzalez, Ainhoa, et al. &laquo;Quinate-enhanced glyphosate toxicity is related to the accumulation of quinate derivatives&raquo;. Plant Stress, vol. 12, 2024, https://doi.org/10.1016/J.STRESS.2024.100496.</p>",
+"keywords": [
+"Amaranthus palmeri",
+"glyphosate",
+"quinate",
+"shikimate pathway",
+"Metabolic profiling"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Dataset_ZuletGonzalez_2024"
+},
+"revision": 6
+}
+],
+"total": 14
+}
+},
+"method": "GET",
+"params": {
+"q": "\"Amaranthus palmeri\"",
+"size": "8",
+"sort": "bestmatch",
+"type": "dataset"
+},
+"status": 200,
+"url": "https://zenodo.org/api/records"
+},
+{
+"data": null,
+"headers": {
+"content-length": "461"
+},
+"json": {
+"hits": {
+"hits": [],
+"total": 0
+}
+},
+"method": "GET",
+"params": {
+"q": "\"Senna obtusifolia\"",
+"size": "8",
+"sort": "bestmatch",
+"type": "dataset"
+},
+"status": 200,
+"url": "https://zenodo.org/api/records"
+},
+{
+"data": null,
+"headers": {
+"content-length": "98932"
+},
+"json": {
+"hits": {
+"hits": [
+{
+"files": [
+{
+"checksum": "md5:5eba3e7f43e7c1a49518e1bbdbbedc40",
+"key": "Photosynthetic Pigment Data_all varieties_For Zonedo corr MIH.xlsx",
+"links": {
+"self": "https://zenodo.org/api/records/6578412/files/Photosynthetic%20Pigment%20Data_all%20varieties_For%20Zonedo%20corr%20MIH.xlsx/content"
+},
+"size": 528789
+}
+],
+"id": 6578412,
+"links": {
+"self_html": "https://zenodo.org/records/6578412"
+},
+"metadata": {
+"description": "<p>Photosynthetic Pigment Data_all varieties : Common purslane (Portulaca oleracea) and annual ryegrass (Lolium rigidum) treated with different Wheat, Buckwheat varieties)</p>",
+"keywords": [
+"Photosynthetic Pigments"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Photosynthetic Pigment Data_all varieties_For Zonedo corr MIH"
+},
+"revision": 2
+},
+{
+"files": [
+{
+"checksum": "md5:2ee2e1f8daff264cc74641346afb69e2",
+"key": "oo_954152.rar",
+"links": {
+"self": "https://zenodo.org/api/records/10424762/files/oo_954152.rar/content"
+},
+"size": 229911
+}
+],
+"id": 10424762,
+"links": {
+"self_html": "https://zenodo.org/records/10424762"
+},
+"metadata": {
+"description": "Scripts",
+"keywords": [
+"Oleraindole",
+"Portulaca oleracea",
+"UHPLC",
+"Orbitrap"
+],
+"license": {
+"id": "cc-zero"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Supplementary material 2 from: Voynikov Y, Gevrenova R, Zheleva-Dimitrova D, Balabanova V, Nikolova I, Marinov L, Benbassat I, Momekov G (2023) UHPLC-Orbitrap screening of oleraindoles in hydromethanolic extracts of Portulaca oleracea. Pharmacia 70(4): 1521-1527. https://doi.org/10.3897/pharmacia.70.e113577"
+},
+"revision": 4
+},
+{
+"files": [
+{
+"checksum": "md5:0ce1c7f83e85080dc23b967e5a0fe0be",
+"key": "Minimal_Dataset_Pb_Biochar_Purslane_v2.xlsx",
+"links": {
+"self": "https://zenodo.org/api/records/21969571/files/Minimal_Dataset_Pb_Biochar_Purslane_v2.xlsx/content"
+},
+"size": 19746
+}
+],
+"id": 21969571,
+"links": {
+"self_html": "https://zenodo.org/records/21969571"
+},
+"metadata": {
+"description": "<p>This dataset contains the replicate-level experimental data underlying the manuscript entitled &ldquo;Lead-Induced Nutrient Imbalance and Biochar-Mediated Nutrient Homeostasis Responses in Purslane (Portulaca oleracea L.).&rdquo; It includes shoot fresh weight, shoot dry weight, shoot height, shoot Pb concentration, macro- and micronutrient concentrations, and calculated nutrient uptake values for 27 independent pots under different Pb and biochar treatments. Version 2.0 includes corrected shoot dry weight data and newly calculated pot-level uptake values for N, P, K, Ca, Mg, Fe, Cu, Zn, Mn, and B.</p>",
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Minimal Dataset for Lead-Induced Nutrient Imbalance and Biochar-Mediated Nutrient Homeostasis Responses in Purslane (Portulaca oleracea L.)"
+},
+"revision": 4
+},
+{
+"files": [
+{
+"checksum": "md5:c2c482cc94a224a407f65413d260c24b",
+"key": "oo_954151.docx",
+"links": {
+"self": "https://zenodo.org/api/records/10424758/files/oo_954151.docx/content"
+},
+"size": 373441
+}
+],
+"id": 10424758,
+"links": {
+"self_html": "https://zenodo.org/records/10424758"
+},
+"metadata": {
+"description": "MS/MS spectra of identified compounds",
+"keywords": [
+"Oleraindole",
+"Portulaca oleracea",
+"UHPLC",
+"Orbitrap"
+],
+"license": {
+"id": "cc-zero"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Supplementary material 1 from: Voynikov Y, Gevrenova R, Zheleva-Dimitrova D, Balabanova V, Nikolova I, Marinov L, Benbassat I, Momekov G (2023) UHPLC-Orbitrap screening of oleraindoles in hydromethanolic extracts of Portulaca oleracea. Pharmacia 70(4): 1521-1527. https://doi.org/10.3897/pharmacia.70.e113577"
+},
+"revision": 4
+},
+{
+"files": [
+{
+"checksum": "md5:71b558390b0f726d01b1a59e6005a16c",
+"key": "Yedra Vieites-Alvarez et al 2026_Raw data.xlsx",
+"links": {
+"self": "https://zenodo.org/api/records/21343499/files/Yedra%20Vieites-Alvarez%20et%20al%202026_Raw%20data.xlsx/content"
+},
+"size": 199910
+}
+],
+"id": 21343499,
+"links": {
+"self_html": "https://zenodo.org/records/21343499"
+},
+"metadata": {
+"description": "<p>Raw data (Shoot Invasive Capacity, Root Invasive Capacity, Seedling Vigour Index; Shoot Length, Root Length; Benzoxazinoids composition) of an allelopathy experiment with 30 different common wheat (<em>Triticum aestivum</em>) genotypes and two weed species (<em>Lolium rigidum</em>, <em>Portulaca oleracea</em>). Data are arranged in 3 sheets; key legend separately in first sheet.</p>",
+"keywords": [
+"Benzoxazinoids",
+"Triticum aestivum",
+"Lolium rigidum",
+"Portulaca oleracea",
+"allelopathy"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Genotype-dependent allelopathic suppression of herbicide-resistant weeds by living wheat plants: Root-mediated interference, benzoxazinoid plasticity and novel weed establishment indices"
+},
+"revision": 4
+},
+{
+"files": [
+{
+"checksum": "md5:c5dbfd5f4b66589c5848710a8911455f",
+"key": "table.html",
+"links": {
+"self": "https://zenodo.org/api/records/15153985/files/table.html/content"
+},
+"size": 11411
+}
+],
+"id": 15153985,
+"links": {
+"self_html": "https://zenodo.org/records/15153985"
+},
+"metadata": {
+"description": "<p><b>Table 1</b> Overview of monomeric natural benzoxazinoids of the classes benzoxazinones (1,4-benzoxazin-3-one backbone with <i>C</i> 2 hydroxylation) and benzoxazolinones (1,3-benzoxazol-2-one backbone) reported in literature, with their systematic name and abbreviation. All benzoxazinones are displayed as aglycones. Note that some of these compounds have, so far, only been detected as their 2- <i>O</i> -glycosides. n.a., no abbreviation assigned in literature.</p><table><thead><tr><th><b>Benzoxazinones</b></th><th>R2</th><th>R3</th><th>R4</th><th>R5</th><th>Systematic name</th><th>Abbreviation a</th><th>Natural source b</th><th>Ref.</th></tr><tr><th colspan=\"9\"><i>N-hydro (R</i> <i>1</i> = <i>H)</i>: <i>lactams</i></th></tr></thead><tbody><tr><th rowspan=\"4\">R5 R <b>8</b> <b>1</b> O OH 4 <b>2</b> <b>7</b> R <b>6</b> N <b>3</b> O 3 <b>5</b> <b>4</b> R2 R1</th><td>H</td><td>H</td><td>H</td><td>H</td><td>2-hydroxy-1,4-benzoxazin-3-one</td><td>HBOA</td><td>Poaceae</td><td>(Hofman and Hofmanov&aacute;, 1969; Tanwir et al., 2013)</td></tr><tr><td></td><td></td><td></td><td></td><td></td><td></td><td>Acanthaceae Calceolariaceae Plantaginaceae Lamiaceae</td><td>(Baumeler et al., 2000",
+"keywords": [
+"Biodiversity",
+"Taxonomy"
+],
+"license": {
+"id": "notspecified"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Table 1 in Structure and biosynthesis of benzoxazinoids: Plant defence metabolites with potential as antimicrobial scaffolds"
+},
+"revision": 7
+},
+{
+"files": [
+{
+"checksum": "md5:4fc4d024e9442706e358f6edc2fc3079",
+"key": "30319_SP_1_159621_A_233458.xls",
+"links": {
+"self": "https://zenodo.org/api/records/4959608/files/30319_SP_1_159621_A_233458.xls/content"
+},
+"size": 71680
+}
+],
+"id": 4959608,
+"links": {
+"self_html": "https://zenodo.org/records/4959608"
+},
+"metadata": {
+"description": "One of the important tools to evaluate the ecological quality of surface water is the Macrophytes indices based on the bioindication capacity of aquatic plants. In Mediterranean rivers (France, Spain, and Portugal), the development of some macrophytes indices like l'Indice Biologique Macrophytes Rivi\u00e8res (IBMR), the biological metric score (BMS), as well as the Fluvial Macrophyte Index (IMF) are founded on the determination of the indicator values of the floristic reference lists.\n\nThe aim of this study was to test the impact of the eco-Mediterranean differences (from one country to another) on the indicator taxa by comparing the indicator values of the Euro\u2010 Mediterranean macrophyte indices. With this in mind, we explore the possibility of the introduction of the Euro\u2010Mediterranean macrophytes-based indices in Morocco (i.e. the hydrological basin of Sebou (HBS)) as a part of a preliminary attempt to develop the first Afro-Mediterranean macrophyte index.\n\nWe confirm that the ecological amplitude and species optima vary between Mediterranean ecoregions, and indicator taxa differ between countries: There are medium to small correlations between Mediterranean indices: IBMR/BMS (p = 0.",
+"keywords": [
+"Corymbia citriodora",
+"Euphorbia sp",
+"Carthamus caeruleus",
+"Silybum marianum",
+"Tamarix canariensis",
+"Ceratophyllum sp",
+"Verbena sp",
+"Lythrum junceum",
+"Anagallis arvensis",
+"Cynodon dactylon",
+"Scolymus hispanicus",
+"Cirsium echinatum",
+"bioindicators",
+"Cuscuta pentagona",
+"Mentha pulegium",
+"Juncus acutus",
+"Pistacia lentiscus",
+"Scorpiurus sp",
+"Centaurea calcitrapa",
+"Juncus rigidus",
+"Asteriscus aquaticus",
+"Heliotropium supinum",
+"Datura sp",
+"Visnaga daucoides",
+"Solanum dulcamara",
+"Xanthium spinosum",
+"Pulicaria arabica",
+"Eryngium campestre",
+"Piptatherum miliaceum",
+"Chenopodium sp",
+"Hydrological Basin of Sebou (HBS)",
+"Eryngium glaciale",
+"Adonis aestivalis",
+"Sonchus maritimus",
+"Marrubium vulgare",
+"Rubus ulmifolius",
+"Carduus pycnocephalus",
+"Crataegus azarolus",
+"Lythrum acutangulum",
+"Lavandula multifida",
+"Trifolium dubium",
+"Bituminaria bituminosa",
+"Turgenia latifolia",
+"Rumex crispus",
+"Aster squamatus",
+"Scirpus sp",
+"Populus nigra",
+"Potentilla reptans",
+"Fraxinus excelsior",
+"Trifolium sp",
+"Ranunculus bulbosus",
+"Glebionis coronaria",
+"Epilobium hirsutum",
+"Sonchus asper",
+"Mentha rotundifolia",
+"Tamarix aphylla",
+"Stachyurus salicifolius",
+"Crataegus sp",
+"Cyperus longus",
+"Lolium multiflorum",
+"Nerium oleander",
+"Pennisetum setaceum",
+"Scrophularia auriculata",
+"Cynoglossum creticum",
+"Arundo donax",
+"Onopordum sp",
+"Verbascum blattaria",
+"Juniperus sp",
+"Xanthium strumarium",
+"Berula erecta",
+"Trachelium caeruleum",
+"Stachys ocymastrum",
+"Tamarix boveana",
+"Carlina vulgaris",
+"Potamogeton nodosus",
+"Ricinus communis",
+"Elodea sp",
+"Verbena officinalis",
+"Cichorium intybus",
+"Vitex agnus-castus",
+"Tamarix africana",
+"Anacyclus clavatus",
+"Ononis spinosa",
+"Checklist",
+"Heterotheca subaxillaris",
+"Dittrichia viscosa",
+"Erigeron canadensis",
+"Phragmites australis",
+"Persicaria maculosa",
+"Peganum harmala",
+"Samolus valerandi",
+"Catananche caerulea",
+"Pallenis spinosa",
+"Reseda luteola",
+"Ludwigia palustris",
+"Ziziphus lotus",
+"Mantisalca sp",
+"Crataegus monogyna",
+"Ammi majus",
+"Festuca arundinacea",
+"Cladanthus arabicus",
+"Cynodon sp",
+"Plantago coronopus",
+"Potamogeton sp",
+"Filago pyramidata",
+"Portulaca oleracea",
+"Onopordum macracanthum",
+"Carduus tenuiflorus",
+"Porophyllum ruderale",
+"Polypogon viridis",
+"Hibiscus syriacus",
+"Mentha longifolia",
+"Teucrium spinosum",
+"Echium plantagineum",
+"Ecological Water Quality",
+"Plantago lagopus",
+"Erigeron sp",
+"Lolium rigidum",
+"Veronica beccabunga",
+"Paronychia argentea",
+"Geranium dissectum",
+"Polygonum aviculare",
+"Cyperus rotundus",
+"Vachellia karroo",
+"Paspalum sp",
+"Scolymus maculatus",
+"Trifolium fragiferum",
+"Rumex palustris",
+"Isatis tinctoria",
+"Adiantum capillus-veneris",
+"Polypogon monspeliensis",
+"Potamogeton pectinatus",
+"Polycarpon tetraphyllum",
+"Lemna gibba",
+"Calendula officinalis",
+"Zannichellia palustris",
+"Verbascum sinuatum",
+"Convolvulus arvensis",
+"Sonchus sp",
+"Alopecurus pratensis",
+"Malva sp",
+"Trifolium stellatum",
+"Rapistrum rugosum",
+"Lolium sp",
+"Plantago major",
+"Euphorbia cossoniana",
+"Thymelaea virgata",
+"Ficus carica",
+"Chenopodium album",
+"Malva parviflora",
+"Anacyclus homogamos",
+"Tamarix gallica",
+"Verbascum sp",
+"Vachellia gummifera",
+"Apium repens",
+"Equisetum ramosissimum",
+"Helosciadium repens",
+"Raphanus raphanistrum",
+"Amaranthus retroflexus",
+"Eryngium sp",
+"Panicum repens",
+"Helosciadium nodiflorum",
+"Hordeum marinum",
+"Asclepias curassavica",
+"Glyceria notata",
+"macrophytes",
+"Morus sp",
+"Pulicaria sp",
+"Chara sp",
+"Aegilops geniculata",
+"Lemna sp",
+"Persicaria lapathifolia",
+"Mentha suaveolens",
+"Foeniculum vulgare",
+"Heliotropium europaeum",
+"Centaurium pulchellum",
+"Pistia stratiotes",
+"Papaver rhoeas",
+"Typha angustifolia",
+"Erodium cicutarium",
+"Quercus sp",
+"Celtis australis",
+"Hygrohypnum luridum",
+"Sonchus aquatilis",
+"Campanula sp",
+"Datura stramonium",
+"Herniaria cinerea",
+"Rumex conglomeratus",
+"Polygonum sp",
+"Torilis nodosa",
+"Verbascum thapsus",
+"Campanula mairei",
+"Hypericum pubescens",
+"aquatic plants",
+"Rumex sp",
+"Amaranthus sp",
+"Mentha aquatica",
+"Agrostis stolonifera",
+"Bunium alpinum",
+"Hieracium racemosum",
+"Hirschfeldia incana",
+"Antirrhinum sp",
+"Dittrichia graveolens",
+"Trifolium campestre",
+"Chrozophora tinctoria",
+"Lepidium draba",
+"Paspalum vaginatum",
+"Anchusa azurea",
+"Erigeron bonariensis",
+"Nasturtium officinale",
+"Glinus lotoides",
+"Centaurea aspera"
+],
+"license": {
+"id": "cc-zero"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Data from: Impact of hydromorphological pressures on the macrophytes bioindicators of the ecological water quality in Mediterranean rivers"
+},
+"revision": 3
+},
+{
+"files": [
+{
+"checksum": "md5:29ca8fcdc5ba98b1b6eaccf9104b123b",
+"key": "LocusInfo.zip",
+"links": {
+"self": "https://zenodo.org/api/records/4996402/files/LocusInfo.zip/content"
+},
+"size": 352832786
+},
+{
+"checksum": "md5:6f6d917e78dce8849c8105cbdf4bb5da",
+"key": "GCF_000004515.3_V1.1_genomic.gff",
+"links": {
+"self": "https://zenodo.org/api/records/4996402/files/GCF_000004515.3_V1.1_genomic.gff/content"
+},
+"size": 251856013
+},
+{
+"checksum": "md5:76839770611db14a74263710429f594b",
+"key": "glycine_max_454_raw_all.fasta",
+"links": {
+"self": "https://zenodo.org/api/records/4996402/files/glycine_max_454_raw_all.fasta/content"
+},
+"size": 114395751
+},
+{
+"checksum": "md5:4c79a1f1fa085a7ee3dd777ca322628c",
+"key": "G_R_0764-0510-HitTable.csv",
+"links": {
+"self": "https://zenodo.org/api/records/4996402/files/G_R_0764-0510-HitTable.csv/content"
+},
+"size": 61387852
+},
+{
+"checksum": "md5:0ed36db4d04a18195c246226b7fb474c",
+"key": "G_R_0803-0253-HitTable.csv",
+"links": {
+"self": "https://zenodo.org/api/records/4996402/files/G_R_0803-0253-HitTable.csv/content"
+},
+"size": 58298606
+},
+{
+"checksum": "md5:26b224a13cd8d47f29e0250ffd99b8db",
+"key": "README.txt",
+"links": {
+"self": "https://zenodo.org/api/records/4996402/files/README.txt/content"
+},
+"size": 5648
+},
+{
+"checksum": "md5:67674d6c06d96897dd7fafa7d9118b92",
+"key": "Scaffolds.zip",
+"links": {
+"self": "https://zenodo.org/api/records/4996402/files/Scaffolds.zip/content"
+},
+"size": 1617568894
+}
+],
+"id": 4996402,
+"links": {
+"self_html": "https://zenodo.org/records/4996402"
+},
+"metadata": {
+"description": "Premise of the study: The One Thousand Plant Transcriptomes Project (1KP, 1000+ assembled plant transcriptomes) provides an enormous resource for developing microsatellite loci across the plant tree of life. We developed loci from these transcriptomes and tested their utility. Methods and Results: Using software packages and custom scripts, we identified microsatellite loci in 1KP transcriptomes. We assessed the potential for cross-amplification and whether loci were biased toward exons, as compared to markers derived from genomic DNA. We characterized over 5.7 million simple sequence repeat (SSR) loci from 1334 plant transcriptomes. Eighteen percent of loci substantially overlapped with open reading frames (ORFs), and electronic PCR revealed that over half the loci would amplify successfully in conspecific taxa. Transcriptomic SSRs were approximately three times more likely to map to translated regions than genomic SSRs. Conclusions: We believe microsatellites still have a place in the genomic age\u2014they remain effective and cost-efficient markers. The loci presented here are a valuable resource for researchers.",
+"keywords": [
+"Mollugo pentaphylla",
+"Oenothera rosea",
+"Amaranthus cruentus",
+"Betaphycus gelatinae",
+"Coleochaete scutata",
+"Bathycoccus prasinos",
+"Draba sachalinensis",
+"Retrophyllum minus",
+"Bambusina borreri",
+"Tanacetum parthenium",
+"Allamanda cathartica",
+"Zygnema sp",
+"Pseudoscourfieldia marina",
+"Ephedra sinica",
+"Oenothera serrulata",
+"Salix purpurea",
+"Spirogyra sp",
+"Eucalyptus leucoxylon",
+"Avena fatua",
+"Cercocarpus ledifolius",
+"Glycine soja",
+"Panicum miliaceum A",
+"Synsepalum dulcificum",
+"Zephyranthes treatiae",
+"Ajuga reptans",
+"Schlegelia violacea",
+"Viburnum odoratissimum",
+"Allium commutatum",
+"Atropa belladonna",
+"Osmunda sp",
+"Amentotaxus argotaenia",
+"Barbilophozia barbata",
+"Portulaca umbraticola",
+"Scouleria aquatica",
+"Neurachne munroi",
+"Botryococcus braunii",
+"Staurastrum sebaldi",
+"Papaver somniferum",
+"Matricaria matricariodes",
+"Microtea debilis",
+"Yucca filamentosa",
+"Marrubium vulgare",
+"Oenothera nana",
+"Interfilum paradoxum",
+"Bituminaria bituminosa",
+"Rosmarinus officinalis",
+"Lepidosperma gibsonii",
+"Ribes aff. giraldii",
+"Scapania nemorosa",
+"Polysiphonia japonica",
+"Wrightia natalensis",
+"Atriplex prostrata",
+"Aesculus pavia",
+"Tragopogon pratensis",
+"Cystopteris fragilis",
+"Lophophora williamsii",
+"Apios americana",
+"Triodia aff. bynoei",
+"Prionitis divaricata",
+"Syzygium macranthum",
+"Linum leonii",
+"Podophyllum peltatum",
+"Gentiana acaulis",
+"Hymenophyllum cupressiforme",
+"Viola canadensis",
+"Cyanastrum cordifolium",
+"Datura metel",
+"Sansevieria trifasciata",
+"Entocladia endozoica",
+"Aster tataricus",
+"Solidago canadensis",
+"Ludovia sp",
+"Triglochin maritimum",
+"Chamaseyce mesebyranthemum",
+"Sceptridium dissectum",
+"Maesa lanceolata",
+"Pilularia globulifera",
+"Ailanthus altissima",
+"Sargassum vachellianum",
+"Orchidantha maxillaroides",
+"Argemone mexicana",
+"Heliotropium texanum",
+"Microcachrys tetragona",
+"Geum quellyon",
+"Amelanchier canadensis",
+"Chamaecyparis lawsoniana",
+"Sarcodes sanguinea",
+"Magnolia grandiflora",
+"Xanthicercis zambesiaca",
+"Pediastrum duplex",
+"Eucheuma denticulatum",
+"Exacum affine",
+"Kaliphora madagascariensis",
+"Selaginella willdenowii",
+"Portulaca grandiflora",
+"Cystopteris reevesiana",
+"Cosmarium granatum",
+"Eremosphaera viridi",
+"Sarcandra glabra",
+"Planotaenium ohtanii",
+"Psychotria douarrei",
+"Tragopogon dubius",
+"Cyanoptyche gloeocystis",
+"Nolina atopocarpa",
+"Cibotium glaucum",
+"Lagerstroemia indica",
+"Mollugo cerviana",
+"Oltmannsiellopsis viridis",
+"Boswellia sacra",
+"Dunaliella tertiolecta",
+"Pilgerodendron uviferum",
+"Glyptostrobus pensilis",
+"Phyllanthus sp",
+"Ardisia revoluta",
+"Flaveria trinervia",
+"Corokia cotoneaster",
+"Amborella trichopoda",
+"Nymphaea spp",
+"Cicerbita plumieri",
+"Phellodendron amurense",
+"Thuja plicata",
+"Hibiscus cannabinus",
+"Persea borbonia",
+"Forestiera segregata",
+"Lobelia siphilitica",
+"Mirabilis jalapa",
+"Nolina bigelorii",
+"Chlamydomonas cribrum",
+"Talbotia elegans",
+"Nuphar advena",
+"Phyllocladus hypohyllus",
+"Lunularia cruciata",
+"Leonurus japonicus",
+"Heuchera sanguinea",
+"Cleome gynandra",
+"Draba oligosperma",
+"Cycas micholitzii",
+"Passiflora caerulea",
+"Cymbomonas sp",
+"Fagus sylvatica",
+"Chrysobalanus icaco",
+"Flaveria sonorensis",
+"Maianthemum sp",
+"Grateloupia filicina",
+"Schwetschkeopsis fabronia",
+"Scytosihon lomentaria",
+"Carteria crucifera",
+"Linum perenne",
+"Polansia trachysperma",
+"Lennoa madreporoides",
+"Gyrostemon ramulosus",
+"Psilotum nudum",
+"Zygnemopsis sp",
+"Drimia altissima",
+"Mertensia paniculata",
+"Mollugo nudicaulis",
+"Didymochlaena truncatula",
+"Phelline lucida",
+"Heliotropium tenellum",
+"Curculigo sp",
+"Dichroa febrifuga",
+"Pinguicula caudata",
+"Scenedesmus dimorphus",
+"Chloromonas oogama",
+"Pereskia aculeata",
+"Tapiscia sinensis",
+"Myristica fragrans",
+"Flaveria vaginata",
+"Garcinia oblongiflolia",
+"Alnus serrulata",
+"Rhodella violacea",
+"Mesotaenium kramstei",
+"Berberidopsis beckleri",
+"Spirotaenia minuta",
+"Holarrhena pubescens",
+"Oenothera clelandii",
+"Anisacanthus quadrifidas",
+"Uvaria microcarpa",
+"Ascarina rubricaulis",
+"Sphagnum recurvatum",
+"Scaevola sp",
+"Calycanthus floridus",
+"Psychotria ipecacuanha",
+"Portulaca pilosa",
+"Flaveria pubescens",
+"Encalypta streptocarpa",
+"Vitreochlamys sp",
+"Thujopsis dolabrata",
+"Monotropa uniflora",
+"Nelumbo sp",
+"Nothofagus obliqua",
+"Cosmarium tinctum",
+"Hypecoum procumbens",
+"Asteromonas gracilis",
+"Encephalartos barteri",
+"1KP",
+"Draba magellanica",
+"Neurachne lanigera",
+"Escallonia rubra",
+"Scytosiphon dotyo",
+"Exocarpos cupressiformis",
+"Cunninghamia lanceolata",
+"Paraneurachne muelleri",
+"Plantago coronopis",
+"Nothoceros aenigmaticus",
+"Thyridolepis mitchelliana",
+"Lycium sp",
+"Salix sachalinensis",
+"Koeberlina spinosa",
+"Adiantum tenerum",
+"Frullania",
+"Helwingia japonica",
+"Melia azedarach",
+"Carya glabra",
+"Salix acutifolia",
+"Hymenophyllum bivalve",
+"Cupressus dupreziana",
+"Conzya canadensis",
+"Hakea drupaceae",
+"Nannochloropsis oculata",
+"Tiarella polyphylla",
+"Cedrus libani",
+"Davallia fejeensis",
+"Nepeta cataria",
+"Austrocedrus chilensis",
+"Homalosorus pycnocarpos",
+"Brodiaea sierrae",
+"Chondropetalum tectorum",
+"Bursera simaruba",
+"Delosperma echinatum",
+"Crassula perforata",
+"Betula pendula",
+"Typha latifolia",
+"Linum macraei",
+"Campanula delicatula",
+"Keteleeria evelyniana",
+"Polypremum procumbens",
+"Cosmocladium cf. constrictum",
+"Pinus parviflora",
+"Beta maritima",
+"Dicranum scoparium",
+"Ochna serrulata",
+"Kalanchoe crenato diagremontiana",
+"Euptelea pleiosperma",
+"Neochloris sp",
+"Diphyscium foliosum",
+"Monomastix opisthostigma",
+"Silene latifolia",
+"Phormium tenax",
+"Cannabis sativa",
+"Wollemia nobilis",
+"Polyscias fruticosa",
+"Cathaya agryrophylla",
+"Oenothera grandiflora",
+"Taxodium distichum",
+"Ilex paraguariensis",
+"Spermatozopsis exsultans",
+"Jacquinia sp",
+"Portulaca suffruticosa",
+"Gymnocladus dioicus",
+"Sequoiadendron giganteum",
+"Dacrycarpus compactus",
+"Brocchinia reducta",
+"Itea virginica",
+"Mumea americana",
+"Rhynchostegium serrulatum",
+"Diospyros malabarica",
+"Pennantia corymbosa",
+"Asparagus densiflorus",
+"Phaeomegaceros coriaceus",
+"Ceratopteris thalictroides",
+"Rhododendron scopulorum",
+"SSR",
+"Staurodesmus convergens",
+"Lobochlamys segnis",
+"Cylindrocystis cushleckae",
+"Dunaliella primolecta",
+"Euphorbia pekinensis",
+"Sorbus koehneana",
+"neutral markers",
+"Microstrobos fitzgeraldii",
+"Sargassum integerrimum",
+"Heliotropium calcicola",
+"Pyramimonas parkeae",
+"Flaveria palmeri",
+"Cyanophora paradoxa",
+"Callitris macleayana",
+"Centella asiatica",
+"Chloromonas reticulata",
+"Melissa officinalis",
+"Gracilaria chouae",
+"Opuntia sp",
+"Welwitschia mirabilis",
+"Anomodon attenuatus",
+"Galax urceolata",
+"Larix speciosa",
+"Myrica cerifera",
+"Rhodiola rosea",
+"Widdringtonia cedarbergensis",
+"Linum bienne",
+"Calocedrus decurrens",
+"Pityrogramma trifoliata",
+"Maranta leuconeura",
+"Valeriana officianalis",
+"Freycinetia multiflora",
+"Pyrenacantha malvifolia",
+"Strychnos spinosa",
+"Heliotropium racemosum",
+"Prunella vulgaris",
+"Papuacedrus papuana",
+"Ilex sp",
+"Ipomoea purpurea",
+"Oenothera elata hookeri",
+"Olea europaea",
+"Anthoceros agrestis",
+"Cleome viscosa",
+"Camptotheca acuminata",
+"Philadelphus inodorus",
+"Angelica archangelica",
+"Hedera helix",
+"Platanus occidentalis",
+"Salix fargesii",
+"Oenothera laciniata",
+"Ipomoea lindheimeri",
+"Kochia scoparia",
+"Salvia spp",
+"Deutzia scabra",
+"Geminella sp",
+"Platycladus orientalis",
+"Linum tenuifolium",
+"Goodyera pubescens",
+"Citrus x paradisi",
+"Edgeworthia papyrifera",
+"Hesperaloe parviflora",
+"Oedogonium foveolatum",
+"Spergularia media",
+"Ptilidium pulcherrimum",
+"Platanthera clavellata",
+"Prototheca wickerhamii",
+"Oncidium sphacelatum",
+"Pinguicula agnata",
+"Medinilla magnifica",
+"Schistochila sp",
+"Alternanthera sessilis",
+"Selaginella selaginoides",
+"Batis maritima",
+"Microstegium vimineum",
+"Desmanthus illinoensis",
+"Actinidia chinensis",
+"Punica granatum",
+"Elaeagnus pungens",
+"Acer negundo",
+"Stigeoclonium helveticum",
+"microsatellite development",
+"Stichococcus bacillaris",
+"Quassia amara",
+"Chara vulgaris",
+"Simmondsia chinensis",
+"Ricinus communis",
+"Sassafras albidum",
+"Sarcobatus vermiculatus",
+"Glaucosphaera vacuolata",
+"Vanilla planifolia",
+"Dianthus sp",
+"Glycyrrhiza lepidota",
+"Pycnanthemum tenuifolium",
+"Atriplex hortensis",
+"Athyrium filix femina",
+"Limnanthes douglassii",
+"Gracilaria asiatica",
+"Lomandra longifolia",
+"Boykinia jamesii",
+"Codariocalyx motorius",
+"Sphaerocarpos texanus",
+"Brassica nigra",
+"Bryum argenteum",
+"Schiedea membranacea",
+"Passiflora sp",
+"Tragopogon porrifolius",
+"Gomortega keule",
+"Lupinus polyphyllus",
+"Staphylea trifolia",
+"Manihot grahamii",
+"Symphoricarpos sp",
+"Volvox globator",
+"Lupinus angustifolius",
+"Daenikera sp",
+"Sargassum henslowianum",
+"Carthamus lanatus",
+"Hypnum subimponens",
+"Marattia attenuata",
+"Sargassum horneri",
+"Selaginella apoda",
+"Anemone pulsatilla",
+"Eudorina elegans",
+"Vittaria lineata",
+"Buxus sempervirens",
+"Platyspermation crassifolium",
+"Aphanochaete repens",
+"Coriaria nepalensis",
+"Lathyrus sativus",
+"Blastophysa cf. rhizopus",
+"Equisetum diffusum",
+"Anthirrhinum majus",
+"Diplazium wichurae",
+"Rehmannia glutinosa",
+"Oresitrophe rupifraga",
+"Dioon edule",
+"Chlamydomonas noctigama",
+"Fokienia hodginsii",
+"Austrobaileya scandens",
+"Botryococcus terribilis",
+"Elaeocarpus sylvestris",
+"Houttuynia cordata",
+"Onychonema laeve",
+"Solanum lasiophyllum",
+"Deschampsia cespitosa",
+"Lindsaea linearis",
+"Syntrichia princeps",
+"Netrium digitus",
+"Ochna mossambicensis",
+"Tetrazygia bicolor",
+"Selaginella wallacei",
+"Halochlorococcum marinum",
+"next generation sequencing (NGS)",
+"Tellima breviflora",
+"Cinnamomum camphora",
+"Kerria japonica",
+"Aphanopetalum resinosum",
+"Parachlorella kessleri",
+"Moringa oleifera",
+"Ruellia brittoniana",
+"Sinapis alba",
+"Tsuga heterophylla",
+"Oenothera villaricae",
+"Thladiantha villosula",
+"Canna sp",
+"Scourfieldia sp",
+"Mantoniella squamata",
+"Oenothera speciosa",
+"Chionanthus retusus",
+"Akebia trifoliata",
+"Chloromonas subdivisa",
+"Griselinia racemosa",
+"Bolbocoleon piliferum",
+"Colpomenia sinuosa",
+"Planophila laetevirens",
+"Picocystis salinarum",
+"Ardisia humilis",
+"Griselinia littoralis",
+"Pseudolarix amabilis",
+"Castanea crenata",
+"Peperomia fraseri",
+"Nephrolepis exaltata",
+"Heliotropium greggii",
+"Sargassum thunbergii",
+"Dioscorea villosa",
+"Callitris gracilis",
+"Rhodomonas sp",
+"Gleditsia sinensis",
+"Oedogonium cardiacu",
+"Erythroxylum coca",
+"Boerhavia cf. spiderwort",
+"Reseda odorata",
+"Gracilaria blodgettii",
+"Peumus boldus",
+"Convolvulus arvensis",
+"Francoa appendiculata",
+"Talinum sp",
+"Desmarestia viridis",
+"Drakea elastica",
+"Physocarpus opulifolius",
+"Undaria pinnatifida",
+"Cyrilla racemiflora",
+"Tetraclinis sp",
+"Juniperus scopulorum",
+"Manilkara zapota",
+"Lygodium japonicum",
+"Euastrum affine",
+"Basella alba",
+"Portulaca mauii",
+"Urginea maritima",
+"Chlorosarcinopsis halophila",
+"Amaranthus retroflexus",
+"Litchi chinensis",
+"Polypodium glycyrrhiza",
+"Masdevallia yuangensis",
+"Menyanthes trifoliata",
+"Mazzaella japonica",
+"Oenothera picensis",
+"Liquidambar styraciflua",
+"Rhizophora mangle",
+"Pinus radiata",
+"Schlegelia parasitica",
+"Conopholis americana",
+"Crepidomanes venosum",
+"Pinus jeffreyi",
+"Thyrsopteris elegans",
+"Allionia incarnata",
+"Chelidonium majus",
+"Xanthidium antilopaeum",
+"Capnoides sempervirens",
+"Phytolacca americana",
+"Idiospermum australiense",
+"Saintpaulia ionantha",
+"Saponaria officianalis",
+"Nicotiana sylvestris",
+"Linum strictum",
+"Saururus cernuus",
+"Cleome violaceae",
+"Flaveria bidentis",
+"Megaceros vincentianus",
+"Typha angustifolia",
+"Castanea pumila",
+"Celsia arcturus",
+"Inula helenium",
+"Paulownia fargesii",
+"Hizikia fusifrome",
+"Heliotropium karwinsky",
+"Isoetes tegetiformans",
+"Manoao colensoi",
+"Disporopsis pernyi",
+"Dombeya burgessiae",
+"Larrea tridentata",
+"Myriopteris eatonii",
+"Schizolaena sp",
+"Helonias bullata",
+"Isochrysis sp",
+"Chroodactylon ornatu",
+"Ehretia acuminata",
+"Ipomoea coccinea",
+"Ipomoea nil",
+"Neochloris oleoabundans",
+"Sequoia sempervirens",
+"Flaveria cronquestii",
+"Blasia sp",
+"Stemona tuberosa",
+"Microthamnion kuetzigianum",
+"Sargassum muticum",
+"Balanophora fungosa",
+"Chlamydomonas sp",
+"Synura sp",
+"Pittosporum sahnianum",
+"Ceramium kondoi",
+"Laurelia sempervirens",
+"Saruma henryi",
+"Mallomonas sp",
+"Dolichomastix tenuilepi",
+"Ginkgo biloba",
+"Radula lindenbergia",
+"Chlamydomonas moewusii",
+"Glycyrrhiza glabra",
+"Sanguinaria canadensis",
+"Hemiselmis virescens",
+"Bergenia sp",
+"Stachyurus praecox",
+"Begonia sp",
+"Cyathea spinulosa",
+"Mitella pentandra",
+"Senna hebecarpa",
+"Lantana camara",
+"Meliosma cuneifolia",
+"Oncotheca balansae",
+"Heteropyxis natalensis",
+"Lagarostrobos franklinii",
+"Cosmarium subtumidum",
+"Plumbago auriculata",
+"Tragopogon castellanus",
+"Porella navicularis",
+"Grateloupia livida",
+"Angiopteris evecta",
+"Celtis occidentalis",
+"Golenkinia longispicula",
+"Oenothera longituba",
+"Quercus shumardii",
+"Copaifera officianalis",
+"Illicium parviflorum",
+"Spirotaenia sp",
+"Nannochloris atomus",
+"Senecio rowleyanus",
+"Pteris ensigormis",
+"Monoclea gottschei",
+"Utricularia sp",
+"Saxifraga stolonifera",
+"Cryptomonas curvata",
+"Cotoneaster transcaucasicus",
+"Pteris vittata",
+"Gonium pectorale",
+"Ligustrum sinense",
+"Cosmarium broomei",
+"Fritschiella tuberosa",
+"Epilobium sp",
+"Sphagnum lescurii",
+"Laminaria japonica",
+"Huperzia squarrosa",
+"Lilium sargentiae",
+"Daphne geraldii",
+"Lavandula angustifolia",
+"Gonatozygon kinahanii",
+"Metasequoia glyptostroboides",
+"Acrosiphonia sp",
+"Flaveria angustifolia",
+"Chroomonas sp",
+"Eschscholzia californica",
+"Sideroxylon reclinatum",
+"Cephaleuros virescens",
+"Scherffelia dubia",
+"Sphagnum palustre",
+"Hormidiella sp",
+"Chaetosphaeridium globosum",
+"Aristida stricta",
+"Pleurastrum insigne",
+"Canella winterana",
+"Falcatifolium taxoides",
+"Microbiota decussata",
+"Strelitzia reginae",
+"Planophila terrestris",
+"Arucaria sp",
+"Yucca brevifolia",
+"Cavendishia cuatrecasasii",
+"Cladophora glomerata",
+"Desmidium aptogonum",
+"Phycella aff. cyrtanthoides",
+"Byblis gigantea",
+"Asplenium platyneuron",
+"Ulmus alata",
+"Traubia modesta",
+"Heliotropium sp",
+"Punctaria latifolia",
+"Hydrocotyle umbellata",
+"Haemaria discolor",
+"Lobomonas rostrata",
+"Hilleria latifolia",
+"Mydocarpus sp",
+"Cymbopogon nardus",
+"Pteromonas angulosa",
+"Equisetum hymale",
+"Sanchezia sp",
+"Nandina domestica",
+"Plantago virginica",
+"Coccomyxa pringsheimii",
+"Buxbaumia aphylla",
+"Helenium autumnale",
+"Pseudotaxiphyllum elegans",
+"Thelypteris acuminata",
+"Licania michauxii",
+"Mesotaenium endlicherianum",
+"Phlox drummondii",
+"Prorocentrum micans",
+"Hypericum perforatum",
+"Sciadopitys verticillata",
+"Tetraselmis striata",
+"Peganum harmala",
+"Oenothera affinis",
+"Dacrydium balansae",
+"Portulaca amilis",
+"Escallonia sp. cv. Newport",
+"Piper auritum",
+"Plagiomnium insigne",
+"Cuscuta pentagonia",
+"Picea engelmanii",
+"Gunnera manicata",
+"Salvadora sp",
+"Sundacarpus amarus",
+"Serenoa repens",
+"Chloromonas perforata",
+"Astilbe chinensis",
+"Ziziphus jujuba",
+"Platycodon grandiflorus",
+"Eupomatia bennettii",
+"Dumontia simplex",
+"Fontinalis antipyretica",
+"Curtisia dentata",
+"Mesostigma viride",
+"Aextoxicon punctatum",
+"Carteria obtusa",
+"Kigelia africana",
+"Uniola paniculata",
+"Chlorogalum pomeridianum",
+"Gracilaria lemaneiformi",
+"Campanula erinus",
+"Stangeria eriopus",
+"Abies lasiocarpa",
+"Portulaca oleracea",
+"Ceratocapnos vesicaria",
+"Aloe vera",
+"Marchantia emarginata",
+"Danaea nodosa",
+"Solenostemon scutellarioides",
+"Smilax bona nox",
+"Mesotaenium caldariorum",
+"Aruncus dioicus",
+"Pellia cf. Epiphylla",
+"Neurachne tenuifolia",
+"Oogamochlamys gigantea",
+"Lycopersicon cheesmanii",
+"Cheilanthes arizonica",
+"Wisteria floribunda",
+"Nephroselmis pyriformis",
+"Pogostemon sp",
+"Dillenia indica",
+"Volvox aureus",
+"Prasiola crispa",
+"Humulus lupulus",
+"Chloromonas tughillensi",
+"Rhamnus japonica",
+"Vittaria appalachiana",
+"Polystichum acrostichoides",
+"Synura petersenii",
+"Heterosiphonia pulchra",
+"Muntingia calabura",
+"Agathis robusta",
+"Boehmeria nivea",
+"Ceratodon purpureus",
+"Garcinia livingstonei",
+"Botrypus virginianus",
+"Sanguisorba minor",
+"Neurachne annularis",
+"Osmundastrum cinnamomeum",
+"Chlamydomonas bilatus",
+"Prymnesium parvum",
+"Cercidiphyllum japonicum",
+"Mesotaenium braunii",
+"Asclepia curassavica",
+"Taiwania cryptomerioides",
+"Lactuca graminifolia",
+"Cosmarium ochthodes",
+"Flaveria pringlei",
+"Uronema belka",
+"Portulaca molokaiensis",
+"Schlegelia parasitica B",
+"Vitex agnus castus",
+"Prasinococcus capsulatus",
+"Maianthemum canadense",
+"Dendropemon caribaeus",
+"Proteomonas sulcata",
+"Symphyocladia latiuscula",
+"Calliergon cordifolium",
+"Melaleuca quinquenervia",
+"Flaveria brownii",
+"Gymnocarpium dryopteris",
+"Onoclea sensibilis",
+"Pleopeltis polypodioides",
+"Stylidium adnatum",
+"Morus nigra",
+"Athrotaxis cupressoides",
+"Daphniphyllum macropodum",
+"Heterochlamydomonas inaequalis",
+"Prumnopitys andina",
+"Bischofia javanica",
+"Gloriosa superba",
+"Heliotropium filiforme",
+"Trochodendron araliodes",
+"Podocarpus coriaceus",
+"Kjellmaniella crassifolia",
+"Trebouxia arboricola",
+"Haematococcus pluvialis",
+"Ishige okamurai",
+"Hemerocallis spp",
+"Pseudotsuga menziesii",
+"Allionia spp",
+"Gnetum montanum",
+"Grevillea robusta",
+"Helicodictyon planctonicum",
+"Draba hispida",
+"Galphimia gracilis",
+"Ochlochaete sp",
+"Phlox sp",
+"Borya sphaerocephala",
+"Anemia tomentosa",
+"Bryopsis plumosa",
+"Ignatius tetrasporus",
+"Papaver rhoeas",
+"Oxalis sp",
+"Pycnococcus provasolii",
+"Ledum palustre",
+"Polycarpaea repens",
+"Cercis canadensis",
+"Hemerocallis sp",
+"Souroubea exauriculata",
+"Cassytha filiformis",
+"Salix eriocephala",
+"Hafniomonas reticulata",
+"Rosa palustris",
+"Porphyridium purpureum",
+"Gloeopeltis furcata",
+"Orobanche fasciculata",
+"Thymus vulgaris",
+"Neocallitropsis pancheri",
+"Gyrocarpus americanus",
+"Linum usitatissimum",
+"Cryptomeria japonica",
+"Tetraphis pellucida",
+"Posidonia australis",
+"Anemone hupenhensis",
+"Cochlearea officinalis",
+"Ruscus sp",
+"Peliosanthese minor",
+"Taxus cuspidata",
+"Austrotaxus spicata",
+"Drypetes deplanchei",
+"Viola tricolor",
+"Curcuma olena",
+"Leptosira obovata",
+"Cladrastis lutea",
+"Petiveria alliacea",
+"Draba aizoides",
+"Araucaria rulei",
+"Phoradendron serotinum",
+"Alternanthera tenella",
+"Tamarix chinensis",
+"Lonicera japonica",
+"Ochromonas sp",
+"Oxera pulchella",
+"Ficus religiosa",
+"Pandorina morum",
+"Ipomoea lobata",
+"Aerva lanata",
+"Phacotus lenticularis",
+"Sessuvium portulacastrum",
+"Mansoa alliacea",
+"Mapania palustris",
+"Roridula gorgonias",
+"Stephanosphaera pluvialis",
+"Tropaeolum peregrinum",
+"Nageia nagi",
+"Solanum sisymbriifolium",
+"Oenothera gaura",
+"Silybum marianum",
+"Metzgeria crassipilis",
+"Oenothera suffulta suffulta",
+"Anticharis glandulosa",
+"Arabis alpina",
+"Codium fragile",
+"Polypodium hesperium",
+"Cephalotus follicularis",
+"Brachiomonas submarina",
+"Ankistrodesmus sp",
+"Staurodesmus omearii",
+"Ancistrocladus tectorius",
+"Peltoboykinia watanabei",
+"Azadirachta indica",
+"Lycopodium deuterodensum",
+"Pleurotaenium trabecul",
+"Xanthuium strumarium",
+"Gompholobium polymorphum",
+"Dipteris conjugata",
+"Sambucus canadensis",
+"Sagittaria latifolia",
+"Huperzia lucidula",
+"Ipomoea quamoclit",
+"Sinojackia xylocarpa",
+"Chlorokybus atmophyticus",
+"Aristolochia elegans",
+"Gelsemium sempervirens",
+"Neurachne alopecuroidea",
+"Mollugo verticillata",
+"Pteromonas sp",
+"Agapanthus africanus",
+"Hydrangea quercifolia",
+"Calypogeia fissa",
+"Chondrus crispus",
+"Rhodochaete parvula",
+"Culcita macrocarpa",
+"Solanum dulcamara",
+"Oxera neriifolia",
+"Micrasterias fimbriata",
+"Passiflora edulis",
+"Hamamelis virginiana",
+"Erigeron speciosus",
+"Typhonium blumei",
+"Johnsonia pubescens",
+"Oenothera biennis",
+"Pirula salina",
+"Pseudolycopodiella caroliniana",
+"Zingiber officinale",
+"Phytolacca bogotensis",
+"Spermatozopsis similis",
+"Cunonia capensis",
+"Impatiens balsamifera",
+"Sessuvium ventricosum",
+"Pellia neesiana",
+"Amaryllis belladonna",
+"Huperzia selago",
+"Linum grandiflorum",
+"Thyridolepis multiculmis",
+"Parasitaxus usta",
+"Gymnogongrus ftabelliformis",
+"Annona muricata",
+"Torreya taxifolia",
+"Urtica dioica",
+"Loropetalum chinense",
+"Cyperus papyrus",
+"Linum lewisii",
+"transcriptomes",
+"Digitalis purpurea",
+"Rhodophiala pratensis",
+"Prunus prostrata",
+"Solanum ptychanthum",
+"Marchantia paleacea",
+"Dennstaedtia",
+"Gleditsia triacanthos",
+"Lycopodiella apressa",
+"Papaver setigerum",
+"Cystopteris utahensis",
+"Polytrichum commune",
+"Conocephalum conicum",
+"Orthotrichum lyellii",
+"Draba ossetica",
+"Persursaria percursa",
+"Oenothera berlandieri",
+"Philonotis fontana",
+"Chloromonas rosa",
+"Xerophyllum asphodeloides",
+"Sargassum hemiphyllum",
+"Roya obtusa",
+"Dipsacus sativum",
+"Halocarpus bidwillii",
+"Niphotrichum elongatum",
+"Porella pinnata",
+"Acacia pycnantha",
+"Coleochaete irregularis",
+"Botryococcus sudeticus",
+"Agastache rugosa",
+"Cylindrocystis sp",
+"Torreya nucifera",
+"Neurachne minor",
+"Caiophora chuquitensis",
+"Juncus inflexus",
+"Aucuba japonica",
+"Buddleja sp",
+"Porphyridium cruentum",
+"Sisyrinchium angustifolium",
+"Ipomoea pubescens",
+"Scutellaria montana",
+"Racomitrium varium",
+"Leontopodium alpinum",
+"Polygonum convolvulus",
+"Teucrium chamaedrys",
+"Cylindrocystis brebissonii",
+"Non-neutral markers",
+"Blutoparon vermiculare",
+"Chlorella minutissima",
+"Thalictrum thalictroides",
+"Anthemis tinctoria",
+"Prasinoderma coloniale",
+"Polygala lutea",
+"Nepenthes alata",
+"Grateloupia turuturu",
+"Papaver bracteatum",
+"Kadsura heteroclite",
+"Lycium barbarum",
+"Cistus inflatus",
+"Rauvolfia tetraphyla",
+"Eriospermum lancifolia",
+"Juglans nigra",
+"Malus baccata",
+"Narcissus viridiflorus",
+"Euglena sp",
+"Ophioglossum vulgatum",
+"Selaginella lepidophylla",
+"Heliotropium mendocinum",
+"Podocarpus rubens",
+"Cypselea humifusum",
+"Cocos nucifera",
+"Michelia maudiae",
+"Cornus floridana",
+"Quillaja saponaria",
+"Leucobryum glaucum",
+"Trentepohlia annulata",
+"Cephalotaxus harringtonia",
+"Pittosporum resiniferum",
+"Stackhousia spathulata",
+"Neochlorosarcina sp",
+"Chaetopeltis orbicularis",
+"Acmopyle pancheri",
+"Croton tiglium",
+"Pedinomonas minor",
+"Salix dasyclados",
+"coccoid prasinophyte",
+"Unidentified species CCMP 1205",
+"Chenopodium quinoa",
+"Portulaca cryptopetala",
+"Fouqueria macdougalli",
+"Ternstroemia gymnanthera",
+"Phymatodocis nordstedtiana",
+"Bacopa caroliniana",
+"Haematococcus pluviali",
+"Megaceros tosanus",
+"Mougeotia sp",
+"Tetraselmis chui",
+"Colchicum autumnale",
+"Corydalis linstowiana",
+"Eleusine coracana",
+"Oenothera grandis",
+"Cyanella orchidofromis",
+"Syzygium paniculatum",
+"Brugmansia sanguinea",
+"Aerva persica",
+"Agave tequilana",
+"Zaleya pentandra",
+"Nothotsuga longibracteata",
+"Tetraselmis cordiformis",
+"Odontosororia sp",
+"Azolla cf. caroliniana",
+"Nypa fruticans",
+"Dryas octopetala",
+"Lycopodium annotinum",
+"Verbena hastata",
+"Alternanthera caracasana",
+"Nyssa ogeche",
+"Bauhinia tomentosa",
+"Entransia fimbriat",
+"Pseudotaxus chienii",
+"Trubulus eichlerianus",
+"Allium sativum",
+"Astragalus membranaceus",
+"Diselma archeri",
+"Isoetes sp",
+"Pholisma arenarium",
+"Klebsormidium subtile",
+"Asplenium nidus",
+"Krameria lanceolata",
+"Alternanthera brasileana",
+"Boerhavia dominnii",
+"Rhamnus caroliniana",
+"Solanum xanthocarpum",
+"Lindenbergia philippensis",
+"Santalum acuminatum",
+"Drimys winteri",
+"Trianthemum portulacastrum",
+"Climacium dendroides",
+"Huperzia myrisinites",
+"Xeronema callistemon",
+"Marchantia polymorpha",
+"Heracleum lanatum",
+"Apocynum androsaemifolium",
+"Leiosporoceros dussii",
+"Porphyra yezoensis",
+"Cylindrocapsa geminella",
+"Pinus ponderosa",
+"Closterium lunula",
+"Nephroselmis olivace",
+"Sabal bermudana",
+"Microspora cf. tumidula",
+"Thuidium delicatulum",
+"Psychotria marginata",
+"Bixa orellana",
+"Epifagus virginiana",
+"Ilex vomitoria",
+"Pistia stratioides",
+"Takakia lepidozioides",
+"Kappaphycus alvarezii",
+"Crossopetalum rhacoma",
+"Frankenia laevis",
+"Hydrastis canadensis",
+"Limonium spectabile",
+"Paeonia lactiflora",
+"Penium exiguum",
+"Heliotropium convolvulaceum",
+"Saxegothaea conspicua",
+"Gloeochaete wittrockiana",
+"Ipomoea indica",
+"Heliconia sp",
+"Flaveria kochiana",
+"Pavlova lutheri",
+"Ipomoea hederacea",
+"Petalonia fascia",
+"Calceolaria pinifolia",
+"Alangium chinense",
+"Nucleotaenium eifelense",
+"Linum flavum",
+"Eucommia ulmoides",
+"Pedinomonas tuberculata",
+"Symplocus sp",
+"Glaucocystis cf. nostochinearum",
+"Dictyopteris undulata",
+"Sinotubimorpha guangdongensis",
+"Linum hirsutum",
+"Deparia lobato",
+"Acacia argyrophylla",
+"Hakea prostrata",
+"Taxus baccata",
+"Illicium floridanum",
+"Tmesipteris parva",
+"Phyla dulcis",
+"Geranium carolinianum",
+"Terminalia neotaliala",
+"Astragalus propinquus",
+"Myriophyllum aquaticum",
+"Salix viminalis",
+"Paraphymatoceros hallii",
+"Neckera douglasii",
+"Oenothera elata",
+"Sinningia tuberosa",
+"Lindera benzoin",
+"Physena madagascariensis",
+"Blechnum spicant",
+"Oenothera filiformis",
+"Atriplex rosea",
+"Danaea sp"
+],
+"license": {
+"id": "cc-zero"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Data from: A new resource for the development of SSR markers: millions of loci from a thousand plant transcriptomes"
+},
+"revision": 3
+}
+],
+"total": 12
+}
+},
+"method": "GET",
+"params": {
+"q": "\"Portulaca oleracea\"",
+"size": "8",
+"sort": "bestmatch",
+"type": "dataset"
+},
+"status": 200,
+"url": "https://zenodo.org/api/records"
+},
+{
+"data": null,
+"headers": {
+"content-length": "41220"
+},
+"json": {
+"hits": {
+"hits": [
+{
+"files": [
+{
+"checksum": "md5:2f72cd3395fd6b7c487ffa9a42ba130f",
+"key": "Dataset_BarcoAntonanzas_2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/15875029/files/Dataset_BarcoAntonanzas_2022.zip/content"
+},
+"size": 21656
+}
+],
+"id": 15875029,
+"links": {
+"self_html": "https://zenodo.org/records/15875029"
+},
+"metadata": {
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>Mar&iacute;a Barco-Anto&ntilde;anzas, Miriam Gil-Monreal, Mikel V. Eceiza, Mercedes Royuela, Ana Zabalza, Primary metabolism in an Amaranthus palmeri population with multiple resistance to glyphosate and pyrithiobac herbicides, Plant Science, Volume 318, 2022, 111212,</p>",
+"keywords": [
+"glyphosate",
+"acetolactate synthase",
+"palmer amaranth",
+"5-enolpyruvylshikimate-3-phosphate synthase",
+"target site resistance"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Daset_BarcoAnto\u00f1anzas2022"
+},
+"revision": 10
+},
+{
+"files": [
+{
+"checksum": "md5:f2e95366f39ebf4e4029fb1a449050e7",
+"key": "Master_Planting_List2_Feb16.csv",
+"links": {
+"self": "https://zenodo.org/api/records/5532803/files/Master_Planting_List2_Feb16.csv/content"
+},
+"size": 108897
+},
+{
+"checksum": "md5:d588406cec5da4f2616a735e12583685",
+"key": "R_Mapping_Locations.csv",
+"links": {
+"self": "https://zenodo.org/api/records/5532803/files/R_Mapping_Locations.csv/content"
+},
+"size": 649
+},
+{
+"checksum": "md5:52bafbb8eaf78cb0fce9bc0668e396d3",
+"key": "Block1_Resistance_F_Fitness.csv",
+"links": {
+"self": "https://zenodo.org/api/records/5532803/files/Block1_Resistance_F_Fitness.csv/content"
+},
+"size": 23566
+},
+{
+"checksum": "md5:ac0cd319a75d80ac8583aa27e1b2b774",
+"key": "ddPCR_data_Feb16.csv",
+"links": {
+"self": "https://zenodo.org/api/records/5532803/files/ddPCR_data_Feb16.csv/content"
+},
+"size": 28450
+},
+{
+"checksum": "md5:5030f340bd47191e8f0515c2583f6b4b",
+"key": "ddPCR_replicates.csv",
+"links": {
+"self": "https://zenodo.org/api/records/5532803/files/ddPCR_replicates.csv/content"
+},
+"size": 1087
+},
+{
+"checksum": "md5:5ea1cd945ebcd4fc5e5fcc1df6fd0db0",
+"key": "Experiment1_GH_2017_Block1_2_Resistance_sby.csv",
+"links": {
+"self": "https://zenodo.org/api/records/5532803/files/Experiment1_GH_2017_Block1_2_Resistance_sby.csv/content"
+},
+"size": 124563
+},
+{
+"checksum": "md5:a2623829e4bdba87f903c442d8a785ee",
+"key": "ReadMe.docx",
+"links": {
+"self": "https://zenodo.org/api/records/5532803/files/ReadMe.docx/content"
+},
+"size": 26027
+}
+],
+"id": 5532803,
+"links": {
+"self_html": "https://zenodo.org/records/5532803"
+},
+"metadata": {
+"description": "<p>Gene copy number variation (CNV) has been increasingly associated with organismal responses to environmental stress, but we know little about the quantitative relation between CNV and phenotypic variation. In this study we quantify the relation between variation in <i>EPSPS</i> (5-enolpyruvylshikimate-3-phosphate synthase) copy number using digital drop PCR and variation in phenotypic glyphosate resistance in 22 populations of <i>Amaranthus palmeri</i> (Palmer Amaranth), a range-expanding agricultural weed. Overall, we detected a significant positive relation between population mean copy number and resistance. The majority of populations exhibited high glyphosate resistance yet maintained low-resistance individuals, resulting in bimodality in many populations. We also investigated threshold models for the relation between copy number and resistance, and found evidence for a threshold of ~15 <i>EPSPS</i> copies: there was a steep increase in resistance below the threshold, followed by a much shallower increase. Across 924 individuals, as copy number increases the range of variation in resistance decreases, yielding an increasing frequency of high phenotypic resistance individuals",
+"license": {
+"id": "cc-zero"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Amaranthus palmeri EPSPS copy number and glyphosate resistance variation"
+},
+"revision": 3
+},
+{
+"files": [
+{
+"checksum": "md5:5f3cdd017f34953e7773cb55a5c89b65",
+"key": "Year2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2022.zip/content"
+},
+"size": 11078601602
+},
+{
+"checksum": "md5:f0c025a55046274921cb1ca19882d986",
+"key": "Year2021_Part1.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2021_Part1.zip/content"
+},
+"size": 10703691024
+},
+{
+"checksum": "md5:49699cd1aa4ce15e6351f5d6e98bf63b",
+"key": "README.txt",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/README.txt/content"
+},
+"size": 2236
+},
+{
+"checksum": "md5:22cee76b6e01483d03991e80c5f1877b",
+"key": "Year2021_Part2.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2021_Part2.zip/content"
+},
+"size": 14047434538
+}
+],
+"id": 10762138,
+"links": {
+"self_html": "https://zenodo.org/records/10762138"
+},
+"metadata": {
+"description": "<div>The <strong>2SeasonWeedDet8</strong> dataset comprises two eight-class sub-datasets acquired in two consecutive seasons of 2021 and 2022. It was specifically curated for assessing the cross-season generalization assessment of weed detection models.</div>\n<div>\n<ul>\n<li>Images in both years were captured for naturally germinated weeds using smartphone or digital color cameras in cotton fields across Mississippi.&nbsp;</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Images were manually labeled by qualified personnel who draw bounding boxes for individual weed plants using the VGG Image Annotator (version 2.10).&nbsp;</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Initial annotations were examined by PI or trained personnel for weed identification for quality control before inclusions in the final dataset.</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Weed classes of the dataset include: Waterhemp, Carpetweed, Morninglory, Goosegrass, Spotted Spurge, Palmer Amaranth, Purslane, and Ragweed.</li>\n</ul>\n</div>\n<div>&nbsp;</div>\n<div>\n<p>Each weed image (in .jpg format) has one corresponding annotation file of the same file name, in both JSON and XML formats, placed in the same folder.&nbsp;</p>\n<ul>\n<li>For the JSON file, ",
+"license": {
+"id": "cc-by-nc-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "2SeasonWeedDet8: a two-season, 8-class dataset for cross-season weed detection generalization evaluation"
+},
+"revision": 10
+},
+{
+"files": [
+{
+"checksum": "md5:b1feda76a25d66f71d3e47ab0a2b9644",
+"key": "data2023.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2023.zip/content"
+},
+"size": 7593663005
+},
+{
+"checksum": "md5:270de0a1fe1cbcaebf50a5a8906baf14",
+"key": "README.txt",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/README.txt/content"
+},
+"size": 3312
+},
+{
+"checksum": "md5:5231b854e8b1c72d615a0b29d57e2577",
+"key": "data2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2022.zip/content"
+},
+"size": 11139611582
+},
+{
+"checksum": "md5:9a7684fe52d6487fecf8048e5742c59a",
+"key": "data2021.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2021.zip/content"
+},
+"size": 24600835651
+}
+],
+"id": 14861516,
+"links": {
+"self_html": "https://zenodo.org/records/14861516"
+},
+"metadata": {
+"description": "<p>The&nbsp;<strong>3SeasonWeedDet10</strong> is a three-season dataset comprising 10 weed classes of images acquired in three consecutive years. The ten weed classes in the dataset, defined as common weed names, include Carpetweed, Eclipta, Goosegrass, Lambsquarters, Morningglory, Ragweed, Palmer Amaranth, Purslane, Spotted spurge, and Waterhemp. Although the dataset was specifically curated as a testbed for training ControlNet-added stable diffusion models for weed image generation and enhanced weed detection, it can be generally used for evaluating computer vision algorithms and artificial intelligence (AI) models for weed detection, especially in cross-season generation studies. &nbsp;</p>\n<p>&nbsp;</p>\n<p>This dataset contains three subsets, i.e., <strong>data2021</strong>, <strong>data2022</strong>, and <strong>data2023 </strong>for the data collected in the years 2021, 2022, and 2023, respectively. &nbsp;</p>\n<ul>\n<li><strong>data2021</strong>: derived from our previous&nbsp;<a href=\"https://zenodo.org/records/7535814\">CottonWeedDet12</a> dataset, this subset has <strong>4704</strong> images with <strong>7892</strong> annotated weed instances (bounding boxes).&nbsp; &nbsp;</",
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "3SeasonWeedDet10: a three-season, 10-class dataset for benchmarking AI models for robust weed detection"
+},
+"revision": 12
+},
+{
+"files": [
+{
+"checksum": "md5:f3f3c833b76ffea676e9690350c338a1",
+"key": "weed_dataset.zip",
+"links": {
+"self": "https://zenodo.org/api/records/15808623/files/weed_dataset.zip/content"
+},
+"size": 49704794641
+}
+],
+"id": 15808623,
+"links": {
+"self_html": "https://zenodo.org/records/15808623"
+},
+"metadata": {
+"description": "<p>This dataset is a comprehensive collection of temporally annotated weed imagery designed for computer vision applications in precision agriculture.&nbsp;Developed at the&nbsp;<a href=\"https://g.co/kgs/7wvk7dA\" target=\"_blank\" rel=\"noopener\">SIU Horticulture Research Center</a> in 2024, this dataset capture the complete growth progression of 16 agriculturally significant weed species over an 11-week developmental cycle. The <a href=\"https://www.nature.com/articles/s41598-025-05092-z\" target=\"_blank\" rel=\"noopener\">paper</a> associated with this dataset has been published in Scientific Reports. Codes are available at our project <a href=\"https://github.com/taminulislam/weedswin\" target=\"_blank\" rel=\"noopener\">GitHub page</a>.</p>\n<h3><strong>Dataset Composition</strong></h3>\n<p>The datasets encompass 16 weed species from 8 botanical families, including&nbsp;AMAPA (palmer amaranth), AMARE&nbsp;(redroot pigweed), AMATU (waterhemp), DIGSA (large crabgrass), ECHCG (barnyardgrass), CHEAL (common lambsquarter), ABUTH (velvetleaf), AMBEL (common ragweed), CYPES (yellow nutsedge), ERICA (horseweed), PANDI (fall panicum), SETFA (giant foxtail), SETPU (yellow foxtail), SIDSP (prickly sida),",
+"keywords": [
+"weed dataset",
+"weed",
+"weed species",
+"weed growth stage",
+"agriculture dataset",
+"weed classification",
+"weed detection"
+],
+"license": {
+"id": "cc-by-nc-sa-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Weed Growth Stage Dataset"
+},
+"revision": 20
+}
+],
+"total": 5
+}
+},
+"method": "GET",
+"params": {
+"q": "\"Palmer amaranth\"",
+"size": "8",
+"sort": "bestmatch",
+"type": "dataset"
+},
+"status": 200,
+"url": "https://zenodo.org/api/records"
+},
+{
+"data": null,
+"headers": {
+"content-length": "453"
+},
+"json": {
+"hits": {
+"hits": [],
+"total": 0
+}
+},
+"method": "GET",
+"params": {
+"q": "\"Sicklepod\"",
+"size": "8",
+"sort": "bestmatch",
+"type": "dataset"
+},
+"status": 200,
+"url": "https://zenodo.org/api/records"
+},
+{
+"data": null,
+"headers": {
+"content-length": "45562"
+},
+"json": {
+"hits": {
+"hits": [
+{
+"files": [
+{
+"checksum": "md5:5eba3e7f43e7c1a49518e1bbdbbedc40",
+"key": "Photosynthetic Pigment Data_all varieties_For Zonedo corr MIH.xlsx",
+"links": {
+"self": "https://zenodo.org/api/records/6578412/files/Photosynthetic%20Pigment%20Data_all%20varieties_For%20Zonedo%20corr%20MIH.xlsx/content"
+},
+"size": 528789
+}
+],
+"id": 6578412,
+"links": {
+"self_html": "https://zenodo.org/records/6578412"
+},
+"metadata": {
+"description": "<p>Photosynthetic Pigment Data_all varieties : Common purslane (Portulaca oleracea) and annual ryegrass (Lolium rigidum) treated with different Wheat, Buckwheat varieties)</p>",
+"keywords": [
+"Photosynthetic Pigments"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Photosynthetic Pigment Data_all varieties_For Zonedo corr MIH"
+},
+"revision": 2
+},
+{
+"files": [
+{
+"checksum": "md5:0ce1c7f83e85080dc23b967e5a0fe0be",
+"key": "Minimal_Dataset_Pb_Biochar_Purslane_v2.xlsx",
+"links": {
+"self": "https://zenodo.org/api/records/21969571/files/Minimal_Dataset_Pb_Biochar_Purslane_v2.xlsx/content"
+},
+"size": 19746
+}
+],
+"id": 21969571,
+"links": {
+"self_html": "https://zenodo.org/records/21969571"
+},
+"metadata": {
+"description": "<p>This dataset contains the replicate-level experimental data underlying the manuscript entitled &ldquo;Lead-Induced Nutrient Imbalance and Biochar-Mediated Nutrient Homeostasis Responses in Purslane (Portulaca oleracea L.).&rdquo; It includes shoot fresh weight, shoot dry weight, shoot height, shoot Pb concentration, macro- and micronutrient concentrations, and calculated nutrient uptake values for 27 independent pots under different Pb and biochar treatments. Version 2.0 includes corrected shoot dry weight data and newly calculated pot-level uptake values for N, P, K, Ca, Mg, Fe, Cu, Zn, Mn, and B.</p>",
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Minimal Dataset for Lead-Induced Nutrient Imbalance and Biochar-Mediated Nutrient Homeostasis Responses in Purslane (Portulaca oleracea L.)"
+},
+"revision": 4
+},
+{
+"files": [
+{
+"checksum": "md5:006db24a62311a9bdf5636b92a8c0da3",
+"key": "CoFly-WeedDB.zip",
+"links": {
+"self": "https://zenodo.org/api/records/6697343/files/CoFly-WeedDB.zip/content"
+},
+"size": 1198780322
+}
+],
+"id": 6697343,
+"links": {
+"self_html": "https://zenodo.org/records/6697343"
+},
+"metadata": {
+"description": "<p>The CoFly-WeedDB contains 201 RGB images (~436MB) from the attached camera of DJI Phantom Pro 4 from a cotton field in Larissa, Greece during the first stages of plant growth. The RGB images were collected while the Unmanned Aerial Vehicle (UAV) was performing a coverage mission over the field&#39;s area. During the designed mission, the camera angle was adjusted to -87&deg;, vertically with the field. The flight altitude and speed of the UAV were equal to 5m and 3m/s, respectively, aiming to provide a close and clear view of the weed instances.&nbsp; All images have been annotated by expert agronomists using the LabelMe annotation tool, providing the exact boundaries of 3 types of common weeds in this type of crop, namely (i) Johnson grass, (ii) Field bindweed, and (iii) Purslane. The dataset can be used alone and in combination with other datasets to develop AI-based methodologies for automatic weed segmentation and classification purposes.</p>",
+"keywords": [
+"Precision Agriculture, UAV Dataset, Weed Detection, Deep Convolutional Neural Networks, Semantic Segmentation"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "CoFly-WeedDB: A UAV image dataset for weed detection and species identification"
+},
+"revision": 2
+},
+{
+"files": [
+{
+"checksum": "md5:5f3cdd017f34953e7773cb55a5c89b65",
+"key": "Year2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2022.zip/content"
+},
+"size": 11078601602
+},
+{
+"checksum": "md5:f0c025a55046274921cb1ca19882d986",
+"key": "Year2021_Part1.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2021_Part1.zip/content"
+},
+"size": 10703691024
+},
+{
+"checksum": "md5:49699cd1aa4ce15e6351f5d6e98bf63b",
+"key": "README.txt",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/README.txt/content"
+},
+"size": 2236
+},
+{
+"checksum": "md5:22cee76b6e01483d03991e80c5f1877b",
+"key": "Year2021_Part2.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2021_Part2.zip/content"
+},
+"size": 14047434538
+}
+],
+"id": 10762138,
+"links": {
+"self_html": "https://zenodo.org/records/10762138"
+},
+"metadata": {
+"description": "<div>The <strong>2SeasonWeedDet8</strong> dataset comprises two eight-class sub-datasets acquired in two consecutive seasons of 2021 and 2022. It was specifically curated for assessing the cross-season generalization assessment of weed detection models.</div>\n<div>\n<ul>\n<li>Images in both years were captured for naturally germinated weeds using smartphone or digital color cameras in cotton fields across Mississippi.&nbsp;</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Images were manually labeled by qualified personnel who draw bounding boxes for individual weed plants using the VGG Image Annotator (version 2.10).&nbsp;</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Initial annotations were examined by PI or trained personnel for weed identification for quality control before inclusions in the final dataset.</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Weed classes of the dataset include: Waterhemp, Carpetweed, Morninglory, Goosegrass, Spotted Spurge, Palmer Amaranth, Purslane, and Ragweed.</li>\n</ul>\n</div>\n<div>&nbsp;</div>\n<div>\n<p>Each weed image (in .jpg format) has one corresponding annotation file of the same file name, in both JSON and XML formats, placed in the same folder.&nbsp;</p>\n<ul>\n<li>For the JSON file, ",
+"license": {
+"id": "cc-by-nc-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "2SeasonWeedDet8: a two-season, 8-class dataset for cross-season weed detection generalization evaluation"
+},
+"revision": 10
+},
+{
+"files": [
+{
+"checksum": "md5:b1feda76a25d66f71d3e47ab0a2b9644",
+"key": "data2023.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2023.zip/content"
+},
+"size": 7593663005
+},
+{
+"checksum": "md5:270de0a1fe1cbcaebf50a5a8906baf14",
+"key": "README.txt",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/README.txt/content"
+},
+"size": 3312
+},
+{
+"checksum": "md5:5231b854e8b1c72d615a0b29d57e2577",
+"key": "data2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2022.zip/content"
+},
+"size": 11139611582
+},
+{
+"checksum": "md5:9a7684fe52d6487fecf8048e5742c59a",
+"key": "data2021.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2021.zip/content"
+},
+"size": 24600835651
+}
+],
+"id": 14861516,
+"links": {
+"self_html": "https://zenodo.org/records/14861516"
+},
+"metadata": {
+"description": "<p>The&nbsp;<strong>3SeasonWeedDet10</strong> is a three-season dataset comprising 10 weed classes of images acquired in three consecutive years. The ten weed classes in the dataset, defined as common weed names, include Carpetweed, Eclipta, Goosegrass, Lambsquarters, Morningglory, Ragweed, Palmer Amaranth, Purslane, Spotted spurge, and Waterhemp. Although the dataset was specifically curated as a testbed for training ControlNet-added stable diffusion models for weed image generation and enhanced weed detection, it can be generally used for evaluating computer vision algorithms and artificial intelligence (AI) models for weed detection, especially in cross-season generation studies. &nbsp;</p>\n<p>&nbsp;</p>\n<p>This dataset contains three subsets, i.e., <strong>data2021</strong>, <strong>data2022</strong>, and <strong>data2023 </strong>for the data collected in the years 2021, 2022, and 2023, respectively. &nbsp;</p>\n<ul>\n<li><strong>data2021</strong>: derived from our previous&nbsp;<a href=\"https://zenodo.org/records/7535814\">CottonWeedDet12</a> dataset, this subset has <strong>4704</strong> images with <strong>7892</strong> annotated weed instances (bounding boxes).&nbsp; &nbsp;</",
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "3SeasonWeedDet10: a three-season, 10-class dataset for benchmarking AI models for robust weed detection"
+},
+"revision": 12
+},
+{
+"files": [
+{
+"checksum": "md5:bc15345dc50bf8f72fd11e8d2198f287",
+"key": "ICSEFT-59.pdf",
+"links": {
+"self": "https://zenodo.org/api/records/20567141/files/ICSEFT-59.pdf/content"
+},
+"size": 1256842
+}
+],
+"id": 20567141,
+"links": {
+"self_html": "https://zenodo.org/records/20567141"
+},
+"metadata": {
+"description": "<p>The present work reports the effect of hybridization on physical and mechanical properties of date palm petiole (DP)/sea purslane (SP) fiber reinforced hybrid epoxy composites. Using a standard hand lay-up method, five types of composites were fabricated (C1, C2, H1, H2, and H3) taking 20 wt% of fibers as reinforcement. Various physical properties (density, void content) and mechanical properties (tensile, flexural, impact and hardness)were investigated. It was observed that H3 (5wt %DP +15wt%SP) type composites reveal highest mechanical properties. It also shows less void content with comparison to other fabricated composites which enhances its hardness. With better properties, the fabricated hybrid composites can be used for fabrication of automotive exterior parts as well as dashboard and interior door panels.</p>",
+"keywords": [
+"Date palm sea purslane hybrid mechanical properties epoxy"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "PERFORMANCE EVALUATION OF HYBRID EPOXY COMPOSITES REINFORCED WITH DATE PALM AND SEA PURSLANE FIBERS FOR AUTOMOTIVE APPLICATIONS"
+},
+"revision": 3
+},
+{
+"files": [
+{
+"checksum": "md5:cbe442d5a23d0037201fa4def813c112",
+"key": "1232.pdf",
+"links": {
+"self": "https://zenodo.org/api/records/16418387/files/1232.pdf/content"
+},
+"size": 418091
+}
+],
+"id": 16418387,
+"links": {
+"self_html": "https://zenodo.org/records/16418387"
+},
+"metadata": {
+"description": "<p>Portulacaoleracea L.,commonly known as purslane, is a widely distributed annual succulent plant traditionally used in various folk medicinal systems. Rich in bioactive compounds such as omega-3 fatty acids, flavonoids, alkaloids, vitamins, and minerals, P. oleracea has drawn significant scientific interest for its pharmacological potential. Numerous studies have highlighted its antioxidant, anti-inflammatory, antimicrobial, antidiabetic, neuroprotective, and hepatoprotective properties.Additionally, it has shown promising effects in cardiovascular health and wound healing. This review provides a comprehensive overview of the ethnobotanical uses, phytochemical composition, and diverse therapeutic potentials of Portulacaoleracea, aiming to bridge traditional knowledge with modern pharmacological evidence. The plants safety profile, potential applications in nutraceutical and pharmaceutical industries, and areas requiring further investigation are also discussed. This synthesis underscores P. oleracea as a valuable medicinal resource that merits more attention in clinical and experimental research.</p>\n<p>&nbsp;</p>",
+"keywords": [
+"Portulacaoleracea Pharmacological Activities Medicinal Plant Bioactive Compounds"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "PORTULACAOLERACEA (KHURFA)-WHOLE PLANT: AN UNDERUTILIZED MEDICINAL PLANT WITH PROMISING PHARMACOLOGICAL ACTIVITIES-A REVIEW"
+},
+"revision": 3
+}
+],
+"total": 7
+}
+},
+"method": "GET",
+"params": {
+"q": "\"Purslane\"",
+"size": "8",
+"sort": "bestmatch",
+"type": "dataset"
+},
+"status": 200,
+"url": "https://zenodo.org/api/records"
+},
+{
+"data": null,
+"headers": {},
+"json": {
+"agcontexts": [
+{
+"category_statistics": {
+"weed: amaranthus palmeri (BBCH10-12)": {
+"annotation_count": 509,
+"bounding_box_count": 509,
+"image_count": 65,
+"segmentation_count": 0
+},
+"weed: amaranthus palmeri (BBCH13-16)": {
+"annotation_count": 314,
+"bounding_box_count": 314,
+"image_count": 121,
+"segmentation_count": 0
+},
+"weed: amaranthus palmeri (BBCH13-29 - bushy)": {
+"annotation_count": 361,
+"bounding_box_count": 361,
+"image_count": 237,
+"segmentation_count": 0
+},
+"weed: amaranthus palmeri (BBCH17-19)": {
+"annotation_count": 246,
+"bounding_box_count": 246,
+"image_count": 175,
+"segmentation_count": 0
+},
+"weed: amaranthus palmeri (BBCH51-59 - bushy)": {
+"annotation_count": 202,
+"bounding_box_count": 202,
+"image_count": 170,
+"segmentation_count": 0
+},
+"weed: amaranthus palmeri (BBCH51-59)": {
+"annotation_count": 68,
+"bounding_box_count": 68,
+"image_count": 63,
+"segmentation_count": 0
+},
+"weed: amaranthus palmeri (BBCH60-69 - bushy)": {
+"annotation_count": 175,
+"bounding_box_count": 175,
+"image_count": 147,
+"segmentation_count": 0
+},
+"weed: amaranthus palmeri (BBCH60-69)": {
+"annotation_count": 65,
+"bounding_box_count": 65,
+"image_count": 57,
+"segmentation_count": 0
+}
+},
+"id": 0,
+"n_images": 614
+}
+],
+"head_version": 2,
+"metadata": {
+"creator": [
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "University of Sydney"
+},
+"name": "Guy Coleman",
+"sameAs": "https://orcid.org/0000-0002-8808-2965"
+},
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Texas A&M University"
+},
+"name": "Matthew Kutugata"
+},
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "University of Sydney"
+},
+"name": "Michael Walsh"
+},
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Texas A&M University"
+},
+"name": "Muthukumar Bagavathiannan"
+}
+],
+"description": "Images of Palmer amaranth at eight different growth stages collected in cotton at the Texas A&M University farm in College Station, Texas. The dataset is a benchmark for growth stage detection under highly variable conditions in a morphologically challenging plant species.",
+"license": "https://creativecommons.org/licenses/by/4.0/",
+"name": "Palmer amaranth Growth Stage - 8 (PAGS8)"
+}
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://weed-ai.sydney.edu.au/api/upload_info/5c78d067-8750-4803-9cbe-57df8fae55e4"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "1925536422"
+},
+"method": "HEAD",
+"params": {},
+"status": 200,
+"text": "",
+"url": "https://weed-ai.sydney.edu.au/code/download/5c78d067-8750-4803-9cbe-57df8fae55e4.zip"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "6071"
+},
+"json": {
+"build_response_end": 1790627523.93925,
+"build_response_start": 1790627523.913865,
+"dataready": "0.025",
+"html_response_code": "200",
+"method": "GET",
+"nodelist": [
+[
+{
+"attributes": {
+"affiliation": "1. Technical University of Munich, TUM Campus Straubing for Biotechnology and Sustainability, Bioinformatics, Schulgasse 22, 94315 Straubing, Germany <br> 2. Weihenstephan-Triesdorf University of Applied Sciences, Bioinformatics, Petersgasse 18, 94315 Straubing, Germany <br> 3. Technical University of Munich, TUM School of Computation, Information and Technology (CIT), Boltzmannstr. 3, 85748 Garching, Germany <br> 4. Institute for Crop Science and Plant Breeding, Bavarian State Research Center for Agriculture, Am Gereuth 6, 85354 Freising, Germany <br> 5. Technology and Support Centre in the Centre of Excellence for Renewable Resources (TFZ), Schulgasse 18, 94315 Straubing, Germany<br>",
+"author": "Genze,Nikita (1;2); Vahl, Wouter K. (4); Groth, Jennifer (4); Wirth, Maximilian (1;2); Grieb, Michael (5); Grimm, Dominik G. (1;2;3) <br>",
+"author.public_email": "dominik.grimm@tum.de",
+"creationtime": "2023-07-28T14:56:15",
+"data_source": "Abbildungen von Objekten / image of objects;Textdokumente / text documents",
+"data_source_other": "",
+"date_production": "2021-12-13T00:00:00",
+"date_publication": "2023-10-27T00:00:00",
+"description": "To generate a dataset consisting of high quality images that capture the initial growth dynamics of individual plants of several weed species, a greenhouse experiment was performed at the Moving Fields facility of the LfL in Freising, Germany. This experiment took place from 16.06.2021 - 13.12.2021. The plant species were selected as weed species common to fields of sorghum grown in Germany. A Scanalyzer 3D imaging cabin of the Moving Fields facility was used for generating high-quality images. In this cabin, one RGB camera (Basler piA2400-17gm) is mounted 2.8 m perpendicular above the conveyor band. This camera takes images with 2456 x 2058 pixels, which resulted in a ground sampling distance of \u223c 0.1735 mm per pixel.\r\nEach plant in a plot was annotated with bounding boxes using the open souce software CVAT (cvat.ai) throughout the growth, leading to a timeseries of images from sprouting to harvest. The seeds differed in germination rate thus a variable amount of plots were sown per species. This helped mitigating the imbalance issue, but there is still class imbalance in this dataset.\r\nThe dataset contains 640 plots of 28 weed species (monocots and dicots), 6 varieties of Sorghum and 2 varieties of Maize. Each plot consists of a timeseries of images resulting in > 82.000 images in total.",
+"doi": "10.14459/2023mp1717366",
+"format": "Bilder / images;Tabellen / tables",
+"format_other": "csv",
+"fp7-projectid": "",
+"horizont2020-projectid": "",
+"keywords": "Weed Detection; Computer Vision; Object Detection; Weed Classification; Segmentation; Time-series",
+"language": "en",
+"license": "by, http://creativecommons.org/licenses/by/4.0",
+"license_other": "",
+"method": "The plants were grown in plots that were watered and photographed automatically on at least a daily basis from the day of sowing till harvest, which took place at around shooting. Afterwards plants in a plot was annotated with bounding boxes using the open souce software CVAT (cvat.ai) throughout the growth, leading to a timeseries of images from sprouting to harvest. Not each plant in a plot was annotated, leading to plots that were fully annotated (usable in object detection and tracking) and partly annotated - which can be used for classification and pre-training. Additionally, we provide some images of trays that were not annotated.<br>Finally, we provide instance segmentation masks for a total of >2.000 plant samples of 14 different species.",
+"publisher": "TUM",
+"responsible": "Grimm, Dominik G",
+"sortfield": "off",
+"special_field": "",
+"subject": "BIO Biowissenschaften;DAT Datenverarbeitung, Informatik;LAN Landbauwissenschaft;NAT Naturwissenschaften (allgemein)",
+"subject_add": "",
+"technical_notes": "<a href=\"https://dataserv.ub.tum.de/index.php/s/m1717366\" target=\"_blank\">View and download (928 GB total, 421 Files)</a><br/> The data server also offers <a href=\"ftp://m1717366:m1717366@dataserv.ub.tum.de:21\" target=\"_blank\">downloads with FTP</a><br/> The data server also offers downloads with rsync (password m1717366):<br/> <code>rsync rsync://m1717366@dataserv.ub.tum.de/m1717366/</code>",
+"title": "Manually annotated and curated dataset of diverse weed species in maize and sorghum for computer vision",
+"type": "Forschungsdaten",
+"updatetime": "2023-10-27T13:04:34",
+"www-address": "This dataset relates to the publication: <a href=\" https://www.nature.com/articles/s41597-024-02945-6\" target=\"_blank\"> https://www.nature.com/articles/s41597-024-02945-6</a>",
+"year": "2023"
+},
+"id": 1717366
+}
+]
+],
+"nodelist_count": 1,
+"nodelist_limit": 1,
+"nodelist_start": 0,
+"oauthuser": "",
+"path": "/services/export/node/1717366",
+"query": "attrspec=all&format=json",
+"result_shortlist": [],
+"retrievaldate": "2026-09-28T22:32:03",
+"sfields": [],
+"sortdirection": "",
+"sortfield": "",
+"status": "ok",
+"userid": null,
+"username": "guest"
+},
+"method": "GET",
+"params": {
+"attrspec": "all",
+"format": "json"
+},
+"status": 200,
+"url": "https://mediatum.ub.tum.de/services/export/node/1717366"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "4465"
+},
+"json": {
+"categories": [
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-189720754",
+"label": "Computer Vision"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-249523402",
+"label": "Machine Learning"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-257946001",
+"label": "Weed Management"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-442095486",
+"label": "Deep Learning"
+}
+],
+"data_licence": {
+"short_name": "CC BY 4.0"
+},
+"description": "Weeds are invasive plants that compete with crops for vital nutrients and often attract pests, significantly impacting agricultural productivity. They account for approximately 45% of the annual productivity loss in farming. Manual weeding methods, while effective, are labor-intensive and financially burdensome, particularly for smallholder farmers. Conversely, excessive reliance on chemical herbicides has led to herbicide resistance in several weed species, creating additional challenges in weed management.\n\nEmerging technologies, particularly artificial intelligence (AI) and computer vision, are revolutionizing agriculture by automating labor-intensive tasks. Computer vision enables the precise identification of crops and weeds from images, supporting autonomous systems for selective weeding and targeted herbicide application. To develop robust AI models, high-quality datasets are critical. Addressing this need, we introduce the MH-Weed16 Image Dataset, collected from soybean fields in the Maharashtra region of India between July 2023 and November 2023 under diverse natural field conditions.\nThe dataset comprises a total of 18,677 images of 16 weed species, annotated with the gui",
+"id": "d3n3mgjjbv",
+"institutions": [],
+"name": "MH-Weed16:An Indian Multiclass Annotated Weed Dataset for Computer Vision Tasks ",
+"size": 0,
+"version": 2
+},
+"method": "GET",
+"params": {
+"version": "2"
+},
+"status": 200,
+"url": "https://data.mendeley.com/public-api/datasets/d3n3mgjjbv"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "2472059"
+},
+"json": {
+"categories": [
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-189720754",
+"label": "Computer Vision"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-249562831",
+"label": "Vegetable"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-264728677",
+"label": "Leaf Vegetables"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-442095486",
+"label": "Deep Learning"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-603644649",
+"label": "Agriculture"
+}
+],
+"data_licence": {
+"short_name": "CC BY 4.0"
+},
+"description": "This repository contains a field-acquired RGB image dataset of five winter leafy vegetables cultivated in agricultural plots in Cumilla, Bangladesh, captured under natural conditions between November 2025 and January 2026. Images were collected using multiple smartphone devices (e.g., iPhone 15, Redmi Note 14 Pro, vivo Y50i) to introduce sensor variability. The dataset is designed for leafy vegetable image classification and includes natural variation in illumination, leaf pose/orientation, growth stage, and background.\n\nClasses (5)\n1) Purslane (Portulaca oleracea) \u2013 231 images\n2) Radish Leaves (Raphanus sativus) \u2013 186 images\n3) Red Amaranth (Amaranthus tricolor) \u2013 337 images\n4) Spinach (Spinacia oleracea) \u2013 342 images\n5) Sweet Pumpkin Leaves (Cucurbita moschata) \u2013 248 images\n\n\n",
+"id": "vzt878hwdn",
+"institutions": [
+{
+"id": "edf371b8-f2cd-4105-abcf-28abece11e13",
+"name": "Daffodil International University",
+"ror_id": "https://ror.org/052t4a858"
+}
+],
+"name": "AgroWinterLeaf-BD: A curated field image dataset of five winter leafy vegetables from Bangladesh",
+"size": 10737117707,
+"version": 1
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://data.mendeley.com/public-api/datasets/vzt878hwdn"
+},
+{
+"data": null,
+"headers": {},
+"json": {
+"agcontexts": [
+{
+"category_statistics": {
+"weed: amaranthus palmeri": {
+"annotation_count": 348,
+"bounding_box_count": 348,
+"image_count": 305,
+"segmentation_count": 0
+},
+"weed: amaranthus tuberculatus": {
+"annotation_count": 1959,
+"bounding_box_count": 1959,
+"image_count": 1413,
+"segmentation_count": 0
+},
+"weed: ambrosia artemisiifolia": {
+"annotation_count": 896,
+"bounding_box_count": 896,
+"image_count": 512,
+"segmentation_count": 0
+},
+"weed: eclipta": {
+"annotation_count": 865,
+"bounding_box_count": 865,
+"image_count": 576,
+"segmentation_count": 0
+},
+"weed: eleusine indica": {
+"annotation_count": 214,
+"bounding_box_count": 214,
+"image_count": 183,
+"segmentation_count": 0
+},
+"weed: euphorbia maculata": {
+"annotation_count": 956,
+"bounding_box_count": 956,
+"image_count": 671,
+"segmentation_count": 0
+},
+"weed: ipomoea indica": {
+"annotation_count": 1344,
+"bounding_box_count": 1344,
+"image_count": 1149,
+"segmentation_count": 0
+},
+"weed: mollugo verticillata": {
+"annotation_count": 962,
+"bounding_box_count": 962,
+"image_count": 564,
+"segmentation_count": 0
+},
+"weed: physalis angulata": {
+"annotation_count": 123,
+"bounding_box_count": 123,
+"image_count": 111,
+"segmentation_count": 0
+},
+"weed: portulaca oleracea": {
+"annotation_count": 992,
+"bounding_box_count": 992,
+"image_count": 652,
+"segmentation_count": 0
+},
+"weed: senna obtusifolia": {
+"annotation_count": 243,
+"bounding_box_count": 243,
+"image_count": 198,
+"segmentation_count": 0
+},
+"weed: sida rhombifolia": {
+"annotation_count": 486,
+"bounding_box_count": 486,
+"image_count": 433,
+"segmentation_count": 0
+}
+},
+"id": 0,
+"n_images": 5648
+}
+],
+"head_version": 1,
+"metadata": {
+"creator": [
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Michigan State University"
+},
+"name": "Fengying Dang"
+},
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Michigan State University"
+},
+"name": "Dong Chen"
+},
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Michigan State University"
+},
+"name": "Yuzhen Lu"
+},
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Mississippi State University"
+},
+"name": "Zhaojian Li"
+}
+],
+"description": "The dataset CottonWeedDet12 consists of 5648 RGB images of 12-class weeds that are common in cotton fields in the southern U.S. states, with a total of 9370 bounding boxes. These images were acquired by either smartphones or hand-held digital cameras, under natural field light condition and throughout June to September of 2021. The images were manually labeled by qualified personnel for weed identification, and the labeling process was done using the VGG Image Annotator (version 2.10).\n\nThe dataset, at the time of publication, is the largest publicly available multi-class dataset dedicated to weed detection. It expects to facilitate communicate efforts to exploit state-of-the-art deep learning method to push weed recognition to the next level. With the WeedDet12 dataset, a performance benc",
+"license": "https://creativecommons.org/licenses/by/4.0/",
+"name": "CottonWeedDet12"
+}
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://weed-ai.sydney.edu.au/api/upload_info/2c14915b-0827-4b65-9908-d2a6df0d48f3"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "29193000620"
+},
+"method": "HEAD",
+"params": {},
+"status": 200,
+"text": "",
+"url": "https://weed-ai.sydney.edu.au/code/download/2c14915b-0827-4b65-9908-d2a6df0d48f3.zip"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "5275"
+},
+"json": {
+"categories": [
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-209895139",
+"label": "Allelochemical"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-253057668",
+"label": "Agroecosystem"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-375109541",
+"label": "Agroecology"
+}
+],
+"data_licence": {
+"short_name": "CC BY 4.0"
+},
+"description": "The dataset records the effects of Eucalyptus tereticornis leaf extracts on black turtle bean (Phaseolus vulgaris L., NABE\u202f2) and common purslane (Portulaca oleracea L.) under five concentration treatments (0\u2013100% w/v) with three replicates. Over 14 days, germination, seedling growth, biomass, stem girth, and leaf count were measured. Analyses using ANOVA, Tukey\u2019s HSD, and linear mixed models showed concentration\u2011dependent inhibition (p < 0.01). Bean germination fell from 96.7% to 40.0%, with biomass reduced by ~50%. Purslane was more sensitive, with germination dropping from 90.0% to 13.3%, height reduced by over 60%, and fresh weight cut by 65%, though dry weight was unaffected. Significant Species \u00d7 Concentration interactions highlighted differential susceptibility, confirming strong allelopathic effects relevant to bioherbicide potential and eucalyptus agroforestry design.",
+"id": "7znrj57p3t",
+"institutions": [
+{
+"id": "a8e634fe-073c-4386-bb0d-2e90b06a582a",
+"name": "Muni University",
+"ror_id": "https://ror.org/04wr6mz63"
+}
+],
+"name": "Comparative allelopathic effects of Eucalyptus tereticornis leaf extracts on germination and seedling growth of black turtle bean (Phaseolus vulgaris) and common purslane (Portulaca oleracea)",
+"size": 26490,
+"version": 1
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://data.mendeley.com/public-api/datasets/7znrj57p3t"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "6476"
+},
+"json": {
+"categories": [
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-189720738",
+"label": "Artificial Intelligence"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-189720754",
+"label": "Computer Vision"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-190195236",
+"label": "Robotics"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-249523402",
+"label": "Machine Learning"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-257946001",
+"label": "Weed Management"
+}
+],
+"data_licence": {
+"short_name": "CC BY 4.0"
+},
+"description": "This dataset contains annotated RGB images collected to develop and benchmark YOLO models for weed detection in commercial horseradish (Armoracia rusticana) production systems in Southern Illinois. The data support research on vision-based, real-time robotic weeding in a high-value specialty crop with limited herbicide options. This dataset is provided to accompany the manuscript submitted to Frontiers in Agronomy, titled \u2018Evaluation of YOLO-based Weed Detection Models on Commercial Horseradish Fields in Southern Illinois'.\n\nImages were captured during the 2024 growing season from two commercial horseradish fields in Collinsville, Illinois, and one research plot (Illinois Autonomous Farm, UIUC). Two acquisition platforms were used:\n* A handheld Apple iPhone 13 Mini mounted on a monopod for proximal imaging between crop rows.\n* A Farm-ng Amiga mobile robot equipped with Luxonis OAK-D cameras for robotic imaging.\n\nVideos were recorded at 30 and 60 fps and further processed to convert to image frames. After curation and augmentation (e.g., flipping, saturation adjustments), the dataset contains approximately 2,696 images. Each image is annotated for object detection with two classes: ",
+"id": "fcf7brsfm6",
+"institutions": [
+{
+"id": "78ed3465-2e9a-490c-8f5d-8c87c1dd2cab",
+"name": "University of Illinois Urbana-Champaign",
+"ror_id": "https://ror.org/047426m28"
+}
+],
+"name": "Horseradish and weed dataset from commercial fields in Southern Illinois",
+"size": 518334744,
+"version": 1
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://data.mendeley.com/public-api/datasets/fcf7brsfm6"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "3504"
+},
+"json": {
+"categories": [
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-253045582",
+"label": "Antioxidant Capacity"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-257936874",
+"label": "Bioactive Compound"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-603568303",
+"label": "Antioxidant Enzyme"
+}
+],
+"data_licence": {
+"short_name": "CC BY 4.0"
+},
+"description": "Data from the manuscript Impact of the application of selenium nanoparticles on the physicochemical characteristics and antioxidant system in purslane (Portulaca oleracea L.) are shown.",
+"id": "gf9xctvjrf",
+"institutions": [
+{
+"id": "03f72aa3-cd2d-56fa-8c27-b823437e077f",
+"name": "Universidad Autonoma del Estado de Hidalgo",
+"ror_id": "https://ror.org/031f8kt38"
+}
+],
+"name": "Application of selenium nanoparticles in Portulaca oleracea L",
+"size": 16243,
+"version": 1
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://data.mendeley.com/public-api/datasets/gf9xctvjrf"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "38074"
+},
+"json": {
+"categories": [
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-520831004",
+"label": "Sanger Sequencing"
+}
+],
+"data_licence": {
+"short_name": "CC BY 4.0"
+},
+"description": "This repository contains all the electropherograms (ABI format chromatogram file, ab1) obtained by Sanger sequencing carried out for the paper entitled \u201cRecent discovery of Amaranthus palmeri (Amaranthaceae) in Italy: characterization of ALS-resistant populations and sensitivity to alternative herbicides\u201d. Three A. palmeri (Palmer Amaranth) populations were found in soybean fields in Italy, were ALS-resistance was suspected. Bioassay test revealed that all the three populations were cross-resistant to thifensulfuron-methyl and imazamox, due to a point mutation at position 574 of ALS. DNA of 15 plants per population, survived to the field dose of thifensulfuron-methyl, was extracted and primers AMA-2F (5\u2019-TCCCGGTTAAAATCATGCTC-3\u2019 / AMA-2R (5\u2019-CTTCTTCCATCACCCTCTGT-3\u2019) were used to amplify the region surrounding the position 574. Amplicons were purified and primers AMA-2R was used for Sanger sequencing. In order to facilitate data interpretation, the sequences have been renamed as: \nPopulation-code_plant#_CODONS\nCODONS might be W for tryptophan (wild type) and L for leucine (mutated). WL refers to heterozygous genotypes. Population codes are the same used in the paper. Sequences should",
+"id": "zjwvrbtbyt",
+"institutions": [
+{
+"id": "dc3d2b0b-8579-5cb8-b127-eaf5692b24d6",
+"name": "Istituto per la Protezione Sostenibile delle Piante Consiglio Nazionale delle Ricerche"
+}
+],
+"name": "Sanger sequences for \u201cRecent discovery of Amaranthus palmeri in Italy: characterization of ALS-resistant populations and sensitivity to alternative herbicides\u201d",
+"size": 9663399,
+"version": 1
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://data.mendeley.com/public-api/datasets/zjwvrbtbyt"
+},
+{
+"data": null,
+"headers": {
+"content-length": "8040"
+},
+"json": {
+"files": [
+{
+"checksum": "md5:5f3cdd017f34953e7773cb55a5c89b65",
+"key": "Year2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2022.zip/content"
+},
+"size": 11078601602
+},
+{
+"checksum": "md5:f0c025a55046274921cb1ca19882d986",
+"key": "Year2021_Part1.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2021_Part1.zip/content"
+},
+"size": 10703691024
+},
+{
+"checksum": "md5:49699cd1aa4ce15e6351f5d6e98bf63b",
+"key": "README.txt",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/README.txt/content"
+},
+"size": 2236
+},
+{
+"checksum": "md5:22cee76b6e01483d03991e80c5f1877b",
+"key": "Year2021_Part2.zip",
+"links": {
+"self": "https://zenodo.org/api/records/10762138/files/Year2021_Part2.zip/content"
+},
+"size": 14047434538
+}
+],
+"id": 10762138,
+"links": {
+"self_html": "https://zenodo.org/records/10762138"
+},
+"metadata": {
+"creators": [
+{
+"affiliation": "Michigan State University",
+"name": "Lu, Yuzhen"
+}
+],
+"description": "<div>The <strong>2SeasonWeedDet8</strong> dataset comprises two eight-class sub-datasets acquired in two consecutive seasons of 2021 and 2022. It was specifically curated for assessing the cross-season generalization assessment of weed detection models.</div>\n<div>\n<ul>\n<li>Images in both years were captured for naturally germinated weeds using smartphone or digital color cameras in cotton fields across Mississippi.&nbsp;</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Images were manually labeled by qualified personnel who draw bounding boxes for individual weed plants using the VGG Image Annotator (version 2.10).&nbsp;</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Initial annotations were examined by PI or trained personnel for weed identification for quality control before inclusions in the final dataset.</li>\n</ul>\n</div>\n<div>\n<ul>\n<li>Weed classes of the dataset include: Waterhemp, Carpetweed, Morninglory, Goosegrass, Spotted Spurge, Palmer Amaranth, Purslane, and Ragweed.</li>\n</ul>\n</div>\n<div>&nbsp;</div>\n<div>\n<p>Each weed image (in .jpg format) has one corresponding annotation file of the same file name, in both JSON and XML formats, placed in the same folder.&nbsp;</p>\n<ul>\n<li>For the JSON file, ",
+"license": {
+"id": "cc-by-nc-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "2SeasonWeedDet8: a two-season, 8-class dataset for cross-season weed detection generalization evaluation"
+},
+"revision": 10
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://zenodo.org/api/records/10762138"
+},
+{
+"data": null,
+"headers": {
+"content-length": "9030"
+},
+"json": {
+"files": [
+{
+"checksum": "md5:b1feda76a25d66f71d3e47ab0a2b9644",
+"key": "data2023.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2023.zip/content"
+},
+"size": 7593663005
+},
+{
+"checksum": "md5:270de0a1fe1cbcaebf50a5a8906baf14",
+"key": "README.txt",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/README.txt/content"
+},
+"size": 3312
+},
+{
+"checksum": "md5:5231b854e8b1c72d615a0b29d57e2577",
+"key": "data2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2022.zip/content"
+},
+"size": 11139611582
+},
+{
+"checksum": "md5:9a7684fe52d6487fecf8048e5742c59a",
+"key": "data2021.zip",
+"links": {
+"self": "https://zenodo.org/api/records/14861516/files/data2021.zip/content"
+},
+"size": 24600835651
+}
+],
+"id": 14861516,
+"links": {
+"self_html": "https://zenodo.org/records/14861516"
+},
+"metadata": {
+"creators": [
+{
+"affiliation": "Michigan State University",
+"name": "Lu, Yuzhen"
+}
+],
+"description": "<p>The&nbsp;<strong>3SeasonWeedDet10</strong> is a three-season dataset comprising 10 weed classes of images acquired in three consecutive years. The ten weed classes in the dataset, defined as common weed names, include Carpetweed, Eclipta, Goosegrass, Lambsquarters, Morningglory, Ragweed, Palmer Amaranth, Purslane, Spotted spurge, and Waterhemp. Although the dataset was specifically curated as a testbed for training ControlNet-added stable diffusion models for weed image generation and enhanced weed detection, it can be generally used for evaluating computer vision algorithms and artificial intelligence (AI) models for weed detection, especially in cross-season generation studies. &nbsp;</p>\n<p>&nbsp;</p>\n<p>This dataset contains three subsets, i.e., <strong>data2021</strong>, <strong>data2022</strong>, and <strong>data2023 </strong>for the data collected in the years 2021, 2022, and 2023, respectively. &nbsp;</p>\n<ul>\n<li><strong>data2021</strong>: derived from our previous&nbsp;<a href=\"https://zenodo.org/records/7535814\">CottonWeedDet12</a> dataset, this subset has <strong>4704</strong> images with <strong>7892</strong> annotated weed instances (bounding boxes).&nbsp; &nbsp;</",
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "3SeasonWeedDet10: a three-season, 10-class dataset for benchmarking AI models for robust weed detection"
+},
+"revision": 12
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://zenodo.org/api/records/14861516"
+},
+{
+"data": null,
+"headers": {
+"content-length": "4777"
+},
+"json": {
+"files": [
+{
+"checksum": "md5:2f72cd3395fd6b7c487ffa9a42ba130f",
+"key": "Dataset_BarcoAntonanzas_2022.zip",
+"links": {
+"self": "https://zenodo.org/api/records/15875029/files/Dataset_BarcoAntonanzas_2022.zip/content"
+},
+"size": 21656
+}
+],
+"id": 15875029,
+"links": {
+"self_html": "https://zenodo.org/records/15875029"
+},
+"metadata": {
+"creators": [
+{
+"affiliation": "Universidad Publica de Navarra Escuela T\u00e9cnica Superior de Ingenieros Agr\u00f3nomos",
+"name": "Zabalza, Ana"
+}
+],
+"description": "<p>Datos de la publicaci&oacute;n&nbsp;<br>Mar&iacute;a Barco-Anto&ntilde;anzas, Miriam Gil-Monreal, Mikel V. Eceiza, Mercedes Royuela, Ana Zabalza, Primary metabolism in an Amaranthus palmeri population with multiple resistance to glyphosate and pyrithiobac herbicides, Plant Science, Volume 318, 2022, 111212,</p>",
+"keywords": [
+"glyphosate",
+"acetolactate synthase",
+"palmer amaranth",
+"5-enolpyruvylshikimate-3-phosphate synthase",
+"target site resistance"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Daset_BarcoAnto\u00f1anzas2022"
+},
+"revision": 10
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://zenodo.org/api/records/15875029"
+},
+{
+"data": null,
+"headers": {
+"content-length": "4480"
+},
+"json": {
+"files": [
+{
+"checksum": "md5:0ce1c7f83e85080dc23b967e5a0fe0be",
+"key": "Minimal_Dataset_Pb_Biochar_Purslane_v2.xlsx",
+"links": {
+"self": "https://zenodo.org/api/records/21969571/files/Minimal_Dataset_Pb_Biochar_Purslane_v2.xlsx/content"
+},
+"size": 19746
+}
+],
+"id": 21969571,
+"links": {
+"self_html": "https://zenodo.org/records/21969571"
+},
+"metadata": {
+"creators": [
+{
+"affiliation": null,
+"name": "Balc\u0131, Meri\u00e7"
+}
+],
+"description": "<p>This dataset contains the replicate-level experimental data underlying the manuscript entitled &ldquo;Lead-Induced Nutrient Imbalance and Biochar-Mediated Nutrient Homeostasis Responses in Purslane (Portulaca oleracea L.).&rdquo; It includes shoot fresh weight, shoot dry weight, shoot height, shoot Pb concentration, macro- and micronutrient concentrations, and calculated nutrient uptake values for 27 independent pots under different Pb and biochar treatments. Version 2.0 includes corrected shoot dry weight data and newly calculated pot-level uptake values for N, P, K, Ca, Mg, Fe, Cu, Zn, Mn, and B.</p>",
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Minimal Dataset for Lead-Induced Nutrient Imbalance and Biochar-Mediated Nutrient Homeostasis Responses in Purslane (Portulaca oleracea L.)"
+},
+"revision": 4
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://zenodo.org/api/records/21969571"
+},
+{
+"data": null,
+"headers": {
+"content-length": "4811"
+},
+"json": {
+"files": [
+{
+"checksum": "md5:5eba3e7f43e7c1a49518e1bbdbbedc40",
+"key": "Photosynthetic Pigment Data_all varieties_For Zonedo corr MIH.xlsx",
+"links": {
+"self": "https://zenodo.org/api/records/6578412/files/Photosynthetic%20Pigment%20Data_all%20varieties_For%20Zonedo%20corr%20MIH.xlsx/content"
+},
+"size": 528789
+}
+],
+"id": 6578412,
+"links": {
+"self_html": "https://zenodo.org/records/6578412"
+},
+"metadata": {
+"creators": [
+{
+"affiliation": "Universidade de Vigo",
+"name": "Hussain, M.I."
+}
+],
+"description": "<p>Photosynthetic Pigment Data_all varieties : Common purslane (Portulaca oleracea) and annual ryegrass (Lolium rigidum) treated with different Wheat, Buckwheat varieties)</p>",
+"keywords": [
+"Photosynthetic Pigments"
+],
+"license": {
+"id": "cc-by-4.0"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Photosynthetic Pigment Data_all varieties_For Zonedo corr MIH"
+},
+"revision": 2
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://zenodo.org/api/records/6578412"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "3248"
+},
+"json": {
+"categories": [
+{
+"id": "http://data.elsevier.com/vocabulary/OmniScience/Concept-253439260",
+"label": "Analytical Chemistry Analysis"
+}
+],
+"data_licence": {
+"short_name": "CC BY NC 3.0"
+},
+"description": "Supplementary material for the Microchemical Journal, title: A rapid LC-MS/MS method for lutein quantification in spinach (Spinacia oleracea) \n\nMasashi Miura, Miho Sakai, Mamiko Nogami, Miwa Sato, Takeshi Yatsushiro\n\nAppendix A, which includes Fig. A.1 and A.2 and Tables A.1 to A.5.",
+"id": "2j77n3ynnc",
+"institutions": [],
+"name": "Data for: A rapid LC-MS/MS method for lutein quantification in spinach (Spinacia oleracea)  ",
+"size": 261542,
+"version": 1
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://data.mendeley.com/public-api/datasets/2j77n3ynnc"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "796564"
+},
+"json": {
+"categories": [
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-249564171",
+"label": "Biological Classification"
+},
+{
+"id": "data.elsevier.com/vocabulary/OmniScience/Concept-257197105",
+"label": "Characterization of Food"
+}
+],
+"data_licence": {
+"short_name": "CC BY 4.0"
+},
+"description": "Brassica oleracea, commonly known as kohlrabi, is a nutritious cruciferous vegetable widely consumed in South Asia. It is valued for its low calorie content, high moisture level, and crisp texture, making it suitable for healthy and diabetic-friendly diets. Kohlrabi is a good source of dietary fiber, vitamin C, vitamin B6, and minerals such as potassium, calcium, and magnesium, which support digestion, immunity, bone health, and cardiovascular function.\nThe standard shelf life of Brassica oleracea (kohlrabi) depends mainly on storage conditions. At ambient (room) temperature (25\u201330 \u00b0C), kohlrabi typically remains acceptable for 2\u20133 days. Rapid moisture loss, surface wrinkling, textural hardening, and microbial spoilage occur due to its high respiration rate and exposure to uncontrolled environmental conditions.\nFresh kohlrabi samples exhibiting light green to pale green coloration with smooth, firm, and intact skin represent better-preserved quality. Slight surface dullness and minor shrivelling indicate early moisture loss and onset of senescence. In contrast, severely deteriorated samples show yellowing or browning, surface cracks, fungal growth (white or grey mycelium), tissue s",
+"id": "3t3x2p5n5j",
+"institutions": [],
+"name": "Good and Bad classification of Brassica oleracea ",
+"size": 3661856286,
+"version": 1
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://data.mendeley.com/public-api/datasets/3t3x2p5n5j"
+},
+{
+"data": null,
+"headers": {},
+"json": {
+"agcontexts": [
+{
+"category_statistics": {
+"weed: amaranthus palmeri": {
+"annotation_count": 1405,
+"bounding_box_count": 1405,
+"image_count": 993,
+"segmentation_count": 0
+}
+},
+"id": 0,
+"n_images": 995
+}
+],
+"head_version": 1,
+"metadata": {
+"creator": [
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Cornell University"
+},
+"name": "Akhilesh Sharma"
+}
+],
+"description": "Images of Palmer amaranth annotated with bounding box in fallow, corn and soybeans ",
+"license": "https://creativecommons.org/licenses/by/4.0/",
+"name": "Palmer amaranth - Cornell"
+}
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://weed-ai.sydney.edu.au/api/upload_info/0935d5a0-1270-4e6b-9618-2224240b5a03"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "1315416729"
+},
+"method": "HEAD",
+"params": {},
+"status": 200,
+"text": "",
+"url": "https://weed-ai.sydney.edu.au/code/download/0935d5a0-1270-4e6b-9618-2224240b5a03.zip"
+},
+{
+"data": null,
+"headers": {},
+"json": {
+"agcontexts": [
+{
+"category_statistics": {
+"weed: amaranthus palmeri": {
+"annotation_count": 155,
+"bounding_box_count": 155,
+"image_count": 13,
+"segmentation_count": 0
+}
+},
+"id": 0,
+"n_images": 13
+}
+],
+"head_version": 3,
+"metadata": {
+"creator": [
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "University of Sydney"
+},
+"name": "Guy Coleman"
+}
+],
+"description": "A set of images collected in a cotton field with dense Palmer amaranth infestation. Uploaded as a test dataset for a webinar on the upload process.",
+"license": "https://creativecommons.org/licenses/by/4.0/",
+"name": "Palmer amaranth"
+}
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://weed-ai.sydney.edu.au/api/upload_info/7e03cd97-f462-439d-b4c7-b6289edcc21b"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "13786820"
+},
+"method": "HEAD",
+"params": {},
+"status": 200,
+"text": "",
+"url": "https://weed-ai.sydney.edu.au/code/download/7e03cd97-f462-439d-b4c7-b6289edcc21b.zip"
+},
+{
+"data": null,
+"headers": {},
+"json": {
+"agcontexts": [
+{
+"category_statistics": {
+"weed: amaranthus palmeri": {
+"annotation_count": 493,
+"bounding_box_count": 493,
+"image_count": 260,
+"segmentation_count": 0
+},
+"weed: amaranthus tuberculatus": {
+"annotation_count": 197,
+"bounding_box_count": 197,
+"image_count": 152,
+"segmentation_count": 0
+},
+"weed: chenopodium album": {
+"annotation_count": 464,
+"bounding_box_count": 464,
+"image_count": 311,
+"segmentation_count": 0
+},
+"weed: taraxacum officinale": {
+"annotation_count": 144,
+"bounding_box_count": 144,
+"image_count": 99,
+"segmentation_count": 0
+},
+"weed: xanthium strumarium": {
+"annotation_count": 96,
+"bounding_box_count": 96,
+"image_count": 83,
+"segmentation_count": 0
+}
+},
+"id": 0,
+"n_images": 905
+}
+],
+"head_version": 3,
+"metadata": {
+"creator": [
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Cornell University"
+},
+"name": "Akhilesh Sharma"
+},
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Cornell University"
+},
+"name": "Vipan  Kumar"
+},
+{
+"@type": "Person",
+"affiliation": {
+"@type": "Organization",
+"name": "Cornell University"
+},
+"name": "Louis Longchamps"
+}
+],
+"description": "An annotated image database for cocklebur, dandelion, common waterhemp, common lambsquarters and palmer amaranth collected at Cornell University Musgrave Research Farm and Kansas State University Agricultural Research Center. \n\nImages were collected at varying heights and angles with a GoPro Hero 8 under variable field and weather conditions",
+"license": "https://creativecommons.org/licenses/by/4.0/",
+"name": "Multiple weed species detection"
+}
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://weed-ai.sydney.edu.au/api/upload_info/84fd3c3f-dd3e-400b-ac5a-d18ca712c3d0"
+},
+{
+"data": null,
+"headers": {
+"Content-Length": "1769147630"
+},
+"method": "HEAD",
+"params": {},
+"status": 200,
+"text": "",
+"url": "https://weed-ai.sydney.edu.au/code/download/84fd3c3f-dd3e-400b-ac5a-d18ca712c3d0.zip"
+},
+{
+"data": null,
+"headers": {
+"content-length": "5108"
+},
+"json": {
+"files": [
+{
+"checksum": "md5:c2c482cc94a224a407f65413d260c24b",
+"key": "oo_954151.docx",
+"links": {
+"self": "https://zenodo.org/api/records/10424758/files/oo_954151.docx/content"
+},
+"size": 373441
+}
+],
+"id": 10424758,
+"links": {
+"self_html": "https://zenodo.org/records/10424758"
+},
+"metadata": {
+"creators": [
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Voynikov, Yulian"
+},
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Gevrenova, Reneta"
+},
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Zheleva-Dimitrova, Dimitrina"
+},
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Balabanova, Vessela"
+},
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Nikolova, Irina"
+}
+],
+"description": "MS/MS spectra of identified compounds",
+"keywords": [
+"Oleraindole",
+"Portulaca oleracea",
+"UHPLC",
+"Orbitrap"
+],
+"license": {
+"id": "cc-zero"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Supplementary material 1 from: Voynikov Y, Gevrenova R, Zheleva-Dimitrova D, Balabanova V, Nikolova I, Marinov L, Benbassat I, Momekov G (2023) UHPLC-Orbitrap screening of oleraindoles in hydromethanolic extracts of Portulaca oleracea. Pharmacia 70(4): 1521-1527. https://doi.org/10.3897/pharmacia.70.e113577"
+},
+"revision": 4
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://zenodo.org/api/records/10424758"
+},
+{
+"data": null,
+"headers": {
+"content-length": "5076"
+},
+"json": {
+"files": [
+{
+"checksum": "md5:2ee2e1f8daff264cc74641346afb69e2",
+"key": "oo_954152.rar",
+"links": {
+"self": "https://zenodo.org/api/records/10424762/files/oo_954152.rar/content"
+},
+"size": 229911
+}
+],
+"id": 10424762,
+"links": {
+"self_html": "https://zenodo.org/records/10424762"
+},
+"metadata": {
+"creators": [
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Voynikov, Yulian"
+},
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Gevrenova, Reneta"
+},
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Zheleva-Dimitrova, Dimitrina"
+},
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Balabanova, Vessela"
+},
+{
+"affiliation": "Medical University of Sofia, Sofia, Bulgaria",
+"name": "Nikolova, Irina"
+}
+],
+"description": "Scripts",
+"keywords": [
+"Oleraindole",
+"Portulaca oleracea",
+"UHPLC",
+"Orbitrap"
+],
+"license": {
+"id": "cc-zero"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Supplementary material 2 from: Voynikov Y, Gevrenova R, Zheleva-Dimitrova D, Balabanova V, Nikolova I, Marinov L, Benbassat I, Momekov G (2023) UHPLC-Orbitrap screening of oleraindoles in hydromethanolic extracts of Portulaca oleracea. Pharmacia 70(4): 1521-1527. https://doi.org/10.3897/pharmacia.70.e113577"
+},
+"revision": 4
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://zenodo.org/api/records/10424762"
+},
+{
+"data": null,
+"headers": {
+"content-length": "22780"
+},
+"json": {
+"files": [
+{
+"checksum": "md5:c5dbfd5f4b66589c5848710a8911455f",
+"key": "table.html",
+"links": {
+"self": "https://zenodo.org/api/records/15153985/files/table.html/content"
+},
+"size": 11411
+}
+],
+"id": 15153985,
+"links": {
+"self_html": "https://zenodo.org/records/15153985"
+},
+"metadata": {
+"creators": [
+{
+"affiliation": "Laboratory of Food Chemistry, Wageningen University, P. O. Box 17, 6700 AA Wageningen, The Netherlands",
+"name": "de Bruijn, Wouter J. C."
+},
+{
+"affiliation": "Laboratory of Food Chemistry, Wageningen University, P. O. Box 17, 6700 AA Wageningen, The Netherlands",
+"name": "Gruppen, Harry"
+},
+{
+"affiliation": "Laboratory of Food Chemistry, Wageningen University, P. O. Box 17, 6700 AA Wageningen, The Netherlands",
+"name": "Vincken, Jean-Paul"
+}
+],
+"description": "<p><b>Table 1</b> Overview of monomeric natural benzoxazinoids of the classes benzoxazinones (1,4-benzoxazin-3-one backbone with <i>C</i> 2 hydroxylation) and benzoxazolinones (1,3-benzoxazol-2-one backbone) reported in literature, with their systematic name and abbreviation. All benzoxazinones are displayed as aglycones. Note that some of these compounds have, so far, only been detected as their 2- <i>O</i> -glycosides. n.a., no abbreviation assigned in literature.</p><table><thead><tr><th><b>Benzoxazinones</b></th><th>R2</th><th>R3</th><th>R4</th><th>R5</th><th>Systematic name</th><th>Abbreviation a</th><th>Natural source b</th><th>Ref.</th></tr><tr><th colspan=\"9\"><i>N-hydro (R</i> <i>1</i> = <i>H)</i>: <i>lactams</i></th></tr></thead><tbody><tr><th rowspan=\"4\">R5 R <b>8</b> <b>1</b> O OH 4 <b>2</b> <b>7</b> R <b>6</b> N <b>3</b> O 3 <b>5</b> <b>4</b> R2 R1</th><td>H</td><td>H</td><td>H</td><td>H</td><td>2-hydroxy-1,4-benzoxazin-3-one</td><td>HBOA</td><td>Poaceae</td><td>(Hofman and Hofmanov&aacute;, 1969; Tanwir et al., 2013)</td></tr><tr><td></td><td></td><td></td><td></td><td></td><td></td><td>Acanthaceae Calceolariaceae Plantaginaceae Lamiaceae</td><td>(Baumeler et al., 2000",
+"keywords": [
+"Biodiversity",
+"Taxonomy"
+],
+"license": {
+"id": "notspecified"
+},
+"resource_type": {
+"title": "Dataset",
+"type": "dataset"
+},
+"title": "Table 1 in Structure and biosynthesis of benzoxazinoids: Plant defence metabolites with potential as antimicrobial scaffolds"
+},
+"revision": 7
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://zenodo.org/api/records/15153985"
+}
+],
+"format": "collect-recording/1",
+"recorded": "2026-09-28",
+"settings": {
+"classes": [
+"PalmerAmaranth",
+"Sicklepod",
+"Purslane"
+],
+"providers": [
+"weedai",
+"mendeley",
+"huggingface",
+"zenodo",
+"mediatum",
+"kaggle",
+"roboflow"
+],
+"query_grammar": {
+"max_describe_per_provider": 8,
+"max_queries_per_provider": 6,
+"max_results_per_query": 8
+}
+},
+"synthetic": [
+{
+"data": null,
+"headers": {},
+"json": [
+{
+"licenseName": "CC BY 4.0",
+"ref": "yuzhenlu/cottonweeddet3",
+"subtitle": "A 3-class weed detection dataset: carpetweed, morningglory and Palmer amaranth, with bounding boxes",
+"tags": [
+{
+"name": "object detection"
+}
+],
+"title": "CottonWeedDet3",
+"totalBytes": 5180000000
+}
+],
+"method": "GET",
+"params": {
+"page": "1",
+"search": "\"Palmer amaranth\""
+},
+"status": 200,
+"url": "https://www.kaggle.com/api/v1/datasets/list"
+},
+{
+"data": null,
+"headers": {},
+"json": {
+"currentVersionNumber": 1,
+"description": "848 images with bounding boxes of carpetweed, morningglory and Palmer amaranth",
+"licenseName": "CC BY 4.0",
+"ref": "yuzhenlu/cottonweeddet3",
+"subtitle": "A 3-class weed detection dataset",
+"title": "CottonWeedDet3",
+"totalBytes": 5180000000
+},
+"method": "GET",
+"params": {},
+"status": 200,
+"url": "https://www.kaggle.com/api/v1/datasets/view/yuzhenlu/cottonweeddet3"
+},
+{
+"data": null,
+"headers": {},
+"json": {
+"page_size": 12,
+"results": [
+{
+"classes": [
+"Palmer Amaranth",
+"soybean"
+],
+"images": 420,
+"latestVersion": 2,
+"license": "CC BY 4.0",
+"name": "field survey",
+"type": "object-detection",
+"url": "https://universe.roboflow.com/some-ws/field-survey",
+"workspace": {
+"url": "some-ws"
+}
+},
+{
+"classes": [
+"PricklySida",
+"Carpetweed",
+"Palmer Amaranth"
+],
+"images": 900,
+"latestVersion": 1,
+"license": "Public Domain",
+"name": "mixed boxes",
+"type": "object-detection",
+"url": "https://universe.roboflow.com/other-ws/mixed-boxes",
+"workspace": {
+"url": "other-ws"
+}
+}
+]
+},
+"method": "GET",
+"params": {
+"page": "1",
+"q": "Palmer amaranth"
+},
+"status": 200,
+"url": "https://api.roboflow.com/universe/search"
+}
+],
+"synthetic_why": "Kaggle datasets/list and datasets/view answers holding the known item CottonWeedDet3 as its Kaggle page describes it; a Roboflow Universe search answer with one ordinary project and one that declares a species with no public source outside the evaluation lab (the presumed-derivative rule, section 7.2 [review]).",
+"why": "The provider answers of one narrow discovery run (collect plan with the settings above, the weed collector config of 2026-09-28), recorded live from Zenodo, Mendeley Data, Hugging Face, the annotation index and the record server, and trimmed to the fields the providers read. Kaggle and Roboflow need credentials the recording machine did not have: their answers are SYNTHETIC (listed under 'synthetic'), in the documented response shape, and say what they stand for."
+}

@@ -128,16 +128,21 @@ def _exp_of_job(job):
     return parts[1] if len(parts) >= 3 and parts[0] == "inc" else None
 
 
+_SACCT_JOB_RE = re.compile(r"^inc:job([0-9]+(?:_[0-9]+)?):sacct$")
+
+
 def spent(name, domain=M.DOMAIN, base_dir=None):
-    """SU the ledger holds for campaign `name`, and the experiments it settles."""
+    """SU the ledger holds for campaign `name`, the experiments it settles, and
+    the jobs settled from sacct (stream mode: record_job_spend)."""
     step = campaign_step(name)
     # su_ledger folds each (job, step) to its last line; its public readers do
     # not filter by step, so the fold and its aggregate are reused directly.
     entries = [e for e in su_ledger._read_deduped(domain, base_dir) if str(e.get("step")) == step]
     agg = su_ledger._aggregate(entries)
     settled = sorted({x for x in (_exp_of_job(e.get("job")) for e in entries) if x})
+    jobs = sorted({m.group(1) for m in (_SACCT_JOB_RE.match(str(e.get("job") or "")) for e in entries) if m})
     return {"su": agg["su"], "n_entries": agg["n_entries"], "n_unknown": agg["n_unknown"],
-            "unknown_su_jobs": agg["unknown_su_jobs"], "settled_exps": settled}
+            "unknown_su_jobs": agg["unknown_su_jobs"], "settled_exps": settled, "settled_jobs": jobs}
 
 
 def fold(executions):
@@ -181,17 +186,35 @@ def child_of(rec):
     """
     if str(rec.get("action") or "").startswith("inc_build_"):
         exp = (rec.get("params") or {}).get("exp")
+        if not exp and rec.get("action") in STREAM_CHILD_ACTIONS:
+            # a stream build names no --exp; the executor checked its child_exp
+            # is one of its stream's experiments (executor._resolve)
+            exp = rec.get("child_exp")
         return str(exp) if exp else None
     return rec.get("child_exp")
 
 
-def committed(executions, name, settled_exps=()):
-    """Estimates charged by the executor whose experiment has no recorded spend."""
+# Stream builds (docs/CONTINUOUS_LOOP.md 6.3) whose experiment is the request's
+# checked child_exp, and the stream jobs settled from sacct (record_job_spend).
+STREAM_CHILD_ACTIONS = ("inc_build_segment", "inc_build_consolidation")
+
+
+def committed(executions, name, settled_exps=(), settled_jobs=()):
+    """Estimates charged by the executor whose experiment has no recorded spend
+    (and, in stream mode, whose jobs sacct has not settled)."""
     settled = set(settled_exps or ())
+    jobs = set(str(j) for j in settled_jobs or ())
     su, items = 0.0, []
     for rec, est in _charged(executions, name):
         child = child_of(rec)
         if child and child in settled:
+            continue
+        ids = [str(j) for j in rec.get("job_ids") or []]
+        # a job settled from sacct releases its estimate, unless it is a build
+        # whose experiment's report spend releases it (a build job with no
+        # experiment, such as a stream fork, is released by its sacct)
+        if jobs and ids and (not str(rec.get("action") or "").startswith("inc_build_") or not child) \
+                and all(j in jobs for j in ids):
             continue
         su += est
         items.append({"action": rec.get("action"), "child_exp": child, "est_su": est,
@@ -221,7 +244,7 @@ def state(campaign, executions=(), given_budget=None, now=None, domain=M.DOMAIN,
     name = c.get("name")
     env = envelope(c, given_budget)
     sp = spent(name, domain, base_dir)
-    cm = committed(executions, name, sp["settled_exps"])
+    cm = committed(executions, name, sp["settled_exps"], sp.get("settled_jobs"))
     td = today(executions, name, now if now is not None else datetime.datetime.now(
         datetime.timezone.utc).timestamp())
     remaining = None
@@ -231,14 +254,80 @@ def state(campaign, executions=(), given_budget=None, now=None, domain=M.DOMAIN,
     if env["daily_cap_su"] is not None:
         daily_remaining = round(env["daily_cap_su"] - td, 6)
     known = [v for v in (remaining, daily_remaining) if v is not None]
-    return {"campaign": name, "envelope_su": env["envelope_su"],
-            "domain_envelope_su": env["domain_envelope_su"],
-            "daily_cap_su": env["daily_cap_su"], "sources": env["sources"],
-            "spent_su": sp["su"], "committed_su": cm["su"], "committed": cm["items"],
-            "today_su": td, "remaining_su": remaining, "daily_remaining_su": daily_remaining,
-            "su_remaining": min(known) if known else None,
-            "unknown_su_jobs": sp["unknown_su_jobs"], "settled_exps": sp["settled_exps"],
-            "reasons": env["reasons"]}
+    out = {"campaign": name, "envelope_su": env["envelope_su"],
+           "domain_envelope_su": env["domain_envelope_su"],
+           "daily_cap_su": env["daily_cap_su"], "sources": env["sources"],
+           "spent_su": sp["su"], "committed_su": cm["su"], "committed": cm["items"],
+           "today_su": td, "remaining_su": remaining, "daily_remaining_su": daily_remaining,
+           "su_remaining": min(known) if known else None,
+           "unknown_su_jobs": sp["unknown_su_jobs"], "settled_exps": sp["settled_exps"],
+           "reasons": env["reasons"]}
+    if c.get("mode") == "stream":
+        out.update(stream_windows(c, executions, env, sp, cm, now, domain, base_dir))
+        known = [v for v in (out["remaining_su"], out["daily_remaining_su"], out["window_remaining_su"],
+                             out["domain_remaining_su"]) if v is not None]
+        out["su_remaining"] = min(known) if known else None
+    return out
+
+
+# --- stream mode (docs/CONTINUOUS_LOOP.md 6.6, L-2) --------------------------------------
+def _month_start(now):
+    d = datetime.datetime.fromtimestamp(float(now), datetime.timezone.utc)
+    return datetime.datetime(d.year, d.month, 1, tzinfo=datetime.timezone.utc).timestamp()
+
+
+def _ts_epoch(ts):
+    try:
+        return datetime.datetime.strptime(str(ts)[:19], "%Y-%m-%dT%H:%M:%S").replace(
+            tzinfo=datetime.timezone.utc).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+def stream_windows(campaign, executions, env, sp, cm, now, domain=M.DOMAIN, base_dir=None):
+    """The stream campaign's monthly window and the domain's cross-campaign cap.
+
+    Window: the SU the ledger holds for this campaign with a timestamp in the
+    current calendar month (UTC), plus the estimates charged this month that
+    are still committed, against `window_cap_su` (L-2: 350). Domain: every
+    campaign's `inc:*` ledger steps (the funnel's and weed_inc_v1's included)
+    plus every campaign's committed estimates in the domain's execution log,
+    against the domain envelope (db.py su_envelope 1500, or the live domain's
+    budget block the ticker passes). Unknown is never 0: a window with no cap
+    reports None and fits() refuses nothing on it."""
+    now = now if now is not None else datetime.datetime.now(datetime.timezone.utc).timestamp()
+    c = campaign if isinstance(campaign, dict) else {}
+    start = _month_start(now)
+    step = campaign_step(c.get("name"))
+    entries = su_ledger._read_deduped(domain, base_dir)
+    mine = [e for e in entries if str(e.get("step")) == step
+            and (_ts_epoch(e.get("ts")) or 0.0) >= start]
+    window_spent = su_ledger._aggregate(mine)["su"]
+    window_committed = 0.0
+    for it in cm.get("items") or []:
+        t = _ts_epoch(it.get("ts"))
+        if t is not None and t >= start:
+            window_committed += float(it.get("est_su") or 0.0)
+    cap = _num(c.get("window_cap_su"))
+    win_used = round(window_spent + window_committed, 6)
+    inc_entries = [e for e in entries if str(e.get("step") or "").startswith(STEP_PREFIX)]
+    dom_spent = su_ledger._aggregate(inc_entries)["su"]
+    names = sorted({r.get("campaign") for r in fold(executions) if r.get("campaign")})
+    dom_committed = 0.0
+    for n in names:
+        try:
+            s_n = spent(n, domain, base_dir)
+        except ValueError:
+            continue
+        dom_committed += committed(executions, n, s_n["settled_exps"], s_n.get("settled_jobs"))["su"]
+    dom_cap = env.get("domain_envelope_su")
+    dom_used = round(dom_spent + dom_committed, 6)
+    return {"window": "month", "window_start_utc": datetime.datetime.fromtimestamp(
+                start, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "window_cap_su": cap, "window_su": win_used,
+            "window_remaining_su": None if cap is None else round(cap - win_used, 6),
+            "domain_inc_su": dom_used, "domain_committed_su": round(dom_committed, 6), "domain_cap_su": dom_cap,
+            "domain_remaining_su": None if dom_cap is None else round(dom_cap - dom_used, 6)}
 
 
 def budget_state(st):
@@ -277,6 +366,21 @@ def fits(st, est_su, need_daily=False):
     elif est > daily:
         reasons.append("estimated %.4g SU exceeds the %.4g SU left under today's cap of %.4g"
                        % (est, daily, st.get("daily_cap_su") or 0.0))
+    # stream mode only (the keys exist only for a stream campaign): the monthly
+    # window and the domain's cross-campaign cap
+    if "window_remaining_su" in st:
+        win = st.get("window_remaining_su")
+        if win is None:
+            if need_daily:
+                reasons.append("no monthly window is declared for this stream campaign")
+        elif est > win:
+            reasons.append("estimated %.4g SU exceeds the %.4g SU left in this month's window of %.4g"
+                           % (est, win, st.get("window_cap_su") or 0.0))
+    if "domain_remaining_su" in st:
+        dom = st.get("domain_remaining_su")
+        if dom is not None and est > dom:
+            reasons.append("estimated %.4g SU exceeds the %.4g SU left of the domain's %.4g across every campaign"
+                           % (est, dom, st.get("domain_cap_su") or 0.0))
     return (not reasons), reasons
 
 
@@ -365,3 +469,49 @@ def record_build_spend(exp, campaign_name, hours, source, ts=None, measured=Fals
         return {"ok": False, "reason": "the SU ledger could not be written: %s" % e}
     return {"ok": True, "exp": exp, "step": step, "key": r.get("key"), "su": su.get("value"),
             "hours": h, "measured": bool(measured), "updated": bool(r.get("updated"))}
+
+
+def record_job_spend(job_id, campaign_name, sacct_job, action=None, actor=M.AUTOPILOT_ACTOR, domain=M.DOMAIN,
+                     base_dir=None, ts=None):
+    """Settle a stream job from sacct (docs/CONTINUOUS_LOOP.md 6.6: 'Each L16,
+    L17, L18 and L20 job's estimate is settled from sacct'): one su_ledger entry
+    job `inc:job<ID>:sacct` under the campaign's step, priced by su_ledger.su_for
+    from the sacct row's GPU family, count and elapsed time. `committed` then
+    releases the estimate of the execution whose job ids are all settled. A
+    build's estimate is released by its experiment's report spend instead (its
+    runs are later jobs), so builds are not settled here."""
+    if not re.match(r"^[0-9]+(_[0-9]+)?$", str(job_id or "")):
+        return {"ok": False, "reason": "no job id (%r)" % (job_id,)}
+    row = sacct_job if isinstance(sacct_job, dict) else {}
+    el = _num(row.get("elapsed_s"))
+    gpu_type = row.get("gpu_type") or GPU_TYPE
+    gpu_count = int(row.get("gpu_count") or 1)
+    su = su_ledger.su_for(gpu_type, gpu_count, el, estimated=False)
+    su["source"] = "sacct"
+    su["reason"] = ("job %s (%s): sacct %s, %s s on %d x %s; %s"
+                    % (job_id, action or "stream job", row.get("state"), el, gpu_count, gpu_type, su.get("reason") or ""))
+    try:
+        r = su_ledger.record({"domain": domain, "job": "inc:job%s:sacct" % job_id, "step": campaign_step(campaign_name),
+                              "actor": actor, "gpu_count": gpu_count, "gpu_type": gpu_type, "elapsed_s": el,
+                              "su": su, "ts": ts}, base_dir=base_dir)
+    except (OSError, ValueError) as e:
+        return {"ok": False, "reason": "the SU ledger could not be written: %s" % e}
+    return {"ok": True, "job": job_id, "su": su.get("value"), "key": r.get("key")}
+
+
+def partition_rates(path=None):
+    """{partition: {"billing", ...}} of su_rates.json's `partitions` block
+    (docs/CONTINUOUS_LOOP.md 6.6: an explicit rate for every partition the
+    loop uses, so no job is priced 'unknown'); {} when there is none."""
+    import json as _json
+    from pathlib import Path as _P
+    p = _P(path) if path else _P(su_ledger.__file__).with_name("su_rates.json")
+    try:
+        raw = _json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for k, v in ((raw or {}).get("partitions") or {}).items():
+        if isinstance(v, dict) and "value" in v:
+            out[k] = v["value"]
+    return out

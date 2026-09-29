@@ -70,6 +70,10 @@ accuracy? The platform runs it; no estimate exists yet.
 - [`docs/FUNNEL_AUDIT_RUNNER.md`](../docs/FUNNEL_AUDIT_RUNNER.md): modules, formats and commands.
 - [`docs/FUNNEL_REPRODUCE.md`](../docs/FUNNEL_REPRODUCE.md): deploy (`deploy/deploy_funnel.sh`) and reproduction.
 
+Continuous loop (in progress): the platform collects target-species data, filters it per box, stacks it in
+fixed-size increments, gates each against the incumbent and rolls back what hurts — continuously. No result yet.
+- [`docs/CONTINUOUS_LOOP.md`](../docs/CONTINUOUS_LOOP.md): the contract (decisions, data flow, splits v2, recipe, autopilot stream mode, rollout).
+
 Reproduce on Bridges-2. Run from the repo root with `REPO` pointing at it and `PYTHONPATH=$REPO`, in the `bench`
 environment (Ultralytics 8.4.37, pinned by the scorer):
 

@@ -141,6 +141,26 @@ from ..brain import policy as POL
 ENVELOPE_LEVERS = {"L1": ("inc_build_pilot",), "L2": ("inc_build_realloop",),
                    "L5": ("inc_build_realloop",), "L8": ("inc_build_baseline",),
                    "L9": ("inc_build_pilot",)}
+# Stream mode (docs/CONTINUOUS_LOOP.md 6.5): the R3 levers the envelope may
+# approve for a stream campaign, and their actions. L21 only when its target is
+# the pool the last 'hurts' milestone recommended (the campaign's
+# last_milestone_pool, read from the stream summary's rollback_pending); LI
+# (the stream's creation) with Stage A's recorded arms; L23's splits build and
+# lock always wait for a person. Their parameters are checked against
+# stream_levers.json (levers_stream.check_params) and their counts against its
+# limits, which replace the blanket 3-per-campaign rule for these levers.
+STREAM_ENVELOPE_LEVERS = {"L18": ("inc_build_segment",), "L20": ("inc_build_consolidation",),
+                          "L21": ("inc_stream_rollback",), "L22": ("inc_build_segment",),
+                          "L23B": ("inc_build_baseline_v2",), "L25": ("inc_build_pilot4",),
+                          "L27": ("inc_build_consolidation",), "L28": ("inc_build_segment",),
+                          "LI": ("inc_stream_init",)}
+# The R2 data levers that run directly only with data_autonomy on, a stream
+# replay pass, the floors set (L16) and the caps (6.5, 6.6); otherwise they are
+# filed for a person. Keyed by policy action (a sub-lever shares its family's).
+GATED_R2_ACTIONS = {"inc_stream_collect": "L16", "inc_stream_collect_lab": "L16", "inc_stream_intake": "L16",
+                    "inc_stream_admit": "L17", "inc_stream_quarantine": "L24"}
+# Stream actions of a limited family that are neither a job nor a download.
+STREAM_NON_JOB_ACTIONS = ("inc_stream_sync",)
 # Stop-loss: more than 3 submissions of the same lever per campaign pauses it.
 # The executor will not self-approve a 4th.
 MAX_LEVER_SUBMISSIONS = 3
@@ -155,7 +175,14 @@ REMOTE_TIMEOUT_S = {"inc_snapshot": 300, "inc_report": 300, "inc_advance": 240,
                     "inc_build_pilot": 300, "inc_build_realloop": 300, "inc_build_baseline": 300,
                     "inc_relevance_build": 300, "inc_label_audit": 300,
                     "inc_unblock_transient": 180, "inc_funnel_audit": 300, "inc_funnel_map": 300,
-                    "inc_funnel_recover": 300, "inc_funnel_dev_scores": 300}
+                    "inc_funnel_recover": 300, "inc_funnel_dev_scores": 300,
+                    "inc_stream_snapshot": 600, "inc_stream_collect": 300, "inc_stream_collect_review": 300,
+                    "inc_stream_intake": 300, "inc_stream_probe": 300, "inc_stream_admit": 300,
+                    "inc_build_segment": 300, "inc_build_consolidation": 300, "inc_splits_build": 300,
+                    "inc_build_baseline_v2": 300, "inc_build_pilot4": 300, "inc_stream_commit": 600,
+                    "inc_stream_rollback": 600, "inc_stream_quarantine": 300, "inc_stream_release": 300,
+                    "inc_stream_init": 300, "inc_stream_choose_arm": 600, "inc_stream_compare": 600,
+                    "inc_stream_verdict": 600}
 DEFAULT_REMOTE_TIMEOUT_S = 120
 # ssh's own messages for a connection that was never made (read off the last
 # stderr line of a call that printed nothing): the remote command never ran.
@@ -189,6 +216,17 @@ FUNNEL_REPLAY_CASES = ("R9", "R9_early", "R9b", "R10", "R11", "R12", "R13", "R14
 REPLAY_REQUIRED = ("R1", "R3", "R4a", "R5", "R6", "R7", "R8", "negative_controls", "test_blindness",
                    "earliest_fire", "governance") + FUNNEL_REPLAY_CASES + ("funnel_mutations", "domain_free")
 REPLAY_MAY_SKIP = ("R2", "R4b")
+# The stream-mode scenario cases (docs/CONTINUOUS_LOOP.md 6.8) and the mutation
+# harness over D20-D33. run_replay_tests runs their scripts with the others
+# (REPLAY_SCRIPTS) and records each case; any case recorded as a failure fails
+# the whole record (check_replay_cases), so a failing S-case blocks envelope
+# autonomy for every campaign, the funnel's and weed_inc_v1's included. A stream
+# campaign's own autonomy (its envelope builds and its gated R2 data levers)
+# needs every one of them to pass (stream_replay_status).
+STREAM_REPLAY_CASES = ("S1", "S1b", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S13",
+                       "S14", "S15", "S16", "S17", "S18", "S19", "S20", "S21", "S22", "S23", "S24", "S25", "S26",
+                       "S27", "S28", "stream_prospective", "stream_r0")
+STREAM_MUTATION_CASE = "stream_mutations"
 CODE_ROOT = Path(__file__).resolve().parents[3]       # the directory holding weed_optimizer_framework/
 # Files outside this package that decide what the executor may do; a replay
 # pass recorded before any of them changed does not count.
@@ -201,12 +239,20 @@ GOVERNANCE_FILES = ("weed_optimizer_framework/tools/brain/policy_actions.json",
                     "tests/test_funnel_ap_replay.py",
                     "tests/test_funnel_ap_mutations.py",
                     "tests/test_funnel_domain_free.py",
-                    "weed_optimizer_framework/tools/funnel/domains/weed.json")
+                    "weed_optimizer_framework/tools/funnel/domains/weed.json",
+                    # stream mode (docs/CONTINUOUS_LOOP.md 6.5 review): the collector's
+                    # policy file decides what L16 may do by itself; the stream's
+                    # scenario and mutation scripts decide what a pass means.
+                    "weed_optimizer_framework/tools/collect/domains/weed.json",
+                    "tests/test_stream_ap_replay.py",
+                    "tests/test_stream_ap_mutations.py")
 REPLAY_SCRIPTS = {"replay": "tests/test_inc_ap_replay.py",
                   "governance": "tests/test_inc_ap_governance.py",
                   "funnel": "tests/test_funnel_ap_replay.py",
                   "funnel_mutations": "tests/test_funnel_ap_mutations.py",
-                  "domain_free": "tests/test_funnel_domain_free.py"}
+                  "domain_free": "tests/test_funnel_domain_free.py",
+                  "stream": "tests/test_stream_ap_replay.py",
+                  "stream_mutations": "tests/test_stream_ap_mutations.py"}
 # How test_inc_ap_replay.py names a skipped check, mapped to the case it
 # belongs to. A skip under any other name makes the recorded result a fail.
 REPLAY_SKIP_CASES = (("R2", "R2"), ("R4b", "R4b"), ("remote snapshot", "live_path"))
@@ -271,10 +317,79 @@ ARGV_FORMS = {
                          (("--prereg", "prereg", "str"), ("--what", "what", "str"),
                           ("--names-from", "names_from", "str"), ("--out", "out", "str")),
                          ("prereg", "what", "out")),
+    # Stream mode (docs/CONTINUOUS_LOOP.md 6.3; stream_levers.json). '{pkg}' in the
+    # first token is the campaign's protocol package, the policy parameter 'pkg'.
+    # One flag order serves every verb of a shared action (L18 build, L22 fork,
+    # L28 feasibility), since a verb renders only the flags it is given. The
+    # grammar is inc2.stream.build_parser()'s (group E).
+    "inc_build_segment": ("{pkg}.stream", "{verb}",
+                          (("--stream", "stream", "str"), ("--k", "k", "int"), ("--exp", "exp", "str"),
+                           ("--holdout", "holdout", "str"), ("--m", "m", "int"), ("--recipes", "recipes", "str")),
+                          ("pkg", "verb", "stream")),
+    "inc_stream_init": ("{pkg}.stream", "init", (("--stream", "stream", "str"), ("--stage-b", "stage_b", "str")),
+                        ("pkg", "stream", "stage_b")),
+    "inc_stream_choose_arm": ("{pkg}.stream", "choose-arm", (("--stream", "stream", "str"),), ("pkg", "stream")),
+    "inc_stream_compare": ("{pkg}.stream", "compare", (("--exp", "exp", "str"),), ("pkg", "exp")),
+    "inc_stream_verdict": ("{pkg}.{module}", "{verb}", (("--exp", "exp", "str"),), ("pkg", "module", "verb")),
+    "inc_build_consolidation": ("{pkg}.stream", "{verb}",
+                                (("--stream", "stream", "str"), ("--from", "from_pool", "str")),
+                                ("pkg", "verb", "stream")),
+    "inc_stream_commit": ("{pkg}.stream", "commit", (("--exp", "exp", "str"),), ("pkg", "exp")),
+    "inc_stream_rollback": ("{pkg}.stream", "rollback", (("--stream", "stream", "str"), ("--to", "to", "str")),
+                            ("pkg", "stream", "to")),
+    "inc_stream_quarantine": ("{pkg}.stream", "quarantine",
+                              (("--source", "source", "str"), ("--cite", "cite", "str")), ("pkg", "source", "cite")),
+    "inc_stream_release": ("{pkg}.stream", "release", (("--stream", "stream", "str"), ("--hold", "hold", "str")),
+                           ("pkg", "stream", "hold")),
+    "inc_splits_build": ("{pkg}.splits", "{verb}", (), ("pkg", "verb")),
+    "inc_build_baseline_v2": ("{pkg}.baseline", "build",
+                              (("--exp", "exp", "str"), ("--manifest", "manifest", "str"), ("--union", "union", "str"),
+                               ("--seeds", "seeds", "str"), ("--arm", "arm", "str"), ("--role", "role", "str")),
+                              ("pkg", "exp", "seeds", "arm", "role")),
+    "inc_build_pilot4": ("{pkg}.pilot4", "build",
+                         (("--exp", "exp", "str"), ("--from", "from_exp", "str"), ("--recipes", "recipes", "str")),
+                         ("pkg", "exp", "from_exp", "recipes")),
+    "inc_stream_collect": ("run_inc_collect.sh", "fetch",
+                           (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
+                            ("--candidates", "candidates", "str")),
+                           ("source", "max_bytes")),
+    "inc_stream_collect_review": ("run_inc_collect.sh", "fetch",
+                                  (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
+                                   ("--candidates", "candidates", "str")),
+                                  ("source", "max_bytes")),
+    "inc_stream_intake": ("run_inc_collect.sh", "intake", (("--source", "source", "str"),), ("source",)),
+    "inc_stream_probe": ("run_inc_collect.sh", "probe", (), ()),
+    "inc_stream_admit": ("run_inc2_stream.sh", "{verb}", (("--intake", "intake", "str"), ("--hold", "hold", "str")),
+                         ("verb",)),
+    "inc_stream_discover": ("collect", "plan",
+                            (("--config", "config", "str"), ("--classes", "classes", "str"), ("--out", "out", "str")),
+                            ("config", "classes", "out")),
+    "inc_stream_names": ("collect", "names", (("--source", "source", "str"), ("--out", "out", "str")),
+                         ("source", "out")),
+    "inc_stream_collect_lab": ("collect", "fetch",
+                               (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
+                                ("--out", "out", "str")),
+                               ("source", "max_bytes", "out")),
 }
+# Stream actions and how the cluster runs them: a job script through remote.py
+# stream-submit KIND, or a login-node verb through stream-run.
+STREAM_REMOTE = {"inc_build_segment": "build", "inc_build_consolidation": "build", "inc_splits_build": "build",
+                 "inc_build_baseline_v2": "build", "inc_build_pilot4": "build",
+                 "inc_stream_collect": "collect", "inc_stream_collect_review": "collect",
+                 "inc_stream_intake": "collect", "inc_stream_probe": "collect", "inc_stream_admit": "admit",
+                 "inc_stream_commit": "run", "inc_stream_rollback": "run", "inc_stream_quarantine": "run",
+                 "inc_stream_release": "run", "inc_stream_init": "build", "inc_stream_choose_arm": "run",
+                 "inc_stream_compare": "run", "inc_stream_verdict": "run"}
+# The modules whose R0 verdicts a stream campaign records (inc_stream_verdict):
+# inc2.baseline canary-verdict / capacity-verdict and inc2.pilot4 verdict.
+STREAM_VERDICT_MODULES = ("baseline", "pilot4")
+# A stream build's child experiment: <stream>_s|m|c|b<NNN> (contract 3.5, 3.6).
+STREAM_CHILD_RE = r"^%s_[smcb][0-9]{3}$"
+_BIGINT_RE = re.compile(r"^[1-9][0-9]{0,12}$")
 # Lab-side actions: the executor calls the hook the caller registered for each
 # (Context.local_hooks) and refuses when none is.
-LAB_ACTIONS = ("inc_lit_fetch", "inc_funnel_fetch", "inc_verify_queue", "inc_funnel_sync")
+LAB_ACTIONS = ("inc_lit_fetch", "inc_funnel_fetch", "inc_verify_queue", "inc_funnel_sync",
+               "inc_stream_discover", "inc_stream_names", "inc_stream_collect_lab", "inc_stream_sync")
 # The research brain's plan job (docs/INC_AUTOPILOT.md (c)): staged and
 # submitted, then pulled back, by segments the executor builds itself
 # (_plan_segment), not by remote.py verbs.
@@ -469,6 +584,24 @@ def replay_status(ctx=None):
     return out
 
 
+def stream_replay_status(ctx=None):
+    """replay_status, and every stream case (STREAM_REPLAY_CASES and the
+    mutation harness) recorded as a pass: what a stream campaign's envelope
+    builds and gated R2 data levers need (docs/CONTINUOUS_LOOP.md 6.5)."""
+    st = replay_status(ctx)
+    if not st["passed"]:
+        return st
+    cases = (st.get("recorded") or {}).get("cases") or {}
+    missing = [c for c in STREAM_REPLAY_CASES + (STREAM_MUTATION_CASE,) if cases.get(c) != "pass"]
+    if missing:
+        st = dict(st, passed=False,
+                  reason="the recorded replay pass does not pass the stream case(s) %s" % ", ".join(missing[:8]))
+    return st
+
+
+_CASE_RE = re.compile(r"^case (\S+): (pass|fail)$")
+
+
 def _last_line(text, prefix_re):
     for line in reversed((text or "").splitlines()):
         m = re.match(prefix_re, line.strip())
@@ -549,6 +682,39 @@ def run_replay_tests(ctx=None, python=None, scripts=None, timeout=3600, code_roo
                                                           " with no closing summary line"))
         for c in keyed:
             cases[c] = "pass" if ok else "fail"
+    # The stream's scenario and mutation scripts (docs/CONTINUOUS_LOOP.md 6.8):
+    # each case reports its own line "case <id>: pass|fail"; a script that does
+    # not end clean ("0 failure(s), 0 skipped") fails every case it did not
+    # report as a pass. A caller's own script set without them records none.
+    for key, keyed in (("stream", STREAM_REPLAY_CASES), ("stream_mutations", (STREAM_MUTATION_CASE,))):
+        if key not in scripts:
+            continue
+        path = root / scripts[key]
+        out_all = ""
+        try:
+            p = subprocess.run([python or sys.executable, str(path)], cwd=str(root),
+                               capture_output=True, text=True, timeout=timeout)
+            out_all = p.stdout or ""
+            runs[key] = {"rc": p.returncode, "tail": out_all[-2000:], "stderr_tail": (p.stderr or "")[-500:]}
+        except (OSError, subprocess.TimeoutExpired) as e:
+            runs[key] = {"rc": None, "tail": "", "stderr_tail": "%s: %s" % (type(e).__name__, e)}
+        m = _last_line(runs[key]["tail"], r"^(\d+) failure\(s\), (\d+) skipped: (.*)$")
+        clean = runs[key]["rc"] == 0 and m is not None and m.group(1) == "0" and m.group(2) == "0"
+        said = {}
+        for line in out_all.splitlines():
+            mm = _CASE_RE.match(line.strip())
+            if mm:
+                said[mm.group(1)] = mm.group(2) if said.get(mm.group(1)) != "fail" else "fail"
+        if not clean:
+            notes.append("the %s script exited %s%s" % (key, runs[key]["rc"], "" if m else
+                                                          " with no closing summary line"))
+        if key == "stream_mutations":
+            cases[STREAM_MUTATION_CASE] = "pass" if clean else "fail"
+            continue
+        for c in keyed:
+            cases[c] = "pass" if (m is not None and said.get(c) == "pass") else "fail"
+        # a failure the script reports outside every case still fails the record
+        cases["stream_script"] = "pass" if clean else "fail"
     after = code_hash()
     if after != before:
         notes.append("the code changed while the tests ran")
@@ -586,10 +752,17 @@ def params_from_argv(action, argv):
     if form is None:
         raise ExecError("%s is not a builder command; it takes no argv" % action)
     first, command, spec, _required = form
+    out = {}
+    if "{pkg}" in first:
+        # a stream action: the protocol package is read off the module token
+        form_first = first
+        first, pkg = _pkg_token(argv, first)
+        out["pkg"] = pkg
+        if form_first.endswith(".{module}"):
+            out["module"] = first.split(".", 1)[1]
     tail = _builder_tail(argv, first)
     if tail is None:
         raise ExecError("the argv %r does not run %s" % (" ".join(map(str, argv)), first))
-    out = {}
     if command and command.startswith("{") and command.endswith("}"):
         # a positional param (run_inc_funnel.sh VERB)
         if not tail or tail[0].startswith("--"):
@@ -630,12 +803,43 @@ def params_from_argv(action, argv):
             if not _INT_RE.match(val):
                 raise ExecError("%s %r is not a whole number" % (tok, val))
             val = int(val)
+        elif kind == "bigint":
+            if not _BIGINT_RE.match(val):
+                raise ExecError("%s %r is not a whole number" % (tok, val))
+            val = int(val)
         elif kind == "auto":
             if not val.startswith(AUTO_REASON) or not val[len(AUTO_REASON):]:
                 raise ExecError("an autopilot %s must read %r<cause>" % (tok, AUTO_REASON))
             val = val[len(AUTO_REASON):]
         out[param] = val
     return out
+
+
+def _pkg_token(argv, first):
+    """(the resolved first token, the protocol package) of a stream action's
+    argv: the module token '<pkg>.<module>' (optionally under
+    weed_optimizer_framework.tools.) that '{pkg}.<module>' stands for. A form
+    '{pkg}.{module}' (the R0 verdicts) takes any module of STREAM_VERDICT_MODULES."""
+    mod = first.split(".", 1)[1]
+    mods = STREAM_VERDICT_MODULES if mod == "{module}" else (mod,)
+    for t in [str(a) for a in argv]:
+        short = t[len("weed_optimizer_framework.tools."):] \
+            if t.startswith("weed_optimizer_framework.tools.") else t
+        m = re.match(r"^([a-z][a-z0-9_]{0,31})\.(%s)$" % "|".join(re.escape(x) for x in mods), short)
+        if m:
+            return short, m.group(1)
+    raise ExecError("the argv %r runs no <package>.%s module" % (" ".join(map(str, argv)), mod))
+
+
+def _stream_meta_tokens(meta, run=False):
+    toks = []
+    keys = (("approval_id", "--approval-id"), ("decided_by", "--decided-by")) if run else (
+        ("parent_exp", "--parent-exp"), ("child_exp", "--child-exp"), ("trigger", "--trigger"),
+        ("approval_id", "--approval-id"), ("decided_by", "--decided-by"))
+    for key, flag in keys:
+        if meta.get(key):
+            toks += [flag, str(meta[key])]
+    return toks
 
 
 def _flag_tokens(spec, p):
@@ -697,7 +901,7 @@ def render(action, params, meta=None):
         need("arxiv_id")
         need("paper_id")
         return {"builder": None, "remote": None, "local": True}
-    if action in ("inc_verify_queue", "inc_funnel_sync"):
+    if action in ("inc_verify_queue", "inc_funnel_sync", "inc_stream_sync"):
         return {"builder": None, "remote": None, "local": True}
     if action in PLAN_ACTIONS:
         need("campaign")
@@ -718,10 +922,20 @@ def render(action, params, meta=None):
         raise ExecError(M.EVIDENCE_WITH_RELEVANCE)
     if command and command.startswith("{") and command.endswith("}"):
         command = need(command[1:-1])
+    if "{" in first:
+        first = re.sub(r"\{([a-z_]+)\}", lambda m: need(m.group(1)), first)
     flags = _flag_tokens(spec, p)
     builder = [first] + ([command] if command else []) + flags
-    if action == "inc_funnel_fetch":
+    if action == "inc_funnel_fetch" or action in LAB_ACTIONS:
         return {"builder": builder, "remote": None, "local": True}
+    if action in STREAM_REMOTE:
+        kind = STREAM_REMOTE[action]
+        if kind == "run":
+            remote = ["stream-run", first, command] + _stream_meta_tokens(meta or {}, run=True) + ["--"] + flags
+        else:
+            args = ([first] if kind == "build" else []) + ([command] if command else []) + flags
+            remote = ["stream-submit", kind] + _stream_meta_tokens(meta or {}) + ["--"] + args
+        return {"builder": builder, "remote": remote, "local": False}
     if action == "inc_unblock_transient":
         return {"builder": builder, "remote": ["unblock"] + flags, "local": False}
     sub, module = SUBMIT_FORMS[action]
@@ -1245,7 +1459,22 @@ def _resolve(req, row, res):
                                   req["est_gpu_hours"])
     req["params"], req["meta_params"] = policy, meta
     res["params"], res["meta_params"] = policy, meta
-    if str(req["action"]).startswith("inc_build_"):
+    if req["action"] in ("inc_build_segment", "inc_build_consolidation"):
+        # A stream build names no --exp: the experiment it builds is the
+        # stream's next <stream>_s|m|c|b<NNN>, which the ticker states as
+        # child_exp; it must be one of that stream's names (the budget releases
+        # the estimate when that experiment reports its spend). A fork builds
+        # no experiment.
+        child = req["child_exp"]
+        if policy.get("verb") == "fork":
+            if child not in (None, ""):
+                raise ExecError("a fork builds no experiment; child_exp %r is not one" % (child,))
+        elif not re.match(STREAM_CHILD_RE % re.escape(str(policy.get("stream") or "")), str(child or "")):
+            raise ExecError("child_exp %r is not an experiment of stream %r (<stream>_s|m|c|b<NNN>)"
+                            % (child, policy.get("stream")))
+        elif policy.get("exp") not in (None, "") and policy["exp"] != child:
+            raise ExecError("child_exp %r is not the segment --exp names (%r)" % (child, policy["exp"]))
+    elif str(req["action"]).startswith("inc_build_"):
         # The budget releases a build's estimate when the experiment it builds
         # reports its spend; a child_exp naming any other experiment would
         # release it early, so it is not the caller's to choose.
@@ -1296,7 +1525,11 @@ def _plan(res, action, params, rendered, ctx=None):
     if action in PLAN_ACTIONS:
         remote = _plan_segment(ctx, action, params)
     elif not rendered["local"]:
-        meta = _submit_meta(res) if action in SUBMIT_FORMS else {}
+        meta = _submit_meta(res) if action in SUBMIT_FORMS or action in STREAM_REMOTE else {}
+        if STREAM_REMOTE.get(action) == "build" and res.get("child_exp"):
+            if not _NAME_RE.match(str(res["child_exp"])):
+                raise ExecError("child_exp %r is not an experiment name" % res["child_exp"])
+            meta["child_exp"] = str(res["child_exp"])
         remote = render(action, params, meta)["remote"]
     return {"res": res, "action": action, "params": params, "local": rendered["local"],
             "remote": remote}
@@ -1370,6 +1603,13 @@ def _prepare(request, actor, campaign, ctx):
         if POL._decide(tier, risk) == "direct":
             return _finish(ctx, res, "refused", ["budget: " + "; ".join(auth["reasons"])]), None
         return _file(ctx, req, actor, camp, risk, est, bud, res, auth["reasons"]), None
+    if req["action"] in GATED_R2_ACTIONS and tier != "human":
+        # A stream data lever runs directly only under its gates (6.5, 6.6);
+        # otherwise a person decides (shadow mode files every one).
+        gate = _gated_r2(ctx, req, camp)
+        if gate:
+            return _file(ctx, req, actor, camp, risk, est, bud, res,
+                         ["awaiting a person: " + w for w in gate]), None
     res["authorized_as"], res["decided_by"], res["basis"] = actor, actor, "direct"
     why = _resources_known(resources, costed)
     if why:
@@ -1512,8 +1752,121 @@ def _differs(item, req):
     return out
 
 
+def _gated_r2(ctx, req, camp):
+    """[reasons] a gated stream data lever (GATED_R2_ACTIONS) may not run
+    directly now; [] when it may: a stream campaign with data_autonomy 'on'
+    (a person's flag), a stream replay pass, L16's floors set by a person
+    (floor_gb, floor_su: a placeholder refuses), L24 citing a firing D28 or
+    D31, and the stream limits (levers_stream.limits)."""
+    from . import levers_stream as LS
+    c = camp or {}
+    fam = GATED_R2_ACTIONS[req["action"]]
+    why = []
+    if c.get("mode") != "stream":
+        why.append("%s is a stream data lever; this campaign is not in stream mode" % fam)
+    if c.get("data_autonomy") != "on":
+        why.append("data_autonomy is %r, not 'on': shadow mode (diagnose and propose only); a person sets it"
+                   % (c.get("data_autonomy"),))
+    rp = stream_replay_status(ctx)
+    if not rp["passed"]:
+        why.append("stream replay: " + rp["reason"])
+    if fam == "L16":
+        try:
+            th = LS.load_thresholds()
+            floors = (LS.t(th, "D21", "floor_gb"), LS.t(th, "D21", "floor_su"))
+        except Exception as e:
+            floors = (None, None)
+            why.append("stream_thresholds.json is unreadable (%s)" % type(e).__name__)
+        if None in floors:
+            why.append("floor_gb / floor_su are placeholders in stream_thresholds.json: L16 is not autonomous until "
+                       "a person sets them from the measured first wave")
+    if fam == "L24":
+        cite = req["params"].get("cite")
+        fired = ctx.fired_diagnoses(c.get("name")) or []
+        if cite not in req["trigger"] or not any(d.get("id") == cite for d in fired):
+            why.append("L24 needs a firing %s in its trigger" % cite)
+    why += stream_limits(ctx, c, fam, req)
+    return why
+
+
+def _epoch(r):
+    try:
+        return float(r.get("epoch"))
+    except (TypeError, ValueError):
+        return None
+
+
+def stream_limits(ctx, camp, lever, req):
+    """[reasons] lever family `lever` is over a stream limit (stream_levers.json
+    'limits', docs/CONTINUOUS_LOOP.md 6.6) with this request; [] otherwise.
+    Counts come from the execution log (runs that ran or may have run); the
+    in-flight and per-milestone / per-rollback / per-version counts come from
+    the ticker (campaign 'in_flight', 'limit_counts')."""
+    from . import levers_stream as LS
+    lim = LS.limits(lever)
+    if not lim:
+        return []
+    c = camp or {}
+    name, now = c.get("name"), ctx.clock()
+    recs = [r for r in executions(ctx) if r.get("campaign") == name and r.get("lever")
+            and LS.family(r["lever"]) == lever and (r.get("status") == "executed" or r.get("charged"))]
+    day = [r for r in recs if (_epoch(r) or 0.0) >= now - 86400.0]
+    # a lab -> cluster sync (L16S) moves files already fetched: it is no job
+    # and no download, so it does not use the day's job allowance
+    day_jobs = [r for r in day if r.get("action") not in STREAM_NON_JOB_ACTIONS]
+    p = req.get("params") or {}
+    why = []
+    for key in ("jobs_per_day", "per_day"):
+        if key in lim and len(day_jobs) >= int(lim[key]):
+            why.append("%s already ran %d time(s) in the last 24 h (limit %d)" % (lever, len(day_jobs), lim[key]))
+    if "total" in lim and len(recs) >= int(lim["total"]):
+        why.append("%s already ran %d time(s) in this campaign (limit %d)" % (lever, len(recs), lim["total"]))
+    fetch = ("inc_stream_collect", "inc_stream_collect_lab", "inc_stream_collect_review")
+    src = p.get("source")
+    if src and req.get("action") in fetch:
+        mine = [r for r in recs if r.get("action") in fetch and (r.get("params") or {}).get("source") == src]
+        if "attempts_per_source" in lim and len(mine) >= int(lim["attempts_per_source"]):
+            why.append("source %s was attempted %d time(s) (limit %d)" % (src, len(mine), lim["attempts_per_source"]))
+        want = float(p.get("max_bytes") or 0) / 1e9
+        if "gb_per_source" in lim:
+            got = sum(float((r.get("params") or {}).get("max_bytes") or 0) for r in mine) / 1e9
+            if got + want > float(lim["gb_per_source"]) + 1e-9:
+                why.append("source %s would reach %.1f GB (limit %g GB unless a person approves)"
+                           % (src, got + want, lim["gb_per_source"]))
+        daily = [float(x) for x in (lim.get("gb_per_day"), c.get("collect_gb_daily")) if x is not None]
+        if daily:
+            got = sum(float((r.get("params") or {}).get("max_bytes") or 0) for r in day
+                      if r.get("action") in fetch) / 1e9
+            if got + want > min(daily) + 1e-9:
+                why.append("today's fetches would reach %.1f GB (limit %g GB)" % (got + want, min(daily)))
+        if c.get("collect_gb_envelope") is not None:
+            got = sum(float((r.get("params") or {}).get("max_bytes") or 0) for r in recs
+                      if r.get("action") in fetch) / 1e9
+            if got + want > float(c["collect_gb_envelope"]) + 1e-9:
+                why.append("the campaign's fetches would reach %.1f GB (collect_gb_envelope %g GB)"
+                           % (got + want, float(c["collect_gb_envelope"])))
+    if "in_flight" in lim:
+        n = int(((c.get("in_flight") or {}).get(lever)) or 0)
+        if n >= int(lim["in_flight"]):
+            why.append("%d %s item(s) in flight (limit %d)" % (n, lever, lim["in_flight"]))
+    counts = (c.get("limit_counts") or {}).get(lever) or {}
+    for key in ("per_milestone", "per_rollback", "per_stream_version"):
+        if key in lim and int(counts.get(key) or 0) >= int(lim[key]):
+            why.append("%s already ran %d time(s) %s (limit %d)" % (lever, counts.get(key), key.replace("_", " "),
+                                                                 lim[key]))
+    return why
+
+
 def _lever_params_check(lever, params):
-    """[reasons] the resolved parameters are not lever `lever`'s (levers.json)."""
+    """[reasons] the resolved parameters are not lever `lever`'s (levers.json;
+    stream_levers.json for a stream envelope lever)."""
+    if lever in STREAM_ENVELOPE_LEVERS:
+        from . import levers_stream as LS
+        try:
+            ok, bad = LS.check_params(lever, params)
+        except Exception as e:
+            return ["lever %s cannot be checked against stream_levers.json (%s)" % (lever, e)]
+        return [] if ok else ["the parameters are not lever %s's: %s" % (lever, "; ".join(bad))]
     try:
         r = LV.row(lever)
         ok, bad = LV.check_params(lever, params)
@@ -1608,20 +1961,28 @@ def _autonomy(ctx, req, camp, row, est, bud, resources, item=None):
         own = _own_item(item)
         if own:
             why.append(own)
-    rp = replay_status(ctx)
+    lever, action = req["lever"], req["action"]
+    stream_lever = c.get("mode") == "stream"
+    table = STREAM_ENVELOPE_LEVERS if stream_lever else ENVELOPE_LEVERS
+    rp = stream_replay_status(ctx) if stream_lever else replay_status(ctx)
     if not rp["passed"]:
         why.append("replay tests: " + rp["reason"])
-    lever, action = req["lever"], req["action"]
-    if lever not in ENVELOPE_LEVERS or action not in ENVELOPE_LEVERS[lever]:
+    if lever not in table or action not in table[lever]:
         why.append("lever %r with %s is not covered by the envelope (covered: %s)"
-                   % (lever, action, ", ".join(sorted(ENVELOPE_LEVERS))))
+                   % (lever, action, ", ".join(sorted(table))))
     else:
         why += _lever_params_check(lever, req["params"])
+    if stream_lever and lever == "L21" and req["params"].get("to") != c.get("last_milestone_pool"):
+        why.append("L21's envelope covers a rollback to the last milestone pool (%s) only; a rollback to %s "
+                   "waits for a person" % (c.get("last_milestone_pool"), req["params"].get("to")))
     if action == "inc_build_realloop" and req["params"].get("no_truth") == 1:
         why.append("--no-truth is lever L6, which the envelope does not cover")
     tw, matched, n_verified = _trigger_check(ctx, req, camp)
     why += tw
-    if est["su"] is None or est["su"] <= 0:
+    free = stream_lever and isinstance(row.get("est_su"), dict) and row["est_su"].get("fixed_su") == 0.0
+    if free and est["su"] == 0.0:
+        pass                  # a stream login-node verb (L21's rollback) costs no allocation by its policy row
+    elif est["su"] is None or est["su"] <= 0:
         why.append("no positive SU estimate (%s)" % est["su"])
     else:
         _ok, r = B.fits(bud, est["su"], need_daily=True)
@@ -1629,7 +1990,10 @@ def _autonomy(ctx, req, camp, row, est, bud, resources, item=None):
     unknown = _resources_known(resources, True)
     if unknown:
         why.append(unknown)
-    if c.get("name") and lever:
+    if c.get("name") and lever and stream_lever:
+        from . import levers_stream as LS
+        why += stream_limits(ctx, c, LS.family(lever), req)
+    elif c.get("name") and lever:
         n = _lever_count(ctx, c["name"], lever)
         if n >= MAX_LEVER_SUBMISSIONS:
             why.append("lever %s already ran %d times in this campaign (stop-loss at more than %d)"
@@ -2016,6 +2380,81 @@ def campaign_snapshot(exps, advance=False, report="auto", ledger_from=None, no_s
     elif plan_pull is not None:
         out["plan_pull"] = pulled[0] if pulled else None
     return out
+
+
+def stream_snapshot(sid, exps=(), advance=(), report="auto", ledger_from=None, dev_scores=(), sacct=(),
+                    largest=False, actor=M.AUTOPILOT_ACTOR, campaign=None, ctx=None):
+    """remote.py stream-snapshot: the one call of a stream campaign's tick that
+    observes every lane (docs/CONTINUOUS_LOOP.md 6.2 step 2). Composite, like
+    campaign_snapshot: each part is authorised through its own policy row
+    (inc_stream_status; inc_snapshot and inc_report per experiment; inc_advance
+    for each experiment in `advance`), and the verb runs only when every part
+    may run directly. The payload comes back whole; the log keeps it trimmed."""
+    ctx = ctx or Context()
+    now = ctx.clock()
+    exps = [str(e) for e in (exps or [])]
+    advance = [str(e) for e in (advance or [])]
+    ledger_from = dict(ledger_from or {})
+    params = {"sid": sid, "exps": exps, "advance": advance, "report": report, "ledger_from": ledger_from,
+              "dev_scores": list(dev_scores or []), "sacct": [str(j) for j in sacct or []], "largest": bool(largest)}
+    req = _normalize({"policy_action": "inc_stream_snapshot", "params": params})
+    try:
+        camp = _campaign(campaign)
+    except ExecError as e:
+        return _finish(ctx, _new_result(req, actor, None, now), "refused", [str(e)])
+    res = _new_result(req, actor, camp, now)
+    res["risk"] = "R1" if advance else "R0"
+    names = exps + advance + list(params["dev_scores"]) + [str(sid)]
+    if not all(_NAME_RE.match(e) for e in names) or len(set(exps)) != len(exps) \
+            or any(a not in exps for a in advance):
+        return _finish(ctx, res, "refused", ["sid, exps, advance and dev_scores must be names, advance a subset of "
+                                             "exps; got %r" % (names,)])
+    if report not in ("auto", "always", "never"):
+        return _finish(ctx, res, "refused", ["report must be auto, always or never"])
+    if not all(re.match(r"^[0-9]+(_[0-9]+)?$", j) for j in params["sacct"]):
+        return _finish(ctx, res, "refused", ["sacct job ids must be numeric"])
+    bad = [k for k, v in ledger_from.items() if k not in exps or _ledger_pos(v) is None]
+    if bad:
+        return _finish(ctx, res, "refused", ["ledger_from names %r, not a listed experiment with a line count" % bad])
+    tier = _tier(actor)
+    if tier is None:
+        return _finish(ctx, res, "refused", ["actor %r is not a recognised actor" % (actor,)])
+    if tier == "round-scheduler" and camp and camp.get("paused_reason") and advance:
+        return _finish(ctx, res, "refused", ["the campaign is paused: %s" % camp["paused_reason"]])
+    resources = ctx.resources()
+    if resources.get("cluster_reachable") is False:
+        return _finish(ctx, res, "refused", ["the cluster is not reachable"])
+    parts = [("inc_stream_status", {"sid": str(sid)})]
+    for e in exps:
+        parts.append(("inc_snapshot", {"exp": e}))
+        if report != "never":
+            parts.append(("inc_report", {"exp": e}))
+        if e in advance:
+            parts.append(("inc_advance", {"exp": e}))
+    for action, p in parts:
+        auth = POL.authorize(actor, action, p, None, resources)
+        if not auth["allowed"] or auth["needs_approval"]:
+            return _finish(ctx, res, "refused", ["%s %s: %s" % (action, p.get("exp") or p.get("sid"),
+                                                                "; ".join(auth["reasons"]))])
+    res["authorized_as"], res["decided_by"], res["basis"] = actor, actor, "direct"
+    argv = ["stream-snapshot", "--sid", str(sid)]
+    for e in exps:
+        argv += ["--exp", e]
+    for e in advance:
+        argv += ["--advance", e]
+    argv += ["--report", report]
+    for e in exps:
+        if e in ledger_from:
+            n, sha = _ledger_pos(ledger_from[e])
+            argv += ["--ledger-from", ("%s=%d:%s" % (e, n, sha)) if sha else ("%s=%d" % (e, n))]
+    for e in params["dev_scores"]:
+        argv += ["--dev-scores", e]
+    for j in params["sacct"]:
+        argv += ["--sacct", j]
+    if largest:
+        argv.append("--largest")
+    plan = {"res": res, "action": "inc_stream_snapshot", "params": params, "local": False, "remote": argv}
+    return _run_plans(ctx, [plan])[0]
 
 
 def execute_approved(item_id, campaign=None, ctx=None, invoked_by=M.AUTOPILOT_ACTOR,

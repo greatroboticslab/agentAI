@@ -125,6 +125,8 @@ status 0 when the record says ok, else 1.
         estimate (--prereg, --out), map (--part geometry|relation), recover
         (--audit, --maps, --policy, --out under INC_DIR); the verb's extra
         sbatch flags come from funnel/__main__.py SBATCH_RESOURCES.
+    stream-snapshot | stream-submit | stream-run
+        stream mode (docs/CONTINUOUS_LOOP.md 6.2): see stream_remote.py.
     fixture --from FILE --out DIR
         (either host) the INCAP line in FILE (a snapshot or campaign-snapshot)
         written out as files named as on the cluster (relative to INC_DIR),
@@ -2285,8 +2287,14 @@ def _split_submit(argv):
 def dispatch(argv):
     if not argv:
         raise _ArgError("a verb is needed: status, snapshot, advance, report, unblock, cancel, sync-outer, "
-                        "submit, campaign-snapshot, funnel, fixture")
+                        "submit, campaign-snapshot, funnel, fixture, stream-snapshot, stream-submit, stream-run")
     verb, rest = argv[0], argv[1:]
+    if verb in ("stream-snapshot", "stream-submit", "stream-run"):
+        # Stream mode (docs/CONTINUOUS_LOOP.md 6.2): the verbs live in
+        # stream_remote.py, which reuses this module's snapshot, report,
+        # advance, status and dev-only scrub.
+        from . import stream_remote as SR
+        return SR.dispatch(verb, rest)
     if verb == "submit":
         builder, meta, dry, args = _split_submit(rest)
         return submit(builder, args, meta=meta, dry_run=dry)

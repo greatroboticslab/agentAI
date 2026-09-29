@@ -497,9 +497,15 @@ def campaign_config(raw, name):
     return c
 
 
-def check_goal(goal):
+def check_goal(goal, mode="experiment"):
     """The normalised goal, or ValueError. None is 'no goal': the campaign runs
-    until nothing is left to propose."""
+    until nothing is left to propose. A stream campaign's goal is
+    {"kind": "continuous"} (docs/CONTINUOUS_LOOP.md 6.2, P7: it never
+    COMPLETEs by itself), and only a stream campaign's may be."""
+    if mode == "stream":
+        if not isinstance(goal, dict) or goal.get("kind") != "continuous" or len(goal) != 1:
+            raise ValueError("a stream campaign's goal is {'kind': 'continuous'}, got %r" % (goal,))
+        return {"kind": "continuous"}
     if goal is None:
         return None
     if not isinstance(goal, dict):
@@ -813,8 +819,16 @@ def _tick_all(paths, slurm_sh, cfg_hooks, log, db, log_action, clock, names, res
     res_fn = _resources_fn(resources, db)
     out = {}
     for name in order:
-        run = _Run(name, camps.get(name), paths, ssh, clock, log, cfg_hooks, res_fn,
-                   domain_budget, log_action, preamble)
+        raw = camps.get(name)
+        if isinstance(raw, dict) and raw.get("mode") == "stream":
+            # docs/CONTINUOUS_LOOP.md 6.2: a stream campaign runs the lane ticker;
+            # experiment-mode campaigns run _Run, unchanged
+            from . import stream as S
+            run = S.StreamRun(name, raw, paths, ssh, clock, log, cfg_hooks, res_fn, domain_budget,
+                              log_action, preamble)
+        else:
+            run = _Run(name, raw, paths, ssh, clock, log, cfg_hooks, res_fn,
+                       domain_budget, log_action, preamble)
         out[name] = run.go()
     try:
         write_status(paths, cfg_hooks, clock)
@@ -3341,6 +3355,10 @@ def status(name=None, cfg_hooks=None, lab_repo=None):
     for n in sorted(camps):
         if name and n != name:
             continue
+        if isinstance(camps.get(n), dict) and camps[n].get("mode") == "stream":
+            from . import stream as S
+            out.update(S.status(n, cfg_hooks, lab_repo))
+            continue
         c = campaign_config(camps.get(n), n)
         out[n] = {"config": c, "summary": summary(c, load_state(paths, n))}
     return out
@@ -3353,6 +3371,11 @@ def write_status(paths, cfg_hooks, clock=time.time):
     out = {"format": STATUS_FORMAT, "utc": _utc(clock()), "ts": clock(), "campaigns": {}}
     for n in sorted(camps):
         if not NAME_RE.match(str(n)):
+            continue
+        if isinstance(camps.get(n), dict) and camps[n].get("mode") == "stream":
+            from . import stream as S
+            c = S.stream_config(camps[n], n)
+            out["campaigns"][n] = S.summary(c, S.load_state(S.StreamPaths(paths.lab_repo, M.campaign_domain(c)), n))
             continue
         c = campaign_config(camps.get(n), n)
         out["campaigns"][n] = summary(c, load_state(paths, n))

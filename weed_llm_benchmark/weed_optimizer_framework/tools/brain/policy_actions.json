@@ -1543,6 +1543,875 @@
         "human"
       ],
       "description": "The dev scores the realloop_v2 panel compares (inc_autopilot/panel.py): runs/<run>/scores/dev.json of an experiment's base runs, or of a real loop step's truth 'with' runs, and nothing else; a score not stamped dev is refused."
+    },
+    "inc_stream_status": {
+      "template": "remote.py stream-snapshot --sid {sid} (the stream summary part)",
+      "param_bounds": {
+        "sid": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A read on the cluster login node; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "tier0",
+        "tier1",
+        "tier2",
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Stream mode (docs/CONTINUOUS_LOOP.md 6.2): the stream part of the one snapshot per tick: the queue summary, the stream ledger, dev scores of base runs, step1_stream status, intake summaries, placement, the splits lock status, sacct, projects and quota. Aggregates only; test is never read."
+    },
+    "inc_stream_discover": {
+      "template": "lab: python -m weed_optimizer_framework.tools.collect plan --config {config} --classes {classes} --out {out}",
+      "param_bounds": {
+        "config": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/collect/domains/[a-z0-9_]{1,40}\\.json$"
+        },
+        "classes": {
+          "type": "str",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}(,[A-Za-z][A-Za-z0-9_-]{0,63}){0,31}$"
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/collect/candidates\\.json$"
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A lab-side read of public provider APIs, run detached; no cluster allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L15 (docs/CONTINUOUS_LOOP.md 6.3, R0): discovery of candidate sources for the deficit classes, on the lab, as a detached process the ticker polls."
+    },
+    "inc_stream_names": {
+      "template": "lab: python -m weed_optimizer_framework.tools.collect names --source {source} --out {out}",
+      "param_bounds": {
+        "source": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/intake/names/$"
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A lab-side name resolution over the funnel's taxonomy cache (read only); no cluster allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L26 (review): the stream's own class-name resolution for a new source, writing INC_DIR/intake/names/ and never the funnel's directory."
+    },
+    "inc_stream_probe": {
+      "template": "sbatch -p GPU-shared run_inc_collect.sh probe",
+      "param_bounds": {
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream job script on GPU-shared with one V100 (the allocation refuses RM-shared: 'Invalid qos'): est_gpu_hours is its walltime or the stream-domain config's rate for it (levers_stream.price, contract 5.6, est.), in V100 GPU-hours; settled from sacct when the job ends (budget.record_job_spend)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "The network probe (docs/CONTINUOUS_LOOP.md 7.2, R0): one short GPU-shared job trying each provider host from a compute node; writes INC_DIR/intake/placement.json."
+    },
+    "inc_stream_collect": {
+      "template": "sbatch -p GPU-shared run_inc_collect.sh fetch --source {source} --max-bytes {max_bytes} [--candidates {candidates}]",
+      "param_bounds": {
+        "source": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "max_bytes": {
+          "type": "int",
+          "min": 1,
+          "max": 53687091200
+        },
+        "candidates": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/candidates_sync/[A-Za-z0-9_.-]{1,160}\\.json$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream job script on GPU-shared with one V100 (the allocation refuses RM-shared: 'Invalid qos'): est_gpu_hours is its walltime or the stream-domain config's rate for it (levers_stream.price, contract 5.6, est.), in V100 GPU-hours; settled from sacct when the job ends (budget.record_job_spend)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L16 (R2, gated): collect one source into content-addressed staging. Runs directly only with data_autonomy on, a stream replay pass, the floors set and the caps (executor.GATED_R2_ACTIONS); otherwise filed for a person."
+    },
+    "inc_stream_collect_lab": {
+      "template": "lab: python -m weed_optimizer_framework.tools.collect fetch --source {source} --max-bytes {max_bytes} --out {out}",
+      "param_bounds": {
+        "source": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "max_bytes": {
+          "type": "int",
+          "min": 1,
+          "max": 53687091200
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/intake/staging/$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 0.0
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A lab-side download, run detached; no cluster allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L16 on the lab (a provider the network probe has not passed, S22): the same verb as the job, detached; the files reach the cluster through inc_stream_sync."
+    },
+    "inc_stream_collect_review": {
+      "template": "sbatch -p GPU-shared run_inc_collect.sh fetch --source {source} --max-bytes {max_bytes} [--candidates {candidates}]",
+      "param_bounds": {
+        "source": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "max_bytes": {
+          "type": "int",
+          "min": 1,
+          "max": 53687091200
+        },
+        "candidates": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/candidates_sync/[A-Za-z0-9_.-]{1,160}\\.json$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream job script on GPU-shared with one V100 (the allocation refuses RM-shared: 'Invalid qos'): est_gpu_hours is its walltime or the stream-domain config's rate for it (levers_stream.price, contract 5.6, est.), in V100 GPU-hours; settled from sacct when the job ends (budget.record_job_spend)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L16 for a source that failed a pre-check (licence unknown, no target class, image-level labels only, over the byte cap, missing credentials, an evaluation lab without the copy scan): R3, a person decides; never within the envelope."
+    },
+    "inc_stream_intake": {
+      "template": "sbatch -p GPU-shared run_inc_collect.sh intake --source {source}",
+      "param_bounds": {
+        "source": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream job script on GPU-shared with one V100 (the allocation refuses RM-shared: 'Invalid qos'): est_gpu_hours is its walltime or the stream-domain config's rate for it (levers_stream.price, contract 5.6, est.), in V100 GPU-hours; settled from sacct when the job ends (budget.record_job_spend)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L16's intake (R2, gated): normalise, class map, licence gate and GuardV2 over a fetched source; writes INC_DIR/intake/<batch>/."
+    },
+    "inc_stream_sync": {
+      "template": "lab: rsync the lab's intake/staging/<source>/ with the source's names-layer files (or, with candidate 1, the source's candidate record intake/candidates_sync/<source>.json; with names 1, only intake/names/names_cache.json and names_<source>.json) to the cluster, verified by sha256 on arrival",
+      "param_bounds": {
+        "source": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "candidate": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            1
+          ]
+        },
+        "names": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            1
+          ]
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A file transfer to the cluster's data node; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L16 after a lab fetch: the staged files of one source pushed to the cluster and checked on arrival (as OP_FUNNEL_SYNC); and before a discovered source's cluster fetch, its candidate record, which the cluster's collector reads with --candidates."
+    },
+    "inc_stream_admit": {
+      "template": "sbatch -p GPU-shared run_inc2_stream.sh {verb} [--intake {intake}] [--hold {hold}]",
+      "param_bounds": {
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "admit",
+            "bootstrap",
+            "knowntruth",
+            "backfill",
+            "scan-holds"
+          ]
+        },
+        "intake": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+        },
+        "hold": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "h6_scan"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream job script on GPU-shared with one V100 (the allocation refuses RM-shared: 'Invalid qos'): est_gpu_hours is its walltime or the stream-domain config's rate for it (levers_stream.price, contract 5.6, est.), in V100 GPU-hours; settled from sacct when the job ends (budget.record_job_spend)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L17 (R2, gated): incremental Step 1 over an intake batch (admit), its one-time jobs (bootstrap, knowntruth, backfill; contract 10 R1), and the stream's own copy detector over h6_scan holds past their deadline (scan-holds)."
+    },
+    "inc_build_segment": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.stream {verb} --stream {stream} [--k {k}] [--exp {exp}] [--holdout {holdout}] [--m {m}] [--recipes {recipes}]",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "build",
+            "fork",
+            "feasibility"
+          ]
+        },
+        "stream": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "k": {
+          "type": "int",
+          "min": 1,
+          "max": 4
+        },
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,58}_s[0-9]{3}$"
+        },
+        "holdout": {
+          "type": "str",
+          "pattern": "^[a-z0-9_]{1,32}$"
+        },
+        "m": {
+          "type": "int",
+          "min": 1,
+          "max": 50000
+        },
+        "recipes": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "r0",
+            "x1a",
+            "x1b",
+            "r0,x1a",
+            "r0,x1b"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Levers L18 (cut and build a segment <stream>_sNNN, named by --exp), L22 (fork: double M, a new stream version) and L28 (Stage C feasibility chain): R3, envelope-eligible for a stream campaign. The argv is inc2.stream's build_parser grammar; the arm (choose-arm, L-4) and the truth cadence are the stream's own, never a build flag."
+    },
+    "inc_build_consolidation": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.stream {verb} --stream {stream} [--from {from_pool}]",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "milestone",
+            "bisect"
+          ]
+        },
+        "stream": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "from_pool": {
+          "type": "str",
+          "pattern": "^P_[0-9]{1,4}(\\.[0-9a-f]{16})?$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Levers L20 (milestone: 5 cold seeds on P_s, finals dev, imageweeds and test) and L27 (bisect the suspect increments after a rollback): R3, envelope-eligible."
+    },
+    "inc_stream_commit": {
+      "template": "remote.py stream-run {pkg}.stream commit -- --exp {exp}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        }
+      },
+      "risk": "R1",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A login-node verb; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L19 (R1): commit a finished segment, deterministic from its report and ledger (contract 3.5)."
+    },
+    "inc_stream_rollback": {
+      "template": "remote.py stream-run {pkg}.stream rollback -- --stream {stream} --to {to}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "stream": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "to": {
+          "type": "str",
+          "pattern": "^P_[0-9]{1,4}(\\.[0-9a-f]{16})?$"
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A login-node verb; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L21 (R3): the pool pointer back to P_c; envelope only when P_c is the rollback the last 'hurts' milestone recommended (the stream summary's rollback_pending; inc2.stream refuses any other without a person), any other target waits for a person."
+    },
+    "inc_stream_quarantine": {
+      "template": "remote.py stream-run {pkg}.stream quarantine -- --source {source} --cite {cite}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "source": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "cite": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "D28",
+            "D31"
+          ]
+        }
+      },
+      "risk": "R2",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A login-node verb; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L24 (R2, gated): quarantine a source, reversible, only with a firing D28 or D31 cited."
+    },
+    "inc_stream_release": {
+      "template": "remote.py stream-run {pkg}.stream release -- --stream {stream} --hold {hold}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "stream": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "hold": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "funnel_F9"
+          ]
+        }
+      },
+      "risk": "R3",
+      "reversible": false,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A login-node verb; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "A funnel_F9 hold past its deadline (contract 6.7 review): R3 for a person, never within the envelope; releasing the held rows costs the stream models their H10d comparability."
+    },
+    "inc_splits_build": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.splits {verb}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "build",
+            "lock"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": false,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream job script on GPU-shared with one V100 (the allocation refuses RM-shared: 'Invalid qos'): est_gpu_hours is its walltime or the stream-domain config's rate for it (levers_stream.price, contract 5.6, est.), in V100 GPU-hours; settled from sacct when the job ends (budget.record_job_spend)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23 (R3): splits v2 build and lock (contract 4.2), with the embedding copy scan before lock. One approval by a person of the exact D-A command; never within the envelope."
+    },
+    "inc_build_baseline_v2": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.baseline build --exp {exp} [--manifest {manifest}] [--union {union}] --seeds {seeds} --arm {arm} --role {role}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "manifest": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v[0-9]{1,3}/[A-Za-z0-9_][A-Za-z0-9_.-]{0,100}\\.jsonl$"
+        },
+        "union": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v[0-9]{1,3}/[A-Za-z0-9_][A-Za-z0-9_.-]{0,100}\\.jsonl(,(?!.*\\.\\.)/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v[0-9]{1,3}/[A-Za-z0-9_][A-Za-z0-9_.-]{0,100}\\.jsonl){1,5}$"
+        },
+        "seeds": {
+          "type": "str",
+          "pattern": "^[0-9](,[0-9]){0,9}$"
+        },
+        "arm": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "n640",
+            "s640",
+            "m640"
+          ]
+        },
+        "role": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "b_v2",
+            "capacity",
+            "canary",
+            "union"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23's baselines (R3, envelope-eligible): B_v2 (milestone 0, 5 cold seeds), the canary, the capacity arms of L-4 (--arm s640 | m640) and B0 u tsw (--union), each a cold baseline under the v2 guard; the role is inc2.baseline's and must match what is built."
+    },
+    "inc_build_pilot4": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.pilot4 build --exp {exp} --from {from_exp} --recipes {recipes}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "from_exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "recipes": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "x1a,x1b",
+            "x1a",
+            "x1b"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L25 (R3, envelope after a person accepts Protocol v3, P1): Stage A, pilot_v4 on pilot_v3's bins with the X1a and X1b recipes and no truth arm (contract 5.1)."
+    },
+    "inc_stream_init": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.stream init --stream {stream} --stage-b {stage_b}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "stream": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "stage_b": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "r0",
+            "r0,x1a",
+            "r0,x1b"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 200.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime): the stream's P_0 dHashes; settled from sacct when the job ends (budget.record_job_spend)."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever LI (R3, envelope-eligible): create the stream (stream.json, P_0 = LOCK v2's base_v2, the init and prospective ledger lines) with Stage A's recorded segment 1 recipes as its Stage B arms (pilot_v4/stage_a.json)."
+    },
+    "inc_stream_choose_arm": {
+      "template": "remote.py stream-run {pkg}.stream choose-arm -- --stream {stream}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "stream": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        }
+      },
+      "risk": "R1",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A login-node verb; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever LA (R1): the stream adopts inc2.baseline capacity-verdict's decision (capacity/capacity_v1.json, dev only, L-4) by its sha256; allowed before the first segment only."
+    },
+    "inc_stream_compare": {
+      "template": "remote.py stream-run {pkg}.stream compare -- --exp {exp}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,58}_[mcb][0-9]{3}$"
+        }
+      },
+      "risk": "R1",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A login-node verb; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever LC (R1): decide a finished milestone (5 v 5 on dev), the Stage C chain (gate3) or a bisect arm (gate.truth_detail against P_c's milestone seeds); deterministic from recorded dev scores."
+    },
+    "inc_stream_verdict": {
+      "template": "remote.py stream-run {pkg}.{module} {verb} -- [--exp {exp}]",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "module": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "baseline",
+            "pilot4"
+          ]
+        },
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "canary-verdict",
+            "capacity-verdict",
+            "verdict"
+          ]
+        },
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        }
+      },
+      "risk": "R1",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A login-node verb; it requests no allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever LV (R1): record an R0 verdict by its pre-registered rule, dev only: inc2.baseline canary-verdict (canary.json), capacity-verdict (capacity/capacity_v1.json, L-4) and inc2.pilot4 verdict (pilot_v4/stage_a.json)."
     }
   }
 }

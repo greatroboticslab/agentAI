@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -119,6 +120,27 @@ def domain_terms(domain=None):
     as it had 'cwd12 test' written into its pattern before."""
     from ..funnel import domain as FD
     return tuple((FD.load(domain or DOMAIN).raw or {}).get("domain_terms") or ())
+
+
+# --------------------------------------------------------- per-campaign domain
+# A campaign names its domain in its config ("domain"; docs/CONTINUOUS_LOOP.md
+# 6.2); an experiment-mode campaign names none and is DOMAIN's, as before. The
+# stream ticker keeps its state, ledger, approvals and SU ledger under that
+# domain's tree, and reads that domain's exams (exam_splits(domain)).
+_DOMAIN_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+
+
+def campaign_domain(cfg):
+    """The campaign config's domain, or DOMAIN when it names none (or an invalid one)."""
+    d = cfg.get("domain") if isinstance(cfg, dict) else None
+    return d if isinstance(d, str) and _DOMAIN_NAME_RE.match(d) else DOMAIN
+
+
+def domain_campaign_dir(domain=None, lab_repo=None):
+    """<lab>/results/framework/_brain/<domain>/inc: CAMPAIGN_DIR for DOMAIN on the
+    dashboard's tree; the same layout for another domain or a test tree."""
+    brain = (Path(lab_repo) / "results" / "framework" / "_brain") if lab_repo is not None else BRAIN_DIR
+    return brain / (domain or DOMAIN) / "inc"
 
 
 def utc_now():

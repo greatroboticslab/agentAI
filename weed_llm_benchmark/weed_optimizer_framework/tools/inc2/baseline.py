@@ -1,0 +1,804 @@
+"""Baselines on splits v2 (docs/CONTINUOUS_LOOP.md §4.4, §3.6, §2.6 L-4):
+B_v2, its capacity arms, the canary, B0 u tsw and the stream's milestones.
+
+    python -m weed_optimizer_framework.tools.inc2.baseline build --exp E (--manifest PATH | --union P1,P2,...)
+        [--seeds 0,1,2] [--arm n640|s640|m640 | --arch yolo11s --imgsz 640] [--final-exams dev,imageweeds,test]
+        [--role b_v2|capacity|canary|union|milestone|baseline] [--testing | --testing-settings JSON] [--no-init]
+    python -m weed_optimizer_framework.tools.inc2.baseline canary-verdict   --exp canary_v2 [--reference b0_v1]
+    python -m weed_optimizer_framework.tools.inc2.baseline capacity-verdict --n b_v2 --arms b_v2_s640,b_v2_m640
+        [--m M] [--out-dir DIR]
+    python -m weed_optimizer_framework.tools.inc2.baseline secondary --exp <sid>_mNNN --weights PATH
+        [--run-id secondary__incumbent] [--source TEXT]
+    python -m weed_optimizer_framework.tools.inc2.baseline estimate --n-images N [--seeds 0,1,2] [--arm A]
+
+build writes a 'baseline' experiment for the pinned driver (inc/driver.py,
+unchanged): one cold base run per seed (the arm's Protocol v3 cold recipe,
+from the arm's COCO checkpoint), scored on dev, then one final run per seed on
+the final exams (default splits v2's dev, imageweeds and test; test is read
+only here, at a milestone, P10). The runs are executed by inc2.train through
+run_inc2_job.sh: build sets INC_JOB_SCRIPT to REPO/weed_llm_benchmark/
+run_inc2_job.sh before driver init (and refuses when it already names another
+script), so the driver never submits the v1 executor for a v2 experiment.
+
+Before anything is written (fail closed):
+  * the arm resolves (inc2.recipes.resolve_arm): its checkpoint is in REPO and
+    its sha256 is pinned into exp.json's "arm" (a testing build may lack it);
+  * splits v2 are locked: LOCK v2 exists and the never-train index hashes as
+    it records; a production build refuses a LOCK a testing build wrote;
+  * the manifest passes inc2.train's own checks, the ones every base run
+    repeats: check_manifest (keys, labels, image and label bytes, not an
+    evaluation manifest of v1 or v2, by path or content) and guard_rows (the
+    v2 never-train guard over the 8 flips and rotations, GuardV2 plus the
+    index cross-check). --union checks every part, then that the parts are
+    pairwise disjoint by key, image path and image sha256, then the guard
+    over the union;
+  * the definition passes the pinned driver's validate_definition and
+    check_definition_data.
+The manifest is copied into manifests/<sanitised stem>.jsonl (same bytes); a
+union is written there as <exp>_union.jsonl. exp.json carries
+inc2.recipes.stamp(arm) (protocol v3, protocol_package inc2, splits v2, the
+arm record, init_weights = the arm's checkpoint), the role, the source
+manifest(s) and whether LOCK v2 records it (source_locked), and
+cost_estimate (inc2.recipes.baseline_cost: est., low and high GPU-h, the
+projected longest run against the 8 h cold walltime) and research_only (the
+§8 taint of the base's rows, from splits v2's base_v2_provenance.jsonl
+when it hashes as LOCK v2 records: false only when every row is known and
+none is research-only, else true). build_summary.json
+records the manifest summary, the guard record, the LOCK status and the
+sha256 of every input.
+
+Roles and their contract rows (§4.4, §3.6, L-4):
+  b_v2       LOCK v2's base_v2, arm n640, seeds 0..4 (milestone 0); finals
+             dev, imageweeds, test
+  capacity   LOCK v2's base_v2, arm s640 or m640, seeds 0..2; finals dev,
+             imageweeds, test (L-4: test read once per arm at R0)
+  canary     LOCK v2's train_core (the v2 byte copy), arm n640, seed 0;
+             final exam dev only
+  union      --union (B0 u tsw), seeds 0..2; finals dev, imageweeds
+  milestone  a stream pool P_s, seeds 0..4 (group E's inc2.stream milestone);
+             finals dev, imageweeds, test
+  baseline   any other manifest, seeds 0..2; finals dev, imageweeds
+Test is read only at milestone reads (P10): b_v2, capacity and milestone. A
+build of any other role that lists test is refused. Without --role the role
+is inferred from what is built (the autopilot's L23B argv names none): --union
+is union; LOCK v2's base_v2 (by sha256) is b_v2 on n640 and capacity on
+another arm; LOCK v2's train_core is canary; anything else is baseline. A
+role given explicitly must match: b_v2, capacity and canary refuse another
+manifest or arm, union needs --union.
+
+The arm is --arm (an id), or --arch and --imgsz together (the autopilot's
+L23B argv: --arch yolo11s --imgsz 640 is s640), which must name one row of
+inc2.recipes.ARMS; both forms at once must agree.
+
+canary-verdict: the canary's base__s0 dev mAP50-95 against b0_v1's base
+seeds (report.json's dev 12-class mean and sd, else the runs' own scores):
+passes when |canary - mean| <= sd (§4.4), the canary's scorer sidecar was
+written and still hashes as run.json records (a baseline records a failed
+sidecar without failing the run, so the canary is where a sidecar that does
+not work on the cluster's Ultralytics shows up first), the run and its score
+are production ones, and the canary trained what the reference's seed 0
+trained (the reference exp.json's base manifest_sha256 and cold recipe, seed
+0 among its seeds). Written to INC_DIR/<exp>/canary.json.
+
+capacity-verdict (L-4's rule, dev only): every arm's base runs on the seeds
+all arms share, their dev mAP50-95 (production scores, one scorer, one dev
+manifest and key order). An arm qualifies when mean(arm) - mean(n640) >
+2 x pooled sd, pooled sd = sqrt((sd(arm)^2 + sd(n640)^2) / 2); the stream
+takes the qualifying arm with the highest dev mean (a tie: the fewer FLOPs),
+else stays on n640. For the chosen arm: the measured cold rate (median ms
+per image-epoch over its base runs' run.json), the incremental rate est. as
+cold x 7.4 / 6.5 (the n640 ratio of §5.6), the per-step cost of one r0 step
+with its truth arm at N = the base's images and M = ceil(0.10 N), and
+truth_every = 1 when that is <= 25 GPU-h, else ceil(cost / 25) (L-4). Writes
+INC_DIR/capacity/capacity_v1.json (the decision: it opens no test file) and
+capacity_v1_report.{json,md} (for people: every arm's final dev, imageweeds
+and test mean +- sd over its seeds, 12-class and agnostic, and the gap to
+0.90; the milestone read of test at R0).
+
+secondary: the milestone's second number (§3.6), the chain incumbent scored
+on the milestone's final exams: writes runs/<run id>/spec.json (kind final,
+init = the incumbent's weights, checked by inc2.train.validate_spec), a
+one-line submission list and secondary.json (the weights' sha256 and the
+source), and returns the sbatch argv of run_inc2_job.sh for the platform to
+submit. It submits nothing itself; the driver does not track that run.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+import shutil
+import statistics
+import sys
+from pathlib import Path
+
+from ..inc import common as C
+from ..inc import driver as D
+from ..inc import pilot as P
+from ..inc.scorer import TEST_ENV
+from ..inc.splits import sanitise
+from . import recipes as RC
+from . import train as T
+
+BUILDER = "inc2.baseline build"
+ROLES = ("b_v2", "capacity", "canary", "union", "milestone", "baseline")
+ROLE_SEEDS = {"b_v2": (0, 1, 2, 3, 4), "milestone": (0, 1, 2, 3, 4), "canary": (0,)}
+DEFAULT_SEEDS = (0, 1, 2)
+FINAL_EXAMS = ("dev", "imageweeds", "test")
+CANARY_FINAL_EXAMS = ("dev",)
+NO_TEST_FINAL_EXAMS = ("dev", "imageweeds")
+# P10 (L-1): test is read only at milestone reads -- milestone 0 (b_v2), the
+# capacity arms at R0 (L-4) and the stream's milestones.
+TEST_ROLES = ("b_v2", "capacity", "milestone")
+ROLE_FINAL_EXAMS = {"b_v2": FINAL_EXAMS, "capacity": FINAL_EXAMS, "milestone": FINAL_EXAMS,
+                    "canary": CANARY_FINAL_EXAMS, "union": NO_TEST_FINAL_EXAMS, "baseline": NO_TEST_FINAL_EXAMS}
+# The LOCK v2 manifest a role trains (by sha256), and the arm it needs.
+ROLE_MANIFEST = {"b_v2": "base_v2", "capacity": "base_v2", "canary": "train_core"}
+JOB_SCRIPT_NAME = "run_inc2_job.sh"
+BUILD_SUMMARY = "build_summary.json"
+CAPACITY_FORMAT = "inc2-capacity/1"
+CAPACITY_NAME = "capacity_v1"
+CANARY_FORMAT = "inc2-canary/1"
+SECONDARY_FORMAT = "inc2-secondary/1"
+TARGET_TEST = 0.90                    # the success measure's target (docs/CONTINUOUS_LOOP.md 1.2)
+M_SHARE = 0.10                        # M = ceil(0.10 x |base|) (5.3)
+INC_OVER_COLD = RC.INC_MS[0] / (0.5 * (RC.COLD_MS[0] + RC.COLD_MS[1]))     # 7.4 / 6.5 (5.6), est.
+
+
+class BaselineError(RuntimeError):
+    """A condition under which the baseline must not be built or judged."""
+
+
+def log(msg):
+    print("[inc2.baseline] %s" % msg, flush=True)
+
+
+def _write_json(path, obj):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(".%s.%d.tmp" % (path.name, os.getpid()))
+    try:
+        with open(tmp, "w") as fh:
+            json.dump(obj, fh, indent=1, sort_keys=True, allow_nan=False)
+            fh.write("\n")
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    return C.sha256_file(path)
+
+
+def _read_json(path):
+    try:
+        with open(path) as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def _sha(path):
+    try:
+        return C.sha256_file(path)
+    except OSError:
+        return None
+
+
+def _mean_sd(xs):
+    xs = [float(x) for x in xs]
+    return (statistics.fmean(xs) if xs else None, statistics.stdev(xs) if len(xs) >= 2 else None)
+
+
+# ---------------------------------------------------------------- inputs
+def job_script_path():
+    return C.REPO / "weed_llm_benchmark" / JOB_SCRIPT_NAME
+
+
+def ensure_job_script(testing=False):
+    """Point the driver at run_inc2_job.sh (INC_JOB_SCRIPT) before init; refuse
+    a different script already set, and (production) a missing one."""
+    want = job_script_path()
+    cur = os.environ.get("INC_JOB_SCRIPT")
+    if cur and Path(cur).resolve() != want.resolve():
+        raise BaselineError("INC_JOB_SCRIPT is %s, not the v2 executor's job script %s: a v2 experiment is "
+                            "never run by another executor" % (cur, want))
+    if not testing and not want.is_file():
+        raise BaselineError("the v2 job script %s is missing (deploy the checkout first)" % want)
+    os.environ["INC_JOB_SCRIPT"] = str(want)
+    return str(want)
+
+
+def v2_lock_status(testing=False):
+    """LOCK v2 and its never-train index: a production build needs both, the
+    index the LOCK records, and a LOCK not written by a testing build; a
+    testing build only warns."""
+    lock_path, idx = T.v2_lock_path(), T.v2_nevertrain_path()
+    lock = _read_json(lock_path)
+    out = {"lock": str(lock_path), "lock_sha256": _sha(lock_path), "index": str(idx), "index_sha256": _sha(idx),
+           "testing_lock": bool((lock or {}).get("testing")) if isinstance(lock, dict) else None,
+           "manifests": dict((lock or {}).get("manifests") or {}) if isinstance(lock, dict) else {}}
+    problems = []
+    if not isinstance(lock, dict):
+        problems.append("%s is missing or unreadable: v2 experiments are built only on locked splits "
+                        "(inc2.splits lock)" % lock_path)
+    else:
+        if lock.get("splits_version") != RC.SPLITS_VERSION:
+            problems.append("%s is not a v2 LOCK" % lock_path)
+        if lock.get("nevertrain_sha256") != out["index_sha256"]:
+            problems.append("the v2 never-train index %s is not the one LOCK v2 records" % idx)
+        if lock.get("testing") and not testing:
+            problems.append("LOCK v2 was written by a testing build")
+    if problems:
+        if not testing:
+            raise BaselineError("; ".join(problems))
+        for p in problems:
+            log("WARNING: %s (testing build)" % p)
+    out["problems"] = problems
+    return out
+
+
+def locked_name(sha, lock_status):
+    for name, want in sorted((lock_status.get("manifests") or {}).items()):
+        if want == sha:
+            return name
+    return None
+
+
+def check_training_manifest(path, production=True, what="training manifest"):
+    """(rows, {image: dHash}, info) of a manifest that passes inc2.train's
+    check_manifest and guard_rows (fail closed)."""
+    try:
+        rows, dhashes, info = T.check_manifest(path)
+    except T.RunError as e:
+        raise BaselineError("%s %s refused: %s" % (what, path, e))
+    try:
+        info["guard"] = T.guard_rows(rows, dhashes, production=production)
+    except T.RunError as e:
+        raise BaselineError("%s %s refused by the splits v2 never-train guard: %s" % (what, path, e))
+    return rows, dhashes, info
+
+
+def check_union(paths, production=True):
+    """(rows, info, parts) of the union of several manifests: each passes
+    check_manifest, the parts are pairwise disjoint (key, image path, image
+    sha256), and the guard runs over the union."""
+    parts, all_rows, dh = [], [], {}
+    for p in paths:
+        try:
+            rows, dhashes, info = T.check_manifest(p)
+        except T.RunError as e:
+            raise BaselineError("union part %s refused: %s" % (p, e))
+        for q in parts:
+            try:
+                D.check_disjoint(q["rows"], rows, Path(p).stem, "part %s" % q["name"])
+            except D.DriverError as e:
+                raise BaselineError("the union's parts overlap: %s" % e)
+        parts.append({"name": Path(p).stem, "path": str(Path(p).resolve()), "rows": rows,
+                      "sha256": info["train_manifest_sha256"], "images": len(rows)})
+        all_rows += rows
+        dh.update(dhashes)
+    try:
+        guard = T.guard_rows(all_rows, dh, production=production)
+    except T.RunError as e:
+        raise BaselineError("the union refused by the splits v2 never-train guard: %s" % e)
+    return all_rows, guard, parts
+
+
+def research_only_record(rows):
+    """The research-only taint of a base (docs/CONTINUOUS_LOOP.md §8): each
+    row's research_only flag from splits v2's base_v2_provenance.jsonl
+    (matched by key and image sha256), read only when it hashes as LOCK v2
+    records it. flag is False only when every row is known and none is
+    research-only; a research-only row or a row whose licence is not known
+    here makes it True (fail closed: P6 treats an unresolved licence as
+    research-only, and a model trained on any research-only row is
+    research-only). basis says which. A caller that knows better, such as
+    the stream's milestone, passes its own record through build's extra."""
+    prov = T.v2_dir() / "base_v2_provenance.jsonl"
+    lock = _read_json(T.v2_lock_path())
+    want = (lock or {}).get("provenance_sha256") if isinstance(lock, dict) else None
+    got = _sha(prov)
+    known, problem = {}, None
+    if got is None:
+        problem = "no provenance file"
+    elif want is not None and got != want:
+        problem = "the provenance file does not hash as LOCK v2 records it"
+    else:
+        for r in C.read_manifest(prov):
+            known[(r.get("key"), r.get("sha256"))] = bool(r.get("research_only"))
+    flagged = sum(1 for r in rows if known.get((r["key"], r["sha256"])) is True)
+    unknown = sum(1 for r in rows if (r["key"], r["sha256"]) not in known)
+    flag = bool(flagged or unknown)
+    basis = ("research_only rows" if flagged else "rows of unknown licence" if unknown
+             else "every row known, none research-only")
+    return {"flag": flag, "basis": basis, "rows": len(rows), "research_only_rows": flagged, "unknown_rows": unknown,
+            "provenance": {"path": str(prov), "sha256": got, "lock_sha256": want, "problem": problem},
+            "note": "a model trained on any research-only row, or on a row whose licence is unknown, is "
+                    "research-only (8, P6)"}
+
+
+def _final_exams(final_exams, role):
+    ex = list(final_exams) if final_exams else list(ROLE_FINAL_EXAMS[role])
+    bad = [e for e in ex if e not in T.EXAMS]
+    if bad or D.DECISION_EXAM not in ex or len(set(ex)) != len(ex):
+        raise BaselineError("final exams %s: each must be one of %s, dev included, none twice" % (ex, list(T.EXAMS)))
+    if "test" in ex and role not in TEST_ROLES:
+        raise BaselineError("a %s build may not read test: test is read only at milestone reads (P10), roles %s"
+                            % (role, list(TEST_ROLES)))
+    return ex
+
+
+def arm_arg(arm=None, arch=None, imgsz=None):
+    """The arm id from --arm, or from --arch and --imgsz together (the
+    autopilot's L23B argv), which must agree when both are given."""
+    if arch is None and imgsz is None:
+        return RC.arm_id(arm if arm is not None else RC.DEFAULT_ARM)
+    try:
+        a = RC.arm_from_arch(arch, imgsz)
+    except RC.RecipeError as e:
+        raise BaselineError(str(e))
+    if arm is not None and RC.arm_id(arm) != a:
+        raise BaselineError("--arm %s and --arch %s --imgsz %s name different arms" % (arm, arch, imgsz))
+    return a
+
+
+def resolve_role(role, locked, arm, union=False):
+    """The build's role: checked against what is built when given, inferred
+    when not (module docstring). locked is the LOCK v2 name of the manifest's
+    sha256 (None when LOCK v2 does not list it)."""
+    if role is None:
+        if union:
+            return "union"
+        if locked == "base_v2":
+            return "b_v2" if arm == RC.REFERENCE_ARM else "capacity"
+        if locked == "train_core":
+            return "canary"
+        return "baseline"
+    if role not in ROLES:
+        raise BaselineError("role %r not in %s" % (role, list(ROLES)))
+    if (role == "union") != bool(union):
+        raise BaselineError("role union is built from --union, and --union builds role union only (got role %s)"
+                            % role)
+    want = ROLE_MANIFEST.get(role)
+    if want is not None and locked != want:
+        raise BaselineError("role %s trains LOCK v2's %s; this manifest is %s" % (role, want,
+                                                                                "LOCK v2's %s" % locked if locked
+                                                                                else "not a LOCK v2 manifest"))
+    if role in ("b_v2", "canary") and arm != RC.REFERENCE_ARM:
+        raise BaselineError("role %s is the continuity arm %s, not %s" % (role, RC.REFERENCE_ARM, arm))
+    if role == "capacity" and arm == RC.REFERENCE_ARM:
+        raise BaselineError("role capacity is an arm other than %s (L-4); %s on base_v2 is b_v2"
+                            % (RC.REFERENCE_ARM, RC.REFERENCE_ARM))
+    return role
+
+
+# ------------------------------------------------------------------- build
+def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None,
+                     role=None, testing=False, extra=None, arch=None, imgsz=None):
+    """Check every input and write the manifest copy and the summary; returns
+    (definition, summary). Nothing is written before every check passed.
+    role None infers it (module docstring)."""
+    if role is not None and role not in ROLES:
+        raise BaselineError("role %r not in %s" % (role, list(ROLES)))
+    if (manifest is None) == (not union):
+        raise BaselineError("give exactly one of --manifest and --union")
+    try:
+        testing = P._check_testing(testing)
+    except P.PilotError as e:
+        raise BaselineError(str(e))
+    aid = arm_arg(arm, arch, imgsz)
+    try:
+        arm_rec = RC.resolve_arm(aid, repo=C.REPO, require_weights=not testing)
+    except RC.RecipeError as e:
+        raise BaselineError(str(e))
+    paths = D.Paths(exp)
+    try:
+        P._check_new(paths)
+    except P.PilotError as e:
+        raise BaselineError(str(e))
+    lock = v2_lock_status(testing=bool(testing))
+    production = not testing
+    locked = None if union else locked_name(_sha(Path(os.path.abspath(str(manifest)))), lock)
+    role = resolve_role(role, locked, arm_rec["id"], union=bool(union))
+    try:
+        seeds = P.check_seeds(list(ROLE_SEEDS.get(role, DEFAULT_SEEDS)) if seeds is None else seeds)
+    except P.PilotError as e:
+        raise BaselineError(str(e))
+    exams = _final_exams(final_exams, role)
+    if union:
+        srcs = [Path(os.path.abspath(str(p))) for p in union]
+        rows, guard, parts = check_union(srcs, production=production)
+        name = sanitise("%s_union" % exp)
+        dst = paths.manifests / ("%s.jsonl" % name)
+        sha = C.write_manifest(dst, rows)
+        rows2, _dh, info = T.check_manifest(dst)
+        info["guard"] = guard
+        source = {"union": [{k: v for k, v in q.items() if k != "rows"} for q in parts],
+                  "source_locked": [locked_name(q["sha256"], lock) for q in parts]}
+        rows = rows2
+    else:
+        src = Path(os.path.abspath(str(manifest)))
+        rows, _dh, info = check_training_manifest(src, production=production)
+        sha = info["train_manifest_sha256"]
+        if locked_name(sha, lock) != locked:
+            raise BaselineError("%s changed while it was checked (the role was decided on other bytes)" % src)
+        name = sanitise(src.stem)
+        dst = paths.manifests / ("%s.jsonl" % name)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        if C.sha256_file(dst) != sha:
+            raise BaselineError("copy of %s does not hash like the manifest that was checked" % src)
+        source = {"source_manifest": str(src), "source_locked": locked_name(sha, lock)}
+    cost = RC.baseline_cost(len(rows), seeds, exams, arm_rec["id"])
+    defn = {"exp": exp, "type": "baseline", "builder": BUILDER, "role": role, "testing": testing,
+            "seeds": list(seeds), "decision_exam": D.DECISION_EXAM, "final_exams": exams,
+            "base": dict(P._entry(name, dst, rows, sha, recipe=RC.cold(arm_rec["id"])), **source),
+            "cost_estimate": cost, "research_only": research_only_record(rows),
+            "splits_v2": {"lock": lock["lock"], "lock_sha256": lock["lock_sha256"],
+                          "nevertrain_sha256": lock["index_sha256"]}}
+    defn.update(RC.stamp(arm_rec))
+    if extra:
+        defn.update(extra)
+    try:
+        D.validate_definition(json.loads(json.dumps(defn)))
+        D.check_definition_data(defn)
+    except D.DriverError as e:
+        raise BaselineError("the pinned driver refuses the definition: %s" % e)
+    code = {m: _sha(T.package_dir() / m) for m in ("tools/inc2/baseline.py", "tools/inc2/recipes.py",
+                                                  "tools/inc2/train.py", "tools/inc2/guard.py",
+                                                  "tools/inc/driver.py", "tools/inc/pilot.py")}
+    summary = {"exp": exp, "testing": bool(testing), "built_utc": D._utc(), "builder": BUILDER, "role": role,
+               "seeds": list(seeds), "arm": arm_rec, "final_exams": exams,
+               "manifest": dict(P.manifest_summary(rows, sha, info), name=name, copy=str(dst), **source),
+               "splits_v2": lock, "cold_recipe": RC.cold(arm_rec["id"]),
+               "warmup": {"base": P.effective_warmup(RC.cold(arm_rec["id"]), len(rows))},
+               "cost_estimate": cost, "research_only": defn["research_only"], "code": code}
+    D._write_json(paths.root / BUILD_SUMMARY, summary)
+    return defn, summary
+
+
+def build(exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None, role=None,
+          testing=False, backend=None, init=True, quiet=False, extra=None, arch=None, imgsz=None):
+    """build_definition, then driver init through run_inc2_job.sh. Returns
+    (summary, definition, init result or None)."""
+    defn, summary = build_definition(exp, manifest=manifest, union=union, seeds=seeds, arm=arm,
+                                     final_exams=final_exams, role=role, testing=testing, extra=extra,
+                                     arch=arch, imgsz=imgsz)
+    log("%s (%s): baseline on %s, %d images, arm %s, seeds %s, finals %s; est. %s-%s GPU-h"
+        % (exp, role, defn["base"]["manifest"], defn["base"]["n_images"], defn["arm"]["id"], defn["seeds"],
+           defn["final_exams"], defn["cost_estimate"]["total_gpu_h"][0], defn["cost_estimate"]["total_gpu_h"][1]))
+    result = None
+    if init:
+        ensure_job_script(testing=bool(defn["testing"]))
+        result = D.Driver(exp, backend=backend, quiet=quiet).init(defn)
+    return summary, defn, result
+
+
+# ------------------------------------------------------------------ verdicts
+def base_dev_scores(exp, seeds=None, testing_ok=False):
+    """{seed: (map50_95, score record)} of an experiment's base runs on dev
+    (runs/base__s<k>/scores/dev.json), production scores unless testing_ok."""
+    root = C.INC_DIR / exp
+    defn = _read_json(root / "exp.json")
+    if not isinstance(defn, dict):
+        raise BaselineError("%s has no exp.json" % root)
+    out = {}
+    for s in (defn["seeds"] if seeds is None else seeds):
+        rid = "base__s%d" % s
+        p = root / "runs" / rid / "scores" / "dev.json"
+        rj = _read_json(root / "runs" / rid / "run.json")
+        d = _read_json(p)
+        if not isinstance(d, dict) or not isinstance(rj, dict) or rj.get("status") != "done":
+            raise BaselineError("%s's %s has no finished dev score (%s)" % (exp, rid, p))
+        if d.get("exam") != "dev" or (d.get("production") is not True and not testing_ok):
+            raise BaselineError("%s is not a production dev score" % p)
+        out[s] = (float(d["map50_95"]), {"run_id": rid, "path": str(p), "sha256": _sha(p),
+                                         "stamps": {k: d.get(k) for k in ("scorer_sha256", "manifest_sha256",
+                                                                          "key_order_sha256", "n_images")},
+                                         "production": d.get("production") is True, "run_json": rj})
+    return defn, out
+
+
+def canary_verdict(exp="canary_v2", reference="b0_v1", write=True, allow_testing=False):
+    """The canary against b0_v1's seeds (module docstring). allow_testing
+    lets a test-mode canary pass (tests only; the CLI never sets it)."""
+    defn, scores = base_dev_scores(exp, seeds=[0], testing_ok=True)
+    value, rec = scores[0]
+    ref_path = C.INC_DIR / reference / "exp.json"
+    ref_defn = _read_json(ref_path)
+    same = None
+    if isinstance(ref_defn, dict) and isinstance(ref_defn.get("base"), dict):
+        cb, rb = defn.get("base") or {}, ref_defn["base"]
+        same = {"manifest_sha256": cb.get("manifest_sha256") == rb.get("manifest_sha256")
+                and cb.get("manifest_sha256") is not None,
+                "cold_recipe": cb.get("recipe") == rb.get("recipe") and cb.get("recipe") is not None,
+                "seed_0": 0 in (ref_defn.get("seeds") or []) and 0 in (defn.get("seeds") or [])}
+    same_run = bool(same) and all(same.values())
+    rep_path = C.INC_DIR / reference / "report.json"
+    rep = _read_json(rep_path)
+    ref = None
+    if isinstance(rep, dict):
+        for f in rep.get("final") or []:
+            if str(f.get("model", "")).startswith("base"):
+                tw = ((f.get("exams") or {}).get("dev") or {}).get("twelve") or {}
+                if tw.get("mean") is not None and tw.get("sd") is not None:
+                    ref = {"mean": tw["mean"], "sd": tw["sd"], "n": tw.get("n"), "source": str(rep_path),
+                           "sha256": _sha(rep_path)}
+                break
+    if ref is None:
+        _d, rs = base_dev_scores(reference)
+        m, sd = _mean_sd([v for v, _ in rs.values()])
+        ref = {"mean": m, "sd": sd, "n": len(rs), "source": "runs of %s" % reference,
+               "inputs": [r for _v, r in rs.values()]}
+    within = abs(value - ref["mean"]) <= ref["sd"]
+    sc = (rec["run_json"].get("sidecars") or {}).get("dev")
+    sidecar_ok = bool(isinstance(sc, dict) and sc.get("status") != "failed" and sc.get("sha256")
+                      and _sha(sc.get("path") or "") == sc.get("sha256"))
+    production = rec["run_json"].get("testing") is False and rec["production"]
+    passed = within and sidecar_ok and same_run and (production or allow_testing)
+    doc = {"format": CANARY_FORMAT, "exp": exp, "reference": reference, "canary_dev": value,
+           "reference_dev": ref, "abs_diff": abs(value - ref["mean"]), "within_one_sd": within,
+           "sidecar_ok": sidecar_ok, "sidecar": sc, "passed": passed, "production": production,
+           "testing_allowed": bool(allow_testing), "same_run_as_reference": same,
+           "rule": "|canary base__s0 dev mAP50-95 - mean(reference seeds)| <= sd(reference seeds) (4.4), the "
+                   "canary's scorer sidecar was written (the v2 executor's whole path, the sidecar included), a "
+                   "production run and score, and the reference's base manifest, cold recipe and seed 0",
+           "inputs": {"canary_score": {k: rec[k] for k in ("run_id", "path", "sha256")},
+                      "exp_json_sha256": _sha(C.INC_DIR / exp / "exp.json"),
+                      "reference_exp_json": {"path": str(ref_path), "sha256": _sha(ref_path)}},
+           "generated_utc": D._utc()}
+    if write:
+        doc["out"] = str(C.INC_DIR / exp / "canary.json")
+        _write_json(doc["out"], doc)
+    log("canary %s: dev %.4f vs %s %.4f +- %.4f: %s" % (exp, value, reference, ref["mean"], ref["sd"],
+                                                         "PASS" if passed else "FAIL"))
+    return doc
+
+
+def capacity_decision(n_exp, arm_exps, m=None, testing_ok=False):
+    """L-4's rule on dev only (module docstring). Opens exp.json, the base
+    runs' run.json and scores/dev.json, nothing else."""
+    exps = [n_exp] + list(arm_exps)
+    loaded, arms = {}, {}
+    for e in exps:
+        defn = _read_json(C.INC_DIR / e / "exp.json")
+        if not isinstance(defn, dict) or defn.get("type") != "baseline":
+            raise BaselineError("%s is not a baseline experiment" % e)
+        if not isinstance(defn.get("arm"), dict):
+            raise BaselineError("%s pins no arm (build it with inc2.baseline)" % e)
+        aid = RC.arm_id(defn["arm"])
+        if aid in arms:
+            raise BaselineError("arm %s appears twice (%s, %s)" % (aid, arms[aid], e))
+        arms[aid] = e
+        loaded[e] = defn
+    if RC.arm_id(loaded[n_exp]["arm"]) != RC.REFERENCE_ARM:
+        raise BaselineError("%s is arm %s; the rule compares every arm with %s" % (n_exp, loaded[n_exp]["arm"]["id"],
+                                                                                 RC.REFERENCE_ARM))
+    common = sorted(set.intersection(*[set(loaded[e]["seeds"]) for e in exps]))
+    if len(common) < 2:
+        raise BaselineError("the arms share seeds %s; the rule needs at least 2" % common)
+    manifests = {loaded[e]["base"]["manifest_sha256"] for e in exps}
+    if len(manifests) != 1:
+        raise BaselineError("the arms were trained on different manifests (%d distinct)" % len(manifests))
+    per, stamps = {}, None
+    for e in exps:
+        _d, sc = base_dev_scores(e, seeds=common, testing_ok=testing_ok)
+        for s, (_v, r) in sc.items():
+            if stamps is None:
+                stamps = r["stamps"]
+            elif r["stamps"] != stamps:
+                raise BaselineError("%s %s was scored by another scorer, dev manifest or key order" % (e, r["run_id"]))
+        vals = [sc[s][0] for s in common]
+        mean, sd = _mean_sd(vals)
+        per[e] = {"arm": loaded[e]["arm"]["id"], "seeds": common, "dev": vals, "mean": mean, "sd": sd,
+                  "inputs": [{k: sc[s][1][k] for k in ("run_id", "path", "sha256")} for s in common],
+                  "run_json": [sc[s][1]["run_json"] for s in common]}
+    n = per[n_exp]
+    for e in arm_exps:
+        a = per[e]
+        pooled = math.sqrt((a["sd"] ** 2 + n["sd"] ** 2) / 2.0)
+        a.update(diff_vs_n=a["mean"] - n["mean"], pooled_sd=pooled,
+                 qualifies=(a["mean"] - n["mean"]) > 2.0 * pooled)
+    qual = [e for e in arm_exps if per[e]["qualifies"]]
+    chosen = max(qual, key=lambda e: (per[e]["mean"], -RC.ARMS[per[e]["arm"]]["gflops"])) if qual else n_exp
+    arm = per[chosen]["arm"]
+    cold_ms, n_runs = RC.measured_rates(per[chosen]["run_json"])
+    n_images = int(loaded[chosen]["base"]["n_images"])
+    mm = int(m) if m is not None else int(math.ceil(M_SHARE * n_images))
+    if cold_ms is not None:
+        inc_ms = cold_ms * INC_OVER_COLD
+        cost = RC.step_cost(n_images, mm, arm, "r0", truth=True, cold_ms=cold_ms, inc_ms=inc_ms)
+        basis = ("measured cold rate %.2f ms per image-epoch (median of %d base run(s) of %s); incremental est. as "
+                 "cold x %.4f (7.4 / 6.5, n640, 5.6)" % (cold_ms, n_runs, chosen, INC_OVER_COLD))
+        step_h = cost["gpu_h"][1]
+    else:
+        cost = RC.step_cost(n_images, mm, arm, "r0", truth=True)
+        basis = "est. rates (no measured run): the high end of inc2.recipes.rates(%s)" % arm
+        step_h = cost["gpu_h"][1]
+    for e in exps:
+        per[e].pop("run_json", None)
+    return {"format": CAPACITY_FORMAT, "rule": "an arm qualifies when mean(arm) - mean(n640) > 2 x pooled sd on "
+                                               "dev mAP50-95 (seeds all arms share); the best qualifying arm by "
+                                               "dev mean is chosen, else n640 (L-4)",
+            "n_exp": n_exp, "arm_exps": list(arm_exps), "seeds": common, "stamps": stamps, "arms": per,
+            "qualifying": qual, "chosen_exp": chosen, "chosen_arm": arm,
+            "chosen_arm_record": loaded[chosen]["arm"],
+            "step_cost": dict(cost, basis=basis), "m": mm, "n_images": n_images,
+            "truth_every": RC.truth_every(step_h), "truth_step_cap_gpu_h": RC.TRUTH_STEP_CAP_GPU_H,
+            "note": "decided on dev only; test is in the separate report, for people"}
+
+
+def capacity_report(decision, testing_ok=False):
+    """Every arm's final scores on its final exams (dev, imageweeds, test),
+    mean +- sd over seeds, 12-class and agnostic, and the gap to 0.90 on test."""
+    rows = {}
+    for e in [decision["n_exp"]] + list(decision["arm_exps"]):
+        defn = _read_json(C.INC_DIR / e / "exp.json") or {}
+        out = {"arm": (defn.get("arm") or {}).get("id"), "seeds": defn.get("seeds"), "exams": {}, "inputs": []}
+        for exam in defn.get("final_exams") or []:
+            tw, ag = [], []
+            for s in defn.get("seeds") or []:
+                p = C.INC_DIR / e / "runs" / ("final__base__s%d" % s) / "scores" / ("%s.json" % exam)
+                d = _read_json(p)
+                if isinstance(d, dict) and (d.get("production") is True or testing_ok):
+                    tw.append(float(d["map50_95"]))
+                    ag.append(float(d["agnostic_map50_95"]))
+                    out["inputs"].append({"path": str(p), "sha256": _sha(p)})
+            m1, s1 = _mean_sd(tw)
+            m2, s2 = _mean_sd(ag)
+            out["exams"][exam] = {"n": len(tw), "twelve": {"mean": m1, "sd": s1}, "agnostic": {"mean": m2, "sd": s2},
+                                  "complete": len(tw) == len(defn.get("seeds") or [])}
+        t = out["exams"].get("test", {}).get("twelve", {}).get("mean")
+        out["gap_to_target"] = (TARGET_TEST - t) if t is not None else None
+        rows[e] = out
+    return {"format": CAPACITY_FORMAT + "-report", "target_test_map50_95": TARGET_TEST, "arms": rows,
+            "chosen_exp": decision["chosen_exp"], "chosen_arm": decision["chosen_arm"],
+            "note": "the test column is the milestone read of R0 (L-4), for people; it is never an input of the "
+                    "capacity decision"}
+
+
+def _report_md(rep):
+    lines = ["# Capacity grid at R0 (L-4)", "", "Chosen arm: **%s** (%s). Target test mAP50-95 %.2f." %
+             (rep["chosen_arm"], rep["chosen_exp"], rep["target_test_map50_95"]), "",
+             "| Experiment | Arm | Exam | 12-class mean +- sd | agnostic mean +- sd | n |", "|---|---|---|---|---|---|"]
+
+    def f(x):
+        return "-" if x is None else "%.4f" % x
+    for e, r in rep["arms"].items():
+        for exam, v in r["exams"].items():
+            lines.append("| %s | %s | %s | %s +- %s | %s +- %s | %d |" % (e, r["arm"], exam, f(v["twelve"]["mean"]),
+                                                                         f(v["twelve"]["sd"]), f(v["agnostic"]["mean"]),
+                                                                         f(v["agnostic"]["sd"]), v["n"]))
+        lines.append("| %s | %s | gap to %.2f on test | %s | | |" % (e, r["arm"], rep["target_test_map50_95"],
+                                                                     f(r["gap_to_target"])))
+    return "\n".join(lines) + "\n"
+
+
+def capacity_verdict(n_exp="b_v2", arm_exps=("b_v2_s640", "b_v2_m640"), m=None, out_dir=None, write=True,
+                     testing_ok=False):
+    decision = capacity_decision(n_exp, arm_exps, m=m, testing_ok=testing_ok)
+    decision["generated_utc"] = D._utc()
+    report = capacity_report(decision, testing_ok=testing_ok)
+    report["generated_utc"] = decision["generated_utc"]
+    if write:
+        d = Path(out_dir) if out_dir else C.INC_DIR / "capacity"
+        decision["out"] = str(d / ("%s.json" % CAPACITY_NAME))
+        _write_json(decision["out"], decision)
+        report["decision_sha256"] = _sha(decision["out"])
+        report["out"] = str(d / ("%s_report.json" % CAPACITY_NAME))
+        _write_json(report["out"], report)
+        md = d / ("%s_report.md" % CAPACITY_NAME)
+        tmp = md.with_name(".%s.tmp" % md.name)
+        tmp.write_text(_report_md(report))
+        os.replace(tmp, md)
+    log("capacity: chosen arm %s (%s); qualifying %s; truth every %d step(s)"
+        % (decision["chosen_arm"], decision["chosen_exp"], decision["qualifying"], decision["truth_every"]))
+    return decision, report
+
+
+# ------------------------------------------------------------------ secondary
+def secondary(exp, weights, run_id="secondary__incumbent", source=None):
+    """Write the milestone's incumbent-scoring spec (module docstring);
+    returns {spec, list, argv, record}."""
+    root = C.INC_DIR / exp
+    defn = _read_json(root / "exp.json")
+    if not isinstance(defn, dict) or defn.get("type") != "baseline":
+        raise BaselineError("%s is not a built baseline experiment" % exp)
+    D.check_name(run_id, "run_id")
+    if run_id in {"base__s%d" % s for s in defn["seeds"]} | {"final__base__s%d" % s for s in defn["seeds"]}:
+        raise BaselineError("run id %s is one of the driver's own" % run_id)
+    w = Path(weights).resolve()
+    if not w.is_file():
+        raise BaselineError("no weights at %s" % w)
+    out = root / "runs" / run_id
+    spec_path = out / "spec.json"
+    spec = {"exp": exp, "run_id": run_id, "kind": "final", "init": str(w), "exams": list(defn["final_exams"]),
+            "out_dir": str(out)}
+    if out.exists() and sorted(os.listdir(out)) not in ([], ["spec.json"]):
+        raise BaselineError("%s already holds a run" % out)
+    if spec_path.exists() and _read_json(spec_path) != spec:
+        raise BaselineError("%s holds another spec" % spec_path)
+    D._write_json(spec_path, spec)
+    try:
+        T.validate_spec(spec, spec_path)
+    except T.RunError as e:
+        spec_path.unlink()
+        raise BaselineError("the v2 executor refuses the spec: %s" % e)
+    lst = root / "submissions" / ("%s.txt" % run_id)
+    lst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = lst.with_name(".%s.%d.tmp" % (lst.name, os.getpid()))
+    tmp.write_text("%s\n" % spec_path)
+    os.replace(tmp, lst)
+    (root / "logs").mkdir(parents=True, exist_ok=True)      # Slurm opens --output before the job starts
+    script = job_script_path()
+    argv = ["sbatch", "--parsable", "--array=0-0", "--job-name=inc_%s_%s" % (exp, run_id),
+            "--output=%s" % (root / "logs" / "%x_%A_%a.out"), str(script), str(lst), exp]
+    rec = {"format": SECONDARY_FORMAT, "exp": exp, "run_id": run_id, "weights": str(w), "weights_sha256": _sha(w),
+           "source": source, "exams": list(defn["final_exams"]), "spec": str(spec_path),
+           "spec_sha256": _sha(spec_path), "list": str(lst), "argv": argv, "job_script": str(script),
+           "written_utc": D._utc(),
+           "note": "the chain incumbent's secondary number (3.6); the driver does not track this run"}
+    _write_json(root / ("%s.json" % run_id), rec)
+    return {"spec": str(spec_path), "list": str(lst), "argv": argv, "record": rec}
+
+
+# ----------------------------------------------------------------------- CLI
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Splits v2 baselines: B_v2, capacity arms, canary, B0 u tsw, "
+                                             "milestones.")
+    ap.add_argument("command", choices=("build", "canary-verdict", "capacity-verdict", "secondary", "estimate"))
+    ap.add_argument("--exp", default=None)
+    ap.add_argument("--manifest", default=None)
+    ap.add_argument("--union", default=None, help="build: comma-separated manifests to merge (B0 u tsw)")
+    ap.add_argument("--seeds", default=None, help="comma-separated (default by role: b_v2 and milestone 0-4, "
+                                                  "canary 0, else 0-2)")
+    ap.add_argument("--arm", default=None, choices=RC.ARM_IDS, help="default %s" % RC.DEFAULT_ARM)
+    ap.add_argument("--arch", default=None, help="build: the arm's detector (yolo11n|yolo11s|yolo11m), with --imgsz")
+    ap.add_argument("--imgsz", type=int, default=None, help="build: the arm's training imgsz, with --arch")
+    ap.add_argument("--final-exams", default=None, help="comma-separated, from %s" % ",".join(T.EXAMS))
+    ap.add_argument("--role", default=None, choices=ROLES, help="default: inferred from what is built")
+    ap.add_argument("--testing", action="store_true", help="needs %s=1" % TEST_ENV)
+    ap.add_argument("--testing-settings", default=None)
+    ap.add_argument("--no-init", action="store_true", help="build: write the definition, do not driver-init")
+    ap.add_argument("--reference", default="b0_v1", help="canary-verdict: the B0 experiment")
+    ap.add_argument("--n", default="b_v2", help="capacity-verdict: the n640 experiment")
+    ap.add_argument("--arms", default="b_v2_s640,b_v2_m640", help="capacity-verdict: the other arms' experiments")
+    ap.add_argument("--m", type=int, default=None, help="capacity-verdict: M (default ceil(0.10 x |base|))")
+    ap.add_argument("--out-dir", default=None)
+    ap.add_argument("--weights", default=None, help="secondary: the chain incumbent's final.pt")
+    ap.add_argument("--run-id", default="secondary__incumbent")
+    ap.add_argument("--source", default=None, help="secondary: where the weights come from (recorded)")
+    ap.add_argument("--n-images", type=int, default=None, help="estimate: images in the base")
+    ap.add_argument("--quiet", action="store_true")
+    a = ap.parse_args(argv)
+    try:
+        if a.command == "build":
+            if not a.exp:
+                raise BaselineError("build needs --exp")
+            testing = P.testing_arg(a.testing, a.testing_settings)
+            build(a.exp, manifest=a.manifest, union=a.union.split(",") if a.union else None,
+                  seeds=a.seeds, arm=a.arm, arch=a.arch, imgsz=a.imgsz, role=a.role, testing=testing,
+                  init=not a.no_init, quiet=a.quiet, final_exams=a.final_exams.split(",") if a.final_exams else None)
+        elif a.command == "canary-verdict":
+            canary_verdict(a.exp or "canary_v2", a.reference)
+        elif a.command == "capacity-verdict":
+            capacity_verdict(a.n, [x for x in a.arms.split(",") if x], m=a.m, out_dir=a.out_dir)
+        elif a.command == "secondary":
+            if not a.exp or not a.weights:
+                raise BaselineError("secondary needs --exp and --weights")
+            res = secondary(a.exp, a.weights, run_id=a.run_id, source=a.source)
+            print(json.dumps(res["argv"]))
+        else:
+            if a.n_images is None:
+                raise BaselineError("estimate needs --n-images")
+            seeds = P.check_seeds(a.seeds or ",".join(str(s) for s in DEFAULT_SEEDS))
+            print(json.dumps(RC.baseline_cost(a.n_images, seeds, list(FINAL_EXAMS), arm_arg(a.arm, a.arch, a.imgsz)),
+                             indent=1, sort_keys=True))
+    except (BaselineError, P.PilotError, D.DriverError, RC.RecipeError) as e:
+        print("[inc2.baseline] ERROR: %s" % e, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

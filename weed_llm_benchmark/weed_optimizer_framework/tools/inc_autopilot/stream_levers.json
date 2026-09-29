@@ -1,0 +1,768 @@
+{
+ "_meta": {
+  "version": "inc-autopilot-stream-levers/1",
+  "pre_registered": "2026-09-28",
+  "contract": "docs/CONTINUOUS_LOOP.md 6.3 (levers L15-L28, cards X13-X17), 6.5 (governance), 6.6 (limits)",
+  "purpose": "The stream-mode lever menu (menu v2, a dated pre-registered amendment of the INC lever menu). Every lever renders the exact command a person would run (levers_stream.argv); the executor re-renders it from the policy parameters (executor.ARGV_FORMS) and runs only what the policy table checked. It lives in its own file, not in levers.json, because diagnose.rules_version() hashes levers.json whole and brain_plan's menu lists its 'levers' block: stream rows there would change the experiment-mode rules version and brain digest (docs/CONTINUOUS_LOOP.md, Build notes, group F).",
+  "argv_template": "levers.json's grammar: a plain string is literal; '{name}' inside a token is replaced by the param 'name'; {\"if\": name, \"tokens\": [...]} is rendered only when 'name' is given. '{pkg}' is the campaign's protocol_package (docs/CONTINUOUS_LOOP.md 4.3), an enum of the packages accepted under P11.",
+  "follow": "What the lane waits on after the lever runs: 'lab' a detached lab process and its result file; 'job' a cluster job (squeue, then sacct); 'build' a build job, then the experiment it builds until it is built; 'experiment' a build job, then its experiment until it is done; 'login' nothing (the verb ran on the login node).",
+  "read_by": [
+   "weed_optimizer_framework/tools/inc_autopilot/levers_stream.py",
+   "weed_optimizer_framework/tools/inc_autopilot/executor.py (limits, gated R2 levers, envelope levers)"
+  ]
+ },
+ "packages": {
+  "value": [
+   "inc2"
+  ],
+  "why": "Contract 4.3 and P11: the protocol packages a stream campaign may address; each is pinned as a unit at acceptance. tools.inc (v1) is not one: its never-train index refuses every 3SeasonWeedDet10 image (contract 2 D-A)."
+ },
+ "levers": {
+  "L15": {
+   "name": "discover",
+   "title": "Discover candidate sources for the deficit classes (lab, detached)",
+   "lane": "DATA",
+   "follow": "lab",
+   "policy_action": "inc_stream_discover",
+   "risk": "R0",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.collect",
+    "plan",
+    "--config",
+    "{config}",
+    "--classes",
+    "{classes}",
+    "--out",
+    "{out}"
+   ],
+   "control": "The owner's known items (collect config known_items): discovery must find them itself (recall, S1b).",
+   "success": "candidates.json lists every known item and new candidates for the deficit classes.",
+   "falsifier": "A known item is missing: a discovery defect, raised as a card; the item stays fetchable.",
+   "estimator": "zero"
+  },
+  "L26": {
+   "name": "names",
+   "title": "Resolve a new source's class names (stream-owned, lab, detached)",
+   "lane": "DATA",
+   "follow": "lab",
+   "policy_action": "inc_stream_names",
+   "risk": "R0",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.collect",
+    "names",
+    "--source",
+    "{source}",
+    "--out",
+    "{out}"
+   ],
+   "control": "The funnel's taxonomy cache, read only.",
+   "success": "Every declared class name of the source has a status in intake/names/.",
+   "falsifier": "A name stays unresolvable: the source needs a card class table (a person).",
+   "estimator": "zero"
+  },
+  "LP": {
+   "name": "network_probe",
+   "title": "Probe which providers compute nodes reach (placement.json)",
+   "lane": "DATA",
+   "follow": "job",
+   "policy_action": "inc_stream_probe",
+   "risk": "R0",
+   "argv": [
+    "sbatch",
+    "-p",
+    "GPU-shared",
+    "run_inc_collect.sh",
+    "probe"
+   ],
+   "control": "The lab placement every provider has until it passes (contract 7.2).",
+   "success": "INC_DIR/intake/placement.json names each provider pass or fail.",
+   "falsifier": "-",
+   "estimator": "probe"
+  },
+  "L16": {
+   "name": "collect",
+   "title": "Collect one source (GPU-shared job, or the lab hook of the same verb)",
+   "lane": "DATA",
+   "follow": "job",
+   "policy_action": "inc_stream_collect",
+   "risk": "R2",
+   "actions": [
+    "inc_stream_collect",
+    "inc_stream_collect_lab",
+    "inc_stream_collect_review",
+    "inc_stream_intake",
+    "inc_stream_sync"
+   ],
+   "argv": [
+    "sbatch",
+    "-p",
+    "GPU-shared",
+    "run_inc_collect.sh",
+    "fetch",
+    "--source",
+    "{source}",
+    "--max-bytes",
+    "{max_bytes}",
+    {
+     "if": "candidates",
+     "tokens": [
+      "--candidates",
+      "{candidates}"
+     ]
+    }
+   ],
+   "control": "The source's own card: declared classes, licence, checksum.",
+   "success": "Staged content-addressed files with checksums; a decisions.jsonl row for every file.",
+   "falsifier": "Yield below floor_gb/floor_su after min(2 GB, the source): D21 closes it.",
+   "estimator": "collect",
+   "note": "A discovered source (not a known item of the collect config) fetched on the cluster carries --candidates: its candidate record, which the lab synced first (L16S with candidate 1), since the cluster has no copy of the lab's candidates.json."
+  },
+  "L16L": {
+   "name": "collect_lab",
+   "title": "Collect one source on the lab (a provider not reachable from compute nodes), detached",
+   "lane": "DATA",
+   "follow": "lab",
+   "policy_action": "inc_stream_collect_lab",
+   "risk": "R2",
+   "lever": "L16",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.collect",
+    "fetch",
+    "--source",
+    "{source}",
+    "--max-bytes",
+    "{max_bytes}",
+    "--out",
+    "{out}"
+   ],
+   "control": "As L16.",
+   "success": "As L16, then a verified sync to the cluster.",
+   "falsifier": "As L16.",
+   "estimator": "zero"
+  },
+  "L16R": {
+   "name": "collect_review",
+   "title": "Collect a source that failed a pre-check (a person decides)",
+   "lane": "DATA",
+   "follow": "job",
+   "policy_action": "inc_stream_collect_review",
+   "risk": "R3",
+   "lever": "L16",
+   "argv": [
+    "sbatch",
+    "-p",
+    "GPU-shared",
+    "run_inc_collect.sh",
+    "fetch",
+    "--source",
+    "{source}",
+    "--max-bytes",
+    "{max_bytes}",
+    {
+     "if": "candidates",
+     "tokens": [
+      "--candidates",
+      "{candidates}"
+     ]
+    }
+   ],
+   "control": "As L16.",
+   "success": "As L16.",
+   "falsifier": "As L16.",
+   "estimator": "collect"
+  },
+  "L16I": {
+   "name": "intake",
+   "title": "Intake a fetched source: normalise, class map, licence, guard",
+   "lane": "DATA",
+   "follow": "job",
+   "policy_action": "inc_stream_intake",
+   "risk": "R2",
+   "lever": "L16",
+   "argv": [
+    "sbatch",
+    "-p",
+    "GPU-shared",
+    "run_inc_collect.sh",
+    "intake",
+    "--source",
+    "{source}"
+   ],
+   "control": "GuardV2 (never-train v2, base copy, near-duplicate), counted per reason.",
+   "success": "INC_DIR/intake/<batch>/ with summary.json and a decisions.jsonl row for every file.",
+   "falsifier": "A share of never-train refusals >= 5 %: D28 quarantines the source.",
+   "estimator": "intake"
+  },
+  "L16S": {
+   "name": "sync",
+   "title": "Sync a lab-fetched source to the cluster, verified by sha256 on arrival",
+   "lane": "DATA",
+   "follow": "lab",
+   "policy_action": "inc_stream_sync",
+   "risk": "R0",
+   "lever": "L16",
+   "argv": null,
+   "control": "The lab's checksums.",
+   "success": "Every staged file hashes on the cluster as on the lab.",
+   "falsifier": "A mismatch: nothing moves into place.",
+   "estimator": "zero",
+   "note": "Two uses: a source's staging after a lab fetch, and (candidate 1) one discovered source's candidate record before its cluster fetch, written by the lab hook to INC_DIR/intake/candidates_sync/<source>.json from the lab's candidates.json."
+  },
+  "L17": {
+   "name": "admit",
+   "title": "Admit an intake batch through incremental Step 1 (one GPU-shared job)",
+   "lane": "DATA",
+   "follow": "job",
+   "policy_action": "inc_stream_admit",
+   "risk": "R2",
+   "argv": [
+    "sbatch",
+    "-p",
+    "GPU-shared",
+    "run_inc2_stream.sh",
+    "{verb}",
+    {
+     "if": "intake",
+     "tokens": [
+      "--intake",
+      "{intake}"
+     ]
+    },
+    {
+     "if": "hold",
+     "tokens": [
+      "--hold",
+      "{hold}"
+     ]
+    }
+   ],
+   "control": "The frozen verifier (pinned sha) and the known-truth base copies (verified_precision).",
+   "success": "A committed batch: queue rows appended, status.json updated.",
+   "falsifier": "Known-truth precision with a Wilson lower bound < 0.99: a verifier refit is proposed (X11).",
+   "estimator": "admit"
+  },
+  "L18": {
+   "name": "segment",
+   "title": "Cut and build a segment of K fixed-size increments",
+   "lane": "TRAIN",
+   "follow": "experiment",
+   "policy_action": "inc_build_segment",
+   "risk": "R3",
+   "fixed": {
+    "verb": "build"
+   },
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "build",
+    "--stream",
+    "{stream}",
+    "--k",
+    "{k}",
+    "--exp",
+    "{exp}",
+    {
+     "if": "recipes",
+     "tokens": [
+      "--recipes",
+      "{recipes}"
+     ]
+    }
+   ],
+   "control": "The incumbent P_{s-1} and the null arm under the same recipe (the pinned gate, read at commit by Protocol v3, L-3).",
+   "success": "Every increment is decided at commit (inc2.gate3); ACCEPTs join P_s.",
+   "falsifier": "0 ACCEPT in 12 decided increments while the recipe is healthy (D32).",
+   "estimator": "segment",
+   "note": "The arm is the one choose-arm adopted (L-4) and the truth cadence is inc2.stream's own (ceil(cost/25), per segment); the build takes neither from the platform. --exp is the name the stream summary gives as next_segment, so a build that would make another experiment refuses. --recipes is for a person only: segment 1 runs init's Stage B arms, later segments the chosen recipe."
+  },
+  "L19": {
+   "name": "commit",
+   "title": "Commit a finished segment (deterministic from its report and ledger)",
+   "lane": "TRAIN",
+   "follow": "login",
+   "policy_action": "inc_stream_commit",
+   "risk": "R1",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "commit",
+    "--exp",
+    "{exp}"
+   ],
+   "control": "The segment's recorded gate verdicts; commit reads them only.",
+   "success": "P_s written, dispositions applied (3.5), the ledger appended.",
+   "falsifier": "-",
+   "estimator": "zero"
+  },
+  "L20": {
+   "name": "milestone",
+   "title": "Milestone consolidation: 5 cold seeds on P_s, finals dev, imageweeds and test",
+   "lane": "MAINT",
+   "follow": "experiment",
+   "policy_action": "inc_build_consolidation",
+   "risk": "R3",
+   "fixed": {
+    "verb": "milestone"
+   },
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "milestone",
+    "--stream",
+    "{stream}"
+   ],
+   "control": "The previous milestone's 5 cold seeds (milestone 0 = B_v2).",
+   "success": "Dev 5 v 5 comparison recorded; the headline test mean +- sd with the gap to 0.90, shown to people only.",
+   "falsifier": "A 5 v 5 'hurts' (p <= 0.025): D25 rolls back (L21).",
+   "estimator": "milestone",
+   "note": "Built as <sid>_mNNN (the summary's milestones.next); once done, LC compares it on dev."
+  },
+  "L21": {
+   "name": "rollback",
+   "title": "Roll the pool back to the last good milestone pool P_c",
+   "lane": "MAINT",
+   "follow": "login",
+   "policy_action": "inc_stream_rollback",
+   "risk": "R3",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "rollback",
+    "--stream",
+    "{stream}",
+    "--to",
+    "{to}"
+   ],
+   "control": "The last milestone pool.",
+   "success": "Increments since P_c marked suspect; card X4 and L27.",
+   "falsifier": "-",
+   "estimator": "zero"
+  },
+  "L22": {
+   "name": "double_m",
+   "title": "Double M (a new stream version)",
+   "lane": "TRAIN",
+   "follow": "job",
+   "policy_action": "inc_build_segment",
+   "risk": "R3",
+   "fixed": {
+    "verb": "fork"
+   },
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "fork",
+    "--stream",
+    "{stream}",
+    "--m",
+    "{m}"
+   ],
+   "control": "The current stream version's gate entries (D8S).",
+   "success": "P_data leaves (0.25, 0.75) in the new version.",
+   "falsifier": "Still underpowered after 2 doublings: card X17.",
+   "estimator": "zero_job"
+  },
+  "L23": {
+   "name": "splits_v2",
+   "title": "Build and lock splits v2 (one approval by a person of the exact D-A command)",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_splits_build",
+   "risk": "R3",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.splits",
+    "{verb}"
+   ],
+   "control": "The v1 LOCK: dev, test, imageweeds and train_core are byte copies.",
+   "success": "LOCK v2 written; the never-train v2 index complete.",
+   "falsifier": "A planted copy in the base refuses the build (R4 incident).",
+   "estimator": "splits"
+  },
+  "L23B": {
+   "name": "baseline_v2",
+   "title": "Cold baselines on splits v2 (B_v2 milestone 0, the canary, the capacity arms, B0 u tsw)",
+   "lane": "MAINT",
+   "follow": "build",
+   "policy_action": "inc_build_baseline_v2",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.baseline",
+    "build",
+    "--exp",
+    "{exp}",
+    {
+     "if": "manifest",
+     "tokens": [
+      "--manifest",
+      "{manifest}"
+     ]
+    },
+    {
+     "if": "union",
+     "tokens": [
+      "--union",
+      "{union}"
+     ]
+    },
+    "--seeds",
+    "{seeds}",
+    "--arm",
+    "{arm}",
+    "--role",
+    "{role}"
+   ],
+   "control": "B0 (identical manifests and scorer, not re-run).",
+   "success": "Finals on dev, imageweeds and test.",
+   "falsifier": "The canary misses B0 seed 0 by more than 1 sd on dev (canary-verdict).",
+   "estimator": "baseline"
+  },
+  "LV": {
+   "name": "verdict",
+   "title": "Record an R0 verdict: the canary, the capacity decision (L-4), Stage A",
+   "lane": "MAINT",
+   "follow": "login",
+   "policy_action": "inc_stream_verdict",
+   "risk": "R1",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.{module}",
+    "{verb}",
+    {
+     "if": "exp",
+     "tokens": [
+      "--exp",
+      "{exp}"
+     ]
+    }
+   ],
+   "control": "The pre-registered rules of inc2.baseline (canary within 1 sd of b0_v1; an arm beats n640 by more than 2 pooled sd on dev) and inc2.pilot4 (the Stage A survival rule).",
+   "success": "canary.json, capacity/capacity_v1.json or pilot_v4/stage_a.json written, dev only.",
+   "falsifier": "-",
+   "estimator": "zero"
+  },
+  "LI": {
+   "name": "stream_init",
+   "title": "Create the stream: stream.json, P_0 = base_v2, the prospective line",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_stream_init",
+   "risk": "R3",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "init",
+    "--stream",
+    "{stream}",
+    "--stage-b",
+    "{stage_b}"
+   ],
+   "control": "LOCK v2's base_v2 (by sha256) and Stage A's recorded segment 1 recipes.",
+   "success": "The stream ledger's init and prospective lines; queue_summary.json.",
+   "falsifier": "-",
+   "estimator": "zero_job"
+  },
+  "LA": {
+   "name": "choose_arm",
+   "title": "Adopt the capacity decision (L-4) as the stream's arm and milestone 0",
+   "lane": "MAINT",
+   "follow": "login",
+   "policy_action": "inc_stream_choose_arm",
+   "risk": "R1",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "choose-arm",
+    "--stream",
+    "{stream}"
+   ],
+   "control": "capacity/capacity_v1.json (inc2.baseline capacity-verdict, dev only).",
+   "success": "The stream ledger's arm line (by the decision's sha256).",
+   "falsifier": "-",
+   "estimator": "zero"
+  },
+  "L24": {
+   "name": "quarantine_source",
+   "title": "Quarantine a source (reversible; cites D28 or D31)",
+   "lane": "DATA",
+   "follow": "login",
+   "policy_action": "inc_stream_quarantine",
+   "risk": "R2",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "quarantine",
+    "--source",
+    "{source}",
+    "--cite",
+    "{cite}"
+   ],
+   "control": "The cited diagnosis.",
+   "success": "The source's rows are excluded from cuts; no more shards.",
+   "falsifier": "-",
+   "estimator": "zero"
+  },
+  "L25": {
+   "name": "stage_a",
+   "title": "Protocol v3 Stage A pilot (pilot_v4, known truth)",
+   "lane": "MAINT",
+   "follow": "build",
+   "policy_action": "inc_build_pilot4",
+   "risk": "R3",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.pilot4",
+    "build",
+    "--exp",
+    "{exp}",
+    "--from",
+    "{from_exp}",
+    "--recipes",
+    "{recipes}"
+   ],
+   "control": "pilot_v3's recorded truth verdicts; R0 is pilot_v3's full chain.",
+   "success": "An arm accepts I2, I3, I5, rejects Bswap and Breal, agrees on >= 5/7 and ends at final dev >= 0.7998.",
+   "falsifier": "No arm survives: segment 1 runs R0 alone.",
+   "estimator": "pilot4"
+  },
+  "L27": {
+   "name": "bisect",
+   "title": "Bisect the suspect increments after a rollback (cold 3-seed arm per increment)",
+   "lane": "MAINT",
+   "follow": "experiment",
+   "policy_action": "inc_build_consolidation",
+   "risk": "R3",
+   "fixed": {
+    "verb": "bisect"
+   },
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "bisect",
+    "--stream",
+    "{stream}",
+    "--from",
+    "{from_pool}"
+   ],
+   "control": "The P_c milestone seeds (gate.truth_detail).",
+   "success": "helps -> re-queued; hurts -> quarantined; neutral -> neutral.",
+   "falsifier": "An effect that needs two increments together: X4 stays raised.",
+   "estimator": "bisect",
+   "note": "One build makes one cold 3-seed arm per suspect increment (<sid>_bNNN, numbered across rollbacks); the lane follows the first, and LC decides each arm once it is done."
+  },
+  "L28": {
+   "name": "stage_c",
+   "title": "Stage C gate-feasibility chain: a known-good tsw increment of exactly M",
+   "lane": "MAINT",
+   "follow": "experiment",
+   "policy_action": "inc_build_segment",
+   "risk": "R3",
+   "fixed": {
+    "verb": "feasibility"
+   },
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "feasibility",
+    "--stream",
+    "{stream}",
+    "--holdout",
+    "{holdout}",
+    "--m",
+    "{m}"
+   ],
+   "control": "The truth arm on an expert-labelled increment (expected helps or neutral).",
+   "success": "The chain ACCEPTs D: M is feasible.",
+   "falsifier": "A species-guard-only REJECT: D33 prospectively and card X17 to the owner before R2.",
+   "estimator": "stage_c",
+   "note": "Its recipes are the stream's Stage B arms (init); its verdict is read by LC (compare --exp <sid>_c001)."
+  },
+  "LC": {
+   "name": "compare",
+   "title": "Decide a finished milestone, Stage C chain or bisect arm (dev only)",
+   "lane": "MAINT",
+   "follow": "login",
+   "policy_action": "inc_stream_compare",
+   "risk": "R1",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "compare",
+    "--exp",
+    "{exp}"
+   ],
+   "control": "The last good milestone (5 v 5 permutation test), gate3 on the Stage C chain, or P_c's milestone seeds (a bisect arm).",
+   "success": "The ledger's milestone compare, feasibility read or bisect decide line.",
+   "falsifier": "-",
+   "estimator": "zero"
+  },
+  "LH": {
+   "name": "release_hold",
+   "title": "Release (or keep) a funnel_F9 hold past its deadline (a person)",
+   "lane": "DATA",
+   "follow": "login",
+   "policy_action": "inc_stream_release",
+   "risk": "R3",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.stream",
+    "release",
+    "--stream",
+    "{stream}",
+    "--hold",
+    "{hold}"
+   ],
+   "control": "The funnel's H10d hold-out (P8).",
+   "success": "Held rows released; stream models lose H10d comparability.",
+   "falsifier": "-",
+   "estimator": "zero"
+  }
+ },
+ "cards": {
+  "X13": {
+   "title": "Let the truth arm decide admission",
+   "risk": "R4",
+   "hypothesis": "The cold truth arm is less noisy than the warm chain's gate on rare classes.",
+   "why_menu_insufficient": "D-D: the pinned gate decides every increment; the truth arm is evidence for attribution only (contract 5.4).",
+   "required_change": "A new protocol version in which truth verdicts admit data.",
+   "cheapest_test": "Re-read the recorded segments with truth as the decision and compare the pools.",
+   "control": "The pinned gate's verdicts.",
+   "success_criterion": "Recorded, not adopted (conflicts with D-D)."
+  },
+  "X14": {
+   "title": "Raise the domain envelope, the allocation reserve, or renew the allocation",
+   "risk": "R4",
+   "hypothesis": "The campaign's envelope, the domain's su_envelope or the allocation's end date binds.",
+   "why_menu_insufficient": "Budgets and allocations are an owner's decision.",
+   "required_change": "A person raises envelope_su, the domain budget, alloc_reserve_su, or renews the Bridges-2 allocation.",
+   "cheapest_test": "-",
+   "control": "-",
+   "success_criterion": "The campaign resumes."
+  },
+  "X15": {
+   "title": "Walltime limits bind the next build",
+   "risk": "R4",
+   "hypothesis": "The pool has grown so that a run's projected time reaches 0.8 of its walltime.",
+   "why_menu_insufficient": "driver.COLD_TIME_LIMIT and run_inc_job.sh --time are pinned.",
+   "required_change": "A new protocol version with longer limits, or disk-read tuning.",
+   "cheapest_test": "Time one cold run at the current pool size.",
+   "control": "The measured ms per image-epoch.",
+   "success_criterion": "The projection falls below 0.8 of the limit."
+  },
+  "X16": {
+   "title": "Provider credentials or licence policy",
+   "risk": "R4",
+   "hypothesis": "A source is blocked by missing credentials or an unresolved licence.",
+   "why_menu_insufficient": "Credentials and licence policy are a person's (P6).",
+   "required_change": "Rotate or provide the credential; decide the licence.",
+   "cheapest_test": "-",
+   "control": "-",
+   "success_criterion": "The source's pre-check passes."
+  },
+  "X17": {
+   "title": "M beyond the doubling rule, dev composition, or the species guard on a rare dev class",
+   "risk": "R4",
+   "hypothesis": "The gate cannot accept increments at this M, or a rare dev class trips the species guard on noise.",
+   "why_menu_insufficient": "M changes only by L22 (at most 2 doublings); the gate, dev and the guard are pinned (D-D, L-3 is its own protocol version).",
+   "required_change": "An owner decision: a new protocol version of the guard or of dev, or a new M rule.",
+   "cheapest_test": "Stage C's known-good increment (L28) reads the guard's behaviour at M.",
+   "control": "Stage C and the segments' gate entries.",
+   "success_criterion": "Increments that the truth arm calls helpful are accepted."
+  }
+ },
+ "reused_cards": {
+  "value": [
+   "X1",
+   "X4",
+   "X10",
+   "X11"
+  ],
+  "why": "Contract 6.3: the recipe (Protocol v3), leave-one-source-out after a rollback, class policy and the verifier refit are the existing cards of levers.json."
+ },
+ "limits": {
+  "_why": "Contract 6.6 'Limits': these replace the blanket 3-per-campaign rule for the stream levers; L1-L14 keep it.",
+  "L16": {
+   "attempts_per_source": 3,
+   "in_flight": 2,
+   "jobs_per_day": 6,
+   "gb_per_day": 50,
+   "gb_per_source": 50
+  },
+  "L17": {
+   "in_flight": 2,
+   "jobs_per_day": 6
+  },
+  "L18": {
+   "in_flight": 1,
+   "per_day": 1
+  },
+  "L20": {
+   "in_flight": 1
+  },
+  "L21": {
+   "per_milestone": 1
+  },
+  "L22": {
+   "total": 2
+  },
+  "L25": {
+   "total": 1
+  },
+  "L27": {
+   "per_rollback": 1
+  },
+  "L28": {
+   "per_stream_version": 1
+  },
+  "LI": {
+   "total": 1
+  }
+ },
+ "gated_r2": {
+  "value": [
+   "L16",
+   "L17",
+   "L24"
+  ],
+  "why": "Contract 6.5: these R2 data levers run directly only with data_autonomy on, a stream replay pass and the caps; otherwise they are filed for a person. Stricter than the R2 cell because a bug in the data lane could loop downloads."
+ },
+ "envelope": {
+  "value": [
+   "L18",
+   "L20",
+   "L21",
+   "L22",
+   "L23B",
+   "L25",
+   "L27",
+   "L28",
+   "LI"
+  ],
+  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms). L23's splits build and lock always wait for a person (D-A's exact command)."
+ }
+}

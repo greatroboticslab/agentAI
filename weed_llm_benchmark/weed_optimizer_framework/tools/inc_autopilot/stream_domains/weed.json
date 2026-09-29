@@ -1,0 +1,265 @@
+{
+ "format": "inc-autopilot/stream-domain/1",
+ "domain": "weed",
+ "_meta": {
+  "pre_registered": "2026-09-28",
+  "contract": "docs/CONTINUOUS_LOOP.md (sections 2, 4.2, 5, 6, 7)",
+  "purpose": "Everything the stream-mode autopilot needs to know about the weed domain, so that inc_autopilot/stream*.py, diagnose_stream.py and levers_stream.py name no domain term (contract S13). The targets and the exam names are not copied here: they are read from the funnel domain config by name (funnel_domain), never duplicated.",
+  "governance": "A governance file (contract 6.5 review): it decides what the DATA lane may do by itself, so it is hashed into the replay pass (executor.code_hash covers this package). Written by a person or a deploy, never by the running platform."
+ },
+ "sid": "weed_stream_v1",
+ "protocol_package": "inc2",
+ "splits_version": "v2",
+ "funnel_domain": "weed",
+ "collect_config": "collect/domains/weed.json",
+ "never_train": {
+  "source": "weed_optimizer_framework/tools/mega_trainer.py",
+  "attr": "NEVER_TRAIN_SLUGS",
+  "why": "Contract 3.1: a source in the trainer's NEVER_TRAIN_SLUGS is refused. The set is read by parsing the trainer's source (ast.literal_eval of the assignment), never by importing it, as the collector does (collect/prefilter.never_train_slugs); an unreadable file refuses every source (fail closed)."
+ },
+ "metric": "map50_95",
+ "increment": {
+  "M": 682,
+  "K_max": 4,
+  "base_images": 6813,
+  "why": "Contract 5.3 and P2: M = ceil(0.10 x |base_v2|), fixed per stream version. With L-5 base_v2 is about 6,813 images and M about 682 (group A's note) [to verify on cluster]; the stream's own M is inc2.stream's (queue_summary.json M), which every proposal reads first. These values only price proposals before the stream exists."
+ },
+ "paths": {
+  "lock": "splits/v2/LOCK.json",
+  "base_manifest": "splits/v2/base_v2.jsonl",
+  "train_core_manifest": "splits/v2/train_core.jsonl",
+  "tsw_manifests": [
+   "splits/v2/tsw22.jsonl",
+   "splits/v2/tsw23.jsonl"
+  ],
+  "capacity_decision": "capacity/capacity_v1.json",
+  "funnel_f9_release": "step1_r1/domain_dev.jsonl",
+  "why": "INC_DIR-relative paths: group A's splits v2 (contract 4.2), group B's capacity decision (L-4), the funnel's F9 output that releases funnel_F9 holds (3.9)."
+ },
+ "species_priority": {
+  "value": {
+   "PricklySida": 1,
+   "CutleafGroundcherry": 1,
+   "Sicklepod": 1,
+   "Eclipta": 2,
+   "Goosegrass": 2,
+   "SpottedSpurge": 2,
+   "Carpetweed": 3,
+   "Ragweed": 3,
+   "MorningGlory": 3,
+   "PalmerAmaranth": 3,
+   "Purslane": 3,
+   "Waterhemp": 3
+  },
+  "why": "Contract 7.1: box supply after D-A; D20's first deficit list is PricklySida, CutleafGroundcherry and Sicklepod (priority 1)."
+ },
+ "eval_lab_groups": {
+  "value": [
+   "LuLab",
+   "NDSU"
+  ],
+  "why": "Contract 3.2 and P9: sources from the labs of the evaluation splits (dev and test: LuLab; ImageWeeds: NDSU) are fetched only after the copy scan; the auto L16 never picks them before (S1)."
+ },
+ "baselines": {
+  "why": "Contract 4.4 and L-4, in the order R0 builds them: B_v2 (milestone 0, 5 cold seeds), the canary (B0 seed 0 under inc2.train, judged by inc2.baseline canary-verdict), the capacity arms (3 cold seeds each, judged together by capacity-verdict), then B0 u tsw (recommended; it blocks nothing). The experiment names are inc2.baseline's defaults (canary_v2; b_v2_s640 and b_v2_m640 for capacity-verdict).",
+  "items": [
+   {
+    "id": "b_v2",
+    "exp": "b_v2",
+    "manifest": "splits/v2/base_v2.jsonl",
+    "seeds": "0,1,2,3,4",
+    "arm": "n640",
+    "role": "b_v2",
+    "required": true
+   },
+   {
+    "id": "canary",
+    "exp": "canary_v2",
+    "manifest": "splits/v2/train_core.jsonl",
+    "seeds": "0",
+    "arm": "n640",
+    "role": "canary",
+    "required": true,
+    "verdict": "canary-verdict"
+   },
+   {
+    "id": "cap_s640",
+    "exp": "b_v2_s640",
+    "manifest": "splits/v2/base_v2.jsonl",
+    "seeds": "0,1,2",
+    "arm": "s640",
+    "role": "capacity",
+    "required": true
+   },
+   {
+    "id": "cap_m640",
+    "exp": "b_v2_m640",
+    "manifest": "splits/v2/base_v2.jsonl",
+    "seeds": "0,1,2",
+    "arm": "m640",
+    "role": "capacity",
+    "required": true
+   },
+   {
+    "id": "b0_tsw",
+    "exp": "b0_tsw_v2",
+    "union": [
+     "splits/v2/train_core.jsonl",
+     "splits/v2/tsw22.jsonl",
+     "splits/v2/tsw23.jsonl"
+    ],
+    "seeds": "0,1,2",
+    "arm": "n640",
+    "role": "union",
+    "required": false,
+    "images": 6748
+   }
+  ]
+ },
+ "capacity": {
+  "default_arm": "n640",
+  "verdict": "capacity-verdict",
+  "arms": {
+   "n640": {
+    "exp": "b_v2",
+    "cost_factor": 1.0
+   },
+   "s640": {
+    "exp": "b_v2_s640",
+    "cost_factor": 2.0
+   },
+   "m640": {
+    "exp": "b_v2_m640",
+    "cost_factor": 3.0
+   }
+  },
+  "why": "Contract 2.6 L-4. The arms are inc2.recipes.ARMS ids; the decision is inc2.baseline capacity-verdict's (capacity/capacity_v1.json, dev only) and inc2.stream choose-arm adopts it. Every arm trains and scores at 640 px, so the grid varies capacity only; a resolution arm needs a new scorer version (R4) and is not in this grid. cost_factor is GPU time relative to n640 (est.: contract 11.4 gives 2-4x the B_v2 cost for such an arm; s640 at 2 and m640 at 3 sit inside inc2.recipes' brackets, pixel ratio 1 to FLOPs ratio 3.3 and 10.6) and only prices proposals until the decision records a measured step cost."
+ },
+ "stage_a": {
+  "exp": "pilot_v4",
+  "from_exp": "pilot_v3",
+  "recipes": "x1a,x1b",
+  "record": "stage_a.json",
+  "r0": {
+   "chain": "full",
+   "agree": 5,
+   "final_dev": 0.8006,
+   "why": "R0 is pilot_v3's own full chain and is not re-run: 5/7 agreement, final dev 0.8006 (contract 5.1)."
+  },
+  "why": "Contract 5.1 Stage A: X1a and X1b chained on pilot_v3's bins, no truth arm, judged by pilot_v3's recorded truth verdicts; inc2.pilot4 verdict applies the survival rule and writes INC_DIR/pilot_v4/stage_a.json (status READY | PENDING, segment1_recipes), which the stream's init takes as its Stage B arms."
+ },
+ "stage_c": {
+  "holdout": "tsw22",
+  "why": "Contract 5.1 Stage C: one increment D of exactly M data2022 target images, drawn as whole sessions, held out of base v2."
+ },
+ "cost": {
+  "cold_ms_per_image_epoch": 7.0,
+  "incr_ms_per_image_epoch": 7.4,
+  "cold_epochs": 100,
+  "chain_epochs": {
+   "r0": 30,
+   "x1a": 30,
+   "x1b": 50
+  },
+  "seeds": 3,
+  "milestone_seeds": 5,
+  "finals_hours": 0.8,
+  "build_job_hours": 4.0,
+  "collect_job_hours": 4.0,
+  "intake_job_hours": 1.0,
+  "admit_fixed_hours": 0.5,
+  "admit_seconds_per_1000_images": 75,
+  "probe_hours": 0.5,
+  "splits_hours": 4.0,
+  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job holds one V100 for up to its 4 h walltime, a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed."
+ },
+ "walltime": {
+  "cold_h": 8.0,
+  "incremental_h": 3.0,
+  "build_h": 4.0,
+  "why": "Contract 5.6 and 6.4 D26: driver.COLD_TIME_LIMIT 8 h, run_inc_job.sh --time 3 h, a build job 4 h."
+ },
+ "prior": {
+  "exp": "realloop_v1",
+  "ledger": "tests/fixtures/inc_replay/funnel/realloop_v1/ledger.jsonl",
+  "sha256": "5c8775a676122622fc57cbc00db6cc96e8c3723ef6e5a9406992b6769ce57076",
+  "why": "Contract 5.1: realloop_v1 is D30's prior until Stage A is READY; the funnel's pinned copy is reused by sha256 (tests/fixtures/inc_replay/funnel/MANIFEST.json), not duplicated."
+ },
+ "allocation": {
+  "end_date": "2026-12-31",
+  "resource_pattern": "GPU",
+  "why": "Contract 6.6 review: the Bridges-2 allocation's recorded end date; the snapshot's projects output is read over it when present. The GPU resource block is the one GPU-shared jobs draw from (read from projects, never assumed when it says otherwise)."
+ },
+ "collect": {
+  "max_bytes_default": 10737418240,
+  "why": "One L16 shard is at most 10 GiB, well inside the 50 GB per source and per day caps (contract 6.6)."
+ },
+ "decisions": [
+  {
+   "id": "DEC-A",
+   "decided_by": "human",
+   "utc": "2026-09-28",
+   "text": "The base grows: 3SeasonWeedDet10 data2022 and data2023 move into training (splits v2); ImageWeeds stays an exam."
+  },
+  {
+   "id": "DEC-B",
+   "decided_by": "human",
+   "utc": "2026-09-28",
+   "text": "Step 1 admits per box, with masking."
+  },
+  {
+   "id": "DEC-C",
+   "decided_by": "human",
+   "utc": "2026-09-28",
+   "text": "Collection is re-enabled and targeted at the 12 cwd12 species."
+  },
+  {
+   "id": "DEC-D",
+   "decided_by": "human",
+   "utc": "2026-09-28",
+   "text": "Fixed-size increments, the pinned gate, and rollback; the loop never stops by itself while collection yields data and the budget allows."
+  },
+  {
+   "id": "L-1",
+   "decided_by": "human-delegated",
+   "utc": "2026-09-28",
+   "text": "P1-P4 and P6-P11 are adopted as 2.5 states them."
+  },
+  {
+   "id": "L-2",
+   "decided_by": "human-delegated",
+   "utc": "2026-09-28",
+   "text": "Budget: 1,000 SU to 2026-12-31, a 350 SU monthly window, a 120 SU daily cap."
+  },
+  {
+   "id": "L-3",
+   "decided_by": "human-delegated",
+   "utc": "2026-09-28",
+   "text": "The species guard's tolerance is per species (Protocol v3): tol_s = max(0.03, 1.96 x image-bootstrap SE of the incumbent's dev AP for s)."
+  },
+  {
+   "id": "L-4",
+   "decided_by": "human-delegated",
+   "utc": "2026-09-28",
+   "text": "Capacity grid at R0: YOLO11n@640, YOLO11s@640, YOLO11m@640, 3 seeds each (every arm trains and scores at 640 px: capacity only); switch on dev by more than 2 pooled sd; truth arm every ceil(cost/25)-th step above 25 GPU-h."
+  },
+  {
+   "id": "L-5",
+   "decided_by": "human-delegated",
+   "utc": "2026-09-28",
+   "text": "base_v2 drops the cwp10 and vanpe harvested images outright."
+  },
+  {
+   "id": "L-6",
+   "decided_by": "human-delegated",
+   "utc": "2026-09-28",
+   "text": "Freeze and LoRA stay out of stream version 1."
+  },
+  {
+   "id": "L-7",
+   "decided_by": "human-delegated",
+   "utc": "2026-09-28",
+   "text": "D27's quota floor is 3 % of the /ocean quota (about 210 GB of 6.84 TiB): pause when staging + projected bytes leave less free. Measured 2026-09-28: 454 GB free (94 % used)."
+  }
+ ]
+}

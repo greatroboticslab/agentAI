@@ -13,6 +13,23 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-09-28 — The professor's method had never run end to end; a continuous loop is built to run it
+
+**Where it stood.** The method is: a large high-precision base, fixed-size increments stacked on it, each gated, and rollback of what hurts. It was tested only in pieces:
+- a known-answer pilot (a 1,540-image base with 7 increments of about 250 images);
+- one real loop (6 increments of 287 images on a 3,927-image base; all six rejected).
+
+Collection had been off since 2026-09-10, so the "large base" held 878 harvested images. Every result sat near test 0.85: B0 0.8541 ± 0.0074, base B 0.8502, pilot_v3 chain 0.8475, realloop_v1 union 0.8410.
+
+**What the design review found before any code was written:**
+- **The species guard rejected on noise.** It scales a species' drop by the overall null spread (sd 0.006). PricklySida, with 42 dev boxes, failed it in 5 of 6 realloop_v1 steps (drops of 0.033–0.057), so the loop could not accept data that lacks that species. It is now a per-species tolerance from the image-bootstrap SE of dev AP (L-3).
+- **Box accuracy caps the score.** Class-agnostic test mAP50-95 is 0.874 (B0) and 0.873 (B). With YOLO11n at 640 px the 12-class score cannot reach 0.90, whatever the data. A capacity grid (YOLO11n, s and m at 640) now runs at R0 (L-4).
+- **Base B was mostly re-uploads.** 812 of its 878 harvested images come from two re-uploads that had already shown copies of dev and test. They leave the base (L-5).
+
+**What was built.** Splits v2, which move the 3SeasonWeedDet10 2022/2023 subsets (3,699 expert-labelled images) into training. Incremental Step 1 with per-box admission. A targeted collector. A streaming chain with gate3, rollback, bisection and milestones. A stream-mode autopilot. 88 test scripts pass, including an end-to-end synthetic run.
+
+**Status.** No new accuracy number yet. The first is the R0 baseline table: B_v2 on dev, test and ImageWeeds, with the capacity arms and the gap to 0.90.
+
 ## 2026-09-28 — Did the Step 1 filters discard target data? The audit is pre-registered, and the platform flagged its own conclusion
 
 **Question.** The 2026-09-27 loop concluded that the harvest holds few target-species labels. Only 2,049 of 670,818 harvested boxes were verified, and every increment was rejected. The loop observed data only after the filters, and the verifier's known truth is all cwd12 photographs. So the conclusion says nothing yet about what the filters discarded.

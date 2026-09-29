@@ -42,5 +42,34 @@
       "value": 1.0,
       "why": "The WP5 gate's own bar (docs/TIERED_SUPERVISION_EXECUTION.md): 'SU ledger for the last 20 jobs matches sacct within 1%.' Restated here rather than hardcoded in su_ledger.py so the gate check and an operator's manual reconcile() call are scored against the same pre-registered number. Applies per job, not only to the aggregate: two per-job errors that cancel to a correct-looking total must still fail this bar (TIERED_SUPERVISION_PLAN's reason for a per-job breakdown, not just a total)."
     }
+  },
+  "partitions": {
+    "_why": "docs/CONTINUOUS_LOOP.md 6.6: an explicit rate for every partition the continuous loop uses, so no job is priced 'unknown'. Read by inc_autopilot/budget.partition_rates (not by su_ledger's rate table, which keys GPU families: a job's SU is still priced from its GPU family by su_for). Settled spend comes from sacct (budget.record_job_spend).",
+    "GPU-shared": {
+      "value": {
+        "billing": "per_gpu_hour",
+        "rate_from": "gpu_family",
+        "default_family": "v100",
+        "su_per_gpu_hour": 1.0
+      },
+      "why": "Every stream job (collect, intake, admit, the probe, builds and runs) holds one V100-32 on GPU-shared: 1 SU per GPU-hour at the v100 rate above. A job that asks for an H100 there (the brain's plan job) is priced at the h100 rate by its family."
+    },
+    "GPU": {
+      "value": {
+        "billing": "per_gpu_hour",
+        "rate_from": "gpu_family",
+        "default_family": "v100",
+        "su_per_gpu_hour": 1.0
+      },
+      "why": "Whole-node GPU jobs bill per GPU-hour of their family, as GPU-shared does (Bridges-2 hardware facts as briefed 2026-09-04); the loop does not use this partition."
+    },
+    "RM-shared": {
+      "value": {
+        "billing": "per_core_hour",
+        "su_per_core_hour": 1.0,
+        "usable": false
+      },
+      "why": "Regular-memory jobs bill per core-hour (to verify on the cluster against the 'projects' output). The allocation refuses RM-shared with 'Invalid qos' (FUNNEL_AUDIT_RUNNER note 33), so the loop never submits there; the rate is declared so a stray job is never priced unknown."
+    }
   }
 }
