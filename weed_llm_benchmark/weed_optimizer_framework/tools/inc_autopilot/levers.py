@@ -1186,8 +1186,14 @@ def estimate_funnel(lid, params, menu=None):
     info = dict(info, estimator="funnel_walltime", verb=verb, verb_class=cls, gpu=gpu)
     if gpu and gpu != "v100":
         from ..brain import su_ledger
-        rates = su_ledger.rates()
-        ratio = float(rates[gpu]["su_per_gpu_hour"]) / float(rates["v100"]["su_per_gpu_hour"])
+        # rates() is {"values": {"rates.<family>.su_per_gpu_hour": ...}, ...} (su_ledger._flatten); the
+        # first rl-b proposal (2026-09-29) raised KeyError 'h100' indexing it as su_rates.json's raw tree
+        vals = su_ledger.rates().get("values") or {}
+        g, v = _num(vals.get("rates.%s.su_per_gpu_hour" % gpu)), _num(vals.get("rates.v100.su_per_gpu_hour"))
+        if g is None or not v:
+            raise LeverError("su_rates.json declares no SU rate for GPU %r (or none for v100): the %s job "
+                             "cannot be priced" % (gpu, verb))
+        ratio = g / v
         info.update(gpu_hours=hours, su_ratio_to_v100=ratio)
         hours = round(hours * ratio, 3)
     return hours, info

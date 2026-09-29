@@ -28,7 +28,14 @@ The pre-registration now carries amendment A2 (post hoc, dated): per-image calib
 
 **What still failed.** The build refused at its last check. One train_core image and one 2023 image were within 6 dHash bits in the direction the drop rule did not read. dHash is not symmetric under rotation, so the two directions can disagree. The drop now reads both directions. The platform held the lane after the second failed build (its stop-loss).
 
-**Status.** No new accuracy number. Best sealed: test mAP50-95 0.8541 ± 0.0074, gap to 0.90: 0.046. Next: the fourth splits v2 build, then the R0 baselines on the enlarged base.
+**Later the same day.**
+- **Splits v2 are built and locked.** base_v2 holds 6,811 expert-labelled images (train_core 3,048, 3SeasonWeedDet10 2022 1,915, 2023 1,782, harvested 66), 2.2× the base every earlier result was trained on.
+- **The platform ran the funnel's leak_v2 itself.**
+  - Base B and every realloop_v1 increment are cleared, so those results stand.
+  - 22 sources stay quarantined (v1: 39), all by dHash. Every one of those hits is under a flip or rotation, none under the identity, most are against 2023 images, and many have low cosine (a video-game source at 0.12–0.16).
+  - The 6-bit, 8-variant dHash rule may also false-alarm at scale. That is measured before any recovery.
+
+**Status.** No new accuracy number. Best sealed: test mAP50-95 0.8541 ± 0.0074, gap to 0.90: 0.046. Next: the R0 baselines on base_v2 (YOLO11n, 5 seeds; YOLO11s and m capacity arms).
 
 ## 2026-09-28 — The professor's method had never run end to end; a continuous loop is built to run it
 

@@ -175,6 +175,15 @@ def test_mirrors():
           RM.funnel_resources("rl-b") == FM.SBATCH_RESOURCES["gpu_large"] and RM.funnel_resources("census") == [])
     check("remote.funnel_resources refuses a verb the table does not know",
           raises(lambda: RM.funnel_resources("nope"), RM.Refused))
+    # rl-b is priced in V100 GPU-hours at the su_rates.json ratio (2026-09-29: the first live rl-b proposal
+    # raised KeyError 'h100', indexing su_ledger.rates() as the file's raw tree)
+    h_rlb, i_rlb = LV.estimate_funnel("L10", {"verb": "rl-b"})
+    h_cen, i_cen = LV.estimate_funnel("L10", {"verb": "census"})
+    check("estimate_funnel: rl-b holds an H100, priced at 2x the V100 walltime (su_rates.json 2.0 / 1.0); census "
+          "at the walltime itself",
+          i_rlb["gpu"] == "h100" and i_rlb["su_ratio_to_v100"] == 2.0 and h_rlb == round(i_rlb["gpu_hours"] * 2.0, 3)
+          and i_cen["gpu"] == "v100" and "su_ratio_to_v100" not in i_cen and h_rlb == round(h_cen * 2.0, 3),
+          (h_rlb, i_rlb, h_cen, i_cen))
     pre = jload(PREREG)
     check("realloop.RECOVERED_SEQUENCE = the pre-registered realloop_v2 sequence = panel.RECOVERY_STEPS; levers "
           "recovered_steps = its length",

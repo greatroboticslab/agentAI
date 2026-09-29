@@ -10615,3 +10615,12 @@ Every result sat near test 0.85, against the 0.90 goal.
 - **Prereg:** the real prereg loads under the current contract with A1 (sample lock) and A2, core `62fd2e34…`.
 - **Not yet on the cluster:** `leak_v2.json` (the platform's next L10 step), and the fourth splits v2 build.
 - **No new accuracy number.** Best sealed: test mAP50-95 0.8541 ± 0.0074 (B0), gap to 0.90: 0.046.
+
+### Later on 2026-09-29 (live)
+
+- **Splits v2 built and locked.** The fourth build (cluster job 47261503) passed with the both-direction drop, and the lock (job 47262115) followed on the owner's approval. base_v2 holds 6,811 images: train_core 3,048, tsw22 1,915, tsw23 1,782 and base B 66. The never-train index holds 5,802 entries. Two tsw23 rows were dropped: one near train_core (the reverse-direction pair of job 47260765) and one near tsw22.
+- **leak_v2 (job 47261575, launched by the platform).**
+  - Threshold 0.949514. Known limits: `crop` (recall 0.69) and `letterbox640` (0.27).
+  - H6(b): base B and every realloop_v1 increment are cleared.
+  - H6(a): 22 sources are quarantined, against v1's 39, all of them by dHash, none by the embedding. Every dHash hit is under a flip or rotation, none under the identity, and most are against ood23. Open before recovery (F9): the per-image false-positive rate of the 8-variant dHash rule.
+- **Fix: `levers.estimate_funnel` priced an H100 verb with the wrong key.** It indexed `su_ledger.rates()` as su_rates.json's raw tree. The first live rl-b proposal raised `KeyError: 'h100'` on every tick, and the funnel campaign stood still after `sheets` (job 47261940). It now reads `rates.<family>.su_per_gpu_hour` and refuses a missing rate. `tests/test_funnel_ap_units.py` prices rl-b at 2× the V100 walltime.
