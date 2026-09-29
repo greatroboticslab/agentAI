@@ -74,7 +74,9 @@ same-domain images looked like copies of an evaluation image; at the new one, ab
 
 Continuous loop (in progress): the platform collects target-species data, filters it per box, stacks it in
 fixed-size increments, gates each against the incumbent and rolls back what hurts — continuously. Splits v2 are
-locked (base_v2: 6,811 expert-labelled images, 2.2× the earlier base); the R0 baselines are next. No result yet.
+locked (base_v2: 6,811 expert-labelled images, 2.2× the earlier base). First result: YOLO11n on base_v2 scores test
+0.8468 ± 0.0074 (5 seeds), against 0.8541 ± 0.0074 on train_core alone. The added data is half OtherPlant and adds
+nothing for three species, so it does not help; see RESEARCH_LOG 2026-09-29.
 - [`docs/CONTINUOUS_LOOP.md`](../docs/CONTINUOUS_LOOP.md): the contract (decisions, data flow, splits v2, recipe, autopilot stream mode, rollout).
 
 Reproduce on Bridges-2. Run from the repo root with `REPO` pointing at it and `PYTHONPATH=$REPO`, in the `bench`
