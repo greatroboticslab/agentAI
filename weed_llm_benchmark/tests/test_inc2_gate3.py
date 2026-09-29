@@ -180,6 +180,19 @@ def test_sidecar_units():
     check("with tied confidences the exam key order is off the score (%.2g) and check_recompute refuses it; "
           "check_capture, in the validator's order, reproduces it exactly" % off,
           off > 1e-9 and e_key is not None and SC.check_capture(score_pc, tied)[0] == 0.0, (off, e_key))
+    # ties also split a class-restricted call from the full call (0.0103 on a real dev exam, pilot_v4): both now run
+    # on tie_break's one order, and agree exactly
+    tb = SC.tie_break(key_order)
+    kept = np.all(np.diff(key_order["conf"][np.argsort(-tb["conf"], kind="stable")]) <= 0)
+    check("tie_break: every confidence distinct, no prediction crosses another's value, deterministic",
+          kept and len(np.unique(tb["conf"])) == len(tb["conf"])
+          and np.array_equal(tb["conf"], SC.tie_break(key_order)["conf"]))
+    _w, restricted_tied = SC.check_capture(score_pc, tied)
+    check("on tied arrays the class-restricted AP equals the full call's exactly (both tie-broken)",
+          restricted_tied == 0.0, restricted_tied)
+    shift = SC.tie_shift(score_pc, key_order)
+    check("tie_shift records how far the tie-broken AP sits from the score (%.2g), within the tie noise" % shift,
+          0.0 <= shift < 0.05, shift)
     t0 = time.time()
     a = SC.bootstrap_species_se(arr, resamples=200)
     b = SC.bootstrap_species_se(arr, resamples=200)

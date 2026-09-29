@@ -10637,3 +10637,11 @@ Every result sat near test 0.85, against the 0.90 goal.
   - `tests/test_inc2_gate3.py` builds tied confidences: key order is 0.0069 off, and the validator's order is exact.
 - **Capacity arm m640.** YOLO11m on base_v2 (3 seeds) scores test 0.8786 ± 0.0018, the best sealed result so far (gap to 0.90: 0.021), with class-agnostic 0.8901 and dev 0.8524. The curve on base_v2 is n 0.8468, s 0.8653, m 0.8786. The weakest species are Carpetweed (0.736), SpottedSpurge (0.810) and Purslane (0.828).
 - **Canary.** canary_v2 reproduces b0_v1 on dev (0.8107 against 0.8082 ± 0.0063) but was recorded as failed: its sidecar hit the recompute-order bug, and DCAN held the TRAIN lane. Re-scored under the fix (job 47269241, from its verified weights, nothing retrained), the recompute is exact (0.0) and `canary-verdict` passes. The pilot_v4 units were unblocked with the reason recorded in the driver's ledger (array 47269204, re-score only). The first L16L fetch (mediatum_1717366) was approved.
+- **Fix: a v2 experiment's runs could be submitted to the v1 executor.**
+  - The pinned driver chooses its job script from `$INC_JOB_SCRIPT` alone, with `run_inc_job.sh` (v1) as the default, and nothing in the autopilot set it.
+  - So `remote.advance`, which the stream calls every tick, and `remote.unblock` submitted pilot_v4's runs to v1. v1 refuses the Protocol v3 recipes (X1a lr0 0.005, X1b lr0 0.01 and 50 epochs: "a production cand run trains the protocol's recipe only") and writes no sidecar. The pilot_v4 base re-scores ran on v1 too.
+  - `remote._job_script_for` now sets `run_inc2_job.sh` for an experiment whose exp.json says `protocol_package: inc2`, removes the variable for any other, and refuses a v2 experiment whose script is missing (`tests/test_inc_ap_remote.py`).
+- **Fix: ties also split the sidecar's class-restricted AP from the full call.**
+  - This happened on pilot_v4's x1a candidate: 0.0103, over the 0.01 allowance.
+  - The restricted check and the bootstrap now run on `tie_break`'s arrays: every tie in conf is broken deterministically inside its gap, without crossing another value, so the check is exact (allowance 1e-9).
+  - The score check still runs on the captured arrays, in capture order. `tie_broken_vs_score_max_abs_diff` records the shift.

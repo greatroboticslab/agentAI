@@ -1928,8 +1928,47 @@ def test_run_inc_build_sh():
               p.returncode == 2 and "usage:" in p.stderr and not (inc / "x").exists(), (p.returncode, p.stderr[-200:]))
 
 
+def test_job_script_for():
+    """remote.advance / unblock point the pinned driver at the experiment's own executor (2026-09-29: an advance
+    from the login node submitted pilot_v4's runs to run_inc_job.sh, which refused the Protocol v3 recipes)."""
+    v2, v1 = "js_v2_exp", "js_v1_exp"
+    for e, d in ((v2, {"type": "pilot", "protocol_package": "inc2"}), (v1, {"type": "pilot"})):
+        (INC / e).mkdir(parents=True, exist_ok=True)
+        (INC / e / "exp.json").write_text(json.dumps(d))
+    script = pathlib.Path(C.REPO) / "weed_llm_benchmark" / "run_inc2_job.sh"
+    old = os.environ.get("INC_JOB_SCRIPT")
+    try:
+        os.environ.pop("INC_JOB_SCRIPT", None)
+        missing = None
+        if not script.exists():
+            try:
+                RM._job_script_for(v2)
+            except RM.Refused as e:
+                missing = str(e)
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text("#!/bin/bash\n")
+        check("a v2 experiment whose job script is missing is refused, before anything is submitted",
+              missing is not None and "run_inc2_job.sh" in missing, missing)
+        got = RM._job_script_for(v2)
+        check("a v2 experiment (protocol_package inc2) sets INC_JOB_SCRIPT to run_inc2_job.sh",
+              got == str(script) and os.environ.get("INC_JOB_SCRIPT") == str(script), got)
+        got1 = RM._job_script_for(v1)
+        check("a v1 experiment removes it again (the driver's default, run_inc_job.sh)",
+              got1 is None and "INC_JOB_SCRIPT" not in os.environ)
+        from weed_optimizer_framework.tools.inc import driver as DRV
+        RM._job_script_for(v2)
+        check("  and the pinned driver then submits the v2 script", str(DRV.job_script()) == str(script))
+    finally:
+        if old is None:
+            os.environ.pop("INC_JOB_SCRIPT", None)
+        else:
+            os.environ["INC_JOB_SCRIPT"] = old
+
+
 def main():
     make_bin()
+    print("the job script per experiment (advance, unblock)")
+    test_job_script_for()
     print("markers")
     test_markers()
     print("snapshot of pilot_v1 (local files)")

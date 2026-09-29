@@ -73,7 +73,8 @@ RESAMPLES = 1000
 SPECIES = tuple(C.CLASS_NAMES[:C.OTHER_PLANT])
 MAX_SCORE_DIFF = 0.002            # per_class / map50_95, sidecar pass vs the recorded score
 MAX_RECOMPUTE_DIFF = 1e-9         # full-sample ap_per_class vs the sidecar score's own per_class
-MAX_RESTRICTED_DIFF = 0.01        # per-species (class-restricted) full-sample AP vs the full call
+MAX_RESTRICTED_DIFF = 1e-9        # per-species (class-restricted) full-sample AP vs the full call, both on the
+                                  # tie-broken arrays (one order: exact; 0.01 before tie_break, 2026-09-29)
 JSON_SUFFIX = ".sidecar.json"
 NPZ_SUFFIX = ".images.npz"
 STAMPS = ("exam", "scorer_sha256", "manifest_sha256", "key_order_sha256", "n_images", "weights_sha256")
@@ -268,6 +269,42 @@ def species_arrays(arrays, s_id):
     return arrays["tp"][sel], arrays["conf"][sel], arrays["pred_img"][sel], gt
 
 
+def tie_break(arrays):
+    """The arrays with every tie in conf broken, deterministically: within a
+    group of equal confidences the prediction that comes first (in the
+    arrays' order) keeps its value and the others step down, evenly, inside
+    the gap to the next lower distinct value, so no prediction crosses
+    another's confidence (below the lowest group, into the 1.0 under it). ap_per_class sorts with np.argsort(-conf), which is
+    not stable, so on tied arrays a class-restricted call and the full call
+    (or two resamples) can rank the same ties differently: 0.0031 and 0.0103
+    on real dev exams (2026-09-29). AP depends on conf only through that
+    order, so on tie-broken arrays both are computed on one order. Only the
+    sidecar's own AP (restricted, bootstrap) uses it; the check against the
+    score runs on the captured arrays (check_capture)."""
+    import numpy as np
+    conf = np.asarray(arrays["conf"], dtype=np.float64)
+    n = len(conf)
+    out = dict(arrays)
+    if n == 0:
+        out["conf"] = conf
+        return out
+    order = np.lexsort((np.arange(n), -conf))          # conf descending, then position (stable)
+    c = conf[order]
+    new = np.ones(n, dtype=bool)
+    new[1:] = c[1:] != c[:-1]
+    starts = np.flatnonzero(new)
+    gid = np.cumsum(new) - 1
+    rank = np.arange(n) - starts[gid]
+    size = np.diff(np.append(starts, n))[gid]
+    uniq = c[starts]
+    # the next lower distinct confidence; below the lowest group, 1.0 lower (AP reads conf only through its order)
+    lower = np.append(uniq[1:], uniq[-1] - 1.0)[gid]
+    broken = np.empty(n, dtype=np.float64)
+    broken[order] = c - rank * ((c - lower) / (size + 1.0))
+    out["conf"] = broken
+    return out
+
+
 def class_ap(tp, conf, n_gt, s_id, ap_fn):
     """AP50-95 of one class from its detections and GT count, with
     ap_per_class (0.0 when there are GT boxes and no detection)."""
@@ -361,16 +398,27 @@ def check_recompute(per_class, arrays, ap_fn=None):
     if worst > MAX_RECOMPUTE_DIFF:
         raise SidecarError("ap_per_class on the captured per-image arrays differs from the score's per_class by "
                            "%.3g: they are not the inputs of that score" % worst)
+    # the class-restricted AP (the bootstrap's statistic) against the full call, both on one tie-broken order
+    tb = tie_break(arrays)
+    full_tb = full_per_class(tb, ap_fn)
     restricted = 0.0
     for name in SPECIES:
         if name not in per_class:
             continue
         s_id = C.CLASS_NAMES.index(name)
-        tp, conf, _, gt = species_arrays(arrays, s_id)
-        restricted = max(restricted, abs(class_ap(tp, conf, int(gt.sum()), s_id, ap_fn) - full[name]))
+        tp, conf, _, gt = species_arrays(tb, s_id)
+        restricted = max(restricted, abs(class_ap(tp, conf, int(gt.sum()), s_id, ap_fn) - full_tb[name]))
     if restricted > MAX_RESTRICTED_DIFF:
         raise SidecarError("a species' AP from its own detections differs from the full call by %.4f" % restricted)
     return worst, restricted
+
+
+def tie_shift(per_class, arrays, ap_fn=None):
+    """The largest |AP on the tie-broken arrays - the score's per_class|: how
+    far the sidecar's own AP (the bootstrap's point estimate) may sit from the
+    score because ties are ranked another way. Recorded, not a gate."""
+    full_tb = full_per_class(tie_break(arrays), ap_fn)
+    return max([abs(full_tb[c] - float(per_class[c])) for c in per_class if c in full_tb] or [0.0])
 
 
 # --------------------------------------------------------------------- run
@@ -399,7 +447,8 @@ def run(weights, exam, score_json, out_json=None, lock_check=True, imgsz=S.IMGSZ
     arrays = flatten(images, keys)        # the npz and the bootstrap: exam key order
     ap_fn = _ap_per_class()
     recompute, restricted = check_capture(res["per_class"], images, ap_fn)
-    se = bootstrap_species_se(arrays, resamples=resamples, seed_text=seed_text, ap_fn=ap_fn)
+    shift = tie_shift(res["per_class"], arrays, ap_fn)
+    se = bootstrap_species_se(tie_break(arrays), resamples=resamples, seed_text=seed_text, ap_fn=ap_fn)
     npz_sha = save_npz(npz, arrays)
     import ultralytics
     rec = {
@@ -414,7 +463,11 @@ def run(weights, exam, score_json, out_json=None, lock_check=True, imgsz=S.IMGSZ
                         "full_recompute_max_abs_diff": recompute, "max_recompute_diff": MAX_RECOMPUTE_DIFF,
                         "full_recompute_order": "capture (the validator's image order; the npz is in exam key "
                                                 "order, and ap_per_class ranks equal confidences by input order)",
-                        "species_restricted_max_abs_diff": restricted},
+                        "species_restricted_max_abs_diff": restricted,
+                        "tie_broken_vs_score_max_abs_diff": shift,
+                        "tie_break": "restricted AP and the bootstrap run on tie-broken arrays (tie_break: equal "
+                                     "confidences ranked by position in exam key order); the score check runs on "
+                                     "the captured arrays"},
         "images": {"path": str(npz), "sha256": npz_sha, "n_images": len(keys),
                    "n_predictions": int(len(arrays["conf"])), "n_targets": int(len(arrays["target_cls"]))},
         "species_se": {"seed_text": seed_text, "seed": C.stable_int(seed_text), "resamples": int(resamples),

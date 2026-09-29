@@ -1552,6 +1552,15 @@ The existing `test_inc_splits`, `test_funnel_leak`, `test_funnel_embed`, `test_f
     - `canary-verdict` passes (dev 0.8107 against 0.8082 ± 0.0063, sidecar ok, production).
   - Its dev bootstrap SE per species runs from 0.0225 (Waterhemp) to 0.0961 (Goosegrass), with CutleafGroundcherry 0.074 and PalmerAmaranth 0.073.
   - Treated as independent across species, the 12-class dev mean has a sampling SE of about 0.016, several times the seed sd (0.003–0.006).
+- **Stage A ran on the v1 executor.**
+  - The pinned driver takes its job script from `$INC_JOB_SCRIPT`, with v1's `run_inc_job.sh` as the default. Only the v2 job script and the v2 builders set it.
+  - So every advance from the login node submitted v1: `remote.advance`, which the stream calls each tick, `remote.unblock`, and the unblock made by hand.
+  - pilot_v4's X1a/X1b candidate and null runs were refused at stage recipe. v1 admits only the protocol recipe, and Stage A exists to test these two. The base re-scores ran on v1 and wrote no sidecar.
+  - `remote._job_script_for` now sets the experiment's own executor before any driver call that may submit.
+- **A second tie effect.**
+  - pilot_v4's x1a candidate, on the v2 executor, failed at the sidecar: its class-restricted AP differed from the full call by 0.0103.
+  - The cause is the same unstable sort, this time between the global call and a single class's call.
+  - The restricted check and the bootstrap now run on tie-broken arrays (`tie_break`) and agree exactly. The score check keeps the captured arrays.
 
 ### Build note (group C)
 

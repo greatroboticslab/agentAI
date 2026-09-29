@@ -1048,6 +1048,34 @@ def _drift_guard(rec):
     return drift_message(d) if d["drift"] else None
 
 
+V2_PACKAGE = "inc2"                      # inc2.recipes.PROTOCOL_PACKAGE, stamped into every v2 exp.json
+V2_JOB_SCRIPT = "run_inc2_job.sh"
+
+
+def _job_script_for(exp):
+    """Point the pinned driver at the executor the experiment was built for,
+    before it may submit: inc.driver.job_script() reads only $INC_JOB_SCRIPT
+    and defaults to run_inc_job.sh (the v1 executor). A v2 experiment
+    (exp.json protocol_package inc2) gets REPO/weed_llm_benchmark/
+    run_inc2_job.sh; any other has the variable removed. Without it, an
+    advance or unblock from the login node submitted a v2 experiment's runs
+    to the v1 executor, which refuses the Protocol v3 recipes and writes no
+    scorer sidecar (pilot_v4, 2026-09-29). Returns the script set, or None."""
+    try:
+        with open(str(inc_dir() / exp / "exp.json")) as fh:
+            defn = json.load(fh)
+    except (OSError, ValueError):
+        defn = None
+    if isinstance(defn, dict) and defn.get("protocol_package") == V2_PACKAGE:
+        js = Path(_C().REPO) / "weed_llm_benchmark" / V2_JOB_SCRIPT
+        if not js.is_file():
+            raise Refused("%s is a v2 experiment and its job script %s is missing" % (exp, js))
+        os.environ["INC_JOB_SCRIPT"] = str(js)
+        return str(js)
+    os.environ.pop("INC_JOB_SCRIPT", None)
+    return None
+
+
 def advance(exp, backend=None):
     rec = base_record("advance")
     try:
@@ -1065,6 +1093,10 @@ def advance(exp, backend=None):
                     type(e).__name__, "other")
     if why:
         return fail(rec, why, "DriftError", "code_drift")
+    try:
+        rec["job_script"] = _job_script_for(exp)
+    except Refused as e:
+        return fail(rec, e, error_kind="refused")
     D = _D()
     try:
         rec["result"] = D.advance(exp, backend=backend, quiet=True)
@@ -1141,6 +1173,7 @@ def unblock(exp, unit, reason, backend=None):
                         type(e).__name__, "other")
         if why:
             return fail(rec, why, "DriftError", "code_drift")
+        rec["job_script"] = _job_script_for(exp)
     except Refused as e:
         return fail(rec, e, error_kind="refused")
     D = _D()
