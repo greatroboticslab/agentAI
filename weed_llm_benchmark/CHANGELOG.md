@@ -10624,3 +10624,7 @@ Every result sat near test 0.85, against the 0.90 goal.
   - H6(b): base B and every realloop_v1 increment are cleared.
   - H6(a): 22 sources are quarantined, against v1's 39, all of them by dHash, none by the embedding. Every dHash hit is under a flip or rotation, none under the identity, and most are against ood23. Open before recovery (F9): the per-image false-positive rate of the 8-variant dHash rule.
 - **Fix: `levers.estimate_funnel` priced an H100 verb with the wrong key.** It indexed `su_ledger.rates()` as su_rates.json's raw tree. The first live rl-b proposal raised `KeyError: 'h100'` on every tick, and the funnel campaign stood still after `sheets` (job 47261940). It now reads `rates.<family>.su_per_gpu_hour` and refuses a missing rate. `tests/test_funnel_ap_units.py` prices rl-b at 2× the V100 walltime.
+- **First R0 result.**
+  - b_v2 (YOLO11n n640, 5 seeds on base_v2, 6,811 images): test 0.8468 ± 0.0074, against B0 0.8541 ± 0.0074, so no gain; dev 0.8217 ± 0.0033, against 0.8082 ± 0.0063.
+  - canary_v2 reproduces B0 on dev (0.8107).
+  - 51 % of base_v2's boxes are OtherPlant, and three species got no new boxes. RESEARCH_LOG 2026-09-29 has the per-species analysis and the dev–test disagreement.

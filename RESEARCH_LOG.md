@@ -13,6 +13,36 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-09-29 — First result of the loop: 2.2× the data, no gain on test; dev said +0.013
+
+**Result** (YOLO11n, 640 px, same recipe, locked scorer; means ± sd over seeds):
+
+| | training images | dev 12-class | test 12-class | test class-agnostic |
+|---|---|---|---|---|
+| B0 (train_core, 3 seeds) | 3,049 | 0.8082 ± 0.0063 | **0.8541 ± 0.0074** | 0.874 |
+| canary_v2 (train_core under the v2 pipeline, 1 seed) | 3,048 | 0.8107 | — (dev only) | — |
+| **b_v2 (base_v2, 5 seeds)** | 6,811 | 0.8217 ± 0.0033 | **0.8468 ± 0.0074** | 0.8751 |
+
+- **The v2 pipeline reproduces B0.** canary_v2's dev is 0.8107, against B0's 0.8082 ± 0.0063.
+- **Adding 3,700 expert-labelled 3SeasonWeedDet10 images did not raise test.** It changed by −0.007 (Welch t ≈ 1.3). Gap to 0.90: 0.053.
+
+**Why the data did not help** (box counts per class):
+- tsw23 carries 12,698 OtherPlant boxes, so 51 % of base_v2's boxes are a class the 12-class metric does not score.
+- The new target boxes go to a few species: Purslane 440→2,961, PalmerAmaranth 205→1,946, Waterhemp 1,059→2,082.
+- PricklySida (263), Sicklepod (121) and CutleafGroundcherry (50) got none. Their share of the boxes fell about five-fold.
+- On test, the largest drops are the diluted, harder species: CutleafGroundcherry −0.053, PricklySida −0.029, Goosegrass −0.021, Carpetweed −0.016. The species that gained data gained little: Ragweed +0.010, SpottedSpurge +0.009, PalmerAmaranth +0.007.
+
+**Dev and test disagree.**
+- Dev rose by 0.0135 (t ≈ 3.4 over seeds), and test fell.
+- Five dev species have 31 boxes each. Their dev changes do not survive on test: CutleafGroundcherry +0.046 on dev and −0.053 on test; PalmerAmaranth +0.062 and +0.007.
+- Only 7 of the 12 species move in the same direction on both.
+- The seed sd measures training noise, not the sampling noise of a 617-image dev set. A dev gain of this size is therefore not evidence of a test gain. The loop's gate decides on dev, so its decisions need dev's image-level bootstrap SE as well as seed noise.
+
+**What it implies for the loop.**
+- Bulk data from a neighbouring dataset, skewed toward species that are already strong and half unscored, does not move the metric.
+- The lever is targeted data for the rare, weak species (CutleafGroundcherry, PricklySida, Carpetweed, Goosegrass, Purslane, SpottedSpurge), possibly with class balance. This is the loop's targeted-collection design (D-C), and the first measurement supports it.
+- Still to come at R0: the capacity arms (YOLO11s and YOLO11m at 640), which ask whether a larger model uses the extra data.
+
 ## 2026-09-29 — The "leakage" was a calibration error: at the funnel's threshold, 64 % of clean same-domain images looked like copies
 
 **What the cluster measured.** The third splits v2 build (job 47260765) scored every train_core image with a known capture session the way the copy scan scores an image: its best DINOv2 cosine over the evaluation images outside its own session and date. None of these images is a copy.
