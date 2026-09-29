@@ -339,6 +339,17 @@ def compare_scores(recorded, sidecar):
     return worst
 
 
+def check_capture(per_class, images, ap_fn=None):
+    """check_recompute on the arrays concatenated in the order the validator
+    saw the images (images' insertion order), the order DetMetrics
+    concatenates its stats in. ap_per_class sorts with np.argsort(-conf), which
+    is not stable: predictions with equal confidence (common at half precision)
+    are ranked by input order, so the same arrays in another image order give a
+    slightly different AP (0.0007-0.0012 on the real dev exam, pilot_v4,
+    2026-09-29). Only this order reproduces the score exactly."""
+    return check_recompute(per_class, flatten(images, list(images)), ap_fn)
+
+
 def check_recompute(per_class, arrays, ap_fn=None):
     """Raise unless ap_per_class on the captured arrays gives the score's
     per_class exactly. Returns (largest diff, largest class-restricted diff)."""
@@ -385,9 +396,9 @@ def run(weights, exam, score_json, out_json=None, lock_check=True, imgsz=S.IMGSZ
     keys = sorted(r["key"] for r in C.read_manifest(C.manifest_path(exam)))
     if C.sha256_text("\n".join(keys)) != res["key_order_sha256"]:
         raise SidecarError("the exam's key order does not hash to the score's key_order_sha256")
-    arrays = flatten(images, keys)
+    arrays = flatten(images, keys)        # the npz and the bootstrap: exam key order
     ap_fn = _ap_per_class()
-    recompute, restricted = check_recompute(res["per_class"], arrays, ap_fn)
+    recompute, restricted = check_capture(res["per_class"], images, ap_fn)
     se = bootstrap_species_se(arrays, resamples=resamples, seed_text=seed_text, ap_fn=ap_fn)
     npz_sha = save_npz(npz, arrays)
     import ultralytics
@@ -401,6 +412,8 @@ def run(weights, exam, score_json, out_json=None, lock_check=True, imgsz=S.IMGSZ
                                                    "scorer_sha256", "settings", "device")},
         "consistency": {"max_abs_diff_vs_recorded": worst, "max_score_diff": MAX_SCORE_DIFF,
                         "full_recompute_max_abs_diff": recompute, "max_recompute_diff": MAX_RECOMPUTE_DIFF,
+                        "full_recompute_order": "capture (the validator's image order; the npz is in exam key "
+                                                "order, and ap_per_class ranks equal confidences by input order)",
                         "species_restricted_max_abs_diff": restricted},
         "images": {"path": str(npz), "sha256": npz_sha, "n_images": len(keys),
                    "n_predictions": int(len(arrays["conf"])), "n_targets": int(len(arrays["target_cls"]))},

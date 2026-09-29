@@ -158,6 +158,28 @@ def test_sidecar_units():
     except SC.SidecarError as x:
         e = x
     check("check_recompute refuses a per_class the arrays do not give", e is not None, e)
+    # equal confidences (half precision): ap_per_class ranks ties by input order, so only the validator's own
+    # image order reproduces its score (pilot_v4, 2026-09-29: 0.0007-0.0012 off in exam key order)
+    import numpy as np
+    rng = np.random.default_rng(20260929)
+    tied = {}
+    for i in rng.permutation(80):                           # the validator's order is not the key order
+        n = int(rng.integers(5, 40))
+        conf = (np.round(rng.random(n) * 20) / 20).astype(np.float32)   # 21 distinct values: many ties
+        tied["img_%03d" % i] = {"tp": rng.random((n, 10)) < (0.2 + 0.7 * conf[:, None]), "conf": conf,
+                                "pred_cls": rng.integers(0, 12, n).astype(np.float32),
+                                "target_cls": rng.integers(0, 12, int(rng.integers(1, 12))).astype(np.float32)}
+    score_pc = SC.full_per_class(SC.flatten(tied, list(tied)))   # what DetMetrics reports
+    key_order = SC.flatten(tied, sorted(tied))
+    off = max(abs(SC.full_per_class(key_order)[c] - score_pc[c]) for c in score_pc)
+    try:
+        SC.check_recompute(score_pc, key_order)
+        e_key = None
+    except SC.SidecarError as x:
+        e_key = x
+    check("with tied confidences the exam key order is off the score (%.2g) and check_recompute refuses it; "
+          "check_capture, in the validator's order, reproduces it exactly" % off,
+          off > 1e-9 and e_key is not None and SC.check_capture(score_pc, tied)[0] == 0.0, (off, e_key))
     t0 = time.time()
     a = SC.bootstrap_species_se(arr, resamples=200)
     b = SC.bootstrap_species_se(arr, resamples=200)
