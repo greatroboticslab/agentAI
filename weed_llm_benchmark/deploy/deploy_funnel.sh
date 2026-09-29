@@ -75,6 +75,8 @@ PKG_PATHS=(
   weed_optimizer_framework/tools/inc_autopilot
   weed_optimizer_framework/tools/inc
   weed_optimizer_framework/tools/model_router.py
+  # the /inc page and /api/health/inc (their health rows read the stream state)
+  weed_optimizer_framework/tools/inc_dashboard.py weed_optimizer_framework/tools/inc_dashboard_page.py
   weed_optimizer_framework/tools/cwd12_species.py
   weed_optimizer_framework/tools/brain/policy_actions.json
   weed_optimizer_framework/tools/brain/approvals.py
