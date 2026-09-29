@@ -1536,6 +1536,23 @@ The existing `test_inc_splits`, `test_funnel_leak`, `test_funnel_embed`, `test_f
 
 **How it was verified.** `tests/test_inc2_splits.py` `test_near_both_directions`: a pair that only the reverse direction finds (none of the row's variants within 6 bits of the earlier dHash; the earlier image's rot90 3 bits from the row's dHash) is a hit with variant `earlier:rot90`; `disjoint_problems` flags that pair and not the base without the row; a forward hit and a miss behave as before. The whole splits suite passes. The real build is the platform's next L23 build.
 
+#### Live incidents of 2026-09-29, after the lock
+
+- **rl-b could not be priced (funnel).** `levers.estimate_funnel` indexed `su_ledger.rates()` as su_rates.json's raw tree; the first live rl-b proposal raised `KeyError: 'h100'` on every tick. It now reads `rates.<family>.su_per_gpu_hour` (commit 24d24f0; `tests/test_funnel_ap_units.py`).
+- **L15 discovery wrote to the cluster's path on the lab.** The ticker's environment sets no INC_DIR, and `inc.common` defaults to /ocean. Two discoveries (targeted at CutleafGroundcherry, PricklySida and Sicklepod, the species base_v2 added nothing for) failed at `intake_lock` with PermissionError, and the stop-loss held DATA. The lab collector verbs now pass `--inc-dir` (commit 2fe0e0d; replays S1b, S22). After the fix, discovery listed 385 candidates.
+- **The scorer sidecar's recompute check ran in the wrong image order.**
+  - `ap_per_class` sorts with `np.argsort(-conf)`, which is not stable, so predictions with equal confidence are ranked by input order. The sidecar concatenated per-image arrays in exam key order; DetMetrics concatenates them in the validator's order. The "exact" recompute was therefore 0.0007–0.0012 off.
+  - Stage A (pilot_v4) failed all three units at the sidecar stage, and the platform paused the stream (D5, not transient).
+  - The canary's sidecar failed the same way, so DCAN held TRAIN, although the canary reproduced b0_v1 on dev within one sd.
+  - `check_capture` recomputes in the validator's order, still to 1e-9 (commit 334f76b; `tests/test_inc2_gate3.py` with tied confidences).
+  - Recovery, by a person as D5 and DCAN ask: the pilot_v4 units were unblocked (driver `unblock --all`, with the reason in its ledger; the runs re-score and nothing is retrained); the canary's run was re-run on `run_inc2_job.sh` with its own submission list (it re-scores the verified weights and writes the sidecar); then `inc2.baseline canary-verdict`.
+  - Baselines b_v2, b_v2_s640 and b_v2_m640 recorded failed sidecars without failing (by design), so their dev SE is not yet available.
+  - Verified on the cluster after the fix:
+    - the canary's re-scored sidecar recomputes the score exactly (`full_recompute_max_abs_diff` 0.0; class-restricted 0.0031);
+    - `canary-verdict` passes (dev 0.8107 against 0.8082 ± 0.0063, sidecar ok, production).
+  - Its dev bootstrap SE per species runs from 0.0225 (Waterhemp) to 0.0961 (Goosegrass), with CutleafGroundcherry 0.074 and PalmerAmaranth 0.073.
+  - Treated as independent across species, the 12-class dev mean has a sampling SE of about 0.016, several times the seed sd (0.003–0.006).
+
 ### Build note (group C)
 
 **What was built.** `inc2/step1_stream.py` (verbs `bootstrap`, `admit --intake <batch>` / `admit --registry [--slugs]`, `backfill`, `knowntruth`, `rejoin --slug`, `serve-holds [--hold h6_scan|licence|funnel_F9]` (also accepted as `scan-holds`, the name group F's L17 form submits), `status`, `verify`), `inc2/mask.py` (`decide`, `mask_except`), `run_inc2_stream.sh`; tests `test_inc2_step1_stream.py` and `test_inc2_mask.py`.

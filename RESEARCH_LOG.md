@@ -37,6 +37,10 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 - Five dev species have 31 boxes each. Their dev changes do not survive on test: CutleafGroundcherry +0.046 on dev and −0.053 on test; PalmerAmaranth +0.062 and +0.007.
 - Only 7 of the 12 species move in the same direction on both.
 - The seed sd measures training noise, not the sampling noise of a 617-image dev set. A dev gain of this size is therefore not evidence of a test gain. The loop's gate decides on dev, so its decisions need dev's image-level bootstrap SE as well as seed noise.
+- **Measured later the same day** (the canary's scorer sidecar, 1,000 image resamples):
+  - dev's per-species SE runs from 0.022 to 0.096;
+  - treated as independent across species, the 12-class dev mean has an SE of about 0.016 (unpaired; a paired difference is smaller and needs a paired bootstrap);
+  - so the +0.0135 dev gain is within dev's own sampling noise.
 
 **What it implies for the loop.**
 - Bulk data from a neighbouring dataset, skewed toward species that are already strong and half unscored, does not move the metric.
@@ -46,6 +50,12 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
   - YOLO11n could not absorb the heavier, skewed base; YOLO11s can.
   - The weakest species are now Carpetweed (0.728), SpottedSpurge (0.803) and Purslane (0.805).
   - Not yet separated: how much of the gain is capacity and how much is data. There is no YOLO11s arm on train_core alone.
+- **YOLO11m on base_v2 (3 seeds): test 0.8786 ± 0.0018** (seeds 0.8769, 0.8804, 0.8785), the best sealed result so far.
+  - Gap to 0.90: 0.021. Class-agnostic 0.8901, dev 0.8524.
+  - Capacity curve on the same 6,811 images: n 0.8468 → s 0.8653 → m 0.8786.
+  - m raises nearly every species: CutleafGroundcherry 0.876, PricklySida 0.924, PalmerAmaranth 0.926.
+  - The remaining gap sits in small, prostrate weeds: Carpetweed 0.736, SpottedSpurge 0.810, Purslane 0.828.
+  - Carpetweed stays flat from n to m (0.709 → 0.736) although its training boxes grew from 530 to 1,204. Hypothesis: 640 px resolves these plants too coarsely. No arm above 640 px exists yet.
 
 ## 2026-09-29 — The "leakage" was a calibration error: at the funnel's threshold, 64 % of clean same-domain images looked like copies
 
