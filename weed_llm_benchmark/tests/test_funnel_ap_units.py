@@ -857,11 +857,11 @@ def test_campaign_da():
            if e["event"] == "da_not_recorded"])
     pre_raw = PREREG.read_bytes()
     from weed_optimizer_framework.tools.funnel import domain as FD
-    check("  its header records the pre-registration (sha256 and core sha256), the contract's sha256, the "
-          "domain config and the digest it answers (runner 1.2)",
+    check("  its header records the pre-registration (sha256 and core sha256), the contract's sha256 (the one "
+          "in force: its contract amendment's), the domain config and the digest it answers (runner 1.2)",
           rec.get("prereg", {}).get("sha256") == hashlib.sha256(pre_raw).hexdigest()
           and rec["prereg"]["core_sha256"] == FD.prereg_core_sha256(json.loads(pre_raw))
-          and rec.get("contract", {}).get("sha256") == jload(PREREG)["contract"]["sha256"]
+          and rec.get("contract", {}).get("sha256") == FD.contract_sha256_of(jload(PREREG))
           == hashlib.sha256(CONTRACT.read_bytes()).hexdigest()
           and rec.get("domain") == "weed" and rec.get("domain_config", {}).get("sha256")
           and rec.get("inputs", {}).get("digest", {}).get("sha256") == da["digest_sha256"],

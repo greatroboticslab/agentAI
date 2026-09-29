@@ -93,7 +93,8 @@ print("draw and lock")
 res = DR.draw(PREREG, fd, adapter, dinov2=W.fake_dinov2, testing=True)
 pre = D.load_prereg(PREREG)
 lock = pre.sample_lock
-check("drawn and locked", res["status"] == "drawn" and lock is not None and lock["id"] == "A1")
+check("drawn and locked (the lock takes the next free id after the prereg's amendment A2: A3)",
+      res["status"] == "drawn" and lock is not None and lock["id"] == D.next_amendment_id(pre0) == "A3")
 check("core sha unchanged by the lock", pre.core_sha256 == pre0.core_sha256)
 for name, fn in (("sample", "sample_v1.csv"), ("key", "sample_v1_key.jsonl"), ("frames", "frames_v1.json"),
                  ("name_status_v2", "name_status_v2.json")):
@@ -234,7 +235,8 @@ print("reruns and the lock")
 before = {n: F.file_record(fd / n)["sha256"] for n in ("sample_v1.csv", "sample_v1_key.jsonl", "frames_v1.json")}
 again = DR.draw(PREREG, fd, adapter, dinov2=W.fake_dinov2, testing=True)
 check("a second draw with the same inputs is a no-op", again["status"] == "no-op" and
-      {n: F.file_record(fd / n)["sha256"] for n in before} == before and len(D.load_prereg(PREREG).amendments) == 1)
+      {n: F.file_record(fd / n)["sha256"] for n in before} == before
+      and len(D.load_prereg(PREREG).amendments) == len(pre0.amendments) + 1)
 changed_known = W.known_truth(dom)
 changed_known["KT7"] = changed_known["KT7"][1:]
 check("a locked rerun whose known truth changed refuses (SampleLocked)",
@@ -274,7 +276,7 @@ tmp2 = TMP / "second"
 p2 = tmp2 / "prereg_v1.json"
 p2.write_text(json.dumps(pre0.raw, indent=1))
 for n in ("census_v1.json", "ledger.jsonl", "name_status_v2.json", "funnel_ledger.json", "guard_pairs_v1.csv",
-          "leak_pairs_v1.csv"):
+          "leak_pairs_v1.csv", "leak_pairs_v2.csv", "leak_v2.json"):
     shutil.copy(fd / n, tmp2 / n)
 census = json.loads((tmp2 / "census_v1.json").read_text())
 census["name_status_v2"]["path"] = str(tmp2 / "name_status_v2.json")

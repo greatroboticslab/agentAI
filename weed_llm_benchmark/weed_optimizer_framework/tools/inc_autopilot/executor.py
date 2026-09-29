@@ -2670,7 +2670,8 @@ FUNNEL_PULL_FILES = ("funnel/census_v1.json", "funnel/name_status_v2.json", "fun
                      "funnel/audit_v1.json", "funnel/audit_v1.md", "funnel/class_maps.json",
                      "funnel/relation_geometry_v1.json", "funnel/relation_audit_v1.json",
                      "funnel/judge_qualification.json", "funnel/rl_qualification.json", "funnel/leak_v1.json",
-                     "funnel/frames_v1.json", "funnel/sample_v1.csv", "funnel/sheets_v1/", "step1_r1/recovery.json")
+                     "funnel/leak_v2.json", "funnel/frames_v1.json", "funnel/sample_v1.csv", "funnel/sheets_v1/",
+                     "step1_r1/recovery.json")
 FUNNEL_PULL_RECOVERY = "step1_r1/recovery.json"      # shipped to the evidence as funnel/recovery.json
 # The pre-registration comes back only when the cluster's copy has grown by
 # amendments (the sample lock) over the same core; a person commits it.

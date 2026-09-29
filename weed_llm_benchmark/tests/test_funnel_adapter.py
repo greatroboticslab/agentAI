@@ -542,8 +542,9 @@ def test_world():
     msg = raises(lambda: A.census(pre, str(alt), fd, tax, known_items=known, force=True, testing=True),
                  (AdapterError, D.DomainError))
     check("a config whose stages differ from the adapter's is refused", msg is not None, msg)
-    D.append_amendment(pre, {"id": "A1", "kind": "sample_lock", "date": "2026-09-28",
-                             "prereg_core_sha256": D.load_prereg(pre).core_sha256, "sample_sha256": "0" * 64})
+    D.append_amendment(pre, {"id": D.next_amendment_id(D.load_prereg(pre)), "kind": "sample_lock",
+                             "date": "2026-09-28", "prereg_core_sha256": D.load_prereg(pre).core_sha256,
+                             "sample_sha256": "0" * 64})
     c3 = A.census(pre, "weed", fd, tax, known_items=known, testing=True)
     check("after the sample lock, the same inputs are still a no-op", c3["built_utc"] == c["built_utc"])
     msg = raises(lambda: A.census(pre, "weed", fd, tax, force=True, testing=True), SampleLocked)

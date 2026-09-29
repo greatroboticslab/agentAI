@@ -27,6 +27,9 @@ gold and one qualified kNN judge's scores):
   * a genus-unsure answer masks its box (the image then recovers nothing);
   * the identity check failing masks every Ragweed box under R-A;
   * H1 not supported recovers nothing under R-A;
+  * the copy detector's record is leak_v2.json (contract §14 A2): with it
+    missing, recovery refuses rather than use leak_v1.json's quarantine; with
+    it, its quarantine applies and version 1's does not;
   * a quarantined source contributes no image, even its clean ones (M9); a
     source without a licence is refused; a not-recoverable source and base
     B's images are left out;
@@ -275,14 +278,32 @@ def main():
     ad._guard = world["guard_clean"]
 
     # the leak record: a failed calibration or an H6(b) incident stops F9 before anything is planned
-    lk = read_json(fd / "leak_v1.json")
+    lk = read_json(fd / "leak_v2.json")
     for label, bad_leak in (("a failed copy-detector calibration", dict(lk, calibration={"ok": False})),
                             ("an H6(b) incident", dict(lk, h6b=dict(lk["h6b"], incident=True, base_copy=True))),
-                            ("no H6(b) record", {k: v for k, v in lk.items() if k != "h6b"})):
-        write_json_atomic(fd / "leak_v1.json", bad_leak)
+                            ("no H6(b) record", {k: v for k, v in lk.items() if k != "h6b"}),
+                            ("a record stating another detector version", dict(lk, detector_version=1))):
+        write_json_atomic(fd / "leak_v2.json", bad_leak)
         check("refused: %s" % label, raises(lambda: RC.run(prereg, domain, fd, out, pols, ad, detector=no_copy,
                                                            force=True), RecoverError))
-    write_json_atomic(fd / "leak_v1.json", lk)
+    write_json_atomic(fd / "leak_v2.json", lk)
+
+    # contract §14 A2: once the amendment is in the prereg, leak_v1.json's quarantine is never used for recovery
+    check("the prereg's amendment A2 requires copy detector version 2", D.leak_detector_version(prereg) == 2)
+    v2_bytes = (fd / "leak_v2.json").read_bytes()
+    os.unlink(fd / "leak_v2.json")
+    msg = raises(lambda: RC.run(prereg, domain, fd, out, pols, ad, detector=no_copy, force=True), RecoverError)
+    check("with leak_v2.json missing, recovery refuses rather than use leak_v1.json's quarantine (A2)",
+          msg and "A2" in msg and "leak_v1.json" in msg and (fd / "leak_v1.json").is_file(), msg)
+    (fd / "leak_v2.json").write_bytes(v2_bytes)
+    doc_v2 = RC.run(prereg, domain, fd, out, pols, ad, detector=no_copy, force=True)
+    rows_v2 = {r["key"]: r for r in read_jsonl(out / "recovered_pool.jsonl")}
+    check("with leak_v2.json: its quarantine applies (QS left out), not version 1's (XS, which version 1 alone "
+          "quarantined, recovers), and recovery.json records leak_v2.json as its input",
+          doc_v2["quarantined_sources"] == [FX.QS] and "xs_syn1" in rows_v2
+          and not any(k.startswith("qs_") for k in rows_v2)
+          and doc_v2["inputs"]["leak"]["path"].endswith("leak_v2.json"), (doc_v2.get("quarantined_sources"),
+                                                                         doc_v2["inputs"].get("leak")))
 
     # --------------------------------------------------------------- gates
     au0 = read_json(fd / "audit_v1.json")

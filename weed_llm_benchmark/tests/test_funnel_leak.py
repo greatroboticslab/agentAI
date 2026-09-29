@@ -59,7 +59,39 @@ Pinned on that world:
     image it cannot describe;
   * a sample-lock amendment leaves leak_v1.json current (prereg core);
   * an empty 7-10-bit negative set fails the calibration; a row that cannot
-    be described is unscanned, and the base and increments are not cleared.
+    be described is unscanned, and the base and increments are not cleared;
+  * once the prereg's amendment A2 requires detector version 2, leak_v1.json
+    is never rewritten (not even with force).
+
+Detector version 2 (contract §14 A2), on a same-domain world: a descriptor
+with a scene part (the palette every photograph of a scene shares) and a
+photograph part (the luminance layout), so another photograph of a scene
+sits near 0.8 and a copy near 1; evaluation images with capture sessions;
+train_core photographs of the same scenes in other sessions, plus near
+frames of a test image in its session and of a dev image on its date:
+  * the set rule on its own: one hit in 15 images at a 1 % rate is chance, 5
+    are not, a dHash hit always flags, a large source within its rate is not
+    flagged, no rate fails closed; threshold_for;
+  * version 1 passes its per-pair calibration and quarantines the
+    same-scene source, the base and a same-scene increment;
+  * version 2 reuses every descriptor file leak_v1 wrote (no embedder call),
+    leaves leak_v1.json and its files unchanged, rebuilds version 1's
+    threshold as its floor and sets a higher one from per-image negatives;
+    its tiers (hard, session-disjoint, provenance-disjoint) and their
+    one-sided 97.5 % bounds are recorded;
+  * a near frame in an evaluation image's session, or on its date, is scored
+    without that image (and would reach the copy level with it);
+  * the same-scene set that version 1 flags is cleared; crop copies the dHash
+    misses are still caught per image, and their source is flagged by the
+    binomial rule alone; a JPEG copy flags its source by dHash; base B and
+    the same-scene increment are cleared, the increment with the copy is an
+    incident; both readings side by side, version 1's reproduced set by set;
+    no evaluation path in leak_v2.json; detect under version 2; the pairs
+    file keeps version 1's negative pairs; rerun no-op, changed inputs
+    refuse;
+  * without leak_v1.json version 2 describes into its own files and reaches
+    the same readings; an adapter without capture sessions leaves the hard
+    tier empty and the calibration refuses.
 
 Run:  python3 tests/test_funnel_leak.py
 """
@@ -73,6 +105,7 @@ import shutil
 import sys
 import tempfile
 import types
+import funnel_prereg as FPR  # noqa: E402
 
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="funnel_leak_"))
 os.environ["INC_DIR"] = str(TMP / "inc")
@@ -88,7 +121,10 @@ CONTRACT = REAL_REPO / "docs" / "FUNNEL_AUDIT.md"
 for src, dst in ((CONTRACT, TMP / "repo" / "docs" / "FUNNEL_AUDIT.md"),
                  (REAL_INC / "funnel" / "prereg_v1.json", TMP / "inc" / "funnel" / "prereg_v1.json")):
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dst)
+    if dst.name == "prereg_v1.json":
+        FPR.write_pre_draw(dst, src)
+    else:
+        shutil.copyfile(src, dst)
 
 FAILURES, SKIPS = [], []
 
@@ -534,9 +570,13 @@ def test_run(L, D):
     check("a rerun on the same inputs is a no-op", e2.calls == 0 and doc2 == json.loads(text))
     pool_rows_saved = ad.pool_rows
     ad.pool_rows = lambda sources=None: [r for r in pool_rows_saved(sources) if r["key"] != "clean_1"]
-    check("changed inputs refuse without force",
+    check("changed inputs refuse, even with force: once the prereg's amendment A2 requires detector version 2, "
+          "leak_v1.json is the first reading and is never rewritten",
           raises(lambda: L.run(pre, dom, fdir, ad, embedder=HueEmbedder(), procs=1, testing=True), L.LeakError,
-                 "--force") is not None)
+                 "never rewritten") is not None
+          and raises(lambda: L.run(pre, dom, fdir, ad, embedder=HueEmbedder(), procs=1, testing=True, force=True),
+                     L.LeakError, "never rewritten") is not None
+          and (fdir / "leak_v1.json").read_text() == text and D.leak_detector_version(pre) == 2)
     ad.pool_rows = pool_rows_saved
     pre_path = TMP / "inc" / "funnel" / "prereg_v1.json"
     D.append_amendment(pre_path, {"id": "T-lock", "kind": "sample_lock", "date": "2026-09-28"})
@@ -672,6 +712,318 @@ def _estimate_stand_in():
     return True
 
 
+# ============================================================ detector version 2 (contract §14 A2)
+SAME = "rf_samescene__plots"
+EMB = "rf_embcopies__x"
+V2_ROOT = "v2"
+
+
+class SceneEmbedder(HueEmbedder):
+    """A descriptor with a scene part and a photograph part: the hue
+    histogram (weight 0.8 of the squared norm: every photograph of a scene
+    shares its palette) and the mean-centred 9 x 8 luminance layout (weight
+    0.2: it tells two photographs of one scene apart). A copy keeps both
+    (cosine near 1); another photograph of the same scene keeps the palette
+    only (cosine near 0.8); a flip or rotation moves the layout, so those
+    families' cosines fall to the scene level, as a real descriptor's
+    hardest families do."""
+    dim = N_BINS + 72
+
+    def __call__(self, pils):
+        self.calls += 1
+        out = []
+        for p in pils:
+            h = HueEmbedder.__call__(self, [p])[0].astype(np.float64)
+            self.calls -= 1
+            lum = np.asarray(p.convert("L").resize((9, 8), Image.BILINEAR), dtype=np.float64).reshape(-1)
+            lum = lum - lum.mean()
+            nrm = np.linalg.norm(lum)
+            lum = lum / nrm if nrm > 0 else lum
+            out.append(np.concatenate([h * np.sqrt(0.8), lum * np.sqrt(0.2)]).astype(np.float32))
+        return np.stack(out)
+
+
+def build_world_v2(L, root):
+    """The version 2 world (module docstring of the v2 checks): evaluation
+    images with capture sessions over five scenes; train_core photographs of
+    the same scenes in other sessions and dates, plus near frames of a test
+    image in its own session and of a dev image on its date (other camera);
+    a same-scene source that copies nothing; a source of crop copies; a
+    source with a JPEG copy; a clean source; the provenance-disjoint group."""
+    from weed_optimizer_framework.tools.inc import common as C
+    from weed_optimizer_framework.tools.funnel.adapters import inc_step1 as AD
+    root = pathlib.Path(root)
+    triples = hue_triples(40)
+    scenes, others = triples[:5], iter(triples[5:])
+    img_dir = root / "images"
+    eval_rows, eval_meta = {}, {}
+    plan = (("dev", "20210702_Cam_D0", 3), ("dev", "20210702_Cam_D1", 3), ("test", "20210703_Cam_T0", 3),
+            ("ood22", "20220711_Cam_O0", 3))
+    i = 0
+    for split, sess, n in plan:
+        for f in range(n):
+            g, hues = grid(20000 + i), scenes[i % 5]
+            key = "%s_%s_%d" % (split, sess[-2:], f)
+            p = save(render(g, hues), root / "eval" / split / ("%s.png" % key))
+            eval_rows.setdefault(split, []).append(mrow(p, key, "cottonweeddet12/%s" % split, sess))
+            eval_meta[key] = (split, sess, g, hues, p)
+            i += 1
+    ref_rows, near_frames = [], {}
+    for k in range(100):
+        g, hues = grid(21000 + k), scenes[k % 5]
+        p = save(render(g, hues), img_dir / "ref" / ("r%03d.png" % k))
+        ref_rows.append(mrow(p, "core_%03d" % k, "cottonweeddet12/train", "20210701_Cam_S%d" % (k % 10)))
+    # near frames of an evaluation image, 8-12 dHash bits from it: same session as the test images, and the
+    # dev images' date under another camera (their own image must be left out of their score)
+    for k, (ekey, sess) in enumerate([("test_T0_%d" % (j % 3), "20210703_Cam_T0") for j in range(5)]
+                                     + [("dev_D0_%d" % (j % 3), "20210702_Cam_X1") for j in range(5)]):
+        _s, _es, g0, h0, _p = eval_meta[ekey]
+        img, bits = planted_near(L, g0, h0, h0, set(range(8, 13)), 22000 + k)
+        p = save(img, img_dir / "ref" / ("near%02d.png" % k))
+        key = "core_near_%02d" % k
+        ref_rows.append(mrow(p, key, "cottonweeddet12/train", sess))
+        near_frames[key] = (ekey, bits)
+    pool = []
+    for k in range(6):
+        pool.append(mrow(save(render(grid(23000 + k), next(others)), img_dir / "mh" / ("m%d.png" % k)),
+                         "mh_%d" % k, MH))
+    for k in range(6):
+        img, _d = planted_near(L, grid(21000 + k), scenes[k % 5], next(others), set(range(7, 11)), 24000 + k)
+        pool.append(mrow(save(img, img_dir / "mh" / ("n%d.png" % k)), "mh_near_%d" % k, MH))
+    for k in range(15):
+        pool.append(mrow(save(render(grid(25000 + k), scenes[k % 5]), img_dir / "same" / ("s%02d.png" % k)),
+                         "same_%02d" % k, SAME))
+    ekeys = sorted(eval_meta)
+    emb_copies = {}
+    for k in range(6):
+        # crop copies the dHash half misses (> 6 bits under every variant): only the embedding can find them
+        ekey = ekeys[(2 * k) % len(ekeys)]
+        with Image.open(eval_meta[ekey][4]) as im:
+            src_img = im.convert("RGB")
+        h0 = L.dhash_variants(src_img)["id"]
+        for s in range(200):
+            aug, _p = L.augment(src_img, "crop", np.random.default_rng(26000 + 1000 * k + s), L.FAMILY_DEFAULTS["crop"])
+            hv = L.dhash_variants(aug)
+            if min(bin(hv[v] ^ h0).count("1") for v in L.VARIANTS) > 6:
+                break
+        pool.append(mrow(save(aug, img_dir / "emb" / ("e%d.png" % k)), "emb_copy_%d" % k, EMB))
+        emb_copies["emb_copy_%d" % k] = ekey
+    with Image.open(eval_meta["dev_D1_1"][4]) as im:
+        aug, _p = L.augment(im.convert("RGB"), "jpeg", np.random.default_rng(27000), L.FAMILY_DEFAULTS["jpeg"])
+    pool.append(mrow(save(aug, img_dir / "tuf" / "jpeg_copy.png"), "tuf_jpeg_copy", TUF))
+    for k in range(3):
+        pool.append(mrow(save(render(grid(28000 + k), next(others)), img_dir / "tuf" / ("c%d.png" % k)),
+                         "tuf_clean_%d" % k, TUF))
+    for k in range(6):
+        pool.append(mrow(save(render(grid(29000 + k), next(others)), img_dir / "clean" / ("c%d.png" % k)),
+                         "clean_%d" % k, CLEAN))
+    pool.sort(key=lambda r: r["key"])
+    by_key = {r["key"]: r for r in pool}
+    extra = mrow(save(render(grid(29900), scenes[1]), img_dir / "extra" / "x.png"), "extra_same", "rf_notinpool__x")
+    base = [dict(r) for r in ref_rows] + [by_key["same_%02d" % k] for k in range(5)] + \
+        [by_key["clean_0"], by_key["clean_1"], extra]
+    increments = {"S1": [by_key["same_%02d" % k] for k in range(5, 9)], "S2": [by_key["clean_2"], by_key["clean_3"]],
+                  "S3": [by_key["tuf_jpeg_copy"], by_key["clean_4"]], "base_B": [dict(r) for r in base]}
+    C.write_manifest(C.manifest_path(REF), ref_rows)
+    per_slug = {SAME: {"kept": 15, "near_eval_by_split": {"ood22": 1}},
+                EMB: {"kept": 6, "near_eval_by_split": {"dev": 2}},
+                TUF: {"kept": 4, "near_eval_by_split": {"dev": 1}},
+                CLEAN: {"kept": 6, "near_eval_by_split": {}},
+                MH: {"kept": 12, "near_eval_by_split": {}}}
+    ps = C.INC_DIR / "step1" / "pool_summary.json"
+    ps.parent.mkdir(parents=True, exist_ok=True)
+    ps.write_text(json.dumps({"per_slug": per_slug}))
+    ad = types.ModuleType("fake_leak_adapter_v2")
+    ad.__file__ = str(HERE)
+    ad.pool_rows = lambda sources=None: [dict(r) for r in pool if sources is None or r["source"] in sources]
+    ad.base_rows = lambda: [dict(r) for r in base]
+    ad.increment_rows = lambda exp: {k: [dict(r) for r in v] for k, v in increments.items()}
+    ad.eval_rows = lambda: {s: [dict(r) for r in v] for s, v in eval_rows.items()}
+    ad.capture_session = AD.capture_session             # the weed adapter's own session key
+    return ad, {"eval_meta": eval_meta, "near_frames": near_frames, "emb_copies": emb_copies, "by_key": by_key,
+                "ref_rows": ref_rows, "pool": pool, "eval_rows": eval_rows}
+
+
+def test_set_verdict(L):
+    print("the set rule (contract §14 A2)")
+    v = L.set_verdict(15, 1, 0, 0.01)
+    check("one embedding hit in a 15-image source at a 1 % per-image rate is chance: not flagged",
+          not v["flagged"] and v["expected_false_hits"] == 0.15 and v["p_value"] > 0.1, v)
+    v = L.set_verdict(15, 5, 0, 0.01)
+    check("five hits of 15 at 1 % are improbable (P < 0.001): flagged, with observed and expected hits",
+          v["flagged"] and v["p_value"] < 0.001 and v["hits"] == 5 and "expected by chance" in v["why"][0], v)
+    v = L.set_verdict(2000, 1, 1, 0.01)
+    check("one hit within 6 dHash bits flags a set of any size", v["flagged"] and "dHash" in v["why"][0], v)
+    v = L.set_verdict(6341, 60, 0, 0.0122)
+    check("a large source's hits within what its rate predicts are not flagged (the version 1 failure mode)",
+          not v["flagged"] and v["expected_false_hits"] > 60, v)
+    v = L.set_verdict(15, 1, 0, None)
+    check("without a per-image rate any embedding hit flags (fail closed)", v["flagged"] and "fail closed" in v["why"][0])
+    check("threshold_for: the smallest 6-decimal cosine with at most floor(1 % of n) scores at or above it",
+          L.threshold_for([0.5] * 98 + [0.9, 0.8], 0.01) == 0.800001
+          and L.threshold_for([0.5] * 50, 0.01) == 0.500001 and L.threshold_for([], 0.01) is None,
+          (L.threshold_for([0.5] * 98 + [0.9, 0.8], 0.01), L.threshold_for([0.5] * 50, 0.01)))
+
+
+def test_v2(L, D):
+    print("detector version 2 on a same-domain world (contract §14 A2)")
+    from weed_optimizer_framework.tools.inc import common as C
+    dom = D.load("weed")
+    pre = D.load_prereg(TMP / "inc" / "funnel" / "prereg_v1.json")
+    check("the prereg's amendment A2 requires copy detector version 2",
+          D.leak_detector_version(pre) == 2 and (D.leak_detector_amendment(pre) or {}).get("id") == "A2")
+    root = TMP / V2_ROOT
+    ad, w = build_world_v2(L, root)
+    fd = root / "funnel"
+    fd.mkdir(parents=True, exist_ok=True)
+    emb = SceneEmbedder()
+    v1 = L.run(pre, dom, fd, ad, embedder=emb, procs=1, testing=True)
+    v1_text = (fd / "leak_v1.json").read_text()
+    v1_files = {k: C.sha256_file(v["path"]) for k, v in v1["descriptor_files"].items()}
+    v1_files["eval"] = C.sha256_file(v1["eval_descriptors"]["path"])
+    theta1 = v1["calibration"]["cos_threshold"]
+    check("version 1 passes its per-pair calibration on this world", v1["calibration"]["ok"], v1["calibration"]["why"])
+    check("  and quarantines the same-scene source, the base and a same-scene increment on scene similarity alone",
+          SAME in v1["h6a"]["quarantine"] and v1["h6b"]["base_copy"] and v1["h6b"]["increment_copies"]["realloop_v1:S1"] > 0,
+          (v1["h6a"]["quarantine"], v1["h6b"]))
+    e2 = SceneEmbedder()
+    doc = L.run_v2(pre, dom, fd, ad, embedder=e2, procs=1, testing=True)
+    cal = doc["calibration"]
+    check("version 2 calibrates (per image, hard tier >= min_negatives) and writes leak_v2.json, funnel-leak/2",
+          cal["ok"] and doc["status"] == "complete" and doc["format"] == "funnel-leak/2"
+          and doc["detector_version"] == 2 and (fd / "leak_v2.json").is_file(), cal.get("why"))
+    check("the descriptor files leak_v1 wrote are reused (sha256 match): nothing is described again",
+          e2.calls == 0 and all(v.get("from") == "leak_v1" for v in doc["descriptor_files"].values())
+          and doc["eval_descriptors"]["sha256"] == v1_files["eval"], (e2.calls, doc["descriptor_files"]))
+    check("leak_v1.json and every file it records are left unchanged",
+          (fd / "leak_v1.json").read_text() == v1_text
+          and all(C.sha256_file(v["path"]) == v1_files[k] for k, v in v1["descriptor_files"].items()))
+    theta2 = cal["cos_threshold"]
+    check("version 1's threshold is rebuilt from its seeds and descriptors and is the floor; version 2's is above it",
+          cal["floor"] == theta1 and cal["v1_threshold"]["reproduced"] is True and theta2 > theta1, (theta1, theta2))
+    neg = cal["negatives"]
+    check("the hard tier: every reference image with a capture session, each scored by its maximum over the "
+          "evaluation images outside its session and date; the constraining tiers hold <= 1 % false positives",
+          neg["hard"]["n"] == 110 and neg["hard"]["constraining"] and neg["hard_session_disjoint"]["n"] == 100
+          and neg["provenance_disjoint"]["n"] == 12
+          and all(neg[t]["false_hits"] <= 0.01 * neg[t]["n"] for t in cal["constraining"]), neg)
+    check("  each tier's rate carries its one-sided 97.5 % upper bound, at version 2's threshold and at version 1's",
+          all(isinstance(neg[t]["ub"], float) and neg[t]["ub"] > neg[t]["fpr"] for t in ("hard", "provenance_disjoint"))
+          and neg["hard"]["at_v1_threshold"]["false_hits"] > 0.5 * neg["hard"]["n"]
+          and cal["p_false"] == neg["hard"]["ub"], neg["hard"])
+    with open(fd / "leak_negatives_v2.csv", newline="") as fh:
+        nrows = {r["key"]: r for r in csv.DictReader(fh) if r["tier"] == "hard"}
+    ok_excl = True
+    for key, (ekey, bits) in w["near_frames"].items():
+        r = nrows.get(key)
+        own = w["eval_meta"][ekey]
+        ok_excl &= (r is not None and bits > 6 and r["eval_key"] != ekey
+                    and w["eval_meta"][r["eval_key"]][1][:8] != own[1][:8] and float(r["cos"]) < theta2)
+    check("a near frame of an evaluation image in its session, or on its date, is scored without that image "
+          "(its nearest is another date's image, below the threshold)", ok_excl,
+          {k: nrows.get(k) for k in w["near_frames"]})
+    ev_idx = L.eval_index(ad, SceneEmbedder(), fd / "leak_eval_desc.npz")
+    rows = [w["ref_rows"][-10]]
+    res = L.E.embed_images(rows, None, SceneEmbedder(), prepare=L.prepare_hashed, n_hashes=8)
+    best, _a, _b, _ba, _bv = L.per_image(L._normalise(res["X"]), res["H"], [True], ev_idx)
+    check("  (the same frame scored against every evaluation image would reach the copy level)",
+          float(best[0]) > theta2 + 0.05, (float(best[0]), theta2))
+    scans = doc["scans"]
+    same = scans["source:%s" % SAME]
+    check("the same-scene source: version 1's rule flags it, version 2 clears it (hits within chance)",
+          same["v1_rule"]["copy_found"] and same["v1_rule"]["copies"] >= 10 and not same["copy_found"]
+          and SAME not in doc["h6a"]["quarantine"] and same["dhash_hits"] == 0
+          and same["embedding_hits"] <= same["expected_false_hits"] + 2, same["verdict"])
+    embs = scans["source:%s" % EMB]
+    found = {e["key"]: e["eval_key"] for e in embs["listed"]}
+    check("augmented (crop) copies the dHash misses are still caught by version 2's image rule, each with its "
+          "evaluation image (at least 5 of 6; the crop family's recall at the new threshold is %s)"
+          % cal["positives"]["crop"]["recall"],
+          len(found) >= 5 and all(w["emb_copies"].get(k) == v for k, v in found.items()), (found, w["emb_copies"]))
+    check("  and their source is flagged by the set rule on the embedding hits alone (binomial, P < 0.001)",
+          embs["copy_found"] and embs["dhash_hits"] == 0 and embs["p_value"] < 0.001 and EMB in doc["h6a"]["quarantine"],
+          embs["verdict"])
+    tuf = scans["source:%s" % TUF]
+    check("a JPEG copy within 6 dHash bits flags its source whatever the count",
+          tuf["copy_found"] and tuf["dhash_hits"] >= 1 and TUF in doc["h6a"]["quarantine"]
+          and any(e["key"] == "tuf_jpeg_copy" and e["eval_key"] == "dev_D1_1" for e in tuf["listed"]), tuf["verdict"])
+    check("clean sources are cleared under both readings",
+          not scans["source:%s" % CLEAN]["copy_found"] and not scans["source:%s" % CLEAN]["v1_rule"]["copy_found"])
+    h6b = doc["h6b"]
+    check("H6(b): base B (same-scene images) and the same-scene increment are cleared, the increment holding the "
+          "JPEG copy is flagged; each set records hits against the expected count",
+          not h6b["base_copy"] and not h6b["increment_flagged"]["realloop_v1:S1"]
+          and h6b["increment_flagged"]["realloop_v1:S3"] and h6b["incident"]
+          and scans["base_B"]["v1_rule"]["copy_found"] and "expected_false_hits" in h6b["sets"]["base_B"]
+          and h6b["same_as_base"] == ["realloop_v1:base_B"], h6b)
+    check("the source rule counts every scanned image of a source, the base's extra image included",
+          doc["h6a"]["sources"]["rf_notinpool__x"]["images"] == 1
+          and not doc["h6a"]["sources"]["rf_notinpool__x"]["flagged"], doc["h6a"]["sources"].get("rf_notinpool__x"))
+    rd = doc["readings"]
+    check("both readings side by side: version 1 as recorded (the invalid first reading) and version 2",
+          rd["v1"]["file"]["sha256"] == C.sha256_file(fd / "leak_v1.json") and rd["v1"]["h6a"]["quarantine"] ==
+          v1["h6a"]["quarantine"] and "invalid first reading" in rd["v1"]["status"]
+          and rd["v2"]["h6a"]["quarantine"] == doc["h6a"]["quarantine"] and rd["v2"]["cos_threshold"] == theta2, rd)
+    check("  this run's version 1 rule reproduces leak_v1.json's copy count in every scanned set",
+          rd["v1"]["reproduced_by_this_run"]["scans"] is True
+          and rd["v1"]["reproduced_by_this_run"]["sets_compared"] == len(scans),
+          [(k, v["v1_rule"]) for k, v in scans.items() if not v["v1_rule"].get("reproduced")])
+    check("recall at version 2's threshold is recorded per family; flips and rotations are caught by the dHash "
+          "variants; a family below 0.95 would be a known limit, not a refusal",
+          all(cal["positives"][f]["n"] == 110 for f in L.FAMILIES)
+          and cal["positives"]["flip"]["recall"] == 1.0 and cal["positives"]["rot90"]["recall"] == 1.0
+          and sorted(x["family"] for x in cal["known_limits"]) == sorted(
+              f for f in L.FAMILIES if cal["positives"][f]["recall"] < 0.95), cal["positives"])
+    text = (fd / "leak_v2.json").read_text()
+    eval_paths = [r["image"] for rows in w["eval_rows"].values() for r in rows]
+    check("leak_v2.json names no evaluation image path (keys only)",
+          not [p for p in eval_paths if p in text] and str(root / "eval") not in text)
+    caught = sorted(found)[0]
+    got = L.detect([{"key": "q", "path": w["by_key"][caught]["image"]},
+                    {"key": "s", "path": w["by_key"]["same_01"]["image"]}], ev_idx, doc)
+    check("detect under version 2's calibration finds a crop copy and clears a same-scene photograph",
+          [e["key"] for e in got] == ["q"] and got[0]["eval_key"] == w["emb_copies"][caught], got)
+    with open(fd / "leak_pairs_v2.csv", newline="") as fh:
+        prs = list(csv.DictReader(fh))
+    with open(fd / "leak_pairs_v1.csv", newline="") as fh:
+        prs1 = list(csv.DictReader(fh))
+    check("leak_pairs_v2.csv lists every image hit and version 1's negative pairs unchanged (the draw's sentinels)",
+          [r for r in prs if r["kind"].startswith("neg")] == [r for r in prs1 if r["kind"].startswith("neg")]
+          and {r["kind"] for r in prs} >= {"hit", "negative_7_10", "negative_hard"})
+    e3 = SceneEmbedder()
+    again = L.run_v2(pre, dom, fd, ad, embedder=e3, procs=1, testing=True)
+    check("a rerun is a no-op", e3.calls == 0 and again == json.loads(text))
+    saved = ad.pool_rows
+    ad.pool_rows = lambda sources=None: [r for r in saved(sources) if r["key"] != "clean_5"]
+    check("changed inputs refuse without force", raises(lambda: L.run_v2(pre, dom, fd, ad, embedder=SceneEmbedder(),
+                                                                         procs=1, testing=True), L.LeakError,
+                                                        "--force") is not None)
+    ad.pool_rows = saved
+
+    print("version 2 without a leak_v1.json, and without capture sessions")
+    fd2 = root / "funnel_fresh"
+    fd2.mkdir()
+    e4 = SceneEmbedder()
+    doc2 = L.run_v2(pre, dom, fd2, ad, embedder=e4, procs=1, testing=True)
+    check("with no leak_v1.json it describes everything into its own files and reaches the same readings",
+          e4.calls > 0 and all(v.get("from") == "computed" and "leak_v2_" in pathlib.Path(v["path"]).name
+                               for v in doc2["descriptor_files"].values())
+          and doc2["calibration"]["cos_threshold"] == theta2 and doc2["h6a"]["quarantine"] == doc["h6a"]["quarantine"]
+          and doc2["readings"]["v1"]["file"] is None and not (fd2 / "leak_v1.json").exists(), doc2["descriptor_files"])
+    ad_nocap = types.ModuleType("fake_leak_adapter_nocap")
+    for fn in ("pool_rows", "base_rows", "increment_rows", "eval_rows"):
+        setattr(ad_nocap, fn, getattr(ad, fn))
+    ad_nocap.__file__ = ad.__file__
+    fd3 = root / "funnel_nocap"
+    fd3.mkdir()
+    msg = raises(lambda: L.run_v2(pre, dom, fd3, ad_nocap, embedder=SceneEmbedder(), procs=1, testing=True),
+                 L.LeakCalibrationError, "hard negative tier holds 0")
+    d3 = json.loads((fd3 / "leak_v2.json").read_text()) if (fd3 / "leak_v2.json").exists() else {}
+    check("an adapter that names no capture session leaves the hard tier empty: the calibration refuses, "
+          "leak_v2.json is written with ok false and nothing is scanned",
+          msg is not None and d3.get("calibration", {}).get("ok") is False and d3.get("scans") == {}, msg)
+
+
 def main():
     if np is None:
         skip("all", "numpy is not installed")
@@ -682,12 +1034,14 @@ def main():
     from weed_optimizer_framework.tools.inc import common as C
     L.C = C
     test_scope(L)
+    test_set_verdict(L)
     if Image is None:
         skip("dhash, augmentations and run", "PIL is not installed")
         return
     test_dhash(L)
     test_augment(L, D)
     test_run(L, D)
+    test_v2(L, D)
 
 
 if __name__ == "__main__":

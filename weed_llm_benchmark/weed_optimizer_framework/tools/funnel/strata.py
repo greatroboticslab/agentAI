@@ -736,7 +736,7 @@ def frames(prereg, domain, census_dir, adapter, judge_qual=None, dinov2=None, al
               "guard_pairs_v1": file_record(pairs_p)}
     if crops_rec.get("sha256"):
         inputs["crop_table"] = crops_rec
-    for opt in ("relation_geometry_v1.json", "judge_qualification.json", "leak_pairs_v1.csv"):
+    for opt in ("relation_geometry_v1.json", "judge_qualification.json", "leak_pairs_v1.csv", "leak_pairs_v2.csv"):
         if (fd / opt).exists():
             inputs[opt.rsplit(".", 1)[0]] = file_record(fd / opt)
     rec = getattr(dinov2, "record", None)

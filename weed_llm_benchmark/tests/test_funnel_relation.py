@@ -40,6 +40,7 @@ import sys
 import tempfile
 import time
 import zipfile
+import funnel_prereg as FPR  # noqa: E402
 
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="funnel_relation_"))
 os.environ["INC_DIR"] = str(TMP / "inc")
@@ -249,7 +250,7 @@ def test_relation_audit():
     (fd / "judges").mkdir(parents=True)
     (TMP / "repo" / "docs").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT.parent / "docs" / "FUNNEL_AUDIT.md", TMP / "repo" / "docs" / "FUNNEL_AUDIT.md")
-    shutil.copyfile(ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json", fd / "prereg_v1.json")
+    FPR.write_pre_draw(fd / "prereg_v1.json", ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json")
     dom = D.load("weed")
     rc = dom.raw["sources"]["relation_checks"]
     hold, three, keep = rc["h0b_flag_old_join"][0], rc["h0b_map_sources"][1], rc["h0b_keep_current_join"][0]

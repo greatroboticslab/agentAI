@@ -1,0 +1,30 @@
+{
+ "amendments": [
+  {
+   "before_any": [
+    "F7 reference label ingested or read",
+    "F9 recovery"
+   ],
+   "contract_sha256": "11b771d61d9e33fa0c9e5e27b588bba06e5ea879e3cbef7028ad76d78e6df2f0",
+   "contract_sha256_before": "52abc928092c5ccf11bfb2e847a4f2214c6276bc45441e88108a8985acb660b5",
+   "date": "2026-09-29",
+   "decided_by": "human-delegated",
+   "effects": {
+    "leak_detector_version": 2
+   },
+   "id": "A2",
+   "kind": "amendment",
+   "made_after": [
+    "F6 sample draw (A1, job 47261044)"
+   ],
+   "post_hoc": true,
+   "prereg_core_sha256": "62fd2e34b7d8e7cf8bc3c29bae22d308bf2b0422980060cce7fb54e12a982f94",
+   "risk": "R4",
+   "section": "docs/FUNNEL_AUDIT.md 14 A2",
+   "seen_before": [
+    "funnel/leak_v1.json"
+   ],
+   "text": "Post hoc, R4 under the project owner's delegation; made after leak_v1.json was read and after the sample draw (F6, amendment A1, job 47261044), before any recovery (F9) and before any reference label (F7) was ingested or read. The draw does not depend on the copy detector: its pair sentinels are the calibration's negative pairs, which both versions list alike, no frame reads H6's quarantine, and the frames record leak_pairs_v1.csv, which this amendment keeps unchanged. leak_v1's calibration measured a per-pair false-positive rate (0.006 over 2,000 provenance-disjoint pairs at cosine 0.825636), but the scan flags an image on its maximum cosine over about 9,500 evaluation images and H6(a) quarantines a whole source on one hit: 39 of 47 sources were quarantined (a video-game source among them) and H6(b) declared an incident for base B (314/878) and every realloop_v1 increment (12-26 of 287). Detector version 2: per-image calibration on same-domain negatives (the reference images' maximum cosine over the evaluation set outside their capture session and date; plus the provenance-disjoint group), threshold = the smallest cosine with per-image false-positive rate <= 1 % (one-sided 97.5 % upper bound reported), never below v1's; recall per augmentation family at it, a family below 0.95 a known limit; H6(a) and H6(b) decided by the set rule (any hit within 6 dHash bits under a variant, or P(Binom(n, p) >= hits) < 0.001 with p the hard tier's upper bound). Output leak_v2.json with both readings; leak_v1.json is kept as the invalid first reading and is never used for recovery once this amendment is in the prereg. Contract section 14 A2."
+  }
+ ]
+}

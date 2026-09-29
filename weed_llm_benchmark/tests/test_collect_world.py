@@ -39,6 +39,7 @@ import socket
 import sys
 import tempfile
 import zipfile
+import funnel_prereg as FPR  # noqa: E402
 
 TESTS = pathlib.Path(__file__).resolve().parent
 ROOT = TESTS.parent
@@ -90,8 +91,8 @@ def setup(prefix):
     (TMP / "repo" / "docs").mkdir(parents=True)
     (TMP / "inc" / "funnel").mkdir(parents=True)
     shutil.copyfile(GIT / "docs" / "FUNNEL_AUDIT.md", TMP / "repo" / "docs" / "FUNNEL_AUDIT.md")
-    shutil.copyfile(ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json",
-                    TMP / "inc" / "funnel" / "prereg_v1.json")
+    FPR.write_pre_draw(TMP / "inc" / "funnel" / "prereg_v1.json",
+                       ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json")
     sys.path.insert(0, str(ROOT))
     sys.path.insert(0, str(TESTS))
     socket.socket = _NoNet

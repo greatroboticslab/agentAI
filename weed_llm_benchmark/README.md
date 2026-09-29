@@ -65,8 +65,10 @@ Contract and results:
 - `results/framework/_brain/weed/inc/inc_campaign.jsonl`: the autopilot's own decision ledger.
 
 Funnel audit (in progress): did the Step 1 filters discard target-species data, and does recovering it raise dev
-accuracy? The platform runs it; no estimate exists yet.
-- [`docs/FUNNEL_AUDIT.md`](../docs/FUNNEL_AUDIT.md): the pre-registered contract (hypotheses H0–H12, gates, decisions).
+accuracy? The platform runs it; no estimate exists yet. The sample is drawn and locked (amendment A1). Amendment A2
+replaces the copy detector's per-pair calibration with a per-image one: at the first threshold, 64 % of clean
+same-domain images looked like copies of an evaluation image; at the new one, about 1 %.
+- [`docs/FUNNEL_AUDIT.md`](../docs/FUNNEL_AUDIT.md): the pre-registered contract (hypotheses H0–H12, gates, decisions, dated amendments).
 - [`docs/FUNNEL_AUDIT_RUNNER.md`](../docs/FUNNEL_AUDIT_RUNNER.md): modules, formats and commands.
 - [`docs/FUNNEL_REPRODUCE.md`](../docs/FUNNEL_REPRODUCE.md): deploy (`deploy/deploy_funnel.sh`) and reproduction.
 

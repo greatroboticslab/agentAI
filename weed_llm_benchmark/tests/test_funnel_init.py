@@ -128,7 +128,9 @@ h = F.header("audit", dom, pre, {"in": d / "in.json"}, seeds={"s": "funnel/v1/s"
 check("every §1.2 key", set(F.HEADER_KEYS) <= set(h), sorted(set(F.HEADER_KEYS) - set(h)))
 check("format from the kind", h["format"] == "funnel-audit/1")
 check("prereg record with core sha", h["prereg"]["core_sha256"] == pre.core_sha256 and h["prereg"]["sha256"] == pre.sha256)
-check("contract record", h["contract"]["sha256"] == pre.raw["contract"]["sha256"])
+check("contract record: the contract in force (the prereg's contract amendment records it)",
+      h["contract"]["sha256"] == D.contract_sha256_of(pre) == pre.contract_sha256
+      and h["contract"]["sha256"] == F.sha256_file(pre.contract_path))
 check("domain config record", h["domain_config"]["sha256"] == dom.sha256 and h["domain"] == "weed")
 check("inputs hashed", h["inputs"]["in"]["sha256"] == C.sha256_file(d / "in.json"))
 check("code relative to the tools package", sorted(h["code"]) == ["funnel/__init__.py", "funnel/domain.py"], h["code"])

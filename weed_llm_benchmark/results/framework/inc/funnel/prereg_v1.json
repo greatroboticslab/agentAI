@@ -412,5 +412,61 @@
   "never-train hit in a recovered set -> stop F9",
   "no RL qualifies for a genus -> hypotheses about it bounded"
  ],
- "amendments": []
+ "amendments": [
+  {
+   "id": "A1",
+   "kind": "sample_lock",
+   "date": "2026-09-29",
+   "prereg_core_sha256": "62fd2e34b7d8e7cf8bc3c29bae22d308bf2b0422980060cce7fb54e12a982f94",
+   "sample_sha256": "4c02db96caa000719dc05d5b529d8359a095e466df3bc7d91fce822f1aac9e10",
+   "key_sha256": "8e1891ed4f77c9b538808af9821308189ccf7a8572485510a8c1423fffc70e90",
+   "frames_sha256": "1fcfd108d35a7934df1de26519a6e3f772ce9660458959fb501d85463bd7bb55",
+   "name_status_v2_sha256": "2d83a8990ac993f1756763b9a94f045ce24ece3493a50745e5156da45088e62f",
+   "frame_sizes": {
+    "G0": 4827,
+    "G1": 6256,
+    "G2": 5232,
+    "G2a": 1108,
+    "G2v": 989,
+    "G3": 418904,
+    "G4": 531781,
+    "G5": 15063,
+    "identity": 369,
+    "pair_sentinel": 7953,
+    "sentinel": 28999
+   },
+   "confirmatory_frames": {
+    "H2a": 3813,
+    "H2b": 2436,
+    "H4_named": 114323,
+    "H4_noinfo": 413907
+   }
+  },
+  {
+   "id": "A2",
+   "kind": "amendment",
+   "date": "2026-09-29",
+   "post_hoc": true,
+   "risk": "R4",
+   "decided_by": "human-delegated",
+   "section": "docs/FUNNEL_AUDIT.md 14 A2",
+   "text": "Post hoc, R4 under the project owner's delegation; made after leak_v1.json was read and after the sample draw (F6, amendment A1, job 47261044), before any recovery (F9) and before any reference label (F7) was ingested or read. The draw does not depend on the copy detector: its pair sentinels are the calibration's negative pairs, which both versions list alike, no frame reads H6's quarantine, and the frames record leak_pairs_v1.csv, which this amendment keeps unchanged. leak_v1's calibration measured a per-pair false-positive rate (0.006 over 2,000 provenance-disjoint pairs at cosine 0.825636), but the scan flags an image on its maximum cosine over about 9,500 evaluation images and H6(a) quarantines a whole source on one hit: 39 of 47 sources were quarantined (a video-game source among them) and H6(b) declared an incident for base B (314/878) and every realloop_v1 increment (12-26 of 287). Detector version 2: per-image calibration on same-domain negatives (the reference images' maximum cosine over the evaluation set outside their capture session and date; plus the provenance-disjoint group), threshold = the smallest cosine with per-image false-positive rate <= 1 % (one-sided 97.5 % upper bound reported), never below v1's; recall per augmentation family at it, a family below 0.95 a known limit; H6(a) and H6(b) decided by the set rule (any hit within 6 dHash bits under a variant, or P(Binom(n, p) >= hits) < 0.001 with p the hard tier's upper bound). Output leak_v2.json with both readings; leak_v1.json is kept as the invalid first reading and is never used for recovery once this amendment is in the prereg. Contract section 14 A2.",
+   "effects": {
+    "leak_detector_version": 2
+   },
+   "contract_sha256": "11b771d61d9e33fa0c9e5e27b588bba06e5ea879e3cbef7028ad76d78e6df2f0",
+   "seen_before": [
+    "funnel/leak_v1.json"
+   ],
+   "made_after": [
+    "F6 sample draw (A1, job 47261044)"
+   ],
+   "before_any": [
+    "F7 reference label ingested or read",
+    "F9 recovery"
+   ],
+   "contract_sha256_before": "52abc928092c5ccf11bfb2e847a4f2214c6276bc45441e88108a8985acb660b5",
+   "prereg_core_sha256": "62fd2e34b7d8e7cf8bc3c29bae22d308bf2b0422980060cce7fb54e12a982f94"
+  }
+ ]
 }

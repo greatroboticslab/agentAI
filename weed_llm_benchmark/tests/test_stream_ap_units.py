@@ -776,9 +776,77 @@ def t_lanes():
           lane.get("item") is None and not lane.get("fails") and "dup" in run2.st["declined"], lane)
 
 
+def t_d28():
+    section("D28's source rule (contract 6.4 as amended 2026-09-29: dHash copies, or embedding hits above what the "
+            "per-image false-positive rate predicts; inc2.embed_calibration.source_verdict)")
+    from weed_optimizer_framework.tools.inc2 import embed_calibration as EC
+    from weed_optimizer_framework.tools.inc2 import guard as G2
+    dom, th = LS.load_domain("weed"), LS.load_thresholds()
+    check("the thresholds: source_alpha mirrors inc2's SOURCE_ALPHA; the 5 % never-train share rule is gone",
+          LS.t(th, "D28", "source_alpha") == EC.SOURCE_ALPHA and "never_train_share" not in th["D28"])
+    check("D28's reason names are the guard's (inc2.guard.REASONS)",
+          set(DS.D28_DHASH_REASONS) | {DS.D28_EMBED_REASON} <= set(G2.REASONS))
+
+    def summary(src, images, reasons, p_false=0.01, base_share=0.0):
+        n_eval = sum(v for k, v in reasons.items() if k in DS.D28_DHASH_REASONS + (DS.D28_EMBED_REASON,))
+        return json.dumps({"format": "collect-summary/1", "source": src, "batch": "b", "images": images,
+                           "guard": dict(reasons), "yield": {"images_seen": images, "rejected": dict(reasons)},
+                           "source_leak": {"eval_share": round(n_eval / float(images), 4), "base_share": base_share},
+                           "copy_scan": {"checked": True, "p_false": p_false, "cos_threshold": 0.9}})
+
+    def d28(texts, lock_p=None):
+        if lock_p is not None:
+            texts = dict(texts, **{"splits/v2/lock_status.json": json.dumps(
+                {"splits_version": "v2", "locked": True, "embed_calibration_v2": {"p_false": lock_p}})})
+        ev = E.from_texts(texts, "x", context={"sid": "none"})
+        return DS.by_id(DS.detect(ev, dom, th, only=("D28",)))["D28"]
+    d = d28({"intake/b0001_chance/summary.json": summary("zen:chance", 15, {"near_eval_embed": 1})})
+    check("one embedding hit in a 15-image source (6.7 % of it, over the old 5 % share) is chance at a 1 % "
+          "per-image rate: no leak", not d["fired"], d.get("summary"))
+    d = d28({"intake/b0002_copy/summary.json": summary("zen:copy", 15, {"near_eval_variant": 1})})
+    check("a source with a planted copy (a flip within 6 dHash bits of a dev image) leaks: D28 -> L24",
+          d["fired"] and "L24" in d["levers"] and d["detail"]["leaks"][0]["source"] == "zen:copy"
+          and d["detail"]["leaks"][0]["verdict"]["dhash_hits"] == 1, d.get("summary"))
+    d = d28({"intake/b0003_many/summary.json": summary("zen:many", 15, {"near_eval_embed": 5})})
+    check("five embedding hits of 15 at 1 % are improbable (P < 0.001): a leak, with observed and expected hits",
+          d["fired"] and d["detail"]["leaks"][0]["verdict"]["expected_false_hits"] == 0.15
+          and d["detail"]["leaks"][0]["verdict"]["p_value"] < 0.001, d.get("detail"))
+    d = d28({"intake/b0004_big/summary.json": summary("zen:big", 1915, {"near_eval_embed": 20})})
+    check("a large same-domain source with hits within its rate is not a leak (805 of 1,915 was the old rule's "
+          "failure)", not d["fired"], d.get("summary"))
+    d = d28({"intake/b0005_base/summary.json": summary("zen:base", 20, {}, base_share=0.25)})
+    check("the base-copy share rule is unchanged (25 % >= 20 %)", d["fired"], d.get("summary"))
+    bare = json.loads(summary("zen:bare", 15, {"near_eval_v2": 1}))
+    for k in ("images", "guard", "source_leak"):
+        bare.pop(k)
+    d = d28({"intake/b0007_bare/summary.json": json.dumps(bare)})
+    check("a summary without the guard's flat fields and source_leak is not read (yield.rejected is not D28's input)",
+          not d["fired"], d.get("summary"))
+    old = json.loads(summary("zen:old", 15, {"near_eval_embed": 1}))
+    old.pop("guard")
+    d = d28({"intake/b0008_old/summary.json": json.dumps(old)})
+    check("never-train refusals without their per-reason counts: a dHash copy cannot be ruled out (fail closed)",
+          d["fired"] and d["detail"]["leaks"][0]["verdict"]["dhash_hits"] == 1, d.get("summary"))
+    nop = json.loads(summary("zen:nop", 15, {"near_eval_embed": 1}))
+    nop["copy_scan"] = {"checked": False}
+    d = d28({"intake/b0006_nop/summary.json": json.dumps(nop)})
+    check("without any per-image rate (no copy scan record, no LOCK calibration) an embedding hit flags (fail "
+          "closed)", d["fired"], d.get("summary"))
+    d = d28({"intake/b0006_nop/summary.json": json.dumps(nop)}, lock_p=0.01)
+    check("  with the splits LOCK's v2 calibration rate it is chance again", not d["fired"], d.get("summary"))
+    st = {"format": "inc2-step1-stream/status/1", "per_source": {
+        "rf_chance": {"images_seen": 15, "near_eval_embed": 1},
+        "rf_copy": {"images_seen": 15, "near_eval_embed": 0, "decision:near_eval_v2": 1},
+        "rf_many": {"images_seen": 200, "near_eval_embed": 14}}}
+    d = d28({"step1_stream/status.json": json.dumps(st)}, lock_p=0.01)
+    got = sorted(h["source"] for h in (d.get("detail") or {}).get("leaks") or [])
+    check("Step 1's per-source counts under the same rule: the chance hit is not a leak; the dHash copy and 14 of "
+          "200 embedding hits are", got == ["rf_copy", "rf_many"], (got, d.get("summary")))
+
+
 def main():
     for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_formats, t_replay_gate, t_config, t_lab,
-               t_lanes):
+               t_lanes, t_d28):
         try:
             fn()
         except Exception as e:

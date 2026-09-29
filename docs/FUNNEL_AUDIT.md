@@ -7,6 +7,7 @@ This is the contract for the FUNNEL campaign. It builds on:
 **Version: pre-registration v1, 2026-09-28.**
 - This file is committed before any audit sample is drawn and before any reference label exists. So is its machine-readable transcription, `INC_DIR/funnel/prereg_v1.json`: the thresholds, strata, seeds, gates and class policy of §5–§7.
 - If the file and the JSON differ, that is a defect. The doc wins, and the fix is recorded as a dated amendment.
+- Dated amendments made after v1 are in §14; each is also recorded in `prereg_v1.json` `amendments`.
 - Every later audit artifact records the sha256 of both files.
 
 **Markers:**
@@ -577,7 +578,9 @@ All estimators live in `funnel/estimate.py`, the only producer of audit numbers.
   - [review] **Calibration instead:**
     - *Positives:* train_core images (never evaluation images) put through the augmentations Roboflow and Keras exports apply: flips, 90° rotations, crops of 0–20 %, brightness ±25 %, blur, shear, letterbox resize to 640 and JPEG re-encoding. The ImageWeeds paper applies such augmentations itself (§2.5). Recall ≥ 0.95 per augmentation family.
     - *Negatives:* pairs at 7–10 bits whose sources share no lab, country or collection (for example cwd12 train_core × MH-Weed16). FPR ≤ 1 %.
+  - **[A2] Amended 2026-09-29 (§14 A2, post hoc).** This calibration measures a false-positive rate per pair, while the scan flags an image on its maximum cosine over every evaluation image and (a) quarantines a source on any one hit. Detector version 2 calibrates per image on same-domain negatives and decides (a) and (b) by a set rule. `leak_v1.json` is kept and reported as the invalid first reading.
 - [review] **Scope.** (a) is run for every source that kept images and has a near_eval hit (§3.4: 14 sources), not only rf_tuf. A source with a detected copy is quarantined from recovery as a whole, not image by image, because its undetected copies are the ones a detector misses.
+  - [A2] "A detected copy" in (a) and "a copy" in (b) are read by §14 A2's set rule: a hit within 6 dHash bits under any variant, or more embedding hits than the per-image false-positive rate predicts.
 - *(a)* Does rf_tuf hold at least one augmented copy of a never-train image? If yes:
   - rf_tuf is quarantined from recovery;
   - ood numbers of any arm that contains rf_tuf are void;
@@ -677,6 +680,7 @@ All estimators live in `funnel/estimate.py`, the only producer of audit numbers.
 - **Guards are never touched.** never_train, near_eval, cwd12_copy, quarantine and user flags are marked `recoverable: false`. Every recovered image passes the never-train index (6 bits) and the H6 detector.
   - [review] **The checks run on the unmasked source image,** and again on the masked copy. A mean-colour mask changes the dHash, so a masked copy of a near-eval image could otherwise pass the 6-bit index.
   - [review] **A source that H6(a) links to an evaluation set is excluded from recovery as a whole.**
+  - [A2] The detector and the H6(a) links are those of `leak_v2.json` (detector version 2, §14 A2). Recovery never uses `leak_v1.json`'s quarantine once A2 is in the prereg.
   - [review] **Every recovered image records its H6(c) provenance group** (§6), which routes the exam reading in §9.3.
 - **Box-level precision gate:** the RL precision of "label right and box valid", Rogan–Gladen corrected, must have a one-sided 97.5 % lower bound ≥ **0.85** and a point estimate ≥ **0.90** at the level used. That level is species, or genus for MorningGlory only.
   - *Why this level.* ~~It sits above the measured label precision of the pilot's `Breal` sources (0.737 and 0.650, Step 4).~~ [review] Struck: those numbers are a probe's agreement, not label precision (§1). The detection literature favours moderate thresholds over strict ones (OWL-ST; 2506.02359). realloop_v2 measures whether data at this precision helps.
@@ -1116,3 +1120,54 @@ These are the R4 decisions §8.7 and §12 leave open. They were made on 2026-09-
 | DEC-8 | **KT7** is at most 30 iNaturalist Research Grade observations per taxon, CC-licensed photos only. Each observation's id, licence and photo sha256 are recorded. The photos are used for sentinels and judge qualification only, never for training. | §4.1. |
 | DEC-9 | **The judge panel for F5** is J-zs (BioCLIP-2 zero-shot with taxonomic plus common-name prompts over the closed candidate set), J-knn1 and J-knn2 (DINOv2 ViT-B/14 features of the same crops), and J-vlm = RL-B asked the same multiple choice. The copy detector for H6 is DINOv2 descriptors plus dHash of flipped and rotated variants, calibrated as in §6 H6. SSCD is not used. | SSCD weights are not installed on the cluster, and DINOv2 is §6's named fallback. qwen3.8:27b is the strongest vision model in the cluster store (§4.3's minicpm-v, llama3.2-vision and moondream are smaller). |
 | DEC-10 | **Budget.** The campaign's GPU spend is charged to the INC envelope through `su_ledger`, with a campaign cap of 120 GPU-h (about twice §10.1's estimate). Reaching the cap stops new submissions and is reported. | §10.1. |
+
+---
+
+## 14. Amendments (dated)
+
+Each amendment is made after pre-registration v1 and says what had been seen before it. It is recorded in `prereg_v1.json` `amendments` through the domain module's amendment writer (`funnel/domain.append_amendment`, kind `amendment`), together with the sha256 of this file after the edit. The prereg core does not change, so every artifact compared by the core stays current. Earlier sections are not rewritten; they carry "[A<n>]" notes that point here. Amendment ids are the prereg's, in the order they were appended: the draw's sample lock (§5.2, kind `sample_lock`) takes an id too.
+
+### A1 — 2026-09-29: the sample lock (F6)
+
+Written by the draw (L10 `draw`, cluster job 47261044), not a change to this contract: kind `sample_lock`, recording the prereg core (62fd2e34…), the sha256 of `sample_v1.csv`, `sample_v1_key.jsonl` and `frames_v1.json`, the frame sizes and the confirmatory frames (§5.2).
+
+### A2 — 2026-09-29, post hoc: the H6 copy detector is recalibrated per image (detector version 2)
+
+**Status.** Post hoc and R4, decided under the project owner's standing delegation for this campaign (as in §13). It was made after `leak_v1.json` had been read (F4 ran on the cluster) and after the sample draw (F6, A1), and before any recovery (F9) and before any reference label (F7) was ingested or read. The draw does not depend on the copy detector: its pair sentinels are the calibration's negative pairs (`negative_7_10`, `negative_hard`), which both versions list alike (version 2 copies them from `leak_pairs_v1.csv` into `leak_pairs_v2.csv`); no frame reads H6's quarantine or links; and the frames record `leak_pairs_v1.csv` by sha256, a file this amendment keeps unchanged. X12 is not affected.
+
+**What was found** (`leak_v1.json`, read on the cluster on 2026-09-29):
+- The calibration passed: DINOv2 CLS cosine threshold 0.825636; the "hard" negatives gave a false-positive rate of 0.006 over 2,000 pairs.
+- H6(a) quarantined 39 of the 47 scanned sources. Among them:
+  - fvossel__csgo_player_detection (video-game players), on 4 "copies" of weed evaluation photographs;
+  - rf_uav-qnoms__uav-wqshy, 1,083 of its 6,341 images flagged;
+  - rf_school, 829 of its 2,064 images flagged.
+- H6(b) declared an incident for base B (314 of 878 images flagged) and for every realloop_v1 increment (12 to 26 of 287 images each).
+- The continuous loop's splits v2 scan (docs/CONTINUOUS_LOOP.md, decision L-9) applied the same threshold to 3SeasonWeedDet10 2022 and flagged 805 of its 1,915 images. None of them shares a capture session with dev, test or train_core, and every high-similarity pair is a 2022 capture against a 2021 capture.
+
+**Why leak_v1 is not evidence of leakage.** Three different error rates were treated as one.
+- *Per pair.* Each calibration negative is one image against one partner: its 7–10-bit pair, or its single nearest image in the provenance-disjoint group (MH-Weed16). The 0.006 is the rate of that one comparison. Every negative was provenance-disjoint; no same-domain scene (another field or another season of the same lab) was ever a negative.
+- *Per image.* The scan flags an image when its best cosine over all of about 9,500 evaluation images reaches the threshold. That is the maximum of thousands of comparisons against same-domain photographs, so the per-image false-positive rate is far above the per-pair one. It was never measured.
+- *Per source.* H6(a) quarantines a whole source on one flagged image, and H6(b) declares an incident on one. At a per-image rate p, a set of n images is flagged by chance with probability 1 − (1 − p)^n, which is close to 1 for any set of a few hundred images even at p = 1 %.
+- leak_v1's quarantine list and its H6(b) incident therefore measure the size and the domain of each set, not copying. The findings show it: a video-game source "copies" weed photographs, and the 3SeasonWeedDet10 2022 flags are all cross-year.
+
+**What changes: copy detector version 2** (`funnel/leak.py`; runner §4.13a and §5.3.3).
+- *Negatives, per image.* Each negative image is scored the way the scan scores an image: its maximum cosine over the full evaluation set, leaving out the evaluation images of its own capture session and of its capture date where those are known. The domain's adapter says which rows name a capture session and its date (`capture_session`); the engine names neither. A negative within 6 dHash bits of an evaluation image under any of the 8 variants is a copy under the dHash rule, not a negative: it is left out and counted.
+  - *hard:* reference-set (train_core) images with a known capture session: the same domain, other sessions and dates;
+  - *hard, session-disjoint:* the hard images whose session and date no evaluation image shares. They are reported, and they constrain the threshold when they number at least 100;
+  - *provenance-disjoint (easy):* the non-reference groups of `leak.negative_source_pairs` (MH-Weed16).
+- *Threshold.* The smallest cosine (6 decimals) at which the per-image false-positive rate is ≤ 1 % on the hard tier, which must hold at least 100 images, and on every other tier that holds at least 100 images. It is never below v1's threshold, which version 2 rebuilds from v1's seeds and descriptor files and must reproduce. Each tier's rate is reported with its one-sided 97.5 % upper bound (Clopper–Pearson), at the new threshold and at v1's.
+- *Recall.* v1's positives (the same seeds and augmentations) are scored at the new threshold, per family. A family below 0.95 is recorded as a known limit, not a refusal: the 8 dHash variants still catch flips, rotations and re-encoding.
+- *Set rule for H6(a) and H6(b).* A set of images (a source, base B, each realloop_v1 increment) holds copies only if:
+  - any of its images is within 6 dHash bits of an evaluation image under any variant; or
+  - its number of embedding hits at the new threshold is improbable under the per-image rate: P(Binom(n, p) ≥ hits) < 0.001, where n is the number of its images scanned and p is the hard tier's one-sided 97.5 % upper bound at the new threshold.
+
+  Every set records its images, its hits, the expected number of chance hits n·p and the p value. H6(a) quarantines the sources the rule flags, whole, as before. H6(b)'s incident is the rule applied to base B and to each increment. H6(c) joins only flagged sources to a lab group.
+- *Output.* `funnel/leak_v2.json` (format `funnel-leak/2`, `detector_version` 2) records the v1 reading and the v2 reading side by side for every set. It reuses the descriptor files leak_v1 wrote wherever their sha256 still matches. `leak_v1.json` and `leak_pairs_v1.csv` are kept unchanged and reported as the invalid first reading.
+- *Readers.* Recovery (§7), the H6 report of the audit (F8) and the draw's pair sentinels read `leak_v2.json` when it exists. Once A2 is in the prereg, recovery refuses to run on `leak_v1.json`'s quarantine and waits for `leak_v2.json`.
+- *The platform reruns it.* The autopilot reads the detector version the prereg requires and, while `leak_v2.json` is missing on the cluster, proposes L10 `leak` again with the detector version in its lineage key (replay R16, tests/test_funnel_ap_replay.py).
+
+**What does not change.** The prereg core; H6's gates (recall 0.95 per family, false-positive rate 1 %); the positives; the dHash radius (6 bits) and its 8 variants; the rule that a flagged source is quarantined whole; the configured lab groups of H6(c); the stop rules of §10.
+
+**Left open.** §7's guard runs the detector on every recovered image, and a hit stops F9. At a per-image rate p, N recovered images hold about p·N chance hits, so F9 can stop on chance alone. Whether such an embedding-only hit leaves the image out or stops F9 is decided before F9 and recorded as a later amendment.
+
+**How it was verified.** Synthetic tests: a same-scene set that is not a copy, which version 1 flags and version 2 clears; an augmented copy that version 2 still catches; the set rule on a chance hit and on a planted copy (tests/test_funnel_leak.py); recovery refusing `leak_v1.json` after A2 (tests/test_funnel_recover.py); the replay R16. The rerun on the real data is the platform's own L10 job.

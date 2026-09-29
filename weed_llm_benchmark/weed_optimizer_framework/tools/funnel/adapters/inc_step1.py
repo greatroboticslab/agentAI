@@ -1015,6 +1015,28 @@ def increment_rows(exp):
     return {p.stem: _read_jsonl(p) for p in sorted(md.iterdir()) if p.suffix == ".jsonl"}
 
 
+# A capture session in the INC manifests' "session" field: the date and the
+# camera of a capture, "<YYYYMMDD>_<camera>[_<operator>]" (the reference
+# dataset's and its lab's own captures, e.g. dev's sessions); any other value
+# (empty, a stem group) names no capture. The same pattern as
+# inc2.embed_calibration's CAPTURE_RE and DATE_RE.
+CAPTURE_SESSION_RE = re.compile(r"^[0-9]{8}_[A-Za-z0-9]")
+CAPTURE_DATE_RE = re.compile(r"^([0-9]{8})_")
+
+
+def capture_session(row):
+    """(capture session, capture date) of a manifest row, each None when the
+    row names no capture: the engine's session key for the copy detector's
+    per-image calibration (leak detector version 2, contract §14 A2), which
+    leaves out a negative's own session and date. An optional adapter
+    function: the engine names neither the field nor the pattern."""
+    s = str((row or {}).get("session") or "")
+    if not CAPTURE_SESSION_RE.match(s):
+        return None, None
+    m = CAPTURE_DATE_RE.match(s)
+    return s, (m.group(1) if m else None)
+
+
 def eval_rows():
     """{split: manifest rows} for every evaluation split (C.EVAL_SPLITS)."""
     out = {}

@@ -379,8 +379,8 @@ def draw_all(fr, prereg, domain, prefix=S.SEED_PREFIX, leak_pairs_path=None):
     pgrp = _pair_sentinel_frame(fr, domain, leak_pairs_path)
     _plan_pair_sentinels(pgrp, domain, sentinel_count(len(g5), domain))
     if len(g5) and sum(st["n_planned"] for st in pgrp["strata"].values()) == 0:
-        raise DrawError("G5 has %d items but no pair sentinel can be drawn (copy twins or "
-                        "leak_pairs_v1.csv negatives missing)" % len(g5))
+        raise DrawError("G5 has %d items but no pair sentinel can be drawn (copy twins or the leak pairs "
+                        "file's negatives missing)" % len(g5))
     groups["pair_sentinel"] = pgrp
     picks += draw_srs_group("pair_sentinel", pgrp, prefix, sheet_class="eval")
     return picks, planted
@@ -581,7 +581,9 @@ def draw(prereg_path, out_dir, adapter, force=False, domain=None, judge_qual=Non
     if short:
         raise DrawError("frames below their pre-registered minimum (a decision for a person, F7): %s"
                         % "; ".join(short))
-    picks, planted = draw_all(fr, pre, dom, leak_pairs_path=out_dir / "leak_pairs_v1.csv")
+    # the calibration's negative pairs: the pairs file of the copy detector's record in use (leak_pairs_v2.csv
+    # once leak_v2.json exists; both versions list the same negative_7_10 and negative_hard rows)
+    picks, planted = draw_all(fr, pre, dom, leak_pairs_path=D.leak_pairs_path(out_dir, pre))
     rows, keys = build_rows(picks, fr, dom)
     from . import code_record  # noqa: F401  (header records the modules)
     seeds = {"prefix": S.SEED_PREFIX, "within_stratum": "%s/<stratum id>" % S.SEED_PREFIX,

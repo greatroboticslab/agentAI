@@ -64,6 +64,8 @@ import sys
 import tempfile
 import types
 
+import funnel_prereg as FPR
+
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="funnel_cli_"))
 os.environ["INC_DIR"] = str(TMP / "inc")
 os.environ["REPO"] = str(TMP / "repo")
@@ -79,7 +81,7 @@ PREREG = ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json"
 shutil.copyfile(CONTRACT, TMP / "repo" / "docs" / "FUNNEL_AUDIT.md")
 PREREG_COPY = TMP / "inc" / "funnel" / "prereg_v1.json"
 PREREG_COPY.parent.mkdir(parents=True)
-shutil.copyfile(PREREG, PREREG_COPY)
+FPR.write_pre_draw(PREREG_COPY, PREREG)
 
 from weed_optimizer_framework.tools import funnel as F  # noqa: E402
 from weed_optimizer_framework.tools.funnel import __main__ as M  # noqa: E402
@@ -113,10 +115,13 @@ def last_line(text):
 
 # --------------------------------------------------------------- the fakes
 class FakePrereg(object):
+    detector = 1                      # the copy detector version it requires (a test sets 2: amendment A2)
+
     def __init__(self, path):
         self.path = pathlib.Path(path)
         self.core_sha256 = "c" * 64
         self.domain_name = "fakedom"
+        self.detector_version = FakePrereg.detector
 
 
 class FakeDomain(object):
@@ -204,7 +209,7 @@ def make_fakes():
                                             "fit_info_projection=None"]),
         crop_table=rec("adapter.crop_table", lambda: "CROPS"),
         thing_embedder=rec("adapter.thing_embedder", lambda: FakeEmbedder("thing:model")))
-    mod("domain", load_pair=load_pair)
+    mod("domain", load_pair=load_pair, leak_detector_version=lambda pre: pre.detector_version)
     mod("adapters", INTERFACE=("census", "ledger_from_summaries", "crop_table", "thing_embedder", "text_encoder"),
         load=rec("adapters.load", lambda name: adapter))
 
@@ -212,7 +217,11 @@ def make_fakes():
         maybe_raise("leak.run")
         CALLS.append(("leak.run", (prereg, domain, funnel_dir, adapter), {"embedder": embedder}))
         return {"format": "funnel-leak/1", "calibration_ok": True}
-    mod("leak", run=leak_run)
+
+    def leak_run_v2(prereg, domain, funnel_dir, adapter, embedder=None):
+        CALLS.append(("leak.run_v2", (prereg, domain, funnel_dir, adapter), {"embedder": embedder}))
+        return {"format": "funnel-leak/2", "detector_version": 2}
+    mod("leak", run=leak_run, run_v2=leak_run_v2)
     mod("embed", features_config=lambda d: ("vision/base", "cls"),
         Dinov2Embedder=lambda model, pooling: FakeEmbedder("%s:%s" % (model, pooling)),
         embed_crops=signature_fn("embed.embed_crops", ["crop_table", "out_dir", "shard", "nshards", "embedder=None",
@@ -433,6 +442,17 @@ def test_dispatch():
             rc, so, se = run(["leak", "--prereg", pre, "--out", str(out)])
             check("leak with a CUDA device runs without --testing", rc == 0 and one("leak.run") is not None)
             M.cuda_available = lambda: False
+            FakePrereg.detector = 2
+            CALLS[:] = []
+            rc, so, se = run(["leak", "--prereg", pre, "--out", str(out), "--testing"])
+            c = one("leak.run_v2")
+            check("a prereg whose amendment requires copy detector version 2: leak runs leak.run_v2 (leak_v2.json), "
+                  "never leak.run", rc == 0 and c is not None and c[1] == (PRE_OBJ[0], DOM_OBJ[0], out, ad)
+                  and not calls("leak.run"), (rc, se))
+            FakePrereg.detector = 3
+            rc, so, se = run(["leak", "--prereg", pre, "--out", str(out), "--testing"])
+            check("  a version the engine does not implement is refused (exit 2)", rc == 2 and "version 3" in se, se)
+            FakePrereg.detector = 1
 
             # embed-judges
             out = fresh_out("embed")
@@ -798,7 +818,8 @@ def test_real_signatures():
         return fn
 
     patches = [(ad, "census", {"format": "funnel-census/1"}), (ad, "ledger_from_summaries", {"format": "x"}),
-               (ad, "crop_table", "CROPS"), (mods["leak"], "run", {}), (mods["embed"], "embed_crops", {}),
+               (ad, "crop_table", "CROPS"), (mods["leak"], "run", {}), (mods["leak"], "run_v2", {}),
+               (mods["embed"], "embed_crops", {}),
                (mods["embed"], "embed_table", {}), (mods["judges"], "score_all", {}), (mods["qualify"], "judges", {}),
                (mods["qualify"], "rl", {}), (mods["draw"], "draw", {}), (mods["sheets"], "run", {}),
                (mods["rl"], "run_rl_b", {}), (mods["rl"], "ingest", {}),
@@ -864,7 +885,8 @@ def test_real_signatures():
             codes.append((argv[0], rc, se.strip().splitlines()[-1:] if rc else ""))
         bad = [b for b in bound if b[1] is not True]
         called = {b[0] for b in bound}
-        want = {"inc_step1.census", "inc_step1.ledger_from_summaries", "inc_step1.crop_table", "leak.run",
+        # the real prereg's amendment A2 requires copy detector version 2: leak calls leak.run_v2
+        want = {"inc_step1.census", "inc_step1.ledger_from_summaries", "inc_step1.crop_table", "leak.run_v2",
                 "embed.embed_crops", "embed.embed_table", "judges.score_all", "qualify.judges", "qualify.rl",
                 "draw.draw", "sheets.run", "rl.run_rl_b", "rl.ingest", "estimate.evaluate", "relation.run_geometry",
                 "relation.run_relation", "recover.run", "recover.arms", "fetch.taxonomy", "fetch.known_items",

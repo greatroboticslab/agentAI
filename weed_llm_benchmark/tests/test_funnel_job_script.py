@@ -63,6 +63,7 @@ os.environ["REPO"] = str(TMP / "repo_unused")
 sys.path.insert(0, str(ROOT))
 
 from weed_optimizer_framework.tools.funnel import __main__ as M  # noqa: E402
+import funnel_prereg as FPR  # noqa: E402
 
 FAILURES = []
 SKIPS = []
@@ -92,7 +93,7 @@ shutil.copyfile(GIT / "docs" / "FUNNEL_AUDIT.md", REPO / "docs" / "FUNNEL_AUDIT.
 INC = REPO / "results" / "framework" / "inc"
 (INC / "funnel").mkdir(parents=True)
 PREREG = INC / "funnel" / "prereg_v1.json"
-shutil.copyfile(ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json", PREREG)
+FPR.write_pre_draw(PREREG, ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json")
 BIN = TMP / "bin"
 BIN.mkdir()
 os.symlink(sys.executable, BIN / "python")

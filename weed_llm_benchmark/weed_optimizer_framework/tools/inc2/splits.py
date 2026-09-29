@@ -31,8 +31,13 @@ build (one GPU-shared job; the order of §4.2):
      unhashable_embed for an image the scan could not describe); a row of a
      dev or test capture session (L-9(a)); a row within 6 bits of an image of
      an earlier part of the base (train_core, tsw22, tsw23, base B's part, in
-     that order: the one ood23-ood22 pair keeps its tsw22 row). Rows sharing
-     a session with train_core are kept and counted;
+     that order: the one ood23-ood22 pair keeps its tsw22 row), in both
+     directions: the row's dHash or a variant of it near the earlier image's
+     dHash, or a variant of the earlier image near the row's dHash (dHash is
+     taken after a 9x8 resize, so the two directions can disagree; step 8's
+     check reads both, and a one-way drop let job 47260765 reach it with a
+     train_core-tsw23 pair). Rows sharing a session with train_core are kept
+     and counted;
   5. base B's 878 (step1/base_selected.jsonl, checked against the sha256 that
      select_summary.json records): L-5 drops every image of cwp10 and vanpe
      outright (listed in l5_excluded.jsonl); the rest get the same 8-variant
@@ -795,9 +800,9 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
     examples = collections.defaultdict(list)
     overlap = {}
     rules = []
-    earlier = NearHashIndex()
+    earlier = EarlierIndex()
     for r in core:                      # every v1 train_core image, the L-8 drops too: a near copy of one is dropped
-        earlier.add(r["dhash"], ("train_core", r["key"]), max_bits=BITS)
+        earlier.add(r, "train_core")
     kept = {"train_core": core_kept}
 
     def drop(part, r, reason, detail=None):
@@ -832,7 +837,7 @@ def _build(testing, scorer_path, licences_path, tsw_record_path, domain_config, 
                 continue
             keep.append(r)
         for r in keep:
-            earlier.add(r["dhash"], (split, r["key"]), max_bits=BITS)
+            earlier.add(r, split)
         ov["sessions"] = dict(sorted(ov["sessions"].items()))
         overlap[split] = ov
         kept[split] = keep
@@ -1113,15 +1118,37 @@ def _embed_v2_summary(ecal, scan, rules):
                                "judged by the copy rules"}
 
 
+class EarlierIndex:
+    """The images of the earlier parts of the base, looked up in both
+    directions: by their dHash (a variant of the row near it) and by their 8
+    variants (the row's dHash near one of them). disjoint_problems reads
+    both, so a drop rule that reads one lets a pair through to step 8."""
+
+    def __init__(self):
+        self.hashes = NearHashIndex()
+        self.variants = NearHashIndex()
+
+    def add(self, r, part):
+        owner = (part, r["key"])
+        self.hashes.add(int(r["dhash"]), owner, max_bits=BITS)
+        for name, h in zip(G.VARIANTS, r["variants"]):
+            self.variants.add(int(h), (owner, name), max_bits=BITS)
+
+
 def _near_earlier(index, r):
     """((part, key), bits, variant) of the nearest image of an earlier part
-    within 6 bits of the row's dHash or one of its variants, else None."""
-    vs = list(zip(G.VARIANTS, r["variants"]))
+    within 6 bits, in either direction: one of the row's variants near its
+    dHash (variant: the row's), or the row's dHash near one of its variants
+    (variant: "earlier:<name>"). None without a hit; the first found wins a
+    tie, the row's variants in VARIANTS order first."""
     best = None
-    for name, h in vs:
-        m = index.find(h)
+    for name, h in zip(G.VARIANTS, r["variants"]):
+        m = index.hashes.find(int(h))
         if m is not None and (best is None or m[1] < best[1]):
             best = (m[0], m[1], name)
+    m = index.variants.find(int(r["dhash"]))
+    if m is not None and (best is None or m[1] < best[1]):
+        best = (m[0][0], m[1], "earlier:%s" % m[0][1])
     return best
 
 

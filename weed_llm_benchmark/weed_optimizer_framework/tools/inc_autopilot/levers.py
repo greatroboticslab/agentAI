@@ -187,15 +187,30 @@ def match_refusal(message, menu=None):
 
 
 # ---------------------------------------------------------------- render
+# Lineage keys of funnel steps that the autopilot derives from the evidence and
+# that no planner sets: they are declared here, not in levers.json's
+# param_bounds, which the planner's menu shows (brain_plan.menu_section). They
+# are no flag of the command; the executor keeps them as meta params and the
+# campaign's lineage keys a step by them (campaign.FUNNEL_KEY_PARAMS).
+LINEAGE_BOUNDS = {
+    "L10": {"detector": {"type": "enum", "value_type": "int", "values": [2],
+                         "why": "the copy detector version the pre-registration requires (its amendment A2, "
+                                "docs/FUNNEL_AUDIT.md 14; context funnel_leak, funnel_steps): the leak step of "
+                                "version 2 writes funnel/leak_v2.json; the leak verb reads the version from the "
+                                "pre-registration"}}}
+
+
 def check_params(lid, params, menu=None):
-    """(ok, reasons): params against the lever's param_bounds, with the
-    policy gate's own checker (no coercion; an undeclared key is refused),
-    and the one pair the bounds cannot express: --increment-sources evidence
-    with --relevance, which realloop refuses (M.EVIDENCE_WITH_RELEVANCE)."""
+    """(ok, reasons): params against the lever's param_bounds (and its
+    LINEAGE_BOUNDS), with the policy gate's own checker (no coercion; an
+    undeclared key is refused), and the one pair the bounds cannot express:
+    --increment-sources evidence with --relevance, which realloop refuses
+    (M.EVIDENCE_WITH_RELEVANCE)."""
     from ..brain import policy
     bounds = row(lid, menu).get("param_bounds")
     if not isinstance(bounds, dict):
         return False, ["%s declares no param_bounds" % lid]
+    bounds = dict(bounds, **LINEAGE_BOUNDS.get(lid, {}))
     ok, reasons = policy._check_params(params, bounds)
     if evidence_with_relevance(params):
         ok, reasons = False, list(reasons) + [M.EVIDENCE_WITH_RELEVANCE]
@@ -1092,12 +1107,45 @@ def _has(files, path):
     return path in files
 
 
+# The copy detector's record (contract docs/FUNNEL_AUDIT.md 14 A2): once the
+# pre-registration requires copy detector version v > 1 (the ticker's context
+# funnel_leak, read from the lab's copy of the prereg by campaign), the leak
+# step writes funnel/leak_v<v>.json, and its lineage key carries detector=v,
+# so the version 1 run the lineage holds does not stand for it (as L11a's
+# config key does for a stale cards index).
+LEAK_OUTPUT = "funnel/leak_v%d.json"
+
+
+def leak_detector(ev):
+    """(the copy detector version the funnel's leak step must produce, the
+    context record funnel_leak or None): the context's detector_version when
+    it is an integer >= 1, else 1."""
+    rec = (ev.json(E.CONTEXT) or {}).get("funnel_leak") if ev is not None else None
+    rec = rec if isinstance(rec, dict) else None
+    v = (rec or {}).get("detector_version")
+    return (v if isinstance(v, int) and not isinstance(v, bool) and v >= 1 else 1), rec
+
+
+def funnel_steps(ev):
+    """FUNNEL_STEPS with the leak step of the detector version the prereg
+    requires (leak_detector): its output funnel/leak_v<v>.json and, above
+    version 1, its lineage key detector=v."""
+    v, _rec = leak_detector(ev)
+    out = []
+    for lv, params, path in FUNNEL_STEPS:
+        if lv == "L10" and params.get("verb") == "leak" and v > 1:
+            params, path = dict(params, detector=v), LEAK_OUTPUT % v
+        out.append((lv, params, path))
+    return tuple(out)
+
+
 def funnel_next(ev, lid=None):
     """(lever, params, output) of the funnel's first cluster step whose output
     is not in the cluster listing, among steps of lever `lid` (default: any);
-    (None, None, None) when every step's output is there."""
+    (None, None, None) when every step's output is there. The leak step is
+    the one of the detector version the prereg requires (funnel_steps)."""
     files = cluster_files(ev)
-    for lv, params, out in FUNNEL_STEPS:
+    for lv, params, out in funnel_steps(ev):
         if lid is not None and lv != lid:
             continue
         if not _has(files, out):
@@ -1291,9 +1339,19 @@ def _build_funnel(lid, d, ev, menu):
         paths = _funnel_paths(ev, menu)
         derived = {"prereg": paths["prereg"], "out": paths["out"],
                    "sbatch_resources": funnel_resources(params["verb"], menu)}
+        step = {"writes": out}
+        if params.get("detector"):
+            # the prereg's amendment supersedes the version 1 record: the leak step runs again
+            _v, rec = leak_detector(ev)
+            step.update(detector_version=params["detector"], supersedes=LEAK_OUTPUT % 1,
+                        amendment=(rec or {}).get("amendment"))
+            try:
+                cites.append(ev.cite(E.CONTEXT, "/funnel_leak/detector_version"))
+            except KeyError:
+                pass
         return [_funnel_proposal("L10", params, derived, d, cites, menu,
                                  waits=_waits(ev, "L10", params["verb"], menu),
-                                 extra={"funnel_step": {"writes": out}})]
+                                 extra={"funnel_step": step})]
     if lid == "L11":
         nl, params, out = funnel_next(ev, "L11")
         if nl is None:

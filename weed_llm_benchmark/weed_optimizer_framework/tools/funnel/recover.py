@@ -57,8 +57,11 @@ Policies (one per image, in the order VETO > AUTH > CLASS > JUDGE):
        (refetch/chain_v1.json), then as R-C: H3a supported and every target
        box's class the class of an accepted card map whose gates passed.
 
-Preconditions: the audit is valid and did not stop; leak_v1.json records a
-calibrated copy detector and an H6(b) result without an incident.
+Preconditions: the audit is valid and did not stop; the copy detector's
+record (domain.leak_record: leak_v2.json when it exists; once an amendment of
+the prereg requires detector version 2 (contract §14 A2), leak_v2.json and
+never leak_v1.json, whose quarantine is the superseded first reading) records
+a calibrated detector and an H6(b) result without an incident.
 
 Never recoverable: guard stages, small boxes, sources the config marks not
 recoverable, sources H6(a) links to an evaluation set (the whole source), the
@@ -434,6 +437,24 @@ def _genus_unsure_units(funnel_dir, domain):
                 str(r.get("answer_taxon")).split()[0] in unsure:
             out.add(r.get("unit_id"))
     return out
+
+
+def leak_reading(funnel_dir, prereg):
+    """(path, record) of the copy detector's record recovery reads
+    (domain.leak_record). Once an amendment requires a later detector
+    version, its record must exist and state that version: leak_v1.json's
+    quarantine is never used in its place (contract §14 A2)."""
+    from . import domain as DM
+    path, version, why = DM.leak_record(funnel_dir, prereg)
+    if path is None:
+        raise RecoverError("no copy detector record to recover under: %s; nothing is recovered (contract §10 F4)"
+                           % why)
+    doc = read_json(path)
+    got = int(doc.get("detector_version") or 1)
+    if got != version:
+        raise RecoverError("%s states copy detector version %d, the prereg requires %d; nothing is recovered"
+                           % (path, got, version))
+    return path, doc
 
 
 def _quarantined(leak):
@@ -860,14 +881,17 @@ def write_overlay(plans, out_dir, adapter=None, dhash_of=None):
 
 
 def _default_detector(adapter, funnel_dir, leak_doc, domain):
-    """leak.detect against the evaluation index, with the calibration of
-    leak_v1.json (the evaluation descriptors never leave the cluster)."""
+    """leak.detect against the evaluation index, with the calibration of the
+    copy detector's record (leak_record) and the evaluation descriptors it
+    records (the file never leaves the cluster)."""
     from . import leak as L
     from . import embed as EM
     if domain is None:
         raise RecoverError("the H6 detector needs the domain config (its feature extractor)")
     embedder = EM.default_embedder(domain)
-    idx = L.eval_index(adapter, embedder, Path(funnel_dir) / "leak_eval_desc.npz")
+    rec = (leak_doc or {}).get("eval_descriptors") or {}
+    name = Path(rec["path"]).name if rec.get("path") else L.EVAL_DESC
+    idx = L.eval_index(adapter, embedder, Path(funnel_dir) / name)
 
     def detect(images):
         return L.detect(images, idx, leak_doc)
@@ -1000,8 +1024,7 @@ def run(prereg, domain, funnel_dir=None, out_dir=None, policies=("R-A", "R-C", "
     relation = _read_opt(funnel_dir / "relation_geometry_v1.json")
     maps_path = Path(maps_path or funnel_dir / "class_maps.json")
     class_maps = _read_opt(maps_path)
-    leak_path = funnel_dir / "leak_v1.json"
-    leak = read_json(leak_path)
+    leak_path, leak = leak_reading(funnel_dir, prereg)
     if ((leak.get("calibration") or {}).get("ok")) is not True:
         raise RecoverError("the copy detector in %s did not meet its calibration: H6(a) quarantines nothing that "
                            "can be trusted, so nothing is recovered (contract §10 F4)" % leak_path)

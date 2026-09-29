@@ -24,6 +24,7 @@ import pathlib
 import shutil
 import sys
 import tempfile
+import funnel_prereg as FPR  # noqa: E402
 
 PKG_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GIT_ROOT = PKG_ROOT.parent
@@ -46,7 +47,7 @@ def setup(prefix):
     shutil.copy(GIT_ROOT / "docs" / "FUNNEL_AUDIT.md", tmp / "repo" / "docs" / "FUNNEL_AUDIT.md")
     fd = tmp / "inc" / "funnel"
     fd.mkdir(parents=True)
-    shutil.copy(LOCAL_INC / "funnel" / "prereg_v1.json", fd / "prereg_v1.json")
+    FPR.write_pre_draw(fd / "prereg_v1.json", LOCAL_INC / "funnel" / "prereg_v1.json")
     # appended, not inserted: a package copy on PYTHONPATH (the mutation harness) comes first
     if str(PKG_ROOT) not in sys.path:
         sys.path.append(str(PKG_ROOT))
@@ -381,7 +382,8 @@ def sheet_world(tmp, domain):
                                  + [{"planted": planted}])
     pre = D.load_prereg(fd / "prereg_v1.json")
     D.append_amendment(fd / "prereg_v1.json", {
-        "id": "A1", "kind": "sample_lock", "date": "2026-09-28", "prereg_core_sha256": pre.core_sha256,
+        "id": D.next_amendment_id(pre), "kind": "sample_lock", "date": "2026-09-28",
+        "prereg_core_sha256": pre.core_sha256,
         "sample_sha256": sample_sha, "key_sha256": key_sha, "frames_sha256": frames_sha,
         "name_status_v2_sha256": "0" * 64, "frame_sizes": {g: v["N"] for g, v in groups.items()},
         "confirmatory_frames": {"H2a": 1, "H2b": 1, "H4_named": 1, "H4_noinfo": 1}})
@@ -602,8 +604,15 @@ def recover_world(tmp, domain):
          "status": "proposed", "reason": "card id 12 and geometry agree"},
         {"source": MH, "src_id": "5", "src_name": "5", "map_to": "MorningGlory", "via": "card",
          "status": "proposed", "reason": "card only"}]})
-    write_json_atomic(fd / "leak_v1.json", {"format": "funnel-leak/1", "h6a": {"quarantine": [QS]},
-                                            "h6b": {"base_copy": False, "increment_copies": {}, "incident": False},
+    # the copy detector's two readings (contract §14 A2): version 1 quarantined XS too (the per-pair calibration
+    # read per source); version 2, the one the prereg's amendment requires, quarantines QS only
+    write_json_atomic(fd / "leak_v1.json", {"format": "funnel-leak/1", "h6a": {"quarantine": [QS, XS]},
+                                            "h6b": {"base_copy": True, "increment_copies": {"S1": 3},
+                                                    "incident": True},
+                                            "h6c": {"groups": {"NDSU": [ND, ND2]}}, "calibration": {"ok": True}})
+    write_json_atomic(fd / "leak_v2.json", {"format": "funnel-leak/2", "detector_version": 2,
+                                            "h6a": {"quarantine": [QS]},
+                                            "h6b": {"base_copy": False, "increment_flagged": {}, "incident": False},
                                             "h6c": {"groups": {"NDSU": [ND, ND2]}}, "calibration": {"ok": True}})
     write_json_atomic(fd / "name_status_v2.json", {"names": [
         {"source": XS, "src_id": "0", "name": "Amaranthus rudis", "status_v2": "target_synonym", "via": "scientific",

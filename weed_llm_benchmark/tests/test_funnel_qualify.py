@@ -443,7 +443,8 @@ def main():
     save("J-knn2", "kt7", labels_o, {t["crop_id"]: "other" for t in known["KT7"]})
     check("other inputs are refused without --force", raises(lambda: Q.judges(prereg, domain, fd, adapter),
                                                            QualifyError))
-    D.append_amendment(fd / "prereg_v1.json", {"id": "A1", "kind": "sample_lock", "date": "2026-09-28",
+    D.append_amendment(fd / "prereg_v1.json", {"id": D.next_amendment_id(prereg), "kind": "sample_lock",
+                                               "date": "2026-09-28",
                                                "prereg_core_sha256": prereg.core_sha256, "sample_sha256": "0" * 64,
                                                "key_sha256": "0" * 64})
     locked = D.load_prereg(fd / "prereg_v1.json")

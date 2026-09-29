@@ -13,6 +13,23 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-09-29 — The "leakage" was a calibration error: at the funnel's threshold, 64 % of clean same-domain images looked like copies
+
+**What the cluster measured.** The third splits v2 build (job 47260765) scored every train_core image with a known capture session the way the copy scan scores an image: its best DINOv2 cosine over the evaluation images outside its own session and date. None of these images is a copy.
+- At the funnel's threshold (0.825636), 1,952 of the 3,048 still hit an evaluation image: a per-image false-positive rate of 64 %.
+- At the recalibrated threshold (0.946384), 30 did (about 1 %).
+- Augmented copies below the new threshold (the `crop` and `letterbox640` families) are recorded as known limits. The 6-bit dHash check under 8 flips and rotations still applies.
+
+**What it overturns.** The funnel's leak_v1 had quarantined 39 of 47 harvested sources (a video-game source among them) and declared incidents for base B (314 of 878 images) and for every realloop_v1 increment. Those readings measured each set's size and domain, not copying:
+- the threshold had been set on a per-pair rate (0.006), but the scan takes an image's maximum over about 9,500 comparisons;
+- a single hit quarantined a whole source.
+
+The pre-registration now carries amendment A2 (post hoc, dated): per-image calibration, and a binomial set rule for sources. leak_v1 is kept as the invalid first reading. The draw (A1, the sample lock) had already run; it does not depend on the detector. No reference label had been ingested or read.
+
+**What still failed.** The build refused at its last check. One train_core image and one 2023 image were within 6 dHash bits in the direction the drop rule did not read. dHash is not symmetric under rotation, so the two directions can disagree. The drop now reads both directions. The platform held the lane after the second failed build (its stop-loss).
+
+**Status.** No new accuracy number. Best sealed: test mAP50-95 0.8541 ± 0.0074, gap to 0.90: 0.046. Next: the fourth splits v2 build, then the R0 baselines on the enlarged base.
+
 ## 2026-09-28 — The professor's method had never run end to end; a continuous loop is built to run it
 
 **Where it stood.** The method is: a large high-precision base, fixed-size increments stacked on it, each gated, and rollback of what hurts. It was tested only in pieces:

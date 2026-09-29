@@ -13,8 +13,9 @@ sha256 in its MANIFEST.json:
   synthetic  claims registers, synthetic audits and class maps for R10-R12,
              the R13 vehicles domain (its config, ledger and claim), the R9b
              ledger reconstructed from the artifacts of 2026-08-25, the
-             high-yield negative control, and the R14 devil's-advocate
-             replies. Each carries its why in the manifest.
+             high-yield negative control, the R14 devil's-advocate
+             replies, and the R16 amendment A2 of the pre-registration.
+             Each carries its why in the manifest.
 
 No file sits directly at funnel/<name> under a name evidence.load_dir reads
 (funnel_ledger.json, audit_v1.json, class_maps.json, recovery.json,
@@ -508,6 +509,11 @@ def build(root):
         "R14: the positive devil's-advocate reply (contract 8.6: six counter-arguments, two concessions); "
         "written by the contract's author, so it tests the validator's mechanics only")
     put("da/da_sycophantic.json", da_sycophantic(ledger), "R14: a sycophantic reply (concessions without checks)")
+    pre = json.loads((LOCAL_INC / "funnel" / "prereg_v1.json").read_text())
+    put("leak_a2/amendment_A2.json", {"amendments": [a for a in pre.get("amendments") or []
+                                                    if "leak_detector_version" in (a.get("effects") or {})]},
+        "R16: the pre-registration's amendment A2 (2026-09-29, docs/FUNNEL_AUDIT.md 14), copied from "
+        "results/framework/inc/funnel/prereg_v1.json: it requires copy detector version 2, superseding leak_v1.json")
     return {"format": FORMAT, "frozen_utc": FROZEN_UTC,
             "what": "The funnel audit's replay fixtures (docs/FUNNEL_AUDIT.md 8.9; runner 5.5.10), read by "
                     "tests/test_funnel_ap_replay.py and pinned here: byte copies of the local results files, the "

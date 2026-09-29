@@ -10582,3 +10582,36 @@ Every result sat near test 0.85, against the 0.90 goal.
   - GPU SU remaining is 10,529;
   - /ocean has 454 GB free.
 - **No loop result exists yet.**
+
+## 2026-09-29 — v3.63.0 (in progress): copy detection per image (funnel amendment A2), and base v2's near-copy drop in both directions
+
+### What changed
+
+- **Funnel, amendment A2 (`docs/FUNNEL_AUDIT.md` §14; post hoc, R4): copy detector version 2.**
+  - Negatives are scored per image, as the scan scores an image: the maximum cosine over the evaluation set, leaving out the image's own capture session and date. The tiers are hard (train_core), hard session-disjoint, and provenance-disjoint.
+  - The threshold is the smallest cosine with a per-image false-positive rate of at most 1 % (its one-sided 97.5 % bound reported), never below v1's.
+  - H6(a) and H6(b) use a set rule: any hit within 6 dHash bits under a variant, or P(Binom(n, p) ≥ hits) < 0.001.
+  - `leak_v2.json` carries the v1 and v2 readings side by side. `leak_v1.json` is kept unchanged as the invalid first reading. Recovery, the H6 report and the draw's pair sentinels read the record the prereg requires, and never read `leak_v1.json` in its place.
+  - The autopilot proposes L10 `leak` again, keyed `detector=2` (replay R16).
+- **Funnel, the prereg's amendment ids.**
+  - The draw ran on the cluster (job 47261044) before A2 was deployed, so its sample lock is A1. A2 was appended to the cluster's prereg; the core is unchanged (`62fd2e34…`).
+  - `domain.next_amendment_id` now gives A<n+1> for the largest id number n, so an id is never reused.
+  - The synthetic test worlds start from the prereg without its sample lock (`tests/funnel_prereg.py`).
+- **Loop, D28 (`source_leak`).**
+  - A source is quarantined when it holds a dHash copy of an evaluation image, or when its embedding hits are improbable under the v2 calibration's per-image false-positive rate: P(Binom(images, p_false) ≥ hits) < 0.001.
+  - With no calibration, any hit flags (fail closed).
+  - `stream_summary` passes the LOCK's v2 calibration to the ticker.
+- **Loop, splits v2 (`inc2/splits.py`).** The drop of a row near an earlier part of base v2 now reads both directions: the row's variants against the earlier dHash, and the earlier image's variants against the row's dHash. The final disjointness check, which `lock` also runs, already read both.
+
+### Why
+
+- **The copy detector's threshold measured scene similarity.** On the cluster, the third splits v2 build (job 47260765) measured it directly. At the funnel's threshold 0.825636, 1,952 of 3,048 hard train_core negatives had a "copy" among the evaluation images: a per-image false-positive rate of 64 %. At the per-image threshold 0.946384, 30 did (about 1 %). leak_v1's quarantine of 39 of 47 sources and its incidents therefore measured each set's size and domain, not copying.
+- **Build 47260765 refused at its last check.** One train_core–tsw23 pair was within 6 dHash bits in the direction the drop rule did not read. dHash is taken after a 9×8 resize, which a rotation does not preserve, so the two directions can disagree. Nothing was written.
+
+### How verified
+
+- **Tests:** 96 of the 97 funnel, INC, inc2, stream, collect, brain and policy test scripts pass locally. They include a unit test for a pair that only the reverse direction finds, R16 against the rebuilt fixture `leak_a2/amendment_A2.json`, and the replay mutation suites. `funnel_ap_fixtures.py --check` rebuilds every pinned fixture byte for byte.
+- **Pre-existing failure:** `test_brain_api` fails as it does on the parent commit. `brain/supervision_health.py` (v3.56.0) reads the reviewer's output, which its v3.36.0 check forbids; neither file is changed here.
+- **Prereg:** the real prereg loads under the current contract with A1 (sample lock) and A2, core `62fd2e34…`.
+- **Not yet on the cluster:** `leak_v2.json` (the platform's next L10 step), and the fourth splits v2 build.
+- **No new accuracy number.** Best sealed: test mAP50-95 0.8541 ± 0.0074 (B0), gap to 0.90: 0.046.

@@ -39,6 +39,7 @@ import pathlib
 import shutil
 import sys
 import tempfile
+import funnel_prereg as FPR  # noqa: E402
 
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="funnel_embed_"))
 os.environ["INC_DIR"] = str(TMP / "inc")
@@ -53,7 +54,10 @@ for src, dst in ((REAL_REPO / "docs" / "FUNNEL_AUDIT.md", TMP / "repo" / "docs" 
                  (HERE.parents[1] / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json",
                   TMP / "inc" / "funnel" / "prereg_v1.json")):
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dst)
+    if dst.name == "prereg_v1.json":
+        FPR.write_pre_draw(dst, src)
+    else:
+        shutil.copyfile(src, dst)
 
 FAILURES, SKIPS = [], []
 

@@ -40,6 +40,7 @@ import pathlib
 import shutil
 import time
 import zlib
+import funnel_prereg as FPR  # noqa: E402
 
 IMG_W, IMG_H = 160, 120
 COLORS = [p for p in itertools.product((0, 128, 255), repeat=3)
@@ -211,8 +212,8 @@ def build_world(root, seed=0, with_probe=True, n_images=60, plant=None, core_fra
     (repo / "docs").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT.parent / "docs" / "FUNNEL_AUDIT.md", repo / "docs" / "FUNNEL_AUDIT.md")
     W.funnel_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json",
-                    W.funnel_dir / "prereg_v1.json")
+    FPR.write_pre_draw(W.funnel_dir / "prereg_v1.json",
+                       ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json")
 
     # ---------------------------------------------------------------- splits
     cwd = repo / "downloads" / "cottonweeddet12"

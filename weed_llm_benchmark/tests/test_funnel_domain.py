@@ -16,12 +16,20 @@ Pinned:
     non_dev_exams() is the non-decision list;
   * options() are numbered 1..n: targets in config order, then attractors,
     then the four tail options, with their answers;
-  * load_prereg refuses a contract whose sha256 differs from the prereg's;
+  * load_prereg refuses a contract whose sha256 differs from the one the
+    prereg names (the core's, or its last contract amendment's);
   * core_sha256 excludes the amendments: append_amendment keeps it, writes
     only the amendments list (the file stays json.dumps(indent=1) bytes), and
     refuses an amendment naming another core (the file was edited outside
     its amendments), a malformed amendment, a repeated id and a second
     sample lock;
+  * contract amendments (kind "amendment", contract §14): A1 records the
+    contract's sha256 before and after the edit and the copy detector
+    version 2; a broken chain refuses the prereg; an amendment whose sha256
+    is not the contract file's, whose heading is not in the contract, or
+    whose effect is unknown or not above the version in force is refused; a
+    second amendment chains from the first; leak_record picks leak_v2.json,
+    never leak_v1.json once A1 requires version 2;
   * terms() gives the grep terms of runner §7.5 from the config alone and
     leaves out the known-truth pseudo-source of the independent set.
 
@@ -31,6 +39,7 @@ import copy
 import json
 import os
 import pathlib
+import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -38,6 +47,19 @@ import funnel_stats_world as W  # noqa: E402
 
 TMP = W.setup("funnel_domain_")
 check, raises = W.check, W.raises
+
+
+def re_search(pattern, text):
+    return re.search(pattern, text, flags=re.M) is not None
+
+
+def raises_with(fn, exc, contains):
+    """True when fn raises exc with `contains` in its message."""
+    try:
+        fn()
+    except exc as e:
+        return contains in str(e)
+    return False
 
 from weed_optimizer_framework.tools import funnel as F  # noqa: E402
 from weed_optimizer_framework.tools.funnel import domain as D  # noqa: E402
@@ -214,7 +236,9 @@ check("the independent set's pseudo-source is not a term", "kt7" not in wt["subs
 
 print("prereg")
 pre = D.load_prereg(PREREG)
-check("prereg loads", pre.domain_name == "weed" and pre.amendments == [] and pre.sample_lock is None)
+check("prereg loads, holding one dated contract amendment (A2; the world leaves out the real sample lock, A1) and "
+      "no sample lock",
+      pre.domain_name == "weed" and [a["id"] for a in pre.amendments] == ["A2"] and pre.sample_lock is None)
 check("groups (planned, minimum)", pre.groups["G1"] == (300, 160) and pre.groups["sentinels"] == (400, None))
 core = {k: v for k, v in json.loads(PREREG.read_text()).items() if k != "amendments"}
 check("core sha = canonical JSON without amendments",
@@ -252,31 +276,114 @@ finally:
 
 print("amendments")
 raw_before = PREREG.read_bytes()
-am = {"id": "A1", "kind": "sample_lock", "date": "2026-09-28", "prereg_core_sha256": pre.core_sha256,
+nxt = D.next_amendment_id(pre)
+am = {"id": nxt, "kind": "sample_lock", "date": "2026-09-28", "prereg_core_sha256": pre.core_sha256,
       "sample_sha256": "0" * 64}
 new = D.append_amendment(PREREG, am)
 pre2 = D.load_prereg(PREREG)
-check("amendment appended", pre2.amendments == [am] and pre2.sample_lock["id"] == "A1")
+check("amendment appended, with the next free id (A3: A1 stays the real sample lock's)", nxt == "A3"
+      and pre2.amendments[-1] == am and pre2.sample_lock["id"] == "A3"
+      and pre2.amendments[:-1] == pre.amendments)
 check("core sha unchanged", pre2.core_sha256 == pre.core_sha256)
 check("raw sha changed", pre2.sha256 != pre.sha256)
 check("file is json.dumps(indent=1) of the new object", PREREG.read_text() == json.dumps(new, indent=1,
                                                                                           ensure_ascii=False))
 check("everything but amendments byte-equal in JSON",
       {k: v for k, v in json.loads(PREREG.read_text()).items() if k != "amendments"} == core)
-check("next amendment id", D.next_amendment_id(pre2) == "A2")
+check("next amendment id", D.next_amendment_id(pre2) == "A4")
 check("repeated id refused", raises(lambda: D.append_amendment(PREREG, dict(am, kind="note")), F.PreregError))
-check("second sample lock refused", raises(lambda: D.append_amendment(PREREG, dict(am, id="A2")), F.PreregError))
-check("missing date refused", raises(lambda: D.append_amendment(PREREG, {"id": "A2", "kind": "note"}),
+check("second sample lock refused", raises(lambda: D.append_amendment(PREREG, dict(am, id="A4")), F.PreregError))
+check("missing date refused", raises(lambda: D.append_amendment(PREREG, {"id": "A4", "kind": "note"}),
                                      F.PreregError))
-check("bad date refused", raises(lambda: D.append_amendment(PREREG, {"id": "A2", "kind": "note", "date": "28/09"}),
+check("bad date refused", raises(lambda: D.append_amendment(PREREG, {"id": "A4", "kind": "note", "date": "28/09"}),
                                  F.PreregError))
+check("a sample lock (or any kind but amendment) recording a contract sha256 or effects is refused",
+      raises(lambda: D.append_amendment(PREREG, {"id": "A4", "kind": "note", "date": "2026-09-29",
+                                                 "contract_sha256": "0" * 64}), F.PreregError)
+      and raises(lambda: D.append_amendment(PREREG, {"id": "A4", "kind": "note", "date": "2026-09-29",
+                                                     "effects": {D.LEAK_DETECTOR_EFFECT: 3}}), F.PreregError))
 edited = json.loads(PREREG.read_text())
 edited["hypotheses"]["H1"]["supported"] = "LB>=0.50 overall and for Ragweed"
 PREREG.write_text(json.dumps(edited, indent=1))
 check("an edit outside amendments is refused (the amendment names the old core)",
-      raises(lambda: D.append_amendment(PREREG, {"id": "A2", "kind": "note", "date": "2026-09-29",
+      raises(lambda: D.append_amendment(PREREG, {"id": "A4", "kind": "note", "date": "2026-09-29",
                                                  "prereg_core_sha256": pre.core_sha256}), F.PreregError))
 PREREG.write_bytes(raw_before)
 check("prereg restored", D.load_prereg(PREREG).sha256 == pre.sha256)
+
+print("contract amendments (runner §3.3; contract §14)")
+import hashlib  # noqa: E402
+contract_text = contract.read_bytes()
+a1 = pre.amendments[0]
+core_contract = pre.raw["contract"]["sha256"]
+check("A2: kind amendment, post hoc, dated, the contract's sha256 before and after the edit, effects "
+      "leak_detector_version 2, made under the unchanged core",
+      a1["kind"] == "amendment" and a1["post_hoc"] is True and a1["date"] == "2026-09-29"
+      and a1["contract_sha256_before"] == core_contract and a1["contract_sha256"] != core_contract
+      and a1["contract_sha256"] == hashlib.sha256(contract_text).hexdigest()
+      and a1["effects"] == {D.LEAK_DETECTOR_EFFECT: 2} and a1["prereg_core_sha256"] == pre.core_sha256, a1)
+check("the contract in force is A2's; the core still names the pre-registered one",
+      D.contract_sha256_of(pre) == pre.contract_sha256 == a1["contract_sha256"]
+      and pre.raw["contract"]["sha256"] == core_contract)
+check("the contract carries the amendment's heading", re_search(r"^### A2\b", contract_text.decode("utf-8")))
+check("the copy detector version: 2 (A2); a prereg without the amendment requires 1",
+      D.leak_detector_version(pre) == 2 and (D.leak_detector_amendment(pre) or {}).get("id") == "A2"
+      and D.leak_detector_version(dict(pre.raw, amendments=[])) == 1)
+tampered = json.loads(raw_before)
+tampered["amendments"][0]["contract_sha256_before"] = "f" * 64
+PREREG.write_text(json.dumps(tampered, indent=1))
+check("an amendment chain that does not start from the core's contract refuses the prereg",
+      raises_with(lambda: D.load_prereg(PREREG), F.PreregError, "edited"))
+PREREG.write_bytes(raw_before)
+
+
+def amend_contract(extra):
+    contract.write_bytes(contract_text + extra)
+    return hashlib.sha256(contract_text + extra).hexdigest()
+
+
+a2 = {"id": "A3", "kind": "amendment", "date": "2026-09-30", "post_hoc": True, "text": "a test amendment"}
+sha_x = amend_contract(b"\n### A3 - a test amendment\n")
+check("an amendment whose contract_sha256 is not the contract file's is refused (nothing written)",
+      raises(lambda: D.append_amendment(PREREG, dict(a2, contract_sha256="0" * 64)), F.PreregError)
+      and PREREG.read_bytes() == raw_before)
+sha_y = amend_contract(b"\nno heading for it\n")
+check("an amendment whose heading ('### A3') is not in the contract is refused",
+      raises_with(lambda: D.append_amendment(PREREG, dict(a2, contract_sha256=sha_y)), F.PreregError, "heading")
+      and PREREG.read_bytes() == raw_before)
+sha_x = amend_contract(b"\n### A3 - a test amendment\n")
+check("an effect the engine does not know, or a detector version not above the one in force, is refused",
+      raises(lambda: D.append_amendment(PREREG, dict(a2, contract_sha256=sha_x, effects={"x": 1})), F.PreregError)
+      and raises(lambda: D.append_amendment(PREREG, dict(a2, contract_sha256=sha_x,
+                                                         effects={D.LEAK_DETECTOR_EFFECT: 2})), F.PreregError))
+check("a text-less or post_hoc-less amendment is refused",
+      raises(lambda: D.append_amendment(PREREG, dict(a2, contract_sha256=sha_x, text="")), F.PreregError)
+      and raises(lambda: D.append_amendment(PREREG, {k: v for k, v in dict(a2, contract_sha256=sha_x).items()
+                                                     if k != "post_hoc"}), F.PreregError))
+D.append_amendment(PREREG, dict(a2, contract_sha256=sha_x))
+pre3 = D.load_prereg(PREREG)
+check("a second contract amendment chains from the first: the contract in force is the newest, the core unchanged",
+      pre3.contract_sha256 == sha_x and pre3.amendments[-1]["contract_sha256_before"] == a1["contract_sha256"]
+      and pre3.core_sha256 == pre.core_sha256 and D.leak_detector_version(pre3) == 2)
+contract.write_bytes(contract_text)
+check("  the older contract no longer loads the prereg", raises(lambda: D.load_prereg(PREREG), F.PreregError))
+PREREG.write_bytes(raw_before)
+check("prereg and contract restored", D.load_prereg(PREREG).sha256 == pre.sha256)
+
+print("the copy detector's record every reader uses (domain.leak_record)")
+lk = TMP / "leakdir"
+lk.mkdir()
+p1, v1_, why1 = D.leak_record(lk, pre)
+check("A2 in force, leak_v2.json missing: no record (never leak_v1.json in its place), with the reason",
+      p1 is None and v1_ == 2 and "A2" in why1 and "leak_v1.json" in why1, why1)
+(lk / "leak_v1.json").write_text("{}")
+check("  even when leak_v1.json exists", D.leak_record(lk, pre)[0] is None and D.leak_pairs_path(lk, pre) is None)
+(lk / "leak_v2.json").write_text("{}")
+check("  leak_v2.json once it exists, with its pairs file",
+      D.leak_record(lk, pre)[:2] == (lk / "leak_v2.json", 2) and D.leak_pairs_path(lk, pre) == lk / "leak_pairs_v2.csv")
+raw1 = dict(pre.raw, amendments=[])
+check("without the amendment: leak_v2.json when it exists, else leak_v1.json",
+      D.leak_record(lk, raw1)[:2] == (lk / "leak_v2.json", 2)
+      and (os.unlink(lk / "leak_v2.json") or D.leak_record(lk, raw1)[:2] == (lk / "leak_v1.json", 1)))
 
 W.finish()

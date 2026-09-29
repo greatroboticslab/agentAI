@@ -7,10 +7,11 @@ into it (runner §1.5).
 
 build_world(fd, ...) writes a small census in the formats of runner §4.1-4.4
 (census_v1.json, ledger.jsonl, name_status_v2.json, funnel_ledger.json,
-guard_pairs_v1.csv, leak_pairs_v1.csv) for the weed config, and returns a
-FakeAdapter serving the known truth of runner §4.6. Every source slug and
-class name comes from domains/weed.json; every count is chosen here and is
-synthetic.
+guard_pairs_v1.csv, leak_pairs_v1.csv, and leak_pairs_v2.csv with a minimal
+leak_v2.json: the prereg's amendment A2 requires copy detector version 2) for
+the weed config, and returns a FakeAdapter serving the known truth of runner
+§4.6. Every source slug and class name comes from domains/weed.json; every
+count is chosen here and is synthetic.
 """
 import hashlib
 import json
@@ -19,6 +20,7 @@ import pathlib
 import shutil
 import sys
 import tempfile
+import funnel_prereg as FPR  # noqa: E402
 
 PKG_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GIT_ROOT = PKG_ROOT.parent
@@ -64,7 +66,7 @@ def setup(prefix):
     shutil.copy(GIT_ROOT / "docs" / "FUNNEL_AUDIT.md", tmp / "repo" / "docs" / "FUNNEL_AUDIT.md")
     fd = tmp / "inc" / "funnel"
     fd.mkdir(parents=True)
-    shutil.copy(LOCAL_INC / "funnel" / "prereg_v1.json", fd / "prereg_v1.json")
+    FPR.write_pre_draw(fd / "prereg_v1.json", LOCAL_INC / "funnel" / "prereg_v1.json")
     sys.path.insert(0, str(PKG_ROOT))
     return tmp
 
@@ -305,11 +307,16 @@ def build_world(fd, dom, prereg_path):
         for i in range(5):
             w.writerow(["p:%s|images/c%02d.jpg|train_core|tc%03d" % (LU, i, i), "cwd12_copy", LU, "images/c%02d.jpg" % i,
                         1, "train_core", "tc%03d" % i, "", 2, "a", "b", 1])
-    with open(fd / "leak_pairs_v1.csv", "w", newline="") as fh:
-        w = csv.writer(fh, lineterminator="\n")
-        w.writerow(["set", "key", "eval_split", "eval_key", "cos", "bits", "variant", "kind"])
-        for i in range(25):
-            w.writerow([REF, "tc%03d" % i, MH, "mh_12_img%03d" % i, 0.3, 8, "id", "negative"])
+    # the copy detector's pairs files: version 1's, and version 2's (amendment A2 of the prereg requires it;
+    # both list the same calibration negatives), with a minimal leak_v2.json naming the version
+    for name in ("leak_pairs_v1.csv", "leak_pairs_v2.csv"):
+        with open(fd / name, "w", newline="") as fh:
+            w = csv.writer(fh, lineterminator="\n")
+            w.writerow(["set", "key", "eval_split", "eval_key", "cos", "bits", "variant", "kind"])
+            for i in range(25):
+                w.writerow([REF, "tc%03d" % i, MH, "mh_12_img%03d" % i, 0.3, 8, "id", "negative"])
+    (fd / "leak_v2.json").write_text(json.dumps({"format": "funnel-leak/2", "detector_version": 2,
+                                                 "calibration": {"ok": True}}))
     return FakeAdapter(known_truth(dom), dom.other["id"])
 
 

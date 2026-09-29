@@ -1497,12 +1497,21 @@ def h5b(ctx):
 
 
 def h6(ctx):
+    """H6 is reported, not tested: the routing of the copy detector's record
+    (domain.leak_record: leak_v2.json when it exists, and, once an amendment
+    requires detector version 2, never leak_v1.json; contract §14 A2). A
+    version 2 record also carries the superseded first reading."""
     if ctx.leak is None:
-        return _hyp(ctx.prereg, "H6", "not_evaluated", "leak_v1.json is missing")
+        return _hyp(ctx.prereg, "H6", "not_evaluated", getattr(ctx, "leak_why", None) or "leak_v1.json is missing")
     lk = ctx.leak
-    return _hyp(ctx.prereg, "H6", "reported", "routing from leak_v1.json", estimator="copy detector",
-                parts={"calibration_ok": (lk.get("calibration") or {}).get("ok"), "h6a": lk.get("h6a"),
-                       "h6b": lk.get("h6b"), "h6c": lk.get("h6c")})
+    ver = int(lk.get("detector_version") or 1)
+    name = D.LEAK_FILES.get(ver, ("leak_v%d.json" % ver,))[0]
+    parts = {"detector_version": ver, "calibration_ok": (lk.get("calibration") or {}).get("ok"),
+             "h6a": lk.get("h6a"), "h6b": lk.get("h6b"), "h6c": lk.get("h6c")}
+    if ver > 1:
+        parts["readings"] = lk.get("readings")
+        parts["amendment"] = lk.get("amendment")
+    return _hyp(ctx.prereg, "H6", "reported", "routing from %s" % name, estimator="copy detector", parts=parts)
 
 
 def h7(ctx):
@@ -2382,9 +2391,11 @@ def build_context(prereg_path, funnel_dir, adapter, domain=None):
             known = adapter.known_truth(dom, fd)
         except Exception as e:
             raise EstimateError("the adapter's known truth could not be read (%s)" % e)
+    leak_p, _leak_ver, leak_why = D.leak_record(fd, pre)
     ctx = Context(dom, pre, frames, sample, key, gold, rlq, jq=jq, materials=materials,
                   census=census, rel_geo=_load_optional(fd / "relation_geometry_v1.json"),
-                  rel_audit=_load_optional(fd / "relation_audit_v1.json"), leak=_load_optional(fd / "leak_v1.json"),
+                  rel_audit=_load_optional(fd / "relation_audit_v1.json"),
+                  leak=_load_optional(leak_p) if leak_p else None,
                   da=read_json(fd / "prospective_da.json"), calib=_load_optional(STEP1_DIR / "calibration.json"),
                   class_maps=_load_optional(fd / "class_maps.json"),
                   name_status=_load_optional(fd / "name_status_v2.json"),
@@ -2398,7 +2409,8 @@ def build_context(prereg_path, funnel_dir, adapter, domain=None):
               "gold_v1": file_record(gold_p), "rl_qualification": file_record(fd / "rl_qualification.json"),
               "prospective_da": file_record(fd / "prospective_da.json")}
     for opt in ("judge_qualification.json", "census_v1.json", "relation_geometry_v1.json", "relation_audit_v1.json",
-                "leak_v1.json", "class_maps.json", "name_status_v2.json", "funnel_ledger.json", "ledger.jsonl"):
+                "leak_v1.json", "leak_v2.json", "class_maps.json", "name_status_v2.json", "funnel_ledger.json",
+                "ledger.jsonl"):
         if (fd / opt).exists():
             inputs[opt.rsplit(".", 1)[0]] = file_record(fd / opt)
     for opt, p in (("calibration", STEP1_DIR / "calibration.json"),
@@ -2407,6 +2419,7 @@ def build_context(prereg_path, funnel_dir, adapter, domain=None):
         if p.exists():
             inputs[opt] = file_record(p)
     ctx.inputs = inputs
+    ctx.leak_why = leak_why
     return ctx
 
 

@@ -1986,7 +1986,8 @@ FUNNEL_SHIP = (("funnel/funnel_ledger.json", "funnel/funnel_ledger.json"),
                ("step1/calibration.json", "step1/calibration.json"))
 FUNNEL_NEVER = ("step1/conflicts.csv", "step1/pool_verdicts.npz", "funnel/ledger.jsonl", "funnel/sample_v1_key.jsonl",
                 "funnel/sheets_v1_key/", "funnel/sheets_v1_cluster/", "funnel/leak_eval_desc.npz",
-                "funnel/leak_pairs_v1.csv")
+                "funnel/leak_pairs_v1.csv", "funnel/leak_v2_eval_desc.npz", "funnel/leak_pairs_v2.csv",
+                "funnel/leak_negatives_v2.csv")
 FUNNEL_LISTING_DEPTH = 3                 # funnel/<a>/<b>/<file>: rl_answers/RL-B/<sheet>.json
 FUNNEL_HASH_MAX = 64 << 20               # a bigger file is listed with its size, sha256 null
 FIT_INFO = "step1/verifier/fit_info.json"

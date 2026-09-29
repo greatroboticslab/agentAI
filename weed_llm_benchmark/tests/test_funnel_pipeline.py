@@ -55,8 +55,10 @@ Asserted, beyond every step completing:
     hashes as recorded; its code record is the code that ran; each consumer
     records its producer's file; the sample lock names the sample, key,
     frames and name status;
-  * census reconciles; leak calibrates and quarantines the no-name source
-    whole; H0(b) passes on the planted copies; pairs stay on cluster sheets;
+  * census reconciles; leak (copy detector version 2: the prereg's
+    amendment A2 requires it, so the verb writes leak_v2.json and no
+    leak_v1.json) calibrates per image and quarantines the source holding
+    the flipped dev copy whole; H0(b) passes on the planted copies; pairs stay on cluster sheets;
     no pool sheet names a source, unit, stratum or verdict; RL-A answers pool
     sheets only; the machine RL qualifies at species level in H0's scope;
   * the estimates cover the planted truth: H0 is supported with the planted
@@ -774,7 +776,7 @@ def verify(w, fd, r1, dom, prereg, FW, C):
     sha = C.sha256_file
 
     print("the freshness chain (runner §7.3): headers, recorded inputs and code")
-    arts = ["census_v1.json", "name_status_v2.json", "funnel_ledger.json", "leak_v1.json", "kt7/kt7_index.json",
+    arts = ["census_v1.json", "name_status_v2.json", "funnel_ledger.json", "leak_v2.json", "kt7/kt7_index.json",
             "relation_geometry_v1.json", "class_maps.json", "judges/index.json", "judge_qualification.json",
             "relation_audit_v1.json", "frames_v1.json", "sheets_v1/index.json", "sheets_v1_cluster/index.json",
             "gold_v1.json", "rl_qualification.json", "audit_v1.json"]
@@ -813,17 +815,17 @@ def verify(w, fd, r1, dom, prereg, FW, C):
              ("audit_v1.json", "rl_qualification", fd / "rl_qualification.json"),
              ("audit_v1.json", "prospective_da", fd / "prospective_da.json"),
              ("audit_v1.json", "sample_v1", fd / "sample_v1.csv"),
-             ("audit_v1.json", "leak_v1", fd / "leak_v1.json"),
+             ("audit_v1.json", "leak_v2", fd / "leak_v2.json"),
              ("step1_r1/recovery.json", "audit", fd / "audit_v1.json"),
-             ("step1_r1/recovery.json", "leak", fd / "leak_v1.json"),
+             ("step1_r1/recovery.json", "leak", fd / "leak_v2.json"),
              ("step1_r1/arms/arms.json", "recovery", r1 / "recovery.json"),
              ("step1_r1/arms/arms.json", "exp", w.inc_dir / "realloop_v2" / "exp.json")]
     missing = [(a, n) for a, n, p in links if (docs[a].get("inputs") or {}).get(n, {}).get("sha256") != sha(p)]
     check("each consumer records its producer's file (%d links, census -> ... -> arms)" % len(links), not missing,
           missing)
     lock = pre.sample_lock or {}
-    check("the sample lock is the prereg's one amendment and names the sample, key, frames and name status",
-          [a.get("kind") for a in pre.amendments] == ["sample_lock"]
+    check("the sample lock follows the prereg's contract amendment A2 (as A3) and names the sample, key, frames and "
+          "name status", [(a.get("id"), a.get("kind")) for a in pre.amendments] == [("A2", "amendment"), ("A3", "sample_lock")]
           and lock.get("sample_sha256") == sha(fd / "sample_v1.csv")
           and lock.get("key_sha256") == sha(fd / "sample_v1_key.jsonl")
           and lock.get("frames_sha256") == sha(fd / "frames_v1.json")
@@ -838,15 +840,19 @@ def verify(w, fd, r1, dom, prereg, FW, C):
           [c for c in cen["reconciliation"]["checks"] if not c["ok"]])
     check("the funnel ledger validates", not LG.validate(docs["funnel_ledger.json"]),
           LG.validate(docs["funnel_ledger.json"])[:5])
-    lk = docs["leak_v1.json"]
-    check("the copy detector passed its calibration on the planted negatives (7-10 bits, provenance-disjoint)",
-          lk["calibration"]["ok"] and lk["calibration"]["negatives"]["pairs_7_10"]["n"] >= len(planted["negatives"]),
-          lk["calibration"]["why"])
+    # the prereg's amendment A2 (contract §14) requires copy detector version 2: the leak verb wrote leak_v2.json
+    lk = docs["leak_v2.json"]
+    v1n = ((lk["readings"]["v1"].get("calibration") or {}).get("negatives") or {}).get("pairs_7_10") or {}
+    check("the copy detector (version 2, per image) passed its calibration; version 1's per-pair calibration, "
+          "rebuilt, holds the planted negatives (7-10 bits, provenance-disjoint)",
+          lk["detector_version"] == 2 and not (fd / "leak_v1.json").exists() and lk["calibration"]["ok"]
+          and lk["calibration"]["negatives"]["hard"]["n"] > 0 and v1n.get("n", 0) >= len(planted["negatives"])
+          and lk["calibration"]["cos_threshold"] >= lk["calibration"]["floor"], lk["calibration"]["why"])
     gh_copy = "%s__%s" % (FW.GREENHOUSE, planted["h6_copy"]["stem"])
     listed = [(c["key"], c["eval_key"]) for c in lk["scans"]["source:%s" % FW.GREENHOUSE]["listed"]]
-    check("H6(a): the flipped dev copy is found and its source is quarantined as a whole",
-          (gh_copy, planted["h6_copy"]["eval_key"]) in listed and lk["h6a"]["quarantine"] == [FW.GREENHOUSE],
-          (listed, lk["h6a"]))
+    check("H6(a): the flipped dev copy is found (dHash variants) and its source is quarantined as a whole",
+          (gh_copy, planted["h6_copy"]["eval_key"]) in listed and lk["h6a"]["quarantine"] == [FW.GREENHOUSE]
+          and lk["scans"]["source:%s" % FW.GREENHOUSE]["dhash_hits"] >= 1, (listed, lk["h6a"]["quarantine"]))
     check("H6(b): base B and realloop_v1's increments hold no copy", lk["h6b"]["incident"] is False
           and lk["h6b"]["cleared"] is True, lk["h6b"])
     ra = docs["relation_audit_v1.json"]

@@ -50,6 +50,16 @@ tests/fixtures/inc_replay/funnel/, never typed):
          with a person), a job that ended FAILED lets the step run again once
          the file is on the cluster, and the third failed run stays with a
          person with the job's state and log path.
+  R16    the copy detector superseded (contract 14 A2, 2026-09-29): the
+         pre-registration's amendment requires detector version 2 (the
+         pinned amendment fixture, through the ticker's own context builder);
+         with leak_v1.json on the cluster and the version 1 leak step in the
+         lineage, L10 proposes leak again with its exact command, keyed
+         detector=2 in the lineage (the version 1 run does not stand for it),
+         writing funnel/leak_v2.json; without the amendment leak_v1.json
+         stands; a version 2 run that ran waits for a person, one whose job
+         FAILED is proposed again, and leak_v2.json on the cluster moves the
+         funnel on.
   funnel_negative_controls  pilot_v1-v3, b0_v1 and base_b_v1 with the funnel
          ledger and no claim: D17 is silent (no conclusion); a high-yield Step
          1 with out-of-domain known truth: D19 is silent.
@@ -511,6 +521,118 @@ def test_r15():
           "does not carry: deferred for a person, never run to a sure refusal",
           list(fw) == ["known-items"] and not props(res, "L11a")
           and any("--what known-items" in r and "--sources" in r for r in deferred(res, "L11a")), deferred(res, "L11a"))
+
+
+# ------------------------------------------------------------------------ R16
+# The cluster's funnel files on 2026-09-29, when leak_v1.json's reading was
+# found invalid (contract 14 A2): census, leak (version 1), the cards, the
+# geometry match and the KT7 photos done; no judges yet.
+LIVE_0929 = LIVE_0928 + KT7_FILES
+LINEAGE_0929 = LINEAGE_0928 + [{"lever": "L11a", "status": "executed", "params": {"what": "kt7"}}]
+LEAK_V2 = "funnel/leak_v2.json"
+
+
+def test_r16():
+    print("R16 the copy detector superseded (contract 14 A2, 2026-09-29): the prereg's amendment requires detector "
+          "version 2; the platform proposes L10 leak again, keyed by the detector version, until leak_v2.json is on "
+          "the cluster")
+    from weed_optimizer_framework.tools.inc_autopilot import campaign as CP
+    from weed_optimizer_framework.tools.inc_autopilot import executor as X
+    from weed_optimizer_framework.tools.brain import policy as POL
+    from weed_optimizer_framework.tools.funnel import domain as FD
+    claims = jload(FF / "claims" / "claims_seed.json")
+    root = funnel_world("r16")
+    inc = cluster_inc()
+    fx = FF / "leak_a2" / "amendment_A2.json"
+    leak_ctx = CP.funnel_leak_context(fx)
+    a1 = jload(fx)["amendments"][0]
+    check("the fixture is the prereg's amendment A2 (post hoc, R4, contract 14; A1 is the draw's sample lock), and it "
+          "requires detector version 2",
+          a1["id"] == "A2" and a1["kind"] == "amendment" and a1["post_hoc"] is True
+          and a1["effects"] == {FD.LEAK_DETECTOR_EFFECT: 2}, a1)
+    check("the ticker's context record from it: detector_version 2, amendment A2",
+          (leak_ctx or {}).get("detector_version") == 2 and (leak_ctx.get("amendment") or {}).get("id") == "A2"
+          and len(leak_ctx.get("prereg_sha256") or "") == 64, leak_ctx)
+    check("  a pre-registration without such an amendment gives no record (the leak step stays version 1)",
+          CP.funnel_leak_context(FF / "claims" / "claims_seed.json") is None)
+    real = ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json"
+    check("  and the repository's pre-registration gives the same record as the fixture",
+          (CP.funnel_leak_context(real) or {}).get("detector_version") == 2
+          and (CP.funnel_leak_context(real) or {}).get("amendment") == leak_ctx["amendment"])
+
+    def evidence(files, lineage=(), with_amendment=True):
+        (root / "funnel" / "files.json").write_text(json.dumps(
+            {"format": "funnel-files/1", "files": {p: {"sha256": _sha(p), "bytes": 1} for p in files}}))
+        ctx = {"lineage": list(lineage)}
+        if with_amendment:
+            ctx["funnel_leak"] = leak_ctx
+        return E.load_dir(root, "realloop_v1", exps=["realloop_v1"], context=ctx, claims=claims)
+
+    def props(res, lever):
+        return [p for p in res["proposals"] if p["lever"] == lever]
+
+    def deferred(res, lever):
+        return [x["reason"] for x in res["deferred"] if x["lever"] == lever]
+
+    def executable(p):
+        row = POL.describe(p["policy_action"])
+        pol, _meta = X.resolve_params(p["policy_action"], row, p["params"], p["argv"], p["est_gpu_hours"])
+        ok, _why = X.argv_check(X.render(p["policy_action"], pol), p["argv"])
+        return ok and POL._check_params(pol, row["param_bounds"])[0]
+
+    want = ["sbatch", "run_inc_funnel.sh", "leak", "--prereg", inc + "/funnel/prereg_v1.json", "--out",
+            inc + "/funnel/"]
+    # (1) the state of 2026-09-29: leak_v1.json on the cluster, the version 1 leak step in the lineage
+    ev = evidence(LIVE_0929, LINEAGE_0929)
+    diags, by, res = run(ev)
+    l10 = props(res, "L10")
+    check("D17 fires and L10's next step is leak again, keyed detector=2 (leak_v2.json is not on the cluster)",
+          by["D17"]["fired"] and LV.funnel_next(ev, "L10") == ("L10", {"verb": "leak", "detector": 2}, LEAK_V2),
+          LV.funnel_next(ev, "L10"))
+    check("L10 leak is proposed with its exact command (the leak verb reads the version from the prereg)",
+          len(l10) == 1 and l10[0]["argv"] == want and l10[0]["params"].get("detector") == 2
+          and executable(l10[0]), l10 and (l10[0]["argv"], l10[0]["params"]))
+    step = (l10[0].get("funnel_step") if l10 else None) or {}
+    check("  it writes funnel/leak_v2.json and supersedes funnel/leak_v1.json under amendment A2, citing the context",
+          step.get("writes") == LEAK_V2 and step.get("supersedes") == "funnel/leak_v1.json"
+          and (step.get("amendment") or {}).get("id") == "A2" and step.get("detector_version") == 2
+          and any(c.get("artifact") == E.CONTEXT and c.get("pointer") == "/funnel_leak/detector_version"
+                  for c in l10[0]["cites"]), step)
+    check("  the version 1 run in the lineage does not stand for it (its key lacks detector)",
+          not any("was already run" in r for r in deferred(res, "L10")), deferred(res, "L10"))
+    rec = {"lever": "L10", "params": {"verb": "leak"}, "meta_params": {"detector": 2, "est_gpu_hours": 8.0}}
+    check("  its lineage key (campaign._step_params) carries the detector version, like L11a's config key",
+          CP._step_params(rec) == {"verb": "leak", "detector": 2}
+          and CP._step_params({"lever": "L10", "params": {"verb": "leak"}}) == {"verb": "leak"}
+          and "detector" in CP.FUNNEL_KEY_PARAMS)
+    check("  the executor splits it off as a meta param (no flag of the command)",
+          l10 and X.resolve_params(l10[0]["policy_action"], POL.describe(l10[0]["policy_action"]), l10[0]["params"],
+                                   l10[0]["argv"], l10[0]["est_gpu_hours"])[1].get("detector") == 2)
+    # (2) without the amendment the version 1 record stands (R15's state: embed-judges next)
+    ev = evidence(LIVE_0929, LINEAGE_0929, with_amendment=False)
+    check("without the amendment, leak_v1.json stands and L10 moves on to embed-judges",
+          LV.funnel_next(ev, "L10") == ("L10", {"verb": "embed-judges"}, "funnel/judges/"), LV.funnel_next(ev, "L10"))
+    # (3) the version 2 leak step ran and its output is not there yet: a person decides
+    ran = {"lever": "L10", "status": "executed", "params": {"verb": "leak", "detector": 2}}
+    ev = evidence(LIVE_0929, LINEAGE_0929 + [ran])
+    diags, by, res = run(ev)
+    check("the version 2 leak step that ran is not proposed again while its output is missing (a person decides)",
+          not props(res, "L10") and any("was already run in this campaign" in r for r in deferred(res, "L10")),
+          deferred(res, "L10"))
+    # (4) its job ended FAILED: proposed again (funnel_job_retries)
+    failed = dict(ran, status="failed", job={"ids": ["47400001"], "states": {"47400001": "FAILED"},
+                                            "log": "%s/funnel/logs/inc_funnel_leak_47400001.out" % inc})
+    diags, by, res = run(evidence(LIVE_0929, LINEAGE_0929 + [failed]))
+    check("its job ended FAILED: the version 2 leak step is proposed again, with the same command",
+          [p["argv"] for p in props(res, "L10")] == [want], [p["argv"] for p in props(res, "L10")])
+    # (5) leak_v2.json on the cluster: the funnel moves on
+    ev = evidence(LIVE_0929 + (LEAK_V2,), LINEAGE_0929 + [ran])
+    check("once funnel/leak_v2.json is on the cluster, L10 moves on to embed-judges",
+          LV.funnel_next(ev, "L10") == ("L10", {"verb": "embed-judges"}, "funnel/judges/"), LV.funnel_next(ev, "L10"))
+    check("  and the leak record is on the lab's pull list (runner 6.3), its cluster-only files never shipped",
+          LEAK_V2 in X.FUNNEL_PULL_FILES and all(
+              f in __import__("weed_optimizer_framework.tools.inc_autopilot.remote", fromlist=["x"]).FUNNEL_NEVER
+              for f in ("funnel/leak_pairs_v2.csv", "funnel/leak_negatives_v2.csv", "funnel/leak_v2_eval_desc.npz")))
 
 
 def legacy_world(name, exps, step1):
@@ -1046,6 +1168,7 @@ def main():
         test_r13()
         test_r14(root, ev, diags)
         test_r15()
+        test_r16()
         test_negative_controls()
     finally:
         shutil.rmtree(str(TMP), ignore_errors=True)

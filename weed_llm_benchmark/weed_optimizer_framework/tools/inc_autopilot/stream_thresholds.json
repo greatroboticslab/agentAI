@@ -101,9 +101,10 @@
   }
  },
  "D28": {
-  "never_train_share": {
-   "value": 0.05,
-   "why": "Contract 6.4 D28: a source with at least 5 % of its images refused by the never-train v2 guard (6-bit dHash, its 8 variants, or the embedding copy detector) is a leak and is quarantined (L24)."
+  "source_alpha": {
+   "value": 0.001,
+   "mirrors": "inc2/embed_calibration.py SOURCE_ALPHA",
+   "why": "Contract 6.4 D28 as amended on 2026-09-29 (decision L-9; the funnel's amendment A2, docs/FUNNEL_AUDIT.md 14): a source is a leak and is quarantined (L24) when one of its images is within 6 dHash bits of an evaluation image under any of the 8 variants, or when its embedding hits are improbable under the copy detector's per-image false-positive rate: P(Binom(images, p_false) >= hits) < 0.001 (inc2.embed_calibration.source_verdict), p_false being the v2 calibration's one-sided 97.5 % upper bound. It replaces 'never_train_share >= 0.05': at a per-image rate p a source of n images holds about n p chance hits, so a share rule quarantines by a source's size and domain, not by copying (at the funnel's first threshold, 805 of 1,915 3SeasonWeedDet10 2022 images were flagged, none a capture-session copy)."
   },
   "base_copy_share": {
    "value": 0.2,

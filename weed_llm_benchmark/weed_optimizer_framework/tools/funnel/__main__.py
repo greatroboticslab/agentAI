@@ -16,7 +16,8 @@ traceback).
 Verbs, their options and the function each one calls:
   census        --taxonomy PATH --known-items PATH      adapter.census
                 --summaries-only [--census-v0 PATH]     adapter.ledger_from_summaries
-  leak                                                  leak.run
+  leak                                                  leak.run, or leak.run_v2 when the prereg requires
+                                                        copy detector version 2 (amendment A2)
   embed-judges  --stage embed|judges|all                embed.embed_crops (every shard, or --shard of
                 --shard i --nshards n                   --nshards), then judges.score_all
                 --refetch                               embed.embed_table on the refetch crop table
@@ -331,7 +332,15 @@ def do_census(ctx):
 
 
 def do_leak(ctx):
-    return ctx.call(_module("leak").run, ctx.prereg, ctx.domain, ctx.out, ctx.adapter())
+    """leak.run (detector version 1, leak_v1.json), or leak.run_v2 (leak_v2.json)
+    when an amendment of the prereg requires version 2 (contract §14 A2)."""
+    LK = _module("leak")
+    need = _module("domain").leak_detector_version(ctx.prereg)
+    if need == 1:
+        return ctx.call(LK.run, ctx.prereg, ctx.domain, ctx.out, ctx.adapter())
+    if need == 2:
+        return ctx.call(LK.run_v2, ctx.prereg, ctx.domain, ctx.out, ctx.adapter())
+    raise CLIError("the prereg requires copy detector version %d, which this engine does not implement" % need)
 
 
 def do_embed_judges(ctx):

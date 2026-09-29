@@ -315,6 +315,13 @@ G-stats writes the loader and the schema check (`domain.py`). G-data writes `wee
 - **`core_sha256`** is the sha256 of the canonical JSON of the prereg with the key `amendments` removed. Canonical JSON means `json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)`, UTF-8.
 - Every artifact records the prereg's raw sha256 and its `core_sha256`. A consumer compares `core_sha256`, so the sample-lock amendment (§4.9) does not make earlier artifacts stale.
 - `domain.append_amendment(path, amendment)` is the only writer of the file. It refuses when anything but the `amendments` list would change, and writes atomically.
+- [2026-09-29, contract §14 A2] **Contract amendments.** An amendment of kind `amendment` changes the contract text. It carries `id` (`A<n>`), `date`, `text`, `post_hoc` (a bool), optional `effects`, and `contract_sha256`: the contract's sha256 after the edit. The writer:
+  - loads the prereg against that sha256 (the contract file must hash to it);
+  - requires a heading `### <id>` in the contract, and refuses a `contract_sha256` equal to the one in force;
+  - checks `effects` against the known list (`leak_detector_version`, which must name a known copy-detector version above the one in force);
+  - writes `contract_sha256_before` (the sha256 in force) and `prereg_core_sha256`. No other kind may carry `contract_sha256` or `effects`.
+- The contract in force is the `contract_sha256` of the last amendment that records one, else the core's (`domain.contract_sha256_of`). `load_prereg` checks the contract file against it, and refuses a chain in which an amendment's `contract_sha256_before` is not the sha256 in force before it. The core, with its original contract sha256, is unchanged, so every artifact compared by the core stays current. A header records the contract in force.
+- `domain.leak_detector_version(prereg)`: the last amendment's `leak_detector_version`, else the core H6's `detector_version`, else 1. `domain.leak_record(funnel_dir, prereg)`: the copy detector's record every reader uses. Above version 1 it is that version's record (`leak_v<v>.json`) or none, never `leak_v1.json` in its place. At version 1 it is `leak_v2.json` when it exists, else `leak_v1.json`. `domain.leak_pairs_path` gives the matching pairs file.
 
 ---
 
@@ -703,6 +710,44 @@ Each sheet directory holds:
 
 - A copy entry is `{"key", "image", "eval_split", "eval_key", "cos", "bits", "variant"}`. Evaluation images appear only as keys.
 - `leak_pairs_v1.csv` (cluster-only) lists every copy, and the calibration negatives, with columns `set, key, eval_split, eval_key, cos, bits, variant, kind`.
+- [2026-09-29] Once the prereg holds amendment A2 (contract §14), `leak_v1.json` is the superseded first reading. It is kept unchanged (`leak.run` refuses to rewrite it, even with `--force`), and no reader uses it in place of `leak_v2.json`.
+
+### 4.13a `leak_v2.json` (F4 under amendment A2; G-vision, `funnel-leak/2`)
+
+```
+{header...,                                              # format "funnel-leak/2"; inputs add "leak_v1" when it exists
+ "detector_version": 2, "amendment": {"id", "date", "kind", "section", "post_hoc"},
+ "detector": {"version": 2, "descriptor": {...as v1}, "dhash_variants": [...], "dhash_bits_max": 6,
+              "cos_threshold": float, "rule": str, "set_rule": str},
+ "calibration": {"ok": bool, "why": [str], "protocol": "per_image_max_cosine/v2", "cos_threshold": float,
+                 "floor": float,                          # version 1's threshold, rebuilt from its seeds
+                 "recall_min": 0.95, "fpr_max": 0.01, "min_negatives": 100 (5 in a testing run),
+                 "tier_thresholds": {tier: float}, "constraining": [tier],
+                 "negatives": {"hard" | "hard_session_disjoint" | "provenance_disjoint":
+                               {"n", "false_hits", "fpr", "ub", "at_v1_threshold": {...}, "constraining",
+                                "candidates", "excluded_dhash_copies", "unscored", "cos": {"max", "q99", "median"}}},
+                 "positives": {family: {"n", "hits", "recall", "lb", "dhash_hits", "at_v1_threshold": {...}}},
+                 "known_limits": [{"family", "recall", "lb", "n", "why"}], "p_false": float,
+                 "set_rule": {"rule", "alpha": 0.001, "p_false"}, "v1_threshold": {"rebuilt", "recorded", "reproduced"}},
+ "scans": {set: {"images", "unscanned", "scanned", "hits", "embedding_hits", "dhash_hits",
+                 "expected_false_hits", "p_value", "verdict": {...}, "copy_found",   # copy_found = the set rule
+                 "splits_hit", "max_cos", "listed": [hit],
+                 "v1_rule": {"copies", "copy_found", "leak_v1": {"copies", "copy_found"}, "reproduced"}}},
+ "h6a": {"scope", "rule", "copy_found": {slug: bool}, "sources": {slug: verdict}, "quarantine", "void_ood_arms_with",
+         "unscanned", "missing_from_pool"},
+ "h6b": {"rule", "base_copy", "base_scans", "same_as_base", "sets": {set: {"images", "hits", "dhash_hits",
+         "expected_false_hits", "p_value", "flagged", "v1_rule_copies"}}, "increment_flagged": {step: bool},
+         "incident", "cleared", "splits_hit"},
+ "h6c": {...as v1, with the flagged sources only},
+ "readings": {"v1": {"status", "file", "cos_threshold", "calibration" (per pair), "h6a", "h6b",
+                     "reproduced_by_this_run": {"threshold", "scans", "sets_compared"}},
+              "v2": {"cos_threshold", "p_false", "known_limits", "h6a", "h6b"}},
+ "eval_descriptors": {"path", "sha256"}, "descriptor_files": {set: {"path", "sha256", "from": "leak_v1" | "computed"}},
+ "pairs_csv", "negatives_csv"}
+```
+
+- A hit entry is a copy entry plus `"by": "embedding" | "dhash" | "both"`. Evaluation images appear only as keys.
+- `leak_pairs_v2.csv` (cluster-only) lists every image hit (kind `hit`) and version 1's calibration negative pairs (kinds `negative_7_10`, `negative_hard`, the same rows as `leak_pairs_v1.csv`; the draw's pair sentinels read them). `leak_negatives_v2.csv` (cluster-only) lists every per-image negative: `tier, key, source, cos, eval_split, eval_key, bits`.
 
 ### 4.14 Relation outputs (G-data)
 
@@ -1155,7 +1200,10 @@ def bioclip_embedder() -> verify.BioclipEmbedder
 def label_rows(keys) -> {key: [(cls, cx, cy, w, h)]}  # the step1 label files, sha-checked against pool.jsonl
 def name_status_v1(name) -> str                       # verify.other_name_status with numeric split out
 def verifier_fit_info_projection(step1_dir) -> dict   # {"other_sample": {...fit_info other_sample...}}
+def capture_session(row) -> (session | None, date | None)  # optional; contract §14 A2 (leak detector version 2)
 ```
+
+[2026-09-29] `capture_session` is optional (not in `adapters.INTERFACE`). It is the domain's session key for the copy detector's per-image calibration: a manifest `session` of the form `<YYYYMMDD>_<camera>...` is a capture session and its first 8 digits the date; any other value names no capture. It is the adapter's, not the config's, so that neither `domains/weed.json` (hashed by the continuous loop's scan) nor the engine changes.
 
 **Census inputs** (cluster): `step1/{pool.jsonl, pool_meta.jsonl, pool_summary.json, cwd12_copies.jsonl, crops.csv, crops_skipped.csv, crops_info.json, emb/, verifier/{probe.joblib, verifier.npz, thresholds.json, fit_info.json}, calibration.json, verified.jsonl, conflicts.csv, admit_summary.json, pool_verdicts.npz, select_summary.json, base_B.jsonl, increment_pool.jsonl, select_clusters.csv, cache/dhash/*.json, cache/train_core_probe.json}`, the registry and flags, the never-train index, `funnel/taxonomy_cache.json`, and `funnel/known_items_v1.json` (optional).
 
@@ -1355,6 +1403,30 @@ def run(prereg, domain, funnel_dir, adapter, embedder=None) -> dict             
 - **Evaluation pixels never leave the cluster.** Only keys are written to `leak_v1.json`.
 - `recover` calls `detect` on masked copies (CPU is allowed there).
 
+**Detector version 2** (contract §14 A2; `run_v2`, chosen by the `leak` verb when `domain.leak_detector_version(prereg)` is 2):
+
+```
+def run_v2(prereg, domain, funnel_dir, adapter, embedder=None, ...) -> dict   # leak_v2.json, leak_pairs_v2.csv, leak_negatives_v2.csv
+def per_image(Xn, H, ok, index, q_sess=None, q_date=None, e_sess=None, e_date=None) -> (best cos, arg, bits, arg, variant)
+def threshold_for(scores, fpr_max) -> float           # smallest 6-decimal cosine with #(scores >= t) <= floor(fpr_max n)
+def rate_record(scores, t) -> {"n", "false_hits", "fpr", "ub"}   # ub: one-sided 97.5 % Clopper-Pearson
+def set_verdict(images, hits, dhash_hits, p_false, alpha=0.001) -> dict
+```
+
+- **Descriptors.** A `_ReuseStore` reads each set (reference, positives, pool, extra, evaluation) from the file `leak_v1.json` records when it still hashes as recorded and was made from exactly these rows by this embedder and preparation. Otherwise the set is described into `leak_v2_desc_<set>.npz` (evaluation: `leak_v2_eval_desc.npz`). No file `leak_v1.json` names is written. With every file reused, the run loads no model.
+- **Version 1's calibration is rebuilt** (`calibrate`, the same seeds). Its threshold is the floor and must equal the one `leak_v1.json` records, else `LeakCalibrationError`. Its positives' cosines and dHash bits are re-scored at the new threshold, and its negative pairs go to `leak_pairs_v2.csv`.
+- **Negatives, per image.** Each negative image is scored by its maximum cosine over every evaluation image, leaving out those of its own capture session and date (`adapter.capture_session`), and by its minimum dHash bits over every evaluation image and variant. A negative within 6 bits is a copy, not a negative: it is left out and counted.
+  - `hard`: reference images with a capture session. It always constrains, and it must hold `min_negatives` images, else the calibration fails. An adapter without `capture_session` leaves it empty.
+  - `hard_session_disjoint`: the hard images whose session and date no evaluation image shares.
+  - `provenance_disjoint`: the pool images of the non-reference groups of `leak.negative_source_pairs`.
+- **Threshold:** the largest of the floor and `threshold_for` of each constraining tier (hard, plus any tier holding at least `min_negatives` images). `p_false` is the hard tier's `ub` at that threshold.
+- **Recall:** per family at the new threshold (cosine at or above it, or within 6 dHash bits under a variant). A family below `recall_min` is listed in `known_limits`; it does not fail the calibration.
+- **Scan:** every set as version 1 scans it, but each image is scored by its maximum cosine over every evaluation image (no session exclusion) and its minimum dHash bits. An image hits when its cosine is at or above the threshold (embedding) or its bits are at most 6 (dHash). The version 1 rule (cosine at or above the floor, or dHash) is applied to the same scores and compared with `leak_v1.json`'s count set by set.
+- **Set rule** (`set_verdict`): a set holds copies iff it has a dHash hit, or P(Binom(scanned, p_false) ≥ embedding hits) < 0.001; without `p_false` any embedding hit flags it. H6(a) applies the rule to each source over every scanned image of the source (the base's and increments' extra images included). H6(b)'s incident is the rule on each base scan and increment. H6(c) joins only flagged sources.
+- A failed calibration writes `leak_v2.json` with `ok: false`, no scans and both pairs and negatives files, then raises `LeakCalibrationError`. A rerun on the same inputs is a no-op; other inputs refuse without `--force`.
+
+Tests (`tests/test_funnel_leak.py`, version 2): on a same-domain world (a scene part and a photograph part in the fake descriptor), a same-scene non-copy set that version 1 flags and version 2 clears; crop copies that the dHash misses, caught per image and flagged by the binomial rule alone; a JPEG copy flagged by dHash; near frames in an evaluation image's session or on its date scored without it; reuse with no embedder call and `leak_v1.json` unchanged; both readings, version 1 reproduced set by set; no `leak_v1.json`; no capture session; the set rule and `threshold_for` alone.
+
 Tests (`tests/test_funnel_leak.py`):
 - `dhash_variants` of a horizontally flipped image contains the original's dHash under `hflip`;
 - each family's augmentation is deterministic under its seed;
@@ -1504,6 +1576,8 @@ def arms(realloop_exp_dir, out_dir, base_manifest, adapter) -> dict      # arms/
 - `leak.detect` on both.
 A hit raises `NeverTrainHit` and stops F9 [§10 stop rules].
 
+**The copy detector's record** [2026-09-29, contract §14 A2]. `recover` reads it through `domain.leak_record` (`recover.leak_reading`). Once the prereg's amendment requires detector version 2, it reads `leak_v2.json` only. With that file missing it refuses, naming the amendment, rather than use `leak_v1.json`'s quarantine. A record whose `detector_version` is not the required one is refused. `_default_detector` reads the evaluation descriptors that record names. The guard is unchanged: any H6 hit on a recovered image stops F9 (contract §14 A2, "Left open").
+
 **Source labels.** The sha256 of every step1 label read is checked again after the write (`source_labels_unchanged`).
 
 **H10d hold-out.** Per recovered source, one near-duplicate group (or one capture-stem group when the config declares a stem regex) with ≥ `min_group_images` images is chosen with seed `funnel/v1/h10d/<slug>`. It is written to `domain_dev.jsonl` and excluded from every pool.
@@ -1586,6 +1660,7 @@ The signals are functions of the funnel ledger, the claims and the loop reports 
 - [2026-09-29] L10 `embed-judges`, `qualify`, `draw`, `sheets` and `estimate` require `funnel/kt7/crops_kt7.csv` on the cluster (then L11a with what = kt7). On 2026-09-28 embed-judges ran without it: it embedded all 564,686 crops, then refused. The L11a builder picks the fetch the next waiting step needs, in this order: cards (missing or stale), kt7, known-items, refetch. known-items needs `--sources`, which L11a does not carry, so it is deferred for a person.
 - [2026-09-29] A funnel job that ends in a failure state is marked failed in the lineage; the state comes from `sacct` through the snapshot's `--sacct`. Its step may be proposed again, with a new proposal id, at most twice. A third failure stays with a person, together with the job state and log path. Funnel levers are counted per step for the lever stop-loss.
 - A `refusals` entry maps the census message "no resolution ... run fetch --what taxonomy (lever L12)" to prerequisite L12 with `retry: true`.
+- [2026-09-29, contract §14 A2] **The leak step follows the copy detector version the prereg requires.** The ticker's context `funnel_leak` carries it (below). `levers.funnel_steps` then gives the leak step the output `funnel/leak_v<v>.json` and, above version 1, the lineage key `detector=<v>`. It is declared in `levers.LINEAGE_BOUNDS` (enum [2]), not in levers.json's `param_bounds`, because the planner's menu shows those and no planner sets it. The key is not a flag of the command: the `leak` verb reads the version from the prereg, and the executor keeps the key as a meta param. The version 1 run in the lineage does not stand for it, so L10 proposes `leak` again while `leak_v2.json` is not on the cluster. The proposal's `funnel_step` records `writes`, `supersedes: funnel/leak_v1.json`, the amendment and the detector version, and cites the context.
 
 The realloop_v2 build is L2 with the new params `increment_sources: recovered`, `step1_overlay` and `size`. The `protocol.increment_sources_modes` mirror becomes `inc/realloop.py INCREMENT_SOURCE_MODES`. The baselines of §6 F10 are L8 with `seeds`.
 
@@ -1606,6 +1681,7 @@ The `hypothesis`, `required_change`, `cheapest_test`, `control` and `success_cri
 - A COMPLETE card may not say "concluded" for a claim in `challenged`.
 - Every claim transition is a campaign ledger entry with `decided_by`.
 - The decisions DEC-1..DEC-10 are logged once with `decided_by: human-delegated` [§13].
+- [2026-09-29] The context gains `funnel_leak` (`campaign.funnel_leak_context` of the lab's `funnel/prereg_v1.json`): `{"detector_version", "amendment": {"id", "date", "section", "post_hoc"}, "prereg_sha256"}` when an amendment requires a copy detector above version 1, else absent. `FUNNEL_KEY_PARAMS` gains `detector`. The prospective DA header compares the contract with the one in force (`domain.contract_sha256_of`).
 
 #### 5.5.5 Adversary (`model_router.py`, `brain_plan.py`, `run_inc_plan.sh`, `validate.py`)
 
@@ -1688,6 +1764,13 @@ def spec_v2() -> dict        # H10a: U vs B; H10b: U vs U_ctl; H10c: CLASS_ctl v
 - **R13:** `vehicles.json` plus a synthetic funnel ledger and a claim: D17 and D19 fire with the same code and thresholds, and the vehicles exam name is refused by evidence, remote and validate.
 - **R14:** the positive reply keeps 6 counter-arguments and 2 concessions. The sycophantic reply keeps 0 and the claim stays `challenged`. A fabricated cite, a test leak and an echo are dropped or not counted. A same-family model cannot move the claim. A digest containing a blind marker is refused.
 - **funnel_negative_controls:** pilot_v1–v3, b0_v1 and base_b_v1: D17 is silent. A synthetic high-yield Step 1 with out-of-domain calibration: D19 is silent.
+- **R16** [2026-09-29, contract §14 A2], in `tests/test_funnel_ap_replay.py`, from the pinned fixture `leak_a2/amendment_A2.json` (the prereg's amendment, rebuilt by `funnel_ap_fixtures.py`) through the ticker's own `funnel_leak_context`:
+  - the cluster state of 2026-09-29 (`leak_v1.json` on the cluster, the version 1 leak step in the lineage): D17 fires, L10 proposes `leak` again with its exact command, keyed `detector=2`, writing `funnel/leak_v2.json` and superseding `funnel/leak_v1.json`;
+  - without the amendment, `leak_v1.json` stands and L10 moves on to embed-judges;
+  - a version 2 run that ran waits for a person, and one whose job FAILED is proposed again;
+  - with `leak_v2.json` on the cluster, the funnel moves on.
+
+  R16 runs in the funnel replay script, whose exit status the replay gate records for every funnel case.
 
 **`tests/test_funnel_mutations.py`:** §7.6.
 
@@ -1883,8 +1966,8 @@ The file lists are fixed in code. Each transfer is verified on arrival against a
 - **Lab → cluster:** `funnel/{prereg_v1.json, census_v0.json, taxonomy_cache.json, known_items_v1.json, fetch_manifest.json, cards/, kt7/, refetch/, prospective_da.json, rl_answers/RL-A/}`.
   - `prereg_v1.json` and `census_v0.json` come from the git copy.
   - The push of `prereg_v1.json` refuses when the cluster copy holds more amendments, or another `core_sha256`.
-- **Cluster → lab:** `funnel/prereg_v1.json` (only when its amendments grew; a person commits it), `funnel/{census_v1.json, name_status_v2.json, funnel_ledger.json, audit_v1.json, audit_v1.md, class_maps.json, relation_geometry_v1.json, relation_audit_v1.json, judge_qualification.json, rl_qualification.json, leak_v1.json, frames_v1.json, sample_v1.csv, sheets_v1/}` and `step1_r1/recovery.json`.
-- **Never moved:** `sample_v1_key.jsonl`, `sheets_v1_key/`, `sheets_v1_cluster/`, `leak_eval_desc.npz`, `leak_pairs_v1.csv`, `ledger.jsonl`, `gold_v1.csv`, embeddings, judge score files, anything under `step1/` other than the three summaries, and any evaluation image.
+- **Cluster → lab:** `funnel/prereg_v1.json` (only when its amendments grew; a person commits it), `funnel/{census_v1.json, name_status_v2.json, funnel_ledger.json, audit_v1.json, audit_v1.md, class_maps.json, relation_geometry_v1.json, relation_audit_v1.json, judge_qualification.json, rl_qualification.json, leak_v1.json, leak_v2.json, frames_v1.json, sample_v1.csv, sheets_v1/}` and `step1_r1/recovery.json`.
+- **Never moved:** `sample_v1_key.jsonl`, `sheets_v1_key/`, `sheets_v1_cluster/`, `leak_eval_desc.npz`, `leak_pairs_v1.csv`, `leak_v2_eval_desc.npz`, `leak_v2_desc_*.npz`, `leak_pairs_v2.csv`, `leak_negatives_v2.csv`, `ledger.jsonl`, `gold_v1.csv`, embeddings, judge score files, anything under `step1/` other than the three summaries, and any evaluation image.
 
 The sync refuses a path outside the list.
 
@@ -2660,3 +2743,36 @@ These settle V.6 items 1, 2 and 4, and one inconsistency the full pipeline test 
 | F1-R2 | **Which judges mask a box under R-J** (V.6 item 2). "Any judge calls a target" counts a judge whose label space holds a non-target option. A judge that can only answer with a target (J-knn1: a bank of target crops) names a target for every box, so its answer is not a call. It may still vote where it is qualified. J1's own confident target calls (a conflict) still mask. | `funnel/recover.py` `mask_judges_of`, used by `_apply`; `recovery.json` records `mask_judges` | `test_funnel_recover.py`: `mask_judges_of` drops a targets-only label space; an unqualified judge with a non-target option still masks. `test_funnel_pipeline.py`: J-knn1 is not a masking judge, and 62 of 88 recovered images carry a mask (the R-V ones). |
 | F1-R3 | **D18 proposes a card map (R-C) only when H3a is supported.** Contract §8.4 applies a card map "when the card and the purity check agree"; otherwise the stratum goes to the judges (R-J). `recover.py` already refused R-C without H3a, so D18 could propose a recovery that recovery must refuse. | `inc_autopilot/diagnose.py` `d18` (`why_not_card_map` in the stratum record) | `test_funnel_ap_replay.py` R11: with a proposed card+geometry map, H3a missing → R-J, inconclusive → R-J, supported → R-C. `test_funnel_pipeline.py`: its world now holds a card-resolved numeric class of at least `G3_MIN_BOXES` boxes (the H3a stratum), and every policy D18 proposes recovers rows. |
 | F1-R4 | **The poster's router check** (V.6 item 1). The poster is final and is never rebuilt. The check now pins the eight roles the poster printed by name, and lists roles added after it with their date (`adversary`, 2026-09-28). | `tests/test_poster_data.py` | the check passes, and fails if any printed role is renamed or removed |
+
+## Amendment A2 (2026-09-29): copy detector version 2
+
+The contract's §14 A2 records what was found in `leak_v1.json` and why its reading is not evidence of leakage. This section records the code.
+
+**What changed.**
+- `funnel/domain.py`: contract amendments (kind `amendment`: the contract's sha256 before and after, effects), `contract_sha256_of`, `leak_detector_version`, `leak_detector_amendment`, `leak_record`, `leak_pairs_path` (§3.3). A2 was appended to `results/framework/inc/funnel/prereg_v1.json` through `append_amendment`; the core sha256 is unchanged (`62fd2e34…`).
+- `funnel/leak.py`: `run_v2` and its parts (§4.13a, §5.3.3). Version 1's `run` is unchanged in what it computes (its input collection now lives in `_scan_inputs`, shared with `run_v2`), and it refuses to rewrite an existing `leak_v1.json` once an amendment requires a later version.
+- `funnel/adapters/inc_step1.py`: `capture_session` (optional; §5.2.2).
+- `funnel/__main__.py`: the `leak` verb runs `run_v2` when the prereg requires version 2, and refuses a version it does not implement.
+- Readers: `recover.py` (`leak_reading`), `estimate.py` (H6), `draw.py` (pair sentinels from `leak_pairs_v2.csv`), `strata.py` (records the pairs file).
+- Autopilot: `levers.funnel_steps`, `leak_detector`, `LINEAGE_BOUNDS`; `campaign.funnel_leak_context`, the context `funnel_leak`, `FUNNEL_KEY_PARAMS` += `detector`, the prospective DA header's contract in force; `executor.FUNNEL_PULL_FILES` += `funnel/leak_v2.json`; `remote.FUNNEL_NEVER` += the version 2 cluster-only files.
+- The continuous loop's D28 (`diagnose_stream.d28`, `stream_thresholds.json` D28 `source_alpha`) applies `inc2.embed_calibration.source_verdict` (docs/CONTINUOUS_LOOP.md §6.4), and `stream_remote` ships the LOCK's v2 calibration rate in `splits/v2/lock_status.json`.
+- No pinned INC module, `inc2/**`, `realloop.py`, `pilot.py` or `domains/weed.json` changed.
+
+**How it was verified** (locally, no network, no GPU): every `tests/test_funnel_*.py`, `test_inc_ap_*.py`, `test_stream_*.py` and `test_inc2_*.py` passes, and so do `test_collect_*.py`. New checks:
+- `test_funnel_leak.py`: detector version 2 on a same-domain world, and the set rule on its own (§5.3.3 lists the cases).
+- `test_funnel_domain.py`: the contract amendment checks and `leak_record`.
+- `test_funnel_recover.py`: recovery refuses `leak_v1.json` after A2 and applies version 2's quarantine.
+- `test_funnel_cli.py`: the `leak` verb's version dispatch, on the fakes and on the real engine signatures.
+- `test_funnel_estimate.py`: H6 from either record, and not evaluated without the required one.
+- `test_funnel_ap_replay.py`: R16.
+- `test_funnel_pipeline.py`: the chain runs end to end under A2 (the leak verb writes `leak_v2.json` and no `leak_v1.json`; the flipped dev copy quarantines its source by dHash; base B and the increments clear).
+- `test_stream_ap_units.py`: D28's binomial rule.
+
+In the real prereg the draw's sample lock is A1 and the detector amendment A2: the draw ran (job 47261044) before A2 was deployed, and A2 was appended to the cluster's prereg (with the sample lock), not to an earlier copy. `domain.next_amendment_id` gives A<n+1> for the largest id number n the prereg holds (for ids A1..An, the old len + 1), so an id is never reused in a copy that leaves an amendment out. The synthetic test worlds draw their own sample, so they start from the repository's prereg without its sample lock (`tests/funnel_prereg.py`: everything else byte-equal, A2 included); their own lock is A3. `tests/fixtures/inc_replay/funnel/leak_a2/amendment_A2.json` is pinned in the fixture manifest, and `funnel_ap_fixtures.py --check` rebuilds it byte for byte.
+
+**Checks only the cluster can make.**
+- The real version 2 run (L10 `leak`, which the platform proposes itself). It must reproduce version 1's threshold 0.825636 from `leak_v1.json`'s seeds and descriptor files; otherwise it refuses. Expected cost: with every descriptor file reused, no DINOv2 load, and CPU time for about 103 K pool images × 9,500 evaluation images plus the reference images. Outcomes to read: the new threshold, the hard tier's size and upper bound, the known-limit families, the quarantine count against 39 of 47, and H6(b) for base B and each realloop_v1 increment.
+- Whether any evaluation manifest's `session` values do not match the capture pattern (ImageWeeds, 3SeasonWeedDet10). Such images are never left out of a negative's maximum, which can only raise the threshold.
+- The cluster's `prereg_v1.json` must hold no amendment the repository copy lacks (no sample lock yet) before the deploy copies the amended file over it.
+- `funnel/leak.py` changed, so `inc2.embed_calibration`'s identity (which hashes it) no longer matches an existing `splits/v2/embed_calibration_v2.json`. `inc2.splits build` recomputes the calibration from the funnel's reused files (CPU, minutes). `build --skip-scan` applies none until a build or `scan` writes it again. The existing `embed_scan.json` stays current, because its inputs (the funnel config, `leak_v1.json` and the evaluation descriptors) are unchanged.
+- The contract's sha256 changed. A rerun of `embed-judges` over judge score files already written refuses without `--force`, because their identity holds the contract sha256 and the adapter's code sha256. Artifacts compared by the prereg core are unaffected.

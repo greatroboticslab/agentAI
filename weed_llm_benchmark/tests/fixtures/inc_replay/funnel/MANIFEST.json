@@ -111,6 +111,11 @@
    "sha256": "aa45a2f9c6b1fadf4e5a32a92b9bf71f8a4b116455828f3e535a5439e88b0e5b",
    "why": "R14: a sycophantic reply (concessions without checks)"
   },
+  "leak_a2/amendment_A2.json": {
+   "bytes": 2417,
+   "sha256": "10e0569b21138de9346390efa7bd641b9e9035f6d7c9b1233df2ae38f666fc40",
+   "why": "R16: the pre-registration's amendment A2 (2026-09-29, docs/FUNNEL_AUDIT.md 14), copied from results/framework/inc/funnel/prereg_v1.json: it requires copy detector version 2, superseding leak_v1.json"
+  },
   "r9b/r9b_claims.json": {
    "bytes": 1734,
    "sha256": "bafe02a9dd19c16e9586bb2155f7c4941c3ef98ccfa61f03767b056aae7eaf2b",

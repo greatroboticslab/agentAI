@@ -102,6 +102,7 @@ import itertools
 import json
 import os
 import pathlib
+import random
 import shutil
 import stat
 import subprocess
@@ -535,6 +536,40 @@ def test_units():
           S2.lab_group(groups, "cottonweeddet12/train", "train_core") == "LuLab"
           and S2.lab_group(groups, "3seasonweeddet10/data2022", "tsw22") == "LuLab"
           and S2.lab_group(groups, IWA, "base_b") == "NDSU" and S2.lab_group(groups, WCD, "base_b") is None)
+
+
+
+def test_near_both_directions():
+    print("near copies of an earlier part, both directions (job 47260765)")
+    rnd = random.Random(47260765)
+
+    def far(n=8):                        # hashes >= 20 bits from 0 and from each other's seeds
+        out = []
+        while len(out) < n:
+            h = rnd.getrandbits(64)
+            if bin(h).count("1") >= 20:
+                out.append(h)
+        return out
+    y = far(1)[0]
+    x_vars = [0] + far(2) + [y ^ 0b111] + far(4)          # X's rot90 is 3 bits from Y's dHash
+    x = {"key": "train_core__x", "dhash": 0, "variants": x_vars}
+    yv = [y] + far(7)
+    yrow = {"key": "tsw23__y", "dhash": y, "variants": yv}
+    one_way = [h for h in yv if bin(h ^ x["dhash"]).count("1") <= S2.BITS]
+    idx = S2.EarlierIndex()
+    idx.add(x, "train_core")
+    hit = S2._near_earlier(idx, yrow)
+    rows = [dict(x, part="train_core", image="a", sha256="a"), dict(yrow, part="tsw23", image="b", sha256="b")]
+    check("a pair only the reverse direction finds: none of Y's variants is near X's dHash, X's rot90 is",
+          one_way == [] and hit == (("train_core", "train_core__x"), 3, "earlier:rot90"), (one_way, hit))
+    check("disjoint_problems flags that pair, and not the base without Y",
+          len(S2.disjoint_problems(rows)) == 1 and S2.disjoint_problems(rows[:1]) == [],
+          S2.disjoint_problems(rows))
+    z = {"key": "base_b__z", "dhash": 1, "variants": [1] + far(7)}
+    check("the forward direction still finds a row whose dHash is near an earlier dHash",
+          S2._near_earlier(idx, z) == (("train_core", "train_core__x"), 1, "id"))
+    w = {"key": "base_b__w", "dhash": far(1)[0], "variants": far(8)}
+    check("a row near nothing is not a hit", S2._near_earlier(idx, w) is None)
 
 
 def test_writer_lock():
@@ -1414,6 +1449,7 @@ def test_module_rules():
 def main():
     test_real_pins()
     test_units()
+    test_near_both_directions()
     test_writer_lock()
     make_v1_world()
     v1 = tree_shas(INC / "splits" / "v1")

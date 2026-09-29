@@ -476,6 +476,12 @@ def stream_summary(sid, dev_exps=()):
             mans = sorted((obj or {}).get("manifests") or {}) if isinstance(obj, dict) else []
             st["train_manifests"] = [m for m in mans if m not in blocked]
             st["h6"] = (obj or {}).get("h6_status") if isinstance(obj, dict) else None
+            # the v2 embedding calibration the LOCK binds (decision L-9(c)): D28 compares a source's
+            # embedding hits with the count its per-image false-positive rate predicts
+            ec = (obj or {}).get("embed_calibration_v2") if isinstance(obj, dict) else None
+            if isinstance(ec, dict):
+                st["embed_calibration_v2"] = {k: ec.get(k) for k in ("sha256", "cos_threshold", "strict_threshold",
+                                                                     "p_false", "testing")}
             # the LOCK's sha256 hashes the evaluation manifests' entries: provenance
             # (files), never decision data
             files["splits/%s/lock_status.json" % ver] = {"sha256": (info or {}).get("sha256"), "of": "LOCK.json"}

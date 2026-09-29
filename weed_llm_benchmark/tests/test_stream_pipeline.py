@@ -120,6 +120,7 @@ from weed_optimizer_framework.tools.inc2 import step1_stream as SS  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import stream as ST  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import stream_report as SR2  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import train as T2  # noqa: E402
+import funnel_prereg as FPR  # noqa: E402
 
 assert C.INC_DIR == TMP / "inc" and C.REPO == TMP / "repo", "the temporary REPO / INC_DIR are not in effect"
 
@@ -1355,7 +1356,7 @@ def stage_intake(w):
     import test_collect_world as CW
     import funnel_world as FWD
     fdir = INC / "funnel"
-    shutil.copyfile(HERE.parent / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json", fdir / "prereg_v1.json")
+    FPR.write_pre_draw(fdir / "prereg_v1.json", HERE.parent / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json")
     (REPO / "docs").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(HERE.parent.parent / "docs" / "FUNNEL_AUDIT.md", REPO / "docs" / "FUNNEL_AUDIT.md")
     FWD.build_taxonomy_cache(fdir, list(CW.CACHE_NAMES))

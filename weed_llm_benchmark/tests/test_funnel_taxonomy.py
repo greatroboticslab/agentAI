@@ -31,6 +31,7 @@ import shutil
 import socket
 import sys
 import tempfile
+import funnel_prereg as FPR  # noqa: E402
 
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="funnel_taxonomy_"))
 os.environ["INC_DIR"] = str(TMP / "inc")
@@ -42,8 +43,8 @@ sys.path.insert(0, str(TESTS))
 (TMP / "repo" / "docs").mkdir(parents=True)
 (TMP / "inc" / "funnel").mkdir(parents=True)
 shutil.copyfile(ROOT.parent / "docs" / "FUNNEL_AUDIT.md", TMP / "repo" / "docs" / "FUNNEL_AUDIT.md")
-shutil.copyfile(ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json",
-                TMP / "inc" / "funnel" / "prereg_v1.json")
+FPR.write_pre_draw(TMP / "inc" / "funnel" / "prereg_v1.json",
+                   ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json")
 
 
 class _NoNet(socket.socket):

@@ -644,6 +644,20 @@ h7 = E.h7(Builder().ctx(jq={"h7": {"J-zs": {"predicted": "fail", "qualified": Fa
                                    "J-knn2": {"predicted": "qualify", "qualified": False}}}))
 check("H7 scores each judge's own prediction", h7["verdict"] == "reported" and
       h7["parts"]["J-zs"]["verdict"] == "supported" and h7["parts"]["J-knn2"]["verdict"] == "falsified", h7["parts"])
+c6 = Builder().ctx()
+c6.leak_why = "amendment A2 requires copy detector version 2: leak_v2.json is missing"
+h6 = E.h6(c6)
+check("H6 without the required record is not evaluated and says why (never leak_v1.json in its place, §14 A2)",
+      h6["verdict"] == "not_evaluated" and "A2" in h6["why"], h6)
+h6 = E.h6(Builder().ctx(leak={"format": "funnel-leak/1", "calibration": {"ok": True}, "h6a": {"quarantine": ["s"]}}))
+check("H6 from a version 1 record names leak_v1.json", h6["verdict"] == "reported"
+      and "leak_v1.json" in h6["why"] and h6["parts"]["detector_version"] == 1, h6)
+h6 = E.h6(Builder().ctx(leak={"format": "funnel-leak/2", "detector_version": 2, "calibration": {"ok": True},
+                              "h6a": {"quarantine": []}, "readings": {"v1": {"h6a": {"quarantine": ["s"]}}},
+                              "amendment": {"id": "A2"}}))
+check("H6 from a version 2 record names leak_v2.json and carries both readings and the amendment",
+      h6["verdict"] == "reported" and "leak_v2.json" in h6["why"] and h6["parts"]["detector_version"] == 2
+      and h6["parts"]["readings"]["v1"]["h6a"]["quarantine"] == ["s"] and h6["parts"]["amendment"]["id"] == "A2", h6)
 check("every hypothesis is present with a known verdict", set(a["hypotheses"]) >= {
     "H0", "H1", "H2a", "H2b", "H3a", "H3b", "H4", "H5a", "H5b", "H6", "H7", "H8", "H9", "H9'", "H10", "H11", "H12"}
       and all(h["verdict"] in E.VERDICTS for h in a["hypotheses"].values()))

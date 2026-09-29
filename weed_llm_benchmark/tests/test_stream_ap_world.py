@@ -604,6 +604,8 @@ class World(object):
         tb = images * 2 if target_boxes is None else target_boxes
         self._w("intake/%s/summary.json" % batch, {
             "format": "collect-summary/1", "source": source, "batch": batch, "rows": images,
+            # the flat fields collect.intake writes for D28: the images the guard checked and its refusals
+            "images": images + sum((reasons or {}).values()), "guard": dict(reasons or {}),
             "yield": {"images_seen": images + sum((reasons or {}).values()), "images_kept": images,
                       "target_images": images if tb else 0, "target_boxes": tb, "rejected": reasons or {}},
             "source_leak": {"eval_share": eval_share, "base_share": base_share,

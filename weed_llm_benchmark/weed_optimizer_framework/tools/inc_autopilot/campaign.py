@@ -237,8 +237,10 @@ BUILD_FAILED = ("build_failed", "refused_drift", "refused_missing_module", "env_
 FUNNEL_DECISIONS = ("DEC-1", "DEC-2", "DEC-3", "DEC-4", "DEC-5", "DEC-6", "DEC-7", "DEC-8", "DEC-9", "DEC-10")
 # A callable taking the _Run and returning its executor's lab hooks (tests).
 LAB_HOOKS = None
-# The params that tell one funnel step from another in the lineage.
-FUNNEL_KEY_PARAMS = ("verb", "rl", "part", "what", "policy", "config")
+# The params that tell one funnel step from another in the lineage (detector:
+# the copy detector version of the leak step, contract docs/FUNNEL_AUDIT.md
+# 14 A2, levers.funnel_steps).
+FUNNEL_KEY_PARAMS = ("verb", "rl", "part", "what", "policy", "config", "detector")
 # The funnel levers that run as Slurm jobs of run_inc_funnel.sh (levers.json
 # L10, L11, L13). A job leaves squeue when it ends; its final state comes from
 # sacct (the campaign snapshot's --sacct, remote.job_states), is recorded in
@@ -265,6 +267,26 @@ def _step_params(r):
     merged = dict(r.get("meta_params") or {})
     merged.update(r.get("params") or {})
     return {k: merged.get(k) for k in FUNNEL_KEY_PARAMS if merged.get(k) is not None}
+
+
+def funnel_leak_context(prereg_path, once=None):
+    """The context record funnel_leak of a pre-registration file (see
+    _Run._funnel_leak), or None when it requires copy detector version 1. An
+    unreadable file decides nothing new (recorded through once)."""
+    from ..funnel import domain as FD
+    try:
+        raw = Path(prereg_path).read_bytes()
+        pre = json.loads(raw.decode("utf-8"))
+        version = FD.leak_detector_version(pre)
+        a = FD.leak_detector_amendment(pre) or {}
+    except Exception as e:                    # an unreadable prereg: the leak step keeps its version 1 key
+        if once is not None:
+            once("funnel_prereg", str(e), "funnel_prereg_unreadable", reasons=[_short(e, 300)])
+        return None
+    if version <= 1:
+        return None
+    return {"detector_version": int(version), "prereg_sha256": hashlib.sha256(raw).hexdigest(),
+            "amendment": {k: a.get(k) for k in ("id", "date", "section", "post_hoc") if k in a} or None}
 
 
 def job_state(rows, job_id):
@@ -2313,6 +2335,9 @@ class _Run(object):
             stale = self._funnel_cards_stale()
             if stale:
                 ctx["funnel_cards_stale"] = stale
+            leak = self._funnel_leak()
+            if leak:
+                ctx["funnel_leak"] = leak
             try:
                 ctx["funnel_lab_pull"] = X.funnel_pull_local(self.paths.lab_inc)
             except OSError as e:
@@ -3213,10 +3238,14 @@ class _Run(object):
         raw = pre_path.read_bytes()
         pre = json.loads(raw.decode("utf-8"))
         csha = hashlib.sha256(self.paths.contract.read_bytes()).hexdigest()
-        if (pre.get("contract") or {}).get("sha256") != csha:
+        # the contract in force: the core's, or the one its last contract amendment records
+        try:
+            want = FD.contract_sha256_of(pre)
+        except FD.PreregError as e:
+            raise ValueError("%s: %s" % (pre_path, e))
+        if want != csha:
             raise ValueError("the contract %s (sha256 %s) is not the one %s names (%s)"
-                             % (self.paths.contract, csha[:12], pre_path, str((pre.get("contract") or {})
-                                                                               .get("sha256"))[:12]))
+                             % (self.paths.contract, csha[:12], pre_path, str(want)[:12]))
         prereg = {"path": str(pre_path), "sha256": hashlib.sha256(raw).hexdigest(),
                   "core_sha256": FD.prereg_core_sha256(pre),
                   "contract": {"path": pre["contract"].get("path") or str(self.paths.contract), "sha256": csha}}
@@ -3321,6 +3350,17 @@ class _Run(object):
         if refused and was and was != cur:
             return {"index_domain_sha256": was, "domain_sha256": cur, "refused": refused}
         return None
+
+    def _funnel_leak(self):
+        """{"detector_version", "amendment", "prereg_sha256"} when the lab's
+        copy of the pre-registration requires a copy detector version above 1
+        (an amendment's effects, contract docs/FUNNEL_AUDIT.md 14 A2), else
+        None: levers.funnel_steps then keys the leak step by that version, and
+        L10 runs it again while its record is not on the cluster."""
+        p = self.paths.lab_inc / "funnel" / "prereg_v1.json"
+        if not p.is_file():
+            return None
+        return funnel_leak_context(p, once=self._once)
 
     def _funnel_sync(self):
         """The funnel sync (inc_funnel_sync, R0) when DIAGNOSE asked for it; it is

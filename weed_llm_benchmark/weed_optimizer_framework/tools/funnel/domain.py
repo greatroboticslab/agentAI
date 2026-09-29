@@ -16,6 +16,15 @@ sample-lock amendment does not make earlier outputs stale. append_amendment
 is the only writer of the prereg file, and it can change nothing but the
 amendments list.
 
+Contract amendments (kind "amendment", runner §3.3; contract §14). A dated
+amendment of the contract text records the contract's sha256 after the edit
+(contract_sha256) and the one it replaced (contract_sha256_before, written by
+append_amendment). The contract a prereg names is then the one its last such
+amendment records (contract_sha256_of); the core's own contract sha256 stays
+as it was, so the core, and every artifact compared by it, is unchanged. An
+amendment may state effects on the engine; the one known is
+"leak_detector_version" (leak_detector_version, leak_record).
+
 Standard library only.
 """
 from __future__ import annotations
@@ -53,6 +62,15 @@ PAIR_ANSWERS = ("same", "consecutive", "different", "unsure")
 LEVELS = ("species", "genus", "plant")
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _WORD_RE = re.compile(r"[a-z0-9]+")
+# A dated amendment of the contract (runner §3.3): its id, its heading in the
+# contract's amendments section, the effects the engine knows, and the file
+# names of each copy-detector version's record and pairs file (contract §14).
+AMENDMENT_KIND = "amendment"
+AMENDMENT_ID_RE = re.compile(r"^A[1-9][0-9]*$")
+_SHA_RE = re.compile(r"^[0-9a-f]{64}$")
+LEAK_DETECTOR_EFFECT = "leak_detector_version"
+AMENDMENT_EFFECTS = (LEAK_DETECTOR_EFFECT,)
+LEAK_FILES = {1: ("leak_v1.json", "leak_pairs_v1.csv"), 2: ("leak_v2.json", "leak_pairs_v2.csv")}
 
 
 def _is_int(v):
@@ -778,10 +796,25 @@ def check_prereg_domain(prereg, domain):
         raise DomainError("the prereg is for domain %r, the config for %r" % (prereg.domain_name, name))
 
 
-def load_prereg(path, domain=None):
-    """A Prereg with its format and its contract's sha256 checked. With a
-    domain (a Domain, a name or a config path), the two must name the same
-    domain."""
+def contract_sha256_of(prereg):
+    """The contract sha256 a prereg names now: the contract_sha256 of its last
+    amendment that records one (a dated amendment of the contract text), else
+    the core's contract.sha256. The chain is checked: each such amendment
+    must name, as contract_sha256_before, the sha256 in force before it."""
+    raw = prereg.raw if isinstance(prereg, Prereg) else prereg
+    want = (raw.get("contract") or {}).get("sha256")
+    for a in raw.get("amendments") or []:
+        if not isinstance(a, dict) or not a.get("contract_sha256"):
+            continue
+        if a.get("contract_sha256_before") != want:
+            raise PreregError("amendment %s replaces contract %s, but the contract in force before it was %s: "
+                              "the amendments were edited" % (a.get("id"), str(a.get("contract_sha256_before"))[:12],
+                                                              str(want)[:12]))
+        want = a["contract_sha256"]
+    return want
+
+
+def _load_prereg(path, expect_contract=None):
     path = Path(path)
     data = _read_bytes(path, PreregError)
     try:
@@ -795,14 +828,21 @@ def load_prereg(path, domain=None):
         raise PreregError("%s: domain %r" % (path, raw.get("domain")))
     if not isinstance(raw.get("amendments", []), list):
         raise PreregError("%s: amendments must be a list" % path)
-    want = (raw.get("contract") or {}).get("sha256")
+    want = expect_contract or contract_sha256_of(raw)
     cpath = contract_path(raw, prereg_path=path)
     cdata = _read_bytes(cpath, PreregError)
     got = hashlib.sha256(cdata).hexdigest()
     if got != want:
         raise PreregError("contract %s hashes to %s, the prereg records %s"
                           % (cpath, got[:12], str(want)[:12]))
-    pre = Prereg(raw, path, hashlib.sha256(data).hexdigest(), cpath, got)
+    return Prereg(raw, path, hashlib.sha256(data).hexdigest(), cpath, got)
+
+
+def load_prereg(path, domain=None):
+    """A Prereg with its format and its contract's sha256 checked (the sha256
+    in force: contract_sha256_of). With a domain (a Domain, a name or a config
+    path), the two must name the same domain."""
+    pre = _load_prereg(path)
     if domain is not None:
         check_prereg_domain(pre, load(domain) if not isinstance(domain, Domain) else domain)
     return pre
@@ -816,16 +856,67 @@ def load_pair(prereg_path):
     return pre, dom
 
 
+def _check_contract_amendment(pre, amendment):
+    """The checks of a kind "amendment" record (runner §3.3), before it is
+    written: an id A<n>, a non-empty text, post_hoc a bool, known effects,
+    and, when it amends the contract text, a contract_sha256 that the contract
+    file hashes to now, differs from the one in force, and whose text holds
+    the amendment's heading ("### <id> ..." in its amendments section).
+    Returns the amendment with contract_sha256_before (the sha256 in force)
+    and the prereg core it was made under filled in."""
+    a = copy.deepcopy(amendment)
+    if not AMENDMENT_ID_RE.match(str(a.get("id") or "")):
+        raise PreregError("a contract amendment's id is A<n>, got %r" % a.get("id"))
+    if not isinstance(a.get("text"), str) or not a["text"].strip():
+        raise PreregError("amendment %s needs its text" % a["id"])
+    if not isinstance(a.get("post_hoc"), bool):
+        raise PreregError("amendment %s must say whether it is post hoc (post_hoc true or false)" % a["id"])
+    eff = a.get("effects", {})
+    if not isinstance(eff, dict) or set(eff) - set(AMENDMENT_EFFECTS):
+        raise PreregError("amendment %s: effects must be an object over %s" % (a["id"], list(AMENDMENT_EFFECTS)))
+    if LEAK_DETECTOR_EFFECT in eff:
+        v = eff[LEAK_DETECTOR_EFFECT]
+        if not _is_int(v) or v not in LEAK_FILES or v <= leak_detector_version(pre):
+            raise PreregError("amendment %s: %s %r must be a known detector version above the one in force (%d)"
+                              % (a["id"], LEAK_DETECTOR_EFFECT, v, leak_detector_version(pre)))
+    before = contract_sha256_of(pre.raw)
+    if "contract_sha256_before" in a and a["contract_sha256_before"] != before:
+        raise PreregError("amendment %s names contract %s as the one it replaces; %s is in force"
+                          % (a["id"], str(a["contract_sha256_before"])[:12], str(before)[:12]))
+    if a.get("contract_sha256") is not None:
+        csha = a["contract_sha256"]
+        if not isinstance(csha, str) or not _SHA_RE.match(csha):
+            raise PreregError("amendment %s: contract_sha256 must be a sha256" % a["id"])
+        if csha == before:
+            raise PreregError("amendment %s records the contract in force (%s): the contract text was not amended"
+                              % (a["id"], csha[:12]))
+        text = _read_bytes(pre.contract_path, PreregError).decode("utf-8", "replace")
+        if not re.search(r"^### %s\b" % re.escape(a["id"]), text, flags=re.M):
+            raise PreregError("the contract %s holds no heading '### %s': the amendment is not in its text"
+                              % (pre.contract_path, a["id"]))
+        a["contract_sha256_before"] = before
+    a.setdefault("prereg_core_sha256", pre.core_sha256)
+    return a
+
+
 def append_amendment(path, amendment):
     """Append one dated amendment to the prereg file, atomically. Refuses when
     the amendment is malformed or repeats an id, when the file no longer loads
-    (contract changed), when an amendment names a prereg core other than the
-    file's (the file was edited outside its amendments), or when the rewrite
-    would change anything but the amendments list. Returns the new raw prereg."""
+    (contract changed, unless the amendment is the one that records the new
+    contract), when an amendment names a prereg core other than the file's
+    (the file was edited outside its amendments), or when the rewrite would
+    change anything but the amendments list. A kind "amendment" record is
+    checked by _check_contract_amendment. Returns the new raw prereg."""
     path = Path(path)
-    pre = load_prereg(path)
     if not isinstance(amendment, dict):
         raise PreregError("an amendment is a JSON object")
+    expect = None
+    if amendment.get("kind") == AMENDMENT_KIND and isinstance(amendment.get("contract_sha256"), str):
+        expect = amendment["contract_sha256"]
+    pre = _load_prereg(path, expect_contract=expect)
+    if expect is not None:
+        # the file named by the amendment must still chain from the contract in force
+        contract_sha256_of(pre.raw)
     for key in ("id", "kind", "date"):
         if not isinstance(amendment.get(key), str) or not amendment.get(key):
             raise PreregError("an amendment needs %r" % key)
@@ -833,6 +924,10 @@ def append_amendment(path, amendment):
         raise PreregError("amendment date %r is not YYYY-MM-DD" % amendment["date"])
     if any(a.get("id") == amendment["id"] for a in pre.amendments):
         raise PreregError("amendment id %r already exists" % amendment["id"])
+    if amendment["kind"] == AMENDMENT_KIND:
+        amendment = _check_contract_amendment(pre, amendment)
+    elif amendment.get("contract_sha256") is not None or amendment.get("effects") is not None:
+        raise PreregError("only a kind %r amendment may record a contract sha256 or effects" % AMENDMENT_KIND)
     named = amendment.get("prereg_core_sha256")
     if named is not None and named != pre.core_sha256:
         raise PreregError("the amendment names prereg core %s but the file's core is %s: the prereg was "
@@ -856,4 +951,66 @@ def append_amendment(path, amendment):
 
 
 def next_amendment_id(prereg):
-    return "A%d" % (len(prereg.amendments) + 1)
+    """A<n+1>, n the largest id number among the prereg's amendments (0
+    without one): an id is never reused, also in a copy that leaves an
+    amendment out (the test worlds drop the real sample lock, A1, and keep
+    A2). For a prereg whose ids run A1..An this is the old len + 1."""
+    ns = [int(str(a.get("id"))[1:]) for a in prereg.amendments
+          if isinstance(a, dict) and AMENDMENT_ID_RE.match(str(a.get("id") or ""))]
+    return "A%d" % (max(ns or [0]) + 1)
+
+
+# ------------------------------------------------------------ the copy detector's version
+def leak_detector_amendment(prereg):
+    """The last amendment that sets the copy detector's version (its effects
+    name leak_detector_version), or None."""
+    raw = prereg.raw if isinstance(prereg, Prereg) else (prereg or {})
+    found = None
+    for a in raw.get("amendments") or []:
+        eff = a.get("effects") if isinstance(a, dict) else None
+        if isinstance(eff, dict) and LEAK_DETECTOR_EFFECT in eff:
+            found = copy.deepcopy(a)
+    return found
+
+
+def leak_detector_version(prereg):
+    """The copy detector version the prereg requires: the last amendment's
+    leak_detector_version, else the core H6's detector_version, else 1."""
+    raw = prereg.raw if isinstance(prereg, Prereg) else (prereg or {})
+    a = leak_detector_amendment(raw)
+    if a is not None:
+        return int(a["effects"][LEAK_DETECTOR_EFFECT])
+    v = (((raw.get("hypotheses") or {}).get("H6") or {}).get("detector_version"))
+    return int(v) if _is_int(v) else 1
+
+
+def leak_record(funnel_dir, prereg):
+    """(path or None, version, why) of the copy detector's record every funnel
+    reader uses: the record of the version the prereg requires when that
+    version is above 1 (None, with why, while it is missing: the superseded
+    record is never used in its place); else leak_v2.json when it exists,
+    else leak_v1.json (None when neither exists)."""
+    fd = Path(funnel_dir)
+    need = leak_detector_version(prereg)
+    if need not in LEAK_FILES:
+        return None, need, "the prereg requires copy detector version %d, which this engine does not know" % need
+    if need > 1:
+        p = fd / LEAK_FILES[need][0]
+        if p.is_file():
+            return p, need, None
+        a = leak_detector_amendment(prereg) or {}
+        return None, need, ("amendment %s requires copy detector version %d: %s is missing, and %s (the "
+                            "superseded reading) is not used in its place" % (a.get("id") or "?", need,
+                                                                              LEAK_FILES[need][0],
+                                                                              LEAK_FILES[1][0]))
+    for v in sorted(LEAK_FILES, reverse=True):
+        p = fd / LEAK_FILES[v][0]
+        if p.is_file():
+            return p, v, None
+    return None, 1, "%s is missing" % LEAK_FILES[1][0]
+
+
+def leak_pairs_path(funnel_dir, prereg):
+    """The pairs file of the record leak_record chooses (None when it chooses none)."""
+    p, v, _why = leak_record(funnel_dir, prereg)
+    return None if p is None else Path(funnel_dir) / LEAK_FILES[v][1]

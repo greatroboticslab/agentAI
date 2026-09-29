@@ -41,6 +41,7 @@ import socket
 import sys
 import tempfile
 import zipfile
+import funnel_prereg as FPR  # noqa: E402
 
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="funnel_fetch_"))
 os.environ["INC_DIR"] = str(TMP / "inc")
@@ -54,7 +55,7 @@ sys.path.insert(0, str(TESTS))
 FD = TMP / "inc" / "funnel"
 FD.mkdir(parents=True)
 shutil.copyfile(ROOT.parent / "docs" / "FUNNEL_AUDIT.md", TMP / "repo" / "docs" / "FUNNEL_AUDIT.md")
-shutil.copyfile(ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json", FD / "prereg_v1.json")
+FPR.write_pre_draw(FD / "prereg_v1.json", ROOT / "results" / "framework" / "inc" / "funnel" / "prereg_v1.json")
 
 
 class _NoNet(socket.socket):
