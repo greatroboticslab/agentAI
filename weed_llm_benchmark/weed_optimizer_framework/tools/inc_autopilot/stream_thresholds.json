@@ -34,12 +34,16 @@
  },
  "D21": {
   "floor_gb": {
-   "value": null,
-   "why": "Contract 7.4: verified target boxes admitted per GB below which a source is closed. Set by a person from the measured first D-C wave; null is the placeholder, under which D21 does not evaluate and L16 is not autonomous."
+   "value": 5.0,
+   "why": "Contract 7.4: verified target boxes admitted per GB below which a source is closed. Set 2026-09-30 by the owner's standing grant (human:harry567566@gmail.com), before any D-C wave was measured, deliberately lenient so no real weed dataset closes early: PAGS8 carries about 1,000 target boxes per GB and the cwd12-like detection sets hundreds; a source under 5 per GB is mostly crops or non-target plants. Revisit from the measured first wave.",
+   "decided_by": "human:harry567566@gmail.com",
+   "decided_utc": "2026-09-30"
   },
   "floor_su": {
-   "value": null,
-   "why": "Contract 7.4: verified target boxes admitted per SU of collect + admit. Set by a person from the first wave; null is the placeholder."
+   "value": 10.0,
+   "why": "Contract 7.4: verified target boxes admitted per SU of collect + admit. Set 2026-09-30 by the owner's standing grant (human:harry567566@gmail.com), before any wave was measured, lenient: a fetch-and-admit of about 4 SU must admit at least 40 target boxes. Revisit from the measured first wave.",
+   "decided_by": "human:harry567566@gmail.com",
+   "decided_utc": "2026-09-30"
   },
   "min_gb": {
    "value": 2.0,
