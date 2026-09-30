@@ -744,20 +744,44 @@ def licence_state(text):
     return str(text).strip(), ("-nc" in lid or "-nd" in lid)
 
 
+def _restricted(text):
+    """True when a licence text restricts use (non-commercial in any
+    spelling, research, academic, educational, non-profit, personal or
+    evaluation use): the collector's own rule (collect.licence.restricted),
+    so a person's override reads as the collector reads it."""
+    from ..collect import licence as CL
+    return bool(CL.restricted(text))
+
+
 def intake_licence_state(row, srec):
     """(licence or None, research_only) of an intake row. The collector's own
     verdict decides (collect/licence.py): a person's override recorded in the
     source's licence record resolves it; otherwise the row's licence_class
     must be permissive or research_only (unresolved or refused is held); a row
-    without a class (an older intake) falls back to licence_state."""
+    without a class (an older intake) falls back to licence_state. An
+    override is a licence text or the collector's record of a person's
+    decision (a dict with the licence text as id); anything else, or a record
+    without a licence text, refuses (StreamError). The override is
+    research-only unless its record says false, when its text restricts use
+    (collect.licence.restricted: non-commercial, research, academic ...),
+    names a non-commercial or no-derivatives licence or names no known
+    licence (licence_id None: fail closed)."""
     lrec = (srec or {}).get("licence") if isinstance((srec or {}).get("licence"), dict) else {}
     ro_row = bool(row.get("research_only"))
     ov = lrec.get("override")
     if ov:
-        text = ov if isinstance(ov, str) else (ov.get("id") or ov.get("licence") or ov.get("text") or row.get("licence"))
-        _l, ro = licence_state(text)
-        ov_ro = bool(ov.get("research_only")) if isinstance(ov, dict) else False
-        return "%s (person override)" % text, bool(ro_row or ro or ov_ro or lrec.get("research_only"))
+        if not isinstance(ov, (str, dict)):
+            raise StreamError("the licence override of source %s is %s, neither a licence text nor a person's "
+                              "decision record: the row is not admitted (fail closed)"
+                              % (row.get("source"), type(ov).__name__))
+        text = ov if isinstance(ov, str) else (ov.get("id") or ov.get("licence") or ov.get("text"))
+        if not isinstance(text, str) or not text.strip():
+            raise StreamError("the licence override of source %s records no licence text (id): the row is not "
+                              "admitted (fail closed)" % row.get("source"))
+        lid, ro = licence_state(text)
+        ov_ro = ov.get("research_only") is not False if isinstance(ov, dict) else False
+        return "%s (person override)" % text, bool(ro_row or ro or ov_ro or lid is None or lrec.get("research_only")
+                                                   or _restricted(text))
     cls = row.get("licence_class", lrec.get("class"))
     if cls is not None:
         if cls not in ("permissive", "research_only") or not row.get("licence"):

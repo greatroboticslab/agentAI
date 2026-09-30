@@ -23,6 +23,11 @@ Pinned:
   * every target has an EPPO code in the pinned table; the PAGS8 card table is
     pinned with its source and who pinned it; the alias table resolves to
     targets only; the yield floors are unset (a person sets them);
+  * licence_overrides is an object keyed by source ids, each a person's
+    decision {id, research_only (a boolean), decided_by (human:<id>),
+    decided_utc, reason}; research_only false only for an id the licence
+    policy reads as permissive; anything else is refused; the config holds the
+    owner's two research-only decisions (CottonWeedDet3, the MFWD trays);
   * no collector module writes under collect/domains/.
 
 Run:  python3 tests/test_collect_config.py
@@ -83,6 +88,26 @@ def main():
                 (lambda r: r["placement"].update(lab_only=["nosuch"]), "placement.lab_only"),
                 (lambda r: r["budgets"].update(floor_gb=5.0), "placeholder"),
                 (lambda r: r["class_map"]["status_map"].update(default="nowhere"), "status_map"),
+                (lambda r: r.update(licence_overrides=["mediatum_1717366"]), "licence_overrides: an object"),
+                (lambda r: r["licence_overrides"].update(mediatum_1717366="research-only"),
+                 "licence_overrides.mediatum_1717366: {id, research_only"),
+                (lambda r: r["licence_overrides"].update({"bad id!": dict(r["licence_overrides"]["mediatum_1717366"])}),
+                 "is not a source id"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].pop("id"), "id (the licence"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].update(research_only="yes"),
+                 "research_only must be true or false"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].update(decided_by="owner"),
+                 "decided_by must be a person"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].update(decided_utc=""), "decided_utc is required"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].pop("reason"), "reason is required"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].update(id="unknown", research_only=False),
+                 "research_only false needs a licence the policy reads as permissive ('unknown' is unresolved)"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].update(research_only=False),
+                 "('research-only' is research_only)"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].update(id="CC BY-NC 4.0", research_only=False),
+                 "research_only false needs"),
+                (lambda r: r["licence_overrides"]["mediatum_1717366"].update(id="Custom terms", research_only=False),
+                 "research_only false needs"),
         ):
             r = copy.deepcopy(raw)
             mut(r)
@@ -93,6 +118,12 @@ def main():
         r = copy.deepcopy(raw)
         r["budgets"]["floor_gb"] = {"value": 120.0, "set_by": "person 2026-10-15 from the first wave"}
         check("a floor written by a person with its value and who set it is valid", CF.validate(r) == [])
+        r = copy.deepcopy(raw)
+        r["licence_overrides"]["mediatum_1717366"].update(id="CC BY 4.0", research_only=False)
+        r["licence_overrides"]["kg_yuzhenlu__cottonweeddet3"].update(id="unknown")
+        check("an override that is not research-only is valid for a licence the policy reads as permissive; a "
+              "research-only one for any licence text (fail closed: research_only false needs a resolved licence)",
+              CF.validate(r) == [], CF.validate(r))
         for mut, want in ((lambda r: r["class_space"].update(unmapped_id=12), "collides"),
                           (lambda r: r["search_terms"].update(NotATarget=["x"]), "not a target"),
                           (lambda r: r["prefilter"]["presumed_derivative"].update(declares_any=["NotATarget"]),
@@ -130,6 +161,16 @@ def main():
         check("the alias table resolves to targets only", al and set(al.values()) <= set(cfg.target_names))
         check("the yield floors are unset until a person sets them", cfg.yield_floors() == {"floor_gb": None,
                                                                                             "floor_su": None})
+        lo = cfg.raw["licence_overrides"]
+        check("the owner's licence overrides: the two unresolved sources, research use only, each a person's decision",
+              sorted(lo) == ["kg_yuzhenlu__cottonweeddet3", "mediatum_1717366"]
+              and all(v["id"] == "research-only" and v["research_only"] is True and v["class"] == "research_only"
+                      and v["decided_by"] == "human:harry567566@gmail.com" and v["decided_utc"] == "2026-09-30"
+                      and "not for deployment or redistribution" in v["reason"] for v in lo.values()), lo)
+        check("licence_override reads a source's decision by its exact id, a copy, None for any other",
+              CF.licence_override(cfg, "mediatum_1717366") == lo["mediatum_1717366"]
+              and CF.licence_override(cfg, "mfwd_porol") is None and CF.licence_override(cfg, None) is None
+              and CF.licence_override(cfg, "mediatum_1717366") is not lo["mediatum_1717366"])
         col = W.ROOT / "weed_optimizer_framework" / "tools" / "collect"
         writers = []
         for p in sorted(col.rglob("*.py")):

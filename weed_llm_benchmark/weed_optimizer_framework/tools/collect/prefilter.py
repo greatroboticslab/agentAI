@@ -39,7 +39,7 @@ from pathlib import Path
 
 from . import TOOLS_DIR, ConfigError, Refusal, in_slurm, read_json
 from . import classmap as CM
-from .config import record_text
+from .config import licence_override, record_text
 from . import licence as LIC
 
 TRAINER_SOURCE = "mega_trainer.py"          # parsed, never imported
@@ -219,8 +219,8 @@ DERIVED = ("known_item", "known_item_id", "known_item_name", "known_item_role", 
            "names_pending", "names_unresolved", "text_targets", "copy_candidate", "lab_group", "lab_group_basis",
            "evaluation_lab", "provenance_cleared", "hold_until", "exhaustive_labels", "licence", "decision",
            "target_classes", "estimate", "rank", "precheck", "superseded_by", "id", "found_by_search", "licence_ok",
-           "licence_id", "licence_class", "expected_target_boxes", "credentials_ok", "image_level",
-           "annotation_type", "copy_scan_done", "classes_source")
+           "licence_id", "licence_class", "licence_override", "expected_target_boxes", "credentials_ok",
+           "image_level", "annotation_type", "copy_scan_done", "classes_source")
 
 
 def decide(cand, cfg, names, targets, deficit=None, never_train=frozenset()):
@@ -439,7 +439,9 @@ def precheck(c, cfg, ctx):
         _fail(f, "superseded", "a preferred licence copy exists (%s)" % c["superseded_by"], "close")
     lic = c.get("licence") or {}
     if lic.get("class") == "unresolved":
-        _fail(f, "licence_unresolved", "licence %r is unresolved (P6; card X16)" % lic.get("id"), "hold", "R3")
+        # a person's licence override (the config's licence_overrides) lets it through; never a refused one
+        if licence_override(cfg, sid) is None:
+            _fail(f, "licence_unresolved", "licence %r is unresolved (P6; card X16)" % lic.get("id"), "hold", "R3")
     elif lic.get("class") == "refused":
         _fail(f, "licence_refused", "licence %r is not research-usable" % lic.get("id"), "close")
     if c.get("evaluation_lab") and c.get("lab_group_basis") == "declared":

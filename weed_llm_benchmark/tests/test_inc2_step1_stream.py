@@ -43,7 +43,10 @@ Pinned (acceptance of group C):
     released) and h6_scan (the funnel's calibration serves same-lab rows at
     once, the stream's own only after the deadline) are served; intake rows
     (INC ids with unmapped 13) are masked per box and provenance-cleared
-    sources are not held; rejoin relabels from a recorded resolution and
+    sources are not held; a person's licence override resolves an intake
+    row (research_only unless the record says false and its text names a
+    known licence that does not restrict use), and an override of any other
+    type or without a licence text refuses; rejoin relabels from a recorded resolution and
     supersedes the old rows; the status schema; the CLI; the job script.
 
 No network, no GPU. Run:  python3 tests/test_inc2_step1_stream.py
@@ -518,6 +521,40 @@ def test_groups_unit():
     r, merged = g3.assign(0b11 << 8)              # 2 bits from both: merges them
     check("a hash near two groups merges them into the smaller id, and says so",
           r == min(p, q) and merged == [max(p, q)] and g3.find(q) == g3.find(p))
+
+
+def test_intake_licence_unit():
+    print("an intake row's licence under a person's override")
+    row = {"key": "src_x__a", "source": "src_x", "licence": "unresolved", "licence_class": "unresolved",
+           "research_only": False}
+
+    def state(ov, **lrec):
+        return SS.intake_licence_state(row, {"licence": dict({"id": "unresolved", "class": "unresolved",
+                                                              "research_only": False}, override=ov, **lrec)})
+    owner = {"id": "research-only", "class": "research_only", "research_only": True, "decided_by": "human:owner",
+             "decided_utc": "2026-09-30", "reason": "research use only"}
+    check("the collector's record of a person's decision resolves the row: its id, research_only as decided",
+          state(owner) == ("research-only (person override)", True), state(owner))
+    check("a restriction in the override's text keeps research_only (collect.licence.restricted), whatever the "
+          "record's flag says", state(dict(owner, id="CC BY 4.0, academic use only", research_only=False))[1] is True
+          and state("CC BY 4.0, research use only")[1] is True and state("Non-Commercial terms")[1] is True)
+    check("a permissive override text is not research-only; a non-commercial one is (as before)",
+          state("cc-by-4.0") == ("cc-by-4.0 (person override)", False)
+          and state({"id": "cc-by-nc-4.0", "decided_by": "owner"})[1] is True, (state("cc-by-4.0"),))
+    check("an override that is neither a licence text nor a decision record refuses (StreamError, fail closed)",
+          raises(lambda: state(["research-only"]), text="neither a licence text") is True
+          and raises(lambda: state(5), text="neither a licence text") is True)
+    check("a decision record without a licence text refuses (the row's own 'unresolved' is never read as one)",
+          raises(lambda: state({"decided_by": "human:x", "research_only": False}), text="no licence text") is True
+          and raises(lambda: state(dict(owner, id="  ")), text="no licence text") is True)
+    check("fail closed: an override whose text names no known licence is research-only whatever its record says; "
+          "a record without research_only false is research-only; a permissive record with research_only false "
+          "is not",
+          state(dict(owner, id="unknown", research_only=False)) == ("unknown (person override)", True)
+          and state("unknown")[1] is True and state("Custom terms, see card")[1] is True
+          and state({"id": "cc-by-4.0", "decided_by": "human:x"})[1] is True
+          and state(dict(owner, id="cc-by-4.0", research_only=False)) == ("cc-by-4.0 (person override)", False),
+          (state(dict(owner, id="unknown", research_only=False)), state({"id": "cc-by-4.0", "decided_by": "human:x"})))
 
 
 
@@ -1521,6 +1558,16 @@ def test_job_script():
           and "DRY RUN: python -u -m weed_optimizer_framework.tools.inc2.step1_stream admit --intake b7" in out.stdout
           and "module tools/inc/verify.py:" in out.stdout and "= outer" in out.stdout
           and "module tools/inc2/step1_stream.py:" in out.stdout, out.stdout[-800:] + out.stderr[-400:])
+    check("the collector's licence rule an override is read with (collect/__init__.py, collect/licence.py) is "
+          "hashed into the log", "module tools/collect/__init__.py:" in out.stdout
+          and "module tools/collect/licence.py:" in out.stdout, out.stdout[-800:])
+    (outer / "tools" / "collect").mkdir(parents=True, exist_ok=True)
+    (outer / "tools" / "collect" / "licence.py").write_text("# stale\n")
+    out_c = job("admit", "--intake", "b7")
+    (outer / "tools" / "collect" / "licence.py").unlink()
+    check("an outer collect/licence.py that differs from the nested copy refuses (exit 2)",
+          out_c.returncode == 2 and "module tools/collect/licence.py: nested" in out_c.stdout
+          and "differs from the nested" in out_c.stderr, out_c.stdout[-400:] + out_c.stderr[-300:])
     check("an unknown verb and no verb refuse (exit 2)", job("pool").returncode == 2 and job().returncode == 2)
     out = job("scan-holds", "--hold", "h6_scan")
     check("scan-holds --hold h6_scan (the autopilot's L17 form) runs", out.returncode == 0
@@ -1559,6 +1606,7 @@ def main():
         guards_eq = make_guards(lock_eq)
         guards = make_guards(lock)
         test_groups_unit()
+        test_intake_licence_unit()
         test_equivalence(lock_eq, guards_eq)
         test_split_invariance(lock_eq, guards_eq)
         lay = test_backfill(lock, guards, sel)

@@ -38,6 +38,10 @@ What is pinned:
   list stops the run and a production LOCK without the record is refused;
 - the arm: no arm means n640 (with a warning) only for yolo11n.pt; a cold run
   whose init is not the arm's checkpoint (name or pinned sha256) departs;
+- research_only: run.json copies exp.json's flag (a segment's
+  stream.research_only.models, a baseline's research_only.flag; true when
+  either is), "unknown" when a stream built the experiment and recorded
+  neither, and leaves it out when exp.json records neither;
 - end to end on the CPU: a base run, a cand from it, a null and a final run
   finish; run.json says protocol v3 / inc2, records the arm, the guard and
   the code of every tools/inc2 module; base and cand runs carry a scorer
@@ -494,6 +498,22 @@ def test_specs_and_manifests(W):
           T.init_check("base", "yolo11n.pt", rec) == [] and T.init_check("base", "yolo11s.pt", rec)
           and T.init_check("union", "yolo11n.pt", dict(rec, weights_sha256="0" * 64))
           and T.init_check("cand", "/x/y.pt", rec) == [])
+    d = C.INC_DIR / "t2_ro"
+    d.mkdir(parents=True, exist_ok=True)
+    got = {}
+    for name, defn in (("segment", {"stream": {"research_only": {"models": True, "pool": False}}}),
+                       ("baseline", {"research_only": {"flag": True, "basis": "research_only rows"}}),
+                       ("either", {"stream": {"research_only": {"models": False}}, "research_only": {"flag": True}}),
+                       ("unknown", {"stream": {"research_only": {"models": "unknown"}}}),
+                       ("clean", {"research_only": {"flag": False}}), ("stream_unrecorded", {"stream": {"sid": "x"}}),
+                       ("absent", {"type": "baseline"})):
+        (d / "exp.json").write_text(json.dumps(dict(defn, exp="t2_ro")))
+        got[name] = T.experiment_research_only("t2_ro")
+    check("experiment_research_only: a segment's stream.research_only.models or a baseline's research_only.flag; "
+          "true when either is; 'unknown' and false as recorded; 'unknown' when a stream built it and recorded "
+          "neither (fail closed); None when exp.json records neither and no stream built it",
+          got == {"segment": True, "baseline": True, "either": True, "unknown": "unknown", "clean": False,
+                  "stream_unrecorded": "unknown", "absent": None}, got)
 
 
 def test_guard(W):
@@ -756,6 +776,7 @@ def test_end_to_end(W):
           (rc, rj.get("stage"), (rj.get("error") or "")[-800:]))
     check("run.json: protocol v3, inc2, splits v2, the arm (n640, assumed), testing deviations recorded",
           rj.get("protocol") == "v3" and rj.get("protocol_package") == "inc2" and rj.get("splits_version") == "v2"
+          and "research_only" not in rj
           and (rj.get("arm") or {}).get("id") == "n640" and rj.get("recipe_deviations")
           and rj.get("init_check", {}).get("passed") is True
           and any("continuity arm" in w for w in rj.get("warnings", [])), {k: rj.get(k) for k in (
@@ -825,7 +846,8 @@ def test_end_to_end(W):
           (rcy, jy.get("stage"), jy.get("resumed_from_attempt")))
     bexp = "t2_base_exp"
     (C.INC_DIR / bexp).mkdir(parents=True, exist_ok=True)
-    (C.INC_DIR / bexp / "exp.json").write_text(json.dumps({"exp": bexp, "type": "baseline", "testing": TESTING}))
+    (C.INC_DIR / bexp / "exp.json").write_text(json.dumps({"exp": bexp, "type": "baseline", "testing": TESTING,
+                                                           "research_only": {"flag": True}}))
     pbx = spec("base__s0", "base", exp=bexp, init="yolo11n.pt", train_manifest=base_m, recipe=recipe())
     with patched(T, "sidecar_command", broken):
         rcz = run(pbx)
@@ -833,6 +855,9 @@ def test_end_to_end(W):
     check("in a baseline experiment a failed sidecar is recorded (status failed, a warning) and the run is done",
           rcz == 0 and jz.get("status") == "done" and jz["sidecars"]["dev"].get("status") == "failed"
           and any("sidecar failed" in w for w in jz.get("warnings", [])), (rcz, jz.get("sidecars")))
+    check("run.json copies the experiment's research-only flag (exp.json research_only.flag); an experiment that "
+          "records none leaves it out", jz.get("research_only") is True and "research_only" not in rj,
+          (jz.get("research_only"), rj.get("research_only")))
     return out / "weights" / "final.pt"
 
 
@@ -854,7 +879,8 @@ def test_production(W):
     check("a production cold run whose checkpoint is not the arm's pinned sha256 is refused at stage recipe",
           rc == 1 and rj.get("stage") == "recipe" and "arm's checkpoint" in (rj.get("error") or ""),
           (rj.get("stage"), (rj.get("error") or "")[-300:]))
-    (C.INC_DIR / EXP_PROD / "exp.json").write_text(json.dumps({"exp": EXP_PROD, "arm": arm, "init_weights": "yolo11n.pt"}))
+    (C.INC_DIR / EXP_PROD / "exp.json").write_text(json.dumps({"exp": EXP_PROD, "arm": arm, "init_weights": "yolo11n.pt",
+                                                             "stream": {"research_only": {"models": True}}}))
     p3 = spec("p_ok", "base", exp=EXP_PROD, init="yolo11n.pt", train_manifest=base_m,
               recipe=dict(RC.cold("n640"), seed=0))
     import torch
@@ -866,6 +892,8 @@ def test_production(W):
         check("the protocol's cold recipe from the arm's checkpoint passes stage recipe and stops at device "
               "(no CUDA here)", rc == 1 and rj.get("stage") == "device" and rj.get("init_check", {}).get("passed")
               and rj.get("recipe_name") == "cold", (rj.get("stage"), rj.get("init_check")))
+    check("run.json copies a segment's research-only flag (exp.json stream.research_only.models), a failed run "
+          "included", rj.get("research_only") is True, rj.get("research_only"))
 
 
 def test_job_script(spec_path):

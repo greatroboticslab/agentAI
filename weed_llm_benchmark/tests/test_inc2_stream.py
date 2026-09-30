@@ -20,7 +20,9 @@ Pinned:
   * init: P_0 is base_v2's bytes, M = ceil(0.10 |base|) or given, the
     prospective record precedes any build, a stream is defined once;
   * the cut: exactly M; deterministic under stable_int; whole near-duplicate
-    units; target images only; holds honoured (a person's release lifts one);
+    units; target images only; holds honoured (a person's release lifts one;
+    the rows a licence release lifts are research_only in the rows sidecar
+    unless it records the person's --licence and --not-research-only);
     refused, unevidenced, OtherPlant-only and base-copy rows never cut;
     planted exact, 3-bit, 6-bit, hflip and rot90 copies of a dev image and a
     masked row whose original is a dev copy refused by GuardV2 at the cut;
@@ -677,6 +679,14 @@ def test_cut(base, base_rows, guard, dev_paths):
     el2 = {e["key"] for e in ana2["eligible"]}
     check("after the person's release the licence-held row is eligible; the h6_scan row stays held",
           lic["key"] in el2 and held["key"] not in el2)
+    e_lic = next((e for e in ana2["eligible"] if e["key"] == lic["key"]), {})
+    check("a keys-scoped licence release applies to the row it lifts, fail closed (research_only, the release "
+          "named); a row of the same source it did not lift carries none",
+          (e_lic.get("licence_release") or {}).get("by") == "human:owner"
+          and e_lic["licence_release"].get("research_only") is True and ST._row_licence(e_lic)[1] is True
+          and all(e.get("licence_release") is None for e in ana2["eligible"]
+                  if e["source"] == "srcB" and e["key"] != lic["key"]),
+          (e_lic.get("licence_release"), ST._row_licence(e_lic) if e_lic else None))
     check("a stream-wide release is for funnel_F9 only (a licence is released row by row or by source)",
           raises(lambda: st.release("licence", None, "human:owner"), ST.StreamError, "funnel_F9"))
     f9 = s1.add("srcB", "b0002", mixed, n=1, capture_group="vidB9", holds=("funnel_F9",))[0]
@@ -703,6 +713,69 @@ def test_cut(base, base_rows, guard, dev_paths):
     (ps,), _r, _a = st2.cut_plan(1)
     check("one source is all there is: the cap does not apply (one species, 100 %)",
           not ps["species_cap"]["applies"] and ps["species_cap"]["max_share"] == 1.0)
+
+
+def test_licence_release(base, guard):
+    print("a licence release fails closed: research_only unless the person records the licence and says not")
+    M = 4
+    mixed = [1, 1, 0, 0, 0, 1] + [0] * 6
+    s1 = Step1World("s1_licrel")
+    for r in s1.add("lic_a", "b0001", mixed, n=M, capture_group="la", holds=("licence",)):
+        r["licence"] = None                           # a row held licence records none
+    s1.commit()
+    st = new_stream("licw", base, M, s1, guard)
+    check("--not-research-only needs the person's licence text; --licence belongs to a licence release; nothing "
+          "recorded", raises(lambda: st.release("licence", "r", "human:owner", source="lic_a", research_only=False),
+                             ST.StreamError, "--licence TEXT")
+          and raises(lambda: st.release("funnel_F9", "r", "human:owner", licence="CC BY 4.0"), ST.StreamError,
+                     "licence release")
+          and not [e for e in st.ledger.read() if e["event"] == "release"])
+    check("--not-research-only is refused for a licence text that names no known licence or restricts use (read as "
+          "step1_stream reads an override); nothing recorded",
+          all(raises(lambda t=t: st.release("licence", "r", "human:owner", source="lic_a", licence=t,
+                                            research_only=False), ST.StreamError, "stay research_only")
+              for t in ("unknown", "Custom terms", "CC BY-NC 4.0", "CC BY 4.0, academic use only", "research-only"))
+          and ST.main(["release", "--stream", "licw", "--hold", "licence", "--source", "lic_a", "--licence",
+                       "unknown", "--not-research-only", "--decided-by", "human:owner"], deps=st.deps) == 1
+          and not [e for e in st.ledger.read() if e["event"] == "release"])
+    st.release("licence", "the owner accepts the source", "human:owner", source="lic_a")
+    rel = [e for e in st.ledger.read() if e["event"] == "release"][-1]
+    check("a licence release without the person's licence text records none, and research_only true",
+          rel["licence"] is None and rel["research_only"] is True, rel)
+    exp = st.build(1)
+    f = st.load()
+    inc = f.segments[1]["increments"][0]
+    side = f.inc_rows(inc)
+    meta = json.loads(st.p.inc_meta(inc).read_text())
+    ro = json.loads(D.Paths(exp).exp_json.read_text())["stream"]["research_only"]
+    check("its rows are research_only in the cut's rows sidecar and meta (fail closed), the release named; the "
+          "segment's models are research_only",
+          len(side) == M and all(r["research_only"] is True and r["licence"] is None
+                                 and (r["licence_release"] or {}).get("by") == "human:owner" for r in side.values())
+          and meta["research_only_rows"] == M and ro["models"] is True,
+          ([(r["research_only"], r["licence"], r.get("licence_release")) for r in side.values()], meta.get(
+              "research_only_rows"), ro))
+    s2 = Step1World("s1_licrel2")
+    for r in s2.add("lic_b", "b0001", mixed, n=M - 1, capture_group="lb", holds=("licence",)):
+        r["licence"] = None
+    tainted = s2.add("lic_b", "b0001", mixed, n=1, capture_group="lb", holds=("licence",), research_only=True)[0]
+    tainted["licence"] = None
+    s2.commit()
+    st2 = new_stream("licw2", base, M, s2, guard)
+    rc = ST.main(["release", "--stream", "licw2", "--hold", "licence", "--source", "lic_b", "--licence", "CC BY 4.0",
+                  "--not-research-only", "--decided-by", "human:owner", "--reason", "the licence is on the record"],
+                 deps=st2.deps)
+    rel2 = [e for e in st2.ledger.read() if e["event"] == "release"][-1]
+    check("the CLI records the person's licence text and research_only false",
+          rc == 0 and rel2["licence"] == "CC BY 4.0" and rel2["research_only"] is False, (rc, rel2))
+    st2.build(1)
+    f2 = st2.load()
+    side2 = f2.inc_rows(f2.segments[1]["increments"][0])
+    check("with the licence text and --not-research-only the rows carry that licence and are not research_only; a "
+          "row the queue marks research_only stays so",
+          len(side2) == M and all(r["licence"] == "CC BY 4.0" for r in side2.values())
+          and all(r["research_only"] is (k == tainted["key"]) for k, r in side2.items()),
+          [(k, r["licence"], r["research_only"]) for k, r in side2.items()])
 
 
 def test_guard_at_cut(base, base_rows, guard, dev_paths):
@@ -1080,7 +1153,7 @@ def test_end_to_end(base, base_rows, guard):
           and {e["key"] for e in f.quarantine if e["reason"] == "neutral"} >= set(flat_keys + recipe_keys))
     # ---- segment 4: sneaky (accepted, hurts cold), good2, rare (species-only pinned REJECT; v3 ACCEPT)
     for src in ("sneaky_a", "good_b", "rare_a"):
-        s1.add(src, "b0007", mixed, n=M, capture_group=src)
+        s1.add(src, "b0007", mixed, n=M, capture_group=src, research_only=src == "sneaky_a")
     s1.commit()
     exp4 = st.build(3)
     drive(exp4, fb, ex)
@@ -1132,6 +1205,15 @@ def test_end_to_end(base, base_rows, guard):
           and all(f.keys[k]["status"] == "returned_bisect" for k in f.inc_rows(kinds4["good"])), dec)
     bdef = json.loads(D.Paths(arms[kinds4["good"]]).exp_json.read_text())
     check("a bisect arm never reads test (finals dev only)", bdef["final_exams"] == ["dev"] and bdef["seeds"] == [0, 1, 2])
+    bro = {k: json.loads(D.Paths(arms[kinds4[k]]).exp_json.read_text())["stream"].get("research_only")
+           for k in ("sneaky", "good")}
+    p1_ro = f.pools["P_1"]["research_only"]
+    check("§8: a bisect arm records its models' research-only flag (P_c's plus the increment's rows): the arm with "
+          "research_only rows is research-only, the other one carries P_c's flag",
+          (bro["sneaky"] or {}).get("models") is True and bro["sneaky"]["increments_research_only_rows"] == M
+          and (bro["good"] or {}).get("increments_research_only_rows") == 0 and bro["good"]["pool"] == p1_ro
+          and bro["good"]["models"] == (True if p1_ro is True else ("unknown" if p1_ro == "unknown" else False)),
+          (bro, p1_ro))
     import re
     check("every experiment the stream builds is named <sid>_[smcb]NNN (the autopilot's child_exp rule)",
           all(re.match(r"^e2e_[smcb][0-9]{3}$", e) for e in list(arms.values()) + [exp1, m1, m2]), sorted(arms.values()))
@@ -1334,6 +1416,13 @@ def test_withdraw_fork_feasibility(base, base_rows, guard):
           and len(brows) == len(base_rows) - M and not ({r["key"] for r in Drows} & {r["key"] for r in brows})
           and cd["truth"] is True and cd["steps"][0]["clean"] is False and sorted(cd["recipes"]) == ["r0", "x1a"],
           (len(Drows), cd["stream"]))
+    p0_ro = st.load().pools["P_0"]["research_only"]
+    check("§8: Stage C records its models' research-only flag, P_0's (base and D are drawn from it)",
+          (cd["stream"].get("research_only") or {}).get("pool") == p0_ro
+          and cd["stream"]["research_only"]["models"] in (True, False, "unknown")
+          and cd["stream"]["research_only"]["models"] == (True if p0_ro is True else
+                                                          ("unknown" if p0_ro == "unknown" else False)),
+          (cd["stream"].get("research_only"), p0_ro))
     drive(cexp, fb, ex)
     res = st.compare(cexp)
     check("Stage C read under Protocol v3: M feasible (the known-good increment is ACCEPTed)",
@@ -1649,6 +1738,7 @@ def main():
     test_ledger()
     test_init(base, base_rows, guard)
     test_cut(base, base_rows, guard, dev_paths)
+    test_licence_release(base, guard)
     test_guard_at_cut(base, base_rows, guard, dev_paths)
     test_deadlock(base, guard)
     test_split_units(base, guard)

@@ -27,6 +27,12 @@ The config holds everything domain-specific the collector reads:
   known_items        the owner's D-C list, each item with its decision stamp
                      (decided_by) and its source id, a recall audit of
                      discovery and fetchable after a recorded miss;
+  licence_overrides  a person's decision on a source whose licence is
+                     unresolved, by exact source id: {id, research_only,
+                     decided_by (human:<id>), decided_utc, reason}; it lets
+                     the source through the licence hold (never a refused
+                     licence) and its rows carry research_only as decided
+                     (false only for an id the policy reads as permissive);
   placement          the providers kept on the lab whatever the network probe
                      finds (lab_only).
 
@@ -43,6 +49,7 @@ import re
 from pathlib import Path
 
 from . import DOMAINS_DIR, FORMATS, TOOLS_DIR, ConfigError, sha256_file, sha256_json
+from . import licence as LIC
 
 SCHEMA = FORMATS["domain"]
 TOP_KEYS = ("format", "domain", "about", "targets", "class_space", "taxonomy", "alias_table", "search_terms",
@@ -248,6 +255,32 @@ def validate(raw):
                 p.append("card_class_tables.%s: by_id and/or by_name tables" % src)
             elif not t.get("table_source") or not t.get("pinned_by"):
                 p.append("card_class_tables.%s: table_source and pinned_by are required" % src)
+    lo = raw.get("licence_overrides")
+    if lo is not None and not isinstance(lo, dict):
+        p.append("licence_overrides: an object of a person's decisions keyed by source id")
+    else:
+        for src, ov in (lo or {}).items():
+            if not _ID_RE.match(src):
+                p.append("licence_overrides: %r is not a source id" % src)
+            if not isinstance(ov, dict):
+                p.append("licence_overrides.%s: {id, research_only, decided_by, decided_utc, reason}" % src)
+                continue
+            if not isinstance(ov.get("id"), str) or not ov["id"].strip():
+                p.append("licence_overrides.%s: id (the licence the person records) is required" % src)
+            if not isinstance(ov.get("research_only"), bool):
+                p.append("licence_overrides.%s: research_only must be true or false" % src)
+            elif ov["research_only"] is False and isinstance(ov.get("id"), str) and ov["id"].strip():
+                # fail closed (P6): an override lifts research_only only for a licence the policy reads as permissive
+                pol = {c: v for c, v in lp.items() if isinstance(v, list)} if isinstance(lp, dict) else {}
+                cls = LIC.classify(LIC.canonical(ov["id"]), pol)
+                if cls != "permissive":
+                    p.append("licence_overrides.%s: research_only false needs a licence the policy reads as "
+                             "permissive (%r is %s)" % (src, ov["id"], cls))
+            if not isinstance(ov.get("decided_by"), str) or not ov["decided_by"].startswith("human:"):
+                p.append("licence_overrides.%s: decided_by must be a person (human:<id>)" % src)
+            for k in ("decided_utc", "reason"):
+                if not isinstance(ov.get(k), str) or not ov[k].strip():
+                    p.append("licence_overrides.%s: %s is required" % (src, k))
     return p
 
 
@@ -452,6 +485,14 @@ def match_any(rules, provider=None, ref=None, title=None, text=None):
         if ok and any(k in r for k in ("ref", "ref_regex", "title_regex", "text_regex")):
             return True
     return False
+
+
+def licence_override(cfg, source_id):
+    """A person's licence decision for a source (licence_overrides, by its
+    exact source id), else None: the one reading the pre-check, plan and
+    intake share. It lets an unresolved licence through, never a refused one."""
+    ov = (cfg.raw.get("licence_overrides") or {}).get(source_id) if source_id is not None else None
+    return copy.deepcopy(ov) if ov else None
 
 
 def record_text(c):

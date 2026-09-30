@@ -32,7 +32,15 @@ Pinned:
   * the queries come only from the config (the deficit list names only
     targets; a non-target refuses);
   * --resolve-names resolves missing names through the authority (the
-    recorded GBIF answers here) into the names layer.
+    recorded GBIF answers here) into the names layer;
+  * a source the collector holds for licence_unresolved that a person's
+    licence override names is released by plan (a released event with the
+    override's decided_by, decided_utc and reason; a candidate again), once;
+    a source no override names, or held for another reason, stays held; an
+    unresolved candidate under an override records licence_ok true, the
+    override's id and the override, its licence record still unresolved and
+    no licence hold in its pre-check; an override never lifts a refused
+    licence (licence_ok false, no override recorded, still closed).
 
 Run:  python3 tests/test_collect_plan.py
 """
@@ -200,6 +208,81 @@ def test_plan():
           calls and layer.is_file() and dn["names_layer"]["path"] == str(layer), (len(calls), dn.get("names_layer")))
 
 
+def test_release():
+    from weed_optimizer_framework.tools.collect import plan as PL
+    from weed_optimizer_framework.tools.collect import sources_ledger, state as S, verify_chain
+    print("a person's licence override releases the collector's licence hold")
+    rec = json.loads(FIX.read_text())
+    cfg = configured(rec)
+    S.append(None, "mediatum_1717366", "held", reason="licence_unresolved", codes=["licence_unresolved"], risk="R3",
+             stage="fetch")
+    S.append(None, "zenodo_no_override", "held", reason="licence_unresolved", codes=["licence_unresolved"],
+             risk="R3", stage="fetch")
+    S.append(None, "kg_yuzhenlu__cottonweeddet3", "held", reason="copy_scan_pending", codes=["copy_scan_pending"],
+             risk="R3", stage="fetch")
+    out = TMP / "lab" / "c_release.json"
+    res = PL.plan(cfg, out, classes=rec["settings"]["classes"], providers=rec["settings"]["providers"],
+                  net=replay_net(rec), testing=True)
+    fold = S.fold(S.read())
+    rel = [r for r in S.read() if r["event"] == "released"]
+    ov = cfg.raw["licence_overrides"]["mediatum_1717366"]
+    check("plan releases the source held for licence_unresolved that an override names: a candidate again",
+          res["released"] == ["mediatum_1717366"] and fold["mediatum_1717366"]["status"] == "candidate"
+          and fold["mediatum_1717366"]["holds"] == [], (res.get("released"), fold["mediatum_1717366"]))
+    check("... the released event carries the override's decided_by, decided_utc and reason",
+          len(rel) == 1 and rel[0]["source"] == "mediatum_1717366" and rel[0]["decided_by"] == ov["decided_by"]
+          and rel[0]["decided_utc"] == ov["decided_utc"] and rel[0]["reason"] == ov["reason"]
+          and rel[0]["codes"] == ["licence_unresolved"] and rel[0]["research_only"] is True, rel)
+    check("... a source no override names, or held for another reason, stays held",
+          fold["zenodo_no_override"]["status"] == "held" and fold["kg_yuzhenlu__cottonweeddet3"]["status"] == "held",
+          (fold["zenodo_no_override"]["status"], fold["kg_yuzhenlu__cottonweeddet3"]["status"]))
+    doc = json.loads(out.read_text())
+    check("... and the candidates file records it", doc["released"] == ["mediatum_1717366"], doc.get("released"))
+    res2 = PL.plan(cfg, out, classes=rec["settings"]["classes"], providers=rec["settings"]["providers"],
+                   net=replay_net(rec), testing=True)
+    check("idempotent: a second plan releases nothing more",
+          res2["released"] == [] and len([r for r in S.read() if r["event"] == "released"]) == 1, res2.get("released"))
+    check("sources.jsonl's hash chain still verifies", verify_chain(sources_ledger()) == [])
+    unres = sorted(c["source_id"] for c in doc["candidates"] if c["licence"]["class"] == "unresolved"
+                   and "licence_unresolved" in [f["code"] for f in c["precheck"]["failures"]])
+    check("fixture: the recorded answers hold candidates whose licence is unresolved", unres, unres)
+    from weed_optimizer_framework.tools.collect.config import CollectConfig
+    raw = json.loads(json.dumps(cfg.raw))
+    raw["licence_overrides"] = dict(raw["licence_overrides"], **{unres[0]: dict(ov)})
+    cfg2 = CollectConfig(raw, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    PL.plan(cfg2, out, classes=rec["settings"]["classes"], providers=rec["settings"]["providers"],
+            net=replay_net(rec), testing=True)
+    by = {c["source_id"]: c for c in json.loads(out.read_text())["candidates"]}
+    c, c2 = by[unres[0]], by[unres[1]] if len(unres) > 1 else None
+    check("under an override plan records licence_ok true, the override's id and the override; the licence record "
+          "and its class stay unresolved; no licence hold in its pre-check",
+          c["licence_ok"] is True and c["licence_id"] == "research-only" and c["licence_override"] == ov
+          and c["licence_class"] == "unresolved" and c["licence"]["class"] == "unresolved"
+          and "licence_unresolved" not in [f["code"] for f in c["precheck"]["failures"]],
+          {k: c.get(k) for k in ("licence_ok", "licence_id", "licence_class", "licence_override", "precheck")})
+    check("... another unresolved candidate is unchanged (licence_ok None, held)", c2 is None
+          or (c2["licence_ok"] is None and c2["licence_override"] is None
+              and "licence_unresolved" in [f["code"] for f in c2["precheck"]["failures"]]), c2 and c2["precheck"])
+    # a refused licence: the policy refuses cc-by-nc here, and an override names such a candidate
+    raw3 = json.loads(json.dumps(raw))
+    pol = raw3["licence_policy"]
+    pol["research_only"] = [x for x in pol["research_only"] if x != "cc-by-nc"]
+    pol["refused"] = pol["refused"] + ["cc-by-nc"]
+    refd = sorted(c["source_id"] for c in doc["candidates"] if c["licence"]["id"] == "cc-by-nc-4.0")
+    check("fixture: the recorded answers hold a cc-by-nc-4.0 candidate", refd, refd)
+    raw3["licence_overrides"] = dict(raw3["licence_overrides"], **{refd[0]: dict(ov)})
+    cfg3 = CollectConfig(raw3, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    PL.plan(cfg3, out, classes=rec["settings"]["classes"], providers=rec["settings"]["providers"],
+            net=replay_net(rec), testing=True)
+    c3 = {c["source_id"]: c for c in json.loads(out.read_text())["candidates"]}[refd[0]]
+    check("an override never lifts a refused licence: licence_ok false, no override recorded, the licence_refused "
+          "close still in its pre-check",
+          c3["licence"]["class"] == "refused" and c3["licence_ok"] is False and c3["licence_override"] is None
+          and c3["licence_id"] == "cc-by-nc-4.0"
+          and [f["action"] for f in c3["precheck"]["failures"] if f["code"] == "licence_refused"] == ["close"],
+          {k: c3.get(k) for k in ("licence", "licence_ok", "licence_id", "licence_override", "precheck")})
+
+
 def test_refusals():
     from weed_optimizer_framework.tools.collect import ConfigError, CollectError
     from weed_optimizer_framework.tools.collect import plan as PL
@@ -224,6 +307,7 @@ def main():
     try:
         W.build_cache()
         test_plan()
+        test_release()
         test_refusals()
     finally:
         W.cleanup()

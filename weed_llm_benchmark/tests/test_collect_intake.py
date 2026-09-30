@@ -33,6 +33,11 @@ Pinned:
     NamesPending refusal (lever L26 first);
   * the licence is gated again at intake (an unresolved licence holds, R3);
     a non-commercial source's rows are research_only;
+  * a person's licence override (licence_overrides): the fetch and the
+    intake of an unresolved licence pass; rows, summary.json and the registry
+    provenance record research_only (the override's) and the override, the
+    licence and its class stay unresolved; a refused licence still closes;
+    the owner's decision for the MFWD trays makes their rows research_only;
   * a record-server source over FTP (the box-table layout: EPPO label ids, a
     tray column) intakes with the tray as the capture group and the target
     code's boxes as the target;
@@ -238,6 +243,8 @@ def test_registry(cfg, bdir):
     e = reg[SID]
     check("registered with annotation intake_v1 and status intake", e["annotation"] == "intake_v1"
           and e["status"] == "intake" and e["local_path"] == str(bdir) and e["license"] == "cc-by-4.0", e)
+    check("... its provenance records research_only (false for a permissive licence) and no licence override",
+          e["provenance"]["research_only"] is False and e["provenance"]["licence_override"] is None, e["provenance"])
     check("the real verify._skip_reason skips it", V._skip_reason(SID, e, {}, M) == "annotation_not_bbox")
     ctrl = TMP / "ctrl"
     for i in range(2):
@@ -331,6 +338,54 @@ def test_research_only(cfg):
     check("a non-commercial source's rows are research_only, and held for the scan (not provenance-cleared)",
           row["research_only"] is True and row["licence_class"] == "research_only" and sm["research_only"] is True
           and row["hold_until"] == "h6_scan", row)
+
+
+def test_licence_override(cfg):
+    from weed_optimizer_framework.tools.collect import Refusal, staging_dir
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.collect.config import CollectConfig
+    print("a person's licence override: fetched and intaken, research-only, the licence kept as fetched")
+    ref = "56565656-0000-0000-0000-000000000011"
+    sid = "weedai_" + ref
+    cats = [{"id": 1, "name": "weed: amaranthus palmeri"}]
+    files = coco_files({"o0.jpg": W.img_bytes(680)}, cats,
+                       [{"id": 1, "image_id": 0, "category_id": 1, "bbox": [10, 20, 40, 40]}])
+    e = raises(lambda: fetch_simple(cfg, ref, files, licence="unknown"), Refusal)
+    check("without an override an unresolved licence holds the fetch (R3)", e is not None
+          and e.code == "licence_unresolved" and e.risk == "R3", e)
+    ov = {"id": "research-only", "class": "research_only", "research_only": True,
+          "decided_by": "human:owner@example.org", "decided_utc": "2026-09-30",
+          "reason": "licence unresolved at harvest; accepted for research use only"}
+    raw = json.loads(json.dumps(cfg.raw))
+    raw["licence_overrides"] = dict(raw["licence_overrides"], **{sid: ov})
+    cfg2 = CollectConfig(raw, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    fetch_simple(cfg2, ref, files, licence="unknown")
+    r = I.intake(cfg2, sid, guard=W.FakeGuard())
+    b = pathlib.Path(r["dir"])
+    row = json.loads((b / "manifest.jsonl").read_text().splitlines()[0])
+    sm = json.loads((b / "summary.json").read_text())
+    src = json.loads((b / "sources.json").read_text())
+    reg = json.loads(pathlib.Path(os.environ["COLLECT_REGISTRY"]).read_text())["datasets"][sid]
+    check("with the override the fetch and the intake pass; the rows are research_only (the override's) and carry "
+          "it; licence and licence_class stay as fetched (unresolved)",
+          r["status"] == "intaken" and row["research_only"] is True and row["licence_override"] == ov
+          and row["licence"] == "unresolved" and row["licence_class"] == "unresolved", row)
+    check("... summary.json records research_only and the override",
+          sm["research_only"] is True and sm["licence_override"] == ov, (sm.get("research_only"),
+                                                                           sm.get("licence_override")))
+    check("... sources.json's licence record keeps its class and carries the override",
+          src["licence"]["class"] == "unresolved" and src["licence"]["override"] == ov, src["licence"])
+    check("... the registry entry's provenance records research_only and the override (licence unresolved)",
+          reg["license"] == "unresolved" and reg["provenance"]["license_class"] == "unresolved"
+          and reg["provenance"]["research_only"] is True and reg["provenance"]["licence_override"] == ov,
+          reg["provenance"])
+    fj = staging_dir(sid) / "fetch.json"
+    doc = json.loads(fj.read_text())
+    doc["licence"] = dict(doc["licence"], id="all-rights-reserved", **{"class": "refused"})
+    fj.write_text(json.dumps(doc))
+    e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), Refusal)
+    check("an override never rescues a refused licence: the intake closes", e is not None
+          and e.code == "licence_refused" and e.action == "close", e)
 
 
 def fetch_simple(cfg, ref, files, cats=("weed: amaranthus palmeri",), licence="https://creativecommons.org/licenses/by/4.0/"):
@@ -743,6 +798,10 @@ def test_ftp_box_table(cfg):
     dec = [json.loads(x) for x in (pathlib.Path(ri["dir"]) / "decisions.jsonl").read_text().splitlines()]
     check("box-table rows naming images that were not fetched are one counted decision",
           [d for d in dec if d["kind"] == "table_rows"][0]["count"] == 1)
+    ov = cfg.raw["licence_overrides"]["mediatum_1717366"]
+    check("the owner's research-only decision for the MFWD trays applies: every row research_only with the "
+          "override recorded, the licence as fetched", all(x["research_only"] is True and x["licence_override"] == ov
+                                                           and x["licence"] == "cc-by-4.0" for x in rows), rows[0])
 
 
 def main():
@@ -758,6 +817,7 @@ def main():
         test_registry(cfg, bdir)
         test_pending_and_licence(cfg)
         test_research_only(cfg)
+        test_licence_override(cfg)
         test_ftp_box_table(cfg)
         test_unlisted_and_clearance(cfg)
         test_copy_rule_and_keys(cfg)

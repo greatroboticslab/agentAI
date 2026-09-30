@@ -441,6 +441,31 @@ def experiment_type(exp):
     return data.get("type") if isinstance(data, dict) else None
 
 
+def experiment_research_only(exp):
+    """The research-only flag of the models an experiment trains (§8, P6),
+    as its exp.json records it: a stream segment's stream.research_only.models,
+    a baseline's or milestone's research_only.flag. True when either is
+    true; else the recorded value ("unknown" or false); "unknown" when a
+    stream built the experiment (a stream block) but recorded neither, as
+    its rows may be research-only (fail closed); None when exp.json records
+    neither and no stream built it (nothing is invented)."""
+    data = _read_json(C.INC_DIR / exp / "exp.json")
+    if not isinstance(data, dict):
+        return None
+    vals = []
+    ro = (data.get("stream") or {}).get("research_only") if isinstance(data.get("stream"), dict) else None
+    if isinstance(ro, dict) and "models" in ro:
+        vals.append(ro["models"])
+    ro = data.get("research_only")
+    if isinstance(ro, dict) and "flag" in ro:
+        vals.append(ro["flag"])
+    if not vals:
+        return "unknown" if isinstance(data.get("stream"), dict) else None
+    if any(v is True for v in vals):
+        return True
+    return next((v for v in vals if v is not False), False)
+
+
 def init_check(kind, init_path, arm):
     """[] when a cold run's init is the arm's checkpoint (file name, and its
     sha256 when the arm pins one); else how it departs. Other kinds start from
@@ -2060,6 +2085,9 @@ def _run(spec, spec_path, out_dir, rec, prev, resume_from, ctx, lock):
             raise RunError("code", msg)
 
     stage("recipe")
+    ro = experiment_research_only(spec["exp"])
+    if ro is not None:
+        rec["research_only"] = ro           # §8: a model trained on any research-only row is research-only
     arm, warns = experiment_arm(spec["exp"])
     rec["warnings"] += warns
     rec["arm"] = arm

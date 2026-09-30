@@ -805,6 +805,8 @@ class StreamRun(object):
         known = [dict(r, known_item=True) for r in ((cc or {}).get("known_items") or []) if isinstance(r, dict)]
         placement = ((self._artifact("intake/placement.json") or {}).get("providers")) or {}
         lab_only = set((((cc or {}).get("placement") or {}).get("lab_only")) or [])
+        overrides = (cc or {}).get("licence_overrides")
+        overrides = overrides if isinstance(overrides, dict) else {}
         nt, nt_err = self._never_train()
         by = {}
         for r in known + rows:
@@ -825,10 +827,21 @@ class StreamRun(object):
                            if isinstance(c, dict) and c.get("status") in ("target", "target_synonym")]
             lic = r.get("licence", r.get("license"))
             lic_ok = r.get("licence_ok")
+            lcls = lic.get("class") if isinstance(lic, dict) else None
             if isinstance(lic, dict):
                 if lic_ok is None and lic.get("class") in ("refused",):
                     lic_ok = False
                 lic = lic.get("id") if lic.get("class") not in (None, "unresolved") else None
+            if lic is None and lic_ok is True and r.get("licence_override"):
+                lic = r.get("licence_id")        # a person's licence override, as collect.plan records it
+            # a person's licence override the collect config records, read here as _fold reads it: a candidates
+            # file plan wrote before the override still says unresolved, and its pre-check still holds
+            # licence_unresolved, until the next L15; an unresolved licence only, never a refused one
+            ov = overrides.get(cid)
+            by_ov = isinstance(ov, dict) and bool(ov.get("id")) and lcls == "unresolved" and lic_ok is not False
+            if by_ov and lic is None:
+                lic, lic_ok = ov.get("id"), True
+            lifted = ("licence_unresolved",) if by_ov else ()
             s = (self.st.get("sources") or {}).get(cid) or {}
             prov = r.get("provider")
             pr = (placement.get(prov) or {}) if isinstance(placement, dict) else {}
@@ -858,10 +871,12 @@ class StreamRun(object):
                                                                 if f.get("action") in ("close", "refuse")
                                                                 and f.get("code") != "names_pending"),
                                                "review": sorted(f.get("code") for f in fails
-                                                                if f.get("action") == "hold" and f.get("risk") == "R3"),
+                                                                if f.get("action") == "hold" and f.get("risk") == "R3"
+                                                                and f.get("code") not in lifted),
                                                "wait": sorted(f.get("code") for f in fails
                                                               if f.get("action") == "hold" and f.get("risk") != "R3"
-                                                              and f.get("code") != "names_pending")}})
+                                                              and f.get("code") != "names_pending"
+                                                              and f.get("code") not in lifted)}})
         if nt is None:
             self._once("never_train_unreadable", nt_err, "never_train_unreadable", reasons=[nt_err])
             self._card("data", "The never-train list cannot be read: no source is collected", nt_err)
@@ -2350,6 +2365,9 @@ class StreamRun(object):
                 if s.get("zero_yield"):
                     src["zero_yield_reasons"] = s.get("zero_yield_reasons")
         srows = arts.get("intake/sources.json") or {}
+        _cp, cc = self._collect_config()
+        overrides = (cc or {}).get("licence_overrides")
+        overrides = overrides if isinstance(overrides, dict) else {}
         for src, row in srows.items():
             if not isinstance(row, dict):
                 continue
@@ -2358,21 +2376,35 @@ class StreamRun(object):
                 if row.get(k) is not None:
                     s[k] = row[k]
             self._fetch_completeness(src, row.get("fetch_complete"), row.get("fetch_remaining"), "collector ledger")
-            if row.get("status") in ("held", "closed", "quarantined") and s.get("status") not in ("closed", "quarantined"):
-                if s.get("status") != row["status"]:
-                    self._ledger("source_status", source=src, status=row["status"], by="collector",
+            rst = row.get("status")
+            ov = None
+            if rst == "held" and isinstance(overrides.get(src), dict) and (
+                    "licence_unresolved" in (row.get("holds") or []) or row.get("reason") == "licence_unresolved"):
+                # a person's licence override (the collect config's licence_overrides) lifts the collector's
+                # licence hold: collect.plan records that release in the lab's ledger, which no snapshot folds,
+                # so a hold in this ledger is read as released here (the next fetch checks the source anew)
+                rst, ov = "candidate", overrides[src]
+            if rst in ("held", "closed", "quarantined") and s.get("status") not in ("closed", "quarantined"):
+                if s.get("status") != rst:
+                    self._ledger("source_status", source=src, status=rst, by="collector",
                                  reasons=[_short(row.get("reason") or "", 300)])
-                s["status"] = row["status"]
+                s["status"] = rst
                 s["held_by"] = "collector"
                 if row.get("reason"):
                     s["held_reason"] = _short(row.get("reason"), 300)
             elif s.get("status") == "held" and s.get("held_by") == "collector" \
-                    and row.get("status") in ("candidate", "fetched", "intaken"):
+                    and rst in ("candidate", "fetched", "intaken"):
                 # the collector released its hold (licence, credentials, the copy scan): collectable again
-                s.update(status="candidate" if row["status"] == "candidate" else row["status"], held_by=None,
-                         held_reason=None)
-                self._ledger("source_released", source=src, status=s["status"], by="collector")
-            elif row.get("status") in ("fetched", "intaken") and s.get("status") in (None, "candidate"):
+                s.update(status=rst, held_by=None, held_reason=None)
+                if ov is not None:
+                    # the release is the person's decision the collect config records, not the collector's
+                    self._ledger("source_released", source=src, status=s["status"], by="licence_overrides",
+                                 decided_by=ov.get("decided_by"), decided_utc=ov.get("decided_utc"),
+                                 licence=ov.get("id"), research_only=ov.get("research_only"),
+                                 collect_config_sha256=LS.sha256_file(_cp) if _cp and Path(_cp).is_file() else None)
+                else:
+                    self._ledger("source_released", source=src, status=s["status"], by="collector")
+            elif rst in ("fetched", "intaken") and s.get("status") in (None, "candidate"):
                 # fetched or intaken outside this campaign's own items (a person's run of the collector, a lab
                 # fetch, a restarted ticker): the collector's ledger is the record, so DPIPE takes the next step
                 # (L16I, then L17 admit) instead of the source waiting with no status for ever

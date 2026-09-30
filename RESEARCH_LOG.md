@@ -13,6 +13,21 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-09-30 — Where the data supply stands: the loop has added no harvested data yet
+
+**Accuracy.** The best sealed result is YOLO11m on base_v2: test 0.8786 ± 0.0018 (gap to 0.90: 0.021).
+- It comes from capacity and from 3,700 expert-labelled 3SeasonWeedDet10 images, not from harvested data.
+- Stage C (weed_stream_v1_c001) adds tsw22's 682 images as a known increment on m640. Dev moves from 0.8516 to 0.8518, the truth arm reads it as neutral, and the gate accepted it.
+- At m640 the model is no longer data-limited on in-domain images of the same kind.
+
+**Data supply.**
+- The step1_stream queue holds 95,059 harvested images. Only 7 images (8 target boxes) are eligible for an increment.
+- 51,637 rows are held because no licence is known for them; the rest have no verified target box.
+- Targeted collection lists 385 candidates, but the collector had fetched nothing: a pre-check held every unresolved licence and never read a person's override.
+- That path is fixed and the owner's research-only acceptance of CottonWeedDet3 and the MFWD trays is recorded (CHANGELOG, Fix of 2026-09-30). Every row and every model trained on them carries research_only.
+
+**Status.** No increment has been committed yet; segments 0. The next measurements are the first harvested increments and a higher-resolution arm for the small weeds that hold the gap: Carpetweed 0.736, SpottedSpurge 0.810, Purslane 0.828.
+
 ## 2026-09-29 — First result of the loop: 2.2× the data, no gain on test; dev said +0.013
 
 **Result** (YOLO11n, 640 px, same recipe, locked scorer; means ± sd over seeds):

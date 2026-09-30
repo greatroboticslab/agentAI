@@ -26,8 +26,9 @@ Pinned:
   * ranking by expected target boxes per GB (declared box counts first), a
     bonus per deficit class; a non-commercial copy is superseded by a
     permissive copy of the same dataset (P6);
-  * the pre-check matrix: credentials (R3), licence unresolved (R3) and
-    refused (close), an evaluation lab without the copy scan (R3) and with
+  * the pre-check matrix: credentials (R3), licence unresolved (R3; a
+    person's licence override for that source id lets it through) and
+    refused (close, whatever an override says), an evaluation lab without the copy scan (R3) and with
     it, the per-source (R3), daily and envelope caps, attempts (close), the
     registry (quarantined, a source registered outside intake: close),
     another campaign's source (hold), and inside Slurm a provider not placed
@@ -275,6 +276,22 @@ def test_precheck(cfg, nm, tg):
     from weed_optimizer_framework.tools.collect.config import CollectConfig
     cfg2 = CollectConfig(appr, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
     check("... unless a person approved more for that source", "over_source_cap" not in codes(PF.precheck(big, cfg2, ctx())))
+    ov = {"id": "research-only", "class": "research_only", "research_only": True, "decided_by": "human:owner@example.org",
+          "decided_utc": "2026-09-30", "reason": "licence unresolved; accepted for research use only"}
+    raw3 = json.loads(json.dumps(cfg.raw))
+    rf_src = "roboflow_ws__rf"
+    raw3["licence_overrides"] = {un["source_id"]: ov, rf_src: ov}
+    cfg3 = CollectConfig(raw3, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    r3 = PF.precheck(un, cfg3, ctx())
+    check("a person's licence override lets an unresolved licence through: no licence_unresolved hold, the rest "
+          "as before", "licence_unresolved" not in codes(r3)
+          and codes(r3) == [c for c in codes(PF.precheck(un, cfg, ctx())) if c != "licence_unresolved"], r3)
+    un2 = PF.decide(cand("roboflow", "ws/un2", ["Palmer Amaranth"], licence_text=None), cfg3, nm, tg)
+    check("... only for the source id it names", "licence_unresolved" in codes(PF.precheck(un2, cfg3, ctx())))
+    rf3 = PF.decide(cand("roboflow", "ws/rf", ["Palmer Amaranth"], licence_text="All rights reserved"), cfg3, nm, tg)
+    r3 = PF.precheck(rf3, cfg3, ctx())
+    check("... never a refused licence: rejected and closed whatever an override says", rf3["source_id"] == rf_src
+          and rf3["decision"]["status"] == "rejected" and "licence_refused" in codes(r3) and r3["action"] == "close", r3)
     r = PF.precheck(ok, cfg, ctx(bytes_today=50e9))
     check("the daily byte cap: hold, no person", "daily_bytes" in codes(r) and r["risk"] is None, r)
     r = PF.precheck(ok, cfg, ctx(bytes_total=200e9))

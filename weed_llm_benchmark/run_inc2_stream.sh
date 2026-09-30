@@ -145,7 +145,8 @@ done
 # The stream's own modules and the rest it imports: logged; an outer copy that exists must agree.
 OWN="$(cd "$NESTED" && find tools/inc2 -maxdepth 1 -type f -name '*.py' | LC_ALL=C sort)"
 for m in $OWN tools/inc/__init__.py tools/inc/common.py tools/funnel/__init__.py tools/funnel/embed.py \
-         tools/funnel/domain.py tools/funnel/qualify.py tools/dataset_discovery.py tools/registry_lock.py; do
+         tools/funnel/domain.py tools/funnel/qualify.py tools/dataset_discovery.py tools/registry_lock.py \
+         tools/collect/__init__.py tools/collect/licence.py; do
     n="$NESTED/$m"
     o="$OUTER/$m"
     [ -f "$n" ] || { echo "FATAL: module missing in the nested copy: $m" >&2; exit 1; }

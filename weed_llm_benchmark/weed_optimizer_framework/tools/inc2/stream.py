@@ -20,7 +20,9 @@ rollback and bisection, milestones and the hash-chained stream ledger
     ... quarantine  --source SLUG --cite D28 [--stream SID]
     ... unquarantine --source SLUG --stream SID --decided-by human:X
     ... release     --stream SID --hold KIND [--source S | --keys FILE] --decided-by human:X [--reason TEXT]
-                    (KIND licence, join_conflict or funnel_F9; h6_scan is lifted only by the copy scan)
+                    [--licence TEXT [--not-research-only]]
+                    (KIND licence, join_conflict or funnel_F9; h6_scan is lifted only by the copy scan; the rows
+                    a licence release lifts are research_only unless it records --licence and --not-research-only)
     ... withdraw    --exp SID_sNNN --reason TEXT
     ... summary     --stream SID                     (writes queue_summary.json)
     ... verify      --stream SID                     (the hash chain and every file it names)
@@ -1121,7 +1123,8 @@ class Fold:
         self.forked_to = e["to"]
 
     def _ev_release(self, e):
-        self.releases.append({k: e.get(k) for k in ("hold", "source", "keys_file", "by", "reason", "seq", "scope")})
+        self.releases.append({k: e.get(k) for k in ("hold", "source", "keys_file", "by", "reason", "seq", "scope",
+                                                     "licence", "research_only")})
 
     # ---- derived views
     def current_pool(self):
@@ -1171,6 +1174,21 @@ class Fold:
 
     def released_all(self):
         return {r["hold"] for r in self._releases() if r.get("scope") == "all" and r["hold"] == "funnel_F9"}
+
+    def licence_releases(self):
+        """({key: release}, {source: release}): the latest release of the
+        licence hold per key and per source, which the cutter applies to the
+        rows it lifts (_row_licence)."""
+        by_key, by_src = {}, {}
+        for r in self._releases():
+            if r["hold"] != "licence":
+                continue
+            if r.get("keys_file"):
+                for x in _read_jsonl(_check_rec(r["keys_file"], "released keys")):
+                    by_key[x["key"] if isinstance(x, dict) else str(x)] = r
+            if r.get("source"):
+                by_src[r["source"]] = r
+        return by_key, by_src
 
 
 # ----------------------------------------------------------------- stream
@@ -1704,6 +1722,7 @@ class Stream:
         rel_keys = f.released_keys()
         rel_src = f.released_sources()
         rel_all = f.released_all()
+        lic_keys, lic_src = f.licence_releases()
         now = self._now()
         reasons = collections.Counter()
         held = collections.Counter()
@@ -1763,8 +1782,10 @@ class Stream:
             if any(near.find(h) is not None for h in known):
                 reasons["near_pool_or_in_flight"] += 1
                 continue
+            # a licence hold a person lifted: the release's licence and research_only apply (_row_licence)
+            lic_rel = (lic_keys.get(key) or lic_src.get(row.get("source"))) if "licence" in holds_of(row) else None
             eligible.append({"key": key, "row": row, "man": man, "species": vec, "tb": sum(vec),
-                             "hashes": hashes, "hash_known": bool(known),
+                             "hashes": hashes, "hash_known": bool(known), "licence_release": lic_rel,
                              "source": str(row.get("source") or ""), "batch": str(row.get("batch") or ""),
                              "capture_group": str(row.get("capture_group") or ("batch:%s" % row.get("batch"))),
                              "group": row.get("group"),
@@ -2255,12 +2276,16 @@ class Stream:
         side = []
         for r in sorted(rows, key=lambda r: r["key"]):
             q = r["row"]
+            lic, ro = _row_licence(r)
+            rel = r.get("licence_release")
             side.append({"key": r["key"], "source": r["source"], "batch": r["batch"], "capture_group": r["capture_group"],
                          "verifier": r["verifier"], "reference": q.get("reference"), "species_boxes": r["species"],
                          "other_boxes": q.get("other_boxes"), "admission": q.get("admission"),
                          "n_masked": q.get("n_masked"), "masked_area_frac": q.get("masked_area_frac"),
-                         "lab_group": q.get("lab_group"), "licence": q.get("licence"),
-                         "research_only": q.get("research_only"), "prior": q.get("prior"),
+                         "lab_group": q.get("lab_group"), "licence": lic, "research_only": ro,
+                         "licence_release": None if rel is None else {k: rel.get(k) for k in (
+                             "by", "reason", "seq", "scope", "licence", "research_only")},
+                         "prior": q.get("prior"),
                          "stream_pins_sha": q.get("stream_pins_sha"), "image": r["man"]["image"],
                          "sha256": r["man"]["sha256"], "unmasked_image": q.get("unmasked_image"),
                          "hashes": {kk: vv for kk, vv in r["hashes"].items() if vv is not None},
@@ -2289,9 +2314,9 @@ class Stream:
                 "queue": {"path": str(ana["view"].queue_path), "sha256": ana["view"].sha256,
                           "events_sha256": ana["view"].events_sha256},
                 "seed_text": plan["seed_text"], "seed": plan["seed"], "attempts": plan["attempts"],
-                "research_only_rows": sum(1 for r in rows if r["row"].get("research_only")),
+                "research_only_rows": sum(1 for r in rows if _row_licence(r)[1]),
                 "lab_groups": dict(collections.Counter(str(r["row"].get("lab_group")) for r in rows)),
-                "licences": dict(collections.Counter(str(r["row"].get("licence")) for r in rows)),
+                "licences": dict(collections.Counter(str(_row_licence(r)[0]) for r in rows)),
                 "prior": dict(collections.Counter(str(r["row"].get("prior")) for r in rows if r["row"].get("prior"))),
                 "manifest": {"path": str(mpath), "sha256": msha}, "rows": {"path": str(rpath), "sha256": rsha},
                 "draw": "select.balanced_order + select.draw_parts([order], sizes, 1, M), unchanged"}
@@ -2684,11 +2709,15 @@ class Stream:
                 exp = bisect_exp(self.sid, n_arm)
                 mp = self.p.bisect / ("rb%02d" % rb["n"]) / ("%s.jsonl" % inc)
                 sha = C.write_manifest(mp, base_rows + rows)
+                # §8: the arm trains on P_c plus the increment, so its models are research-only when either holds one
+                ro_inc = sum(1 for r in f.inc_rows(inc).values() if r.get("research_only"))
                 defn = {"exp": exp, "type": "baseline", "builder": "inc2.stream bisect", "testing": testing,
                         "seeds": list(BISECT_SEEDS), "decision_exam": D.DECISION_EXAM, "final_exams": list(BISECT_EXAMS),
                         "base": {"name": "%s_plus_%s" % (from_pool.replace("P_", "P"), inc), "manifest": str(mp),
                                  "manifest_sha256": sha, "n_images": len(base_rows) + len(rows), "recipe": cold},
-                        "stream": {"sid": self.sid, "rollback": rb["n"], "from": from_pool, "increment": inc}}
+                        "stream": {"sid": self.sid, "rollback": rb["n"], "from": from_pool, "increment": inc,
+                                   "research_only": _research_only(f.pools[from_pool],
+                                                                   [{"research_only_rows": ro_inc}])}}
                 defn.update(RC.stamp(arm_rec))
                 D.validate_definition(defn)
                 D.check_definition_data(defn)
@@ -2803,7 +2832,9 @@ class Stream:
                                "n_images": len(D_rows), "clean": False, "kind": "stage_c"}],
                     "recipes": {r: table[r] for r in recs}, "truth": True, "truth_recipe": table["cold"],
                     "increment_images": M,
-                    "stream": {"sid": self.sid, "stage": "C", "holdout": holdout, "split_session": split}}
+                    "stream": {"sid": self.sid, "stage": "C", "holdout": holdout, "split_session": split,
+                               # §8: base and D are both drawn from P_0, so P_0's flag holds for the models
+                               "research_only": _research_only(f.pools[p0], [])}}
             defn.update(RC.stamp(RC.resolve_arm(arm_id, repo=self.deps.repo or C.REPO, require_weights=not testing)))
             D.validate_definition(defn)
             D.check_definition_data(defn)
@@ -2915,7 +2946,7 @@ class Stream:
                 raise StreamError("source %s is not quarantined" % source)
             self.event("unquarantine", by=decided_by, source=source)
 
-    def release(self, hold, reason, decided_by, source=None, keys_file=None):
+    def release(self, hold, reason, decided_by, source=None, keys_file=None, licence=None, research_only=True):
         """A person's release of a hold for the cutter (P8: the owner may
         release the funnel_F9 rows early; an R3 item at a hold's deadline).
         Without --source or --keys it covers every row of that hold kind,
@@ -2924,7 +2955,13 @@ class Stream:
         never released here: it is mandatory for every source that is not
         provenance-cleared (D-C, P9, §3.2), a copy dHash misses would inflate
         the success measure, and only the scan itself (step1_stream
-        serve-holds, L17 scan-holds at the deadline) lifts it."""
+        serve-holds, L17 scan-holds at the deadline) lifts it. A licence
+        release fails closed: the rows it lifts are research_only unless the
+        person records the licence text (--licence TEXT) and says they are
+        not (--not-research-only); both are recorded and the cutter applies
+        them (_row_licence). --not-research-only is refused for a text that
+        names no known licence or restricts use, read as step1_stream reads
+        a person's override (intake_licence_state)."""
         if hold not in HOLD_KINDS:
             raise StreamError("--hold must be one of %s" % (HOLD_KINDS,))
         if hold not in RELEASABLE_HOLDS:
@@ -2938,6 +2975,27 @@ class Stream:
         if not source and not keys_file and hold != "funnel_F9":
             raise StreamError("a stream-wide release is for funnel_F9 only; %s is released by --source or --keys"
                               % hold)
+        licence = str(licence).strip() if licence is not None else None
+        if hold != "licence" and (licence or research_only is not True):
+            raise StreamError("--licence and --not-research-only belong to a licence release (--hold licence)")
+        if research_only is not True and not licence:
+            raise StreamError("--not-research-only needs the person's licence text (--licence TEXT): without it the "
+                              "released rows stay research_only (fail closed, P6)")
+        if research_only is not True:
+            # the text is read as step1_stream reads a person's override (its one reader): an unknown licence, or one
+            # that restricts use, keeps the rows research_only, so --not-research-only is refused for it
+            S1 = _inc2("step1_stream")
+            if S1 is None or not hasattr(S1, "intake_licence_state"):
+                raise StreamError("inc2.step1_stream (the reader of a person's licence text) cannot be imported: "
+                                  "--not-research-only is refused (fail closed, P6)")
+            _l, ro = S1.intake_licence_state({"source": source}, {"licence": {"override": {
+                "id": licence, "research_only": False}}})
+            if ro:
+                raise StreamError("--not-research-only: %r names no known licence that allows use beyond research "
+                                  "(unknown, non-commercial, no-derivatives or restricted): the released rows stay "
+                                  "research_only (fail closed, P6)" % licence)
+        lic_rec = {"licence": licence or None, "research_only": research_only is not False} if hold == "licence" \
+            else {}
         reason = str(reason or "R3 approval of a person")
         with self.writing():
             rec = None
@@ -2947,7 +3005,7 @@ class Stream:
                 _write_jsonl(kp, [{"key": k} for k in keys])
                 rec = _file_rec(kp)
             self.event("release", by=decided_by, hold=hold, source=source, keys_file=rec, reason=reason,
-                       scope="keys" if keys_file else ("source" if source else "all"))
+                       scope="keys" if keys_file else ("source" if source else "all"), **lic_rec)
 
     # ---------------------------------------------------------------- summary
     def write_summary(self):
@@ -3167,6 +3225,20 @@ def _max_share(units_ids, units):
     return tot[i] / float(s), species_names()[i]
 
 
+def _row_licence(e):
+    """(licence, research_only) of a cut row: the queue row's, unless a
+    person's release lifted its licence hold. Then the release decides, fail
+    closed: its licence text (--licence) when it records one, and
+    research_only true unless it records both the person's licence text and
+    --not-research-only; a row the queue marks research_only stays so."""
+    q = e["row"]
+    rel = e.get("licence_release")
+    if rel is None:
+        return q.get("licence"), q.get("research_only")
+    ro = bool(q.get("research_only")) or not (rel.get("licence") and rel.get("research_only") is False)
+    return rel.get("licence") or q.get("licence"), ro
+
+
 def _research_only(pool, written):
     """§8: a model trained on any research_only image is research-only. The
     segment's cand, truth and final models train on the pool plus its
@@ -3290,6 +3362,9 @@ def build_parser():
     p.add_argument("--source")
     p.add_argument("--keys")
     p.add_argument("--reason")
+    p.add_argument("--licence", help="--hold licence: the licence text the person records for the released rows")
+    p.add_argument("--not-research-only", action="store_true",
+                   help="--hold licence with --licence: the released rows are not research_only (else they are)")
     p = add("withdraw", stream=False)
     p.add_argument("--exp", required=True)
     p.add_argument("--reason", required=True)
@@ -3352,7 +3427,8 @@ def main(argv=None, deps=None, clock=time.time):
         elif a.cmd == "unquarantine":
             st.unquarantine_source(a.source, decided_by=who)
         elif a.cmd == "release":
-            st.release(a.hold, a.reason, who, source=a.source, keys_file=a.keys)
+            st.release(a.hold, a.reason, who, source=a.source, keys_file=a.keys, licence=a.licence,
+                       research_only=not a.not_research_only)
         elif a.cmd == "withdraw":
             st.withdraw(a.exp, a.reason, decided_by=who)
         elif a.cmd == "summary":

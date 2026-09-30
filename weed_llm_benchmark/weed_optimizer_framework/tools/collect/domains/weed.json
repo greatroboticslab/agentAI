@@ -264,7 +264,24 @@
   ],
   "why": "P6 (section 2.5): unresolved -> held; non-commercial (and no-derivatives) -> research_only; a permissive copy is preferred; nothing is redistributed"
  },
- "licence_overrides": {},
+ "licence_overrides": {
+  "kg_yuzhenlu__cottonweeddet3": {
+   "id": "research-only",
+   "class": "research_only",
+   "research_only": true,
+   "decided_by": "human:harry567566@gmail.com",
+   "decided_utc": "2026-09-30",
+   "reason": "Licence unresolved at harvest. The owner accepts this source for research use only (P6): every row and every model trained on it is research_only, and it is not for deployment or redistribution."
+  },
+  "mediatum_1717366": {
+   "id": "research-only",
+   "class": "research_only",
+   "research_only": true,
+   "decided_by": "human:harry567566@gmail.com",
+   "decided_utc": "2026-09-30",
+   "reason": "Licence unresolved at harvest. The owner accepts this source for research use only (P6): every row and every model trained on it is research_only, and it is not for deployment or redistribution."
+  }
+ },
  "budgets": {
   "bytes_per_source": 50000000000.0,
   "bytes_daily": 50000000000.0,

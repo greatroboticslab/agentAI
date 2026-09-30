@@ -549,6 +549,77 @@ def t_formats():
     s2 = (w.state()["sources"].get("zen:2") or {})
     check("  and collectable again once the collector releases it", s2.get("status") == "candidate"
           and not s2.get("held_by"), s2)
+    # a person's licence override (the collect config's licence_overrides): collect.plan releases the hold in the
+    # lab's ledger, which no snapshot folds, so a licence hold in this one is read as released
+    w.sources([{"source": sid, "event": ev, "reason": "licence_unresolved", "codes": ["licence_unresolved"]}
+               for sid in ("zen:4", "zen:5") for ev in ("candidate", "held")])
+    for _ in range(3):
+        w.tick()
+    src = lambda sid: (w.state()["sources"].get(sid) or {})  # noqa: E731
+    check("a licence hold of the collector's with no person's override is held here",
+          src("zen:4").get("status") == "held" and src("zen:5").get("status") == "held", (src("zen:4"), src("zen:5")))
+    ov = {"id": "research-only", "class": "research_only", "research_only": True, "decided_by": "human:owner",
+          "decided_utc": "2026-09-30", "reason": "licence unresolved; accepted for research use only"}
+    w.sources([{"source": "zen:6", "event": ev, "reason": "copy_scan_pending", "codes": ["copy_scan_pending"]}
+               for ev in ("candidate", "held")])
+    cc = json.loads(w.collect_cfg.read_text())
+    cc["licence_overrides"] = {"zen:4": ov, "zen:6": ov}
+    w.collect_cfg.write_text(json.dumps(cc))
+    cc_sha = hashlib.sha256(w.collect_cfg.read_bytes()).hexdigest()
+    for _ in range(3):
+        w.tick()
+    check("  once the collect config records a person's licence override for it, collectable again (released, "
+          "recorded); a source without one stays held",
+          src("zen:4").get("status") == "candidate" and not src("zen:4").get("held_by")
+          and src("zen:5").get("status") == "held"
+          and [e.get("source") for e in w.events("source_released")].count("zen:4") == 1,
+          (src("zen:4"), src("zen:5"), [e.get("source") for e in w.events("source_released")]))
+    check("  an override lifts a licence hold only: a source it names that the collector holds for the copy scan "
+          "stays held, by the collector", src("zen:6").get("status") == "held"
+          and src("zen:6").get("held_by") == "collector" and "zen:6" not in [e.get("source") for e in
+                                                                            w.events("source_released")],
+          src("zen:6"))
+    rel = {e.get("source"): e for e in w.events("source_released")}
+    check("  the release names the person's decision (by licence_overrides, decided_by, decided_utc, the licence, "
+          "the collect config's sha256), not the collector; a release of the collector's own stays the collector's",
+          rel["zen:4"].get("by") == "licence_overrides" and rel["zen:4"].get("decided_by") == "human:owner"
+          and rel["zen:4"].get("decided_utc") == "2026-09-30" and rel["zen:4"].get("licence") == "research-only"
+          and rel["zen:4"].get("research_only") is True and rel["zen:4"].get("collect_config_sha256") == cc_sha
+          and rel["zen:2"].get("by") == "collector" and not str(rel["zen:2"].get("decided_by")).startswith("human:"),
+          (rel.get("zen:4"), rel.get("zen:2")))
+    w.candidates([{"source_id": "zen:4", "id": "zen:4", "provider": "hf",
+                   "licence": {"id": "unresolved", "class": "unresolved"}, "licence_ok": True,
+                   "licence_id": "research-only", "licence_class": "unresolved", "licence_override": ov,
+                   "target_classes": ["Purslane"], "bytes": 1e8, "expected_target_boxes": 500,
+                   "precheck": {"ok": True, "failures": []}, "decision": {"status": "kept"}}])
+    c4 = {x["id"]: x for x in run._candidates()}["zen:4"]
+    check("  and the plan's record of the override reads as a usable licence (no 'licence unknown' review)",
+          c4["licence"] == "research-only" and c4["licence_ok"] is True and DS.precheck(v, c4) == ([], []),
+          (c4["licence"], c4["licence_ok"], DS.precheck(v, c4)))
+    # a candidates file plan wrote before the override: the licence unresolved, its pre-check holding
+    # licence_unresolved for a person (R3); the collect config's override is read directly, as the fold reads it
+    def stale(sid, cls="unresolved", lid="unresolved", code="licence_unresolved", action="hold"):
+        return {"source_id": sid, "id": sid, "provider": "hf", "licence": {"id": lid, "class": cls},
+                "licence_ok": None if cls == "unresolved" else False, "licence_id": lid, "licence_class": cls,
+                "target_classes": ["Purslane"], "bytes": 1e8, "expected_target_boxes": 500,
+                "precheck": {"ok": False, "risk": "R3" if action == "hold" else None, "action": action,
+                             "failures": [dict({"code": code, "action": action}, **({"risk": "R3"}
+                                                                                   if action == "hold" else {}))]},
+                "decision": {"status": "kept"}}
+    w.candidates([stale("zen:4"), stale("zen:5"),
+                  stale("zen:7", cls="refused", lid="all-rights-reserved", code="licence_refused", action="close")])
+    cc["licence_overrides"]["zen:7"] = ov
+    w.collect_cfg.write_text(json.dumps(cc))
+    cs = {x["id"]: x for x in run._candidates()}
+    pre = {k: DS.precheck(v, cs[k]) for k in ("zen:4", "zen:5", "zen:7")}
+    check("  a candidates file written before the override reads the collect config's override: a usable licence, "
+          "the collector's licence_unresolved hold lifted, no review; without an override the source is still "
+          "reviewed; a refused licence stays refused whatever an override says",
+          cs["zen:4"]["licence"] == "research-only" and cs["zen:4"]["licence_ok"] is True
+          and cs["zen:4"]["collector_precheck"] == {"refuse": [], "review": [], "wait": []} and pre["zen:4"] == ([], [])
+          and "licence unknown" in pre["zen:5"][1] and "collector: licence_unresolved" in pre["zen:5"][1]
+          and cs["zen:7"]["licence_ok"] is False and "licence not research-usable" in pre["zen:7"][0]
+          and "collector: licence_refused" in pre["zen:7"][0], (cs["zen:4"], pre))
     w.sources([{"source": "zen:3", "event": "fetched", "bytes": 1e9, "complete": False, "remaining": 7}])
     fold = SR.stream_summary(w.sid)["decision"]["artifacts"].get("intake/sources.json") or {}
     check("the source fold carries the last fetch's completeness (a fetch stopped at a byte cap: its next shard)",

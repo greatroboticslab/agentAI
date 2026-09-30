@@ -12,6 +12,8 @@ An append-only, hash-chained ledger of events (format collect-source-event/1):
   released       a person or a condition released a hold          -> candidate
 Each event records what it needs: reasons, bytes, seconds, the Slurm job id
 (so the autopilot can settle its SU from sacct), the batch and its yield.
+release_overridden() appends the release a person's licence override makes
+(plan calls it on each run).
 fold() gives the current state of every source; the lab and the cluster
 each append to their own copy, and fold() reads any number of them in time
 order. A "quarantined" status is read from the registry (lever L24 is the
@@ -91,6 +93,29 @@ def fold(rows):
             if ev == "candidate" and s["status"] not in (None, "candidate"):
                 continue                       # plan never demotes a source it saw before
             s["status"] = st
+    return out
+
+
+def release_overridden(inc, overrides, rows=None):
+    """A released event for every source the collector holds for an
+    unresolved licence (its hold names licence_unresolved) that a person's
+    licence override names (the config's licence_overrides, by source id),
+    with the override's decided_by, decided_utc and reason: the source is a
+    candidate again, and the next fetch checks it anew. Idempotent: a
+    released source is no longer held, so a second call appends nothing.
+    Returns the released source ids."""
+    rows = read(inc) if rows is None else rows
+    out = []
+    for src, s in sorted(fold(rows).items()):
+        ov = (overrides or {}).get(src)
+        if not isinstance(ov, dict) or s["status"] != "held":
+            continue
+        if "licence_unresolved" not in s["holds"] and s["reason"] != "licence_unresolved":
+            continue
+        append(inc, src, "released", provider=s["provider"], ref=s["ref"], codes=["licence_unresolved"],
+               by="licence_overrides", decided_by=ov.get("decided_by"), decided_utc=ov.get("decided_utc"),
+               reason=ov.get("reason"), licence=ov.get("id"), research_only=ov.get("research_only"))
+        out.append(src)
     return out
 
 

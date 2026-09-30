@@ -27,6 +27,10 @@ is a discovery defect, not a stop.
 Outputs: the candidates file (format collect-candidates/1) at --out,
 intake/plan_latest.json (its path and sha256, read by fetch and names), and a
 candidate event in sources.jsonl for each source seen for the first time.
+A source the collector holds for an unresolved licence that a person's
+licence override names (licence_overrides) is released first (a released
+event: a candidate again); such a candidate records licence_ok true, the
+override's id as licence_id and the override itself (licence_override).
 """
 from __future__ import annotations
 
@@ -39,7 +43,7 @@ from . import names as NM
 from . import prefilter as PF
 from . import providers as P
 from . import state as S
-from .config import match_any, record_text
+from .config import licence_override, match_any, record_text
 from .fetch import CAND_POINTER, context
 from .targets import Targets
 from .transport import Net
@@ -158,6 +162,8 @@ def plan(cfg, out, classes=None, providers=None, net=None, inc=None, resolve_nam
     PF.supersede(decided, cfg)
     ranked = PF.rank(decided)
     with intake_lock(inc, what="collect plan"):
+        # a person's licence override lifts the collector's own licence hold: the source is a candidate again
+        released = S.release_overridden(inc, cfg.raw.get("licence_overrides"))
         rows = S.read(inc)
         ctx = context(cfg, inc, rows, net=net, now=now, never_train=never, providers=list(enabled))
         for c in ranked:
@@ -166,11 +172,15 @@ def plan(cfg, out, classes=None, providers=None, net=None, inc=None, resolve_nam
             c["id"] = c["source_id"]
             c["found_by_search"] = bool(c.get("found_by"))
             # tri-state: True usable, False refused (closed), None unresolved (a person decides, R3; P6): an
-            # unresolved licence is not a refused one, and reading it as False would drop the source unasked
+            # unresolved licence is not a refused one, and reading it as False would drop the source unasked.
+            # A person's override (licence_overrides) makes an unresolved licence usable, with the override's
+            # id; the licence record and its class stay as the source states them
             lcls = c["licence"]["class"]
-            c["licence_ok"] = True if lcls in ("permissive", "research_only") else (False if lcls == "refused"
-                                                                                     else None)
-            c["licence_id"], c["licence_class"] = c["licence"]["id"], lcls
+            ov = licence_override(cfg, c["source_id"]) if lcls == "unresolved" else None
+            c["licence_ok"] = True if lcls in ("permissive", "research_only") or ov else (False if lcls == "refused"
+                                                                                           else None)
+            c["licence_id"], c["licence_class"] = (ov.get("id") if ov else c["licence"]["id"]), lcls
+            c["licence_override"] = ov
             c["names_unresolved"] = bool(c.get("names_pending"))
             c["expected_target_boxes"] = c["estimate"]["target_boxes"]
             c["credentials_ok"] = bool((ctx["creds"].get(c["provider"]) or (True, None))[0])
@@ -191,7 +201,7 @@ def plan(cfg, out, classes=None, providers=None, net=None, inc=None, resolve_nam
             counts[c["decision"]["status"]] = counts.get(c["decision"]["status"], 0) + 1
         doc.update({"classes": deficit, "providers": sorted(enabled), "queries": queries, "provider_errors": errors,
                     "candidates": ranked, "counts": counts, "recall": rec, "names_misses": sorted(set(names.misses)),
-                    "seconds": round(time.time() - t0, 3)})
+                    "released": released, "seconds": round(time.time() - t0, 3)})
         if resolve_names:                      # the names resolved online join the names layer (lever L26's file)
             _f, layer = NM.cache_paths(cfg, inc)
             doc["names_layer"] = names.save_layer(layer, testing=testing)
@@ -205,5 +215,5 @@ def plan(cfg, out, classes=None, providers=None, net=None, inc=None, resolve_nam
                          decision=c["decision"]["status"], rank=c.get("rank"))
     return {"status": "planned", "out": str(out), "sha256": sha256_file(out), "candidates": len(ranked),
             "counts": counts, "recall": rec["recall"], "missed": [m["id"] for m in rec["missed"]],
-            "provider_errors": {k: len(v) for k, v in errors.items()},
+            "provider_errors": {k: len(v) for k, v in errors.items()}, "released": released,
             "top": [c["source_id"] for c in ranked if c.get("rank")][:10]}

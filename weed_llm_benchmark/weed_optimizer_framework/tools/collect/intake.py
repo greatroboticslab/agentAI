@@ -8,8 +8,9 @@ guard loads:
      (a lab fetch synced to the cluster is verified here, by sha256);
      an intake of the same fetch record already committed is a no-op;
   2. the gates that do not need the images: the licence (P6: unresolved ->
-     held, refused -> closed), the registry (quarantined -> closed), the
-     never-train slugs;
+     held unless a person's licence override names the source, refused ->
+     closed whatever an override says), the registry (quarantined -> closed),
+     the never-train slugs;
   3. the copy guard: inc2.guard.GuardV2.load(LOCK v2) (group A); a guard that
      cannot be loaded refuses the intake. The images of earlier intake
      batches are added as its intake index (near_dup_intake, 3 bits). Then
@@ -49,9 +50,13 @@ licence, research_only, lab_group, capture_group, dhash, plus session (the
 capture group, so inc.common.MANIFEST_KEYS readers work), batch, hold_until
 (h6_scan unless the source is provenance-cleared; licence when a person let an
 unresolved licence through), provenance_cleared, exhaustive_labels,
-licence_class, boxes, target_boxes, unmapped_boxes, width, height, rel and
-intake_utc. Labels hold class ids 0..n-1 (targets), the reject class and the
-unmapped id, which exists only in intake labels.
+licence_class, licence_override (the person's decision, or null), boxes,
+target_boxes, unmapped_boxes, width, height, rel and intake_utc. Under an
+override licence and licence_class stay as fetched ("unresolved") and
+research_only is the licence's OR the override's; summary.json and the
+registry entry's provenance record both. Labels hold class ids 0..n-1
+(targets), the reject class and the unmapped id, which exists only in intake
+labels.
 """
 from __future__ import annotations
 
@@ -69,6 +74,7 @@ from . import (FORMATS, CollectError, GuardUnavailable, NamesPending, NormaliseE
                write_jsonl_atomic)
 from . import classmap as CM
 from . import normalize as NZ
+from .config import licence_override
 from . import prefilter as PF
 from . import state as S
 
@@ -354,10 +360,12 @@ def _registry_count(path):
     return len(doc["datasets"])
 
 
-def _register(cfg, source_id, fetch_doc, bdir, batch, n_rows, class_names, lic, registry_path=None):
+def _register(cfg, source_id, fetch_doc, bdir, batch, n_rows, class_names, lic, registry_path=None,
+              research_only=None, override=None):
     from ..registry_lock import update_registry
     path = registry_path or PF.registry_path()
     before = _registry_count(path)
+    ro = bool(lic.get("research_only")) if research_only is None else bool(research_only)
 
     def mutate(reg):
         if before is not None and (not isinstance(reg.get("datasets"), dict) or len(reg["datasets"]) < before):
@@ -377,7 +385,8 @@ def _register(cfg, source_id, fetch_doc, bdir, batch, n_rows, class_names, lic, 
                   "local_path": str(bdir), "intake_batches": batches, "class_names": class_names,
                   "source_ref": fetch_doc["ref"], "source_version": fetch_doc.get("version"),
                   "license": lic["id"], "provenance": {"license": lic["id"], "license_class": lic["class"],
-                                                       "license_evidence": lic.get("evidence")},
+                                                       "license_evidence": lic.get("evidence"), "research_only": ro,
+                                                       "licence_override": override},
                   "images": int(e.get("images") or 0) + int(n_rows), "registered_by": "collect intake",
                   "used_for_training": False, "updated_utc": utc()})
         ds[source_id] = e
@@ -407,7 +416,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         if lic.get("class") == "refused":
             S.append(inc, source_id, "closed", reason="licence_refused", codes=["licence_refused"], stage="intake")
             raise Refusal("licence_refused", "licence %r is not research-usable" % lic.get("id"), action="close")
-        person_licence = (cfg.raw.get("licence_overrides") or {}).get(source_id)
+        person_licence = licence_override(cfg, source_id)
         if lic.get("class") == "unresolved" and not person_licence:
             S.append(inc, source_id, "held", reason="licence_unresolved", codes=["licence_unresolved"],
                      risk="R3", stage="intake")
@@ -507,7 +516,10 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         hold = holds[0] if holds else None
         exhaustive = fetch_doc.get("exhaustive_labels")
         lic_rec = dict(lic) if not person_licence else dict(lic, override=person_licence)
-        research_only = bool(lic.get("research_only"))
+        # P6, §8: research-only when the licence is, or when the person's override says so; the licence and its
+        # class stay as the fetch recorded them (still "unresolved" under an override), so provenance is honest
+        research_only = bool(lic.get("research_only")) or bool(isinstance(person_licence, dict)
+                                                               and person_licence.get("research_only") is True)
         n_targets = len(cfg.targets)
         keys = Keys(used=(r.get("key") for r in earlier if r.get("key")), salt=fetch_sha)
         decisions, manifest = [], []
@@ -590,7 +602,8 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
             row = {"key": key, "image": str(img), "sha256": sha, "label": str(lab), "label_sha256": sha256_text(text),
                    "source": source_id, "session": it["group"], "capture_group": it["group"],
                    "capture_group_basis": it["group_basis"], "licence": lic.get("id"), "licence_class": lic.get("class"),
-                   "research_only": research_only, "lab_group": lab_group, "dhash": int(dh),
+                   "research_only": research_only, "licence_override": person_licence, "lab_group": lab_group,
+                   "dhash": int(dh),
                    "batch": batch, "hold_until": hold, "holds": holds, "provenance_cleared": cleared, "exhaustive_labels": exhaustive,
                    "boxes": len(boxes), "target_boxes": tb, "unmapped_boxes": counts.get(cfg.unmapped_id, 0),
                    "class_ids": sorted(counts), "width": wh[0], "height": wh[1], "rel": rel, "intake_utc": now_s,
@@ -626,7 +639,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                                                                         "files": fetch_doc.get("files")}})
         write_json_atomic(bdir / "sources.json", src)
         _register(cfg, source_id, fetch_doc, bdir, batch, len(manifest), [c["name"] for c in res.classes], lic,
-                  registry_path=registry_path)
+                  registry_path=registry_path, research_only=research_only, override=person_licence)
         kept_tb = sum(r["target_boxes"] for r in manifest)
         seen_imgs = len(res.items) + len(res.images_without_labels)
         eval_hits = sum(reasons.get(k, 0) for k in EVAL_REASONS)
@@ -659,6 +672,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                      "yield": yld, "source_leak": leak,
                      "zero_yield": kept_tb == 0, "zero_yield_reasons": dict(sorted(reasons.items())) if kept_tb == 0
                      else None, "hold_until": hold, "lab_group": lab_group, "research_only": research_only,
+                     "licence_override": person_licence,
                      "format": res.format, "copy_scan": copy_scan_rec,
                      "seconds": round(time.time() - t0, 3)})
         write_json_atomic(bdir / "summary.json", summ)
