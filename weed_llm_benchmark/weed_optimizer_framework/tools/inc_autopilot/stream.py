@@ -1667,15 +1667,46 @@ class StreamRun(object):
                 "inc_stream_collect_lab": hook("fetch"), "inc_stream_sync": hook("sync")}
 
     def _run_lab_items(self):
-        """Start every proposed lab item (a detached process; no ssh)."""
+        """Start every ready lab item (a detached process; no ssh): a proposed
+        one, and a filed one as _ready treats a filed cluster item (approved:
+        run it; run elsewhere: follow that run; denied: clear it; a gated data
+        lever under data_autonomy on: re-check its gates). _ready skips lab
+        actions, and this loop once took proposed items only, so an approved
+        lab fetch (L16L) waited for ever: the DATA lane stood still from
+        2026-09-29 to 2026-09-30 with its approval recorded."""
+        ap = None
         for ln in ALL_LANES:
             it = self.st["lanes"][ln].get("item")
-            if not it or it.get("status") != "proposed":
+            if not it:
                 continue
             p = it["proposal"]
             if p["policy_action"] not in X.LAB_ACTIONS:
                 continue
-            res = X.submit(p, actor=AUTO, campaign=self.camp, ctx=self.xctx)
+            if it.get("status") == "proposed":
+                res = X.submit(p, actor=AUTO, campaign=self.camp, ctx=self.xctx)
+            elif it.get("status") == "filed" and it.get("approval_id"):
+                if ap is None:
+                    ap = AP.state(self.domain, root=self.xctx.approvals_root)
+                a = ap.get(it["approval_id"]) or {}
+                if a.get("status") == "approved" and a.get("execution") is None:
+                    res = X.execute_approved(it["approval_id"], self.camp, self.xctx, invoked_by=AUTO,
+                                             quiet_repeat=True)
+                elif a.get("status") == "approved":
+                    self._executed_elsewhere(ln, it, a)
+                    continue
+                elif a.get("status") == "denied":
+                    self._ledger("denied", lane=ln, lever=it["lever"], approval_id=it["approval_id"],
+                                 decided_by=a.get("decided_by") or "human")
+                    self.st["declined"] = (list(self.st.get("declined") or []) + [p["id"]])[-200:]
+                    self._person_denied(it, a)
+                    self._clear(ln)
+                    continue
+                elif p["policy_action"] in X.GATED_R2_ACTIONS and self.cfg.get("data_autonomy") == "on":
+                    res = X.submit(p, actor=AUTO, campaign=self.camp, ctx=self.xctx)
+                else:
+                    continue
+            else:
+                continue
             self._on_result(ln, it, res)
 
     def _poll_lab(self):
