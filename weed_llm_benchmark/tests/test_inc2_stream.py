@@ -450,6 +450,24 @@ class BaselineDouble:
 
 
 # ------------------------------------------------------------------ tests
+def test_run_as_main():
+    """`python -m ...inc2.stream VERB` (every job script) runs the module as __main__: PKG and the other groups'
+    modules must resolve then too (2026-09-29: a PKG derived from __name__ made stream init fail with 'inc2.recipes
+    ... is not installed', job 47276839)."""
+    import importlib.util
+    import types
+    spec = importlib.util.find_spec("weed_optimizer_framework.tools.inc2.stream")
+    src = open(spec.origin).read()
+    main_guard = 'if __name__ == "__main__":'
+    mod = types.ModuleType("__main__")
+    mod.__dict__.update(__name__="__main__", __package__="weed_optimizer_framework.tools.inc2", __spec__=spec,
+                        __file__=spec.origin)
+    exec(compile(src.replace(main_guard, "if False:"), spec.origin, "exec"), mod.__dict__)
+    check("run as __main__ (python -m): PKG is the package, and _inc2 resolves recipes and gate3",
+          src.count(main_guard) == 1 and mod.PKG == "weed_optimizer_framework.tools"
+          and mod._inc2("recipes") is not None and mod._inc2("gate3") is not None, mod.PKG)
+
+
 def test_rules():
     print("the disposition rule and the permutation test (pure functions)")
     p_reject = G.GateConfig().p_reject
@@ -1626,6 +1644,7 @@ def main():
     for i, p in enumerate(dev_paths):
         save_pattern(pattern(4242 + i), p)
     guard = make_guard(dev_paths, base_rows)
+    test_run_as_main()
     test_rules()
     test_ledger()
     test_init(base, base_rows, guard)

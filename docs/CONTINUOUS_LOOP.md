@@ -1561,6 +1561,11 @@ The existing `test_inc_splits`, `test_funnel_leak`, `test_funnel_embed`, `test_f
   - pilot_v4's x1a candidate, on the v2 executor, failed at the sidecar: its class-restricted AP differed from the full call by 0.0103.
   - The cause is the same unstable sort, this time between the global call and a single class's call.
   - The restricted check and the bootstrap now run on tie-broken arrays (`tie_break`) and agree exactly. The score check keeps the captured arrays.
+- **Stream init could not start.**
+  - `inc2/stream.py` took `PKG` from `__name__`, so under `python -m` (every job script) its `_inc2()` imports of recipes, gate3 and the others all failed, each reported as "not installed".
+  - The tests imported the module and never ran it as `__main__`.
+  - LI's first run (job 47276839) failed in one second. The platform charged the failure and filed LI's second run for a person, since LI's campaign limit is 1.
+  - `PKG` now comes from `__package__`, and a test runs the module as `__main__`.
 
 ### Build note (group C)
 

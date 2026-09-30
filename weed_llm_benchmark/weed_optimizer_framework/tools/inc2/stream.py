@@ -160,7 +160,9 @@ SUMMARY_FORMAT = "inc2-stream/queue-summary/1"
 STATE_FORMAT = "inc2-stream-state/1"
 QUARANTINE_FORMAT = "inc2-stream-quarantine/1"
 STREAM_VERSION = 1
-PKG = __name__.rsplit(".", 2)[0]                  # weed_optimizer_framework.tools
+# weed_optimizer_framework.tools, from __package__: under `python -m ...inc2.stream` __name__ is "__main__",
+# and a PKG derived from it made every _inc2() import fail as "not installed" (stream init, job 47276839)
+PKG = (__package__ or "weed_optimizer_framework.tools.inc2").rsplit(".", 1)[0]
 BUILDER = "inc2.stream build"
 M_FRAC_NUM, M_FRAC_DEN = 1, 10                    # M = ceil(0.10 x |base_v2|), fixed per stream version (P2)
 K_MAX = 4

@@ -10645,3 +10645,7 @@ Every result sat near test 0.85, against the 0.90 goal.
   - This happened on pilot_v4's x1a candidate: 0.0103, over the 0.01 allowance.
   - The restricted check and the bootstrap now run on `tie_break`'s arrays: every tie in conf is broken deterministically inside its gap, without crossing another value, so the check is exact (allowance 1e-9).
   - The score check still runs on the captured arrays, in capture order. `tie_broken_vs_score_max_abs_diff` records the shift.
+- **Fix: `python -m ...inc2.stream` could not reach the other inc2 modules.**
+  - `PKG` was derived from `__name__`, which is `__main__` under `-m`. Every `_inc2()` import failed and was reported as "not installed".
+  - The platform's first stream init (LI, job 47276839) failed with "inc2.recipes (Protocol v3's recipe table) is not installed".
+  - `PKG` now comes from `__package__`. `tests/test_inc2_stream.py` runs the module as `__main__`; the old line fails it.
