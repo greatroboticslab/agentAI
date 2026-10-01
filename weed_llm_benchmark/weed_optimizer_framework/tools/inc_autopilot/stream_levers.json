@@ -770,7 +770,7 @@
   "L16": {
    "attempts_per_source": 3,
    "in_flight": 2,
-   "jobs_per_day": 6,
+   "jobs_per_day": 12,
    "gb_per_day": 50,
    "gb_per_source": 50
   },

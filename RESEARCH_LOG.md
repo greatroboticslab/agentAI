@@ -42,7 +42,7 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 **Data.**
 - MFWD's POROL trays are admitted: 251 images and 273 Purslane boxes, 223 of the images with conflicting boxes masked.
 - The eligible queue holds 1,013 images (1,521 boxes).
-- PAGS8 (Palmer amaranth, CC BY) is the next fetch.
+- PAGS8 (Palmer amaranth, CC BY) was fetched on the cluster at 07:35Z, and segment s001 was committed (L19) at 07:25Z. The platform launched the native-resolution rescore of m832 itself (L23N).
 
 ## 2026-10-01 — The loop admitted its first targeted data: 1,240 verified boxes, most of them for the weakest species
 

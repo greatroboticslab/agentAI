@@ -80,7 +80,7 @@ nothing for three species, so it does not help. Larger models do use it: YOLO11s
 0.8786 ± 0.0018, the best sealed result so far (gap to 0.90: 0.021); see RESEARCH_LOG 2026-09-29. No harvested increment has entered training yet
 (RESEARCH_LOG 2026-09-30). The first targeted source (CottonWeedDet3) was admitted on 2026-10-01: 1,240 verified
 target boxes, 473 of them Carpetweed, the weakest species. The first collected increment (682 images) was accepted
-by the gate: dev 0.8524 to 0.8606. Carpetweed did not move (RESEARCH_LOG 2026-10-01).
+by the gate and committed: dev 0.8524 to 0.8606. Carpetweed did not move (RESEARCH_LOG 2026-10-01).
 - [`docs/CONTINUOUS_LOOP.md`](../docs/CONTINUOUS_LOOP.md): the contract (decisions, data flow, splits v2, recipe, autopilot stream mode, rollout).
 
 Reproduce on Bridges-2. Run from the repo root with `REPO` pointing at it and `PYTHONPATH=$REPO`, in the `bench`

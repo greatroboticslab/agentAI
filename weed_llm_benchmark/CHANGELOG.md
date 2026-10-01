@@ -10734,3 +10734,8 @@ Every result sat near test 0.85, against the 0.90 goal.
     - new checks in `test_stream_ap_units.py`, `test_stream_ap_replay.py` (stream_r0), `test_stream_pipeline.py` and `test_inc2_stream.py`;
     - 59 source mutations, each killed in a mkdtemp copy, then 23 more for the review fixes (see docs/CONTINUOUS_LOOP.md).
   - Deploy: the change moves `executor.code_hash()` and the stream rules version. Sync the lab and the cluster from one commit, then re-run `executor.run_replay_tests`.
+- **L16 jobs_per_day 6 → 12; the first segment is committed.**
+  - One source takes at least two L16-family jobs (fetch and intake), and failed attempts count too. The limit of 6 a day held PAGS8's intake for a person after its fetch.
+  - Twelve allows six sources a day. The byte caps (50 GB a source, 20 GB a day, 60 GB for the campaign) and the SU envelope still bound collection.
+  - Segment s001 committed inc0001 (L19, 2026-10-01T07:25Z). PAGS8 was fetched on the cluster (07:35Z).
+  - The native-resolution rescore of b_v2_m832 (L23N, job 47306291) was proposed and run by the platform.
