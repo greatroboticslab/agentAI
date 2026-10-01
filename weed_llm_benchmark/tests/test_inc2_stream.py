@@ -49,7 +49,9 @@ Pinned:
   * queue_summary.json: its schema, and test blindness: every test and
     ImageWeeds score perturbed -> the same summary;
   * run_inc2_build.sh: verbs, INC_JOB_SCRIPT, the module drift check, the
-    provenance record and the advance of the experiment a stream verb built.
+    provenance record and the advance of the experiment a stream verb built;
+    inc2.baseline rescore-native runs under its own provenance name and is
+    never advanced.
 
 Run:  python3 tests/test_inc2_stream.py
 """
@@ -1721,6 +1723,19 @@ def test_build_script():
     check("inc2.baseline build: the lock and provenance are named by --exp; the advance follows",
           p.returncode == 0 and "[stub driver] advance --exp b_v2" in p.stdout
           and (prov("b_v2") or {}).get("attempts", [{}])[-1].get("status") == "advanced", p.stdout[-400:])
+    p = run(["inc2.baseline", "rescore-native", "--exp", "b_v2_m832", "--reference", "b_v2_m640"])
+    a = ((prov("native_b_v2_m832") or {}).get("attempts") or [{}])[-1]
+    check("inc2.baseline rescore-native (L23N, 2026-10-01): run, recorded as scored under native_<exp>, never the "
+          "arm's own provenance, and no advance (it builds nothing)",
+          p.returncode == 0 and "[stub baseline] rescore-native --exp b_v2_m832 --reference b_v2_m640" in p.stdout
+          and "[stub driver]" not in p.stdout and a.get("status") == "scored" and a.get("build_rc") == 0
+          and len((prov("b_v2") or {}).get("attempts") or []) == 1 and prov("b_v2_m832") is None,
+          (p.returncode, p.stdout[-400:], a))
+    p = run(["inc2.baseline", "rescore-native", "--exp", "refuse", "--reference", "b_v2_m640"])
+    a = ((prov("native_refuse") or {}).get("attempts") or [{}])[-1]
+    check("  a rescore-native refusal: exit 1, recorded build_failed with its ERROR line, no advance",
+          p.returncode == 1 and a.get("status") == "build_failed" and "ERROR" in str(a.get("refusal"))
+          and "[stub driver]" not in p.stdout, (p.returncode, a))
     p = run(["inc2.stream", "commit", "--exp", "wsv_s001"])
     check("inc2.stream commit is not a build verb: usage error, nothing run",
           p.returncode == 2 and "usage:" in p.stderr and "[stub" not in p.stdout, (p.returncode, p.stderr[-300:]))

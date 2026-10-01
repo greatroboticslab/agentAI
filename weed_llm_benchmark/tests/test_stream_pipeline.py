@@ -18,7 +18,8 @@ executed by the real module it names:
        FakeBackend; LV verdicts; L25 (Stage A); LI (inc2.stream init); LA
        (choose-arm); L28 (Stage C feasibility) and LC (compare); then, R0
        complete, L23B of the measurement arms m832 and s1024 (the stream's
-       arm unchanged);
+       arm unchanged); once each is done, L23N (inc2.baseline rescore-native:
+       its finals at its own imgsz), once per arm;
   R1   L17 bootstrap / knowntruth / backfill (inc2.step1_stream): batch b0000
        holds a masked veto image (funnel_F9), refuses a mirrored test image
        (GuardV2) and a 15 % dev crop (the embedding scan), sends an overlap to
@@ -71,6 +72,12 @@ Honest scope (every deviation from the platform is named here):
     in-process on a fake network, with the disk-headroom rule patched; the
     L4 label audit is proposed but refused by the policy's path patterns,
     which pin the cluster's INC_DIR.
+  * The measurement arms' native-resolution rescore (L23N) runs the real
+    inc2.baseline rescore-native, which refuses this world's stand-in
+    weights (they cannot be loaded as a detector): the platform's failure
+    path is what this world exercises (a card, the stream runs on, never
+    proposed again). The scoring itself runs on real CPU passes in
+    tests/test_inc2_native.py.
   * sbatch, squeue, sacct, ssh, the allocation and quota reads are the
     simulated cluster's (test_stream_ap_world); every INC_DIR file the
     autopilot reads is written by the real code of groups A-E, and a done
@@ -1171,6 +1178,37 @@ def stage_measure_arms(w):
           and not any(x in json.dumps(cap) for x in exps), [(e.get("arm") or {}).get("id") for e in arms])
 
 
+def stage_native_rescore(w):
+    stage("MAINT: each done measurement arm's native-resolution rescore (L23N), once; its failure is a card")
+    exps = ("b_v2_m832", "b_v2_s1024")
+
+    def ended():
+        return sum(1 for n, _a, rc in w.jobs if n.startswith("inc_build_native_") and rc is not None) >= len(exps)
+    ok = ended() or w.run_until(ended, max_ticks=30, note="native rescore")
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L23N"]
+    ref = w.dom["capacity"]["native"]["reference_exp"]
+    check("the platform proposed each done measurement arm's rescore once, as L23N (rescore-native --exp E "
+          "--reference %s), each one run_inc2_build.sh job under its own name" % ref,
+          ok and sorted((e.get("argv") or [])[-3] for e in pro) == sorted(exps)
+          and all((e.get("argv") or [])[-5:] == ["rescore-native", "--exp", (e.get("argv") or [])[-3], "--reference",
+                                                 ref] for e in pro)
+          and sorted(n for n, _a, _rc in w.jobs if n.startswith("inc_build_native_"))
+          == sorted("inc_build_native_%s" % x for x in exps), [(e.get("argv") or [])[-5:] for e in pro])
+    runs = [(n, rc) for n, _a, rc in w.jobs if n.startswith("inc_build_native_")]
+    written = [str(p) for x in exps for p in D.Paths(x).root.glob("runs/*/scores/*@*")]
+    check("the real rescore-native refused this world's stand-in weights (exit 1: they cannot be loaded as a "
+          "detector), writing no native score", runs and all(rc == 1 for _n, rc in runs) and not written,
+          (runs, written))
+    st = w.state()
+    cards = [c["title"] for c in st.get("cards") or [] if "Native-resolution rescore" in c.get("title", "")]
+    held = [e for e in w.events("lane_held") if "L23N" in str(e.get("hold"))]
+    check("each failure is a card, never a pause or a held lane, and stays failed (not proposed again)",
+          sorted(cards) == sorted("Native-resolution rescore of %s failed (L23N)" % x for x in exps)
+          and w.config().get("enabled") is True and not held and len(pro) == len(exps)
+          and all(((st.get("stage") or {}).get("r0") or {}).get("native_%s" % b["id"]) == "failed"
+                  for b in w.dom["baselines"]["items"] if b.get("measure")), (cards, held, len(pro)))
+
+
 def stage_leak_and_audit(w):
     stage("the leaking veto source (D28 -> L24)")
     q = summary(w)
@@ -1516,6 +1554,7 @@ def main_stages():
     stage_report(w)
     stage_f9(w)
     stage_intake(w)
+    stage_native_rescore(w)
     stage_invariants(w)
     if os.environ.get("STREAM_PIPELINE_COMMANDS"):
         # the commands the platform ran, in order: sbatch argv (stream_remote.stream_submit) and login-node verbs

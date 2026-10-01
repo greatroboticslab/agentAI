@@ -1631,21 +1631,40 @@ def s_r0():
     sub = [x for x in w.submits if "inc2.baseline" in x["argv"] and "b_v2_m832" in x["argv"]]
     req = SR.parse_submit("build", sub[0]["argv"][sub[0]["argv"].index("inc2.baseline"):]) if sub else {}
     check("  the cluster's grammar reads the measurement arm back", req.get("params", {}).get("arm") == "m832", req)
+    # 2026-10-01: each done measurement arm is read at its own resolution, once (L23N), within the envelope
+    ngot = []
+    for b in measure:
+        ngot.append(_step(w, "L23N", lambda b=b: (w.job_done("inc_build_native_%s" % b["exp"]),
+                                                  w.native_record(b["exp"]))))
+    nex = [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23N"]
+    ref = w.dom["capacity"]["native"]["reference_exp"]
+    check("the measurement arms done: each is rescored at its own resolution once, as L23N (inc2.baseline "
+          "rescore-native --exp E --reference %s), within the envelope, citing only the lock and its own state" % ref,
+          [tail(x, 4) for x in ngot] == [["--exp", b["exp"], "--reference", ref] for b in measure]
+          and nex == ["envelope"] * len(measure)
+          and [sorted(c.get("pointer") for c in (x or {}).get("cites") or []) for x in ngot]
+          == [sorted(["/stage/lock", "/stage/exp_status/%s" % b["exp"], "/stage/native/%s" % b["id"]])
+              for b in measure], ([tail(x, 6) for x in ngot], nex))
+    nsub = [x["name"] for x in w.submits if "rescore-native" in x["argv"]]
+    check("  each one GPU job of run_inc2_build.sh under its own name (never the arm's build job's)",
+          nsub == ["inc_build_native_%s" % b["exp"] for b in measure], nsub)
     check("  and the stream's arm stays the capacity decision's: no new arm line, no LA, capacity_v1.json unchanged",
           [e for e in w.stream_ledger() if e.get("event") == "arm"] == arm0
           and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0
           and [e.get("lever") for e in w.events("proposed")].count("LA") == 1, arm0)
     w.tick(2)
-    check("  once both exist, no measurement arm is proposed again",
+    check("  once both exist, no measurement arm is proposed again, nor its rescore",
           [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_m832") == 1
-          and [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_s1024") == 1)
+          and [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_s1024") == 1
+          and len([e for e in w.events("proposed") if e.get("lever") == "L23N"]) == len(measure))
     w.queue(4 * w.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w.t[0] - 2 * DAY))
     pr = _step(w, "L18")
     check("R0 READY: the first segment is cut (L18)", pr is not None and pr.get("child_exp") == "%s_s001" % w.sid,
           [e.get("lever") for e in w.events("proposed")][-5:])
     lv = [e.get("lever") for e in w.events("executed") if e.get("lane") == "MAINT"]
     check("the whole sequence ran by the platform, in order, one MAINT item at a time, each once",
-          lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure), lv)
+          lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure)
+          + ["L23N"] * len(measure), lv)
 
 
 def _commits_ev(segments, ctx):

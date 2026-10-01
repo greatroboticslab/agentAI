@@ -47,7 +47,7 @@ NAMES = {"D20": "data_needed", "D21": "source_low_yield", "D22": "cut_ready", "D
          "D8S": "gate_underpowered", "D10S": "budget_exhausted",
          "DSA": "stage_a", "DSC": "stage_c", "DCAP": "capacity_decision", "DCAN": "canary_failed",
          "DR0": "r0_due", "DCMP": "compare_due", "DPIPE": "data_pipeline", "DHOLD": "hold_deadline",
-         "DBIS": "bisect_due", "DKT": "known_truth_precision"}
+         "DBIS": "bisect_due", "DKT": "known_truth_precision", "DNAT": "native_verdict"}
 RULES_FILES = ("diagnose_stream.py", "stream_thresholds.json", "stream_levers.json", "levers_stream.py")
 RULES_VERSION_HEX = 12
 EPS = 1e-12
@@ -1223,6 +1223,33 @@ def capacity(v):
                   "arm": dict(cap.get(chosen) or {}, name=chosen)})
 
 
+def native(v):
+    """DNAT: the measurement arms' native-resolution verdict as inc2.baseline
+    native-verdict recorded it (capacity/native_v1.json, dev only; the
+    stream-domain config's capacity.native.record). An arm that qualifies
+    for a stream fork proposal is card X18 for a person; nothing switches
+    and no lane holds."""
+    name = ((v.dom.get("capacity") or {}).get("native") or {}).get("record")
+    rec = v.ev.json(name) if name else None
+    if not isinstance(rec, dict) or not isinstance(rec.get("arms"), dict):
+        return _silent("DNAT", "no native-resolution verdict recorded")
+    cites = [v.cite(name, "/qualifying")]
+    arms = rec["arms"]
+    qual = [e for e in rec.get("qualifying") or [] if (arms.get(e) or {}).get("qualifies") is True]
+    if not qual:
+        return _silent("DNAT", "native-resolution verdict: no measurement arm qualifies (%s)"
+                       % ", ".join("%s %s" % (e, (a or {}).get("status")) for e, a in sorted(arms.items())),
+                       cites=cites)
+    cites += [v.cite(name, E.pointer("arms", e, "qualifies")) for e in qual]
+    summ = "; ".join("%s at %s px: dev D %+.4f > 2 pooled sd %.4f and SE %.4f; improved %s"
+                     % (e, arms[e].get("imgsz"), _num(arms[e].get("diff")) or 0.0,
+                        _num(arms[e].get("two_pooled_sd")) or 0.0, _num(arms[e].get("se_diff")) or 0.0,
+                        ", ".join(arms[e].get("improved_targets") or [])) for e in qual)
+    return _diag("DNAT", True, "info", "native-resolution verdict: %s qualif%s for a stream fork proposal (%s) -> "
+                 "card X18; nothing switches" % (", ".join(qual), "ies" if len(qual) == 1 else "y", summ),
+                 cites, ["X18"], None, {"qualifying": qual})
+
+
 def canary(v):
     """DCAN: the canary's recorded verdict (inc2.baseline canary-verdict,
     <exp>/canary.json): a failed canary means the v2 executor does not
@@ -1263,7 +1290,8 @@ def r0(v):
     the capacity grid's verdicts (LV); Stage A (L25, once a person accepted
     Protocol v3) and its verdict (LV); the stream's creation with Stage A's
     recipes (LI); the capacity decision adopted (LA); Stage C (L28); then,
-    R0 complete, the measurement arms (L23B, baselines marked measure). DATA --
+    R0 complete, the measurement arms (L23B, baselines marked measure), and
+    once one is done, its native-resolution rescore (L23N, once). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill)."""
     st = v.c("/stage") or {}
@@ -1338,6 +1366,24 @@ def r0(v):
                             "why": "measurement arm %s (%s) not built; recorded, never a candidate of the capacity "
                                    "decision" % (b["id"], b["exp"])}
             cites = [v.ccite("/stage/lock"), v.ccite("/stage/baselines/%s" % b["id"])]
+            break
+    # a done measurement arm's native-resolution rescore (2026-10-01, pre-registered): proposed once, on the
+    # arms' own conditions, when its experiment is done and its native scores are missing (/stage/native: the
+    # rescore's record in the evidence, else what the platform ran); a failure of it is a card and it stays
+    # failed, so it is never proposed again. Cites only what it rests on, as the arms' builds do.
+    nat = (v.dom.get("capacity") or {}).get("native") or {}
+    if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"] \
+            and nat.get("reference_exp"):
+        for b in (v.dom.get("baselines") or {}).get("items") or []:
+            if not b.get("measure") or exps.get(b["exp"]) != "done" \
+                    or (st.get("native") or {}).get(b["id"]) not in (None, "missing"):
+                continue
+            out["MAINT"] = {"lever": "L23N", "baseline": b["id"],
+                            "why": "measurement arm %s (%s) is done without its native-resolution scores; read at "
+                                   "its own imgsz against %s at 640 (record only)" % (b["id"], b["exp"],
+                                                                                   nat["reference_exp"])}
+            cites = [v.ccite("/stage/lock"), v.ccite(E.pointer("stage", "exp_status", b["exp"])),
+                     v.ccite("/stage/native/%s" % b["id"])]
             break
     items = {k: x for k, x in out.items() if x}
     if not items:
@@ -1509,7 +1555,7 @@ def known_truth(v):
 # --------------------------------------------------------------- detect
 HEALTH_STREAM = ("D10S", "D26", "D27")
 ORDER = ("D10S", "D27", "D26", "D28", "DCAN", "D25", "D23", "D30", "D31", "D33", "D32", "D8S", "D22", "D24",
-         "DCMP", "DBIS", "D21", "DHOLD", "DPIPE", "D20", "D29", "DR0", "DSA", "DSC", "DCAP", "DKT")
+         "DCMP", "DBIS", "D21", "DHOLD", "DPIPE", "D20", "D29", "DR0", "DSA", "DSC", "DCAP", "DKT", "DNAT")
 
 
 def detect(ev, dom, th=None, prior=None, only=None, include_prior_d31=False):
@@ -1559,6 +1605,7 @@ def detect(ev, dom, th=None, prior=None, only=None, include_prior_d31=False):
     run("DSA", stage_a)
     run("DCAP", capacity)
     run("DKT", known_truth)
+    run("DNAT", native)
     return [out[k] for k in ORDER if k in out]
 
 

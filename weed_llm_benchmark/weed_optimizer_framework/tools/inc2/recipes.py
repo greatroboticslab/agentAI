@@ -60,7 +60,10 @@ it). capacity-verdict --record lists them, and they are never a candidate of
 the decision or a stream's arm. Their production scores are
 still the locked scorer's, at 640 px: they measure what training at the
 larger size gives under 640 px inference. Inferring at the arm's size needs
-a scorer version whose imgsz is the arm's (R4).
+a scorer version whose imgsz is the arm's (R4); until then
+inc2.scorer_native reads their finals at their own size, record only, by a
+pre-registered rule against m640 at 640 (inc2.baseline rescore-native,
+native-verdict; docs/CONTINUOUS_LOOP.md, group B, amendment 2026-10-01).
 
 Their estimates (2026-09-30), from the measured 640 px runs on the cluster
 (one V100-32GB, cache ram, base_v2 6,811 images, 100 epochs; one base run

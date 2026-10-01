@@ -11,6 +11,10 @@ B_v2, its capacity arms, the canary, B0 u tsw and the stream's milestones.
     python -m weed_optimizer_framework.tools.inc2.baseline secondary --exp <sid>_mNNN --weights PATH
         [--run-id secondary__incumbent] [--source TEXT]
     python -m weed_optimizer_framework.tools.inc2.baseline estimate --n-images N [--seeds 0,1,2] [--arm A]
+    python -m weed_optimizer_framework.tools.inc2.baseline rescore-native --exp b_v2_m832 [--reference b_v2_m640]
+        [--out-dir DIR]
+    python -m weed_optimizer_framework.tools.inc2.baseline native-verdict [--arms b_v2_m832,b_v2_s1024]
+        [--reference b_v2_m640] [--out-dir DIR]
 
 build writes a 'baseline' experiment for the pinned driver (inc/driver.py,
 unchanged): one cold base run per seed (the arm's Protocol v3 cold recipe,
@@ -127,6 +131,43 @@ init = the incumbent's weights, checked by inc2.train.validate_spec), a
 one-line submission list and secondary.json (the weights' sha256 and the
 source), and returns the sbatch argv of run_inc2_job.sh for the platform to
 submit. It submits nothing itself; the driver does not track that run.
+
+rescore-native (docs/CONTINUOUS_LOOP.md, group B, "Amendment (2026-10-01):
+the measurement arms read at their own resolution (pre-registered)"): a
+measurement arm's final runs scored by inc2.scorer_native at the arm's
+training imgsz on dev and imageweeds (never test), and the reference's
+(b_v2_m640) final runs on dev at 640 on the seeds both share, each only when
+its native score is missing (a native score is written once; the 640 px
+scores are never touched). Every final run must be done first. Writes
+INC_DIR/<exp>/native_rescore.json (status complete and the dev files' names
+and sha256s, no path: the platform reads it, dev only; the returned record
+lists every native file) and then the native verdict. The autopilot's L23N
+runs it as one GPU job (run_inc2_build.sh). Like the scorers' own CLIs,
+rescore-native and native-verdict set YOLO_AUTOINSTALL=false and
+YOLO_OFFLINE=true before Ultralytics is imported.
+
+native-verdict: the pre-registered rule, from the native dev files only.
+For each arm, on the seeds it shares with the reference: D = mean(arm's dev
+species_map50_95 at its imgsz) - mean(reference's at 640); pooled sd =
+sqrt((sd_arm^2 + sd_ref^2) / 2); SE(D) from a paired image bootstrap
+(NATIVE_RESAMPLES resamples of the dev images under
+stable_int(NATIVE_SEED_TEXT), one draw for every run; per run and resample
+each species' AP50-95 by the scorer sidecar's method on its tie-broken
+per-image arrays, the 12-class mean over the species with a GT box, the mean
+over seeds per arm, the arm minus the reference); each species' difference
+and SE the same way. An arm qualifies for a stream fork proposal only when D
+> 2 x pooled sd, D > SE(D), and one of NATIVE_TARGET_SPECIES has a higher
+mean dev AP at the arm's imgsz than the reference's at 640. Native files of
+one arm or of the reference that disagree on the exam manifest, key order,
+locked scorer, a setting other than imgsz or Ultralytics' version refuse,
+and so does a test-mode score unless testing is allowed (tests). An arm
+without its native dev scores (or the reference without its) is pending.
+Writes INC_DIR/capacity/native_v1.json (the decision: dev only, no score
+path, the platform's card reads it) and native_v1_report.{json,md} (for
+people: dev and imageweeds at the native size and at 640). Qualifying
+switches nothing: the stream's arm stays the capacity decision's,
+capacity_v1.json is not touched, test is not read; the autopilot files card
+X18 for a person.
 """
 from __future__ import annotations
 
@@ -144,9 +185,12 @@ from ..inc import common as C
 from ..inc import driver as D
 from ..inc import pilot as P
 from ..inc.scorer import TEST_ENV
+from ..inc.scorer import testing as scorer_testing
 from ..inc.splits import sanitise
 from . import common as C2
 from . import recipes as RC
+from . import scorer_native as SN
+from . import scorer_sidecar as SC
 from . import train as T
 
 BUILDER = "inc2.baseline build"
@@ -174,6 +218,26 @@ SECONDARY_FORMAT = "inc2-secondary/1"
 TARGET_TEST = 0.90                    # the success measure's target (docs/CONTINUOUS_LOOP.md 1.2)
 M_SHARE = 0.10                        # M = ceil(0.10 x |base|) (5.3)
 INC_OVER_COLD = RC.INC_MS[0] / (0.5 * (RC.COLD_MS[0] + RC.COLD_MS[1]))     # 7.4 / 6.5 (5.6), est.
+# The measurement arms read at their own resolution (amendment 2026-10-01, pre-registered).
+NATIVE_FORMAT = "inc2-native-rescore/1"
+NATIVE_VERDICT_FORMAT = "inc2-native-verdict/1"
+NATIVE_NAME = "native_v1"
+NATIVE_RECORD = "native_rescore.json"
+NATIVE_REFERENCE = "b_v2_m640"
+NATIVE_ARMS = ("b_v2_m832", "b_v2_s1024")
+NATIVE_EXAM = "dev"
+NATIVE_TARGET_SPECIES = ("Carpetweed", "SpottedSpurge", "Purslane")
+NATIVE_SEED_TEXT = "inc2/native/diff_se"
+NATIVE_RESAMPLES = 1000
+# what every native dev file of one comparison must share (imgsz aside)
+NATIVE_STAMPS = ("manifest_sha256", "key_order_sha256", "n_images", "locked_scorer_sha256", "ultralytics_version",
+                 "native_production")
+NATIVE_SETTINGS = ("batch", "conf", "iou", "half", "rect", "max_det", "image_correct_conf", "image_correct_iou")
+NATIVE_RULE = ("an arm qualifies for a stream fork proposal only when D = mean(arm's dev species_map50_95 at its own "
+               "imgsz) - mean(b_v2_m640's at 640), on the seeds both share, exceeds 2 x pooled sd (sqrt((sd_arm^2 + "
+               "sd_ref^2) / 2)) AND the paired image-bootstrap SE of D, AND one of Carpetweed, SpottedSpurge, Purslane "
+               "has a higher mean dev AP50-95 at the arm's imgsz than b_v2_m640's at 640; qualifying files a card for "
+               "a person (no switch, no test read)")
 
 
 class BaselineError(RuntimeError):
@@ -920,11 +984,338 @@ def secondary(exp, weights, run_id="secondary__incumbent", source=None):
     return {"spec": str(spec_path), "list": str(lst), "argv": argv, "record": rec}
 
 
+# ------------------------------------------------------------ native resolution
+def _final_id(seed):
+    return "final__base__s%d" % int(seed)
+
+
+def _native_arm(exp, measure=True):
+    """(exp.json, arm, imgsz) of a measurement arm (measure) or of the
+    reference arm (not measure); BaselineError otherwise."""
+    try:
+        defn, aid, imgsz = SN.load_arm(exp)
+    except SN.NativeRefused as e:
+        raise BaselineError(str(e))
+    if measure and aid not in RC.MEASURE_ARMS:
+        raise BaselineError("%s is arm %s: only a measurement arm %s is read at its own imgsz"
+                            % (exp, aid, list(RC.MEASURE_ARMS)))
+    if not measure and aid != SN.REFERENCE_ARM:
+        raise BaselineError("%s is arm %s, not the reference arm %s" % (exp, aid, SN.REFERENCE_ARM))
+    return defn, aid, imgsz
+
+
+def rescore_native(exp, reference=NATIVE_REFERENCE, out_dir=None, verdict=True, batch=None, device=None,
+                   resamples=NATIVE_RESAMPLES):
+    """Score a measurement arm's final runs at its imgsz (dev, imageweeds)
+    and the reference's on dev at 640, each only when missing, then record
+    the native verdict (module docstring). Returns the rescore record."""
+    defn, aid, imgsz = _native_arm(exp)
+    rdefn, _raid, rimgsz = _native_arm(reference, measure=False)
+    exams = [e for e in SN.EXAMS if e in (defn.get("final_exams") or [])]
+    if NATIVE_EXAM not in exams:
+        raise BaselineError("%s's final exams %s hold no %s" % (exp, defn.get("final_exams"), NATIVE_EXAM))
+    seeds = [int(s) for s in defn.get("seeds") or []]
+    common = sorted(set(seeds) & set(int(s) for s in rdefn.get("seeds") or []))
+    if len(common) < 2:
+        raise BaselineError("%s and %s share seeds %s; the comparison needs at least 2" % (exp, reference, common))
+    try:                                         # every final run done before anything is scored
+        for s in seeds:
+            SN.final_run(exp, _final_id(s), defn)
+        for s in common:
+            SN.final_run(reference, _final_id(s), rdefn)
+    except SN.NativeRefused as e:
+        raise BaselineError(str(e))
+
+    def one(e, s, exam, size):
+        scores = C.INC_DIR / e / "runs" / _final_id(s) / "scores"
+        js, _npz = SN.paths_for(scores, exam, size)
+        status = "kept"
+        if not js.is_file():
+            try:
+                SN.score_run(e, _final_id(s), exam, batch=batch, device=device)
+            except SN.NativeRefused as x:
+                raise BaselineError("%s %s on %s at %d px refused: %s" % (e, _final_id(s), exam, size, x))
+            status = "written"
+        d = _read_json(js) or {}
+        return {"run_id": _final_id(s), "score": js.name, "sha256": _sha(js), "imgsz": size, "status": status,
+                "native_production": d.get("native_production")}
+
+    scores = {exam: [one(exp, s, exam, imgsz) for s in seeds] for exam in exams}
+    ref = {NATIVE_EXAM: [one(reference, s, NATIVE_EXAM, rimgsz) for s in common]}
+    # the record the platform reads (evidence.ALLOWED): dev only and no path; the returned record lists every
+    # native file, and the verdict's report (for people) every file it read
+    rec = {"format": NATIVE_FORMAT, "exp": exp, "arm": aid, "imgsz": imgsz, "seeds": seeds,
+           "reference": {"exp": reference, "imgsz": rimgsz, "seeds": common, "scores": ref},
+           "scores": {NATIVE_EXAM: scores[NATIVE_EXAM]}, "n_native_scores": sum(len(v) for v in scores.values()),
+           "status": "complete", "written_utc": D._utc(),
+           "note": "native-resolution scores (scores/<exam>@<imgsz>.json): never test, never a protocol score; "
+                   "dev listed only"}
+    out = C.INC_DIR / exp / NATIVE_RECORD
+    _write_json(out, rec)
+    rec = dict(rec, scores=scores, out=str(out))
+    log("%s: native scores at %d px complete (%s); reference %s at %d px on seeds %s"
+        % (exp, imgsz, ", ".join("%s %d written" % (x, sum(1 for r in v if r["status"] == "written"))
+                                 for x, v in scores.items()), reference, rimgsz, common))
+    if verdict:
+        d = Path(out_dir) if out_dir else C.INC_DIR / "capacity"
+        old = _read_json(d / ("%s.json" % NATIVE_NAME))
+        prev = list((old.get("arms") or {}) if isinstance(old, dict) else [])
+        testing_ok = bool(defn.get("testing")) and scorer_testing()
+        native_verdict(list(dict.fromkeys(prev + [exp])), reference=reference, out_dir=out_dir,
+                       testing_ok=testing_ok, resamples=resamples)
+    return rec
+
+
+def _native_files(exp, seeds, imgsz, testing_ok):
+    """({seed: (native dev score, per-image arrays, input record)}, [missing
+    run ids]) of an experiment's final runs at imgsz."""
+    out, missing = {}, []
+    for s in seeds:
+        rid = _final_id(s)
+        js, npz = SN.paths_for(C.INC_DIR / exp / "runs" / rid / "scores", NATIVE_EXAM, imgsz)
+        d = _read_json(js)
+        if d is None:
+            missing.append(rid)
+            continue
+        if (not isinstance(d, dict) or d.get("format") != SN.FORMAT or d.get("exam") != NATIVE_EXAM
+                or d.get("imgsz") != imgsz or d.get("exp") != exp or d.get("run_id") != rid):
+            raise BaselineError("%s is not %s %s's native %s score at %d px" % (js, exp, rid, NATIVE_EXAM, imgsz))
+        if d.get("native_production") is not True and not testing_ok:
+            raise BaselineError("%s is a test-mode score (%s): the verdict reads native-protocol scores only"
+                                % (js, "; ".join(d.get("other_deviations") or []) or "not native_production"))
+        img = d.get("images") or {}
+        if _sha(npz) is None or _sha(npz) != img.get("sha256"):
+            raise BaselineError("%s does not hash as %s records" % (npz, js))
+        arrays = SC.load_npz(npz)
+        if C.sha256_text("\n".join(str(k) for k in arrays["keys"])) != d.get("key_order_sha256"):
+            raise BaselineError("%s is not in the exam key order %s records" % (npz, js))
+        out[s] = (d, arrays, {"run_id": rid, "score": js.name, "sha256": _sha(js), "images_sha256": img["sha256"]})
+    return out, missing
+
+
+def native_bootstrap(arm_arrays, ref_arrays, resamples=NATIVE_RESAMPLES, seed_text=NATIVE_SEED_TEXT, ap_fn=None,
+                     species=SC.SPECIES):
+    """The paired image bootstrap of D = mean over arm runs - mean over
+    reference runs of the 12-class mean dev AP50-95, and of each species'
+    difference (module docstring). Every run's arrays must be in one key
+    order with the same GT boxes (one exam). Returns {"se", "n_valid",
+    "per_species": {s: {"se", "n_valid"}}}."""
+    import numpy as np
+    ap_fn = ap_fn or SC._ap_per_class()
+    runs = list(arm_arrays) + list(ref_arrays)
+    if not arm_arrays or not ref_arrays:
+        raise BaselineError("the bootstrap needs runs on both sides")
+    keys = [str(k) for k in runs[0]["keys"]]
+    for a in runs[1:]:
+        if [str(k) for k in a["keys"]] != keys:
+            raise BaselineError("the runs' per-image arrays are not in one key order")
+        if not (np.array_equal(a["target_img"], runs[0]["target_img"])
+                and np.array_equal(a["target_cls"], runs[0]["target_cls"])):
+            raise BaselineError("the runs' GT boxes differ: they were not scored on one exam")
+    n = len(keys)
+    if n < 2:
+        raise BaselineError("an image bootstrap needs at least 2 exam images, got %d" % n)
+    counts = np.stack([np.bincount(row, minlength=n) for row in SC.resample_indices(n, resamples, seed_text)])
+    tb = [SC.tie_break(a) for a in runs]
+    per = []
+    for name in species:
+        s_id = C.CLASS_NAMES.index(name)
+        arrs = [SC.species_arrays(t, s_id) for t in tb]
+        per.append((name, s_id, arrs, arrs[0][3]))
+    k = len(arm_arrays)
+    diffs, sdiffs = [], {name: [] for name in species}
+    for b in range(resamples):
+        m = counts[b]
+        aps = {}
+        for name, s_id, arrs, gt in per:
+            n_gt = int((m * gt).sum())
+            if n_gt <= 0:
+                continue
+            aps[name] = [SC.class_ap(np.repeat(tp, m[pimg], axis=0), np.repeat(conf, m[pimg]), n_gt, s_id, ap_fn)
+                         for tp, conf, pimg, _gt in arrs]
+        if not aps:
+            continue
+        twelve = [statistics.fmean(aps[nm][r] for nm in aps) for r in range(len(runs))]
+        diffs.append(statistics.fmean(twelve[:k]) - statistics.fmean(twelve[k:]))
+        for nm, vals in aps.items():
+            sdiffs[nm].append(statistics.fmean(vals[:k]) - statistics.fmean(vals[k:]))
+
+    def sd(v):
+        return float(np.std(np.asarray(v, dtype=np.float64), ddof=1)) if len(v) >= 2 else None
+    return {"se": sd(diffs), "n_valid": len(diffs),
+            "per_species": {nm: {"se": sd(v), "n_valid": len(v)} for nm, v in sdiffs.items()}}
+
+
+def _native_stamps(d):
+    out = {k: d.get(k) for k in NATIVE_STAMPS}
+    out.update(("settings.%s" % k, (d.get("settings") or {}).get(k)) for k in NATIVE_SETTINGS)
+    return out
+
+
+def native_decision(arm_exps, reference=NATIVE_REFERENCE, testing_ok=False, resamples=NATIVE_RESAMPLES,
+                    seed_text=NATIVE_SEED_TEXT):
+    """The pre-registered rule on the native dev files (module docstring).
+    Opens the experiments' exp.json and their final runs' native dev scores
+    and arrays, nothing else (no protocol score, no other exam)."""
+    rdefn, raid, rimgsz = _native_arm(reference, measure=False)
+    arms, qualifying, pending = {}, [], []
+    for e in arm_exps:
+        if not (C.INC_DIR / e / "exp.json").is_file():
+            arms[e] = {"status": "pending", "why": "not built"}
+            pending.append(e)
+            continue
+        defn, aid, imgsz = _native_arm(e)
+        seeds = sorted(set(int(s) for s in defn.get("seeds") or []) & set(int(s) for s in rdefn.get("seeds") or []))
+        if len(seeds) < 2:
+            raise BaselineError("%s and %s share seeds %s; the rule needs at least 2" % (e, reference, seeds))
+        a_in, a_miss = _native_files(e, seeds, imgsz, testing_ok)
+        r_in, r_miss = _native_files(reference, seeds, rimgsz, testing_ok)
+        if a_miss or r_miss:
+            arms[e] = {"status": "pending", "arm": aid, "imgsz": imgsz, "seeds": seeds,
+                       "missing": ["%s/%s" % (e, r) for r in a_miss] + ["%s/%s" % (reference, r) for r in r_miss]}
+            pending.append(e)
+            continue
+        stamps = None
+        for who, files in ((e, a_in), (reference, r_in)):
+            for s in seeds:
+                st = _native_stamps(files[s][0])
+                if stamps is None:
+                    stamps = st
+                elif st != stamps:
+                    diff = sorted(k for k in st if st[k] != stamps[k])
+                    raise BaselineError("%s %s was scored on another exam, scorer or settings than the comparison's "
+                                        "first file (%s differ)" % (who, _final_id(s), ", ".join(diff)))
+        av = [float(a_in[s][0]["species_map50_95"]) for s in seeds]
+        rv = [float(r_in[s][0]["species_map50_95"]) for s in seeds]
+        ma, sa = _mean_sd(av)
+        mr, sr = _mean_sd(rv)
+        pooled = math.sqrt((sa ** 2 + sr ** 2) / 2.0)
+        diff = ma - mr
+        boot = native_bootstrap([a_in[s][1] for s in seeds], [r_in[s][1] for s in seeds], resamples=resamples,
+                                seed_text=seed_text)
+        per = {}
+        for name in SC.SPECIES:
+            pa = [a_in[s][0].get("per_class", {}).get(name) for s in seeds]
+            pr = [r_in[s][0].get("per_class", {}).get(name) for s in seeds]
+            if any(x is None for x in pa + pr):
+                continue
+            da = statistics.fmean(float(x) for x in pa) - statistics.fmean(float(x) for x in pr)
+            per[name] = {"arm_mean": statistics.fmean(float(x) for x in pa),
+                         "ref_mean": statistics.fmean(float(x) for x in pr), "diff": da,
+                         "se": boot["per_species"].get(name, {}).get("se"),
+                         "n_valid": boot["per_species"].get(name, {}).get("n_valid")}
+        improved = [s for s in NATIVE_TARGET_SPECIES if s in per and per[s]["diff"] > 0]
+        se = boot["se"]
+        conds = {"above_2_pooled_sd": diff > 2.0 * pooled, "above_se": se is not None and diff > se,
+                 "target_species_improved": bool(improved)}
+        q = all(conds.values())
+        arms[e] = {"status": "decided", "arm": aid, "imgsz": imgsz, "reference_imgsz": rimgsz, "seeds": seeds,
+                   "dev": av, "mean": ma, "sd": sa, "reference_dev": rv, "reference_mean": mr, "reference_sd": sr,
+                   "diff": diff, "pooled_sd": pooled, "two_pooled_sd": 2.0 * pooled, "se_diff": se,
+                   "n_valid": boot["n_valid"], "per_species": per, "target_species": list(NATIVE_TARGET_SPECIES),
+                   "improved_targets": improved, "conditions": conds, "qualifies": q, "stamps": stamps,
+                   "inputs": [a_in[s][2] for s in seeds],
+                   "reference_inputs": [r_in[s][2] for s in seeds]}
+        if q:
+            qualifying.append(e)
+    return {"format": NATIVE_VERDICT_FORMAT, "rule": NATIVE_RULE,
+            "pre_registered": "docs/CONTINUOUS_LOOP.md, group B, Amendment (2026-10-01): the measurement arms read "
+                              "at their own resolution",
+            "reference": {"exp": reference, "arm": raid, "imgsz": rimgsz},
+            "bootstrap": {"seed_text": seed_text, "seed": C.stable_int(seed_text), "resamples": int(resamples),
+                          "paired": "one draw of the dev images for every run", "ddof": 1,
+                          "statistic": "the 12-class mean AP50-95 over the species with a GT box in the resample, "
+                                       "averaged over seeds per arm; the arm minus the reference"},
+            "arms": arms, "qualifying": qualifying, "pending": pending, "testing_allowed": bool(testing_ok),
+            "on_qualifying": "the autopilot files card X18 for a person: a stream fork proposal; nothing switches, "
+                             "capacity_v1.json is not touched, test is not read",
+            "note": "dev only: the native dev files of the final runs; ImageWeeds is in the report, for people"}
+
+
+def native_report(decision, testing_ok=False):
+    """For people: each arm's dev and imageweeds at its imgsz and at 640
+    (the protocol's scores of the same final runs), and the reference's dev
+    at 640, mean +- sd over the seeds. Never test."""
+    rows = {}
+    ref = decision["reference"]["exp"]
+    for e, a in list(decision["arms"].items()) + [(ref, {"imgsz": decision["reference"]["imgsz"]})]:
+        defn = _read_json(C.INC_DIR / e / "exp.json") or {}
+        size = a.get("imgsz")
+        out = {"arm": (defn.get("arm") or {}).get("id"), "imgsz": size, "status": a.get("status"), "exams": {},
+               "inputs": []}
+        for exam in [x for x in SN.EXAMS if x in (defn.get("final_exams") or [])]:
+            for label, name in (("native", SN.score_name(exam, size) if size else None), ("at_640", "%s.json" % exam)):
+                if name is None:
+                    continue
+                vals = []
+                for s in defn.get("seeds") or []:
+                    p = C.INC_DIR / e / "runs" / _final_id(s) / "scores" / name
+                    d = _read_json(p)
+                    if isinstance(d, dict) and d.get("species_map50_95") is not None and (
+                            label == "native" or d.get("production") is True or testing_ok):
+                        vals.append(float(d["species_map50_95"]))
+                        out["inputs"].append({"path": str(p), "sha256": _sha(p)})
+                m, sd = _mean_sd(vals)
+                out["exams"].setdefault(exam, {})[label] = {"n": len(vals), "mean": m, "sd": sd}
+        rows[e] = out
+    return {"format": NATIVE_VERDICT_FORMAT + "-report", "arms": rows, "qualifying": decision["qualifying"],
+            "note": "for people: dev and imageweeds at each arm's imgsz and at 640; test is never scored at another "
+                    "size and is not read here"}
+
+
+def _native_md(rep, decision):
+    def f(x):
+        return "-" if x is None else "%.4f" % x
+    lines = ["# Measurement arms at their own resolution", "",
+             "Qualifying for a stream fork proposal: %s." % (", ".join(decision["qualifying"]) or "none"), "",
+             "| Experiment | Arm | Exam | at own imgsz mean +- sd | at 640 mean +- sd | n |", "|---|---|---|---|---|---|"]
+    for e, r in rep["arms"].items():
+        for exam, v in r["exams"].items():
+            nat, p = v.get("native") or {}, v.get("at_640") or {}
+            lines.append("| %s | %s @ %s | %s | %s +- %s | %s +- %s | %s |" % (
+                e, r["arm"], r["imgsz"], exam, f(nat.get("mean")), f(nat.get("sd")), f(p.get("mean")), f(p.get("sd")),
+                nat.get("n", p.get("n"))))
+    for e, a in decision["arms"].items():
+        if a.get("status") == "decided":
+            lines.append("")
+            lines.append("%s: D = %.4f, 2 x pooled sd = %.4f, SE(D) = %s, improved targets %s -> %s"
+                         % (e, a["diff"], a["two_pooled_sd"], f(a["se_diff"]), a["improved_targets"] or "none",
+                            "qualifies" if a["qualifies"] else "does not qualify"))
+    return "\n".join(lines) + "\n"
+
+
+def native_verdict(arm_exps=NATIVE_ARMS, reference=NATIVE_REFERENCE, out_dir=None, write=True, testing_ok=False,
+                   resamples=NATIVE_RESAMPLES):
+    """The decision and its report (module docstring); returns (decision, report)."""
+    decision = native_decision(list(arm_exps), reference=reference, testing_ok=testing_ok, resamples=resamples)
+    decision["generated_utc"] = D._utc()
+    report = native_report(decision, testing_ok=testing_ok)
+    report["generated_utc"] = decision["generated_utc"]
+    if write:
+        d = Path(out_dir) if out_dir else C.INC_DIR / "capacity"
+        decision["out"] = str(d / ("%s.json" % NATIVE_NAME))
+        _write_json(decision["out"], decision)
+        report["decision_sha256"] = _sha(decision["out"])
+        report["out"] = str(d / ("%s_report.json" % NATIVE_NAME))
+        _write_json(report["out"], report)
+        md = d / ("%s_report.md" % NATIVE_NAME)
+        tmp = md.with_name(".%s.tmp" % md.name)
+        tmp.write_text(_native_md(report, decision))
+        os.replace(tmp, md)
+    log("native verdict: qualifying %s; pending %s; %s" % (
+        decision["qualifying"], decision["pending"], "; ".join(
+            "%s D %.4f vs 2 pooled sd %.4f, SE %s" % (e, a["diff"], a["two_pooled_sd"],
+                                                     "-" if a["se_diff"] is None else "%.4f" % a["se_diff"])
+            for e, a in decision["arms"].items() if a.get("status") == "decided") or "none decided"))
+    return decision, report
+
+
 # ----------------------------------------------------------------------- CLI
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Splits v2 baselines: B_v2, capacity arms, canary, B0 u tsw, "
                                              "milestones.")
-    ap.add_argument("command", choices=("build", "canary-verdict", "capacity-verdict", "secondary", "estimate"))
+    ap.add_argument("command", choices=("build", "canary-verdict", "capacity-verdict", "secondary", "estimate",
+                                        "rescore-native", "native-verdict"))
     ap.add_argument("--exp", default=None)
     ap.add_argument("--manifest", default=None)
     ap.add_argument("--union", default=None, help="build: comma-separated manifests to merge (B0 u tsw)")
@@ -938,9 +1329,13 @@ def main(argv=None):
     ap.add_argument("--testing", action="store_true", help="needs %s=1" % TEST_ENV)
     ap.add_argument("--testing-settings", default=None)
     ap.add_argument("--no-init", action="store_true", help="build: write the definition, do not driver-init")
-    ap.add_argument("--reference", default="b0_v1", help="canary-verdict: the B0 experiment")
+    ap.add_argument("--reference", default=None, help="canary-verdict: the B0 experiment (default b0_v1); "
+                                                       "rescore-native, native-verdict: the reference arm's "
+                                                       "experiment (default %s)" % NATIVE_REFERENCE)
     ap.add_argument("--n", default="b_v2", help="capacity-verdict: the n640 experiment")
-    ap.add_argument("--arms", default="b_v2_s640,b_v2_m640", help="capacity-verdict: the other arms' experiments")
+    ap.add_argument("--arms", default=None, help="capacity-verdict: the other arms' experiments (default "
+                                                  "b_v2_s640,b_v2_m640); native-verdict: the measurement arms' "
+                                                  "(default %s)" % ",".join(NATIVE_ARMS))
     ap.add_argument("--record", default=None, help="capacity-verdict: measurement arms' experiments, listed record "
                                                    "only (e.g. b_v2_m832,b_v2_s1024)")
     ap.add_argument("--m", type=int, default=None, help="capacity-verdict: M (default ceil(0.10 x |base|))")
@@ -951,6 +1346,11 @@ def main(argv=None):
     ap.add_argument("--n-images", type=int, default=None, help="estimate: images in the base")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
+    if a.command in ("rescore-native", "native-verdict"):
+        # as the locked scorer's and the native scorer's CLIs: nothing is installed or fetched (before Ultralytics
+        # is first imported, which this module's imports do not do)
+        os.environ["YOLO_AUTOINSTALL"] = "false"
+        os.environ["YOLO_OFFLINE"] = "true"
     try:
         if a.command == "build":
             if not a.exp:
@@ -960,10 +1360,17 @@ def main(argv=None):
                   seeds=a.seeds, arm=a.arm, arch=a.arch, imgsz=a.imgsz, role=a.role, testing=testing,
                   init=not a.no_init, quiet=a.quiet, final_exams=a.final_exams.split(",") if a.final_exams else None)
         elif a.command == "canary-verdict":
-            canary_verdict(a.exp or "canary_v2", a.reference)
+            canary_verdict(a.exp or "canary_v2", a.reference or "b0_v1")
         elif a.command == "capacity-verdict":
-            capacity_verdict(a.n, [x for x in a.arms.split(",") if x], m=a.m, out_dir=a.out_dir,
-                             record_exps=[x for x in (a.record or "").split(",") if x])
+            capacity_verdict(a.n, [x for x in (a.arms or "b_v2_s640,b_v2_m640").split(",") if x], m=a.m,
+                             out_dir=a.out_dir, record_exps=[x for x in (a.record or "").split(",") if x])
+        elif a.command == "rescore-native":
+            if not a.exp:
+                raise BaselineError("rescore-native needs --exp (a measurement arm's experiment)")
+            rescore_native(a.exp, reference=a.reference or NATIVE_REFERENCE, out_dir=a.out_dir)
+        elif a.command == "native-verdict":
+            native_verdict([x for x in (a.arms or ",".join(NATIVE_ARMS)).split(",") if x],
+                           reference=a.reference or NATIVE_REFERENCE, out_dir=a.out_dir)
         elif a.command == "secondary":
             if not a.exp or not a.weights:
                 raise BaselineError("secondary needs --exp and --weights")

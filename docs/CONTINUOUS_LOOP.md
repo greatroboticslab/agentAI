@@ -1884,6 +1884,113 @@ Nothing has run on the cluster.
 
 **Deploy.** `brain/policy_actions.json`, `stream_domains/weed.json` and the autopilot modules change `executor.code_hash()`, and `diagnose_stream.py` and `levers_stream.py` change the stream rules version. After the lab and cluster copies are synced from one commit, run `executor.run_replay_tests` so that envelope builds are granted again. The next L18 writes its prospective record under the new rules version.
 
+#### Amendment (2026-10-01): the measurement arms read at their own resolution (pre-registered)
+
+**Why.** The first measurement arm is in: b_v2_m832's dev 12-class mAP50-95 is 0.8591 ± 0.0018 against b_v2_m640's 0.8524 ± 0.0025 (3 seeds each, the locked scorer at 640 px), and Carpetweed is down 0.014 on dev. The hypothesis behind the arms is that the small prostrate weeds (Carpetweed, SpottedSpurge, Purslane) need more pixels at **inference**. The locked scorer infers at 640 px and refuses any other size, so it cannot test that hypothesis. This amendment adds a second, separately named scorer that changes imgsz only.
+
+**Pre-registration.** This paragraph was written before any native-resolution score existed, and it is not edited afterwards.
+- **What is scored.** Each measurement arm's final runs (`final__base__s<k>` of b_v2_m832 and b_v2_s1024; their weights are the base runs' final EMA weights), on dev and on ImageWeeds, at the arm's own training imgsz (832 or 1024). b_v2_m640's final runs are scored on dev at 640 by the same code, as the reference. **Test is never scored**: the native scorer refuses the exam `test` at every size, so nothing scores test at a size other than 640. Nothing else is scored by it: an experiment whose arm is not a measurement arm, a size other than the arm's own, or a run other than a baseline's final run is refused.
+- **How.** The locked scorer's own code is used as a library (`inc/scorer.py`: the LOCK checks of the exam manifest and of scorer.py, the materialised-exam check of every image and label, the model check, the temporary exam view, its validator, `conf` 0.001, `iou` 0.7, batch 32 with rect batching, fp16 on a CUDA device, Ultralytics' default `max_det` 300, the pinned Ultralytics 8.4.37, the exam manifests and their key order, `species_map50_95`). Only imgsz changes. The per-image detections are captured in the same pass with the scorer sidecar's validator (`inc2/scorer_sidecar.py`), and they must reproduce the score's per-class AP exactly. Each score is written as `scores/<exam>@<imgsz>.json` beside the run's other scores, with its per-image arrays as `scores/<exam>@<imgsz>.images.npz`, in its own format `inc2-native-score/1`. It records the locked scorer's sha256, the native scorer's sha256, imgsz and every setting. It says `production: false` and carries a scorer stamp prefixed `NATIVE<imgsz>-`, so no gate, milestone or capacity decision can take it for a protocol score. A native score is written once and never overwrites anything: a run's 640 px scores are never touched. The reference's dev score at 640 must reproduce its run's recorded protocol dev score within 0.002 (the sidecar's tolerance), or it is refused.
+- **The comparison.** The statistic is dev `species_map50_95` (the 12-class mean). The arm at its native imgsz is compared with b_v2_m640 at 640 px, on the seeds both share (0, 1, 2), from the native score files. mean and sd (sample sd) are taken over those seeds, and pooled sd = √((sd_arm² + sd_m640²)/2), as in L-4. The difference is D = mean(arm) − mean(m640). Its standard error is an image bootstrap paired by exam image, the scorer sidecar's method:
+  - 1,000 resamples of the dev images with replacement, drawn once as numpy.random.default_rng(stable_int("inc2/native/diff_se")) over the exam's key order, and used for every run;
+  - per run and resample, each species' AP50-95 is Ultralytics' ap_per_class on that run's tie-broken per-image arrays, each image's detections and GT boxes counted as many times as the image was drawn;
+  - the 12-class mean is taken over the species with a GT box in the resample; it is averaged over seeds per arm, and the arm minus m640 is D_b;
+  - SE(D) is the sample sd (ddof 1) of the D_b. Each species' difference and its SE are computed the same way.
+- **The decision rule.** An arm **qualifies for a stream fork proposal** only if all three hold:
+  1. D > 2 × pooled sd;
+  2. D > SE(D);
+  3. at least one of Carpetweed, SpottedSpurge and Purslane improves: its mean dev AP50-95 over the shared seeds at the arm's imgsz is higher than m640's at 640.
+  
+  The verdict is recorded in `INC_DIR/capacity/native_v1.json`, dev only. A qualifying arm files one R4 card (X18) for a person, and nothing else changes: the stream's arm stays the capacity decision's, `capacity_v1.json` is not touched, nothing switches automatically and test is not read. A fork at a native resolution would also need the gate, the milestones and the stream's comparisons scored at that resolution, which is a new protocol version. An arm that does not qualify is recorded, and nothing follows from it. ImageWeeds native scores are reported for people and never enter the rule.
+- **Inputs that refuse the verdict.** Any of these refuses the verdict:
+  - native files of one arm that disagree on the exam manifest, key order, locked scorer, a setting other than imgsz, or Ultralytics' version;
+  - a reference that disagrees with the arm on any of those;
+  - fewer than 2 shared seeds;
+  - a test-mode score in a production verdict.
+
+  An arm without all its native dev scores is listed as pending.
+
+**What was built.**
+- `inc2/scorer_native.py` (new). It is the locked scorer used as a library, with `imgsz` as the only change.
+  - Reused unchanged: the checks (`check_lock`, `check_exam`, `load_model`, `_check_model`), `build_view`, `_device`, `_precision_kwargs`, `CONF`, `IOU`, `BATCH` and `deviations`.
+  - The validator is the sidecar's subclass of the scorer's own. The captured arrays must reproduce the pass's `per_class` exactly (`scorer_sidecar.check_capture`).
+  - `score_run(exp, run, exam)` scores a done final run at the arm's own size: 832 or 1024 for a measurement arm, 640 for m640.
+  - It refuses everything the pre-registration names, before anything is written. That includes m640 on any exam but dev: `score_run` refuses the reference arm's ImageWeeds, and `score` refuses any exam but dev at 640. It also refuses weights that cannot be loaded, and a size Ultralytics would round to another stride multiple.
+  - A score is put in place under its own lock file, `scores/.<exam>@<imgsz>.commit`, which is created exclusively and held only for two renames. The npz is renamed into place only while no JSON is there; a leftover npz from an attempt that wrote no JSON is replaced. The JSON is then hard-linked into place only if it is absent. So a JSON always names the npz beside it. A second writer of the same score is refused and replaces neither file, and its npz is discarded. A writer that finds the lock held waits up to 60 s, then is refused and leaves the lock to its holder. The run's 640 px score is hashed before and after the pass.
+- `inc2/baseline.py`: two new verbs.
+  - `rescore-native --exp E [--reference b_v2_m640]` first checks that every final run of the arm and of the reference is done. It then scores each missing native file and keeps those already written. It writes `INC_DIR/<exp>/native_rescore.json`, then the verdict. The record holds the status (complete) and the dev files' names and sha256s, with no path, because the platform reads it as evidence. The returned record lists every native file, and the verdict's report lists every file it read.
+  - `native-verdict [--arms b_v2_m832,b_v2_s1024]` writes `capacity/native_v1.json` (dev only) and `native_v1_report.{json,md}`. The report is for people and holds dev and ImageWeeds at the native size and at 640.
+  - `--reference` and `--arms` now default per verb. canary-verdict and capacity-verdict keep their old defaults.
+  - Both verbs set `YOLO_AUTOINSTALL=false` and `YOLO_OFFLINE=true` before Ultralytics is imported, as the locked scorer's and the native scorer's CLIs do. Importing `inc2.baseline` does not import Ultralytics.
+- `run_inc2_build.sh` accepts `inc2.baseline rescore-native`. Its lock and provenance are named `native_<exp>`, so the arm's own build record is never touched, and it records status `scored`. No driver advance follows it, because it builds nothing. `scorer_native.py` joins the module drift check.
+- Autopilot: lever **L23N** (`stream_levers.json`, policy action `inc_rescore_native`).
+  - It is in the MAINT lane, follows its job, and is R3 within the envelope. It is priced by the new estimator `rescore`: `cost.rescore_hours_per_run` 0.25 GPU-h per final run, for the arm's 3 runs and the reference's 3, so 1.5 GPU-h. For comparison, the arm's L23B build is 20.7 GPU-h.
+  - DR0 proposes it on the arms' own conditions. R0 must be complete, nothing else of R0 may be due in MAINT or DATA, the arm's experiment must be done, and `/stage/native/<id>` must be missing. It cites only `/stage/lock`, `/stage/exp_status/<exp>` and `/stage/native/<id>`.
+  - `/stage/native` is `done` when the shipped `<exp>/native_rescore.json` says complete. Otherwise it is what the platform ran: `running` from submission, then `done` or `failed`. So each arm is proposed once.
+  - A failure of the rescore is record only (`stream.RECORD_ONLY_LEVERS`). This covers its job ending without success and a refusal of its submission. It files one escalation card and marks the arm `failed`. It never counts as a failed step, and it neither holds the lane nor pauses the stream. It is not proposed again.
+  - A submission whose outcome is unknown (the verb may have run, but no reply came back) does not pause the stream. The item is followed by its job name, `inc_build_native_<exp>`, and by its record. It stays running while a job of that name is queued. It is done once the record says complete. It fails, record only, after 3 snapshots with neither.
+  - Two platform-wide rules still apply to it as to every lever. An sbatch refused on qos is a platform defect (S21): it holds the MAINT lane and files a platform card. A price the campaign envelope cannot pay pauses the stream.
+  - The MAINT lane runs one item at a time, so while the L23N job is queued or running every other MAINT step waits for it, queue time included. That means a milestone compare (LC), a recommended rollback (L21, which runs while TRAIN is held), a bisect (L27), a milestone (L20) and an audit (L4). The ordering has one more effect. A compare that runs between the two arms' rescores is a login-node verb, so the lane is free as soon as it returns. DR0 can then give the lane the second arm's rescore before the compare's 'hurts' reaches the evidence, and the rollback the compare recommends waits for that job too. In total the wait is two scoring jobs (1.5 GPU-h each, est.) plus their queue time, over the stream's life.
+  - DNAT reads `capacity/native_v1.json`. An arm in `qualifying` fires lever X18, so the ticker files card **X18** ("Fork the stream to a measurement arm read at its own resolution", R4) once. Nothing switches, and no lane holds.
+  - The plumbing for L23N:
+    - executor: `ARGV_FORMS`, `STREAM_REMOTE`, `STREAM_ENVELOPE_LEVERS`, the timeout;
+    - `brain/approvals.ENVELOPE_ACTIONS`;
+    - the policy row;
+    - `stream_remote`: the build grammar (`--exp`, `--reference`, both required), the job name `inc_build_native_<exp>`, `native_rescore.json` among the shipped records, and `capacity/native_v1.json` in the summary;
+    - `evidence.ALLOWED`: both files, never the report;
+    - `stream_domains/weed.json`: `capacity.native` (the reference `b_v2_m640`, the record's path) and `cost.rescore_hours_per_run`.
+- A fix in `stream._fold`. Its loop over the stream ledger reused the name `names` for a list of the experiments the ledger built, which overwrote the set of queued job names that the items below it read. So an uncertain build, which has no job id, was checked against the wrong names, and the same would have held for the record-only follow. The loop's list is now `built`.
+
+**How it was verified.** Locally, with no GPU and no cluster:
+- `tests/test_inc2_native.py` (new, 84 checks). Real Ultralytics passes on the CPU, in test mode, in test_inc2_train's synthetic world:
+  - every refusal above, the CLI's `--exam test` and the reference's `--exam imageweeds` included (exit 2, nothing written);
+  - putting a score in place: a leftover npz without its JSON is replaced. A second writer of the same score, staged before the first one commits, is refused and replaces neither file. While the lock is held, a writer is refused after the wait, and the lock is left to its holder;
+  - both verbs run with `YOLO_OFFLINE` and `YOLO_AUTOINSTALL` set, and importing `inc2.baseline` loads no Ultralytics;
+  - an m832 final run scored at 832: its file, stamps and settings, arrays that reproduce `per_class` exactly, and the 640 score unchanged;
+  - the reference at 640 reproducing the pinned scorer's own score of the same weights exactly (`per_class`, `image_correct`, key order). This is the check that only imgsz differs between the two scorers;
+  - a recorded score off by 0.01 refused;
+  - `rescore-native`'s files and record. Every exam name, manifest request and opened path is recorded, and none touches test. `native_rescore.json` lists the dev files only, with no path, and the evidence scrub drops nothing from it. A second arm's rescore keeps the first arm's decision byte for byte. A production verdict refuses kept test-mode scores, both for a non-testing experiment and with test mode off. A second run writes nothing;
+  - the rule on synthetic numbers: it qualifies with all three conditions, and fails with each condition missing alone. At D = 0.011, the 2 pooled sd and the SE conditions are each tested separately. Pooled sd is checked against √((sd_arm² + sd_m640²)/2) in every case. With unequal sds (0.006 and 0.0005), D = 0.010 qualifies, though it is below 2 × the larger sd and 2 × √(sd_arm² + sd_m640²);
+  - each of the 14 stamps and settings, mismatched alone in one arm file or in the reference's files, refuses the verdict and is named in the refusal;
+  - the paired bootstrap against an independent recomputation (one `ap_per_class` call per run and resample).
+- `tests/test_stream_ap_units.py` (the new `t_native`, 35 checks; `t_menu` checks L23N's policy row, its bounds and the executor's rendering, as for every lever):
+  - the lever against the executor and the policy table, its price, and the cluster's grammar;
+  - the proposal: not for an arm still running, not before R0 is complete, not while a DATA item of R0 is due, and not once its record says complete. It is then proposed once per done arm, citing only the lock, the arm's status and its own state, and granted within the envelope;
+  - the TRAIN and DATA lanes run beside it;
+  - a failed job files one card, holds no lane and pauses nothing, and the arm is not proposed again;
+  - a submission whose reply never came (the World's `lose_reply`) is followed by its job name. It is not lost while that job is queued, and it is done once its record is complete. Without a record it fails after 3 snapshots, record only. A qos refusal holds the lane, files a platform card and leaves the arm unmarked;
+  - the MAINT wait, pinned: a milestone compare that falls due while the L23N job is queued runs only after that job ends. The second arm's rescore then takes the lane, and the 'hurts' rollback runs only after that job ends too;
+  - card X18 is filed once for a qualifying verdict, with test-blindness on that path, and no card is filed when no arm qualifies.
+
+  `t_measure` now builds the arms without finishing them, because a done arm is followed by its rescore. The test world's `ready_r0` marks the measurement arms rescored (`native_rescore.json`), so the S-cases do not change.
+- `tests/test_stream_ap_replay.py` stream_r0: after the arms, both rescores run within the envelope, each once, under their own job names, in the platform's R0 sequence.
+- `tests/test_stream_pipeline.py`: the platform proposes L23N once per done arm. The real `rescore-native` refuses that world's untrained stand-in weights (exit 1), so the failure path runs end to end: two cards, no pause, no held lane, not proposed again.
+- `tests/test_inc2_stream.py`: `run_inc2_build.sh rescore-native` writes the `native_<exp>` provenance with status scored and no advance; a refusal is recorded as build_failed.
+- **Mutation checks.** 59 source mutations of the new checks were each run in a mkdtemp copy of `weed_llm_benchmark/`, and every one makes its test fail. They cover:
+  - scorer_native: 21;
+  - baseline: 19, including each of the rule's three conditions, `> 0` changed to `>= 0` for "improves", and `all` changed to `any`;
+  - autopilot: 17;
+  - `run_inc2_build.sh`: 2.
+
+  On the first pass 57 were killed. Two survived because a second guard still refused the call: the rescore's shared-seed check (the verdict's own check refused, but only after the record was rewritten) and the per-file key-order check (the bootstrap's refused instead). The tests now check the specific refusal, and that nothing was written. Both mutants are killed.
+
+  After the first pass, these were not yet pinned by any test: the pooled-sd formula, four of the stamps and settings, the production gate, and the merge of the arms already recorded. The checks above were added for them and for the fixes listed under "What was built". 23 further mutations were each run the same way, and every one is killed:
+  - the uncertain follow, the `names` fix, the record check and the lost count: 4;
+  - the commit lock: 3;
+  - the reference's dev-only rules: 2;
+  - the offline environment: 1;
+  - three wrong pooled-sd formulas: 3;
+  - four dropped stamps and settings: 4;
+  - three weakened production gates: 3;
+  - the arms' merge: 1;
+  - a record listing every exam, and a record carrying its path: 2.
+
+  On that round's first pass, the four dropped stamps and settings survived, because the check read its field list from `baseline.NATIVE_STAMPS` and `NATIVE_SETTINGS`. The check now writes out the pre-registered fields itself, and all four are killed.
+
+**Not verified here** [to verify on cluster]: a GPU pass at 832 and at 1024 in fp16 with batch 32 under Ultralytics 8.4.37. The first L23N's 640 reproduction of b_v2_m640's recorded dev scores is the first cluster reading of the native scorer.
+
+**Deploy.** These files change `executor.code_hash()`: the autopilot modules, `stream_domains/weed.json`, `stream_levers.json`, `brain/policy_actions.json`, `brain/approvals.py` and `tests/test_stream_ap_replay.py`. `diagnose_stream.py`, `stream_levers.json` and `levers_stream.py` change the stream rules version. Sync the lab and cluster copies from one commit (outer and nested, `scorer_native.py` included), then run `executor.run_replay_tests` so that envelope grants resume. The next L18 writes its prospective record under the new rules version.
+
 ### Build note (group E)
 
 **What was built.** `inc2/stream.py` (verbs `init`, `choose-arm`, `cut` (dry run), `build`, `commit`, `milestone`, `compare`, `rollback`, `bisect`, `feasibility`, `fork`, `quarantine`, `unquarantine`, `release`, `withdraw`, `summary`, `verify`, `status`), `inc2/stream_report.py` (`--stream`, `--segment`), `run_inc2_build.sh`; tests `test_inc2_stream.py` and `test_inc2_stream_report.py`. `inc2/driver3.py` (R5) is not built: its trigger is evidence from three segments.

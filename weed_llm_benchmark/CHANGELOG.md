@@ -10711,3 +10711,26 @@ Every result sat near test 0.85, against the 0.90 goal.
   - Residual: the lab runner's 6 h timeout is not sized from `max_bytes`. The 10.8 GB L16L of mediatum needs about 6.5 h at the lab's ~460 kB/s, so a run killed that way counts its 10.8 GB.
   - Tests: new `tests/test_stream_ap_fetch_bytes.py` (40 checks in 12 cases: live, in flight, unknown, caps, killed lab and cluster fetches, an end recorded by `_failed`, both machines, a missing fold, an incomplete cluster ledger). Every case fails at HEAD, and each of 12 further targeted mutations fails at least one check. `test_stream_ap_review_placement.py`'s camp helper sets the StreamRun's paths. See docs/CONTINUOUS_LOOP.md, the live incident of 2026-10-01 on byte limits.
   - Deploy: `executor.py`, `stream.py` and `stream_remote.py` change `executor.code_hash()` and the S23 module hashes. Sync the lab and the cluster from one commit, then re-run `executor.run_replay_tests`.
+- **The measurement arms read at their own resolution, pre-registered (2026-10-01).**
+  - Why: b_v2_m832 reads dev 12-class 0.8591 ± 0.0018 against b_v2_m640's 0.8524 ± 0.0025, with Carpetweed down 0.014. The arms test whether the small prostrate weeds need more pixels at inference, and the locked scorer infers at 640 px only.
+  - The pre-registration was written before any native-resolution score existed (docs/CONTINUOUS_LOOP.md, group B, "Amendment (2026-10-01)"):
+    - what is scored: each measurement arm's finals on dev and ImageWeeds at its training imgsz, and b_v2_m640's on dev at 640. Test is never scored;
+    - how: the locked scorer's code and settings with only imgsz changed;
+    - the rule: an arm qualifies for a stream fork proposal only if its dev mean beats m640's by more than 2 pooled seed sd and by more than the paired image-bootstrap SE of the difference, and Carpetweed, SpottedSpurge or Purslane improves. Qualifying files card X18; nothing switches.
+  - New `inc2/scorer_native.py` reuses `inc/scorer.py` as a library (unedited).
+    - It refuses test at every size, any arm but m832, s1024 and the reference m640, the reference on any exam but dev, and any departure but imgsz.
+    - It writes `scores/<exam>@<imgsz>.json` (format `inc2-native-score/1`, `production: false`, stamp `NATIVE<imgsz>-`) and the per-image npz. A native score is written once, and a run's 640 px scores are never touched. The npz and the JSON are put in place under a per-score lock file: the npz only while no JSON is there, then the JSON only if absent. So a JSON always names the npz beside it, and a second writer of the same score replaces neither file.
+    - At 640 it must reproduce the run's recorded protocol score within 0.002.
+  - `inc2.baseline rescore-native` and `native-verdict` write `capacity/native_v1.json` (dev only) beside `capacity_v1.json`. `<exp>/native_rescore.json` lists the dev files only, with no path. Both verbs run with `YOLO_OFFLINE=true` and `YOLO_AUTOINSTALL=false`.
+  - The autopilot's new lever L23N (MAINT, envelope, 1.5 GPU-h) is proposed once per done arm.
+    - A failed rescore is a card, never a pause or a held lane.
+    - A submission whose outcome is unknown is followed by its job name and its record, never a pause.
+    - A qos refusal holds the lane, as for every lever (S21).
+    - While its job is queued or running, the other MAINT steps wait for it (compare, rollback, bisect, milestone, audit).
+    - DNAT files card X18 when an arm qualifies.
+  - Fix: `stream._fold` no longer overwrites the queued job names with its stream-ledger loop's list, so an uncertain build's name check reads the queue.
+  - Tests:
+    - new `tests/test_inc2_native.py`, with real CPU passes; at 640 the native pass equals the pinned scorer's own score exactly;
+    - new checks in `test_stream_ap_units.py`, `test_stream_ap_replay.py` (stream_r0), `test_stream_pipeline.py` and `test_inc2_stream.py`;
+    - 59 source mutations, each killed in a mkdtemp copy, then 23 more for the review fixes (see docs/CONTINUOUS_LOOP.md).
+  - Deploy: the change moves `executor.code_hash()` and the stream rules version. Sync the lab and the cluster from one commit, then re-run `executor.run_replay_tests`.

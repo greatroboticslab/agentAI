@@ -151,9 +151,9 @@ ENVELOPE_LEVERS = {"L1": ("inc_build_pilot",), "L2": ("inc_build_realloop",),
 # limits, which replace the blanket 3-per-campaign rule for these levers.
 STREAM_ENVELOPE_LEVERS = {"L18": ("inc_build_segment",), "L20": ("inc_build_consolidation",),
                           "L21": ("inc_stream_rollback",), "L22": ("inc_build_segment",),
-                          "L23B": ("inc_build_baseline_v2",), "L25": ("inc_build_pilot4",),
-                          "L27": ("inc_build_consolidation",), "L28": ("inc_build_segment",),
-                          "LI": ("inc_stream_init",)}
+                          "L23B": ("inc_build_baseline_v2",), "L23N": ("inc_rescore_native",),
+                          "L25": ("inc_build_pilot4",), "L27": ("inc_build_consolidation",),
+                          "L28": ("inc_build_segment",), "LI": ("inc_stream_init",)}
 # The R2 data levers that run directly only with data_autonomy on, a stream
 # replay pass, the floors set (L16) and the caps (6.5, 6.6); otherwise they are
 # filed for a person. Keyed by policy action (a sub-lever shares its family's).
@@ -182,7 +182,7 @@ REMOTE_TIMEOUT_S = {"inc_snapshot": 300, "inc_report": 300, "inc_advance": 240,
                     "inc_build_baseline_v2": 300, "inc_build_pilot4": 300, "inc_stream_commit": 600,
                     "inc_stream_rollback": 600, "inc_stream_quarantine": 300, "inc_stream_release": 300,
                     "inc_stream_init": 300, "inc_stream_choose_arm": 600, "inc_stream_compare": 600,
-                    "inc_stream_verdict": 600}
+                    "inc_stream_verdict": 600, "inc_rescore_native": 300}
 DEFAULT_REMOTE_TIMEOUT_S = 120
 # ssh's own messages for a connection that was never made (read off the last
 # stderr line of a call that printed nothing): the remote command never ran.
@@ -349,6 +349,10 @@ ARGV_FORMS = {
     "inc_build_pilot4": ("{pkg}.pilot4", "build",
                          (("--exp", "exp", "str"), ("--from", "from_exp", "str"), ("--recipes", "recipes", "str")),
                          ("pkg", "exp", "from_exp", "recipes")),
+    # L23N (2026-10-01): a done measurement arm's finals scored at its own imgsz (inc2.scorer_native), one job
+    "inc_rescore_native": ("{pkg}.baseline", "rescore-native",
+                           (("--exp", "exp", "str"), ("--reference", "reference", "str")),
+                           ("pkg", "exp", "reference")),
     "inc_stream_collect": ("run_inc_collect.sh", "fetch",
                            (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
                             ("--candidates", "candidates", "str")),
@@ -379,7 +383,7 @@ ARGV_FORMS = {
 # Stream actions and how the cluster runs them: a job script through remote.py
 # stream-submit KIND, or a login-node verb through stream-run.
 STREAM_REMOTE = {"inc_build_segment": "build", "inc_build_consolidation": "build", "inc_splits_build": "build",
-                 "inc_build_baseline_v2": "build", "inc_build_pilot4": "build",
+                 "inc_build_baseline_v2": "build", "inc_build_pilot4": "build", "inc_rescore_native": "build",
                  "inc_stream_collect": "collect", "inc_stream_collect_review": "collect",
                  "inc_stream_intake": "collect", "inc_stream_probe": "collect", "inc_stream_admit": "admit",
                  "inc_stream_commit": "run", "inc_stream_rollback": "run", "inc_stream_quarantine": "run",

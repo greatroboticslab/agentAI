@@ -459,6 +459,30 @@
    "falsifier": "The canary misses B0 seed 0 by more than 1 sd on dev (canary-verdict).",
    "estimator": "baseline"
   },
+  "L23N": {
+   "name": "rescore_native",
+   "title": "Score a done measurement arm's finals at its own imgsz (dev and ImageWeeds, never test), then record the native-resolution verdict",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_rescore_native",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.baseline",
+    "rescore-native",
+    "--exp",
+    "{exp}",
+    "--reference",
+    "{reference}"
+   ],
+   "control": "The reference arm's finals on dev at 640 px (the locked scorer's code and settings, the same exam manifest and key order).",
+   "success": "scores/<exam>@<imgsz>.json of every final run, <exp>/native_rescore.json complete, and capacity/native_v1.json (dev only).",
+   "falsifier": "An arm qualifies only when its native dev mean beats the reference's by more than 2 pooled sd and the paired bootstrap SE, and a small prostrate weed improves (pre-registered, 2026-10-01); qualifying files card X18, nothing switches.",
+   "estimator": "rescore",
+   "note": "Record only, like the measurement arms themselves: proposed once per arm, when its experiment is done and its native scores are missing; a failure is a person's card, never a failed step of the lane, and it is not proposed again."
+  },
   "LV": {
    "name": "verdict",
    "title": "Record an R0 verdict: the canary, the capacity decision (L-4), Stage A",
@@ -720,6 +744,16 @@
    "cheapest_test": "Stage C's known-good increment (L28) reads the guard's behaviour at M.",
    "control": "Stage C and the segments' gate entries.",
    "success_criterion": "Increments that the truth arm calls helpful are accepted."
+  },
+  "X18": {
+   "title": "Fork the stream to a measurement arm read at its own resolution",
+   "risk": "R4",
+   "hypothesis": "A measurement arm inferring at its training imgsz beats the stream's arm on dev, through the small prostrate weeds (capacity/native_v1.json qualifying).",
+   "why_menu_insufficient": "The stream's arm is the capacity decision's (L-4), and the gate, the milestones and the stream's comparisons are all scored by the locked scorer at 640 px: a fork at another resolution is a new protocol version.",
+   "required_change": "An owner decision: a scorer version at the arm's imgsz (relocked), then a stream version on that arm.",
+   "cheapest_test": "-",
+   "control": "b_v2_m640's finals at 640 px.",
+   "success_criterion": "Recorded by a person; the platform switches nothing and reads no test."
   }
  },
  "reused_cards": {
@@ -785,11 +819,12 @@
    "L21",
    "L22",
    "L23B",
+   "L23N",
    "L25",
    "L27",
    "L28",
    "LI"
   ],
-  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms). L23's splits build and lock always wait for a person (D-A's exact command)."
+  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01). L23's splits build and lock always wait for a person (D-A's exact command)."
  }
 }

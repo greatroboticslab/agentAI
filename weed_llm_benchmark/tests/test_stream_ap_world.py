@@ -264,6 +264,7 @@ class World(object):
         self.tick_calls, self.verbs, self.ticks_out = [], [], []
         self.next_job = 5000
         self.qos = False
+        self.lose_reply = None           # an argv word: that verb runs once and prints no INCAP line
         self.busy_runs = 0
         self.projects = [{"resource": "Bridges-2 GPU", "allocation_su": 20000.0, "balance_su": 10529.0,
                           "end_date": "2026-12-31"}]
@@ -661,6 +662,31 @@ class World(object):
                                                "within_one_sd": ok, "sidecar_ok": True, "production": True,
                                                "canary_dev": 0.806, "reference_dev": {"mean": 0.8082, "sd": 0.0063}})
 
+    def native_record(self, exp, status="complete"):
+        """inc2.baseline rescore-native's record of a measurement arm
+        (<exp>/native_rescore.json: its finals scored at its own imgsz)."""
+        b = next((x for x in self.dom["baselines"]["items"] if x["exp"] == exp), {})
+        self._w("%s/native_rescore.json" % exp, {
+            "format": "inc2-native-rescore/1", "exp": exp, "arm": b.get("arm"), "status": status,
+            "seeds": [0, 1, 2], "written_utc": utc(self.t[0]),
+            "reference": {"exp": ((self.dom["capacity"].get("native") or {}).get("reference_exp")), "imgsz": 640}})
+
+    def native_verdict_file(self, qualifying=(), decided=None):
+        """inc2.baseline native-verdict's record (capacity/native_v1.json, dev
+        only): each decided arm with its rule's numbers; `qualifying` the arms
+        that qualify for a stream fork proposal."""
+        arms = {}
+        for exp in (decided if decided is not None else [b["exp"] for b in self.dom["baselines"]["items"]
+                                                        if b.get("measure")]):
+            q = exp in qualifying
+            arms[exp] = {"status": "decided", "imgsz": 832, "diff": 0.012 if q else 0.003, "pooled_sd": 0.002,
+                         "two_pooled_sd": 0.004, "se_diff": 0.005, "improved_targets": ["Carpetweed"] if q else [],
+                         "qualifies": q, "conditions": {"above_2_pooled_sd": q, "above_se": q,
+                                                        "target_species_improved": q}}
+        self._w("capacity/native_v1.json", {"format": "inc2-native-verdict/1", "arms": arms,
+                                            "qualifying": [e for e in arms if e in qualifying], "pending": [],
+                                            "reference": {"exp": "b_v2_m640", "arm": "m640", "imgsz": 640}})
+
     def stage_a_file(self, status="READY", recipes=None):
         sa = self.dom["stage_a"]
         rec = list(recipes or self.stage_a_recipes or ["r0", "x1a"])
@@ -714,6 +740,10 @@ class World(object):
             i, argv = int(m.group(1)), shlex.split(m.group(2))
             out.append("INCAP_SEG %d" % i)
             rec = self._answer(argv)
+            if self.lose_reply and self.lose_reply in argv:
+                # the verb ran (its job is queued) and printed no reply (killed after sbatch): outcome unknown
+                self.lose_reply = None
+                continue
             out.append("INCAP " + json.dumps(rec, default=str))
             out.append("INCAP_SEG_END %d %d" % (i, 0 if rec.get("ok") else 1))
         return {"ok": True, "stdout": "\n".join(out), "stderr": "", "returncode": 0}
@@ -861,7 +891,9 @@ class World(object):
         groups' code writes it: the lock; the baselines done; the canary's,
         the capacity grid's and Stage A's verdicts (READY: r0 and x1a); the
         stream created with its arm adopted; Stage C built and read (M
-        feasible); the placement; Step 1's one-time jobs."""
+        feasible); the placement; Step 1's one-time jobs. The measurement
+        arms are done and rescored at their own resolution (their
+        native_rescore.json records), so no S-case waits on their L23N."""
         self.lock()
         if bootstrap:
             self.step1_status()
@@ -869,6 +901,8 @@ class World(object):
                         "mendeley_zenodo": "pass"})
         for b in self.dom["baselines"]["items"]:
             self.experiment(b["exp"], final=[self.final_row("base base_v2", 0.812, 0.002, 5)])
+            if b.get("measure"):
+                self.native_record(b["exp"])
         self.canary_file()
         self.capacity_file()
         sa = self.dom["stage_a"]

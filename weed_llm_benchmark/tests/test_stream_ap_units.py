@@ -49,6 +49,7 @@ PARAMS = {
     "L22": {"pkg": "inc2", "stream": "weed_stream_v1", "m": 1526}, "L23": {"pkg": "inc2", "verb": "lock"},
     "L23B": {"pkg": "inc2", "exp": "b_v2", "manifest": LS.inc_path("splits/v2/base_v2.jsonl"), "seeds": "0,1,2,3,4",
              "arm": "n640", "role": "b_v2"},
+    "L23N": {"pkg": "inc2", "exp": "b_v2_m832", "reference": "b_v2_m640"},
     "LV": {"pkg": "inc2", "module": "baseline", "verb": "canary-verdict", "exp": "canary_v2"},
     "LI": {"pkg": "inc2", "stream": "weed_stream_v1", "stage_b": "r0,x1a"},
     "LA": {"pkg": "inc2", "stream": "weed_stream_v1"},
@@ -145,7 +146,7 @@ def t_menu():
         for l in ("L15", "L26", "L16L", "L16RL")) and X.render("inc_stream_sync", {"source": "a"})["local"])
     check("the gated R2 levers and the envelope levers are the contract's (and LI, the stream's creation)",
           LS.gated_r2() == ("L16", "L17", "L24")
-          and set(LS.envelope_levers()) == {"L18", "L20", "L21", "L22", "L23B", "L25", "L27", "L28", "LI"})
+          and set(LS.envelope_levers()) == {"L18", "L20", "L21", "L22", "L23B", "L23N", "L25", "L27", "L28", "LI"})
     check("the executor's gated actions cover L16 (fetch on the cluster or the lab, intake), L17 and L24",
           set(X.GATED_R2_ACTIONS.values()) == {"L16", "L17", "L24"})
     check("every envelope action of a stream lever is in approvals.ENVELOPE_ACTIONS",
@@ -558,14 +559,15 @@ def t_measure():
     check("  the TRAIN lane does not wait for them: R0 READY with both missing, and the segment is cut (L18)",
           run._train_ready() == "" and any(e.get("lever") == "L18" for e in w.events("proposed")),
           (run._train_ready(), [e.get("lever") for e in w.events("proposed")]))
-    w.experiment("b_v2_m832", final=[w.final_row("base base_v2", 0.83, 0.002, 3)])
+    # built and running: a done arm is rescored at its own resolution next (L23N, t_native)
+    w.experiment("b_v2_m832", done=False)
     w.job_done("inc_build_b_v2_m832")
     w.tick(3)
     pro = [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"]
     check("once b_v2_m832 exists, b_v2_s1024 is proposed (--arm s1024)", pro == ["b_v2_m832", "b_v2_s1024"]
           and [e for e in w.events("proposed") if e.get("lever") == "L23B"][-1].get("argv", [])[-4:]
           == ["--arm", "s1024", "--role", "capacity"], pro)
-    w.experiment("b_v2_s1024", final=[w.final_row("base base_v2", 0.82, 0.002, 3)])
+    w.experiment("b_v2_s1024", done=False)
     w.job_done("inc_build_b_v2_s1024")
     w.tick(3)
     pro = [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"]
@@ -619,6 +621,273 @@ def t_measure():
     check("  the same block on a segment of the stream still pauses it (D5 -> OP_PAUSE)",
           "%s_s001 is not transient (D5)" % wf.sid in str((st.get("paused") or {}).get("reason"))
           and wf.config().get("enabled") is False, st.get("paused"))
+
+
+def _native_world(tag, stage_c=True):
+    """R0 complete (Stage C read; stage_c False: built and running unread) and both measurement arms done, their
+    native-resolution scores missing."""
+    w = World(tag)
+    w.ready_r0(stage_c=stage_c)
+    if not stage_c:
+        w.stage_c_built(done=False)
+    for b in w.dom["baselines"]["items"]:
+        if b.get("measure"):
+            (w.inc / b["exp"] / "native_rescore.json").unlink()
+    return w
+
+
+def _diags(w):
+    return {x["id"]: x for x in json.loads(S.StreamPaths(str(w.lab), "weed").diagnoses(NAME).read_text())["diagnoses"]}
+
+
+def t_native():
+    section("the measurement arms read at their own resolution (L23N, 2026-10-01): one rescore per done arm, priced "
+            "small; a failure is a card; a qualifying verdict is card X18, and nothing switches")
+    dom = LS.load_domain("weed")
+    est, det = LS.price("L23N", PARAMS["L23N"], dom, {"runs": 6})
+    est0, _d = LS.price("L23N", PARAMS["L23N"], dom, {})
+    b3, _d = LS.price("L23B", dict(PARAMS["L23B"], exp="b_v2_m832", seeds="0,1,2", arm="m832", role="capacity"), dom,
+                      {"images": 6813})
+    check("priced small: one scoring pass per final run, 6 runs (the arm's 3 and the reference's 3) x 0.25 GPU-h = "
+          "%.2f, under a tenth of the arm's build (%.1f)" % (est, b3),
+          est == 1.5 and est0 == 1.5 and det["runs"] == 6 and det["hours_per_run"] == 0.25 and est < b3 / 10, det)
+    ok_args = ["inc2.baseline", "rescore-native", "--exp", "b_v2_m832", "--reference", "b_v2_m640"]
+    for args, want in ((ok_args, True), (ok_args[:4], False), (ok_args + ["--exam", "test"], False),
+                       (["inc2.baseline", "rescore-native", "--exp", "a;b", "--reference", "b_v2_m640"], False),
+                       (["inc2.stream", "rescore-native", "--exp", "b_v2_m832", "--reference", "b_v2_m640"], False)):
+        try:
+            SR.parse_submit("build", args)
+            got = True
+        except R.Refused:
+            got = False
+        check("the cluster's build grammar %s %s" % ("admits" if want else "refuses", " ".join(args[1:])), got == want)
+    req = SR.parse_submit("build", ok_args)
+    check("  its job is run_inc2_build.sh under its own name (inc_build_native_<exp>), never the arm's build job's",
+          req["script"] == "run_inc2_build.sh" and SR.job_name(req, {}) == "inc_build_native_b_v2_m832", req)
+    check("the evidence allow-lists capacity/native_v1.json and <exp>/native_rescore.json, never the report",
+          E.allowed("capacity/native_v1.json") and E.allowed("b_v2_m832/native_rescore.json")
+          and not E.allowed("capacity/native_v1_report.json") and not E.allowed("b_v2_m832/native_v1.json"))
+    wr = _native_world("native_running")
+    for b in [x for x in wr.dom["baselines"]["items"] if x.get("measure")]:
+        wr.experiment(b["exp"], done=False)
+    wr.tick(3)
+    check("an arm that is built but not done is not rescored (no L23N)",
+          not [e for e in wr.events("proposed") if e.get("lever") == "L23N"], [e.get("lever") for e in wr.events("proposed")])
+    wc = _native_world("native_stage_c", stage_c=False)
+    wc.tick(3)
+    check("  nor before R0 is complete (Stage C running unread, MAINT idle): no L23N, DR0 silent",
+          not [e for e in wc.events("proposed") if e.get("lever") == "L23N"] and not _diags(wc)["DR0"]["fired"],
+          ([e.get("lever") for e in wc.events("proposed")], _diags(wc)["DR0"]["summary"]))
+    wd = _native_world("native_data")
+    wd.step1_status(one_time=("bootstrap", "knowntruth"))
+    wd.tick(3)
+    check("  nor while a DATA item of R0 is due (the L17 backfill not run): R0 completes first",
+          not [e for e in wd.events("proposed") if e.get("lever") == "L23N"]
+          and any(e.get("lever") == "L17" for e in wd.events("proposed")),
+          [(e.get("lever"), (e.get("argv") or [])[-2:]) for e in wd.events("proposed")])
+    wk = World("native_recorded")
+    wk.ready_r0()
+    wk.tick(3)
+    check("  nor once its record says complete, whatever the platform ran (a world whose arms were rescored)",
+          not [e for e in wk.events("proposed") if e.get("lever") == "L23N"] and not _diags(wk)["DR0"]["fired"],
+          _diags(wk)["DR0"]["summary"])
+
+    w = _native_world("native")
+    cap0 = (w.inc / "capacity" / "capacity_v1.json").read_bytes()
+    w.queue(4 * w.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w.t[0] - 2 * 86400.0))
+    w.tick(3)
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L23N"]
+    first = pro[0] if pro else {}
+    ex = [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23N"]
+    check("R0 complete, b_v2_m832 done without native scores: DR0 proposes its rescore once (L23N rescore-native "
+          "--exp b_v2_m832 --reference b_v2_m640), priced 1.5 GPU-h and granted within the envelope",
+          [(e.get("argv") or [])[-5:] for e in pro] == [["rescore-native", "--exp", "b_v2_m832", "--reference",
+                                                         "b_v2_m640"]]
+          and abs(float(first.get("est_gpu_hours") or 0) - 1.5) < 1e-9 and ex == ["envelope"],
+          ([(e.get("argv") or [])[-5:] for e in pro], ex))
+    check("  citing only the lock, the arm's status and its own native state",
+          sorted(c.get("pointer") for c in first.get("cites") or []) == ["/stage/exp_status/b_v2_m832", "/stage/lock",
+                                                                         "/stage/native/cap_m832"], first.get("cites"))
+    check("  one GPU-shared job of run_inc2_build.sh, under its own name",
+          [x["name"] for x in w.submits if "rescore-native" in x["argv"]] == ["inc_build_native_b_v2_m832"]
+          and all("GPU-shared" in x["argv"] for x in w.submits if "rescore-native" in x["argv"]))
+    check("  the TRAIN lane does not wait for it: the first segment is cut and run (L18)",
+          any(e.get("lever") == "L18" for e in w.events("executed")), [e.get("lever") for e in w.events("executed")])
+    w.tick(3)
+    due = (((_diags(w)["DR0"].get("detail") or {}).get("due") or {}).get("MAINT")) or {}
+    check("while its job runs it is not proposed again (the MAINT lane follows it; DR0 now calls for b_v2_s1024's, "
+          "which waits for the lane)",
+          len([e for e in w.events("proposed") if e.get("lever") == "L23N"]) == 1
+          and ((w.lane("MAINT").get("item") or {}).get("lever")) == "L23N"
+          and due.get("baseline") == "cap_s1024" and w.state()["stage"]["r0"].get("native_cap_m832") == "running",
+          (w.lane("MAINT").get("item", {}).get("lever"), _diags(w)["DR0"]["summary"]))
+    w.job_done("inc_build_native_b_v2_m832")
+    w.tick(3)
+    pro = [(e.get("argv") or [])[-3] for e in w.events("proposed") if e.get("lever") == "L23N"]
+    check("its job done (the record not yet in the evidence): b_v2_m832 is not proposed again, b_v2_s1024 is, once",
+          pro == ["b_v2_m832", "b_v2_s1024"] and w.state()["stage"]["r0"].get("native_cap_m832") == "done", pro)
+    w.native_record("b_v2_m832")
+    w.job_done("inc_build_native_b_v2_s1024")
+    w.native_record("b_v2_s1024")
+    w.tick(4)
+    pro = [(e.get("argv") or [])[-3] for e in w.events("proposed") if e.get("lever") == "L23N"]
+    d = _diags(w)
+    check("both rescored: neither is proposed again (DR0 silent); the stream's arm, its one arm line and "
+          "capacity_v1.json are unchanged, no LA",
+          pro == ["b_v2_m832", "b_v2_s1024"] and not d["DR0"]["fired"] and w.state()["capacity"]["chosen"] == "n640"
+          and len([e for e in w.stream_ledger() if e.get("event") == "arm"]) == 1
+          and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0
+          and not [e for e in w.events("proposed") if e.get("lever") == "LA"], (pro, d["DR0"]["summary"]))
+
+    wf = _native_world("native_fail")
+    wf.tick(3)
+    check("the DATA lane works beside it: discovery (L15) proposed and run in the same ticks",
+          [(e.get("lane"), e.get("lever")) for e in wf.events("executed")][:2] == [("DATA", "L15"), ("MAINT", "L23N")],
+          [(e.get("lane"), e.get("lever")) for e in wf.events("executed")])
+    wf.job_done("inc_build_native_b_v2_m832", state="FAILED", refusal="[inc2.baseline] ERROR: refused")
+    wf.tick(3)
+    st = wf.state()
+    pro = [(e.get("argv") or [])[-3] for e in wf.events("proposed") if e.get("lever") == "L23N"]
+    cards = [c["title"] for c in st.get("cards") or []]
+    check("its job FAILED: one card, never a pause; the MAINT lane is not held and counts no failed step; "
+          "b_v2_m832's rescore stays failed and b_v2_s1024's runs next",
+          not st.get("paused") and wf.config().get("enabled") is True
+          and cards == ["Native-resolution rescore of b_v2_m832 failed (L23N)"]
+          and not wf.lane("MAINT").get("hold") and int(wf.lane("MAINT").get("fails") or 0) == 0
+          and not [k for k in st.get("step_failures") or {} if k.startswith("L23N")]
+          and st["stage"]["r0"].get("native_cap_m832") == "failed" and pro == ["b_v2_m832", "b_v2_s1024"],
+          (st.get("paused"), cards, wf.lane("MAINT"), pro))
+    wf.job_done("inc_build_native_b_v2_s1024", state="FAILED")
+    wf.tick(4)
+    st = wf.state()
+    pro = [(e.get("argv") or [])[-3] for e in wf.events("proposed") if e.get("lever") == "L23N"]
+    check("  a second failed rescore is a second card, not a held lane (2 consecutive failed steps would hold it); "
+          "neither is proposed again", pro == ["b_v2_m832", "b_v2_s1024"] and not wf.lane("MAINT").get("hold")
+          and not st.get("paused") and len([c for c in st.get("cards") or [] if "Native-resolution" in c["title"]]) == 2,
+          (pro, wf.lane("MAINT").get("hold")))
+
+    # a submission whose outcome is unknown (the verb ran, its reply never came): followed by its job name
+    wu = _native_world("native_uncertain")
+    wu.lose_reply = "rescore-native"
+    wu.tick(2)
+    st = wu.state()
+    it = wu.lane("MAINT").get("item") or {}
+    unc = [e for e in wu.events("uncertain") if e.get("lever") == "L23N"]
+    check("an L23N submission whose outcome is unknown pauses nothing: it is followed by its job name (MAINT runs it, "
+          "uncertain, no job id), no card, its arm running",
+          not st.get("paused") and wu.config().get("enabled") is True and it.get("lever") == "L23N"
+          and it.get("status") == "running" and it.get("uncertain") is True and not it.get("job_ids")
+          and unc and "job name" in unc[0].get("next", "") and not st.get("cards")
+          and st["stage"]["r0"].get("native_cap_m832") == "running"
+          and [x["name"] for x in wu.submits if "rescore-native" in x["argv"]] == ["inc_build_native_b_v2_m832"],
+          (st.get("paused"), it, unc, st.get("cards")))
+    wu.tick(3)
+    it = wu.lane("MAINT").get("item") or {}
+    check("  while a job of its name is queued it stays running: not failed, not lost, not proposed again",
+          it.get("lever") == "L23N" and it.get("status") == "running" and not it.get("lost")
+          and len([e for e in wu.events("proposed") if e.get("lever") == "L23N"]) == 1 and not wu.state().get("cards"),
+          it)
+    wu.job_done("inc_build_native_b_v2_m832")
+    wu.native_record("b_v2_m832")
+    wu.tick(2)
+    st = wu.state()
+    check("  its job gone and its record complete: done, the lane free for the next arm (b_v2_s1024's rescore)",
+          st["stage"]["r0"].get("native_cap_m832") == "done" and not st.get("cards") and not st.get("paused")
+          and any(e.get("lever") == "L23N" for e in wu.events("item_done"))
+          and [(e.get("argv") or [])[-3] for e in wu.events("proposed") if e.get("lever") == "L23N"]
+          == ["b_v2_m832", "b_v2_s1024"], (st["stage"]["r0"], wu.lane("MAINT").get("item")))
+    wl = _native_world("native_uncertain_lost")
+    wl.lose_reply = "rescore-native"
+    wl.tick(2)
+    wl.job_done("inc_build_native_b_v2_m832", state="FAILED")
+    wl.tick(2)
+    it = wl.lane("MAINT").get("item") or {}
+    check("  its job gone without a record: lost for %d snapshots before anything is decided"
+          % (S.BUILD_LOST_SNAPSHOTS - 1), it.get("lever") == "L23N" and it.get("lost") == S.BUILD_LOST_SNAPSHOTS - 1
+          and not wl.state().get("cards"), it)
+    wl.tick(1)
+    st = wl.state()
+    check("  and then failed, record only: one card, no pause, no held lane, no failed step; not proposed again",
+          [c["title"] for c in st.get("cards") or []] == ["Native-resolution rescore of b_v2_m832 failed (L23N)"]
+          and not st.get("paused") and not wl.lane("MAINT").get("hold")
+          and int(wl.lane("MAINT").get("fails") or 0) == 0
+          and st["stage"]["r0"].get("native_cap_m832") == "failed"
+          and len([e for e in wl.events("proposed") if (e.get("argv") or [])[-3:-2] == ["b_v2_m832"]]) == 1,
+          ([c["title"] for c in st.get("cards") or []], wl.lane("MAINT"), st["stage"]["r0"]))
+    wo = _native_world("native_qos")
+    wo.qos = True
+    wo.tick(2)
+    st = wo.state()
+    check("an sbatch refused on qos is a platform defect, as for every lever (S21): the MAINT lane holds, a platform "
+          "card, no pause; the rescore never ran, so it is not marked failed",
+          "qos" in str(wo.lane("MAINT").get("hold")) and any(c.get("kind") == "platform" for c in st.get("cards") or [])
+          and not st.get("paused") and st["stage"]["r0"].get("native_cap_m832") in (None, "missing"),
+          (wo.lane("MAINT"), st.get("cards"), st["stage"]["r0"]))
+
+    # the MAINT lane runs one item: a milestone compare and a 'hurts' rollback wait for a queued L23N job
+    wm = _native_world("native_maint_wait")
+    wm.tick(1)
+    s1 = wm.segment(1, [("I2", "ACCEPT", 0.9, [], "helps", ["src_a"])])
+    wm._commit(s1)
+    m1 = wm.milestone_built(done=True)
+    wm.compare_plan[m1] = {"verdict": "hurts", "perm_p": 0.004, "new_mean_dev": 0.781, "old_mean_dev": 0.812}
+    wm.tick(3)
+    check("a milestone compare that falls due while an L23N job is queued waits for it (DCMP due, no LC run, the "
+          "MAINT lane still on L23N; queue time included)",
+          _diags(wm)["DCMP"]["fired"] and not [r for r in wm.runs if "compare" in r]
+          and not [e for e in wm.events("proposed") if e.get("lever") == "LC"]
+          and (wm.lane("MAINT").get("item") or {}).get("lever") == "L23N",
+          (_diags(wm)["DCMP"]["summary"], (wm.lane("MAINT").get("item") or {}).get("lever")))
+    wm.job_done("inc_build_native_b_v2_m832")
+    wm.native_record("b_v2_m832")
+    wm.tick(3)
+    order = [e.get("lever") for e in wm.events("proposed") if e.get("lane") == "MAINT"]
+    check("  once its job ends the compare runs (DCMP precedes DR0); before the compare's 'hurts' is in the "
+          "evidence, the lane takes b_v2_s1024's rescore, and the recommended rollback waits for its job",
+          [r[-2:] for r in wm.runs if "compare" in r] == [["--exp", m1]] and order == ["L23N", "LC", "L23N"]
+          and not [r for r in wm.runs if "rollback" in r]
+          and (wm.lane("MAINT").get("item") or {}).get("lever") == "L23N", (order, [r[3:] for r in wm.runs]))
+    wm.job_done("inc_build_native_b_v2_s1024")
+    wm.native_record("b_v2_s1024")
+    wm.tick(2)
+    order = [e.get("lever") for e in wm.events("proposed") if e.get("lane") == "MAINT"]
+    check("  that job ended, the rollback runs (L21 to P_0, within the envelope)",
+          [r[-2:] for r in wm.runs if "rollback" in r] == [["--to", "P_0"]] and order == ["L23N", "LC", "L23N", "L21"],
+          (order, [r[3:] for r in wm.runs]))
+
+    wq = World("native_x18")
+    wq.ready_r0()
+    wq.native_verdict_file(qualifying=["b_v2_m832"])
+    capq = (wq.inc / "capacity" / "capacity_v1.json").read_bytes()
+    wq.tick(3)
+    st = wq.state()
+    x18 = [c for c in st.get("cards") or [] if c.get("lever") == "X18"]
+    d = _diags(wq)
+    check("a verdict in which b_v2_m832 qualifies is card X18 (R4, for a person), filed once: no pause, no hold, the "
+          "stream's arm and capacity_v1.json unchanged, no LA",
+          len(x18) == 1 and x18[0]["risk"] == "R4" and "b_v2_m832" in x18[0]["detail"] and d["DNAT"]["fired"]
+          and d["DNAT"]["levers"] == ["X18"] and not st.get("paused")
+          and not any(wq.lane(ln).get("hold") or wq.lane(ln).get("diag_hold") for ln in ("TRAIN", "DATA", "MAINT"))
+          and st["capacity"]["chosen"] == "n640" and (wq.inc / "capacity" / "capacity_v1.json").read_bytes() == capq
+          and not [e for e in wq.events("proposed") if e.get("lever") == "LA"], (x18, d["DNAT"]["summary"]))
+    wq.tick(3)
+    check("  and not filed again on the next ticks",
+          len([c for c in wq.state().get("cards") or [] if c.get("lever") == "X18"]) == 1)
+    wn = World("native_none")
+    wn.ready_r0()
+    wn.native_verdict_file(qualifying=())
+    wn.tick(3)
+    d = _diags(wn)
+    check("a verdict in which no arm qualifies files no card (DNAT silent)",
+          not d["DNAT"]["fired"] and not [c for c in wn.state().get("cards") or [] if c.get("lever") == "X18"],
+          d["DNAT"]["summary"])
+    pw = World("native_perturbed", perturbed=True)
+    pw.ready_r0()
+    pw.native_verdict_file(qualifying=["b_v2_m832"])
+    pw.tick(2)
+    check("test-blind: with every non-dev exam value of the cluster's files perturbed, DNAT reads the same",
+          _diags(pw)["DNAT"]["summary"] == _diags(wq)["DNAT"]["summary"] and _diags(pw)["DNAT"]["fired"],
+          (_diags(pw)["DNAT"]["summary"], _diags(wq)["DNAT"]["summary"]))
 
 
 def t_formats():
@@ -1060,7 +1329,8 @@ def t_d28():
 
 
 def main():
-    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_formats, t_replay_gate,
+    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_formats,
+               t_replay_gate,
                t_config, t_lab, t_lanes, t_d28):
         try:
             fn()

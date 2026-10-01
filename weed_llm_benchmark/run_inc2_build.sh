@@ -17,6 +17,7 @@
 #
 #   python -m weed_optimizer_framework.tools.inc2.splits   build | lock [...]
 #   python -m weed_optimizer_framework.tools.inc2.baseline build --exp E --manifest M [--seeds ...] [...]
+#   python -m weed_optimizer_framework.tools.inc2.baseline rescore-native --exp E --reference R
 #   python -m weed_optimizer_framework.tools.inc2.pilot4   build --exp E [...]
 #   python -m weed_optimizer_framework.tools.inc2.stream   init | build | milestone | fork | feasibility | bisect
 #                                                          --stream SID [...]
@@ -30,7 +31,10 @@
 #
 # The experiment an advance is run for: --exp when the builder takes one;
 # for an inc2.stream verb, every "[inc2.stream] built experiment NAME" line it
-# printed (a build, a milestone, Stage C, the bisect arms). The segments' and
+# printed (a build, a milestone, Stage C, the bisect arms). inc2.baseline
+# rescore-native (L23N, 2026-10-01: a done measurement arm's finals scored at
+# its own imgsz, then the native verdict) builds nothing: no advance follows
+# it, and its provenance and lock are named native_<exp>, never the arm's own. The segments' and
 # milestones' runs execute inc2.train through run_inc2_job.sh: this script
 # exports INC_JOB_SCRIPT=$REPO/weed_llm_benchmark/run_inc2_job.sh before the
 # builder runs, so the driver init inside the builder and the advance after it
@@ -68,8 +72,8 @@ INC_ROOT="${INC_DIR:-$REPO/results/framework/inc}"
 export INC_JOB_SCRIPT="$REPO/weed_llm_benchmark/run_inc2_job.sh"
 
 usage() {
-    echo "usage: sbatch run_inc2_build.sh {inc2.splits build|lock | inc2.baseline build | inc2.pilot4 build |" \
-         "inc2.stream init|build|milestone|fork|feasibility|bisect} [flags ...]" >&2
+    echo "usage: sbatch run_inc2_build.sh {inc2.splits build|lock | inc2.baseline build|rescore-native |" \
+         "inc2.pilot4 build | inc2.stream init|build|milestone|fork|feasibility|bisect} [flags ...]" >&2
     exit 2
 }
 
@@ -82,7 +86,7 @@ case "$MOD" in
     *) usage ;;
 esac
 case "$MOD $CMD" in
-    "splits build"|"splits lock"|"baseline build"|"pilot4 build") shift 2 ;;
+    "splits build"|"splits lock"|"baseline build"|"baseline rescore-native"|"pilot4 build") shift 2 ;;
     "stream init"|"stream build"|"stream milestone"|"stream fork"|"stream feasibility"|"stream bisect") shift 2 ;;
     *) usage ;;
 esac
@@ -108,6 +112,7 @@ elif [ -n "$EXP" ]; then
         usage
     fi
     NAME="$EXP"
+    [ "$MOD $CMD" = "baseline rescore-native" ] && NAME="native_$EXP"
 elif [ "$MOD" = splits ]; then
     NAME="splits"
 else
@@ -191,7 +196,8 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py tools/inc2/splits.py tools/inc2/recipes.py
          tools/inc2/embed_calibration.py
          tools/inc2/train.py tools/inc2/baseline.py tools/inc2/pilot4.py tools/inc2/gate3.py
-         tools/inc2/scorer_sidecar.py tools/inc2/step1_stream.py tools/inc2/mask.py tools/inc2/stream.py
+         tools/inc2/scorer_sidecar.py tools/inc2/scorer_native.py tools/inc2/step1_stream.py tools/inc2/mask.py
+         tools/inc2/stream.py
          tools/inc2/stream_report.py)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 
@@ -330,6 +336,12 @@ if [ "$rc" != 0 ]; then
     fi
     prov update status=build_failed "build_rc=$rc" "refusal=$refusal" "built_exp=$BUILT" finish
     exit "$rc"
+fi
+if [ "$MOD $CMD" = "baseline rescore-native" ]; then
+    # scores only: nothing was built, nothing is advanced
+    prov update status=scored build_rc=0 finish
+    echo "=== done $(date) ==="
+    exit 0
 fi
 if [ "$MOD" != stream ] && [ -n "$EXP" ]; then
     BUILT="$EXP"

@@ -164,6 +164,11 @@
    }
   },
   "measure_why": "2026-09-30: measurement arms, not candidates of the decision (inc2.recipes.MEASURE_ARMS). They train at 832 and 1024 px and are scored by the locked scorer at 640 px. cost_factor prices their L23B builds against n640's 7.0 ms per image-epoch, upper-leaning from the measured 640 px runs on base_v2 scaled by pixels: m640 2.68 GPU-h per base run (2.0 x the 7.0 ms rate) x 1.69 x 1.1 (batch 16) = 3.8 -> 4.0; s640 1.58 (1.2 x) x 2.56 = 3.05 -> 3.5.",
+  "native": {
+   "reference_exp": "b_v2_m640",
+   "record": "capacity/native_v1.json",
+   "why": "2026-10-01 (docs/CONTINUOUS_LOOP.md, group B, amendment 'the measurement arms read at their own resolution', pre-registered): once a measurement arm's experiment is done and its native-resolution scores are missing, DR0 proposes L23N once (inc2.baseline rescore-native --exp <arm> --reference <reference_exp>): the arm's finals scored at its own imgsz on dev and imageweeds (never test) and the reference's on dev at 640, then the verdict in record. A qualifying arm is card X18 for a person (DNAT); nothing switches. A failure is a card, never a pause, and is not proposed again."
+  },
   "why": "Contract 2.6 L-4. The arms are inc2.recipes.ARMS ids; the decision is inc2.baseline capacity-verdict's (capacity/capacity_v1.json, dev only) and inc2.stream choose-arm adopts it. Every arm trains and scores at 640 px, so the grid varies capacity only; a resolution arm needs a new scorer version (R4) and is not in this grid. cost_factor is GPU time relative to n640 (est.: contract 11.4 gives 2-4x the B_v2 cost for such an arm; s640 at 2 and m640 at 3 sit inside inc2.recipes' brackets, pixel ratio 1 to FLOPs ratio 3.3 and 10.6) and only prices proposals until the decision records a measured step cost."
  },
  "stage_a": {
@@ -202,7 +207,8 @@
   "admit_seconds_per_1000_images": 75,
   "probe_hours": 0.5,
   "splits_hours": 4.0,
-  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job holds one V100 for up to its 4 h walltime, a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed."
+  "rescore_hours_per_run": 0.25,
+  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job holds one V100 for up to its 4 h walltime, a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed. A native-resolution rescore (L23N, 2026-10-01) is one scoring pass per final run: dev and ImageWeeds are 3,825 images, at up to 210 ms per image (54.5 ms measured for n640 at 640, x 2.2 for YOLO11m measured at 640, x 1.69 for 832 px) 0.22 GPU-h, rounded up to 0.25 per run; the reference's dev pass is priced as a run too."
  },
  "walltime": {
   "cold_h": 8.0,

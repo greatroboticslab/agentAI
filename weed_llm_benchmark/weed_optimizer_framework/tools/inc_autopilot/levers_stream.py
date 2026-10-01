@@ -375,6 +375,12 @@ def price(lid, params, dom, info=None):
     if kind == "splits":
         h = float(cost(dom, "splits_hours"))
         return h, dict(detail, job_hours=h)
+    if kind == "rescore":
+        # one GPU pass per final run (the arm's on its final exams, the reference's on dev), never training
+        runs = int(info.get("runs") or 2 * seeds)
+        per = float(cost(dom, "rescore_hours_per_run"))
+        return round(runs * per, 3), dict(detail, runs=runs, hours_per_run=per,
+                                          why="scoring only: one pass per final run, no training")
     factor = arm_factor(dom, p.get("arm") or info.get("arm"))
     recipes = tuple(x for x in str(p.get("recipes") or info.get("recipes") or "r0").split(",") if x)
     finals = float(cost(dom, "finals_hours"))

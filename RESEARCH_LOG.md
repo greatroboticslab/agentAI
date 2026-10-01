@@ -13,6 +13,37 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-01 (later) — The first collected increment is accepted; Carpetweed does not move
+
+**Accuracy.**
+- Best sealed test is unchanged at 0.8786 ± 0.0018 (YOLO11m on base_v2), a gap to 0.90 of 0.021. The sealed test is read only at milestones.
+- Segment s001 (m640, gate3) took the first increment, inc0001: 682 images, almost all CottonWeedDet3.
+- The gate ACCEPTed it with P_data 1.00, and the truth arm (union retrain) reads it as helping, so the two agree.
+
+| dev 12-class | value |
+|---|---|
+| base P_0 (3 seeds) | 0.8524 ± 0.0025 |
+| incumbent at the step | 0.8547 |
+| candidate (pool + inc0001, 3 seeds) | 0.8549 ± 0.0016 |
+| null (pool only, 3 seeds) | 0.8489 ± 0.0023 |
+| **new incumbent (soup)** | **0.8606** |
+
+**Per species (dev, base → new incumbent).**
+- PalmerAmaranth 0.882 → 0.950 and CutleafGroundcherry 0.788 → 0.830 rose most, but each has 31 dev boxes and is noisy.
+- Goosegrass +0.019, MorningGlory +0.012.
+- **Carpetweed 0.698 → 0.698.**
+- Three independent signs now say Carpetweed is not limited by data volume:
+  - YOLO11n → s → m barely moves it;
+  - its training boxes grew from 530 to 1,204 without effect;
+  - 473 more verified Carpetweed boxes did not move it.
+- Training at 832 px with inference at 640 (the m832 measurement arm) lowered it by 0.014 on dev.
+- The next test is inference at the arm's own resolution, on dev only. Its decision rule is pre-registered before any number exists (CONTINUOUS_LOOP, Amendment 2026-10-01): an arm qualifies for a stream fork only if its dev gain over m640 exceeds 2 pooled seed sd and the paired image-bootstrap SE, and Carpetweed, SpottedSpurge or Purslane improves.
+
+**Data.**
+- MFWD's POROL trays are admitted: 251 images and 273 Purslane boxes, 223 of the images with conflicting boxes masked.
+- The eligible queue holds 1,013 images (1,521 boxes).
+- PAGS8 (Palmer amaranth, CC BY) is the next fetch.
+
 ## 2026-10-01 — The loop admitted its first targeted data: 1,240 verified boxes, most of them for the weakest species
 
 **Accuracy (unchanged).** Best sealed: YOLO11m on base_v2, test 0.8786 ± 0.0018 (gap to 0.90: 0.021). The m832 measurement arm is running.

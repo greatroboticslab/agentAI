@@ -166,7 +166,10 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # never the LOCK's manifest table), and the R0 verdicts, which read dev only
 # (inc2.baseline's capacity/capacity_v1.json and <exp>/canary.json,
 # inc2.pilot4's <exp>/stage_a.json; capacity_v1_report.* holds test and is not
-# on the list). A stream ledger has no experiment: it is kept as a JSON list
+# on the list), and the measurement arms' native-resolution records, which
+# read dev only (inc2.baseline's capacity/native_v1.json and
+# <exp>/native_rescore.json; native_v1_report.* holds a non-decision exam and
+# is not on the list). A stream ledger has no experiment: it is kept as a JSON list
 # artifact, not under Evidence.ledgers.
 BATCH_RE = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}"
 STREAM_FILES = ("queue_summary.json", "ledger.jsonl", "dev_scores.json")
@@ -180,8 +183,8 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"intake/(?P<batch>%s)/summary\.json\Z" % BATCH_RE,
     r"intake/(?P<file>sources|placement)\.json\Z",
     r"splits/(?P<ver>v[0-9]{1,3})/lock_status\.json\Z",
-    r"capacity/capacity_v1\.json\Z",
-    r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a)\.json\Z" % ("|".join(RESERVED_DIRS), EXP_RE),
+    r"capacity/(?:capacity|native)_v1\.json\Z",
+    r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore)\.json\Z" % ("|".join(RESERVED_DIRS), EXP_RE),
 ))
 # the path of any score file but the decision exam's (scores/<exam>.json, driver.Paths.score)
 _NON_DEV_SCORE = re.compile(r"(^|/)scores/(?!%s\.json\Z)[^/]+\.json\Z" % re.escape(DECISION_EXAM))
