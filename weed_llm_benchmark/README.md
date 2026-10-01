@@ -78,7 +78,8 @@ locked (base_v2: 6,811 expert-labelled images, 2.2× the earlier base). First re
 0.8468 ± 0.0074 (5 seeds), against 0.8541 ± 0.0074 on train_core alone. The added data is half OtherPlant and adds
 nothing for three species, so it does not help. Larger models do use it: YOLO11s 0.8653 ± 0.0051, YOLO11m
 0.8786 ± 0.0018, the best sealed result so far (gap to 0.90: 0.021); see RESEARCH_LOG 2026-09-29. No harvested increment has entered training yet
-(RESEARCH_LOG 2026-09-30); the first targeted fetch started on 2026-09-30.
+(RESEARCH_LOG 2026-09-30). The first targeted source (CottonWeedDet3) was admitted on 2026-10-01: 1,240 verified
+target boxes, 473 of them Carpetweed, the weakest species (RESEARCH_LOG 2026-10-01).
 - [`docs/CONTINUOUS_LOOP.md`](../docs/CONTINUOUS_LOOP.md): the contract (decisions, data flow, splits v2, recipe, autopilot stream mode, rollout).
 
 Reproduce on Bridges-2. Run from the repo root with `REPO` pointing at it and `PYTHONPATH=$REPO`, in the `bench`

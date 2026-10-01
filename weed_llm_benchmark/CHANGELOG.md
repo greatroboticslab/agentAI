@@ -10689,3 +10689,8 @@ Every result sat near test 0.85, against the 0.90 goal.
   - A filed L16R whose approval already ran, for a source now placed on the lab, is superseded when D20 lists the source again, so its review is filed once as L16RL. Before, a review whose L16R had run (such as the mediatum one) stayed `filed`, and the source was never offered to a person in its lab form.
   - Tests: new `tests/test_stream_ap_review_placement.py` (70 checks in 9 cases; every case fails at HEAD; each of 9 further mutations, beyond the first version's 14, fails it); `test_stream_ap_units.py` covers L16RL in the menu checks. `test_stream_ap_world` removes its temporary tree at exit (`STREAM_AP_KEEP=1` or `STREAM_PIPELINE_KEEP=1` keeps it), since every World suite left a `stream_ap_*` directory behind. docs/CONTINUOUS_LOOP.md, Live incident of 2026-10-01.
   - Deploy: `policy_actions.json`, `stream_levers.json` and the autopilot modules change `executor.code_hash()`, so re-run `executor.run_replay_tests` after the sync.
+- **First targeted source admitted; D22 stale_days lowered to 1.**
+  - CottonWeedDet3 was fetched on the cluster in 50 s (5.6 GB) and intaken (795 images).
+  - At admission, 755 queue rows passed: 673 whole and 82 masked, none refused, no hold left after the copy scan. They hold 1,240 verified target boxes: Carpetweed 473, MorningGlory 423 and PalmerAmaranth 344.
+  - The eligible queue went from 7 images to 762 (1,248 boxes), which is at least one increment (M 682).
+  - A segment was cut only at Q >= 4M or after the oldest eligible row had waited 7 days. With supply arriving source by source, that left the first increment untrained for a week, so `stale_days` is 1 (decided under the owner's standing grant, recorded in stream_thresholds.json).

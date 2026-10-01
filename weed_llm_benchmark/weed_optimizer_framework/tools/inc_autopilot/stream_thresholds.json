@@ -56,8 +56,10 @@
    "why": "Contract 5.3: a segment is cut when Q >= 4M (K = 4 increments)."
   },
   "stale_days": {
-   "value": 7,
-   "why": "Contract 5.3: or when Q >= M and the oldest eligible row is at least 7 days old."
+   "value": 1,
+   "why": "Contract 5.3: or when Q >= M and the oldest eligible row is at least stale_days old. Lowered from 7 to 1 on 2026-10-01 under the owner's standing grant (human:harry567566@gmail.com): targeted supply arrives source by source (the first, CottonWeedDet3, gave 755 eligible images on 2026-10-01, Q 762 >= M 682), so a 7-day wait left the first increment untrained for a week; one day lets a full increment of a new source reach the gate the next day, and Q >= 4M still cuts K = 4 at once.",
+   "decided_by": "human:harry567566@gmail.com",
+   "decided_utc": "2026-10-01"
   },
   "K_max": {
    "value": 4,

@@ -13,6 +13,27 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-01 — The loop admitted its first targeted data: 1,240 verified boxes, most of them for the weakest species
+
+**Accuracy (unchanged).** Best sealed: YOLO11m on base_v2, test 0.8786 ± 0.0018 (gap to 0.90: 0.021). The m832 measurement arm is running.
+
+**Data.**
+- CottonWeedDet3 is the first source collected by targeted collection. The platform fetched it on the cluster (5.6 GB in 50 s), intaken 795 images, and Step 1 admitted 755 of them per box: 673 whole and 82 with the conflicting boxes masked.
+- The copy scan refused none, and no hold is left.
+- It adds **1,240 verified target boxes: Carpetweed 473, MorningGlory 423, PalmerAmaranth 344**. Carpetweed is the weakest species of every arm (0.709–0.736 test AP), and base_v2 held 1,204 Carpetweed boxes before.
+- The eligible queue grew from 7 images to 762 (1,248 boxes), more than one increment (M = 682). `stale_days` is now 1, so the first increment reaches the gate (m640, gate3) the next day, not in a week.
+- The second targeted source, MFWD (the POROL trays: Purslane), downloads on the lab at about 460 kB/s after the deadline fix. The FTP server is the limit: the cluster gets 575 kB/s from it.
+
+**Platform defects fixed on the way.**
+- An approved lab fetch was never run.
+- The D21 floors were null.
+- A licence override was ignored at fetch and intake.
+- The download deadline assumed 2 MB/s.
+- A source review of a lab-only provider was submitted to the cluster.
+- Leftover test directories filled the build machine's disk.
+
+Each has a test that fails without its fix.
+
 ## 2026-09-30 — Where the data supply stands: the loop has added no harvested data yet
 
 **Accuracy.** The best sealed result is YOLO11m on base_v2: test 0.8786 ± 0.0018 (gap to 0.90: 0.021).
