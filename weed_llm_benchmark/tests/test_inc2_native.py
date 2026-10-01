@@ -214,8 +214,10 @@ def test_refusals():
     check("the exam test is refused at every size (P10)", e is not None and "P10" in str(e), e)
     check("... and every exam but dev and imageweeds", refused(SN.check_exam, "ood22") is not None
           and SN.check_exam("dev") == "dev" and SN.check_exam("imageweeds") == "imageweeds")
-    check("the sizes: a measurement arm's training imgsz (m832 832, s1024 1024), the reference arm m640 at 640",
+    check("the sizes: a measurement arm's training imgsz (m832 832, s1024 1024, the box-quality arms 640), the "
+          "reference arm m640 at 640",
           SN.native_imgsz("m832") == 832 and SN.native_imgsz("s1024") == 1024 and SN.native_imgsz("m640") == 640
+          and [SN.native_imgsz(a) for a in ("l640", "y26m640", "y26l640")] == [640] * 3
           and SN.allowed_sizes() == [640, 832, 1024] and SN.REFERENCE_ARM == "m640")
     for arm in ("n640", "s640"):
         e = refused(SN.native_imgsz, arm)
@@ -544,6 +546,23 @@ def test_rescore():
           "a testing one (without it) both refuse, writing no decision" % S.TEST_ENV,
           e is not None and "test-mode" in str(e) and e2 is not None and "test-mode" in str(e2)
           and not (out_p / "native_v1.json").exists(), (e, e2))
+    # a box-quality arm (2026-10-01) trains at 640: it is read at 640 on dev only, as the reference is
+    make_exp("nat_y26l", "y26l640", testing=CPU32)
+    for s in (0, 1, 2):
+        make_final("nat_y26l", s, 40 + s)
+    ry = B.rescore_native("nat_y26l", reference="nat_ref", out_dir=out, resamples=100)
+    sy = [json.loads((C.INC_DIR / "nat_y26l" / "runs" / ("final__base__s%d" % s) / "scores" / "dev@640.json")
+                     .read_text()) for s in (0, 1, 2)]
+    dy = json.loads((out / "native_v1.json").read_text())["arms"]
+    check("a box-quality arm (y26l640) is rescored at 640 on dev only (its imageweeds score is the locked scorer's), "
+          "each dev score reproducing the run's protocol score exactly, and decided against the reference",
+          sorted(ry["scores"]) == ["dev"]
+          and [(r["score"], r["status"]) for r in ry["scores"]["dev"]] == [("dev@640.json", "written")] * 3
+          and not list((C.INC_DIR / "nat_y26l").rglob("imageweeds@*"))
+          and all(d["vs_protocol_score"]["compared"] is True and d["vs_protocol_score"]["max_abs_diff"] == 0.0
+                  for d in sy)
+          and dy["nat_y26l"]["status"] == "decided" and dy["nat_y26l"]["imgsz"] == 640
+          and dy["nat_m832"]["status"] == "decided", (sorted(ry["scores"]), [d.get("vs_protocol_score") for d in sy]))
 
 
 # ------------------------------------------------------------------ the rule

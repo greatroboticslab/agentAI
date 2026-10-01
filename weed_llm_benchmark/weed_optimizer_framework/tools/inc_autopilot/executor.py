@@ -2677,16 +2677,22 @@ def execute_approved(item_id, campaign=None, ctx=None, invoked_by=M.AUTOPILOT_AC
         if not _is_human(authority):
             return _finish(ctx, res, "refused", ["approval %s was decided by %r, not a person"
                                                  % (item_id, authority)])
+    # The campaign's caps first: an approval never lifts them, and a refusal
+    # that names the cap (today's, the month's window) lets the caller wait
+    # with the approval still open. Asked first, the policy gate escalates the
+    # same shortfall to an approval the item already has, and that refusal
+    # reads as a failed step (2026-10-01: an arm filed past today's cap, then
+    # approved, was failed and filed again each tick until the day turned).
+    if costed:
+        ok, why = B.fits(bud, est["su"])
+        if not ok:
+            return _finish(ctx, res, "refused", ["budget: " + r for r in why])
     auth = POL.authorize(authority, req["action"], req["params"], B.budget_state(bud), resources)
     res["authorized_as"] = authority
     if not auth["allowed"]:
         return _finish(ctx, res, "refused", auth["reasons"])
     if auth["needs_approval"]:
         return _finish(ctx, res, "refused", ["budget: " + "; ".join(auth["reasons"])])
-    if costed:
-        ok, why = B.fits(bud, est["su"])
-        if not ok:
-            return _finish(ctx, res, "refused", ["budget: " + r for r in why])
     if rendered["local"]:
         if not callable(ctx.local_hooks.get(req["action"])):
             return _finish(ctx, res, "refused", ["no lab hook is registered for %s" % req["action"]])

@@ -44,6 +44,9 @@ is defined once; inc2.train checks every cold run's init weights against it.
   m640   yolo11m.pt at 640 px
   m832   yolo11m.pt at 832 px, batch 16   (measurement arm, 2026-09-30)
   s1024  yolo11s.pt at 1024 px             (measurement arm, 2026-09-30)
+  l640     yolo11l.pt at 640 px            (measurement arm, 2026-10-01)
+  y26m640  yolo26m.pt at 640 px            (measurement arm, 2026-10-01)
+  y26l640  yolo26l.pt at 640 px            (measurement arm, 2026-10-01)
 
 L-4's grid (GRID_ARMS: n640, s640, m640) varies capacity only: every arm
 trains at 640 px and is scored by the locked scorer, which infers at 640 px
@@ -64,6 +67,29 @@ a scorer version whose imgsz is the arm's (R4); until then
 inc2.scorer_native reads their finals at their own size, record only, by a
 pre-registered rule against m640 at 640 (inc2.baseline rescore-native,
 native-verdict; docs/CONTINUOUS_LOOP.md, group B, amendment 2026-10-01).
+
+The box-quality arms (l640, y26m640, y26l640; 2026-10-01, docs/CONTINUOUS_LOOP.md
+group B, amendment 'box-quality measurement arms'). On test, m640's
+class-agnostic mAP50-95 is 0.8901 against its 12-class 0.8786: a perfect
+species call on m640's boxes would still score about 0.89, so data that only
+fixes species (s001 shrank dev's 12-class/agnostic gap from 0.017 to 0.007
+and left agnostic dev where it was) cannot reach 0.90 on m640. Agnostic test
+grew with capacity alone (n 0.8751, s 0.8842, m 0.8901). These arms ask
+whether a larger (YOLO11l) or newer (YOLO26, NMS-free, small-target-aware
+assignment) detector places better boxes. They train and score at 640 px
+like the grid and are measurement arms all the same: built after R0, finals
+dev and imageweeds, never a candidate of the capacity decision. They are
+judged by the same pre-registered rule (native-verdict, read at their own
+imgsz, which is 640), on dev only. Batch 32: the measured activations per
+image (saved tensors of one training forward with the loss, fp32, CPU,
+Ultralytics 8.4.37, nc 13) are 949 MiB for yolo11m, 1,232 for yolo11l
+(1.30 x), 1,100 for yolo26m (1.16 x) and 1,374 for yolo26l (1.45 x); m640
+peaked at 15.8 GB on a V100-32GB at batch 32 (Ultralytics GPU_mem, b_v2_m640
+seed 0), so the largest is about 23-26 GB. Time, from m640's 2.68 h per base
+run scaled by FLOPs (GPU-bound): l640 3.4 h, y26m640 2.9-3.2 h, y26l640
+3.7-4.0 h (YOLO26 assigns for two heads in training), all under D26's 6.4 h
+line. yolo11x and yolo26x (195.5 and 208.7 GFLOPs) would take about 8 h per
+base run on one V100 and are left out.
 
 Their estimates (2026-09-30), from the measured 640 px runs on the cluster
 (one V100-32GB, cache ram, base_v2 6,811 images, 100 epochs; one base run
@@ -159,6 +185,10 @@ ARMS = {
     # replaces COMMON's in every recipe of the arm (m832: batch 32 would not fit one V100-32GB)
     "m832": {"model": "yolo11m.pt", "imgsz": 832, "gflops": 115.326, "gflops_at_640": 68.240, "batch": 16},
     "s1024": {"model": "yolo11s.pt", "imgsz": 1024, "gflops": 55.229, "gflops_at_640": 21.574},
+    # box-quality measurement arms (2026-10-01): larger or newer detectors at 640 px, batch 32 like the grid
+    "l640": {"model": "yolo11l.pt", "imgsz": 640, "gflops": 87.325, "gflops_at_640": 87.325},
+    "y26m640": {"model": "yolo26m.pt", "imgsz": 640, "gflops": 74.821, "gflops_at_640": 74.821},
+    "y26l640": {"model": "yolo26l.pt", "imgsz": 640, "gflops": 93.221, "gflops_at_640": 93.221},
 }
 ARM_IDS = tuple(ARMS)
 GRID_ARMS = ("n640", "s640", "m640")            # L-4's capacity grid: the arms a decision may choose
@@ -166,7 +196,8 @@ MEASURE_ARMS = tuple(a for a in ARM_IDS if a not in GRID_ARMS)
 DEFAULT_ARM = "n640"
 REFERENCE_ARM = "n640"                          # the arm the measured rates are of
 FLOPS_BASIS = ("GFLOPs of one forward pass at nc 13, ultralytics.utils.torch_utils.get_flops (thop) on "
-               "yolo11{n,s,m}.yaml, Ultralytics 8.4.22")
+               "yolo11{n,s,m}.yaml, Ultralytics 8.4.22; yolo11l.yaml, yolo26m.yaml and yolo26l.yaml, Ultralytics "
+               "8.4.37 (yolo11m.yaml gives the same 68.240 there)")
 ARM_RECORD_KEYS = ("id", "model", "imgsz", "gflops", "gflops_at_640", "weights_sha256")
 
 # ------------------------------------------------------------------- rates

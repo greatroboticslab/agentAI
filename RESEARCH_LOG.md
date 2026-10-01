@@ -13,6 +13,40 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-01 (evening) — The boxes, not the species call, cap YOLO11m at about 0.89; three box-quality arms are pre-registered
+
+**Accuracy.** Best sealed test is unchanged: 0.8786 ± 0.0018 (YOLO11m on base_v2), gap to 0.90 = 0.021. The committed incumbent reads dev 0.8606; test is read at the next milestone.
+
+**Why the gap is about boxes.**
+
+| test, 3 seeds | 12-class | class-agnostic | gap |
+|---|---|---|---|
+| YOLO11n (b_v2) | 0.8468 | 0.8751 | 0.028 |
+| YOLO11s | 0.8653 | 0.8842 | 0.019 |
+| YOLO11m | 0.8786 | 0.8901 | 0.012 |
+
+- A perfect species call on YOLO11m's boxes scores about 0.89. Data alone cannot reach 0.90 on this model.
+- Data fixes the species call. s001 (CottonWeedDet3) narrowed dev's 12-class/agnostic gap from 0.017 to 0.007 (Palmer amaranth 0.88 → 0.95 in the incumbent), while agnostic dev went 0.8695 → 0.8674. The null arm (30 more epochs, no new data) gave 0.8489, so the gain is the data's.
+- Box quality grew only with capacity: agnostic test 0.875 → 0.884 → 0.890 for n → s → m. Training at 832 px did not help: native dev 0.8566 ± 0.0033 against 0.8524, does not qualify, agnostic dev 0.868.
+- Carpetweed is a localisation problem (dev per-image arrays, statistics only). 90–93 % of its plants are found at IoU 0.5, but only about 65 % of those matches hold at IoU 0.9. Every other species keeps 72–100 %. Its dev AP50-95 stays within 0.684–0.704 under every model, data and resolution tried.
+
+**Next measurement (pre-registered before any run).** YOLO26l, YOLO26m and YOLO11l, each at 640 px with batch 32 and YOLO11m's recipes, 3 seeds on base_v2, dev and ImageWeeds only.
+- They are judged by the same rule as the resolution arms: D > 2 pooled sd and > the bootstrap SE, and one of Carpetweed, SpottedSpurge and Purslane improves.
+- A qualifying arm becomes a stream fork; its next milestone reads test.
+- Checked first:
+  - the pinned scorer reads an NMS-free YOLO26 exactly as plain Ultralytics validation does (0.099645 = 0.099645 on a synthetic exam);
+  - measured GFLOPs and memory fit batch 32 on one V100 (about 23–26 GB peak for YOLO26l);
+  - priced 18.7 / 16.7 / 16.7 GPU-h. YOLO11x and YOLO26x would take about 8 h per run and are left out.
+
+**Data.**
+- PAGS8 (WeedAI, Texas A&M Palmer amaranth: 611 images, 1,894 boxes) was quarantined by D28. One image is within 6 dHash bits of an ImageWeeds image; the embedding scan found none.
+- The same batch's two "base copies" match images taken a year or two apart, so 6-bit dHash collides on these field images. One eval hit is about what chance gives.
+- The pre-registered rule was kept. Palmer amaranth is not a species that holds the gap.
+- The only ranked source left, zenodo_15808623 (SIU Weed Growth Stage, 49.7 GB, research-only, carries Ragweed), was approved under the owner's standing grant. The campaign's download budget was raised to 200 GB (80 GB a day).
+- The eligible queue is 331 images, under one increment (682), so supply is the binding limit for segment s002.
+
+**Platform defect fixed.** An item filed past today's SU cap and then approved was failed and filed again each tick; two in a row would hold the MAINT lane. The executor now checks the caps before the policy gate, so an approved item waits for the cap and runs under its approval when the UTC day turns. The new test fails on the old code.
+
 ## 2026-10-01 (later) — The first collected increment is accepted; Carpetweed does not move
 
 **Accuracy.**

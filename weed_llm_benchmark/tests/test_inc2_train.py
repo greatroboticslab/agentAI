@@ -383,12 +383,13 @@ def test_recipes():
     check("freeze and lora are deviations naming L-6", dz and dl and "L-6" in dz[0] and "L-6" in dl[0], (dz, dl))
     keys = lambda d: {x.split()[0] for x in d if not x.startswith("nearest")}  # noqa: E731
     check("a cold recipe on a cand, x1b on a base, imgsz 1024 on n640 or s640 are deviations; every grid arm's cold "
-          "trains at 640, each measurement arm's at its own imgsz (m832 832, s1024 1024)",
+          "trains at 640, each measurement arm's at its own imgsz (m832 832, s1024 1024, the box-quality arms 640)",
           RC.deviations("cand", RC.cold()) and keys(RC.deviations("base", x1b)) >= {"epochs", "warmup_bias_lr"}
           and keys(RC.deviations("cand", dict(r0, imgsz=1024))) == {"imgsz"}
           and all(RC.cold(a)["imgsz"] == 640 and not RC.deviations("base", RC.cold(a), a) for a in RC.GRID_ARMS)
-          and all(RC.cold(a)["imgsz"] == RC.ARMS[a]["imgsz"] != 640 and not RC.deviations("base", RC.cold(a), a)
+          and all(RC.cold(a)["imgsz"] == RC.ARMS[a]["imgsz"] and not RC.deviations("base", RC.cold(a), a)
                   for a in RC.MEASURE_ARMS)
+          and [RC.ARMS[a]["imgsz"] for a in RC.MEASURE_ARMS] == [832, 1024, 640, 640, 640]
           and keys(RC.deviations("base", dict(RC.cold("s640"), imgsz=1024), "s640")) == {"imgsz"}
           and keys(RC.deviations("base", dict(RC.cold("s1024"), imgsz=640), "s1024")) == {"imgsz"})
     check("match names the table entry", RC.match("cand", x1a) == "x1a" and RC.match("base", RC.cold()) == "cold"

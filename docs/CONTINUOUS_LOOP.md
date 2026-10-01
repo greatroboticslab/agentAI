@@ -1991,6 +1991,68 @@ Nothing has run on the cluster.
 
 **Deploy.** These files change `executor.code_hash()`: the autopilot modules, `stream_domains/weed.json`, `stream_levers.json`, `brain/policy_actions.json`, `brain/approvals.py` and `tests/test_stream_ap_replay.py`. `diagnose_stream.py`, `stream_levers.json` and `levers_stream.py` change the stream rules version. Sync the lab and cluster copies from one commit (outer and nested, `scorer_native.py` included), then run `executor.run_replay_tests` so that envelope grants resume. The next L18 writes its prospective record under the new rules version.
 
+#### Amendment (2026-10-01): box-quality measurement arms l640, y26m640 and y26l640 (pre-registered)
+
+**Why.** The 12-class test score is bounded by how well the boxes are placed, whatever the species call.
+- On test (R0's milestone reads, 3 seeds each), class-agnostic mAP50-95 is 0.8751 (n640), 0.8842 (s640) and 0.8901 (m640), against 12-class 0.8468, 0.8653 and 0.8786. A perfect species call on m640's boxes would score about 0.89, under the 0.90 bar.
+- Data has so far fixed the species call, not the boxes. Segment s001 (CottonWeedDet3, 755 images, 1,240 verified boxes) took dev 12-class from 0.8524 ± 0.0025 (b_v2_m640) to 0.8606 (the committed incumbent), while dev agnostic went from 0.8695 ± 0.0035 to 0.8674. The 12-class/agnostic gap on dev went from 0.017 to 0.007. A rehearsal without the new data (the s001 null arm) gave 0.8489, so the gain is the data's, not more epochs'.
+- Resolution did not move the boxes either. b_v2_m832 read at 832 px gives dev 0.8566 ± 0.0033 (native verdict: D = 0.0042 < 2 pooled sd 0.0058; no target species improved), and its agnostic dev is 0.868.
+- The worst species loses mostly on localisation. From the per-image arrays of b_v2_m640's three dev finals (statistics only), Carpetweed's recall at IoU 0.5 is 0.90–0.93, but of its matches at IoU 0.5 only 0.645–0.649 also match at IoU 0.9. Every other species keeps 0.72 (Ragweed) to 1.00 of its matches at 0.9. Carpetweed's dev AP50-95 stays within 0.684–0.704 under every model, data and resolution tried.
+
+Agnostic test grew with capacity alone. So whether a larger or a newer detector places better boxes decides whether the loop can reach 0.90 on m640's data.
+
+**Pre-registration.** This paragraph was written before any of these arms was built, and it is not edited afterwards.
+- **The arms.** Each is a COCO checkpoint at 640 px with batch 32 and m640's recipes, key for key (`inc2.recipes.table(arm) == table("m640")`). The checkpoints are pinned by sha256:
+  - **l640**: yolo11l.pt, `9ebd0e09…`;
+  - **y26m640**: yolo26m.pt, `401cea9a…`;
+  - **y26l640**: yolo26l.pt, `9fe3c544…`.
+
+  YOLO26 is NMS-free and assigns small targets on their own. Each arm runs 3 cold seeds (0, 1, 2) on base_v2. Its finals are dev and ImageWeeds, never test (P10). Each is a measurement arm, never a candidate of the capacity decision or the stream's arm.
+- **How each is read.** By `inc2.baseline rescore-native`, at its own imgsz, which is 640, on dev only: its other 640 px scores are the locked scorer's own. Each dev score must reproduce the run's recorded protocol dev score (the 640 reproduction check) or it is refused.
+- **The rule.** The 2026-10-01 native rule, unchanged. An arm qualifies for a stream fork proposal only if all three hold, against b_v2_m640 at 640 on the shared seeds:
+  1. D > 2 × pooled sd;
+  2. D > SE(D), the paired image bootstrap with 1,000 resamples under `stable_int("inc2/native/diff_se")`;
+  3. one of Carpetweed, SpottedSpurge and Purslane has a higher mean dev AP50-95.
+
+  The verdict is recorded in `capacity/native_v1.json` beside m832's and s1024's. A qualifying arm files card X18 for a person, nothing switches automatically, and test is not read. Changing the stream's arm is a person's decision. The stream then trains on the new arm, and its next milestone (5 cold seeds on the accumulated pool) reads test.
+- **Reported for people, outside the rule.** Agnostic dev mean ± sd; per-species dev; Carpetweed's share of IoU-0.5 matches that reach IoU 0.9; ImageWeeds.
+- **Order and pace.** DR0 proposes y26l640, then y26m640, then l640 (the largest expected box gain first), after the two resolution arms, one at a time, under the same conditions as m832 and s1024. Each is followed by its L23N.
+
+**Cost (est.).**
+- **Pricing.** The platform prices the builds at 18.7 (y26l640), 16.7 (y26m640) and 16.7 (l640) GPU-h, the build job included. `capacity.measure_arms` cost factors are 3.5, 3.0 and 3.0, against n640's 7.0 ms per image-epoch.
+- **Expected time.** From m640's measured 2.68 h per base run, scaled by GFLOPs at nc 13 (YOLO11m at 640 is GPU-bound): about 3.7–4.0, 2.9–3.2 and 3.4 h per base run. That is under D26's 6.4 h line and the pinned 8 h cold limit.
+- **Rescores.** 1.5 GPU-h each.
+- **Daily cap.** At 120 SU a UTC day, one or two arms run per day beside the segments.
+- **Left out.** yolo11x and yolo26x (195.5 and 208.7 GFLOPs) would take about 8 h per base run on one V100.
+
+**Measured before the change** (Ultralytics 8.4.37, nc 13):
+- **GFLOPs at 640:** yolo11m 68.240 (the table's figure), yolo11l 87.325, yolo26m 74.821, yolo26l 93.221.
+- **Activations saved for backward** (one image, train mode with the loss, fp32, CPU): yolo11m 949 MiB, yolo11l 1,232 (1.30 ×), yolo26m 1,100 (1.16 ×), yolo26l 1,374 (1.45 ×).
+- **Logged peak `GPU_mem`** (V100-32GB, seed 0): b_v2_m640 15.8 GB at batch 32, b_v2_s1024 21.7 GB at batch 32, b_v2_m832 13.7 GB at batch 16. So the largest new arm should peak at about 23–26 GB at batch 32.
+- **The locked scorer on an NMS-free detector.** On the cluster, a yolo26n.yaml and a yolo11n.yaml (the control) were each trained for 40 epochs on synthetic shapes at 64 px, then scored in test mode on a synthetic exam. The locked scorer's 12-class mAP50-95 equals a plain Ultralytics val of the same exam exactly: 0.099645 for YOLO26 and 0.115328 for YOLO11.
+
+**What changed.**
+- `inc2/recipes.py`: the three rows; `MEASURE_ARMS` is now m832, s1024, l640, y26m640, y26l640.
+- `inc2/baseline.py` `rescore_native`: an arm that trains at 640 is read on dev only. The native scorer reads nothing else at 640, and before this change it would have refused the arm's ImageWeeds and failed the rescore.
+- `stream_domains/weed.json`: the baselines `cap_y26l640`, `cap_y26m640` and `cap_l640`, marked `measure`, and their cost factors.
+- `stream_remote`'s build grammar and the `inc_build_baseline_v2` policy row admit the three arm ids. Both listed the arms by name, so the cluster would have refused the builds.
+
+**A defect found on the way: an approval past today's cap failed instead of waiting** (`executor.execute_approved`).
+- **The defect.** An item that exceeds the SU left under today's cap is filed for a person. Approved before the UTC day turned, it was refused by the policy gate, which escalated the same shortfall to an approval the item already had. The stream read that refusal as a failed step, cleared the lane, and filed the item again under a new approval id. Two in a row would hold the MAINT lane. With arms priced at 16.7–18.7 SU, this would have hit the second arm of a day.
+- **The fix.** `execute_approved` now checks the campaign's caps (`budget.fits`) before the policy gate. An approval never lifts a cap, and a refusal that names today's cap or the month's window is one the stream waits on (`WAIT_REFUSALS`), with the approval still open. When the day turns, the item runs once under that approval. An item filed past the cap and left alone still runs within the envelope after the turn, as before.
+- **Its test.** `tests/test_stream_ap_cap_approved.py` (new) fails 2 of its checks against the old executor and passes with the fix.
+
+**How it was verified.** Locally, with no GPU:
+- `test_inc2_baseline.py`: the three arms' models, imgsz, batch and recipes (m640's table); resolution with their checkpoint's sha256; `--arch/--imgsz`; a y26l640 build on base_v2 (role capacity, 3 seeds, dev and ImageWeeds, a definition the pinned driver accepts); a box-quality build that lists test is refused.
+- `test_inc2_native.py`: a y26l640 arm is rescored at 640 on dev only, each dev score reproducing its protocol score exactly (max abs diff 0.0), and is decided against the reference beside m832.
+- `test_inc2_train.py`: every measurement arm's cold recipe is at its own imgsz (832, 1024, 640, 640, 640).
+- `test_stream_ap_units.py`: the five arms are proposed in the domain's order, each once its predecessor exists. The fourth, past today's cap, is filed for a person; approved, it waits with no failed step and runs under that approval when the day turns. Five rescores follow, each once.
+- `test_stream_ap_replay.py`: the five arms within the envelope, a day apart.
+- `test_stream_pipeline.py`: the real `inc2.baseline` builds all five on the pinned driver; their rescores refuse the stand-in weights, record only. The rollback-order check ignores record-only MAINT items (L23B and L23N after R0). The summary-refresh checks wait for the next snapshot, since a tick that submits takes none.
+- Broad regression: all 102 test scripts of the inc, inc2, stream, collect, funnel, policy, approvals and round groups pass (`test_brain_api.py`, outside these groups, was not rerun).
+
+**Deploy.** `brain/policy_actions.json`, `stream_domains/weed.json` and the autopilot modules change `executor.code_hash()`. Sync the lab and both cluster copies from one commit, then run `executor.run_replay_tests` so that envelope grants resume. The arms need their checkpoints in the cluster REPO (downloaded 2026-10-01, sha256 above).
+
 ### Build note (group E)
 
 **What was built.** `inc2/stream.py` (verbs `init`, `choose-arm`, `cut` (dry run), `build`, `commit`, `milestone`, `compare`, `rollback`, `bisect`, `feasibility`, `fork`, `quarantine`, `unquarantine`, `release`, `withdraw`, `summary`, `verify`, `status`), `inc2/stream_report.py` (`--stream`, `--segment`), `run_inc2_build.sh`; tests `test_inc2_stream.py` and `test_inc2_stream_report.py`. `inc2/driver3.py` (R5) is not built: its trigger is evidence from three segments.

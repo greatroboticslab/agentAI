@@ -10739,3 +10739,27 @@ Every result sat near test 0.85, against the 0.90 goal.
   - Twelve allows six sources a day. The byte caps (50 GB a source, 20 GB a day, 60 GB for the campaign) and the SU envelope still bound collection.
   - Segment s001 committed inc0001 (L19, 2026-10-01T07:25Z). PAGS8 was fetched on the cluster (07:35Z).
   - The native-resolution rescore of b_v2_m832 (L23N, job 47306291) was proposed and run by the platform.
+- **Box-quality measurement arms l640, y26m640, y26l640, pre-registered (2026-10-01).**
+  - Why: YOLO11m's class-agnostic test mAP50-95 is 0.8901 against its 12-class 0.8786. A perfect species call on its boxes would score about 0.89. s001's data closed most of dev's 12-class/agnostic gap (0.017 → 0.007) and left agnostic dev where it was. Agnostic test grew with capacity only (n 0.8751, s 0.8842, m 0.8901), and 832 px training did not help (native verdict: does not qualify).
+  - The arms: yolo11l.pt, yolo26m.pt and yolo26l.pt at 640 px, batch 32, m640's recipes key for key. Each runs 3 cold seeds on base_v2 with finals dev and ImageWeeds (never test, P10). They are measurement arms, never a candidate of the capacity decision.
+  - They are read by `rescore-native` at 640 on dev only, each dev score reproducing its protocol score, and judged by the 2026-10-01 native rule unchanged (docs/CONTINUOUS_LOOP.md, group B, "Amendment (2026-10-01): box-quality measurement arms", written before any of them ran). A qualifying arm files card X18.
+  - Measured first:
+    - GFLOPs at nc 13: 87.325, 74.821 and 93.221;
+    - activations: 1.30, 1.16 and 1.45 × yolo11m's;
+    - logged peaks: m640 15.8 GB at batch 32, s1024 21.7 GB;
+    - the locked scorer on an NMS-free YOLO26: 12-class equal to a plain val, 0.099645 = 0.099645.
+  - Priced 18.7, 16.7 and 16.7 GPU-h. DR0 proposes them after m832 and s1024: y26l640, then y26m640, then l640. Their checkpoints are in the cluster REPO, pinned by sha256.
+  - Changed:
+    - `inc2/recipes.py` (three ARMS rows);
+    - `inc2/baseline.py` (a 640 arm is rescored on dev only, since the native scorer reads nothing else at 640);
+    - `inc2/scorer_native.py` (docstring);
+    - `stream_domains/weed.json` (three measure baselines and their cost factors);
+    - `stream_remote`'s build grammar and the `inc_build_baseline_v2` policy row (the arm ids).
+- **Fix: an approval past today's SU cap waits instead of failing** (`executor.execute_approved`).
+  - An item filed for a person because it exceeded today's cap was refused when approved: the policy gate escalated the same shortfall to an approval the item already had. The stream counted a failed step, cleared the lane, and filed the item again under a new approval id, each tick. Two in a row would hold the lane.
+  - The campaign's caps (`budget.fits`) are now checked before the gate. A refusal that names today's cap or the month's window is one the stream waits on, with the approval open, and the item runs once under that approval when the day turns.
+  - New `tests/test_stream_ap_cap_approved.py` fails 2 checks on the old executor.
+- **Tests.** `test_inc2_baseline`, `test_inc2_native` (a 640 arm rescored on dev only, reproducing its protocol score exactly), `test_inc2_train`, `test_stream_ap_units`, `test_stream_ap_replay` and `test_stream_pipeline` now cover the five measurement arms. The pipeline's rollback-order check ignores record-only MAINT items. Its summary-refresh checks wait for the next snapshot, because a tick that submits takes none.
+- **Operations (owner's standing grant, 2026-09-30).**
+  - `collect_gb_envelope` 60 → 200 GB and `collect_gb_daily` 20 → 80 GB, for zenodo_15808623 (SIU Weed Growth Stage, 49.7 GB, research-only, Ragweed). Its L16L fetch was approved.
+  - PAGS8 (weedai_5c78d067) was quarantined by D28: one 6-bit dHash hit on an ImageWeeds image, none by the embedding scan. The pre-registered rule stands.

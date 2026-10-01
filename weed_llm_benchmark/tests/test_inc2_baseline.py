@@ -22,6 +22,10 @@ What is pinned:
   imageweeds: built after R0, at no milestone read, they never read test,
   P10), by --arm or by --arch/--imgsz, and a build of one that lists test is
   refused;
+- the box-quality measurement arms (2026-10-01): l640 (yolo11l.pt), y26m640
+  (yolo26m.pt) and y26l640 (yolo26l.pt) train at 640 px, batch 32, with the
+  grid's recipes; they resolve with their checkpoint's sha256, --arch/--imgsz
+  names them, and on base_v2 they are capacity builds that never read test;
 - union: the parts' rows in one manifest, each part recorded; overlapping
   parts are refused, and so is a part holding an hflip copy of a test image
   (the guard runs over the union);
@@ -310,8 +314,9 @@ def test_builds(Wd):
 
 def test_measure_arms(Wd):
     print("the measurement arms m832 and s1024 (2026-09-30)")
-    check("L-4's grid is n640, s640, m640; the measurement arms are m832 and s1024, in the table",
-          RC.GRID_ARMS == ("n640", "s640", "m640") and RC.MEASURE_ARMS == ("m832", "s1024")
+    check("L-4's grid is n640, s640, m640; the measurement arms are m832, s1024, l640, y26m640, y26l640",
+          RC.GRID_ARMS == ("n640", "s640", "m640")
+          and RC.MEASURE_ARMS == ("m832", "s1024", "l640", "y26m640", "y26l640")
           and set(RC.ARM_IDS) == set(RC.GRID_ARMS) | set(RC.MEASURE_ARMS), (RC.GRID_ARMS, RC.MEASURE_ARMS))
     check("the grid's recipes are unchanged: 640 px, batch 32, every recipe of the table",
           all(RC.table(a)[r] == dict(RC.COMMON, **(RC.COLD if r == "cold" else RC.INCREMENTAL[r]), imgsz=640)
@@ -372,6 +377,34 @@ def test_measure_arms(Wd):
     c = bm["cost_estimate"]
     check("... and their est. cost is recorded with the pixel ratio (m832 low bracket %s GPU-h per run)"
           % c["per_run_gpu_h"][0], c["arm"] == "m832" and abs(c["pixel_factor"] - 1.69) < 1e-9 and c["imgsz"] == 832)
+
+    # the box-quality arms (2026-10-01): larger or newer detectors at 640 px
+    box = {"l640": "yolo11l.pt", "y26m640": "yolo26m.pt", "y26l640": "yolo26l.pt"}
+    for model in box.values():
+        (C.REPO / model).write_bytes(os.urandom(4096))
+    check("l640, y26m640, y26l640 train yolo11l.pt, yolo26m.pt, yolo26l.pt at 640 px, batch 32, with the grid's "
+          "recipes (m640's table, key for key)",
+          all(RC.ARMS[a]["model"] == m and RC.ARMS[a]["imgsz"] == 640 and RC.table(a) == RC.table("m640")
+              for a, m in box.items()), {a: RC.cold(a) for a in box})
+    rb = {a: RC.resolve_arm(a, repo=C.REPO) for a in box}
+    check("they resolve with their checkpoint's sha256 and pass check_arm_record",
+          all(rb[a]["weights_sha256"] == W.sha(C.REPO / m) and RC.check_arm_record(rb[a]) == a for a, m in box.items()),
+          rb)
+    check("--arch/--imgsz name them: yolo11l at 640 is l640, yolo26m.pt at 640 y26m640, yolo26l at 640 y26l640",
+          RC.arm_from_arch("yolo11l", 640) == "l640" and RC.arm_from_arch("yolo26m.pt", 640) == "y26m640"
+          and RC.arm_from_arch("yolo26l", 640) == "y26l640")
+    by, _ = B.build_definition("b_v2_y26l640", manifest=base_v2, arch="yolo26l", imgsz=640, testing=True)
+    D.validate_definition(json.loads(json.dumps(by)))
+    D.check_definition_data(by)
+    check("on base_v2 y26l640 is a capacity build: 3 seeds, finals dev and imageweeds (no test: P10), m640's cold "
+          "recipe, yolo26l.pt, a definition the pinned driver accepts",
+          by["role"] == "capacity" and by["seeds"] == [0, 1, 2] and by["final_exams"] == ["dev", "imageweeds"]
+          and by["base"]["recipe"] == RC.cold("m640") and by["init_weights"] == "yolo26l.pt"
+          and by["arm"]["id"] == "y26l640", (by["role"], by["final_exams"], by["arm"]))
+    e = refused(B.build_definition, "b_v2_box_test", manifest=base_v2, arm="l640",
+                final_exams=["dev", "imageweeds", "test"], testing=True)
+    check("... and a box-quality build that lists test is refused (P10)",
+          e is not None and "may not read test" in str(e) and not (C.INC_DIR / "b_v2_box_test").exists(), e)
 
 
 def test_e2e_baseline(Wd):

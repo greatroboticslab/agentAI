@@ -405,7 +405,7 @@ def _human(who):
 def _grid_arms(RC):
     """The arms a stream may run: L-4's capacity grid (inc2.recipes.GRID_ARMS;
     every arm of a recipes module that names no grid). A measurement arm
-    (m832, s1024) is recorded, never a stream's arm."""
+    (inc2.recipes.MEASURE_ARMS) is recorded, never a stream's arm."""
     return tuple(getattr(RC, "GRID_ARMS", None) or RC.ARMS)
 
 

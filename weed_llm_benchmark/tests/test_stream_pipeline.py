@@ -17,8 +17,8 @@ executed by the real module it names:
        canary, both capacity arms, B0 u tsw) on the pinned driver with a
        FakeBackend; LV verdicts; L25 (Stage A); LI (inc2.stream init); LA
        (choose-arm); L28 (Stage C feasibility) and LC (compare); then, R0
-       complete, L23B of the measurement arms m832 and s1024 (the stream's
-       arm unchanged); once each is done, L23N (inc2.baseline rescore-native:
+       complete, L23B of the measurement arms m832, s1024, y26l640, y26m640
+       and l640 (the stream's arm unchanged); once each is done, L23N (inc2.baseline rescore-native:
        its finals at its own imgsz), once per arm;
   R1   L17 bootstrap / knowntruth / backfill (inc2.step1_stream): batch b0000
        holds a masked veto image (funnel_F9), refuses a mirrored test image
@@ -123,6 +123,7 @@ from weed_optimizer_framework.tools.inc import select as SEL  # noqa: E402
 from weed_optimizer_framework.tools.inc import splits as S1  # noqa: E402
 from weed_optimizer_framework.tools.inc import verify as V  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import baseline as B2  # noqa: E402
+from weed_optimizer_framework.tools.inc2 import recipes as RC  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import common as C2  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import splits as S2  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import step1_stream as SS  # noqa: E402
@@ -1146,10 +1147,15 @@ def ledger_events(w, event, **match):
 
 
 def stage_measure_arms(w):
-    stage("MAINT: the measurement arms (m832, s1024), proposed by the platform once R0 is complete; the stream's arm "
-          "stays the capacity decision's")
-    exps = {"b_v2_m832": ("m832", 832, 16), "b_v2_s1024": ("s1024", 1024, 32)}
-    ok = w.run_until(lambda: all(rj(D.Paths(e).state, {}).get("done") for e in exps), max_ticks=40,
+    stage("MAINT: the measurement arms (m832, s1024; y26l640, y26m640, l640), proposed by the platform once R0 is "
+          "complete; the stream's arm stays the capacity decision's")
+    exps = {b["exp"]: (b["arm"], RC.ARMS[b["arm"]]["imgsz"], RC.ARMS[b["arm"]].get("batch", RC.COMMON["batch"]))
+            for b in w.dom["baselines"]["items"] if b.get("measure")}
+    check("the domain's measurement arms: m832 (832, batch 16), s1024 (1024, 32), y26l640, y26m640, l640 (640, 32)",
+          list(exps.items()) == [("b_v2_m832", ("m832", 832, 16)), ("b_v2_s1024", ("s1024", 1024, 32)),
+                                 ("b_v2_y26l640", ("y26l640", 640, 32)), ("b_v2_y26m640", ("y26m640", 640, 32)),
+                                 ("b_v2_l640", ("l640", 640, 32))], exps)
+    ok = w.run_until(lambda: all(rj(D.Paths(e).state, {}).get("done") for e in exps), max_ticks=80,
                      note="measurement arms")
     pro = [e for e in w.events("proposed") if e.get("lane") == "MAINT"]
     idx = {e.get("child_exp"): i for i, e in enumerate(pro) if e.get("lever") == "L23B"}
@@ -1180,7 +1186,7 @@ def stage_measure_arms(w):
 
 def stage_native_rescore(w):
     stage("MAINT: each done measurement arm's native-resolution rescore (L23N), once; its failure is a card")
-    exps = ("b_v2_m832", "b_v2_s1024")
+    exps = tuple(b["exp"] for b in w.dom["baselines"]["items"] if b.get("measure"))
 
     def ended():
         return sum(1 for n, _a, rc in w.jobs if n.startswith("inc_build_native_") and rc is not None) >= len(exps)
@@ -1280,7 +1286,9 @@ def stage_milestone2_rollback(w):
     check("milestone 2 vs milestone 1 on dev: hurts (one-sided permutation p %s <= 0.025, lower mean), rollback "
           "recommended to P_1" % c.get("perm_p"), c.get("verdict") == "hurts" and c.get("rollback_recommended")
           and c.get("to_pool") == "P_1" and c.get("compared_with") == "%s_m001" % w.sid, c)
-    maint = [lv for lv, ln in w.executed() if ln == "MAINT"]
+    # the measurement arms' builds and rescores (L23B, L23N: record only, R0 long complete) may take the idle MAINT
+    # lane between them
+    maint = [lv for lv, ln in w.executed() if ln == "MAINT" and lv not in ("L23B", "L23N")]
     tail_ = maint[maint.index("L21") - 2:] if "L21" in maint else maint
     lcs = [e for e in w.events("proposed") if e.get("lever") == "LC"]
     check("the autopilot ran L20, LC, then L21 (D25), L27 (bisect) and LC (compare --exp on a bisect arm), and no "
@@ -1350,9 +1358,12 @@ def stage_f9(w):
           rc == 0 and mk and "funnel_F9" in (mk[0].get("holds") or []) and mk2
           and "funnel_F9" not in (mk2[0].get("holds") or []), (rc, mk2 and mk2[0].get("holds")))
     n0 = len(w.runs)
-    w.tick()
-    w.process_jobs()
-    refresh = [r for r in w.runs[n0:] if len(r) > 3 and r[2].endswith("inc2.stream") and r[3] == "summary"]
+    for _ in range(4):                          # a tick that submits takes no snapshot: the next snapshot refreshes
+        w.tick()
+        w.process_jobs()
+        refresh = [r for r in w.runs[n0:] if len(r) > 3 and r[2].endswith("inc2.stream") and r[3] == "summary"]
+        if refresh:
+            break
     after = (summary(w).get("held") or {}).get("funnel_F9") or {}
     check("the next snapshot refreshed the stream summary, which no stream verb had rewritten since Step 1 changed "
           "the queue (stream_remote.refresh_summary): funnel_F9 rows %s -> %s" % (before.get("rows"), after.get("rows")),
@@ -1459,9 +1470,12 @@ def stage_intake(w):
           "admit job (no hold left)", len(rows) == 5 and all(r.get("admission") == "whole" and not (r.get("holds") or [])
                                                              and r.get("licence") for r in rows),
           [(r["key"], r.get("admission"), r.get("holds"), r.get("licence")) for r in rows])
-    w.tick()                                   # the next snapshot refreshes the summary after the admit batch
-    w.process_jobs()
-    q = summary(w)
+    for _ in range(4):                          # the next snapshot refreshes the summary after the admit batch
+        w.tick()
+        w.process_jobs()
+        q = summary(w)
+        if ((q.get("eligible") or {}).get("by_source") or {}).get(clean) == 5:
+            break
     stop = [e for e in w.events("proposed") if e.get("lever") == "L24" and leak in " ".join(e.get("argv") or [])]
     check("D28 read the collector's source_leak and L24 quarantined the leaking source; the clean source's rows "
           "are eligible supply", stop and leak in (q.get("quarantined_sources") or {})

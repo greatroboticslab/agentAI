@@ -1011,7 +1011,10 @@ def rescore_native(exp, reference=NATIVE_REFERENCE, out_dir=None, verdict=True, 
     the native verdict (module docstring). Returns the rescore record."""
     defn, aid, imgsz = _native_arm(exp)
     rdefn, _raid, rimgsz = _native_arm(reference, measure=False)
-    exams = [e for e in SN.EXAMS if e in (defn.get("final_exams") or [])]
+    # an arm that trains at 640 (the box-quality arms) is read at 640 on dev only: its other 640 px scores are
+    # the locked scorer's own (inc2.scorer_native reads nothing else at 640)
+    exams = [e for e in SN.EXAMS if e in (defn.get("final_exams") or [])
+             and (imgsz != rimgsz or e in SN.REFERENCE_EXAMS)]
     if NATIVE_EXAM not in exams:
         raise BaselineError("%s's final exams %s hold no %s" % (exp, defn.get("final_exams"), NATIVE_EXAM))
     seeds = [int(s) for s in defn.get("seeds") or []]

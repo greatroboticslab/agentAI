@@ -61,7 +61,7 @@
   "why": "Contract 3.2 and P9: sources from the labs of the evaluation splits (dev and test: LuLab; ImageWeeds: NDSU) are fetched only after the copy scan; the auto L16 never picks them before (S1)."
  },
  "baselines": {
-  "why": "Contract 4.4 and L-4, in the order R0 builds them: B_v2 (milestone 0, 5 cold seeds), the canary (B0 seed 0 under inc2.train, judged by inc2.baseline canary-verdict), the capacity arms (3 cold seeds each, judged together by capacity-verdict), then B0 u tsw (recommended; it blocks nothing). The experiment names are inc2.baseline's defaults (canary_v2; b_v2_s640 and b_v2_m640 for capacity-verdict). The two items marked measure (2026-09-30: b_v2_m832, YOLO11m at 832 px, and b_v2_s1024, YOLO11s at 1024 px, 3 cold seeds each, finals dev and imageweeds: built after R0, at no milestone read, they never read test, P10) are measurement arms for the small prostrate weeds: DR0 proposes them only once R0 is complete (the stream has adopted its arm and read Stage C) and nothing else of R0 is due, so the TRAIN lane never waits for them; a failure of theirs is a card, never a pause (inc_autopilot.stream._record_only). They share the stream's daily and monthly caps, so a grant of theirs can defer a segment's grant to the next UTC day. capacity-verdict lists them with --record, never as candidates, and the stream's arm stays the capacity decision's.",
+  "why": "Contract 4.4 and L-4, in the order R0 builds them: B_v2 (milestone 0, 5 cold seeds), the canary (B0 seed 0 under inc2.train, judged by inc2.baseline canary-verdict), the capacity arms (3 cold seeds each, judged together by capacity-verdict), then B0 u tsw (recommended; it blocks nothing). The experiment names are inc2.baseline's defaults (canary_v2; b_v2_s640 and b_v2_m640 for capacity-verdict). The two items marked measure (2026-09-30: b_v2_m832, YOLO11m at 832 px, and b_v2_s1024, YOLO11s at 1024 px, 3 cold seeds each, finals dev and imageweeds: built after R0, at no milestone read, they never read test, P10) are measurement arms for the small prostrate weeds: DR0 proposes them only once R0 is complete (the stream has adopted its arm and read Stage C) and nothing else of R0 is due, so the TRAIN lane never waits for them; a failure of theirs is a card, never a pause (inc_autopilot.stream._record_only). They share the stream's daily and monthly caps, so a grant of theirs can defer a segment's grant to the next UTC day. capacity-verdict lists them with --record, never as candidates, and the stream's arm stays the capacity decision's. The three items added 2026-10-01 (b_v2_y26l640, b_v2_y26m640, b_v2_l640: YOLO26l, YOLO26m and YOLO11l at 640 px, batch 32, 3 cold seeds, finals dev and imageweeds) are box-quality measurement arms (docs/CONTINUOUS_LOOP.md, group B, amendment 'box-quality measurement arms'): m640's class-agnostic test mAP50-95 (0.8901) caps its 12-class score near 0.89, so whether a larger or newer detector places better boxes decides whether the loop can reach 0.90. They are proposed after the two resolution arms, in this order (the largest expected gain first), under the same rules.",
   "items": [
    {
     "id": "b_v2",
@@ -133,6 +133,36 @@
     "role": "capacity",
     "required": false,
     "measure": true
+   },
+   {
+    "id": "cap_y26l640",
+    "exp": "b_v2_y26l640",
+    "manifest": "splits/v2/base_v2.jsonl",
+    "seeds": "0,1,2",
+    "arm": "y26l640",
+    "role": "capacity",
+    "required": false,
+    "measure": true
+   },
+   {
+    "id": "cap_y26m640",
+    "exp": "b_v2_y26m640",
+    "manifest": "splits/v2/base_v2.jsonl",
+    "seeds": "0,1,2",
+    "arm": "y26m640",
+    "role": "capacity",
+    "required": false,
+    "measure": true
+   },
+   {
+    "id": "cap_l640",
+    "exp": "b_v2_l640",
+    "manifest": "splits/v2/base_v2.jsonl",
+    "seeds": "0,1,2",
+    "arm": "l640",
+    "role": "capacity",
+    "required": false,
+    "measure": true
    }
   ]
  },
@@ -161,13 +191,25 @@
    "s1024": {
     "exp": "b_v2_s1024",
     "cost_factor": 3.5
+   },
+   "y26l640": {
+    "exp": "b_v2_y26l640",
+    "cost_factor": 3.5
+   },
+   "y26m640": {
+    "exp": "b_v2_y26m640",
+    "cost_factor": 3.0
+   },
+   "l640": {
+    "exp": "b_v2_l640",
+    "cost_factor": 3.0
    }
   },
-  "measure_why": "2026-09-30: measurement arms, not candidates of the decision (inc2.recipes.MEASURE_ARMS). They train at 832 and 1024 px and are scored by the locked scorer at 640 px. cost_factor prices their L23B builds against n640's 7.0 ms per image-epoch, upper-leaning from the measured 640 px runs on base_v2 scaled by pixels: m640 2.68 GPU-h per base run (2.0 x the 7.0 ms rate) x 1.69 x 1.1 (batch 16) = 3.8 -> 4.0; s640 1.58 (1.2 x) x 2.56 = 3.05 -> 3.5.",
+  "measure_why": "2026-09-30: measurement arms, not candidates of the decision (inc2.recipes.MEASURE_ARMS). They train at 832 and 1024 px and are scored by the locked scorer at 640 px. cost_factor prices their L23B builds against n640's 7.0 ms per image-epoch, upper-leaning from the measured 640 px runs on base_v2 scaled by pixels: m640 2.68 GPU-h per base run (2.0 x the 7.0 ms rate) x 1.69 x 1.1 (batch 16) = 3.8 -> 4.0; s640 1.58 (1.2 x) x 2.56 = 3.05 -> 3.5. 2026-10-01: the box-quality arms train at 640 px (batch 32) and are priced the same way from m640's measured 2.68 GPU-h per base run (2.0 x the 7.0 ms rate), scaled by FLOPs at nc 13 (inc2.recipes): l640 87.3 / 68.2 = 1.28 -> 2.6 -> 3.0; y26m640 74.8 / 68.2 = 1.10, x 1.1 for YOLO26's second assignment head -> 2.4 -> 3.0; y26l640 93.2 / 68.2 = 1.37 x 1.1 -> 3.0 -> 3.5.",
   "native": {
    "reference_exp": "b_v2_m640",
    "record": "capacity/native_v1.json",
-   "why": "2026-10-01 (docs/CONTINUOUS_LOOP.md, group B, amendment 'the measurement arms read at their own resolution', pre-registered): once a measurement arm's experiment is done and its native-resolution scores are missing, DR0 proposes L23N once (inc2.baseline rescore-native --exp <arm> --reference <reference_exp>): the arm's finals scored at its own imgsz on dev and imageweeds (never test) and the reference's on dev at 640, then the verdict in record. A qualifying arm is card X18 for a person (DNAT); nothing switches. A failure is a card, never a pause, and is not proposed again."
+   "why": "2026-10-01 (docs/CONTINUOUS_LOOP.md, group B, amendment 'the measurement arms read at their own resolution', pre-registered): once a measurement arm's experiment is done and its native-resolution scores are missing, DR0 proposes L23N once (inc2.baseline rescore-native --exp <arm> --reference <reference_exp>): the arm's finals scored at its own imgsz on dev and imageweeds (never test) and the reference's on dev at 640, then the verdict in record. A qualifying arm is card X18 for a person (DNAT); nothing switches. A failure is a card, never a pause, and is not proposed again. The box-quality arms (2026-10-01) are read the same way at their own imgsz, 640: on dev only (their other 640 px scores are the locked scorer's), under the same rule."
   },
   "why": "Contract 2.6 L-4. The arms are inc2.recipes.ARMS ids; the decision is inc2.baseline capacity-verdict's (capacity/capacity_v1.json, dev only) and inc2.stream choose-arm adopts it. Every arm trains and scores at 640 px, so the grid varies capacity only; a resolution arm needs a new scorer version (R4) and is not in this grid. cost_factor is GPU time relative to n640 (est.: contract 11.4 gives 2-4x the B_v2 cost for such an arm; s640 at 2 and m640 at 3 sit inside inc2.recipes' brackets, pixel ratio 1 to FLOPs ratio 3.3 and 10.6) and only prices proposals until the decision records a measured step cost."
  },

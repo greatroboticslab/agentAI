@@ -3,8 +3,8 @@
 the executor and the policy table, the cluster verbs' parsers and grammar,
 the evidence allow-list, the budget windows and job settlement, the R0
 records (Stage A, Stage C, the capacity decision), the measurement arms
-(m832, s1024: priced, proposed once R0 is complete and only while missing,
-never the stream's arm), the dispositions, the replay gate's stream cases, the
+(m832, s1024, and the box-quality arms y26l640, y26m640, l640: priced,
+proposed once R0 is complete and only while missing, never the stream's arm), the dispositions, the replay gate's stream cases, the
 config and the campaign dispatch, and the lab runner. No network, no GPU, no
 ssh.
 
@@ -510,14 +510,15 @@ def _measure_world(tag, stage_c=True):
 
 
 def t_measure():
-    section("the measurement arms m832 and s1024 (2026-09-30): proposed once R0 is complete, never the stream's arm")
+    section("the measurement arms (m832, s1024 2026-09-30; y26l640, y26m640, l640 2026-10-01): proposed once R0 is "
+            "complete, never the stream's arm")
     from weed_optimizer_framework.tools.inc2 import recipes as RC
     dom = LS.load_domain("weed")
     meas = [b for b in dom["baselines"]["items"] if b.get("measure")]
     check("the domain's measurement baselines are inc2.recipes' measurement arms: capacity builds on base_v2, 3 seeds, "
           "not required; the decision's arms are L-4's grid",
           sorted(b["arm"] for b in meas) == sorted(RC.MEASURE_ARMS)
-          and [b["exp"] for b in meas] == ["b_v2_m832", "b_v2_s1024"]
+          and [b["exp"] for b in meas] == ["b_v2_m832", "b_v2_s1024", "b_v2_y26l640", "b_v2_y26m640", "b_v2_l640"]
           and all(b["role"] == "capacity" and b["seeds"] == "0,1,2" and not b.get("required")
                   and b["manifest"] == "splits/v2/base_v2.jsonl" for b in meas)
           and sorted(dom["capacity"]["arms"]) == sorted(RC.GRID_ARMS)
@@ -569,10 +570,37 @@ def t_measure():
           == ["--arm", "s1024", "--role", "capacity"], pro)
     w.experiment("b_v2_s1024", done=False)
     w.job_done("inc_build_b_v2_s1024")
+    # the box-quality arms (2026-10-01) follow, in the domain's order, each once its predecessor exists
+    for b in meas[2:]:
+        w.tick(3)
+        last = [e for e in w.events("proposed") if e.get("lever") == "L23B"][-1]
+        check("then %s is proposed (--arm %s)" % (b["exp"], b["arm"]),
+              last.get("child_exp") == b["exp"] and last.get("argv", [])[-4:] == ["--arm", b["arm"], "--role", "capacity"],
+              (last.get("child_exp"), last.get("argv", [])[-4:]))
+        it = w.lane("MAINT").get("item") or {}
+        if it.get("status") == "filed":
+            why = [e.get("reasons") for e in w.events("filed") if e.get("lever") == "L23B"][-1]
+            check("  past today's cap (120 SU) it is filed for a person, not run", "today's cap" in str(why), why)
+            aid = it["approval_id"]
+            res = AP.decide(w.domain, aid, "approve", OWNER, "test: past today's cap", w.clock(), root=str(w.lab))
+            w.tick(2)
+            it2 = w.lane("MAINT").get("item") or {}
+            check("  a person approves it: it waits for today's cap with the approval open, no failed step",
+                  isinstance(res, dict) and res.get("ok") and it2.get("approval_id") == aid
+                  and it2.get("status") == "filed" and not int(w.lane("MAINT").get("fails") or 0)
+                  and not [e for e in w.events("refused") if e.get("lever") == "L23B"], (it2.get("status"), res))
+            w.advance(86400.0)
+            w.tick(2)
+            ex = [e for e in w.events("executed") if e.get("lever") == "L23B"]
+            check("  and runs under that approval once the UTC day turns",
+                  ex and ex[-1].get("child_exp") == b["exp"] and ex[-1].get("approval_id") == aid,
+                  [(e.get("child_exp"), e.get("approval_id")) for e in ex])
+        w.experiment(b["exp"], done=False)
+        w.job_done("inc_build_%s" % b["exp"])
     w.tick(3)
     pro = [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"]
     d = {x["id"]: x for x in json.loads(S.StreamPaths(str(w.lab), "weed").diagnoses(NAME).read_text())["diagnoses"]}
-    check("once both exist, neither is proposed again (DR0 is silent)", pro == ["b_v2_m832", "b_v2_s1024"]
+    check("once all exist, none is proposed again (DR0 is silent)", pro == [b["exp"] for b in meas]
           and not d["DR0"]["fired"], (pro, d["DR0"]["summary"]))
     arms = [e for e in w.stream_ledger() if e.get("event") == "arm"]
     check("the stream's arm is unchanged throughout: the capacity decision's n640, one arm line, no LA, "
@@ -729,12 +757,19 @@ def t_native():
     w.native_record("b_v2_m832")
     w.job_done("inc_build_native_b_v2_s1024")
     w.native_record("b_v2_s1024")
+    meas = [b["exp"] for b in w.dom["baselines"]["items"] if b.get("measure")]
+    for exp in meas[2:]:            # the box-quality arms (2026-10-01), read at 640, in the domain's order
+        w.tick(3)
+        pro = [(e.get("argv") or [])[-3] for e in w.events("proposed") if e.get("lever") == "L23N"]
+        check("then %s's rescore is proposed, once" % exp, pro[-1] == exp and pro.count(exp) == 1, pro)
+        w.job_done("inc_build_native_%s" % exp)
+        w.native_record(exp)
     w.tick(4)
     pro = [(e.get("argv") or [])[-3] for e in w.events("proposed") if e.get("lever") == "L23N"]
     d = _diags(w)
-    check("both rescored: neither is proposed again (DR0 silent); the stream's arm, its one arm line and "
+    check("all rescored: none is proposed again (DR0 silent); the stream's arm, its one arm line and "
           "capacity_v1.json are unchanged, no LA",
-          pro == ["b_v2_m832", "b_v2_s1024"] and not d["DR0"]["fired"] and w.state()["capacity"]["chosen"] == "n640"
+          pro == meas and not d["DR0"]["fired"] and w.state()["capacity"]["chosen"] == "n640"
           and len([e for e in w.stream_ledger() if e.get("event") == "arm"]) == 1
           and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0
           and not [e for e in w.events("proposed") if e.get("lever") == "LA"], (pro, d["DR0"]["summary"]))
@@ -762,7 +797,9 @@ def t_native():
     st = wf.state()
     pro = [(e.get("argv") or [])[-3] for e in wf.events("proposed") if e.get("lever") == "L23N"]
     check("  a second failed rescore is a second card, not a held lane (2 consecutive failed steps would hold it); "
-          "neither is proposed again", pro == ["b_v2_m832", "b_v2_s1024"] and not wf.lane("MAINT").get("hold")
+          "neither is proposed again (the next arm's rescore runs next)",
+          pro[:2] == ["b_v2_m832", "b_v2_s1024"] and pro.count("b_v2_m832") == 1 and pro.count("b_v2_s1024") == 1
+          and pro[2:] in ([], ["b_v2_y26l640"]) and not wf.lane("MAINT").get("hold")
           and not st.get("paused") and len([c for c in st.get("cards") or [] if "Native-resolution" in c["title"]]) == 2,
           (pro, wf.lane("MAINT").get("hold")))
 

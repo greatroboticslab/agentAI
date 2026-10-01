@@ -1621,12 +1621,14 @@ def s_r0():
         mgot.append(_step(w, "L23B", lambda b=b: (w.experiment(b["exp"], final=[w.final_row("base", 0.83, 0.002, 3)]),
                                                   w.job_done("inc_build_%s" % b["exp"]))))
     mex = [e.get("basis") for e in w.events("executed")
-           if e.get("lever") == "L23B" and e.get("child_exp") in ("b_v2_m832", "b_v2_s1024")]
-    check("R0 complete: the measurement arms, each once, as L23B in inc2.baseline's grammar (--arm m832 / s1024, "
-          "role capacity), within the envelope (no person asked)",
-          [(x or {}).get("child_exp") for x in mgot] == ["b_v2_m832", "b_v2_s1024"]
-          and tail(mgot[0], 4) == ["--arm", "m832", "--role", "capacity"]
-          and tail(mgot[1], 4) == ["--arm", "s1024", "--role", "capacity"] and mex == ["envelope", "envelope"],
+           if e.get("lever") == "L23B" and e.get("child_exp") in [b["exp"] for b in measure]]
+    check("R0 complete: the measurement arms, each once, as L23B in inc2.baseline's grammar (--arm m832 / s1024 / "
+          "y26l640 / y26m640 / l640, role capacity), within the envelope (no person asked; a day apart, so the "
+          "daily cap does not bind)",
+          [(x or {}).get("child_exp") for x in mgot] == [b["exp"] for b in measure]
+          == ["b_v2_m832", "b_v2_s1024", "b_v2_y26l640", "b_v2_y26m640", "b_v2_l640"]
+          and all(tail(x, 4) == ["--arm", b["arm"], "--role", "capacity"] for x, b in zip(mgot, measure))
+          and mex == ["envelope"] * len(measure),
           ([(x or {}).get("argv", [])[-6:] for x in mgot], mex))
     sub = [x for x in w.submits if "inc2.baseline" in x["argv"] and "b_v2_m832" in x["argv"]]
     req = SR.parse_submit("build", sub[0]["argv"][sub[0]["argv"].index("inc2.baseline"):]) if sub else {}

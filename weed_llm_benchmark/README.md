@@ -81,6 +81,9 @@ nothing for three species, so it does not help. Larger models do use it: YOLO11s
 (RESEARCH_LOG 2026-09-30). The first targeted source (CottonWeedDet3) was admitted on 2026-10-01: 1,240 verified
 target boxes, 473 of them Carpetweed, the weakest species. The first collected increment (682 images) was accepted
 by the gate and committed: dev 0.8524 to 0.8606. Carpetweed did not move (RESEARCH_LOG 2026-10-01).
+YOLO11m's class-agnostic test score is 0.8901, so its boxes alone cap the 12-class score near 0.89: data fixes
+the species call, and three pre-registered box-quality arms (YOLO11l, YOLO26m, YOLO26l at 640 px, dev only) now
+measure whether a larger or newer detector places better boxes (CONTINUOUS_LOOP, Amendment 2026-10-01).
 - [`docs/CONTINUOUS_LOOP.md`](../docs/CONTINUOUS_LOOP.md): the contract (decisions, data flow, splits v2, recipe, autopilot stream mode, rollout).
 
 Reproduce on Bridges-2. Run from the repo root with `REPO` pointing at it and `PYTHONPATH=$REPO`, in the `bench`

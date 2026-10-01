@@ -2223,7 +2223,10 @@
             "s640",
             "m640",
             "m832",
-            "s1024"
+            "s1024",
+            "l640",
+            "y26m640",
+            "y26l640"
           ]
         },
         "role": {
@@ -2255,7 +2258,7 @@
         "round-scheduler",
         "human"
       ],
-      "description": "Lever L23's baselines (R3, envelope-eligible): B_v2 (milestone 0, 5 cold seeds), the canary, the capacity arms of L-4 (--arm s640 | m640), the measurement arms (--arm m832 | s1024, role capacity, record only) and B0 u tsw (--union), each a cold baseline under the v2 guard; the role is inc2.baseline's and must match what is built."
+      "description": "Lever L23's baselines (R3, envelope-eligible): B_v2 (milestone 0, 5 cold seeds), the canary, the capacity arms of L-4 (--arm s640 | m640), the measurement arms (--arm m832 | s1024 | l640 | y26m640 | y26l640, role capacity, record only) and B0 u tsw (--union), each a cold baseline under the v2 guard; the role is inc2.baseline's and must match what is built."
     },
     "inc_rescore_native": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.baseline rescore-native --exp {exp} --reference {reference}",

@@ -10,7 +10,11 @@ infers at 640 px and refuses any other size outside test mode. The
 measurement arms (inc2.recipes.MEASURE_ARMS: m832, s1024) train at 832 and
 1024 px; whether the small prostrate weeds gain from more pixels at
 inference needs a score at the arm's own size. This module is that second,
-separately named scorer. It never edits or replaces the locked one.
+separately named scorer. It never edits or replaces the locked one. The
+box-quality arms (l640, y26m640, y26l640, 2026-10-01) train at 640 px: they
+are read here at 640 on dev only, as the reference arm is, so the verdict
+has their per-image arrays; their score must reproduce the run's recorded
+protocol score.
 
 What it reuses, unchanged (the locked scorer as a library): check_lock (the
 exam manifest and scorer.py against LOCK.json), check_exam (every image and
