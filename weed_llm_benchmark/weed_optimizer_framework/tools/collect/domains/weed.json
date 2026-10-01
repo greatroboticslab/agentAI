@@ -223,10 +223,10 @@
  },
  "download": {
   "base_timeout_s": 120,
-  "min_rate_bytes_per_s": 2000000,
+  "min_rate_bytes_per_s": 150000,
   "read_timeout_s": 60,
   "attempts": 3,
-  "why": "a timeout scaled to size (not a flat 480 s): 120 s plus the size at 2 MB/s"
+  "why": "a timeout scaled to size (not a flat 480 s): 120 s plus the size at 150 kB/s. Lowered from 2 MB/s on 2026-09-30: the lab reads the MFWD FTP (dataserv.ub.tum.de) at about 460 kB/s (25 s probe), so every 300 MB tray failed its deadline (the first L16L fetch of mediatum_1717366, download_failed); 150 kB/s leaves a third of the measured rate. read_timeout_s still refuses a stalled connection."
  },
  "licence_policy": {
   "permissive": [

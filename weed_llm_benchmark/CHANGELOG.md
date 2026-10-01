@@ -10677,3 +10677,7 @@ Every result sat near test 0.85, against the 0.90 goal.
   - A filed lab item is now treated as `_ready` treats a filed cluster item: approved → run; run elsewhere → follow that run; denied → clear; a gated data lever under data_autonomy on → re-check its gates.
   - `tests/test_stream_ap_lab_filed.py` covers approve and deny and fails 4 checks without the change. On the live stream the fetch started at 2026-09-30T23:45Z.
 - **The old harvest pool is not released for licence.** The step1_stream queue holds 51,637 licence-held rows, but only 194 of them carry a kept verified target box, nearly all from cwp10/vanpe (the L-5 cwd12 re-uploads). Releasing them would add leakage risk and no usable data, so they stay held. Target data comes from targeted new sources.
+- **Collector download deadline lowered to 150 kB/s.**
+  - The first targeted fetch (MFWD, mediatum_1717366, 2026-09-30T23:45Z) took `gt.csv` (19 MB). It then failed every tray archive at its size-scaled deadline, which assumed 2 MB/s.
+  - The lab reads the TUM FTP at about 460 kB/s (a 25 s probe), so the floor is now a third of that, and `read_timeout_s` still refuses a stalled connection.
+  - The fetch also resolved the source's licence as CC BY 4.0 from the mediaTUM record, so it is permissive.
