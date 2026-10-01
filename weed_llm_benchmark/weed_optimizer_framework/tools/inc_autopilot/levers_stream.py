@@ -305,10 +305,12 @@ def _hours(images, epochs, ms):
 
 def arm_factor(dom, arm=None):
     """GPU time of a capacity arm (an inc2.recipes.ARMS id) relative to the
-    default arm, from the stream-domain config (est.)."""
+    default arm, from the stream-domain config (est.): the decision's arms
+    (capacity.arms), else the measurement arms (capacity.measure_arms)."""
     if arm in (None, ""):
         return 1.0
-    a = ((dom.get("capacity") or {}).get("arms") or {}).get(str(arm))
+    cap = dom.get("capacity") or {}
+    a = (cap.get("arms") or {}).get(str(arm)) or (cap.get("measure_arms") or {}).get(str(arm))
     if not isinstance(a, dict):
         raise LeverError("no capacity arm %r in the stream-domain config" % (arm,))
     return float(a.get("cost_factor") or 1.0)

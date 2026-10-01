@@ -1262,7 +1262,8 @@ def r0(v):
     (L23B: B_v2, the canary, the capacity arms, B0 u tsw); the canary's and
     the capacity grid's verdicts (LV); Stage A (L25, once a person accepted
     Protocol v3) and its verdict (LV); the stream's creation with Stage A's
-    recipes (LI); the capacity decision adopted (LA); Stage C (L28). DATA --
+    recipes (LI); the capacity decision adopted (LA); Stage C (L28); then,
+    R0 complete, the measurement arms (L23B, baselines marked measure). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill)."""
     st = v.c("/stage") or {}
@@ -1276,7 +1277,7 @@ def r0(v):
         out["MAINT"] = {"lever": "L23", "verb": verb, "why": "splits v2 %s" % ("built, not locked" if verb == "lock"
                                                                                 else "not built")}
     else:
-        items = (v.dom.get("baselines") or {}).get("items") or []
+        items = [x for x in (v.dom.get("baselines") or {}).get("items") or [] if not x.get("measure")]
         for b in sorted(items, key=lambda x: not x.get("required")):
             if (st.get("baselines") or {}).get(b["id"]) not in (None, "missing"):
                 continue
@@ -1320,6 +1321,24 @@ def r0(v):
             if not s1.get(verb):
                 out["DATA"] = {"lever": "L17", "verb": verb, "why": "step1_stream %s has not run" % verb}
                 break
+    # the measurement arms (baselines marked measure, 2026-09-30): proposed only
+    # once R0 is complete (the stream's arm adopted, Stage C read) and nothing
+    # else of it is due, so R0 READY never waits for them (they share the
+    # stream's daily and monthly caps, though: a grant of theirs can defer a
+    # segment's to the next UTC day); capacity-verdict never reads them as
+    # candidates. They are built while the TRAIN lane runs, and /stage changes
+    # with every experiment it builds: an envelope grant needs the diagnosis's
+    # cites unchanged at submission, so the item cites only what it rests on
+    # (the lock and the arm's own state)
+    if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"]:
+        for b in (v.dom.get("baselines") or {}).get("items") or []:
+            if not b.get("measure") or (st.get("baselines") or {}).get(b["id"]) not in (None, "missing"):
+                continue
+            out["MAINT"] = {"lever": "L23B", "baseline": b["id"],
+                            "why": "measurement arm %s (%s) not built; recorded, never a candidate of the capacity "
+                                   "decision" % (b["id"], b["exp"])}
+            cites = [v.ccite("/stage/lock"), v.ccite("/stage/baselines/%s" % b["id"])]
+            break
     items = {k: x for k, x in out.items() if x}
     if not items:
         return _silent("DR0", "no rollout prerequisite is due", cites=cites)

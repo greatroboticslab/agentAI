@@ -1565,7 +1565,8 @@ def s_r0():
     inc = M.CLUSTER_INC_DIR
     tail = lambda pr, n: (pr or {}).get("argv", [])[-n:]  # noqa: E731
     got = []
-    for b in w.dom["baselines"]["items"]:
+    measure = [b for b in w.dom["baselines"]["items"] if b.get("measure")]
+    for b in [x for x in w.dom["baselines"]["items"] if not x.get("measure")]:
         pr = _step(w, "L23B", lambda b=b: (w.experiment(b["exp"], final=[w.final_row("base", 0.81, 0.002, 3)]),
                                            w.job_done("inc_build_%s" % b["exp"])))
         got.append(pr)
@@ -1613,13 +1614,38 @@ def s_r0():
     check("LC reads Stage C (inc2.stream compare --exp <sid>_c001)",
           tail(pr, 4) == [MOD + "inc2.stream", "compare", "--exp", "%s_c001" % w.sid]
           and any(e.get("event") == "feasibility" and e.get("phase") == "read" for e in w.stream_ledger()), tail(pr, 4))
+    arm0 = [e for e in w.stream_ledger() if e.get("event") == "arm"]
+    cap0 = (w.inc / "capacity" / "capacity_v1.json").read_bytes()
+    mgot = []
+    for b in measure:
+        mgot.append(_step(w, "L23B", lambda b=b: (w.experiment(b["exp"], final=[w.final_row("base", 0.83, 0.002, 3)]),
+                                                  w.job_done("inc_build_%s" % b["exp"]))))
+    mex = [e.get("basis") for e in w.events("executed")
+           if e.get("lever") == "L23B" and e.get("child_exp") in ("b_v2_m832", "b_v2_s1024")]
+    check("R0 complete: the measurement arms, each once, as L23B in inc2.baseline's grammar (--arm m832 / s1024, "
+          "role capacity), within the envelope (no person asked)",
+          [(x or {}).get("child_exp") for x in mgot] == ["b_v2_m832", "b_v2_s1024"]
+          and tail(mgot[0], 4) == ["--arm", "m832", "--role", "capacity"]
+          and tail(mgot[1], 4) == ["--arm", "s1024", "--role", "capacity"] and mex == ["envelope", "envelope"],
+          ([(x or {}).get("argv", [])[-6:] for x in mgot], mex))
+    sub = [x for x in w.submits if "inc2.baseline" in x["argv"] and "b_v2_m832" in x["argv"]]
+    req = SR.parse_submit("build", sub[0]["argv"][sub[0]["argv"].index("inc2.baseline"):]) if sub else {}
+    check("  the cluster's grammar reads the measurement arm back", req.get("params", {}).get("arm") == "m832", req)
+    check("  and the stream's arm stays the capacity decision's: no new arm line, no LA, capacity_v1.json unchanged",
+          [e for e in w.stream_ledger() if e.get("event") == "arm"] == arm0
+          and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0
+          and [e.get("lever") for e in w.events("proposed")].count("LA") == 1, arm0)
+    w.tick(2)
+    check("  once both exist, no measurement arm is proposed again",
+          [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_m832") == 1
+          and [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_s1024") == 1)
     w.queue(4 * w.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w.t[0] - 2 * DAY))
     pr = _step(w, "L18")
     check("R0 READY: the first segment is cut (L18)", pr is not None and pr.get("child_exp") == "%s_s001" % w.sid,
           [e.get("lever") for e in w.events("proposed")][-5:])
     lv = [e.get("lever") for e in w.events("executed") if e.get("lane") == "MAINT"]
     check("the whole sequence ran by the platform, in order, one MAINT item at a time, each once",
-          lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"], lv)
+          lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure), lv)
 
 
 def _commits_ev(segments, ctx):

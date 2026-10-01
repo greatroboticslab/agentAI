@@ -161,6 +161,18 @@ def _short(text, n=300):
     return text if len(text) <= n else text[:n] + "..."
 
 
+def _record_only(d):
+    """A measurement arm's D5 without OP_PAUSE: the arm is record only and no
+    lane waits for it, so a block that is not transient is a person's card,
+    never a pause, and never the firing stop-loss that refuses every envelope
+    grant (executor._trigger_check). L7 for its transient units stays."""
+    if "OP_PAUSE" not in (d.get("levers") or []):
+        return d
+    return dict(d, levers=[x for x in d["levers"] if x != "OP_PAUSE"], severity="warn",
+                summary="%s (a measurement arm, record only: a card, not a pause)" % d.get("summary"),
+                detail=dict(d.get("detail") or {}, record_only=True))
+
+
 def _write_json(path, obj):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -2606,9 +2618,12 @@ class StreamRun(object):
     def _health(self, payload):
         """D5-D7 and D14 on every live experiment of the snapshot (the pinned
         driver's experiments: the autopilot's own health rules, diagnose.py),
-        and the stops they call for."""
+        and the stops they call for. A measurement arm's (a baseline marked
+        measure: record only, no lane waits for it) D5 and D6 never stop the
+        stream: they are a person's card (_record_only)."""
         st = self.st
         out = []
+        measure = self._measure_exps()
         sq = (payload.get("status") or {}).get("squeue") or {}
         names = [j.get("name") for j in sq.get("jobs") or [] if isinstance(j, dict)] if sq.get("ok") else None
         for exp, sub in sorted((payload.get("experiments") or {}).items()):
@@ -2635,7 +2650,7 @@ class StreamRun(object):
                 continue
             for d in DG.detect(ev, only=HEALTH_EXP):
                 if d.get("fired"):
-                    out.append(d)
+                    out.append(_record_only(d) if exp in measure and d["id"] == "D5" else d)
         st["health"] = out
         by = {}
         for d in out:
@@ -2651,6 +2666,8 @@ class StreamRun(object):
             if "OP_PAUSE" in (d.get("levers") or []):
                 return self._pause("a blocked unit of %s is not transient (D5): %s" % (d.get("exp"),
                                                                                    _short(d.get("summary"), 300)))
+            if (d.get("detail") or {}).get("record_only"):
+                self._measure_card(d)
             stop = st["lanes"]["STOP"]
             units = [u for u in (d.get("detail") or {}).get("units") or [] if u.get("transient")]
             if units and "L7" in (d.get("levers") or []) and stop.get("item") is None:
@@ -2672,10 +2689,30 @@ class StreamRun(object):
         for d in by.get("D6") or []:
             stale[d["exp"]] = int(stale.get(d["exp"]) or 0) + 1
             if stale[d["exp"]] >= STALE_TO_PAUSE:
+                if d["exp"] in measure:
+                    self._measure_card(d)
+                    continue
                 return self._pause("stale advance (D6) of %s on %d consecutive snapshots" % (d["exp"], stale[d["exp"]]))
         for exp in list(stale):
             if not any(d.get("exp") == exp for d in by.get("D6") or []):
                 stale[exp] = 0
+
+    def _measure_exps(self):
+        """The measurement arms' experiments (baselines marked measure)."""
+        return {b["exp"] for b in ((self.dom or {}).get("baselines") or {}).get("items") or [] if b.get("measure")}
+
+    def _measure_card(self, d):
+        """A measurement arm's D5 (a block that is not transient) or D6 (a
+        stale advance): a person's card, once per block and generation, and
+        the stream runs on; the experiment stays built, so DR0 does not
+        propose it again."""
+        exp = d.get("exp")
+        gen = (((self.st.get("history") or {}).get(exp) or [{}])[-1]).get("generation")
+        if self._once("measure_health:%s:%s" % (d["id"], exp), [(d.get("detail") or {}).get("units"), gen],
+                      "measure_health", exp=exp, trigger=[d["id"]], summary=_short(d.get("summary"), 300)):
+            self._card("escalation", "Measurement arm %s: %s" % (exp, d["id"]),
+                       "%s. The arm is record only and the stream runs on; a person unblocks it (inc.driver "
+                       "unblock) or leaves it" % _short(d.get("summary"), 400), trigger=[d["id"]])
 
 
 # ------------------------------------------------------------------ status

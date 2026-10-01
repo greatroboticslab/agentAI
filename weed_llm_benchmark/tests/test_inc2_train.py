@@ -17,7 +17,8 @@ What is pinned:
 - the v3 table: cold, r0, x1a, x1b on every arm have no deviation; x1a / x1b
   are the contract's values; freeze and lora are refused (L-6); a cold recipe
   on a cand, x1b on a base, imgsz 1024 on n640 or s640 are deviations; every
-  arm's cold trains at 640 (capacity only, no resolution arm);
+  grid arm's cold trains at 640 (L-4: capacity only), each measurement arm's
+  (m832, s1024) at its own imgsz;
 - specs: ood22 / ood23 exams are refused, test only for kind final;
 - the evaluation manifests of v1 and v2 are refused by path and by content;
 - guard_rows: a planted exact dev copy, a test copy 1-6 dHash bits away, a
@@ -381,12 +382,15 @@ def test_recipes():
     dz, dl = RC.deviations("cand", freeze), RC.deviations("cand", lora)
     check("freeze and lora are deviations naming L-6", dz and dl and "L-6" in dz[0] and "L-6" in dl[0], (dz, dl))
     keys = lambda d: {x.split()[0] for x in d if not x.startswith("nearest")}  # noqa: E731
-    check("a cold recipe on a cand, x1b on a base, imgsz 1024 on n640 or s640 are deviations; every arm's cold "
-          "trains at 640",
+    check("a cold recipe on a cand, x1b on a base, imgsz 1024 on n640 or s640 are deviations; every grid arm's cold "
+          "trains at 640, each measurement arm's at its own imgsz (m832 832, s1024 1024)",
           RC.deviations("cand", RC.cold()) and keys(RC.deviations("base", x1b)) >= {"epochs", "warmup_bias_lr"}
           and keys(RC.deviations("cand", dict(r0, imgsz=1024))) == {"imgsz"}
-          and all(RC.cold(a)["imgsz"] == 640 and not RC.deviations("base", RC.cold(a), a) for a in RC.ARM_IDS)
-          and keys(RC.deviations("base", dict(RC.cold("s640"), imgsz=1024), "s640")) == {"imgsz"})
+          and all(RC.cold(a)["imgsz"] == 640 and not RC.deviations("base", RC.cold(a), a) for a in RC.GRID_ARMS)
+          and all(RC.cold(a)["imgsz"] == RC.ARMS[a]["imgsz"] != 640 and not RC.deviations("base", RC.cold(a), a)
+                  for a in RC.MEASURE_ARMS)
+          and keys(RC.deviations("base", dict(RC.cold("s640"), imgsz=1024), "s640")) == {"imgsz"}
+          and keys(RC.deviations("base", dict(RC.cold("s1024"), imgsz=640), "s1024")) == {"imgsz"})
     check("match names the table entry", RC.match("cand", x1a) == "x1a" and RC.match("base", RC.cold()) == "cold"
           and RC.match("cand", freeze) is None)
     try:

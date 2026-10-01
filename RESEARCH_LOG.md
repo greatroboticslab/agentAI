@@ -28,6 +28,17 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 **Status.** No increment has been committed yet; segments 0. The next measurements are the first harvested increments and a higher-resolution arm for the small weeds that hold the gap: Carpetweed 0.736, SpottedSpurge 0.810, Purslane 0.828.
 
+**Later the same day.**
+- **Two platform defects stopped targeted collection.**
+  - An approved lab fetch was never run (`_run_lab_items`).
+  - The D21 floors were null, so even an approved fetch was refused at execution.
+  - Both are fixed. The first targeted fetch (MFWD, mediatum_1717366, which includes POROL = Purslane) started at 23:45Z.
+- **The old harvest pool is exhausted for target species.** The 51,637 licence-held queue rows hold 194 images with a verified target box, almost all cwd12 re-uploads (cwp10, vanpe). They stay held.
+- **Two higher-resolution measurement arms, YOLO11m@832 and YOLO11s@1024, are added for the platform to run.**
+  - They read dev and ImageWeeds only, since the sealed test is read only at milestones (P10).
+  - The pinned scorer infers at 640 px, so these arms measure training at higher resolution, not inference at higher resolution.
+  - Inference at higher resolution needs its own scoring path, declared before any number is read.
+
 ## 2026-09-29 — First result of the loop: 2.2× the data, no gain on test; dev said +0.013
 
 **Result** (YOLO11n, 640 px, same recipe, locked scorer; means ± sd over seeds):

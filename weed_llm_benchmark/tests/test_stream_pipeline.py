@@ -16,7 +16,9 @@ executed by the real module it names:
        and approved as the owner; L23B (inc2.baseline build: B_v2, the
        canary, both capacity arms, B0 u tsw) on the pinned driver with a
        FakeBackend; LV verdicts; L25 (Stage A); LI (inc2.stream init); LA
-       (choose-arm); L28 (Stage C feasibility) and LC (compare);
+       (choose-arm); L28 (Stage C feasibility) and LC (compare); then, R0
+       complete, L23B of the measurement arms m832 and s1024 (the stream's
+       arm unchanged);
   R1   L17 bootstrap / knowntruth / backfill (inc2.step1_stream): batch b0000
        holds a masked veto image (funnel_F9), refuses a mirrored test image
        (GuardV2) and a 15 % dev crop (the embedding scan), sends an overlap to
@@ -1136,6 +1138,39 @@ def ledger_events(w, event, **match):
             and all(e.get(k) == v for k, v in match.items())]
 
 
+def stage_measure_arms(w):
+    stage("MAINT: the measurement arms (m832, s1024), proposed by the platform once R0 is complete; the stream's arm "
+          "stays the capacity decision's")
+    exps = {"b_v2_m832": ("m832", 832, 16), "b_v2_s1024": ("s1024", 1024, 32)}
+    ok = w.run_until(lambda: all(rj(D.Paths(e).state, {}).get("done") for e in exps), max_ticks=40,
+                     note="measurement arms")
+    pro = [e for e in w.events("proposed") if e.get("lane") == "MAINT"]
+    idx = {e.get("child_exp"): i for i, e in enumerate(pro) if e.get("lever") == "L23B"}
+    lc = next((i for i, e in enumerate(pro) if e.get("lever") == "LC"), None)
+    check("the platform proposed each measurement arm once, as L23B (--arm ID --role capacity), after R0's last "
+          "item (LC reading Stage C)", ok and all(sum(1 for e in pro if e.get("child_exp") == x) == 1 for x in exps)
+          and lc is not None and all(idx.get(x, -1) > lc for x in exps)
+          and all(pro[idx[x]]["argv"][-4:] == ["--arm", a[0], "--role", "capacity"] for x, a in exps.items()),
+          [(e.get("lever"), e.get("child_exp")) for e in pro])
+    good = {}
+    for x, (aid, imgsz, batch) in exps.items():
+        d = rj(D.Paths(x).exp_json, {})
+        good[x] = (d.get("role") == "capacity" and (d.get("arm") or {}).get("id") == aid
+                   and d.get("seeds") == [0, 1, 2] and d.get("final_exams") == ["dev", "imageweeds"]
+                   and (d.get("base") or {}).get("recipe", {}).get("imgsz") == imgsz
+                   and (d.get("base") or {}).get("recipe", {}).get("batch") == batch
+                   and rj(D.Paths(x).state, {}).get("done") is True
+                   and not list(D.Paths(x).root.glob("runs/*/scores/test.json")))
+    check("inc2.baseline built them on base_v2 (role capacity, 3 seeds, finals dev/imageweeds: no test outside a "
+          "milestone, P10; the arm's imgsz and batch) and the pinned driver ran them to done", all(good.values()), good)
+    cap = rj(INC / "capacity" / "capacity_v1.json", {})
+    arms = [e for e in ledger_events(w, "arm")]
+    check("the stream's arm is unchanged: one arm line (the capacity decision's %s); the decision names neither "
+          "measurement arm" % cap.get("chosen_arm"),
+          len(arms) == 1 and (arms[0].get("arm") or {}).get("id") == cap.get("chosen_arm") == "n640"
+          and not any(x in json.dumps(cap) for x in exps), [(e.get("arm") or {}).get("id") for e in arms])
+
+
 def stage_leak_and_audit(w):
     stage("the leaking veto source (D28 -> L24)")
     q = summary(w)
@@ -1473,6 +1508,7 @@ def main_stages():
     stage_r0(w)
     stage_b0000(w)
     stage_segment1(w)
+    stage_measure_arms(w)
     stage_leak_and_audit(w)
     stage_milestone1(w)
     stage_segment2(w)

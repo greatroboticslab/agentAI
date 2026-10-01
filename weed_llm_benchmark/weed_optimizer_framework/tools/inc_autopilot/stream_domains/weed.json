@@ -61,7 +61,7 @@
   "why": "Contract 3.2 and P9: sources from the labs of the evaluation splits (dev and test: LuLab; ImageWeeds: NDSU) are fetched only after the copy scan; the auto L16 never picks them before (S1)."
  },
  "baselines": {
-  "why": "Contract 4.4 and L-4, in the order R0 builds them: B_v2 (milestone 0, 5 cold seeds), the canary (B0 seed 0 under inc2.train, judged by inc2.baseline canary-verdict), the capacity arms (3 cold seeds each, judged together by capacity-verdict), then B0 u tsw (recommended; it blocks nothing). The experiment names are inc2.baseline's defaults (canary_v2; b_v2_s640 and b_v2_m640 for capacity-verdict).",
+  "why": "Contract 4.4 and L-4, in the order R0 builds them: B_v2 (milestone 0, 5 cold seeds), the canary (B0 seed 0 under inc2.train, judged by inc2.baseline canary-verdict), the capacity arms (3 cold seeds each, judged together by capacity-verdict), then B0 u tsw (recommended; it blocks nothing). The experiment names are inc2.baseline's defaults (canary_v2; b_v2_s640 and b_v2_m640 for capacity-verdict). The two items marked measure (2026-09-30: b_v2_m832, YOLO11m at 832 px, and b_v2_s1024, YOLO11s at 1024 px, 3 cold seeds each, finals dev and imageweeds: built after R0, at no milestone read, they never read test, P10) are measurement arms for the small prostrate weeds: DR0 proposes them only once R0 is complete (the stream has adopted its arm and read Stage C) and nothing else of R0 is due, so the TRAIN lane never waits for them; a failure of theirs is a card, never a pause (inc_autopilot.stream._record_only). They share the stream's daily and monthly caps, so a grant of theirs can defer a segment's grant to the next UTC day. capacity-verdict lists them with --record, never as candidates, and the stream's arm stays the capacity decision's.",
   "items": [
    {
     "id": "b_v2",
@@ -113,6 +113,26 @@
     "role": "union",
     "required": false,
     "images": 6748
+   },
+   {
+    "id": "cap_m832",
+    "exp": "b_v2_m832",
+    "manifest": "splits/v2/base_v2.jsonl",
+    "seeds": "0,1,2",
+    "arm": "m832",
+    "role": "capacity",
+    "required": false,
+    "measure": true
+   },
+   {
+    "id": "cap_s1024",
+    "exp": "b_v2_s1024",
+    "manifest": "splits/v2/base_v2.jsonl",
+    "seeds": "0,1,2",
+    "arm": "s1024",
+    "role": "capacity",
+    "required": false,
+    "measure": true
    }
   ]
  },
@@ -133,6 +153,17 @@
     "cost_factor": 3.0
    }
   },
+  "measure_arms": {
+   "m832": {
+    "exp": "b_v2_m832",
+    "cost_factor": 4.0
+   },
+   "s1024": {
+    "exp": "b_v2_s1024",
+    "cost_factor": 3.5
+   }
+  },
+  "measure_why": "2026-09-30: measurement arms, not candidates of the decision (inc2.recipes.MEASURE_ARMS). They train at 832 and 1024 px and are scored by the locked scorer at 640 px. cost_factor prices their L23B builds against n640's 7.0 ms per image-epoch, upper-leaning from the measured 640 px runs on base_v2 scaled by pixels: m640 2.68 GPU-h per base run (2.0 x the 7.0 ms rate) x 1.69 x 1.1 (batch 16) = 3.8 -> 4.0; s640 1.58 (1.2 x) x 2.56 = 3.05 -> 3.5.",
   "why": "Contract 2.6 L-4. The arms are inc2.recipes.ARMS ids; the decision is inc2.baseline capacity-verdict's (capacity/capacity_v1.json, dev only) and inc2.stream choose-arm adopts it. Every arm trains and scores at 640 px, so the grid varies capacity only; a resolution arm needs a new scorer version (R4) and is not in this grid. cost_factor is GPU time relative to n640 (est.: contract 11.4 gives 2-4x the B_v2 cost for such an arm; s640 at 2 and m640 at 3 sit inside inc2.recipes' brackets, pixel ratio 1 to FLOPs ratio 3.3 and 10.6) and only prices proposals until the decision records a measured step cost."
  },
  "stage_a": {

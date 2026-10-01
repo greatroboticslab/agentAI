@@ -2,9 +2,11 @@
 """Units of stream mode (docs/CONTINUOUS_LOOP.md 6): the lever menu against
 the executor and the policy table, the cluster verbs' parsers and grammar,
 the evidence allow-list, the budget windows and job settlement, the R0
-records (Stage A, Stage C, the capacity decision), the dispositions, the
-replay gate's stream cases, the config and the campaign dispatch, and the
-lab runner. No network, no GPU, no ssh.
+records (Stage A, Stage C, the capacity decision), the measurement arms
+(m832, s1024: priced, proposed once R0 is complete and only while missing,
+never the stream's arm), the dispositions, the replay gate's stream cases, the
+config and the campaign dispatch, and the lab runner. No network, no GPU, no
+ssh.
 
 Run:  python3 tests/test_stream_ap_units.py
 """
@@ -13,6 +15,7 @@ import hashlib
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -200,6 +203,16 @@ def t_prices():
     b2, _ = LS.price("L23B", dict(PARAMS["L23B"], exp="b_v2_s640", arm="s640", role="capacity"), dom, {"images": 6813})
     check("a capacity arm's baseline is priced by its cost factor (s640 at 2x n640)",
           1.9 * (b1 - 4.8) < b2 - 4.8 < 2.1 * (b1 - 4.8), (b1, b2))
+    b3, d3 = LS.price("L23B", dict(PARAMS["L23B"], exp="b_v2_m832", seeds="0,1,2", arm="m832", role="capacity"), dom,
+                      {"images": 6813})
+    b4, d4 = LS.price("L23B", dict(PARAMS["L23B"], exp="b_v2_s1024", seeds="0,1,2", arm="s1024", role="capacity"), dom,
+                      {"images": 6813})
+    cold3 = LS._hours(3 * 6813, 100, LS.cost(dom, "cold_ms_per_image_epoch"))
+    check("the measurement arms are priced by capacity.measure_arms: m832 x4.0 (%.1f GPU-h), s1024 x3.5 (%.1f GPU-h), "
+          "3 seeds with finals and the build job" % (b3, b4),
+          d3["factor"] == 4.0 and d4["factor"] == 3.5 and abs(b3 - (4.0 * cold3 + 0.8 + 4.0)) < 1e-3
+          and abs(b4 - (3.5 * cold3 + 0.8 + 4.0)) < 1e-3, (d3, d4))
+    check("  an arm in neither table is refused a price", _raises(lambda: LS.arm_factor(dom, "x9")))
     check("  the grid's est. factors (s640 2x, m640 3x) keep the truth arm on every step at N 7,626, M 763",
           LS.truth_every(dom, th, 7626, 763, ("r0",), 2.0) == 1 and LS.truth_every(dom, th, 7626, 763, ("r0",), 3.0) == 1)
     check("  a 4x arm (a measured rate can exceed the est. factors): one step with truth costs %.1f > 25 GPU-h -> "
@@ -267,6 +280,12 @@ def t_remote():
                                       "--role", "union"], False),
                            ("build", ["inc2.baseline", "build", "--exp", "b", "--manifest", "/x/a.jsonl", "--seeds",
                                       "0,1", "--arm", "x9", "--role", "b_v2"], False),
+                           ("build", ["inc2.baseline", "build", "--exp", "b_v2_m832", "--manifest", "/x/a.jsonl",
+                                      "--seeds", "0,1,2", "--arm", "m832", "--role", "capacity"], True),
+                           ("build", ["inc2.baseline", "build", "--exp", "b_v2_s1024", "--manifest", "/x/a.jsonl",
+                                      "--seeds", "0,1,2", "--arm", "s1024", "--role", "capacity"], True),
+                           ("build", ["inc2.baseline", "build", "--exp", "b", "--manifest", "/x/a.jsonl", "--seeds",
+                                      "0,1,2", "--arm", "m1024", "--role", "capacity"], False),
                            ("build", ["inc2.stream", "init", "--stream", "s", "--stage-b", "r0,x1a"], True),
                            ("build", ["inc2.stream", "build", "--stream", "s", "--k", "4", "--exp", "s_s001"], True),
                            ("build", ["inc2.stream", "build", "--stream", "s", "--k", "4", "--arch", "yolo11s"], False),
@@ -475,6 +494,129 @@ def t_records():
           d["DCAN"]["fired"] and "DCAN" in str(w3.lane("TRAIN").get("diag_hold"))
           and not [e for e in w3.events("proposed") if e.get("lever") == "L18"], (d["DCAN"]["summary"],
                                                                                   w3.lane("TRAIN")))
+
+
+def _measure_world(tag, stage_c=True):
+    """A world with every R0 prerequisite but the measurement arms' experiments."""
+    w = World(tag)
+    w.ready_r0(stage_c=stage_c)
+    for b in w.dom["baselines"]["items"]:
+        if b.get("measure"):
+            shutil.rmtree(str(w.inc / b["exp"]))
+    return w
+
+
+def t_measure():
+    section("the measurement arms m832 and s1024 (2026-09-30): proposed once R0 is complete, never the stream's arm")
+    from weed_optimizer_framework.tools.inc2 import recipes as RC
+    dom = LS.load_domain("weed")
+    meas = [b for b in dom["baselines"]["items"] if b.get("measure")]
+    check("the domain's measurement baselines are inc2.recipes' measurement arms: capacity builds on base_v2, 3 seeds, "
+          "not required; the decision's arms are L-4's grid",
+          sorted(b["arm"] for b in meas) == sorted(RC.MEASURE_ARMS)
+          and [b["exp"] for b in meas] == ["b_v2_m832", "b_v2_s1024"]
+          and all(b["role"] == "capacity" and b["seeds"] == "0,1,2" and not b.get("required")
+                  and b["manifest"] == "splits/v2/base_v2.jsonl" for b in meas)
+          and sorted(dom["capacity"]["arms"]) == sorted(RC.GRID_ARMS)
+          and sorted(dom["capacity"]["measure_arms"]) == sorted(RC.MEASURE_ARMS),
+          [(b["id"], b["arm"]) for b in meas])
+    w0 = _measure_world("measure0", stage_c=False)
+    w0.tick(2)
+    mp = [e.get("child_exp") for e in w0.events("proposed") if e.get("lever") == "L23B"]
+    check("before R0 is complete (Stage C not built) they are not proposed: MAINT takes L28 first",
+          not mp and "L28" in [e.get("lever") for e in w0.events("proposed")],
+          [e.get("lever") for e in w0.events("proposed")])
+    w1 = _measure_world("measure1", stage_c=False)
+    w1.stage_c_built(done=False)
+    w1.tick(3)
+    d1 = {x["id"]: x for x in json.loads(S.StreamPaths(str(w1.lab), "weed").diagnoses(NAME).read_text())["diagnoses"]}
+    check("  nor while Stage C runs unread (nothing else of R0 due, MAINT idle): R0 completes first",
+          not [e for e in w1.events("proposed") if e.get("lever") == "L23B"] and not d1["DR0"]["fired"]
+          and w1.lane("MAINT").get("item") is None, ([e.get("lever") for e in w1.events("proposed")],
+                                                     d1["DR0"]["summary"]))
+    w = _measure_world("measure")
+    cap0 = (w.inc / "capacity" / "capacity_v1.json").read_bytes()
+    w.queue(4 * w.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w.t[0] - 2 * 86400.0))
+    w.tick(3)
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L23B"]
+    first = pro[0] if pro else {}
+    ptrs = sorted(c.get("pointer") for c in first.get("cites") or [])
+    est, _d = LS.price("L23B", dict(PARAMS["L23B"], exp="b_v2_m832", seeds="0,1,2", arm="m832", role="capacity"),
+                       dom, {"images": dom["increment"]["base_images"]})
+    check("R0 complete and b_v2_m832 missing: DR0 proposes it (L23B --arm m832 --role capacity), priced x4.0",
+          [e.get("child_exp") for e in pro] == ["b_v2_m832"]
+          and first.get("argv", [])[-4:] == ["--arm", "m832", "--role", "capacity"]
+          and abs(float(first.get("est_gpu_hours") or 0) - est) < 1e-6, [(e.get("child_exp"), e.get("argv", [])[-6:])
+                                                                          for e in pro])
+    check("  citing only the lock and its own state (a stage that changes with every segment would void the "
+          "envelope grant)", ptrs == ["/stage/baselines/cap_m832", "/stage/lock"], first.get("cites"))
+    run = W.S.StreamRun(NAME, w.config(), C.Paths(str(w.lab)), C._SshBudget(None), w.clock, w.log, w.hooks,
+                        lambda: W.RES, None, None, None)
+    run.st, run.dom, run.th = w.state(), LS.load_domain("weed"), LS.load_thresholds()
+    check("  the TRAIN lane does not wait for them: R0 READY with both missing, and the segment is cut (L18)",
+          run._train_ready() == "" and any(e.get("lever") == "L18" for e in w.events("proposed")),
+          (run._train_ready(), [e.get("lever") for e in w.events("proposed")]))
+    w.experiment("b_v2_m832", final=[w.final_row("base base_v2", 0.83, 0.002, 3)])
+    w.job_done("inc_build_b_v2_m832")
+    w.tick(3)
+    pro = [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"]
+    check("once b_v2_m832 exists, b_v2_s1024 is proposed (--arm s1024)", pro == ["b_v2_m832", "b_v2_s1024"]
+          and [e for e in w.events("proposed") if e.get("lever") == "L23B"][-1].get("argv", [])[-4:]
+          == ["--arm", "s1024", "--role", "capacity"], pro)
+    w.experiment("b_v2_s1024", final=[w.final_row("base base_v2", 0.82, 0.002, 3)])
+    w.job_done("inc_build_b_v2_s1024")
+    w.tick(3)
+    pro = [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"]
+    d = {x["id"]: x for x in json.loads(S.StreamPaths(str(w.lab), "weed").diagnoses(NAME).read_text())["diagnoses"]}
+    check("once both exist, neither is proposed again (DR0 is silent)", pro == ["b_v2_m832", "b_v2_s1024"]
+          and not d["DR0"]["fired"], (pro, d["DR0"]["summary"]))
+    arms = [e for e in w.stream_ledger() if e.get("event") == "arm"]
+    check("the stream's arm is unchanged throughout: the capacity decision's n640, one arm line, no LA, "
+          "capacity_v1.json untouched",
+          w.state()["capacity"]["chosen"] == "n640" and len(arms) == 1
+          and not [e for e in w.events("proposed") if e.get("lever") in ("LA", "LV")]
+          and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0, (w.state().get("capacity"), arms))
+    wd = _measure_world("measure_data")
+    wd.step1_status(one_time=("bootstrap", "knowntruth"))
+    wd.tick(3)
+    check("  nor while a DATA item of R0 is due (Stage C read, the L17 backfill not run): R0 completes first",
+          not [e for e in wd.events("proposed") if e.get("lever") == "L23B"]
+          and any(e.get("lever") == "L17" and "backfill" in (e.get("argv") or []) for e in wd.events("proposed")),
+          [(e.get("lever"), (e.get("argv") or [])[-3:]) for e in wd.events("proposed")])
+    # a measurement arm that fails: a card, never a stop of the stream (the TRAIN lane and the envelope run on)
+    wf = _measure_world("measure_fail")
+    wf.queue(4 * wf.M, boxes={"Purslane": 900}, oldest_utc=W.utc(wf.t[0] - 2 * 86400.0))
+    wf.tick(3)
+    wf.experiment("b_v2_m832", done=False, blocked={"base:s0": {"cause": {"kind": "failed_run"},
+                                                               "error": "2 failed attempts (CUDA out of memory)"}})
+    wf.job_done("inc_build_b_v2_m832")
+    wf.tick(3)
+    st = wf.state()
+    h5 = [d for d in st.get("health") or [] if d.get("id") == "D5" and d.get("exp") == "b_v2_m832"]
+    ex = [(e.get("child_exp"), e.get("basis")) for e in wf.events("executed") if e.get("lever") == "L23B"]
+    check("a failed_run block of b_v2_m832 (not transient) pauses nothing: the campaign stays enabled, one card, its "
+          "D5 carries no OP_PAUSE (no stop-loss refuses a grant), and b_v2_s1024 is still granted within the envelope",
+          not st.get("paused") and wf.config().get("enabled") is True
+          and [c["title"] for c in st.get("cards") or []] == ["Measurement arm b_v2_m832: D5"]
+          and len(h5) == 1 and "OP_PAUSE" not in h5[0]["levers"] and h5[0]["detail"].get("record_only") is True
+          and ex == [("b_v2_m832", "envelope"), ("b_v2_s1024", "envelope")]
+          and wf.lane("TRAIN").get("item", {}).get("status") in ("executed", "running"),
+          (st.get("paused"), [c["title"] for c in st.get("cards") or []], h5, ex))
+    wf.advance(3 * 3600)
+    wf.tick(3)
+    st = wf.state()
+    check("  its stale advance (D6, generation unchanged for over 2 h) is one more card, not a pause",
+          not st.get("paused") and wf.config().get("enabled") is True
+          and sorted(c["title"] for c in st.get("cards") or []) == ["Measurement arm b_v2_m832: D5",
+                                                                     "Measurement arm b_v2_m832: D6"]
+          and len(wf.events("measure_health")) == 2, [c["title"] for c in st.get("cards") or []])
+    wf.experiment("%s_s001" % wf.sid, typ="chain", done=False,
+                  blocked={"base:s0": {"cause": {"kind": "failed_run"}, "error": "2 failed attempts"}})
+    wf.tick(2)
+    st = wf.state()
+    check("  the same block on a segment of the stream still pauses it (D5 -> OP_PAUSE)",
+          "%s_s001 is not transient (D5)" % wf.sid in str((st.get("paused") or {}).get("reason"))
+          and wf.config().get("enabled") is False, st.get("paused"))
 
 
 def t_formats():
@@ -916,8 +1058,8 @@ def t_d28():
 
 
 def main():
-    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_formats, t_replay_gate, t_config, t_lab,
-               t_lanes, t_d28):
+    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_formats, t_replay_gate,
+               t_config, t_lab, t_lanes, t_d28):
         try:
             fn()
         except Exception as e:

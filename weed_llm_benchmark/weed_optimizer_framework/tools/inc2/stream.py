@@ -402,6 +402,13 @@ def _human(who):
     return str(who).startswith(("human:", "human-delegated:"))
 
 
+def _grid_arms(RC):
+    """The arms a stream may run: L-4's capacity grid (inc2.recipes.GRID_ARMS;
+    every arm of a recipes module that names no grid). A measurement arm
+    (m832, s1024) is recorded, never a stream's arm."""
+    return tuple(getattr(RC, "GRID_ARMS", None) or RC.ARMS)
+
+
 def permutation_p(new, old):
     """One-sided exact permutation p of mean(new) - mean(old) (small = new
     below old): the share of all relabellings whose difference is <= the
@@ -1364,8 +1371,9 @@ class Stream:
         if testing and os.environ.get("INC_SCORER_TESTING") != "1":
             raise StreamError("a testing stream builds testing experiments, which need INC_SCORER_TESTING=1")
         RC = self.deps.recipes()
-        if arm not in RC.ARMS:
-            raise StreamError("arm %r is not one of %s (L-4)" % (arm, list(RC.ARMS)))
+        if arm not in _grid_arms(RC):
+            raise StreamError("arm %r is not one of L-4's grid %s (a measurement arm is never a stream's arm)"
+                              % (arm, list(_grid_arms(RC))))
         stage_b = self._check_stage_b(stage_b or list(DEFAULT_STAGE_B))
         k_max = int(k_max)
         if not 1 <= k_max <= K_MAX:
@@ -1532,8 +1540,9 @@ class Stream:
             if not isinstance(doc, dict) or doc.get("format") != "inc2-capacity/1":
                 raise StreamError("%s is not inc2.baseline's capacity decision (inc2-capacity/1)" % path)
             arm = doc.get("chosen_arm")
-            if arm not in RC.ARMS:
-                raise StreamError("the capacity decision chose %r, not an arm of %s" % (arm, list(RC.ARMS)))
+            if arm not in _grid_arms(RC):
+                raise StreamError("the capacity decision chose %r, not an arm of L-4's grid %s (a measurement arm "
+                                  "is never a stream's arm)" % (arm, list(_grid_arms(RC))))
             sc = doc.get("step_cost") or {}
             measured = sc.get("estimate") is False
             est = RC.step_cost(int(doc["n_images"]), int(doc["m"]), arm=arm, recipe=R0, truth=True)["gpu_h"][1]

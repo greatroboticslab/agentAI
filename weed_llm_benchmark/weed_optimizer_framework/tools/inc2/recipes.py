@@ -17,8 +17,9 @@ inc.driver RECIPE_KEYS key but the per-run seed):
          0.01;
   x1b    LR re-warm: 50 epochs, peak lr0 0.01, warmup 3 epochs, cosine to lrf
          0.01.
-Every recipe shares SGD, batch 32, momentum 0.937, weight decay 0.0005,
-close_mosaic 10, deterministic and trainer 'full'. An incremental recipe's
+Every recipe shares SGD, batch 32 (unless the arm sets its own, below),
+momentum 0.937, weight decay 0.0005, close_mosaic 10, deterministic and
+trainer 'full'. An incremental recipe's
 warmup_bias_lr equals its lr0, the runner doc's convention for incremental
 runs (without it the bias LR would start at Ultralytics' 0.1, far above a
 fine-tune's peak). imgsz is the arm's (below). Freeze and LoRA are not in the
@@ -41,11 +42,52 @@ is defined once; inc2.train checks every cold run's init weights against it.
   n640   yolo11n.pt at 640 px   (continuity: every INC experiment so far)
   s640   yolo11s.pt at 640 px
   m640   yolo11m.pt at 640 px
+  m832   yolo11m.pt at 832 px, batch 16   (measurement arm, 2026-09-30)
+  s1024  yolo11s.pt at 1024 px             (measurement arm, 2026-09-30)
 
-The grid varies capacity only: every arm trains at 640 px and is scored by the
-locked scorer, which infers at 640 px (inc/scorer.py IMGSZ; another size is a
-TEST- score). A resolution arm needs a new scorer version (R4) and is not in
-this grid.
+L-4's grid (GRID_ARMS: n640, s640, m640) varies capacity only: every arm
+trains at 640 px and is scored by the locked scorer, which infers at 640 px
+(inc/scorer.py IMGSZ; another size is a TEST- score). capacity-verdict chooses
+among these alone.
+
+The measurement arms (MEASURE_ARMS: m832, s1024) train at a larger input,
+because on base_v2 the gap to 0.90 sits in the small prostrate weeds
+(YOLO11m at 640: Carpetweed 0.736, SpottedSpurge 0.810, Purslane 0.828 test
+AP50-95, R0's milestone read). They are built on base_v2 like the capacity
+arms (3 seeds) but with finals dev and imageweeds only: they are built after
+R0, at no milestone read, so they never read test (P10; inc2.baseline refuses
+it). capacity-verdict --record lists them, and they are never a candidate of
+the decision or a stream's arm. Their production scores are
+still the locked scorer's, at 640 px: they measure what training at the
+larger size gives under 640 px inference. Inferring at the arm's size needs
+a scorer version whose imgsz is the arm's (R4).
+
+Their estimates (2026-09-30), from the measured 640 px runs on the cluster
+(one V100-32GB, cache ram, base_v2 6,811 images, 100 epochs; one base run
+with its dev score): n640 about 1.2 h, s640 1.58 h (4.73 GPU-h for 3), m640
+2.68 h (8.05 GPU-h for 3), i.e. 6.3, 8.3 and 14.2 ms per image-epoch. YOLO11m
+at 640 is GPU-bound, so its time scales with the pixels:
+  m832   14.2 ms x 1.69 = 24 ms: about 4.5 h per base run, 5.0 h with 10 % for
+         batch 16; 3 seeds with finals 14-16 GPU-h;
+  s1024  8.3 ms x 2.56 = 21 ms: at most about 4.0 h per base run (YOLO11s at
+         640 is partly loader-bound, so the pixel ratio over-states it); 3
+         seeds with finals 10-13 GPU-h.
+Both are well under the 8 h cold walltime (inc.driver COLD_TIME_LIMIT) and
+D26's 6.4 h line. GPU memory: the activations saved for the backward pass,
+per image, measured with torch.autograd.graph.saved_tensors_hooks on
+yolo11{s,m}.yaml at nc 13 in train mode with the loss (fp32, CPU, Ultralytics
+8.4.22), are 392 MiB for s640, 833 MiB for m640, 1,014 MiB for s1024 and
+1,410 MiB for m832. At batch 32 that is 26 GiB for m640 (which trains on one
+V100-32GB under AMP), 32 GiB for s1024 (1.22 x m640: fits) and 44 GiB for
+m832 (1.69 x m640: about 27-30 GB under AMP with the workspace, too close to
+32 GB). m832 therefore trains at batch 16 (22 GiB, 0.85 x m640). Ultralytics
+accumulates gradients to its nominal batch of 64 (accumulate = round(64 /
+batch)) and scales the weight decay by batch x accumulate / 64, so batch 16
+and batch 32 both take one optimizer step per 64 images with the same decay;
+only BatchNorm's batch statistics differ. RAM cache (inc2.train.choose_cache,
+0.6 x the job's 45G): about 1.35 GB per 1,000 images at 640 with Ultralytics'
+50 % margin (docs/CONTINUOUS_LOOP.md 5.6), so base_v2 needs about 15.5 GB at
+832 and 23.5 GB at 1024, both under 27 GB.
 
 Cost (estimates, V100, 1 SU per GPU-hour). The measured rates are YOLO11n at
 640 px (docs/CONTINUOUS_LOOP.md §5.6): cold 6.0-7.0 ms per image-epoch
@@ -60,9 +102,13 @@ images). Another arm's rate is bracketed:
          is never faster than the loader, whose work grows with the pixels.
 FLOPs are GFLOPs of one forward pass at nc 13, from Ultralytics'
 torch_utils.get_flops (thop) on yolo11{n,s,m}.yaml, 8.4.22, at 640: n 6.454,
-s 21.574, m 68.240. Training and scoring both run at 640 for every arm, so the
-pixel ratio is 1 (the low bracket is the n640 rate itself) and the high
-bracket, for training and scoring alike, scales by these FLOPs. Every figure
+s 21.574, m 68.240 (gflops_at_640). Scoring runs at 640 for every arm, so
+the score's high bracket scales by gflops_at_640. Training runs at the arm's
+imgsz: gflops is the 640 figure x (imgsz / 640)^2, and the pixel ratio is 1
+for the grid (the low bracket is the n640 rate itself) and (imgsz / 640)^2
+for a measurement arm. The high bracket of a measurement arm (m832 x17.9,
+s1024 x8.6 of n640) over-states it several times: the measured m640 rate is
+2.2 x n640's, not 10.6 x. Every figure
 these functions return says est. with its basis; a measured rate
 (measured_rates) replaces them once an arm has run.
 """
@@ -106,8 +152,14 @@ ARMS = {
     "n640": {"model": "yolo11n.pt", "imgsz": 640, "gflops": 6.454, "gflops_at_640": 6.454},
     "s640": {"model": "yolo11s.pt", "imgsz": 640, "gflops": 21.574, "gflops_at_640": 21.574},
     "m640": {"model": "yolo11m.pt", "imgsz": 640, "gflops": 68.240, "gflops_at_640": 68.240},
+    # measurement arms (module docstring): gflops = gflops_at_640 x (imgsz / 640)^2; an arm's "batch"
+    # replaces COMMON's in every recipe of the arm (m832: batch 32 would not fit one V100-32GB)
+    "m832": {"model": "yolo11m.pt", "imgsz": 832, "gflops": 115.326, "gflops_at_640": 68.240, "batch": 16},
+    "s1024": {"model": "yolo11s.pt", "imgsz": 1024, "gflops": 55.229, "gflops_at_640": 21.574},
 }
 ARM_IDS = tuple(ARMS)
+GRID_ARMS = ("n640", "s640", "m640")            # L-4's capacity grid: the arms a decision may choose
+MEASURE_ARMS = tuple(a for a in ARM_IDS if a not in GRID_ARMS)
 DEFAULT_ARM = "n640"
 REFERENCE_ARM = "n640"                          # the arm the measured rates are of
 FLOPS_BASIS = ("GFLOPs of one forward pass at nc 13, ultralytics.utils.torch_utils.get_flops (thop) on "
@@ -170,10 +222,15 @@ def arm_from_arch(arch, imgsz):
     return hits[0]
 
 
+def _arm_keys(a):
+    """The recipe keys an arm sets: its imgsz, and its batch when it has one."""
+    return {"imgsz": a["imgsz"], "batch": a.get("batch", COMMON["batch"])}
+
+
 def cold(arm=DEFAULT_ARM):
     """The cold recipe (base, union) of an arm, in exp.json's form (no seed)."""
     a = ARMS[arm_id(arm)]
-    return dict(COMMON, **COLD, imgsz=a["imgsz"])
+    return dict(COMMON, **COLD, **_arm_keys(a))
 
 
 def incremental(name, arm=DEFAULT_ARM):
@@ -183,7 +240,7 @@ def incremental(name, arm=DEFAULT_ARM):
         raise RecipeError("recipe %r is not in the Protocol v3 table %s%s"
                           % (name, list(INCREMENTAL_NAMES), " (%s)" % why if why else ""))
     a = ARMS[arm_id(arm)]
-    return dict(COMMON, **INCREMENTAL[name], imgsz=a["imgsz"])
+    return dict(COMMON, **INCREMENTAL[name], **_arm_keys(a))
 
 
 def table(arm=DEFAULT_ARM):

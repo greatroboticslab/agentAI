@@ -845,6 +845,21 @@ def test_choose_arm(base, guard):
     bad = TMP / "bad_capacity.json"
     bad.write_text(json.dumps({"format": "x"}))
     check("anything but inc2.baseline's capacity decision is refused", raises(lambda: st.choose_arm(bad), ST.StreamError))
+    n_arm = len([e for e in st.ledger.read() if e["event"] == "arm"])
+    for aid in RC.MEASURE_ARMS:
+        meas_cap = TMP / ("capacity_%s.json" % aid)
+        meas_cap.write_text(json.dumps(dict(json.loads(cap.read_text()), chosen_arm=aid, chosen_exp="b_v2_%s" % aid,
+                                            qualifying=["b_v2_%s" % aid])))
+        check("a decision naming the measurement arm %s is refused: never a stream's arm" % aid,
+              raises(lambda: st.choose_arm(meas_cap), ST.StreamError, contains="measurement arm"))
+    check("... and the stream's arm is still the one the decision chose (s640), with no new arm line",
+          (st.load().arm or {}).get("id") == "s640"
+          and len([e for e in st.ledger.read() if e["event"] == "arm"]) == n_arm, st.load().arm)
+    deps = ST.Deps(guard=guard, hasher=hashes, backend=D.FakeBackend())
+    check("a stream is never created on a measurement arm (init --arm m832)",
+          raises(lambda: ST.Stream("armw_m832", deps=deps, clock=Clock(), quiet=True).init(
+              base=base, m=5, testing=True, step1_dir=str(s1.root), arm="m832"), ST.StreamError,
+              contains="measurement arm"))
 
 
 def test_deadlock(base, guard):

@@ -2,11 +2,12 @@
 B_v2, its capacity arms, the canary, B0 u tsw and the stream's milestones.
 
     python -m weed_optimizer_framework.tools.inc2.baseline build --exp E (--manifest PATH | --union P1,P2,...)
-        [--seeds 0,1,2] [--arm n640|s640|m640 | --arch yolo11s --imgsz 640] [--final-exams dev,imageweeds,test]
+        [--seeds 0,1,2] [--arm n640|s640|m640|m832|s1024 | --arch yolo11s --imgsz 640]
+        [--final-exams dev,imageweeds,test]
         [--role b_v2|capacity|canary|union|milestone|baseline] [--testing | --testing-settings JSON] [--no-init]
     python -m weed_optimizer_framework.tools.inc2.baseline canary-verdict   --exp canary_v2 [--reference b0_v1]
     python -m weed_optimizer_framework.tools.inc2.baseline capacity-verdict --n b_v2 --arms b_v2_s640,b_v2_m640
-        [--m M] [--out-dir DIR]
+        [--record b_v2_m832,b_v2_s1024] [--m M] [--out-dir DIR]
     python -m weed_optimizer_framework.tools.inc2.baseline secondary --exp <sid>_mNNN --weights PATH
         [--run-id secondary__incumbent] [--source TEXT]
     python -m weed_optimizer_framework.tools.inc2.baseline estimate --n-images N [--seeds 0,1,2] [--arm A]
@@ -50,8 +51,10 @@ sha256 of every input.
 Roles and their contract rows (§4.4, §3.6, L-4):
   b_v2       LOCK v2's base_v2, arm n640, seeds 0..4 (milestone 0); finals
              dev, imageweeds, test
-  capacity   LOCK v2's base_v2, arm s640 or m640, seeds 0..2; finals dev,
-             imageweeds, test (L-4: test read once per arm at R0)
+  capacity   LOCK v2's base_v2, an arm other than n640 (L-4's s640 or m640,
+             or a measurement arm, m832 or s1024), seeds 0..2; finals dev,
+             imageweeds, test (L-4: test read once per arm at R0); a
+             measurement arm's finals dev, imageweeds (below)
   canary     LOCK v2's train_core (v1's train_core minus the L-8 drops),
              arm n640, seed 0; final exam dev only. exp.json's
              variant_drops records the dropped rows (key, image sha256, the
@@ -64,12 +67,14 @@ Roles and their contract rows (§4.4, §3.6, L-4):
              finals dev, imageweeds, test
   baseline   any other manifest, seeds 0..2; finals dev, imageweeds
 Test is read only at milestone reads (P10): b_v2, capacity and milestone. A
-build of any other role that lists test is refused. Without --role the role
-is inferred from what is built (the autopilot's L23B argv names none): --union
-is union; LOCK v2's base_v2 (by sha256) is b_v2 on n640 and capacity on
-another arm; LOCK v2's train_core is canary; anything else is baseline. A
-role given explicitly must match: b_v2, capacity and canary refuse another
-manifest or arm, union needs --union.
+build of any other role that lists test is refused, and so is a build of a
+measurement arm (inc2.recipes.MEASURE_ARMS) whatever its role: it is built
+after R0, at no milestone read, so its finals are dev and imageweeds. Without
+--role the role is inferred from what is built (the autopilot's L23B argv
+names none): --union is union; LOCK v2's base_v2 (by sha256) is b_v2 on n640
+and capacity on another arm; LOCK v2's train_core is canary; anything else is
+baseline. A role given explicitly must match: b_v2, capacity and canary
+refuse another manifest or arm, union needs --union.
 
 The arm is --arm (an id), or --arch and --imgsz together (the autopilot's
 L23B argv: --arch yolo11s --imgsz 640 is s640), which must name one row of
@@ -106,7 +111,15 @@ truth_every = 1 when that is <= 25 GPU-h, else ceil(cost / 25) (L-4). Writes
 INC_DIR/capacity/capacity_v1.json (the decision: it opens no test file) and
 capacity_v1_report.{json,md} (for people: every arm's final dev, imageweeds
 and test mean +- sd over its seeds, 12-class and agnostic, and the gap to
-0.90; the milestone read of test at R0).
+0.90; the milestone read of test at R0). Only L-4's grid arms
+(inc2.recipes.GRID_ARMS) are candidates: an --arms experiment on a
+measurement arm (m832, s1024) is refused. --record lists measurement arms
+record only: their dev mean, sd and difference from n640 (on the seeds the
+grid shares) and their finals (dev and imageweeds: no test, P10) in the
+report, never in qualifying or chosen, so the decision is the one the grid
+alone gives. With --record, an existing decision file is kept byte for byte
+(the stream adopted it by sha256) and only the report is written; a
+recomputed decision that differs from it is refused.
 
 secondary: the milestone's second number (§3.6), the chain incumbent scored
 on the milestone's final exams: writes runs/<run id>/spec.json (kind final,
@@ -144,7 +157,9 @@ FINAL_EXAMS = ("dev", "imageweeds", "test")
 CANARY_FINAL_EXAMS = ("dev",)
 NO_TEST_FINAL_EXAMS = ("dev", "imageweeds")
 # P10 (L-1): test is read only at milestone reads -- milestone 0 (b_v2), the
-# capacity arms at R0 (L-4) and the stream's milestones.
+# capacity arms at R0 (L-4) and the stream's milestones. A measurement arm
+# (inc2.recipes.MEASURE_ARMS) is built after R0, at no milestone read: its
+# finals are dev and imageweeds whatever its role, and test is refused.
 TEST_ROLES = ("b_v2", "capacity", "milestone")
 ROLE_FINAL_EXAMS = {"b_v2": FINAL_EXAMS, "capacity": FINAL_EXAMS, "milestone": FINAL_EXAMS,
                     "canary": CANARY_FINAL_EXAMS, "union": NO_TEST_FINAL_EXAMS, "baseline": NO_TEST_FINAL_EXAMS}
@@ -420,14 +435,18 @@ def canary_manifest_match(defn, ref_defn):
     return not probs, rec
 
 
-def _final_exams(final_exams, role):
-    ex = list(final_exams) if final_exams else list(ROLE_FINAL_EXAMS[role])
+def _final_exams(final_exams, role, arm=None):
+    measure = arm in RC.MEASURE_ARMS
+    ex = list(final_exams) if final_exams else list(NO_TEST_FINAL_EXAMS if measure else ROLE_FINAL_EXAMS[role])
     bad = [e for e in ex if e not in T.EXAMS]
     if bad or D.DECISION_EXAM not in ex or len(set(ex)) != len(ex):
         raise BaselineError("final exams %s: each must be one of %s, dev included, none twice" % (ex, list(T.EXAMS)))
     if "test" in ex and role not in TEST_ROLES:
         raise BaselineError("a %s build may not read test: test is read only at milestone reads (P10), roles %s"
                             % (role, list(TEST_ROLES)))
+    if "test" in ex and measure:
+        raise BaselineError("measurement arm %s may not read test: it is built after R0, at no milestone read (P10)"
+                            % arm)
     return ex
 
 
@@ -507,7 +526,7 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         seeds = P.check_seeds(list(ROLE_SEEDS.get(role, DEFAULT_SEEDS)) if seeds is None else seeds)
     except P.PilotError as e:
         raise BaselineError(str(e))
-    exams = _final_exams(final_exams, role)
+    exams = _final_exams(final_exams, role, arm_rec["id"])
     drops = None
     if union:
         srcs = [Path(os.path.abspath(str(p))) for p in union]
@@ -665,12 +684,15 @@ def canary_verdict(exp="canary_v2", reference="b0_v1", write=True, allow_testing
     return doc
 
 
-def capacity_decision(n_exp, arm_exps, m=None, testing_ok=False):
+def capacity_decision(n_exp, arm_exps, m=None, testing_ok=False, record_exps=()):
     """L-4's rule on dev only (module docstring). Opens exp.json, the base
-    runs' run.json and scores/dev.json, nothing else."""
+    runs' run.json and scores/dev.json, nothing else. record_exps
+    (measurement arms) are read on the same seeds, manifest and scorer and
+    listed record only: they never enter qualifying or chosen."""
+    record_exps = list(record_exps or ())
     exps = [n_exp] + list(arm_exps)
     loaded, arms = {}, {}
-    for e in exps:
+    for e in exps + record_exps:
         defn = _read_json(C.INC_DIR / e / "exp.json")
         if not isinstance(defn, dict) or defn.get("type") != "baseline":
             raise BaselineError("%s is not a baseline experiment" % e)
@@ -679,6 +701,12 @@ def capacity_decision(n_exp, arm_exps, m=None, testing_ok=False):
         aid = RC.arm_id(defn["arm"])
         if aid in arms:
             raise BaselineError("arm %s appears twice (%s, %s)" % (aid, arms[aid], e))
+        if e in record_exps and aid not in RC.MEASURE_ARMS:
+            raise BaselineError("%s is arm %s, one of L-4's grid %s: it is a candidate (--arms), not a record"
+                                % (e, aid, list(RC.GRID_ARMS)))
+        if e not in record_exps and aid not in RC.GRID_ARMS:
+            raise BaselineError("%s is measurement arm %s (trained at %d px, scored at 640 px): never a candidate "
+                                "of L-4's decision; list it with --record" % (e, aid, RC.ARMS[aid]["imgsz"]))
         arms[aid] = e
         loaded[e] = defn
     if RC.arm_id(loaded[n_exp]["arm"]) != RC.REFERENCE_ARM:
@@ -687,11 +715,15 @@ def capacity_decision(n_exp, arm_exps, m=None, testing_ok=False):
     common = sorted(set.intersection(*[set(loaded[e]["seeds"]) for e in exps]))
     if len(common) < 2:
         raise BaselineError("the arms share seeds %s; the rule needs at least 2" % common)
-    manifests = {loaded[e]["base"]["manifest_sha256"] for e in exps}
+    for e in record_exps:
+        if not set(common) <= set(loaded[e]["seeds"]):
+            raise BaselineError("record arm %s lacks seeds %s of the grid's %s"
+                                % (e, sorted(set(common) - set(loaded[e]["seeds"])), common))
+    manifests = {loaded[e]["base"]["manifest_sha256"] for e in exps + record_exps}
     if len(manifests) != 1:
         raise BaselineError("the arms were trained on different manifests (%d distinct)" % len(manifests))
     per, stamps = {}, None
-    for e in exps:
+    for e in exps + record_exps:
         _d, sc = base_dev_scores(e, seeds=common, testing_ok=testing_ok)
         for s, (_v, r) in sc.items():
             if stamps is None:
@@ -725,26 +757,44 @@ def capacity_decision(n_exp, arm_exps, m=None, testing_ok=False):
         cost = RC.step_cost(n_images, mm, arm, "r0", truth=True)
         basis = "est. rates (no measured run): the high end of inc2.recipes.rates(%s)" % arm
         step_h = cost["gpu_h"][1]
+    record = {}
+    for e in record_exps:
+        a = per.pop(e)
+        pooled = math.sqrt((a["sd"] ** 2 + n["sd"] ** 2) / 2.0)
+        a.pop("run_json", None)
+        record[e] = dict(a, diff_vs_n=a["mean"] - n["mean"], pooled_sd=pooled,
+                         above_2_pooled_sd=(a["mean"] - n["mean"]) > 2.0 * pooled, record_only=True,
+                         trained_imgsz=RC.ARMS[a["arm"]]["imgsz"], scored_imgsz=640)
     for e in exps:
         per[e].pop("run_json", None)
-    return {"format": CAPACITY_FORMAT, "rule": "an arm qualifies when mean(arm) - mean(n640) > 2 x pooled sd on "
-                                               "dev mAP50-95 (seeds all arms share); the best qualifying arm by "
-                                               "dev mean is chosen, else n640 (L-4)",
-            "n_exp": n_exp, "arm_exps": list(arm_exps), "seeds": common, "stamps": stamps, "arms": per,
-            "qualifying": qual, "chosen_exp": chosen, "chosen_arm": arm,
-            "chosen_arm_record": loaded[chosen]["arm"],
-            "step_cost": dict(cost, basis=basis), "m": mm, "n_images": n_images,
-            "truth_every": RC.truth_every(step_h), "truth_step_cap_gpu_h": RC.TRUTH_STEP_CAP_GPU_H,
-            "note": "decided on dev only; test is in the separate report, for people"}
+    out = {"format": CAPACITY_FORMAT, "rule": "an arm qualifies when mean(arm) - mean(n640) > 2 x pooled sd on "
+                                              "dev mAP50-95 (seeds all arms share); the best qualifying arm by "
+                                              "dev mean is chosen, else n640 (L-4)",
+           "n_exp": n_exp, "arm_exps": list(arm_exps), "seeds": common, "stamps": stamps, "arms": per,
+           "qualifying": qual, "chosen_exp": chosen, "chosen_arm": arm,
+           "chosen_arm_record": loaded[chosen]["arm"],
+           "step_cost": dict(cost, basis=basis), "m": mm, "n_images": n_images,
+           "truth_every": RC.truth_every(step_h), "truth_step_cap_gpu_h": RC.TRUTH_STEP_CAP_GPU_H,
+           "note": "decided on dev only; test is in the separate report, for people"}
+    if record_exps:
+        out.update(record_exps=list(record_exps), record=record,
+                   record_note="measurement arms, record only: never in qualifying or chosen; trained at their "
+                               "imgsz and scored by the locked scorer at 640 px")
+    return out
 
 
 def capacity_report(decision, testing_ok=False):
     """Every arm's final scores on its final exams (dev, imageweeds, test),
-    mean +- sd over seeds, 12-class and agnostic, and the gap to 0.90 on test."""
+    mean +- sd over seeds, 12-class and agnostic, and the gap to 0.90 on test.
+    The decision's record arms (measurement arms) are listed too, marked
+    record_only."""
     rows = {}
-    for e in [decision["n_exp"]] + list(decision["arm_exps"]):
+    record = list(decision.get("record_exps") or [])
+    for e in [decision["n_exp"]] + list(decision["arm_exps"]) + record:
         defn = _read_json(C.INC_DIR / e / "exp.json") or {}
         out = {"arm": (defn.get("arm") or {}).get("id"), "seeds": defn.get("seeds"), "exams": {}, "inputs": []}
+        if e in record:
+            out["record_only"] = True
         for exam in defn.get("final_exams") or []:
             tw, ag = [], []
             for s in defn.get("seeds") or []:
@@ -775,25 +825,41 @@ def _report_md(rep):
     def f(x):
         return "-" if x is None else "%.4f" % x
     for e, r in rep["arms"].items():
+        arm = "%s (record only, scored at 640 px)" % r["arm"] if r.get("record_only") else r["arm"]
         for exam, v in r["exams"].items():
-            lines.append("| %s | %s | %s | %s +- %s | %s +- %s | %d |" % (e, r["arm"], exam, f(v["twelve"]["mean"]),
+            lines.append("| %s | %s | %s | %s +- %s | %s +- %s | %d |" % (e, arm, exam, f(v["twelve"]["mean"]),
                                                                          f(v["twelve"]["sd"]), f(v["agnostic"]["mean"]),
                                                                          f(v["agnostic"]["sd"]), v["n"]))
-        lines.append("| %s | %s | gap to %.2f on test | %s | | |" % (e, r["arm"], rep["target_test_map50_95"],
+        lines.append("| %s | %s | gap to %.2f on test | %s | | |" % (e, arm, rep["target_test_map50_95"],
                                                                      f(r["gap_to_target"])))
     return "\n".join(lines) + "\n"
 
 
+# What a record-only run must find unchanged in an existing decision file.
+DECISION_KEYS = ("n_exp", "arm_exps", "seeds", "qualifying", "chosen_exp", "chosen_arm")
+
+
 def capacity_verdict(n_exp="b_v2", arm_exps=("b_v2_s640", "b_v2_m640"), m=None, out_dir=None, write=True,
-                     testing_ok=False):
-    decision = capacity_decision(n_exp, arm_exps, m=m, testing_ok=testing_ok)
+                     testing_ok=False, record_exps=()):
+    """The decision and its report (module docstring). With record_exps and
+    an existing decision file, that file is kept byte for byte and only the
+    report is written; a recomputed decision that differs from it refuses."""
+    decision = capacity_decision(n_exp, arm_exps, m=m, testing_ok=testing_ok, record_exps=record_exps)
     decision["generated_utc"] = D._utc()
     report = capacity_report(decision, testing_ok=testing_ok)
     report["generated_utc"] = decision["generated_utc"]
     if write:
         d = Path(out_dir) if out_dir else C.INC_DIR / "capacity"
         decision["out"] = str(d / ("%s.json" % CAPACITY_NAME))
-        _write_json(decision["out"], decision)
+        if record_exps and Path(decision["out"]).exists():
+            old = _read_json(decision["out"])
+            diff = [k for k in DECISION_KEYS if not isinstance(old, dict) or old.get(k) != decision.get(k)]
+            if diff:
+                raise BaselineError("%s holds another decision (%s differ); a record-only run never replaces it"
+                                    % (decision["out"], ", ".join(diff)))
+            decision["decision_kept"] = True
+        else:
+            _write_json(decision["out"], decision)
         report["decision_sha256"] = _sha(decision["out"])
         report["out"] = str(d / ("%s_report.json" % CAPACITY_NAME))
         _write_json(report["out"], report)
@@ -801,8 +867,10 @@ def capacity_verdict(n_exp="b_v2", arm_exps=("b_v2_s640", "b_v2_m640"), m=None, 
         tmp = md.with_name(".%s.tmp" % md.name)
         tmp.write_text(_report_md(report))
         os.replace(tmp, md)
-    log("capacity: chosen arm %s (%s); qualifying %s; truth every %d step(s)"
-        % (decision["chosen_arm"], decision["chosen_exp"], decision["qualifying"], decision["truth_every"]))
+    log("capacity: chosen arm %s (%s); qualifying %s; truth every %d step(s)%s"
+        % (decision["chosen_arm"], decision["chosen_exp"], decision["qualifying"], decision["truth_every"],
+           "; record only: %s" % ", ".join("%s dev %.4f" % (e, r["mean"]) for e, r in decision["record"].items())
+           if record_exps else ""))
     return decision, report
 
 
@@ -873,6 +941,8 @@ def main(argv=None):
     ap.add_argument("--reference", default="b0_v1", help="canary-verdict: the B0 experiment")
     ap.add_argument("--n", default="b_v2", help="capacity-verdict: the n640 experiment")
     ap.add_argument("--arms", default="b_v2_s640,b_v2_m640", help="capacity-verdict: the other arms' experiments")
+    ap.add_argument("--record", default=None, help="capacity-verdict: measurement arms' experiments, listed record "
+                                                   "only (e.g. b_v2_m832,b_v2_s1024)")
     ap.add_argument("--m", type=int, default=None, help="capacity-verdict: M (default ceil(0.10 x |base|))")
     ap.add_argument("--out-dir", default=None)
     ap.add_argument("--weights", default=None, help="secondary: the chain incumbent's final.pt")
@@ -892,7 +962,8 @@ def main(argv=None):
         elif a.command == "canary-verdict":
             canary_verdict(a.exp or "canary_v2", a.reference)
         elif a.command == "capacity-verdict":
-            capacity_verdict(a.n, [x for x in a.arms.split(",") if x], m=a.m, out_dir=a.out_dir)
+            capacity_verdict(a.n, [x for x in a.arms.split(",") if x], m=a.m, out_dir=a.out_dir,
+                             record_exps=[x for x in (a.record or "").split(",") if x])
         elif a.command == "secondary":
             if not a.exp or not a.weights:
                 raise BaselineError("secondary needs --exp and --weights")
@@ -902,8 +973,9 @@ def main(argv=None):
             if a.n_images is None:
                 raise BaselineError("estimate needs --n-images")
             seeds = P.check_seeds(a.seeds or ",".join(str(s) for s in DEFAULT_SEEDS))
-            print(json.dumps(RC.baseline_cost(a.n_images, seeds, list(FINAL_EXAMS), arm_arg(a.arm, a.arch, a.imgsz)),
-                             indent=1, sort_keys=True))
+            aid = arm_arg(a.arm, a.arch, a.imgsz)
+            exams = NO_TEST_FINAL_EXAMS if aid in RC.MEASURE_ARMS else FINAL_EXAMS
+            print(json.dumps(RC.baseline_cost(a.n_images, seeds, list(exams), aid), indent=1, sort_keys=True))
     except (BaselineError, P.PilotError, D.DriverError, RC.RecipeError) as e:
         print("[inc2.baseline] ERROR: %s" % e, file=sys.stderr)
         return 1

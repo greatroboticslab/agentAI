@@ -1730,6 +1730,45 @@ The existing `test_inc_verify`, `test_inc_select`, `test_funnel_recover` and `te
 
 Nothing has run on the cluster.
 
+#### Amendment (2026-09-30): measurement arms m832 and s1024, beside L-4's grid
+
+**Why.** On base_v2 (6,811 images, 3 seeds each) the capacity grid gives test 12-class mAP50-95 0.8468 (n640), 0.8653 (s640) and 0.8786 (m640). These are R0's milestone read of test (L-4). The gap to 0.90 is 0.021, and it sits in the small prostrate weeds: under m640, Carpetweed 0.736, SpottedSpurge 0.810 and Purslane 0.828. Input resolution is the next lever to measure.
+
+**What changed.**
+- `inc2/recipes.py`: two arms. `m832` is yolo11m.pt at 832 px, batch 16. `s1024` is yolo11s.pt at 1024 px, batch 32. Their `gflops` are the 640 figure × (imgsz/640)², and `gflops_at_640` stays the 640 figure, because scoring runs at 640. An arm's `batch` now replaces the table's 32 in every recipe of that arm, and no other arm sets one. `GRID_ARMS` (n640, s640, m640) and `MEASURE_ARMS` (m832, s1024) name the two sets.
+- `inc2/baseline.py`: on base_v2 the two arms build as role `capacity` (3 seeds; finals dev and imageweeds). They are built after R0, at no milestone read, so they never read test (P10): a build of a measurement arm that lists test is refused, whatever its role. `capacity-verdict` refuses a measurement arm in `--arms`. `--record b_v2_m832,b_v2_s1024` lists them record only: their dev mean against n640, and their finals in `capacity_v1_report`. They never enter `qualifying` or `chosen`. An existing `capacity_v1.json` is kept byte for byte, because the stream adopted it by sha256. A recomputed decision that differs from it refuses the run.
+- `inc2/stream.py`: `init` and `choose-arm` accept only a grid arm.
+- Autopilot:
+  - `stream_domains/weed.json` holds the baselines `cap_m832` (b_v2_m832) and `cap_s1024` (b_v2_s1024), marked `measure`, and `capacity.measure_arms`, whose cost factors are 4.0 and 3.5.
+  - DR0 proposes them as L23B, within the envelope, one at a time and only while missing. It does so only once R0 is complete, meaning the stream has adopted its arm and read Stage C, and nothing else of R0 is due, in MAINT or DATA. R0 READY never waits for them. Their proposals cite only `/stage/lock` and `/stage/baselines/<id>`. The whole `/stage` changes with every segment the TRAIN lane builds, and a changed cite would leave the grant waiting for a person.
+  - A failure of theirs never stops the stream. `stream._health` runs D5 and D6 on them as on every live experiment. A measurement arm's D5 loses OP_PAUSE (`_record_only`), so it neither pauses the campaign nor stands as a firing stop-loss that would refuse every envelope grant (`executor._trigger_check`); L7 still unblocks its transient units. A block that is not transient (`failed_run`, two failed attempts, for example a CUDA OOM) and a stale advance (D6) file one escalation card each, and the lanes run on. The experiment stays built, so DR0 does not propose it again; a person unblocks it or leaves it. D7 and D14 still pause the stream on any experiment.
+  - They share the stream's budget. At the default caps (120 SU a UTC day, 350 SU a month) a K=4 segment on m640 with r0 prices at about 101 SU, so an arm granted earlier the same UTC day (20.7 or 18.7 SU) defers that segment's envelope grant to the next UTC day. The two arms use about 39 SU, 11 % of a month's window.
+  - `stream_remote` and the `inc_build_baseline_v2` policy row admit `--arm m832 | s1024`.
+
+**What they measure.** Production scores are the locked scorer's, and it infers at 640 px (L-4). These arms therefore measure what training at 832 or 1024 px gives under 640 px inference. They do not measure inference at the larger size: that needs a scorer version whose imgsz is the arm's (R4). **They do not change the stream's arm.** The capacity decision (m640) stays, because nothing reads them as candidates and `choose-arm` refuses them.
+
+**Resource estimate (est.; V100-32GB, cache ram, one `run_inc2_job.sh` job with `--mem=45G`).**
+- **Time.** Measured per base run (100 epochs plus the dev score): n640 about 1.2 h, s640 1.58 h and m640 2.68 h, that is 6.3, 8.3 and 14.2 ms per image-epoch. YOLO11m at 640 is GPU-bound.
+  - m832: 14.2 × 1.69 gives about 4.5 h per base run, 5.0 h with 10 % for batch 16, and 14–16 GPU-h for 3 seeds with finals.
+  - s1024: 8.3 × 2.56 gives at most about 4.0 h per base run, and 10–13 GPU-h.
+  - Both are well under the 8 h cold walltime (`driver.COLD_TIME_LIMIT`) and D26's 6.4 h line. The platform prices the builds at 20.7 and 18.7 GPU-h, the build job included.
+- **GPU memory.** The activations saved for backward were measured per image on the CPU in fp32 (Ultralytics 8.4.22, train mode with the loss): m640 833 MiB, m832 1,410 MiB, s1024 1,014 MiB.
+  - At batch 32 that is 26 GiB for m640, which fits one V100-32GB under AMP as it ran; 32 GiB for s1024 (1.22 × m640, fits); and 44 GiB for m832 (1.69 × m640, about 27–30 GB under AMP, too close to 32 GB).
+  - m832 therefore uses batch 16 (0.85 × m640). Ultralytics accumulates to its nominal batch of 64 and scales weight decay to match, so the optimizer step is unchanged. Only BatchNorm's batch statistics differ.
+  - These are CPU extrapolations anchored on m640 having fit; m640's logged GPU peak has not been read, and neither arm has run at 832 or 1024 px on a GPU. If s1024 at batch 32 runs out of memory, its runs fail and block, which is a card (above), not a stop of the stream. Reading m640's logged `GPU_mem` first tells whether s1024 needs batch 16 like m832 (above about 24 GB for m640 it does).
+- **RAM cache.** About 15.5 GB at 832 and 23.5 GB at 1024 for base_v2, under the 27 GB (0.6 × 45G) at which `inc2.train` falls back to disk.
+
+**How it was verified.** Locally, with no GPU:
+- `test_inc2_baseline.py`: the arms resolve with their checkpoint's sha256; the cost factors hold; a batch-32 m832 recipe deviates; the grid's recipes are unchanged; capacity builds by `--arm` and by `--arch/--imgsz`, with finals dev and imageweeds, and a measurement build that lists test is refused; the `--record` rules above, including a record arm that lacks one of the grid's seeds or was trained on another manifest (refused) and one with an extra seed (the decision's seeds and outcome are the grid's alone).
+- `test_inc2_train.py`: the table check reads every grid arm's cold recipe at 640 px and each measurement arm's at its own size. It previously asserted 640 px for every arm.
+- `test_inc2_stream.py`: `choose-arm` and `init` refuse both arms, and the stream's arm stays.
+- `test_stream_ap_units.py`: prices and grammar. The arms are not proposed before R0 is complete, while Stage C runs unread, or while a DATA item of R0 (the L17 backfill) is due. Then m832 is proposed, then s1024, then nothing, with the narrow cites, with L18 still cut and with the arm, the LA count and `capacity_v1.json` unchanged. A `failed_run` block of b_v2_m832 files a card, the campaign stays enabled and s1024 is still granted within the envelope; a stale advance of it (D6) files a card too; the same block on a segment still pauses the stream.
+- `test_stream_ap_replay.py` (stream_r0): R0 step by step, then both arms within the envelope.
+- `test_stream_pipeline.py`: the real `inc2.baseline` builds both arms after R0 on the pinned driver, with finals dev and imageweeds, while segment 1 is cut and committed, and the stream keeps the arm its decision chose (n640 in that world).
+- 11 source mutations, each run in a scratch copy, make a test fail. Nine further mutations fail a test as well: DR0 proposing an arm while a DATA item of R0 is due; `capacity-verdict` without the record arms' seed check, taking the seed intersection over the record arms, or leaving them out of the one-manifest check; a measurement arm's finals defaulting to test, or its test refusal removed; its D5 keeping OP_PAUSE; its D6 pausing; and its card filed once per summary rather than once per block.
+
+**Deploy.** `brain/policy_actions.json`, `stream_domains/weed.json` and the autopilot modules change `executor.code_hash()`, and `diagnose_stream.py` and `levers_stream.py` change the stream rules version. After the lab and cluster copies are synced from one commit, run `executor.run_replay_tests` so that envelope builds are granted again. The next L18 writes its prospective record under the new rules version.
+
 ### Build note (group E)
 
 **What was built.** `inc2/stream.py` (verbs `init`, `choose-arm`, `cut` (dry run), `build`, `commit`, `milestone`, `compare`, `rollback`, `bisect`, `feasibility`, `fork`, `quarantine`, `unquarantine`, `release`, `withdraw`, `summary`, `verify`, `status`), `inc2/stream_report.py` (`--stream`, `--segment`), `run_inc2_build.sh`; tests `test_inc2_stream.py` and `test_inc2_stream_report.py`. `inc2/driver3.py` (R5) is not built: its trigger is evidence from three segments.

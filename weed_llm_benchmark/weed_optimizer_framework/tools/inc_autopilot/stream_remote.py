@@ -568,7 +568,7 @@ BUILD_FLAGS = {
     ("baseline", "build"): {"--exp": ("exp", _NAME), "--manifest": ("manifest", re.compile(_INC_MANIFEST + r"\Z")),
                             "--union": ("union", re.compile(_INC_MANIFEST + r"(," + _INC_MANIFEST + r"){1,5}\Z")),
                             "--seeds": ("seeds", re.compile(r"[0-9]{1,2}(,[0-9]{1,2}){0,9}\Z")),
-                            "--arm": ("arm", _ENUM("n640", "s640", "m640")),
+                            "--arm": ("arm", _ENUM("n640", "s640", "m640", "m832", "s1024")),
                             "--role": ("role", _ENUM("b_v2", "capacity", "canary", "union"))},
     ("pilot4", "build"): {"--exp": ("exp", _NAME), "--from": ("from_exp", _NAME), "--recipes": ("recipes", _RECIPES)},
 }

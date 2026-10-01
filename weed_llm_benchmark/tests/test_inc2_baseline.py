@@ -10,9 +10,18 @@ What is pinned:
 - every build's definition passes the pinned driver's validate_definition
   and check_definition_data, and carries protocol v3 / inc2 / splits v2, the
   arm record with its checkpoint's sha256, init_weights = the arm's
-  checkpoint, the arm's Protocol v3 cold recipe (imgsz 640 on every arm), the
-  role's seeds and final exams, source_locked (the LOCK v2 name of the
-  manifest), and an est. cost scaled by the arm's FLOPs and pixels;
+  checkpoint, the arm's Protocol v3 cold recipe (imgsz 640 on every grid
+  arm), the role's seeds and final exams, source_locked (the LOCK v2 name of
+  the manifest), and an est. cost scaled by the arm's FLOPs and pixels;
+- the measurement arms (2026-09-30): m832 (yolo11m.pt, 832 px, batch 16) and
+  s1024 (yolo11s.pt, 1024 px, batch 32) resolve with their checkpoint's
+  sha256, their GFLOPs are the 640 figure x (imgsz / 640)^2, their cost
+  scales by those FLOPs and the pixel ratio (scoring by the 640 FLOPs), a
+  recipe at another batch deviates, the grid's recipes are unchanged; built
+  on base_v2 without --role they are capacity builds (3 seeds, finals dev,
+  imageweeds: built after R0, at no milestone read, they never read test,
+  P10), by --arm or by --arch/--imgsz, and a build of one that lists test is
+  refused;
 - union: the parts' rows in one manifest, each part recorded; overlapping
   parts are refused, and so is a part holding an hflip copy of a test image
   (the guard runs over the union);
@@ -53,7 +62,13 @@ What is pinned:
   none beating it keeps n640; truth_every follows the measured rate; the
   decision is identical when every test score is perturbed (test-blind) and
   refuses mixed scorers or a missing arm; the report carries test and the
-  gap to 0.90;
+  gap to 0.90; a measurement arm is refused as a candidate and a grid arm as
+  a record; --record lists the measurement arms (dev against n640, finals in
+  the report) and leaves the decision what the grid alone gives, even when a
+  measurement arm has the best dev mean or an extra seed; a record arm that
+  lacks one of the grid's seeds or was trained on another manifest is
+  refused; an existing decision file is kept byte for byte, and one that
+  disagrees refuses the record-only run;
 - secondary: a final spec the v2 executor accepts, the milestone's exams, the
   run_inc2_job.sh argv, the log dir its --output names; a driver run id or
   missing weights refuse;
@@ -245,8 +260,10 @@ def test_builds(Wd):
         "--union with role b_v2": dict(union=[tc, V2() / "tsw22.jsonl"], role="b_v2"),
         "--arch without --imgsz": dict(manifest=base_v2, arch="yolo11s"),
         "an arch/imgsz pair outside the table": dict(manifest=base_v2, arch="yolo11x", imgsz=640),
-        "yolo11s at 1024 (a detector of the table at another imgsz; no resolution arm)":
-            dict(manifest=base_v2, arch="yolo11s", imgsz=1024),
+        "yolo11s at 832 (a detector of the table at an imgsz no arm has)":
+            dict(manifest=base_v2, arch="yolo11s", imgsz=832),
+        "yolo11m at 1024 (the measurement arms are m832 and s1024 only)":
+            dict(manifest=base_v2, arch="yolo11m", imgsz=1024),
         "--arm and --arch that disagree": dict(manifest=base_v2, arm="m640", arch="yolo11s", imgsz=640)}
     for what, kw in role_cases.items():
         e = refused(B.build_definition, "b_role", testing=True, **kw)
@@ -289,6 +306,72 @@ def test_builds(Wd):
           e is not None and "nothing is downloaded" in str(e), e)
     e = refused(B.build_definition, "b_prod", manifest=base_v2, role="b_v2")
     check("a production build refuses a LOCK v2 written by a testing build", e is not None and "testing" in str(e), e)
+
+
+def test_measure_arms(Wd):
+    print("the measurement arms m832 and s1024 (2026-09-30)")
+    check("L-4's grid is n640, s640, m640; the measurement arms are m832 and s1024, in the table",
+          RC.GRID_ARMS == ("n640", "s640", "m640") and RC.MEASURE_ARMS == ("m832", "s1024")
+          and set(RC.ARM_IDS) == set(RC.GRID_ARMS) | set(RC.MEASURE_ARMS), (RC.GRID_ARMS, RC.MEASURE_ARMS))
+    check("the grid's recipes are unchanged: 640 px, batch 32, every recipe of the table",
+          all(RC.table(a)[r] == dict(RC.COMMON, **(RC.COLD if r == "cold" else RC.INCREMENTAL[r]), imgsz=640)
+              and RC.table(a)[r]["batch"] == 32 for a in RC.GRID_ARMS for r in RC.table(a)))
+    m, s = RC.table("m832"), RC.table("s1024")
+    check("m832 trains yolo11m.pt at 832 px, batch 16, in every recipe; s1024 yolo11s.pt at 1024 px, batch 32",
+          RC.ARMS["m832"]["model"] == "yolo11m.pt" and RC.ARMS["s1024"]["model"] == "yolo11s.pt"
+          and all(r["imgsz"] == 832 and r["batch"] == 16 for r in m.values())
+          and all(r["imgsz"] == 1024 and r["batch"] == 32 for r in s.values())
+          and {k: v for k, v in m["cold"].items() if k not in ("imgsz", "batch")}
+          == {k: v for k, v in RC.cold("m640").items() if k not in ("imgsz", "batch")}, (m["cold"], s["cold"]))
+    check("every arm's GFLOPs are its 640 figure x (imgsz / 640)^2, and the 640 figure is the same model's 640 arm's",
+          all(abs(v["gflops"] - round(v["gflops_at_640"] * (v["imgsz"] / 640.0) ** 2, 3)) < 1e-9
+              for v in RC.ARMS.values())
+          and RC.ARMS["m832"]["gflops_at_640"] == RC.ARMS["m640"]["gflops"]
+          and RC.ARMS["s1024"]["gflops_at_640"] == RC.ARMS["s640"]["gflops"],
+          {a: (v["gflops"], v["gflops_at_640"]) for a, v in RC.ARMS.items()})
+    rm = RC.resolve_arm("m832", repo=C.REPO)
+    rs = RC.resolve_arm("s1024", repo=C.REPO)
+    check("the arms resolve with their checkpoint's sha256 (yolo11m.pt, yolo11s.pt) and pass check_arm_record",
+          rm["weights_sha256"] == W.sha(C.REPO / "yolo11m.pt") and rs["weights_sha256"] == W.sha(C.REPO / "yolo11s.pt")
+          and RC.check_arm_record(rm) == "m832" and RC.check_arm_record(rs) == "s1024" and rm["imgsz"] == 832, (rm, rs))
+    e = refused(RC.check_arm_record, dict(rm, imgsz=640))
+    check("... and a record of m832 at 640 px is refused", e is not None and "imgsz" in str(e), e)
+    check("--arch/--imgsz name them: yolo11m at 832 is m832, yolo11s.pt at 1024 is s1024",
+          RC.arm_from_arch("yolo11m", 832) == "m832" and RC.arm_from_arch("yolo11s.pt", 1024) == "s1024")
+    check("an m832 recipe at batch 32 deviates from the table; its own recipe does not",
+          RC.deviations("base", dict(RC.cold("m832"), batch=32), "m832") == ["batch 32 (protocol v3 16)"]
+          and not RC.deviations("base", RC.cold("m832"), "m832")
+          and RC.match("cand", RC.incremental("r0", "m832"), "m832") == "r0")
+    rt = {a: RC.rates(a) for a in ("n640", "m640", "m832", "s1024")}
+    check("cost factors: m832 FLOPs x%.3f and pixels x%.2f of n640, s1024 x%.3f and x%.2f; scoring (640 px) at "
+          "m640's and s640's FLOPs" % (rt["m832"]["flops_factor"], rt["m832"]["pixel_factor"],
+                                         rt["s1024"]["flops_factor"], rt["s1024"]["pixel_factor"]),
+          abs(rt["m832"]["flops_factor"] - 17.8689) < 1e-3 and abs(rt["m832"]["pixel_factor"] - 1.69) < 1e-9
+          and abs(rt["s1024"]["flops_factor"] - 8.5573) < 1e-3 and abs(rt["s1024"]["pixel_factor"] - 2.56) < 1e-9
+          and rt["m832"]["score"] == rt["m640"]["score"] and RC.rates("s1024")["score"] == RC.rates("s640")["score"]
+          and rt["m832"]["cold"][0] == round(RC.COLD_MS[0] * 1.69, 4)
+          and rt["m832"]["cold"][1] == round(RC.COLD_MS[1] * RC.flops_factor("m832"), 4), rt["m832"])
+    base_v2 = V2() / "base_v2.jsonl"
+    bm, _ = B.build_definition("b_v2_m832", manifest=base_v2, arm="m832", testing=True)
+    bs, _ = B.build_definition("b_v2_s1024", manifest=base_v2, arch="yolo11s", imgsz=1024, testing=True)
+    D.validate_definition(json.loads(json.dumps(bm)))
+    D.check_definition_data(bm)
+    check("on base_v2 without --role they are capacity builds: 3 seeds, finals dev and imageweeds (no test: P10), "
+          "the arm's cold recipe and checkpoint, a definition the pinned driver accepts",
+          all(d["role"] == "capacity" and d["seeds"] == [0, 1, 2] and d["final_exams"] == ["dev", "imageweeds"]
+              for d in (bm, bs))
+          and bm["base"]["recipe"] == RC.cold("m832") and bm["init_weights"] == "yolo11m.pt"
+          and bs["base"]["recipe"] == RC.cold("s1024") and bs["init_weights"] == "yolo11s.pt"
+          and bm["arm"]["id"] == "m832" and bs["arm"]["id"] == "s1024",
+          [(d["role"], d["arm"]["id"], d["base"]["recipe"]["imgsz"], d["base"]["recipe"]["batch"]) for d in (bm, bs)])
+    for what, kw in (("role capacity", dict(arm="m832", role="capacity")), ("inferred role", dict(arm="s1024"))):
+        e = refused(B.build_definition, "b_v2_meas_test", manifest=base_v2, final_exams=["dev", "imageweeds", "test"],
+                    testing=True, **kw)
+        check("... and a measurement build (%s) that lists test is refused: it is at no milestone read (P10)" % what,
+              e is not None and "may not read test" in str(e) and not (C.INC_DIR / "b_v2_meas_test").exists(), e)
+    c = bm["cost_estimate"]
+    check("... and their est. cost is recorded with the pixel ratio (m832 low bracket %s GPU-h per run)"
+          % c["per_run_gpu_h"][0], c["arm"] == "m832" and abs(c["pixel_factor"] - 1.69) < 1e-9 and c["imgsz"] == 832)
 
 
 def test_e2e_baseline(Wd):
@@ -407,17 +490,20 @@ def test_e2e_chain(Wd):
 
 
 def fake_baseline(exp, arm, dev_values, test_values, rate_ms=None, n_images=7625, scorer="s" * 16, sidecar=True,
-                  production=True, manifest_sha="b" * 64):
+                  production=True, manifest_sha="b" * 64, seeds=None):
+    """A built baseline's files as inc2.baseline and the driver write them
+    (a measurement arm's finals are dev and imageweeds: no test)."""
     root = C.INC_DIR / exp
-    seeds = list(range(len(dev_values)))
+    seeds = list(range(len(dev_values))) if seeds is None else list(seeds)
+    exams = ["dev", "imageweeds"] if RC.arm_id(arm) in RC.MEASURE_ARMS else ["dev", "imageweeds", "test"]
     rec = RC.resolve_arm(arm, require_weights=False)
-    defn = {"exp": exp, "type": "baseline", "seeds": seeds, "final_exams": ["dev", "imageweeds", "test"],
+    defn = {"exp": exp, "type": "baseline", "seeds": seeds, "final_exams": exams,
             "base": {"name": "base_v2", "manifest": "/x/base_v2.jsonl", "manifest_sha256": manifest_sha,
                      "n_images": n_images, "recipe": RC.cold(arm)}}
     defn.update(RC.stamp(rec))
     root.mkdir(parents=True, exist_ok=True)
     (root / "exp.json").write_text(json.dumps(defn))
-    for s, (dv, tv) in enumerate(zip(dev_values, test_values)):
+    for s, dv, tv in zip(seeds, dev_values, test_values):
         r = root / "runs" / ("base__s%d" % s)
         (r / "scores").mkdir(parents=True, exist_ok=True)
         secs = (rate_ms or 6.5) * n_images * 100 / 1000.0
@@ -433,6 +519,8 @@ def fake_baseline(exp, arm, dev_values, test_values, rate_ms=None, n_images=7625
         f = root / "runs" / ("final__base__s%d" % s) / "scores"
         f.mkdir(parents=True, exist_ok=True)
         for exam, v in (("dev", dv), ("imageweeds", 0.05), ("test", tv)):
+            if exam not in exams:
+                continue
             (f / ("%s.json" % exam)).write_text(json.dumps(dict(fake_score(v, "w%s%d" % (exp, s)), exam=exam,
                                                                 production=True)))
 
@@ -579,6 +667,67 @@ def test_verdicts(Wd):
           "has no test number", abs(repd["arms"]["cap_s"]["gap_to_target"] - (0.90 - (0.874 + 0.870 + 0.877) / 3)) < 1e-9
           and not decision_reads_test(json.load(open(dec["out"])))
           and (C.INC_DIR / "capacity_t" / "capacity_v1_report.md").is_file())
+    # the measurement arms: m832 with the best dev mean of all, s1024 below n640
+    fake_baseline("cap_m832", "m832", [0.870, 0.872, 0.869], [0.890, 0.888, 0.891], rate_ms=24.0)
+    fake_baseline("cap_s1024", "s1024", [0.800, 0.803, 0.799], [0.84] * 3, rate_ms=21.0)
+    e = refused(B.capacity_verdict, "cap_n", ["cap_s", "cap_m832"], write=False)
+    check("a measurement arm is never a candidate (--arms b_v2_m832 is refused: list it with --record)",
+          e is not None and "never a candidate" in str(e) and "--record" in str(e), e)
+    e = refused(B.capacity_verdict, "cap_n", ["cap_s"], write=False, record_exps=["cap_m"])
+    check("a grid arm is a candidate, not a record", e is not None and "not a record" in str(e), e)
+    dec_path = C.INC_DIR / "capacity_t" / "capacity_v1.json"
+    dec_bytes = dec_path.read_bytes()
+    decr, repr_ = B.capacity_verdict("cap_n", ["cap_s", "cap_m"], out_dir=C.INC_DIR / "capacity_t",
+                                     record_exps=["cap_m832", "cap_s1024"])
+    core = lambda d: {k: v for k, v in strip(d).items() if k not in ("record_exps", "record", "record_note",  # noqa: E731
+                                                                     "decision_kept")}
+    rec = decr.get("record") or {}
+    check("--record: the decision is the grid's alone (s640 chosen, qualifying [cap_s]) although m832 has the best "
+          "dev mean; the measurement arms are listed record only, never in arms, qualifying or chosen",
+          core(decr) == core(dec) and decr["chosen_arm"] == "s640" and decr["qualifying"] == ["cap_s"]
+          and set(rec) == {"cap_m832", "cap_s1024"} and "cap_m832" not in decr["arms"]
+          and rec["cap_m832"]["record_only"] is True and rec["cap_m832"]["above_2_pooled_sd"] is True
+          and rec["cap_s1024"]["above_2_pooled_sd"] is False
+          and rec["cap_m832"]["mean"] > max(v["mean"] for v in decr["arms"].values())
+          and rec["cap_m832"]["trained_imgsz"] == 832 and rec["cap_m832"]["scored_imgsz"] == 640,
+          {k: decr.get(k) for k in ("chosen_arm", "qualifying", "record")})
+    rows = repr_["arms"]
+    check("... an existing decision file is kept byte for byte (the stream adopted it by sha256); the report lists the "
+          "measurement arms' finals (dev, imageweeds: no test, so no gap to 0.90), marked record only",
+          dec_path.read_bytes() == dec_bytes and decr.get("decision_kept") is True
+          and repr_["decision_sha256"] == W.sha(dec_path) and rows["cap_m832"].get("record_only") is True
+          and "record_only" not in rows["cap_s"] and sorted(rows["cap_m832"]["exams"]) == ["dev", "imageweeds"]
+          and rows["cap_m832"]["exams"]["dev"]["n"] == 3 and rows["cap_m832"]["gap_to_target"] is None
+          and rows["cap_s"]["exams"]["test"]["n"] == 3
+          and "m832 (record only" in (C.INC_DIR / "capacity_t" / "capacity_v1_report.md").read_text(),
+          {k: rows[k].get("record_only") for k in rows})
+    fake_baseline("cap_m832_s2", "m832", [0.870, 0.872], [0.0] * 2)
+    e = refused(B.capacity_verdict, "cap_n", ["cap_s", "cap_m"], write=False, record_exps=["cap_m832_s2"])
+    check("a record arm that lacks one of the grid's seeds is refused (the grid's seeds are never narrowed by it)",
+          e is not None and "lacks seeds [2]" in str(e), e)
+    fake_baseline("cap_s1024_s4", "s1024", [0.800, 0.803, 0.799, 0.806], [0.0] * 4, seeds=[0, 1, 2, 3])
+    dec4, _ = B.capacity_verdict("cap_n", ["cap_s", "cap_m"], write=False, record_exps=["cap_s1024_s4"])
+    check("... and one with an extra seed leaves the decision's seeds and outcome the grid's alone, read on those seeds",
+          core(dec4) == core(dec) and dec4["seeds"] == [0, 1, 2]
+          and dec4["record"]["cap_s1024_s4"]["seeds"] == [0, 1, 2]
+          and abs(dec4["record"]["cap_s1024_s4"]["mean"] - (0.800 + 0.803 + 0.799) / 3) < 1e-9,
+          {k: dec4.get(k) for k in ("seeds", "chosen_arm", "qualifying")})
+    fake_baseline("cap_m832_mf", "m832", [0.870, 0.872, 0.869], [0.0] * 3, manifest_sha="c" * 64)
+    e = refused(B.capacity_verdict, "cap_n", ["cap_s", "cap_m"], write=False, record_exps=["cap_m832_mf"])
+    check("... and one trained on another manifest is refused", e is not None and "different manifests" in str(e), e)
+    other = json.loads(dec_bytes)
+    other["chosen_arm"], other["chosen_exp"] = "m640", "cap_m"
+    dec_path.write_text(json.dumps(other))
+    e = refused(B.capacity_verdict, "cap_n", ["cap_s", "cap_m"], out_dir=C.INC_DIR / "capacity_t",
+                record_exps=["cap_m832"])
+    check("... and a decision file that disagrees with the recomputed grid refuses the record-only run, untouched",
+          e is not None and "never replaces it" in str(e) and json.loads(dec_path.read_text()) == other, e)
+    dec_path.write_bytes(dec_bytes)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = B.main(["capacity-verdict", "--n", "cap_n", "--arms", "cap_s,cap_m", "--record", "cap_m832,cap_s1024",
+                     "--out-dir", str(C.INC_DIR / "capacity_t")])
+    check("the CLI takes --record (exit 0; the decision file unchanged)", rc == 0 and dec_path.read_bytes() == dec_bytes)
     fake_baseline("cap_n2", "n640", [0.810, 0.813, 0.808], [0.85] * 3)
     fake_baseline("cap_m2", "m640", [0.812, 0.816, 0.809], [0.86] * 3)
     dec3, _ = B.capacity_verdict("cap_n2", ["cap_m2"], write=False)
@@ -612,7 +761,11 @@ def test_autopilot_argv():
               "capacity", "s640", ["dev", "imageweeds", "test"]),
              ("ap_cap_m", ["--manifest", base_v2, "--seeds", "0,1,2", "--arch", "yolo11m", "--imgsz", "640"],
               "capacity", "m640", ["dev", "imageweeds", "test"]),
-             ("ap_canary", ["--manifest", tc, "--seeds", "0"], "canary", "n640", ["dev"])]
+             ("ap_canary", ["--manifest", tc, "--seeds", "0"], "canary", "n640", ["dev"]),
+             ("ap_cap_m832", ["--manifest", base_v2, "--seeds", "0,1,2", "--arm", "m832", "--role", "capacity"],
+              "capacity", "m832", ["dev", "imageweeds"]),
+             ("ap_cap_s1024", ["--manifest", base_v2, "--seeds", "0,1,2", "--arch", "yolo11s", "--imgsz", "1024"],
+              "capacity", "s1024", ["dev", "imageweeds"])]
     for exp, args, role, arm, exams in cases:
         rc = B.main(["build", "--exp", exp] + args + ["--testing", "--no-init", "--quiet"])
         summ = json.loads((C.INC_DIR / exp / B.BUILD_SUMMARY).read_text()) if rc == 0 else {}
@@ -631,6 +784,7 @@ def main():
     try:
         Wd = W.build_world()
         test_builds(Wd)
+        test_measure_arms(Wd)
         test_e2e_baseline(Wd)
         test_e2e_chain(Wd)
         test_verdicts(Wd)
