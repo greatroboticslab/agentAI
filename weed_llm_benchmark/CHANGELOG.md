@@ -10694,3 +10694,20 @@ Every result sat near test 0.85, against the 0.90 goal.
   - At admission, 755 queue rows passed: 673 whole and 82 masked, none refused, no hold left after the copy scan. They hold 1,240 verified target boxes: Carpetweed 473, MorningGlory 423 and PalmerAmaranth 344.
   - The eligible queue went from 7 images to 762 (1,248 boxes), which is at least one increment (M 682).
   - A segment was cut only at Q >= 4M or after the oldest eligible row had waited 7 days. With supply arriving source by source, that left the first increment untrained for a week, so `stale_days` is 1 (decided under the owner's standing grant, recorded in stream_thresholds.json).
+- **Fix: the fetch byte limits counted requested bytes, not fetched bytes (2026-10-01).**
+  - `executor.stream_limits` summed the requested `max_bytes` of every past L16-family fetch, whatever its outcome. It filed the next L16L of mediatum_1717366 for a person on all three byte caps: 71.5 GB for the source, 121.5 GB today and 121.5 GB for the campaign. On disk were CottonWeedDet3's 5.59 GB (requested 50 GB), 19 MB of mediatum's failed lab fetch (requested 10.7 GB), and nothing of its cluster review, refused before any download (requested 50 GB). With the envelope read as exceeded, every later fetch would have waited for a person.
+  - Ended attempts now count what the collector's source ledger on their machine records. Each `fetched` event counts at the time it was fetched. A refused attempt counts nothing; a failed one counts the files `collect.fetch` recorded as finished when it caught the failure.
+  - An attempt not yet seen to end reserves its `max_bytes`.
+  - A killed attempt counts its `max_bytes`. That covers the lab runner's 6 h timeout, the cluster's walltime, and an exception the collector does not catch, such as `ftplib.error_temp`. Each leaves finished files in staging and no event for them. Its machine's ledger shows a `fetch_started` that no `fetch_failed`, `fetched`, `held` or `closed` follows before the source's next start. That open start belongs to the machine's latest attempt of the source requested before it, within 60 s of clock skew.
+  - Fail safe: an ended attempt whose bytes cannot be determined counts its `max_bytes`, and the reason says so. That covers:
+    - a lab ledger that is missing or cannot be read whole;
+    - a fold without fetched facts, including one from a cluster ledger the snapshot could not read whole (an unparsed line, or a read stopped at `MAX_LEDGER_ROWS`). Every ended cluster attempt then counts, including those of sources absent from the fold;
+    - a fold not newer than the attempt's end;
+    - a snapshot that ships no fold, where the previous fold is kept.
+  - The ticker's campaign carries the facts (`fetched`):
+    - the ends (`fetch_ends`, taken once from the campaign ledger for older states);
+    - the cluster ledger's facts from the snapshot (`stream_remote.fetch_facts`: `fetched_events` and `open_fetches`, kept by `_fold_sources` only for a whole read; `_jsonl` reports a read stopped at its cap, and the snapshot's notes name an incomplete read);
+    - the same facts from the lab collector's own ledger.
+  - Residual: the lab runner's 6 h timeout is not sized from `max_bytes`. The 10.8 GB L16L of mediatum needs about 6.5 h at the lab's ~460 kB/s, so a run killed that way counts its 10.8 GB.
+  - Tests: new `tests/test_stream_ap_fetch_bytes.py` (40 checks in 12 cases: live, in flight, unknown, caps, killed lab and cluster fetches, an end recorded by `_failed`, both machines, a missing fold, an incomplete cluster ledger). Every case fails at HEAD, and each of 12 further targeted mutations fails at least one check. `test_stream_ap_review_placement.py`'s camp helper sets the StreamRun's paths. See docs/CONTINUOUS_LOOP.md, the live incident of 2026-10-01 on byte limits.
+  - Deploy: `executor.py`, `stream.py` and `stream_remote.py` change `executor.code_hash()` and the S23 module hashes. Sync the lab and the cluster from one commit, then re-run `executor.run_replay_tests`.

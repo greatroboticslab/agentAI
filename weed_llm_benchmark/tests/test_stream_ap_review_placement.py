@@ -100,6 +100,7 @@ def stream_camp(w):
     read from the state the last tick wrote."""
     sr = S.StreamRun.__new__(S.StreamRun)
     sr.name, sr.cfg, sr.st, sr.dom = W.NAME, w.config(), w.state(), w.dom
+    sr.paths = S.StreamPaths(str(w.lab), w.domain)
     sr._artifact = lambda rel: None
     sr._limit_counts = lambda: {}
     return sr.camp

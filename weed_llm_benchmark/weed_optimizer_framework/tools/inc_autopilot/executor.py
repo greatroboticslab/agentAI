@@ -1802,12 +1802,121 @@ def _epoch(r):
         return None
 
 
+# The L16 family's fetches (a source's attempt), and those the lab runs.
+FETCH_ACTIONS = ("inc_stream_collect", "inc_stream_collect_lab", "inc_stream_collect_review",
+                 "inc_stream_collect_review_lab")
+LAB_FETCH_ACTIONS = ("inc_stream_collect_lab", "inc_stream_collect_review_lab")
+
+
+def fetched_bytes(camp, recs, now):
+    """[(source, epoch, bytes, kind)] that the byte limits of 6.6 count for the
+    campaign's fetch attempts `recs` (execution records).
+
+    The stream ticker's campaign carries `fetched` (StreamRun._fetched): the
+    attempts whose end the lane saw (`ended`: proposal id -> utc), and the
+    fetched facts of the cluster collector's source ledger as of the last
+    snapshot that folded it (`cluster`: {"utc", "sources", "open"}) and of the
+    lab collector's own ledger (`lab`: {"sources", "open"}, None when it
+    cannot be read). Per machine, `sources` is {source: [[epoch, bytes]]} of
+    its 'fetched' events (None when not known) and `open` is {source:
+    [epoch]} of its fetch_started events that no closing event follows.
+
+    An ended attempt counts what its machine's ledger records for its source,
+    each event at the time it was fetched (kind "fetched"): nothing when it was
+    refused or failed before downloading, the files it finished when it failed
+    after (collect.fetch records them). Every other attempt counts its
+    requested max_bytes at its request time, as before 2026-10-01: one not
+    seen to end reserves it (kind "in_flight"), so concurrent fetches cannot
+    overshoot a cap; and, fail safe, an ended one whose fetched bytes cannot be
+    determined (kind "unknown"): its machine's ledger unreadable or not read
+    whole, a cluster fold that is not newer than its end or carries no fetched
+    facts, or an attempt its ledger shows started and never closed (killed by a
+    timeout or the walltime, or an exception the collector does not catch,
+    with finished files in staging and no event for them: _open_attempts). A
+    campaign without `fetched` (not the stream ticker's) counts every attempt
+    that way."""
+    f = (camp or {}).get("fetched")
+    f = f if isinstance(f, dict) else {}
+    ended = f.get("ended") if isinstance(f.get("ended"), dict) else {}
+    cl = f.get("cluster") if isinstance(f.get("cluster"), dict) else {}
+    lab = f.get("lab") if isinstance(f.get("lab"), dict) else None
+    # each machine's facts, None when unknown (on_lab -> facts)
+    facts = {True: lab if lab is not None and isinstance(lab.get("sources"), dict) else None,
+             False: cl if cl.get("utc") and isinstance(cl.get("sources"), dict) else None}
+    killed = _open_attempts(recs, facts)
+    rows, seen = [], set()
+    for i, r in enumerate(recs):
+        p = r.get("params") or {}
+        src, on_lab = p.get("source"), r.get("action") in LAB_FETCH_ACTIONS
+        end = ended.get(r.get("proposal_id")) if r.get("proposal_id") else None
+        m, ev = facts[on_lab], None
+        if end is not None and m is not None and (on_lab or str(m["utc"]) > str(end)):
+            ev = m["sources"].get(src, [])
+        if not isinstance(ev, list) or i in killed:
+            rows.append((src, _epoch(r) or now, float(p.get("max_bytes") or 0),
+                         "in_flight" if end is None else "unknown"))
+            if not isinstance(ev, list):
+                continue
+        if (src, on_lab) in seen:
+            continue
+        seen.add((src, on_lab))
+        for e in ev:
+            t, b = (list(e) + [None, None])[:2] if isinstance(e, (list, tuple)) else (None, None)
+            try:
+                rows.append((src, now if t is None else float(t), float(b or 0), "fetched"))
+            except (TypeError, ValueError):
+                rows.append((src, now, float(p.get("max_bytes") or 0), "unknown"))
+    return rows
+
+
+# The most a collector's fetch_started may precede its attempt's request (the
+# lab and cluster clocks), when an open start is matched to its attempt.
+FETCH_START_SKEW_S = 60.0
+
+
+def _open_attempts(recs, facts):
+    """Indexes in `recs` of the attempts a machine's ledger shows started and
+    never closed (fetched_bytes `facts`, `open`): each open fetch_started of a
+    source belongs to that machine's latest attempt of the source requested
+    before it (an unreadable start time: the latest attempt). One still
+    running is in flight anyway."""
+    out = set()
+    for on_lab, m in facts.items():
+        opened = (m or {}).get("open")
+        if not isinstance(opened, dict):
+            continue
+        for src, starts in opened.items():
+            mine = [(_epoch(r) or 0.0, i) for i, r in enumerate(recs)
+                    if (r.get("params") or {}).get("source") == src
+                    and (r.get("action") in LAB_FETCH_ACTIONS) == on_lab]
+            for t in starts if isinstance(starts, list) else [None]:
+                try:
+                    lim = float("inf") if t is None else float(t) + FETCH_START_SKEW_S
+                except (TypeError, ValueError):
+                    lim = float("inf")
+                cand = [x for x in mine if x[0] <= lim]
+                if cand:
+                    out.add(max(cand)[1])
+    return out
+
+
+def _byte_note(rows):
+    """What of `rows` (fetched_bytes) counts a requested max_bytes, for the reason."""
+    out = []
+    for kind, what in (("in_flight", "not yet seen to end"), ("unknown", "ended, fetched bytes not known")):
+        xs = [x[2] for x in rows if x[3] == kind]
+        if xs:
+            out.append("%.1f GB requested by %d fetch(es) %s" % (sum(xs) / 1e9, len(xs), what))
+    return ("; counted at their requested max_bytes: " + ", ".join(out)) if out else ""
+
+
 def stream_limits(ctx, camp, lever, req):
     """[reasons] lever family `lever` is over a stream limit (stream_levers.json
     'limits', docs/CONTINUOUS_LOOP.md 6.6) with this request; [] otherwise.
     Counts come from the execution log (runs that ran or may have run); the
     in-flight and per-milestone / per-rollback / per-version counts come from
-    the ticker (campaign 'in_flight', 'limit_counts')."""
+    the ticker (campaign 'in_flight', 'limit_counts'). The byte limits count
+    each attempt's fetched bytes where they are known (fetched_bytes)."""
     from . import levers_stream as LS
     lim = LS.limits(lever)
     if not lim:
@@ -1827,31 +1936,32 @@ def stream_limits(ctx, camp, lever, req):
             why.append("%s already ran %d time(s) in the last 24 h (limit %d)" % (lever, len(day_jobs), lim[key]))
     if "total" in lim and len(recs) >= int(lim["total"]):
         why.append("%s already ran %d time(s) in this campaign (limit %d)" % (lever, len(recs), lim["total"]))
-    fetch = ("inc_stream_collect", "inc_stream_collect_lab", "inc_stream_collect_review",
-             "inc_stream_collect_review_lab")
+    fetch = FETCH_ACTIONS
     src = p.get("source")
     if src and req.get("action") in fetch:
         mine = [r for r in recs if r.get("action") in fetch and (r.get("params") or {}).get("source") == src]
         if "attempts_per_source" in lim and len(mine) >= int(lim["attempts_per_source"]):
             why.append("source %s was attempted %d time(s) (limit %d)" % (src, len(mine), lim["attempts_per_source"]))
         want = float(p.get("max_bytes") or 0) / 1e9
+        rows = fetched_bytes(c, [r for r in recs if r.get("action") in fetch], now)
         if "gb_per_source" in lim:
-            got = sum(float((r.get("params") or {}).get("max_bytes") or 0) for r in mine) / 1e9
+            sel = [x for x in rows if x[0] == src]
+            got = sum(x[2] for x in sel) / 1e9
             if got + want > float(lim["gb_per_source"]) + 1e-9:
-                why.append("source %s would reach %.1f GB (limit %g GB unless a person approves)"
-                           % (src, got + want, lim["gb_per_source"]))
+                why.append("source %s would reach %.1f GB (limit %g GB unless a person approves)%s"
+                           % (src, got + want, lim["gb_per_source"], _byte_note(sel)))
         daily = [float(x) for x in (lim.get("gb_per_day"), c.get("collect_gb_daily")) if x is not None]
         if daily:
-            got = sum(float((r.get("params") or {}).get("max_bytes") or 0) for r in day
-                      if r.get("action") in fetch) / 1e9
+            sel = [x for x in rows if x[1] >= now - 86400.0]
+            got = sum(x[2] for x in sel) / 1e9
             if got + want > min(daily) + 1e-9:
-                why.append("today's fetches would reach %.1f GB (limit %g GB)" % (got + want, min(daily)))
+                why.append("today's fetches would reach %.1f GB (limit %g GB)%s"
+                           % (got + want, min(daily), _byte_note(sel)))
         if c.get("collect_gb_envelope") is not None:
-            got = sum(float((r.get("params") or {}).get("max_bytes") or 0) for r in recs
-                      if r.get("action") in fetch) / 1e9
+            got = sum(x[2] for x in rows) / 1e9
             if got + want > float(c["collect_gb_envelope"]) + 1e-9:
-                why.append("the campaign's fetches would reach %.1f GB (collect_gb_envelope %g GB)"
-                           % (got + want, float(c["collect_gb_envelope"])))
+                why.append("the campaign's fetches would reach %.1f GB (collect_gb_envelope %g GB)%s"
+                           % (got + want, float(c["collect_gb_envelope"]), _byte_note(rows)))
     if "in_flight" in lim:
         n = int(((c.get("in_flight") or {}).get(lever)) or 0)
         if n >= int(lim["in_flight"]):

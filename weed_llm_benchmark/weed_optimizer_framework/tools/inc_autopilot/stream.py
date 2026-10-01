@@ -204,6 +204,30 @@ def _num(v):
         return None
 
 
+def _fetch_facts(rows):
+    """{"sources": {source: [[epoch, bytes]]}, "open": {source: [epoch]}} of a
+    machine's source ledger (stream_remote.fetch_facts on each source row:
+    its 'fetched' events, and its fetch_started events no closing event
+    follows), which the byte limits count (executor.fetched_bytes); None
+    when a row carries none (a fold written before they were kept, or of a
+    ledger not read whole) or one is unreadable."""
+    out = {"sources": {}, "open": {}}
+    for src, row in rows.items():
+        ev = row.get("fetched_events") if isinstance(row, dict) else None
+        op = row.get("open_fetches") if isinstance(row, dict) else None
+        if not isinstance(ev, list) or not isinstance(op, list):
+            return None
+        got = []
+        for e in ev:
+            if not isinstance(e, (list, tuple)) or len(e) != 2 or _num(e[1]) is None:
+                return None
+            got.append([_secs(e[0]), _num(e[1])])
+        out["sources"][str(src)] = got
+        if op:
+            out["open"][str(src)] = [_secs(t) for t in op]
+    return out
+
+
 # ------------------------------------------------------------------ paths
 class StreamPaths(object):
     """The lab files of one domain's stream campaigns (model.domain_campaign_dir)."""
@@ -664,7 +688,8 @@ class StreamRun(object):
                 "paused_reason": c.get("paused_reason") or (st.get("paused") or {}).get("reason"),
                 "last_milestone_pool": pend[-1]["to_pool"] if pend else None,
                 "in_flight": in_flight, "limit_counts": self._limit_counts(),
-                "collect_gb_envelope": c.get("collect_gb_envelope"), "collect_gb_daily": c.get("collect_gb_daily")}
+                "collect_gb_envelope": c.get("collect_gb_envelope"), "collect_gb_daily": c.get("collect_gb_daily"),
+                "fetched": self._fetched()}
 
     def _limit_counts(self):
         st = self.st or {}
@@ -676,6 +701,67 @@ class StreamRun(object):
                "L28": {"per_stream_version": 1 if ((st.get("stage") or {}).get("r0") or {}).get("stage_c_built")
                        else 0}}
         return out
+
+    def _fetched(self):
+        """What the executor's byte limits count fetched bytes from
+        (executor.fetched_bytes, 6.6): the fetch attempts whose end the lane
+        saw, the cluster collector's fetched facts (_fetch_facts) as of the
+        last snapshot that folded its ledger, and the lab collector's own."""
+        st = self.st or {}
+        return {"ended": dict(self._fetch_ends()), "cluster": copy.deepcopy(st.get("cluster_fetched") or {}),
+                "lab": self._lab_fetched()}
+
+    def _fetch_ends(self):
+        """{proposal id: utc} of this campaign's fetch attempts (FETCH_LEVERS)
+        whose end the lane observed (state fetch_ends, written by _done and
+        _failed). A state written before the record existed takes them once
+        from the campaign ledger's item_done and failed entries, so attempts
+        that ended before it count their fetched bytes too."""
+        st = self.st
+        if not isinstance(st, dict):
+            return {}
+        if not isinstance(st.get("fetch_ends"), dict):
+            ends = {}
+            try:
+                with open(str(self.paths.ledger), "r", encoding="utf-8") as fh:
+                    for line in fh:
+                        if '"item_done"' not in line and '"failed"' not in line:
+                            continue
+                        try:
+                            rec = json.loads(line)
+                        except ValueError:
+                            continue
+                        if rec.get("campaign") == self.name and rec.get("event") in ("item_done", "failed") \
+                                and rec.get("lever") in FETCH_LEVERS and rec.get("proposal_id"):
+                            ends[str(rec["proposal_id"])] = rec.get("utc")
+            except OSError:
+                pass
+            st["fetch_ends"] = ends
+        return st["fetch_ends"]
+
+    def _lab_fetched(self):
+        """The fetched facts (_fetch_facts) of the lab collector's own ledger
+        (lab INC_DIR/intake/sources.jsonl: L16L and L16RL append there, and no
+        snapshot folds it; a fetch that failed after finishing some files
+        records those), or None when it cannot be read whole (missing,
+        unreadable, a line that is not JSON): the lab's ended fetches then
+        count their requested max_bytes."""
+        from . import stream_remote as SR
+        rows = []
+        try:
+            with open(str(self.paths.lab_inc / "intake" / "sources.jsonl"), "r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    r = json.loads(line)
+                    if isinstance(r, dict) and r.get("source"):
+                        rows.append(r)
+        except (OSError, ValueError):
+            return None
+        rows.sort(key=lambda r: (str(r.get("ts") or ""), str(r.get("source") or "")))
+        ff = SR.fetch_facts(rows)
+        return None if ff is None else _fetch_facts(ff)
 
     # ---- entry
     def go(self):
@@ -2222,6 +2308,7 @@ class StreamRun(object):
                      empty_runs=(int(d.get("empty_runs") or 0) + 1) if new == 0 else 0)
             self._check_recall()
         elif lever in FETCH_LEVERS:
+            self._fetch_ends()[p["id"]] = self.utc
             s = st["sources"].setdefault(params["source"], {})
             s.update(status="fetched", fetched_utc=self.utc)
             if lever in LAB_FETCH_LEVERS:
@@ -2288,6 +2375,9 @@ class StreamRun(object):
         p = it["proposal"]
         lever, params = it["lever"], p.get("params") or {}
         lane = st["lanes"][ln]
+        if lever in FETCH_LEVERS:
+            # ended: the byte limits count what it fetched, not its max_bytes
+            self._fetch_ends()[p["id"]] = self.utc
         if not retry:
             # a refusal the identical request meets again (a verifier or LOCK
             # mismatch, S3): declined for good, its source held, a person decides
@@ -2545,6 +2635,12 @@ class StreamRun(object):
                 if s.get("zero_yield"):
                     src["zero_yield_reasons"] = s.get("zero_yield_reasons")
         srows = arts.get("intake/sources.json") or {}
+        if isinstance(arts.get("intake/sources.json"), dict):
+            # the cluster collector's fetched facts as of this snapshot, which the
+            # byte limits count (executor.fetched_bytes): None when the fold
+            # carries none; otherwise a source absent from the ledger fetched
+            # nothing on the cluster
+            st["cluster_fetched"] = dict(_fetch_facts(srows) or {"sources": None, "open": None}, utc=self.utc)
         _cp, cc = self._collect_config()
         overrides = (cc or {}).get("licence_overrides")
         overrides = overrides if isinstance(overrides, dict) else {}

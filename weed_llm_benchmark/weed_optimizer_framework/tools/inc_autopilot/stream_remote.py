@@ -118,12 +118,17 @@ def _read_json(path):
     return obj, info
 
 
-def _jsonl(path, cap=MAX_LEDGER_ROWS):
+def _jsonl(path, cap=MAX_LEDGER_ROWS, info=None):
+    """(rows, unparsed lines) of the first `cap` lines of a JSON-lines file,
+    (None, 0) when it cannot be read. `info`, a dict, gets "truncated": True
+    when lines past the cap were left unread."""
     rows, bad = [], 0
     try:
         with open(str(path), "r", encoding="utf-8") as fh:
             for i, line in enumerate(fh):
                 if i >= cap:
+                    if info is not None:
+                        info["truncated"] = True
                     break
                 line = line.strip()
                 if not line:
@@ -322,14 +327,54 @@ def _advance_v2(exp):
     return out
 
 
-def _fold_sources(rows):
+# The source events that close a fetch attempt the collector started
+# (collect.fetch: an attempt that returns, or raises a refusal, after its
+# fetch_started records one of them).
+FETCH_CLOSE_EVENTS = ("fetch_failed", "fetched", "held", "closed")
+
+
+def fetch_facts(rows):
+    """{source: {"fetched_events": [[ts, bytes]], "open_fetches": [ts]}} of
+    source-ledger rows in time order, or None when a fetched event's bytes
+    are not a number. `open_fetches` holds each fetch_started that no closing
+    event (FETCH_CLOSE_EVENTS) follows before the source's next fetch_started:
+    an attempt still running, or one that ended without recording what it
+    fetched (killed by a timeout or the walltime, or an exception the
+    collector does not catch, with finished files left in staging). The
+    autopilot's byte limits count the fetched events by the time each was
+    fetched, and an ended attempt with an open start at its requested
+    max_bytes (executor.fetched_bytes)."""
+    out, cur = {}, {}
+    for r in rows:
+        src, ev = str(r["source"]), r.get("event")
+        row = out.setdefault(src, {"fetched_events": [], "open_fetches": []})
+        if ev == "fetch_started":
+            if src in cur:
+                row["open_fetches"].append(cur[src])
+            cur[src] = r.get("ts")
+        elif ev in FETCH_CLOSE_EVENTS:
+            cur.pop(src, None)
+        if ev == "fetched":
+            try:
+                row["fetched_events"].append([r.get("ts"), int(r.get("bytes") or 0)])
+            except (TypeError, ValueError):
+                return None
+    for src, ts in cur.items():
+        out[src]["open_fetches"].append(ts)
+    return out
+
+
+def _fold_sources(rows, facts=True):
     """{source: folded state} of intake/sources.jsonl: the collector's own fold
     (collect.state.fold: status, attempts, failed_attempts, bytes, su,
     batches, yield, jobs), else the last row per source. Each source also
     carries `fetch_complete` and `fetch_remaining` of its last `fetched` event
     (collect.fetch: a fetch that stopped at a byte cap records complete false
     and the files left, and the next fetch continues them), which the fold
-    does not keep; None when no fetched event says."""
+    does not keep; None when no fetched event says. With the collector's
+    fold, and `facts` (the whole ledger was read), each source also carries
+    `fetched_events` and `open_fetches` (fetch_facts), which the autopilot's
+    byte limits count; with any of these missing, no source carries them."""
     rows = [r for r in rows if isinstance(r, dict) and r.get("source")]
     rows = sorted(rows, key=lambda r: (str(r.get("ts") or ""), str(r.get("source") or "")))
     last_fetch = {}
@@ -339,6 +384,10 @@ def _fold_sources(rows):
     try:
         from ..collect import state as CS
         out = {str(k): v for k, v in CS.fold(rows).items()}
+        ff = fetch_facts(rows) if facts else None
+        if ff is not None:
+            for src, row in out.items():
+                row.update(ff.get(src) or {"fetched_events": [], "open_fetches": []})
     except Exception:  # noqa: BLE001 - no collector here: the last row per source
         out = {}
         for r in rows:
@@ -450,9 +499,18 @@ def stream_summary(sid, dev_exps=()):
         if R.NAME_RE.match(b) or BATCH_RE.match(b):
             if (idir / b / "summary.json").is_file():
                 put("intake/%s/summary.json" % b, idir / b / "summary.json")
-    srows, _bad = _jsonl(idir / "sources.jsonl")
+    sinfo = {}
+    srows, sbad = _jsonl(idir / "sources.jsonl", info=sinfo)
     if srows is not None:
-        arts["intake/sources.json"] = _dev(_fold_sources(srows))
+        whole = not sbad and not sinfo.get("truncated")
+        if not whole:
+            # the fold misses events: it carries no fetched facts, so the byte limits count the cluster's
+            # ended fetches at their requested max_bytes (executor.fetched_bytes)
+            notes.append("intake/sources.jsonl: %d unparsed line(s)%s; its fold carries no fetched bytes"
+                         % (sbad, ", read stopped at %d lines" % MAX_LEDGER_ROWS if sinfo.get("truncated") else ""))
+        fold = _fold_sources(srows, facts=whole)
+        if fold or whole:
+            arts["intake/sources.json"] = _dev(fold)
     put("intake/placement.json", idir / "placement.json")
     # the R0 verdicts: L-4's capacity decision, the canary, Stage A (dev only;
     # capacity_v1_report.* holds test and is never read here)

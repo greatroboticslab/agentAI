@@ -32,7 +32,7 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 - A source review of a lab-only provider was submitted to the cluster.
 - Leftover test directories filled the build machine's disk.
 
-Each has a test that fails without its fix.
+Each has a test that fails without its fix. A seventh is fixed the same way: the fetch byte limits counted the requested `max_bytes` of attempts that fetched nothing, so the campaign read 121.5 GB fetched against 16.4 GB on disk, and every later fetch was waiting for a person.
 
 ## 2026-09-30 — Where the data supply stands: the loop has added no harvested data yet
 

@@ -1640,6 +1640,85 @@ The existing `test_inc_splits`, `test_funnel_leak`, `test_funnel_embed`, `test_f
 
 **Deploy.** `policy_actions.json`, `stream_levers.json` and the autopilot modules change `executor.code_hash()`, so re-run `executor.run_replay_tests` after the lab and the cluster are synced from one commit.
 
+#### Live incident (2026-10-01): the fetch byte limits counted requested bytes, not fetched bytes
+
+**What happened.** `executor.stream_limits` checks the L16 family's byte limits (`gb_per_source`; `gb_per_day` and `collect_gb_daily`; `collect_gb_envelope`). It summed the requested `max_bytes` of every past fetch attempt, whatever the outcome. On 2026-10-01 it filed the next L16L of `mediatum_1717366` for a person, with three reasons:
+- "source mediatum_1717366 would reach 71.5 GB (limit 50 GB unless a person approves)";
+- "today's fetches would reach 121.5 GB (limit 20 GB)";
+- "the campaign's fetches would reach 121.5 GB (collect_gb_envelope 60 GB)".
+
+What was on disk:
+- 5.59 GB of CottonWeedDet3 (requested 50 GB);
+- 19 MB of mediatum's lab fetch, which failed `download_failed` after `gt.csv` (requested 10.7 GB);
+- nothing of mediatum's cluster review, refused `not_placed_on_cluster` before any download (requested 50 GB).
+
+With the campaign envelope read as exceeded, every later fetch would have waited for a person.
+
+**What changed.**
+- `executor.fetched_bytes` decides what each attempt counts in the byte limits.
+  - **Ended attempts.** An attempt whose end the lane saw counts what the collector's source ledger on its machine records for its source. Each `fetched` event counts at the time it was fetched. A refused attempt, or one that failed before downloading, counts nothing. One that failed after counts the files it finished: `collect.fetch` records them in a `fetched` event when it catches the failure.
+  - **Attempts in flight.** An attempt not seen to end reserves its requested `max_bytes` at its request time, so concurrent fetches cannot overshoot a cap.
+  - **Killed attempts.** Some attempts end with finished files in staging and no event for them. `collect.fetch` writes its closing event only after its download loop, and only for the exceptions it catches. Three cases skip it: the lab runner's timeout (`LabRunner.launch`, 6 h, SIGKILL); the cluster job's walltime (`run_inc_collect.sh`, 8 h); and an exception the collector does not catch, such as `ftplib.error_temp` from an FTP 421/426 or `http.client.IncompleteRead`, neither of which is an `OSError`. On that machine's ledger, such an attempt leaves a `fetch_started` with no closing event (`fetch_failed`, `fetched`, `held` or `closed`) before the source's next `fetch_started`. Such an open start belongs to that machine's latest attempt of the source requested before it, allowing 60 s of clock skew (`FETCH_START_SKEW_S`). An ended attempt with an open start counts its `max_bytes`. It keeps counting them after a later attempt fetches the same files again, and those files then count a second time, so the error is an over-count.
+  - **Fail safe.** An ended attempt whose fetched bytes cannot be determined also counts its `max_bytes`. That covers four cases:
+    - the lab ledger is missing or cannot be read whole;
+    - the cluster fold carries no fetched facts, from a fold written before they were kept or from a cluster ledger the snapshot could not read whole (an unparsed line, or a read stopped at `MAX_LEDGER_ROWS`). Every ended cluster attempt then counts its `max_bytes`, including those of sources absent from the fold;
+    - the cluster fold is not newer than the attempt's end. The snapshot reads the ledger before squeue, so the fold that shows a job ended may predate the job's last event;
+    - a snapshot ships no fold, because the ledger is missing or unreadable. The previous fold is kept, so later ends stay unknown.
+  - **Reasons.** Each reason names what it counted at `max_bytes`, for example "counted at their requested max_bytes: 10.8 GB requested by 1 fetch(es) not yet seen to end".
+- The daily window counts bytes by the time they were fetched. The campaign envelope counts every fetched byte of the sources the campaign fetched, on the machines it fetched them on.
+- The ticker passes these facts in its campaign (`StreamRun.camp` `fetched`):
+  - `fetch_ends`: proposal id → utc, written by `_done` and `_failed` for L16, L16L, L16R and L16RL. A state written before the record existed takes the ends once from the campaign ledger's `item_done` and `failed` entries.
+  - `cluster_fetched`: the cluster ledger's fetched facts (`sources`: each source's `fetched` events; `open`: its open `fetch_started` times), as of the last snapshot that folded the ledger.
+  - The same facts from the lab collector's own ledger (lab `INC_DIR/intake/sources.jsonl`), read when the limits are checked.
+- `stream_remote.fetch_facts` gives each source's `fetched` events (`fetched_events`: [[ts, bytes]]) and open starts (`open_fetches`: [ts]). `_fold_sources` puts them in the snapshot's `intake/sources.json` only when `_jsonl` read the whole ledger. `_jsonl` now reports a read stopped at its cap, and the snapshot's notes name an incomplete read.
+- **Residual.**
+  - An attempt the lane never saw end keeps its reservation. An example is a run cleared as "already ran" after a tick failed between the run and its state write.
+  - The lab runner's timeout is not sized from `max_bytes`. At the lab's ~460 kB/s, the 10.8 GB L16L of mediatum needs about 6.5 h, past the 6 h timeout. A run killed that way counts its 10.8 GB from then on.
+
+**How it was verified.**
+- `tests/test_stream_ap_fetch_bytes.py` (new, 40 checks in 12 cases, in the stream world of `test_stream_ap_world`):
+  - **Live.** The record as the platform holds it: three ended attempts whose ends are only in the campaign ledger, CottonWeedDet3's event in the cluster's ledger, and mediatum's 19 MB in the lab's. It counts 5.59 GB + 19 MB.
+    - A 10.8 GB L16L of mediatum reaches no cap.
+    - A 49.99 GB request of mediatum would reach 50.0 GB.
+    - Today and the campaign read 5.6 GB.
+    - The next L16L runs on the lab, with nothing filed.
+  - **In flight.** A running L16L reserves its 10.8 GB: 21.4 GB today with a 5 GB request. Once it ends, its 3.0 GB count instead.
+  - **Unknown bytes.** These cases each count the requested `max_bytes` and say so:
+    - a torn line in the lab ledger;
+    - a fold without fetched events, where both cluster attempts count (105.0 GB today), since such a fold cannot say that mediatum's review fetched nothing;
+    - a cluster fetch whose end the folding snapshot showed. Its 1.5 GB count from the next snapshot on;
+    - a cluster ledger that becomes unreadable before the end: no snapshot ships a fold, and the previous one is kept.
+  - **Killed attempts.**
+    - An L16L of mediatum killed by the lab runner's timeout, with only `fetch_started` in the lab ledger, counts its 10.8 GB: 21.4 GB today with a 5 GB request. The earlier failed attempt still counts its 19 MB. A later closed attempt (5 GB requested, 1.0 GB fetched) counts its 1.0 GB, and the killed one still counts its 10.8 GB.
+    - A cluster L16 that ends TIMEOUT with only `fetch_started` counts its 2.0 GB after a fold newer than its end.
+  - **Incomplete cluster ledger.** A torn line, or a read stopped at the cap (patched to 1 line), gives a fold without fetched facts: both cluster attempts count (105.0 GB), and the snapshot's notes say why. A unit check of `_fold_sources` covers the open-start rule: a start followed by the source's next start is open; a start followed by `fetch_failed` or `held` is closed; a last start with nothing after it is open.
+  - **Ends recorded by `_failed`.** In a state that already records ends, an L16L that ends rc 2 with a 2.0 GB partial `fetched` event counts 2.0 GB and reserves nothing (20.1 GB today with a 12.5 GB request).
+  - **Both machines.** A source with a cluster attempt (4.0 GB) listed before a lab attempt (3.0 GB) counts both: 20.5 GB today with a 13.5 GB request, and 50.5 GB for the source with a 43.5 GB request.
+  - **Caps on real bytes.**
+    - Per source: 53.0 GB.
+    - Per day, by fetch time: 18 GB that landed 2 h ago, from a request 26 h old, give 23.0 GB.
+    - Over the campaign: 63.0 GB.
+    - The ticker files the next fetch for a person.
+- Mutation checks, in a temporary copy:
+  - Every case fails at HEAD. Two cases stop at a set-up assertion, and one raises because `_jsonl` takes no `info`.
+  - Before the open-start rule, each of the first 22 checks failed under at least one of 14 targeted mutations: ended attempts never covered; in-flight attempts counted as 0; unknown attempts counted as 0; a fold as new as the end taken as fresh; ledger bytes dated at the request; the lab ledger's bytes dropped; an unreadable lab ledger read as empty; no backfill from the campaign ledger; ends not recorded by `_done` and `_failed`; a fold without fetched events; no note in the reason; the per-source sum taken over every source; a source absent from the fold read as unknown; the ticker passing no facts.
+  - Each of 12 further mutations fails at least one check:
+    - `_failed` not recording ends;
+    - dedup by source only, not by source and machine;
+    - a snapshot without the fold read as an empty fold;
+    - no open-attempt rule;
+    - an open start given to the latest attempt whatever its request time, or to the earliest attempt;
+    - an incomplete cluster read taken as whole, or truncation ignored;
+    - `held` not closing a start;
+    - the cluster's open starts dropped;
+    - the lab's open starts dropped;
+    - a fold row without facts skipped instead of making the fold's facts unknown.
+- `test_stream_ap_review_placement.py`: its camp helper now sets the StreamRun's paths, which the ticker's camp reads. Its check that the L16 limits count an L16RL's run for the source still holds. That world's lab has no collector ledger, so the run counts its 2 GB request.
+
+**Deploy.** `executor.py`, `stream.py` and `stream_remote.py` change `executor.code_hash()` and the stream modules that S23 compares. So sync the lab and the cluster from one commit, then re-run `executor.run_replay_tests`.
+
+Until the first snapshot after the sync, the cluster's ended fetches still count their requested `max_bytes`. A fetch filed on these limits is re-checked each tick while `data_autonomy` is on, and it runs once the limits pass.
+
 ### Build note (group C)
 
 **What was built.** `inc2/step1_stream.py` (verbs `bootstrap`, `admit --intake <batch>` / `admit --registry [--slugs]`, `backfill`, `knowntruth`, `rejoin --slug`, `serve-holds [--hold h6_scan|licence|funnel_F9]` (also accepted as `scan-holds`, the name group F's L17 form submits), `status`, `verify`), `inc2/mask.py` (`decide`, `mask_except`), `run_inc2_stream.sh`; tests `test_inc2_step1_stream.py` and `test_inc2_mask.py`.
