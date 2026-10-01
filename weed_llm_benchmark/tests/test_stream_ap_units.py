@@ -41,6 +41,7 @@ PARAMS = {
     "LP": {}, "L16": {"source": "mfwd_porol", "max_bytes": 10737418240},
     "L16L": {"source": "gh:abc/def", "max_bytes": 1000, "out": "/lab/x/intake/staging/"},
     "L16R": {"source": "kg:yuzhenlu/cottonweeddet3", "max_bytes": 5180000000}, "L16I": {"source": "mfwd_porol"},
+    "L16RL": {"source": "mediatum_1717366", "max_bytes": 1000, "out": "/lab/x/intake/staging/"},
     "L17": {"verb": "admit", "intake": "b0001"},
     "L18": {"pkg": "inc2", "stream": "weed_stream_v1", "k": 2, "exp": "weed_stream_v1_s003", "recipes": "r0,x1a"},
     "L19": {"pkg": "inc2", "exp": "weed_stream_v1_s001"}, "L20": {"pkg": "inc2", "stream": "weed_stream_v1"},
@@ -107,7 +108,7 @@ def t_menu():
         W.SKIPS.append("inc2.stream absent (group E): the stream argv checked against the contract grammar only")
     try:
         from weed_optimizer_framework.tools.collect import __main__ as CM
-        for lid in ("L15", "L26", "L16L", "L16", "L16I", "LP"):
+        for lid in ("L15", "L26", "L16L", "L16RL", "L16", "L16I", "LP"):
             argv = LS.render(lid, LS.policy_params(lid, PARAMS[lid]))
             args = argv[argv.index("run_inc_collect.sh") + 1:] if "run_inc_collect.sh" in argv else argv[3:]
             ns = CM.build_parser().parse_args(args)
@@ -139,9 +140,9 @@ def t_menu():
           r["remote"][:3] == ["stream-run", "inc2.stream", "commit"] and r["remote"][-2:] == ["--exp",
                                                                                           "weed_stream_v1_s001"],
           r["remote"])
-    check("a lab lever renders local (L15, L26, L16L, L16S)", all(X.render(LS.row(l)["policy_action"], LS.policy_params(
-        l, PARAMS.get(l, {"source": "a"})))["local"] for l in ("L15", "L26", "L16L")) and X.render("inc_stream_sync", {
-            "source": "a"})["local"])
+    check("a lab lever renders local (L15, L26, L16L, L16RL, L16S)", all(X.render(
+        LS.row(l)["policy_action"], LS.policy_params(l, PARAMS.get(l, {"source": "a"})))["local"]
+        for l in ("L15", "L26", "L16L", "L16RL")) and X.render("inc_stream_sync", {"source": "a"})["local"])
     check("the gated R2 levers and the envelope levers are the contract's (and LI, the stream's creation)",
           LS.gated_r2() == ("L16", "L17", "L24")
           and set(LS.envelope_levers()) == {"L18", "L20", "L21", "L22", "L23B", "L25", "L27", "L28", "LI"})
@@ -150,7 +151,8 @@ def t_menu():
     check("every envelope action of a stream lever is in approvals.ENVELOPE_ACTIONS",
           all(a in AP.ENVELOPE_ACTIONS for v in X.STREAM_ENVELOPE_LEVERS.values() for a in v))
     check("  and the splits build, a pre-check review and a funnel_F9 release are not",
-          not {"inc_splits_build", "inc_stream_collect_review", "inc_stream_release"} & set(AP.ENVELOPE_ACTIONS))
+          not {"inc_splits_build", "inc_stream_collect_review", "inc_stream_collect_review_lab",
+               "inc_stream_release"} & set(AP.ENVELOPE_ACTIONS))
     check("experiment mode's envelope table is untouched", X.ENVELOPE_LEVERS == {
         "L1": ("inc_build_pilot",), "L2": ("inc_build_realloop",), "L5": ("inc_build_realloop",),
         "L8": ("inc_build_baseline",), "L9": ("inc_build_pilot",)})

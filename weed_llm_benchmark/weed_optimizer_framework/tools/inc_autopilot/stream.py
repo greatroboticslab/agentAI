@@ -17,8 +17,8 @@ Each tick, in order (6.2):
   1. lab work, no ssh: the last snapshot and the lab's files are folded into
      the evidence; the diagnoses (diagnose_stream D20-D33 and the lanes' own
      items) run on it; the stop-losses and holds apply; each idle lane takes the
-     first item its diagnoses call for; lab items (L15, L26, L16L, L16S) start
-     as detached processes, and the ones running are polled;
+     first item its diagnoses call for; lab items (L15, L26, L16L, L16RL, L16S)
+     start as detached processes, and the ones running are polled;
   2. the one ssh of the tick: the ready items of every lane go to the cluster
      in one executor.submit_many batch, in priority order (TRAIN, DATA, MAINT;
      an R3 item goes alone, since its envelope grant runs it in its own call);
@@ -98,7 +98,13 @@ FAILED_IDS_KEEP = 200                # proposal ids of lane items that ended fai
 # The collection levers, whose attempts are bounded per source (7.5: 3 failed
 # attempts close a source; a 4th attempt pauses, S15): the step bound
 # (stop_loss step_retries) leaves them to that rule.
-SOURCE_BOUND = ("L16", "L16L", "L16R", "L16S", "L16I", "L17")
+SOURCE_BOUND = ("L16", "L16L", "L16R", "L16RL", "L16S", "L16I", "L17")
+# The fetch levers (a source's attempt), the ones that fetch on the lab (folded
+# from the lab process, then synced: L16S), and a source review's two forms
+# (L16R on the cluster, L16RL on the lab, chosen by the candidate's placement).
+FETCH_LEVERS = ("L16", "L16L", "L16R", "L16RL")
+LAB_FETCH_LEVERS = ("L16L", "L16RL")
+REVIEW_LEVERS = ("L16R", "L16RL")
 STALE_TO_PAUSE = 2
 BUILD_LOST_SNAPSHOTS = 3
 WAIT_REFUSALS = ("today's cap", "this month's window", "of the domain's", "the cluster is not reachable",
@@ -113,7 +119,7 @@ STREAM_DEFAULTS = {"enabled": False, "paused_reason": None, "mode": "stream", "d
                    "collect_gb_envelope": 200.0, "collect_gb_daily": 50.0, "protocol_v3_accepted_by": None,
                    "brain": {"enabled": False, "model": None}}
 LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "DATA", "L16R": "DATA",
-           "L16I": "DATA", "L16S": "DATA", "L17": "DATA", "L24": "STOP", "LH": "DATA",
+           "L16RL": "DATA", "L16I": "DATA", "L16S": "DATA", "L17": "DATA", "L24": "STOP", "LH": "DATA",
            "L18": "TRAIN", "L19": "TRAIN", "L22": "TRAIN",
            "L20": "MAINT", "L21": "MAINT", "L23": "MAINT", "L23B": "MAINT", "L25": "MAINT", "L27": "MAINT",
            "L28": "MAINT", "L4": "MAINT", "LV": "MAINT", "LI": "MAINT", "LA": "MAINT", "LC": "MAINT"}
@@ -1328,9 +1334,9 @@ class StreamRun(object):
     @staticmethod
     def _phase_of(lever):
         return {"L15": "DISCOVER", "L26": "NAMES", "LP": "PROBE", "L16": "COLLECT", "L16L": "COLLECT",
-                "L16R": "COLLECT", "L16S": "SYNC", "L16I": "INTAKE", "L17": "ADMIT", "L24": "QUARANTINE",
-                "LH": "HOLD_RELEASE", "L18": "SEGMENT", "L19": "COMMIT", "L22": "FORK", "L20": "MILESTONE",
-                "L21": "ROLLBACK", "L23": "SPLITS", "L23B": "BASELINE", "L25": "STAGE_A", "L27": "BISECT",
+                "L16R": "COLLECT", "L16RL": "COLLECT", "L16S": "SYNC", "L16I": "INTAKE", "L17": "ADMIT",
+                "L24": "QUARANTINE", "LH": "HOLD_RELEASE", "L18": "SEGMENT", "L19": "COMMIT", "L22": "FORK",
+                "L20": "MILESTONE", "L21": "ROLLBACK", "L23": "SPLITS", "L23B": "BASELINE", "L25": "STAGE_A", "L27": "BISECT",
                 "L28": "STAGE_C", "L4": "AUDIT", "LV": "VERDICT", "LI": "INIT", "LA": "ARM",
                 "LC": "COMPARE"}.get(lever, "ITEM")
 
@@ -1604,37 +1610,89 @@ class StreamRun(object):
                 "est_gpu_hours": 0.0, "proposed_by": AUTO, "lane": "MAINT", "follow": "job",
                 "parent_exp": exp, "child_exp": exp, "attempt": 0}
 
+    def _context_candidate(self, src):
+        """The source's candidate row in the evidence context (_candidates), or {}."""
+        cands = ((self.ev.json(E.CONTEXT) if self.ev is not None else None) or {}).get("candidates") or []
+        return next((c for c in cands if isinstance(c, dict) and c.get("id") == src), {})
+
     def _file_reviews(self):
         """D20's candidates that failed a pre-check: an R3 item for a person
-        each (L16R), filed once, never taking a lane (6.3 L16)."""
+        each, filed once, never taking a lane (6.3 L16). Its form follows the
+        candidate's placement, as D20's L16 -> L16L does: L16R fetches on the
+        cluster, L16RL on the lab, where the cluster's collector refuses a
+        provider placement.json does not place on compute nodes
+        (not_placed_on_cluster: job 47302914 ran an approved L16R of a
+        lab-placed source). A review superseded because its cluster form met a
+        lab-placed source (_misplaced_review), or because its cluster form
+        already ran for a source now placed on the lab (_spent_cluster_review),
+        is filed again, in the form its placement calls for."""
         st = self.st
         d20 = DS.by_id(self.diags).get("D20") or {}
         for r in ((d20.get("detail") or {}).get("review") or [])[:3]:
             src = r.get("source")
-            if not src or src in (st.get("source_reviews") or {}):
+            if not src:
+                continue
+            prev = (st.get("source_reviews") or {}).get(src)
+            cand = self._context_candidate(src)
+            self._spent_cluster_review(src, prev, cand)
+            superseded = isinstance(prev, dict) and prev.get("status") == "superseded"
+            if prev is not None and not superseded:
                 continue
             cap = int(float((LS.limits("L16") or {}).get("gb_per_source") or 50) * 1e9)
-            cand = next((c for c in (self.ev.json(E.CONTEXT) or {}).get("candidates") or [] if c.get("id") == src), {})
             params = {"source": src, "max_bytes": max(1, min(int(_num(cand.get("bytes")) or cap), cap))}
+            lid = "L16R"
+            if cand.get("placement") == "lab":
+                lid = "L16RL"
+                params["out"] = str(self.paths.staging()) + "/"
             try:
-                est, estimate = LS.price("L16R", params, self.dom)
-                p = LS.proposal(self.name, "L16R", params, trigger=["D20"], cites=d20.get("cites") or [],
+                est, estimate = LS.price(lid, params, self.dom)
+                p = LS.proposal(self.name, lid, params, trigger=["D20"], cites=d20.get("cites") or [],
                                 est=est, estimate=estimate)
             except LS.LeverError as e:
-                self._once("review:%s" % src, str(e), "not_taken", lever="L16R", reasons=[str(e)])
+                self._once("review:%s" % src, str(e), "not_taken", lever=lid, reasons=[str(e)])
                 continue
             p["reason"] = "pre-check failed for %s: %s; a person decides" % (src, "; ".join(r.get("reasons") or []))
             res = X.submit(p, actor=AUTO, campaign=self.camp, ctx=self.xctx)
-            st.setdefault("source_reviews", {})[src] = {"approval_id": res.get("approval_id"), "status": res.get("status"),
-                                                 "reasons": r.get("reasons"), "utc": self.utc}
+            rec = {"approval_id": res.get("approval_id"), "status": res.get("status"), "reasons": r.get("reasons"),
+                   "utc": self.utc, "lever": lid}
+            if superseded:
+                rec["superseded"] = list(prev.get("superseded") or []) + [
+                    {"approval_id": prev.get("approval_id"), "lever": prev.get("lever") or "L16R",
+                     "utc": prev.get("superseded_utc"), "reason": prev.get("superseded_reason")}]
+            st.setdefault("source_reviews", {})[src] = rec
             if res.get("status") == "filed" and res.get("approval_id"):
                 # an approval by a person is adopted into the DATA lane and run
                 self._park("DATA", p, "D20", d20, res.get("approval_id"))
-            self._ledger("review_filed", lever="L16R", source=src, approval_id=res.get("approval_id"),
+            self._ledger("review_filed", lever=lid, source=src, approval_id=res.get("approval_id"),
                          status=res.get("status"), reasons=r.get("reasons"))
             if any("credentials" in x for x in r.get("reasons") or []):
                 self._card("research", "X16: credentials for %s" % src, "; ".join(r["reasons"]), lever="X16",
                            trigger=["D20"])
+
+    def _spent_cluster_review(self, src, prev, cand):
+        """A source's filed review in its cluster form (L16R) whose approval
+        already ran, for a source whose candidate is now placed on the lab, is
+        marked superseded, so that _file_reviews files its lab form (L16RL)
+        when D20 lists the source again: the cluster's collector refuses such a
+        provider (not_placed_on_cluster), and one approval runs once. The live
+        record: approval ap-1790700040-42144765 ran as job 47302914 before the
+        lab form existed, and its review stayed 'filed'. D20 lists no source
+        that is being fetched, so a run still in progress is never superseded."""
+        if not isinstance(prev, dict) or prev.get("status") != "filed" or (prev.get("lever") or "L16R") != "L16R" \
+                or cand.get("placement") != "lab":
+            return
+        a = AP.state(self.domain, root=self.xctx.approvals_root).get(prev.get("approval_id")) or {}
+        ex = a.get("execution") or {}
+        if ex.get("phase") not in ("done", "failed"):
+            return
+        why = ("its cluster form (L16R, approval %s) already ran (%s by %s, outcome %s), and its provider %s is "
+               "placed on the lab: the cluster's collector refuses it (not_placed_on_cluster), so the review is "
+               "filed again in its lab form (L16RL)"
+               % (prev.get("approval_id"), ex.get("phase"), ex.get("executed_by"),
+                  (ex.get("outcome") or {}).get("status"), cand.get("provider")))
+        prev.update(status="superseded", superseded_utc=self.utc, superseded_reason=_short(why, 500))
+        self._ledger("review_superseded", lever="L16R", source=src, approval_id=prev.get("approval_id"),
+                     reasons=[why])
 
     # ---- lab items (no ssh)
     def _lab_hooks(self):
@@ -1676,7 +1734,8 @@ class StreamRun(object):
                 return {"ok": True, "detached": True, "lab_job": got.get("job", job), "argv": argv}
             return h
         return {"inc_stream_discover": hook("discover"), "inc_stream_names": hook("names"),
-                "inc_stream_collect_lab": hook("fetch"), "inc_stream_sync": hook("sync")}
+                "inc_stream_collect_lab": hook("fetch"), "inc_stream_collect_review_lab": hook("fetch"),
+                "inc_stream_sync": hook("sync")}
 
     def _run_lab_items(self):
         """Start every ready lab item (a detached process; no ssh): a proposed
@@ -1754,7 +1813,11 @@ class StreamRun(object):
             elif it.get("status") == "filed" and it.get("approval_id"):
                 a = ap.get(it["approval_id"]) or {}
                 if a.get("status") == "approved" and a.get("execution") is None:
-                    out.append((ln, it, it["approval_id"]))
+                    why = self._misplaced_review(it)
+                    if why:
+                        self._refuse_misplaced_review(ln, it, why)
+                    else:
+                        out.append((ln, it, it["approval_id"]))
                 elif a.get("status") == "approved":
                     # run by someone else (a person from the INC page): the
                     # lane follows that run instead of waiting for ever
@@ -1775,6 +1838,80 @@ class StreamRun(object):
                     # lane does not wait for ever on an item filed before
                     out.append((ln, it, None))
         return out
+
+    def _misplaced_review(self, it):
+        """Why an approved source review in its cluster form (L16R: sbatch
+        run_inc_collect.sh fetch) must not be submitted, or "": its source's
+        candidate is placed on the lab, whose provider the cluster's collector
+        refuses (not_placed_on_cluster). Such a review was filed before the
+        lab form (L16RL) existed (mediatum_1717366: approval
+        ap-1790700040-42144765, job 47302914). Fail closed: a source with no
+        candidate row this tick (a discovered source the last plan, L15, no
+        longer lists) is not submitted either, since its placement cannot be
+        read, and an L16R carries no --candidates, so the cluster's collector
+        could not load a discovered source's record anyway."""
+        if it.get("lever") != "L16R":
+            return ""
+        src = ((it.get("proposal") or {}).get("params") or {}).get("source")
+        cand = self._context_candidate(src) if src else {}
+        if not cand:
+            return ("L16R (approval %s) fetches source %s on the cluster, and the source has no candidate row in this "
+                    "tick's candidates (the last plan, L15, no longer lists it, and the collect config has no known "
+                    "item of that id): its provider's placement cannot be read, and the cluster's collector could not "
+                    "load its record (an L16R carries no --candidates), so the approved cluster fetch is not "
+                    "submitted. If the source is listed again, D20 fetches it (L16 or L16L, by its placement) or files "
+                    "its review again in the form its placement calls for" % (it.get("approval_id"), src))
+        if cand.get("placement") != "lab":
+            return ""
+        return ("L16R (approval %s) fetches source %s on the cluster, and its provider %s is placed on the lab "
+                "(intake/placement.json, the collect config's lab_only): the cluster's collector refuses it "
+                "(not_placed_on_cluster), so the approved cluster fetch is not submitted. The source is fetched on "
+                "the lab instead: D20's L16 -> L16L once its pre-check passes, else its review filed again in its lab "
+                "form (L16RL) for a person" % (it.get("approval_id"), src, cand.get("provider")))
+
+    def _refuse_misplaced_review(self, ln, it, why):
+        """Not submitted (_misplaced_review): recorded, declined, the lane
+        cleared, nothing charged and no attempt or failure counted; the
+        source's review is superseded so that _file_reviews files it again in
+        the form its placement calls for. The approval is closed in the
+        approvals log (_close_unsubmitted), so neither the ticker nor a
+        person's Run now on the INC page (executor.execute_approved) can still
+        send it to sbatch, where the cluster's collector would refuse it."""
+        p = it["proposal"]
+        src = (p.get("params") or {}).get("source")
+        aid = it.get("approval_id")
+        closed, cwhy = self._close_unsubmitted(aid, why)
+        self._ledger("refused", lane=ln, lever=it["lever"], approval_id=aid, proposal_id=p["id"],
+                     source=src, reasons=[why], charged=False, approval_closed=closed,
+                     close_error=cwhy or None)
+        self.st["declined"] = (list(self.st.get("declined") or []) + [p["id"]])[-200:]
+        rv = (self.st.get("source_reviews") or {}).get(src)
+        if isinstance(rv, dict):
+            rv.update(status="superseded", superseded_utc=self.utc, superseded_reason=_short(why, 500))
+        note = ("approval %s is closed (not_submitted, no job), so it cannot be run again" % aid if closed else
+                "approval %s could not be closed (%s): do not run it from the INC page, the cluster's collector "
+                "refuses it" % (aid, cwhy))
+        self._card("data", "Approved review of %s not submitted (approval %s)" % (src, aid), "%s. %s" % (why, note),
+                   lever=it["lever"])
+        self._clear(ln)
+
+    def _close_unsubmitted(self, aid, why):
+        """(closed, why not) for an approval the lane will not submit: its one
+        run is recorded as started, then failed with the outcome not_submitted
+        and no job, in the approvals log only (approvals.record_executed), so
+        approvals.awaiting_execution no longer lists it and
+        executor.execute_approved refuses it as already executed. The execution
+        log, the budget and the source's attempts are not touched."""
+        now = self.xctx.clock()
+        got = AP.record_executed(self.domain, aid, "started", AUTO, now, root=self.xctx.approvals_root)
+        if not got.get("ok"):
+            return False, got.get("reason") or "the approval could not be claimed"
+        got = AP.record_executed(self.domain, aid, "failed", AUTO, now, root=self.xctx.approvals_root,
+                                 outcome={"status": "not_submitted", "job_ids": [], "error": _short(why, 1000)})
+        if not got.get("ok"):
+            # claimed, so it cannot run, but its outcome is not recorded
+            return False, got.get("reason") or "the approval's outcome could not be written"
+        return True, ""
 
     def _executed_elsewhere(self, ln, it, a):
         """A lane item whose approval another executor ran (a person from the
@@ -1808,7 +1945,7 @@ class StreamRun(object):
             self.st["sources"].setdefault(str(src), {})["leak_kept_by"] = a.get("decided_by") or "human"
             self._ledger("leak_kept", source=src, decided_by=a.get("decided_by") or "human",
                          approval_id=it.get("approval_id"))
-        if it.get("lever") == "L16R" and src:
+        if it.get("lever") in REVIEW_LEVERS and src:
             rv = (self.st.get("source_reviews") or {}).get(src)
             if isinstance(rv, dict):
                 rv["status"] = "denied"
@@ -2023,10 +2160,10 @@ class StreamRun(object):
         st = self.st
         p = it["proposal"]
         lever, params = it["lever"], p.get("params") or {}
-        if lever in ("L16", "L16L", "L16R"):
+        if lever in FETCH_LEVERS:
             s = st["sources"].setdefault(params["source"], {})
             s["attempts"] = int(s.get("attempts") or 0) + 1
-            s.update(status="fetching", placement="lab" if lever == "L16L" else "cluster",
+            s.update(status="fetching", placement="lab" if lever in LAB_FETCH_LEVERS else "cluster",
                      max_bytes=params.get("max_bytes"))
         child = p.get("child_exp")
         if child and child not in st["exps"] and p.get("follow") in ("build", "experiment"):
@@ -2084,10 +2221,10 @@ class StreamRun(object):
             d.update(last_utc=self.utc, found_new=new, runs=int(d.get("runs") or 0) + 1,
                      empty_runs=(int(d.get("empty_runs") or 0) + 1) if new == 0 else 0)
             self._check_recall()
-        elif lever in ("L16", "L16L", "L16R"):
+        elif lever in FETCH_LEVERS:
             s = st["sources"].setdefault(params["source"], {})
             s.update(status="fetched", fetched_utc=self.utc)
-            if lever == "L16L":
+            if lever in LAB_FETCH_LEVERS:
                 # a lab fetch appends to the lab's own sources.jsonl, which no
                 # snapshot folds: its completeness comes from its closing line
                 got = self._collect_result(payload)
@@ -2177,7 +2314,7 @@ class StreamRun(object):
                                                               "message": _short(why, 1000)}])[-REFUSALS_KEEP:]
         self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
                      charged=charged, fails=lane["fails"])
-        if lever in ("L16", "L16L", "L16R", "L16I", "L17") and params.get("source") or lever in ("L16", "L16L", "L16R"):
+        if lever in FETCH_LEVERS + ("L16I", "L17") and params.get("source") or lever in FETCH_LEVERS:
             src = params.get("source") or next((k for k, v in st["sources"].items()
                                                 if v.get("batch") == params.get("intake")), None)
             if src:

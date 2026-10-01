@@ -94,6 +94,7 @@
     "inc_stream_collect",
     "inc_stream_collect_lab",
     "inc_stream_collect_review",
+    "inc_stream_collect_review_lab",
     "inc_stream_intake",
     "inc_stream_sync"
    ],
@@ -176,6 +177,32 @@
    "success": "As L16.",
    "falsifier": "As L16.",
    "estimator": "collect"
+  },
+  "L16RL": {
+   "name": "collect_review_lab",
+   "title": "Collect on the lab a source that failed a pre-check (a person decides), detached",
+   "lane": "DATA",
+   "follow": "lab",
+   "policy_action": "inc_stream_collect_review_lab",
+   "risk": "R3",
+   "lever": "L16",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.collect",
+    "fetch",
+    "--source",
+    "{source}",
+    "--max-bytes",
+    "{max_bytes}",
+    "--out",
+    "{out}"
+   ],
+   "control": "As L16.",
+   "success": "As L16L.",
+   "falsifier": "As L16.",
+   "estimator": "zero",
+   "note": "L16R's lab form, for a source whose candidate placement is 'lab' (its provider is not placed on compute nodes by intake/placement.json, or the collect config lists it lab_only), the field D20 routes L16 -> L16L by. The cluster's collector refuses such a provider (not_placed_on_cluster, job 47302914), so L16R's sbatch can never succeed for it. Run by the lab fetch hook once a person approves; folded as an L16L run."
   },
   "L16I": {
    "name": "intake",

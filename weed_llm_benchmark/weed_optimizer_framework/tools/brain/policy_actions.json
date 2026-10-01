@@ -1755,6 +1755,41 @@
       ],
       "description": "Lever L16 for a source that failed a pre-check (licence unknown, no target class, image-level labels only, over the byte cap, missing credentials, an evaluation lab without the copy scan): R3, a person decides; never within the envelope."
     },
+    "inc_stream_collect_review_lab": {
+      "template": "lab: python -m weed_optimizer_framework.tools.collect fetch --source {source} --max-bytes {max_bytes} --out {out}",
+      "param_bounds": {
+        "source": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$"
+        },
+        "max_bytes": {
+          "type": "int",
+          "min": 1,
+          "max": 53687091200
+        },
+        "out": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}/intake/staging/$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 0.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A lab-side download, run detached; no cluster allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L16R on the lab (L16RL): the review of a source that failed a pre-check, for a source whose provider is placed on the lab (the cluster's collector refuses it: not_placed_on_cluster). R3, a person decides; never within the envelope. Once approved, the lab fetch hook runs it detached, as inc_stream_collect_lab; the files reach the cluster through inc_stream_sync."
+    },
     "inc_stream_intake": {
       "template": "sbatch -p GPU-shared run_inc_collect.sh intake --source {source}",
       "param_bounds": {

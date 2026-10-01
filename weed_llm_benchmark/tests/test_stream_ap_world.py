@@ -21,6 +21,7 @@ report.json, ledger.jsonl, runs/<run>/scores/dev.json).
 Imported by tests/test_stream_ap_replay.py, test_stream_ap_units.py and
 test_stream_ap_identity.py. Run directly it runs a short smoke tick.
 """
+import atexit
 import copy
 import hashlib
 import json
@@ -35,6 +36,11 @@ import tempfile
 import types
 
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="stream_ap_"))
+# removed when the process exits, so no suite built on this world leaves its
+# tree in the system temp dir (STREAM_AP_KEEP=1, or test_stream_pipeline's
+# STREAM_PIPELINE_KEEP=1, keeps it for a post-mortem)
+if not (os.environ.get("STREAM_AP_KEEP") or os.environ.get("STREAM_PIPELINE_KEEP")):
+    atexit.register(shutil.rmtree, str(TMP), True)
 PKG_ROOT = pathlib.Path(__file__).resolve().parents[1]
 os.environ.setdefault("INC_DIR", str(TMP / "default_inc"))
 os.environ.setdefault("REPO", str(TMP / "repo"))

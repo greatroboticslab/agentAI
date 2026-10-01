@@ -370,6 +370,11 @@ ARGV_FORMS = {
                                (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
                                 ("--out", "out", "str")),
                                ("source", "max_bytes", "out")),
+    # L16RL: a source review (R3) whose source is placed on the lab, run by the same lab hook
+    "inc_stream_collect_review_lab": ("collect", "fetch",
+                                      (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
+                                       ("--out", "out", "str")),
+                                      ("source", "max_bytes", "out")),
 }
 # Stream actions and how the cluster runs them: a job script through remote.py
 # stream-submit KIND, or a login-node verb through stream-run.
@@ -389,7 +394,8 @@ _BIGINT_RE = re.compile(r"^[1-9][0-9]{0,12}$")
 # Lab-side actions: the executor calls the hook the caller registered for each
 # (Context.local_hooks) and refuses when none is.
 LAB_ACTIONS = ("inc_lit_fetch", "inc_funnel_fetch", "inc_verify_queue", "inc_funnel_sync",
-               "inc_stream_discover", "inc_stream_names", "inc_stream_collect_lab", "inc_stream_sync")
+               "inc_stream_discover", "inc_stream_names", "inc_stream_collect_lab", "inc_stream_collect_review_lab",
+               "inc_stream_sync")
 # The research brain's plan job (docs/INC_AUTOPILOT.md (c)): staged and
 # submitted, then pulled back, by segments the executor builds itself
 # (_plan_segment), not by remote.py verbs.
@@ -1821,7 +1827,8 @@ def stream_limits(ctx, camp, lever, req):
             why.append("%s already ran %d time(s) in the last 24 h (limit %d)" % (lever, len(day_jobs), lim[key]))
     if "total" in lim and len(recs) >= int(lim["total"]):
         why.append("%s already ran %d time(s) in this campaign (limit %d)" % (lever, len(recs), lim["total"]))
-    fetch = ("inc_stream_collect", "inc_stream_collect_lab", "inc_stream_collect_review")
+    fetch = ("inc_stream_collect", "inc_stream_collect_lab", "inc_stream_collect_review",
+             "inc_stream_collect_review_lab")
     src = p.get("source")
     if src and req.get("action") in fetch:
         mine = [r for r in recs if r.get("action") in fetch and (r.get("params") or {}).get("source") == src]

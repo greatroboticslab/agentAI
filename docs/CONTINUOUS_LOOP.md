@@ -1604,6 +1604,42 @@ The existing `test_inc_splits`, `test_funnel_leak`, `test_funnel_embed`, `test_f
 
 **Open.** A research_only model is not yet refused by the model router or the robot uplink.
 
+#### Live incident (2026-10-01): an approved source review of a lab-placed source went to the cluster
+
+**What happened.** D20 files a candidate that fails a pre-check as an R3 review for a person (L16R), and L16R always rendered the cluster's fetch (`sbatch -p GPU-shared run_inc_collect.sh fetch`). The approved review of `mediatum_1717366` (approval `ap-1790700040-42144765`) was adopted into the DATA lane and ran as job 47302914. The cluster's collector refused it: `not_placed_on_cluster: provider mediatum is not placed on compute nodes (placement.json); the lab hook fetches it`. For a provider that placement.json does not place on compute nodes (the mediaTUM FTP, github), an approved review could never succeed, and each failure counted toward the DATA lane's stop-loss. The automatic path already routed by placement (D20's L16 → L16L).
+
+**What changed.**
+- A lab form of the review, L16RL (`inc_stream_collect_review_lab`, R3). It runs L16L's command (`collect fetch --source <id> --max-bytes <B> --out <lab INC_DIR>/intake/staging/`), is priced at zero, and is an `executor.LAB_ACTIONS` action that the ticker's fetch hook runs. It is outside the envelope and is not a gated R2 action, so only a person's approval runs it. `stream_levers.json`, `policy_actions.json`, `executor.ARGV_FORMS` and `StreamRun._lab_hooks` carry it.
+- `_file_reviews` picks the form from the candidate's `placement`, the field D20 routes L16 by: `lab` files L16RL, anything else L16R as before. `source_reviews` records the lever.
+- An approved L16RL is adopted into the DATA lane and started by `_run_lab_items` under the approval (detached, no sbatch). It folds as an L16L run: the attempt is counted and the source is `fetching` on the lab; then `fetched` and the sync (L16S), or a failed step counted against the source.
+- `_ready` never submits an approved L16R whose source's candidate is placed on the lab. It also fails closed: an approved L16R whose source has no candidate row this tick is not submitted either. That happens to a discovered source that the last plan (L15) no longer lists. Its placement cannot be read, and an L16R carries no `--candidates`, so the cluster's collector could not load its record anyway. In both cases the lane writes a `refused` ledger entry with the reason and a data card naming the source and the approval, declines the proposal, counts no attempt, failure or charge, and marks the source's review `superseded`. The source is then fetched on the lab: by D20's L16 → L16L once its pre-check passes, otherwise through a new L16RL review for a person (the record keeps the superseded approval id).
+- The refused approval is closed in the approvals log (`approvals.record_executed`: `started`, then `failed` with the outcome `not_submitted` and no job). Left open, it stayed "approved, not executed": the INC page offered Run now for it, and `executor.execute_approved`, which has no placement check, would have sent it to sbatch, where the cluster's collector refuses it as it refused job 47302914. Once closed, `approvals.awaiting_execution` no longer lists it, and `execute_approved` refuses it as already executed. The execution log, the budget and the source's attempts are not touched. The `refused` entry records whether the approval was closed; if it could not be, the card says not to run it from the INC page.
+- A filed L16R whose approval already ran (`done` or `failed`) is marked `superseded` when D20 lists its source again for review, if the source's candidate is now placed on the lab (`_spent_cluster_review`, ledger `review_superseded`). Its review is then filed again as L16RL, once. Before, such a review stayed `filed` for ever, so the source was never offered to a person in its lab form. The live approval has already run (its execution is recorded), so it is never run again, and its review is filed in the lab form if `mediatum_1717366` fails a pre-check again. D20 lists no source that is being fetched, so a run in progress is never superseded.
+
+**How it was verified.**
+- `tests/test_stream_ap_review_placement.py` (new, 70 checks in 9 cases, in the stream world of `test_stream_ap_world`):
+  - The menu, the executor, the policy table and the lab hooks agree on L16RL.
+  - A lab-placed candidate failing its pre-check files L16RL, and nothing runs before the person decides. Once approved, it is launched on the lab runner and never reaches sbatch. While it runs, the executor's campaign counts it in flight as the L16 family.
+  - An ok end gives fetched, then L16S. Its completeness is read from the lab process's last line: complete, or partial with a `source_partial` entry. The L16 limits count its bytes for the source: a later 48.5 GB fetch would reach 50.5 GB. A failed end gives a failed step and a source failure.
+  - A person's denial of an L16RL is recorded on `source_reviews`, and the review is not filed again.
+  - A cluster-placed candidate still files L16R, run by sbatch.
+  - An approved L16R of a source now placed on the lab, or of a source with no candidate row, is not submitted and counts nothing. The approval is closed as `not_submitted` with no execution-log run or charge, a data card names it, and a Run now as the person (`execute_approved` with a Context that can reach the cluster) is refused with no sbatch. The source's review is superseded and, for the lab-placed source, filed again as L16RL.
+  - An L16R that already ran in its cluster form and failed for a source now placed on the lab is filed again as L16RL, once.
+- Mutations in a temporary copy. The first version of the test (37 checks) failed 34 of them at HEAD, and each of its checks failed under at least one of 14 targeted mutations: the lab form never or always chosen; the `_ready` guard, the lab hook, the lab action or the argv form removed; the fold's or the fetch levers' list without L16RL; no re-filing; the row at R2; a job follow; the family's action list; a job price; the cluster argv. The current test fails in all 9 cases at HEAD. Each of 9 further mutations fails it:
+  - `stream_limits`' fetch actions without L16RL;
+  - the lab fold's completeness for L16L only;
+  - `_person_denied` for L16R only;
+  - L16RL removed from `LANE_OF`;
+  - the refusal's card removed;
+  - the approval not closed;
+  - the approval claimed but not closed;
+  - the guard failing open on a missing candidate row;
+  - no superseding of a spent cluster-form review.
+- `test_stream_ap_units.py` exercises L16RL in the menu checks.
+- `test_stream_ap_world` now removes its temporary tree when the process exits (`STREAM_AP_KEEP=1`, or `STREAM_PIPELINE_KEEP=1` as before, keeps it). Before, every suite built on it left a `stream_ap_*` directory in the system temp dir, and 315 of them (4.5 GB) were there on 2026-09-30.
+
+**Deploy.** `policy_actions.json`, `stream_levers.json` and the autopilot modules change `executor.code_hash()`, so re-run `executor.run_replay_tests` after the lab and the cluster are synced from one commit.
+
 ### Build note (group C)
 
 **What was built.** `inc2/step1_stream.py` (verbs `bootstrap`, `admit --intake <batch>` / `admit --registry [--slugs]`, `backfill`, `knowntruth`, `rejoin --slug`, `serve-holds [--hold h6_scan|licence|funnel_F9]` (also accepted as `scan-holds`, the name group F's L17 form submits), `status`, `verify`), `inc2/mask.py` (`decide`, `mask_except`), `run_inc2_stream.sh`; tests `test_inc2_step1_stream.py` and `test_inc2_mask.py`.
