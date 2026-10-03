@@ -13,6 +13,37 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-03 (night, decisions) — SIU admitted, four false quarantines lifted, base v3 build approved
+
+**Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap to 0.90 = 0.021. Training set 7,493 images; base v3 is building.
+
+**SIU through Step 1 (job 47384911, 19:08Z).**
+- Queued: 26,012 of 39,958 rows, every hold released, so they are eligible for base v3. 2,014 were exact duplicate frames. No row hit the embedding copy scan (0 near_eval_embed).
+- Target boxes the frozen verifier confirmed: 2,384 of 10,106. Palmer amaranth 1,205 of 2,522; prickly sida 962 of 2,527; waterhemp 217 of 2,530; ragweed 0 of 2,527.
+- The platform raised X11 on its own: "Ragweed: >= 100 new target boxes, >= 0.50 unknown -> verifier refit".
+- A visual check of 4 cwd12 train_core Ragweed crops against 4 SIU AMBEL frames found finely dissected leaves on both: common ragweed, *A. artemisiifolia*, in both. The mapping is right. The refusals are a domain shift: the verifier learned field soil and grey-green leaves, and SIU shows a white greenhouse bench, pots and darker leaves.
+- A verifier refit on SIU as a new domain (leave-source-out) is queued. It does not affect E1, which keeps all weed boxes as one class.
+
+**False quarantines lifted.** The eval-hits sidecar (step1_stream/eval_hits/b0000.json, 19:38Z) scored all 49 dHash hits on evaluation images over 11 quarantined sources. None reaches the 0.80 confirm cosine. The highest is 0.659, for Latvia, an evaluation group.
+
+A person (human:harry567566@gmail.com, under the 2026-09-30 grant) lifted the four sources base v3 reads:
+
+| Source | Hits | Max pair cosine |
+|---|---|---|
+| rf_tuf__weed-3434e | 4 | 0.594 |
+| rf_new-workspace-zbm50__weeds-qftz4 | 3 | 0.390 |
+| rf_srec-dthh0__crop-and-weed-detection-fqrtg | 4 | 0.418 |
+| rf_weed-tnf9e__weed-bqdok | 1 | 0.353 |
+
+The other eight stay quarantined: they are not in base v3's allow-list, or they are evaluation groups.
+
+**Build ordering.** Autonomy was set to off at 19:09Z, so the base v3 build (L23V) and segment s002 would wait for the pre-build fixes; data autonomy stayed on, and eval-hits ran. The fixes were deployed at 20:14Z (47492e8). L23V, filed at 19:48Z, was then approved after the lift. Autonomy returns to envelope once the build job is submitted. s002 is approved after splits v3 is complete.
+
+**Corrections.**
+- The SIU archive holds 230,899 annotated images (184,719 train + 23,090 val + 23,090 test), not the 203,567 the Zenodo record states.
+- The "(later)" entry below quotes the first rehearsal (arm B 23,230 / 29,647, test v1 2,560). Revision 1 gives 23,015 / 28,948 / 2,636.
+- Since b8c8aef the builder loads `inc2/base3_v2.json`, not `base3_v1.json`.
+
 ## 2026-10-03 (night, later) — Base v3: review fixes before the build
 
 **Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap to 0.90 = 0.021. Training set 7,493 images (P_1); base v3 (about 35K planned) is not built yet.

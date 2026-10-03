@@ -10847,3 +10847,9 @@ Every result sat near test 0.85, against the 0.90 goal.
   - L23V is priced at its 12 h walltime (`base3_job` estimator, `cost.base3_job_hours` 12.0); its policy row's `est_gpu_hours` bound is 12.0 (was 8.0).
   - Tests: `test_inc2_base3.py` (`test_build_race`, `test_companions_and_masked`, unmatched names, registry counts, companions in `test_prior_lists`), `test_stream_ap_units.py` (`t_e1_lift_faults`, `t_e1_cut_order`, L23V's price); the fake stream summary states `quarantined_sources` as the real one does. The new fault checks fail on the unfixed code (15 failures).
   - Deploy: `inc2/base3.py` is imported at run time by `step1_stream.test_v1_rows`; sync it after the running Step 1 admit job ends.
+- **Operations, 2026-10-03 night (person decisions under the 2026-09-30 grant, recorded in the ledgers).**
+  - Daily SU cap 120 → 180. Without it, s002 (about 87–110 SU) would have pushed E1 to Monday.
+  - Stale approvals ap-1790832807-36691997 and ap-1790849291-80605078 denied.
+  - Autonomy off from 19:09Z, so L23V and L18 would wait for the deployed pre-build fixes.
+  - Unquarantined rf_tuf__weed-3434e, rf_new-workspace-zbm50__weeds-qftz4, rf_srec-dthh0__crop-and-weed-detection-fqrtg and rf_weed-tnf9e__weed-bqdok. Eval-hits sidecar b0000 scored their hits at a max pair cosine of 0.594, 0.390, 0.418 and 0.353, against the 0.80 confirm threshold.
+  - L23V approval ap-1791056921-77746394 granted.
