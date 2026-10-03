@@ -108,6 +108,7 @@ LAB_FETCH_LEVERS = ("L16L", "L16RL")
 REVIEW_LEVERS = ("L16R", "L16RL")
 STALE_TO_PAUSE = 2
 BUILD_LOST_SNAPSHOTS = 3
+LOST_RUNS_MAX = 3            # a step killed from outside this many times in a row counts as failed
 WAIT_REFUSALS = ("today's cap", "this month's window", "of the domain's", "the cluster is not reachable",
                  "Mongo's health", "the execution log", "no slurm_sh hook", "could not be locked",
                  "collides with another request", "could not be filed", "one ssh per tick")
@@ -118,6 +119,7 @@ STREAM_DEFAULTS = {"enabled": False, "paused_reason": None, "mode": "stream", "d
                    "envelope_su": 1000.0, "envelope_end_utc": "2026-12-31T23:59:59Z", "window": "month",
                    "window_cap_su": 350.0, "daily_cap_su": 120.0, "alloc_reserve_su": None,
                    "collect_gb_envelope": 200.0, "collect_gb_daily": 50.0, "protocol_v3_accepted_by": None,
+                   "reopened_sources": {},
                    "brain": {"enabled": False, "model": None}}
 LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "DATA", "L16R": "DATA",
            "L16RL": "DATA", "L16I": "DATA", "L16S": "DATA", "L17": "DATA", "L24": "STOP", "LH": "DATA",
@@ -310,7 +312,8 @@ def check_stream_config(cfg):
 def configure_stream(name, by, domain=None, enable=None, autonomy=None, data_autonomy=None, envelope_su=None,
                      window_cap_su=None, daily_cap_su=None, alloc_reserve_su=None, collect_gb_envelope=None,
                      protocol_v3_accepted=None, stream_domain=None, collect_config=None, cfg_hooks=None,
-                     lab_repo=None, clock=None, complete=None, envelope_end_utc=None, collect_gb_daily=None):
+                     lab_repo=None, clock=None, complete=None, envelope_end_utc=None, collect_gb_daily=None,
+                     reopen_source=None, reopen_why=None):
     """Create or change a stream campaign as person `by`. data_autonomy,
     autonomy 'envelope', the acceptance of Protocol v3 and a completion are a
     person's flags (6.5, 10): the ticker never writes them."""
@@ -370,6 +373,14 @@ def configure_stream(name, by, domain=None, enable=None, autonomy=None, data_aut
             c["protocol_v3_accepted_by"] = by
         if complete:
             c["completed_by"], c["completed_utc"] = by, utc
+        if reopen_source is not None:
+            if not re.match(r"^[A-Za-z0-9_.-]{1,200}$", str(reopen_source)):
+                raise ValueError("source %r is not a source id" % (reopen_source,))
+            if not str(reopen_why or "").strip():
+                raise ValueError("reopening a closed source records why (--why)")
+            ro = dict(c.get("reopened_sources") or {})
+            ro[str(reopen_source)] = {"by": by, "utc": utc, "why": str(reopen_why)[:500]}
+            c["reopened_sources"] = ro
         if enable is not None:
             c["enabled"] = bool(enable)
             if enable:
@@ -389,6 +400,7 @@ def configure_stream(name, by, domain=None, enable=None, autonomy=None, data_aut
                                                                "envelope_su", "envelope_end_utc", "window_cap_su",
                                                                "daily_cap_su", "alloc_reserve_su", "collect_gb_envelope",
                                                                "collect_gb_daily", "protocol_v3_accepted_by",
+                                                               "reopened_sources",
                                                                "stream")}})
     return full
 
@@ -730,6 +742,31 @@ class StreamRun(object):
             return self.cfg.get("paused_reason") or "not enabled"
         return self.cfg.get("paused_reason") or ((self.st.get("paused") or {}).get("reason"))
 
+    def _reopen_sources(self):
+        """A person's reopening of a closed source (`stream reopen`): the
+        config stamps {source: {by, utc, why}}; a source closed before that
+        stamp becomes a candidate again with its failure count reset, once
+        per stamp, and the ledger records who and why. A quarantine is not
+        a closure and is lifted only by inc2.stream unquarantine."""
+        ro = self.cfg.get("reopened_sources") or {}
+        srcs = self.st.setdefault("sources", {})
+        for src, rec in sorted(ro.items()):
+            rec = rec or {}
+            s = srcs.get(src)
+            if not s or s.get("status") != "closed" or not rec.get("utc"):
+                continue
+            if s.get("reopened_utc") and str(s["reopened_utc"]) >= str(rec["utc"]):
+                continue
+            if s.get("closed_utc") and str(rec["utc"]) < str(s["closed_utc"]):
+                continue                             # closed again after the stamp: a new stamp is needed
+            prev = {k: s.get(k) for k in ("status", "failures", "attempts", "closed_reason", "closed_utc")}
+            # attempts too: the 4th collection attempt on a source pauses the campaign (S15), so a reopened
+            # source whose attempts stayed at 3 would stop the stream on its first retry
+            s.update(status="candidate", failures=0, attempts=0, closed_reason=None, reopened_utc=rec["utc"],
+                     reopened_by=rec.get("by"))
+            self._ledger("source_reopened", source=src, decided_by=rec.get("by") or "human",
+                         reasons=[_short(rec.get("why") or "", 300)], before=prev)
+
     def _resumed(self):
         st = self.st
         p = st.get("paused") or {}
@@ -920,6 +957,7 @@ class StreamRun(object):
         st = self.st
         st["ticks"] = int(st.get("ticks") or 0) + 1
         self._resumed()
+        self._reopen_sources()
         why = self._paused_reason()
         if why:
             return {"mode": "stream", "paused": why, "ssh": False}
@@ -1994,7 +2032,8 @@ class StreamRun(object):
             else:
                 self._failed(ln, it, "the lab process %s ended %s: %s" % (it["lab_job"], res.get("rc"),
                                                                            _short(res.get("stderr_tail") or res.get("error")
-                                                                                  or "", 300)))
+                                                                                  or "", 300)),
+                             lost=bool(res.get("lost")))
 
     # ---- the one ssh: ready items
     def _ready(self):
@@ -2416,6 +2455,7 @@ class StreamRun(object):
         lever, params = it["lever"], p.get("params") or {}
         lane = st["lanes"][ln]
         lane["fails"] = 0
+        (st.get("lost_runs") or {}).pop(step_key(lever, params), None)
         self._ledger("item_done", lane=ln, lever=lever, proposal_id=p["id"], child_exp=p.get("child_exp"))
         # what a later tick diagnoses before the next snapshot still shows the
         # state before this item: the same work is not proposed again on it
@@ -2499,7 +2539,7 @@ class StreamRun(object):
             st["bisected"] = rb[-1]["utc"] if rb else self.utc
         self._clear(ln)
 
-    def _failed(self, ln, it, why, charged=False, retry=True):
+    def _failed(self, ln, it, why, charged=False, retry=True, lost=False):
         st = self.st
         p = it["proposal"]
         lever, params = it["lever"], p.get("params") or {}
@@ -2507,6 +2547,30 @@ class StreamRun(object):
         if lever in FETCH_LEVERS:
             # ended: the byte limits count what it fetched, not its max_bytes
             self._fetch_ends()[p["id"]] = self.utc
+        if lost:
+            # killed from outside (a restart, an OOM kill, a reboot): not the step's or the source's failure. The
+            # lane is freed and the same work is proposed again, up to LOST_RUNS_MAX times in a row for one step;
+            # after that it counts as a failure, so a job that is always killed still ends in the stop-loss
+            # (2026-10-03: a deploy restart killed the zenodo_15808623 fetch, and counting it as the source's
+            # third failed attempt closed the largest source the stream had found)
+            key = step_key(lever, params)
+            lr = st.setdefault("lost_runs", {})
+            lr[key] = int(lr.get(key) or 0) + 1
+            if lr[key] < LOST_RUNS_MAX:
+                # a new proposal id for the retry (the executor runs an id once), as a failed step gets
+                att = st.setdefault("attempts", {})
+                att[key] = int(att.get(key) or 0) + 1
+                st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+                if lever in FETCH_LEVERS and params.get("source"):
+                    src = st.setdefault("sources", {}).setdefault(params["source"], {})
+                    if src.get("status") == "fetching":
+                        src["status"] = "candidate"      # as a failed fetch leaves it, without a failure
+                    # the attempt _on_started counted is not the source's: a 4th attempt pauses the campaign (S15)
+                    src["attempts"] = max(0, int(src.get("attempts") or 0) - 1)
+                self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
+                             charged=charged, fails=int(lane.get("fails") or 0), lost=True, lost_runs=lr[key])
+                self._clear(ln)
+                return
         if lever in RECORD_ONLY_LEVERS:
             # record only (a measurement arm's native-resolution rescore): a person's card; the lane's
             # failure count, its step count and its stop-loss are not touched, and the item stays failed,
@@ -2558,6 +2622,7 @@ class StreamRun(object):
                 s["status"] = "candidate" if s["failures"] < 3 else "closed"
                 if s["status"] == "closed":
                     s["closed_reason"] = "3 failed attempts (7.5)"
+                    s["closed_utc"] = self.utc
                     self._ledger("source_closed", source=src, reasons=["3 failed attempts"])
                     self._zero_yield(src, "failed")
         self._clear(ln)
@@ -3221,6 +3286,11 @@ def main(argv=None):
     rl = sub.add_parser("release")
     rl.add_argument("--name", required=True)
     rl.add_argument("--by", required=True)
+    ro = sub.add_parser("reopen", help="a person reopens a closed source (the next tick applies it)")
+    ro.add_argument("--name", required=True)
+    ro.add_argument("--source", required=True)
+    ro.add_argument("--by", required=True)
+    ro.add_argument("--why", required=True)
     c = sub.add_parser("complete")
     c.add_argument("--name", required=True)
     c.add_argument("--by", required=True)
@@ -3253,6 +3323,11 @@ def main(argv=None):
                                    lab_repo=a.lab_repo)
         elif a.cmd == "release":
             out = release(a.name, a.by, cfg_hooks=hooks, lab_repo=a.lab_repo)
+        elif a.cmd == "reopen":
+            full = configure_stream(a.name, a.by, cfg_hooks=hooks, lab_repo=a.lab_repo, reopen_source=a.source,
+                                    reopen_why=a.why)
+            out = {"ok": True, "campaign": a.name, "reopened": a.source,
+                   "stamp": (full.get("reopened_sources") or {}).get(a.source)}
         elif a.cmd == "status":
             out = status(a.name, hooks, a.lab_repo)
         elif a.cmd == "complete":

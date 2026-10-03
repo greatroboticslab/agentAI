@@ -23,6 +23,8 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 **Data lane.** The SIU Weed Growth Stage zip (zenodo_15808623, 49.7 GB, 203,567 images) broke off after 9.1 GB; the collector could not resume, the partial file was deleted, and the second failed fetch in a row held the DATA lane from 2026-10-02 08:34Z. Fixed: resumable downloads and a lab fetch wall clock sized from bytes (CHANGELOG). The fetch restarts after deploy.
 
+The restarted fetch was then killed by the next deploy's dashboard restart (the unit killed its whole control group). The lane detected the dead job but counted it as SIU's third failed attempt, after the earlier cap refusal and the no-resume drop, and closed the source. Fixed: lab jobs survive restarts (KillMode=process); a job lost to an outside kill is proposed again without counting against the source, the lane's stop-loss or the attempt-pause (three losses of one step in a row still count); a person can reopen a closed source with a recorded reason.
+
 ## 2026-10-01 (evening) — The boxes, not the species call, cap YOLO11m at about 0.89; three box-quality arms are pre-registered
 
 **Accuracy.** Best sealed test is unchanged: 0.8786 ± 0.0018 (YOLO11m on base_v2), gap to 0.90 = 0.021. The committed incumbent reads dev 0.8606; test is read at the next milestone.

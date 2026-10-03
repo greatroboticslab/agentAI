@@ -10778,3 +10778,8 @@ Every result sat near test 0.85, against the 0.90 goal.
   - `LabRunner.launch` records the lab-run pid; `poll` returns a `lost` failure when no result exists and no lab-run of the spec is alive (pid, else any process naming the spec), so the lane fails the step and proposes again.
   - `deploy/weed-dashboard.service`: `KillMode=process` (the start script execs uvicorn), so a restart no longer kills detached lab jobs.
   - New `tests/test_stream_ap_lab_lost.py` (real processes: running, killed, finished, legacy spec; stream-world re-proposal).
+- **A lost lab job is charged to nobody; a person can reopen a closed source (2026-10-03).**
+  - Live: zenodo_15808623 (SIU, 203K images) was closed by "3 failed attempts": a refusal over the collector's daily byte cap, a download broken off before resume existed, and the deploy restart's kill.
+  - A lab job lost to an outside kill frees its lane and is proposed again under a new id without counting as the source's failure, the lane's stop-loss step or a collection attempt (S15); three losses of the same step in a row count as a failure.
+  - New `inc_autopilot.stream reopen --name --source --by --why`: a config stamp the next tick applies (candidate, failures and attempts reset, ledger `source_reopened`).
+  - Tests in `tests/test_stream_ap_lab_lost.py`.
