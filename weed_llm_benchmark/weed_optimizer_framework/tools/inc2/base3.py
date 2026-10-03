@@ -37,8 +37,15 @@ Inputs (all recorded by sha256 in summary.json):
     only when Step 1's queue (inc2.stream.QueueView, the queue's one
     reader) holds it with no hold left;
   * the stream's source quarantines (--stream SID: inc2.stream's ledger
-    fold, its head recorded): a quarantined source is not admitted. The
-    quarantine is an input, never a constant here.
+    fold, its head recorded): a quarantined source's rows never enter arm B.
+    The quarantine is an input, never a constant here, and it is applied
+    after the holdout (below), so test v1 does not depend on it;
+  * the evaluation groups' images (config "evaluation_groups": test v1's
+    groups and the OOD-dev groups, every slug excluded): their 8-variant
+    dHashes from the v1 Step 1 pool, else hashed from the registry's
+    local_path (build and count alike);
+  * every test list an earlier build wrote (INC_DIR/splits/*/test_v1/
+    *.jsonl, whatever its directory is now called): never trained.
 
 The rules (pre-registered; base3_v1.json "rules"). base_v2 rows are exempt
 from every box, image and source rule: arm A is base_v2 whole.
@@ -60,7 +67,8 @@ from every box, image and source rule: arm A is base_v2 whole.
   * Dedupe (never 4-6 bits): the same original bytes; or dHash within 3
     bits under one of the 8 flips and rotations AND >= 80 % of the larger
     box set matched one-to-one at IoU >= 0.8 after that transform; or an
-    identical label layout (rounded to 0.01, >= 3 boxes). One row kept per
+    identical label layout (rounded to 0.01, >= 3 boxes) whose dHashes lie
+    within 10 bits under one of the 8 variants. One row kept per
     copy group: base_v2 rows always (an external copy of one is dropped),
     else the lowest tier, then the most pixels, then the slug, then the key.
   * Leak guard (build): GuardV2 and the index cross-check on the exact
@@ -75,18 +83,39 @@ from every box, image and source rule: arm A is base_v2 whole.
     leaves both arms (expected none). count weighs stored hashes of the
     originals and reports the embedding check and the pair cosines as
     pending (dHash hits unweighed).
-  * Main-test holdout v1: capture groups join images within 6 dHash bits
-    under the 8 variants (both directions), their copy edges, the same
+  * Evaluation-group guard: a candidate row within 6 dHash bits (GuardV2's
+    never-train radius) under the 8 variants, in both directions, of any
+    image of an evaluation group is dropped (near_eval_group): never in arm
+    B, never in test v1. summary.json reports the rows within 3 and within
+    6 bits per group and source (base_v2's counted, never dropped).
+  * Earlier test lists: a row an earlier build's test list holds (the same
+    original or written bytes, the same key, a shared capture relation, or
+    within 6 dHash bits under the 8 variants) never trains.
+  * Main-test holdout v1, computed before the quarantine is applied (every
+    step up to it ignores the quarantine, so test v1 is the same whichever
+    sources are quarantined): capture groups join images within 6 dHash
+    bits under the 8 variants (both directions), their copy edges, the same
     Roboflow export stem (across a family), the intake capture group and a
-    source's group_regex session. From each included external source,
-    seeded by stable_int("inc2/base3/test_v1/<source>"), whole groups are
-    held out until ~15 % of its kept rows (min 30, max 400 images); a group
-    touching base_v2 or a row of the stream's pools (an image a current model
-    trained on), or larger than 400 images, is never held out. Held-out
-    rows never train and are listed in splits/v3/test_v1/<source>.jsonl for
-    a later never-train index v3.
-  * Family cap (dock): after the holdout, D <= floor(0.35 / 0.65 x non-dock
-    images), enforced by dropping whole capture groups in a seeded order.
+    source's group_regex session. A group is named by its own content (the
+    sha256 of its members' sorted sha256s), never by row positions. From
+    each included external source (quarantined or not), whole groups it
+    owns are held out in the order stable_int("inc2/base3/test_v1/<source>/
+    <group digest>") -- a group holding a row of an earlier test list first
+    -- until ~15 % of its kept rows (min 30, max 400 images) are held; a
+    source's count includes its rows held in other sources' groups, and a
+    group is taken only while every source with rows in it stays at or
+    under 400. A group touching base_v2 or a row of the stream's pools (an
+    image a current model trained on), or larger than 400 images, is never
+    held out (summary.json counts each source's rows in such groups by
+    reason). Held-out rows never train and are listed in
+    splits/v3/test_v1/<source>.jsonl (with their capture relations) for a
+    later never-train index v3 and for every later build.
+  * The quarantine: a quarantined source's rows that are not held out
+    leave arm B (quarantined); a copy group whose kept row is quarantined
+    keeps its best copy from a source that is not.
+  * Family cap (dock): after the quarantine, D <= floor(0.35 / 0.65 x
+    non-dock images), enforced by dropping whole capture groups in the order
+    stable_int("inc2/base3/test_v1/cap/dock/<group digest>").
 
 Materialisation (build). An image whose long side exceeds 640, or that has a
 masked box, is written as a lossless PNG of exactly the pixels Ultralytics
@@ -117,8 +146,10 @@ bytes, and summary.json is written last):
                          deduped, held out (holdout_v1), capped, guard,
                          leak verdict; the inputs' sha256s; no key named
                          after a non-dev split (the snapshot ships it)
-inc2.baseline build trains cold_budget on exactly the two manifests this
-summary records (by sha256).
+inc2.baseline build trains cold_budget on exactly the two manifests a
+complete summary records (by sha256), and refuses any other build on a
+manifest under splits/v3 or one any base v3 summary records (v3_claim);
+inc2.train runs cold_budget only for such an E1 arm (e1_problems).
 """
 from __future__ import annotations
 
@@ -238,6 +269,19 @@ def load_config(path=None):
     for s, e in conf["intake"].items():
         if e.get("classes") != "all_weed":
             raise Base3Error("intake source %s: only 'all_weed' is supported" % s)
+    dd = conf["rules"].get("dedupe") or {}
+    if not isinstance(dd.get("layout_max_bits"), int) or dd["layout_max_bits"] < 0:
+        raise Base3Error("%s: rules.dedupe.layout_max_bits must be a whole number of bits" % path)
+    eg = conf.get("evaluation_groups")
+    if not isinstance(eg, dict) or not isinstance(eg.get("groups"), dict) or not eg["groups"] \
+            or not isinstance(eg.get("bits"), int):
+        raise Base3Error("%s has no evaluation_groups block (bits and groups)" % path)
+    for g, slugs in eg["groups"].items():
+        if not isinstance(slugs, list) or not slugs:
+            raise Base3Error("evaluation group %s lists no slug" % g)
+        inside = sorted(set(slugs) - set(conf["excluded"]))
+        if inside:
+            raise Base3Error("evaluation group %s lists %s, which the config does not exclude" % (g, inside))
     return conf, C.sha256_file(path)
 
 
@@ -370,32 +414,32 @@ def _reduce_pairs(Q, T, D, V, n):
     return Q[sel], T[sel], D[sel], V[sel]
 
 
-def near_pairs(H, var_ok, bits):
-    """(Q, T, D, V) int64 arrays, one entry per ordered pair q != t of rows
-    with popcount(H[q, v] ^ H[t, 0]) <= bits: D the fewest bits, V the
-    variant index (VARIANTS order) giving them, the lowest on a tie. H:
-    [N, 8] uint64, column 0 the dHash; a row with var_ok False is queried by
-    its dHash only. Pigeonhole blocks: two 64-bit hashes within `bits` agree
-    exactly on one of bits + 1 blocks."""
+def _pair_search(HQ, okQ, HT, bits, same):
+    """near_pairs' search: every (q, t) with popcount(HQ[q, v] ^ HT[t, 0])
+    <= bits for some variant v (v 0 only when okQ[q] is False), one entry
+    per pair (the fewest bits, then the lowest variant); with same (HQ is
+    HT) the pairs q == t are left out. Pigeonhole blocks: two 64-bit hashes
+    within `bits` agree exactly on one of bits + 1 blocks."""
     import numpy as np
-    H = np.asarray(H, dtype=np.uint64).reshape(-1, 8)
-    ok = np.asarray(var_ok, dtype=bool).reshape(-1)
-    n = len(H)
+    HQ = np.asarray(HQ, dtype=np.uint64).reshape(-1, 8)
+    HT = np.asarray(HT, dtype=np.uint64).reshape(-1, 8)
+    ok = np.asarray(okQ, dtype=bool).reshape(-1)
+    nq, nt = len(HQ), len(HT)
     z = np.zeros(0, dtype=np.int64)
     acc = (z, z, z, z)
-    if n < 2:
+    if nq == 0 or nt == 0 or (same and nq < 2):
         return acc
     for shift, mask in _blocks(bits):
         sh, mk = np.uint64(shift), np.uint64(mask)
-        kid = (H[:, 0] >> sh) & mk
+        kid = (HT[:, 0] >> sh) & mk
         order = np.argsort(kid, kind="stable")
         ks = kid[order]
-        parts = [list(acc[0:1]), list(acc[1:2]), list(acc[2:3]), list(acc[3:4])]
+        parts = [[acc[0]], [acc[1]], [acc[2]], [acc[3]]]
         for v in range(8):
-            q = np.arange(n) if v == 0 else np.flatnonzero(ok)
+            q = np.arange(nq) if v == 0 else np.flatnonzero(ok)
             if not len(q):
                 continue
-            kq = (H[q, v] >> sh) & mk
+            kq = (HQ[q, v] >> sh) & mk
             lo = np.searchsorted(ks, kq, side="left")
             hi = np.searchsorted(ks, kq, side="right")
             has = np.flatnonzero(hi > lo)
@@ -411,7 +455,7 @@ def near_pairs(H, var_ok, bits):
                 ti = order[lo[hs[a]]:hi[hs[a]]]
                 for c0 in range(0, len(qi), 1024):
                     qc = qi[c0:c0 + 1024]
-                    d = _popcount(H[qc, v][:, None] ^ H[ti, 0][None, :])
+                    d = _popcount(HQ[qc, v][:, None] ^ HT[ti, 0][None, :])
                     rr, cc = np.nonzero(d <= bits)
                     if len(rr):
                         parts[0].append(qc[rr].astype(np.int64))
@@ -419,9 +463,83 @@ def near_pairs(H, var_ok, bits):
                         parts[2].append(d[rr, cc].astype(np.int64))
                         parts[3].append(np.full(len(rr), v, dtype=np.int64))
         Q, T, D, V = (np.concatenate(p) for p in parts)
-        keep = Q != T
-        acc = _reduce_pairs(Q[keep], T[keep], D[keep], V[keep], n)
+        if same:
+            keep = Q != T
+            Q, T, D, V = Q[keep], T[keep], D[keep], V[keep]
+        acc = _reduce_pairs(Q, T, D, V, nt)
     return acc
+
+
+def near_pairs(H, var_ok, bits):
+    """(Q, T, D, V) int64 arrays, one entry per ordered pair q != t of rows
+    with popcount(H[q, v] ^ H[t, 0]) <= bits: D the fewest bits, V the
+    variant index (VARIANTS order) giving them, the lowest on a tie. H:
+    [N, 8] uint64, column 0 the dHash; a row with var_ok False is queried by
+    its dHash only."""
+    return _pair_search(H, var_ok, H, bits, True)
+
+
+def near_pairs_between(HQ, okQ, HT, bits):
+    """near_pairs from one set (HQ, queried under its variants) to another
+    (HT, by its dHash): (Q, T, D, V) with Q indexing HQ and T indexing HT."""
+    return _pair_search(HQ, okQ, HT, bits, False)
+
+
+def cross_nearest(HA, okA, HB, okB, bits):
+    """(dist, arg): for every row of A the fewest bits to a row of B under
+    the 8 variants in both directions (A's variants against B's dHash, B's
+    variants against A's dHash), bits + 1 when none is within `bits`, and
+    that row of B (-1 when none)."""
+    import numpy as np
+    na = len(np.asarray(HA).reshape(-1, 8))
+    best = np.full(na, bits + 1, dtype=np.int64)
+    arg = np.full(na, -1, dtype=np.int64)
+    if na == 0 or len(np.asarray(HB).reshape(-1, 8)) == 0:
+        return best, arg
+    Q1, T1, D1, _V1 = near_pairs_between(HA, okA, HB, bits)
+    T2, Q2, D2, _V2 = near_pairs_between(HB, okB, HA, bits)
+    a = np.r_[Q1, Q2].astype(np.int64)
+    b = np.r_[T1, T2].astype(np.int64)
+    d = np.r_[D1, D2].astype(np.int64)
+    if len(a):
+        order = np.lexsort((b, d, a))
+        a, b, d = a[order], b[order], d[order]
+        first = np.r_[True, a[1:] != a[:-1]]
+        best[a[first]] = d[first]
+        arg[a[first]] = b[first]
+    return best, arg
+
+
+def hash_matrix(rows):
+    """(H [N, 8] uint64, var_ok [N], has [N]) of rows: the 8 variants when
+    known, else the dHash alone (var_ok False); has False without a hash."""
+    import numpy as np
+    H = np.zeros((len(rows), 8), dtype=np.uint64)
+    ok = np.zeros(len(rows), dtype=bool)
+    has = np.zeros(len(rows), dtype=bool)
+    for i, r in enumerate(rows):
+        if r.get("variants") is not None:
+            H[i] = np.asarray([int(x) for x in r["variants"]], dtype=np.uint64)
+            ok[i] = has[i] = True
+        elif r.get("dhash") is not None:
+            H[i, 0] = np.uint64(int(r["dhash"]))
+            has[i] = True
+    return H, ok, has
+
+
+def hash_dist(a, b):
+    """The fewest dHash bits between two rows under the 8 variants in both
+    directions (the dHashes alone when neither has variants); None when
+    either has no hash."""
+    if a.get("dhash") is None or b.get("dhash") is None:
+        return None
+    da, db = int(a["dhash"]), int(b["dhash"])
+    best = bin(da ^ db).count("1")
+    for v in (a.get("variants") or ())[1:]:
+        best = min(best, bin(int(v) ^ db).count("1"))
+    for v in (b.get("variants") or ())[1:]:
+        best = min(best, bin(int(v) ^ da).count("1"))
+    return best
 
 
 def _components(n, Q, T):
@@ -853,43 +971,51 @@ def masked_area(mask, keep, W, H):
 
 
 # ------------------------------------------------------------------- hashes
+def pool_hashes(inc_dir=None):
+    """({image path: [8 variants]}, {image path: sha256}, record) of the v1
+    Step 1 pool (funnel/emb_dinov2_images_pool.npz and step1/pool.jsonl):
+    stored hashes, empty when the files are missing."""
+    inc = Path(inc_dir or C.INC_DIR)
+    npz, pool = inc / "funnel" / "emb_dinov2_images_pool.npz", inc / "step1" / "pool.jsonl"
+    by_path, sha_by_path = {}, {}
+    if not (npz.is_file() and pool.is_file()):
+        return by_path, sha_by_path, {"pool_npz": None, "hashed": 0}
+    import numpy as np
+    path_of = {}
+    with open(pool) as fh:
+        for line in fh:
+            if line.strip():
+                r = json.loads(line)
+                path_of[r["key"]] = os.path.normpath(r["image"])
+                sha_by_path[os.path.normpath(r["image"])] = r.get("sha256")
+    with np.load(str(npz), allow_pickle=False) as z:
+        keys, H = z["keys"], z["H"]
+        ok = z["hash_ok"] if "hash_ok" in z.files else np.ones(len(keys), bool)
+    for k, h, o in zip(keys.tolist(), H, ok):
+        q = path_of.get(str(k))
+        if q is not None and bool(o):
+            by_path[q] = [int(x) for x in h]
+    return by_path, sha_by_path, {"pool_npz": str(npz), "pool_manifest": str(pool), "hashed": len(by_path)}
+
+
 class StoredHashes:
     """count's hashes: what is stored (the v1 Step 1 pool's 8 variants and
     sha256 by image path, the registry's dHash cache, intake and base_v2
     records); an image with none is hashed when it is small, else its
-    variants stay unknown (pending)."""
+    variants stay unknown (pending). The original's sha256 is read for every
+    row that has none (the holdout ranks groups by their members' bytes)."""
 
     def __init__(self, inc_dir=None, compute_max_bytes=COUNT_HASH_MAX_BYTES):
-        self.by_path = {}
-        self.sha_by_path = {}
+        self.by_path, self.sha_by_path, self.record = pool_hashes(inc_dir)
         self.compute_max_bytes = compute_max_bytes
-        self.record = {}
-        inc = Path(inc_dir or C.INC_DIR)
-        npz, pool = inc / "funnel" / "emb_dinov2_images_pool.npz", inc / "step1" / "pool.jsonl"
-        if npz.is_file() and pool.is_file():
-            import numpy as np
-            path_of = {}
-            with open(pool) as fh:
-                for line in fh:
-                    if line.strip():
-                        r = json.loads(line)
-                        path_of[r["key"]] = r["image"]
-                        self.sha_by_path[r["image"]] = r.get("sha256")
-            with np.load(str(npz), allow_pickle=False) as z:
-                keys, H = z["keys"], z["H"]
-                ok = z["hash_ok"] if "hash_ok" in z.files else np.ones(len(keys), bool)
-            for k, h, o in zip(keys.tolist(), H, ok):
-                p = path_of.get(str(k))
-                if p is not None and bool(o):
-                    self.by_path[p] = [int(x) for x in h]
-            self.record = {"pool_npz": str(npz), "pool_manifest": str(pool), "hashed": len(self.by_path)}
 
     def fill(self, row):
-        vs = self.by_path.get(row["image"])
+        key = os.path.normpath(row["image"])
+        vs = self.by_path.get(key)
         if vs is not None:
             row["dhash"], row["variants"] = int(vs[0]), list(vs)
         if row["sha256"] is None:
-            row["sha256"] = self.sha_by_path.get(row["image"])
+            row["sha256"] = self.sha_by_path.get(key) or _sha_file(row["image"])
         try:
             size = os.path.getsize(row["image"])
         except OSError:
@@ -903,6 +1029,125 @@ class StoredHashes:
                     row["dhash"] = int(h)
                     row["variants"] = [int(v[k]) for k in VARIANTS]
                     row["hashed_here"] = True
+
+
+# ------------------------------------------------------ evaluation groups
+def eval_group_images(conf, registry):
+    """{group: {slug: [image paths]}} of the config's evaluation groups (the
+    test v1 groups and the OOD-dev groups, every slug excluded), and
+    {slug: why not read} (not in the registry, no directory)."""
+    ents = (registry or {}).get("datasets", registry) or {}
+    out, missing = {}, {}
+    for g, slugs in sorted(((conf.get("evaluation_groups") or {}).get("groups") or {}).items()):
+        out[g] = {}
+        for slug in slugs:
+            e = ents.get(slug)
+            root = e.get("local_path") if isinstance(e, dict) else None
+            if not root or not os.path.isdir(root):
+                missing[slug] = "not in the registry" if not isinstance(e, dict) else "local_path %r is not a " \
+                                                                                     "directory" % root
+                continue
+            out[g][slug] = [str(x) for x in _list_files(root)[0]]
+    return out, missing
+
+
+def eval_group_hashes(conf, registry, stored=None, compute=True, max_bytes=None, procs=8):
+    """({group: (H [n, 8] uint64, var_ok [n])}, record): every image of each
+    evaluation group, its 8 variants from the Step 1 pool's stored hashes
+    when held there, else hashed here (every image when max_bytes is None,
+    as build and count call it)."""
+    import numpy as np
+    from . import guard as G
+    imgs, missing = eval_group_images(conf, registry)
+    by_path = stored if stored is not None else pool_hashes()[0]
+    out, rec = {}, {"groups": {}, "slugs_not_read": missing}
+    for g, slugs in imgs.items():
+        H, per = [], {}
+        for slug, paths in sorted(slugs.items()):
+            have = [by_path.get(os.path.normpath(p)) for p in paths]
+            todo = [p for p, h in zip(paths, have) if h is None]
+            if todo and compute:
+                def one(p):
+                    try:
+                        if max_bytes is not None and os.path.getsize(p) > max_bytes:
+                            return None
+                    except OSError:
+                        return None
+                    h, v = G.image_hashes(p)
+                    return None if h is None or v is None else [int(h)] + [int(v[k]) for k in VARIANTS[1:]]
+                with ThreadPoolExecutor(max_workers=max(1, int(procs))) as ex:
+                    got = dict(zip(todo, ex.map(one, todo)))
+            else:
+                got = {}
+            vals = [h if h is not None else got.get(p) for p, h in zip(paths, have)]
+            H.extend(v for v in vals if v is not None)
+            per[slug] = {"images": len(paths), "stored": sum(1 for h in have if h is not None),
+                         "hashed_here": sum(1 for p in todo if got.get(p) is not None),
+                         "unhashed": sum(1 for v in vals if v is None)}
+        arr = np.asarray(H, dtype=np.uint64).reshape(-1, 8)
+        out[g] = (arr, np.ones(len(arr), dtype=bool))
+        rec["groups"][g] = {"hashes": int(len(arr)), "slugs": per}
+    return out, rec
+
+
+def eval_guard(rows, groups, bits):
+    """Every candidate row (drop None) against each evaluation group's
+    hashes: row["eval_group"] = {group: bits} for each group within `bits`
+    under the 8 variants (both directions); an external row within `bits` of
+    any group is dropped (near_eval_group: never in arm B, never in test
+    v1). Returns the record (per group and source: rows within 3 bits and
+    within `bits`; base_v2 rows, which stay, counted apart)."""
+    import numpy as np
+    cand = [r for r in rows if r["drop"] is None]
+    H, ok, has = hash_matrix(cand)
+    idx = np.flatnonzero(has)
+    rec = {"bits": bits, "judged": int(len(idx)), "unjudged": int(len(cand) - len(idx)), "groups": {}}
+    for r in cand:
+        r.pop("eval_group", None)
+    for g, (HG, okG) in sorted(groups.items()):
+        d, _a = cross_nearest(H[idx], ok[idx], HG, okG, bits)
+        by = collections.defaultdict(lambda: {"within_3": 0, "within": 0})
+        for k, dist in zip(idx.tolist(), d.tolist()):
+            if dist <= bits:
+                r = cand[k]
+                r.setdefault("eval_group", {})[g] = int(dist)
+                s = r["source"] if r["kind"] != BASE_KIND else "base_v2"
+                by[s]["within"] += 1
+                by[s]["within_3"] += 1 if dist <= 3 else 0
+        rec["groups"][g] = {"hashes": int(len(HG)), "by_source": {s: dict(v) for s, v in sorted(by.items())}}
+    n = 0
+    for r in cand:
+        if r.get("eval_group") and r["kind"] != BASE_KIND:
+            r["drop"] = "near_eval_group"
+            n += 1
+    rec["dropped"] = n
+    return rec
+
+
+def merge_eval_records(hashed, guarded):
+    """eval_group_hashes' record (each group's hashes, per slug) and
+    eval_guard's (each group's rows within range, per source) as one."""
+    out = dict(guarded, slugs_not_read=hashed.get("slugs_not_read"), groups={})
+    for g in sorted(set(hashed.get("groups") or {}) | set(guarded.get("groups") or {})):
+        out["groups"][g] = dict((hashed.get("groups") or {}).get(g) or {}, **((guarded.get("groups") or {}).get(g) or {}))
+    return out
+
+
+# ------------------------------------------------------ earlier test lists
+def prior_test_lists(splits_dir=None):
+    """(rows, record) of every test list an earlier base build wrote
+    (<splits>/*/test_v1/*.jsonl, whatever the directory is now called): the
+    rows never train in a later build (mark_prior, select)."""
+    root = Path(splits_dir or (Path(C.INC_DIR) / "splits"))
+    rows, files = [], []
+    for f in sorted(root.glob("*/%s/*.jsonl" % HOLDOUT_DIR)):
+        try:
+            got = C.read_manifest(f)
+        except Exception as e:  # noqa: BLE001 - an unreadable test list cannot be honoured: refuse
+            raise Base3Error("the earlier test list %s cannot be read (%s): its rows' status is unknown" % (f, e))
+        rows.extend(got)
+        files.append({"file": str(f), "sha256": C.sha256_file(f), "rows": len(got)})
+    return rows, {"files": files, "rows": len(rows)}
 
 
 def _load_640(path):
@@ -1102,10 +1347,17 @@ def _exact_key(r):
     return None
 
 
+def _identity(r):
+    """A row's content identity: its original's sha256 (its key without one)."""
+    return ("sha:%s" % r["sha256"]) if r.get("sha256") else ("key:%s" % r["key"])
+
+
 def copy_components(live, dd):
     """UnionFind over the rows: exact copies, near copies (dHash within
     near_bits under a variant AND the layout matches after it) and identical
-    layouts (module docstring). Returns (uf, number of near edges taken)."""
+    layouts (rounded to layout_round, at least layout_min_boxes boxes) whose
+    dHashes lie within layout_max_bits under a variant (module docstring).
+    Returns (uf, record)."""
     n = len(live)
     uf = UnionFind(n)
     exact = {}
@@ -1137,21 +1389,43 @@ def copy_components(live, dd):
                         uf.union(i, j)
                         taken += 1
     nd = 2 if abs(float(dd["layout_round"]) - 0.01) < 1e-12 else 4
-    lay = {}
+    lay = collections.defaultdict(list)
+    lay_taken, lay_far = 0, 0
     for i, r in enumerate(live):
         if len(r["boxes"]) >= dd["layout_min_boxes"]:
             k = layout_key(r["boxes"], nd)
-            if k in lay:
-                uf.union(lay[k], i)
-            else:
-                lay[k] = i
-    return uf, taken
+            for j in lay[k]:
+                d = hash_dist(r, live[j])
+                if d is None or d > dd["layout_max_bits"]:
+                    lay_far += 1
+                    continue
+                if uf.find(i) != uf.find(j):
+                    uf.union(i, j)
+                    lay_taken += 1
+            lay[k].append(i)
+    return uf, {"near_layout_edges": taken, "layout_edges": lay_taken, "layout_pairs_too_far": lay_far}
+
+
+def capture_keys(r):
+    """The capture relations of a row besides its hash: its export stem (per
+    family, else per source), its intake capture group, its file-name session."""
+    ks = []
+    if r.get("stem"):
+        ks.append(("stem", r.get("family") or r["source"], r["stem"]))
+    if r.get("capture"):
+        ks.append(("capture", r["capture"]))
+    if r.get("group_key"):
+        ks.append(("session", r["group_key"]))
+    return ks
 
 
 def capture_groups(live, copies, bits):
-    """A group name per row (module docstring): 6-bit hash components, copy
-    components, the same export stem (per family, else per source), the
-    intake capture group and the group_regex session."""
+    """({row: group name}, {group name: digest}) (module docstring): 6-bit
+    hash components, copy components, the same export stem (per family, else
+    per source), the intake capture group and the group_regex session. A
+    group is named by its members' content (the sha256 of their sorted
+    identities), never by row positions, so a group keeps its name and its
+    place in the holdout's order whatever else is read."""
     n = len(live)
     ug = UnionFind(n)
     for comp in copies:
@@ -1159,37 +1433,81 @@ def capture_groups(live, copies, bits):
             ug.union(comp[0], i)
     first = {}
     for i, (r, h) in enumerate(zip(live, hash_components(live, bits).tolist())):
-        ks = [("hash", h)]
-        if r["stem"]:
-            ks.append(("stem", r["family"] or r["source"], r["stem"]))
-        if r["capture"]:
-            ks.append(("capture", r["capture"]))
-        if r["group_key"]:
-            ks.append(("session", r["group_key"]))
-        for k in ks:
+        for k in [("hash", h)] + capture_keys(r):
             if k in first:
                 ug.union(first[k], i)
             else:
                 first[k] = i
-    out = {}
+    out, digest = {}, {}
     for _root, mem in ug.groups(range(n)).items():
-        name = "g%06d" % min(mem)
+        dg = hashlib.sha256("\n".join(sorted(_identity(live[i]) for i in mem)).encode("utf-8")).hexdigest()
+        name = "g%s" % dg[:16]
+        digest[name] = dg
         for i in mem:
             out[i] = name
-    return out
+    return out, digest
 
 
-def select(rows, conf, seed_text=None):
-    """Dedupe, capture groups, the main-test holdout and the family caps over
-    the rows still standing (drop None). Sets drop (duplicate, dup_of_base,
-    holdout_v1, family_cap), dup_of and group; returns the record."""
+def mark_prior(rows, prior, bits):
+    """prior_test on every candidate row that a test list of an earlier build
+    holds (inc2.base3 test_v1/*.jsonl under any splits directory): the same
+    original or written bytes, the same key, a shared capture relation, or a
+    dHash within `bits` under the 8 variants (both directions). Such a row
+    never trains (select). Returns the number marked."""
+    cand = [r for r in rows if r["drop"] is None]
+    for r in cand:
+        r.pop("prior_test", None)
+    if not prior or not cand:
+        return 0
+    shas, keys, caps = set(), set(), set()
+    for p in prior:
+        for k in ("original_sha256", "sha256"):
+            if p.get(k):
+                shas.add(str(p[k]))
+        if p.get("key"):
+            keys.add(str(p["key"]))
+        for c in p.get("capture_keys") or ():
+            caps.add(tuple(c))
+    HP, okP, hasP = hash_matrix([{"dhash": p.get("dhash"), "variants": p.get("variants")} for p in prior])
+    HR, okR, hasR = hash_matrix(cand)
     import numpy as np
+    near = np.full(len(cand), bits + 1, dtype=np.int64)
+    if hasP.any() and hasR.any():
+        ir, ip = np.flatnonzero(hasR), np.flatnonzero(hasP)
+        d, _a = cross_nearest(HR[ir], okR[ir], HP[ip], okP[ip], bits)
+        near[ir] = d
+    n = 0
+    for i, r in enumerate(cand):
+        why = None
+        if (r.get("sha256") and r["sha256"] in shas) or (r.get("train_sha256") and r["train_sha256"] in shas):
+            why = "bytes"
+        elif r["key"] in keys:
+            why = "key"
+        elif any(tuple(k) in caps for k in capture_keys(r)):
+            why = "capture"
+        elif near[i] <= bits:
+            why = "dhash_%d" % int(near[i])
+        if why:
+            r["prior_test"] = why
+            n += 1
+    return n
+
+
+def select(rows, conf, quarantine=(), seed_text=None):
+    """Dedupe, capture groups, the main-test holdout, the quarantine and the
+    family caps over the rows still standing (drop None). Every step up to
+    the holdout ignores the quarantine, so test v1 is the same whichever
+    sources are quarantined; a quarantined source's rows then stay out of
+    arm B (its held rows stay in test v1). Sets drop (duplicate, dup_of_base,
+    holdout_v1, prior_test_v1, quarantined, family_cap), dup_of and group;
+    returns the record."""
     rules = conf["rules"]
     dd, ho = rules["dedupe"], rules["holdout"]
     seed_text = seed_text or ho["seed_text"]
+    q = set(quarantine)
     live = [r for r in rows if r["drop"] is None]
     t0 = time.time()
-    uf, near_taken = copy_components(live, dd)
+    uf, crec = copy_components(live, dd)
     comps = list(uf.groups(range(len(live))).values())
     n_dup = 0
     for comp in comps:
@@ -1203,48 +1521,84 @@ def select(rows, conf, seed_text=None):
                 live[i]["drop"] = "dup_of_base" if base else "duplicate"
                 live[i]["dup_of"] = live[best]["key"]
                 n_dup += 1
-    gid = capture_groups(live, comps, ho["group_bits"])
+    gid, digest = capture_groups(live, comps, ho["group_bits"])
     members = collections.defaultdict(list)
     for i, g in gid.items():
         live[i]["group"] = g
         members[g].append(i)
-    owner, eligible = {}, {}
+
+    def ext(i):
+        return live[i]["kind"] != BASE_KIND and live[i]["drop"] is None
+    owner, eligible, why_not, rows_of, prior_in = {}, {}, {}, {}, {}
     for g, mem in members.items():
-        cnt = collections.Counter(live[i]["source"] for i in mem if live[i]["kind"] != BASE_KIND
-                                  and live[i]["drop"] is None)
+        cnt = collections.Counter(live[i]["source"] for i in mem if ext(i))
+        rows_of[g] = cnt
         if cnt:
             tier = {live[i]["source"]: live[i]["tier"] for i in mem}
             owner[g] = sorted(cnt, key=lambda s: (-cnt[s], tier[s], s))[0]
-        eligible[g] = (not any(live[i]["kind"] == BASE_KIND or live[i].get("in_pool") for i in mem)
-                       and len(mem) <= ho["max_group"])
-    kept_by = collections.Counter(r["source"] for r in live if r["kind"] != BASE_KIND and r["drop"] is None)
-    held, holdout = set(), {}
+        touch = any(live[i]["kind"] == BASE_KIND or live[i].get("in_pool") for i in mem)
+        why_not[g] = "base_or_pool" if touch else ("over_max_group" if len(mem) > ho["max_group"] else None)
+        eligible[g] = why_not[g] is None
+        prior_in[g] = any(live[i].get("prior_test") for i in mem)
+    kept_by = collections.Counter(live[i]["source"] for i in range(len(live)) if ext(i))
+    held, held_n, holdout = set(), collections.Counter(), {}
     for s in sorted(kept_by):
         nk = kept_by[s]
         target = min(max(round_half_up(ho["share"] * nk), ho["min_images"]), ho["max_images"])
-        cand = sorted(g for g, o in owner.items() if o == s and eligible[g])
-        rng = np.random.default_rng(C.stable_int("%s/%s" % (seed_text, s)))
-        got, took = 0, []
-        for k in (rng.permutation(len(cand)).tolist() if cand else []):
-            if got >= target:
-                break
-            g = cand[k]
-            mine = sum(1 for i in members[g] if live[i]["source"] == s and live[i]["drop"] is None)
-            if got + mine > ho["max_images"]:
+        # an order built from each group's own content: a group earlier test lists hold comes first
+        cand = sorted((g for g, o in owner.items() if o == s and eligible[g]),
+                      key=lambda g: (0 if prior_in[g] else 1, C.stable_int("%s/%s/%s" % (seed_text, s, digest[g])), g))
+        took, skipped = [], 0
+        for g in cand:
+            if held_n[s] >= target and not prior_in[g]:
+                break                  # a group an earlier test list holds is held again whatever the target
+            add = rows_of[g]
+            if any(held_n[t] + add[t] > ho["max_images"] for t in add):
+                skipped += 1           # it would take some source past max_images: never held
                 continue
             took.append(g)
-            got += mine
-        held.update(took)
+            held.add(g)
+            held_n.update(add)
+        inel = collections.Counter()
+        for g, cnt in rows_of.items():
+            if cnt.get(s) and not eligible[g]:
+                inel[why_not[g]] += cnt[s]
         holdout[s] = {"kept_rows": nk, "target": target, "eligible_groups": len(cand), "groups": len(took),
-                      "images": got}
+                      "skipped_over_max": skipped, "ineligible_rows": dict(sorted(inel.items()))}
     n_held = 0
     for g in held:
         for i in members[g]:
-            r = live[i]
-            if r["drop"] is None and r["kind"] != BASE_KIND:
-                r["drop"] = "holdout_v1"
-                r["holdout_owner"] = owner.get(g)
+            if ext(i):
+                live[i]["drop"] = "holdout_v1"
+                live[i]["holdout_owner"] = owner.get(g)
                 n_held += 1
+    for s, v in holdout.items():
+        v["images"] = held_n[s]
+        v["quarantined_source"] = s in q
+    n_prior = 0
+    for i, r in enumerate(live):
+        if ext(i) and r.get("prior_test"):
+            r["drop"] = "prior_test_v1"            # an earlier build's test list holds it: never trained
+            n_prior += 1
+    # the quarantine, after the holdout: a quarantined source's rows stay out of arm B; a copy group whose kept
+    # row is quarantined keeps its best copy from a source that is not
+    n_q, promoted = 0, 0
+    for comp in comps:
+        quar = [i for i in comp if ext(i) and live[i]["source"] in q]
+        for i in quar:
+            live[i]["drop"] = "quarantined"
+            n_q += 1
+        if quar and len(comp) > 1 and not any(ext(i) for i in comp):
+            alt = [i for i in comp if live[i]["drop"] == "duplicate" and live[i]["source"] not in q
+                   and not live[i].get("prior_test")]
+            if alt:
+                m = min(alt, key=lambda i: _rank(live[i]))
+                live[m]["drop"] = None
+                live[m].pop("dup_of", None)
+                for i in comp:
+                    if live[i]["drop"] == "duplicate":
+                        live[i]["dup_of"] = live[m]["key"]
+                promoted += 1
     caps = {}
     for fam, fr in sorted((rules.get("families") or {}).items()):
         share = float(fr["cap_share"])
@@ -1257,21 +1611,25 @@ def select(rows, conf, seed_text=None):
             fg = collections.defaultdict(list)
             for i in fam_rows:
                 fg[gid[i]].append(i)
-            order = sorted(fg)
-            rng = np.random.default_rng(C.stable_int("%s/cap/%s" % (seed_text, fam)))
+            order = sorted(fg, key=lambda g: (C.stable_int("%s/cap/%s/%s" % (seed_text, fam, digest[g])), g))
             cur = len(fam_rows)
-            for k in rng.permutation(len(order)).tolist():
+            for g in order:
                 if cur <= cap:
                     break
-                for i in fg[order[k]]:
+                for i in fg[g]:
                     live[i]["drop"] = "family_cap"
                     cur -= 1
                     rec["dropped"] += 1
         rec["after"] = sum(1 for i in fam_rows if live[i]["drop"] is None)
         caps[fam] = rec
-    return {"rows": len(live), "duplicates": n_dup, "near_layout_edges": near_taken, "groups": len(members),
-            "held_groups": len(held), "held_images": n_held, "holdout": holdout, "family_caps": caps,
-            "seconds": round(time.time() - t0, 1)}
+    big = sorted(((len(m), g) for g, m in members.items()), reverse=True)[:5]
+    return dict({"rows": len(live), "duplicates": n_dup, "groups": len(members), "held_groups": len(held),
+                 "held_images": n_held, "prior_test_dropped": n_prior, "quarantined": n_q,
+                 "promoted_copies": promoted, "quarantine": sorted(q), "holdout": holdout, "family_caps": caps,
+                 "largest_groups": [{"group": g, "rows": n, "sources": dict(collections.Counter(
+                     live[i]["source"] if live[i]["kind"] != BASE_KIND else "base_v2" for i in members[g])),
+                     "eligible": eligible[g], "why_not": why_not[g]} for n, g in big],
+                 "seconds": round(time.time() - t0, 1)}, **crec)
 
 
 def distinct_photos(rows):
@@ -1331,10 +1689,10 @@ def queue_holds():
 
 
 def gather(conf, sid, registry=None, testing=False):
-    """Every candidate row with the rules applied, then the stream's
-    quarantine (drop 'quarantined' on a row that passed every rule, so a
-    scenario that lifts it needs nothing recomputed): (rows, inputs record,
-    per-source records, quarantine)."""
+    """Every candidate row with the rules applied: (rows, inputs record,
+    per-source records, quarantine). The stream's quarantine is returned,
+    never applied here: select applies it after the holdout, so every step
+    before it is the same whichever sources are quarantined."""
     q_sources, q_rec, (pool_keys, pool_shas) = quarantined_sources(sid)
     holds, h_rec = queue_holds()
     reg_path = registry_path()
@@ -1344,6 +1702,9 @@ def gather(conf, sid, registry=None, testing=False):
                 registry = json.load(fh)
         except (OSError, ValueError) as e:
             raise Base3Error("cannot read the dataset registry %s: %s" % (reg_path, e))
+        reg_rec = {"path": str(reg_path), "sha256": _sha_file(reg_path)}
+    else:
+        reg_rec = {"path": None, "sha256": _sha_text(registry), "in_memory": True}
     lock = C2.read_lock_v2()
     if lock.get("testing") and not testing:
         raise Base3Error("LOCK v2 was written by a testing build")
@@ -1378,14 +1739,13 @@ def gather(conf, sid, registry=None, testing=False):
                 r["drop"] = r["drop"] or "convention"
     for r in rows:
         image_rules(r, conf["rules"])
-    for r in rows:
-        if r["kind"] != BASE_KIND and r["drop"] is None and r["source"] in q_sources:
-            r["drop"] = "quarantined"
     mark_pool(rows, (pool_keys, pool_shas))
-    inputs = {"registry": {"path": str(reg_path), "sha256": _sha_file(reg_path)}, "base_v2": b_rec, "intake": i_rec,
+    inputs = {"registry": reg_rec, "base_v2": b_rec, "intake": i_rec,
               "stream": q_rec, "step1_queue": h_rec, "lock_v2": {"path": str(C2.LOCK_PATH),
                                                                   "sha256": _sha_file(C2.LOCK_PATH)}}
-    return rows, inputs, {"registry": r_rec, "convention": conv, "pool": (pool_keys, pool_shas)}, q_sources
+    not_read = {s: v["error"] for s, v in sorted(r_rec.items()) if v.get("error")}
+    return rows, inputs, {"registry": r_rec, "convention": conv, "pool": (pool_keys, pool_shas),
+                          "registry_doc": registry, "not_read": not_read}, q_sources
 
 
 def mark_pool(rows, pool):
@@ -1405,13 +1765,15 @@ def per_source(rows, recs, quarantine, lifted=()):
         v = out.setdefault(s, {"kind": r["kind"], "family": r["family"], "tier": r["tier"], "seen": 0, "labelled": 0,
                                "with_weed_box": 0, "admitted": 0, "in_B": 0, "boxes_B": 0, "masked_boxes_B": 0,
                                "polygons": 0, "dropped": collections.Counter(), "guard": collections.Counter(),
-                               "holdout_v1": 0, "quarantined": False})
+                               "eval_groups": collections.Counter(), "holdout_v1": 0, "quarantined": False})
         v["seen"] += 1
         v["labelled"] += 1 if (r["label"] or r["kind"] == BASE_KIND) else 0
         v["with_weed_box"] += 1 if (r["n_weed"] or r["boxes"]) else 0
         v["polygons"] += int(r["polygons"] or 0)
         for x in (r.get("guard") or {}).get("reasons") or []:
             v["guard"][x] += 1
+        for g in r.get("eval_group") or {}:
+            v["eval_groups"][g] += 1
         if r["drop"] is None:
             v["in_B"] += 1
             v["boxes_B"] += len(r["boxes"])
@@ -1423,6 +1785,7 @@ def per_source(rows, recs, quarantine, lifted=()):
     for s, v in out.items():
         v["dropped"] = dict(sorted(v["dropped"].items()))
         v["guard"] = dict(sorted(v["guard"].items()))
+        v["eval_groups"] = dict(sorted(v["eval_groups"].items()))
         v["quarantined"] = s in quarantine and s not in set(lifted)
         v["convention"] = recs["convention"].get(s)
         if s in recs["registry"]:
@@ -1435,20 +1798,6 @@ def arm_rows(rows):
     a = [r for r in rows if r["kind"] == BASE_KIND and r["drop"] is None]
     b = [r for r in rows if r["drop"] is None]
     return a, b
-
-
-def _scenario(conf, rows, recs, quarantine, lifted, seed_text=None):
-    """A copy of the rows with the quarantine of `lifted` lifted (their rows
-    passed every rule already), the guard's drops applied, then the
-    selection: (rows, selection record, per-source record)."""
-    import copy as _copy
-    rs = _copy.deepcopy(rows)
-    for r in rs:
-        if r["drop"] == "quarantined" and r["source"] in lifted:
-            r["drop"] = None
-    _guard_drops(rs)
-    sel = select(rs, conf, seed_text=seed_text)
-    return rs, sel, per_source(rs, recs, quarantine, lifted)
 
 
 def _guard_drops(rows):
@@ -1465,9 +1814,28 @@ def _guard_drops(rows):
             r["drop"] = "base_copy"
 
 
+def apply_leak_drops(rows, leak):
+    """The embedding check's and D28-v2's verdicts (build): a row the
+    embedding detector refuses (near_eval_embed, or unhashable: fail closed)
+    is dropped; every other row of a source D28-v2 flags is dropped
+    (source_leak)."""
+    for r in rows:
+        if r["drop"]:
+            continue
+        if r.get("embed") in ("near_eval_embed", "unhashable"):
+            r["drop"] = "embed:%s" % r["embed"]
+        elif r["kind"] != BASE_KIND and (leak.get(r["source"]) or {}).get("flagged"):
+            r["drop"] = "source_leak"
+
+
+def held_keys(rows):
+    return sorted(r["key"] for r in rows if r["drop"] == "holdout_v1")
+
+
 def count(sid, out, conf_path=None, registry=None, testing=False, hashes=None):
     """count (module docstring): the selection on stored hashes, read-only;
     the report goes to `out` (a directory outside INC_DIR)."""
+    import copy as _copy
     t0 = time.time()
     conf, csha = load_config(conf_path)
     out = Path(out)
@@ -1476,7 +1844,7 @@ def count(sid, out, conf_path=None, registry=None, testing=False, hashes=None):
     rows, inputs, recs, quarantine = gather(conf, sid, registry=registry, testing=testing)
     hashes = hashes or StoredHashes()
     th0 = time.time()
-    live = [r for r in rows if r["drop"] in (None, "quarantined")]
+    live = [r for r in rows if r["drop"] is None]
     with ThreadPoolExecutor(max_workers=4) as ex:
         list(ex.map(hashes.fill, live))
     log("hashes: %d rows (%d hashed here) in %.0fs" % (len(live), sum(1 for r in live if r.get("hashed_here")),
@@ -1484,11 +1852,19 @@ def count(sid, out, conf_path=None, registry=None, testing=False, hashes=None):
     mark_pool(rows, recs["pool"])
     guards, grec = run_guard(live, production=not testing)
     th, th_sha = load_thresholds()
+    _guard_drops(rows)
+    egs, eg_rec = eval_group_hashes(conf, recs["registry_doc"], stored=hashes.by_path)
+    eg_rec = merge_eval_records(eg_rec, eval_guard(rows, egs, conf["evaluation_groups"]["bits"]))
+    prior, prior_rec = prior_test_lists()
+    prior_rec["marked"] = mark_prior(rows, prior, conf["rules"]["holdout"]["group_bits"])
     lifted = sorted(s for s in quarantine if s in conf["sources"] or s in conf["intake"])
-    scen = {}
+    scen, held = {}, {}
     for name, lift in (("as_is", ()), ("lifted", tuple(lifted))):
-        rs, sel, ps = _scenario(conf, rows, recs, quarantine, set(lift))
+        rs = _copy.deepcopy(rows)
+        sel = select(rs, conf, quarantine=set(quarantine) - set(lift))
+        ps = per_source(rs, recs, quarantine, set(lift))
         a, b = arm_rows(rs)
+        held[name] = held_keys(rs)
         dhash_hits = {}
         for r in rs:
             reasons = (r.get("guard") or {}).get("reasons") or []
@@ -1498,6 +1874,8 @@ def count(sid, out, conf_path=None, registry=None, testing=False, hashes=None):
                       "arms": {"A": {"images": len(a), "boxes": sum(len(r["boxes"]) for r in a)},
                                "B": {"images": len(b), "boxes": sum(len(r["boxes"]) for r in b),
                                      "distinct_photos": distinct_photos(b)}},
+                      "holdout_v1": {"images": len(held[name]),
+                                     "sha256_of_keys": C.sha256_text("\n".join(held[name])), "keys": held[name]},
                       "dhash_hits_unweighed": dhash_hits,
                       "pending": {"embedding_check": "not run (count; the build job runs GuardV2.check_embed)",
                                   "pair_cosines": "not run (count): %d source(s) with dHash hits would be judged by "
@@ -1510,6 +1888,8 @@ def count(sid, out, conf_path=None, registry=None, testing=False, hashes=None):
     rep = {"format": COUNT_FORMAT, "built_utc": C2.utc(), "config": {"path": str(conf_path or CONFIG), "sha256": csha},
            "inputs": inputs, "hashes": hashes.record, "guard": {k: grec.get(k) for k in ("reasons", "checked",
                                                                                         "refused", "crosscheck_hits")},
+           "evaluation_groups": eg_rec, "prior_test": prior_rec, "sources_not_read": recs["not_read"],
+           "holdout_same_in_every_scenario": len({tuple(v) for v in held.values()}) == 1,
            "thresholds_sha256": th_sha, "scenarios": scen, "seconds": round(time.time() - t0, 1),
            "note": "read-only rehearsal on stored hashes of the originals; the embedding check and the D28-v2 pair "
                    "cosines are pending (the build job runs them on the files it writes)"}
@@ -1560,6 +1940,10 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
     root = out_dir()
     if (root / SUMMARY).is_file():
         raise Base3Error("%s exists: base v3 is built once (a rebuild is a new version)" % (root / SUMMARY))
+    if (root / HOLDOUT_DIR).exists():
+        raise Base3Error("%s holds the test lists of a build that did not finish: move %s aside inside %s first "
+                         "(its test lists are then read as never-train)" % (root / HOLDOUT_DIR, root, root.parent))
+    prior, prior_rec = prior_test_lists()
     rows, inputs, recs, quarantine = gather(conf, sid, registry=registry, testing=bool(testing))
     todo = [r for r in rows if not r["drop"]]
     log("materialising %d rows (%d workers)" % (len(todo), procs))
@@ -1598,14 +1982,15 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
         bc = sum(1 for r in rs if "base_copy" in r["guard"]["reasons"])
         leak[s] = leak_verdict(len(rs), len(hits), cos, emb, erec.get("p_false"), copy_cos, bc, th)
     _guard_drops(rows)
-    for r in live:
-        if r["drop"]:
-            continue
-        if r.get("embed") in ("near_eval_embed", "unhashable"):
-            r["drop"] = "embed:%s" % r["embed"]
-        elif r["kind"] != BASE_KIND and leak.get(r["source"], {}).get("flagged"):
-            r["drop"] = "source_leak"
-    sel = select(rows, conf)
+    apply_leak_drops(rows, leak)
+    te = time.time()
+    egs, eg_rec = eval_group_hashes(conf, recs["registry_doc"], procs=max(1, int(procs)))
+    eg_rec = merge_eval_records(eg_rec, eval_guard(rows, egs, conf["evaluation_groups"]["bits"]))
+    log("evaluation groups: %s hashes, %d rows dropped within %d bits, in %.0fs"
+        % ({g: v["hashes"] for g, v in eg_rec["groups"].items()}, eg_rec["dropped"], eg_rec["bits"],
+           time.time() - te))
+    prior_rec["marked"] = mark_prior(rows, prior, conf["rules"]["holdout"]["group_bits"])
+    sel = select(rows, conf, quarantine=quarantine)
     a, b = arm_rows(rows)
     if len(a) == 0 or len(b) <= len(a):
         raise Base3Error("arm A has %d rows and arm B %d: nothing to compare" % (len(a), len(b)))
@@ -1634,6 +2019,8 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
                      "sha256": r["train_sha256"], "label": r["v3_label"], "label_sha256": r["v3_label_sha256"],
                      "boxes": len(r["boxes"]), "masked_boxes": len(r["mask"]), "masked_area": r["masked_area"],
                      "dhash": r["dhash"], "variants": r["variants"], "group": r.get("group"),
+                     "capture_keys": [list(k) for k in capture_keys(r)],
+                     "quarantined_source": r["source"] in quarantine, "prior_test": r.get("prior_test"),
                      "licence": r["licence"], "research_only": r["research_only"]})
     prov_sha = C2.write_jsonl_atomic(root / PROVENANCE, prov)
     hold_files = {}
@@ -1641,9 +2028,10 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
         hrows = [p for p in prov if p["source"] == s and p["holdout_v1"]]
         hold_files[s] = {"file": "%s/%s.jsonl" % (HOLDOUT_DIR, s),
                          "sha256": C2.write_jsonl_atomic(root / HOLDOUT_DIR / ("%s.jsonl" % s), hrows),
-                         "images": len(hrows)}
+                         "images": len(hrows), "quarantined_source": s in quarantine}
     drop_rows = [{"key": r["key"], "source": r["source"], "image": r["image"], "reason": r["drop"],
-                  "dup_of": r.get("dup_of")} for r in sorted(rows, key=lambda r: r["key"])
+                  "dup_of": r.get("dup_of"), "group": r.get("group"), "eval_group": r.get("eval_group"),
+                  "prior_test": r.get("prior_test")} for r in sorted(rows, key=lambda r: r["key"])
                  if r["drop"] not in (None, "holdout_v1")]
     drop_sha = C2.write_jsonl_atomic(root / DROPPED, drop_rows)
     used = {r["train_image"] for r in rows if r["drop"] in (None, "holdout_v1") and r.get("train_image")}
@@ -1676,6 +2064,8 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
                   "pngs_written": written, "pngs_removed_unused": removed},
         "holdout_v1": {"dir": HOLDOUT_DIR, "seed_text": conf["rules"]["holdout"]["seed_text"],
                        "per_source": hold_files, "images": sum(v["images"] for v in hold_files.values())},
+        "quarantine": sorted(quarantine), "sources_not_read": recs["not_read"], "evaluation_groups": eg_rec,
+        "prior_test": prior_rec,
         "selection": sel, "per_source": ps, "guard": {k: grec.get(k) for k in ("reasons", "checked", "refused",
                                                                                "crosscheck_hits", "lock_sha256",
                                                                                "index_sha256")},
@@ -1751,6 +2141,30 @@ def read_summary(root=None):
     except (OSError, ValueError):
         return None
     return s if isinstance(s, dict) and s.get("format") == FORMAT and s.get("status") == "complete" else None
+
+
+def v3_claim(manifest, manifest_sha):
+    """Why a manifest belongs to a base v3 build, or None: it lies under
+    splits/v3, or a base v3 summary.json under any splits directory records
+    its sha256 as an arm (whatever that summary's status). inc2.baseline
+    trains such a manifest only as an E1 arm (e1_arm_of)."""
+    try:
+        if Path(os.path.abspath(str(manifest))).resolve().is_relative_to(out_dir().resolve()):
+            return "it lies under %s" % out_dir()
+    except (OSError, ValueError):
+        pass
+    for sp in sorted((Path(C.INC_DIR) / "splits").glob("*/%s" % SUMMARY)):
+        try:
+            with open(sp) as fh:
+                s = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(s, dict) or s.get("format") != FORMAT:
+            continue
+        for k, a in sorted((s.get("arms") or {}).items()):
+            if isinstance(a, dict) and a.get("sha256") == manifest_sha:
+                return "%s records it as arm %s (status %s)" % (sp, k, s.get("status"))
+    return None
 
 
 def e1_arm_of(manifest_sha, root=None):

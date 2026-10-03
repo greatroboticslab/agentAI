@@ -131,13 +131,32 @@ def test_recipe():
     check("the pinned driver accepts the recipe (a float warmup_epochs) in a definition and in a base run's spec", True)
 
 
-def write_exp(exp, n, typ="baseline", recipe_name=RC.BUDGET_NAME, budget=True, arm="m640"):
+def write_summary(manifest_a, status="complete"):
+    """A splits v3 summary.json recording manifest_a as E1's arm A (and a stand-in arm B); its sha256."""
+    from weed_optimizer_framework.tools.inc2 import base3 as B3
+    sp = B3.out_dir() / B3.SUMMARY
+    sp.parent.mkdir(parents=True, exist_ok=True)
+    sp.write_text(json.dumps({"format": B3.FORMAT, "status": status,
+                              "arms": {"A": {"manifest": str(manifest_a), "sha256": W.sha(manifest_a)},
+                                       "B": {"manifest": "/nowhere.jsonl", "sha256": "b" * 64}}}))
+    return W.sha(sp)
+
+
+def write_exp(exp, n, typ="baseline", recipe_name=RC.BUDGET_NAME, budget=True, arm="m640", manifest=None, e1=True):
     root = C.INC_DIR / exp
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True)
     rec = RC.resolve_arm(arm, repo=C.REPO)
     defn = {"exp": exp, "type": typ, "base": {"n_images": n}}
+    if manifest is not None:
+        defn["base"]["manifest_sha256"] = W.sha(manifest)
+    if e1 is True:
+        from weed_optimizer_framework.tools.inc2 import base3 as B3
+        sp = B3.out_dir() / B3.SUMMARY
+        defn["e1"] = {"arm": "A", "summary_sha256": W.sha(sp) if sp.is_file() else None}
+    elif isinstance(e1, dict):
+        defn["e1"] = e1
     defn.update(RC.stamp(rec))
     if recipe_name:
         defn["recipe_name"] = recipe_name
@@ -157,7 +176,8 @@ def test_train_recipe():
         p = W.spec(run_id, kind, exp=exp, init="yolo11m.pt", train_manifest=base_m, recipe=recipe, **kw)
         rc = W.run(p)
         return rc, W.run_json(p)
-    write_exp("e1t_prod", n)
+    write_summary(base_m)
+    write_exp("e1t_prod", n, manifest=base_m)
     rc, rj = go("e1t_prod", "base__s0", "base", dict(RC.cold_budget("m640", n), seed=0))
     if torch.cuda.is_available():
         print("  NOTE a CUDA device is present; the production device refusal is not exercised")
@@ -171,19 +191,41 @@ def test_train_recipe():
     rc, rj = go("e1t_prod", "base__s2", "base", dict(RC.cold("m640"), seed=2))
     check("the cold table under an exp.json that names cold_budget: refused", rc == 1 and rj.get("stage") == "recipe",
           rj.get("stage"))
-    write_exp("e1t_bud", n, budget=dict(RC.budget_record("m640", n), image_epochs=2400000))
+    write_exp("e1t_bud", n, budget=dict(RC.budget_record("m640", n), image_epochs=2400000), manifest=base_m)
     rc, rj = go("e1t_bud", "base__s0", "base", dict(RC.cold_budget("m640", n), seed=0))
     check("a budget record that is not the pre-registered one: refused at stage recipe",
           rc == 1 and rj.get("stage") == "recipe" and "budget" in (rj.get("error") or ""),
           (rj.get("error") or "")[-300:])
-    write_exp("e1t_chain", n, typ="chain")
+    write_exp("e1t_chain", n, typ="chain", manifest=base_m)
     rc, rj = go("e1t_chain", "base__s0", "base", dict(RC.cold_budget("m640", n), seed=0))
     check("a chain naming cold_budget: refused (baseline experiments only)", rc == 1 and rj.get("stage") == "recipe",
           rj.get("stage"))
-    write_exp("e1t_union", n)
+    write_exp("e1t_union", n, manifest=base_m)
     rc, rj = go("e1t_union", "union__s0", "union", dict(RC.cold_budget("m640", n), seed=0))
     check("a union run under an exp.json naming cold_budget: refused (base runs only)",
           rc == 1 and rj.get("stage") == "recipe", rj.get("stage"))
+    # cold_budget is E1's: the base manifest must be an arm of the complete splits v3 summary the e1 record names
+    out = {}
+    write_exp("e1t_noe1", n, manifest=base_m, e1=False)
+    out["no e1 record"] = go("e1t_noe1", "base__s0", "base", dict(RC.cold_budget("m640", n), seed=0))
+    other = W.TMP / "e1_other.jsonl"
+    C.write_manifest(other, C.read_manifest(base_m))
+    other.write_text(other.read_text() + "\n")
+    write_exp("e1t_other", n, manifest=other)
+    out["a base manifest the summary does not record"] = go("e1t_other", "base__s0", "base",
+                                                            dict(RC.cold_budget("m640", n), seed=0))
+    write_exp("e1t_arm", n, manifest=base_m, e1={"arm": "B", "summary_sha256": write_summary(base_m)})
+    out["the other arm"] = go("e1t_arm", "base__s0", "base", dict(RC.cold_budget("m640", n), seed=0))
+    write_exp("e1t_moved", n, manifest=base_m)
+    write_summary(base_m, status="over_walltime")
+    out["an over_walltime summary"] = go("e1t_moved", "base__s0", "base", dict(RC.cold_budget("m640", n), seed=0))
+    write_exp("e1t_changed", n, manifest=base_m, e1={"arm": "A", "summary_sha256": "0" * 64})
+    write_summary(base_m)
+    out["a summary that changed since the build"] = go("e1t_changed", "base__s0", "base",
+                                                       dict(RC.cold_budget("m640", n), seed=0))
+    check("cold_budget only for an E1 arm: refused at stage recipe with %s" % ", ".join(out),
+          all(rc_ == 1 and rj_.get("stage") == "recipe" for rc_, rj_ in out.values()),
+          {k: (rj_.get("stage"), (rj_.get("error") or "")[-200:]) for k, (rc_, rj_) in out.items()})
 
 
 def test_guard_verdicts(Wd):
@@ -378,6 +420,16 @@ def test_verdict():
         B.agnostic_bootstrap = old
     check("  and not when D <= SE alone (SE 1.0)", d["conditions"]["above_2_pooled_sd"]
           and not d["conditions"]["above_se"] and not d["qualifies"], d["conditions"])
+    B.agnostic_bootstrap = lambda *a, **k: {"se": 0.001, "n_valid": 40}
+    try:
+        fake_agnostic("e1v_b", "B", [0.84, 0.85, 0.86], arrs)
+        fake_agnostic("e1v_a", "A", [0.825, 0.835, 0.845], [synth(seed=10 + i) for i in range(3)])
+        d, _r = B.e1_verdict("e1v_b", "e1v_a", out_dir=out, testing_ok=True, resamples=40)
+    finally:
+        B.agnostic_bootstrap = old
+    check("  and not when D is over SE (0.001) and over 1 pooled sd but not over 2 (D %.4f, pooled sd %.4f)"
+          % (d["diff"], d["pooled_sd"]), d["conditions"] == {"above_2_pooled_sd": False, "above_se": True}
+          and not d["qualifies"] and d["pooled_sd"] < d["diff"] < 2 * d["pooled_sd"], d["conditions"])
     from weed_optimizer_framework.tools.inc_autopilot import remote as R
     doc = json.loads((out / "e1_v1.json").read_text())
     check("capacity/e1_v1.json: dev only (the autopilot's scrub drops nothing), the rule and the bootstrap recorded",

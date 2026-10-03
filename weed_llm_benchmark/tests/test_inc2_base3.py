@@ -16,7 +16,27 @@ What is pinned:
   640; each of the 8 box transforms puts a painted box where funnel.leak's
   variant of that name puts its pixels; layout matching is one-to-one;
 - the pair search equals a brute-force search over random hashes (3 and 6
-  bits, with and without variants);
+  bits, with and without variants), within one set and between two (both
+  directions);
+- each rule on its own (synthetic rows): the source rule's big-box share,
+  boxes per image and small-box share each fail a source alone; a masked
+  area over 50 % drops an image; a class id beyond the name list refuses
+  it; an index cross-check hit alone drops a row; an embedding refusal drops
+  its row; the walltime guard takes the slower of loader and GPU;
+- selection (synthetic rows): 4-6 bit pairs are kept but grouped, a pair
+  near only under a variant is grouped, the higher resolution of two byte
+  copies is kept, two base_v2 copies are both kept, the intake capture group,
+  the file-name session and a family's export stem each join a group, an
+  identical layout is a copy only within 10 bits, group names come from
+  content; the holdout takes exactly round_half_up(15 %) of singleton rows,
+  never passes max_images for any source (rows held in other sources'
+  groups count against that source's max and its target), never holds a
+  group over max_group; the quarantine, a new source of its own photos and
+  the rows' order leave test v1 unchanged; a quarantined copy's best
+  non-quarantined copy enters arm B; rows an earlier test list holds are
+  held first or never trained;
+- the evaluation-group guard: within 6 bits in either direction dropped, 7
+  bits kept, base_v2 counted not dropped;
 - build, end to end on the CPU: arm A is base_v2 whole, every box class 12,
   its rows byte-identical inside arm B; inc2.train's check_manifest and
   guard_rows accept both manifests; a crop box is dropped, a weed box under
@@ -37,11 +57,20 @@ What is pinned:
 - D28-v2 in the build: a source whose dHash hit weighs below the copy
   threshold keeps its other rows; one at or above it is excluded;
 - count: read-only (writes only to --out, outside INC_DIR), the as-is and
-  the lifted scenarios, the same holdout as the build;
+  the lifted scenarios with one test v1, the same holdout as the build;
+- earlier test lists (splits/*/test_v1): a rebuild after the quarantine is
+  lifted holds the same test v1 and trains none of it; a rebuild with a new
+  row holds every earlier test row again or never trains it; a partial
+  build's test lists block a rebuild;
+- the evaluation groups end to end: an hflip copy of a src_big image in an
+  evaluation group's slug drops it (near_eval_group), summary.json counts it
+  and names the slug that is not in the registry;
 - the quarantine is the ledger's: an unquarantine event admits the source;
 - inc2.baseline builds E1's arms with cold_budget (the pinned driver
-  accepts the definition), and a manifest that is not one summary.json
-  records gets the cold table.
+  accepts the definition), a manifest no base v3 summary records and that
+  lies outside splits/v3 gets the cold table, and a base v3 manifest that is
+  not a complete summary's E1 arm (over_walltime, edited, another arm, a
+  union, an unrecorded file under splits/v3) is refused.
 
 Run:  python3 tests/test_inc2_base3.py
 """
@@ -147,6 +176,28 @@ def flip_file(src, dst, how=Image.FLIP_LEFT_RIGHT, size=None):
         out.save(dst, quality=95)
 
 
+def near_copy(src, dst, lo=5, hi=9):
+    """A copy of src with a painted rectangle whose dHash lies lo..hi bits from src's under every one of the 8
+    variants (both directions): beyond dedupe's 3 bits, within the layout rule's 10."""
+    from weed_optimizer_framework.tools.inc2 import guard as G
+    hs, vs = G.image_hashes(src)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    for frac in (0.12, 0.16, 0.2, 0.25, 0.3, 0.35):
+        for pos in ((0.1, 0.1), (0.5, 0.2), (0.2, 0.6), (0.6, 0.6), (0.35, 0.35)):
+            for gray in (0, 255, 128):
+                with Image.open(src) as im:
+                    im = im.convert("RGB")
+                    w, h = im.size
+                    x0, y0 = int(pos[0] * w), int(pos[1] * h)
+                    ImageDraw.Draw(im).rectangle([x0, y0, x0 + int(frac * w), y0 + int(frac * h)], fill=(gray,) * 3)
+                    im.save(dst, quality=95)
+                hd, vd = G.image_hashes(dst)
+                d = min([bin(vs[v] ^ hd).count("1") for v in vs] + [bin(vd[v] ^ hs).count("1") for v in vd])
+                if lo <= d <= hi:
+                    return d
+    raise RuntimeError("no near copy of %s within %d-%d bits" % (src, lo, hi))
+
+
 def build_registry_world(Wd):
     """The sources this test builds; returns (registry, config path, facts)."""
     f = {}
@@ -180,7 +231,9 @@ def build_registry_world(Wd):
                 [(0,) + b for b in hb], None),
                ("train/images/%s.jpg" % rf_name("x02", "b"), lambda p: flip_file(a_img(2), p), None,
                 [(0,) + b for b in boxes_for(77, n=2)], None),
-               ("train/images/%s.jpg" % rf_name("x03", "b"), 90, (352, 352), [(0,) + b for b in a_box(3)], "JPEG")]
+               ("train/images/%s.jpg" % rf_name("x03", "b"), 90, (352, 352), [(0,) + b for b in a_box(3)], "JPEG"),
+               ("train/images/%s.jpg" % rf_name("x05", "b"), lambda p: f.__setitem__("x05_bits", near_copy(a_img(5), p)),
+                None, [(0,) + b for b in a_box(5)], None)]
     for i in range(10, 14):
         b_files.append(("train/images/%s.jpg" % rf_name("e%02d" % i, "b"), 40 + i, (352, 352),
                         [(0,) + b for b in boxes_for(40 + i, n=3)], "JPEG"))
@@ -213,9 +266,17 @@ def build_registry_world(Wd):
     bc.append(("images/c_base.jpg", lambda p: flip_file(Wd["base_v2"][0]["image"], p, how=None, size=(400, 400)),
                None, [(0, 0.5, 0.5, 0.3, 0.3)], None))
     make_source("src_basecopy", bc, ["weed"])
+    # src_session: DeepWeeds-like capture times in the file names (group_regex): s1_* and s2_* are two sessions
+    make_source("src_session", [("images/s%d_%02d.jpg" % (i // 3 + 1, i), 160 + i, (400, 400),
+                                 [(0,) + b for b in boxes_for(160 + i)], "JPEG") for i in range(6)], ["weed"])
+    # src_evalgrp: an evaluation group's slug holding an hflip copy of src_big's big_06 (excluded by name; its
+    # images guard every candidate row)
+    make_source("src_evalgrp", [("images/e00.jpg", lambda p: flip_file(DS / "src_big" / "train/images/big_06.jpg", p,
+                                                                         size=(640, 480)), None, None, None),
+                                ("images/e01.jpg", 170, (400, 400), None, "JPEG")], ["weed"])
     reg = {"datasets": {}}
     for slug in ("src_big", "src_dock_a", "src_dock_b", "src_tiny", "src_quar", "src_poly", "src_badnames", "src_leak",
-                 "src_basecopy", "src_other"):
+                 "src_basecopy", "src_other", "src_session", "src_evalgrp"):
         reg["datasets"][slug] = {"local_path": str(DS / slug), "status": "downloaded",
                                  "provenance": {"license": "CC BY 4.0"}}
     reg["datasets"]["src_dock_b"]["class_names"] = "['weed']"
@@ -245,9 +306,12 @@ def build_registry_world(Wd):
         "src_poly": {"tier": 3, "classes": {"weed": "weed"}},
         "src_badnames": {"tier": 3, "classes": {"weed": "weed"}},
         "src_leak": {"tier": 3, "classes": {"weed": "weed"}},
-        "src_basecopy": {"tier": 3, "classes": {"weed": "weed"}}}
+        "src_basecopy": {"tier": 3, "classes": {"weed": "weed"}},
+        "src_session": {"tier": 3, "classes": {"weed": "weed"}, "group_regex": "^(s\\d)_"}}
     conf["intake"] = {"int_src": {"tier": 1, "classes": "all_weed"}}
-    conf["excluded"] = {"src_other": "not a weed source"}
+    conf["excluded"] = {"src_other": "not a weed source", "src_evalgrp": "evaluation group G1",
+                        "src_unregistered": "evaluation group G1 (not in the registry)"}
+    conf["evaluation_groups"] = dict(conf["evaluation_groups"], groups={"G1": ["src_evalgrp", "src_unregistered"]})
     cp = TMP / "base3_test.json"
     cp.write_text(json.dumps(conf, indent=1))
     return reg, cp, f
@@ -332,19 +396,31 @@ def test_config():
           and r["dedupe"]["near_bits"] == 3 and r["dedupe"]["layout_iou"] == 0.8 and r["dedupe"]["layout_share"] == 0.8
           and r["dedupe"]["layout_round"] == 0.01 and r["dedupe"]["layout_min_boxes"] == 3
           and r["holdout"]["share"] == 0.15 and r["holdout"]["min_images"] == 30 and r["holdout"]["max_images"] == 400
-          and r["holdout"]["seed_text"] == "inc2/base3/test_v1" and r["holdout"]["max_group"] == 400)
+          and r["holdout"]["seed_text"] == "inc2/base3/test_v1" and r["holdout"]["max_group"] == 400
+          and r["dedupe"]["layout_max_bits"] == 10)
+    eg = conf["evaluation_groups"]
+    check("the evaluation groups (test v1's NDSU, Latvia, sesame, maize, PAGS8 and the OOD-dev paddy and chilli) guard "
+          "at 6 bits, every slug of them excluded by name",
+          eg["bits"] == 6 and sorted(eg["groups"]) == ["Latvia", "NDSU", "PAGS8", "chilli", "maize", "paddy", "sesame"]
+          and all(x in ex for v in eg["groups"].values() for x in v)
+          and "rf_tuf__weed-3434e" not in str(eg) and len(eg["groups"]["Latvia"]) == 7
+          and "kg_ravirajsinh45__crop-and-weed-detection-data-with-bounding-boxes" in eg["groups"]["sesame"])
     bad = []
     for mut in (lambda c: c["excluded"].update(src_x="x") or c["sources"].update(src_x={"classes": {"w": "weed"}}),
                 lambda c: c["sources"]["rf_kinjj__weed-avnag"]["classes"].update(weed="maybe"),
                 lambda c: c["sources"]["rf_kinjj__weed-avnag"].update(family="nofamily"),
-                lambda c: c.update(class_id=11)):
+                lambda c: c.update(class_id=11),
+                lambda c: c["evaluation_groups"]["groups"]["NDSU"].append("rf_kinjj__weed-avnag"),
+                lambda c: c.pop("evaluation_groups"),
+                lambda c: c["rules"]["dedupe"].pop("layout_max_bits")):
         c = json.loads(B3.CONFIG.read_text())
         mut(c)
         p = TMP / "bad_conf.json"
         p.write_text(json.dumps(c))
         bad.append(refused(B3.load_config, p) is not None)
-    check("a slug both included and excluded, a role other than weed/drop, an unknown family or another class id "
-          "refuse the config", all(bad), bad)
+    check("a slug both included and excluded, a role other than weed/drop, an unknown family, another class id, an "
+          "evaluation group listing an included slug, no evaluation groups or no layout_max_bits refuse the config",
+          all(bad), bad)
 
 
 def test_geometry():
@@ -412,6 +488,296 @@ def test_pairs():
                         want[(q, t)] = (d, v)
         check("near_pairs at %d bits equals brute force (%d pairs)" % (bits, len(want)), got == want and len(want) > 0,
               (len(got), len(want)))
+    # between two sets, and the nearest row of B in both directions
+    A, B = H[:150].copy(), H[150:].copy()
+    okA, okB = ok[:150], ok[150:]
+    for i in range(0, 40, 4):                      # planted: A's variant near B's dHash, and B's variant near A's
+        B[i, 0] = A[i, int(rng.integers(1, 8))] ^ (np.uint64(1) << np.uint64(3))
+        A[i + 1, 0] = B[i + 1, int(rng.integers(1, 8))] ^ (np.uint64(3) << np.uint64(10))
+        okA[i], okB[i + 1] = True, True
+    for bits in (3, 6):
+        Q, Tt, Dd, V = B3.near_pairs_between(A, okA, B, bits)
+        got = {(int(q), int(t)): (int(d), int(v)) for q, t, d, v in zip(Q, Tt, Dd, V)}
+        want = {}
+        for q in range(len(A)):
+            for v in (range(8) if okA[q] else [0]):
+                for t in range(len(B)):
+                    d = bin(int(A[q, v]) ^ int(B[t, 0])).count("1")
+                    if d <= bits and ((q, t) not in want or (d, v) < want[(q, t)]):
+                        want[(q, t)] = (d, v)
+        dist, arg = B3.cross_nearest(A, okA, B, okB, bits)
+        bf = []
+        for q in range(len(A)):
+            best = bits + 1
+            for t in range(len(B)):
+                for v in range(8):
+                    if v == 0 or okA[q]:
+                        best = min(best, bin(int(A[q, v]) ^ int(B[t, 0])).count("1"))
+                    if v == 0 or okB[t]:
+                        best = min(best, bin(int(B[t, v]) ^ int(A[q, 0])).count("1"))
+            bf.append(best if best <= bits else bits + 1)
+        check("near_pairs_between and cross_nearest (both directions) at %d bits equal brute force (%d pairs, %d rows "
+              "near)" % (bits, len(want), sum(1 for x in bf if x <= bits)),
+              got == want and len(want) > 0 and dist.tolist() == bf and sum(1 for x in bf if x <= bits) >= 20
+              and all((a_ >= 0) == (d_ <= bits) for a_, d_ in zip(arg.tolist(), dist.tolist())), (len(got), len(want)))
+
+
+# ------------------------------------------------------------ unit worlds
+def h64(text):
+    return int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
+
+
+def srow(key, source="s_a", kind="registry", tier=3, sha=None, h=None, var=None, boxes=None, W=640, H=480, stem=None,
+         capture=None, group_key=None, family=None, in_pool=False):
+    """A synthetic candidate row: random far-apart hashes unless given (h: the dHash; var: the 8 variants)."""
+    r = B3._new_row(source, kind, None, "/synthetic/%s.jpg" % key, None, key, family=family, tier=tier)
+    if var is None:
+        var = [h64("%s/%d" % (key, v)) for v in range(8)]
+        if h is not None:
+            var[0] = h
+    r.update(sha256=sha or hashlib.sha256(key.encode("utf-8")).hexdigest(), W=W, H=H, dhash=int(var[0]),
+             variants=[int(x) for x in var], stem=stem, capture=capture, group_key=group_key, in_pool=in_pool,
+             boxes=list(boxes if boxes is not None else [(0.3, 0.3, 0.2, 0.2), (0.7, 0.6, 0.2, 0.3)]))
+    r["n_weed"] = len(r["boxes"])
+    return r
+
+
+def unit_conf(**holdout):
+    conf = json.loads(B3.CONFIG.read_text())
+    conf["rules"]["holdout"].update(holdout)
+    conf["rules"]["families"] = {}
+    return conf
+
+
+def by_key(rows):
+    return {r["key"]: r for r in rows}
+
+
+def test_rules_units():
+    print("the source, image and box rules on their own")
+    rules = json.loads(B3.CONFIG.read_text())["rules"]
+    good = [(0.5, 0.5, 0.2, 0.2)]
+
+    def rows_with(boxes_list, W=640, H=480):
+        return [dict(srow("c%d" % i, boxes=b), W=W, H=H) for i, b in enumerate(boxes_list)]
+    base = rows_with([good] * 10)
+    big = rows_with([[(0.5, 0.5, 0.95, 0.9)]] * 2 + [good] * 8)
+    many = rows_with([[(0.1 + 0.03 * (k % 26), 0.1 + 0.3 * (k // 26), 0.1, 0.1) for k in range(30)]] * 5)
+    small = rows_with([[(0.5, 0.5, 0.2, 0.2)] * 7 + [(0.2, 0.2, 0.02, 0.02)] * 3] * 4)
+    r0, rb, rm, rs = (B3.source_convention(x, rules["source"]) for x in (base, big, many, small))
+    check("the source rule: a clean source passes; 20 %% of boxes over 80 %% of the image fails on that rule alone (%s)"
+          % rb["fails"], r0["passes"] and not rb["passes"] and len(rb["fails"]) == 1 and "over 80" in rb["fails"][0],
+          (r0, rb))
+    check("  a median of 30 boxes per image fails on that rule alone (%s)" % rm["fails"],
+          not rm["passes"] and len(rm["fails"]) == 1 and "boxes per image" in rm["fails"][0], rm)
+    check("  30 %% of boxes under 16 px with a median side of %.0f px fails on that rule alone (%s)"
+          % (rs["median_side_px"], rs["fails"]),
+          not rs["passes"] and len(rs["fails"]) == 1 and "under 16" in rs["fails"][0] and rs["median_side_px"] >= 32, rs)
+    # the masked-area rule: thin boxes under 8 px (sqrt(w x h)) filling 62 % of the image's rows
+    thin = [(0.5, (k + 0.5) / 480.0, 1.0, 0.0001) for k in range(300)]
+    r = dict(srow("m1", boxes=[(0.5, 0.5, 0.2, 0.2)] + thin), W=640, H=480)
+    B3.image_rules(r, rules)
+    r2 = dict(srow("m2", boxes=[(0.5, 0.5, 0.2, 0.2)] + thin[:150]), W=640, H=480)
+    B3.image_rules(r2, rules)
+    check("a masked area over 50 %% drops the image (%.3f); %.3f keeps it" % (r["masked_area"], r2["masked_area"]),
+          r["drop"] == "masked_over_50" and r["masked_area"] > 0.5 and r2["drop"] is None and 0 < r2["masked_area"] < 0.5,
+          (r["drop"], r["masked_area"], r2["drop"], r2["masked_area"]))
+    lab = TMP / "units" / "two.txt"
+    label(lab, [(0, 0.5, 0.5, 0.2, 0.2), (1, 0.3, 0.3, 0.2, 0.2)])
+    conf = {"sources": {"s_a": {"classes": {"weed": "weed"}}}}
+    r = B3._new_row("s_a", B3.REGISTRY_KIND, None, "/x.jpg", lab, "s_a__x")
+    r["names"] = ["weed"]
+    B3.map_boxes(r, conf)
+    r2 = B3._new_row("s_a", B3.REGISTRY_KIND, None, "/x.jpg", lab, "s_a__y")
+    r2["names"] = ["weed", "crop"]
+    B3.map_boxes(r2, {"sources": {"s_a": {"classes": {"weed": "weed", "crop": "drop"}}}})
+    check("a class id beyond the name list refuses the image (unmapped_class); with both names mapped one weed box "
+          "stays and the crop box is dropped", r["drop"] == "unmapped_class" and r2["drop"] is None
+          and r2["n_weed"] == 1 and r2["n_drop"] == 1, (r["drop"], r2))
+    g = [dict(srow("g%d" % i), drop=None) for i in range(4)]
+    g[0]["guard"] = {"reasons": [], "refused": False, "refused_by": [], "crosscheck": True}
+    g[1]["guard"] = {"reasons": ["near_eval_v2"], "refused": True, "refused_by": ["near_eval_v2"], "crosscheck": False}
+    g[2]["guard"] = {"reasons": ["base_copy"], "refused": False, "refused_by": [], "crosscheck": False}
+    g[3]["guard"] = {"pending": True, "reasons": [], "refused": False, "refused_by": [], "crosscheck": False}
+    B3._guard_drops(g)
+    check("the guard's verdicts: an index cross-check hit alone drops the row; a refusal drops it; a base copy drops a "
+          "new row; an unjudged row is not judged", [x["drop"] for x in g] == ["guard:crosscheck", "guard:near_eval_v2",
+                                                                              "base_copy", None], [x["drop"] for x in g])
+    e = [dict(srow("e%d" % i, source="s_l" if i < 3 else "s_ok"), drop=None) for i in range(5)]
+    e[0]["embed"], e[1]["embed"], e[3]["embed"] = "near_eval_embed", "unhashable", "near_eval_embed"
+    B3.apply_leak_drops(e, {"s_l": {"flagged": True}, "s_ok": {"flagged": False}})
+    check("an embedding refusal (near_eval_embed, unhashable) drops its row before D28-v2's source verdict drops the "
+          "rest of a flagged source", [x["drop"] for x in e] == ["embed:near_eval_embed", "embed:unhashable",
+                                                                "source_leak", "embed:near_eval_embed", None],
+          [x["drop"] for x in e])
+    w = rules["walltime"]
+    lo, hi = B3.walltime(5.0, rules), B3.walltime(20.0, rules)
+    check("the walltime guard takes the slower of the loader and the GPU: a 5 ms loader projects the GPU's %.2f h; a "
+          "20 ms loader projects %.2f h, over the 6.4 h line" % (lo["projected_base_run_h"], hi["projected_base_run_h"]),
+          abs(lo["projected_base_run_h"] - (w["gpu_ms_per_image_epoch"] * 1.2e6 / 3.6e6 + 0.27)) < 1e-3
+          and not lo["over_line"] and abs(hi["projected_base_run_h"] - (20.0 * 1.2e6 / 3.6e6 + 0.27)) < 1e-3
+          and hi["over_line"], (lo, hi))
+
+
+def held_of(rows):
+    return sorted(r["key"] for r in rows if r["drop"] == "holdout_v1")
+
+
+def test_select_units():
+    import copy
+    print("selection on synthetic rows: dedupe, capture groups, the holdout, the quarantine")
+    conf = unit_conf(share=0.0, min_images=0, max_images=10)
+    H0, H1, H2 = h64("x0"), h64("x1"), h64("x2")
+    c_var = [h64("c/%d" % v) for v in range(8)]
+    lay = [(0.2, 0.2, 0.1, 0.1), (0.5, 0.5, 0.1, 0.1), (0.8, 0.7, 0.1, 0.1)]
+    rows = [srow("a1", h=H0), srow("a2", h=H0 ^ 0b11111),                   # 5 bits, the same boxes
+            srow("c1", var=c_var), srow("c2", h=c_var[1] ^ 0b11, boxes=[(0.6, 0.2, 0.3, 0.1)]),  # near only by hflip
+            srow("e1", sha="e" * 64, W=320, H=240), srow("e2", sha="e" * 64, W=1280, H=960),     # bytes, other sizes
+            srow("g1", kind="base", source="b", sha="9" * 64, tier=0), srow("g2", kind="base", source="b", sha="9" * 64,
+                                                                             tier=0),
+            srow("g3", sha="9" * 64, tier=1),                                       # an external copy of a base row
+            srow("h1", capture="tray|1"), srow("h2", capture="tray|1"),
+            srow("i1", group_key="s|20170101-120000"), srow("i2", group_key="s|20170101-120000"),
+            srow("j1", source="d_a", family="dock", stem="IMG_7"), srow("j2", source="d_b", family="dock", stem="IMG_7"),
+            srow("k1", h=H1, boxes=lay), srow("k2", h=H1 ^ 0xFF, boxes=lay),         # identical layout, 8 bits
+            srow("l1", h=H2, boxes=lay), srow("l2", boxes=lay)]                      # identical layout, far apart
+    for r in rows:
+        if r["kind"] == "base":
+            r["in_pool"] = True
+    rec = B3.select(rows, conf)
+    R = by_key(rows)
+    same = lambda a, b: R[a]["group"] == R[b]["group"]  # noqa: E731
+    check("dHash 5 bits apart with the same boxes: both kept (dedupe is 3 bits), one capture group (6 bits)",
+          R["a1"]["drop"] is None and R["a2"]["drop"] is None and same("a1", "a2"), (R["a1"]["drop"], R["a2"]["drop"]))
+    check("near only under a variant (hflip, 2 bits) with other boxes: both kept, one capture group",
+          R["c1"]["drop"] is None and R["c2"]["drop"] is None and same("c1", "c2"))
+    check("the same bytes at two sizes: the higher resolution is kept", R["e2"]["drop"] is None
+          and R["e1"]["drop"] == "duplicate" and R["e1"]["dup_of"] == "e2")
+    check("two base_v2 rows with the same bytes are both kept; an external copy of them is dup_of_base",
+          R["g1"]["drop"] is None and R["g2"]["drop"] is None and R["g3"]["drop"] == "dup_of_base")
+    check("the intake capture group, the file-name session and the export stem across a family each join one group",
+          same("h1", "h2") and same("i1", "i2") and same("j1", "j2") and not same("h1", "i1") and not same("a1", "h1"))
+    check("an identical layout within 10 bits is a copy (%s); on far-apart photos it is not (%d pair too far)"
+          % (R["k2"]["drop"], rec["layout_pairs_too_far"]),
+          {R["k1"]["drop"], R["k2"]["drop"]} == {None, "duplicate"} and R["l1"]["drop"] is None
+          and R["l2"]["drop"] is None and rec["layout_pairs_too_far"] >= 1)
+    names = {r["key"]: r["group"] for r in rows}
+    rows2 = [copy.deepcopy(r) for r in rows[::-1]]
+    for r in rows2:
+        r["drop"] = None
+        r.pop("group", None)
+        r.pop("dup_of", None)
+    B3.select(rows2, conf)
+    check("group names come from content: the rows in reverse order get the same names",
+          {r["key"]: r["group"] for r in rows2} == names)
+
+    # ---- the holdout's counts
+    conf = unit_conf(share=0.15, min_images=2, max_images=10, max_group=11)
+    rows = [srow("s%02d" % i, source="src_s") for i in range(40)]
+    rows += [srow("t%02d_%d" % (i, k), source="src_t", capture="t|%d" % i) for i in range(34) for k in range(3)]
+    rows += [srow("big%02d" % i, source="src_s", capture="one|big") for i in range(12)]
+    rec = B3.select(rows, conf)
+    held = held_of(rows)
+    check("a capture group over max_group (12 rows > 11) is never held out, and summary.json counts its rows by "
+          "reason", not [k for k in held if k.startswith("big")]
+          and rec["holdout"]["src_s"]["ineligible_rows"] == {"over_max_group": 12}, rec["holdout"]["src_s"])
+    held = [k for k in held if not k.startswith("big")]
+    hs = [k for k in held if k.startswith("s")]
+    ht = [k for k in held if k.startswith("t")]
+    check("15 %% of 52 rows (40 singletons, 12 in one group too big to hold): exactly 8 held (round half up, min 2, "
+          "max 10); got %d" % len(hs), len(hs) == 8)
+    check("groups of 3 under max 10: 9 held, never a group that would pass 10 (got %d)" % len(ht), len(ht) == 9)
+    # a source's rows inside other sources' groups count against its own max and its own target
+    rows = []
+    for o in ("v", "y", "z"):          # src_o owns 30 groups of 2 own rows + 1 row of src_u
+        rows += [srow("%s%02d_%d" % (o, i, k), source="src_%s" % o, capture="%s|%d" % (o, i))
+                 for i in range(30) for k in range(2)]
+        rows += [srow("u%s%02d" % (o, i), source="src_u", capture="%s|%d" % (o, i)) for i in range(30)]
+    rows += [srow("w%02d" % i, source="src_w", capture="w|%d" % i) for i in range(10)]
+    rows += [srow("x%02d" % i, source="src_x", capture="w|%d" % i) for i in range(10)]
+    rows += [srow("x_own%02d" % i, source="src_x") for i in range(18)]
+    rec = B3.select(rows, unit_conf(share=0.15, min_images=2, max_images=6, max_group=400))
+    held = held_of(rows)
+    n = {c: sum(1 for k in held if k.startswith(c)) for c in "uvyzwx"}
+    ho = rec["holdout"]
+    check("src_u's rows sit in src_v's, src_y's and src_z's groups: src_u stops at max 6 (%s), so src_z's groups are "
+          "never held (%d skipped)" % (n, ho["src_z"]["skipped_over_max"]),
+          n["u"] == 6 and n["v"] == 6 and n["y"] == 6 and n["z"] == 0 and ho["src_u"]["images"] == 6
+          and ho["src_z"]["skipped_over_max"] == 30 and all(v["images"] <= 6 for v in ho.values()), ho)
+    check("src_x's target (%d) counts its rows held in src_w's groups (%d): it holds %d of its own, %d in all"
+          % (ho["src_x"]["target"], n["w"], n["x"] - n["w"], n["x"]),
+          ho["src_x"]["target"] == 4 and n["w"] == 2 and n["x"] == 4 and ho["src_x"]["images"] == 4, ho)
+
+    # ---- the quarantine does not move test v1; nor does a new source; nor the rows' order
+    def world():
+        out = [srow("p%02d" % i, source="src_p") for i in range(40)]
+        out += [srow("q%02d" % i, source="src_q") for i in range(20)]
+        out += [srow("q_copy", source="src_q", tier=1, sha="c" * 64), srow("p_copy", source="src_p", sha="c" * 64,
+                                                                            in_pool=True)]
+        return out
+    conf = unit_conf(share=0.15, min_images=2, max_images=10, max_group=400)
+    a, b = world(), world()
+    ra = B3.select(a, conf, quarantine={"src_q"})
+    B3.select(b, conf, quarantine=set())
+    A, Bk = by_key(a), by_key(b)
+    hq = [k for k in held_of(a) if k.startswith("q")]
+    check("lifting src_q's quarantine leaves every source's test rows unchanged (%d held, %d of src_q's)"
+          % (len(held_of(a)), len(hq)), held_of(a) == held_of(b) and len(hq) == 3)
+    check("quarantined: src_q's other rows are out of arm B, its held rows stay in test v1",
+          all(A[k]["drop"] == "quarantined" for k in A if k.startswith("q") and k not in hq and k != "q_copy")
+          and all(Bk[k]["drop"] is None for k in Bk if k.startswith("q") and k not in hq) and ra["quarantined"] > 0)
+    check("a copy group whose kept row is quarantined keeps its copy from a source that is not (p_copy in B as is; a "
+          "duplicate of q_copy when lifted)", A["q_copy"]["drop"] == "quarantined" and A["p_copy"]["drop"] is None
+          and Bk["q_copy"]["drop"] is None and Bk["p_copy"]["drop"] == "duplicate" and ra["promoted_copies"] == 1,
+          (A["q_copy"]["drop"], A["p_copy"]["drop"], Bk["p_copy"]["drop"]))
+    c = world() + [srow("n%02d" % i, source="src_n") for i in range(30)]
+    B3.select(c, conf, quarantine={"src_q"})
+    check("a new source of its own photos leaves every other source's test rows unchanged",
+          [k for k in held_of(c) if not k.startswith("n")] == held_of(a))
+    d = world()[::-1]
+    B3.select(d, conf, quarantine={"src_q"})
+    check("the rows read in reverse order: the same test rows", held_of(d) == held_of(a))
+
+    # ---- an earlier build's test list
+    rows = world()
+    target = sorted(k for k in by_key(rows) if k.startswith("p") and k not in held_of(a))[:2]
+    R = by_key(rows)
+    R["p_copy"]["in_pool"] = True
+    prior = [{"key": "elsewhere", "original_sha256": R[target[0]]["sha256"]},
+             {"key": "elsewhere2", "dhash": R[target[1]]["dhash"] ^ 0b1111, "variants": None},
+             {"key": "elsewhere3", "capture_keys": [["capture", "tray|9"]]},
+             {"key": "elsewhere4", "original_sha256": "c" * 64}]
+    rows.append(srow("p_tray", source="src_p", capture="tray|9", in_pool=True))
+    n = B3.mark_prior(rows, prior, 6)
+    rec = B3.select(rows, conf, quarantine={"src_q"})
+    R = by_key(rows)
+    check("rows an earlier test list holds (by bytes, by a dHash 4 bits away, by a capture relation: %d marked) never "
+          "train: in an eligible group they are held first (%s), in one touching the pools they are dropped "
+          "(prior_test_v1)" % (n, [R[k]["drop"] for k in target]),
+          n == 5 and all(R[k]["drop"] == "holdout_v1" for k in target) and R["p_tray"]["drop"] == "prior_test_v1"
+          and R["q_copy"]["drop"] == "prior_test_v1" and R["p_copy"]["drop"] == "duplicate"
+          and rec["prior_test_dropped"] == 2 and rec["promoted_copies"] == 0,
+          {k: R[k]["drop"] for k in target + ["p_tray", "p_copy", "q_copy"]})
+
+
+def test_eval_guard():
+    print("the evaluation-group guard")
+    import numpy as np
+    g = np.asarray([[h64("ev%d/%d" % (i, v)) for v in range(8)] for i in range(5)], dtype=np.uint64)
+    rows = [srow("r_near_var", var=[int(g[0, 3]) ^ 0b11111] + [h64("rv/%d" % v) for v in range(1, 8)]),
+            srow("r_near_mine", var=[h64("rm/0")] + [int(g[1, 0]) ^ 0b111111] + [h64("rm/%d" % v) for v in range(2, 8)]),
+            srow("r_far7", h=int(g[2, 0]) ^ 0b1111111),
+            srow("r_base", kind="base", source="b", h=int(g[3, 0]) ^ 0b1),
+            dict(srow("r_nohash"), dhash=None, variants=None)]
+    rec = B3.eval_guard(rows, {"G": (g, np.ones(len(g), dtype=bool))}, 6)
+    R = by_key(rows)
+    check("a row within 6 bits of an evaluation image under its variant, or the image's variant within 6 bits of the "
+          "row, is dropped (near_eval_group); 7 bits away it stays; a base_v2 row is counted, never dropped",
+          R["r_near_var"]["drop"] == "near_eval_group" and R["r_near_mine"]["drop"] == "near_eval_group"
+          and R["r_far7"]["drop"] is None and R["r_base"]["drop"] is None and R["r_base"]["eval_group"] == {"G": 1}
+          and rec["groups"]["G"]["by_source"] == {"base_v2": {"within": 1, "within_3": 1},
+                                                  "s_a": {"within": 2, "within_3": 0}}
+          and rec["dropped"] == 2 and rec["unjudged"] == 1, rec)
 
 
 def summary_ok(summ):
@@ -444,11 +810,18 @@ def test_build(Wd, reg, cp, f):
     check("inc2.train's check_manifest and guard_rows accept both manifests (B: %s)" % g["reasons"],
           info["n_train_images"] == len(b) and g["refused"] == 0 and g["crosscheck_hits"] == 0)
     big = ps["src_big"]
-    check("src_big: crop-only -> no weed box, unlabelled -> no_label, a box over 90 %%, a short side; kept rows hold "
-          "weed boxes only (%s)" % big["dropped"],
+    check("src_big: crop-only -> no weed box, unlabelled -> no_label, a box over 90 %%, a short side, an hflip copy in "
+          "an evaluation group -> near_eval_group; kept rows hold weed boxes only (%s)" % big["dropped"],
           big["dropped"].get("no_weed_box") == 1 and big["dropped"].get("no_label") == 1
           and big["dropped"].get("box_over_90") == 1 and big["dropped"].get("short_side") == 1
-          and big["in_B"] + big["holdout_v1"] == 6)
+          and big["dropped"].get("near_eval_group") == 1 and big["eval_groups"] == {"G1": 1}
+          and big["in_B"] + big["holdout_v1"] == 5)
+    eg = summ["evaluation_groups"]
+    check("the evaluation groups in summary.json: G1's images hashed (%s), the slug not in the registry named, src_big's "
+          "row within 6 bits counted" % eg["groups"]["G1"]["slugs"],
+          eg["groups"]["G1"]["hashes"] == 2 and eg["slugs_not_read"] == {"src_unregistered": "not in the registry"}
+          and eg["groups"]["G1"]["by_source"] == {"src_big": {"within": 1, "within_3": 1}} and eg["dropped"] == 1
+          and eg["bits"] == 6, eg)
     prov = {p["key"]: p for p in (json.loads(x) for x in (root / B3.PROVENANCE).read_text().splitlines())}
     k0 = "src_big__train_images_big_00"
     p0 = prov.get(k0)
@@ -474,11 +847,15 @@ def test_build(Wd, reg, cp, f):
     check("src_tiny fails the convention rule (median side under 32 px): excluded whole",
           ps["src_tiny"]["dropped"] == {"convention": 6} and not ps["src_tiny"]["convention"]["passes"],
           ps["src_tiny"])
-    check("src_quar is quarantined by the stream: excluded", ps["src_quar"]["dropped"] == {"quarantined": 5}
-          and ps["src_quar"]["quarantined"])
-    check("src_badnames: a class name the config does not list -> the source is not read",
-          "src_badnames" not in ps and "mystery" in str(summ["inputs"]) or
-          ps.get("src_badnames", {}).get("in_B", 0) == 0)
+    q = ps["src_quar"]
+    check("src_quar is quarantined by the stream: none of its rows in arm B; its held rows (the holdout ignores the "
+          "quarantine: %d) stay in test v1, marked" % q["holdout_v1"],
+          q["in_B"] == 0 and q["holdout_v1"] == 2 and q["dropped"] == {"quarantined": 3} and q["quarantined"]
+          and summ["holdout_v1"]["per_source"]["src_quar"]["quarantined_source"] is True
+          and summ["quarantine"] == ["src_quar"], q)
+    check("src_badnames: a class name the config does not list -> the source is not read (summary.json names why)",
+          "src_badnames" not in ps and "mystery" in summ["sources_not_read"].get("src_badnames", ""),
+          summ.get("sources_not_read"))
     check("src_poly: polygons became boxes (%d)" % ps["src_poly"]["polygons"],
           ps["src_poly"]["polygons"] == 5 and ps["src_poly"]["in_B"] + ps["src_poly"]["holdout_v1"] == 5)
     lk = ps["src_leak"]
@@ -499,10 +876,11 @@ def test_build(Wd, reg, cp, f):
           it["dropped"].get("intake_hold") == 1 and it["in_B"] + it["holdout_v1"] == 5)
     da, db = ps["src_dock_a"], ps["src_dock_b"]
     dropped_b = db["dropped"]
-    check("dock: the byte copy, the hflip copy with flipped boxes and the identical layout are duplicates of the "
-          "tier-2 source (%s); the hflip copy with other boxes is kept" % dropped_b,
-          dropped_b.get("duplicate") == 3 and db["in_B"] + db["holdout_v1"] + dropped_b.get("family_cap", 0) == 6
-          and da.get("dropped", {}).get("duplicate", 0) == 0)
+    check("dock: the byte copy, the hflip copy with flipped boxes and the identical layout %d bits away are duplicates "
+          "of the tier-2 source (%s); the hflip copy with other boxes, and the identical layout on another photo, are "
+          "kept" % (f["x05_bits"], dropped_b),
+          dropped_b.get("duplicate") == 3 and db["in_B"] + db["holdout_v1"] + dropped_b.get("family_cap", 0) == 7
+          and da.get("dropped", {}).get("duplicate", 0) == 0 and 4 <= f["x05_bits"] <= 10)
     hold = summ["holdout_v1"]
     files_ok = all((root / v["file"]).is_file() for v in hold["per_source"].values())
     check("the holdout: test_v1/<source>.jsonl per source with held rows (%s), never trained"
@@ -525,9 +903,33 @@ def test_build(Wd, reg, cp, f):
     cap = summ["selection"]["family_caps"]["dock"]
     check("the dock cap: D <= floor(0.35 / 0.65 x non-dock) after the holdout (%s)" % cap,
           cap["after"] <= cap["cap"] and cap["cap"] == int(0.35 / 0.65 * cap["non_family"] + 1e-9))
-    check("summary.json: complete, every input's sha256, no key named after a non-dev split",
-          summ["status"] == "complete" and summary_ok(summ) and summ["inputs"]["registry"]["sha256"] is None
-          or summ["inputs"]["lock_v2"]["sha256"] and summary_ok(summ))
+    ins = summ["inputs"]
+    shas = [summ["config"]["sha256"], ins["registry"]["sha256"], ins["base_v2"]["sha256"],
+            ins["base_v2"]["provenance_sha256"], ins["lock_v2"]["sha256"], ins["stream"]["head_sha256"],
+            summ["leak_thresholds"]["sha256"]] + [v["manifest_sha256"] for v in ins["intake"].values()]
+    check("summary.json: complete, every input's sha256 (%d), no key named after a non-dev split" % len(shas),
+          summ["status"] == "complete" and summary_ok(summ) and len(shas) == 8
+          and all(isinstance(x, str) and len(x) == 64 for x in shas), shas)
+    grp_of = {p["key"]: p["group"] for p in prov.values()}
+    for x in (json.loads(ln) for ln in (root / B3.DROPPED).read_text().splitlines()):
+        if x.get("group"):
+            grp_of[x["key"]] = x["group"]
+    k_d02 = next(k for k in grp_of if k.startswith("src_dock_a__") and "_d02_jpg" in k)
+    k_x02 = next(k for k in grp_of if k.startswith("src_dock_b__") and "_x02_jpg" in k)
+    check("an hflip copy whose boxes do not follow the flip (src_dock_b x02) joins its original's capture group "
+          "(src_dock_a d02) through the hflip variant", grp_of[k_d02] == grp_of[k_x02], (k_d02, k_x02))
+    trays = [grp_of.get("int_src__%02d" % i) for i in (2, 3, 4, 5)]
+    check("intake rows of one capture group (tray1: 02, 03; tray2: 04, 05) share a capture group; two trays do not",
+          None not in trays and trays[0] == trays[1] and trays[2] == trays[3] and trays[0] != trays[2], trays)
+    ses = {k: g for k, g in grp_of.items() if k.startswith("src_session__")}
+    s1 = {g for k, g in ses.items() if "_s1_" in k}
+    s2 = {g for k, g in ses.items() if "_s2_" in k}
+    check("src_session's file-name session (group_regex ^(s\\d)_) joins s1_* into one group and s2_* into another",
+          len(ses) == 6 and len(s1) == 1 and len(s2) == 1 and s1 != s2, ses)
+    hrow = next(json.loads(ln) for f in sorted((root / B3.HOLDOUT_DIR).glob("*.jsonl"))
+                for ln in f.read_text().splitlines())
+    check("a test list row carries its capture relations and whether its source is quarantined",
+          "capture_keys" in hrow and "quarantined_source" in hrow and hrow["original_sha256"], hrow.keys())
     check("a second build refuses (built once)", refused(B3.build, SID, conf_path=cp, registry=reg, testing=True)
           is not None)
     wt = summ["walltime"]
@@ -540,6 +942,7 @@ def test_build(Wd, reg, cp, f):
     k, s = B3.e1_arm_of(s1["arms"]["B"]["sha256"])
     check("e1_arm_of names the arm of a manifest the summary records, and nothing else",
           k == "B" and B3.e1_arm_of(s1["arms"]["A"]["sha256"])[0] == "A" and B3.e1_arm_of("0" * 64)[0] is None)
+    summ["_held_keys"] = sorted(p["key"] for p in prov.values() if p["holdout_v1"])
     return summ
 
 
@@ -559,7 +962,9 @@ def test_leak_weighed(Wd, reg, cp, f):
         threshold = 0.95
 
         def scan(self, rows, desc_path=None, procs=1):
-            return {}, set()
+            # the embedding detector finds one copy: src_poly's p01 (used as it is: no PNG)
+            return {r["key"]: [{"cos": 0.99, "bits": 12, "split": "dev", "eval_key": "x"}] for r in rows
+                    if r["image"].endswith("/src_poly/images/p01.jpg")}, set()
 
         def record(self):
             return {"embedder": "stand-in", "cos_threshold": 0.95, "p_false": 1e-4}
@@ -576,7 +981,13 @@ def test_leak_weighed(Wd, reg, cp, f):
         finally:
             EH.pair_cosines = old
         out[cos] = s["per_source"]["src_leak"]
+        out["poly_%s" % cos] = s["per_source"]["src_poly"]
     lo, hi = out[0.3], out[0.97]
+    po = out["poly_0.3"]
+    check("the embedding detector's copy is dropped (embed:near_eval_embed) and, one copy in 5 images, D28-v2's "
+          "embedding rule takes the rest of its source (%s)" % po["dropped"],
+          po["dropped"].get("embed:near_eval_embed") == 1 and po["leak"]["flagged"]
+          and po["dropped"].get("source_leak") == 4 and po["in_B"] + po["holdout_v1"] == 0, po)
     check("a dHash hit weighed at 0.30 is chance: only its image leaves, the source's other rows stay (%s)"
           % lo["dropped"], not lo["leak"]["flagged"] and lo["in_B"] + lo["holdout_v1"] == 3
           and lo["dropped"].get("guard:near_eval_variant") == 1)
@@ -603,10 +1014,28 @@ def test_count_and_quarantine(Wd, reg, cp, f, built):
     check("count refuses an --out inside INC_DIR", refused(B3.count, SID, C.INC_DIR / "x", conf_path=cp, registry=reg,
                                                            testing=True, hashes=Stored()) is not None)
     asis, lift = sc["as_is"], sc["lifted"]
-    check("as is: src_quar stays out; lifted: its rows are in (%d -> %d)" % (asis["arms"]["B"]["images"],
-                                                                           lift["arms"]["B"]["images"]),
+    check("as is: src_quar's rows stay out of arm B; lifted: its rows are in (%d -> %d)"
+          % (asis["arms"]["B"]["images"], lift["arms"]["B"]["images"]),
           asis["per_source"]["src_quar"]["in_B"] == 0 and lift["lifted"] == ["src_quar"]
-          and lift["per_source"]["src_quar"]["in_B"] + lift["per_source"]["src_quar"]["holdout_v1"] == 5)
+          and lift["per_source"]["src_quar"]["in_B"] + lift["per_source"]["src_quar"]["holdout_v1"] == 5
+          and lift["arms"]["B"]["images"] == asis["arms"]["B"]["images"] + 3)
+    check("lifting src_quar leaves test v1 unchanged, every source's held rows included (%d images, keys %s)"
+          % (asis["holdout_v1"]["images"], asis["holdout_v1"]["sha256_of_keys"][:12]),
+          rep["holdout_same_in_every_scenario"] is True and asis["holdout_v1"] == lift["holdout_v1"]
+          and all(asis["per_source"][s_]["holdout_v1"] == lift["per_source"][s_]["holdout_v1"]
+                  for s_ in asis["per_source"]) and asis["per_source"]["src_quar"]["holdout_v1"] == 2)
+    check("count hashes and judges every candidate row, the quarantined ones included (none left unjudged)",
+          asis["pending"]["guard_unjudged_rows"] == 0 and lift["pending"]["guard_unjudged_rows"] == 0
+          and sum(lift["per_source"]["src_quar"]["guard"].values()) == 0
+          and rep["evaluation_groups"]["unjudged"] == 0)
+    same = {s_: (v, built["selection"]["holdout"].get(s_)) for s_, v in asis["selection"]["holdout"].items()
+            if s_ != "src_leak"}
+    ck = {k for k in asis["holdout_v1"]["keys"] if not k.startswith("src_leak__")}
+    bk = {k for k in built["_held_keys"] if not k.startswith("src_leak__")}
+    check("count's holdout is the build's for every source but src_leak (count cannot weigh its dHash hit, so it "
+          "does not drop the source): the same records and the same %d test rows" % len(bk),
+          all(a_ == b_ for a_, b_ in same.values()) and len(same) >= 8 and ck == bk and len(bk) >= 15,
+          ({k: v for k, v in same.items() if v[0] != v[1]}, sorted(ck ^ bk)))
     check("count's arm A is the build's (%d)" % asis["arms"]["A"]["images"],
           asis["arms"]["A"]["images"] == built["arms"]["A"]["images"])
     check("count reports the dHash hits it cannot weigh and the pending embedding check",
@@ -638,6 +1067,8 @@ def test_pool_rows(Wd, reg, cp, f):
     clear_v3()
     rows = f["intake_rows"]
     pool = [{k: r[k] for k in C.MANIFEST_KEYS if k in r} for r in rows[2:]]
+    big05 = DS / "src_big" / "train" / "images" / "big_05.jpg"
+    pool.append(dict(pool[0], key="elsewhere__big05", image=str(big05), sha256=C.sha256_file(big05)))
     for x in pool:
         x.setdefault("session", "")
     make_stream(SID, [QUAR], pool_rows=pool)
@@ -652,8 +1083,12 @@ def test_pool_rows(Wd, reg, cp, f):
     it = summ["per_source"]["int_src"]
     check("the intake rows in the stream's pool (by key) are never held out, even when the rule would take every "
           "group (int_src: %d held of %d kept)" % (it["holdout_v1"], it["in_B"] + it["holdout_v1"]),
-          not ({r["key"] for r in rows[2:]} & held) and summ["inputs"]["stream"]["pool_rows"] == 4
+          not ({r["key"] for r in rows[2:]} & held) and summ["inputs"]["stream"]["pool_rows"] == 5
           and it["in_B"] >= 4, (sorted(held), it))
+    big = summ["per_source"]["src_big"]
+    check("a registry row whose bytes a pool row holds under another key is never held out either (src_big: %d of %d "
+          "held; big_05 in arm B)" % (big["holdout_v1"], big["in_B"] + big["holdout_v1"]),
+          "src_big__train_images_big_05" not in held and big["holdout_v1"] == 4 and big["in_B"] == 1, big)
 
 
 def test_walltime(Wd, reg, cp):
@@ -672,6 +1107,16 @@ def test_walltime(Wd, reg, cp):
           e is not None and "over the" in str(e) and s["status"] == "over_walltime"
           and abs(s["walltime"]["projected_base_run_h"] - 10.27) < 1e-6 and B3.read_summary() is None
           and B3.e1_arm_of(s["arms"]["B"]["sha256"])[0] is None, (e, s.get("status")))
+    (C.REPO / "yolo11m.pt").write_bytes(os.urandom(4096))
+    shutil.rmtree(C.INC_DIR / "e1t_w", ignore_errors=True)
+    e = refused(B.build_definition, "e1t_w", manifest=s["arms"]["B"]["manifest"], arm="m640", testing=True)
+    other = TMP / "copy_of_b.jsonl"
+    shutil.copyfile(s["arms"]["B"]["manifest"], other)
+    e2 = refused(B.build_definition, "e1t_w", manifest=other, arm="m640", role="baseline", testing=True)
+    check("inc2.baseline refuses arm B of an over_walltime summary, and a copy of it elsewhere, instead of training "
+          "the 100-epoch cold table (%s)" % e, isinstance(e, B.BaselineError) and "base v3 manifest" in str(e)
+          and isinstance(e2, B.BaselineError) and "records it as arm B (status over_walltime)" in str(e2)
+          and not (C.INC_DIR / "e1t_w" / "exp.json").exists(), (e, e2))
 
 
 def test_baseline_budget(Wd, reg, cp):
@@ -707,7 +1152,70 @@ def test_baseline_budget(Wd, reg, cp):
     dx, _ = B.build_definition("e1t_x", manifest=other, arm="m640", testing=True)
     check("a manifest summary.json does not record trains the cold table", dx["base"]["recipe"] == RC.cold("m640")
           and dx.get("recipe_name") is None)
+    inside = B3.out_dir() / "extra.jsonl"
+    C.write_manifest(inside, C.read_manifest(mb)[:-2])
+    for exp in ("e1t_y", "e1t_z", "e1t_u"):
+        shutil.rmtree(C.INC_DIR / exp, ignore_errors=True)
+    e1 = refused(B.build_definition, "e1t_y", manifest=inside, arm="m640", testing=True)
+    e2 = refused(B.build_definition, "e1t_u", union=[str(ma), str(other)], arm="m640", testing=True)
+    e3 = refused(B.build_definition, "e1t_z", manifest=ma, arm="n640", role="baseline", testing=True)
+    sp = B3.out_dir() / B3.SUMMARY
+    keep = sp.read_bytes()
+    sp.write_text(json.dumps(dict(json.loads(keep), status="edited")))
+    copy_b = TMP / "copy_b2.jsonl"
+    shutil.copyfile(mb, copy_b)
+    e4 = refused(B.build_definition, "e1t_z", manifest=copy_b, arm="m640", testing=True)
+    sp.write_bytes(keep)
+    inside.unlink()
+    check("inc2.baseline refuses a manifest under splits/v3 that no summary records, a union with an E1 manifest, an "
+          "E1 manifest on another arm, and an E1 manifest once summary.json is no longer complete",
+          all(isinstance(x, B.BaselineError) for x in (e1, e2, e3, e4)) and "lies under" in str(e1)
+          and "never in a union" in str(e2) and "status edited" in str(e4), (e1, e2, e3, e4))
     return summ
+
+
+def test_prior_lists(Wd, reg, cp):
+    print("earlier test lists: never trained in a later build, held again first; a partial build blocks a rebuild")
+    clear_v3()
+    splits = B3.out_dir().parent
+
+    def keys_of(root):
+        held = {json.loads(ln)["key"] for f in (root / B3.HOLDOUT_DIR).glob("*.jsonl")
+                for ln in f.read_text().splitlines()}
+        return held, {r["key"] for r in C.read_manifest(root / ("%s.jsonl" % B3.ARM_B))}
+    make_stream(SID, [QUAR])
+    with holds({"int_src__00": []}):
+        B3.build(SID, conf_path=cp, registry=reg, testing=True, procs=2, loader=LOADER)
+    held1, b1 = keys_of(B3.out_dir())
+    os.rename(B3.out_dir(), splits / "v3_prev1")
+    make_stream(SID, [QUAR, {"event": "unquarantine", "source": "src_quar", "by": "human:x"}])
+    with holds({"int_src__00": []}):
+        s2 = B3.build(SID, conf_path=cp, registry=reg, testing=True, procs=2, loader=LOADER)
+    held2, b2 = keys_of(B3.out_dir())
+    check("rebuilt with src_quar's quarantine lifted, the first build's test lists read as never-train (%s): the same "
+          "test v1 (%d), none of it in arm B, arm B gains src_quar's other 3 rows"
+          % ([f["file"].split("/splits/")[-1] for f in s2["prior_test"]["files"]], len(held2)),
+          held2 == held1 and not (held1 & b2) and b2 - b1 == {k for k in b2 if k.startswith("src_quar__")}
+          and len(b2 - b1) == 3 and s2["prior_test"]["rows"] == len(held1) and s2["prior_test"]["marked"] >= len(held1),
+          (sorted(held1 ^ held2), s2["prior_test"]))
+    os.rename(B3.out_dir(), splits / "v3_prev2")
+    with holds({"int_src__00": [], "int_src__01": []}):
+        s3 = B3.build(SID, conf_path=cp, registry=reg, testing=True, procs=2, loader=LOADER)
+    held3, b3 = keys_of(B3.out_dir())
+    check("rebuilt once more with a new row (int_src__01's hold released, joining tray0): every earlier test row is "
+          "held again or never trained (%d earlier lists)" % len(s3["prior_test"]["files"]),
+          held1 <= held3 and not (held1 & b3) and "int_src__01" in (held3 | b3)
+          and len(s3["prior_test"]["files"]) == 2 * len(s2["holdout_v1"]["per_source"]),
+          (sorted(held1 - held3), s3["selection"]["holdout"].get("int_src"),
+           [json.loads(x) for x in (B3.out_dir() / B3.DROPPED).read_text().splitlines() if "int_src" in x]))
+    os.rename(B3.out_dir(), splits / "v3_prev3")
+    (B3.out_dir() / B3.HOLDOUT_DIR).mkdir(parents=True)
+    e = refused(B3.build, SID, conf_path=cp, registry=reg, testing=True, procs=2, loader=LOADER)
+    check("splits/v3/test_v1 without a summary (a build that did not finish): a rebuild refuses until it is moved "
+          "aside", e is not None and "did not finish" in str(e), e)
+    clear_v3()
+    for d in splits.glob("v3_prev*"):
+        shutil.rmtree(d)
 
 
 def main():
@@ -718,12 +1226,16 @@ def main():
     test_config()
     test_geometry()
     test_pairs()
+    test_rules_units()
+    test_select_units()
+    test_eval_guard()
     built = test_build(Wd, reg, cp, f)
     test_leak_weighed(Wd, reg, cp, f)
     test_count_and_quarantine(Wd, reg, cp, f, built)
     test_pool_rows(Wd, reg, cp, f)
     test_walltime(Wd, reg, cp)
     test_baseline_budget(Wd, reg, cp)
+    test_prior_lists(Wd, reg, cp)
     print("\n%d failure(s) in %.0fs" % (len(FAILURES), time.time() - t0))
     if FAILURES:
         for x in FAILURES:

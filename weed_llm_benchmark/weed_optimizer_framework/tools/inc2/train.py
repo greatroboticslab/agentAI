@@ -406,7 +406,33 @@ def experiment_budget(exp, arm):
     if not _is_int(n) or n < 1:
         return name, None, probs + ["exp.json's base records no image count for %s" % name]
     probs += RC.check_budget_record(data.get("budget"), arm["id"], n)
+    probs += e1_problems(data)
     return name, n, probs
+
+
+def e1_problems(data):
+    """How an exp.json naming cold_budget fails to be an E1 arm: its e1
+    record names arm A or B, its base manifest (by sha256) is that arm of
+    the complete splits/v3/summary.json (inc2.base3.e1_arm_of), and that
+    summary still hashes as the e1 record says. [] when it is one."""
+    from . import base3 as B3
+    e1 = data.get("e1")
+    if not isinstance(e1, dict) or e1.get("arm") not in ("A", "B"):
+        return ["exp.json names %s without an E1 record (e1.arm A or B)" % RC.BUDGET_NAME]
+    probs = []
+    msha = (data.get("base") or {}).get("manifest_sha256")
+    k, _summ = B3.e1_arm_of(msha) if msha else (None, None)
+    if k is None:
+        probs.append("its base manifest %s is not one of the two manifests a complete splits/v3/summary.json "
+                     "records" % str(msha)[:12])
+    elif k != e1["arm"]:
+        probs.append("its base manifest is E1's arm %s, exp.json says %s" % (k, e1["arm"]))
+    sp = B3.out_dir() / B3.SUMMARY
+    cur = C.sha256_file(sp) if sp.is_file() else None
+    if e1.get("summary_sha256") != cur:
+        probs.append("exp.json was built from splits v3 summary %s; %s is now %s"
+                     % (str(e1.get("summary_sha256"))[:12], sp, str(cur)[:12]))
+    return probs
 
 
 def testing_settings(exp):

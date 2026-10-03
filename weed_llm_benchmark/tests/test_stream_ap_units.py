@@ -1934,6 +1934,9 @@ def t_e1():
     check("  while the arms run: no rescore of either (no L23N: native false; no L23E: not done)",
           not [e for e in w.events("proposed") if e.get("lever") in ("L23N", "L23E")])
     w.experiment("e1_a_m640", done=True)
+    w.tick(3)
+    check("  E1-A done, E1-B still running: no L23E (it needs both arms done)",
+          not [e for e in w.events("proposed") if e.get("lever") in ("L23N", "L23E")])
     w.experiment("e1_b_m640", done=True)
     w.tick(3)
     pro = [e for e in w.events("proposed") if e.get("lever") == "L23E"]
@@ -1971,6 +1974,19 @@ def t_e1():
           and st["stage"]["r0"].get("base3") == "failed" and not wf.lane("MAINT").get("hold")
           and not int(wf.lane("MAINT").get("fails") or 0)
           and not [e for e in wf.events("proposed") if e.get("lever") == "L23B"], (cards, st["stage"]["r0"]))
+    for tag, status in (("e1_wall", "over_walltime"), ("e1_nosum", None)):
+        ww = _e1_world(tag)
+        ww.tick(3)
+        ww.job_done("inc_build_base3_v3")
+        if status:
+            ww.base3_summary(status=status)
+        ww.tick(3)
+        d = _diags(ww)
+        check("the base v3 job ended %s: splits v3 is not done, so no E1 arm is built and L23V is not proposed again "
+              "(DR0 silent)" % ("with summary.json status over_walltime" if status else "without a summary.json"),
+              not [e for e in ww.events("proposed") if e.get("lever") == "L23B"]
+              and len([e for e in ww.events("proposed") if e.get("lever") == "L23V"]) == 1
+              and not d["DR0"]["fired"], ([e.get("lever") for e in ww.events("proposed")], d["DR0"]["summary"]))
     wu = _e1_world("e1_uncertain")
     wu.lose_reply = "inc2.base3"
     wu.tick(2)

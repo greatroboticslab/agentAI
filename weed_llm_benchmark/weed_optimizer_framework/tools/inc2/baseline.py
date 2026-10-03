@@ -580,6 +580,14 @@ def e1_record(manifest_sha, role, arm):
             "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-03): E1, weed-box base v3 (pre-registered)"}
 
 
+def e1_claim(manifest, manifest_sha):
+    """inc2.base3.v3_claim: why a manifest belongs to a base v3 build (it lies
+    under splits/v3, or a base v3 summary records its sha256, whatever that
+    summary's status), or None. Such a manifest trains only as an E1 arm."""
+    from . import base3 as B3
+    return B3.v3_claim(manifest, manifest_sha)
+
+
 # ------------------------------------------------------------------- build
 def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None,
                      role=None, testing=False, extra=None, arch=None, imgsz=None):
@@ -616,6 +624,11 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
     drops = e1 = None
     if union:
         srcs = [Path(os.path.abspath(str(p))) for p in union]
+        for p in srcs:
+            claim = e1_claim(p, _sha(p))
+            if claim:
+                raise BaselineError("%s is a base v3 manifest (%s): it trains only as an E1 arm, never in a union"
+                                    % (p, claim))
         rows, guard, parts = check_union(srcs, production=production)
         name = sanitise("%s_union" % exp)
         dst = paths.manifests / ("%s.jsonl" % name)
@@ -633,6 +646,11 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
             raise BaselineError("%s changed while it was checked (the role was decided on other bytes)" % src)
         drops = variant_drops_record(sha, production=production) if role == "canary" else None
         e1 = e1_record(sha, role, arm_rec["id"])
+        claim = e1_claim(src, sha)
+        if claim and e1 is None:
+            raise BaselineError("%s is a base v3 manifest (%s): it trains only as an E1 arm (role baseline on one of "
+                                "the two manifests a complete splits/v3/summary.json records, recipe cold_budget); "
+                                "this build (role %s) is not one, and would train the cold table" % (src, claim, role))
         name = sanitise(src.stem)
         dst = paths.manifests / ("%s.jsonl" % name)
         dst.parent.mkdir(parents=True, exist_ok=True)

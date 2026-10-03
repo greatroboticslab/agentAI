@@ -1197,7 +1197,14 @@ class StreamRun(object):
         # E1 (2026-10-03): splits v3 (L23V) is done once its summary says complete, else what the platform ran;
         # E1's agnostic rescore (L23E) once its record says complete
         b3 = self._artifact("splits/v3/summary.json") or {}
-        base3 = "done" if b3.get("status") == "complete" else (r0.get("base3") or "missing")
+        if b3.get("status") == "complete":
+            base3 = "done"
+        elif b3.get("status"):
+            base3 = str(b3["status"])           # over_walltime (or any other): no E1 arm builds on it
+        elif r0.get("base3") == "done":
+            base3 = "unconfirmed"               # its job ended, but no complete summary.json was shipped
+        else:
+            base3 = r0.get("base3") or "missing"
         e1b = self._e1_exp("B")
         ag = (self._artifact("%s/agnostic_rescore.json" % e1b) or {}) if e1b else {}
         agnostic = "done" if ag.get("status") == "complete" else (r0.get("agnostic") or "missing")
