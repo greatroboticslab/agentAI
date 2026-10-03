@@ -10826,3 +10826,4 @@ Every result sat near test 0.85, against the 0.90 goal.
     - targets: Palmer amaranth, waterhemp, ragweed, prickly sida;
     - 11 others → 12;
     - barnyardgrass → unmapped 13, still a weed in E1.
+- **Class map: a raw name never makes a class wait after its code or taxon was answered (2026-10-03).** If an EPPO code, an EPPO prefix or a format's taxon already got an authority answer, including a non-informative one such as 'unresolvable', an unknown raw name no longer makes the class pending: the class takes that answer. Live, `ECHCG_week_<n>` held zenodo_15808623 after its names round. Test in `test_collect_classmap.py`.

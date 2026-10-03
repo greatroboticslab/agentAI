@@ -107,6 +107,20 @@ def test_map():
     hb = CM.build("zen_prefix_only", cls(["AMAPA_x"], hints={"AMAPA_x": ["CHEAL"]}), cfg, nm, tg)["classes"][0]
     check("  a hint the format carries outranks a code read off the name's first token",
           hb["basis"] == "hint" and hb["inc_id"] == cfg.other_id, hb)
+    # a code whose binomial the authority calls unresolvable: the raw name (never in a cache) does not make it wait
+    old = NM.Names.status
+    NM.Names.status = lambda self, q, alias=None: ({"status": "unresolvable", "via": None, "taxon": None,
+                                                    "target": None, "ambiguous": False}
+                                                   if q == "Chenopodium album" else (None if q == "CHEAL_raw_9"
+                                                                                     else old(self, q, alias)))
+    try:
+        fr = CM.build("zen_prefix_only", cls(["CHEAL_raw_9"]), cfg, nm, tg)
+    finally:
+        NM.Names.status = old
+    fc = fr["classes"][0]
+    check("  a code's binomial answered (unresolvable) and an unknown raw name: the class takes the answer "
+          "(unmapped), not pending", not fr["pending"] and fc["inc_id"] == cfg.unmapped_id
+          and fc["basis"] == "eppo_prefix", fc)
     check("  the EPPO table v2 holds the five SIU codes v1 lacked",
           [cfg.eppo_binomial(c) for c in ("ABUTH", "PANDI", "SETFA", "SETPU", "SORHA")]
           == ["Abutilon theophrasti", "Panicum dichotomiflorum", "Setaria faberi", "Setaria pumila",

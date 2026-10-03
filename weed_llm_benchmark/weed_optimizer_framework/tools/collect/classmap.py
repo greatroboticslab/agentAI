@@ -19,7 +19,8 @@ Each is judged by funnel.names.status_v2 through the offline resolver
 via "join"). The first informative answer decides (target, target_synonym,
 taxon_resolved, target_related, role); a name the caches lack before any
 informative answer makes the class pending (lever L26 resolves it, and intake
-refuses until then). The status becomes a class id through the config's
+refuses until then), except the raw name after a code or a taxon already had
+a non-informative answer: the class takes that answer. The status becomes a class id through the config's
 class_map.status_map: "target" -> the target's id (0..n-1), "other" -> the
 reject class id, "unmapped" -> class_space.unmapped_id (a class id that exists
 only in intake labels, never in a training label; its boxes are kept so that
@@ -134,6 +135,10 @@ def map_class(cl, cfg, names, targets, card=None):
         st = names.status(q, targets.alias_target(q))
         tried.append({"basis": basis, "query": q, "status": None if st is None else st["status"]})
         if st is None:
+            if fallback is not None and basis == "name":
+                # an authority already answered for the code or the format's taxon (non-informative, e.g.
+                # unresolvable): the raw name adds nothing, so the class takes that answer, never waits on it
+                break
             pending = q
             break
         if basis == "card" or st["status"] in INFORMATIVE:
