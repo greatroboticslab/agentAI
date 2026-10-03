@@ -131,6 +131,7 @@ from weed_optimizer_framework.tools.inc import driver as D  # noqa: E402
 from weed_optimizer_framework.tools.inc import select as SEL  # noqa: E402
 from weed_optimizer_framework.tools.inc import splits as S1  # noqa: E402
 from weed_optimizer_framework.tools.inc import verify as V  # noqa: E402
+from weed_optimizer_framework.tools.inc2 import base3 as B3  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import baseline as B2  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import recipes as RC  # noqa: E402
 from weed_optimizer_framework.tools.inc2 import common as C2  # noqa: E402
@@ -906,6 +907,8 @@ class PipelineWorld(W.World):
                             drive(ln.split()[-1])
                 elif mod == "splits":
                     rc = S2.main(rest + ["--testing", "--procs", "1"])
+                elif mod == "base3":
+                    rc = B3.main(rest + ["--testing"])
             elif script == "run_inc2_stream.sh":
                 extra = ["--testing"] if args and args[0] == "bootstrap" else []
                 rc = SS.main(args + extra + ["--procs", "1"])
@@ -1169,7 +1172,7 @@ def stage_measure_arms(w):
     stage("MAINT: the measurement arms (m832, s1024; y26l640, y26m640, l640), proposed by the platform once R0 is "
           "complete; the stream's arm stays the capacity decision's")
     exps = {b["exp"]: (b["arm"], RC.ARMS[b["arm"]]["imgsz"], RC.ARMS[b["arm"]].get("batch", RC.COMMON["batch"]))
-            for b in w.dom["baselines"]["items"] if b.get("measure")}
+            for b in w.dom["baselines"]["items"] if b.get("measure") and not b.get("requires")}
     check("the domain's measurement arms: m832 (832, batch 16), s1024 (1024, 32), y26l640, y26m640, l640 (640, 32)",
           list(exps.items()) == [("b_v2_m832", ("m832", 832, 16)), ("b_v2_s1024", ("s1024", 1024, 32)),
                                  ("b_v2_y26l640", ("y26l640", 640, 32)), ("b_v2_y26m640", ("y26m640", 640, 32)),
@@ -1205,7 +1208,7 @@ def stage_measure_arms(w):
 
 def stage_native_rescore(w):
     stage("MAINT: each done measurement arm's native-resolution rescore (L23N), once; its failure is a card")
-    exps = tuple(b["exp"] for b in w.dom["baselines"]["items"] if b.get("measure"))
+    exps = tuple(b["exp"] for b in w.dom["baselines"]["items"] if b.get("measure") and b.get("native") is not False)
 
     def ended():
         return sum(1 for n, _a, rc in w.jobs if n.startswith("inc_build_native_") and rc is not None) >= len(exps)
@@ -1231,7 +1234,37 @@ def stage_native_rescore(w):
           sorted(cards) == sorted("Native-resolution rescore of %s failed (L23N)" % x for x in exps)
           and w.config().get("enabled") is True and not held and len(pro) == len(exps)
           and all(((st.get("stage") or {}).get("r0") or {}).get("native_%s" % b["id"]) == "failed"
-                  for b in w.dom["baselines"]["items"] if b.get("measure")), (cards, held, len(pro)))
+                  for b in w.dom["baselines"]["items"] if b.get("measure") and b.get("native") is not False),
+          (cards, held, len(pro)))
+
+
+def stage_e1_base3(w):
+    stage("MAINT: E1 (2026-10-03): its first arm requires splits v3, so the platform proposes the base v3 build "
+          "(L23V) once; this world has no dataset registry, so the real inc2.base3 build refuses: a card, the "
+          "stream runs on, and no E1 arm is built")
+    e1 = [b for b in w.dom["baselines"]["items"] if b.get("requires") == "base3"]
+
+    def ended():
+        return any(n == "inc_build_base3_v3" and rc is not None for n, _a, rc in w.jobs)
+    ok = ended() or w.run_until(ended, max_ticks=30, note="base v3 build")
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L23V"]
+    runs = [(n, a, rc) for n, a, rc in w.jobs if n == "inc_build_base3_v3"]
+    check("the platform proposed the base v3 build once (L23V inc2.base3 build --stream %s), one run_inc2_build.sh "
+          "job under its own name, and the real build refused (exit 1: no dataset registry in this world)" % w.sid,
+          ok and len(pro) == 1 and (pro[0].get("argv") or [])[-3:] == ["build", "--stream", w.sid]
+          and len(runs) == 1 and runs[0][2] == 1 and not (INC / "splits" / "v3" / "summary.json").exists(),
+          ([(e.get("argv") or [])[-4:] for e in pro], runs))
+    w.run_until(lambda: False, max_ticks=3, note="settle")
+    st = w.state()
+    cards = [c["title"] for c in st.get("cards") or [] if "Base v3 build" in c.get("title", "")]
+    held = [e for e in w.events("lane_held") if "L23V" in str(e.get("hold"))]
+    check("its failure is one card, never a pause or a held lane; it stays failed (not proposed again) and neither "
+          "E1 arm is built",
+          cards == ["Base v3 build (splits v3, E1) failed (L23V)"] and w.config().get("enabled") is True and not held
+          and len([e for e in w.events("proposed") if e.get("lever") == "L23V"]) == 1
+          and ((st.get("stage") or {}).get("r0") or {}).get("base3") == "failed"
+          and not [e for e in w.events("proposed") if e.get("lever") == "L23B" and e.get("child_exp")
+                   in [b["exp"] for b in e1]], (cards, held, ((st.get("stage") or {}).get("r0") or {}).get("base3")))
 
 
 def d28_now(w):
@@ -1321,9 +1354,9 @@ def stage_milestone2_rollback(w):
     check("milestone 2 vs milestone 1 on dev: hurts (one-sided permutation p %s <= 0.025, lower mean), rollback "
           "recommended to P_1" % c.get("perm_p"), c.get("verdict") == "hurts" and c.get("rollback_recommended")
           and c.get("to_pool") == "P_1" and c.get("compared_with") == "%s_m001" % w.sid, c)
-    # the measurement arms' builds and rescores (L23B, L23N: record only, R0 long complete) may take the idle MAINT
-    # lane between them
-    maint = [lv for lv, ln in w.executed() if ln == "MAINT" and lv not in ("L23B", "L23N")]
+    # the measurement arms' builds and rescores (L23B, L23N; E1's L23V, L23E: record only, R0 long complete) may
+    # take the idle MAINT lane between them
+    maint = [lv for lv, ln in w.executed() if ln == "MAINT" and lv not in ("L23B", "L23N", "L23V", "L23E")]
     tail_ = maint[maint.index("L21") - 2:] if "L21" in maint else maint
     lcs = [e for e in w.events("proposed") if e.get("lever") == "LC"]
     check("the autopilot ran L20, LC, then L21 (D25), L27 (bisect) and LC (compare --exp on a bisect arm), and no "
@@ -1663,6 +1696,7 @@ def main_stages():
     stage_intake(w)
     stage_eval_hits(w)
     stage_native_rescore(w)
+    stage_e1_base3(w)
     stage_invariants(w)
     if os.environ.get("STREAM_PIPELINE_COMMANDS"):
         # the commands the platform ran, in order: sbatch argv (stream_remote.stream_submit) and login-node verbs

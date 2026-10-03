@@ -1564,7 +1564,9 @@ def s_r0():
     """The rollout (contract 10 R0, R0b, R2's prerequisites) driven by the
     platform itself, step by step, against the other groups' real argv
     grammars: baselines, the verdicts, Stage A, the stream's creation, the
-    arm, Stage C, then the first segment."""
+    arm, Stage C, the measurement arms and their rescores, E1 (2026-10-03:
+    base v3's build L23V, its two arms L23B --role baseline, their agnostic
+    rescore L23E), then the first segment."""
     w = World("r0")
     w.lock()
     w.step1_status()
@@ -1572,7 +1574,8 @@ def s_r0():
     inc = M.CLUSTER_INC_DIR
     tail = lambda pr, n: (pr or {}).get("argv", [])[-n:]  # noqa: E731
     got = []
-    measure = [b for b in w.dom["baselines"]["items"] if b.get("measure")]
+    measure = [b for b in w.dom["baselines"]["items"] if b.get("measure") and not b.get("requires")]
+    e1 = [b for b in w.dom["baselines"]["items"] if b.get("requires") == "base3"]
     for b in [x for x in w.dom["baselines"]["items"] if not x.get("measure")]:
         pr = _step(w, "L23B", lambda b=b: (w.experiment(b["exp"], final=[w.final_row("base", 0.81, 0.002, 3)]),
                                            w.job_done("inc_build_%s" % b["exp"])))
@@ -1640,6 +1643,29 @@ def s_r0():
     sub = [x for x in w.submits if "inc2.baseline" in x["argv"] and "b_v2_m832" in x["argv"]]
     req = SR.parse_submit("build", sub[0]["argv"][sub[0]["argv"].index("inc2.baseline"):]) if sub else {}
     check("  the cluster's grammar reads the measurement arm back", req.get("params", {}).get("arm") == "m832", req)
+    # 2026-10-03: E1. Its first arm is next and requires splits v3: the base v3 build (L23V) once, then the two arms
+    pv = _step(w, "L23V", lambda: (w.job_done("inc_build_base3_v3"), w.base3_summary()))
+    vex = [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23V"]
+    vsub = [x for x in w.submits if "inc2.base3" in x["argv"]]
+    vreq = SR.parse_submit("build", vsub[0]["argv"][vsub[0]["argv"].index("inc2.base3"):]) if vsub else {}
+    check("E1: the base v3 build next (L23V inc2.base3 build --stream SID), once, within the envelope, one "
+          "run_inc2_build.sh job under its own name, read back by the cluster's grammar",
+          tail(pv, 4) == [MOD + "inc2.base3", "build", "--stream", w.sid] and vex == ["envelope"]
+          and [x["name"] for x in vsub] == ["inc_build_base3_v3"] and vreq.get("params") == {"stream": w.sid},
+          (tail(pv, 4), vex, [x["name"] for x in vsub]))
+    egot = []
+    for b in e1:
+        egot.append(_step(w, "L23B", lambda b=b: (w.experiment(b["exp"], final=[w.final_row("base", 0.83, 0.002, 3)]),
+                                                  w.job_done("inc_build_%s" % b["exp"]))))
+    esub = [x for x in w.submits if "inc2.baseline" in x["argv"] and "e1_a_m640" in x["argv"]]
+    ereq = SR.parse_submit("build", esub[0]["argv"][esub[0]["argv"].index("inc2.baseline"):]) if esub else {}
+    check("  then E1-A and E1-B, each once, as L23B on splits v3 (--arm m640 --role baseline), within the envelope; "
+          "the cluster's grammar reads role baseline back",
+          [(x or {}).get("child_exp") for x in egot] == ["e1_a_m640", "e1_b_m640"]
+          and [tail(x, 8) for x in egot] == [["--manifest", "%s/%s" % (inc, b["manifest"]), "--seeds", "0,1,2",
+                                              "--arm", "m640", "--role", "baseline"] for b in e1]
+          and ereq.get("params", {}).get("role") == "baseline",
+          ([tail(x, 8) for x in egot], ereq.get("params")))
     # 2026-10-01: each done measurement arm is read at its own resolution, once (L23N), within the envelope
     ngot = []
     for b in measure:
@@ -1657,6 +1683,13 @@ def s_r0():
     nsub = [x["name"] for x in w.submits if "rescore-native" in x["argv"]]
     check("  each one GPU job of run_inc2_build.sh under its own name (never the arm's build job's)",
           nsub == ["inc_build_native_%s" % b["exp"] for b in measure], nsub)
+    pe = _step(w, "L23E", lambda: (w.job_done("inc_build_agnostic_e1_b_m640"), w.agnostic_record("e1_b_m640")))
+    check("E1's arms done: their agnostic rescore and E1's verdict, once (L23E rescore-agnostic --exp e1_b_m640 "
+          "--reference e1_a_m640), within the envelope; no L23N for them",
+          tail(pe, 5) == ["rescore-agnostic", "--exp", "e1_b_m640", "--reference", "e1_a_m640"]
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23E"] == ["envelope"]
+          and not [e for e in w.events("proposed") if e.get("lever") == "L23N"
+                   and (e.get("argv") or [])[-3] in ("e1_a_m640", "e1_b_m640")], tail(pe, 5))
     check("  and the stream's arm stays the capacity decision's: no new arm line, no LA, capacity_v1.json unchanged",
           [e for e in w.stream_ledger() if e.get("event") == "arm"] == arm0
           and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0
@@ -1673,7 +1706,7 @@ def s_r0():
     lv = [e.get("lever") for e in w.events("executed") if e.get("lane") == "MAINT"]
     check("the whole sequence ran by the platform, in order, one MAINT item at a time, each once",
           lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure)
-          + ["L23N"] * len(measure), lv)
+          + ["L23V"] + ["L23B"] * len(e1) + ["L23N"] * len(measure) + ["L23E"], lv)
 
 
 def _commits_ev(segments, ctx):

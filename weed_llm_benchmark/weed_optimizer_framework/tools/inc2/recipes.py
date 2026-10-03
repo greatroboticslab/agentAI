@@ -118,6 +118,27 @@ only BatchNorm's batch statistics differ. RAM cache (inc2.train.choose_cache,
 50 % margin (docs/CONTINUOUS_LOOP.md 5.6), so base_v2 needs about 15.5 GB at
 832 and 23.5 GB at 1024, both under 27 GB.
 
+The equal-compute recipe cold_budget (E1, docs/CONTINUOUS_LOOP.md,
+"Amendment (2026-10-03): E1, weed-box base v3 (pre-registered)"). E1
+compares a base of 6,811 images with one of about 30,000 at equal compute,
+so its recipe is the arm's cold recipe key for key except three keys, each a
+function of the base's size N:
+  epochs        = round_half_up(BUDGET_IMAGE_EPOCHS / N)       (1.2M image-epochs)
+  warmup_epochs = round(WARMUP_ITERATIONS / ceil(N / batch), 6)  (640 iterations,
+                  base_v2's 3 epochs x ceil(6,811 / 32); Ultralytics warms up for
+                  max(round(warmup_epochs x nb), 100) iterations, nb =
+                  ceil(N / batch), which gives exactly 640 for any N here)
+  close_mosaic  = max(1, round_half_up(0.1 x epochs))
+round_half_up(x) = floor(x + 0.5), so a half never rounds to the even
+neighbour. cold_budget(arm, n) writes it; deviations() and match() accept it
+for kind 'base' only, and only when the caller names it (recipe_name
+'cold_budget' with the base's n_images): inc2.baseline sets that for the two
+E1 manifests splits/v3/summary.json records, and inc2.train recomputes it
+from exp.json. Every other run, a union or an incremental one included, is
+compared with the table above as before. budget_cost prices it: seeds x
+BUDGET_IMAGE_EPOCHS x BUDGET_MS_PER_IMAGE_EPOCH (m640's measured 14.2 ms) plus
+the finals, independent of N.
+
 Cost (estimates, V100, 1 SU per GPU-hour). The measured rates are YOLO11n at
 640 px (docs/CONTINUOUS_LOOP.md §5.6): cold 6.0-7.0 ms per image-epoch
 (realloop_v1 base 1.974 h / 3 / 3,927 / 100 = 6.0; b0_v1 base 1.768 h / 3 /
@@ -213,6 +234,18 @@ RATE_BASIS = {
 V2_FINAL_EXAM_IMAGES = {"dev": 617, "imageweeds": 3208, "test": 1977}     # splits v1 summary.json (v2 byte copies)
 TRUTH_STEP_CAP_GPU_H = 25.0   # L-4: a step with truth above this runs truth every ceil(cost/25)-th step
 
+# ------------------------------------------------- E1's equal-compute recipe
+BUDGET_NAME = "cold_budget"
+BUDGET_KINDS = ("base",)                  # only a baseline's base runs train it
+BUDGET_IMAGE_EPOCHS = 1200000             # E1: every arm trains 1.2M image-epochs
+WARMUP_ITERATIONS = 640                   # base_v2's 3 warmup epochs x ceil(6,811 / 32) = 639 -> 640
+CLOSE_MOSAIC_SHARE = 0.1
+BUDGET_ARMS = ("m640",)                   # E1 is pre-registered on YOLO11m at 640 only
+BUDGET_MS_PER_IMAGE_EPOCH = 14.2          # m640 measured: 2.68 GPU-h per base run / (6,811 x 100), est.
+BUDGET_BASIS = ("E1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-03): epochs = round_half_up(1.2e6 / N), "
+                "warmup_epochs = round(640 / ceil(N / batch), 6), close_mosaic = max(1, round_half_up(0.1 x epochs)); "
+                "every other key the arm's cold recipe")
+
 
 class RecipeError(ValueError):
     """A recipe, arm or cost request outside Protocol v3."""
@@ -284,6 +317,73 @@ def table(arm=DEFAULT_ARM):
     return out
 
 
+def round_half_up(x):
+    """floor(x + 0.5): a half rounds up, never to the even neighbour (Python's round)."""
+    return int(math.floor(float(x) + 0.5))
+
+
+def _budget_n(n_images):
+    if isinstance(n_images, bool) or not isinstance(n_images, int) or n_images < 1:
+        raise RecipeError("cold_budget needs the base's image count, a positive int, got %r" % (n_images,))
+    return n_images
+
+
+def budget_epochs(n_images, budget=BUDGET_IMAGE_EPOCHS):
+    """round_half_up(budget / N), at least 1."""
+    return max(1, round_half_up(float(budget) / _budget_n(n_images)))
+
+
+def budget_warmup_epochs(n_images, batch, iterations=WARMUP_ITERATIONS):
+    """round(iterations / ceil(N / batch), 6): Ultralytics then warms up for
+    exactly `iterations` (max(round(warmup_epochs x nb), 100), nb = ceil(N / batch))."""
+    nb = int(math.ceil(_budget_n(n_images) / float(batch)))
+    return round(float(iterations) / nb, 6)
+
+
+def budget_close_mosaic(epochs):
+    return max(1, round_half_up(CLOSE_MOSAIC_SHARE * int(epochs)))
+
+
+def cold_budget(arm, n_images):
+    """E1's equal-compute recipe (module docstring) for a base of n_images,
+    in exp.json's form (no seed): the arm's cold recipe with epochs,
+    warmup_epochs and close_mosaic set from the budget. Only the
+    pre-registered arms (BUDGET_ARMS) have one."""
+    aid = arm_id(arm)
+    if aid not in BUDGET_ARMS:
+        raise RecipeError("cold_budget is pre-registered for %s only, not %s" % (list(BUDGET_ARMS), aid))
+    r = cold(aid)
+    ep = budget_epochs(n_images)
+    r.update(epochs=ep, warmup_epochs=budget_warmup_epochs(n_images, r["batch"]),
+             close_mosaic=budget_close_mosaic(ep))
+    return r
+
+
+def budget_record(arm, n_images):
+    """What exp.json records of the budget (inc2.train recomputes the recipe
+    from n_images and checks these constants)."""
+    r = cold_budget(arm, n_images)
+    nb = int(math.ceil(n_images / float(r["batch"])))
+    return {"recipe_name": BUDGET_NAME, "image_epochs": BUDGET_IMAGE_EPOCHS, "warmup_iterations": WARMUP_ITERATIONS,
+            "close_mosaic_share": CLOSE_MOSAIC_SHARE, "n_images": int(n_images), "epochs": r["epochs"],
+            "warmup_epochs": r["warmup_epochs"], "close_mosaic": r["close_mosaic"], "iterations_per_epoch": nb,
+            "warmup_iterations_effective": max(int(round(r["warmup_epochs"] * nb)), 100),
+            "image_epochs_effective": int(n_images) * r["epochs"], "basis": BUDGET_BASIS}
+
+
+def check_budget_record(rec, arm, n_images):
+    """[] when exp.json's budget record is the one budget_record writes for
+    this arm and base, else how it differs."""
+    if not isinstance(rec, dict):
+        return ["exp.json records no budget"]
+    try:
+        want = budget_record(arm, n_images)
+    except RecipeError as e:
+        return [str(e)]
+    return ["budget.%s %r (pre-registered %r)" % (k, rec.get(k), want[k]) for k in sorted(want)
+            if k != "basis" and rec.get(k) != want[k]]
+
+
 def _diff(recipe, want):
     out = []
     for k in sorted(set(want) | set(recipe)):
@@ -299,11 +399,31 @@ def _diff(recipe, want):
     return out
 
 
-def match(kind, recipe, arm=DEFAULT_ARM):
+def _budget_wanted(kind, recipe_name, n_images, arm):
+    """The cold_budget recipe a run is compared with, or None when the caller
+    does not name it. Named for another kind than 'base' (a union, an
+    incremental run) it raises: only a baseline's base runs train it."""
+    if recipe_name in (None, COLD_NAME):
+        return None
+    if recipe_name != BUDGET_NAME:
+        raise RecipeError("recipe name %r is not %s or %s" % (recipe_name, COLD_NAME, BUDGET_NAME))
+    if kind not in BUDGET_KINDS:
+        raise RecipeError("%s is a %s recipe; a %s run trains the table" % (BUDGET_NAME, list(BUDGET_KINDS), kind))
+    return cold_budget(arm, n_images)
+
+
+def match(kind, recipe, arm=DEFAULT_ARM, recipe_name=None, n_images=None):
     """The table name recipe equals for a run of this kind ('cold', 'r0',
-    'x1a' or 'x1b'), or None."""
+    'x1a' or 'x1b'; 'cold_budget' when the caller names it for a base run
+    of n_images), or None."""
     if not isinstance(recipe, dict):
         return None
+    try:
+        want = _budget_wanted(kind, recipe_name, n_images, arm)
+    except RecipeError:
+        return None
+    if want is not None:
+        return BUDGET_NAME if not _diff(recipe, want) else None
     if kind in COLD_KINDS:
         return COLD_NAME if not _diff(recipe, cold(arm)) else None
     if kind in INC_KINDS:
@@ -313,12 +433,14 @@ def match(kind, recipe, arm=DEFAULT_ARM):
     return None
 
 
-def deviations(kind, recipe, arm=DEFAULT_ARM):
+def deviations(kind, recipe, arm=DEFAULT_ARM, recipe_name=None, n_images=None):
     """How recipe departs from Protocol v3 for a run of kind (base / union:
     the arm's cold recipe; cand / null: one of r0, x1a, x1b at the arm's
     imgsz); [] when it does not. For an incremental run the departures are
     listed against the nearest table recipe (fewest differing keys, then the
-    table's order), named in the first entry."""
+    table's order), named in the first entry. recipe_name 'cold_budget'
+    (with the base's n_images) compares a base run with cold_budget(arm,
+    n_images) instead; named for any other kind it is itself a departure."""
     if kind not in TRAIN_KINDS:
         raise RecipeError("kind %r trains nothing; only %s have a recipe" % (kind, list(TRAIN_KINDS)))
     if not isinstance(recipe, dict):
@@ -327,6 +449,12 @@ def deviations(kind, recipe, arm=DEFAULT_ARM):
     t = recipe.get("trainer")
     if t in EXCLUDED_TRAINERS:
         extra.append("trainer %r is out of stream version 1 (%s)" % (t, EXCLUDED_TRAINERS[t]))
+    try:
+        want = _budget_wanted(kind, recipe_name, n_images, arm)
+    except RecipeError as e:
+        return extra + [str(e)]
+    if want is not None:
+        return extra + _diff(recipe, want)
     if kind in COLD_KINDS:
         return extra + _diff(recipe, cold(arm))
     best = None
@@ -471,6 +599,35 @@ def baseline_cost(n_images, seeds, final_exams, arm=DEFAULT_ARM, exam_images=Non
             "basis": rate["basis"],
             "note": "est.: rates measured for YOLO11n at 640 on V100, bracketed for this arm (low: pixel ratio, "
                     "high: FLOPs ratio); a measured rate of this arm replaces them"}
+
+
+def budget_cost(n_images, seeds, final_exams, arm="m640", exam_images=None, walltime_h=8.0):
+    """baseline_cost for a cold_budget baseline: every base run trains
+    BUDGET_IMAGE_EPOCHS image-epochs at BUDGET_MS_PER_IMAGE_EPOCH (m640's
+    measured rate, est.), whatever N; the dev score and the finals are
+    priced as baseline_cost prices them."""
+    exam_images = dict(V2_FINAL_EXAM_IMAGES, **(exam_images or {}))
+    rate = rates(arm)
+    rec = cold_budget(arm, n_images)
+    n_seeds = len(list(seeds))
+    tr = _hours(BUDGET_MS_PER_IMAGE_EPOCH, BUDGET_IMAGE_EPOCHS)
+    dev = score_hours(exam_images["dev"], rate=rate)
+    per_run = (tr + dev[0], tr + dev[1])
+    fin = score_hours(sum(exam_images[e] for e in final_exams), rate=rate)
+    total = (n_seeds * (per_run[0] + fin[0]), n_seeds * (per_run[1] + fin[1]))
+    return {"estimate": True, "arm": arm_id(arm), "n_images": int(n_images), "seeds": n_seeds,
+            "recipe_name": BUDGET_NAME, "epochs": rec["epochs"], "imgsz": rec["imgsz"],
+            "image_epochs": BUDGET_IMAGE_EPOCHS, "ms_per_image_epoch": BUDGET_MS_PER_IMAGE_EPOCH,
+            "per_run_gpu_h": [round(per_run[0], 3), round(per_run[1], 3)],
+            "final_run_gpu_h": [round(fin[0], 3), round(fin[1], 3)],
+            "total_gpu_h": [round(total[0], 2), round(total[1], 2)],
+            "walltime": {"limit_h": walltime_h, "d26_line_h": round(0.8 * walltime_h, 2),
+                         "longest_run_h": [round(per_run[0], 2), round(per_run[1], 2)],
+                         "over_d26_line": [per_run[0] >= 0.8 * walltime_h, per_run[1] >= 0.8 * walltime_h]},
+            "basis": BUDGET_BASIS,
+            "note": "est.: m640's measured rate (2.68 GPU-h per 100-epoch run on 6,811 images, cache ram) times the "
+                    "budget; a loader-bound base (no RAM cache) is slower, which is why splits v3 holds images "
+                    "pre-resized to 640 px"}
 
 
 def step_cost(n_pool, m, arm=DEFAULT_ARM, recipe="r0", seeds=3, truth=True, cold_ms=None, inc_ms=None):

@@ -1646,7 +1646,7 @@ def test_build_script():
     # loads semisup_labeler lazily), computed from the real modules, not restated
     code = ("import importlib, sys\n"
             "for m in ('splits', 'baseline', 'pilot4', 'stream', 'stream_report', 'step1_stream', 'guard', 'gate3',"
-            " 'recipes'):\n"
+            " 'recipes', 'base3', 'scorer_agnostic', 'mask', 'eval_hits', 'train'):\n"
             "    importlib.import_module('weed_optimizer_framework.tools.inc2.' + m)\n"
             "for m in ('funnel.embed', 'funnel.leak', 'funnel.estimate', 'semisup_labeler'):\n"
             "    importlib.import_module('weed_optimizer_framework.tools.' + m)\n"
@@ -1661,6 +1661,7 @@ def test_build_script():
         pkg_dir = PKG_ROOT / "weed_optimizer_framework" / "tools" / "/".join(rel)
         need.add("tools/%s/__init__.py" % "/".join(rel) if pkg_dir.is_dir() else "tools/%s.py" % "/".join(rel))
     need.add("tools/funnel/domains/weed.json")        # the domain config the splits build and the scan read
+    need.update(("tools/inc2/base3_v1.json", "tools/inc_autopilot/stream_thresholds.json"))   # inc2.base3 reads both
     check("the drift check hashes every module the builders import (including the copy scan's funnel.embed, leak, "
           "estimate, domain, ledger, semisup_labeler) and the funnel domain config",
           pr.returncode == 0 and need and not (need - listed), (pr.stderr[-300:], sorted(need - listed)))
@@ -1680,6 +1681,7 @@ def test_build_script():
     conda.write_text("conda() { return 0; }\n")
     stub_mod = ("import json, os, sys\na = sys.argv[1:]\nprint('[stub %(m)s] ' + ' '.join(a), flush=True)\n"
                 "print('INC_JOB_SCRIPT=' + os.environ.get('INC_JOB_SCRIPT', ''), flush=True)\n"
+                "print('HF_HUB_OFFLINE=' + os.environ.get('HF_HUB_OFFLINE', ''), flush=True)\n"
                 "if 'refuse' in ' '.join(a):\n    print('[inc2.%(m)s] ERROR: refused for the test', file=sys.stderr)\n"
                 "    sys.exit(1)\n"
                 "if '%(m)s' == 'stream' and a[0] == 'build':\n    print('[inc2.stream] built experiment wsv_s001')\n")
@@ -1692,7 +1694,7 @@ def test_build_script():
             p = root / m
             p.parent.mkdir(parents=True, exist_ok=True)
             base = os.path.basename(m)[:-3]
-            if m.startswith("tools/inc2/") and base in ("stream", "splits", "baseline", "pilot4"):
+            if m.startswith("tools/inc2/") and base in ("stream", "splits", "baseline", "pilot4", "base3"):
                 p.write_text(stub_mod % {"m": base})
             elif m == "tools/inc/driver.py":
                 p.write_text(stub_driver)
@@ -1736,6 +1738,23 @@ def test_build_script():
     check("  a rescore-native refusal: exit 1, recorded build_failed with its ERROR line, no advance",
           p.returncode == 1 and a.get("status") == "build_failed" and "ERROR" in str(a.get("refusal"))
           and "[stub driver]" not in p.stdout, (p.returncode, a))
+    p = run(["inc2.baseline", "rescore-agnostic", "--exp", "e1_b_m640", "--reference", "e1_a_m640"])
+    a = ((prov("agnostic_e1_b_m640") or {}).get("attempts") or [{}])[-1]
+    check("inc2.baseline rescore-agnostic (L23E, 2026-10-03): run, recorded as scored under agnostic_<exp>, no "
+          "advance (it builds nothing)",
+          p.returncode == 0 and "[stub baseline] rescore-agnostic --exp e1_b_m640 --reference e1_a_m640" in p.stdout
+          and "[stub driver]" not in p.stdout and a.get("status") == "scored" and prov("e1_b_m640") is None,
+          (p.returncode, p.stdout[-400:], a))
+    p = run(["inc2.base3", "build", "--stream", "wsv"])
+    a = ((prov("base3_v3") or {}).get("attempts") or [{}])[-1]
+    check("inc2.base3 build (L23V, 2026-10-03): run under the provenance and lock base3_v3 with HF_HUB_OFFLINE=1, "
+          "recorded built_splits, no advance (it builds no experiment)",
+          p.returncode == 0 and "[stub base3] build --stream wsv" in p.stdout and "[stub driver]" not in p.stdout
+          and a.get("status") == "built_splits" and "HF_HUB_OFFLINE=1" in p.stdout, (p.returncode, p.stdout[-500:],
+                                                                                    p.stderr[-300:], a))
+    p = run(["inc2.base3", "build"])
+    check("  inc2.base3 build without --stream: usage error, nothing run", p.returncode == 2 and "[stub" not in p.stdout,
+          (p.returncode, p.stderr[-300:]))
     p = run(["inc2.stream", "commit", "--exp", "wsv_s001"])
     check("inc2.stream commit is not a build verb: usage error, nothing run",
           p.returncode == 2 and "usage:" in p.stderr and "[stub" not in p.stdout, (p.returncode, p.stderr[-300:]))

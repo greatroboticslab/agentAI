@@ -172,7 +172,12 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # is not on the list), and D28-v2's intake sidecars, intake/<batch>/eval_hits.json,
 # which weigh again the dHash hits of an intake batch committed before the
 # amendment and which the snapshot ships for D28 (pair cosines and hit keys,
-# no evaluation key, no pixels). A Step 1 sidecar,
+# no evaluation key, no pixels), and E1's records (2026-10-03): splits v3's
+# summary.json (inc2.base3: the two arms' manifests by sha256 and per-source
+# counts; its held-out set is named holdout_v1, never after a split),
+# <exp>/agnostic_rescore.json (inc2.baseline rescore-agnostic: the dev files'
+# names and sha256s) and capacity/e1_v1.json (E1's verdict, dev only;
+# e1_v1_report.* is for people and not on the list). A Step 1 sidecar,
 # step1_stream/eval_hits/<batch>.json, is not on the list: status.json carries
 # its fold, and the sidecar names each hit's matched evaluation key. A stream
 # ledger has no experiment: it is kept as a JSON list artifact, not under
@@ -189,8 +194,10 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"intake/(?P<batch>%s)/(?:summary|eval_hits)\.json\Z" % BATCH_RE,
     r"intake/(?P<file>sources|placement)\.json\Z",
     r"splits/(?P<ver>v[0-9]{1,3})/lock_status\.json\Z",
-    r"capacity/(?:capacity|native)_v1\.json\Z",
-    r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore)\.json\Z" % ("|".join(RESERVED_DIRS), EXP_RE),
+    r"capacity/(?:capacity|native|e1)_v1\.json\Z",
+    r"splits/v3/summary\.json\Z",
+    r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore|agnostic_rescore)\.json\Z"
+    % ("|".join(RESERVED_DIRS), EXP_RE),
 ))
 # the path of any score file but the decision exam's (scores/<exam>.json, driver.Paths.score)
 _NON_DEV_SCORE = re.compile(r"(^|/)scores/(?!%s\.json\Z)[^/]+\.json\Z" % re.escape(DECISION_EXAM))

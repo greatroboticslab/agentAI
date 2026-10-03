@@ -2237,7 +2237,8 @@
             "b_v2",
             "capacity",
             "canary",
-            "union"
+            "union",
+            "baseline"
           ]
         },
         "est_gpu_hours": {
@@ -2259,7 +2260,7 @@
         "round-scheduler",
         "human"
       ],
-      "description": "Lever L23's baselines (R3, envelope-eligible): B_v2 (milestone 0, 5 cold seeds), the canary, the capacity arms of L-4 (--arm s640 | m640), the measurement arms (--arm m832 | s1024 | l640 | y26m640 | y26l640, role capacity, record only) and B0 u tsw (--union), each a cold baseline under the v2 guard; the role is inc2.baseline's and must match what is built."
+      "description": "Lever L23's baselines (R3, envelope-eligible): B_v2 (milestone 0, 5 cold seeds), the canary, the capacity arms of L-4 (--arm s640 | m640), the measurement arms (--arm m832 | s1024 | l640 | y26m640 | y26l640, role capacity, record only) and B0 u tsw (--union), each a cold baseline under the v2 guard; and E1's two arms (2026-10-03: --arm m640 --role baseline on splits v3's base_v2_weed.jsonl and base_v3_weed.jsonl, the equal-compute recipe cold_budget, record only); the role is inc2.baseline's and must match what is built."
     },
     "inc_rescore_native": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.baseline rescore-native --exp {exp} --reference {reference}",
@@ -2299,6 +2300,80 @@
         "human"
       ],
       "description": "Lever L23N (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, group B, amendment 2026-10-01): inc2.baseline rescore-native scores a done measurement arm's final runs with inc2.scorer_native at the arm's training imgsz on dev and ImageWeeds (never test; scores/<exam>@<imgsz>.json, never a protocol score) and the reference arm's finals on dev at 640, then records the pre-registered native verdict (capacity/native_v1.json, dev only). Record only: nothing switches."
+    },
+    "inc_build_base3": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.base3 build --stream {stream}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "stream": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 8.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared build job (run_inc2_build.sh, one V100, up to its 4 h walltime) that writes splits v3 and trains nothing: est_gpu_hours is levers_stream.price's 'zero_job' estimate (the build job's walltime), charged to the campaign envelope and settled from sacct when the job ends."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23V (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-03: E1, weed-box base v3, pre-registered): inc2.base3 build writes INC_DIR/splits/v3 (E1's two manifests, every admitted weed box as class 12, the main-test holdout v1 lists, provenance and summary.json) under the stream's source quarantines; it builds no experiment. Record only: a failure is a card, never a failed step."
+    },
+    "inc_rescore_agnostic": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.baseline rescore-agnostic --exp {exp} --reference {reference}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "exp": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "reference": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 20.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that scores, never trains: one dev pass per final run of E1's two arms for their class-agnostic per-image arrays. est_gpu_hours is levers_stream.price's 'rescore' estimate (stream-domain cost rescore_hours_per_run per run, est.), charged to the campaign envelope and settled from sacct when the job ends."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23E (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-03: E1, pre-registered): inc2.baseline rescore-agnostic scores E1's final runs on dev for their class-agnostic per-image arrays (inc2.scorer_agnostic, the locked scorer as a library; never test, never a protocol score) and records E1's pre-registered verdict (capacity/e1_v1.json, dev only). Record only: nothing switches."
     },
     "inc_build_pilot4": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.pilot4 build --exp {exp} --from {from_exp} --recipes {recipes}",

@@ -2732,3 +2732,127 @@ What follows from the numbers: with p_c = 6.29e-4, one confirmed hit gives P ≥
 **Open items.**
 - A calibration of the confirmed-hit rate, to replace `p_confirmed`'s bound. It is a person's decision, recorded in `stream_thresholds.json`.
 - The 12 sources quarantined before this amendment: re-judged by the sidecars once `eval-hits` has run (choice 3); a person lifts the quarantine of each source D28 then names as cleared.
+
+## Amendment (2026-10-03): E1, weed-box base v3 (pre-registered)
+
+Written before base v3 was built and before any E1 run; not edited afterwards. Decided by the owner's delegate under the 2026-09-30 grant (`human:harry567566@gmail.com`).
+
+**Why.** The best sealed cwd12 test score is 0.8786 ± 0.0018 (YOLO11m at 640 on base_v2's 6,811 images); the gap to 0.90 is 0.021. Class-agnostic the same models score 0.8901 on test, so the boxes cap the score: a perfect species call on them would still miss 0.90. Five larger or newer detectors (m832, s1024, y26l640, y26m640, l640) gave no agnostic gain. Data has only ever been added in hundreds of images (s001: 682). E1 asks one question: does a much larger, cleaned, leak-checked weed-box training set place better boxes?
+
+**Design (lean: no custom loss).** Every weed box of every admitted source is labelled class 12 (OtherPlant) in the existing 13-class INC space. The models are one-class weed detectors that every inc2 check, the pinned driver and the locked scorer accept, and their class-agnostic dev mAP50-95 compares directly with b_v2_m640's (agnostic dev 0.8695, test 0.8901). Crops are background: crop and non-plant boxes are dropped, and an image without a weed box is not admitted. Species come later.
+
+### Pre-registration
+
+**Arms.** YOLO11m at 640 (m640's COCO checkpoint), 3 seeds each, equal compute:
+- **E1-A** (`e1_a_m640`): base_v2's 6,811 images, every box → 12 (`splits/v3/base_v2_weed.jsonl`).
+- **E1-B** (`e1_b_m640`): E1-A plus every admitted external weed source (`splits/v3/base_v3_weed.jsonl`). E1-A's rows are byte-identical inside E1-B.
+
+**Recipe `cold_budget`** (`inc2.recipes.cold_budget`): m640's cold recipe key for key except
+- epochs = round_half_up(1.2e6 / N) (E1-A 176; E1-B about 40 at 30,000);
+- warmup_epochs = round(640 / ceil(N / 32), 6), so Ultralytics warms up for exactly 640 iterations (base_v2's 3 epochs x 213 batches) at any N;
+- close_mosaic = max(1, round_half_up(0.1 x epochs)).
+
+round_half_up(x) = floor(x + 0.5). At m640's measured 14.2 ms per image-epoch a base run trains for about 4.7 GPU-h, under the pinned 8 h cold limit and D26's 6.4 h line.
+
+**Decision (dev only, record only; never the stream's arm).** D = mean agnostic dev mAP50-95 (E1-B) − mean (E1-A) over the seeds both share. E1-B qualifies when D > 2 × pooled sd (√((sd_B² + sd_A²)/2)) **and** D > SE(D). SE(D) is a paired image bootstrap: 1,000 resamples of the dev images under `stable_int("inc2/e1/agnostic_se")`, one draw for every run; per run and resample the locked scorer's class-collapsed AP50-95 (`inc.scorer.collapsed_ap`) on the run's tie-broken per-image arrays; the mean over seeds per arm; B minus A. Qualifying switches nothing: the stream's arm stays the capacity decision's.
+
+**Finals and the test read (an exception to P10, declared here).** Each arm's finals are dev and ImageWeeds (agnostic), never test. The sealed test is read once per arm, only after `capacity/e1_v1.json` holds a decided verdict. That read is a milestone read for P10: `inc2.baseline e1-test-read` writes one kind-final spec per seed on exam test and the `run_inc2_job.sh` argv, a person submits it, and the scores stay off the platform's evidence. It refuses when the verdict is missing, pending or changed, or a test score of the arm exists.
+
+**Base v3 (`inc2/base3.py`, config `inc2/base3_v1.json`, both pinned by sha256 in summary.json).**
+- *Sources.* An allow-list; any registry slug not listed is not read.
+  - Included: the 16 dock slugs ("0 ridderzuring" / "grass weeds", *Rumex obtusifolius*; one family, its Roboflow export stems shared across the family); MH-Weed16 (all 15 ids weeds); gh_tehreemnoor; rf_school '0'; rf_zbm50; rf_tuf (empty label files are not admitted); rf_kinjj (polygons → boxes); rf_itmo (lawn forbs; *Poa*, litter, bare patch and dry grass dropped); the weed boxes of rf_cotton-weed-detect (a dock slug), rf_srec crop-and-weed fqrtg and rf_weed-tnf9e; the intake sources CottonWeedDet3 and MFWD (POROL and Weed), read only through their intake manifests (INC ids 0–13 all → 12), never through their registry paths.
+  - Excluded (named in the config with the reason): the test groups (NDSU: ImageWeeds, weed_crop_detection, imageweeds_aerial, greenhouse; Latvia + francesco_weed_crop_aerial + peradeniya + vitif246x + test-8qezo + project-5nvic + kg_vinayakshanawad; sesame: ravirajsinh45, leopard, poxtn, zbfhf; maize; PAGS8), the OOD-dev groups (paddy rf_main-otq0a, chilli rf_1111-gzfxi), cwd12 and 3SeasonWeedDet10 copies (cottonweed_sp8, cottonweed_holdout, agrobot sd89f, three_season, cwp10, vanpe), crop-only (rf_robtica), synthetic or broken (cowpea, cotton_weed_detection), unresolved class names (bishwarup, test-gzc3r, gh_07931350), non-plant and disease sets.
+  - The stream's source quarantines are an input (`--stream SID`: `inc2.stream`'s ledger fold, its head recorded); a quarantined source is not admitted until a person lifts it.
+  - An intake row with holds is admitted only when Step 1's queue (`inc2.stream.QueueView`) holds it with no hold left.
+- *Box side* (one definition for every rule): √(w × h) in pixels after the image's long side is scaled to 640 (COCO's area convention). Chosen over the shorter side because the thresholds are object sizes and a thin, long plant part is not a small object. This choice decides MFWD's admission (21.8 % of its boxes under 16 px by √(w·h), 27.0 % by the shorter side); the spec check measured both before this text was written.
+- *Source rule*, over the source's weed boxes as delivered: median side ≥ 32 px; ≤ 25 % of boxes under 16 px; ≤ 10 % of boxes covering > 80 % of their image; median weed boxes per image ≤ 25. A failing source is excluded whole.
+- *Box and image rules*: a weed box under 8 px is removed and its rectangle filled with the image's mean colour (`inc2.mask.masked_array`; kept boxes' pixels are never filled); a polygon becomes its bounding box; an image is dropped if a weed box covers > 90 % of it, its shorter side is < 320 px, the masked area is > 50 %, or no weed box remains. base_v2's rows are exempt from every rule (arm A is base_v2 whole; its 66 NDSU rows stay in both arms, so ImageWeeds is same-lab for both).
+- *Dedupe* (never at 4–6 bits): the same original bytes (sha256); a dHash within 3 bits under one of the 8 flips and rotations **and** ≥ 80 % of the larger box set matched one-to-one at IoU ≥ 0.8 after that transform; or an identical label layout (rounded to 0.01, ≥ 3 boxes). One row is kept per copy group: base_v2 rows always (an external copy of one is dropped), else the lowest provider tier (intake and MH-Weed16 1; rf_unitec, the dock release with the original names, and gh_tehreemnoor 2; others 3), then the most pixels, then the slug.
+- *Leak guard* (on the exact files written): GuardV2 and the index cross-check (`inc2.train.guard_verdicts`), the L-5 and L-8 lists on the original bytes, the calibrated embedding copy detector (`GuardV2.check_embed`, LOCK v2's calibration) on every external row, and D28-v2 per source (each dHash hit's pair cosine through `inc2.eval_hits`; the embedding binomial rule; the 20 % base-copy share; thresholds read from `stream_thresholds.json`). A refused row is dropped; a new row that copies a base_v2 image (`base_copy`) is dropped; a source that leaks is excluded whole. A base_v2 row the guard refuses for a never-train reason leaves both arms (none is expected; base_v2 rows are never dropped as base copies). base_v2 is not re-scanned by the embedding detector: LOCK v2 scanned it.
+- *Main-test holdout v1.* Capture groups join images within 6 dHash bits under the 8 variants (both directions), their copy edges, the same Roboflow export stem (across the dock family), the intake capture group and DeepWeeds' capture time in gh_tehreemnoor's file names. From each included external source, whole groups are held out in an order seeded by `stable_int("inc2/base3/test_v1/<source>")` until ~15 % of its kept rows (min 30, max 400 images); a group touching base_v2, or any row of the stream's pools (P_1 holds 682 CottonWeedDet3 images of inc0001), or larger than 400 images, is never held out: test v1 must not hold an image a current model trained on. Held-out rows never train and are listed in `splits/v3/test_v1/<source>.jsonl` (original and written file, dHash and variants) for a later never-train index v3.
+- *Dock cap*: after the holdout, D ≤ floor(0.35 / 0.65 × non-dock images), enforced by dropping whole capture groups in an order seeded by `stable_int("inc2/base3/test_v1/cap/dock")`.
+- *Materialisation.* An image whose long side exceeds 640, or that has a masked box, is written as a lossless PNG of exactly the pixels Ultralytics trains on: its own `BaseDataset.load_image` (imread, long side → 640 with INTER_LINEAR) on the original, then the mask; every PNG is read back through `load_image` and must be equal. Ultralytics' RAM cache holds those pixels, so a cached run of the original and a run of the PNG train on the same arrays, and a 30K-image base needs no 12 MP decode per sample. The original's path and sha256 are kept in `provenance_v1.jsonl`.
+- *Walltime guard.* The build measures arm B's loader through Ultralytics' own training dataset and DataLoader (default augmentation, no cache, 5 workers, a seeded 3,200-row sample). A base run is projected at max(loader rate, m640's measured 12.65 ms) × 1.2e6 + 0.27 h of fixed overhead; over 0.8 × 8 h the build writes `summary.json` with status `over_walltime`, which no E1 arm builds on, and ends with a refusal. This replaces a manual 1-epoch smoke: the GPU rate is measured, the loader was the open risk.
+
+**Pricing.** An E1 arm is priced from its budget, whatever N: seeds × 1.2e6 × 14.2 ms / 3.6e6 + the finals + the build job = 19.0 GPU-h each (the 100-epoch basis would price E1-A at 16.7, too low, and E1-B at 57.3). L23V is one build job (4.0 GPU-h, its walltime); L23E six scoring passes (1.5 GPU-h).
+
+### What changed
+
+- `inc2/recipes.py`: `cold_budget`, `budget_record`, `check_budget_record`, `budget_cost`; `deviations` and `match` accept `cold_budget` for kind base only, when the caller names it with the base's N.
+- `inc2/train.py`: `experiment_budget` reads exp.json's `recipe_name`, `base.n_images` and `budget` (the pre-registered constants, checked); a production base run of a baseline that names `cold_budget` is compared with `cold_budget(arm, n_images)`; a union, an incremental run or a chain naming it is refused. `guard_verdicts` (per-row verdicts) is factored out of `guard_rows`, which refuses exactly as before.
+- `inc2/base3.py` (new) and `inc2/base3_v1.json` (new): the builder (`build`, a GPU job) and its read-only rehearsal (`count`, the login node, stored hashes, the guard on the originals' hashes, the embedding check and pair cosines pending).
+- `inc2/scorer_agnostic.py` (new): the locked scorer as a library with a validator subclass that keeps each image's class-collapsed matches; `scores/dev.agnostic.{json,npz}` per final run, written once; the pass must match the recorded protocol score's stamps and its agnostic AP within 0.002, the captured arrays (capture order) must reproduce the pass's agnostic AP exactly (1e-9), and the tie-broken arrays in exam key order, the bootstrap's input, must lie within 0.02 of the recorded value (they differ only in how equal confidences rank: up to 0.0103 for a species' AP on a real dev exam, 2026-09-29), the shift recorded.
+- `inc2/baseline.py`: `e1_record` (a baseline build on one of the two manifests a complete splits v3 summary records, by sha256, trains `cold_budget`, records `recipe_name`, `budget` and `e1` in exp.json and is priced by `budget_cost`; another arm than m640 refuses); verbs `rescore-agnostic` (L23E: every final run of both arms, then the verdict; `<exp>/agnostic_rescore.json`), `agnostic-verdict` and `e1-test-read`.
+- `run_inc2_build.sh`: `inc2.base3 build` (name `base3_v3`, `HF_HUB_OFFLINE=1`, `YOLO_OFFLINE=true`, torch, transformers, Ultralytics, scipy and cv2 checked, no advance) and `inc2.baseline rescore-agnostic` (name `agnostic_<exp>`, no advance); the drift check covers `base3.py`, `base3_v1.json`, `scorer_agnostic.py` and `stream_thresholds.json`.
+- Autopilot:
+  - levers **L23V** (`inc_build_base3`) and **L23E** (`inc_rescore_agnostic`), MAINT, R3 in the envelope, record only (a failure is a card and is not proposed again; an uncertain submission is followed by its job name, `inc_build_base3_v3` and `inc_build_agnostic_<exp>`, and its record): `stream_levers.json`, `brain/policy_actions.json`, `brain/approvals.ENVELOPE_ACTIONS`, `executor` (ARGV_FORMS, STREAM_REMOTE, STREAM_ENVELOPE_LEVERS, timeouts), `stream_remote` (build grammar, job names, `agnostic_rescore.json` among the records, `splits/v3/summary.json` and `capacity/e1_v1.json` in the summary, `tools/inc2/*.json` in the S23 module hashes), `evidence.ALLOWED` (those three files, never the report, a manifest or a holdout list);
+  - the role enum of `inc_build_baseline_v2` and of the build grammar admits `baseline`;
+  - `stream_domains/weed.json`: baselines `e1_a` and `e1_b` (measure, `requires: base3`, `native: false`, their budget) and the block `e1`;
+  - `stream.py`: `/stage/base3` (done once the shipped summary says complete) and `/stage/agnostic`; the L23V and L23E items; `RECORD_ONLY_LEVERS`;
+  - `diagnose_stream.DR0`: a measure item that requires base3 waits for it; when it is next and splits v3 is missing, L23V is proposed once; an item marked `native: false` gets no L23N; once both E1 arms are done, L23E once;
+  - `levers_stream.price`: an item with a budget is priced from it.
+
+### Choices where the plan was silent or the spec check asked, and why
+
+1. *The "any box > 90 %" rule* reads weed boxes: a crop box that fills a close-up of a crop says nothing about the weed boxes beside it.
+2. *The source rule* is computed on the source as delivered (after the class mapping, before the image rules), so a source cannot pass by losing its worst images first.
+3. *min 30* holds for every included source, so a tiny source (rf_kinjj) contributes mostly to test v1. That is the rule as written.
+4. *base_v2 is exempt from every rule*, not only the mask and the 320 px rule, so that arm A is base_v2 whole.
+5. *The smoke run* became the build's loader measurement and walltime guard (above).
+6. *The embedding check* runs on external rows only; base_v2 was scanned at LOCK v2.
+7. *The stream's pools* (read through the same ledger fold) extend the critique's "a group touching base_v2 is never held out": an image any current model trained on (inc0001's CottonWeedDet3 rows) never enters test v1. The first rehearsal held out 135 CottonWeedDet3 images before this rule was added.
+
+### How it was verified
+
+Locally, no GPU:
+- `tests/test_inc2_base3.py` (new): the shipped config (the 16 dock slugs, MH-Weed16's 15 ids, the exclusions, the pinned numbers, malformed configs refused); geometry (polygons, clipping, √(w·h), each of the 8 box transforms against `funnel.leak.dhash_variants`' image transforms, one-to-one layout matching); the pair search against brute force at 3 and 6 bits; a full build in a synthetic world (arm A whole and byte-identical inside B; both manifests pass `inc2.train.check_manifest` and `guard_rows`; crop boxes dropped, a sub-8 px box masked with the PNG equal to `load_image` + `inc2.mask`, an 800 × 600 image trained as a 640 × 480 PNG that reads back equal, the 90 % / 320 px / no-weed / no-label drops; the convention rule, the quarantine, unknown class names and a fail-closed dHash leak each excluding a source; a base copy dropped; an unreleased intake hold kept out; exact, flip and identical-layout copies deduped toward the lower tier while a flip copy whose boxes do not follow the flip is kept; whole capture groups held out, never one touching base_v2, a Roboflow stem joining one group across the family; the dock cap; no non-dev key in summary.json; a second build refused); D28-v2 with pair cosines (0.30: only the hit image leaves; 0.97: the source leaks); `count` read-only (nothing under INC_DIR), the as-is and lifted scenarios, an unquarantine event admitting the source, a deterministic holdout, fail-closed without a stream ledger or Step 1's queue; the walltime guard (`over_walltime`, no E1 arm); `inc2.baseline` building both arms with `cold_budget` (the pinned driver accepts the definition) and the cold table for any other manifest.
+- `tests/test_inc2_e1.py` (new): the recipe formula at every N from 1,000 to 200,000 (exactly 640 warmup iterations), round-half-up, only m640, base-only acceptance; `inc2.train` in production (cold_budget passes stage recipe and stops at device; one epoch off, a changed budget record, a chain or a union refused); `guard_verdicts`; the agnostic scorer with real CPU passes (refusals, written once, arrays reproducing the recorded agnostic AP, nothing asked of test); the bootstrap (deterministic, SE 0 for identical runs, equal to an independent recomputation); the verdict rule (each condition alone, pooled sd, pending, mismatched summaries, swapped arms, test-mode files refused; the decision file dev only); `rescore-agnostic` end to end; `e1-test-read` (refused before the verdict, specs the v2 executor accepts, refused once a test score exists or the verdict changed).
+- `tests/test_stream_ap_units.py` (new `t_e1`): prices, the build grammar (including `--role baseline`), the allow-list, and the platform's sequence: L23V once with narrow cites, E1-A then E1-B priced from the budget, no L23N for them, L23E once both are done, DR0 silent after; a failed L23V is one card, no pause, no held lane, no E1 arm; an uncertain L23V is followed by its job name and summary.json.
+- `tests/test_stream_ap_replay.py` (stream_r0): R0 now ends with L23V, E1-A, E1-B (role baseline), the five native rescores, then L23E, each once, within the envelope.
+- `tests/test_stream_pipeline.py`: the platform proposes L23V once; the real `inc2.base3 build` refuses in that world (no dataset registry); one card, the stream runs on, no E1 arm.
+
+### Rehearsal on the cluster (read-only, `count`)
+
+`python -m weed_optimizer_framework.tools.inc2.base3 count --stream weed_stream_v1 --out /jet/home/byler/e1_count2` on the Bridges-2 login node, 2026-10-03 09:23 UTC, 1,121 s, from this commit's code (config sha256 `a077e116…`; registry `eb66759c…`, base_v2 `6f54fa14…`, LOCK v2 `1a34ba87…`, the stream ledger head `acba1337…` with 12 quarantined sources and the pools P_0 + P_1, 7,493 rows; Step 1's queue read, 96,508 rows). It reads stored hashes of the originals (the v1 pool's 8-variant dHashes; 30,635 small files hashed on the spot), runs the guard on them, and writes nothing under INC_DIR. The build adds the embedding detector and D28-v2's pair cosines on the files it writes; both can only drop more rows. 1,566 rows of arm B had no stored variants (large files) and are judged there.
+
+"As is" applies the stream's quarantines; "lifted" assumes a person lifted rf_tuf, rf_zbm50, rf_srec fqrtg and rf_weed-tnf9e (the four quarantined sources that the config includes).
+
+| source | files | in B, as is | test v1, as is | in B, lifted | test v1, lifted | what removed the rest (as is) |
+|---|---:|---:|---:|---:|---:|---|
+| base_v2 (arm A, exempt) | 6,811 | 6,811 | 0 | 6,811 | 0 | nothing |
+| MH-Weed16 | 5,000 | 4,590 | 400 | 4,590 | 400 | 7 without a weed box, 2 base copies, 1 duplicate |
+| rf_tuf | 8,700 | 0 | 0 | 4,784 | 400 | D28 quarantine (6,768); 1,843 without a weed box; 88 with a box > 90 % |
+| rf_zbm50 | 1,977 | 0 | 0 | 1,666 | 296 | D28 quarantine (1,970) |
+| dock family, 16 slugs (*Rumex obtusifolius*) | 39,903 | 5,496 | 1,471 | 5,466 | 1,501 | 32,290 duplicates (9 slugs are whole re-exports of one release: 17,507); 38 base copies; 608 without a weed box |
+| MFWD (intake, POROL + Weed) | 4,079 | 1,883 | 0 | 1,883 | 0 | 2,021 duplicates (tray time series); 175 with no box left after masking; no capture group eligible for test v1 |
+| rf_school | 2,071 | 1,748 | 308 | 1,746 | 310 | 13 duplicates, 2 base copies |
+| gh_tehreemnoor (DeepWeeds boxes) | 2,006 | 1,354 | 239 | 1,354 | 239 | 245 with a box > 90 %; 167 without a weed box |
+| CottonWeedDet3 (intake) | 795 | 727 | 12 | 727 | 12 | 40 intake holds; 16 with a box > 90 %; its 682 P_1 rows are never held out |
+| rf_itmo | 787 | 565 | 100 | 564 | 101 | 122 without a forb box |
+| rf_kinjj | 87 | 56 | 30 | 56 | 30 | 1 without a weed box; min 30 to test v1 |
+| rf_srec fqrtg | 6,552 | 0 | 0 | 0 | 0 | convention rule: median side 28.4 px < 32 (also D28-quarantined) |
+| rf_weed-tnf9e | 10,000 | 0 | 0 | 0 | 0 | convention rule: median side 16.4 px, 47.5 % of boxes < 16 px (also D28-quarantined) |
+| **total** | **88,768** | **23,230** | **2,560** | **29,647** | **3,289** | |
+
+- **Arm A**: 6,811 images, 25,703 boxes.
+- **Arm B as is: 23,230 images** (107,534 boxes; 17,820 distinct photos after joining 6-bit near copies), test v1 2,560 images in 1,619 groups, 34,326 copies removed, dock family 5,496 (its cap, 9,549, does not bind). Recipe: 52 epochs, warmup 0.881543 epochs, close_mosaic 5; 1.21M image-epochs, about 4.8 GPU-h a seed.
+- **Arm B lifted: 29,647 images** (114,842 boxes; 22,384 distinct photos), test v1 3,289. Recipe: 40 epochs, close_mosaic 4.
+- Guard on the originals' hashes: 65,712 rows checked; 6 refused `near_eval_variant` (3 in rf_tuf, 3 in rf_zbm50: the two sources' D28 dHash hits) and 6 index cross-check hits; 6,894 `base_copy` verdicts = base_v2's own 6,811 rows + 83 external copies of them (42 dropped as is, 83 lifted).
+- CottonWeedDet3: 682 of its rows are inc0001's (P_1), so they stay in arm B and never enter test v1 (choice 7); the first rehearsal, before that rule, held out 135 of its images, this one 12.
+- MFWD: its 21 intake capture groups (at most 298 images each) join through 6-bit near copies into groups none of which is eligible (over 400 images or touching base_v2; the report does not separate the two), so MFWD gives nothing to test v1.
+
+**Why arm B is under 30,000, and what would raise it without changing a rule.**
+- The D28 quarantines: rf_tuf and rf_zbm50 hold 6,450 arm-B images and 696 test-v1 images. Lifting them is a person's call after D28-v2's sidecars weigh their 3 + 3 dHash hits (the D28-v2 amendment found every quarantined source's hits to be dHash false positives, pair cosine at most 0.744): **29,647**, 353 short of 30,000.
+- The convention rule excludes rf_srec fqrtg (6,552 files, median box side 28.4 px at 640) and rf_weed-tnf9e (10,000 files, median 16.4 px, 47.5 % of boxes under 16 px); lifting their quarantines changes nothing.
+- Copies: the 16 dock-family slugs (39,903 files) are Roboflow exports that largely share one *Rumex* release; 32,290 files are copies (nine slugs add no image at all), leaving 6,967 (5,496 train, 1,471 test v1). MFWD loses 2,021 of 4,079 to near copies.
+- Test v1 takes 2,560 images from the included sources (the 15 % holdout, min 30, max 400 per source).
+- What raises it: new admitted supply through intake and Step 1, added to the config's allow-list as `base3_v2.json` (a source list, not a rule): the SIU set `zenodo_15808623` (about 203K images; reopened, and commit ce98b15 on main, after this branch's base, lets it reach Step 1's queue) and the full MH-Weed16 release (the registry holds a 5,000-image subset). How many of their images pass the rules is not measured yet.
+
+### Deploy
+
+These files change `executor.code_hash()` and the stream rules version: the autopilot modules, `stream_domains/weed.json`, `stream_levers.json`, `brain/policy_actions.json`, `brain/approvals.py`, `diagnose_stream.py`, `levers_stream.py` and the replay test. `inc2.train` hashes every `tools/inc2/*.py` into each run's drift check, so sync the lab and both cluster copies (nested and outer) from one commit, then run `executor.run_replay_tests` so envelope grants resume. The build needs the calibration's DINOv2 in the Hugging Face cache (as the Step 1 jobs do).
+
+### Open items
+
+- The 12 D28 quarantines stand until a person lifts them after D28-v2's sidecars clear them; rf_tuf and rf_zbm50 are included sources only once lifted; rf_srec fqrtg and rf_weed-tnf9e fail the convention rule whether lifted or not.
+- A later never-train index v3 should cover `splits/v3/test_v1/*.jsonl` (and the test groups) before test v1 is frozen.

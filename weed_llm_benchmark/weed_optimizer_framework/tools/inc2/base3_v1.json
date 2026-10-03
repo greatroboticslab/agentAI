@@ -1,0 +1,334 @@
+{
+ "format": "inc2-base3-config/1",
+ "version": "v1",
+ "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-03): E1, weed-box base v3 (pre-registered); human:harry567566@gmail.com under the 2026-09-30 grant",
+ "class_id": 12,
+ "why": "Every weed box of every admitted source becomes INC class 12 (OtherPlant), so the E1 models are one-class weed detectors that every inc2 check, the pinned driver and the locked scorer accept; crop and non-plant boxes are dropped (background); an image without a weed box after the rules is not admitted. The include list is an allow-list: a registry slug that is not listed here is never read (excluded, 'not listed').",
+ "rules": {
+  "box_side": "geometric mean: sqrt(w x h) of the box in pixels after the image's long side is scaled to 640 (COCO's area convention: a box is small when its area is below side^2); one definition for every rule below",
+  "source": {
+   "median_side_min_px": 32,
+   "small_side_px": 16,
+   "small_share_max": 0.25,
+   "big_area": 0.8,
+   "big_share_max": 0.1,
+   "median_boxes_max": 25,
+   "why": "A source is admitted only if its weed boxes, as delivered, meet all four: median side >= 32 px at 640, at most 25 % of boxes under 16 px, at most 10 % of boxes covering more than 80 % of their image, median boxes per image (images with a weed box) at most 25. Base_v2 is exempt (A is base_v2 whole)."
+  },
+  "box": {
+   "mask_side_px": 8,
+   "why": "A weed box under 8 px at 640 is removed and its rectangle filled with the image's mean colour (inc2.mask.masked_array: pixel_rect rounding, rounded mean RGB, kept boxes' pixels never filled). Polygon lines become their bounding box."
+  },
+  "image": {
+   "drop_box_area": 0.9,
+   "min_short_side_px": 320,
+   "max_masked_area": 0.5,
+   "why": "An image is dropped if a weed box covers more than 90 % of it, if its shorter side is under 320 px, if the masked area exceeds 50 %, or if no weed box remains. Base_v2 rows are exempt from every image and box rule."
+  },
+  "dedupe": {
+   "near_bits": 3,
+   "layout_iou": 0.8,
+   "layout_share": 0.8,
+   "layout_round": 0.01,
+   "layout_min_boxes": 3,
+   "why": "Exact copies (same original bytes) are one image. Near copies: dHash within 3 bits under one of the 8 flips and rotations AND at least 80 % of the larger box set matched one-to-one at IoU >= 0.8 after that transform; or an identical label layout (coordinates rounded to 0.01, at least 3 boxes). Kept: the lowest provider tier, then the higher resolution, then the slug, then the key; base_v2 rows are always kept. Never 4-6 bits inside training."
+  },
+  "holdout": {
+   "seed_text": "inc2/base3/test_v1",
+   "share": 0.15,
+   "min_images": 30,
+   "max_images": 400,
+   "group_bits": 6,
+   "max_group": 400,
+   "why": "Main-test holdout v1: from every included external source ~15 % of its capture groups (min 30, max 400 images), seeded, never trained. A capture group joins images within 6 dHash bits under the 8 variants (both directions), near and layout copies, the same Roboflow export stem across the source (across the family for a family), the intake capture group and a source's file-name session (group_regex). A group touching base_v2 or any row of the stream's pools (an image a current model trained on), or larger than 400 images, is never held out."
+  },
+  "families": {
+   "dock": {
+    "cap_share": 0.35,
+    "why": "The Rumex obtusifolius ('0 ridderzuring' / 'grass weeds') photo set uploaded under 16 slugs: at most 35 % of base v3's images, D <= floor(0.35 / 0.65 x non-dock images), applied after the holdout by seeded whole capture groups; its Roboflow export stems are shared across the 16 slugs."
+   }
+  },
+  "walltime": {
+   "gpu_ms_per_image_epoch": 12.65,
+   "fixed_hours": 0.27,
+   "limit_hours": 8.0,
+   "share": 0.8,
+   "why": "A base run of cold_budget trains 1.2M image-epochs; its rate is the slower of the GPU (m640 measured: b_v2_m640 base__s0 trained 6,811 x 100 image-epochs in 8,613.8 s, 12.65 ms, cache ram; 0.27 h of fixed overhead in its 2 h 39 min wall) and the loader that feeds it (measured by the build on a seeded 3,200-row sample of arm B through Ultralytics' own training dataset and DataLoader, 5 workers, no cache). A projected run over 0.8 x the 8 h cold limit (D26's line) cannot run: the build then writes splits v3 with status over_walltime, which no E1 arm builds on, and ends with a refusal (a person's card)."
+  }
+ },
+ "base_v2": {
+  "tier": 0,
+  "why": "Splits v2's base_v2 (LOCK v2, by sha256): every box becomes class 12, nothing else changes; it is arm A whole and inside arm B, byte for byte."
+ },
+ "sources": {
+  "francesco__grass_weeds": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "grass-weeds": "weed",
+    "0 ridderzuring": "weed"
+   },
+   "note": "HF copy of rf_unitec (dHash-identical)"
+  },
+  "rf_chaitali-5f9xc__weed-detection-n0dy9": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_computer-vision-for-traffic-management-9ot3y__weed-detection-7tviy": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_cotton-weed-detect__grass-weed-cotton-detect": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "cotton": "drop",
+    "grass weeds": "weed"
+   }
+  },
+  "rf_detection-lztth__weed-detection-8bdyy": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_indian-institute-of-technology-roorkee-rlcww__weed-xeamn": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_mrunal-ramanna-5c9iq__weed-detection-r67fp": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_project-gfw5f__weed-detection-oxdom": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_python-lec__weed-detection-5bf1l": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_unitec-qdvgo__weed-detection-in-grass": {
+   "family": "dock",
+   "tier": 2,
+   "classes": {
+    "0 ridderzuring": "weed"
+   },
+   "note": "the release that carries the original names (Public Domain)"
+  },
+  "rf_vizerion__weed-detection-5ell6": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed",
+    "weeds": "weed"
+   }
+  },
+  "rf_weed-detection-pfrni__weed-detection-twqao": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "weed": "weed"
+   }
+  },
+  "rf_weeddetection-dab2e__weed-detection-6ibvx": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "0 ridderzuring": "weed"
+   }
+  },
+  "rf_yolo-gyfyq__weed-ieda7": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "weed": "weed"
+   }
+  },
+  "rf_zijian-peng__grass-weed-69hcm": {
+   "family": "dock",
+   "tier": 3,
+   "classes": {
+    "grass weeds - v2 release": "weed"
+   }
+  },
+  "project_agml__mh_weed16_weed_detection": {
+   "tier": 1,
+   "classes": {
+    "0": "weed",
+    "1": "weed",
+    "2": "weed",
+    "3": "weed",
+    "4": "weed",
+    "5": "weed",
+    "6": "weed",
+    "7": "weed",
+    "8": "weed",
+    "9": "weed",
+    "10": "weed",
+    "11": "weed",
+    "12": "weed",
+    "13": "weed",
+    "14": "weed"
+   },
+   "note": "MH-Weed16: all 15 ids are weeds per its card (AgML)"
+  },
+  "gh_tehreemnoor__yolov5-weed-detection-model": {
+   "tier": 2,
+   "classes": {
+    "LANTANA": "weed",
+    "PARTHENIUM": "weed",
+    "SIAM WEED": "weed",
+    "SNAKE WEED": "weed"
+   },
+   "group_regex": "(\\d{8}-\\d{6})",
+   "note": "DeepWeeds-type species; the file names carry DeepWeeds' capture time"
+  },
+  "rf_school-5ult5__weed-6a90d": {
+   "tier": 3,
+   "classes": {
+    "0": "weed"
+   },
+   "note": "single class '0', the project's annotation group 'weed'"
+  },
+  "rf_new-workspace-zbm50__weeds-qftz4": {
+   "tier": 3,
+   "classes": {
+    "weed": "weed"
+   }
+  },
+  "rf_tuf__weed-3434e": {
+   "tier": 3,
+   "classes": {
+    "weed-SYqv": "weed"
+   },
+   "note": "empty label files are not admitted (no weed box)"
+  },
+  "rf_kinjj__weed-avnag": {
+   "tier": 3,
+   "classes": {
+    "weed": "weed"
+   },
+   "note": "polygon labels: each becomes its bounding box"
+  },
+  "rf_itmo-mp0nn__grass-detection-4": {
+   "tier": 3,
+   "classes": {
+    "Achillea_millefolium": "weed",
+    "Dry_grass": "drop",
+    "Glechoma_hederacea": "weed",
+    "Musor": "drop",
+    "Plantago_major": "weed",
+    "Poa_pratensis": "drop",
+    "Poa_trivialis": "drop",
+    "Potentilla_anserina": "weed",
+    "Propleshina": "drop",
+    "Ranunculus_repens": "weed",
+    "Taraxacum_officinale": "weed",
+    "Trifolium_pratense": "weed"
+   },
+   "note": "lawn forbs are weeds; turf grass (Poa), litter (Musor), bare patch (Propleshina) and dry grass are dropped"
+  },
+  "rf_srec-dthh0__crop-and-weed-detection-fqrtg": {
+   "tier": 3,
+   "classes": {
+    "crop": "drop",
+    "weed": "weed"
+   },
+   "note": "weed boxes of a weed+crop source that is not a test group; the convention and image rules decide"
+  },
+  "rf_weed-tnf9e__weed-bqdok": {
+   "tier": 3,
+   "classes": {
+    "BroWeed": "weed",
+    "Maize": "drop",
+    "NarWeed": "weed"
+   },
+   "note": "weed boxes of a weed+crop source that is not a test group; the convention rule decides"
+  }
+ },
+ "intake": {
+  "kg_yuzhenlu__cottonweeddet3": {
+   "tier": 1,
+   "classes": "all_weed",
+   "note": "CottonWeedDet3 (intake labels in INC ids 1, 4, 8); a row whose intake holds Step 1 has not released is not admitted"
+  },
+  "mediatum_1717366": {
+   "tier": 1,
+   "classes": "all_weed",
+   "note": "MFWD: POROL (INC 2) and the unmapped 'Weed' (13), both weeds"
+  }
+ },
+ "excluded": {
+  "project_agml__imageweeds_weed_detection": "evaluation group NDSU (ImageWeeds exam; never-train)",
+  "project_agml__weed_crop_detection": "evaluation group NDSU (test v1)",
+  "project_agml__imageweeds_aerial_weed_detection": "evaluation group NDSU (test v1)",
+  "project_agml__greenhouse_crop_weed_detection": "evaluation group NDSU (test v1)",
+  "project_agml__crop_weed_detection_latvia": "evaluation group Latvia (test v1)",
+  "francesco__weed_crop_aerial": "evaluation group Latvia (copy of Latvia; never-train)",
+  "rf_university-of-peradeniya__weed-detection-ekr8i": "evaluation group Latvia (holds Latvia copies)",
+  "rf_vitif246x__weed-oqamx": "evaluation group Latvia (holds Latvia copies)",
+  "rf_test-8qezo__weed-detection-ycai2": "evaluation group Latvia (holds Latvia copies)",
+  "rf_project-5nvic__weed-detection-0tfsj": "evaluation group Latvia (holds Latvia copies)",
+  "kg_vinayakshanawad__weedcrop": "evaluation group Latvia (unregistered copy)",
+  "kg_ravirajsinh45__crop-and-weed-detection-data-with-bounding-boxes": "evaluation group sesame (test v1)",
+  "rf_leopard-ai__weed-detection-8h4kx": "evaluation group sesame (re-upload)",
+  "rf_srec-dthh0__crop-weed-poxtn": "evaluation group sesame (agri_0_* augmented copies; class names unresolved)",
+  "rf_weed-project-zbfhf__weed-detection-aiml-35-weed-and-crop": "evaluation group sesame (shares sesame photos)",
+  "project_agml__maize_weed_detection": "evaluation group maize (test v1)",
+  "weedai_5c78d067-8750-4803-9cbe-57df8fae55e4": "evaluation group PAGS8 (test v1)",
+  "rf_main-otq0a__weed-in-paddy-field-wmjlr": "OOD-dev group paddy",
+  "rf_1111-gzfxi__weed-chilling": "OOD-dev group chilli",
+  "cottonweed_sp8": "cwd12 copy",
+  "cottonweed_holdout": "cwd12 copy (holds the sealed holdout)",
+  "rf_agrobot-weed-workspace__weed-detection-sd89f": "cwd12 full re-upload",
+  "project_agml__three_season_weed_detection": "cwd12 / 3SeasonWeedDet10 copy",
+  "rf_karthikeya-c8pvy__weed-detection-cwp10": "partial cwd12 copy (L-5)",
+  "rf_zig-zag-lnodr__weed-detection-vanpe": "partial cwd12 copy (L-5)",
+  "rf_robtica-unileon-gluqm__farming-robotics": "crop only (weeds not labelled)",
+  "project_agml__synthetic_cowpea_pod_detection": "synthetic, broken labels",
+  "project_agml__cotton_weed_detection": "broken labels (boxes under 4 px)",
+  "rf_bishwarup-halder__crop-health-advisor": "disease; class names unresolved",
+  "rf_test-gzc3r__crop-mfete": "class names unresolved (mangled list)",
+  "gh_07931350__weed-yolo": "class names unresolved",
+  "fvossel__csgo_player_detection": "non-plant",
+  "rf_uav-qnoms__uav-wqshy": "non-plant",
+  "gh_minhvuongvu__train-yolov9-beehive-dataset": "non-plant",
+  "rf_lemong__agriculture-xi7us": "non-plant",
+  "kg_farukalam__tomato-leaf-diseases-detection-computer-vision": "disease",
+  "rf_fyp-oof0h__smart-agriculture-miw1m": "disease",
+  "gh_vuyyurusairamreddy__real-time-coconut-tree-disease-detection-and-management-using-yolov8-and-machine-learning-techniques": "disease",
+  "dronefreak__brackish": "non-plant (no files)",
+  "dronefreak__exdark": "non-plant (no files)",
+  "dronefreak__gwhd": "crop (no files)",
+  "dronefreak__seadronessee": "non-plant (no files)",
+  "kg_yuzhenlu__cottonweeddet3": "read through its intake manifest, never through the registry path",
+  "mediatum_1717366": "read through its intake manifest, never through the registry path"
+ }
+}

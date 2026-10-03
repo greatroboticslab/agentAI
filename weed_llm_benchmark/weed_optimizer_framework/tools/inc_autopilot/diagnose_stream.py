@@ -1520,7 +1520,11 @@ def r0(v):
     Protocol v3) and its verdict (LV); the stream's creation with Stage A's
     recipes (LI); the capacity decision adopted (LA); Stage C (L28); then,
     R0 complete, the measurement arms (L23B, baselines marked measure), and
-    once one is done, its native-resolution rescore (L23N, once). DATA --
+    once one is done, its native-resolution rescore (L23N, once; not for an
+    arm marked native false); E1 (2026-10-03): an arm that requires base3
+    waits for splits v3, which is proposed once when that arm is next (L23V),
+    and once both E1 arms are done, their agnostic rescore and E1's verdict
+    (L23E, once). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill), then D28-v2's sidecars for batches
     committed before the amendment (L17 eval-hits, _eval_hits_due)."""
@@ -1601,10 +1605,22 @@ def r0(v):
         for b in (v.dom.get("baselines") or {}).get("items") or []:
             if not b.get("measure") or (st.get("baselines") or {}).get(b["id"]) not in (None, "missing"):
                 continue
+            if b.get("requires") == "base3" and st.get("base3") != "done":
+                # E1 (2026-10-03): its manifest is splits v3's; proposed once, when this arm is next, never while
+                # it runs or after it failed (a card); the arm is built only once summary.json says complete
+                if st.get("base3") in (None, "missing"):
+                    out["MAINT"] = {"lever": "L23V", "baseline": b["id"],
+                                    "why": "E1 arm %s (%s) trains splits v3, which is not built: base v3 build "
+                                           "(record only)" % (b["id"], b["exp"])}
+                    cites = [v.ccite("/stage/lock"), v.ccite("/stage/base3")]
+                    break
+                continue
             out["MAINT"] = {"lever": "L23B", "baseline": b["id"],
                             "why": "measurement arm %s (%s) not built; recorded, never a candidate of the capacity "
                                    "decision" % (b["id"], b["exp"])}
             cites = [v.ccite("/stage/lock"), v.ccite("/stage/baselines/%s" % b["id"])]
+            if b.get("requires") == "base3":
+                cites.append(v.ccite("/stage/base3"))
             break
     # a done measurement arm's native-resolution rescore (2026-10-01, pre-registered): proposed once, on the
     # arms' own conditions, when its experiment is done and its native scores are missing (/stage/native: the
@@ -1614,7 +1630,7 @@ def r0(v):
     if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"] \
             and nat.get("reference_exp"):
         for b in (v.dom.get("baselines") or {}).get("items") or []:
-            if not b.get("measure") or exps.get(b["exp"]) != "done" \
+            if not b.get("measure") or b.get("native") is False or exps.get(b["exp"]) != "done" \
                     or (st.get("native") or {}).get(b["id"]) not in (None, "missing"):
                 continue
             out["MAINT"] = {"lever": "L23N", "baseline": b["id"],
@@ -1624,6 +1640,19 @@ def r0(v):
             cites = [v.ccite("/stage/lock"), v.ccite(E.pointer("stage", "exp_status", b["exp"])),
                      v.ccite("/stage/native/%s" % b["id"])]
             break
+    # E1 (2026-10-03): once both arms are done, their agnostic rescore and E1's verdict, once (record only)
+    e1 = v.dom.get("e1") or {}
+    if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"] \
+            and e1.get("arms"):
+        by_id = {b["id"]: b for b in (v.dom.get("baselines") or {}).get("items") or []}
+        ea, eb = by_id.get(e1["arms"].get("A")), by_id.get(e1["arms"].get("B"))
+        if ea and eb and exps.get(ea["exp"]) == "done" and exps.get(eb["exp"]) == "done" \
+                and st.get("agnostic") in (None, "missing"):
+            out["MAINT"] = {"lever": "L23E",
+                            "why": "E1's arms %s and %s are done without their agnostic rescore: E1's verdict "
+                                   "(record only, dev)" % (ea["exp"], eb["exp"])}
+            cites = [v.ccite("/stage/lock"), v.ccite(E.pointer("stage", "exp_status", ea["exp"])),
+                     v.ccite(E.pointer("stage", "exp_status", eb["exp"])), v.ccite("/stage/agnostic")]
     items = {k: x for k, x in out.items() if x}
     if not items:
         return _silent("DR0", "no rollout prerequisite is due", cites=cites)
