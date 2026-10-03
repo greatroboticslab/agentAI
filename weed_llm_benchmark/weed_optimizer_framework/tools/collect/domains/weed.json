@@ -521,6 +521,96 @@
   },
   "zenodo_15808623": {
    "by_name": {
+    "AMAPA_week_1": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_2": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_3": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_4": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_5": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_6": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_7": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_8": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_9": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_10": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_11": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_12": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_13": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_14": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMAPA_week_15": {
+     "taxon": "Amaranthus palmeri"
+    },
+    "AMARE_week_1": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_2": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_3": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_4": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_5": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_6": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_7": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_8": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_9": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_10": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_11": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_12": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_13": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_14": {
+     "taxon": "Amaranthus retroflexus"
+    },
+    "AMARE_week_15": {
+     "taxon": "Amaranthus retroflexus"
+    },
     "AMATA_week_1": {
      "taxon": "Amaranthus tuberculatus"
     },
@@ -565,9 +655,594 @@
     },
     "AMATA_week_15": {
      "taxon": "Amaranthus tuberculatus"
+    },
+    "DIGSA_week_1": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_2": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_3": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_4": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_5": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_6": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_7": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_8": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_9": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_10": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_11": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_12": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_13": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_14": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "DIGSA_week_15": {
+     "taxon": "Digitaria sanguinalis"
+    },
+    "ECHCG_week_1": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_2": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_3": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_4": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_5": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_6": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_7": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_8": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_9": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_10": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_11": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_12": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_13": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_14": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "ECHCG_week_15": {
+     "taxon": "Echinochloa crus-galli"
+    },
+    "CHEAL_week_1": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_2": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_3": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_4": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_5": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_6": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_7": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_8": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_9": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_10": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_11": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_12": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_13": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_14": {
+     "taxon": "Chenopodium album"
+    },
+    "CHEAL_week_15": {
+     "taxon": "Chenopodium album"
+    },
+    "ABUTH_week_1": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_2": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_3": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_4": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_5": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_6": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_7": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_8": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_9": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_10": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_11": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_12": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_13": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_14": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "ABUTH_week_15": {
+     "taxon": "Abutilon theophrasti"
+    },
+    "AMBEL_week_1": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_2": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_3": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_4": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_5": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_6": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_7": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_8": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_9": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_10": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_11": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_12": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_13": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_14": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "AMBEL_week_15": {
+     "taxon": "Ambrosia artemisiifolia"
+    },
+    "CYPES_week_1": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_2": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_3": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_4": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_5": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_6": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_7": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_8": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_9": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_10": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_11": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_12": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_13": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_14": {
+     "taxon": "Cyperus esculentus"
+    },
+    "CYPES_week_15": {
+     "taxon": "Cyperus esculentus"
+    },
+    "ERICA_week_1": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_2": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_3": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_4": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_5": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_6": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_7": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_8": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_9": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_10": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_11": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_12": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_13": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_14": {
+     "taxon": "Erigeron canadensis"
+    },
+    "ERICA_week_15": {
+     "taxon": "Erigeron canadensis"
+    },
+    "PANDI_week_1": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_2": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_3": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_4": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_5": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_6": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_7": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_8": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_9": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_10": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_11": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_12": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_13": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_14": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "PANDI_week_15": {
+     "taxon": "Panicum dichotomiflorum"
+    },
+    "SETFA_week_1": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_2": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_3": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_4": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_5": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_6": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_7": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_8": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_9": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_10": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_11": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_12": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_13": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_14": {
+     "taxon": "Setaria faberi"
+    },
+    "SETFA_week_15": {
+     "taxon": "Setaria faberi"
+    },
+    "SETPU_week_1": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_2": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_3": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_4": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_5": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_6": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_7": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_8": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_9": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_10": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_11": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_12": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_13": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_14": {
+     "taxon": "Setaria pumila"
+    },
+    "SETPU_week_15": {
+     "taxon": "Setaria pumila"
+    },
+    "SIDSP_week_1": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_2": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_3": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_4": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_5": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_6": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_7": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_8": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_9": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_10": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_11": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_12": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_13": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_14": {
+     "taxon": "Sida spinosa"
+    },
+    "SIDSP_week_15": {
+     "taxon": "Sida spinosa"
+    },
+    "SORHA_week_1": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_2": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_3": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_4": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_5": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_6": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_7": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_8": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_9": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_10": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_11": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_12": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_13": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_14": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORHA_week_15": {
+     "taxon": "Sorghum halepense"
+    },
+    "SORVU_week_1": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_2": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_3": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_4": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_5": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_6": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_7": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_8": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_9": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_10": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_11": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_12": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_13": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_14": {
+     "taxon": "Sorghum bicolor"
+    },
+    "SORVU_week_15": {
+     "taxon": "Sorghum bicolor"
     }
    },
-   "table_source": "Zenodo record 15808623 (SIU Weed Growth Stage), its description: the 16 species include 'AMATU (waterhemp)'; its Pascal VOC files name that species 'AMATA_week_<n>' (the 2026-10-03 intake's names_pending list: AMATA_week_1 ... AMATA_week_11, no AMATU). EPPO's AMATA is Amaranthus x tamariscinus (gd.eppo.int, checked 2026-10-03); the record's own species list decides, as a card does (FUNNEL_AUDIT H3a). Weeks 12-15 are listed in case of more weeks.",
+   "table_source": "Zenodo record 15808623 (SIU Weed Growth Stage), its description's species list: AMAPA, AMARE, AMATU (waterhemp), DIGSA, ECHCG, CHEAL, ABUTH, AMBEL, CYPES, ERICA, PANDI, SETFA, SETPU, SIDSP, SORHA, SORVU, as '<code>_week_<n>' classes. Each code maps to the binomial of the pinned EPPO table v2 (gd.eppo.int); the files name waterhemp AMATA (EPPO: Amaranthus x tamariscinus), which the record's list calls AMATU, so AMATA maps to Amaranthus tuberculatus. Pinned for every class, since a code's binomial that the authority calls unresolvable (Echinochloa crus-galli, 2026-10-03) made the class map fall through to the raw name, which never resolves. Weeks 12-15 are listed in case of more weeks.",
    "pinned_by": "human:harry567566@gmail.com under the 2026-09-30 grant, 2026-10-03"
   }
  },

@@ -86,7 +86,7 @@ def test_map():
     check("a vernacular relative is unmapped (a common name never maps)", b["Redroot Pigweed"]["inc_id"] == 13
           and b["Redroot Pigweed"]["via"] == "vernacular", b["Redroot Pigweed"])
     # zenodo_15808623 (SIU Weed Growth Stage) names its 174 classes "<EPPO>_week_<n>"
-    siu = CM.build("zenodo_15808623", cls(["AMAPA_week_5", "CHEAL_week_11", "AMAPA week 2"]), cfg, nm, tg)
+    siu = CM.build("zen_prefix_only", cls(["AMAPA_week_5", "CHEAL_week_11", "AMAPA week 2"]), cfg, nm, tg)
     sb = {c["name"]: c for c in siu["classes"]}
     check("an EPPO code leading a name maps by its binomial: AMAPA_week_5 -> PalmerAmaranth (basis eppo_prefix)",
           sb["AMAPA_week_5"]["inc_id"] == ids["PalmerAmaranth"] and sb["AMAPA_week_5"]["basis"] == "eppo_prefix"
@@ -97,12 +97,14 @@ def test_map():
           CM.eppo_prefix_binomial(cfg, "WEEDS_1") is None and CM.eppo_prefix_binomial(cfg, "amapa_week_5") is None
           and CM.eppo_prefix_binomial(cfg, "AMAPAX_1") is None and CM.eppo_prefix_binomial(cfg, None) is None
           and CM.eppo_prefix_binomial(cfg, "SETFA_week_3") == "Setaria faberi")
-    sc = {c["name"]: c for c in CM.build("zenodo_15808623", cls(["AMATA_week_5", "AMAPA_week_5"]), cfg, nm,
-                                          tg)["classes"]}
-    check("  the source's card maps its AMATA_week_<n> classes (the record's 'AMATU (waterhemp)') to Waterhemp; "
-          "the other codes still map by prefix", sc["AMATA_week_5"]["inc_id"] == ids["Waterhemp"]
-          and sc["AMATA_week_5"]["basis"] == "card" and sc["AMAPA_week_5"]["basis"] == "eppo_prefix", sc)
-    hb = CM.build("zenodo_15808623", cls(["AMAPA_x"], hints={"AMAPA_x": ["CHEAL"]}), cfg, nm, tg)["classes"][0]
+    sc = {c["name"]: c for c in CM.build("zenodo_15808623", cls(["AMATA_week_5", "AMAPA_week_5", "CHEAL_week_11"]),
+                                          cfg, nm, tg)["classes"]}
+    check("  the source's card maps every class: AMATA_week_<n> (the record's 'AMATU (waterhemp)') to Waterhemp, the "
+          "other codes to their EPPO binomial", sc["AMATA_week_5"]["inc_id"] == ids["Waterhemp"]
+          and sc["AMATA_week_5"]["basis"] == "card" and sc["AMAPA_week_5"]["basis"] == "card"
+          and sc["AMAPA_week_5"]["inc_id"] == ids["PalmerAmaranth"] and sc["CHEAL_week_11"]["inc_id"] == cfg.other_id,
+          sc)
+    hb = CM.build("zen_prefix_only", cls(["AMAPA_x"], hints={"AMAPA_x": ["CHEAL"]}), cfg, nm, tg)["classes"][0]
     check("  a hint the format carries outranks a code read off the name's first token",
           hb["basis"] == "hint" and hb["inc_id"] == cfg.other_id, hb)
     check("  the EPPO table v2 holds the five SIU codes v1 lacked",

@@ -10819,3 +10819,10 @@ Every result sat near test 0.85, against the 0.90 goal.
   - `inc2.base3.intake_rows` passes the intake source's family. An unknown intake family refuses the config.
   - Tests: `test_inc2_base3.py`.
 - **zenodo_15808623: a card maps its waterhemp classes (2026-10-03).** The intake's names_pending list showed `AMATA_week_1` … `AMATA_week_11`, with no AMATU, while the record's species list names "AMATU (waterhemp)". EPPO's AMATA is Amaranthus x tamariscinus. A collector card table (`card_class_tables.zenodo_15808623`) maps `AMATA_week_<n>` to Amaranthus tuberculatus (Waterhemp), pinned by a person under the 2026-09-30 grant; the other 15 codes still map by EPPO prefix. Test in `test_collect_classmap.py`.
+- **zenodo_15808623: the card maps every class (2026-10-03).**
+  - The re-intake pended on `ECHCG_week_<n>`. The binomial's answer was 'unresolvable', so the class map fell through to the raw name, which no cache holds.
+  - The card now lists all 16 codes × weeks 1–15 (240 names), each mapped to its EPPO v2 binomial, with AMATA mapped to Amaranthus tuberculatus.
+  - A lab rehearsal with the real names layer maps all 176 real class names with nothing pending:
+    - targets: Palmer amaranth, waterhemp, ragweed, prickly sida;
+    - 11 others → 12;
+    - barnyardgrass → unmapped 13, still a weed in E1.
