@@ -4,7 +4,9 @@ the executor and the policy table, the cluster verbs' parsers and grammar,
 the evidence allow-list, the budget windows and job settlement, the R0
 records (Stage A, Stage C, the capacity decision), the measurement arms
 (m832, s1024, and the box-quality arms y26l640, y26m640, l640: priced,
-proposed once R0 is complete and only while missing, never the stream's arm), the dispositions, the replay gate's stream cases, the
+proposed once R0 is complete and only while missing, never the stream's arm),
+E1 (2026-10-03: base v3's build L23V, the arms on splits v3 with cold_budget
+priced from the budget, their agnostic rescore L23E; record only), the dispositions, the replay gate's stream cases, the
 config and the campaign dispatch, and the lab runner. No network, no GPU, no
 ssh.
 
@@ -51,6 +53,8 @@ PARAMS = {
     "L23B": {"pkg": "inc2", "exp": "b_v2", "manifest": LS.inc_path("splits/v2/base_v2.jsonl"), "seeds": "0,1,2,3,4",
              "arm": "n640", "role": "b_v2"},
     "L23N": {"pkg": "inc2", "exp": "b_v2_m832", "reference": "b_v2_m640"},
+    "L23V": {"pkg": "inc2", "stream": "weed_stream_v1"},
+    "L23E": {"pkg": "inc2", "exp": "e1_b_m640", "reference": "e1_a_m640"},
     "LV": {"pkg": "inc2", "module": "baseline", "verb": "canary-verdict", "exp": "canary_v2"},
     "LI": {"pkg": "inc2", "stream": "weed_stream_v1", "stage_b": "r0,x1a"},
     "LA": {"pkg": "inc2", "stream": "weed_stream_v1"},
@@ -154,7 +158,8 @@ def t_menu():
         for l in ("L15", "L26", "L16L", "L16RL")) and X.render("inc_stream_sync", {"source": "a"})["local"])
     check("the gated R2 levers and the envelope levers are the contract's (and LI, the stream's creation)",
           LS.gated_r2() == ("L16", "L17", "L24")
-          and set(LS.envelope_levers()) == {"L18", "L20", "L21", "L22", "L23B", "L23N", "L25", "L27", "L28", "LI"})
+          and set(LS.envelope_levers()) == {"L18", "L20", "L21", "L22", "L23B", "L23N", "L23V", "L23E", "L25", "L27",
+                                            "L28", "LI"})
     check("the executor's gated actions cover L16 (fetch on the cluster or the lab, intake), L17 and L24",
           set(X.GATED_R2_ACTIONS.values()) == {"L16", "L17", "L24"})
     check("every envelope action of a stream lever is in approvals.ENVELOPE_ACTIONS",
@@ -511,11 +516,12 @@ def t_records():
 
 
 def _measure_world(tag, stage_c=True):
-    """A world with every R0 prerequisite but the measurement arms' experiments."""
+    """A world with every R0 prerequisite but the measurement arms' experiments
+    (E1's arms, which require base v3, stay built: t_e1)."""
     w = World(tag)
     w.ready_r0(stage_c=stage_c)
     for b in w.dom["baselines"]["items"]:
-        if b.get("measure"):
+        if b.get("measure") and not b.get("requires"):
             shutil.rmtree(str(w.inc / b["exp"]))
     return w
 
@@ -525,7 +531,7 @@ def t_measure():
             "complete, never the stream's arm")
     from weed_optimizer_framework.tools.inc2 import recipes as RC
     dom = LS.load_domain("weed")
-    meas = [b for b in dom["baselines"]["items"] if b.get("measure")]
+    meas = [b for b in dom["baselines"]["items"] if b.get("measure") and not b.get("requires")]
     check("the domain's measurement baselines are inc2.recipes' measurement arms: capacity builds on base_v2, 3 seeds, "
           "not required; the decision's arms are L-4's grid",
           sorted(b["arm"] for b in meas) == sorted(RC.MEASURE_ARMS)
@@ -768,7 +774,7 @@ def t_native():
     w.native_record("b_v2_m832")
     w.job_done("inc_build_native_b_v2_s1024")
     w.native_record("b_v2_s1024")
-    meas = [b["exp"] for b in w.dom["baselines"]["items"] if b.get("measure")]
+    meas = [b["exp"] for b in w.dom["baselines"]["items"] if b.get("measure") and b.get("native") is not False]
     for exp in meas[2:]:            # the box-quality arms (2026-10-01), read at 640, in the domain's order
         w.tick(3)
         pro = [(e.get("argv") or [])[-3] for e in w.events("proposed") if e.get("lever") == "L23N"]
@@ -1833,8 +1839,192 @@ def t_d28_v2_round3():
           and "intake batch i0003_legacy" in data.get("why", ""), data)
 
 
+def _e1_items(dom):
+    return [b for b in dom["baselines"]["items"] if b.get("requires") == "base3"]
+
+
+def _e1_world(tag):
+    """R0 complete, every other measurement arm built and rescored; splits v3 (E1's base), E1's arms and their
+    agnostic rescore missing."""
+    w = World(tag)
+    w.ready_r0()
+    (w.inc / "splits" / "v3" / "summary.json").unlink()
+    for b in _e1_items(w.dom):
+        shutil.rmtree(str(w.inc / b["exp"]))
+    return w
+
+
+def t_e1():
+    section("E1 (2026-10-03): base v3's build (L23V), the arms on splits v3 with cold_budget (L23B, role baseline, "
+            "priced from the budget), their agnostic rescore and verdict (L23E); record only")
+    dom = LS.load_domain("weed")
+    e1 = _e1_items(dom)
+    check("the domain's E1 arms: e1_a on splits/v3/base_v2_weed.jsonl then e1_b on base_v3_weed.jsonl, m640, role "
+          "baseline, 3 seeds, measure (record only), requires base3, never read at a native resolution, the budget "
+          "1.2M image-epochs at 14.2 ms",
+          [b["id"] for b in e1] == ["e1_a", "e1_b"]
+          and [b["manifest"] for b in e1] == ["splits/v3/base_v2_weed.jsonl", "splits/v3/base_v3_weed.jsonl"]
+          and all(b["arm"] == "m640" and b["role"] == "baseline" and b["seeds"] == "0,1,2" and b["measure"]
+                  and b["native"] is False and not b.get("required")
+                  and b["budget"] == {"image_epochs": 1200000, "ms_per_image_epoch": 14.2} for b in e1)
+          and dom["e1"]["arms"] == {"A": "e1_a", "B": "e1_b"}, [(b["id"], b.get("manifest")) for b in e1])
+    pa = {"pkg": "inc2", "exp": "e1_a_m640", "manifest": LS.inc_path("splits/v3/base_v2_weed.jsonl"),
+          "seeds": "0,1,2", "arm": "m640", "role": "baseline"}
+    est_a, det = LS.price("L23B", pa, dom, {"images": 6811, "budget": e1[0]["budget"]})
+    est_b, _d = LS.price("L23B", dict(pa, exp="e1_b_m640"), dom, {"images": 30000, "budget": e1[1]["budget"]})
+    want = 3 * 1.2e6 * 14.2 / 3.6e6 + LS.cost(dom, "finals_hours") + LS.cost(dom, "build_job_hours")
+    old, _d = LS.price("L23B", pa, dom, {"images": 30000})
+    check("an E1 arm is priced from its budget, whatever N: 3 x 1.2M x 14.2 ms + finals + the build job = %.2f GPU-h "
+          "for 6,811 and for 30,000 images (the 100-epoch basis would say %.1f at 30,000)" % (est_a, old),
+          abs(est_a - want) < 1e-6 and abs(est_b - want) < 1e-6 and det["estimator"] == "budget" and old > est_b, det)
+    ev, dv = LS.price("L23V", PARAMS["L23V"], dom, {})
+    ee, de = LS.price("L23E", PARAMS["L23E"], dom, {"runs": 6})
+    check("L23V is one build job (%.1f GPU-h, its walltime); L23E six scoring passes (%.2f GPU-h)" % (ev, ee),
+          ev == LS.cost(dom, "build_job_hours") and ee == 1.5, (dv, de))
+    ok, bad = LS.check_params("L23B", LS.policy_params("L23B", pa))
+    back = X.params_from_argv("inc_build_baseline_v2", LS.render("L23B", LS.policy_params("L23B", pa)))
+    check("the role enum admits 'baseline' (the policy row and the executor read L23B --role baseline back)",
+          ok and back == LS.policy_params("L23B", pa), (bad, back))
+    for args, want_ok, name in (
+            (["inc2.base3", "build", "--stream", "weed_stream_v1"], True, "inc_build_base3_v3"),
+            (["inc2.base3", "build"], False, None),
+            (["inc2.base3", "build", "--stream", "weed_stream_v1", "--exp", "x"], False, None),
+            (["inc2.baseline", "rescore-agnostic", "--exp", "e1_b_m640", "--reference", "e1_a_m640"], True,
+             "inc_build_agnostic_e1_b_m640"),
+            (["inc2.baseline", "rescore-agnostic", "--exp", "e1_b_m640"], False, None),
+            (["inc2.baseline", "build", "--exp", "e1_a_m640", "--manifest", pa["manifest"], "--seeds", "0,1,2",
+              "--arm", "m640", "--role", "baseline"], True, "inc_build_e1_a_m640")):
+        try:
+            req = SR.parse_submit("build", args)
+            got, jn = True, SR.job_name(req, {})
+        except R.Refused:
+            got, jn = False, None
+        check("the cluster's build grammar %s %s%s" % ("admits" if want_ok else "refuses", " ".join(args[:2]),
+                                                       " (job %s)" % name if name else ""),
+              got == want_ok and (name is None or jn == name), (got, jn))
+    check("the evidence allow-lists splits/v3/summary.json, <exp>/agnostic_rescore.json and capacity/e1_v1.json, "
+          "never the report, a manifest or the holdout lists",
+          E.allowed("splits/v3/summary.json") and E.allowed("e1_b_m640/agnostic_rescore.json")
+          and E.allowed("capacity/e1_v1.json") and not E.allowed("capacity/e1_v1_report.json")
+          and not E.allowed("splits/v3/base_v3_weed.jsonl") and not E.allowed("splits/v3/test_v1/a.jsonl"))
+    w = _e1_world("e1")
+    cap0 = (w.inc / "capacity" / "capacity_v1.json").read_bytes()
+    w.tick(3)
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L23V"]
+    ex = [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23V"]
+    first = pro[0] if pro else {}
+    check("R0 complete, the other measurement arms built and rescored, splits v3 missing: DR0 proposes the base v3 "
+          "build once (L23V inc2.base3 build --stream SID), within the envelope, citing only the lock and /stage/base3; "
+          "no E1 arm before it",
+          len(pro) == 1 and (first.get("argv") or [])[-4:] == ["weed_optimizer_framework.tools.inc2.base3", "build",
+                                                                 "--stream", w.sid] and ex == ["envelope"]
+          and sorted(c.get("pointer") for c in first.get("cites") or []) == ["/stage/base3", "/stage/lock"]
+          and not [e for e in w.events("proposed") if e.get("lever") == "L23B"],
+          ([(e.get("argv") or [])[-4:] for e in pro], ex, first.get("cites")))
+    check("  one GPU-shared run_inc2_build.sh job under its own name, inc_build_base3_v3",
+          [x["name"] for x in w.submits if "inc2.base3" in x["argv"]] == ["inc_build_base3_v3"]
+          and all("GPU-shared" in x["argv"] for x in w.submits if "inc2.base3" in x["argv"]))
+    w.tick(3)
+    check("  while it runs it is not proposed again, and no E1 arm is (they require splits v3)",
+          len([e for e in w.events("proposed") if e.get("lever") == "L23V"]) == 1
+          and w.state()["stage"]["r0"].get("base3") == "running"
+          and not [e for e in w.events("proposed") if e.get("lever") == "L23B"])
+    w.job_done("inc_build_base3_v3")
+    w.base3_summary()
+    w.tick(3)
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L23B"]
+    first = pro[0] if pro else {}
+    check("splits v3 complete: E1-A is proposed (L23B --manifest splits/v3/base_v2_weed.jsonl --arm m640 --role "
+          "baseline), priced from the budget (%s GPU-h), within the envelope" % first.get("est_gpu_hours"),
+          [e.get("child_exp") for e in pro] == ["e1_a_m640"]
+          and (first.get("argv") or [])[-8:] == ["--manifest", pa["manifest"], "--seeds", "0,1,2", "--arm", "m640",
+                                                  "--role", "baseline"]
+          and abs(float(first.get("est_gpu_hours") or 0) - want) < 1e-6
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23B"] == ["envelope"]
+          and "/stage/base3" in [c.get("pointer") for c in first.get("cites") or []],
+          ([(e.get("child_exp"), (e.get("argv") or [])[-8:]) for e in pro], first.get("est_gpu_hours")))
+    w.experiment("e1_a_m640", done=False)
+    w.job_done("inc_build_e1_a_m640")
+    w.tick(3)
+    pro = [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"]
+    check("then E1-B (base_v3_weed.jsonl), once", pro == ["e1_a_m640", "e1_b_m640"], pro)
+    w.experiment("e1_b_m640", done=False)
+    w.job_done("inc_build_e1_b_m640")
+    w.tick(3)
+    check("  while the arms run: no rescore of either (no L23N: native false; no L23E: not done)",
+          not [e for e in w.events("proposed") if e.get("lever") in ("L23N", "L23E")])
+    w.experiment("e1_a_m640", done=True)
+    w.tick(3)
+    check("  E1-A done, E1-B still running: no L23E (it needs both arms done)",
+          not [e for e in w.events("proposed") if e.get("lever") in ("L23N", "L23E")])
+    w.experiment("e1_b_m640", done=True)
+    w.tick(3)
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L23E"]
+    first = pro[0] if pro else {}
+    check("both done: their agnostic rescore and E1's verdict, once (L23E rescore-agnostic --exp e1_b_m640 "
+          "--reference e1_a_m640, 1.5 GPU-h), within the envelope; still no L23N for them",
+          [(e.get("argv") or [])[-5:] for e in pro] == [["rescore-agnostic", "--exp", "e1_b_m640", "--reference",
+                                                         "e1_a_m640"]]
+          and abs(float(first.get("est_gpu_hours") or 0) - 1.5) < 1e-9
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23E"] == ["envelope"]
+          and [x["name"] for x in w.submits if "rescore-agnostic" in x["argv"]] == ["inc_build_agnostic_e1_b_m640"]
+          and not [e for e in w.events("proposed") if e.get("lever") == "L23N"],
+          ([(e.get("argv") or [])[-5:] for e in pro], first.get("est_gpu_hours")))
+    w.job_done("inc_build_agnostic_e1_b_m640")
+    w.agnostic_record("e1_b_m640")
+    w.tick(3)
+    d = _diags(w)
+    check("its record complete: nothing of E1 is proposed again (DR0 silent); the stream's arm and capacity_v1.json "
+          "are unchanged, no LA",
+          len([e for e in w.events("proposed") if e.get("lever") == "L23E"]) == 1 and not d["DR0"]["fired"]
+          and w.state()["capacity"]["chosen"] == "n640"
+          and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0
+          and not [e for e in w.events("proposed") if e.get("lever") == "LA"], d["DR0"]["summary"])
+    wf = _e1_world("e1_fail")
+    wf.tick(3)
+    wf.job_done("inc_build_base3_v3", state="FAILED", refusal="[inc2.base3] ERROR: refused")
+    wf.tick(3)
+    st = wf.state()
+    cards = [c["title"] for c in st.get("cards") or []]
+    check("the base v3 build FAILED: one card, never a pause or a held lane, it stays failed (not proposed again) and "
+          "no E1 arm is built",
+          not st.get("paused") and wf.config().get("enabled") is True
+          and cards == ["Base v3 build (splits v3, E1) failed (L23V)"]
+          and len([e for e in wf.events("proposed") if e.get("lever") == "L23V"]) == 1
+          and st["stage"]["r0"].get("base3") == "failed" and not wf.lane("MAINT").get("hold")
+          and not int(wf.lane("MAINT").get("fails") or 0)
+          and not [e for e in wf.events("proposed") if e.get("lever") == "L23B"], (cards, st["stage"]["r0"]))
+    for tag, status in (("e1_wall", "over_walltime"), ("e1_nosum", None)):
+        ww = _e1_world(tag)
+        ww.tick(3)
+        ww.job_done("inc_build_base3_v3")
+        if status:
+            ww.base3_summary(status=status)
+        ww.tick(3)
+        d = _diags(ww)
+        check("the base v3 job ended %s: splits v3 is not done, so no E1 arm is built and L23V is not proposed again "
+              "(DR0 silent)" % ("with summary.json status over_walltime" if status else "without a summary.json"),
+              not [e for e in ww.events("proposed") if e.get("lever") == "L23B"]
+              and len([e for e in ww.events("proposed") if e.get("lever") == "L23V"]) == 1
+              and not d["DR0"]["fired"], ([e.get("lever") for e in ww.events("proposed")], d["DR0"]["summary"]))
+    wu = _e1_world("e1_uncertain")
+    wu.lose_reply = "inc2.base3"
+    wu.tick(2)
+    it = wu.lane("MAINT").get("item") or {}
+    check("an L23V submission whose outcome is unknown pauses nothing: it is followed by its job name",
+          not wu.state().get("paused") and it.get("lever") == "L23V" and it.get("status") == "running"
+          and it.get("uncertain"), (it.get("lever"), it.get("status"), wu.state().get("paused")))
+    wu.job_done("inc_build_base3_v3")
+    wu.base3_summary()
+    wu.tick(3)
+    check("  and done once splits/v3/summary.json says complete (E1-A follows)",
+          any(e.get("lever") == "L23V" for e in wu.events("item_done"))
+          and [e.get("child_exp") for e in wu.events("proposed") if e.get("lever") == "L23B"] == ["e1_a_m640"],
+          [e.get("lever") for e in wu.events("proposed")])
+
+
 def main():
-    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_formats,
+    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_e1, t_formats,
                t_replay_gate,
                t_config, t_lab, t_lanes, t_d28, t_d28_v2, t_d28_v2_sources, t_d28_v2_round3):
         try:

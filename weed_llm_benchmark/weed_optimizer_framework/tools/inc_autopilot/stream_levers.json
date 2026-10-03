@@ -484,6 +484,52 @@
    "estimator": "rescore",
    "note": "Record only, like the measurement arms themselves: proposed once per arm, when its experiment is done and its native scores are missing; a failure is a person's card, never a failed step of the lane, and it is not proposed again."
   },
+  "L23V": {
+   "name": "base3_build",
+   "title": "Build splits v3, E1's base: every admitted weed box as class 12, the main-test holdout v1, under the stream's source quarantines",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_build_base3",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.base3",
+    "build",
+    "--stream",
+    "{stream}"
+   ],
+   "control": "base_v2 (LOCK v2, by sha256): arm A is base_v2 whole, every box class 12, byte-identical inside arm B.",
+   "success": "INC_DIR/splits/v3/summary.json complete: both arms' manifests by sha256, per-source counts, the holdout lists.",
+   "falsifier": "inc2.train's check_manifest and guard_rows refuse a manifest; or arm B is not larger than arm A.",
+   "estimator": "zero_job",
+   "note": "E1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-03, pre-registered). Record only: proposed once, in MAINT, once R0 is complete and an E1 arm that requires it is next; a failure is a person's card, never a failed step, and it is not proposed again."
+  },
+  "L23E": {
+   "name": "rescore_agnostic",
+   "title": "Score E1's final runs on dev for their class-agnostic per-image arrays, then record E1's verdict",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_rescore_agnostic",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.baseline",
+    "rescore-agnostic",
+    "--exp",
+    "{exp}",
+    "--reference",
+    "{reference}"
+   ],
+   "control": "E1-A (base_v2, every box class 12, the same recipe and budget).",
+   "success": "scores/dev.agnostic.json of every final run, <exp>/agnostic_rescore.json complete, and capacity/e1_v1.json (dev only).",
+   "falsifier": "E1-B qualifies only when its mean agnostic dev mAP50-95 beats E1-A's by more than 2 pooled sd and the paired image-bootstrap SE (pre-registered, 2026-10-03); nothing switches, test is read once per arm afterwards by a person.",
+   "estimator": "rescore",
+   "note": "Record only: proposed once, when both E1 arms are done and the record is missing; a failure is a person's card and it is not proposed again."
+  },
   "LV": {
    "name": "verdict",
    "title": "Record an R0 verdict: the canary, the capacity decision (L-4), Stage A",
@@ -821,11 +867,13 @@
    "L22",
    "L23B",
    "L23N",
+   "L23V",
+   "L23E",
    "L25",
    "L27",
    "L28",
    "LI"
   ],
-  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01). L23's splits build and lock always wait for a person (D-A's exact command)."
+  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03). L23's splits build and lock always wait for a person (D-A's exact command)."
  }
 }

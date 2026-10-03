@@ -11,7 +11,9 @@ Three lanes, one item in flight per lane:
     TRAIN  IDLE -> SEGMENT (L18, the experiment runs) -> COMMIT (L19) -> IDLE; L22 forks
     MAINT  IDLE -> R0 (L23 splits, L23B baselines, LV verdicts, L25 Stage A, LI init,
                 LA choose-arm, L28 Stage C) | NATIVE (L23N, a done measurement
-                arm's native-resolution rescore) | MILESTONE (L20) | COMPARE (LC)
+                arm's native-resolution rescore) | BASE3 (L23V, E1's base v3
+                build) | AGNOSTIC (L23E, E1's agnostic rescore and verdict)
+                | MILESTONE (L20) | COMPARE (LC)
                 | ROLLBACK (L21) | BISECT (L27) | AUDIT (L4) -> IDLE
 
 Each tick, in order (6.2):
@@ -136,15 +138,21 @@ STREAM_DEFAULTS = {"enabled": False, "paused_reason": None, "mode": "stream", "d
 LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "DATA", "L16R": "DATA",
            "L16RL": "DATA", "L16I": "DATA", "L16S": "DATA", "L17": "DATA", "L24": "STOP", "LH": "DATA",
            "L18": "TRAIN", "L19": "TRAIN", "L22": "TRAIN",
-           "L20": "MAINT", "L21": "MAINT", "L23": "MAINT", "L23B": "MAINT", "L23N": "MAINT", "L25": "MAINT",
+           "L20": "MAINT", "L21": "MAINT", "L23": "MAINT", "L23B": "MAINT", "L23N": "MAINT", "L23V": "MAINT",
+           "L23E": "MAINT", "L25": "MAINT",
            "L27": "MAINT", "L28": "MAINT", "L4": "MAINT", "LV": "MAINT", "LI": "MAINT", "LA": "MAINT", "LC": "MAINT"}
-# Record-only levers (a measurement arm's native-resolution rescore, L23N): a
+# Record-only levers (a measurement arm's native-resolution rescore, L23N;
+# E1's base v3 build, L23V, and its agnostic rescore, L23E, 2026-10-03): a
 # failure is a person's card, never a failed step of its lane (no stop-loss
 # counts it), and the item is not proposed again (_failed); a submission whose
 # outcome is unknown is followed by its job name and its record, never a pause
 # (_follow_record_only). A qos refusal is a platform defect and holds the lane
 # as for every lever (S21).
-RECORD_ONLY_LEVERS = ("L23N",)
+RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E")
+# The failure card title of each record-only lever (_failed; "%s" is its --exp)
+RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
+                      "L23V": "Base v3 build (splits v3, E1) failed (L23V)",
+                      "L23E": "E1's agnostic rescore of %s failed (L23E)"}
 # A callable taking the StreamRun and returning its lab runner (tests).
 LAB_RUNNER = None
 # Refusals the identical request meets again (retry: false): a Step 1 batch
@@ -1208,12 +1216,27 @@ class StreamRun(object):
                 rec = self._artifact("%s/native_rescore.json" % b["exp"]) or {}
                 native[b["id"]] = "done" if rec.get("status") == "complete" else (
                     r0.get("native_%s" % b["id"]) or "missing")
+        # E1 (2026-10-03): splits v3 (L23V) is done once its summary says complete, else what the platform ran;
+        # E1's agnostic rescore (L23E) once its record says complete
+        b3 = self._artifact("splits/v3/summary.json") or {}
+        if b3.get("status") == "complete":
+            base3 = "done"
+        elif b3.get("status"):
+            base3 = str(b3["status"])           # over_walltime (or any other): no E1 arm builds on it
+        elif r0.get("base3") == "done":
+            base3 = "unconfirmed"               # its job ended, but no complete summary.json was shipped
+        else:
+            base3 = r0.get("base3") or "missing"
+        e1b = self._e1_exp("B")
+        ag = (self._artifact("%s/agnostic_rescore.json" % e1b) or {}) if e1b else {}
+        agnostic = "done" if ag.get("status") == "complete" else (r0.get("agnostic") or "missing")
 
         def state_of(exp, key):
             x = exp_status.get(exp)
             return x if x in ("done", "built") else ("building" if r0.get(key) == "building" else "missing")
         return {"lock": bool(lock.get("locked")), "splits_built": bool(r0.get("splits_built")),
                 "train_manifests": lock.get("train_manifests") or [], "baselines": base, "native": native,
+                "base3": base3, "agnostic": agnostic,
                 "exp_status": exp_status, "verdicts": dict(r0.get("verdicts") or {}),
                 "protocol_v3_accepted": bool(self.cfg.get("protocol_v3_accepted_by")),
                 "stage_a": {"exp": sa_exp, "status": state_of(sa_exp, "stage_a")},
@@ -1587,6 +1610,7 @@ class StreamRun(object):
                 "L16R": "COLLECT", "L16RL": "COLLECT", "L16S": "SYNC", "L16I": "INTAKE", "L17": "ADMIT",
                 "L24": "QUARANTINE", "LH": "HOLD_RELEASE", "L18": "SEGMENT", "L19": "COMMIT", "L22": "FORK",
                 "L20": "MILESTONE", "L21": "ROLLBACK", "L23": "SPLITS", "L23B": "BASELINE", "L23N": "NATIVE",
+                "L23V": "BASE3", "L23E": "AGNOSTIC",
                 "L25": "STAGE_A", "L27": "BISECT",
                 "L28": "STAGE_C", "L4": "AUDIT", "LV": "VERDICT", "LI": "INIT", "LA": "ARM",
                 "LC": "COMPARE"}.get(lever, "ITEM")
@@ -1776,6 +1800,8 @@ class StreamRun(object):
             child = b["exp"]
             info["images"] = b.get("images") or (dom.get("increment") or {}).get("base_images")
             info["arm"] = b.get("arm")
+            if isinstance(b.get("budget"), dict):
+                info["budget"] = dict(b["budget"])       # E1's cold_budget: priced from its image-epochs
         elif lever == "L23N":
             b = next(x for x in (dom.get("baselines") or {}).get("items") or []
                      if x["id"] == pr["baseline"] and x.get("measure"))
@@ -1784,6 +1810,17 @@ class StreamRun(object):
             parent = b["exp"]                     # it builds nothing: the job is followed by its id
             seeds = [x for x in str(b.get("seeds") or "").split(",") if x != ""]
             info["runs"] = 2 * len(seeds) if seeds else None
+        elif lever == "L23V":
+            params = {"pkg": pkg, "stream": self.sid}
+        elif lever == "L23E":
+            eb, ea = self._e1_exp("B"), self._e1_exp("A")
+            if not (eb and ea):
+                return None
+            params = {"pkg": pkg, "exp": eb, "reference": ea}
+            parent = eb                           # it builds nothing: the job is followed by its id
+            n = sum(len([x for x in str(b.get("seeds") or "").split(",") if x != ""])
+                    for b in self._e1_items().values())
+            info["runs"] = n or None
         elif lever == "L25":
             sa = dom.get("stage_a") or {}
             params = {"pkg": pkg, "exp": sa["exp"], "from_exp": sa["from_exp"], "recipes": sa["recipes"]}
@@ -2456,6 +2493,10 @@ class StreamRun(object):
             b = self._native_item(params)
             if b:
                 r0["native_%s" % b["id"]] = "running"
+        elif lever == "L23V":
+            r0["base3"] = "running"
+        elif lever == "L23E":
+            r0["agnostic"] = "running"
         elif lever == "L25":
             r0["stage_a"] = "building"
         elif lever == "L28":
@@ -2558,6 +2599,8 @@ class StreamRun(object):
             b = self._native_item(params)
             if b:
                 st["stage"].setdefault("r0", {})["native_%s" % b["id"]] = "done"
+        elif lever in ("L23V", "L23E"):
+            st["stage"].setdefault("r0", {})["base3" if lever == "L23V" else "agnostic"] = "done"
         elif lever == "LV":
             key = p.get("verdict_key") or params.get("exp") or params.get("verb")
             st["stage"]["r0"].setdefault("verdicts", {})[key] = self.utc
@@ -2619,19 +2662,31 @@ class StreamRun(object):
                 self._clear(ln)
                 return
         if lever in RECORD_ONLY_LEVERS:
-            # record only (a measurement arm's native-resolution rescore): a person's card; the lane's
-            # failure count, its step count and its stop-loss are not touched, and the item stays failed,
-            # so DR0 does not propose it again (a person reruns it, or leaves it)
-            b = self._native_item(params)
-            if b:
-                st["stage"].setdefault("r0", {})["native_%s" % b["id"]] = "failed"
+            # record only (a measurement arm's native-resolution rescore; E1's base v3 build and agnostic
+            # rescore): a person's card; the lane's failure count, its step count and its stop-loss are not
+            # touched, and the item stays failed, so DR0 does not propose it again (a person reruns it, or
+            # leaves it)
+            r0 = st["stage"].setdefault("r0", {})
+            if lever == "L23N":
+                b = self._native_item(params)
+                if b:
+                    r0["native_%s" % b["id"]] = "failed"
+                rerun = "inc2.baseline rescore-native --exp %s" % params.get("exp")
+            elif lever == "L23V":
+                r0["base3"] = "failed"
+                rerun = "inc2.base3 build --stream %s (after moving splits/v3 aside if it is partial)" % params.get(
+                    "stream")
+            else:
+                r0["agnostic"] = "failed"
+                rerun = "inc2.baseline rescore-agnostic --exp %s --reference %s" % (params.get("exp"),
+                                                                                   params.get("reference"))
             st["declined"] = (list(st.get("declined") or []) + [p["id"]])[-200:]
             self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
                          charged=charged, record_only=True)
-            self._card("escalation", "Native-resolution rescore of %s failed (%s)" % (params.get("exp"), lever),
-                       "%s. Record only: the stream runs on and the rescore is not proposed again; a person reruns "
-                       "inc2.baseline rescore-native --exp %s or leaves it" % (_short(why, 400), params.get("exp")),
-                       lever=lever, trigger=list(p.get("trigger") or []))
+            title = RECORD_ONLY_TITLES[lever]
+            self._card("escalation", title % params.get("exp") if "%s" in title else title,
+                       "%s. Record only: the stream runs on and it is not proposed again; a person reruns %s or "
+                       "leaves it" % (_short(why, 400), rerun), lever=lever, trigger=list(p.get("trigger") or []))
             self._clear(ln)
             return
         if not retry:
@@ -3119,23 +3174,33 @@ class StreamRun(object):
                     st.setdefault("frozen", {})[exp] = {"utc": self.utc}
         self._health(payload)
 
-    def _follow_record_only(self, ln, it, queued, names, arts):
-        """A record-only item (L23N) whose submission's outcome is unknown: it
-        runs while a job of its name is queued; then it is done once its record
-        (<exp>/native_rescore.json) says complete, and failed (record only: a
-        card) after BUILD_LOST_SNAPSHOTS snapshots with neither."""
+    @staticmethod
+    def _record_only_follow(it):
+        """(job name, record artifact) a record-only item is followed by."""
         from . import stream_remote as SR
-        exp = ((it["proposal"].get("params") or {}).get("exp"))
-        if queued is None or (SR.NATIVE_JOB_NAME % exp) in names:
+        prm = it["proposal"].get("params") or {}
+        if it["lever"] == "L23V":
+            return SR.BASE3_JOB_NAME, "splits/v3/summary.json"
+        if it["lever"] == "L23E":
+            return SR.AGNOSTIC_JOB_NAME % prm.get("exp"), "%s/agnostic_rescore.json" % prm.get("exp")
+        return SR.NATIVE_JOB_NAME % prm.get("exp"), "%s/native_rescore.json" % prm.get("exp")
+
+    def _follow_record_only(self, ln, it, queued, names, arts):
+        """A record-only item (L23N, L23V, L23E) whose submission's outcome is
+        unknown: it runs while a job of its name is queued; then it is done
+        once its record (<exp>/native_rescore.json, splits/v3/summary.json,
+        <exp>/agnostic_rescore.json) says complete, and failed (record only: a
+        card) after BUILD_LOST_SNAPSHOTS snapshots with neither."""
+        job, record = self._record_only_follow(it)
+        if queued is None or job in names:
             return
-        if ((arts.get("%s/native_rescore.json" % exp) or {}).get("status")) == "complete":
+        if ((arts.get(record) or {}).get("status")) == "complete":
             self._done(ln, it)
             return
         it["lost"] = int(it.get("lost") or 0) + 1
         if it["lost"] >= BUILD_LOST_SNAPSHOTS:
             self._failed(ln, it, "its submission's outcome was unknown, and in %d snapshots no job named %s was queued "
-                                 "and %s/native_rescore.json was not complete" % (it["lost"], SR.NATIVE_JOB_NAME % exp,
-                                                                                  exp), charged=True)
+                                 "and %s was not complete" % (it["lost"], job, record), charged=True)
 
     def _settle_build_job(self, it, queued, sacct):
         """6.6: the build job itself (run_inc2_build.sh holds one V100 on
@@ -3300,6 +3365,16 @@ class StreamRun(object):
     def _measure_exps(self):
         """The measurement arms' experiments (baselines marked measure)."""
         return {b["exp"] for b in ((self.dom or {}).get("baselines") or {}).get("items") or [] if b.get("measure")}
+
+    def _e1_items(self):
+        """{'A': item, 'B': item} of E1's baselines (stream-domain e1.arms), or {}."""
+        e1 = (self.dom or {}).get("e1") or {}
+        items = {b["id"]: b for b in ((self.dom or {}).get("baselines") or {}).get("items") or []}
+        return {k: items[i] for k, i in sorted((e1.get("arms") or {}).items()) if i in items}
+
+    def _e1_exp(self, arm):
+        """The experiment of E1's arm 'A' or 'B', or None."""
+        return (self._e1_items().get(arm) or {}).get("exp")
 
     def _native_item(self, params):
         """The measurement baseline an L23N item rescores (by its --exp), or None."""

@@ -408,6 +408,16 @@ def price(lid, params, dom, info=None):
     if kind == "baseline":
         imgs = int(info.get("images") or n)
         s = len([x for x in str(p.get("seeds") or "").split(",") if x != ""]) or seeds
+        bud = info.get("budget")
+        if isinstance(bud, dict):
+            # E1's equal-compute recipe (2026-10-03): every base run trains the same image-epochs at the arm's
+            # measured rate, whatever its N; priced from the budget, never from the images
+            ie, ms = float(bud["image_epochs"]), float(bud["ms_per_image_epoch"])
+            exp_h = s * ie * ms / 3.6e6 + finals
+            return round(exp_h + build, 3), dict(detail, estimator="budget", seeds=s, image_epochs=ie,
+                                                 ms_per_image_epoch=ms, finals=finals, build_job_hours=build,
+                                                 why="cold_budget: seeds x image-epochs x the arm's measured rate, "
+                                                     "plus the finals and the build job")
         exp_h = _hours(s * imgs, ep_cold, cold_ms) * factor + finals
         return round(exp_h + build, 3), dict(detail, seeds=s, images=imgs, factor=factor, build_job_hours=build)
     if kind == "pilot4":

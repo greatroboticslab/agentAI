@@ -13,6 +13,45 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-03 (later) — E1 pre-registered: does a much larger weed-box set place better boxes?
+
+**Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap 0.021; class-agnostic 0.8901, so the boxes cap it. Training set 7,493 images (P_1); nothing added since s001.
+
+**E1 (pre-registered, docs/CONTINUOUS_LOOP.md "Amendment (2026-10-03): E1").** Every weed box of every admitted source becomes INC class 12, so the models are one-class weed detectors the existing checks and the locked scorer accept. E1-A = base_v2 (6,811 images); E1-B = E1-A + every admitted external weed source. YOLO11m@640, 3 seeds, 1.2M image-epochs each (A 176 epochs; B 52 at the as-is 23,230 images, 40 lifted). Verdict on dev only: mean agnostic dev(B) − mean(A) > 2 pooled sd and > the paired image-bootstrap SE. Test is read once per arm after the verdict.
+
+**Base v3, rehearsed read-only on the cluster (stored hashes; the embedding check and D28-v2 pair cosines run in the build job):**
+
+Run 2026-10-03 09:23 UTC on the login node (config sha256 `a077e116…`, ledger head `acba1337…`, 1,121 s). "As is" applies the stream's 12 quarantines; "lifted" assumes a person lifted the four quarantined sources the config includes.
+
+| source | files | in B, as is | test v1, as is | in B, lifted | test v1, lifted | what removed the rest (as is) |
+|---|---:|---:|---:|---:|---:|---|
+| base_v2 (arm A, exempt) | 6,811 | 6,811 | 0 | 6,811 | 0 | nothing |
+| MH-Weed16 | 5,000 | 4,590 | 400 | 4,590 | 400 | 7 without a weed box, 2 base copies, 1 duplicate |
+| rf_tuf | 8,700 | 0 | 0 | 4,784 | 400 | D28 quarantine (6,768); 1,843 without a weed box; 88 with a box > 90 % |
+| rf_zbm50 | 1,977 | 0 | 0 | 1,666 | 296 | D28 quarantine (1,970) |
+| dock family, 16 slugs (*Rumex obtusifolius*) | 39,903 | 5,496 | 1,471 | 5,466 | 1,501 | 32,290 duplicates (9 slugs are whole re-exports of one release: 17,507); 38 base copies; 608 without a weed box |
+| MFWD (intake, POROL + Weed) | 4,079 | 1,883 | 0 | 1,883 | 0 | 2,021 duplicates (tray time series); 175 with no box left after masking; no capture group eligible for test v1 |
+| rf_school | 2,071 | 1,748 | 308 | 1,746 | 310 | 13 duplicates, 2 base copies |
+| gh_tehreemnoor (DeepWeeds boxes) | 2,006 | 1,354 | 239 | 1,354 | 239 | 245 with a box > 90 %; 167 without a weed box |
+| CottonWeedDet3 (intake) | 795 | 727 | 12 | 727 | 12 | 40 intake holds; 16 with a box > 90 %; its 682 P_1 rows are never held out |
+| rf_itmo | 787 | 565 | 100 | 564 | 101 | 122 without a forb box |
+| rf_kinjj | 87 | 56 | 30 | 56 | 30 | 1 without a weed box; min 30 to test v1 |
+| rf_srec fqrtg | 6,552 | 0 | 0 | 0 | 0 | convention rule: median side 28.4 px < 32 (also D28-quarantined) |
+| rf_weed-tnf9e | 10,000 | 0 | 0 | 0 | 0 | convention rule: median side 16.4 px, 47.5 % of boxes < 16 px (also D28-quarantined) |
+| **total** | **88,768** | **23,230** | **2,560** | **29,647** | **3,289** | |
+
+Arm A 6,811 images (25,703 boxes). **Arm B as is 23,230 images** (107,534 boxes, 17,820 distinct photos; recipe 52 epochs, close_mosaic 5); **lifted 29,647** (114,842 boxes; 40 epochs). Test v1 2,560 images (lifted 3,289). Guard on the originals' hashes: 6 `near_eval_variant` refusals (3 rf_tuf, 3 rf_zbm50), 83 external copies of base_v2 rows. 1,566 arm-B rows (large files without stored variants) and the embedding check are judged by the build job, which can only drop more.
+
+**Why base v3 is under 30,000 images, and what raises it without changing the rules.**
+- rf_tuf and rf_zbm50 are D28-quarantined (6,450 train + 696 test-v1 images between them). Lifting them (the entry below found all 12 quarantines dHash false positives, pair cosine at most 0.744) gives 29,647, 353 short; a person lifts them once D28-v2's sidecars confirm.
+- rf_srec fqrtg (6,552 files, median box side 28.4 px) and rf_weed-tnf9e (10,000 files, median 16.4 px, 47.5 % under 16 px) fail the convention rule whether lifted or not.
+- The 16 dock slugs (39,903 files) largely share one *Rumex* release: 32,290 copies, 6,967 distinct rows left (5,496 train, 1,471 test v1). MFWD loses 2,021 of 4,079 to near copies.
+- Test v1 takes 2,560 images.
+- What raises it without a rule change: new admitted supply added to the allow-list (`base3_v2.json`, a source list): SIU `zenodo_15808623` (about 203K images; main's ce98b15 lets it reach Step 1's queue) and the full MH-Weed16 release (the registry holds 5,000). Neither is measured against the rules yet.
+
+**Built for the platform.** `inc2.base3 build` (lever L23V), `inc2.baseline rescore-agnostic` (L23E, the verdict), E1's arms as record-only measure baselines that wait for splits v3, priced from the budget (19.0 GPU-h each). The build measures arm B's data loader and refuses to mark splits v3 complete if a base run would pass D26's 6.4 h line.
+
+
 ## 2026-10-03 — Model swaps exhausted; the data lane was stalled 21 h by a broken 49.7 GB download
 
 **Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap 0.021. Training set 7,493 images; nothing added since segment s001 (2026-10-01).

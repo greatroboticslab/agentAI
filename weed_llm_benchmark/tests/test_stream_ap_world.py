@@ -682,6 +682,25 @@ class World(object):
             "seeds": [0, 1, 2], "written_utc": utc(self.t[0]),
             "reference": {"exp": ((self.dom["capacity"].get("native") or {}).get("reference_exp")), "imgsz": 640}})
 
+    def base3_summary(self, status="complete"):
+        """inc2.base3 build's splits/v3/summary.json (E1's base, 2026-10-03):
+        both arms' manifests by sha256 and per-source counts."""
+        self._w("splits/v3/summary.json", {
+            "format": "inc2-base3-summary/1", "status": status, "version": "v3", "built_utc": utc(self.t[0]),
+            "arms": {"A": {"name": "base_v2_weed", "sha256": "a" * 64, "images": 6811},
+                     "B": {"name": "base_v3_weed", "sha256": "b" * 64, "images": 23800}},
+            "holdout_v1": {"images": 3300}, "per_source": {"base_v2": {"in_B": 6811}}})
+
+    def agnostic_record(self, exp, status="complete"):
+        """inc2.baseline rescore-agnostic's record (<exp>/agnostic_rescore.json:
+        E1's final runs scored for their class-agnostic per-image arrays)."""
+        e1 = self.dom.get("e1") or {}
+        items = {b["id"]: b for b in self.dom["baselines"]["items"]}
+        ref = (items.get((e1.get("arms") or {}).get("A")) or {}).get("exp")
+        self._w("%s/agnostic_rescore.json" % exp, {"format": "inc2-agnostic-rescore/1", "exp": exp, "reference": ref,
+                                                   "status": status, "seeds": [0, 1, 2], "exam": "dev",
+                                                   "written_utc": utc(self.t[0])})
+
     def native_verdict_file(self, qualifying=(), decided=None):
         """inc2.baseline native-verdict's record (capacity/native_v1.json, dev
         only): each decided arm with its rule's numbers; `qualifying` the arms
@@ -904,7 +923,9 @@ class World(object):
         stream created with its arm adopted; Stage C built and read (M
         feasible); the placement; Step 1's one-time jobs. The measurement
         arms are done and rescored at their own resolution (their
-        native_rescore.json records), so no S-case waits on their L23N."""
+        native_rescore.json records), so no S-case waits on their L23N; E1's
+        base v3 is built and its arms rescored (splits/v3/summary.json and
+        the agnostic record), so none waits on L23V or L23E either."""
         self.lock()
         if bootstrap:
             self.step1_status()
@@ -914,6 +935,11 @@ class World(object):
             self.experiment(b["exp"], final=[self.final_row("base base_v2", 0.812, 0.002, 5)])
             if b.get("measure"):
                 self.native_record(b["exp"])
+        e1 = self.dom.get("e1") or {}
+        if e1.get("arms"):
+            self.base3_summary()
+            items = {b["id"]: b for b in self.dom["baselines"]["items"]}
+            self.agnostic_record(items[e1["arms"]["B"]]["exp"])
         self.canary_file()
         self.capacity_file()
         sa = self.dom["stage_a"]

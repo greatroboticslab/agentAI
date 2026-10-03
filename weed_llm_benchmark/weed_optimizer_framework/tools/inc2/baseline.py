@@ -558,6 +558,36 @@ def resolve_role(role, locked, arm, union=False):
     return role
 
 
+def e1_record(manifest_sha, role, arm):
+    """E1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-03): when a 'baseline'
+    build trains one of the two manifests a complete splits/v3/summary.json
+    records (by sha256, the manifest still hashing so), the record exp.json
+    carries (the arm A or B, the summary's sha256, both manifests' sha256s),
+    and the build trains inc2.recipes.cold_budget; else None (the cold
+    table). An E1 manifest on another arm than the pre-registered one
+    refuses."""
+    if role != "baseline":
+        return None
+    from . import base3 as B3
+    k, summ = B3.e1_arm_of(manifest_sha)
+    if k is None:
+        return None
+    if arm not in RC.BUDGET_ARMS:
+        raise BaselineError("E1's arms train on %s only (pre-registered), not %s" % (list(RC.BUDGET_ARMS), arm))
+    sp = B3.out_dir() / B3.SUMMARY
+    return {"arm": k, "summary": str(sp), "summary_sha256": _sha(sp),
+            "manifests": {a: (v or {}).get("sha256") for a, v in sorted((summ.get("arms") or {}).items())},
+            "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-03): E1, weed-box base v3 (pre-registered)"}
+
+
+def e1_claim(manifest, manifest_sha):
+    """inc2.base3.v3_claim: why a manifest belongs to a base v3 build (it lies
+    under splits/v3, or a base v3 summary records its sha256, whatever that
+    summary's status), or None. Such a manifest trains only as an E1 arm."""
+    from . import base3 as B3
+    return B3.v3_claim(manifest, manifest_sha)
+
+
 # ------------------------------------------------------------------- build
 def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None,
                      role=None, testing=False, extra=None, arch=None, imgsz=None):
@@ -591,9 +621,14 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
     except P.PilotError as e:
         raise BaselineError(str(e))
     exams = _final_exams(final_exams, role, arm_rec["id"])
-    drops = None
+    drops = e1 = None
     if union:
         srcs = [Path(os.path.abspath(str(p))) for p in union]
+        for p in srcs:
+            claim = e1_claim(p, _sha(p))
+            if claim:
+                raise BaselineError("%s is a base v3 manifest (%s): it trains only as an E1 arm, never in a union"
+                                    % (p, claim))
         rows, guard, parts = check_union(srcs, production=production)
         name = sanitise("%s_union" % exp)
         dst = paths.manifests / ("%s.jsonl" % name)
@@ -610,6 +645,12 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         if locked_name(sha, lock) != locked:
             raise BaselineError("%s changed while it was checked (the role was decided on other bytes)" % src)
         drops = variant_drops_record(sha, production=production) if role == "canary" else None
+        e1 = e1_record(sha, role, arm_rec["id"])
+        claim = e1_claim(src, sha)
+        if claim and e1 is None:
+            raise BaselineError("%s is a base v3 manifest (%s): it trains only as an E1 arm (role baseline on one of "
+                                "the two manifests a complete splits/v3/summary.json records, recipe cold_budget); "
+                                "this build (role %s) is not one, and would train the cold table" % (src, claim, role))
         name = sanitise(src.stem)
         dst = paths.manifests / ("%s.jsonl" % name)
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -617,15 +658,22 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         if C.sha256_file(dst) != sha:
             raise BaselineError("copy of %s does not hash like the manifest that was checked" % src)
         source = {"source_manifest": str(src), "source_locked": locked_name(sha, lock)}
-    cost = RC.baseline_cost(len(rows), seeds, exams, arm_rec["id"])
+    if e1 is not None:
+        recipe = RC.cold_budget(arm_rec["id"], len(rows))
+        cost = RC.budget_cost(len(rows), seeds, exams, arm_rec["id"])
+    else:
+        recipe = RC.cold(arm_rec["id"])
+        cost = RC.baseline_cost(len(rows), seeds, exams, arm_rec["id"])
     defn = {"exp": exp, "type": "baseline", "builder": BUILDER, "role": role, "testing": testing,
             "seeds": list(seeds), "decision_exam": D.DECISION_EXAM, "final_exams": exams,
-            "base": dict(P._entry(name, dst, rows, sha, recipe=RC.cold(arm_rec["id"])), **source),
+            "base": dict(P._entry(name, dst, rows, sha, recipe=recipe), **source),
             "cost_estimate": cost, "research_only": research_only_record(rows),
             "splits_v2": {"lock": lock["lock"], "lock_sha256": lock["lock_sha256"],
                           "nevertrain_sha256": lock["index_sha256"]}}
     if drops is not None:
         defn["variant_drops"] = drops
+    if e1 is not None:
+        defn.update(recipe_name=RC.BUDGET_NAME, budget=RC.budget_record(arm_rec["id"], len(rows)), e1=e1)
     defn.update(RC.stamp(arm_rec))
     if extra:
         defn.update(extra)
@@ -640,11 +688,13 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
     summary = {"exp": exp, "testing": bool(testing), "built_utc": D._utc(), "builder": BUILDER, "role": role,
                "seeds": list(seeds), "arm": arm_rec, "final_exams": exams,
                "manifest": dict(P.manifest_summary(rows, sha, info), name=name, copy=str(dst), **source),
-               "splits_v2": lock, "cold_recipe": RC.cold(arm_rec["id"]),
-               "warmup": {"base": P.effective_warmup(RC.cold(arm_rec["id"]), len(rows))},
+               "splits_v2": lock, "cold_recipe": recipe,
+               "warmup": {"base": P.effective_warmup(recipe, len(rows))},
                "cost_estimate": cost, "research_only": defn["research_only"], "code": code}
     if drops is not None:
         summary["variant_drops"] = drops
+    if e1 is not None:
+        summary.update(recipe_name=RC.BUDGET_NAME, budget=defn["budget"], e1=e1)
     D._write_json(paths.root / BUILD_SUMMARY, summary)
     return defn, summary
 
@@ -1313,12 +1363,341 @@ def native_verdict(arm_exps=NATIVE_ARMS, reference=NATIVE_REFERENCE, out_dir=Non
     return decision, report
 
 
+# ---------------------------------------------------------------- E1 verdict
+E1_FORMAT = "inc2-e1-verdict/1"
+E1_NAME = "e1_v1"
+AGNOSTIC_FORMAT = "inc2-agnostic-rescore/1"
+AGNOSTIC_RECORD = "agnostic_rescore.json"
+E1_EXAM = "dev"
+E1_SEED_TEXT = "inc2/e1/agnostic_se"
+E1_RESAMPLES = 1000
+E1_TEST_RUN = "e1test__s%d"
+E1_TEST_FORMAT = "inc2-e1-test-read/1"
+E1_RULE = ("E1-B qualifies when D = mean(E1-B's class-agnostic dev mAP50-95) - mean(E1-A's), on the seeds both share, "
+           "exceeds 2 x pooled sd (sqrt((sd_B^2 + sd_A^2) / 2)) AND the paired image-bootstrap SE of D (1,000 resamples "
+           "of the dev images under stable_int('inc2/e1/agnostic_se'), the locked scorer's collapsed AP on each run's "
+           "tie-broken per-image arrays, averaged over seeds per arm); record only: never the stream's arm, nothing "
+           "switches, test is read once per arm only after this verdict (inc2.baseline e1-test-read)")
+
+
+def _e1_defn(exp, want_arm):
+    """exp.json of an E1 arm experiment (a baseline whose e1 record names want_arm)."""
+    defn = _read_json(C.INC_DIR / exp / "exp.json")
+    if not isinstance(defn, dict) or defn.get("type") != "baseline":
+        raise BaselineError("%s is not a built baseline experiment" % exp)
+    e1 = defn.get("e1") if isinstance(defn.get("e1"), dict) else None
+    if e1 is None or defn.get("recipe_name") != RC.BUDGET_NAME:
+        raise BaselineError("%s is not an E1 arm (no e1 record or not cold_budget)" % exp)
+    if e1.get("arm") != want_arm:
+        raise BaselineError("%s is E1's arm %s, not %s" % (exp, e1.get("arm"), want_arm))
+    return defn
+
+
+def _e1_pair(exp, reference):
+    """(B's exp.json, A's exp.json, the seeds both share) of E1's two arms."""
+    db, da = _e1_defn(exp, "B"), _e1_defn(reference, "A")
+    if db["e1"].get("summary_sha256") != da["e1"].get("summary_sha256") or \
+            db["e1"].get("manifests") != da["e1"].get("manifests"):
+        raise BaselineError("%s and %s were built from different splits v3 summaries" % (exp, reference))
+    if RC.arm_id(db["arm"]) != RC.arm_id(da["arm"]):
+        raise BaselineError("%s and %s train different arms" % (exp, reference))
+    seeds = sorted(set(int(s) for s in db["seeds"]) & set(int(s) for s in da["seeds"]))
+    if len(seeds) < 2:
+        raise BaselineError("%s and %s share seeds %s; the rule needs at least 2" % (exp, reference, seeds))
+    return db, da, seeds
+
+
+def rescore_agnostic(exp, reference, out_dir=None, verdict=True, batch=None, device=None, resamples=E1_RESAMPLES):
+    """E1's rescore (lever L23E): every final run of both arms scored for its
+    per-image class-agnostic arrays on dev (inc2.scorer_agnostic, each only
+    when missing; every final run must be done first), then the verdict.
+    Writes INC_DIR/<exp>/agnostic_rescore.json (status complete, the dev
+    files' names and sha256s, no path: the platform reads it)."""
+    from . import scorer_agnostic as SA
+    db, da, seeds = _e1_pair(exp, reference)
+    try:
+        for e, d in ((exp, db), (reference, da)):
+            for s in d["seeds"]:
+                SA.final_run(e, _final_id(s))
+    except SA.AgnosticRefused as e:
+        raise BaselineError(str(e))
+    out = {}
+    for e, d in ((exp, db), (reference, da)):
+        rows = []
+        for s in [int(x) for x in d["seeds"]]:
+            try:
+                r = SA.score_run(e, _final_id(s), E1_EXAM, batch=batch, device=device)
+            except SA.AgnosticRefused as x:
+                raise BaselineError("%s %s: %s" % (e, _final_id(s), x))
+            js, _npz = SA.paths_for(C.INC_DIR / e / "runs" / _final_id(s) / "scores", E1_EXAM)
+            rows.append({"run_id": _final_id(s), "score": js.name, "sha256": _sha(js), "status": r.get("status")})
+        out[e] = rows
+    rec = {"format": AGNOSTIC_FORMAT, "exp": exp, "reference": reference, "seeds": seeds, "exam": E1_EXAM,
+           "scores": out, "status": "complete", "written_utc": D._utc(),
+           "note": "class-agnostic per-image arrays of the final runs on dev (scores/dev.agnostic.json): never test, "
+                   "never a protocol score"}
+    _write_json(C.INC_DIR / exp / AGNOSTIC_RECORD, rec)
+    log("%s: agnostic rescore complete (%s)" % (exp, ", ".join("%s %d written" % (e, sum(1 for r in v if r["status"]
+                                                                                           == "written"))
+                                                                for e, v in out.items())))
+    if verdict:
+        e1_verdict(exp, reference, out_dir=out_dir, testing_ok=bool(db.get("testing")) and scorer_testing(),
+                   resamples=resamples)
+    return rec
+
+
+def _agnostic_files(exp, seeds, testing_ok):
+    """({seed: (record, arrays)}, [missing run ids]) of an experiment's
+    agnostic dev files."""
+    from . import scorer_agnostic as SA
+    out, missing = {}, []
+    for s in seeds:
+        rid = _final_id(s)
+        js, npz = SA.paths_for(C.INC_DIR / exp / "runs" / rid / "scores", E1_EXAM)
+        d = _read_json(js)
+        if d is None:
+            missing.append(rid)
+            continue
+        if d.get("format") != SA.FORMAT or d.get("exp") != exp or d.get("run_id") != rid or d.get("exam") != E1_EXAM:
+            raise BaselineError("%s is not %s %s's agnostic %s score" % (js, exp, rid, E1_EXAM))
+        if d.get("agnostic_production") is not True and not testing_ok:
+            raise BaselineError("%s is a test-mode score: the verdict reads production scores only" % js)
+        if _sha(npz) is None or _sha(npz) != (d.get("images") or {}).get("sha256"):
+            raise BaselineError("%s does not hash as %s records" % (npz, js))
+        arrays = SA.load_npz(npz)
+        if C.sha256_text("\n".join(str(k) for k in arrays["keys"])) != d.get("key_order_sha256"):
+            raise BaselineError("%s is not in the exam key order %s records" % (npz, js))
+        out[s] = (d, arrays)
+    return out, missing
+
+
+def agnostic_bootstrap(arm_arrays, ref_arrays, resamples=E1_RESAMPLES, seed_text=E1_SEED_TEXT):
+    """The paired image bootstrap of D = mean over arm runs - mean over
+    reference runs of the collapsed AP50-95 (module docstring, E1_RULE).
+    Every run's arrays must share the key order and the GT counts (one
+    exam). Returns {"se", "n_valid"}."""
+    import numpy as np
+    runs = list(arm_arrays) + list(ref_arrays)
+    if not arm_arrays or not ref_arrays:
+        raise BaselineError("the bootstrap needs runs on both sides")
+    keys = [str(k) for k in runs[0]["keys"]]
+    for a in runs[1:]:
+        if [str(k) for k in a["keys"]] != keys or not np.array_equal(a["n_gt"], runs[0]["n_gt"]):
+            raise BaselineError("the runs' per-image arrays are not of one exam (key order or GT counts differ)")
+    n = len(keys)
+    if n < 2:
+        raise BaselineError("an image bootstrap needs at least 2 exam images, got %d" % n)
+    gt = np.asarray(runs[0]["n_gt"], dtype=np.int64)
+    counts = np.stack([np.bincount(row, minlength=n) for row in SC.resample_indices(n, resamples, seed_text)])
+    tb = [SC.tie_break(a) for a in runs]
+    k = len(arm_arrays)
+    diffs = []
+    for b in range(resamples):
+        m = counts[b]
+        n_gt = int((m * gt).sum())
+        if n_gt <= 0:
+            continue
+        vals = []
+        for a in tb:
+            rep = m[a["pred_img"]]
+            vals.append(_collapsed_ap50_95(np.repeat(a["tp"], rep, axis=0), np.repeat(a["conf"], rep), n_gt))
+        diffs.append(statistics.fmean(vals[:k]) - statistics.fmean(vals[k:]))
+    se = float(np.std(np.asarray(diffs, dtype=np.float64), ddof=1)) if len(diffs) >= 2 else None
+    return {"se": se, "n_valid": len(diffs)}
+
+
+def _collapsed_ap50_95(tp, conf, n_gt):
+    """The locked scorer's class-collapsed AP50-95 (inc.scorer.collapsed_ap)."""
+    from ..inc import scorer as S
+    return S.collapsed_ap(tp, conf, n_gt)[0]
+
+
+def e1_decision(exp, reference, testing_ok=False, resamples=E1_RESAMPLES, seed_text=E1_SEED_TEXT):
+    """E1_RULE on the agnostic dev files (dev only)."""
+    db, da, seeds = _e1_pair(exp, reference)
+    b_in, b_miss = _agnostic_files(exp, seeds, testing_ok)
+    a_in, a_miss = _agnostic_files(reference, seeds, testing_ok)
+    base = {"format": E1_FORMAT, "rule": E1_RULE, "exp": exp, "reference": reference, "seeds": seeds,
+            "exam": E1_EXAM, "arm": RC.arm_id(db["arm"]),
+            "pre_registered": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-03): E1, weed-box base v3",
+            "images": {"B": db["base"]["n_images"], "A": da["base"]["n_images"]},
+            "summary_sha256": db["e1"].get("summary_sha256"), "testing_allowed": bool(testing_ok)}
+    if b_miss or a_miss:
+        return dict(base, status="pending", missing=["%s/%s" % (exp, r) for r in b_miss]
+                    + ["%s/%s" % (reference, r) for r in a_miss])
+    stamps = None
+    for who, files in ((exp, b_in), (reference, a_in)):
+        for s in seeds:
+            st = {k: (files[s][0].get("recorded") or {}).get("stamps", {}).get(k)
+                  for k in ("exam", "scorer_sha256", "manifest_sha256", "key_order_sha256", "n_images")}
+            st["n_gt"] = files[s][0].get("n_gt")
+            if stamps is None:
+                stamps = st
+            elif st != stamps:
+                raise BaselineError("%s %s was scored on another exam or scorer than the comparison's first file (%s)"
+                                    % (who, _final_id(s), sorted(k for k in st if st[k] != stamps[k])))
+    bv = [float(b_in[s][0]["recorded"]["agnostic_map50_95"]) for s in seeds]
+    av = [float(a_in[s][0]["recorded"]["agnostic_map50_95"]) for s in seeds]
+    mb, sb = _mean_sd(bv)
+    ma, sa = _mean_sd(av)
+    pooled = math.sqrt((sb ** 2 + sa ** 2) / 2.0)
+    diff = mb - ma
+    boot = agnostic_bootstrap([b_in[s][1] for s in seeds], [a_in[s][1] for s in seeds], resamples=resamples,
+                              seed_text=seed_text)
+    se = boot["se"]
+    conds = {"above_2_pooled_sd": diff > 2.0 * pooled, "above_se": se is not None and diff > se}
+    return dict(base, status="decided", dev={"B": bv, "A": av}, mean={"B": mb, "A": ma}, sd={"B": sb, "A": sa},
+                diff=diff, pooled_sd=pooled, two_pooled_sd=2.0 * pooled, se_diff=se, n_valid=boot["n_valid"],
+                bootstrap={"seed_text": seed_text, "seed": C.stable_int(seed_text), "resamples": int(resamples),
+                           "paired": "one draw of the dev images for every run", "ddof": 1},
+                conditions=conds, qualifies=all(conds.values()), stamps=stamps,
+                inputs={exp: [{"run_id": _final_id(s), "sha256": (b_in[s][0].get("images") or {}).get("sha256")}
+                              for s in seeds],
+                        reference: [{"run_id": _final_id(s), "sha256": (a_in[s][0].get("images") or {}).get("sha256")}
+                                    for s in seeds]},
+                note="dev only; record only (never the stream's arm); test is read once per arm after this verdict "
+                     "(e1-test-read), by a person's submission")
+
+
+def e1_report(decision):
+    """For people: both arms' final scores on their final exams (dev and
+    ImageWeeds), 12-class and agnostic, mean +- sd. Never test."""
+    rows = {}
+    for e in (decision["exp"], decision["reference"]):
+        defn = _read_json(C.INC_DIR / e / "exp.json") or {}
+        out = {"e1_arm": (defn.get("e1") or {}).get("arm"), "images": (defn.get("base") or {}).get("n_images"),
+               "exams": {}}
+        for exam in [x for x in defn.get("final_exams") or [] if x != "test"]:
+            tw, ag = [], []
+            for s in defn.get("seeds") or []:
+                d = _read_json(C.INC_DIR / e / "runs" / _final_id(s) / "scores" / ("%s.json" % exam))
+                if isinstance(d, dict) and d.get("agnostic_map50_95") is not None:
+                    tw.append(float(d["map50_95"]))
+                    ag.append(float(d["agnostic_map50_95"]))
+            m1, s1 = _mean_sd(tw)
+            m2, s2 = _mean_sd(ag)
+            out["exams"][exam] = {"n": len(ag), "twelve": {"mean": m1, "sd": s1}, "agnostic": {"mean": m2, "sd": s2}}
+        rows[e] = out
+    return {"format": E1_FORMAT + "-report", "arms": rows, "qualifies": decision.get("qualifies"),
+            "note": "for people: dev and ImageWeeds of both arms; the decision reads dev only; test is read once per "
+                    "arm after the verdict"}
+
+
+def _e1_md(rep, decision):
+    def f(x):
+        return "-" if x is None else "%.4f" % x
+    lines = ["# E1: weed-box base v3 (class-agnostic, dev decides)", "",
+             "| Experiment | Arm | Images | Exam | agnostic mean +- sd | 12-class mean +- sd | n |",
+             "|---|---|---|---|---|---|---|"]
+    for e, r in rep["arms"].items():
+        for exam, v in r["exams"].items():
+            lines.append("| %s | %s | %s | %s | %s +- %s | %s +- %s | %s |" % (
+                e, r["e1_arm"], r["images"], exam, f(v["agnostic"]["mean"]), f(v["agnostic"]["sd"]),
+                f(v["twelve"]["mean"]), f(v["twelve"]["sd"]), v["n"]))
+    if decision.get("status") == "decided":
+        lines += ["", "D = %s, 2 x pooled sd = %s, SE(D) = %s -> %s" % (
+            f(decision["diff"]), f(decision["two_pooled_sd"]), f(decision["se_diff"]),
+            "E1-B qualifies" if decision["qualifies"] else "E1-B does not qualify")]
+    else:
+        lines += ["", "pending: %s" % ", ".join(decision.get("missing") or [])]
+    return "\n".join(lines) + "\n"
+
+
+def e1_verdict(exp, reference, out_dir=None, write=True, testing_ok=False, resamples=E1_RESAMPLES):
+    """The decision (capacity/e1_v1.json, dev only) and its report (people)."""
+    decision = e1_decision(exp, reference, testing_ok=testing_ok, resamples=resamples)
+    decision["generated_utc"] = D._utc()
+    report = e1_report(decision)
+    report["generated_utc"] = decision["generated_utc"]
+    if write:
+        d = Path(out_dir) if out_dir else C.INC_DIR / "capacity"
+        decision["out"] = str(d / ("%s.json" % E1_NAME))
+        _write_json(decision["out"], decision)
+        report["decision_sha256"] = _sha(decision["out"])
+        report["out"] = str(d / ("%s_report.json" % E1_NAME))
+        _write_json(report["out"], report)
+        md = d / ("%s_report.md" % E1_NAME)
+        tmp = md.with_name(".%s.tmp" % md.name)
+        tmp.write_text(_e1_md(report, decision))
+        os.replace(tmp, md)
+    if decision.get("status") == "decided":
+        log("E1 verdict: D %.4f vs 2 pooled sd %.4f, SE %s -> %s" % (
+            decision["diff"], decision["two_pooled_sd"], "-" if decision["se_diff"] is None else
+            "%.4f" % decision["se_diff"], "qualifies" if decision["qualifies"] else "does not qualify"))
+    else:
+        log("E1 verdict pending: %s" % decision.get("missing"))
+    return decision, report
+
+
+def e1_test_read(exps, verdict_path=None, run_fmt=E1_TEST_RUN):
+    """The milestone read of test for E1 (amendment 2026-10-03, P10): once
+    per arm, only after capacity/e1_v1.json is decided. For each arm's seed,
+    a kind-final spec on exam test from its base run's weights
+    (runs/e1test__s<k>), a one-line submission list, and the sbatch argv of
+    run_inc2_job.sh; a person submits it, the driver does not track it, and
+    the scores stay off the platform's evidence. Refuses when the verdict is
+    missing, pending, or not the one a previous read of the arm recorded,
+    and when a test score of the arm already exists."""
+    vp = Path(verdict_path or (C.INC_DIR / "capacity" / ("%s.json" % E1_NAME)))
+    v = _read_json(vp)
+    if not isinstance(v, dict) or v.get("format") != E1_FORMAT or v.get("status") != "decided":
+        raise BaselineError("%s is not a decided E1 verdict: test is read only after it" % vp)
+    vsha = _sha(vp)
+    out = {}
+    for exp in exps:
+        if exp not in (v.get("exp"), v.get("reference")):
+            raise BaselineError("%s is not one of the verdict's arms (%s, %s)" % (exp, v.get("exp"), v.get("reference")))
+        root = C.INC_DIR / exp
+        defn = _read_json(root / "exp.json")
+        if not isinstance(defn, dict) or not isinstance(defn.get("e1"), dict):
+            raise BaselineError("%s is not an E1 arm" % exp)
+        prev = _read_json(root / "e1_test_read.json")
+        if isinstance(prev, dict) and prev.get("verdict_sha256") != vsha:
+            raise BaselineError("%s's test read was prepared under another verdict (%s): the verdict changed"
+                                % (exp, str(prev.get("verdict_sha256"))[:12]))
+        specs = []
+        for s in [int(x) for x in defn["seeds"]]:
+            rid = run_fmt % s
+            out_d = root / "runs" / rid
+            if (out_d / "scores" / "test.json").exists() or (out_d / "run.json").exists():
+                raise BaselineError("%s/%s already holds a run or a test score: test is read once per arm" % (exp, rid))
+            w = root / "runs" / ("base__s%d" % s) / "weights" / "final.pt"
+            if not w.is_file():
+                raise BaselineError("%s has no base weights for seed %d (%s)" % (exp, s, w))
+            spec = {"exp": exp, "run_id": rid, "kind": "final", "init": str(w.resolve()), "exams": ["test"],
+                    "out_dir": str(out_d)}
+            D._write_json(out_d / "spec.json", spec)
+            try:
+                T.validate_spec(spec, out_d / "spec.json")
+            except T.RunError as e:
+                (out_d / "spec.json").unlink()
+                raise BaselineError("the v2 executor refuses the spec: %s" % e)
+            specs.append(str(out_d / "spec.json"))
+        lst = root / "submissions" / "e1test.txt"
+        lst.parent.mkdir(parents=True, exist_ok=True)
+        tmp = lst.with_name(".%s.%d.tmp" % (lst.name, os.getpid()))
+        tmp.write_text("".join("%s\n" % p for p in specs))
+        os.replace(tmp, lst)
+        (root / "logs").mkdir(parents=True, exist_ok=True)
+        argv = ["sbatch", "--parsable", "--array=0-%d" % (len(specs) - 1), "--job-name=inc_%s_e1test" % exp,
+                "--output=%s" % (root / "logs" / "%x_%A_%a.out"), str(job_script_path()), str(lst), exp]
+        rec = {"format": E1_TEST_FORMAT, "exp": exp, "verdict": str(vp), "verdict_sha256": vsha,
+               "verdict_qualifies": v.get("qualifies"), "specs": specs, "list": str(lst), "argv": argv,
+               "written_utc": D._utc(),
+               "note": "the milestone read of test for E1 (once per arm, after the dev verdict); a person submits the "
+                       "argv; the scores stay off the platform's evidence"}
+        _write_json(root / "e1_test_read.json", rec)
+        out[exp] = rec
+    return out
+
+
 # ----------------------------------------------------------------------- CLI
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Splits v2 baselines: B_v2, capacity arms, canary, B0 u tsw, "
                                              "milestones.")
     ap.add_argument("command", choices=("build", "canary-verdict", "capacity-verdict", "secondary", "estimate",
-                                        "rescore-native", "native-verdict"))
+                                        "rescore-native", "native-verdict", "rescore-agnostic", "agnostic-verdict",
+                                        "e1-test-read"))
     ap.add_argument("--exp", default=None)
     ap.add_argument("--manifest", default=None)
     ap.add_argument("--union", default=None, help="build: comma-separated manifests to merge (B0 u tsw)")
@@ -1349,7 +1728,7 @@ def main(argv=None):
     ap.add_argument("--n-images", type=int, default=None, help="estimate: images in the base")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
-    if a.command in ("rescore-native", "native-verdict"):
+    if a.command in ("rescore-native", "native-verdict", "rescore-agnostic", "agnostic-verdict"):
         # as the locked scorer's and the native scorer's CLIs: nothing is installed or fetched (before Ultralytics
         # is first imported, which this module's imports do not do)
         os.environ["YOLO_AUTOINSTALL"] = "false"
@@ -1374,6 +1753,18 @@ def main(argv=None):
         elif a.command == "native-verdict":
             native_verdict([x for x in (a.arms or ",".join(NATIVE_ARMS)).split(",") if x],
                            reference=a.reference or NATIVE_REFERENCE, out_dir=a.out_dir)
+        elif a.command in ("rescore-agnostic", "agnostic-verdict"):
+            if not a.exp or not a.reference:
+                raise BaselineError("%s needs --exp (E1-B's experiment) and --reference (E1-A's)" % a.command)
+            if a.command == "rescore-agnostic":
+                rescore_agnostic(a.exp, a.reference, out_dir=a.out_dir)
+            else:
+                e1_verdict(a.exp, a.reference, out_dir=a.out_dir)
+        elif a.command == "e1-test-read":
+            if not a.exp:
+                raise BaselineError("e1-test-read needs --exp (an E1 arm's experiment; comma-separated for both)")
+            res = e1_test_read([x for x in a.exp.split(",") if x])
+            print(json.dumps({e: r["argv"] for e, r in res.items()}))
         elif a.command == "secondary":
             if not a.exp or not a.weights:
                 raise BaselineError("secondary needs --exp and --weights")

@@ -152,6 +152,7 @@ ENVELOPE_LEVERS = {"L1": ("inc_build_pilot",), "L2": ("inc_build_realloop",),
 STREAM_ENVELOPE_LEVERS = {"L18": ("inc_build_segment",), "L20": ("inc_build_consolidation",),
                           "L21": ("inc_stream_rollback",), "L22": ("inc_build_segment",),
                           "L23B": ("inc_build_baseline_v2",), "L23N": ("inc_rescore_native",),
+                          "L23V": ("inc_build_base3",), "L23E": ("inc_rescore_agnostic",),
                           "L25": ("inc_build_pilot4",), "L27": ("inc_build_consolidation",),
                           "L28": ("inc_build_segment",), "LI": ("inc_stream_init",)}
 # The R2 data levers that run directly only with data_autonomy on, a stream
@@ -182,7 +183,8 @@ REMOTE_TIMEOUT_S = {"inc_snapshot": 300, "inc_report": 300, "inc_advance": 240,
                     "inc_build_baseline_v2": 300, "inc_build_pilot4": 300, "inc_stream_commit": 600,
                     "inc_stream_rollback": 600, "inc_stream_quarantine": 300, "inc_stream_release": 300,
                     "inc_stream_init": 300, "inc_stream_choose_arm": 600, "inc_stream_compare": 600,
-                    "inc_stream_verdict": 600, "inc_rescore_native": 300}
+                    "inc_stream_verdict": 600, "inc_rescore_native": 300, "inc_build_base3": 300,
+                    "inc_rescore_agnostic": 300}
 DEFAULT_REMOTE_TIMEOUT_S = 120
 # ssh's own messages for a connection that was never made (read off the last
 # stderr line of a call that printed nothing): the remote command never ran.
@@ -353,6 +355,12 @@ ARGV_FORMS = {
     "inc_rescore_native": ("{pkg}.baseline", "rescore-native",
                            (("--exp", "exp", "str"), ("--reference", "reference", "str")),
                            ("pkg", "exp", "reference")),
+    # E1 (2026-10-03): L23V builds splits v3 (inc2.base3 build, one GPU job); L23E scores E1's final runs for
+    # their class-agnostic per-image arrays and records E1's verdict (inc2.baseline rescore-agnostic)
+    "inc_build_base3": ("{pkg}.base3", "build", (("--stream", "stream", "str"),), ("pkg", "stream")),
+    "inc_rescore_agnostic": ("{pkg}.baseline", "rescore-agnostic",
+                             (("--exp", "exp", "str"), ("--reference", "reference", "str")),
+                             ("pkg", "exp", "reference")),
     "inc_stream_collect": ("run_inc_collect.sh", "fetch",
                            (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
                             ("--candidates", "candidates", "str")),
@@ -384,6 +392,7 @@ ARGV_FORMS = {
 # stream-submit KIND, or a login-node verb through stream-run.
 STREAM_REMOTE = {"inc_build_segment": "build", "inc_build_consolidation": "build", "inc_splits_build": "build",
                  "inc_build_baseline_v2": "build", "inc_build_pilot4": "build", "inc_rescore_native": "build",
+                 "inc_build_base3": "build", "inc_rescore_agnostic": "build",
                  "inc_stream_collect": "collect", "inc_stream_collect_review": "collect",
                  "inc_stream_intake": "collect", "inc_stream_probe": "collect", "inc_stream_admit": "admit",
                  "inc_stream_commit": "run", "inc_stream_rollback": "run", "inc_stream_quarantine": "run",

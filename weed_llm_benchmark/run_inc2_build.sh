@@ -18,6 +18,8 @@
 #   python -m weed_optimizer_framework.tools.inc2.splits   build | lock [...]
 #   python -m weed_optimizer_framework.tools.inc2.baseline build --exp E --manifest M [--seeds ...] [...]
 #   python -m weed_optimizer_framework.tools.inc2.baseline rescore-native --exp E --reference R
+#   python -m weed_optimizer_framework.tools.inc2.baseline rescore-agnostic --exp E --reference R
+#   python -m weed_optimizer_framework.tools.inc2.base3    build --stream SID
 #   python -m weed_optimizer_framework.tools.inc2.pilot4   build --exp E [...]
 #   python -m weed_optimizer_framework.tools.inc2.stream   init | build | milestone | fork | feasibility | bisect
 #                                                          --stream SID [...]
@@ -34,7 +36,14 @@
 # printed (a build, a milestone, Stage C, the bisect arms). inc2.baseline
 # rescore-native (L23N, 2026-10-01: a done measurement arm's finals scored at
 # its own imgsz, then the native verdict) builds nothing: no advance follows
-# it, and its provenance and lock are named native_<exp>, never the arm's own. The segments' and
+# it, and its provenance and lock are named native_<exp>, never the arm's own.
+# inc2.baseline rescore-agnostic (L23E, 2026-10-03: E1's final runs scored for
+# their per-image class-agnostic arrays on dev, then E1's verdict) is the same:
+# no advance, provenance and lock agnostic_<exp>. inc2.base3 build (L23V,
+# 2026-10-03: splits v3, E1's base) builds no experiment: no advance, its
+# provenance and lock are named base3_v3; it runs with HF_HUB_OFFLINE=1 (its
+# embedding check loads DINOv2 from the Hugging Face cache; compute nodes have
+# no internet) and YOLO_OFFLINE=true. The segments' and
 # milestones' runs execute inc2.train through run_inc2_job.sh: this script
 # exports INC_JOB_SCRIPT=$REPO/weed_llm_benchmark/run_inc2_job.sh before the
 # builder runs, so the driver init inside the builder and the advance after it
@@ -72,8 +81,9 @@ INC_ROOT="${INC_DIR:-$REPO/results/framework/inc}"
 export INC_JOB_SCRIPT="$REPO/weed_llm_benchmark/run_inc2_job.sh"
 
 usage() {
-    echo "usage: sbatch run_inc2_build.sh {inc2.splits build|lock | inc2.baseline build|rescore-native |" \
-         "inc2.pilot4 build | inc2.stream init|build|milestone|fork|feasibility|bisect} [flags ...]" >&2
+    echo "usage: sbatch run_inc2_build.sh {inc2.splits build|lock | inc2.baseline build|rescore-native|" \
+         "rescore-agnostic | inc2.base3 build | inc2.pilot4 build |" \
+         "inc2.stream init|build|milestone|fork|feasibility|bisect} [flags ...]" >&2
     exit 2
 }
 
@@ -86,7 +96,8 @@ case "$MOD" in
     *) usage ;;
 esac
 case "$MOD $CMD" in
-    "splits build"|"splits lock"|"baseline build"|"baseline rescore-native"|"pilot4 build") shift 2 ;;
+    "splits build"|"splits lock"|"baseline build"|"baseline rescore-native"|"baseline rescore-agnostic") shift 2 ;;
+    "pilot4 build"|"base3 build") shift 2 ;;
     "stream init"|"stream build"|"stream milestone"|"stream fork"|"stream feasibility"|"stream bisect") shift 2 ;;
     *) usage ;;
 esac
@@ -106,6 +117,12 @@ if [ "$MOD" = stream ]; then
         usage
     fi
     NAME="stream_$SID"
+elif [ "$MOD" = base3 ]; then
+    if ! [[ "$SID" =~ $NAME_RE ]]; then
+        echo "FATAL: inc2.base3 build needs --stream (the stream whose quarantines apply)" >&2
+        usage
+    fi
+    NAME="base3_v3"
 elif [ -n "$EXP" ]; then
     if ! [[ "$EXP" =~ $NAME_RE ]]; then
         echo "FATAL: --exp '$EXP' is not an experiment name" >&2
@@ -113,6 +130,7 @@ elif [ -n "$EXP" ]; then
     fi
     NAME="$EXP"
     [ "$MOD $CMD" = "baseline rescore-native" ] && NAME="native_$EXP"
+    [ "$MOD $CMD" = "baseline rescore-agnostic" ] && NAME="agnostic_$EXP"
 elif [ "$MOD" = splits ]; then
     NAME="splits"
 else
@@ -198,7 +216,8 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/train.py tools/inc2/baseline.py tools/inc2/pilot4.py tools/inc2/gate3.py
          tools/inc2/scorer_sidecar.py tools/inc2/scorer_native.py tools/inc2/step1_stream.py tools/inc2/mask.py
          tools/inc2/eval_hits.py tools/inc2/stream.py
-         tools/inc2/stream_report.py)
+         tools/inc2/stream_report.py tools/inc2/base3.py tools/inc2/base3_v1.json tools/inc2/scorer_agnostic.py
+         tools/inc_autopilot/stream_thresholds.json)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 
 # prov start -- ARGV... : append an attempt; prov update KEY=VALUE ... : set
@@ -312,6 +331,13 @@ fi
 
 python -u -c "import numpy; print('numpy', numpy.__version__)" \
     || { prov update status=env_failed finish; exit 1; }
+if [ "$MOD $CMD" = "base3 build" ]; then
+    # the embedding check loads the calibration's DINOv2 from the Hugging Face cache (no internet on compute
+    # nodes); Ultralytics (load_image) installs and fetches nothing
+    export HF_HUB_OFFLINE=1 YOLO_OFFLINE=true YOLO_AUTOINSTALL=false
+    python -u -c "import torch, transformers, ultralytics, scipy, cv2; print('torch', torch.__version__, 'transformers', transformers.__version__, 'ultralytics', ultralytics.__version__)" \
+        || { prov update status=env_failed finish; exit 1; }
+fi
 
 OUT_TMP="$(mktemp "${TMPDIR:-/tmp}/inc2_build_${NAME}.XXXXXX")" || OUT_TMP=""
 PHASE=build
@@ -337,9 +363,15 @@ if [ "$rc" != 0 ]; then
     prov update status=build_failed "build_rc=$rc" "refusal=$refusal" "built_exp=$BUILT" finish
     exit "$rc"
 fi
-if [ "$MOD $CMD" = "baseline rescore-native" ]; then
+if [ "$MOD $CMD" = "baseline rescore-native" ] || [ "$MOD $CMD" = "baseline rescore-agnostic" ]; then
     # scores only: nothing was built, nothing is advanced
     prov update status=scored build_rc=0 finish
+    echo "=== done $(date) ==="
+    exit 0
+fi
+if [ "$MOD $CMD" = "base3 build" ]; then
+    # splits v3 (E1's base): no experiment was built, nothing is advanced
+    prov update status=built_splits build_rc=0 finish
     echo "=== done $(date) ==="
     exit 0
 fi

@@ -376,10 +376,63 @@ def validate_recipe(r, bad):
         bad("recipe.cache must be 'ram', 'disk', false or null, got %r" % (r["cache"],))
 
 
-def protocol_deviations(kind, r, arm=RC.DEFAULT_ARM):
+def protocol_deviations(kind, r, arm=RC.DEFAULT_ARM, recipe_name=None, n_images=None):
     """How recipe r departs from Protocol v3's table (inc2.recipes) for a run
-    of this kind on this arm ([] when it does not)."""
-    return RC.deviations(kind, r, arm)
+    of this kind on this arm ([] when it does not); with recipe_name
+    'cold_budget' (E1), how a base run departs from cold_budget(arm,
+    n_images)."""
+    return RC.deviations(kind, r, arm, recipe_name=recipe_name, n_images=n_images)
+
+
+def experiment_budget(exp, arm):
+    """(recipe_name, n_images, problems) of the equal-compute recipe exp.json
+    names (E1, inc2.recipes.cold_budget): (None, None, []) when it names
+    none. Only a 'baseline' experiment may name it; its base's n_images
+    (the driver pins it against the manifest's sha256) gives the recipe, and
+    its budget record must be the pre-registered one (inc2.recipes
+    constants), so a definition cannot carry a budget of its own."""
+    data = _read_json(C.INC_DIR / exp / "exp.json")
+    if not isinstance(data, dict):
+        raise RunError("recipe", "cannot read %s" % (C.INC_DIR / exp / "exp.json"))
+    name = data.get("recipe_name")
+    if name in (None, RC.COLD_NAME):
+        return None, None, []
+    if name != RC.BUDGET_NAME:
+        return name, None, ["exp.json's recipe_name %r is not one inc2.recipes knows" % (name,)]
+    probs = []
+    if data.get("type") != "baseline":
+        probs.append("%s is pre-registered for baseline experiments, not a %r one" % (name, data.get("type")))
+    n = (data.get("base") or {}).get("n_images")
+    if not _is_int(n) or n < 1:
+        return name, None, probs + ["exp.json's base records no image count for %s" % name]
+    probs += RC.check_budget_record(data.get("budget"), arm["id"], n)
+    probs += e1_problems(data)
+    return name, n, probs
+
+
+def e1_problems(data):
+    """How an exp.json naming cold_budget fails to be an E1 arm: its e1
+    record names arm A or B, its base manifest (by sha256) is that arm of
+    the complete splits/v3/summary.json (inc2.base3.e1_arm_of), and that
+    summary still hashes as the e1 record says. [] when it is one."""
+    from . import base3 as B3
+    e1 = data.get("e1")
+    if not isinstance(e1, dict) or e1.get("arm") not in ("A", "B"):
+        return ["exp.json names %s without an E1 record (e1.arm A or B)" % RC.BUDGET_NAME]
+    probs = []
+    msha = (data.get("base") or {}).get("manifest_sha256")
+    k, _summ = B3.e1_arm_of(msha) if msha else (None, None)
+    if k is None:
+        probs.append("its base manifest %s is not one of the two manifests a complete splits/v3/summary.json "
+                     "records" % str(msha)[:12])
+    elif k != e1["arm"]:
+        probs.append("its base manifest is E1's arm %s, exp.json says %s" % (k, e1["arm"]))
+    sp = B3.out_dir() / B3.SUMMARY
+    cur = C.sha256_file(sp) if sp.is_file() else None
+    if e1.get("summary_sha256") != cur:
+        probs.append("exp.json was built from splits v3 summary %s; %s is now %s"
+                     % (str(e1.get("summary_sha256"))[:12], sp, str(cur)[:12]))
+    return probs
 
 
 def testing_settings(exp):
@@ -902,22 +955,42 @@ def load_v2_guards(production=True):
     return g2, guard, index, rec, l5, drops
 
 
-def guard_rows(rows, dhashes, production=True):
-    """The splits v2 never-train guard over every image (module docstring),
-    fail closed. Returns the guard record; raises RunError('guard') with it
-    attached."""
-    g2, guard, index, rec, l5, drops = load_v2_guards(production=production)
+def guard_verdicts(rows, dhashes, production=True, guards=None, variants=None):
+    """The splits v2 never-train guard's verdict on every row, refusing
+    nothing (guard_rows refuses; inc2.base3 drops the rows instead): the L-5
+    and L-8 lists by image sha256, GuardV2 over the dHash and its 8 flips and
+    rotations, and the index cross-check. Returns (per, record, refused,
+    crosscheck): per {key: {"reasons": [...], "refused": [[path, reason,
+    match]], "crosscheck": [path, split, image, bits] or None, "variants":
+    [8 ints] or None}}; a row is refused by any reason in
+    NEVER_TRAIN_REASONS, or any reason not in HARMLESS_REASONS, and by a
+    cross-check hit. guards: load_v2_guards' tuple (loaded when None);
+    variants: {path: variants} when the caller already holds them."""
+    g2, guard, index, rec, l5, drops = guards or load_v2_guards(production=production)
+    rec = dict(rec)
     paths = [r["image"] for r in rows]
-    variants = variant_hashes(g2, paths)
+    if variants is None:
+        variants = variant_hashes(g2, paths)
     reasons, refused, crosscheck = {}, [], []
+    per = {}
     for r in rows:
+        v = per.setdefault(r["key"], {"reasons": [], "refused": [], "crosscheck": None, "variants": None})
         if str(r.get("sha256")) in l5:
             reasons[L5_REASON] = reasons.get(L5_REASON, 0) + 1
-            refused.append([str(r["image"]), L5_REASON, "an L-5 excluded image (%s)" % r["key"]])
+            item = [str(r["image"]), L5_REASON, "an L-5 excluded image (%s)" % r["key"]]
+            refused.append(item)
+            v["reasons"].append(L5_REASON)
+            v["refused"].append(item)
         if str(r.get("sha256")) in drops:
             reasons[VARIANT_DROP_REASON] = reasons.get(VARIANT_DROP_REASON, 0) + 1
-            refused.append([str(r["image"]), VARIANT_DROP_REASON, "the L-8 train_core drop %s, listed as %s"
-                            % (drops[str(r["sha256"])], r["key"])])
+            item = [str(r["image"]), VARIANT_DROP_REASON, "the L-8 train_core drop %s, listed as %s"
+                    % (drops[str(r["sha256"])], r["key"])]
+            refused.append(item)
+            v["reasons"].append(VARIANT_DROP_REASON)
+            v["refused"].append(item)
+    by_path = {}
+    for r in rows:
+        by_path.setdefault(r["image"], []).append(r["key"])
     for p in paths:
         dh = dhashes.get(p)
         var = variants.get(p)
@@ -929,20 +1002,41 @@ def guard_rows(rows, dhashes, production=True):
                 reason, match = guard.check(dh, var)
             except Exception as e:  # noqa: BLE001 -- a check that cannot run clears nothing
                 reason, match = "guard_error", "%s: %s" % (type(e).__name__, e)
+        keys = by_path.get(p) or []
         if reason is not None:
             reasons[reason] = reasons.get(reason, 0) + 1
+            for k in keys:
+                per[k]["reasons"].append(reason)
+                per[k]["match"] = match
             if reason in NEVER_TRAIN_REASONS or reason not in HARMLESS_REASONS:
-                refused.append([str(p), reason, str(match)[:200]])
+                item = [str(p), reason, str(match)[:200]]
+                refused.append(item)
+                for k in keys:
+                    per[k]["refused"].append(item)
         if vals is not None:
+            for k in keys:
+                per[k]["variants"] = list(vals)
             for v in [int(dh)] + vals:
                 m = index.index.find(v)
                 if m is not None:
                     (split, image), bits = m
-                    crosscheck.append([str(p), split, image, bits])
+                    hit = [str(p), split, image, bits]
+                    crosscheck.append(hit)
+                    for k in keys:
+                        per[k]["crosscheck"] = hit
                     break
     rec.update(checked=len(paths), reasons=dict(sorted(reasons.items())), refused=len(refused),
                crosscheck_hits=len(crosscheck), first_refused=refused[:10], first_crosscheck=crosscheck[:10],
                never_train_reasons=list(NEVER_TRAIN_REASONS), harmless_reasons=list(HARMLESS_REASONS))
+    return per, rec, refused, crosscheck
+
+
+def guard_rows(rows, dhashes, production=True):
+    """The splits v2 never-train guard over every image (module docstring),
+    fail closed. Returns the guard record; raises RunError('guard') with it
+    attached."""
+    _per, rec, refused, crosscheck = guard_verdicts(rows, dhashes, production=production)
+    reasons = rec["reasons"]
     if refused or crosscheck:
         err = RunError("guard", "splits v2 never-train guard: %d image(s) refused by GuardV2 or the L-5 / L-8 "
                                 "lists (%s) and %d within %d bits of a dev / test / imageweeds image under a flip or rotation "
@@ -2092,8 +2186,9 @@ def _run(spec, spec_path, out_dir, rec, prev, resume_from, ctx, lock):
     rec["warnings"] += warns
     rec["arm"] = arm
     if kind in TRAIN_KINDS:
-        devs = protocol_deviations(kind, spec["recipe"], arm)
-        rec["recipe_name"] = RC.match(kind, spec["recipe"], arm)
+        rname, n_base, bprobs = experiment_budget(spec["exp"], arm)
+        devs = protocol_deviations(kind, spec["recipe"], arm, recipe_name=rname, n_images=n_base) + bprobs
+        rec["recipe_name"] = RC.match(kind, spec["recipe"], arm, recipe_name=rname, n_images=n_base)
         rec["protocol_recipe"], rec["recipe_deviations"] = not devs, devs
         if devs and testing is None:
             raise RunError("recipe", "a production %s run trains a Protocol v3 recipe of its arm (%s) only; this "
