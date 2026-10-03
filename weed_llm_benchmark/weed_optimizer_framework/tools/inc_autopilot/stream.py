@@ -793,9 +793,12 @@ class StreamRun(object):
                 continue                             # closed again after the stamp: a new stamp is needed
             prev = {k: s.get(k) for k in ("status", "failures", "attempts", "closed_reason", "closed_utc")}
             # attempts too: the 4th collection attempt on a source pauses the campaign (S15), so a reopened
-            # source whose attempts stayed at 3 would stop the stream on its first retry
-            s.update(status="candidate", failures=0, attempts=0, closed_reason=None, reopened_utc=rec["utc"],
-                     reopened_by=rec.get("by"))
+            # source whose attempts stayed at 3 would stop the stream on its first retry. A source closed part-way
+            # through its intake shards resumes them (a new fetch record would start the source over)
+            s.update(status="shard_pending" if DS.mid_shards(s) else "candidate", failures=0, attempts=0,
+                     closed_reason=None, reopened_utc=rec["utc"], reopened_by=rec.get("by"))
+            if s["status"] == "shard_pending":
+                self._bump_attempts("L16I", {"source": src})        # its next intake runs under an id of its own
             self._ledger("source_reopened", source=src, decided_by=rec.get("by") or "human",
                          reasons=[_short(rec.get("why") or "", 300)], before=prev)
 
@@ -1133,6 +1136,7 @@ class StreamRun(object):
                                             or r.get("annotation") == "image_level"),
                         "never_train": (nt is None) or cid in (nt or set()), "known_item": r["known_item"],
                         "status": s.get("status"), "partial": bool(s.get("partial")), "placement": pl,
+                        "in_shards": DS.mid_shards(s),
                         "attempts": int(s.get("attempts") or 0),
                         "names_unresolved": (bool(r.get("names_unresolved")) or names_pending)
                         and not s.get("names_resolved"),
@@ -1698,8 +1702,9 @@ class StreamRun(object):
         elif lever == "L16":
             src = pr["source"]
             s = st["sources"].get(src) or {}
-            if s.get("status") in ("closed", "quarantined", "held", "names_pending", "shard_pending"):
-                return None                       # closed this tick (D21, D28, a retry-false refusal)
+            if s.get("status") in ("closed", "quarantined", "held", "names_pending", "shard_pending") \
+                    or DS.mid_shards(s):
+                return None                       # closed this tick (D21, D28, a retry-false refusal), or its shards
             if int(s.get("attempts") or 0) >= int((LS.limits("L16") or {}).get("attempts_per_source") or 3):
                 # a 4th attempt on one source is a loop, not a retry (S15)
                 self._pause("stop-loss: a 4th collection attempt on source %s was about to be proposed" % src)
@@ -2573,15 +2578,19 @@ class StreamRun(object):
                 (k for k, v in st["sources"].items() if b in (v.get("batches") or [])), None)
             if src:
                 s = st["sources"][src]
-                ab = s.get("admitted_batches")
-                # a source recorded before the list existed: the stream admitted each earlier batch while it was
-                # the latest
-                ab = list(ab) if isinstance(ab, list) else [x for x in s.get("batches") or [] if x != b]
-                s["admitted_batches"] = ab + ([b] if b not in ab else [])
                 s["status"] = "admitted"
                 s["admit_done_utc"] = self.utc
-                # its intake left images deferred, or a shard is committed and not admitted: the next shard
-                self._next_shard(src, s)
+                ab = s.get("admitted_batches")
+                if isinstance(ab, list) or s.get("intake_deferred") is not None:
+                    # a source recorded before the list existed: the stream admitted each earlier batch while it
+                    # was the latest
+                    ab = list(ab) if isinstance(ab, list) else [x for x in s.get("batches") or [] if x != b]
+                    s["admitted_batches"] = ab + ([b] if b not in ab else [])
+                    # its intake left images deferred, or a shard is committed and not admitted: the next shard
+                    self._next_shard(src, s)
+                # else no summary of its latest batch has been folded (a state written before shards existed,
+                # whose snapshots since lacked the summaries): admitted as before, and the sweep decides on its
+                # shards once a snapshot holds that summary, never on its absence
         elif lever == "L17":
             st["stage"]["r0"]["step1_%s" % params.get("verb")] = self.utc
         elif lever == "L19":
@@ -2734,16 +2743,20 @@ class StreamRun(object):
             if src:
                 s = st["sources"].setdefault(src, {})
                 s["failures"] = int(s.get("failures") or 0) + 1
-                # a source with an admitted shard whose next shard's intake or admit failed waits for that shard
-                # again (D20 never fetches it anew: a new fetch record would start the source over); others are
-                # candidates again
-                in_shards = bool(s.get("admitted_batches")) and s.get("status") in ("shard_pending", "intaken")
-                s["status"] = ("shard_pending" if in_shards else "candidate") if s["failures"] < 3 else "closed"
+                # a source part-way through its intake shards whose next shard failed waits for that shard again
+                # (D20 never fetches it anew: a new fetch record would start the source over); a hold the
+                # collector's ledger brought this tick stays until the collector releases it; others are
+                # candidates again. Its failures count per shard (reset when a shard is admitted, _next_shard)
+                held = s.get("status") == "held" and s.get("held_by") == "collector"
+                s["status"] = ("held" if held else "shard_pending" if DS.mid_shards(s) else "candidate") \
+                    if s["failures"] < 3 else "closed"
                 if s["status"] == "closed":
                     s["closed_reason"] = "3 failed attempts (7.5)"
                     s["closed_utc"] = self.utc
                     self._ledger("source_closed", source=src, reasons=["3 failed attempts"])
-                    self._zero_yield(src, "failed")
+                    if not (s.get("admitted_batches") and int(_num(s.get("admitted_target_boxes")) or 0) > 0):
+                        # a source whose admitted shards gave target boxes did not end with zero yield
+                        self._zero_yield(src, "failed")
         self._clear(ln)
         if lane["fails"] >= int(LS.t(self.th, "stop_loss", "lane_fails")):
             lane["hold"] = "stop-loss: %d consecutive failed steps (last: %s)" % (lane["fails"], _short(why, 200))
@@ -2829,18 +2842,29 @@ class StreamRun(object):
         admits the shard, else proposes L16I again once shard_waits allows,
         and D20 and D21 leave it alone. Each time, the L16I step's attempt
         count rises, so the next intake runs under an id of its own (the
-        executor runs an id once). A source whose intake made no new batch
-        (shards_done) is complete."""
+        executor runs an id once), and the source's failure count restarts
+        (failures count per shard). A shard that left as many images deferred
+        as the shard before it made no progress: the source is closed with a
+        card, never proposed again in a loop (a person's reopening resumes
+        it). A source whose intake made no new batch (shards_done) is
+        complete."""
         if s.get("status") != "admitted":
             return
-        left = int(s.get("intake_deferred") or 0)
+        left = int(_num(s.get("intake_deferred")) or 0)
         if s.get("shards_done") and s.get("shards_done") == s.get("batch"):
             left = 0
         ab = set(s.get("admitted_batches") or [])
         unadmitted = [b for b in s.get("batches") or [] if b not in ab]
         if left <= 0 and not unadmitted:
             return
+        rec = (s.get("shard_log") or {}).get(s.get("batch")) or {}
+        prev = (s.get("shard_log") or {}).get(rec.get("prev")) if rec.get("prev") else None
+        if left > 0 and not unadmitted and prev and int(rec.get("deferred") or 0) >= int(prev.get("deferred") or 0):
+            self._shard_stalled(src, s, "its shard %s left %d image(s) deferred, as many as %s before it"
+                                % (s.get("batch"), left, rec.get("prev")))
+            return
         s["status"] = "shard_pending"
+        s["failures"] = 0
         if left > 0:
             self._bump_attempts("L16I", {"source": src})
         self._ledger("source_status", source=src, status="shard_pending", by="stream", batch=s.get("batch"),
@@ -2849,26 +2873,53 @@ class StreamRun(object):
                               "admit), never a new fetch" % (s.get("batch"), left, "; %d committed shard(s) not "
                                                              "admitted yet" % len(unadmitted) if unadmitted else "")])
 
+    def _shard_stalled(self, src, s, why):
+        """A source whose intake shards stopped making progress: closed with a
+        card for a person (fail closed: the same shard is never proposed again
+        and again); `stream reopen` resumes its shards."""
+        s.update(status="closed", closed_reason="intake shards made no progress", closed_utc=self.utc)
+        self._ledger("source_closed", source=src, reasons=[_short(why, 300)])
+        self._card("data", "Source %s: its intake shards made no progress" % src,
+                   "%s. Closed so the shard is not proposed again in a loop; the collector's intake summary and "
+                   "decisions say why; `stream reopen` resumes the shards" % why, trigger=["DPIPE"])
+
     def _shard_sweep(self):
-        """Once per snapshot fold, after the intake summaries: (a) a source the
-        stream admitted before shards existed gets its admitted batches (each
-        of its batches, as the stream admitted the latest every time) and, when
-        its intake left images deferred, waits for its next shard; (b) a
-        source whose continuation intake ended at an earlier snapshot without a
-        new batch (the collector found nothing left) is complete."""
+        """Once per snapshot fold, after the intake summaries and the
+        collector's ledger, deciding only on what this snapshot shows (a
+        snapshot whose summaries failed to read decides nothing): (a) a
+        source the stream admitted before shards existed, whose latest batch's
+        summary this snapshot holds, gets its admitted batches (each of its
+        batches, as the stream admitted the latest every time) and, when its
+        intake left images deferred, waits for its next shard; (b) a source
+        whose continuation intake ended at an earlier snapshot while the
+        collector's ledger in this snapshot lists no batch the stream has not
+        admitted: complete when the collector's last batch left nothing
+        deferred (shards_done), else its shards made no progress (closed with
+        a card, never proposed again in a loop)."""
+        arts = getattr(self, "_arts", None) or {}
+        col = arts.get("intake/sources.json") if isinstance(arts.get("intake/sources.json"), dict) else {}
         for src, s in sorted((self.st.get("sources") or {}).items()):
             if not isinstance(s, dict):
                 continue
+            seen = isinstance(arts.get("intake/%s/summary.json" % s.get("batch")), dict)
             if s.get("status") == "admitted" and not isinstance(s.get("admitted_batches"), list) and s.get("batch"):
+                if not seen or s.get("intake_deferred") is None:
+                    continue
                 s["admitted_batches"] = list(s.get("batches") or [s["batch"]])
                 self._next_shard(src, s)
             elif s.get("status") == "intaken" and s.get("admitted_batches") and s.get("intaken_utc") \
-                    and str(s["intaken_utc"]) < self.utc \
-                    and all(b in s["admitted_batches"] for b in s.get("batches") or []):
-                s.update(status="admitted", shards_done=s.get("batch"))
+                    and str(s["intaken_utc"]) < self.utc and seen and isinstance(col.get(src), dict) \
+                    and all(b in s["admitted_batches"] for b in s.get("batches") or []) \
+                    and all(str(b) in (s.get("batches") or []) for b in col[src].get("batches") or []):
+                left = int(_num((col[src].get("yield") or {}).get("images_deferred")) or 0)
+                if left > 0:
+                    self._shard_stalled(src, s, "its intake of the next shard ended without a new batch while the "
+                                        "collector's ledger shows %d image(s) deferred" % left)
+                    continue
+                s.update(status="admitted", shards_done=s.get("batch"), intake_deferred=0)
                 self._ledger("source_status", source=src, status="admitted", by="stream", batch=s.get("batch"),
-                             reasons=["the intake of the next shard made no new batch: nothing of the source is "
-                                      "left to take"])
+                             reasons=["the intake of the next shard made no new batch and the collector's ledger "
+                                      "shows nothing deferred: nothing of the source is left to take"])
 
     def _intake_names_pending(self, ln, it, ids, states):
         """An L16I job that ended on names_pending (the collector's ledger,
@@ -3087,13 +3138,18 @@ class StreamRun(object):
                 src["target_boxes_intake"] = (s.get("yield") or {}).get("target_boxes")
                 if s.get("zero_yield"):
                     src["zero_yield_reasons"] = s.get("zero_yield_reasons")
+                # the images each batch left deferred (collect.intake step 1b; a batch committed before shards
+                # existed records them as yield.images_deferred) and the batch of its fetch before it, so a shard
+                # that made no progress is seen (_next_shard)
+                sh = s.get("shard") if isinstance(s.get("shard"), dict) else {}
+                left = sh.get("deferred_remaining")
+                left = int(_num(left if left is not None else (s.get("yield") or {}).get("images_deferred")) or 0)
+                earlier = [str(b) for b in sh.get("earlier_batches") or []]
+                src.setdefault("shard_log", {})[batch] = {"n": sh.get("n") or 1, "deferred": left,
+                                                          "prev": earlier[-1] if earlier else None}
                 if batch == src.get("batch"):
-                    # the images its latest batch left deferred (collect.intake step 1b; a batch committed
-                    # before shards existed records them as yield.images_deferred)
-                    sh = s.get("shard") if isinstance(s.get("shard"), dict) else {}
-                    left = sh.get("deferred_remaining")
-                    src["intake_deferred"] = int(_num(left if left is not None else
-                                                      (s.get("yield") or {}).get("images_deferred")) or 0)
+                    # 0 once its shards are done (the sweep read the collector's ledger: nothing left to take)
+                    src["intake_deferred"] = 0 if src.get("shards_done") == batch else left
                     src["intake_shard"] = sh.get("n")
         srows = arts.get("intake/sources.json") or {}
         if isinstance(arts.get("intake/sources.json"), dict):
@@ -3139,8 +3195,10 @@ class StreamRun(object):
                     s["held_reason"] = _short(row.get("reason"), 300)
             elif s.get("status") == "held" and s.get("held_by") == "collector" \
                     and rst in ("candidate", "fetched", "intaken"):
-                # the collector released its hold (licence, credentials, the copy scan): collectable again
-                s.update(status=rst, held_by=None, held_reason=None, names_held=None)
+                # the collector released its hold (licence, credentials, the copy scan): collectable again; a
+                # source part-way through its intake shards waits for its next shard
+                s.update(status="shard_pending" if DS.mid_shards(s) else rst, held_by=None, held_reason=None,
+                         names_held=None)
                 if ov is not None:
                     # the release is the person's decision the collect config records, not the collector's
                     self._ledger("source_released", source=src, status=s["status"], by="licence_overrides",
@@ -3152,15 +3210,23 @@ class StreamRun(object):
             elif rst in ("fetched", "intaken") and s.get("status") in (None, "candidate"):
                 # fetched or intaken outside this campaign's own items (a person's run of the collector, a lab
                 # fetch, a restarted ticker): the collector's ledger is the record, so DPIPE takes the next step
-                # (L16I, then L17 admit) instead of the source waiting with no status for ever
-                s["status"] = row["status"]
-                self._ledger("source_status", source=src, status=row["status"], by="collector",
+                # (L16I, then L17 admit) instead of the source waiting with no status for ever; a source part-way
+                # through its intake shards takes its next shard
+                s["status"] = "shard_pending" if DS.mid_shards(s) else row["status"]
+                self._ledger("source_status", source=src, status=s["status"], by="collector",
                              reasons=["adopted from the collector's ledger"])
         self._shard_sweep()
         s1 = (arts.get("step1_stream/status.json") or {}).get("per_source") or {}
         for src, row in s1.items():
             s = st["sources"].setdefault(src, {})
             s["admitted_target_boxes"] = (row or {}).get("target_boxes_admitted", s.get("admitted_target_boxes"))
+            if int(_num(s.get("admitted_target_boxes")) or 0) > 0 \
+                    and any(r.get("source") == src for r in st.get("zero_run") or []):
+                # a source with admitted target boxes did not end with zero yield: an entry of it in the zero-yield
+                # run is stale (a failed fetch before its intake, or the first shard of a source still taking
+                # shards), and leaves the run now, not at its last shard
+                st["zero_run"] = [r for r in st["zero_run"] if r.get("source") != src]
+                self._ledger("zero_run_cleared", source=src, admitted_target_boxes=s["admitted_target_boxes"])
             if s.get("status") == "admitted" and not s.get("yield_recorded") and s.get("admit_done_utc"):
                 s["yield_recorded"] = True
                 boxes = int(s.get("admitted_target_boxes") or 0)

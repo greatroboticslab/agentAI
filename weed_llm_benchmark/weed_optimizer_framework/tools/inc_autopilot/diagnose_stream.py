@@ -375,6 +375,22 @@ def _priority_classes(v, deficit):
     return sorted(set(deficit) | set(first) | set(bonus))
 
 
+def mid_shards(s):
+    """A source part-way through the continuation shards of its intake
+    (collect.intake step 1b, amendment 2026-10-03): it has an admitted batch,
+    and its latest batch left images deferred or a committed batch is not
+    admitted yet. Read from these facts, never from the status alone, so a
+    detour of the status (a failed shard, the collector's hold and release, a
+    person's reopening) ends with the source waiting for its next shard
+    (shard_pending), never a candidate that D20 would fetch anew."""
+    if not isinstance(s, dict) or not s.get("admitted_batches"):
+        return False
+    if s.get("shards_done") and s.get("shards_done") == s.get("batch"):
+        return False
+    ab = set(s["admitted_batches"])
+    return int(_num(s.get("intake_deferred")) or 0) > 0 or any(b not in ab for b in s.get("batches") or [])
+
+
 def precheck(v, cand):
     """(refuse, review): refuse [] or the reasons the source is never fetched
     (never-train, quarantined, closed); review [] or the reasons a person
@@ -391,6 +407,8 @@ def precheck(v, cand):
     if cand.get("status") in ("quarantined", "closed", "held", "fetching", "fetched", "names_pending", "intaken",
                               "shard_pending") or (cand.get("status") == "admitted" and not cand.get("partial")):
         refuse.append("source status %s" % cand.get("status"))
+    elif cand.get("in_shards"):
+        refuse.append("part-way through its intake shards (the next shard, never a new fetch)")
     lic = str(cand.get("licence") or "").strip().lower()
     if lic in ("", "unknown", "unresolved", "none"):
         review.append("licence unknown")
@@ -469,6 +487,19 @@ def d20(v):
         # take discovery or a fetch before Step 1's one-time jobs (DR0 -> L17)
         return _silent("D20", "Step 1's one-time jobs (R1) have not run (%s): collection waits for them"
                        % ", ".join(r1), cites=cites + [v.ccite("/stage/step1_stream")])
+    # DR0's Step 1 item on the DATA lane (L17 eval-hits) comes before a new source, as R1's jobs do: D20 comes
+    # before DR0 in the diagnosis order, so without this a fetch would take the one DATA item whenever Q is low,
+    # and eval-hits, with E1's base v3 (proposed only when DR0 has no DATA item due) and every intake shard behind
+    # it, would wait for as long as there are candidates (2026-10-03: eval-hits due from 06:56Z, D20 took the
+    # DATA lane three times)
+    try:
+        d0 = r0(v)
+    except Exception:  # noqa: BLE001 - an R0 record that cannot be read holds collection (fail closed), as shards
+        return _silent("D20", "DR0 cannot be read: collection waits", cites=cites + [v.ccite("/stage")])
+    due0 = ((d0.get("detail") or {}).get("due") or {}).get("DATA") if d0.get("fired") else None
+    if due0 and due0.get("lever") == "L17":
+        return _silent("D20", "DR0's L17 %s is due on the DATA lane: collection waits for it" % due0.get("verb"),
+                       cites=cites + [v.ccite("/stage")])
     deficit, dc = _deficit(v)
     refusal = [r for r in (v.c("/refusals") or []) if "eligible images against" in str((r or {}).get("message"))]
     low_water = False
@@ -529,7 +560,8 @@ def d29(v):
     cites = [v.ccite("/discover")]
     if not last:
         return _silent("D29", "discovery has not run", cites=cites)
-    pend = sorted(s for s, r in (v.c("/sources") or {}).items() if (r or {}).get("status") == "shard_pending")
+    pend = sorted(s for s, r in (v.c("/sources") or {}).items() if (r or {}).get("status") == "shard_pending"
+                  or ((r or {}).get("status") not in ("closed", "quarantined") and mid_shards(r)))
     if pend:
         # a source whose intake left images deferred still has data to give (its next shards): not exhausted
         return _silent("D29", "%s wait%s for the next intake shard" % (", ".join(pend), "s" if len(pend) == 1
@@ -574,7 +606,7 @@ def d21(v):
         # whose intake left images deferred (continuation shards, amendment
         # 2026-10-03) is judged once its last shard is admitted: its bytes are
         # all fetched, its boxes only partly admitted
-        if r.get("status") != "admitted" or not r.get("yield_recorded") or deferred_left(v, r):
+        if r.get("status") != "admitted" or not r.get("yield_recorded") or deferred_left(v, r) != 0:
             continue
         got = (_num(r.get("bytes")) or 0.0) / 1e9
         total = (_num(r.get("total_bytes")) or 0.0) / 1e9 or got
@@ -1704,13 +1736,18 @@ def compare_due(v):
 
 def deferred_left(v, r):
     """The images a source's intake has left deferred (collect.intake step
-    1b): what the stream folded (`intake_deferred`), else its latest batch's
-    summary.json in the evidence (shard.deferred_remaining, else
-    yield.images_deferred: a batch committed before shards existed is the
-    first of its fetch). 0 when neither says."""
+    1b): 0 once its shards are done or when it has no intake batch; what the
+    stream folded (`intake_deferred`); else its latest batch's summary.json
+    in the evidence (shard.deferred_remaining, else yield.images_deferred: a
+    batch committed before shards existed is the first of its fetch); None
+    when neither says (unknown: D21 does not judge the source then)."""
+    if not r.get("batch") or (r.get("shards_done") and r.get("shards_done") == r.get("batch")):
+        return 0
     n = _num(r.get("intake_deferred"))
-    if n is None and r.get("batch"):
-        s = v.ev.json("intake/%s/summary.json" % r["batch"]) or {}
+    if n is None:
+        s = v.ev.json("intake/%s/summary.json" % r["batch"])
+        if not isinstance(s, dict):
+            return None
         sh = s.get("shard") if isinstance(s.get("shard"), dict) else {}
         n = _num(sh.get("deferred_remaining"))
         if n is None:
@@ -1741,11 +1778,13 @@ def shard_waits(v):
     waits, or []. It comes after the work that delays E1's first result:
     DR0's DATA item (L17 eval-hits, Step 1's one-time jobs, the probe), which
     must run before DR0 can propose L23V (only when DATA has nothing due);
-    and E1's base v3 while an arm that requires it is not built and base v3
-    is not built either (missing, running, or ended without a complete
-    summary), since splits v3 reads every committed intake batch and was
-    pre-registered on the first shard. A base v3 build that failed, or one
-    whose arms are built, no longer holds the shards."""
+    and E1's base v3 build (L23V) while an arm that requires it is not built
+    and the build is due (base v3 missing, R0 complete, so DR0 proposes it)
+    or running. Every other state of base v3 (built, failed, over walltime,
+    ended without a complete summary) lets the shards run, so they never
+    wait without an end: inc2.base3 reads only the first shard of each
+    fetch record, so a shard committed before or after a build never enters
+    base v3."""
     out = []
     try:
         d = r0(v)
@@ -1757,9 +1796,11 @@ def shard_waits(v):
     st = v.c("/stage") or {}
     e1 = [b for b in (v.dom.get("baselines") or {}).get("items") or [] if b.get("requires") == "base3"
           and (st.get("baselines") or {}).get(b["id"]) in (None, "missing")]
-    if e1 and st.get("base3") in (None, "missing", "running", "unconfirmed"):
-        out.append("E1's base v3 (splits v3, L23V) is %s and arm %s waits for it: it reads every committed intake "
-                   "batch" % (st.get("base3") or "missing", e1[0]["id"]))
+    ss = _stream_state(v)
+    r0_done = bool(st.get("lock")) and ss["arm"] and ss["stage_c_read"]
+    if e1 and (st.get("base3") == "running" or (st.get("base3") in (None, "missing") and r0_done)):
+        out.append("E1's base v3 build (L23V) is %s and arm %s waits for it: the shard runs after it, so E1's first "
+                   "result is not delayed" % ("running" if st.get("base3") == "running" else "due", e1[0]["id"]))
     return out
 
 
